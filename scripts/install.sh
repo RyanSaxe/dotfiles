@@ -111,6 +111,7 @@ main() {
   log "Using package manager: $PM"
   "install_$PM"
   fetch_and_exec "https://astral.sh/uv/install.sh"
+  fetch_and_exec "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
   log "System packages installed"
 }
 
