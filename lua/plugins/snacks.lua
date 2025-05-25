@@ -20,18 +20,18 @@ return {
         function()
           local in_git = Snacks.git.get_root() ~= nil
           local cmds = {
-            {
-              title = "Notifications",
-              cmd = "gh notify -s -a -n5",
-              action = function()
-                vim.ui.open("https://github.com/notifications")
-              end,
-              key = "n",
-              icon = " ",
-              height = 5,
-              padding = 1,
-              enabled = true,
-            },
+            -- {
+            --   title = "Notifications",
+            --   cmd = "gh notify -s -a -n5",
+            --   action = function()
+            --     vim.ui.open("https://github.com/notifications")
+            --   end,
+            --   key = "n",
+            --   icon = " ",
+            --   height = 5,
+            --   padding = 1,
+            --   enabled = true,
+            -- },
             {
               title = "Open Issues",
               cmd = "gh issue list -L 1",
@@ -40,7 +40,7 @@ return {
                 vim.fn.jobstart("gh issue list --web", { detach = true })
               end,
               icon = " ",
-              height = 1,
+              height = 5,
               padding = 1,
             },
             {
@@ -51,7 +51,7 @@ return {
               action = function()
                 vim.fn.jobstart("gh pr list --web", { detach = true })
               end,
-              height = 1,
+              height = 5,
               padding = 1,
             },
             {
@@ -76,4 +76,3 @@ return {
     },
   },
 }
-
