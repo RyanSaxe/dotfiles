@@ -10,6 +10,7 @@ return {
             basedpyright = {
               analysis = {
                 typeCheckingMode = "basic",
+                inlayHints = true,
               },
             },
           },
