@@ -17,10 +17,10 @@ return {
       hl["@number"] = muted_literal
       hl["@number.float"] = muted_literal
       hl["@boolean"] = muted_literal
+      hl["@constant.builtin"] = muted_literal
       -- types and constants should clearly be readable
       hl["@type"] = { fg = c.teal }
       hl["@type.builtin"] = "@type"
-      hl["@constant.builtin"] = "@type"
       hl["@constant"] = { fg = c.magenta2 }
       -- functions should stand out
       hl["@function.method.call"] = { fg = c.yellow }
