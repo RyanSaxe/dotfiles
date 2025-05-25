@@ -1,0 +1,48 @@
+
+
+keybind = cmd+shift+l=new_split:right
+keybind = cmd+shift+h=new_split:left
+keybind = cmd+shift+j=new_split:down
+keybind = cmd+shift+k=new_split:up
+
+keybind = cmd+l=goto_split:right
+keybind = cmd+h=goto_split:left
+keybind = cmd+j=goto_split:down
+keybind = cmd+k=goto_split:up
+
+keybind = cmd+shift+up=resize_split:up,10
+keybind = cmd+shift+down=resize_split:down,10
+keybind = cmd+shift+left=resize_split:left,10
+keybind = cmd+shift+right=resize_split:right,10
+
+
+keybind = global:cmd+g=toggle_quick_terminal
+keybind = cmd+r=reload_config
+keybind = cmd+o=open_config
+
+# look customixation
+font-size = 18
+theme = tokyonight_moon
+
+# below is the tokyonight moon theme.
+# 0=#1b1d2b # black
+# 1=#ff757f # red
+# 2=#c3e88d # green 
+# 3=#ffc777 # yellow
+# 4=#82aaff # blue
+# 5=#c099ff # magenta
+# 6=#86e1fc # cyan
+# 7=#828bb8 # fg_dark
+# 8=#444a73 # black_bright
+# 9=#ff8d94 # red_bright
+# 10=#c7fb6d # green_bright
+# 11=#ffd8ab # yellow_bright
+# 12=#9ab8ff # blue_bright
+# 13=#caabff # magenta_bright
+# 14=#b2ebff # cyan_bright
+# 15=#c8d3f5 # white
+# background = #222436
+# foreground = #c8d3f5 # white
+# cursor-color = #c8d3f5 # white
+# selection-background = #2d3f76 # bg_visual
+# selection-foreground = #c8d3f5 # white
