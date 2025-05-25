@@ -52,6 +52,8 @@ return {
       hl["@keyword.import"] = { fg = c.magenta }
       hl["@module"] = { fg = c.orange }
       hl["@constructor"] = { fg = c.yellow }
+      -- terminal and cursor related changes
+      hl["Cursor"] = { bg = c.magenta2, fg = c.magenta2 }
     end,
   },
 }
