@@ -32,6 +32,9 @@ return {
             --   padding = 1,
             --   enabled = true,
             -- },
+            -- gh run list -L 1 will ve avle to add the same thing but for github actions
+            -- I wonder if I can experiment with showing larger sets and having a command
+            -- to be able to cycle through them? Kind of like tabs
             {
               title = "Open Issues",
               cmd = "gh issue list -L 1",
