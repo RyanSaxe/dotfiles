@@ -55,7 +55,7 @@ return {
       hl["@punctuation.bracket"] = { fg = c.purple }
       hl["@punctuation.special"] = { fg = c.purple }
       -- Finally, just miscellaneous color shifts I prefer
-      hl["@keyword.import"] = { fg = c.magenta }
+      hl["@keyword.import"] = { fg = c.purple }
       hl["@module"] = { fg = c.moon_pink }
       hl["@constructor"] = "@function"
       -- lsp special handling
