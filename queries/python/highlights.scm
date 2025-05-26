@@ -2,6 +2,7 @@
 (
   (identifier) @keyword.risky
   (#match? @keyword.risky "^(exec|eval)$")
+  (#set! priority 150)
 )
 
 [
@@ -9,3 +10,4 @@
   "raise"
   "except"
 ] @keyword.error
+(#set! priority 150)

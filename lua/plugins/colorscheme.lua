@@ -6,6 +6,8 @@ return {
   opts = {
     style = "moon",
     on_colors = function(c)
+      -- original magenta2 is a bit aggressive
+      c.old_magenta2 = c.magenta2
       c.bright_red = "#ff0000"
       -- a less abrasive and more pastel magenta
       c.magenta2 = "#f76da7"
@@ -14,7 +16,7 @@ return {
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
       -- I prefer when the literals are the same color and dont pop out at me
-      local muted_literal = { fg = Util.blend_bg(c.blue1, 1.0) }
+      local muted_literal = { fg = Util.blend_bg(c.blue2, 1.0) }
       hl["@string"] = muted_literal
       hl["@number"] = muted_literal
       hl["@number.float"] = muted_literal
@@ -28,7 +30,7 @@ return {
       -- functions should stand out
       hl["@function.method.call"] = "@function"
       hl["@function.call"] = "@function"
-      hl["@function"] = { fg = c.blue6 }
+      hl["@function"] = { fg = c.magenta2 }
       hl["@function.method"] = "@function"
       -- I like how the purple looks, and make it a base for all things that represent indented blocks
       hl["@keyword.conditional"] = { fg = c.purple }
@@ -39,12 +41,12 @@ return {
       hl["@keyword.type"] = { fg = c.purple }
       -- make things red and clear when the code is doing something that represents errors or issues
       hl["@keyword.risky"] = { fg = c.bright_red }
-      hl["@keyword.error"] = { fg = c.red1 }
+      hl["@keyword.error"] = { fg = c.old_magenta2 }
       -- make variables overall very clear and readable, with a blue theme
-      hl["@variable.builtin"] = { fg = c.magenta2 }
+      hl["@variable.builtin"] = { fg = c.blue6 }
       hl["@variable"] = { fg = c.blue1 }
       hl["@variable.member"] = { fg = c.magenta }
-      hl["@variable.parameter"] = { fg = c.magenta2 }
+      hl["@variable.parameter"] = { fg = c.blue6 }
       -- ensure punctuation and operations are clear and not distracting
       hl["@operator"] = { fg = c.purple }
       hl["@punctuation.delimiter"] = { fg = c.purple }
