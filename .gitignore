@@ -6,4 +6,5 @@ debug
 foo.*
 *.log
 data
+archive/
 .DS_STORE

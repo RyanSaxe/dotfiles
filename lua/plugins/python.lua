@@ -3,18 +3,18 @@ return {
   opts = {
     servers = {
       -- disable pyright to avoid duplication with basedpyright
-      pyright = {
-        settings = {
-          pyright = {
-            analysis = {
-              ignore = { "*" },
-              typeCheckingMode = false,
-              disableOrganizeImports = true,
-            },
-          },
-        },
-      },
-      -- disable diagnostics from ruff to avoid duplication with basedpyright
+      -- pyright = {
+      --   settings = {
+      --     pyright = {
+      --       analysis = {
+      --         ignore = { "*" },
+      --         typeCheckingMode = false,
+      --         disableOrganizeImports = true,
+      --       },
+      --     },
+      --   },
+      -- },
+      -- -- disable diagnostics from ruff to avoid duplication with basedpyright
       ruff = {
         init_options = {
           settings = {
@@ -34,7 +34,7 @@ return {
                 functionReturnTypes = true,
                 genericTypes = true,
               },
-              diagnosticMode = "openFilesOnly", --"workspace" if the entire project. Can be slow.
+              diagnosticMode = "workspace", --"workspace" may make the entire project slow.
               exclude = { ".venv", "venv" },
               autoImportCompletions = true,
               autoSearchPaths = true,
