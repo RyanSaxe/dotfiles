@@ -16,13 +16,13 @@ return {
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
       -- I prefer when the literals are the same color and dont pop out at me
-      local muted_literal = { fg = Util.blend_bg(c.blue2, 1.0) }
+      local muted_literal = { fg = Util.blend_bg(c.blue5, 0.8) }
       hl["@string"] = muted_literal
       hl["@number"] = muted_literal
       hl["@number.float"] = muted_literal
       hl["@boolean"] = muted_literal
       hl["@function.builtin"] = muted_literal
-      hl["@constant.builtin"] = "@type" -- muted_literal
+      hl["@constant.builtin"] = muted_literal
       -- types and constants should clearly be readable
       hl["@type"] = { fg = c.teal }
       hl["@type.builtin"] = "@type"
@@ -30,7 +30,7 @@ return {
       -- functions should stand out
       hl["@function.method.call"] = "@function"
       hl["@function.call"] = "@function"
-      hl["@function"] = { fg = c.magenta2 }
+      hl["@function"] = { fg = c.orange }
       hl["@function.method"] = "@function"
       -- I like how the purple looks, and make it a base for all things that represent indented blocks
       hl["@keyword.conditional"] = { fg = c.purple }
@@ -60,6 +60,7 @@ return {
       hl["@lsp.type.namespace.python"] = "@module"
       hl["@lsp.type.decorator.python"] = "@function"
       hl["LspInlayHint"] = { fg = c.dark3 }
+      hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
       -- I really dont like cursor highlighting the lines
       hl["CursorLine"] = { bg = c.bg }
     end,
