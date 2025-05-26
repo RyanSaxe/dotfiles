@@ -22,7 +22,7 @@ keybind = cmd+o=open_config
 
 # look customixation
 font-size = 18
-theme = tokyonight_moon
+theme = tokyonight_night
 
 # below is the tokyonight moon theme.
 # 0=#1b1d2b # black
