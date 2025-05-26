@@ -16,3 +16,14 @@ vim.keymap.set("n", "N", "Nzzzv")
 -- tab visual blocks
 vim.keymap.set("v", "<", "<gv", opts)
 vim.keymap.set("v", ">", ">gv", opts)
+
+-- custom toggles, all at <leader>u + character to integrate with existing lazyvim toggles UI
+
+-- example for inline type hints -- not needed since comes built with lazyvim
+-- local function _toggle_inlay_hints()
+--   vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+-- end
+--
+-- vim.keymap.set("n", "<leader>th", _toggle_inlay_hints, {
+--   desc = "Toggle LSP Inlay Hints",
+-- })
