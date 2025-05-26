@@ -37,6 +37,8 @@ return {
           init_options = {
             settings = {
               logLevel = "error",
+              showSyntaxErrors = false,
+              lint = { enable = false }, -- linting comes from pyright. only use ruff for formatting.
             },
           },
           keys = {
