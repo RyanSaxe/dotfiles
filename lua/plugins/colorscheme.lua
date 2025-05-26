@@ -64,7 +64,11 @@ return {
       hl["LspInlayHint"] = { fg = c.dark3 }
       hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
       -- I really dont like cursor highlighting the lines
+      -- Treesitter Context also does this, so below is mostly removing annoying background highlights
       hl["CursorLine"] = { bg = c.bg }
+      hl["TreesitterContext"] = { bg = c.bg }
+      hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
+      hl["TreesitterContextSeparator"] = { fg = c.purple }
     end,
   },
 }
