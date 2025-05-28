@@ -27,18 +27,20 @@ return {
         settings = {
           basedpyright = {
             analysis = {
-              typeCheckingMode = "standard",
               inlayHints = {
                 variableTypes = true,
                 -- callArgumentNames = true,
                 functionReturnTypes = true,
                 genericTypes = true,
               },
-              diagnosticMode = "workspace", --"workspace" may make the entire project slow.
+              diagnosticMode = "openFilesOnly", --"workspace" may make the entire project slow.
               exclude = { ".venv", "venv" },
               autoImportCompletions = true,
               autoSearchPaths = true,
               disableOrganizeImports = true,
+              -- parameters on how strict basedpyright should be
+              -- strictGenericNarrowing = true, I like this, but it slows down based pyright
+              typeCheckingMode = "basic",
             },
           },
         },
