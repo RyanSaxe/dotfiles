@@ -75,13 +75,13 @@ return {
       hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bg = c.bg_highlight }
       hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bg = c.bg_highlight }
       -- overwriting the colors for todo comments
-      hl["TodoBgPerf"] = { fg = Util.blend_bg(c.teal, 0.7) }
-      hl["TodoBgWarn"] = { fg = Util.blend_bg(c.yellow, 0.7) }
-      hl["TodoBgHack"] = { fg = Util.blend_bg(c.magenta2, 0.7) }
-      hl["TodoBgFix"] = { fg = Util.blend_bg(c.bright_red, 1.0) }
-      hl["TodoBgNote"] = { fg = Util.blend_bg(c.cyan, 0.7) }
-      hl["TodoBgTodo"] = { fg = Util.blend_bg(c.orange, 0.7) }
-      hl["TodoBgTest"] = { fg = Util.blend_bg(c.moon_pink, 0.7) }
+      hl["TodoBgPerf"] = { fg = Util.blend_bg(c.teal, 0.7), bold = true, italic = true }
+      hl["TodoBgWarn"] = { fg = Util.blend_bg(c.yellow, 0.7), bold = true, italic = true }
+      hl["TodoBgHack"] = { fg = Util.blend_bg(c.magenta2, 0.7), bold = true, italic = true }
+      hl["TodoBgFix"] = { fg = Util.blend_bg(c.bright_red, 1.0), bold = true, italic = true }
+      hl["TodoBgNote"] = { fg = Util.blend_bg(c.cyan, 0.7), bold = true, italic = true }
+      hl["TodoBgTodo"] = { fg = Util.blend_bg(c.orange, 0.7), bold = true, italic = true }
+      hl["TodoBgTest"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bold = true, italic = true }
 
       hl["TodoFgPerf"] = "Comment" -- { fg = Util.blend_bg(c.moon_pink, 0.5) }
       hl["TodoFgWarn"] = "Comment" -- { fg = Util.blend_bg(c.yellow, 0.5) }
