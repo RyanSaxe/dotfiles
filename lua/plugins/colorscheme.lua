@@ -43,12 +43,14 @@ return {
       hl["@keyword.return"] = { fg = c.purple }
       hl["@keyword.type"] = { fg = c.purple }
       -- make things red and clear when the code is doing something that represents errors or issues
-      hl["@keyword.risky"] = { fg = c.bright_red }
+      -- for really risky ops we should never do, create queries for them in treesitter so we can
+      -- represent them with formatting style that makes them stand out
+      hl["@keyword.risky"] = { fg = c.old_magenta2, underline = true, bold = true, italic = true }
       hl["@keyword.error"] = { fg = c.old_magenta2 }
       -- make variables overall very clear and readable, with a blue theme
       hl["@variable.builtin"] = { fg = c.blue5 }
       hl["@variable"] = { fg = c.blue }
-      hl["@variable.member"] = { fg = c.blue6 }
+      hl["@variable.member"] = { fg = c.blue5 }
       hl["@variable.parameter"] = { fg = c.blue5 }
       -- ensure punctuation and operations are clear and not distracting
       hl["@operator"] = { fg = c.purple }
@@ -67,10 +69,11 @@ return {
       hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
       -- plugin specific changes
       -- hl["CursorLine"] = { bg = c.bg } -- if i want to not highlight the line my cursor is on
+      hl["TreesitterContext"] = { bg = c.bg }
       hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
       hl["TreesitterContextSeparator"] = { fg = c.purple }
-      hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_highlight }
-      hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_highlight }
+      hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bg = c.bg_highlight }
+      hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bg = c.bg_highlight }
       -- overwriting the colors for todo comments
       hl["TodoBgPerf"] = { fg = Util.blend_bg(c.teal, 0.7) }
       hl["TodoBgWarn"] = { fg = Util.blend_bg(c.yellow, 0.7) }
