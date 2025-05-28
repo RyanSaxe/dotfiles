@@ -18,21 +18,22 @@ return {
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
       -- I prefer when the literals are the same color and dont pop out at me
-      local muted_literal = { fg = Util.blend_bg(c.blue6, 0.7) }
+      local muted_literal = { fg = Util.blend_bg(c.fg, 0.7) }
       hl["@string"] = muted_literal
       hl["@number"] = muted_literal
       hl["@number.float"] = muted_literal
       hl["@boolean"] = muted_literal
-      hl["@function.builtin"] = { fg = c.orange }
       hl["@constant.builtin"] = muted_literal
+
       -- types and constants should clearly be readable
       hl["@type"] = { fg = c.teal }
       hl["@type.builtin"] = "@type"
       hl["@constant"] = { fg = c.red }
       -- functions should stand out
+      hl["@function"] = { fg = c.orange }
       hl["@function.method.call"] = "@function"
       hl["@function.call"] = "@function"
-      hl["@function"] = { fg = c.orange }
+      hl["@function.builtin"] = "@function" --{ fg = Util.blend_bg(c.orange, 0.5) }
       hl["@function.method"] = "@function"
       -- I like how the purple looks, and make it a base for all things that represent indented blocks
       hl["@keyword.conditional"] = { fg = c.purple }
@@ -61,14 +62,31 @@ return {
       -- lsp special handling
       hl["@lsp.type.namespace.python"] = "@module"
       hl["@lsp.type.decorator.python"] = "@function"
+      hl["@lsp.type.TypeParameter.python"] = { fg = c.blue }
       hl["LspInlayHint"] = { fg = c.dark3 }
       hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
-      -- I really dont like cursor highlighting the lines
-      -- Treesitter Context also does this, so below is mostly removing annoying background highlights
-      hl["CursorLine"] = { bg = c.bg }
-      hl["TreesitterContext"] = { bg = c.bg }
+      -- plugin specific changes
+      -- hl["CursorLine"] = { bg = c.bg } -- if i want to not highlight the line my cursor is on
       hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
       hl["TreesitterContextSeparator"] = { fg = c.purple }
+      hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_highlight }
+      hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_highlight }
+      -- overwriting the colors for todo comments
+      hl["TodoBgPerf"] = { fg = Util.blend_bg(c.teal, 0.7) }
+      hl["TodoBgWarn"] = { fg = Util.blend_bg(c.yellow, 0.7) }
+      hl["TodoBgHack"] = { fg = Util.blend_bg(c.magenta2, 0.7) }
+      hl["TodoBgFix"] = { fg = Util.blend_bg(c.bright_red, 1.0) }
+      hl["TodoBgNote"] = { fg = Util.blend_bg(c.cyan, 0.7) }
+      hl["TodoBgTodo"] = { fg = Util.blend_bg(c.orange, 0.7) }
+      hl["TodoBgTest"] = { fg = Util.blend_bg(c.moon_pink, 0.7) }
+
+      hl["TodoFgPerf"] = "Comment" -- { fg = Util.blend_bg(c.moon_pink, 0.5) }
+      hl["TodoFgWarn"] = "Comment" -- { fg = Util.blend_bg(c.yellow, 0.5) }
+      hl["TodoFgHack"] = "Comment" -- { fg = Util.blend_bg(c.old_magenta2, 0.5) }
+      hl["TodoFgFix"] = "Comment" -- { fg = Util.blend_bg(c.bright_red, 0.5) }
+      hl["TodoFgNote"] = "Comment" -- { fg = Util.blend_bg(c.teal, 0.5) }
+      hl["TodoFgTodo"] = "Comment" -- { fg = Util.blend_bg(c.cyan, 0.5) }
+      hl["TodoFgTest"] = "Comment" -- { fg = Util.blend_bg(c.orange, 0.5) }
     end,
   },
 }

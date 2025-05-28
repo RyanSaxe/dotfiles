@@ -23,18 +23,18 @@ return {
           function()
             local in_git = Snacks.git.get_root() ~= nil
             local cmds = {
-              -- {
-              --   title = "Notifications",
-              --   cmd = "gh notify -s -a -n5",
-              --   action = function()
-              --     vim.ui.open("https://github.com/notifications")
-              --   end,
-              --   key = "n",
-              --   icon = " ",
-              --   height = 5,
-              --   padding = 1,
-              --   enabled = true,
-              -- },
+              {
+                title = "Notifications",
+                cmd = "gh notify -s -a -n5",
+                action = function()
+                  vim.ui.open("https://github.com/notifications")
+                end,
+                key = "n",
+                icon = " ",
+                height = 5,
+                padding = 1,
+                enabled = true,
+              },
               -- gh run list -L 1 will ve avle to add the same thing but for github actions
               -- I wonder if I can experiment with showing larger sets and having a command
               -- to be able to cycle through them? Kind of like tabs

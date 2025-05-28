@@ -8,7 +8,7 @@ return {
       highlight = { enable = true },
       refactor = {
         highlight_definitions = { enable = true },
-        highlight_current_scope = { enable = true },
+        highlight_current_scope = { enable = false },
         clear_on_cursor_move = true,
         smart_rename = {
           enable = true,
