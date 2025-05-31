@@ -2,7 +2,7 @@ local Util = require("tokyonight.util")
 return {
   "folke/tokyonight.nvim",
   lazy = false,
-  priority = 1000,
+  priority = 100000000,
   opts = {
     style = "night",
     on_colors = function(c)
@@ -68,13 +68,13 @@ return {
       hl["LspInlayHint"] = { fg = c.dark3 }
       hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
       -- plugin specific changes
-      -- hl["CursorLine"] = { bg = c.bg } -- if i want to not highlight the line my cursor is on
+      hl["CursorLine"] = { bg = c.bg_dark } -- if i want to not highlight the line my cursor is on
       hl["TreesitterContext"] = { bg = c.bg }
       hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
       hl["TreesitterContextSeparator"] = { fg = c.purple }
-      hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bg = c.bg_highlight }
-      hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.7), bg = c.bg_highlight }
-      -- overwriting the colors for todo comments
+      hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
+      hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
+      -- -- overwriting the colors for todo comments
       hl["TodoBgPerf"] = { fg = Util.blend_bg(c.teal, 0.7), bold = true, italic = true }
       hl["TodoBgWarn"] = { fg = Util.blend_bg(c.yellow, 0.7), bold = true, italic = true }
       hl["TodoBgHack"] = { fg = Util.blend_bg(c.magenta2, 0.7), bold = true, italic = true }
@@ -90,6 +90,15 @@ return {
       hl["TodoFgNote"] = "Comment" -- { fg = Util.blend_bg(c.teal, 0.5) }
       hl["TodoFgTodo"] = "Comment" -- { fg = Util.blend_bg(c.cyan, 0.5) }
       hl["TodoFgTest"] = "Comment" -- { fg = Util.blend_bg(c.orange, 0.5) }
+      -- git not properly reading overrides so specifying them here
+      hl["DiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.2) }
+      hl["DiffChange"] = { bg = Util.blend_bg(c.magenta2, 0.2) }
+      hl["DiffDelete"] = { bg = Util.blend_bg("#ff0000", 0.2) }
+      hl["GitSignsAdd"] = { fg = Util.blend_bg(c.teal, 0.7) }
+      hl["GitSignsChange"] = { fg = Util.blend_bg(c.magenta2, 0.7) }
+      hl["GitSignsDelete"] = { fg = Util.blend_bg(c.red, 0.7) }
+      -- still doesnt work but can figure out later
+      hl["IndentLineCurrent"] = { fg = c.moon_pink, nocombine = true }
     end,
   },
 }
