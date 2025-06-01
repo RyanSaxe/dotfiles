@@ -6,6 +6,7 @@ return {
     lsp = {
       -- turn off the automatic popup when you type "(" or ","
       signature = { enabled = true, auto_open = { trigger = false } },
+      -- this doesnt seem to work
       presets = {
         bottom_search = true, -- use a classic bottom cmdline for search
         command_palette = true, -- position the cmdline and popupmenu together

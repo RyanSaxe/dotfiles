@@ -1,2 +1,8 @@
 -- for integrating git workflows into neovim. Mostly for viewing diffs.
-return {}
+return {
+  "sindrets/diffview.nvim",
+  cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles" },
+  keys = {
+    { "<leader>gho", "<cmd>DiffviewOpen<cr>" },
+  },
+}

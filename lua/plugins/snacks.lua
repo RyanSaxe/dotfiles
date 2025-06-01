@@ -20,62 +20,96 @@ return {
               Snacks.gitbrowse()
             end,
           },
+
+          -- ─── Pull-request browser ──────────────────────────────────────────────────
           function()
+            -- Only show this pane when we’re inside a Git repo *and* gh is available.
             local in_git = Snacks.git.get_root() ~= nil
-            local cmds = {
-              {
-                title = "Notifications",
-                cmd = "gh notify -s -a -n5",
-                action = function()
-                  vim.ui.open("https://github.com/notifications")
-                end,
-                key = "n",
-                icon = " ",
-                height = 5,
-                padding = 1,
-                enabled = true,
-              },
-              -- gh run list -L 1 will ve avle to add the same thing but for github actions
-              -- I wonder if I can experiment with showing larger sets and having a command
-              -- to be able to cycle through them? Kind of like tabs
-              {
-                title = "Open Issues",
-                cmd = "gh issue list -L 1",
-                key = "i",
-                action = function()
-                  vim.fn.jobstart("gh issue list --web", { detach = true })
-                end,
-                icon = " ",
-                height = 5,
-                padding = 1,
-              },
-              {
-                icon = " ",
-                title = "Open PRs",
-                cmd = "gh pr list -L 1",
-                key = "P",
-                action = function()
-                  vim.fn.jobstart("gh pr list --web", { detach = true })
-                end,
-                height = 5,
-                padding = 1,
-              },
-              {
-                icon = " ",
-                title = "Git Status",
-                cmd = "git --no-pager diff --stat -B -M -C",
-                height = 10,
-              },
-            }
-            return vim.tbl_map(function(cmd)
-              return vim.tbl_extend("force", {
+            local has_gh = vim.fn.executable("gh") == 1
+            if not (in_git and has_gh) then
+              return {}
+            end
+
+            -- Utility: truncate with ellipsis (“…”)
+            local function ellipsis(str, max_len)
+              if vim.fn.strdisplaywidth(str) <= max_len then
+                return str
+              end
+              return str:sub(1, max_len - 1) .. "…"
+            end
+
+            -- Helper: fetch open PRs for the current repo, returns Lua table
+            local function get_open_prs()
+              local ok, json = pcall(vim.fn.system, {
+                "gh",
+                "pr",
+                "list",
+                "-L",
+                "10",
+                "--state",
+                "open",
+                "--json",
+                "number,title,headRefName,baseRefName",
+              })
+              if not ok then
+                return {}
+              end
+              return vim.json.decode(json)
+            end
+
+            -- Build one dashboard-entry per PR
+            local prs = get_open_prs()
+            if #prs == 0 then
+              return { -- graceful fallback
+                {
+                  pane = 2,
+                  indent = 0,
+                  icon = " ",
+                  title = "No open pull-requests ✨",
+                  enabled = true,
+                },
+              }
+            end
+
+            local keybank = "123456789abcdefghijklmnopqrstuvwxyz"
+            local entries = {}
+
+            for idx, pr in ipairs(prs) do
+              local key = keybank:sub(idx, idx) -- unique hot-key per PR
+
+              -- Action → checkout PR branch then open Diffview
+              local function checkout_and_diff()
+                -- 1. Make the PR branch local and switch to it.
+                vim.fn.jobstart({ "gh", "pr", "checkout", tostring(pr.number) }, {
+                  detach = false,
+                  on_exit = function()
+                    -- 2. Once checkout is done, open a focused two-pane diff:
+                    --    <base>..HEAD     ← two-dot syntax = “changes on HEAD relative to base”
+                    vim.schedule(function()
+                      --  ensure we reference the up-to-date remote tracking branch
+                      local base = ("origin/%s"):format(pr.baseRefName or "develop")
+                      vim.cmd(("DiffviewOpen %s..HEAD"):format(base))
+                    end)
+                  end,
+                })
+              end
+
+              table.insert(entries, {
                 pane = 2,
-                section = "terminal",
-                enabled = in_git,
-                ttl = 5 * 60,
-                indent = 3,
-              }, cmd)
-            end, cmds)
+                -- section = "terminal",
+                indent = 0,
+                ttl = 60, -- refresh every minute
+                icon = " ",
+                key = key,
+                height = 1,
+                padding = 1,
+                title = ("#%d %s"):format(pr.number, ellipsis(pr.title, 48)),
+                -- cmd = ("gh pr checkout %d"):format(pr.number), -- what runs when *selected*
+                action = checkout_and_diff, -- what runs on hot-key
+              })
+            end
+
+            return entries
           end,
           { section = "startup" },
         },
@@ -95,19 +129,10 @@ return {
           vim.print = _G.dd -- Override print to use snacks for `:=` command
 
           -- Create some toggle mappings
-          Snacks.toggle.option("spell", { name = "Spelling" }):map("<leader>us")
-          Snacks.toggle.option("wrap", { name = "Wrap" }):map("<leader>uw")
-          Snacks.toggle.option("relativenumber", { name = "Relative Number" }):map("<leader>uL")
-          Snacks.toggle.diagnostics():map("<leader>ud")
-          Snacks.toggle.line_number():map("<leader>ul")
-          Snacks.toggle
-            .option("conceallevel", { off = 0, on = vim.o.conceallevel > 0 and vim.o.conceallevel or 2 })
-            :map("<leader>uc")
-          Snacks.toggle.treesitter():map("<leader>uT")
-          Snacks.toggle.option("background", { off = "light", on = "dark", name = "Dark Background" }):map("<leader>ub")
-          Snacks.toggle.inlay_hints():map("<leader>uh")
-          Snacks.toggle.indent():map("<leader>ug")
-          Snacks.toggle.dim():map("<leader>uD")
+          Snacks.toggle.option("spell", { name = "Spelling" }):map("<leader>ts")
+          Snacks.toggle.diagnostics():map("<leader>td")
+          Snacks.toggle.inlay_hints():map("<leader>th")
+          Snacks.toggle.dim():map("<leader>tz")
 
           -- Add Copilot toggle
           local copilot_exists = pcall(require, "copilot")
@@ -128,7 +153,7 @@ return {
                   require("copilot.command").disable()
                 end
               end,
-            }):map("<leader>cp")
+            }):map("<leader>tc")
           end
           --
         end,

@@ -1,32 +1,8 @@
---- inspiration from https://www.youtube.com/watch?v=7HYBrw6EDEM to customize blink. Generally the main
---- part of the above video is to use ; as a trigger key for copilot and snippets because they are often
---- useful, but distracting to always see by default.
-local trigger_text = ";"
-
-local trigger_advanced = function()
-  local col = vim.api.nvim_win_get_cursor(0)[2]
-  local before_cursor = vim.api.nvim_get_current_line():sub(1, col)
-
-  local matched = before_cursor:match(trigger_text .. ".*$")
-
-  return matched
-end
-
-local trigger_only_advanced = function()
-  local matched = trigger_advanced()
-  return matched ~= nil
-end
-
-local trigger_only_normal = function()
-  local matched = trigger_advanced()
-  return matched == nil
-end
-
--- TODO: implement the transform_items to properly remove the semicolon -- or honestly figure out another way
+-- this is still very experimental, but trying to make things simpler and not have too many results show up
 
 return {
   "saghen/blink.cmp",
-  dependencies = { "rafamadriz/friendly-snippets", "giuxtaposition/blink-cmp-copilot" },
+  dependencies = { "rafamadriz/friendly-snippets" }, -- "giuxtaposition/blink-cmp-copilot" },
   version = "*",
   event = { "InsertEnter", "CmdlineEnter" },
 
@@ -45,11 +21,15 @@ return {
       nerd_font_variant = "mono",
     },
     completion = {
-
-      ghost_text = { enabled = true },
+      -- uncommenting below will allow completions to fire way more generically
+      -- trigger = {
+      --   show_on_blocked_trigger_characters = {},
+      --   show_on_x_blocked_trigger_characters = {},
+      -- },
+      ghost_text = { enabled = false },
       accept = { auto_brackets = { enabled = true } },
       documentation = {
-        auto_show = true,
+        auto_show = false,
         auto_show_delay_ms = 50,
         update_delay_ms = 50,
         treesitter_highlighting = true,
@@ -64,18 +44,15 @@ return {
       menu = {
         border = "rounded",
         draw = {
-          -- columns = {
-          --   { "label", "label_description", gap = 1 },
-          --   { "kind_icon", "kind" },
-          -- },
-          treesitter = { "lsp" },
+          treesitter = { "lsp", "buffer", "copilot", "lazydev" },
+          columns = { { "label", "label_description", gap = 1 }, { "kind_icon", "kind" } },
         },
       },
     },
 
     -- My super-TAB configuration
     keymap = {
-      preset = "super-tab",
+      preset = "enter",
       ["<C-space>"] = { "show", "show_documentation", "hide_documentation" },
       ["<C-e>"] = { "hide", "fallback" },
       ["<S-Tab>"] = {
@@ -104,31 +81,28 @@ return {
     -- Experimental signature help support
     signature = {
       enabled = true,
-      window = { border = "rounded" },
+      window = { border = "rounded", show_documentation = false },
     },
 
     sources = {
-      default = { "lazydev", "lsp", "copilot", "path", "snippets", "buffer" },
+      default = { "lsp", "path" }, -- { "lazydev", "lsp", "copilot", "path", "snippets", "buffer" },
       providers = {
-        copilot = {
-          name = "copilot",
-          module = "blink-cmp-copilot",
-          kind = "Copilot",
-          score_offset = 200,
-          async = true,
-          should_show_items = trigger_only_advanced,
-        },
-        lazydev = {
-          name = "LazyDev",
-          module = "lazydev.integrations.blink",
-          -- Make lazydev completions top priority (see `:h blink.cmp`)
-          score_offset = 100,
-          should_show_items = trigger_only_normal,
-        },
+        -- copilot = {
+        --   name = "copilot",
+        --   module = "blink-cmp-copilot",
+        --   kind = "Copilot",
+        --   score_offset = 200,
+        --   async = true,
+        -- },
+        -- lazydev = {
+        --   name = "LazyDev",
+        --   module = "lazydev.integrations.blink",
+        --   -- Make lazydev completions top priority (see `:h blink.cmp`)
+        --   score_offset = 100,
+        -- },
         lsp = {
           min_keyword_length = 0, -- Number of characters to trigger provider
           score_offset = 10, -- Boost/penalize the score of the items
-          should_show_items = trigger_only_normal,
           override = {
             -- allow a . to trigger autocomplete for faster lookup of imports
             get_trigger_characters = function(self)
@@ -142,14 +116,18 @@ return {
           min_keyword_length = 0,
         },
         snippets = {
-          should_show_items = trigger_only_advanced,
+          -- disables snippets. Not sure why I cant disable these by deleting the block.
+          should_show_items = function()
+            return false
+          end,
           min_keyword_length = 2,
+          score_offset = 0,
         },
-        buffer = {
-          min_keyword_length = 3,
-          max_items = 5,
-          should_show_items = trigger_only_normal,
-        },
+        -- buffer = {
+        --   min_keyword_length = 3,
+        --   max_items = 5,
+        --   score_offset = 11,
+        -- },
       },
     },
   },

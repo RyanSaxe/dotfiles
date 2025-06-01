@@ -72,8 +72,9 @@ return {
       hl["TreesitterContext"] = { bg = c.bg }
       hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
       hl["TreesitterContextSeparator"] = { fg = c.purple }
-      hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
-      hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
+      -- hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
+      -- hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
+      hl["CopilotSuggestion"] = { fg = Util.blend_bg(c.moon_pink, 0.5) }
       -- -- overwriting the colors for todo comments
       hl["TodoBgPerf"] = { fg = Util.blend_bg(c.teal, 0.7), bold = true, italic = true }
       hl["TodoBgWarn"] = { fg = Util.blend_bg(c.yellow, 0.7), bold = true, italic = true }
