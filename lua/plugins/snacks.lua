@@ -1,3 +1,4 @@
+local diff = require("functions.diff")
 return {
   {
     "folke/snacks.nvim",
@@ -45,7 +46,7 @@ return {
                 "pr",
                 "list",
                 "-L",
-                "10",
+                "9", -- this will get the numbers on dashboard 1-9
                 "--state",
                 "open",
                 "--json",
@@ -79,16 +80,14 @@ return {
 
               -- Action → checkout PR branch then open Diffview
               local function checkout_and_diff()
-                -- 1. Make the PR branch local and switch to it.
-                vim.fn.jobstart({ "gh", "pr", "checkout", tostring(pr.number) }, {
+                -- NOTE: we do force here to guarantee that we have the exact version of the code in the PR
+                --       because that is what this dashboard is for. This means that you should be careful.
+                vim.fn.jobstart({ "gh", "pr", "checkout", tostring(pr.number), "--force" }, {
                   detach = false,
                   on_exit = function()
-                    -- 2. Once checkout is done, open a focused two-pane diff:
-                    --    <base>..HEAD     ← two-dot syntax = “changes on HEAD relative to base”
                     vim.schedule(function()
-                      --  ensure we reference the up-to-date remote tracking branch
-                      local base = ("origin/%s"):format(pr.baseRefName or "develop")
-                      vim.cmd(("DiffviewOpen %s..HEAD"):format(base))
+                      vim.notify("Checked out PR #" .. pr.number .. " (" .. pr.headRefName .. ")")
+                      diff.fetch_and_diff(pr.baseRefName)
                     end)
                   end,
                 })
@@ -96,7 +95,6 @@ return {
 
               table.insert(entries, {
                 pane = 2,
-                -- section = "terminal",
                 indent = 0,
                 ttl = 60, -- refresh every minute
                 icon = " ",
@@ -104,8 +102,7 @@ return {
                 height = 1,
                 padding = 1,
                 title = ("#%d %s"):format(pr.number, ellipsis(pr.title, 48)),
-                -- cmd = ("gh pr checkout %d"):format(pr.number), -- what runs when *selected*
-                action = checkout_and_diff, -- what runs on hot-key
+                action = checkout_and_diff, -- when the user presses the key for this PR they get to review the diff
               })
             end
 
@@ -115,49 +112,5 @@ return {
         },
       },
     },
-    init = function()
-      vim.api.nvim_create_autocmd("User", {
-        pattern = "VeryLazy",
-        callback = function()
-          -- Setup some globals for debugging (lazy-loaded)
-          _G.dd = function(...)
-            Snacks.debug.inspect(...)
-          end
-          _G.bt = function()
-            Snacks.debug.backtrace()
-          end
-          vim.print = _G.dd -- Override print to use snacks for `:=` command
-
-          -- Create some toggle mappings
-          Snacks.toggle.option("spell", { name = "Spelling" }):map("<leader>ts")
-          Snacks.toggle.diagnostics():map("<leader>td")
-          Snacks.toggle.inlay_hints():map("<leader>th")
-          Snacks.toggle.dim():map("<leader>tz")
-
-          -- Add Copilot toggle
-          local copilot_exists = pcall(require, "copilot")
-          if copilot_exists then
-            Snacks.toggle({
-              name = "Copilot Completion",
-              color = {
-                enabled = "azure",
-                disabled = "orange",
-              },
-              get = function()
-                return not require("copilot.client").is_disabled()
-              end,
-              set = function(state)
-                if state then
-                  require("copilot.command").enable()
-                else
-                  require("copilot.command").disable()
-                end
-              end,
-            }):map("<leader>tc")
-          end
-          --
-        end,
-      })
-    end,
   },
 }
