@@ -19,6 +19,39 @@ local function recent_files_in_cwd(max)
   return list
 end
 
+-- Normalize and format file paths for prettier display
+---@param path string Path to normalize
+---@param max_length? number Maximum display length (default: 40)
+---@return string Normalized and formatted path
+local function normalize_path(path, max_length)
+  max_length = max_length or 40
+  local normalized = vim.fs.normalize(path)
+
+  if #normalized <= max_length then
+    return normalized
+  end
+
+  -- Keep filename and truncate from the middle
+  local parts = vim.split(normalized, "/")
+  local filename = parts[#parts]
+
+  if #filename >= max_length - 3 then
+    return "..." .. filename:sub(-(max_length - 3))
+  end
+
+  -- Build path keeping filename and as much directory structure as possible
+  local result = filename
+  for i = #parts - 1, 1, -1 do
+    local candidate = parts[i] .. "/" .. result
+    if #candidate > max_length - 3 then
+      return "..." .. result
+    end
+    result = candidate
+  end
+
+  return result
+end
+
 local diff = require("functions.diff")
 local enable_issues = true
 --------------------------------------------------------------------------
@@ -287,13 +320,14 @@ return {
           {
             pane = 2,
             icon = " ",
-            desc = "Browse Repo",
-            key = "b",
+            title = "Browse Repository",
+            key = "o",
             padding = 1,
             action = function()
               Snacks.gitbrowse()
             end,
           },
+
           {
             pane = 2,
             icon = " ",
@@ -314,7 +348,7 @@ return {
           } or nil,
           {
             pane = 2,
-            icon = " ",
+            icon = "",
             title = "Git Branches",
             desc = " Select to Checkout",
             key = "b",
@@ -336,8 +370,8 @@ return {
           },
           {
             pane = 2,
-            icon = " ",
-            title = "Git Diff vs Base",
+            icon = "",
+            title = "Git Diff vs Base:",
             desc = " Select to Open File",
             key = "d",
             padding = 1,
@@ -357,13 +391,20 @@ return {
             ttl = 5,
             cmd = [[git diff-index --quiet HEAD -- && git status || git --no-pager diff --color --stat=50,20,5 -B -M -C]],
           },
+          {
+            title = "Recent Files",
+            pane = 1,
+            indent = 0,
+            padding = 1,
+          },
           function()
             local out = {}
             for i, rel in ipairs(recent_files_in_cwd(9)) do
               out[#out + 1] = {
                 pane = 1, -- pick whatever pane you prefer
                 icon = " ",
-                title = rel,
+                indent = 2,
+                desc = normalize_path(rel),
                 key = tostring(i), -- “press 1-9” hot-keys
                 action = function()
                   vim.cmd("edit " .. rel)
