@@ -305,6 +305,28 @@ end
 --------------------------------------------------------------------------
 -- Snacks plugin spec ---------------------------------------------------
 --------------------------------------------------------------------------
+
+local hotkeys = function()
+  local output = {
+    { pane = 1, title = "Hot Keys", indent = 0, padding = 1 },
+  }
+  local keys = {
+    { key = "f", desc = "Find File", action = "fzf-lua.files", icon = "" },
+  }
+  for _, key in ipairs(keys) do
+    output[#output + 1] = {
+      pane = 1,
+      icon = key.icon .. " ",
+      desc = key.desc,
+      key = key.key,
+      action = key.action,
+      indent = 2,
+      padding = 0,
+      enabled = true,
+    }
+  end
+  return output
+end
 return {
   {
     "folke/snacks.nvim",
@@ -314,13 +336,14 @@ return {
     opts = {
       dashboard = {
         sections = {
-          { icon = " ", section = "keys", title = "Hot Keys", indent = 2, padding = 1 },
+          -- { icon = " ", section = "keys", title = "Hot Keys", indent = 2, padding = 1 },
           -- the below should exist in panel 2, but only if not in a git project
           -- { icon = " ", title = "Projects", section = "projects", indent = 2, padding = 1 },
+          hotkeys,
           {
             pane = 2,
             icon = " ",
-            title = "Browse Repository",
+            title = "Browse Repository Online",
             key = "o",
             padding = 1,
             action = function()
