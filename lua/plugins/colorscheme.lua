@@ -13,6 +13,11 @@ return {
       c.magenta2 = "#f76da7"
       -- purple in the moon theme is this nice pink I like to reuse
       c.moon_pink = "#fca7ea"
+      -- experimentally trying an even darker background with lighter popups
+      local old_bg = c.bg
+      c.bg = c.bg_dark
+      c.bg_dark = old_bg
+      c.bg_float = old_bg
     end,
     on_highlights = function(hl, c)
       -- docstrings should be slightly different color than comments but still faded to the background

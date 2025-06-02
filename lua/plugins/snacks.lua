@@ -1,5 +1,5 @@
 -- snacks_dashboard.lua  ── custom git dashboard for Snacks.nvim
---
+-- TODO: break out all the picker logic into a separate module and register them as pickers with commands/keymaps
 
 -- extend snacks section for getting files to be a subset of this directory
 ---@param max integer|nil
@@ -308,20 +308,39 @@ end
 
 local hotkeys = function()
   local output = {
-    { pane = 1, title = "Hot Keys", indent = 0, padding = 1 },
+    { pane = 1, desc = "Hot Keys", indent = 0, padding = 1 },
   }
   local keys = {
-    { key = "f", desc = "Find File", action = "fzf-lua.files", icon = "" },
+    { icon = " ", key = "f", title = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
+    { icon = " ", key = "g", title = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
+    { icon = " ", key = "t", title = "Typing Practice", action = ":Typr" },
+    { icon = " ", key = "v", title = "Vim Practice", action = ":VimBeGood" },
+    {
+      icon = " ",
+      key = "c",
+      title = "Config",
+      action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
+    },
+    { icon = " ", key = "s", title = "Restore Session", section = "session" },
+    { icon = "󰒲 ", key = "l", title = "Lazy", action = ":Lazy", enabled = package.loaded.lazy ~= nil },
+    { icon = " ", key = "x", title = "Lazy Extras", action = ":LazyExtras", enabled = package.loaded.lazy ~= nil },
+
+    { icon = " ", key = "q", title = "Quit", action = ":qa" },
   }
-  for _, key in ipairs(keys) do
+  for nkey, key in ipairs(keys) do
+    if nkey == #keys then
+      key.padding = 1
+    else
+      key.padding = 0
+    end
     output[#output + 1] = {
       pane = 1,
       icon = key.icon .. " ",
-      desc = key.desc,
+      title = key.title,
       key = key.key,
       action = key.action,
       indent = 2,
-      padding = 0,
+      padding = key.padding,
       enabled = true,
     }
   end
@@ -342,10 +361,15 @@ return {
           hotkeys,
           {
             pane = 2,
+            desc = "Git Operations",
+            indent = 0,
+            padding = 1,
+          },
+          {
+            pane = 2,
             icon = " ",
             title = "Browse Repository Online",
             key = "o",
-            padding = 1,
             action = function()
               Snacks.gitbrowse()
             end,
@@ -354,28 +378,25 @@ return {
           {
             pane = 2,
             icon = " ",
-            title = "Search Pull Requests:",
-            desc = " Select to Review the Diff",
+            title = "Search Pull Requests -> Review Diff",
             key = "r",
-            padding = 1,
             action = pick_pr,
           },
-          enable_issues and {
-            pane = 2,
-            icon = " ",
-            title = "Search Issues:",
-            desc = " Select to View in Browser",
-            key = "i",
-            padding = 1,
-            action = pick_issue,
-          } or nil,
+          -- TODO: change this to enable git and have an entirely different view when not in a git repository
+          enable_issues
+              and {
+                pane = 2,
+                icon = " ",
+                title = "Search Issues -> Open in Browser",
+                key = "i",
+                action = pick_issue,
+              }
+            or nil,
           {
             pane = 2,
             icon = "",
-            title = "Git Branches:",
-            desc = " Select to Checkout",
+            title = "Search Branches -> Checkout",
             key = "b",
-            padding = 1,
             action = function()
               require("fzf-lua").git_branches({
                 actions = {
@@ -400,8 +421,8 @@ return {
           {
             pane = 2,
             icon = "",
-            title = "Git Diff vs Base:",
-            desc = " Select to Open File",
+            title = "Diff vs Base Branch",
+            desc = "-> Open File",
             key = "d",
             padding = 1,
             action = function()
@@ -410,18 +431,16 @@ return {
             end,
           },
           {
-            icon = "",
-            title = "Git Status\n",
             section = "terminal",
             pane = 2,
             indent = 0,
-            height = 10,
+            height = 4,
             padding = 1,
             ttl = 5,
             cmd = [[git diff-index --quiet HEAD -- && git status || git --no-pager diff --color --stat=50,20,5 -B -M -C]],
           },
           {
-            title = "Recent Files",
+            desc = "Recent Files",
             pane = 1,
             indent = 0,
             padding = 1,
@@ -433,7 +452,7 @@ return {
                 pane = 1, -- pick whatever pane you prefer
                 icon = " ",
                 indent = 2,
-                desc = normalize_path(rel),
+                title = normalize_path(rel),
                 key = tostring(i), -- “press 1-9” hot-keys
                 action = function()
                   vim.cmd("edit " .. rel)
