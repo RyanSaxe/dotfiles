@@ -122,6 +122,42 @@ local function run_fzf(lines, opts, on_select)
 end
 
 --------------------------------------------------------------------------
+-- Git utilities -------------------------------------------------------
+--------------------------------------------------------------------------
+local function get_base_branch()
+  local lines = vim.fn.systemlist("git symbolic-ref --short refs/remotes/origin/HEAD")
+  local remote_head = lines[1] or ""
+  local default_branch = remote_head:match("^[^/]+/(.+)$") or "main"
+  return "origin/" .. default_branch
+end
+
+local function has_uncommitted_changes()
+  local result = vim.fn.system("git status --porcelain")
+  return result and result:match("%S") ~= nil
+end
+
+local function confirm_with_uncommitted_changes(message, callback)
+  if has_uncommitted_changes() then
+    vim.ui.select(
+      { "Yes", "No" },
+      {
+        prompt = "⚠️  Uncommitted Changes Detected\n\n" .. message .. "\n\nThis might cause you to lose work.\nDo you want to continue?",
+        format_item = function(item)
+          return item
+        end,
+      },
+      function(choice)
+        if choice == "Yes" then
+          callback()
+        end
+      end
+    )
+  else
+    callback()
+  end
+end
+
+--------------------------------------------------------------------------
 -- Pull‑request picker --------------------------------------------------
 --------------------------------------------------------------------------
 local function pick_pr()
@@ -161,25 +197,20 @@ local function pick_pr()
     if not pr then
       return
     end
-    vim.fn.jobstart({ "gh", "pr", "checkout", num, "--force" }, {
-      on_exit = function()
-        vim.schedule(function()
-          vim.notify("Checked out PR #" .. num)
-          diff.fetch_and_diff(pr.baseRefName)
-        end)
-      end,
-    })
+    confirm_with_uncommitted_changes(
+      "Checking out PR #" .. num .. ".",
+      function()
+        vim.fn.jobstart({ "gh", "pr", "checkout", num, "--force" }, {
+          on_exit = function()
+            vim.schedule(function()
+              vim.notify("Checked out PR #" .. num)
+              diff.fetch_and_diff(pr.baseRefName)
+            end)
+          end,
+        })
+      end
+    )
   end)
-end
-
---------------------------------------------------------------------------
--- Git utilities -------------------------------------------------------
---------------------------------------------------------------------------
-local function get_base_branch()
-  local lines = vim.fn.systemlist("git symbolic-ref --short refs/remotes/origin/HEAD")
-  local remote_head = lines[1] or ""
-  local default_branch = remote_head:match("^[^/]+/(.+)$") or "main"
-  return "origin/" .. default_branch
 end
 
 --------------------------------------------------------------------------
@@ -243,7 +274,7 @@ return {
     opts = {
       dashboard = {
         sections = {
-          { section = "keys", title = "Hot Keys", indent = 2, padding = 1 },
+          { icon = " ", section = "keys", title = "Hot Keys", indent = 2, padding = 1 },
           { icon = " ", title = "Recent Files", section = "recent_files", indent = 2, padding = 1 },
           { icon = " ", title = "Projects", section = "projects", indent = 2, padding = 1 },
           {
@@ -259,7 +290,8 @@ return {
           {
             pane = 2,
             icon = " ",
-            desc = "Search Pull‑Requests: Press Enter to Review the Diff",
+            title = "Search Pull Requests:",
+            desc = " Select to Review the Diff",
             key = "r",
             padding = 1,
             action = pick_pr,
@@ -267,7 +299,8 @@ return {
           enable_issues and {
             pane = 2,
             icon = " ",
-            desc = "Search Issues: Press Enter to View in Browser",
+            title = "Search Issues:",
+            desc = " Select to View in Browser",
             key = "i",
             padding = 1,
             action = pick_issue,
@@ -275,17 +308,33 @@ return {
           {
             pane = 2,
             icon = " ",
-            desc = "Git Branches: Press Enter to Checkout",
+            title = "Git Branches",
+            desc = " Select to Checkout",
             key = "b",
             padding = 1,
             action = function()
-              require("fzf-lua").git_branches()
+              require("fzf-lua").git_branches({
+                actions = {
+                  ["default"] = function(selected)
+                    if selected[1] then
+                      local branch = selected[1]:match("[%*%s]*(.-)%s*$")
+                      confirm_with_uncommitted_changes(
+                        "Switching to branch '" .. branch .. "'.",
+                        function()
+                          vim.cmd("Git checkout " .. branch)
+                        end
+                      )
+                    end
+                  end,
+                },
+              })
             end,
           },
           {
             pane = 2,
             icon = " ",
-            desc = "Git Diff vs Base: Press Enter to Open File",
+            title = "Git Diff vs Base",
+            desc = " Select to Open File",
             key = "d",
             padding = 1,
             action = function()
