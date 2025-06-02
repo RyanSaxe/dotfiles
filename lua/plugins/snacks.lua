@@ -173,6 +173,16 @@ local function pick_pr()
 end
 
 --------------------------------------------------------------------------
+-- Git utilities -------------------------------------------------------
+--------------------------------------------------------------------------
+local function get_base_branch()
+  local lines = vim.fn.systemlist("git symbolic-ref --short refs/remotes/origin/HEAD")
+  local remote_head = lines[1] or ""
+  local default_branch = remote_head:match("^[^/]+/(.+)$") or "main"
+  return "origin/" .. default_branch
+end
+
+--------------------------------------------------------------------------
 -- Issue picker ---------------------------------------------------------
 --------------------------------------------------------------------------
 local function pick_issue()
@@ -250,7 +260,7 @@ return {
             pane = 2,
             icon = " ",
             desc = "Search Pull‑Requests: Press Enter to Review the Diff",
-            key = "z",
+            key = "r",
             padding = 1,
             action = pick_pr,
           },
@@ -258,7 +268,7 @@ return {
             pane = 2,
             icon = " ",
             desc = "Search Issues: Press Enter to View in Browser",
-            key = "x",
+            key = "i",
             padding = 1,
             action = pick_issue,
           } or nil,
@@ -266,7 +276,7 @@ return {
             pane = 2,
             icon = " ",
             desc = "Git Branches: Press Enter to Checkout",
-            key = "g",
+            key = "b",
             padding = 1,
             action = function()
               require("fzf-lua").git_branches()
@@ -275,11 +285,12 @@ return {
           {
             pane = 2,
             icon = " ",
-            desc = "Git Status: Press Enter to Open File",
-            key = "s",
+            desc = "Git Diff vs Base: Press Enter to Open File",
+            key = "d",
             padding = 1,
             action = function()
-              require("fzf-lua").git_status()
+              local base_branch = get_base_branch()
+              require("fzf-lua").git_diff({ ref = base_branch })
             end,
           },
           {
