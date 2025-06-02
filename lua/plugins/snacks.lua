@@ -360,7 +360,13 @@ return {
                     if selected[1] then
                       local branch = selected[1]:match("[%*%s]*(.-)%s*$")
                       confirm_with_uncommitted_changes("Switching to branch '" .. branch .. "'.", function()
-                        vim.cmd("Git checkout " .. branch)
+                        vim.fn.jobstart({ "git", "checkout", branch }, {
+                          on_exit = function()
+                            vim.schedule(function()
+                              vim.notify("Switched to branch '" .. branch .. "'")
+                            end)
+                          end,
+                        })
                       end)
                     end
                   end,
