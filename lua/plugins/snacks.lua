@@ -1,16 +1,26 @@
--- snacks_dashboard.lua  ── Aligned table pickers + bottom preview (files changed)
--- COMPLETE & VALID Lua module
---------------------------------------------------------------------------
--- Highlights
---   • Column headers padded exactly like data rows → perfect alignment.
---   • Two‑space gutters between columns for readability.
---   • Prompt/search bar at the **top** via `--layout=reverse`.
---   • Bottom preview pane (`gh pr view {n} --files`).
---   • Tab‑delimited with `--tabstop=1` so ANSI highlights never shift columns.
---------------------------------------------------------------------------
-local diff = require("functions.diff")
-local enable_issues = true -- flip to true to enable the Issues picker
+-- snacks_dashboard.lua  ── custom git dashboard for Snacks.nvim
+--
 
+-- extend snacks section for getting files to be a subset of this directory
+---@param max integer|nil
+---@return string[]
+local function recent_files_in_cwd(max)
+  max = max or 10
+  local cwd = vim.loop.cwd()
+  local list = {}
+  for _, abs in ipairs(vim.v.oldfiles) do
+    if vim.startswith(abs, cwd) and vim.fn.filereadable(abs) == 1 then
+      table.insert(list, vim.fn.fnamemodify(abs, ":.")) -- relative path
+      if #list == max then
+        break
+      end
+    end
+  end
+  return list
+end
+
+local diff = require("functions.diff")
+local enable_issues = true
 --------------------------------------------------------------------------
 -- ANSI helpers ---------------------------------------------------------
 --------------------------------------------------------------------------
@@ -138,20 +148,20 @@ end
 
 local function confirm_with_uncommitted_changes(message, callback)
   if has_uncommitted_changes() then
-    vim.ui.select(
-      { "Yes", "No" },
-      {
-        prompt = "⚠️  Uncommitted Changes Detected\n\n" .. message .. "\n\nThis might cause you to lose work.\nDo you want to continue?",
-        format_item = function(item)
-          return item
-        end,
-      },
-      function(choice)
-        if choice == "Yes" then
-          callback()
-        end
-      end
-    )
+    local prompt = table.concat({
+      "⚠️  Uncommitted Changes Detected",
+      "",
+      message,
+      "",
+      "This might cause you to lose work.",
+      "Do you want to continue?",
+    }, "\n")
+
+    -- `vim.fn.confirm()` returns 1 for the first button, 2 for the second, etc.
+    local choice = vim.fn.confirm(prompt, "&Yes\n&No", 2) -- default = “No”
+    if choice == 1 then
+      callback()
+    end
   else
     callback()
   end
@@ -197,19 +207,16 @@ local function pick_pr()
     if not pr then
       return
     end
-    confirm_with_uncommitted_changes(
-      "Checking out PR #" .. num .. ".",
-      function()
-        vim.fn.jobstart({ "gh", "pr", "checkout", num, "--force" }, {
-          on_exit = function()
-            vim.schedule(function()
-              vim.notify("Checked out PR #" .. num)
-              diff.fetch_and_diff(pr.baseRefName)
-            end)
-          end,
-        })
-      end
-    )
+    confirm_with_uncommitted_changes("Checking out PR #" .. num .. ".", function()
+      vim.fn.jobstart({ "gh", "pr", "checkout", num, "--force" }, {
+        on_exit = function()
+          vim.schedule(function()
+            vim.notify("Checked out PR #" .. num)
+            diff.fetch_and_diff(pr.baseRefName)
+          end)
+        end,
+      })
+    end)
   end)
 end
 
@@ -275,8 +282,8 @@ return {
       dashboard = {
         sections = {
           { icon = " ", section = "keys", title = "Hot Keys", indent = 2, padding = 1 },
-          { icon = " ", title = "Recent Files", section = "recent_files", indent = 2, padding = 1 },
-          { icon = " ", title = "Projects", section = "projects", indent = 2, padding = 1 },
+          -- the below should exist in panel 2, but only if not in a git project
+          -- { icon = " ", title = "Projects", section = "projects", indent = 2, padding = 1 },
           {
             pane = 2,
             icon = " ",
@@ -318,12 +325,9 @@ return {
                   ["default"] = function(selected)
                     if selected[1] then
                       local branch = selected[1]:match("[%*%s]*(.-)%s*$")
-                      confirm_with_uncommitted_changes(
-                        "Switching to branch '" .. branch .. "'.",
-                        function()
-                          vim.cmd("Git checkout " .. branch)
-                        end
-                      )
+                      confirm_with_uncommitted_changes("Switching to branch '" .. branch .. "'.", function()
+                        vim.cmd("Git checkout " .. branch)
+                      end)
                     end
                   end,
                 },
@@ -353,6 +357,30 @@ return {
             ttl = 5,
             cmd = [[git diff-index --quiet HEAD -- && git status || git --no-pager diff --color --stat=50,20,5 -B -M -C]],
           },
+          function()
+            local out = {}
+            for i, rel in ipairs(recent_files_in_cwd(9)) do
+              out[#out + 1] = {
+                pane = 1, -- pick whatever pane you prefer
+                icon = " ",
+                title = rel,
+                key = tostring(i), -- “press 1-9” hot-keys
+                action = function()
+                  vim.cmd("edit " .. rel)
+                end,
+                enabled = true,
+              }
+            end
+            if #out == 0 then
+              out[1] = {
+                pane = 1,
+                icon = " ",
+                title = "No recent files in this directory",
+                enabled = false,
+              }
+            end
+            return out
+          end,
         },
       },
     },
