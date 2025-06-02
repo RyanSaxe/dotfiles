@@ -339,7 +339,7 @@ return {
           },
           enable_issues and {
             pane = 2,
-            icon = " ",
+            icon = " ",
             title = "Search Issues:",
             desc = " Select to View in Browser",
             key = "i",
@@ -348,8 +348,8 @@ return {
           } or nil,
           {
             pane = 2,
-            icon = "",
-            title = "Git Branches",
+            icon = "",
+            title = "Git Branches:",
             desc = " Select to Checkout",
             key = "b",
             padding = 1,
@@ -370,7 +370,7 @@ return {
           },
           {
             pane = 2,
-            icon = "",
+            icon = "",
             title = "Git Diff vs Base:",
             desc = " Select to Open File",
             key = "d",
@@ -381,7 +381,7 @@ return {
             end,
           },
           {
-            icon = " ",
+            icon = "",
             title = "Git Status\n",
             section = "terminal",
             pane = 2,
