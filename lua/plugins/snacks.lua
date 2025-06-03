@@ -186,13 +186,20 @@ local function confirm_with_uncommitted_changes(message, callback)
       "",
       message,
       "",
-      "This might cause you to lose work.",
+      "If you continue, `git stash` will be executed.",
       "Do you want to continue?",
     }, "\n")
 
-    -- `vim.fn.confirm()` returns 1 for the first button, 2 for the second, etc.
+    -- `vim.fn.confirm()` returns 1 for “Yes”, 2 for “No”
     local choice = vim.fn.confirm(prompt, "&Yes\n&No", 2) -- default = “No”
     if choice == 1 then
+      -- Run `git stash` in the current directory
+      vim.fn.system("git stash")
+      if vim.v.shell_error ~= 0 then
+        vim.notify("⚠️  Git stash failed – aborting.", vim.log.levels.ERROR)
+        return
+      end
+
       callback()
     end
   else
@@ -213,9 +220,10 @@ local function pick_pr()
     "--json",
     "number,title,headRefName,baseRefName,author,updatedAt",
   })
-  if not ok then
+  if not ok or raw == "" then
     return vim.notify("gh pr list failed", vim.log.levels.ERROR)
   end
+
   local prs = vim.json.decode(raw)
   if #prs == 0 then
     return vim.notify("No open PRs", vim.log.levels.INFO)
@@ -228,6 +236,7 @@ local function pick_pr()
     lookup["#" .. pr.number] = pr
   end
 
+  -- (Your existing picker_opts + run_fzf logic goes here)
   local opts =
     picker_opts("PR❯ ", "echo {1} | sed 's/#//' | xargs -I {} gh pr diff {} --name-only --color always | head -n 200")
 
@@ -240,12 +249,18 @@ local function pick_pr()
     if not pr then
       return
     end
+
     confirm_with_uncommitted_changes("Checking out PR #" .. num .. ".", function()
+      -- 4) Use `gh pr checkout <N> --force`
       vim.fn.jobstart({ "gh", "pr", "checkout", num, "--force" }, {
         on_exit = function()
           vim.schedule(function()
             vim.notify("Checked out PR #" .. num)
-            diff.fetch_and_diff(pr.baseRefName)
+
+            -- 5) Now open Diffview using EXACT (baseRefName, headRefName)
+            --     → Our my_diff.fetch_and_diff expects two args:
+            --        (pr.baseRefName, pr.headRefName)
+            diff.fetch_and_diff(pr.baseRefName, pr.headRefName)
           end)
         end,
       })
@@ -378,7 +393,8 @@ return {
           {
             pane = 2,
             icon = " ",
-            title = "Search Pull Requests -> Review Diff",
+            title = "Search Pull Requests",
+            desc = "   ->  Review Diff",
             key = "r",
             action = pick_pr,
           },
@@ -387,7 +403,8 @@ return {
               and {
                 pane = 2,
                 icon = " ",
-                title = "Search Issues -> Open in Browser",
+                title = "Search Issues",
+                desc = "          ->  Open in Browser",
                 key = "i",
                 action = pick_issue,
               }
@@ -395,7 +412,8 @@ return {
           {
             pane = 2,
             icon = "",
-            title = "Search Branches -> Checkout",
+            title = "Search Branches",
+            desc = "        ->  Checkout",
             key = "b",
             action = function()
               require("fzf-lua").git_branches({
@@ -422,7 +440,7 @@ return {
             pane = 2,
             icon = "",
             title = "Diff vs Base Branch",
-            desc = "-> Open File",
+            desc = "    ->  Open File",
             key = "d",
             padding = 1,
             action = function()
