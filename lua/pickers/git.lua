@@ -170,6 +170,7 @@ M.custom_diff = function(opts, ctx)
   if opts.base == nil and opts.head == nil then
     ARGS = git_args(opts.args, "--no-pager", "diff", "--no-color", "--no-ext-diff")
   elseif opts.head == nil then
+    -- honestly unclear if this is every better than passing HEAD.
     ARGS = git_args(opts.args, "--no-pager", "diff", opts.base, "--no-color", "--no-ext-diff")
   elseif opts.base == nil then
     error("base is required when head is provided")

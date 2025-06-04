@@ -357,6 +357,9 @@ local hotkeys = function()
   end
   return output
 end
+
+local base_branch = get_base_branch()
+local current_branch = vim.fn.system("git rev-parse --abbrev-ref HEAD")
 return {
   {
     "folke/snacks.nvim",
@@ -366,13 +369,12 @@ return {
     opts = {
       dashboard = {
         sections = {
-          -- { icon = " ", section = "keys", title = "Hot Keys", indent = 2, padding = 1 },
-          -- the below should exist in panel 2, but only if not in a git project
-          -- { icon = " ", title = "Projects", section = "projects", indent = 2, padding = 1 },
+
           hotkeys,
           {
             pane = 2,
-            desc = "Git Operations",
+            title = "Git",
+            desc = string.format("(%s)", current_branch:gsub("\n", "")),
             indent = 0,
             padding = 1,
           },
@@ -380,8 +382,7 @@ return {
             pane = 2,
             icon = " ",
             title = "Search Pull Requests",
-            desc = "   ->  Review Diff",
-            key = "r",
+            key = "p",
             action = pick_pr,
           },
           -- TODO: change this to enable git and have an entirely different view when not in a git repository
@@ -390,7 +391,6 @@ return {
                 pane = 2,
                 icon = " ",
                 title = "Search Issues",
-                desc = "          ->  Open in Browser",
                 key = "i",
                 action = pick_issue,
               }
@@ -398,8 +398,7 @@ return {
           {
             pane = 2,
             icon = "",
-            title = "Search Branches",
-            desc = "        ->  Checkout",
+            title = "Checkout Another Branch",
             key = "b",
             action = function()
               Snacks.picker.git_branches()
@@ -408,12 +407,10 @@ return {
           {
             pane = 2,
             icon = "",
-            title = "Diff vs Base Branch",
-            desc = "    ->  Open File",
+            title = string.format("Search Diff (Hunks) vs %s", base_branch),
+            -- desc = string.format("git diff %s...HEAD", get_base_branch()),
             key = "d",
-            padding = 1,
             action = function()
-              local base_branch = get_base_branch()
               Snacks.picker({
                 finder = git_pickers.custom_diff,
                 format = "file",
@@ -426,13 +423,12 @@ return {
           },
           {
             pane = 2,
-            title = "Git Status",
-            desc = "    ->  Open File",
+            icon = " ",
+            title = "Search Uncommitted Changes",
             key = "s",
             action = function()
               Snacks.picker.git_status()
             end,
-            padding = 1,
           },
           {
             desc = "Recent Files",
