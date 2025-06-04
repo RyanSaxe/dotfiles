@@ -1,6 +1,5 @@
 -- snacks_dashboard.lua  ── custom git dashboard for Snacks.nvim
 -- TODO: break out all the picker logic into a separate module and register them as pickers with commands/keymaps
-
 -- extend snacks section for getting files to be a subset of this directory
 ---@param max integer|nil
 ---@return string[]
@@ -53,6 +52,7 @@ local function normalize_path(path, max_length)
 end
 
 local diff = require("functions.diff")
+local git_pickers = require("pickers.git")
 local enable_issues = true
 --------------------------------------------------------------------------
 -- ANSI helpers ---------------------------------------------------------
@@ -317,10 +317,6 @@ local function pick_issue()
   end)
 end
 
---------------------------------------------------------------------------
--- Snacks plugin spec ---------------------------------------------------
---------------------------------------------------------------------------
-
 local hotkeys = function()
   local output = {
     { pane = 1, desc = "Hot Keys", indent = 0, padding = 1 },
@@ -406,24 +402,7 @@ return {
             desc = "        ->  Checkout",
             key = "b",
             action = function()
-              require("fzf-lua").git_branches({
-                actions = {
-                  ["default"] = function(selected)
-                    if selected[1] then
-                      local branch = selected[1]:match("[%*%s]*(.-)%s*$")
-                      confirm_with_uncommitted_changes("Switching to branch '" .. branch .. "'.", function()
-                        vim.fn.jobstart({ "git", "checkout", branch }, {
-                          on_exit = function()
-                            vim.schedule(function()
-                              vim.notify("Switched to branch '" .. branch .. "'")
-                            end)
-                          end,
-                        })
-                      end)
-                    end
-                  end,
-                },
-              })
+              Snacks.picker.git_branches()
             end,
           },
           {
@@ -435,17 +414,25 @@ return {
             padding = 1,
             action = function()
               local base_branch = get_base_branch()
-              require("fzf-lua").git_diff({ ref = base_branch })
+              Snacks.picker({
+                finder = git_pickers.custom_diff,
+                format = "file",
+                preview = "diff",
+                base = base_branch,
+                head = "HEAD",
+              })
+              -- require("fzf-lua").git_diff({ ref = base_branch })
             end,
           },
           {
-            section = "terminal",
             pane = 2,
-            indent = 0,
-            height = 4,
+            title = "Git Status",
+            desc = "    ->  Open File",
+            key = "s",
+            action = function()
+              Snacks.picker.git_status()
+            end,
             padding = 1,
-            ttl = 5,
-            cmd = [[git diff-index --quiet HEAD -- && git status || git --no-pager diff --color --stat=50,20,5 -B -M -C]],
           },
           {
             desc = "Recent Files",
