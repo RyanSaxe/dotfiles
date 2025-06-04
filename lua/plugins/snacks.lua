@@ -382,16 +382,6 @@ return {
           },
           {
             pane = 2,
-            icon = " ",
-            title = "Browse Repository Online",
-            key = "o",
-            action = function()
-              Snacks.gitbrowse()
-            end,
-          },
-
-          {
-            pane = 2,
             icon = " ",
             title = "Search Pull Requests",
             desc = "   ->  Review Diff",

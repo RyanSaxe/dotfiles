@@ -57,3 +57,18 @@ vim.keymap.set("n", "<leader>tG", function()
 end, {
   desc = "Toggle Diffview (fetch & diff against a specified branch)",
 })
+-- keymaps/gh.lua ---------------------------------------------------------
+
+-- lua/keymaps/gh-picker.lua ----------------------------------------------
+local git = require("pickers.git")
+
+vim.keymap.set("n", "<leader>gp", function()
+  local items = git.fetch_prs()
+  Snacks.picker.pick({
+    prompt_title = "  Open Pull-Requests",
+    items = items,
+    -- format = git.format_pr_row,
+    -- preview = git.preview_pr,
+    layout = "select",
+  })
+end, { desc = "GitHub PR picker" })
