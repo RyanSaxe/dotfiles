@@ -365,7 +365,7 @@ return {
     "folke/snacks.nvim",
     priority = 1000,
     lazy = false,
-    dependencies = { "ibhagwan/fzf-lua" },
+    dependencies = { "ibhagwan/fzf-lua", "folke/todo-comments.nvim" },
     opts = {
       dashboard = {
         sections = {
@@ -428,6 +428,24 @@ return {
             key = "s",
             action = function()
               Snacks.picker.git_status()
+            end,
+          },
+          {
+            pane = 2,
+            icon = " ",
+            title = "Search TODOs",
+            key = "?",
+            action = function()
+              Snacks.picker.todo_comments({ keywords = { "TODO", "FIX", "FIXME", "HACK", "BUG" } })
+            end,
+          },
+          {
+            pane = 2,
+            icon = " ",
+            title = "Search Errors",
+            key = "?",
+            action = function()
+              Snacks.picker.diagnostics()
             end,
           },
           {
