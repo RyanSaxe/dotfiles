@@ -14,7 +14,7 @@ return {
       return not vim.tbl_contains({ "typr" }, vim.bo.filetype) and vim.bo.buftype ~= "prompt"
     end,
     cmdline = {
-      enabled = true,
+      enabled = false,
     },
     appearance = {
       use_nvim_cmp_as_default = false,
@@ -37,8 +37,8 @@ return {
       },
       list = {
         selection = {
-          preselect = true,
-          auto_insert = false,
+          preselect = false,
+          auto_insert = true,
         },
       },
       menu = {
@@ -52,8 +52,9 @@ return {
 
     -- My super-TAB configuration
     keymap = {
-      preset = "enter",
-      ["<C-space>"] = { "show", "show_documentation", "hide_documentation" },
+      preset = nil, -- disable the preset
+      ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
+      ["<S-space>"] = { "show", "show_documentation", "hide_documentation" },
       ["<C-e>"] = { "hide", "fallback" },
       ["<S-Tab>"] = {
         function(cmp)
@@ -80,8 +81,8 @@ return {
 
     -- Experimental signature help support
     signature = {
-      enabled = true,
-      window = { border = "rounded", show_documentation = false },
+      enabled = false,
+      window = { border = "rounded", show_documentation = true },
     },
 
     sources = {

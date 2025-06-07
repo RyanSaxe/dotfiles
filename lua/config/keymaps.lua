@@ -24,14 +24,14 @@ vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv", { desc = "move lines up in visual s
 -- 1) <leader>tg: “Toggle Diffview (fetch & diff against remote default HEAD)”
 --    When no arguments are given, we treat head_refName = "HEAD".
 -------------------------------------------------------------------------------
-local diff = require("functions.diff")
+local diff = require("custom.git.diff")
 vim.keymap.set("n", "<leader>tg", function()
   if diff.is_diffview_open() then
     vim.cmd("DiffviewClose")
   else
     -- pass base_refName = nil (so it falls back to origin/<default>),
     -- head_refName = "HEAD"
-    diff.toggle_diffview(nil, "HEAD")
+    diff.toggle_diffview(nil)
   end
 end, {
   desc = "Toggle Diffview (fetch & diff against remote HEAD)",
@@ -51,7 +51,7 @@ vim.keymap.set("n", "<leader>tG", function()
       -- Treat any non-empty string as the “base_refName” and
       -- always use head_refName = "HEAD" here.
       local base = (input ~= nil and input ~= "") and input or nil
-      diff.toggle_diffview(base, "HEAD")
+      diff.toggle_diffview(base)
     end)
   end
 end, {
@@ -60,7 +60,7 @@ end, {
 -- keymaps/gh.lua ---------------------------------------------------------
 
 -- lua/keymaps/gh-picker.lua ----------------------------------------------
-local git = require("pickers.git")
+local git = require("custom.git.pickers")
 
 vim.keymap.set("n", "<leader>gp", function()
   local items = git.fetch_prs()

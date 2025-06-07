@@ -99,13 +99,17 @@ return {
       hl["TodoFgTest"] = "Comment" -- { fg = Util.blend_bg(c.orange, 0.5) }
       -- git not properly reading overrides so specifying them here
       hl["DiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.2) }
-      hl["DiffChange"] = { bg = Util.blend_bg(c.magenta2, 0.2) }
-      hl["DiffDelete"] = { bg = Util.blend_bg("#ff0000", 0.2) }
+      hl["DiffChange"] = { bg = Util.blend_bg("#FFFF00", 0.2) }
+      hl["DiffDelete"] = { bg = Util.blend_bg("#FF0000", 0.2) }
+      hl["DiffAdded"] = { bg = Util.blend_bg("#00FF00", 0.2) }
+      hl["DiffChanged"] = { bg = Util.blend_bg("#FFFF00", 0.2) }
+      hl["DiffDeleted"] = { bg = Util.blend_bg("#FF0000", 0.2) }
+      hl["MiniDiffSignAdd"] = { fg = Util.blend_bg(c.teal, 0.7) }
+      hl["MiniDiffSignChange"] = { fg = Util.blend_bg(c.yellow, 0.7) }
+      hl["MiniDiffSignDelete"] = { fg = Util.blend_bg(c.red, 0.7) }
       hl["GitSignsAdd"] = { fg = Util.blend_bg(c.teal, 0.7) }
-      hl["GitSignsChange"] = { fg = Util.blend_bg(c.magenta2, 0.7) }
+      hl["GitSignsChange"] = { fg = Util.blend_bg(c.yellow, 0.7) }
       hl["GitSignsDelete"] = { fg = Util.blend_bg(c.red, 0.7) }
-      -- still doesnt work but can figure out later
-      hl["IndentLineCurrent"] = { fg = c.moon_pink, nocombine = true }
     end,
   },
 }
