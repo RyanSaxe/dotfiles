@@ -373,8 +373,7 @@ return {
           hotkeys,
           {
             pane = 2,
-            title = "Git",
-            desc = string.format("(%s)", current_branch:gsub("\n", "")),
+            desc = string.format("Repository Actions (%s)", current_branch:gsub("\n", "")),
             indent = 0,
             padding = 1,
           },
