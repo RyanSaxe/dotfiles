@@ -86,6 +86,11 @@ return {
     },
 
     sources = {
+      -- buffer is removed to avoid random words that arent symbols getting introduced.
+      -- copilot is removed since that is always set to ghost text with tab completion
+      -- TODO: add blink-cmp-dictionary here that is explicitly enabled for markdown files
+      --        https://github.com/Kaiser-Yang/blink-cmp-dictionary/
+      --        https://github.com/linkarzu/dotfiles-latest/blob/main/neovim/neobean/lua/plugins/blink-cmp.lua#L160
       default = { "lsp", "path" }, -- { "lazydev", "lsp", "copilot", "path", "snippets", "buffer" },
       providers = {
         -- copilot = {
@@ -116,6 +121,7 @@ return {
         path = {
           min_keyword_length = 0,
         },
+        -- TODO: learn more about snippets and best way to use -- the defaults from lazyvim are distracting at least for python
         snippets = {
           -- disables snippets. Not sure why I cant disable these by deleting the block.
           should_show_items = function()

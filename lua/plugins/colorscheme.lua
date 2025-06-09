@@ -122,6 +122,8 @@ return {
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg(c.git_purple, 0.5) }
       hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.2) }
+      -- make sure code blocks are clearly readable via having a different background
+      hl["RenderMarkdownCode"] = { bg = c.bg_highlight }
     end,
   },
 }

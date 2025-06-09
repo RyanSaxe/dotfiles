@@ -1,0 +1,12 @@
+# allow hard tabs
+MD010: false
+
+# allow multiple blank lines in a row
+MD012:
+  maximum: 2
+
+# Line length doesnt matter because wrapping
+MD013: false
+
+# HTML is allowed inside markdown
+MD033: false
