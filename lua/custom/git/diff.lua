@@ -13,6 +13,7 @@ end
 
 function M.fetch_and_diff(base_ref)
   local effective_ref = base_ref
+  -- if no base_ref is given, find the default branch from origin/HEAD
   if not effective_ref or effective_ref == "" then
     local lines = vim.fn.systemlist("git symbolic-ref --short refs/remotes/origin/HEAD")
     local remote_head = lines[1] or ""
@@ -21,11 +22,14 @@ function M.fetch_and_diff(base_ref)
   end
 
   local base = ("origin/%s"):format(effective_ref)
+  -- NOTE: effective_ref : effective_ref will actually update the local ref to match the remote ref
   vim.fn.jobstart({ "git", "fetch", "origin", effective_ref, ":", effective_ref }, {
     detach = false,
     on_exit = function()
       vim.schedule(function()
-        vim.cmd(("DiffviewOpen %s..HEAD"):format(base))
+        -- could do DiffviewOpen base.."..HEAD",
+        -- but that will miss any unstaged files and not show diagnostics in the diffview
+        vim.cmd(("DiffviewOpen %s"):format(base))
       end)
     end,
   })

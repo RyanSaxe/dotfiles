@@ -55,6 +55,7 @@ end
 local diff = require("custom.git.diff")
 local git_pickers = require("custom.git.pickers")
 local git_utils = require("custom.git.utils")
+local git_reddit = require("custom.git.reddit")
 local enable_issues = true
 
 local hotkeys = function()
@@ -122,29 +123,7 @@ return {
             icon = " ",
             title = "Search Pull Requests",
             key = "p",
-            action = function()
-              Snacks.picker({
-                finder = git_pickers.fetch_prs,
-                format = git_pickers.format_pr_row,
-                preview = git_pickers.preview_pr,
-                confirm = function(picker, pr)
-                  git_utils.confirm_stash_uncommitted_changes_before_op(
-                    "Checking out PR #" .. pr.number .. ".",
-                    function()
-                      -- 4) Use `gh pr checkout <N> --force`
-                      vim.fn.jobstart({ "gh", "pr", "checkout", pr.number, "--force" }, {
-                        on_exit = function()
-                          vim.schedule(function()
-                            vim.notify("Checked out PR #" .. pr.number)
-                            diff.fetch_and_diff(pr.baseRefName)
-                          end)
-                        end,
-                      })
-                    end
-                  )
-                end,
-              })
-            end,
+            action = git_pickers.pr_picker,
           },
           -- TODO: change this to enable git and have an entirely different view when not in a git repository
           enable_issues
@@ -153,13 +132,7 @@ return {
                 icon = " ",
                 title = "Search Issues",
                 key = "i",
-                action = function()
-                  Snacks.picker({
-                    finder = git_pickers.fetch_issues,
-                    format = git_pickers.format_issue_row,
-                    preview = git_pickers.preview_issue,
-                  })
-                end,
+                action = git_pickers.issue_picker,
               }
             or nil,
           {
@@ -175,17 +148,10 @@ return {
             pane = 2,
             icon = "",
             title = string.format("Search Diff (Hunks) vs %s", base_branch),
-            -- desc = string.format("git diff %s...HEAD", get_base_branch()),
+            -- desc = string.format("git diff %s", get_base_branch()),
             key = "d",
             action = function()
-              Snacks.picker({
-                finder = git_pickers.custom_diff,
-                format = "file",
-                preview = "diff",
-                base = base_branch,
-                head = nil,
-              })
-              -- require("fzf-lua").git_diff({ ref = base_branch })
+              git_pickers.diff_picker(base_branch)
             end,
           },
           {
