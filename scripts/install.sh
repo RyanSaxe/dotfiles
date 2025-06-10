@@ -29,12 +29,12 @@ detect_pm() {
 }
 # NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
 BREW_DEPS=(
-  neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython
+  neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython3
   openjdk@17 wget git-delta curl zsh
 )
 APT_DEPS=(
   neovim ripgrep fzf fd-find git build-essential nodejs tmux gh
-  ipython openjdk-17-jdk wget git-delta curl zsh
+  python3 ipython3 openjdk-17-jdk wget git-delta curl zsh
 )
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
@@ -154,9 +154,16 @@ fetch_and_exec() {
 
 # ──────────────────────────────────────────────────────
 main() {
-  # Warn if terminal has <256 colors
-  if [[ "$(tput colors 2>/dev/null || echo 0)" -lt 256 ]]; then
-    err "Terminal only supports $(tput colors) colors. Use TERM=xterm-256color for full theming."
+  # ── Make sure TERM is valid for tput ─────────────────────
+  if [[ -z "${TERM:-}" || "${TERM}" == "unknown" ]]; then
+    log "TERM is unset/unknown; defaulting to xterm-256color for this run"
+    export TERM=xterm-256color
+  fi
+
+  # ── Warn if < 256 colors ────────────────────────────────
+  colors=$(tput colors 2>/dev/null || echo 0)
+  if ((colors < 256)); then
+    err "Terminal only supports $colors colors. Use TERM=xterm-256color for full theming."
   fi
 
   PM=$(detect_pm)
