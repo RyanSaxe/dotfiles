@@ -30,11 +30,12 @@ detect_pm() {
 # NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
 BREW_DEPS=(
   neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython
-  openjdk@17 wget git-delta zsh bat
+  openjdk@17 wget git-delta zsh bat imagemagick ghostscript tectonic
 )
 APT_DEPS=(
   neovim ripgrep fzf fd-find git build-essential nodejs tmux gh
   python3 ipython3 openjdk-17-jdk wget git-delta curl zsh bat
+  imagemagick ghostscript tectonic
 )
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
@@ -67,6 +68,10 @@ install_brew() {
 }
 
 install_apt() {
+  # ubuntu apt points to old frozen neovim version, so we need to add the PPA to get the latest stable version
+  log "Adding Neovim PPA for latest stable (>= 0.11)…"
+  sudo_if_needed add-apt-repository -y ppa:neovim-ppa/stable
+
   log "Updating apt repositories…"
   sudo_if_needed apt-get update -qq
 
@@ -170,6 +175,9 @@ main() {
   log "Using package manager: $PM"
 
   install_"$PM"
+
+  log "Installing Mermaid CLI…"
+  sudo_if_needed npm install -g @mermaid-js/mermaid-cli
 
   # Astral UV installer
   if ! command -v uv &>/dev/null; then
