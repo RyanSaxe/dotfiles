@@ -30,7 +30,7 @@ detect_pm() {
 # NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
 BREW_DEPS=(
   neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython
-  openjdk@17 wget git-delta curl zsh
+  openjdk@17 wget git-delta zsh
 )
 APT_DEPS=(
   neovim ripgrep fzf fd-find git build-essential nodejs tmux gh
@@ -172,12 +172,19 @@ main() {
   install_"$PM"
 
   # Astral UV installer
-  fetch_and_exec "https://astral.sh/uv/install.sh"
+  if ! command -v uv &>/dev/null; then
+    fetch_and_exec "https://astral.sh/uv/install.sh"
+  else
+    log "Astral UV already present—skipping"
+  fi
 
   # Oh My Zsh (non-interactive)
-  export RUNZSH=no
-  export CHSH=no
-  fetch_and_exec "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+  if [[ ! -d "${ZSH:-$HOME/.oh-my-zsh}" ]]; then
+    export RUNZSH=no CHSH=no
+    fetch_and_exec "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+  else
+    log "Oh My Zsh already installed—skipping re-install"
+  fi
 
   # Ensure default shell is Zsh
   if command -v zsh &>/dev/null && [[ ! "$SHELL" =~ zsh$ ]]; then

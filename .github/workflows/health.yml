@@ -15,7 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Neovim & deps
+      - name: Setup Neovim config
+        run: |
+          mkdir -p ~/.config
+          ln -sf "${{ github.workspace }}" ~/.config/nvim
+
+      - name: Install All Major Dependencies
         shell: bash
         run: |
           set -e
@@ -24,22 +29,27 @@ jobs:
           else
             bash scripts/install.sh
           fi
+      - name: Install LazyVim plugins
+        shell: bash
+        run: |
+          nvim --headless \
+            -u ~/.config/nvim/init.lua \
+            -c 'Lazy sync --no-color' \
+            -c 'qa!'
       - name: Run Neovim healthcheck
         shell: bash
         run: |
-          set -e
+          nvim --headless \
+            -u ~/.config/nvim/init.lua \
+            -c 'checkhealth' \
+            -c 'qa!' \
+            > health.log 2>&1
 
-          # run checkhealth and save everything
-          nvim --headless "+checkhealth" +qa > health.log 2>&1
-
-          # always print the full log so you can eyeball warnings, etc.
           echo "=== Neovim health.log ==="
-          cat health.log
+          bat health.log || true
           echo "=== end health.log ==="
 
-          # then grep for failures (no -q so matches are shown)
-          if grep -En 'ERROR|FAIL' health.log; then
+          if grep -E 'ERROR|FAIL' health.log; then
             echo "::error ::Neovim healthcheck found ERROR or FAIL"
             exit 1
           fi
-
