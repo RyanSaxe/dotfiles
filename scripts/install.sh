@@ -56,7 +56,7 @@ APT_DEPS=(
 #       git-delta: a syntax-highlighting pager for git, makes diffs more readable
 #       build-essential: a package that includes essential tools for building software from source, only needed for linux servers
 #       curl: command-line tool for transferring data with URLs, used for fetching scripts and packages
-#       zsh: a shell that is more powerful and user-friendly than bash, used as the default shell for many developers
+#       zsh: a shell with a superset of features compared to bash, used as the default shell
 #       bat: a cat clone with syntax highlighting so that file outputs are readable and colored
 # ──────────────────────────────────────────────────────
 install_brew() {
