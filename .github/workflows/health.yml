@@ -43,13 +43,14 @@ jobs:
           NVIM_CMD=(nvim --headless -u ~/.config/nvim/init.lua)
 
           "${NVIM_CMD[@]}" \
+            -c 'set nomore' \
             -c 'redir! > health.log' \
-            -c 'silent! checkhealth' \
+            -c 'checkhealth' \
             -c 'redir END' \
             -c 'qa!'
 
           echo "=== Neovim health.log ==="
-          bat health.log || true
+          cat health.log || true
           echo "=== end health.log ==="
 
           if grep -E 'ERROR|FAIL' health.log; then
