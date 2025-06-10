@@ -39,15 +39,7 @@ jobs:
       - name: Run Neovim healthcheck
         shell: bash
         run: |
-          # inside your workspace ~/.config/nvim already points at your lazyvim setup
-          NVIM_CMD=(nvim --headless -u ~/.config/nvim/init.lua)
-
-          "${NVIM_CMD[@]}" \
-            -c 'set nomore' \
-            -c 'redir! > health.log' \
-            -c 'checkhealth' \
-            -c 'redir END' \
-            -c 'qa!'
+          nvim --headless -c 'silent! checkhealth' -c 'w! health.log' -c 'qa!'
 
           echo "=== Neovim health.log ==="
           cat health.log || true
