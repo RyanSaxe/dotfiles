@@ -40,7 +40,7 @@ jobs:
       - name: Run Neovim healthcheck
         shell: bash
         run: |
-          nvim --headless -c 'silent! checkhealth' -c 'w! health.log' -c 'qa!'
+          nvim --headless -c 'silent! checkhealth' -c 'noautocmd w! health.log' -c 'qa!'
 
           if grep -E 'ERROR|FAIL' health.log; then
             echo "::error ::Neovim healthcheck found ERROR or FAIL"
