@@ -30,11 +30,11 @@ detect_pm() {
 # NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
 BREW_DEPS=(
   neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython
-  openjdk@17 wget git-delta zsh
+  openjdk@17 wget git-delta zsh bat
 )
 APT_DEPS=(
   neovim ripgrep fzf fd-find git build-essential nodejs tmux gh
-  python3 ipython3 openjdk-17-jdk wget git-delta curl zsh
+  python3 ipython3 openjdk-17-jdk wget git-delta curl zsh bat
 )
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
@@ -57,7 +57,7 @@ APT_DEPS=(
 #       build-essential: a package that includes essential tools for building software from source, only needed for linux servers
 #       curl: command-line tool for transferring data with URLs, used for fetching scripts and packages
 #       zsh: a shell that is more powerful and user-friendly than bash, used as the default shell for many developers
-
+#       bat: a cat clone with syntax highlighting so that file outputs are readable and colored
 # ──────────────────────────────────────────────────────
 install_brew() {
   log "Updating Homebrew…"
