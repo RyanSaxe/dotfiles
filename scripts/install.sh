@@ -30,12 +30,12 @@ detect_pm() {
 # NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
 BREW_DEPS=(
   neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython
-  openjdk@17 wget git-delta zsh bat imagemagick ghostscript tectonic
+  openjdk@17 wget git-delta zsh bat ghostscript imagemagick tectonic
 )
 APT_DEPS=(
   neovim ripgrep fzf fd-find git build-essential nodejs tmux gh
   python3 ipython3 openjdk-17-jdk wget git-delta curl zsh bat
-  imagemagick ghostscript tectonic
+  ghostscript imagemagick
 )
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
@@ -89,14 +89,52 @@ install_apt() {
     fi
   fi
 
-  # lazygit (not in apt)
-  if ! install_lazygit; then
-    err "lazygit install failed"
-    exit 1
+  # tectonic (not in apt)
+  if ! command -v tectonic &>/dev/null; then
+    install_tectonic || {
+      err "Tectonic install failed"
+      exit 1
+    }
+  else
+    log "Tectonic already installed—skipping re-install"
   fi
+  # lazygit (not in apt)
+  if ! command -v lazygit &>/dev/null; then
+    install_lazygit || {
+      err "lazygit install failed"
+      exit 1
+    }
+  else
+    log "lazygit already installed—skipping re-install"
+  fi
+
 }
 
 # ──────────────────────────────────────────────────────
+# custom source installs for apt when needed
+# ──────────────────────────────────────────────────────
+install_tectonic() {
+  log "Installing latest Tectonic…"
+  local version arch deb_arch url deb_name tmpdir
+  version=$(curl -fsSL https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest |
+    grep -Po '"tag_name":\s*"v?\K[^"]+')
+  arch=$(dpkg --print-architecture 2>/dev/null || uname -m)
+  case "$arch" in
+  amd64 | x86_64) deb_arch=amd64 ;;
+  arm64 | aarch64) deb_arch=arm64 ;;
+  *)
+    err "Unsupported architecture: $arch"
+    return 1
+    ;;
+  esac
+  deb_name="tectonic_${version}_${deb_arch}.deb"
+  url="https://github.com/tectonic-typesetting/tectonic/releases/download/v${version}/${deb_name}"
+  tmpdir=$(mktemp -d)
+  curl -fsSL -o "$tmpdir/$deb_name" "$url"
+  sudo_if_needed dpkg -i "$tmpdir/$deb_name"
+  rm -rf "$tmpdir"
+  log "Tectonic $version installed successfully."
+}
 install_lazygit() {
   log "Installing lazygit…"
   local arch version url tmp
