@@ -312,7 +312,7 @@ return {
           {
             pane = 2,
             section = "terminal",
-            cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.1",
+            cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.01",
             indent = 10,
             height = 20,
           },

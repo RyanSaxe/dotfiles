@@ -25,7 +25,9 @@ return {
   event = "VeryLazy",
   dependencies = { "folke/snacks.nvim" },
   keys = {
-    { "<leader>go", false }, -- disable default mapping in lazyvim
+    -- because sonarlint requires gitsigns to support connected mode, we don't use the lazyvim mini.diff plugin
+    -- so we no longer need to disable the default mapping. Keeping it here as a reminder if I remove sonarlint.
+    -- { "<leader>go", false }, -- disable default mapping in lazyvim
     {
       "<leader>gdo",
       function()
