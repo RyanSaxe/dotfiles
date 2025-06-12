@@ -11,28 +11,7 @@ cd ~/.config/nvim
 nvim
 ```
 
-## LazyVim Links
+Note that this may not perfectly get you there. For example, to get sonarlint working, you will need to do the following extra steps:
 
-This repo is a fork of the starter template for [LazyVim](https://github.com/LazyVim/LazyVim). Refer to the [documentation](https://lazyvim.github.io/installation) to get started.
-
---- below is a comment from GPT, should inspect it and make sure it makes sense and actually update things
-
-### Tips & gotchas
-
-| Situation | Fix |
-|-----------|-----|
-| **Plugins with `lazy=true` don’t appear in `:checkhealth`** | They’re loaded on demand. CI already calls `Lazy! sync`, which forces installation but not runtime load. For health coverage, add `require("lazy").load({plugins={"which-key.nvim","noice.nvim"}, wait=true})` *before* `:checkhealth`, or simply leave them `lazy=false` during CI. |
-| **Treesitter parsers missing** | Add a post-step: `nvim --headless "+TSUpdateSync" +qa` (wrap in `|| true` if some langs optional). |
-| **Windows support** | Use `choco install neovim ripgrep` and add a PowerShell bootstrap, or leverage a Docker image. |
-
----
-
-### Why this works everywhere
-
-* **Package detection** instead of `$OSTYPE` heuristics keeps the script tiny.
-* `nvim --headless "+Lazy! sync" +qa` blocks until every plugin is installed / updated / compiled :contentReference[oaicite:2]{index=2}.
-* `:checkhealth` is the source-of-truth the Neovim team recommends after any update :contentReference[oaicite:3]{index=3}.
-* By grepping for **ERROR/FAIL**, you fail fast without parsing ANSI colours.
-
-Drop these two files into your repo and every new machine (or GitHub runner) gets a reproducible Neovim in one command—and you’ll know immediately if any future change breaks the setup.
-::contentReference[oaicite:4]{index=4}
+1. Open Neovim and run `:MasonInstall sonarlint-language-server`
+2. Ensure your system points to the right version of Java. The script above will install openjdk@17, but you may need to set the `JAVA_HOME` environment variable to point to it for sonarlint to work properly.
