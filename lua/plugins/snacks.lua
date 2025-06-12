@@ -276,7 +276,7 @@ return {
           hotkeys,
           globalkeys,
           {
-            title = "Recent Files",
+            title = "Recent Project Files",
             pane = 1,
             indent = 0,
             padding = 1,
