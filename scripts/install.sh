@@ -107,12 +107,13 @@ install_apt() {
   else
     log "lazygit already installed—skipping re-install"
   fi
+  # mermaid-cli (not in apt)
 
 }
 
-# ──────────────────────────────────────────────────────
-# custom source installs for apt when needed
-# ──────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────
+# extra source installs that cannot always be done via package managers
+# ────────────────────────────────────────────────────────────────────────
 install_tectonic() {
   log "Installing latest Tectonic…"
   local version arch deb_arch url deb_name tmpdir
@@ -173,6 +174,27 @@ install_lazygit() {
   log "lazygit $(lazygit --version) installed"
 }
 
+install_pokemon_colorscripts() {
+  log "Installing Pokémon Colorscripts…"
+
+  # 1) make a temp clone
+  local tmp
+  tmp=$(mktemp -d)
+
+  log "Cloning into $tmp"
+  git clone https://gitlab.com/phoneybadger/pokemon-colorscripts.git "$tmp"
+
+  # 2) from inside that temp clone, run the upstream installer
+  pushd "$tmp" >/dev/null || {
+    err "Cannot cd to $tmp"
+    return 1
+  }
+  sudo_if_needed bash install.sh
+  popd >/dev/null
+
+  # 3) clean up
+  rm -rf "$tmp"
+}
 # ──────────────────────────────────────────────────────
 fetch_and_exec() {
   local url=$1
@@ -214,8 +236,15 @@ main() {
 
   install_"$PM"
 
-  log "Installing Mermaid CLI…"
-  sudo_if_needed npm install -g @mermaid-js/mermaid-cli
+  if ! command -v mmdc &>/dev/null; then
+    log "Installing Mermaid CLI via npm…"
+    sudo_if_needed npm install -g @mermaid-js/mermaid-cli || {
+      err "Mermaid CLI install failed"
+      exit 1
+    }
+  else
+    log "Mermaid CLI already installed—skipping re-install"
+  fi
 
   # Astral UV installer
   if ! command -v uv &>/dev/null; then
@@ -238,6 +267,11 @@ main() {
     sudo_if_needed chsh -s "$(command -v zsh)" "$(whoami)"
     log "Default shell set to $(command -v zsh). Logout/Login to apply."
   fi
+
+  install_pokemon_colorscripts || {
+    err "Failed to install Pokémon Colorscripts"
+    exit 1
+  }
 
   log "✅ All done!"
 }

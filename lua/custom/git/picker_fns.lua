@@ -302,6 +302,15 @@ function M.preview_issue(ctx)
   -- Render
   ctx.preview:set_lines(lines)
   ctx.preview:highlight({ ft = "markdown" })
+  -- NOTE: disabled since the below did not work ... says winid is not a valid window
+  -- since the preview is markdown, enable text wrapping
+  -- vim.schedule(function()
+  -- local winid = ctx.preview.win.id
+  -- local opts = { scope = "local", win = winid }
+  -- vim.api.nvim_set_option_value("wrap",       true, opts)
+  -- vim.api.nvim_set_option_value("linebreak",  true, opts)
+  -- vim.api.nvim_set_option_value("breakindent",true, opts)
+  -- end)
 end
 
 -- below is a slight modification of snacks picker for git diffs to let us pass reference commits
