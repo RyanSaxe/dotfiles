@@ -12,10 +12,9 @@ return {
       auto_trigger = true,
       hide_during_completion = false,
       keymap = {
-        accept = "<Tab>",
-        -- TODO: change these
-        next = "<M-]>",
-        prev = "<M-[>",
+        accept = "<S-Tab>",
+        next = "<Right>",
+        prev = "<Left>",
       },
     },
     panel = { enabled = false },

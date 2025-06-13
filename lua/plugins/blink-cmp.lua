@@ -53,16 +53,10 @@ return {
     -- My super-TAB configuration
     keymap = {
       preset = nil, -- disable the preset
+      ["<CR>"] = { "accept", "fallback" },
       ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
       ["<S-space>"] = { "show", "show_documentation", "hide_documentation" },
       ["<C-e>"] = { "hide", "fallback" },
-      ["<S-Tab>"] = {
-        function(cmp)
-          return cmp.select_next()
-        end,
-        "snippet_forward",
-        "fallback",
-      },
       ["<S-BS>"] = {
         function(cmp)
           return cmp.select_prev()
@@ -70,11 +64,19 @@ return {
         "snippet_backward",
         "fallback",
       },
+      ["<Tab>"] = {
+        function(cmp)
+          return cmp.select_next()
+        end,
+        "snippet_forward",
+        "fallback",
+      },
 
       ["<Up>"] = { "select_prev", "fallback" },
       ["<Down>"] = { "select_next", "fallback" },
       ["<C-p>"] = { "select_prev", "fallback" },
       ["<C-n>"] = { "select_next", "fallback" },
+      ["<C-y>"] = { "accept", "select_and_accept", "fallback" },
       ["<C-up>"] = { "scroll_documentation_up", "fallback" },
       ["<C-down>"] = { "scroll_documentation_down", "fallback" },
     },
