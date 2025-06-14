@@ -21,12 +21,9 @@ M.checkout_branch = function(branch)
   end
 
   local cmd = { "git", "checkout", branch }
-  M.confirm_stash_uncommitted_changes_before_op(
-    "You are about to checkout branch '" .. branch .. "'. This will discard any uncommitted changes.",
-    function()
-      vim.fn.system(cmd)
-    end
-  )
+  M.confirm_stash_uncommitted_changes_before_op("Checking out branch '" .. branch .. "'.", function()
+    vim.fn.system(cmd)
+  end)
 end
 M.has_uncommitted_changes = function()
   local result = vim.fn.system("git status --porcelain")
