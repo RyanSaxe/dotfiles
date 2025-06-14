@@ -167,14 +167,27 @@ local globalkeys = function()
       key = "s",
       desc = "Select Scratch File",
     },
-    { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
+    {
+      icon = " ",
+      key = "P",
+      desc = "Find Project",
+      action = function()
+        return Snacks.picker.projects({
+          confirm = function(picker, item)
+            Snacks.picker.actions.load_session(picker, item)
+            Snacks.dashboard.open()
+          end,
+        })
+      end,
+    },
   }
 
   return create_pane(header, keys)
 end
 
 local base_branch = git_utils.get_base_branch()
-local current_branch = vim.fn.system("git rev-parse --abbrev-ref HEAD")
+local current_branch = git_utils.get_current_branch()
+
 return {
   {
     "folke/snacks.nvim",
@@ -312,6 +325,8 @@ return {
           {
             pane = 2,
             section = "terminal",
+            -- the commented out command below will have an animated ascii aquarium
+            -- cmd = 'curl "http://asciiquarium.live?cols=$(tput cols)&rows=$(tput lines)"',
             cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.1",
             indent = 10,
             height = 20,

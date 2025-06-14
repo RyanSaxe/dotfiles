@@ -72,3 +72,48 @@ vim.keymap.set("n", "<leader>gp", function()
     layout = "select",
   })
 end, { desc = "GitHub PR picker" })
+
+-- LSP related toggles
+-- NOTE: consider extending this to other LSP servers as needed
+-- NOTE: consider extensind to other types of analysis settings like type checking strictness
+local function toggle_pyright_diagnostic_mode()
+  local clients = vim.lsp.get_clients({ bufnr = vim.api.nvim_get_current_buf(), name = "basedpyright" })
+  if vim.tbl_isempty(clients) then
+    vim.notify("basedpyright isn’t attached here", vim.log.levels.WARN)
+    return
+  end
+
+  for _, client in ipairs(clients) do
+    local cfg = client.config.settings or {}
+
+    vim.notify(vim.inspect(cfg), vim.log.levels.INFO)
+
+    if type(cfg.basedpyright) ~= "table" then
+      cfg.basedpyright = {}
+    end
+    if type(cfg.basedpyright.analysis) ~= "table" then
+      cfg.basedpyright.analysis = {}
+    end
+
+    local current = cfg.basedpyright.analysis.diagnosticMode or "openFilesOnly"
+    local next_mode = (current == "openFilesOnly") and "workspace" or "openFilesOnly"
+
+    cfg.basedpyright.analysis.diagnosticMode = next_mode
+
+    client.config.settings = cfg
+
+    client.notify("workspace/didChangeConfiguration", { settings = nil })
+    -- vim.cmd("LspRestart basedpyright")
+
+    vim.notify(("basedpyright diagnosticMode → %s"):format(next_mode), vim.log.levels.INFO)
+  end
+end
+
+vim.keymap.set("n", "<leader>pd", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
+-- TODO: get the picker to reload as more diagnostics come in ... live is very bad for this
+vim.keymap.set("n", "<leader>pD", function()
+  toggle_pyright_diagnostic_mode()
+  Snacks.picker.diagnostics({
+    live = true,
+  })
+end, { desc = "TESTING PICKER" })

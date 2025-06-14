@@ -19,11 +19,29 @@ end
 -- TODO: <S-CR> should open in browser
 M.pr_picker = function()
   Snacks.picker({
+    layout = {
+      { preview = true },
+      layout = {
+        box = "horizontal",
+        width = 0.8,
+        height = 0.8,
+        {
+          box = "vertical",
+          border = "rounded",
+          title = "{source} {live} {flags}",
+          title_pos = "center",
+          { win = "input", height = 1, border = "bottom" },
+          { win = "list", border = "none" },
+        },
+        { win = "preview", border = "rounded", width = 0.7, title = "{preview}", position = "bottom" },
+      },
+    },
     finder = fns.fetch_prs,
     format = fns.format_pr_row,
     preview = fns.preview_pr,
     confirm = function(picker, pr)
       picker:close()
+      vim.notify("Checking out PR #" .. pr.number .. " and opening in DiffView.")
       utils.confirm_stash_uncommitted_changes_before_op("Checking out PR #" .. pr.number .. ".", function()
         -- 4) Use `gh pr checkout <N> --force`
         vim.fn.jobstart({ "gh", "pr", "checkout", pr.number, "--force" }, {
