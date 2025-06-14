@@ -3,6 +3,35 @@ local M = {}
 local fns = require("custom.git.picker_fns")
 local utils = require("custom.git.utils")
 
+local wide_layout_with_wrap = {
+  layout = {
+    box = "vertical", -- stack children top→bottom
+    border = "rounded",
+    height = 0.8,
+    width = 0.8,
+    {
+      win = "input",
+      height = 1,
+      border = "bottom",
+    },
+    {
+      win = "list",
+      height = 0.4, -- exactly two rows tall
+      border = "bottom", -- optional separator
+    },
+    {
+      on_win = function(win)
+        vim.api.nvim_set_option_value("wrap", true, { scope = "local", win = win.win })
+        -- TODO: figure out why this does not work
+        vim.api.nvim_set_option_value("number", false, { scope = "local", win = win.win })
+        vim.api.nvim_set_option_value("relativenumber", false, { scope = "local", win = win.win })
+      end,
+      win = "preview",
+      -- no height ⇒ whatever is left
+    },
+  },
+}
+
 M.issue_picker = function()
   Snacks.picker({
     finder = fns.fetch_issues,
@@ -13,28 +42,32 @@ M.issue_picker = function()
       -- open the browser for the selected issue using gh cli
       vim.fn.jobstart({ "gh", "issue", "view", item.number, "--web" })
     end,
+    layout = wide_layout_with_wrap,
   })
 end
 
 -- TODO: <S-CR> should open in browser
 M.pr_picker = function()
   Snacks.picker({
-    layout = {
-      { preview = true },
-      layout = {
-        box = "horizontal",
-        width = 0.8,
-        height = 0.8,
-        {
-          box = "vertical",
-          border = "rounded",
-          title = "{source} {live} {flags}",
-          title_pos = "center",
-          { win = "input", height = 1, border = "bottom" },
-          { win = "list", border = "none" },
+    layout = wide_layout_with_wrap,
+    win = {
+      input = {
+        keys = {
+          ["<S-CR>"] = { "browse", desc = "Open PR in browser", mode = { "n", "i" } },
         },
-        { win = "preview", border = "rounded", width = 0.7, title = "{preview}", position = "bottom" },
       },
+      list = {
+        keys = {
+          ["<S-CR>"] = { "browse", desc = "Open PR in browser", mode = { "n", "i" } },
+        },
+      },
+    },
+    actions = {
+      browse = function(picker, pr)
+        picker:close()
+        -- open the browser for the selected PR using gh cli
+        vim.fn.jobstart({ "gh", "pr", "view", pr.number, "--web" })
+      end,
     },
     finder = fns.fetch_prs,
     format = fns.format_pr_row,
