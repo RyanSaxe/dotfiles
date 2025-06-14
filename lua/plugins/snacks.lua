@@ -52,10 +52,8 @@ local function normalize_path(path, max_length)
   return result
 end
 
-local diff = require("custom.git.diff")
 local git_pickers = require("custom.git.pickers")
 local git_utils = require("custom.git.utils")
-local git_reddit = require("custom.git.reddit")
 local enable_issues = true
 local Snacks = require("snacks")
 
@@ -207,7 +205,14 @@ local create_sections = function()
       desc = "Checkout Another Branch",
       key = "b",
       action = function()
-        Snacks.picker.git_branches()
+        Snacks.picker.git_branches({
+          confirm = function(picker, item)
+            picker:close()
+            vim.notify(vim.inspect(item), vim.log.levels.DEBUG)
+            git_utils.checkout_branch(item.branch)
+            Snacks.dashboard.update()
+          end,
+        })
       end,
       enabled = Snacks.git.get_root() ~= nil,
       indent = 2,
@@ -229,7 +234,7 @@ local create_sections = function()
       icon = " ",
       indent = 2,
       desc = "Find Un-Commited Changes",
-      padding = 5,
+      padding = 1,
       key = "u",
       action = function()
         Snacks.picker.git_status()
@@ -322,7 +327,7 @@ local create_sections = function()
       -- the commented out command below will have an animated ascii aquarium
       -- cmd = 'curl "http://asciiquarium.live?cols=$(tput cols)&rows=$(tput lines)"',
       cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.5",
-      indent = 10,
+      indent = 8,
       height = 20,
     },
   }
