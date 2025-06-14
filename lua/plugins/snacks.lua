@@ -57,6 +57,15 @@ local git_utils = require("custom.git.utils")
 local enable_issues = true
 local Snacks = require("snacks")
 
+local show_if_has_second_pane = function()
+  -- taken from snacks.dashboard. Only enable this visual if snacks allows a second pane.
+  local width = vim.o.columns
+  local pane_width = 60 -- default ... make dynamic if configured
+  local pane_gap = 4 -- default ... make dynamic if configured
+  local max_panes = math.max(1, math.floor((width + pane_gap) / (pane_width + pane_gap)))
+  return max_panes > 1
+end
+
 local create_pane = function(header, specs)
   local pane = header.pane
   header.padding = header.padding or 1
@@ -192,7 +201,42 @@ local create_sections = function()
 
     search_keys,
     {
+      title = "Recent Project Files",
       pane = 2,
+      indent = 0,
+      padding = 1,
+    },
+    function()
+      local out = {}
+      local recent_files = recent_files_in_cwd(3)
+      for i, rel in ipairs(recent_files) do
+        out[#out + 1] = {
+          pane = 2,
+          icon = "󰈙 ",
+          indent = 2,
+          padding = (i == #recent_files) and 1 or 0,
+          desc = normalize_path(rel),
+          key = tostring(i),
+          action = function()
+            vim.cmd("edit " .. rel)
+          end,
+          enabled = true,
+        }
+      end
+      if #out == 0 then
+        out[1] = {
+          pane = 2,
+          icon = " ",
+          desc = "No recent files in this directory",
+          padding = 1,
+          enabled = false,
+        }
+      end
+      return out
+    end,
+
+    {
+      pane = 1,
       title = "Git Operations",
       desc = string.format(" (%s)", current_branch:gsub("\n", "")),
       indent = 0,
@@ -200,7 +244,7 @@ local create_sections = function()
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
-      pane = 2,
+      pane = 1,
       icon = " ",
       desc = "Checkout Another Branch",
       key = "b",
@@ -208,7 +252,6 @@ local create_sections = function()
         Snacks.picker.git_branches({
           confirm = function(picker, item)
             picker:close()
-            vim.notify(vim.inspect(item), vim.log.levels.DEBUG)
             git_utils.checkout_branch(item.branch)
             Snacks.dashboard.update()
           end,
@@ -218,10 +261,9 @@ local create_sections = function()
       indent = 2,
     },
     {
-      pane = 2,
+      pane = 1,
       icon = " ",
-      desc = string.format("Search Diff (Hunks) vs %s", base_branch),
-      -- desc = string.format("git diff %s", get_base_branch()),
+      desc = string.format("Search Diff vs %s", base_branch),
       key = "d",
       indent = 2,
       action = function()
@@ -230,7 +272,7 @@ local create_sections = function()
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
-      pane = 2,
+      pane = 1,
       icon = " ",
       indent = 2,
       desc = "Find Un-Commited Changes",
@@ -265,7 +307,7 @@ local create_sections = function()
       pane = 1,
       icon = " ",
       desc = "Search Issues",
-      key = "i",
+      key = "I",
       indent = 2,
       action = function()
         vim.notify("Fetching open issues from GitHub...")
@@ -276,51 +318,17 @@ local create_sections = function()
     {
       pane = 1,
       icon = " ",
-      desc = "Open Repo in Browser",
+      desc = "Open in Browser",
       padding = 1,
-      key = "o",
+      key = "B",
       indent = 2,
       action = function()
         Snacks.gitbrowse()
       end,
       enabled = Snacks.git.get_root() ~= nil and enable_issues,
     },
-    hotkeys,
+    -- hotkeys,
     globalkeys,
-    {
-      title = "Recent Project Files",
-      pane = 1,
-      indent = 0,
-      padding = 1,
-    },
-    function()
-      local out = {}
-      local recent_files = recent_files_in_cwd(3)
-      for i, rel in ipairs(recent_files) do
-        out[#out + 1] = {
-          pane = 1,
-          icon = "󰈙 ",
-          indent = 2,
-          padding = (i == #recent_files) and 1 or 0,
-          desc = normalize_path(rel),
-          key = tostring(i),
-          action = function()
-            vim.cmd("edit " .. rel)
-          end,
-          enabled = true,
-        }
-      end
-      if #out == 0 then
-        out[1] = {
-          pane = 2,
-          icon = " ",
-          desc = "No recent files in this directory",
-          padding = 1,
-          enabled = false,
-        }
-      end
-      return out
-    end,
     {
       pane = 2,
       section = "terminal",
@@ -328,7 +336,9 @@ local create_sections = function()
       -- cmd = 'curl "http://asciiquarium.live?cols=$(tput cols)&rows=$(tput lines)"',
       cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.5",
       indent = 8,
-      height = 20,
+      -- 21 is the exact number of lines to make right and left bar aligned
+      height = 21,
+      enabled = show_if_has_second_pane,
     },
   }
 end
@@ -340,7 +350,7 @@ return {
     dependencies = { "ibhagwan/fzf-lua", "folke/todo-comments.nvim" },
     opts = {
       dashboard = {
-        -- this is separated into a function so that the dashboard update can redraw it
+        -- this is separated into a function so that the dashboard update can redraw it on .update()
         sections = create_sections,
       },
     },

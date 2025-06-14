@@ -86,8 +86,6 @@ local function toggle_pyright_diagnostic_mode()
   for _, client in ipairs(clients) do
     local cfg = client.config.settings or {}
 
-    vim.notify(vim.inspect(cfg), vim.log.levels.INFO)
-
     if type(cfg.basedpyright) ~= "table" then
       cfg.basedpyright = {}
     end
@@ -115,5 +113,6 @@ vim.keymap.set("n", "<leader>pD", function()
   toggle_pyright_diagnostic_mode()
   Snacks.picker.diagnostics({
     live = true,
+    supports_live = true,
   })
 end, { desc = "TESTING PICKER" })
