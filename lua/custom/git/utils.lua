@@ -24,7 +24,7 @@ M.checkout_branch = function(branch)
   M.confirm_stash_uncommitted_changes_before_op(
     "You are about to checkout branch '" .. branch .. "'. This will discard any uncommitted changes.",
     function()
-      M._checkout_branch(cmd, branch)
+      vim.fn.system(cmd)
     end
   )
 end
