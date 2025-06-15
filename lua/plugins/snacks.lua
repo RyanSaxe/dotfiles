@@ -161,6 +161,23 @@ local globalkeys = function()
   local header = { pane = 1, title = "Global Commands" }
   local keys = {
     {
+      icon = "󰒲 ",
+      key = "l",
+      desc = "Lazy",
+      action = ":Lazy",
+      enabled = package.loaded.lazy ~= nil,
+    },
+    -- I dont use lazy extras much anymore, but leaving it here to easily enable it if needed
+    {
+      icon = " ",
+      key = "x",
+      desc = "Lazy Extras",
+      action = ":LazyExtras",
+      enabled = false, -- package.loaded.lazy ~= nil,
+    },
+    { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+    { icon = " ", key = "r", desc = "Restore Session", section = "session" },
+    {
       icon = " ",
       key = "c",
       desc = "Search Config",
@@ -176,7 +193,7 @@ local globalkeys = function()
     },
     {
       icon = " ",
-      key = "P",
+      key = "p",
       desc = "Find Project",
       action = function()
         return Snacks.picker.projects({
@@ -276,19 +293,10 @@ local create_sections = function()
       icon = " ",
       indent = 2,
       desc = "Find Un-Commited Changes",
-      padding = 1,
       key = "u",
       action = function()
         Snacks.picker.git_status()
       end,
-      enabled = Snacks.git.get_root() ~= nil,
-    },
-
-    {
-      pane = 1,
-      title = "Search Github",
-      indent = 0,
-      padding = 1,
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
@@ -296,7 +304,7 @@ local create_sections = function()
       icon = " ",
       desc = "Search Pull Requests",
       indent = 2,
-      key = "p",
+      key = "P",
       action = function()
         vim.notify("Fetching open PRs from GitHub...")
         vim.defer_fn(git_pickers.pr_picker, 100)
@@ -334,7 +342,7 @@ local create_sections = function()
       section = "terminal",
       -- the commented out command below will have an animated ascii aquarium
       -- cmd = 'curl "http://asciiquarium.live?cols=$(tput cols)&rows=$(tput lines)"',
-      cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.5",
+      cmd = "pokemon-colorscripts -n snorlax -s --no-title",
       indent = 8,
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
