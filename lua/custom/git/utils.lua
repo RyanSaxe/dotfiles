@@ -14,6 +14,17 @@ M.get_current_branch = function()
   return lines[1] or ""
 end
 
+M.checkout_branch = function(branch)
+  if not branch or branch == "" then
+    vim.notify("⚠️  No branch specified for checkout.", vim.log.levels.WARN)
+    return
+  end
+
+  local cmd = { "git", "checkout", branch }
+  M.confirm_stash_uncommitted_changes_before_op("Checking out branch '" .. branch .. "'.", function()
+    vim.fn.system(cmd)
+  end)
+end
 M.has_uncommitted_changes = function()
   local result = vim.fn.system("git status --porcelain")
   return result and result:match("%S") ~= nil

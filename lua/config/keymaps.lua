@@ -6,7 +6,8 @@
 
 vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv", { desc = "move lines down in visual selection" })
 vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv", { desc = "move lines up in visual selection" })
-
+-- make escape go to normal mode when in a terminal
+vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true, desc = "Terminal: go to Normal mode" })
 -- custom toggles, all at <leader>u + character to integrate with existing lazyvim toggles UI
 
 -- example for inline type hints -- not needed since comes built with lazyvim
@@ -20,6 +21,7 @@ vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv", { desc = "move lines up in visual s
 --
 -- Helper: return true if any Diffview buffer is open
 
+-- TODO: set up full different set of git toggles
 -------------------------------------------------------------------------------
 -- 1) <leader>tg: “Toggle Diffview (fetch & diff against remote default HEAD)”
 --    When no arguments are given, we treat head_refName = "HEAD".
@@ -30,7 +32,6 @@ vim.keymap.set("n", "<leader>tg", function()
     vim.cmd("DiffviewClose")
   else
     -- pass base_refName = nil (so it falls back to origin/<default>),
-    -- head_refName = "HEAD"
     diff.toggle_diffview(nil)
   end
 end, {
@@ -57,18 +58,48 @@ vim.keymap.set("n", "<leader>tG", function()
 end, {
   desc = "Toggle Diffview (fetch & diff against a specified branch)",
 })
--- keymaps/gh.lua ---------------------------------------------------------
 
--- lua/keymaps/gh-picker.lua ----------------------------------------------
-local git = require("custom.git.pickers")
+-- LSP related toggles
+-- NOTE: consider extending this to other LSP servers as needed
+-- NOTE: consider extensind to other types of analysis settings like type checking strictness
+-- TODO: look into seeing if sonarlint can also be executed workspace wide
+local function toggle_pyright_diagnostic_mode()
+  local clients = vim.lsp.get_clients({ bufnr = vim.api.nvim_get_current_buf(), name = "basedpyright" })
+  if vim.tbl_isempty(clients) then
+    vim.notify("basedpyright isn’t attached here", vim.log.levels.WARN)
+    return
+  end
 
-vim.keymap.set("n", "<leader>gp", function()
-  local items = git.fetch_prs()
-  Snacks.picker.pick({
-    prompt_title = "  Open Pull-Requests",
-    items = items,
-    -- format = git.format_pr_row,
-    -- preview = git.preview_pr,
-    layout = "select",
-  })
-end, { desc = "GitHub PR picker" })
+  for _, client in ipairs(clients) do
+    local cfg = client.config.settings or {}
+
+    if type(cfg.basedpyright) ~= "table" then
+      cfg.basedpyright = {}
+    end
+    if type(cfg.basedpyright.analysis) ~= "table" then
+      cfg.basedpyright.analysis = {}
+    end
+
+    local current = cfg.basedpyright.analysis.diagnosticMode or "openFilesOnly"
+    local next_mode = (current == "openFilesOnly") and "workspace" or "openFilesOnly"
+
+    cfg.basedpyright.analysis.diagnosticMode = next_mode
+
+    client.config.settings = cfg
+
+    client.notify("workspace/didChangeConfiguration", { settings = nil })
+    -- vim.cmd("LspRestart basedpyright")
+
+    vim.notify(("basedpyright diagnosticMode → %s"):format(next_mode), vim.log.levels.INFO)
+  end
+end
+
+vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
+-- TODO: get the picker to reload as more diagnostics come in ... below implementation breaks search
+-- vim.keymap.set("n", "<leader>tP", function()
+--   toggle_pyright_diagnostic_mode()
+--   Snacks.picker.diagnostics({
+--     live = true,
+--     supports_live = true,
+--   })
+-- end, { desc = "Search ALL Workspace Diagnostics" })

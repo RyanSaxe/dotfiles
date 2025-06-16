@@ -33,8 +33,8 @@ return {
                 functionReturnTypes = true,
                 genericTypes = true,
               },
-              diagnosticMode = "workspace", -- use this one for smaller projects where it doesn't slow things down.
-              -- diagnosticMode = "openFilesOnly", --bigger projects shouldn't run LSP always on the whole thing.
+              -- diagnosticMode = "workspace", -- use this one for smaller projects where it doesn't slow things down.
+              diagnosticMode = "openFilesOnly", --bigger projects shouldn't run LSP always on the whole thing.
               exclude = { ".venv", "venv" },
               autoImportCompletions = true,
               autoSearchPaths = true,
