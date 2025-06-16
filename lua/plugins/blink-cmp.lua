@@ -2,7 +2,11 @@
 
 return {
   "saghen/blink.cmp",
-  dependencies = { "rafamadriz/friendly-snippets" }, -- "giuxtaposition/blink-cmp-copilot" },
+  dependencies = {
+    "rafamadriz/friendly-snippets",
+    "Kaiser-Yang/blink-cmp-dictionary",
+    dependencies = { "nvim-lua/plenary.nvim" },
+  }, -- "giuxtaposition/blink-cmp-copilot" },
   version = "*",
   event = { "InsertEnter", "CmdlineEnter" },
 
@@ -90,11 +94,18 @@ return {
     sources = {
       -- buffer is removed to avoid random words that arent symbols getting introduced.
       -- copilot is removed since that is always set to ghost text with tab completion
-      -- TODO: add blink-cmp-dictionary here that is explicitly enabled for markdown files
-      --        https://github.com/Kaiser-Yang/blink-cmp-dictionary/
-      --        https://github.com/linkarzu/dotfiles-latest/blob/main/neovim/neobean/lua/plugins/blink-cmp.lua#L160
-      default = { "lsp", "path" }, -- { "lazydev", "lsp", "copilot", "path", "snippets", "buffer" },
+      default = { "lsp", "path", "dictionary" }, -- { "lazydev", "lsp", "copilot", "path", "snippets", "buffer" },
       providers = {
+        dictionary = {
+          module = "blink-cmp-dictionary",
+          name = "Dict",
+          -- Make sure this is at least 2.
+          -- 3 is recommended
+          min_keyword_length = 3,
+          opts = {
+            dictionary_directories = { vim.fn.expand("~/.config/nvim/dictionaries") },
+          },
+        },
         -- copilot = {
         --   name = "copilot",
         --   module = "blink-cmp-copilot",

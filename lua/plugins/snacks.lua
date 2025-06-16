@@ -301,6 +301,24 @@ local create_sections = function()
     },
     {
       pane = 1,
+      icon = " ",
+      desc = "Open LazyGit UI",
+      key = "g",
+      indent = 2,
+      action = function()
+        Snacks.lazygit({ cwd = LazyVim.root.git() })
+      end,
+      enabled = Snacks.git.get_root() ~= nil,
+    },
+    {
+      pane = 1,
+      indent = 2,
+      -- 58 ticks is exactly the size of a line (width 60, indent = 2)
+      title = "----------------------------------------------------------",
+      enabled = Snacks.git.get_root() ~= nil,
+    },
+    {
+      pane = 1,
       icon = " ",
       desc = "Search Pull Requests",
       indent = 2,
@@ -333,7 +351,7 @@ local create_sections = function()
       action = function()
         Snacks.gitbrowse()
       end,
-      enabled = Snacks.git.get_root() ~= nil and enable_issues,
+      enabled = Snacks.git.get_root() ~= nil,
     },
     -- hotkeys,
     globalkeys,
