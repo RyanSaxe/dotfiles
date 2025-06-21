@@ -296,16 +296,9 @@ local create_sections = function()
     },
     {
       pane = 1,
-      indent = 2,
-      -- 58 ticks is exactly the size of a line (width 60, indent = 2)
-      title = "----------------------------------------------------------",
-      enabled = Snacks.git.get_root() ~= nil,
-    },
-    {
-      pane = 1,
       icon = " ",
       desc = "Open LazyGit UI",
-      key = "G",
+      key = "g",
       indent = 2,
       action = function()
         Snacks.lazygit({ cwd = LazyVim.root.git() })
@@ -314,11 +307,23 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
-      desc = "Open Git Blame View",
-      key = "J",
       indent = 2,
-      action = function() end,
+      -- 58 ticks is exactly the size of a line (width 60, indent = 2)
+      title = "----------------------------------------------------------",
+      enabled = Snacks.git.get_root() ~= nil,
+    },
+
+    {
+      pane = 1,
+      icon = " ",
+      desc = "Search Notifications",
+      key = "N",
+      indent = 2,
+      action = function()
+        vim.notify("Fetching Notifications from GitHub...")
+        vim.defer_fn(git_pickers.notification_picker, 100)
+      end,
+      enabled = Snacks.git.get_root() ~= nil,
     },
     {
       pane = 1,
