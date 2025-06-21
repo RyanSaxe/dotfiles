@@ -1,4 +1,5 @@
 return {
+  enabled = false, -- some formatting issues making it so the bullets still render annoyingly
   "bngarren/checkmate.nvim",
   ft = "markdown", -- Lazy loads for Markdown files matching patterns in 'files'
   opts = {
