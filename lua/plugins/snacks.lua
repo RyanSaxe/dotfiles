@@ -219,19 +219,24 @@ local create_sections = function()
     search_keys,
     {
       title = "Recent Project Files",
-      pane = 2,
+      pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
       padding = 1,
     },
     function()
       local out = {}
-      local recent_files = recent_files_in_cwd(3)
+      local max_files = 5
+      local recent_files = recent_files_in_cwd(max_files)
+      local n_files = #recent_files
+      local pane = Snacks.git.get_root() and 2 or 1
+      local final_padding = pane == 2 and max_files - n_files + 1 or 1
+
       for i, rel in ipairs(recent_files) do
         out[#out + 1] = {
-          pane = 2,
+          pane = pane,
           icon = "󰈙 ",
           indent = 2,
-          padding = (i == #recent_files) and 1 or 0,
+          padding = (i == n_files) and final_padding or 0,
           desc = normalize_path(rel),
           key = tostring(i),
           action = function()
@@ -245,8 +250,8 @@ local create_sections = function()
           pane = 2,
           icon = " ",
           desc = "No recent files in this directory",
-          padding = 1,
-          enabled = false,
+          padding = pane == 2 and max_files or 1,
+          enabled = true,
         }
       end
       return out
@@ -360,7 +365,9 @@ local create_sections = function()
       section = "terminal",
       -- the commented out command below will have an animated ascii aquarium
       -- cmd = 'curl "http://asciiquarium.live?cols=$(tput cols)&rows=$(tput lines)"',
-      cmd = "pokemon-colorscripts -n snorlax -s --no-title",
+      -- NOTE: for some reason, sleep 10 makes it never flicker, but also only causes a 1 second pause
+      cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.01",
+      ttl = math.huge, -- make the cache last forever so the 1 second pause is only the first time opening a project
       indent = 8,
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
