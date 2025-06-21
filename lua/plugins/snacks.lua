@@ -197,7 +197,12 @@ local globalkeys = function()
 
   return create_pane(header, keys)
 end
-
+local recent_project_toggle = function()
+  local in_git = Snacks.git.get_root() ~= nil
+  local has_two_panes = show_if_has_second_pane()
+  -- if in git and has one pane, then we disable
+  return not (in_git and not has_two_panes)
+end
 local get_recent_files = function()
   local out = {}
   local max_files = 5
@@ -217,7 +222,7 @@ local get_recent_files = function()
       action = function()
         vim.cmd("edit " .. rel)
       end,
-      enabled = true,
+      enabled = recent_project_toggle,
     }
   end
   if #out == 0 then
@@ -226,7 +231,7 @@ local get_recent_files = function()
       icon = " ",
       desc = "No recent files in this directory",
       padding = pane == 2 and max_files or 1,
-      enabled = true,
+      enabled = recent_project_toggle,
     }
   end
   return out
@@ -244,11 +249,12 @@ local create_sections = function()
       pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
       padding = 1,
+      enabled = recent_project_toggle,
     },
     recent_files,
     {
       pane = 1,
-      title = "Git Operations",
+      title = "Git",
       desc = string.format(" (%s)", current_branch:gsub("\n", "")),
       indent = 0,
       padding = 1,
@@ -421,6 +427,7 @@ return {
       dashboard = {
         -- this is separated into a function so that the dashboard update can redraw it on .update()
         sections = create_sections,
+        layout = { anchor = "center" },
       },
       -- picker = {
       --   layout = full_layout,
