@@ -287,7 +287,7 @@ local create_sections = function()
       pane = 1,
       icon = " ",
       indent = 2,
-      desc = "Find Un-Commited Changes",
+      desc = "Search Un-Commited Changes",
       key = "u",
       action = function()
         Snacks.picker.git_status()
@@ -316,7 +316,7 @@ local create_sections = function()
     {
       pane = 1,
       icon = " ",
-      desc = "Search Notifications",
+      desc = "Search Recent Notifications",
       key = "N",
       indent = 2,
       action = function()
@@ -352,7 +352,7 @@ local create_sections = function()
     {
       pane = 1,
       icon = " ",
-      desc = "Open GitHub",
+      desc = "Open Repo in GitHub",
       padding = 1,
       key = "B",
       indent = 2,
