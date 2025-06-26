@@ -71,7 +71,8 @@ M.notification_picker = function()
       local url = vim.fn.system({
         "gh",
         "api",
-        item.api_url,
+        -- get the comment URL if it exists, otherwise use the API URL
+        item.comment_url ~= "" and item.comment_url or item.api_url,
         "--jq",
         ".html_url",
       })

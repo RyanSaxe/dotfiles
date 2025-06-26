@@ -451,10 +451,8 @@ function M.fetch_notifications()
         title      = subj.title or "",
         type       = subj.type or "",        -- "PullRequest", "Issue", …
         api_url    = subj.url    or "",
-        html_url   = subj.latest_comment_url -- fallback, fixed in preview
-                    and subj.latest_comment_url:gsub("api%.github%.com/repos/", "github.com/"):gsub("/pulls/", "/pull/")
-                    or "",
-      text   = subj.title or "",  -- will be set in formatter
+        comment_url = subj.latest_comment_url or "",
+        text   = subj.title or "",  -- will be set in formatter
       }
 
     end
@@ -469,7 +467,12 @@ end
 ---@param picker table
 function M.format_notification_row(item, picker)
   local ret = {}
-  ret[#ret+1] = { align(item.type or "", 12), item.unread and "SnacksPickerIdx" or "SnacksIndent" }
+  -- if there is a new comment on the PR/issue I have not red, show the type as red
+  if item.comment_url ~= "" then
+    ret[#ret+1] = { align(item.type or "", 12), item.unread and "SnacksPickerSelected" or "SnacksIndent" }
+  else
+    ret[#ret+1] = { align(item.type or "", 12), item.unread and "SnacksPickerIdx" or "SnacksIndent" }
+  end
   ret[#ret+1] = { align(item.reason or "?", 12), item.unread and "SnacksIndent2" or "SnacksIndent" }
   ret[#ret+1] = { " " .. iso_to_relative(item.updated_at), item.unread and "SnacksIndent1" or "SnacksIndent" }
   ret[#ret+1] = { " " .. (item.title ~= "" and item.title or "<no title>"), item.unread and "SnacksIndent4" or "SnacksIndent" }
