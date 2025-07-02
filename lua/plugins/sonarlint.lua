@@ -187,5 +187,22 @@ return {
         "python",
       },
     })
+    -- this is really dumb, but sonarlint.nvim spams notifications about progress without a clear way to disable it.
+    -- the below autocmd silences those notifications so it's not distracting while I type.
+    local sonarlint_group = vim.api.nvim_create_augroup("SilenceSonarLint", { clear = true })
+    vim.api.nvim_create_autocmd("LspAttach", {
+      group = sonarlint_group,
+      callback = function(args)
+        -- Get the client that just attached
+        local client = vim.lsp.get_client_by_id(args.data.client_id)
+
+        -- Check if the client is sonarlint
+        if client and client.name == "sonarlint.nvim" then
+          -- This directly overrides the handler for this specific client,
+          -- silencing the progress notifications.
+          client.handlers["$/progress"] = function() end
+        end
+      end,
+    })
   end,
 }
