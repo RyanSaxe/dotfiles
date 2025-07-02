@@ -50,7 +50,12 @@ return {
               ["python:S1481"] = { level = "on", parameters = { regex = "(_[a-zA-Z0-9_]*|dummy|unused|ignored)" } },
               ["python:S1515"] = { level = "on" },
               ["python:S1542"] = { level = "on", parameters = { format = "^[a-z_][a-z0-9_]*$" } },
-              ["python:S1578"] = { level = "on", parameters = { format = "(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$" } },
+              -- this requires particular naming conventions for python modules. While it is a good rule, it causes sonar to yell when I open
+              -- scratchpad files, so I manually disable it.
+              ["python:S1578"] = {
+                level = "off",
+                parameters = { format = "(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$" },
+              },
               ["python:S1656"] = { level = "on" },
               ["python:S1700"] = { level = "on" },
               ["python:S1716"] = { level = "on" },

@@ -115,33 +115,22 @@ local search_keys = function()
     },
     {
       icon = " ",
-      desc = "Open TODO Notes",
+      desc = "Select and Grep Dependencies",
+      key = "s",
+      action = function()
+        -- TODO: this currently only works with python projects ... generalize to other languages
+        vim.cmd("GrepVenvSelectPackage")
+      end,
+    },
+    {
+      icon = " ",
+      desc = "Open TODO List",
       key = "t",
       action = function()
         Snacks.scratch.open({
           name = "TODO", -- this name makes it such that checkmate.nvim runs on this.
           ft = "markdown",
         })
-      end,
-    },
-    {
-      desc = "Open Code Scratchpad",
-      icon = " ",
-      key = "s",
-      action = function()
-        -- we ask the user to input the filetype and open a scratchpad for them
-
-        vim.ui.input({
-          prompt = "Enter filetype for scratchpad (default: python): ",
-          default = "python",
-        }, function(ft)
-          if ft == nil or ft == "" then
-            ft = "python"
-          end
-          Snacks.scratch.open({
-            ft = ft,
-          })
-        end)
       end,
     },
   }

@@ -1,43 +1,45 @@
--- TODO: make a snacks picker that shows these as preview files
+local filetypes = {
+  { text = "css" },
+  { text = "go" },
+  { text = "html" },
+  { text = "javascript" },
+  { text = "javascriptreact" },
+  { text = "lua" },
+  { text = "markdown" },
+  { text = "python" },
+  { text = "rust" },
+  { text = "typescript" },
+  { text = "typescriptreact" },
+  { text = "zig" },
+}
 return {
   {
     "folke/snacks.nvim",
     keys = {
-      { "<leader>.", false },
+      -- { "<leader>.", false },
       {
-        "<leader>.t",
+        "-",
+        function()
+          require("custom.snacks.scratch").new_scratch(filetypes)
+        end,
+        desc = "Toggle Scratch Buffer",
+      },
+      {
+        "_",
+        function()
+          require("custom.snacks.scratch").select_scratch()
+        end,
+        desc = "Select Scratch Buffer",
+      },
+      {
+        "<leader>-",
         function()
           Snacks.scratch.open({
             name = "TODO", -- this name makes it such that checkmate.nvim runs on this.
             ft = "markdown",
           })
         end,
-        desc = "TODO List",
-      },
-      {
-        "<leader>.m",
-        function()
-          Snacks.scratch.open({
-            ft = "markdown",
-          })
-        end,
-        desc = "Markdown",
-      },
-      {
-        "<leader>.p",
-        function()
-          Snacks.scratch.open({
-            ft = "python",
-          })
-        end,
-        desc = "Python",
-      },
-      {
-        "<leader>..",
-        function()
-          Snacks.scratch.open()
-        end,
-        desc = "Current File Type",
+        desc = "Open TODO List",
       },
     },
   },
