@@ -86,7 +86,6 @@ M.notification_picker = function()
   })
 end
 
--- TODO: <S-CR> should open in browser
 M.pr_picker = function()
   Snacks.picker({
     layout = wide_layout_with_wrap,

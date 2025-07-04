@@ -1,4 +1,5 @@
 -- https://github.com/folke/snacks.nvim/discussions/765
+-- edited from above for my own preferences
 local M = {}
 
 local column_widths = { 0, 0, 0, 0 }
@@ -12,10 +13,10 @@ end
 
 local function process_item(item)
   item._path = item.file
-  item.branch = item.branch and ("branch:%s"):format(item.branch) or ""
+  item.branch = item.branch or ""
   item.cwd = item.cwd and vim.fn.fnamemodify(item.cwd, ":p:~") or ""
   item.icon = item.icon or Snacks.util.icon(item.ft, "filetype")
-  item.preview = { text = item.file }
+  item.preview = { text = item.file, ft = item.ft }
   update_column_widths(item)
 end
 
@@ -25,12 +26,34 @@ local function process_items(items)
   end
 end
 
-local function format_item_text(item)
-  local parts = { item.cwd, item.icon, item.name, item.branch }
-  for i, part in ipairs(parts) do
-    parts[i] = part .. string.rep(" ", column_widths[i] - vim.api.nvim_strwidth(part))
-  end
-  return table.concat(parts, " ")
+---@param item   table   -- the PR item your finder produced
+---@param picker table   -- Snacks passes the current picker object
+---@return snacks.picker.Highlight[]
+function M.format_scratch_row(item, picker)
+  local a = Snacks.picker.util.align
+  local ret = {} ---@type snacks.picker.Highlight[]
+  ret[#ret + 1] = {
+    a(Snacks.picker.util.truncpath(item.cwd, 20, { cwd = item.cwd }), 20),
+    "SnacksPickerIdx",
+  }
+  ret[#ret + 1] = {
+    a(item.branch, 30, { truncate = true }),
+    "SnacksIndent3",
+  }
+  ret[#ret + 1] = {
+    a(item.name .. "." .. item.preview.ft, 20, { truncate = true }),
+    "SnacksIndent5",
+  }
+
+  -- Make the row fuzzy-searchable -- this is why we add the files from the diff
+  item.text = table.concat(
+    vim.tbl_map(function(seg)
+      return seg[1]
+    end, ret),
+    ""
+  )
+
+  return ret
 end
 
 function M.select_scratch()
@@ -40,7 +63,14 @@ function M.select_scratch()
   Snacks.picker.pick({
     source = "scratch",
     items = items,
-    format = "text",
+    format = M.format_scratch_row,
+    -- display the contents of the buffer with syntax highlighting
+    preview = function(ctx)
+      ctx.preview:reset()
+      local lines = vim.fn.readfile(ctx.item.file)
+      ctx.preview:set_lines(lines)
+      ctx.preview:highlight({ ft = ctx.item.preview.ft })
+    end,
     layout = {
       layout = { title = " Select Scratch Buffer: " },
       preview = true,
@@ -50,9 +80,6 @@ function M.select_scratch()
     },
     on_change = function()
       vim.cmd.startinsert()
-    end,
-    transform = function(item)
-      item.text = format_item_text(item)
     end,
     win = {
       input = {
@@ -86,9 +113,9 @@ function M.new_scratch(filetypes)
     items = filetypes,
     format = "text",
     layout = {
-      preset = "vscode",
+      preset = "select",
       preview = false,
-      layout = { title = " Select a filetype: " },
+      layout = { title = " Select a filetype: ", border = "rounded" },
     },
     actions = {
       confirm = function(picker, item)

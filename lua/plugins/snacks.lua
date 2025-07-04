@@ -115,7 +115,7 @@ local search_keys = function()
     },
     {
       icon = " ",
-      desc = "Select and Grep Dependencies",
+      desc = "Grep Dependencies",
       key = "s",
       action = function()
         -- TODO: this currently only works with python projects ... generalize to other languages
