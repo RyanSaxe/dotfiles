@@ -2,6 +2,11 @@
 
 local M = {}
 
+M.get_username = function()
+  local username = vim.fn.system("gh api user -q .login")
+  return username and username:match("^%s*(.-)%s*$") or ""
+end
+
 M.get_base_branch = function()
   local lines = vim.fn.systemlist("git symbolic-ref --short refs/remotes/origin/HEAD")
   local remote_head = lines[1] or ""

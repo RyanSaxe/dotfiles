@@ -3,31 +3,31 @@ local M = {}
 local fns = require("custom.git.picker_fns")
 local utils = require("custom.git.utils")
 
-local wide_layout_with_wrap = {
+-- mirror the default layout from Snacks but have the preview window wrap text
+local default_layout_with_wrap = {
   layout = {
-    box = "vertical", -- stack children top→bottom
-    border = "rounded",
-    height = 0.8,
+    box = "horizontal",
     width = 0.8,
+    min_width = 120,
+    height = 0.8,
     {
-      win = "input",
-      height = 1,
-      border = "bottom",
+      box = "vertical",
+      border = "rounded",
+      title = "{title} {live} {flags}",
+      { win = "input", height = 1, border = "bottom" },
+      { win = "list", border = "none" },
     },
     {
-      win = "list",
-      height = 0.4, -- exactly two rows tall
-      border = "bottom", -- optional separator
-    },
-    {
+      win = "preview",
+      title = "{preview}",
+      border = "rounded",
+      width = 0.5,
       on_win = function(win)
         vim.api.nvim_set_option_value("wrap", true, { scope = "local", win = win.win })
-        -- TODO: figure out why this does not work
+        -- TODO: figure out why this does not work for removing line numbers
         vim.api.nvim_set_option_value("number", false, { scope = "local", win = win.win })
         vim.api.nvim_set_option_value("relativenumber", false, { scope = "local", win = win.win })
       end,
-      win = "preview",
-      -- no height ⇒ whatever is left
     },
   },
 }
@@ -42,7 +42,7 @@ M.issue_picker = function()
       -- open the browser for the selected issue using gh cli
       vim.fn.jobstart({ "gh", "issue", "view", item.number, "--web" })
     end,
-    layout = wide_layout_with_wrap,
+    layout = default_layout_with_wrap,
   })
 end
 
@@ -88,7 +88,7 @@ end
 
 M.pr_picker = function()
   Snacks.picker({
-    layout = wide_layout_with_wrap,
+    layout = default_layout_with_wrap,
     win = {
       input = {
         keys = {

@@ -1,5 +1,49 @@
 local M = {}
 
+-- TODO: now that PR reviews are clean, update the Issue picker similarly and make the notification picker more useful
+
+local utils = require("custom.git.utils")
+
+--- Analyzes PR reviews to determine user involvement and need for response.
+-- @param reviews a Lua table of the 'reviews' for a single PR.
+-- @param current_user_login The GitHub login of the current user.
+-- @return boolean: `has_commented` - True if the user has commented.
+-- @return boolean: `needs_attention` - True if the user has commented AND the last comment is not from them.
+-- @return string: `latest_review_author` - The login of the author of the latest review.
+local get_status = function(reviews, current_user_login)
+
+  if not reviews or #reviews == 0 then
+    -- If there are no reviews, there's nothing to do.
+    return {false, false, "No Comments"}
+  end
+
+  local has_commented = false
+  local latest_review = reviews[1]
+
+  -- Find the latest review and check if the current user has commented.
+  -- Timestamps are ISO 8601, so they can be compared as strings.
+  for _, review in ipairs(reviews) do
+    if review.author and review.author.login == current_user_login then
+      has_commented = true
+    end
+    if review.submittedAt > latest_review.submittedAt then
+      latest_review = review
+    end
+  end
+
+  -- Determine if the latest comment is from someone else.
+  local last_comment_is_other = false
+  if latest_review.author then
+    last_comment_is_other = latest_review.author.login ~= current_user_login
+  end
+
+  -- The PR needs attention if the user is part of the conversation
+  -- and the last word wasn't theirs.
+  local needs_attention = has_commented and last_comment_is_other
+
+  return {has_commented, needs_attention, latest_review.author.login}
+end
+
 function M.fetch_prs()
   local fields = table.concat({
     "number",
@@ -11,6 +55,8 @@ function M.fetch_prs()
     "labels",
     "files",
     "body",
+    "statusCheckRollup",
+    "reviews",
     -- uncomment below and figure out how to determine if a PR has serious issues
     -- "mergeable",
     -- "statusCheckRollup",
@@ -28,36 +74,44 @@ function M.fetch_prs()
     ".[] | @json",
   })
 
+  local username = utils.get_username()
+
   local prs = {}
   for _, line in ipairs(json_lines) do
     local ok, obj = pcall(vim.json.decode, line)
-    if ok then
-      -- copy only what we need (keep path + counts)
-      local files = {}
-      for _, f in ipairs(obj.files or {}) do
-        files[#files + 1] = {
-          path = f.path,
-          additions = f.additions or 0,
-          deletions = f.deletions or 0,
-        }
-      end
-
-      prs[#prs + 1] = {
-        number = obj.number,
-        title = obj.title,
-        author = obj.author and obj.author.login or "",
-        head = obj.headRefName,
-        base = obj.baseRefName,
-        draft = obj.isDraft,
-        labels = vim.tbl_map(function(l)
-          return l.name
-        end, obj.labels or {}),
-        files = files,
-        body = obj.body or "",
-        file = "~/.config/nvim/init.lua",
-        text = obj.body or "",  -- will be set in formatter
+    if not ok then goto continue end
+    -- copy only what we need (keep path + counts)
+    local files = {}
+    for _, f in ipairs(obj.files or {}) do
+      files[#files + 1] = {
+        path = f.path,
+        additions = f.additions or 0,
+        deletions = f.deletions or 0,
       }
     end
+
+    local status_results = get_status(obj.reviews, username)
+    if not status_results then goto continue end
+
+    prs[#prs + 1] = {
+      number = obj.number,
+      title = obj.title,
+      author = obj.author and obj.author.login or "",
+      head = obj.headRefName,
+      base = obj.baseRefName,
+      draft = obj.isDraft,
+      labels = vim.tbl_map(function(l)
+        return l.name
+      end, obj.labels or {}),
+      files = files,
+      body = obj.body or "",
+      file = "~/.config/nvim/init.lua",
+      text = obj.body or "",  -- will be set in formatter
+      checkruns = obj.statusCheckRollup,
+      needs_attention = status_results[2] or false,
+      latest_review_author = status_results[3] or "No Comments",
+    }
+    ::continue::
   end
   return prs
 end
@@ -71,18 +125,18 @@ function M.format_pr_row(item, picker)
   local ret = {} ---@type snacks.picker.Highlight[]
   -- green means open PR, dimmed means draft PR
   ret[#ret + 1] = {
-    a("#" .. tostring(item.number or 0), 6, { truncate = true }),
+    a("#" .. tostring(item.number or 0) .. " by " .. (item.author or "<unknown>"), 25, { truncate = true }),
     item.draft and "SnacksIndent" or "SnacksIndent3",
   }
 
   ret[#ret + 1] = {
-    a(item.author or "<unknown>", 15, { truncate = true }),
-    "SnacksIndent5",
+    a(item.latest_review_author, 15, { truncate = true }),
+    item.needs_attention and "SnacksPickerSelected" or "SnacksIndent5",
   }
 
   local branch = (item.head and item.base) and (item.head .. "→" .. item.base) or ""
   ret[#ret + 1] = {
-    a(branch, 20, { truncate = true }),
+    a(branch, 30, { truncate = true }),
     "SnacksPickerIdx",
   }
 
@@ -126,12 +180,38 @@ function M.preview_pr(ctx)
   local pr = ctx.item or {}
   pr.files = pr.files or {}
   pr.labels = pr.labels or {}
+  pr.checkruns = pr.checkruns or {}
 
   local lines = {}
 
   -- Title
   lines[#lines + 1] = "# PR #" .. (pr.number or 0) .. ": " .. (pr.title or "")
   lines[#lines + 1] = ""
+  -- Overall Checks Status using GFM Alerts
+  if #pr.checkruns > 0 then
+    local has_failure, is_pending = false, false
+    for _, check in ipairs(pr.checkruns) do
+      if check.__typename == "CheckRun" then
+        local conclusion = check.conclusion
+        local status = check.status
+        if conclusion == "FAILURE" or conclusion == "TIMED_OUT" then
+          has_failure = true
+        elseif status ~= "COMPLETED" then
+          is_pending = true
+        end
+      end
+    end
+
+    if has_failure then
+      lines[#lines + 1] = "> [!CAUTION] Some checks have failed"
+    elseif is_pending then
+      lines[#lines + 1] = "> [!WARNING] Checks are pending"
+    else
+      lines[#lines + 1] = "> [!TIP] All checks have passed"
+    end
+    lines[#lines + 1] = "" -- Spacer
+  end
+
 
   -- Metadata
   lines[#lines + 1] = "## Metadata"
@@ -156,7 +236,6 @@ function M.preview_pr(ctx)
   lines[#lines + 1] = ""
   lines[#lines + 1] = "## Description"
   lines[#lines + 1] = (pr.body and pr.body ~= "" and pr.body) or "_No description provided_"
-
   -- Files changed
   if #pr.files > 0 then
     local add_sum, del_sum = 0, 0
@@ -177,7 +256,6 @@ function M.preview_pr(ctx)
     lines[#lines + 1] = "```diff"
 
     for _, f in ipairs(pr.files) do
-      -- Decide prefix so diff coloring shows additions, deletions, or mixed
       local prefix = (f.additions or 0) > 0 and (f.deletions or 0) == 0 and "+"
         or (f.deletions or 0) > 0 and (f.additions or 0) == 0 and "-"
         or " "
@@ -187,13 +265,52 @@ function M.preview_pr(ctx)
     lines[#lines + 1] = "```"
   end
 
-  -- Render into the preview buffer with Markdown + diff coloring
+  -- Detailed Checks List using GFM Alerts
+  if #pr.checkruns > 0 then
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "## Checks"
+
+    local check_flavors = {
+      -- Green
+      SUCCESS = "[!TIP]",
+      -- Red
+      FAILURE = "[!CAUTION]",
+      TIMED_OUT = "[!CAUTION]",
+      -- Yellow
+      IN_PROGRESS = "[!WARNING]",
+      QUEUED = "[!WARNING]",
+      ACTION_REQUIRED = "[!WARNING]",
+      CANCELLED = "[!WARNING]",
+      SKIPPED = "[!NOTE]",
+      STALE = "[!NOTE]",
+      NEUTRAL = "[!NOTE]",
+    }
+
+    for _, check in ipairs(pr.checkruns) do
+      if check.__typename == "CheckRun" then
+        local key = check.conclusion or check.status
+        local flavor = check_flavors[key] or "[!WARNING]" -- Default to warning
+        local name = check.name
+
+        if check.workflowName and check.workflowName ~= "" then
+          name = check.workflowName .. " / " .. name
+        end
+        -- Format as "> [!FLAVOR] STATUS: Check Name"
+        lines[#lines + 1] = string.format("> %s %s", flavor, key)
+        lines[#lines + 1] = "> " .. name
+        lines[#lines + 1] = "" -- Spacer
+      end
+    end
+  end
+
+
+  -- Render into the preview buffer with Markdown highlighting
   ctx.preview:set_lines(lines)
   ctx.preview:highlight({ ft = "markdown" })
+  -- TODO: this works to get markdown rendered nicely, but only for the initial shown preview and not
+  --       when <C-j> is used to look at the next item. Need to figure out why and resolve.
+  vim.bo[ctx.preview.win.buf].filetype = "markdown"
 end
--- GitHub Issues picker ----------------------------------
--- Add these functions below your existing PR picker code, before the final `return M`
-
 --- Fetch open issues from GitHub using the `gh` CLI
 function M.fetch_issues()
   local fields = table.concat({
@@ -419,9 +536,7 @@ local function iso_to_relative(iso)
   else return math.floor(delta/86400) .. " d ago" end
 end
 
--- ─────────────────────────────────────────────────────────────
--- Fetch
--- ─────────────────────────────────────────────────────────────
+
 function M.fetch_notifications()
   local owner, repo = current_repo()
   if owner == "" or repo == "" then return {} end
@@ -457,17 +572,19 @@ function M.fetch_notifications()
 
     end
   end
-    return notes
+  table.sort(notes, function(a, b)
+    return a.updated_at > b.updated_at
+  end)
+  return notes
 end
 
--- ─────────────────────────────────────────────────────────────
--- Row formatter
--- ─────────────────────────────────────────────────────────────
+
 ---@param item   table
 ---@param picker table
 function M.format_notification_row(item, picker)
   local ret = {}
-  -- if there is a new comment on the PR/issue I have not red, show the type as red
+  -- if there is a new comment on the PR/issue I have not read, show the type as red
+  -- FIX: this does not actually work, since the comment url could have been made by me
   if item.comment_url ~= "" then
     ret[#ret+1] = { align(item.type or "", 12), item.unread and "SnacksPickerSelected" or "SnacksIndent" }
   else
