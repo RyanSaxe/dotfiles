@@ -50,7 +50,12 @@ return {
               ["python:S1481"] = { level = "on", parameters = { regex = "(_[a-zA-Z0-9_]*|dummy|unused|ignored)" } },
               ["python:S1515"] = { level = "on" },
               ["python:S1542"] = { level = "on", parameters = { format = "^[a-z_][a-z0-9_]*$" } },
-              ["python:S1578"] = { level = "on", parameters = { format = "(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$" } },
+              -- this requires particular naming conventions for python modules. While it is a good rule, it causes sonar to yell when I open
+              -- scratchpad files, so I manually disable it.
+              ["python:S1578"] = {
+                level = "off",
+                parameters = { format = "(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$" },
+              },
               ["python:S1656"] = { level = "on" },
               ["python:S1700"] = { level = "on" },
               ["python:S1716"] = { level = "on" },
@@ -186,6 +191,23 @@ return {
       filetypes = {
         "python",
       },
+    })
+    -- this is really dumb, but sonarlint.nvim spams notifications about progress without a clear way to disable it.
+    -- the below autocmd silences those notifications so it's not distracting while I type.
+    local sonarlint_group = vim.api.nvim_create_augroup("SilenceSonarLint", { clear = true })
+    vim.api.nvim_create_autocmd("LspAttach", {
+      group = sonarlint_group,
+      callback = function(args)
+        -- Get the client that just attached
+        local client = vim.lsp.get_client_by_id(args.data.client_id)
+
+        -- Check if the client is sonarlint
+        if client and client.name == "sonarlint.nvim" then
+          -- This directly overrides the handler for this specific client,
+          -- silencing the progress notifications.
+          client.handlers["$/progress"] = function() end
+        end
+      end,
     })
   end,
 }
