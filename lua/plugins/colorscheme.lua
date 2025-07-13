@@ -52,6 +52,8 @@ return {
       -- represent them with formatting style that makes them stand out
       hl["@keyword.risky"] = { fg = c.old_magenta2, underline = true, bold = true, italic = true }
       hl["@keyword.error"] = { fg = c.old_magenta2 }
+      -- private variables should be colored like global constants to make them stand out
+      hl["@variable.private"] = { fg = c.red }
       -- make variables overall very clear and readable, with a blue theme
       hl["@variable.builtin"] = { fg = c.blue5 }
       hl["@variable"] = { fg = c.blue }
@@ -123,7 +125,7 @@ return {
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg(c.git_purple, 0.5) }
       hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.2) }
       -- make sure code blocks are clearly readable via having a different background
-      hl["RenderMarkdownCode"] = { bg = c.bg_highlight }
+      hl["RenderMarkdownCode"] = { bg = Util.blend_bg(c.bg_dark, 0.1) }
     end,
   },
 }

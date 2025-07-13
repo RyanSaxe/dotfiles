@@ -94,7 +94,16 @@ return {
     sources = {
       -- buffer is removed to avoid random words that arent symbols getting introduced.
       -- copilot is removed since that is always set to ghost text with tab completion
-      default = { "lsp", "path", "dictionary" }, -- { "lazydev", "lsp", "copilot", "path", "snippets", "buffer" },
+      default = function()
+        -- base set of sources everywhere
+        local result = { "lsp", "path" }
+        -- only load dictionary for markdown
+        if vim.bo.filetype == "markdown" then
+          table.insert(result, "dictionary")
+          table.insert(result, "buffer")
+        end
+        return result
+      end,
       providers = {
         dictionary = {
           module = "blink-cmp-dictionary",

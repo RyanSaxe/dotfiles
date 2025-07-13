@@ -41,7 +41,7 @@ return {
               disableOrganizeImports = true,
               -- parameters on how strict basedpyright should be
               -- strictGenericNarrowing = true, I like this, but it slows down based pyright
-              typeCheckingMode = "basic",
+              typeCheckingMode = "standard",
             },
           },
         },
