@@ -59,6 +59,8 @@ return {
       hl["@variable"] = { fg = c.blue }
       hl["@variable.member"] = { fg = c.blue5 }
       hl["@variable.parameter"] = { fg = c.blue5 }
+      -- in python make read only attributes (like properties) yellow
+      -- hl["@lsp.mod.readonly.python"] = { fg = c.yellow }
       -- ensure punctuation and operations are clear and not distracting
       hl["@operator"] = { fg = c.purple }
       hl["@punctuation.delimiter"] = { fg = c.purple }

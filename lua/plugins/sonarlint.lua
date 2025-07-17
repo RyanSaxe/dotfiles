@@ -1,5 +1,6 @@
 -- NOTE: this requires openjdk@17 to be installed
 return {
+  enabled = true,
   url = "https://gitlab.com/schrieveslaach/sonarlint.nvim",
   ft = { "python" },
   config = function()

@@ -87,7 +87,7 @@ return {
 
     -- Experimental signature help support
     signature = {
-      enabled = false,
+      enabled = true,
       window = { border = "rounded", show_documentation = true },
     },
 
