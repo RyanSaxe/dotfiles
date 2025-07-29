@@ -73,7 +73,9 @@ return {
       -- lsp special handling
       hl["@lsp.type.namespace.python"] = "@module"
       hl["@lsp.type.decorator.python"] = "@function"
-      hl["@lsp.type.TypeParameter.python"] = { fg = c.blue }
+      hl["@lsp.type.TypeParameter.python"] = { fg = c.teal }
+      hl["@lsp.type.clsParameter.python"] = { fg = c.moon_pink }
+      hl["@lsp.type.selfParameter.python"] = { fg = c.moon_pink }
       -- since this is virtual text, it looks annoying during a diff view.
       -- TODO: consider in common diff toggles also toggling inlay hints
       hl["LspInlayHint"] = { fg = c.dark3, bg = nil }
