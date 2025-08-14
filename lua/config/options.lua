@@ -6,3 +6,5 @@
 vim.opt.updatetime = 50
 -- highlight the search results
 vim.opt.hlsearch = true
+-- since I use flash to jump, I prefer absolute line numbers
+vim.opt.relativenumber = false
