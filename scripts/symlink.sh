@@ -41,9 +41,14 @@ create_symlink() {
             rm -f "$target"
         else
             # It's a real file/directory, back it up
-            local backup="${target}.bak.$(date +%s)"
-            mv "$target" "$backup"
-            warn "Backed up existing file to $backup"
+            local timestamp=$(date +%Y%m%d_%H%M%S)
+            local backup_name="$(basename "$target")_${timestamp}"
+            local backup_path="$DOTFILES_DIR/backups/$backup_name"
+            mv "$target" "$backup_path"
+            
+            # Create restore instructions
+            echo "$backup_path → $target" >> "$DOTFILES_DIR/backups/RESTORE_INSTRUCTIONS.txt"
+            warn "Backed up existing file to $backup_path"
         fi
     fi
     

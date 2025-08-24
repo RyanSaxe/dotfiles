@@ -7,4 +7,6 @@ foo.*
 *.log
 data
 archive/
+backups/*
+!backups/README.txt
 .DS_STORE
