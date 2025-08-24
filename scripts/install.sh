@@ -32,16 +32,17 @@ detect_pm() {
   err "No supported package manager found (brew or apt)"
   exit 1
 }
-# NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
-BREW_DEPS=(
-  neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython jq
-  openjdk@17 wget git-delta zsh bat ghostscript imagemagick tectonic luarocks
-)
-APT_DEPS=(
-  neovim ripgrep fzf fd-find git build-essential nodejs npm tmux gh jq
-  python3 ipython3 openjdk-17-jdk wget git-delta curl zsh bat
-  ghostscript imagemagick software-properties-common luarocks
-)
+# Load package lists from config files
+DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
+BREW_DEPS=()
+while IFS= read -r line; do
+  BREW_DEPS[${#BREW_DEPS[@]}]="$line"
+done < "$DOTFILES_DIR/config/brew-packages.txt"
+
+APT_DEPS=()
+while IFS= read -r line; do
+  APT_DEPS[${#APT_DEPS[@]}]="$line"
+done < "$DOTFILES_DIR/config/apt-packages.txt"
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
 #

@@ -5,10 +5,16 @@ This repository contains my complete development environment setup including dot
 ## 📁 Structure
 
 ```
+config/                     # Configuration files for dependencies and symlinks
+├── brew-packages.txt      # Homebrew packages (one per line)
+├── apt-packages.txt       # APT packages (one per line)
+└── symlinks.txt           # Dotfile mappings (source:target per line)
 nvim/                       # Neovim configuration (LazyVim)
 bat/                        # bat (cat with syntax highlighting)  
 ghostty/                    # Ghostty terminal emulator
 zsh/                        # Zsh shell configuration and themes
+├── .zshrc                 # Main zsh configuration
+└── themes/                # Custom zsh themes
 git/                        # Git configuration (global ignore, etc.)
 scripts/                    # Installation and management scripts
 ├── install.sh             # Full environment setup
@@ -68,10 +74,12 @@ Some tools require additional manual setup after installation:
 - **History**: `git log --oneline` to see all configuration changes
 - **Branching**: Test major changes on branches before merging
 
-### Adding New Dotfiles
-1. Add config files to appropriate `toolname/` directory
-2. Update `DOTFILE_MAPPINGS` in `scripts/symlink.sh`  
-3. Run `./scripts/symlink.sh` to create new symlinks
+### Adding New Dependencies
+1. **New packages**: Add to `config/brew-packages.txt` or `config/apt-packages.txt`
+2. **New dotfiles**: Add source:target mapping to `config/symlinks.txt`
+3. Run `./scripts/install.sh` or `./scripts/symlink.sh` as needed
+
+No code changes required - just edit the configuration files!
 
 ## 🌍 Cross-Platform Support
 

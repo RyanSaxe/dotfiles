@@ -18,16 +18,11 @@ success() { printf "\033[1;32m[OK  ]\033[0m %s\n" "$*"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Dotfile mappings: source_path:target_path (Bash 3.2 compatible)
-DOTFILE_MAPPINGS=(
-    "nvim:$HOME/.config/nvim"
-    "bat/config:$HOME/.config/bat/config"
-    "bat/themes:$HOME/.config/bat/themes"
-    "ghostty/config:$HOME/.config/ghostty/config"
-    "zsh/zshrc:$HOME/.zshrc"
-    "zsh/fino-time-custom.zsh-theme:$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
-    "git/ignore:$HOME/.config/git/ignore"
-)
+# Load dotfile mappings from config file
+DOTFILE_MAPPINGS=()
+while IFS= read -r line; do
+  DOTFILE_MAPPINGS[${#DOTFILE_MAPPINGS[@]}]="$line"
+done < "$DOTFILES_DIR/config/symlinks.txt"
 
 # ──────────────────────────────────────────────────────
 # Helper functions
@@ -46,9 +41,14 @@ create_symlink() {
             rm -f "$target"
         else
             # It's a real file/directory, back it up
-            local backup="${target}.bak.$(date +%s)"
-            mv "$target" "$backup"
-            warn "Backed up existing file to $backup"
+            local timestamp=$(date +%Y%m%d_%H%M%S)
+            local backup_name="$(basename "$target")_${timestamp}"
+            local backup_path="$DOTFILES_DIR/backups/$backup_name"
+            mv "$target" "$backup_path"
+            
+            # Create restore instructions
+            echo "$backup_path → $target" >> "$DOTFILES_DIR/backups/RESTORE_INSTRUCTIONS.txt"
+            warn "Backed up existing file to $backup_path"
         fi
     fi
     
