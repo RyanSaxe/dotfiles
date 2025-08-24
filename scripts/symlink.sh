@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeu pipefail
+set -Eeuo pipefail
 IFS=$'\n\t'
 
 # ──────────────────────────────────────────────────────
@@ -19,15 +19,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")/dotfiles"
 
 # Dotfile mappings: source_path:target_path
-declare -A DOTFILE_MAPPINGS=(
-    ["nvim"]="$HOME/.config/nvim"
-    ["bat/config"]="$HOME/.config/bat/config"
-    ["bat/themes"]="$HOME/.config/bat/themes"
-    ["ghostty/config"]="$HOME/.config/ghostty/config"
-    ["zsh/zshrc"]="$HOME/.zshrc"
-    ["zsh/fino-time-custom.zsh-theme"]="$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
-    ["git/ignore"]="$HOME/.config/git/ignore"
-)
+declare -A DOTFILE_MAPPINGS
+DOTFILE_MAPPINGS["nvim"]="$HOME/.config/nvim"
+DOTFILE_MAPPINGS["bat/config"]="$HOME/.config/bat/config"
+DOTFILE_MAPPINGS["bat/themes"]="$HOME/.config/bat/themes"
+DOTFILE_MAPPINGS["ghostty/config"]="$HOME/.config/ghostty/config"
+DOTFILE_MAPPINGS["zsh/zshrc"]="$HOME/.zshrc"
+DOTFILE_MAPPINGS["zsh/fino-time-custom.zsh-theme"]="$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
+DOTFILE_MAPPINGS["git/ignore"]="$HOME/.config/git/ignore"
 
 # ──────────────────────────────────────────────────────
 # Helper functions
