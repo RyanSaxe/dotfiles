@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 # ──────────────────────────────────────────────────────
 # Dotfiles Symlink Manager
-# Creates symlinks for all dotfiles with backup functionality
+# Creates symlinks for all dotfiles with version control management
 # ──────────────────────────────────────────────────────
 
 # Colorized logging (matching install.sh style)
@@ -17,7 +17,6 @@ success() { printf "\033[1;32m[OK  ]\033[0m %s\n" "$*"; }
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")/dotfiles"
-BACKUP_DIR="$HOME/.dotfiles_backup_$(date +%Y%m%d_%H%M%S)"
 
 # Dotfile mappings: source_path:target_path
 declare -A DOTFILE_MAPPINGS=(
@@ -33,21 +32,6 @@ declare -A DOTFILE_MAPPINGS=(
 # ──────────────────────────────────────────────────────
 # Helper functions
 
-backup_existing() {
-    local target=$1
-    if [[ -e "$target" && ! -L "$target" ]]; then
-        log "Backing up existing $target"
-        mkdir -p "$BACKUP_DIR/$(dirname "${target#$HOME/}")"
-        cp -r "$target" "$BACKUP_DIR/${target#$HOME/}"
-        return 0
-    elif [[ -L "$target" ]]; then
-        warn "Existing symlink found at $target - removing"
-        rm "$target"
-        return 0
-    fi
-    return 1
-}
-
 create_symlink() {
     local source=$1
     local target=$2
@@ -55,8 +39,10 @@ create_symlink() {
     # Create target directory if it doesn't exist
     mkdir -p "$(dirname "$target")"
     
-    # Backup existing file/directory if needed
-    backup_existing "$target"
+    # Remove existing file/symlink if it exists
+    if [[ -e "$target" || -L "$target" ]]; then
+        rm -rf "$target"
+    fi
     
     # Create the symlink
     if ln -sf "$source" "$target"; then
@@ -76,28 +62,12 @@ symlink_dotfiles() {
     
     log "Starting dotfiles symlinking..."
     log "Dotfiles directory: $DOTFILES_DIR"
-    log "Backup directory: $BACKUP_DIR"
     echo
     
     # Verify dotfiles directory exists
     if [[ ! -d "$DOTFILES_DIR" ]]; then
         err "Dotfiles directory not found: $DOTFILES_DIR"
         exit 1
-    fi
-    
-    # Create backup directory if we need it
-    local backup_needed=false
-    for mapping in "${!DOTFILE_MAPPINGS[@]}"; do
-        local target="${DOTFILE_MAPPINGS[$mapping]}"
-        if [[ -e "$target" && ! -L "$target" ]]; then
-            backup_needed=true
-            break
-        fi
-    done
-    
-    if [[ "$backup_needed" == true ]]; then
-        mkdir -p "$BACKUP_DIR"
-        log "Created backup directory: $BACKUP_DIR"
     fi
     
     # Process each dotfile mapping
@@ -118,9 +88,6 @@ symlink_dotfiles() {
     echo
     if ((failed == 0)); then
         success "✅ All dotfiles symlinked successfully!"
-        if [[ -d "$BACKUP_DIR" ]]; then
-            log "Backups saved to: $BACKUP_DIR"
-        fi
     else
         err "❌ $failed symlinks failed"
         exit 1
@@ -141,7 +108,6 @@ OPTIONS:
     -h, --help      Show this help message
     -l, --list      List all configured symlinks
     -d, --dry-run   Show what would be done without making changes
-    -f, --force     Force overwrite existing symlinks
 
 EXAMPLES:
     $(basename "$0")                 # Create all symlinks
@@ -174,10 +140,8 @@ dry_run() {
             continue
         fi
         
-        if [[ -e "$target" && ! -L "$target" ]]; then
-            log "BACKUP: $target → $BACKUP_DIR"
-        elif [[ -L "$target" ]]; then
-            warn "REMOVE: Existing symlink at $target"
+        if [[ -e "$target" || -L "$target" ]]; then
+            warn "REMOVE: Existing file/symlink at $target"
         fi
         
         log "LINK: $target → $source"
@@ -202,10 +166,6 @@ main() {
                 ;;
             -d|--dry-run)
                 dry_run_mode=true
-                shift
-                ;;
-            -f|--force)
-                # Force mode - could add logic to skip backup prompts
                 shift
                 ;;
             *)
