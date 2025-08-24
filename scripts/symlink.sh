@@ -82,7 +82,7 @@ symlink_dotfiles() {
     for mapping in "${DOTFILE_MAPPINGS[@]}"; do
         IFS=: read -r src_path target_path <<<"$mapping"
         local source="$DOTFILES_DIR/$src_path"
-        local target="$target_path"
+        local target=$(eval echo "$target_path")
         
         if [[ ! -e "$source" ]]; then
             warn "Source not found, skipping: $source"
@@ -140,7 +140,7 @@ list_mappings() {
     for mapping in "${DOTFILE_MAPPINGS[@]}"; do
         IFS=: read -r src_path target_path <<<"$mapping"
         local source="$DOTFILES_DIR/$src_path"
-        local target="$target_path"
+        local target=$(eval echo "$target_path")
         printf "  %-30s → %s\n" "$source" "$target"
     done
 }
@@ -152,7 +152,7 @@ dry_run() {
     for mapping in "${DOTFILE_MAPPINGS[@]}"; do
         IFS=: read -r src_path target_path <<<"$mapping"
         local source="$DOTFILES_DIR/$src_path"
-        local target="$target_path"
+        local target=$(eval echo "$target_path")
         
         if [[ ! -e "$source" ]]; then
             warn "SKIP: Source not found - $source"

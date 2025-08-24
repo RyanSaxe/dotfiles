@@ -17,6 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test symlink variable expansion
+        shell: bash
+        run: |
+          # Test that symlink script properly expands variables like $HOME
+          # This prevents the literal "$HOME" directory bug
+          ./scripts/symlink.sh --dry-run | grep -q "$HOME" || {
+            echo "::error::Symlink script not expanding variables properly - check for literal \$HOME"
+            exit 1
+          }
+          
+          # Verify no literal $HOME directory is created
+          if [[ -d "\$HOME" ]]; then
+            echo "::error::Found literal '\$HOME' directory - variable expansion bug detected"
+            exit 1
+          fi
+
       - name: Install All Major Dependencies
         shell: bash
         run: |
