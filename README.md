@@ -80,3 +80,7 @@ The installation script supports:
 - **Ubuntu/Debian**: via apt with additional PPAs for latest versions
 
 All configurations are designed to work consistently across platforms.
+
+## 📄 Usage
+
+Feel free to use any code, configurations, or ideas from this repository for your own dotfiles setup. No attribution required - just enjoy!
