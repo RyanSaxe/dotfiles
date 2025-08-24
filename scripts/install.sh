@@ -35,12 +35,12 @@ detect_pm() {
 # NOTE: eventually there will be deps only on brew that are how I like things locally but overkill for a server
 BREW_DEPS=(
   neovim ripgrep fzf fd git lazygit node tmux gh python3 ipython jq
-  openjdk@17 wget git-delta zsh bat ghostscript imagemagick tectonic
+  openjdk@17 wget git-delta zsh bat ghostscript imagemagick tectonic luarocks
 )
 APT_DEPS=(
   neovim ripgrep fzf fd-find git build-essential nodejs npm tmux gh jq
   python3 ipython3 openjdk-17-jdk wget git-delta curl zsh bat
-  ghostscript imagemagick software-properties-common
+  ghostscript imagemagick software-properties-common luarocks
 )
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
