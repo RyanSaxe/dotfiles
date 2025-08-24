@@ -38,9 +38,9 @@ BREW_DEPS=(
   openjdk@17 wget git-delta zsh bat ghostscript imagemagick tectonic
 )
 APT_DEPS=(
-  neovim ripgrep fzf fd-find git build-essential nodejs tmux gh jq
+  neovim ripgrep fzf fd-find git build-essential nodejs npm tmux gh jq
   python3 ipython3 openjdk-17-jdk wget git-delta curl zsh bat
-  ghostscript imagemagick
+  ghostscript imagemagick software-properties-common
 )
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
@@ -73,15 +73,29 @@ install_brew() {
 }
 
 install_apt() {
-  # ubuntu apt points to old frozen neovim version, so we need to add the PPA to get the latest stable version
-  log "Adding Neovim PPA for latest stable (>= 0.11)…"
-  sudo_if_needed add-apt-repository -y ppa:neovim-ppa/stable
+  # Check if we're on Ubuntu before adding Ubuntu-specific PPA
+  . /etc/os-release 2>/dev/null || true
+  if [[ "${ID:-}" = "ubuntu" || "${ID_LIKE:-}" == *ubuntu* ]]; then
+    log "Adding Neovim PPA for latest stable (>= 0.11)…"
+    sudo_if_needed apt-get update -qq
+    sudo_if_needed apt-get install -y software-properties-common
+    sudo_if_needed add-apt-repository -y ppa:neovim-ppa/stable
+  else
+    warn "Skipping Ubuntu PPA on non-Ubuntu system (${ID:-unknown})"
+  fi
 
   log "Updating apt repositories…"
   sudo_if_needed apt-get update -qq
 
   log "Installing: ${APT_DEPS[*]}"
-  sudo_if_needed apt-get install -y "${APT_DEPS[@]}"
+  # Install packages that are available, skip those that aren't
+  for pkg in "${APT_DEPS[@]}"; do
+    if sudo_if_needed apt-get install -y "$pkg" 2>/dev/null; then
+      log "✓ Installed $pkg"
+    else
+      warn "⚠ Failed to install $pkg (may not be available in this repository)"
+    fi
+  done
 
   # fd-find → fd symlink
   if ! command -v fd &>/dev/null; then
@@ -92,6 +106,12 @@ install_apt() {
     else
       err "fdfind not found; fd will be unavailable"
     fi
+  fi
+
+  # bat → batcat symlink (common on Debian/Ubuntu)
+  if ! command -v bat &>/dev/null && command -v batcat &>/dev/null; then
+    log "Linking batcat → bat"
+    sudo_if_needed ln -sf "$(command -v batcat)" /usr/local/bin/bat
   fi
 
   # tectonic (not in apt)
@@ -137,7 +157,14 @@ install_tectonic() {
   url="https://github.com/tectonic-typesetting/tectonic/releases/download/v${version}/${deb_name}"
   tmpdir=$(mktemp -d)
   curl -fsSL -o "$tmpdir/$deb_name" "$url"
-  sudo_if_needed dpkg -i "$tmpdir/$deb_name"
+  
+  # Install the package and fix any dependency issues
+  if ! sudo_if_needed dpkg -i "$tmpdir/$deb_name"; then
+    log "Fixing dependencies for tectonic..."
+    sudo_if_needed apt-get -f install -y
+    sudo_if_needed dpkg -i "$tmpdir/$deb_name"
+  fi
+  
   rm -rf "$tmpdir"
   log "Tectonic $version installed successfully."
 }

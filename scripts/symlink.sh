@@ -18,15 +18,16 @@ success() { printf "\033[1;32m[OK  ]\033[0m %s\n" "$*"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Dotfile mappings: source_path:target_path
-declare -A DOTFILE_MAPPINGS
-DOTFILE_MAPPINGS["nvim"]="$HOME/.config/nvim"
-DOTFILE_MAPPINGS["bat/config"]="$HOME/.config/bat/config"
-DOTFILE_MAPPINGS["bat/themes"]="$HOME/.config/bat/themes"
-DOTFILE_MAPPINGS["ghostty/config"]="$HOME/.config/ghostty/config"
-DOTFILE_MAPPINGS["zsh/zshrc"]="$HOME/.zshrc"
-DOTFILE_MAPPINGS["zsh/fino-time-custom.zsh-theme"]="$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
-DOTFILE_MAPPINGS["git/ignore"]="$HOME/.config/git/ignore"
+# Dotfile mappings: source_path:target_path (Bash 3.2 compatible)
+DOTFILE_MAPPINGS=(
+    "nvim:$HOME/.config/nvim"
+    "bat/config:$HOME/.config/bat/config"
+    "bat/themes:$HOME/.config/bat/themes"
+    "ghostty/config:$HOME/.config/ghostty/config"
+    "zsh/zshrc:$HOME/.zshrc"
+    "zsh/fino-time-custom.zsh-theme:$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
+    "git/ignore:$HOME/.config/git/ignore"
+)
 
 # ──────────────────────────────────────────────────────
 # Helper functions
@@ -38,13 +39,21 @@ create_symlink() {
     # Create target directory if it doesn't exist
     mkdir -p "$(dirname "$target")"
     
-    # Remove existing file/symlink if it exists
+    # Handle existing files/symlinks safely
     if [[ -e "$target" || -L "$target" ]]; then
-        rm -rf "$target"
+        if [[ -L "$target" ]]; then
+            # It's a symlink, safe to remove
+            rm -f "$target"
+        else
+            # It's a real file/directory, back it up
+            local backup="${target}.bak.$(date +%s)"
+            mv "$target" "$backup"
+            warn "Backed up existing file to $backup"
+        fi
     fi
     
-    # Create the symlink
-    if ln -sf "$source" "$target"; then
+    # Create the symlink (use -n for BSD/macOS compatibility)
+    if ln -sfn "$source" "$target"; then
         success "✓ $target → $source"
         return 0
     else
@@ -70,9 +79,10 @@ symlink_dotfiles() {
     fi
     
     # Process each dotfile mapping
-    for mapping in "${!DOTFILE_MAPPINGS[@]}"; do
-        local source="$DOTFILES_DIR/$mapping"
-        local target="${DOTFILE_MAPPINGS[$mapping]}"
+    for mapping in "${DOTFILE_MAPPINGS[@]}"; do
+        IFS=: read -r src_path target_path <<<"$mapping"
+        local source="$DOTFILES_DIR/$src_path"
+        local target="$target_path"
         
         if [[ ! -e "$source" ]]; then
             warn "Source not found, skipping: $source"
@@ -119,9 +129,10 @@ EOF
 list_mappings() {
     log "Configured dotfile mappings:"
     echo
-    for mapping in "${!DOTFILE_MAPPINGS[@]}"; do
-        local source="$DOTFILES_DIR/$mapping"
-        local target="${DOTFILE_MAPPINGS[$mapping]}"
+    for mapping in "${DOTFILE_MAPPINGS[@]}"; do
+        IFS=: read -r src_path target_path <<<"$mapping"
+        local source="$DOTFILES_DIR/$src_path"
+        local target="$target_path"
         printf "  %-30s → %s\n" "$source" "$target"
     done
 }
@@ -130,9 +141,10 @@ dry_run() {
     log "DRY RUN - showing what would be done:"
     echo
     
-    for mapping in "${!DOTFILE_MAPPINGS[@]}"; do
-        local source="$DOTFILES_DIR/$mapping"
-        local target="${DOTFILE_MAPPINGS[$mapping]}"
+    for mapping in "${DOTFILE_MAPPINGS[@]}"; do
+        IFS=: read -r src_path target_path <<<"$mapping"
+        local source="$DOTFILES_DIR/$src_path"
+        local target="$target_path"
         
         if [[ ! -e "$source" ]]; then
             warn "SKIP: Source not found - $source"
@@ -140,7 +152,11 @@ dry_run() {
         fi
         
         if [[ -e "$target" || -L "$target" ]]; then
-            warn "REMOVE: Existing file/symlink at $target"
+            if [[ -L "$target" ]]; then
+                warn "REMOVE: Existing symlink at $target"
+            else
+                warn "BACKUP: Existing file at $target"
+            fi
         fi
         
         log "LINK: $target → $source"
