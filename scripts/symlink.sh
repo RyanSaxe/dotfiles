@@ -20,8 +20,8 @@ DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Load dotfile mappings from config file
 DOTFILE_MAPPINGS=()
-while IFS= read -r line; do
-  DOTFILE_MAPPINGS[${#DOTFILE_MAPPINGS[@]}]="$line"
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ -n "$line" ]] && DOTFILE_MAPPINGS[${#DOTFILE_MAPPINGS[@]}]="$line"
 done < "$DOTFILES_DIR/config/symlinks.txt"
 
 # ──────────────────────────────────────────────────────
@@ -129,6 +129,14 @@ EOF
 list_mappings() {
     log "Configured dotfile mappings:"
     echo
+    local total_lines expected_mappings
+    total_lines=$(wc -l < "$DOTFILES_DIR/config/symlinks.txt" 2>/dev/null || echo 0)
+    expected_mappings=${#DOTFILE_MAPPINGS[@]}
+    
+    if [[ $expected_mappings -ne $total_lines ]]; then
+        warn "⚠ Found $expected_mappings mappings but $total_lines lines in config - possible missing newline issue"
+    fi
+    
     for mapping in "${DOTFILE_MAPPINGS[@]}"; do
         IFS=: read -r src_path target_path <<<"$mapping"
         local source="$DOTFILES_DIR/$src_path"
