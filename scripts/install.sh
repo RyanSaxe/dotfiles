@@ -3,9 +3,14 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 # ──────────────────────────────────────────────────────
+# Script directory for finding companion scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ──────────────────────────────────────────────────────
 # Colorized logging
 log() { printf "\033[1;34m[INFO]\033[0m %s\n" "$*"; }
 err() { printf "\033[1;31m[ERR ]\033[0m %s\n" "$*" >&2; }
+warn() { printf "\033[1;33m[WARN]\033[0m %s\n" "$*"; }
 
 # ──────────────────────────────────────────────────────
 sudo_if_needed() {
@@ -273,7 +278,18 @@ main() {
     exit 1
   }
 
-  log "✅ All done!"
+  # Symlink dotfiles
+  log "Setting up dotfiles symlinks..."
+  if [[ -f "$SCRIPT_DIR/symlink.sh" ]]; then
+    "$SCRIPT_DIR/symlink.sh" || {
+      err "Failed to create dotfiles symlinks"
+      exit 1
+    }
+  else
+    warn "Symlink script not found at $SCRIPT_DIR/symlink.sh - skipping dotfiles setup"
+  fi
+
+  log "✅ All done! Your development environment is ready."
 }
 
 main "$@"
