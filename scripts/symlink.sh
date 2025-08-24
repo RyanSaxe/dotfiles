@@ -21,7 +21,7 @@ DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 # Load dotfile mappings from config file
 DOTFILE_MAPPINGS=()
 while IFS= read -r line; do
-  DOTFILE_MAPPINGS=("${DOTFILE_MAPPINGS[@]}" "$line")
+  DOTFILE_MAPPINGS[${#DOTFILE_MAPPINGS[@]}]="$line"
 done < "$DOTFILES_DIR/config/symlinks.txt"
 
 # ──────────────────────────────────────────────────────
