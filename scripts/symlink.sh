@@ -18,16 +18,8 @@ success() { printf "\033[1;32m[OK  ]\033[0m %s\n" "$*"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Dotfile mappings: source_path:target_path (Bash 3.2 compatible)
-DOTFILE_MAPPINGS=(
-    "nvim:$HOME/.config/nvim"
-    "bat/config:$HOME/.config/bat/config"
-    "bat/themes:$HOME/.config/bat/themes"
-    "ghostty/config:$HOME/.config/ghostty/config"
-    "zsh/zshrc:$HOME/.zshrc"
-    "zsh/fino-time-custom.zsh-theme:$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
-    "git/ignore:$HOME/.config/git/ignore"
-)
+# Load dotfile mappings from config file
+readarray -t DOTFILE_MAPPINGS < "$DOTFILES_DIR/config/symlinks.txt"
 
 # ──────────────────────────────────────────────────────
 # Helper functions
