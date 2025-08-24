@@ -25,6 +25,9 @@ declare -A DOTFILE_MAPPINGS=(
     ["bat/config"]="$HOME/.config/bat/config"
     ["bat/themes"]="$HOME/.config/bat/themes"
     ["ghostty/config"]="$HOME/.config/ghostty/config"
+    ["zsh/zshrc"]="$HOME/.zshrc"
+    ["zsh/fino-time-custom.zsh-theme"]="$HOME/.oh-my-zsh/custom/themes/fino-time-custom.zsh-theme"
+    ["git/ignore"]="$HOME/.config/git/ignore"
 )
 
 # ──────────────────────────────────────────────────────
