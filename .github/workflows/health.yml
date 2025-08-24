@@ -17,11 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup dotfiles symlinks
-        run: |
-          mkdir -p ~/.config
-          ln -sf "${{ github.workspace }}/dotfiles/nvim" ~/.config/nvim
-
       - name: Install All Major Dependencies
         shell: bash
         run: |

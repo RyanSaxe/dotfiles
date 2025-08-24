@@ -16,7 +16,7 @@ success() { printf "\033[1;32m[OK  ]\033[0m %s\n" "$*"; }
 # ──────────────────────────────────────────────────────
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOTFILES_DIR="$(dirname "$SCRIPT_DIR")/dotfiles"
+DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Dotfile mappings: source_path:target_path
 declare -A DOTFILE_MAPPINGS

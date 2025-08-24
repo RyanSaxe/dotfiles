@@ -5,13 +5,11 @@ This repository contains my complete development environment setup including dot
 ## 📁 Structure
 
 ```
-dotfiles/                    # All configuration files
-├── nvim/                   # Neovim configuration (LazyVim)
-├── bat/                    # bat (cat with syntax highlighting)
-├── ghostty/               # Ghostty terminal emulator
-├── zsh/                   # Future: zsh configurations  
-└── git/                   # Future: git configurations
-
+nvim/                       # Neovim configuration (LazyVim)
+bat/                        # bat (cat with syntax highlighting)  
+ghostty/                    # Ghostty terminal emulator
+zsh/                        # Zsh shell configuration and themes
+git/                        # Git configuration (global ignore, etc.)
 scripts/                    # Installation and management scripts
 ├── install.sh             # Full environment setup
 └── symlink.sh             # Dotfiles symlinking management
@@ -61,7 +59,7 @@ Some tools require additional manual setup after installation:
 ## 📝 Managing Your Dotfiles
 
 ### Making Changes
-1. Edit files in the `dotfiles/` directory
+1. Edit files in the tool directories (e.g., `nvim/`, `zsh/`)
 2. Changes are immediately reflected (thanks to symlinks)
 3. Commit changes: `git add . && git commit -m "your changes"`
 
@@ -71,8 +69,8 @@ Some tools require additional manual setup after installation:
 - **Branching**: Test major changes on branches before merging
 
 ### Adding New Dotfiles
-1. Add config files to appropriate `dotfiles/toolname/` directory
-2. Update `DOTFILE_MAPPINGS` in `scripts/symlink.sh`
+1. Add config files to appropriate `toolname/` directory
+2. Update `DOTFILE_MAPPINGS` in `scripts/symlink.sh`  
 3. Run `./scripts/symlink.sh` to create new symlinks
 
 ## 🌍 Cross-Platform Support
