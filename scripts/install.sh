@@ -34,8 +34,15 @@ detect_pm() {
 }
 # Load package lists from config files
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
-readarray -t BREW_DEPS < "$DOTFILES_DIR/config/brew-packages.txt"
-readarray -t APT_DEPS < "$DOTFILES_DIR/config/apt-packages.txt"
+BREW_DEPS=()
+while IFS= read -r line; do
+  BREW_DEPS=("${BREW_DEPS[@]}" "$line")
+done < "$DOTFILES_DIR/config/brew-packages.txt"
+
+APT_DEPS=()
+while IFS= read -r line; do
+  APT_DEPS=("${APT_DEPS[@]}" "$line")
+done < "$DOTFILES_DIR/config/apt-packages.txt"
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.
 #

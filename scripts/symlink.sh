@@ -19,7 +19,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Load dotfile mappings from config file
-readarray -t DOTFILE_MAPPINGS < "$DOTFILES_DIR/config/symlinks.txt"
+DOTFILE_MAPPINGS=()
+while IFS= read -r line; do
+  DOTFILE_MAPPINGS=("${DOTFILE_MAPPINGS[@]}" "$line")
+done < "$DOTFILES_DIR/config/symlinks.txt"
 
 # ──────────────────────────────────────────────────────
 # Helper functions
