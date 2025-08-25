@@ -22,10 +22,11 @@ jobs:
         run: |
           # Test that symlink script properly expands variables like $HOME
           # This prevents the literal "$HOME" directory bug
-          ./scripts/symlink.sh --dry-run | grep -q "$HOME" || {
+          output=$(./scripts/symlink.sh --dry-run)
+          if ! echo "$output" | grep -q "$HOME"; then
             echo "::error::Symlink script not expanding variables properly - check for literal \$HOME"
             exit 1
-          }
+          fi
           
           # Verify no literal $HOME directory is created
           if [[ -d "\$HOME" ]]; then
