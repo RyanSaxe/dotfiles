@@ -23,26 +23,6 @@ keybind = cmd+o=open_config
 # look customixation
 font-size = 16
 theme = tokyonight_night
-
-# below is the tokyonight moon theme.
-# 0=#1b1d2b # black
-# 1=#ff757f # red
-# 2=#c3e88d # green 
-# 3=#ffc777 # yellow
-# 4=#82aaff # blue
-# 5=#c099ff # magenta
-# 6=#86e1fc # cyan
-# 7=#828bb8 # fg_dark
-# 8=#444a73 # black_bright
-# 9=#ff8d94 # red_bright
-# 10=#c7fb6d # green_bright
-# 11=#ffd8ab # yellow_bright
-# 12=#9ab8ff # blue_bright
-# 13=#caabff # magenta_bright
-# 14=#b2ebff # cyan_bright
-# 15=#c8d3f5 # white
-# background = #222436
-# foreground = #c8d3f5 # white
-# cursor-color = #c8d3f5 # white
-# selection-background = #2d3f76 # bg_visual
-# selection-foreground = #c8d3f5 # white
+# selecting text will add it to the clipboard
+# true will copy only to the selection clipboard, for middle click on linux
+copy-on-select = clipboard

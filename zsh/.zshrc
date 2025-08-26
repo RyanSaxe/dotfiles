@@ -10,7 +10,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="fino-time-custom"
 # remove the virtualenv name getting injected in the terminal directly so the prompt can handle it
-# export VIRTUAL_ENV_DISABLE_PROMPT=1
+export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -64,7 +64,7 @@ ZSH_THEME="fino-time-custom"
 # HIST_STAMPS="mm/dd/yyyy"
 
 # Would you like to use another custom folder than $ZSH/custom?
-# ZSH_CUSTOM=/path/to/new-custom-folder
+ZSH_CUSTOM="$HOME/.zsh-custom"
 
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
