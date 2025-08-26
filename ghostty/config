@@ -27,3 +27,7 @@ theme = tokyonight_night
 # true will copy only to the selection clipboard, for middle click on linux
 copy-on-select = clipboard
 unfocused-split-opacity = 0.5
+
+# Remove all window padding to fix lualine gaps
+window-padding-x = 0
+window-padding-y = 0
