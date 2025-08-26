@@ -26,3 +26,4 @@ theme = tokyonight_night
 # selecting text will add it to the clipboard
 # true will copy only to the selection clipboard, for middle click on linux
 copy-on-select = clipboard
+unfocused-split-opacity = 0.5
