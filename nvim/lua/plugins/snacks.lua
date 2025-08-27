@@ -67,13 +67,13 @@ end
 
 local create_pane = function(header, specs)
   local pane = header.pane
-  header.padding = header.padding or 1
+  header.padding = header.padding or 2
   header.indent = header.indent or 0
 
   local output = { header }
   for i, spec in ipairs(specs) do
     -- set padding on the spec itself
-    spec.padding = (i == #specs) and 1 or 0
+    spec.padding = (i == #specs) and 2 or 0
 
     -- start with defaults
     local row = {
@@ -198,7 +198,7 @@ local get_recent_files = function()
   local recent_files = recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
-  local final_padding = pane == 2 and max_files - n_files + 1 or 1
+  local final_padding = pane == 2 and max_files - n_files + 6 or 2
 
   for i, rel in ipairs(recent_files) do
     out[#out + 1] = {
@@ -219,7 +219,7 @@ local get_recent_files = function()
       pane = pane,
       icon = " ",
       desc = "No recent files in this directory",
-      padding = pane == 2 and max_files or 1,
+      padding = pane == 2 and max_files or 2,
       enabled = recent_project_toggle,
     }
   end
@@ -237,7 +237,7 @@ local create_sections = function()
       title = "Recent Project Files",
       pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
-      padding = 1,
+      padding = 2,
       enabled = recent_project_toggle,
     },
     recent_files,
@@ -246,7 +246,7 @@ local create_sections = function()
       title = "Git",
       desc = string.format(" (%s)", current_branch:gsub("\n", "")),
       indent = 0,
-      padding = 1,
+      padding = 2,
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
@@ -298,6 +298,7 @@ local create_sections = function()
       action = function()
         Snacks.lazygit({ cwd = LazyVim.root.git() })
       end,
+      padding = 1,
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
@@ -305,6 +306,7 @@ local create_sections = function()
       indent = 2,
       -- 58 ticks is exactly the size of a line (width 60, indent = 2)
       title = "----------------------------------------------------------",
+      padding = 1,
       enabled = Snacks.git.get_root() ~= nil,
     },
 
@@ -348,7 +350,7 @@ local create_sections = function()
       pane = 1,
       icon = " ",
       desc = "Open Repo in GitHub",
-      padding = 1,
+      padding = 2,
       key = "B",
       indent = 2,
       action = function()
