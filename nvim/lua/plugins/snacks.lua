@@ -153,8 +153,8 @@ local globalkeys = function()
   -- NOTE: consider the projects section that only shows up if not in a git repo
   local header = {
     pane = 1,
-    title = "System",
-    desc = " (Neovim v" .. vim.version().major .. "." .. vim.version().minor .. "." .. vim.version().patch .. ")",
+    title = "Neovim",
+    desc = " (v" .. vim.version().major .. "." .. vim.version().minor .. "." .. vim.version().patch .. ")",
   }
   local keys = {
     {
@@ -223,7 +223,8 @@ local get_recent_files = function()
   if #out == 0 then
     out[1] = {
       pane = pane,
-      icon = " ",
+      icon = " ",
+      indent = 2,
       desc = "No recent files in this directory",
       padding = pane == 2 and max_files + SNORLAX_PADDING - 1 or 2,
       enabled = recent_project_toggle,
@@ -392,15 +393,16 @@ local create_sections = function()
       padding = SNORLAX_PADDING - 1,
     },
     {
-      pane = 1,
+      pane = 2,
       title = "Startup",
       desc = " (" .. vim.fn.printf("%.1fms", require("lazy").stats().startuptime) .. ")",
       indent = 0,
+      align = "right",
     },
     {
-      pane = 2,
-      title = os.date("%B %d, %Y • %H:%M"),
-      align = "right",
+      pane = 1,
+      title = "Time",
+      desc = " (" .. os.date("%H:%M") .. ")",
       indent = 0,
       enabled = show_if_has_second_pane,
     },
