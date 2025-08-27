@@ -196,13 +196,15 @@ local recent_project_toggle = function()
   -- if in git and has one pane, then we disable
   return not (in_git and not has_two_panes)
 end
+
+SNORLAX_PADDING = 4
 local get_recent_files = function()
   local out = {}
   local max_files = 5
   local recent_files = recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
-  local final_padding = pane == 2 and max_files - n_files + 6 or 2
+  local final_padding = pane == 2 and max_files - n_files + SNORLAX_PADDING or 2
 
   for i, rel in ipairs(recent_files) do
     out[#out + 1] = {
@@ -223,7 +225,7 @@ local get_recent_files = function()
       pane = pane,
       icon = " ",
       desc = "No recent files in this directory",
-      padding = pane == 2 and max_files or 2,
+      padding = pane == 2 and max_files + SNORLAX_PADDING - 1 or 2,
       enabled = recent_project_toggle,
     }
   end
@@ -387,6 +389,7 @@ local create_sections = function()
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
       enabled = show_if_has_second_pane,
+      padding = SNORLAX_PADDING - 1,
     },
     {
       pane = 1,
