@@ -103,6 +103,31 @@ function M.fetch_origin(cb, refs)
   })
 end
 
+-- Return the current buffer's file content as it was at local HEAD~N
+function M.get_buffer_text_at_head(n)
+  -- n = 0 → HEAD, n = 1 → HEAD~1, etc.
+  n = tonumber(n) or 0
+  if n < 0 then
+    n = 0
+  end
+
+  -- Path relative to the repo root (same as your other fn)
+  local relpath = vim.fn.expand("%:.")
+
+  -- Build the revspec
+  local rev = (n == 0) and "HEAD" or string.format("HEAD~%d", n)
+
+  -- Show file at that rev; silence errors
+  local cmd = string.format("git show %s:%s 2>/dev/null", vim.fn.shellescape(rev), vim.fn.shellescape(relpath))
+  local lines = vim.fn.systemlist(cmd)
+
+  -- If git failed (e.g., file didn’t exist then), return empty
+  if vim.v.shell_error ~= 0 then
+    return ""
+  end
+
+  return table.concat(lines, "\n")
+end
 --- Get the text of the current buffer's file as it exists on `branch`.
 -- Returns an empty string if the file doesn’t exist there.
 function M.get_buffer_text_on_branch(branch)

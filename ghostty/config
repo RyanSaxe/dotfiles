@@ -1,4 +1,4 @@
-
+# custom keybinds
 
 keybind = cmd+shift+l=new_split:right
 keybind = cmd+shift+h=new_split:left
@@ -20,14 +20,17 @@ keybind = global:cmd+g=toggle_quick_terminal
 keybind = cmd+r=reload_config
 keybind = cmd+o=open_config
 
-# look customixation
+# generic styling 
+
 font-size = 16
 theme = tokyonight_night
-# selecting text will add it to the clipboard
-# true will copy only to the selection clipboard, for middle click on linux
-copy-on-select = clipboard
-unfocused-split-opacity = 0.5
+unfocused-split-opacity = 0.8
 
-# Remove all window padding to fix lualine gaps
+# specific customizations
+
+## no need to type the shortcut for copying highlighted text
+copy-on-select = clipboard
+
+# lualine in neovim needs these or there will be weird padding/gaps
 window-padding-x = 0
 window-padding-y = 0
