@@ -21,7 +21,11 @@ local function open_diff_overlay(base_branch, n)
       local_ref_text = git_utils.get_buffer_text_on_branch(base_branch)
     end
     mini_diff.set_ref_text(0, local_ref_text)
-    mini_diff.toggle_overlay(0)
+    -- toggle on the overlay if it is not already on
+    local overlay_on = mini_diff.get_buf_data(0).overlay
+    if not overlay_on then
+      mini_diff.toggle_overlay(0)
+    end
   end, { base_branch, current_branch }) -- we also fetch current in case review a PR that got updated
 end
 
@@ -30,7 +34,8 @@ return {
   event = "VeryLazy",
   dependencies = { "folke/snacks.nvim" },
   keys = {
-    { "<leader>go", false }, -- disable default mapping in lazyvim
+    -- <leader>go can be used to toggle on/off whatever ref text is set, which other commands change
+    -- { "<leader>go", false }, -- disable default mapping in lazyvim
     {
       "<leader>gdo",
       function()
@@ -58,7 +63,7 @@ return {
         local base_branch = git_utils.get_base_branch()
         open_diff_overlay(base_branch)
       end,
-      desc = "Overlay Diff to Base Branch",
+      desc = "Overlay Review to Base Branch",
     },
     {
       "<leader>grO",
@@ -76,7 +81,7 @@ return {
           end,
         })
       end,
-      desc = "Overlay Diff to Branch",
+      desc = "Overlay Review to Selected Branch",
     },
   },
   -- opts = {

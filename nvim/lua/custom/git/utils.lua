@@ -74,10 +74,10 @@ function M.fetch_origin(cb, refs)
     end
   end
 
-  local label = refs and ("🔄 Fetching origin " .. table.concat(refs, ", ")) or "🔄 Fetching origin (all branches)"
-  vim.notify(label, vim.log.levels.INFO)
-
-  vim.notify(vim.inspect(cmd), vim.log.levels.DEBUG)
+  -- local label = refs and ("🔄 Fetching origin " .. table.concat(refs, ", ")) or "🔄 Fetching origin (all branches)"
+  -- vim.notify(label, vim.log.levels.INFO)
+  -- vim.notify(vim.inspect(cmd), vim.log.levels.DEBUG)
+  --
   vim.fn.jobstart(cmd, {
     stdout_buffered = true,
     stderr_buffered = true,
