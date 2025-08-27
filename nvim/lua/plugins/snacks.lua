@@ -132,7 +132,7 @@ local create_pane = function(header, specs, bottom_padding)
     -- start with defaults
     local row = {
       pane = pane,
-      indent = 2,
+      indent = 0,
     }
     -- copy all spec fields in
     for k, v in pairs(spec) do
@@ -158,9 +158,8 @@ local search_keys = function()
   local header = { pane = 1, title = "Project", desc = right_align_desc("Project", project) }
 
   local keys = {
-    { icon = " ", key = "/", desc = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
+    { key = "/", desc = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
     {
-      icon = " ",
       desc = "Search Code TODOs",
       key = "x",
       action = function()
@@ -168,7 +167,6 @@ local search_keys = function()
       end,
     },
     {
-      icon = " ",
       desc = "Grep Dependencies",
       key = "s",
       action = function()
@@ -177,7 +175,6 @@ local search_keys = function()
       end,
     },
     {
-      icon = " ",
       desc = "Open TODO List",
       key = "t",
       action = function()
@@ -189,7 +186,7 @@ local search_keys = function()
     },
   }
 
-  local find_file_base = { icon = " ", key = "f", desc = "Find File" }
+  local find_file_base = { key = "f", desc = "Find File" }
   table.insert(
     keys,
     different_key_if_condition(
@@ -215,7 +212,6 @@ local globalkeys = function()
   }
   local keys = {
     {
-      icon = " ",
       key = "p",
       desc = "Find Project",
       action = function()
@@ -228,17 +224,15 @@ local globalkeys = function()
         })
       end,
     },
-    { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+    { key = "q", desc = "Quit", action = ":qa" },
     {
-      icon = "󰒲 ",
       key = "l",
       desc = "Manage Lua Plugins",
       action = ":Lazy",
       enabled = package.loaded.lazy ~= nil,
     },
-    { icon = " ", key = "r", desc = "Restore Session", section = "session" },
+    { key = "r", desc = "Restore Session", section = "session" },
     {
-      icon = " ",
       key = "c",
       desc = "Search Neovim Config",
       action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
@@ -266,8 +260,7 @@ local get_recent_files = function()
   for i, rel in ipairs(recent_files) do
     out[#out + 1] = {
       pane = pane,
-      icon = "󰈙 ",
-      indent = 2,
+      indent = 0,
       padding = (i == n_files) and final_padding or 0,
       desc = normalize_path(rel),
       key = tostring(i),
@@ -280,7 +273,7 @@ local get_recent_files = function()
   if #out == 0 then
     out[1] = {
       pane = pane,
-      indent = 2,
+      indent = 0,
       padding = pane == 2 and max_files + SNORLAX_PADDING - 1 or 2,
       enabled = recent_project_toggle,
     }
@@ -322,7 +315,6 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Checkout Another Branch",
       key = "b",
       action = function()
@@ -336,14 +328,13 @@ local create_sections = function()
         })
       end,
       enabled = Snacks.git.get_root() ~= nil,
-      indent = 2,
+      indent = 0,
     },
     {
       pane = 1,
-      icon = " ",
       desc = string.format("Search Diff vs %s", base_branch),
       key = "d",
-      indent = 2,
+      indent = 0,
       action = function()
         git_pickers.diff_picker(base_branch)
       end,
@@ -351,8 +342,7 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
-      indent = 2,
+      indent = 0,
       desc = "Search Un-Commited Changes",
       key = "u",
       action = function()
@@ -362,10 +352,9 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Open LazyGit UI",
       key = "g",
-      indent = 2,
+      indent = 0,
       action = function()
         Snacks.lazygit({ cwd = LazyVim.root.git() })
       end,
@@ -374,19 +363,18 @@ local create_sections = function()
     },
     {
       pane = 1,
-      indent = 2,
-      -- 58 ticks is exactly the size of a line (width 60, indent = 2)
-      title = "----------------------------------------------------------",
+      indent = 0,
+      -- 60 ticks is exactly the size of a line (width 60, indent = 0)
+      title = "------------------------------------------------------------",
       padding = 1,
       enabled = Snacks.git.get_root() ~= nil,
     },
 
     {
       pane = 1,
-      icon = " ",
       desc = "Search Recent Notifications",
       key = "N",
-      indent = 2,
+      indent = 0,
       action = function()
         vim.notify("Fetching Notifications from GitHub...")
         vim.defer_fn(git_pickers.notification_picker, 100)
@@ -395,9 +383,8 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Search Pull Requests",
-      indent = 2,
+      indent = 0,
       key = "P",
       action = function()
         vim.notify("Fetching open PRs from GitHub...")
@@ -407,10 +394,9 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Search Issues",
       key = "I",
-      indent = 2,
+      indent = 0,
       action = function()
         vim.notify("Fetching open issues from GitHub...")
         vim.defer_fn(git_pickers.issue_picker, 100)
@@ -419,11 +405,10 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Open Repo in GitHub",
       padding = 2,
       key = "B",
-      indent = 2,
+      indent = 0,
       action = function()
         Snacks.gitbrowse()
       end,
