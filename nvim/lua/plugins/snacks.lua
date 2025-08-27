@@ -65,7 +65,7 @@ local show_if_has_second_pane = function()
   return max_panes > 1
 end
 
-local create_pane = function(header, specs)
+local create_pane = function(header, specs, bottom_padding)
   local pane = header.pane
   header.padding = header.padding or 2
   header.indent = header.indent or 0
@@ -73,7 +73,7 @@ local create_pane = function(header, specs)
   local output = { header }
   for i, spec in ipairs(specs) do
     -- set padding on the spec itself
-    spec.padding = (i == #specs) and 2 or 0
+    spec.padding = (i == #specs) and bottom_padding or 0
 
     -- start with defaults
     local row = {
@@ -146,7 +146,7 @@ local search_keys = function()
     )
   )
 
-  return create_pane(header, keys)
+  return create_pane(header, keys, 2)
 end
 
 local globalkeys = function()
@@ -184,7 +184,7 @@ local globalkeys = function()
     },
   }
 
-  return create_pane(header, keys)
+  return create_pane(header, keys, 2)
 end
 local recent_project_toggle = function()
   local in_git = Snacks.git.get_root() ~= nil
@@ -232,6 +232,8 @@ local create_sections = function()
   local recent_files = get_recent_files()
   return {
 
+    -- { pane = 1, padding = 2, indent = 0 },
+    -- { pane = 2, padding = 2, enabled = show_if_has_second_pane, indent = 0 },
     search_keys,
     {
       title = "Recent Project Files",
@@ -381,6 +383,10 @@ local create_sections = function()
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
       enabled = show_if_has_second_pane,
+    },
+    {
+      pane = 1,
+      title = "-------------------------------------------------------------",
     },
   }
 end
