@@ -128,9 +128,10 @@ return {
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg(c.git_purple, 0.5) }
       hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.2) }
-      -- snacks dashboard customization where text is very faded
+      -- default blue slightly darker looks like snorlax color for really clean dashboard
+      hl["SnacksDashboardTitle"] = { fg = Util.blend_bg(c.blue, 0.9) }
+      hl["SnacksDashboardKey"] = { fg = "#FBE8B3" }
       hl["SnacksDashboardDesc"] = { fg = c.dark3 }
-      hl["SnacksDashboardIcon"] = { fg = c.blue }
     end,
   },
 }
