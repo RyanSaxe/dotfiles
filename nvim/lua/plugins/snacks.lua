@@ -90,24 +90,24 @@ local git_pickers = require("custom.git.pickers")
 local git_utils = require("custom.git.utils")
 local Snacks = require("snacks")
 
--- Create right-aligned description by padding with spaces
----@param title string The title (to calculate spacing)
----@param desc string The description to right-align
+-- Create title with right-aligned content by padding with spaces
+---@param left string The left side content
+---@param right string The right side content to align
 ---@param pane_width? number Width of the pane (default: 60)
----@return string Right-aligned description with proper spacing
-local function right_align_desc(title, desc, pane_width)
+---@return string Title with right-aligned content and proper spacing
+local function create_aligned_title(left, right, pane_width)
   pane_width = pane_width or 60
-  local title_len = vim.fn.strdisplaywidth(title)
-  local desc_len = vim.fn.strdisplaywidth(desc)
-  local total_content = title_len + desc_len
+  local left_len = vim.fn.strdisplaywidth(left)
+  local right_len = vim.fn.strdisplaywidth(right)
+  local total_content = left_len + right_len
 
   if total_content >= pane_width then
-    -- If content is too long, just return desc as-is
-    return desc
+    -- If content is too long, just return left as-is
+    return left
   end
 
-  local spaces_needed = pane_width - total_content
-  return string.rep(" ", spaces_needed) .. desc
+  local spaces_needed = pane_width - total_content - 2 -- Account for parentheses
+  return left .. string.rep(" ", spaces_needed) .. "(" .. right .. ")"
 end
 
 local show_if_has_second_pane = function()
@@ -155,7 +155,7 @@ end
 local search_keys = function()
   local cwd = vim.fn.getcwd()
   local project = vim.fn.fnamemodify(cwd, ":t")
-  local header = { pane = 1, title = "Project", desc = right_align_desc("Project", project) }
+  local header = { pane = 1, title = create_aligned_title("Project", project) }
 
   local keys = {
     { key = "/", desc = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
@@ -204,13 +204,13 @@ local globalkeys = function()
   -- NOTE: consider the projects section that only shows up if not in a git repo
   local header = {
     pane = 1,
-    title = "Neovim",
-    desc = right_align_desc(
+    title = create_aligned_title(
       "Neovim",
       "v" .. vim.version().major .. "." .. vim.version().minor .. "." .. vim.version().patch
     ),
   }
   local keys = {
+    { key = "q", desc = "Quit", action = ":qa" },
     {
       key = "p",
       desc = "Find Project",
@@ -224,7 +224,6 @@ local globalkeys = function()
         })
       end,
     },
-    { key = "q", desc = "Quit", action = ":qa" },
     {
       key = "l",
       desc = "Manage Lua Plugins",
@@ -297,8 +296,7 @@ local create_sections = function()
     -- { pane = 2, padding = 2, enabled = show_if_has_second_pane, indent = 0 },
     search_keys,
     {
-      title = "Recent Files",
-      desc = right_align_desc("Recent Files", get_recent_file_time()),
+      title = create_aligned_title("Recent Files", get_recent_file_time()),
       pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
       padding = 2,
@@ -307,8 +305,7 @@ local create_sections = function()
     recent_files,
     {
       pane = 1,
-      title = "Git",
-      desc = right_align_desc("Git", current_branch),
+      title = create_aligned_title("Git", current_branch),
       indent = 0,
       padding = 2,
       enabled = Snacks.git.get_root() ~= nil,
@@ -439,15 +436,13 @@ local create_sections = function()
     },
     {
       pane = 2,
-      title = "Startup",
-      desc = right_align_desc("Startup", vim.fn.printf("%.1fms", require("lazy").stats().startuptime)),
+      title = create_aligned_title("Startup", vim.fn.printf("%.1fms", require("lazy").stats().startuptime)),
       indent = 0,
       enabled = show_if_has_second_pane,
     },
     {
       pane = 1,
-      title = "Time",
-      desc = right_align_desc("Time", os.date("%H:%M")),
+      title = create_aligned_title("Time", os.date("%H:%M")),
       indent = 0,
     },
   }
