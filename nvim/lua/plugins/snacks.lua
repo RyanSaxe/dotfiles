@@ -19,6 +19,40 @@ local function recent_files_in_cwd(max)
   return list
 end
 
+-- Get time since most recent file was accessed
+---@return string Time description like "2h ago", "5m ago", etc.
+local function get_recent_file_time()
+  local cwd = vim.loop.cwd()
+  local most_recent_time = 0
+
+  for _, abs in ipairs(vim.v.oldfiles) do
+    if vim.startswith(abs, cwd) and vim.fn.filereadable(abs) == 1 then
+      local stat = vim.loop.fs_stat(abs)
+      if stat and stat.mtime.sec > most_recent_time then
+        most_recent_time = stat.mtime.sec
+      end
+      break -- We only need the first (most recent) file
+    end
+  end
+
+  if most_recent_time == 0 then
+    return "none"
+  end
+
+  local now = os.time()
+  local diff = now - most_recent_time
+
+  if diff < 60 then
+    return math.floor(diff) .. "s ago"
+  elseif diff < 3600 then
+    return math.floor(diff / 60) .. "m ago"
+  elseif diff < 86400 then
+    return math.floor(diff / 3600) .. "h ago"
+  else
+    return math.floor(diff / 86400) .. "d ago"
+  end
+end
+
 -- Normalize and format file paths for prettier display
 ---@param path string Path to normalize
 ---@param max_length? number Maximum display length (default: 40)
@@ -225,9 +259,15 @@ local get_recent_files = function()
       pane = pane,
       icon = " ",
       indent = 2,
-      desc = "No recent files in this directory",
+      desc = "No Recent Files",
       padding = pane == 2 and max_files + SNORLAX_PADDING - 1 or 2,
       enabled = recent_project_toggle,
+    }
+  end
+  if pane == 1 and show_if_has_second_pane() then
+    out[#out + 1] = {
+      pane = 2,
+      padding = n_files > 0 and n_files or 1,
     }
   end
   return out
@@ -243,7 +283,8 @@ local create_sections = function()
     -- { pane = 2, padding = 2, enabled = show_if_has_second_pane, indent = 0 },
     search_keys,
     {
-      title = "Recent Project Files",
+      title = "Recent Files",
+      desc = " (" .. get_recent_file_time() .. ")",
       pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
       padding = 2,
@@ -373,10 +414,8 @@ local create_sections = function()
     -- first pane, and snorlax needs to be padded according to the number of lines in recent files
     {
       pane = 2,
-      enabled = function()
-        return show_if_has_second_pane() and Snacks.git.get_root() == nil
-      end,
-      padding = #recent_files / 2,
+      enabled = show_if_has_second_pane,
+      padding = 2,
     },
     {
       pane = 2,
@@ -386,25 +425,26 @@ local create_sections = function()
       -- NOTE: for some reason, sleep 10 makes it never flicker, but also only causes a 1 second pause
       cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.01",
       ttl = math.huge, -- make the cache last forever so the 1 second pause is only the first time opening a project
-      indent = 10,
+      indent = 22,
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
       enabled = show_if_has_second_pane,
-      padding = SNORLAX_PADDING - 1,
+      padding = 0, --SNORLAX_PADDING - 1,
     },
     {
       pane = 2,
       title = "Startup",
       desc = " (" .. vim.fn.printf("%.1fms", require("lazy").stats().startuptime) .. ")",
       indent = 0,
+      enabled = show_if_has_second_pane,
       align = "right",
     },
     {
       pane = 1,
       title = "Time",
+      align = "left",
       desc = " (" .. os.date("%H:%M") .. ")",
       indent = 0,
-      enabled = show_if_has_second_pane,
     },
   }
 end
