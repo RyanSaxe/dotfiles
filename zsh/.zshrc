@@ -167,3 +167,29 @@ _auto_activate_venv() {
 
 add-zsh-hook chpwd _auto_activate_venv
 _auto_activate_venv
+
+# Tmux session management
+dev() {
+  local session_name="${1:-dev}"
+  
+  # Check if session already exists
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    echo "Session '$session_name' already exists. Attaching..."
+    tmux attach-session -t "$session_name"
+    return
+  fi
+  
+  # Create new session with first window (nvim)
+  tmux new-session -d -s "$session_name" -n "nvim"
+  tmux send-keys -t "$session_name:nvim" "nvim" Enter
+  
+  # Create second window (terminal)
+  tmux new-window -t "$session_name" -n "terminal"
+  
+  # Create third window (logs/misc)
+  tmux new-window -t "$session_name" -n "logs"
+  
+  # Go back to first window and attach
+  tmux select-window -t "$session_name:nvim"
+  tmux attach-session -t "$session_name"
+}
