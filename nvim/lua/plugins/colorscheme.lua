@@ -15,10 +15,10 @@ return {
       c.moon_pink = "#fca7ea"
       c.git_purple = "#ba55d3"
       -- experimentally trying an even darker background with lighter popups
-      local old_bg = c.bg
-      c.bg = c.bg_dark
-      c.bg_dark = old_bg
-      c.bg_float = old_bg
+      -- local old_bg = c.bg
+      -- c.bg = c.bg_dark
+      -- c.bg_dark = old_bg
+      -- c.bg_float = old_bg
     end,
     on_highlights = function(hl, c)
       -- docstrings should be slightly different color than comments but still faded to the background
@@ -81,7 +81,7 @@ return {
       hl["LspInlayHint"] = { fg = c.dark3, bg = nil }
       hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
       -- plugin specific changes
-      hl["CursorLine"] = { bg = c.bg_dark } -- if i want to not highlight the line my cursor is on
+      hl["CursorLine"] = { bg = c.bg } -- if i want to not highlight the line my cursor is on
       hl["TreesitterContext"] = { bg = c.bg }
       hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
       hl["TreesitterContextSeparator"] = { fg = c.purple }
@@ -128,8 +128,10 @@ return {
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg(c.git_purple, 0.5) }
       hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.2) }
-      -- make sure code blocks are clearly readable via having a different background
-      hl["RenderMarkdownCode"] = { bg = Util.blend_bg(c.bg_dark, 0.1) }
+      -- default blue slightly darker looks like snorlax color for really clean dashboard
+      hl["SnacksDashboardTitle"] = { fg = Util.blend_bg(c.blue, 0.9) }
+      hl["SnacksDashboardKey"] = { fg = "#FBE8B3" }
+      hl["SnacksDashboardDesc"] = { fg = c.dark3 }
     end,
   },
 }

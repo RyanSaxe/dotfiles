@@ -3,4 +3,4 @@ bat:$HOME/.config/bat
 ghostty:$HOME/.config/ghostty
 git:$HOME/.config/git
 zsh/.zshrc:$HOME/.zshrc
-zsh/themes:$HOME/.oh-my-zsh/custom/themes
+zsh/themes:$HOME/.zsh-custom/themes

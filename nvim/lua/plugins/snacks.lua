@@ -19,6 +19,40 @@ local function recent_files_in_cwd(max)
   return list
 end
 
+-- Get time since most recent file was accessed
+---@return string Time description like "2h ago", "5m ago", etc.
+local function get_recent_file_time()
+  local cwd = vim.loop.cwd()
+  local most_recent_time = 0
+
+  for _, abs in ipairs(vim.v.oldfiles) do
+    if vim.startswith(abs, cwd) and vim.fn.filereadable(abs) == 1 then
+      local stat = vim.loop.fs_stat(abs)
+      if stat and stat.mtime.sec > most_recent_time then
+        most_recent_time = stat.mtime.sec
+      end
+      break -- We only need the first (most recent) file
+    end
+  end
+
+  if most_recent_time == 0 then
+    return "none"
+  end
+
+  local now = os.time()
+  local diff = now - most_recent_time
+
+  if diff < 60 then
+    return math.floor(diff) .. "s ago"
+  elseif diff < 3600 then
+    return math.floor(diff / 60) .. "m ago"
+  elseif diff < 86400 then
+    return math.floor(diff / 3600) .. "h ago"
+  else
+    return math.floor(diff / 86400) .. "d ago"
+  end
+end
+
 -- Normalize and format file paths for prettier display
 ---@param path string Path to normalize
 ---@param max_length? number Maximum display length (default: 40)
@@ -56,6 +90,26 @@ local git_pickers = require("custom.git.pickers")
 local git_utils = require("custom.git.utils")
 local Snacks = require("snacks")
 
+-- Create title with right-aligned content by padding with spaces
+---@param left string The left side content
+---@param right string The right side content to align
+---@param pane_width? number Width of the pane (default: 60)
+---@return string Title with right-aligned content and proper spacing
+local function create_aligned_title(left, right, pane_width)
+  pane_width = pane_width or 60
+  local left_len = vim.fn.strdisplaywidth(left)
+  local right_len = vim.fn.strdisplaywidth(right)
+  local total_content = left_len + right_len
+
+  if total_content >= pane_width then
+    -- If content is too long, just return left as-is
+    return left
+  end
+
+  local spaces_needed = pane_width - total_content - 2 -- Account for parentheses
+  return left .. string.rep(" ", spaces_needed) .. "(" .. right .. ")"
+end
+
 local show_if_has_second_pane = function()
   -- taken from snacks.dashboard. Only enable this visual if snacks allows a second pane.
   local width = vim.o.columns
@@ -65,20 +119,20 @@ local show_if_has_second_pane = function()
   return max_panes > 1
 end
 
-local create_pane = function(header, specs)
+local create_pane = function(header, specs, bottom_padding)
   local pane = header.pane
-  header.padding = header.padding or 1
+  header.padding = header.padding or 2
   header.indent = header.indent or 0
 
   local output = { header }
   for i, spec in ipairs(specs) do
     -- set padding on the spec itself
-    spec.padding = (i == #specs) and 1 or 0
+    spec.padding = (i == #specs) and bottom_padding or 0
 
     -- start with defaults
     local row = {
       pane = pane,
-      indent = 2,
+      indent = 0,
     }
     -- copy all spec fields in
     for k, v in pairs(spec) do
@@ -101,12 +155,11 @@ end
 local search_keys = function()
   local cwd = vim.fn.getcwd()
   local project = vim.fn.fnamemodify(cwd, ":t")
-  local header = { pane = 1, title = "Project", desc = " (" .. project .. ")" }
+  local header = { pane = 1, title = create_aligned_title("Project", project) }
 
   local keys = {
-    { icon = " ", key = "/", desc = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
+    { key = "/", desc = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
     {
-      icon = " ",
       desc = "Search Code TODOs",
       key = "x",
       action = function()
@@ -114,7 +167,6 @@ local search_keys = function()
       end,
     },
     {
-      icon = " ",
       desc = "Grep Dependencies",
       key = "s",
       action = function()
@@ -123,7 +175,6 @@ local search_keys = function()
       end,
     },
     {
-      icon = " ",
       desc = "Open TODO List",
       key = "t",
       action = function()
@@ -135,7 +186,7 @@ local search_keys = function()
     },
   }
 
-  local find_file_base = { icon = " ", key = "f", desc = "Find File" }
+  local find_file_base = { key = "f", desc = "Find File" }
   table.insert(
     keys,
     different_key_if_condition(
@@ -146,15 +197,21 @@ local search_keys = function()
     )
   )
 
-  return create_pane(header, keys)
+  return create_pane(header, keys, 2)
 end
 
 local globalkeys = function()
   -- NOTE: consider the projects section that only shows up if not in a git repo
-  local header = { pane = 1, title = "Global" }
+  local header = {
+    pane = 1,
+    title = create_aligned_title(
+      "Neovim",
+      "v" .. vim.version().major .. "." .. vim.version().minor .. "." .. vim.version().patch
+    ),
+  }
   local keys = {
+    { key = "q", desc = "Quit", action = ":qa" },
     {
-      icon = " ",
       key = "p",
       desc = "Find Project",
       action = function()
@@ -167,24 +224,21 @@ local globalkeys = function()
         })
       end,
     },
-    { icon = " ", key = "q", desc = "Quit", action = ":qa" },
     {
-      icon = "󰒲 ",
       key = "l",
       desc = "Manage Lua Plugins",
       action = ":Lazy",
       enabled = package.loaded.lazy ~= nil,
     },
-    { icon = " ", key = "r", desc = "Restore Session", section = "session" },
+    { key = "r", desc = "Restore Session", section = "session" },
     {
-      icon = " ",
       key = "c",
       desc = "Search Neovim Config",
       action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
     },
   }
 
-  return create_pane(header, keys)
+  return create_pane(header, keys, 2)
 end
 local recent_project_toggle = function()
   local in_git = Snacks.git.get_root() ~= nil
@@ -192,19 +246,20 @@ local recent_project_toggle = function()
   -- if in git and has one pane, then we disable
   return not (in_git and not has_two_panes)
 end
+
+SNORLAX_PADDING = 4
 local get_recent_files = function()
   local out = {}
   local max_files = 5
   local recent_files = recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
-  local final_padding = pane == 2 and max_files - n_files + 1 or 1
+  local final_padding = pane == 2 and max_files - n_files + SNORLAX_PADDING or 2
 
   for i, rel in ipairs(recent_files) do
     out[#out + 1] = {
       pane = pane,
-      icon = "󰈙 ",
-      indent = 2,
+      indent = 0,
       padding = (i == n_files) and final_padding or 0,
       desc = normalize_path(rel),
       key = tostring(i),
@@ -217,10 +272,15 @@ local get_recent_files = function()
   if #out == 0 then
     out[1] = {
       pane = pane,
-      icon = " ",
-      desc = "No recent files in this directory",
-      padding = pane == 2 and max_files or 1,
+      indent = 0,
+      padding = pane == 2 and max_files + SNORLAX_PADDING - 1 or 2,
       enabled = recent_project_toggle,
+    }
+  end
+  if pane == 1 and show_if_has_second_pane() then
+    out[#out + 1] = {
+      pane = 2,
+      padding = n_files > 0 and n_files or 1,
     }
   end
   return out
@@ -232,26 +292,26 @@ local create_sections = function()
   local recent_files = get_recent_files()
   return {
 
+    -- { pane = 1, padding = 2, indent = 0 },
+    -- { pane = 2, padding = 2, enabled = show_if_has_second_pane, indent = 0 },
     search_keys,
     {
-      title = "Recent Project Files",
+      title = create_aligned_title("Recent Files", get_recent_file_time()),
       pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
-      padding = 1,
+      padding = 2,
       enabled = recent_project_toggle,
     },
     recent_files,
     {
       pane = 1,
-      title = "Git",
-      desc = string.format(" (%s)", current_branch:gsub("\n", "")),
+      title = create_aligned_title("Git", current_branch),
       indent = 0,
-      padding = 1,
+      padding = 2,
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Checkout Another Branch",
       key = "b",
       action = function()
@@ -265,14 +325,13 @@ local create_sections = function()
         })
       end,
       enabled = Snacks.git.get_root() ~= nil,
-      indent = 2,
+      indent = 0,
     },
     {
       pane = 1,
-      icon = " ",
       desc = string.format("Search Diff vs %s", base_branch),
       key = "d",
-      indent = 2,
+      indent = 0,
       action = function()
         git_pickers.diff_picker(base_branch)
       end,
@@ -280,8 +339,7 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
-      indent = 2,
+      indent = 0,
       desc = "Search Un-Commited Changes",
       key = "u",
       action = function()
@@ -291,29 +349,29 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Open LazyGit UI",
       key = "g",
-      indent = 2,
+      indent = 0,
       action = function()
         Snacks.lazygit({ cwd = LazyVim.root.git() })
       end,
+      padding = 1,
       enabled = Snacks.git.get_root() ~= nil,
     },
     {
       pane = 1,
-      indent = 2,
-      -- 58 ticks is exactly the size of a line (width 60, indent = 2)
-      title = "----------------------------------------------------------",
+      indent = 0,
+      -- 60 ticks is exactly the size of a line (width 60, indent = 0)
+      title = "------------------------------------------------------------",
+      padding = 1,
       enabled = Snacks.git.get_root() ~= nil,
     },
 
     {
       pane = 1,
-      icon = " ",
       desc = "Search Recent Notifications",
       key = "N",
-      indent = 2,
+      indent = 0,
       action = function()
         vim.notify("Fetching Notifications from GitHub...")
         vim.defer_fn(git_pickers.notification_picker, 100)
@@ -322,9 +380,8 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Search Pull Requests",
-      indent = 2,
+      indent = 0,
       key = "P",
       action = function()
         vim.notify("Fetching open PRs from GitHub...")
@@ -334,10 +391,9 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Search Issues",
       key = "I",
-      indent = 2,
+      indent = 0,
       action = function()
         vim.notify("Fetching open issues from GitHub...")
         vim.defer_fn(git_pickers.issue_picker, 100)
@@ -346,11 +402,10 @@ local create_sections = function()
     },
     {
       pane = 1,
-      icon = " ",
       desc = "Open Repo in GitHub",
-      padding = 1,
+      padding = 2,
       key = "B",
-      indent = 2,
+      indent = 0,
       action = function()
         Snacks.gitbrowse()
       end,
@@ -362,10 +417,8 @@ local create_sections = function()
     -- first pane, and snorlax needs to be padded according to the number of lines in recent files
     {
       pane = 2,
-      enabled = function()
-        return show_if_has_second_pane() and Snacks.git.get_root() == nil
-      end,
-      padding = #recent_files / 2,
+      enabled = show_if_has_second_pane,
+      padding = 2,
     },
     {
       pane = 2,
@@ -375,10 +428,22 @@ local create_sections = function()
       -- NOTE: for some reason, sleep 10 makes it never flicker, but also only causes a 1 second pause
       cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.01",
       ttl = math.huge, -- make the cache last forever so the 1 second pause is only the first time opening a project
-      indent = 10,
+      indent = 22,
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
       enabled = show_if_has_second_pane,
+      padding = 0, --SNORLAX_PADDING - 1,
+    },
+    {
+      pane = 2,
+      title = create_aligned_title("Startup", vim.fn.printf("%.1fms", require("lazy").stats().startuptime)),
+      indent = 0,
+      enabled = show_if_has_second_pane,
+    },
+    {
+      pane = 1,
+      title = create_aligned_title("Time", os.date("%H:%M")),
+      indent = 0,
     },
   }
 end

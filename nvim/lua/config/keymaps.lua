@@ -174,7 +174,6 @@ local function select_and_grep_package()
     local search_path = site_packages_path .. "/" .. selected_package
 
     -- 5. Open the second picker (grep) scoped to the selected package directory.
-    vim.notify(search_path)
     snacks.picker.grep({
       title = "Grep in " .. selected_package,
       dirs = { search_path }, -- This is the crucial part!
