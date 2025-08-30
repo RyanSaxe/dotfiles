@@ -228,6 +228,22 @@ install_pokemon_colorscripts() {
   # 3) clean up
   rm -rf "$tmp"
 }
+
+install_tpm() {
+  log "Installing TPM (Tmux Plugin Manager)…"
+  
+  local tpm_dir="$HOME/.config/tmux/plugins/tpm"
+  
+  if [[ ! -d "$tpm_dir" ]]; then
+    git clone https://github.com/tmux-plugins/tpm "$tpm_dir" || {
+      err "Failed to clone TPM repository"
+      return 1
+    }
+    log "TPM installed successfully at $tpm_dir"
+  else
+    log "TPM already installed—skipping re-install"
+  fi
+}
 # ──────────────────────────────────────────────────────
 fetch_and_exec() {
   local url=$1
@@ -303,6 +319,11 @@ main() {
 
   install_pokemon_colorscripts || {
     err "Failed to install Pokémon Colorscripts"
+    exit 1
+  }
+
+  install_tpm || {
+    err "Failed to install TPM"
     exit 1
   }
 
