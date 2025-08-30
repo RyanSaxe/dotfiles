@@ -1,0 +1,31 @@
+-- Runs as soon as 'filetype' is set for this buffer (earliest point), before first draw.
+-- Hide terminal cursor (DECTCEM) to avoid any initial block flash
+-- local function term_write(s)
+--   pcall(function()
+--     io.write(s)
+--     io.flush()
+--   end)
+-- end
+--
+-- -- Save & set a near-invisible cursor as a fallback in case terminal ignores hide
+-- vim.b._sd_saved_guicursor = vim.o.guicursor
+-- vim.o.guicursor = "a:hor1-blinkon0"
+-- vim.wo.cursorline = false
+-- vim.wo.cursorcolumn = false
+--
+-- term_write("\x1b[?25l")
+--
+-- -- Buffer-local autocmd to restore on leave/close
+-- local grp = vim.api.nvim_create_augroup("SDHideCursor_" .. vim.api.nvim_get_current_buf(), { clear = true })
+-- vim.api.nvim_create_autocmd({ "BufWinLeave", "WinClosed", "BufWipeout" }, {
+--   group = grp,
+--   buffer = 0,
+--   once = true,
+--   callback = function()
+--     term_write("\x1b[?25h")
+--     if vim.b._sd_saved_guicursor then
+--       vim.o.guicursor = vim.b._sd_saved_guicursor
+--       vim.b._sd_saved_guicursor = nil
+--     end
+--   end,
+-- })

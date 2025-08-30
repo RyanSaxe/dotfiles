@@ -31,6 +31,9 @@ unfocused-split-opacity = 0.8
 ## no need to type the shortcut for copying highlighted text
 copy-on-select = clipboard
 
-# lualine in neovim needs these or there will be weird padding/gaps
+
+## makes lualine look nicer
 window-padding-x = 0
 window-padding-y = 0
+window-padding-color = extend-always
+
