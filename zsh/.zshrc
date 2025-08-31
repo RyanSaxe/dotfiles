@@ -248,6 +248,9 @@ tm() {
     # Create window and run command with delay
     tmux new-window -t "$session_name" -n "$window_name"
     sleep 0.1
+    # Clear screen first for TUI applications
+    tmux send-keys -t "$session_name:$window_name" "clear" Enter
+    sleep 0.1
     tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
   done
   
