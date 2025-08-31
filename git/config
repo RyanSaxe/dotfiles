@@ -29,3 +29,5 @@
 	navigate = true
 [merge]
 	conflictStyle = zdiff3
+[status]
+	showUntrackedFiles = all

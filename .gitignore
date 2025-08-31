@@ -10,3 +10,8 @@ archive/
 backups/*
 !backups/README.txt
 .DS_STORE
+claude/*
+!claude/CLAUDE.md
+!claude/plugins/
+!claude/settings.json
+!claude/statusline.sh

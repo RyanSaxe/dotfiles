@@ -7,3 +7,4 @@ zsh/.zshrc:$HOME/.zshrc
 zsh/themes:$HOME/.zsh-custom/themes
 ipython:$HOME/.ipython
 hammerspoon:$HOME/.hammerspoon
+claude:$HOME/.claude
