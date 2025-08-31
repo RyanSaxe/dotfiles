@@ -32,7 +32,7 @@ unfocused-split-opacity = 0.8
 copy-on-select = clipboard
 
 ## makes lualine look nicer
-window-padding-x = 0
+window-padding-x = 4
 window-padding-y = 0
 window-padding-color = extend-always
 window-padding-balance = true
