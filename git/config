@@ -1,0 +1,12 @@
+[user]
+	name = Ryan Saxe
+	email = ryancsaxe+1@gmail.com
+[core]
+	pager = git-split-diffs --color | less -RFX
+	editor = nvim
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+[merge]
+	conflictStyle = zdiff3
