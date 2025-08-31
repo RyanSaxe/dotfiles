@@ -8,3 +8,4 @@ vim.opt.updatetime = 50
 vim.opt.hlsearch = true
 -- since I use flash to jump, I prefer absolute line numbers
 vim.opt.relativenumber = false
+
