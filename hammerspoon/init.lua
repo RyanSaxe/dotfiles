@@ -1,62 +1,169 @@
 -- Hammerspoon configuration for dotfiles
--- Direct hotkey bindings for websites and applications
+-- Chrome window management with popup interface
 
--- Helper function to find existing Chrome window with specific URL pattern
-local function findExistingWindow(urlPattern)
-	local chromeApp = hs.application.find("Google Chrome")
-	if not chromeApp then
-		return nil
+-- URL mappings for quick site access
+local siteMapping = {
+	github = "https://github.com",
+	google = "https://google.com", 
+	chatgpt = "https://chatgpt.com",
+	youtube = "https://youtube.com",
+	gmail = "https://gmail.com",
+	drive = "https://drive.google.com",
+	calendar = "https://calendar.google.com",
+	docs = "https://docs.google.com",
+	sheets = "https://sheets.google.com",
+	slides = "https://slides.google.com",
+	maps = "https://maps.google.com",
+	news = "https://news.google.com",
+	reddit = "https://reddit.com",
+	linkedin = "https://linkedin.com",
+	twitter = "https://twitter.com",
+	netflix = "https://netflix.com",
+	spotify = "https://spotify.com",
+	twitch = "https://twitch.tv"
+}
+
+-- Global reference to the managed Chrome window
+local managedChromeWindow = nil
+
+-- Get or create the managed Chrome window
+local function getManagedChromeWindow()
+	-- Check if we have a valid reference and window still exists
+	if managedChromeWindow and managedChromeWindow:isValid() then
+		return managedChromeWindow
 	end
 	
-	local windows = chromeApp:allWindows()
-	for _, window in ipairs(windows) do
-		local title = window:title()
-		if title and string.find(string.lower(title), urlPattern) then
-			return window
+	-- Try to find an existing Chrome window to use
+	local chromeApp = hs.application.find("Google Chrome")
+	if chromeApp then
+		local windows = chromeApp:allWindows()
+		if #windows > 0 then
+			-- Use the first available window
+			managedChromeWindow = windows[1]
+			setupChromeWindow(managedChromeWindow)
+			return managedChromeWindow
 		end
 	end
+	
+	-- No Chrome or windows found, create new one
+	hs.application.launchOrFocus("Google Chrome")
+	hs.timer.doAfter(2, function()
+		chromeApp = hs.application.find("Google Chrome")
+		if chromeApp then
+			local windows = chromeApp:allWindows()
+			if #windows > 0 then
+				managedChromeWindow = windows[1]
+				setupChromeWindow(managedChromeWindow)
+			end
+		end
+	end)
+	
 	return nil
 end
 
--- Helper function to open URL in Chrome using AppleScript (avoids duplicate tabs)
-local function openOrFocusWebsite(url, title, urlPattern)
-	-- First check if window already exists
-	local existingWindow = findExistingWindow(urlPattern)
-	if existingWindow then
-		existingWindow:focus()
-		hs.alert.show("Bringing " .. title .. " to front")
+-- Setup Chrome window as fullscreen on main monitor
+function setupChromeWindow(window)
+	if not window then return end
+	
+	local mainScreen = hs.screen.primaryScreen()
+	local screenFrame = mainScreen:fullFrame()
+	
+	-- Make fullscreen on main monitor
+	window:setFrame(screenFrame)
+	window:focus()
+end
+
+-- Find existing tab with matching site input
+local function findExistingTab(siteInput)
+	local script = string.format([[
+		tell application "Google Chrome"
+			set foundTab to false
+			set foundWindow to ""
+			set foundTabIndex to 0
+			
+			repeat with w from 1 to count of windows
+				repeat with t from 1 to count of tabs of window w
+					set tabURL to URL of tab t of window w
+					set tabTitle to title of tab t of window w
+					
+					-- Check if this tab was created by our system for this input
+					if tabTitle contains "hs_managed_%s" or tabURL contains "%s" then
+						set foundTab to true
+						set foundWindow to w
+						set foundTabIndex to t
+						exit repeat
+					end if
+				end repeat
+				if foundTab then exit repeat
+			end repeat
+			
+			if foundTab then
+				set active tab index of window foundWindow to foundTabIndex
+				set index of window foundWindow to 1
+				return "found"
+			else
+				return "not_found"
+			end if
+		end tell
+	]], siteInput, siteInput)
+	
+	local success, result = hs.osascript.applescript(script)
+	return success and result == "found"
+end
+
+-- Navigate to site in managed Chrome window
+local function navigateToSite(siteInput)
+	-- Get URL from mapping or use default
+	local url = siteMapping[siteInput:lower()]
+	if not url then
+		-- Fallback: if input looks like a domain, use https://, otherwise use the input as-is
+		if siteInput:match("^[%w.-]+%.[%a]+$") then
+			url = "https://" .. siteInput
+		else
+			url = "https://" .. siteInput .. ".com"
+		end
+	end
+	
+	-- Check if tab already exists for this input
+	if findExistingTab(siteInput) then
+		hs.alert.show("Switched to existing " .. siteInput .. " tab")
 		return
 	end
 	
-	-- Use AppleScript to open URL properly
+	-- Get or create the managed window
+	local window = getManagedChromeWindow()
+	
+	-- Open in new tab with identifier
 	local script = string.format([[
 		tell application "Google Chrome"
 			activate
-			open location "%s"
+			if (count of windows) = 0 then
+				make new window
+			end if
+			set targetWindow to window 1
+			set newTab to make new tab at end of tabs of targetWindow
+			set URL of newTab to "%s"
+			set title of newTab to "hs_managed_%s - " & title of newTab
+			set active tab index of targetWindow to (count of tabs of targetWindow)
 		end tell
-	]], url)
+	]], url, siteInput)
 	
 	local success, result, error = hs.osascript.applescript(script)
 	if success then
-		hs.alert.show("Opening " .. title)
-		-- Wait for page to load then make window floating
-		hs.timer.doAfter(3, function()
-			local window = hs.application.frontmostApplication():focusedWindow()
-			if window then
-				-- Set window to floating size and position
-				local screen = window:screen()
-				local screenFrame = screen:frame()
-				local windowFrame = {
-					x = screenFrame.x + screenFrame.w * 0.2,
-					y = screenFrame.y + screenFrame.h * 0.15,
-					w = screenFrame.w * 0.6,
-					h = screenFrame.h * 0.7,
-				}
-				window:setFrame(windowFrame)
+		hs.alert.show("Opening " .. siteInput)
+		-- Ensure window is properly configured after navigation
+		hs.timer.doAfter(1, function()
+			local chromeApp = hs.application.find("Google Chrome")
+			if chromeApp then
+				local windows = chromeApp:allWindows()
+				if #windows > 0 then
+					managedChromeWindow = windows[1]
+					setupChromeWindow(managedChromeWindow)
+				end
 			end
 		end)
 	else
-		hs.alert.show("Error opening " .. title .. ": " .. (error or "unknown"))
+		hs.alert.show("Error opening " .. siteInput .. ": " .. (error or "unknown"))
 	end
 end
 
@@ -74,21 +181,23 @@ local function launchOrFocusApp(appName, displayName)
 	end
 end
 
--- Website hotkey bindings
-hs.hotkey.bind({"cmd", "shift"}, "g", function()
-	openOrFocusWebsite("https://github.com", "GitHub", "github")
-end)
+-- Popup input interface for site navigation
+local function showSiteNavigator()
+	local inputModal = hs.textPrompt.new()
+	inputModal:title("Navigate to Site")
+	inputModal:informativeText("Enter site name or URL (e.g. 'github', 'example.com')")
+	inputModal:defaultText("")
+	inputModal:callback(function(result, input)
+		if result == hs.textPrompt.buttonTypes.ok and input and #input > 0 then
+			navigateToSite(input)
+		end
+	end)
+	inputModal:show()
+end
 
-hs.hotkey.bind({"cmd", "shift"}, "s", function()
-	openOrFocusWebsite("https://google.com", "Google", "google")
-end)
-
-hs.hotkey.bind({"cmd", "shift"}, "a", function()
-	openOrFocusWebsite("https://chatgpt.com", "ChatGPT", "chatgpt")
-end)
-
-hs.hotkey.bind({"cmd", "shift"}, "y", function()
-	openOrFocusWebsite("https://youtube.com", "YouTube", "youtube")
+-- Main hotkey binding for site navigation popup
+hs.hotkey.bind({"cmd", "shift"}, "delete", function()
+	showSiteNavigator()
 end)
 
 -- Application hotkey bindings
@@ -96,34 +205,13 @@ hs.hotkey.bind({"cmd", "shift"}, "t", function()
 	launchOrFocusApp("Ghostty", "Ghostty Terminal")
 end)
 
--- Send all managed Chrome windows to back
+-- Send managed Chrome window to back
 hs.hotkey.bind({"cmd", "shift"}, "b", function()
-	local chromeApp = hs.application.find("Google Chrome")
-	if chromeApp then
-		local patterns = {"github", "google", "chatgpt", "youtube"}
-		local windowsSent = 0
-		local windows = chromeApp:allWindows()
-		
-		for _, window in ipairs(windows) do
-			local title = window:title()
-			if title then
-				for _, pattern in ipairs(patterns) do
-					if string.find(string.lower(title), pattern) then
-						window:sendToBack()
-						windowsSent = windowsSent + 1
-						break
-					end
-				end
-			end
-		end
-		
-		if windowsSent > 0 then
-			hs.alert.show("Sent " .. windowsSent .. " Chrome windows to back")
-		else
-			hs.alert.show("No matching Chrome windows found")
-		end
+	if managedChromeWindow and managedChromeWindow:isValid() then
+		managedChromeWindow:sendToBack()
+		hs.alert.show("Sent Chrome window to back")
 	else
-		hs.alert.show("Chrome not running")
+		hs.alert.show("No managed Chrome window found")
 	end
 end)
 
