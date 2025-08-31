@@ -1,156 +1,125 @@
--- Hammerspoon configuration for dotfiles
--- Chrome window management with popup interface
+-- Simple Hammerspoon config: URL shortcuts + terminal switching
+-- Focus an existing Chrome tab by domain; otherwise open a new one.
 
--- URL mappings for quick site access
-local siteMapping = {
-	github = "https://github.com",
-	google = "https://google.com", 
-	chatgpt = "https://chatgpt.com",
-	youtube = "https://youtube.com",
-	gmail = "https://gmail.com",
-	drive = "https://drive.google.com",
-	calendar = "https://calendar.google.com",
-	docs = "https://docs.google.com",
-	sheets = "https://sheets.google.com",
-	slides = "https://slides.google.com",
-	maps = "https://maps.google.com",
-	news = "https://news.google.com",
-	reddit = "https://reddit.com",
-	linkedin = "https://linkedin.com",
-	twitter = "https://twitter.com",
-	netflix = "https://netflix.com",
-	spotify = "https://spotify.com",
-	twitch = "https://twitch.tv"
+local sites = {
+	-- key  = {domain, fallback URL}
+	A = { "chatgpt.com", "https://chatgpt.com" },
+	G = { "github.com", "https://github.com" },
+	Y = { "youtube.com", "https://youtube.com" },
+	M = { "outlook.com", "https://outlook.com" },
+	S = { "google.com", "https://google.com" },
 }
 
--- Find Hammerspoon-created Chrome window for specific site input
-local function findHammerspoonWindow(siteInput)
-	local identifier = "HS_MANAGED_" .. siteInput:upper()
-	local chromeApp = hs.application.find("Google Chrome")
-	if not chromeApp then
-		return nil
+-- Replace your tab enumeration with window IDs (stable)
+local function getAllChromeTabs()
+	local script = [[
+    set out to {}
+    tell application "Google Chrome"
+      repeat with w in windows
+        set wid to id of w
+        set tIndex to 0
+        repeat with t in tabs of w
+          set tIndex to tIndex + 1
+          set end of out to (wid as string) & "|" & (tIndex as string) & "|" & (URL of t as string)
+        end repeat
+      end repeat
+    end tell
+    return out
+  ]]
+	local ok, res = hs.osascript.applescript(script)
+	if not ok or type(res) ~= "table" then
+		return {}
 	end
-	
-	local windows = chromeApp:allWindows()
-	for _, window in ipairs(windows) do
-		local title = window:title()
-		if title and title:find(identifier) then
-			return window
-		end
-	end
-	return nil
+	return res
 end
 
--- Create new Chrome window with Hammerspoon identifier
-local function createHammerspoonWindow(siteInput, url)
-	local identifier = "HS_MANAGED_" .. siteInput:upper()
-	
-	local script = string.format([[
-		tell application "Google Chrome"
-			set newWindow to make new window
-			set URL of active tab of newWindow to "%s"
-			delay 1
-			-- Set tab title to include our identifier
-			tell active tab of newWindow
-				execute javascript "document.title = '%s - ' + document.title"
-			end tell
-		end tell
-	]], url, identifier)
-	
-	local success, result, error = hs.osascript.applescript(script)
-	if success then
-		hs.timer.doAfter(2, function()
-			local chromeApp = hs.application.find("Google Chrome")
-			if chromeApp then
-				local window = chromeApp:focusedWindow()
-				if window then
-					-- Make fullscreen on main monitor
-					local mainScreen = hs.screen.primaryScreen()
-					local screenFrame = mainScreen:fullFrame()
-					window:setFrame(screenFrame)
-					window:focus()
-				end
-			end
-		end)
-		return true
-	else
-		hs.alert.show("Error creating window: " .. (error or "unknown"))
+-- New: focus tab by window ID (robust to reordering/minimized windows)
+local function focusChromeTabByWinID(winID, tabIndex)
+	local script = string.format(
+		[[
+    tell application "Google Chrome"
+      activate
+      try
+        set w to (first window whose id is %d)
+        if (minimized of w) is true then set minimized of w to false
+        set active tab index of w to %d
+        set index of w to 1
+      end try
+      activate
+    end tell
+  ]],
+		winID,
+		tabIndex
+	)
+	hs.osascript.applescript(script)
+end
+
+-- Update your matcher to pass window ID (not index)
+local function hostFromURL(u)
+	local h = u:match("^%a[%w+.-]*://([^/]+)")
+	if h then
+		h = h:lower():gsub("^www%.", "")
+	end
+	return h
+end
+
+local function domainMatches(host, domain)
+	if not host then
 		return false
 	end
+	host = host:lower():gsub("^www%.", "")
+	domain = domain:lower():gsub("^www%.", "")
+	return host == domain or host:sub(-(#domain + 1)) == ("." .. domain)
 end
 
--- Navigate to site with window management
-local function navigateToSite(siteInput)
-	-- Get URL from mapping or use default
-	local url = siteMapping[siteInput:lower()]
-	if not url then
-		-- Fallback: if input looks like a domain, use https://, otherwise add .com
-		if siteInput:match("^[%w.-]+%.[%a]+$") then
-			url = "https://" .. siteInput
-		else
-			url = "https://" .. siteInput .. ".com"
+local function focusByDomainOrOpen(domain, url)
+	local chrome = hs.application.find("Google Chrome")
+	if chrome then
+		for _, line in ipairs(getAllChromeTabs()) do
+			local wid, t, u = line:match("^(%d+)|(%d+)|(.+)$")
+			if wid and t and u then
+				local host = hostFromURL(u)
+				if domainMatches(host, domain) then
+					focusChromeTabByWinID(tonumber(wid), tonumber(t))
+					return
+				end
+			end
 		end
 	end
-	
-	-- Check if Hammerspoon window already exists for this input
-	local existingWindow = findHammerspoonWindow(siteInput)
-	if existingWindow then
-		existingWindow:focus()
-		hs.alert.show("Switching to existing " .. siteInput .. " window")
-		return
-	end
-	
-	-- Create new window
-	if createHammerspoonWindow(siteInput, url) then
-		hs.alert.show("Opening " .. siteInput .. " in new window")
-	end
+	hs.urlevent.openURL(url)
 end
 
--- Helper function to launch or focus applications
-local function launchOrFocusApp(appName, displayName)
-	local app = hs.application.find(appName)
-	if app and app:isFrontmost() then
-		hs.alert.show(displayName .. " already focused")
-	elseif app then
-		app:activate()
-		hs.alert.show("Bringing " .. displayName .. " to front")
+-- Create hotkeys for each site (Cmd+Shift+Letter)
+for key, cfg in pairs(sites) do
+	local domain, url = cfg[1], cfg[2]
+	hs.hotkey.bind({ "cmd", "shift" }, key, function()
+		focusByDomainOrOpen(domain, url)
+	end)
+end
+
+-- Terminal focus (Cmd+Shift+T)
+hs.hotkey.bind({ "cmd", "shift" }, "T", function()
+	hs.application.launchOrFocus("Ghostty")
+end)
+
+-- Toggle between browser and terminal (Cmd+Shift+Delete)
+hs.hotkey.bind({ "cmd", "shift" }, "delete", function()
+	local chrome = hs.application.find("Google Chrome")
+	local ghostty = hs.application.find("Ghostty")
+	if chrome and chrome:isFrontmost() then
+		if ghostty then
+			ghostty:activate()
+			hs.alert.show("Terminal")
+		end
 	else
-		hs.application.launchOrFocus(appName)
-		hs.alert.show("Launching " .. displayName)
-	end
-end
-
--- Popup input interface for site navigation
-local function showSiteNavigator()
-	local button, input = hs.dialog.textPrompt("Navigate to Site", "Enter site name or URL (e.g. 'github', 'example.com'):", "", "Go", "Cancel")
-	if button == "Go" and input and #input > 0 then
-		navigateToSite(input)
-	end
-end
-
--- Main hotkey binding for site navigation popup
-hs.hotkey.bind({"cmd", "shift"}, "delete", function()
-	showSiteNavigator()
-end)
-
--- Application hotkey bindings
-hs.hotkey.bind({"cmd", "shift"}, "t", function()
-	launchOrFocusApp("Ghostty", "Ghostty Terminal")
-end)
-
--- Send managed Chrome window to back
-hs.hotkey.bind({"cmd", "shift"}, "b", function()
-	if managedChromeWindow and managedChromeWindow:isValid() then
-		managedChromeWindow:sendToBack()
-		hs.alert.show("Sent Chrome window to back")
-	else
-		hs.alert.show("No managed Chrome window found")
+		if chrome then
+			chrome:activate()
+			hs.alert.show("Browser")
+		end
 	end
 end)
 
--- Reload Hammerspoon config
-hs.hotkey.bind({"cmd", "shift"}, "r", function()
-	hs.reload()
-end)
+-- Reload config (Cmd+Shift+R)
+hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
-hs.alert.show("Hammerspoon config loaded")
+hs.alert.show("Hammerspoon loaded")
