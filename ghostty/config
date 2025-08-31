@@ -31,9 +31,10 @@ unfocused-split-opacity = 0.8
 ## no need to type the shortcut for copying highlighted text
 copy-on-select = clipboard
 
-
 ## makes lualine look nicer
-window-padding-x = 0
+window-padding-x = 4
 window-padding-y = 0
 window-padding-color = extend-always
-
+window-padding-balance = true
+## allow multiline for claude code
+keybind = shift+enter=text:\n

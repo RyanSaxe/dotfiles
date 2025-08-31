@@ -2,5 +2,7 @@ nvim:$HOME/.config/nvim
 bat:$HOME/.config/bat
 ghostty:$HOME/.config/ghostty
 git:$HOME/.config/git
+tmux:$HOME/.config/tmux
 zsh/.zshrc:$HOME/.zshrc
 zsh/themes:$HOME/.zsh-custom/themes
+ipython:$HOME/.ipython
