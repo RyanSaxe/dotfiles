@@ -19,3 +19,4 @@ ghostscript
 imagemagick
 tectonic
 luarocks
+hammerspoon
