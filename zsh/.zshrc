@@ -169,8 +169,42 @@ add-zsh-hook chpwd _auto_activate_venv
 _auto_activate_venv
 
 # Tmux session management
-dev() {
-  local session_name="${1:-$(basename "$PWD")}"
+
+alias tl="tmux list"
+alias ta="tmux attach"
+alias tk="tmux kill-session"
+alias tq="tmux detach"
+alias tQ="tmux kill-server"
+
+# Create a new tmux session with predefined windows and programs
+tm() {
+  # Define shortcut mappings
+  local -A shortcuts_map=(
+    ["py"]="ipython"
+    ["cc"]="claude"
+  )
+  
+  local session_name="$(basename "$PWD")"
+  local commands=()
+  
+  # Parse flags and arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -n)
+        session_name="$2"
+        shift 2
+        ;;
+      -c)
+        commands+=("$2")
+        shift 2
+        ;;
+      *)
+        # Treat remaining arguments as commands/shortcuts
+        commands+=("$1")
+        shift
+        ;;
+    esac
+  done
   
   # Check if session already exists
   if tmux has-session -t "$session_name" 2>/dev/null; then
@@ -186,8 +220,36 @@ dev() {
   # Create second window (terminal)
   tmux new-window -t "$session_name" -n "terminal"
   
-  # Create third window (logs/misc)
-  tmux new-window -t "$session_name" -n "logs"
+  # Track window names to prevent duplicates
+  local window_names=("nvim" "terminal")
+  
+  # Create additional windows for each command
+  for cmd in "${commands[@]}"; do
+    local window_name
+    local command_to_run
+    
+    # Check if it's a shortcut
+    if [[ -n "${shortcuts_map[$cmd]}" ]]; then
+      command_to_run="${shortcuts_map[$cmd]}"
+      window_name="${command_to_run%% *}"  # Use first word of actual command
+    else
+      # Regular command - use first word as window name
+      command_to_run="$cmd"
+      window_name="${cmd%% *}"
+    fi
+    
+    # Check for duplicate window names
+    if [[ " ${window_names[*]} " =~ " ${window_name} " ]]; then
+      echo "Error: Window name '$window_name' already exists in session '$session_name'"
+      return 1
+    fi
+    window_names+=("$window_name")
+    
+    # Create window and run command with delay
+    tmux new-window -t "$session_name" -n "$window_name"
+    sleep 0.1
+    tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
+  done
   
   # Go back to first window and attach
   tmux select-window -t "$session_name:nvim"
@@ -195,7 +257,7 @@ dev() {
 }
 
 # Switch tmux sessions with fzf (works inside and outside tmux)
-ss() {
+ts() {
   local session
   session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --prompt="Switch to session: " --height=40% --reverse)
   if [[ -n "$session" ]]; then
