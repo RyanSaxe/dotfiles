@@ -27,6 +27,8 @@ return {
       options = {
         theme = "auto",
         globalstatus = vim.o.laststatus == 3,
+        component_separators = { left = "", right = "" },
+        section_separators = { left = "", right = "" },
         -- disabled_filetypes = { statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard" } },
       },
       sections = {
@@ -34,6 +36,12 @@ return {
         lualine_b = { "branch" },
         lualine_c = {
           { LazyVim.lualine.pretty_path() },
+          {
+            function()
+              return vim.bo.modified and "●" or ""
+            end,
+            color = { fg = "#e0af68" }, -- tokyonight yellow for unsaved indicator
+          },
         },
 
         lualine_x = {
@@ -57,12 +65,13 @@ return {
               removed = icons.git.removed,
             },
             source = function()
-              local gitsigns = vim.b.gitsigns_status_dict
-              if gitsigns then
+              local mini_diff = require("mini.diff")
+              local summary = mini_diff.get_buf_data(0).summary
+              if summary then
                 return {
-                  added = gitsigns.added,
-                  modified = gitsigns.changed,
-                  removed = gitsigns.removed,
+                  added = summary.add,
+                  modified = summary.change,
+                  removed = summary.delete,
                 }
               end
             end,
