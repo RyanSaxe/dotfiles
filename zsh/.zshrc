@@ -170,7 +170,7 @@ _auto_activate_venv
 
 # Tmux session management
 
-alias tl="tmux list"
+alias tl="tmux list-sessions"
 alias ta="tmux attach"
 alias tk="tmux kill-session"
 alias tq="tmux detach"
@@ -178,10 +178,11 @@ alias tQ="tmux kill-server"
 
 # Create a new tmux session with predefined windows and programs
 tm() {
-  # Define shortcut mappings
+  # Define shortcut mappings: shortcut -> "command|window_name"
   local -A shortcuts_map=(
-    ["py"]="ipython"
-    ["cc"]="claude"
+    ["py"]="ipython|ipython"
+    ["cc"]="claude|claude"
+    ["pr"]="gh dash|PRs"
   )
   
   local session_name="$(basename "$PWD")"
@@ -230,8 +231,9 @@ tm() {
     
     # Check if it's a shortcut
     if [[ -n "${shortcuts_map[$cmd]}" ]]; then
-      command_to_run="${shortcuts_map[$cmd]}"
-      window_name="${command_to_run%% *}"  # Use first word of actual command
+      # Parse "command|window_name" format
+      command_to_run="${shortcuts_map[$cmd]%|*}"
+      window_name="${shortcuts_map[$cmd]#*|}"
     else
       # Regular command - use first word as window name
       command_to_run="$cmd"
@@ -245,10 +247,8 @@ tm() {
     fi
     window_names+=("$window_name")
     
-    # Create window and run command with delay
     tmux new-window -t "$session_name" -n "$window_name"
-    sleep 0.1
-    # Clear screen first for TUI applications
+    # Clear screen first for TUI applications -- a delay prevents formatting issues
     tmux send-keys -t "$session_name:$window_name" "clear" Enter
     sleep 0.1
     tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
@@ -256,6 +256,7 @@ tm() {
   
   # Go back to first window and attach
   tmux select-window -t "$session_name:nvim"
+  echo "Session '$session_name' created successfully. Attaching..."
   tmux attach-session -t "$session_name"
 }
 
