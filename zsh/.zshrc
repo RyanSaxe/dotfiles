@@ -170,7 +170,7 @@ _auto_activate_venv
 
 # Tmux session management
 dev() {
-  local session_name="${1:-dev}"
+  local session_name="${1:-$(basename "$PWD")}"
   
   # Check if session already exists
   if tmux has-session -t "$session_name" 2>/dev/null; then
@@ -192,4 +192,19 @@ dev() {
   # Go back to first window and attach
   tmux select-window -t "$session_name:nvim"
   tmux attach-session -t "$session_name"
+}
+
+# Switch tmux sessions with fzf (works inside and outside tmux)
+ss() {
+  local session
+  session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --prompt="Switch to session: " --height=40% --reverse)
+  if [[ -n "$session" ]]; then
+    if [[ -n "$TMUX" ]]; then
+      # Inside tmux - switch client
+      tmux switch-client -t "$session"
+    else
+      # Outside tmux - attach to session
+      tmux attach-session -t "$session"
+    fi
+  fi
 }
