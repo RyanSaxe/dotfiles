@@ -170,11 +170,11 @@ _auto_activate_venv
 
 # Tmux session management
 
-alias tl="tmux list-sessions"
-alias ta="tmux attach"
-alias tk="tmux kill-session"
-alias tq="tmux detach"
-alias tQ="tmux kill-server"
+alias tl="tmux -u list-sessions"
+alias ta="tmux -u attach"
+alias tk="tmux -u kill-session"
+alias tq="tmux -u detach"
+alias tQ="tmux -u kill-server"
 
 # Create a new tmux session with predefined windows and programs
 tm() {
@@ -208,18 +208,18 @@ tm() {
   done
   
   # Check if session already exists
-  if tmux has-session -t "$session_name" 2>/dev/null; then
+  if tmux -u has-session -t "$session_name" 2>/dev/null; then
     echo "Session '$session_name' already exists. Attaching..."
-    tmux attach-session -t "$session_name"
+    tmux -u attach-session -t "$session_name"
     return
   fi
   
   # Create new session with first window (nvim)
-  tmux new-session -d -s "$session_name" -n "nvim"
-  tmux send-keys -t "$session_name:nvim" "nvim" Enter
+  tmux -u new-session -d -s "$session_name" -n "nvim"
+  tmux -u send-keys -t "$session_name:nvim" "nvim" Enter
   
   # Create second window (terminal)
-  tmux new-window -t "$session_name" -n "terminal"
+  tmux -u new-window -t "$session_name" -n "terminal"
   
   # Track window names to prevent duplicates
   local window_names=("nvim" "terminal")
@@ -247,30 +247,30 @@ tm() {
     fi
     window_names+=("$window_name")
     
-    tmux new-window -t "$session_name" -n "$window_name"
+    tmux -u new-window -t "$session_name" -n "$window_name"
     # Clear screen first for TUI applications -- a delay prevents formatting issues
-    tmux send-keys -t "$session_name:$window_name" "clear" Enter
+    tmux -u send-keys -t "$session_name:$window_name" "clear" Enter
     sleep 0.1
-    tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
+    tmux -u send-keys -t "$session_name:$window_name" "$command_to_run" Enter
   done
   
   # Go back to first window and attach
-  tmux select-window -t "$session_name:nvim"
+  tmux -u select-window -t "$session_name:nvim"
   echo "Session '$session_name' created successfully. Attaching..."
-  tmux attach-session -t "$session_name"
+  tmux -u attach-session -t "$session_name"
 }
 
 # Switch tmux sessions with fzf (works inside and outside tmux)
 ts() {
   local session
-  session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --prompt="Switch to session: " --height=40% --reverse)
+  session=$(tmux -u list-sessions -F "#{session_name}" 2>/dev/null | fzf --prompt="Switch to session: " --height=40% --reverse)
   if [[ -n "$session" ]]; then
     if [[ -n "$TMUX" ]]; then
       # Inside tmux - switch client
-      tmux switch-client -t "$session"
+      tmux -u switch-client -t "$session"
     else
       # Outside tmux - attach to session
-      tmux attach-session -t "$session"
+      tmux -u attach-session -t "$session"
     fi
   fi
 }

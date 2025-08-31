@@ -146,11 +146,11 @@ ZSH_THEME_GIT_PROMPT_SUFFIX=" ${RESET}"
 ZSH_THEME_GIT_PROMPT_DIRTY=" ${C_RED}✘${RESET}"
 ZSH_THEME_GIT_PROMPT_CLEAN=" ${C_GREEN}✔${RESET}"
 
-PROMPT="\$(get_prefix)${C_CYAN}%~${RESET}\$(git_prompt_info)${C_DIM}\$(_git_time_since_commit)${RESET}
+PROMPT="\$(get_prefix)${C_CYAN}%~${RESET}\$(git_prompt_info)\$(if (( COLUMNS >= 80 )); then echo \"${C_DIM}\$(_git_time_since_commit)${RESET}\"; fi)
 ${C_DIM}╰\$(prompt_padding)\$(virtualenv_info) "
 
-# Right-aligned time in dim color
-RPROMPT="${C_DIM}%*${RESET}"
+# Right-aligned time in dim color (only on wide screens)
+RPROMPT="\$(if (( COLUMNS >= 80 )); then echo \"${C_DIM}%*${RESET}\"; fi)"
 
 # Ensure prompt substitutions work (Oh My Zsh usually sets this, but just in case)
 setopt prompt_subst

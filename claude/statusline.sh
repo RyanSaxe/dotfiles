@@ -76,8 +76,6 @@ if [[ "$output_style" != "default" ]]; then
   status_line+=" ${C_DIM}(${output_style})${RESET}"
 fi
 
-# Time (simple left-aligned)
-status_line+=" ${C_DIM}at${RESET} ${C_DIM}${current_time}${RESET}"
 
 # # Virtual environment if available
 # if [[ -n "$venv_info" ]]; then
