@@ -23,100 +23,68 @@ local siteMapping = {
 	twitch = "https://twitch.tv"
 }
 
--- Global reference to the managed Chrome window
-local managedChromeWindow = nil
-
--- Get or create the managed Chrome window
-local function getManagedChromeWindow()
-	-- Check if we have a valid reference and window still exists
-	if managedChromeWindow and managedChromeWindow:isValid() then
-		return managedChromeWindow
-	end
-	
-	-- Try to find an existing Chrome window to use
+-- Find Hammerspoon-created Chrome window for specific site input
+local function findHammerspoonWindow(siteInput)
+	local identifier = "HS_MANAGED_" .. siteInput:upper()
 	local chromeApp = hs.application.find("Google Chrome")
-	if chromeApp then
-		local windows = chromeApp:allWindows()
-		if #windows > 0 then
-			-- Use the first available window
-			managedChromeWindow = windows[1]
-			setupChromeWindow(managedChromeWindow)
-			return managedChromeWindow
-		end
+	if not chromeApp then
+		return nil
 	end
 	
-	-- No Chrome or windows found, create new one
-	hs.application.launchOrFocus("Google Chrome")
-	hs.timer.doAfter(2, function()
-		chromeApp = hs.application.find("Google Chrome")
-		if chromeApp then
-			local windows = chromeApp:allWindows()
-			if #windows > 0 then
-				managedChromeWindow = windows[1]
-				setupChromeWindow(managedChromeWindow)
-			end
+	local windows = chromeApp:allWindows()
+	for _, window in ipairs(windows) do
+		local title = window:title()
+		if title and title:find(identifier) then
+			return window
 		end
-	end)
-	
+	end
 	return nil
 end
 
--- Setup Chrome window as fullscreen on main monitor
-function setupChromeWindow(window)
-	if not window then return end
+-- Create new Chrome window with Hammerspoon identifier
+local function createHammerspoonWindow(siteInput, url)
+	local identifier = "HS_MANAGED_" .. siteInput:upper()
 	
-	local mainScreen = hs.screen.primaryScreen()
-	local screenFrame = mainScreen:fullFrame()
-	
-	-- Make fullscreen on main monitor
-	window:setFrame(screenFrame)
-	window:focus()
-end
-
--- Find existing tab with matching site input
-local function findExistingTab(siteInput)
 	local script = string.format([[
 		tell application "Google Chrome"
-			set foundTab to false
-			set foundWindow to ""
-			set foundTabIndex to 0
-			
-			repeat with w from 1 to count of windows
-				repeat with t from 1 to count of tabs of window w
-					set tabURL to URL of tab t of window w
-					set tabTitle to title of tab t of window w
-					
-					-- Check if this tab was created by our system for this input
-					if tabTitle contains "hs_managed_%s" or tabURL contains "%s" then
-						set foundTab to true
-						set foundWindow to w
-						set foundTabIndex to t
-						exit repeat
-					end if
-				end repeat
-				if foundTab then exit repeat
-			end repeat
-			
-			if foundTab then
-				set active tab index of window foundWindow to foundTabIndex
-				set index of window foundWindow to 1
-				return "found"
-			else
-				return "not_found"
-			end if
+			set newWindow to make new window
+			set URL of active tab of newWindow to "%s"
+			delay 1
+			-- Set tab title to include our identifier
+			tell active tab of newWindow
+				execute javascript "document.title = '%s - ' + document.title"
+			end tell
 		end tell
-	]], siteInput, siteInput)
+	]], url, identifier)
 	
-	local success, result = hs.osascript.applescript(script)
-	return success and result == "found"
+	local success, result, error = hs.osascript.applescript(script)
+	if success then
+		hs.timer.doAfter(2, function()
+			local chromeApp = hs.application.find("Google Chrome")
+			if chromeApp then
+				local window = chromeApp:focusedWindow()
+				if window then
+					-- Make fullscreen on main monitor
+					local mainScreen = hs.screen.primaryScreen()
+					local screenFrame = mainScreen:fullFrame()
+					window:setFrame(screenFrame)
+					window:focus()
+				end
+			end
+		end)
+		return true
+	else
+		hs.alert.show("Error creating window: " .. (error or "unknown"))
+		return false
+	end
 end
 
--- Navigate to site in managed Chrome window
+-- Navigate to site with window management
 local function navigateToSite(siteInput)
 	-- Get URL from mapping or use default
 	local url = siteMapping[siteInput:lower()]
 	if not url then
-		-- Fallback: if input looks like a domain, use https://, otherwise use the input as-is
+		-- Fallback: if input looks like a domain, use https://, otherwise add .com
 		if siteInput:match("^[%w.-]+%.[%a]+$") then
 			url = "https://" .. siteInput
 		else
@@ -124,46 +92,17 @@ local function navigateToSite(siteInput)
 		end
 	end
 	
-	-- Check if tab already exists for this input
-	if findExistingTab(siteInput) then
-		hs.alert.show("Switched to existing " .. siteInput .. " tab")
+	-- Check if Hammerspoon window already exists for this input
+	local existingWindow = findHammerspoonWindow(siteInput)
+	if existingWindow then
+		existingWindow:focus()
+		hs.alert.show("Switching to existing " .. siteInput .. " window")
 		return
 	end
 	
-	-- Get or create the managed window
-	local window = getManagedChromeWindow()
-	
-	-- Open in new tab with identifier
-	local script = string.format([[
-		tell application "Google Chrome"
-			activate
-			if (count of windows) = 0 then
-				make new window
-			end if
-			set targetWindow to window 1
-			set newTab to make new tab at end of tabs of targetWindow
-			set URL of newTab to "%s"
-			set title of newTab to "hs_managed_%s - " & title of newTab
-			set active tab index of targetWindow to (count of tabs of targetWindow)
-		end tell
-	]], url, siteInput)
-	
-	local success, result, error = hs.osascript.applescript(script)
-	if success then
-		hs.alert.show("Opening " .. siteInput)
-		-- Ensure window is properly configured after navigation
-		hs.timer.doAfter(1, function()
-			local chromeApp = hs.application.find("Google Chrome")
-			if chromeApp then
-				local windows = chromeApp:allWindows()
-				if #windows > 0 then
-					managedChromeWindow = windows[1]
-					setupChromeWindow(managedChromeWindow)
-				end
-			end
-		end)
-	else
-		hs.alert.show("Error opening " .. siteInput .. ": " .. (error or "unknown"))
+	-- Create new window
+	if createHammerspoonWindow(siteInput, url) then
+		hs.alert.show("Opening " .. siteInput .. " in new window")
 	end
 end
 
@@ -183,16 +122,10 @@ end
 
 -- Popup input interface for site navigation
 local function showSiteNavigator()
-	local inputModal = hs.textPrompt.new()
-	inputModal:title("Navigate to Site")
-	inputModal:informativeText("Enter site name or URL (e.g. 'github', 'example.com')")
-	inputModal:defaultText("")
-	inputModal:callback(function(result, input)
-		if result == hs.textPrompt.buttonTypes.ok and input and #input > 0 then
-			navigateToSite(input)
-		end
-	end)
-	inputModal:show()
+	local button, input = hs.dialog.textPrompt("Navigate to Site", "Enter site name or URL (e.g. 'github', 'example.com'):", "", "Go", "Cancel")
+	if button == "Go" and input and #input > 0 then
+		navigateToSite(input)
+	end
 end
 
 -- Main hotkey binding for site navigation popup
