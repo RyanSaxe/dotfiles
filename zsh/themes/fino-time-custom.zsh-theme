@@ -59,7 +59,13 @@ virtualenv_info() {
 # taken from avit theme: https://github.com/0xTim/oh-my-zsh/blob/master/themes/avit.zsh-theme#L49C1-L78C1
 # Determine the time since last commit. If branch is clean,
 # use a neutral color, otherwise colors will vary according to time.
+# Hide on small screens (less than 80 columns)
 function _git_time_since_commit() {
+  # Hide HEAD info on small screens
+  if COLUMNS=$(tput cols) && (( COLUMNS < 80 )); then
+    return
+  fi
+  
   local commit_age=""
 # Only proceed if there is actually a commit.
   if last_commit=$(git log --pretty=format:'%at' -1 2> /dev/null); then
@@ -149,8 +155,13 @@ ZSH_THEME_GIT_PROMPT_CLEAN=" ${C_GREEN}✔${RESET}"
 PROMPT="\$(get_prefix)${C_CYAN}%~${RESET}\$(git_prompt_info)${C_DIM}\$(_git_time_since_commit)${RESET}
 ${C_DIM}╰\$(prompt_padding)\$(virtualenv_info) "
 
-# Right-aligned time in dim color
-RPROMPT="${C_DIM}%*${RESET}"
+# Right-aligned time in dim color (hide on small screens)
+function _conditional_time() {
+  if COLUMNS=$(tput cols) && (( COLUMNS >= 80 )); then
+    echo "${C_DIM}%*${RESET}"
+  fi
+}
+RPROMPT="\$(_conditional_time)"
 
 # Ensure prompt substitutions work (Oh My Zsh usually sets this, but just in case)
 setopt prompt_subst
