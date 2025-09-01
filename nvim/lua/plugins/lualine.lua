@@ -4,20 +4,19 @@ return {
   init = function()
     vim.opt.termguicolors = true
     vim.opt.cmdheight = 0
-    vim.opt.laststatus = 2 -- per-window statuslines
+    vim.opt.laststatus = 2
     vim.o.showmode = false
     if vim.env.TMUX then
       vim.opt.guicursor = ""
     end
   end,
   opts = function()
-    -- TokyoNight Night palette
     local C = {
       bg = "#1a1b26",
       fg = "#c0caf5",
       blue = "#7aa2f7",
       cyan = "#7dcfff",
-      green = "#9ece6a",
+      green = "#1abc9c",
       red = "#f7768e",
       yellow = "#e0af68",
       gray = "#565f89",
@@ -27,11 +26,10 @@ return {
     }
     local L, R = "", ""
 
-    -- Ensure the fill behind sections matches our bg (kills the “black block”)
+    -- ensure bar fill matches background (prevents edge artifacts)
     vim.api.nvim_set_hl(0, "StatusLine", { bg = C.bg, fg = C.fg })
     vim.api.nvim_set_hl(0, "StatusLineNC", { bg = C.bg, fg = C.gray })
 
-    -- Icons (fallbacks if LazyVim not present)
     local icons = (function()
       local ok, LV = pcall(require, "lazyvim.util")
       return ok and LV.config.icons
@@ -41,13 +39,12 @@ return {
         }
     end)()
 
-    -- Mode color helper (for filename bg)
     local function mode_bg()
       local m = vim.fn.mode()
       if m:match("^[iI]") then
         return C.green
       elseif m:match("^[vV]") then
-        return C.cyan
+        return C.purple
       elseif m:match("^R") then
         return C.red
       elseif m:match("^c") then
@@ -57,22 +54,19 @@ return {
       end
     end
 
-    -- File state → location bubble bg
     local function loc_bg()
       if vim.bo.readonly or not vim.bo.modifiable then
         return C.red
       end
-      local name = vim.api.nvim_buf_get_name(0)
-      if name == "" then
+      if vim.api.nvim_buf_get_name(0) == "" then
         return C.purple
       end
       if vim.bo.modified then
-        return C.orange
+        return C.yellow
       end
       return C.gray
     end
 
-    -- Theme: only 'a' (mode) changes by mode; bar bg = C.bg
     local theme = {
       normal = {
         a = { fg = C.bg, bg = C.blue, gui = "bold" },
@@ -85,7 +79,7 @@ return {
         c = { fg = C.fg, bg = C.bg },
       },
       visual = {
-        a = { fg = C.bg, bg = C.cyan, gui = "bold" },
+        a = { fg = C.bg, bg = C.purple, gui = "bold" },
         b = { fg = C.fg, bg = C.bg },
         c = { fg = C.fg, bg = C.bg },
       },
@@ -102,6 +96,20 @@ return {
       inactive = { a = { fg = C.fg, bg = C.bg }, b = { fg = C.fg, bg = C.bg }, c = { fg = C.fg, bg = C.bg } },
     }
 
+    -- WINBAR
+    local winbar_diagnostics = {
+      "diagnostics",
+      symbols = {
+        error = icons.diagnostics.Error or " ",
+        warn = icons.diagnostics.Warn or " ",
+        info = icons.diagnostics.Info or " ",
+        hint = icons.diagnostics.Hint or " ",
+      },
+      colored = true,
+      update_in_insert = false,
+      color = { fg = C.fg, bg = C.bg },
+      -- no always_visible -> hides when zero
+    }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
       if not ok or not mini.get_buf_data then
@@ -113,22 +121,6 @@ return {
         return { added = s.add, modified = s.change, removed = s.delete }
       end
     end
-
-    -- ===== WINBAR =====
-    -- Left: diagnostics (hide when zero). Right: git diff icons. Inactive: blank.
-    local winbar_diagnostics = {
-      "diagnostics",
-      symbols = {
-        error = icons.diagnostics.Error or " ",
-        warn = icons.diagnostics.Warn or " ",
-        info = icons.diagnostics.Info or " ",
-        hint = icons.diagnostics.Hint or " ",
-      },
-      colored = true,
-      update_in_insert = false,
-      -- no always_visible => hides when zero
-      color = { fg = C.fg, bg = C.bg },
-    }
     local winbar_gitdiff = {
       "diff",
       symbols = {
@@ -139,8 +131,15 @@ return {
       source = diff_source,
       color = { fg = C.fg, bg = C.bg },
     }
+    -- always-render filler so the winbar exists even if both sides are empty
+    local winbar_filler = {
+      function()
+        return " "
+      end,
+      color = { fg = C.bg, bg = C.bg },
+    }
 
-    -- Invisible caps to blend outer edges with bar bg (prevents stray blocks)
+    -- invisible caps so outer edges match bg
     local left_cap = {
       function()
         return ""
@@ -158,7 +157,7 @@ return {
       padding = { left = 0, right = 0 },
     }
 
-    -- ===== STATUSLINE BUBBLES =====
+    -- STATUSLINE bubbles
     local mode_bubble = {
       "mode",
       fmt = function(s)
@@ -173,10 +172,12 @@ return {
       icon = "",
       separator = { left = L, right = R },
       color = { fg = C.bg, bg = C.gray },
-      padding = { left = 1, right = 1 },
+      padding = {
+        left = 1,
+        right = 1,
+      },
     }
 
-    -- Location first on the right; bg depends on file state (same active/inactive)
     local location_bubble = {
       "location",
       separator = { left = L, right = R },
@@ -186,25 +187,22 @@ return {
       padding = { left = 1, right = 1 },
     }
 
-    -- Filename next; bg follows current mode color.
-    -- Active: bright text; Inactive: dimmed text.
-    local function filename_color(active)
-      local fg = active and C.bg or C.gutter -- dim when inactive
-      return { fg = fg, bg = mode_bg() }
-    end
+    -- FIX: stable width filename (no hidden status padding/markers)
     local filename_bubble_active = {
       "filename",
-      path = 1,
-      symbols = { modified = "", readonly = "", unnamed = "" }, -- no symbols
+      path = 1, -- 3 for absolute
+      file_status = false, -- <- prevents width changes on modified
+      newfile_status = false,
+      symbols = { modified = "", readonly = "", unnamed = "" }, -- explicit noop
       separator = { left = L, right = R },
       color = function()
-        return filename_color(true)
+        return { fg = C.bg, bg = mode_bg() }
       end,
       padding = { left = 1, right = 1 },
     }
     local filename_bubble_inactive = vim.deepcopy(filename_bubble_active)
     filename_bubble_inactive.color = function()
-      return filename_color(false)
+      return { fg = C.gutter, bg = mode_bg() }
     end
 
     return {
@@ -223,18 +221,16 @@ return {
 
       -- STATUSLINE
       sections = {
-        -- LEFT: cap → mode → branch
+        -- left: cap → mode → branch
         lualine_a = { left_cap, mode_bubble },
         lualine_b = { branch_bubble },
         lualine_c = {},
-
-        -- RIGHT: location → filename → cap
+        -- right: location → filename → cap
         lualine_x = {},
         lualine_y = { location_bubble, filename_bubble_active },
         lualine_z = { right_cap },
       },
 
-      -- INACTIVE: left filename only (dimmed), right location (state color)
       inactive_sections = {
         lualine_a = { left_cap },
         lualine_b = { filename_bubble_inactive },
@@ -244,9 +240,16 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR (active only): left diagnostics, right git; inactive blank
-      winbar = { lualine_c = { winbar_diagnostics }, lualine_z = { winbar_gitdiff } },
-      inactive_winbar = { lualine_c = {}, lualine_z = {} },
+      -- WINBAR: left diagnostics, right git; keep a filler so it never collapses
+      winbar = {
+        lualine_c = { winbar_diagnostics },
+        lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
+        lualine_z = { winbar_gitdiff },
+      },
+      inactive_winbar = {
+        lualine_c = { winbar_filler }, -- blank but present
+        lualine_z = {},
+      },
 
       extensions = { "neo-tree", "lazy", "fzf" },
     }
