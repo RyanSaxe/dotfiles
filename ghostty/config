@@ -34,6 +34,7 @@ copy-on-select = clipboard
 ## makes lualine look nicer
 window-padding-x = 4
 window-padding-y = 4
+window-padding-color = background
 window-padding-balance = true
 ## allow multiline for claude code
 keybind = shift+enter=text:\n
