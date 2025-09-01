@@ -8,6 +8,8 @@ vim.opt.updatetime = 50
 vim.opt.hlsearch = true
 -- since I use flash to jump, I prefer absolute line numbers
 vim.opt.relativenumber = false
+-- highlight current line and line number
+vim.opt.cursorline = true
 -- merge signs into number column to eliminate signcolumn padding
 vim.opt.signcolumn = "number"
 

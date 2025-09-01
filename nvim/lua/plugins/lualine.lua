@@ -32,7 +32,9 @@ return {
         -- disabled_filetypes = { statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard" } },
       },
       sections = {
-        lualine_a = { "mode" },
+        lualine_a = { 
+          { "mode", separator = { left = "" }, right_padding = 2 }
+        },
         lualine_b = { "branch" },
         lualine_c = {
           { LazyVim.lualine.pretty_path() },
@@ -76,6 +78,9 @@ return {
               end
             end,
           },
+        },
+        lualine_z = {
+          { "location", separator = { right = "" }, left_padding = 2 }
         },
       },
       extensions = { "neo-tree", "lazy", "fzf" },
