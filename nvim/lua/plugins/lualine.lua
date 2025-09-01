@@ -6,9 +6,6 @@ return {
     vim.opt.cmdheight = 0
     vim.opt.laststatus = 2
     vim.o.showmode = false
-    if vim.env.TMUX then
-      vim.opt.guicursor = ""
-    end
   end,
   opts = function()
     local C = {
