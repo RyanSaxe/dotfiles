@@ -1,5 +1,5 @@
 return {
-  enabled = false,
+  enabled = true,
   "nvim-treesitter/nvim-treesitter-context",
   event = "LazyFile",
   opts = {
