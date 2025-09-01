@@ -23,9 +23,6 @@ return {
 
     vim.o.laststatus = vim.g.lualine_laststatus
 
-    -- Check terminal width for responsive design
-    local is_mobile = vim.fn.winwidth(0) < 80
-
     local opts = {
       options = {
         theme = "auto",
@@ -36,7 +33,7 @@ return {
       },
       sections = {
         lualine_a = { "mode" },
-        lualine_b = is_mobile and {} or { "branch" },
+        lualine_b = { "branch" },
         lualine_c = {
           { LazyVim.lualine.pretty_path() },
           {
@@ -80,7 +77,6 @@ return {
             end,
           },
         },
-        lualine_z = is_mobile and {} or {},
       },
       extensions = { "neo-tree", "lazy", "fzf" },
     }
