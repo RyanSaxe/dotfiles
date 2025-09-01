@@ -31,7 +31,7 @@ return {
         section_separators = { left = "", right = "" },
         -- disabled_filetypes = { statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard" } },
       },
-      winbar = {
+      sections = {
         lualine_a = { "mode" },
         lualine_b = { "branch" },
         lualine_c = {
@@ -43,6 +43,7 @@ return {
             color = { fg = "#e0af68" }, -- tokyonight yellow for unsaved indicator
           },
         },
+
         lualine_x = {
           -- LazyVim.lualine.root_dir(),
           {
@@ -77,14 +78,6 @@ return {
           },
         },
       },
-      sections = {
-        lualine_a = {},
-        lualine_b = {},
-        lualine_c = {},
-        lualine_x = {},
-        lualine_y = {},
-        lualine_z = {},
-      },
       extensions = { "neo-tree", "lazy", "fzf" },
     }
 
@@ -100,7 +93,7 @@ return {
         format = "{kind_icon}{symbol.name:Normal}",
         hl_group = "lualine_c_normal",
       })
-      table.insert(opts.winbar.lualine_c, {
+      table.insert(opts.sections.lualine_c, {
         symbols and symbols.get,
         cond = function()
           return vim.b.trouble_lualine ~= false and symbols.has()
