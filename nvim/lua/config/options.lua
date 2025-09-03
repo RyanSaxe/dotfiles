@@ -11,3 +11,4 @@ vim.opt.relativenumber = false
 -- merge signs into number column to eliminate signcolumn padding
 vim.opt.signcolumn = "number"
 
+vim.opt.swapfile = false
