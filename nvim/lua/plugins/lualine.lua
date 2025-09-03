@@ -97,10 +97,23 @@ return {
     local winbar_navic = {
       function()
         local navic = require("nvim-navic")
-        if navic.is_available() then
-          return navic.get_location()
+        if not navic.is_available() then
+          return ""
         end
-        return ""
+        
+        local location = navic.get_location()
+        if location == "" then
+          return ""
+        end
+        
+        -- Custom truncation: keep first and last, truncate middle
+        local parts = vim.split(location, " > ", { plain = true })
+        if #parts <= 3 then
+          return location -- no truncation needed
+        end
+        
+        -- Keep first, show "..", keep last two
+        return parts[1] .. " > .. > " .. parts[#parts - 1] .. " > " .. parts[#parts]
       end,
       cond = function()
         local navic = require("nvim-navic")
