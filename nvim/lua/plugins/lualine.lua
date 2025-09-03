@@ -109,8 +109,8 @@ return {
       color = { fg = C.fg, bg = C.bg },
     }
     
-    -- diagnostics moved to statusline
-    local statusline_diagnostics = {
+    -- diagnostics moved to winbar right side for easy spotting
+    local winbar_diagnostics = {
       "diagnostics",
       symbols = {
         error = icons.diagnostics.Error or " ",
@@ -120,9 +120,7 @@ return {
       },
       colored = true,
       update_in_insert = false,
-      separator = { left = L, right = R },
-      color = { fg = C.bg, bg = C.gray },
-      padding = { left = 1, right = 1 },
+      color = { fg = C.fg, bg = C.bg },
     }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
@@ -135,7 +133,8 @@ return {
         return { added = s.add, modified = s.change, removed = s.delete }
       end
     end
-    local winbar_gitdiff = {
+    -- git diff moved to statusline with branch
+    local statusline_gitdiff = {
       "diff",
       symbols = {
         added = icons.git.added or "+",
@@ -143,7 +142,9 @@ return {
         removed = icons.git.removed or "-",
       },
       source = diff_source,
-      color = { fg = C.fg, bg = C.bg },
+      separator = { left = L, right = R },
+      color = { fg = C.bg, bg = C.gray },
+      padding = { left = 1, right = 1 },
     }
     -- always-render filler so the winbar exists even if both sides are empty
     local winbar_filler = {
@@ -235,9 +236,9 @@ return {
 
       -- STATUSLINE
       sections = {
-        -- left: cap → mode → branch → diagnostics
+        -- left: cap → mode → branch → git diff
         lualine_a = { left_cap, mode_bubble },
-        lualine_b = { branch_bubble, statusline_diagnostics },
+        lualine_b = { branch_bubble, statusline_gitdiff },
         lualine_c = {},
         -- right: location → filename → cap
         lualine_x = {},
@@ -254,11 +255,11 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left navic breadcrumbs, right git; clean and focused
+      -- WINBAR: left navic breadcrumbs, right diagnostics for easy spotting
       winbar = {
         lualine_a = { winbar_navic },
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
-        lualine_z = { winbar_gitdiff },
+        lualine_z = { winbar_diagnostics },
       },
       inactive_winbar = {
         lualine_c = { winbar_filler }, -- blank but present
