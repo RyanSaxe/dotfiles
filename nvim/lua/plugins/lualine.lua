@@ -109,7 +109,8 @@ return {
       color = { fg = C.fg, bg = C.bg },
     }
     
-    local winbar_diagnostics = {
+    -- diagnostics moved to statusline
+    local statusline_diagnostics = {
       "diagnostics",
       symbols = {
         error = icons.diagnostics.Error or " ",
@@ -119,8 +120,9 @@ return {
       },
       colored = true,
       update_in_insert = false,
-      color = { fg = C.fg, bg = C.bg },
-      -- no always_visible -> hides when zero
+      separator = { left = L, right = R },
+      color = { fg = C.bg, bg = C.gray },
+      padding = { left = 1, right = 1 },
     }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
@@ -233,9 +235,9 @@ return {
 
       -- STATUSLINE
       sections = {
-        -- left: cap → mode → branch
+        -- left: cap → mode → branch → diagnostics
         lualine_a = { left_cap, mode_bubble },
-        lualine_b = { branch_bubble },
+        lualine_b = { branch_bubble, statusline_diagnostics },
         lualine_c = {},
         -- right: location → filename → cap
         lualine_x = {},
@@ -252,10 +254,9 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left navic breadcrumbs, center diagnostics, right git; keep a filler so it never collapses
+      -- WINBAR: left navic breadcrumbs, right git; clean and focused
       winbar = {
         lualine_a = { winbar_navic },
-        lualine_c = { winbar_diagnostics },
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
         lualine_z = { winbar_gitdiff },
       },
