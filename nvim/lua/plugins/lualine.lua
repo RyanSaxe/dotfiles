@@ -94,6 +94,21 @@ return {
     }
 
     -- WINBAR
+    local winbar_navic = {
+      function()
+        local navic = require("nvim-navic")
+        if navic.is_available() then
+          return navic.get_location()
+        end
+        return ""
+      end,
+      cond = function()
+        local navic = require("nvim-navic")
+        return navic.is_available()
+      end,
+      color = { fg = C.fg, bg = C.bg },
+    }
+    
     local winbar_diagnostics = {
       "diagnostics",
       symbols = {
@@ -237,8 +252,9 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left diagnostics, right git; keep a filler so it never collapses
+      -- WINBAR: left navic breadcrumbs, center diagnostics, right git; keep a filler so it never collapses
       winbar = {
+        lualine_a = { winbar_navic },
         lualine_c = { winbar_diagnostics },
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
         lualine_z = { winbar_gitdiff },
