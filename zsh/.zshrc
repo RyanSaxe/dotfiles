@@ -170,11 +170,12 @@ _auto_activate_venv
 
 # Tmux session management
 
-alias tl="tmux list-sessions"
 alias ta="tmux attach"
+alias td="tmux detach"
+
+alias tl="tmux list-sessions"
 alias tk="tmux kill-session"
-alias tq="tmux detach"
-alias tQ="tmux kill-server"
+alias tK="tmux kill-server"
 
 # Create a new tmux session with predefined windows and programs
 tm() {
@@ -274,3 +275,54 @@ ts() {
     fi
   fi
 }
+
+# Fuzzy find and cd into git repositories sorted by last commit date, then open tmux session
+# INTERFACE: tp [same exact arguments as 'tm']
+
+
+tp() {
+  # Directories to search
+  search_dirs=("$HOME/ABI")
+
+  # Date formatting for Linux/macOS
+  if date -d @0 "+%Y" >/dev/null 2>&1; then
+    date_cmd() { date -d "@$1" "+%Y-%m-%d %H:%M"; }
+  else
+    date_cmd() { date -r "$1" "+%Y-%m-%d %H:%M"; }
+  fi
+
+  # Find all git repos
+  repos=()
+  for dir in "${search_dirs[@]}"; do
+    [[ -d "$dir" ]] && repos+=($(fd .git -t d -H "$dir"))
+  done
+
+  repo_roots=($(printf "%s\n" "${repos[@]}" | sed 's|/\.git||' | sort -u))
+
+  # Build table: repo_name<TAB>repo_path<TAB>date
+  repo_table=()
+  for repo in "${repo_roots[@]}"; do
+    if [[ -d "$repo/.git" ]]; then
+      last_commit=$(git -C "$repo" log -1 --format="%ct" 2>/dev/null)
+      last_commit=${last_commit:-0}
+      date_str=$(date_cmd "$last_commit")
+      repo_name=$(basename "$repo")
+      repo_table+=("${repo_name}  ${repo} ${date_str}")
+    fi
+  done
+
+  # Sort by date (timestamp), format columns for fzf
+  selected=$(printf "%s\n" "${repo_table[@]}" \
+    | sort -r -k3 \
+    | column -t -s $' ' \
+    | fzf --prompt="Select repo: " \
+    )
+
+  # Extract the repo path (second column)
+  repo=$(echo "$selected" | awk '{print $2}')
+  if [[ -n "$repo" ]]; then
+    cd "$repo" || return
+    tm "$@"
+  fi
+}
+
