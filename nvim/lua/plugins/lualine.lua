@@ -117,12 +117,13 @@ return {
       end,
       cond = function()
         local navic = require("nvim-navic")
-        return navic.is_available()
+        -- only show on small screens (mobile/narrow terminals)
+        return navic.is_available() and vim.o.columns < 120
       end,
       color = { fg = C.blue, bg = C.bg }, -- use blue for better visibility
     }
     
-    -- diagnostics back to statusline (flat, no bubble)
+    -- diagnostics component (flat styling)
     local statusline_diagnostics = {
       "diagnostics",
       symbols = {
@@ -146,7 +147,7 @@ return {
         return { added = s.add, modified = s.change, removed = s.delete }
       end
     end
-    -- git diff moved back to winbar
+    -- git diff component for winbar
     local winbar_gitdiff = {
       "diff",
       symbols = {
@@ -193,7 +194,7 @@ return {
       padding = { left = 1, right = 1 },
     }
 
-    -- git branch with dynamic colors (like current filename)
+    -- git branch component with mode-based colors
     local branch_bubble = {
       "branch",
       icon = "",
@@ -213,7 +214,7 @@ return {
       padding = { left = 1, right = 1 },
     }
 
-    -- filename with file status colors (like current location)
+    -- filename component with file status indication
     local filename_bubble_active = {
       "filename",
       path = 1, -- 3 for absolute
