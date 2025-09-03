@@ -122,7 +122,7 @@ return {
       color = { fg = C.blue, bg = C.bg }, -- use blue for better visibility
     }
     
-    -- diagnostics back to statusline
+    -- diagnostics back to statusline (flat, no bubble)
     local statusline_diagnostics = {
       "diagnostics",
       symbols = {
@@ -133,9 +133,7 @@ return {
       },
       colored = true,
       update_in_insert = false,
-      separator = { left = L, right = R },
-      color = { fg = C.bg, bg = C.gray },
-      padding = { left = 1, right = 1 },
+      color = { fg = C.fg, bg = C.bg },
     }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
