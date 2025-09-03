@@ -119,11 +119,11 @@ return {
         local navic = require("nvim-navic")
         return navic.is_available()
       end,
-      color = { fg = C.fg, bg = C.bg },
+      color = { fg = C.blue, bg = C.bg }, -- use blue for better visibility
     }
     
-    -- diagnostics moved to winbar right side for easy spotting
-    local winbar_diagnostics = {
+    -- diagnostics back to statusline
+    local statusline_diagnostics = {
       "diagnostics",
       symbols = {
         error = icons.diagnostics.Error or " ",
@@ -133,7 +133,9 @@ return {
       },
       colored = true,
       update_in_insert = false,
-      color = { fg = C.fg, bg = C.bg },
+      separator = { left = L, right = R },
+      color = { fg = C.bg, bg = C.gray },
+      padding = { left = 1, right = 1 },
     }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
@@ -146,8 +148,8 @@ return {
         return { added = s.add, modified = s.change, removed = s.delete }
       end
     end
-    -- git diff moved to statusline with branch
-    local statusline_gitdiff = {
+    -- git diff moved back to winbar
+    local winbar_gitdiff = {
       "diff",
       symbols = {
         added = icons.git.added or "+",
@@ -155,9 +157,7 @@ return {
         removed = icons.git.removed or "-",
       },
       source = diff_source,
-      separator = { left = L, right = R },
-      color = { fg = C.bg, bg = C.gray },
-      padding = { left = 1, right = 1 },
+      color = { fg = C.fg, bg = C.bg },
     }
     -- always-render filler so the winbar exists even if both sides are empty
     local winbar_filler = {
@@ -195,15 +195,15 @@ return {
       padding = { left = 1, right = 1 },
     }
 
+    -- git branch with dynamic colors (like current filename)
     local branch_bubble = {
       "branch",
       icon = "",
       separator = { left = L, right = R },
-      color = { fg = C.bg, bg = C.gray },
-      padding = {
-        left = 1,
-        right = 1,
-      },
+      color = function()
+        return { fg = C.bg, bg = mode_bg() }
+      end,
+      padding = { left = 1, right = 1 },
     }
 
     local location_bubble = {
@@ -215,7 +215,7 @@ return {
       padding = { left = 1, right = 1 },
     }
 
-    -- FIX: stable width filename (no hidden status padding/markers)
+    -- filename with file status colors (like current location)
     local filename_bubble_active = {
       "filename",
       path = 1, -- 3 for absolute
@@ -224,7 +224,7 @@ return {
       symbols = { modified = "", readonly = "", unnamed = "" }, -- explicit noop
       separator = { left = L, right = R },
       color = function()
-        return { fg = C.bg, bg = mode_bg() }
+        return { fg = C.bg, bg = loc_bg() }
       end,
       padding = { left = 1, right = 1 },
     }
@@ -249,13 +249,13 @@ return {
 
       -- STATUSLINE
       sections = {
-        -- left: cap → mode → branch → git diff
+        -- left: cap → mode → filename → diagnostics
         lualine_a = { left_cap, mode_bubble },
-        lualine_b = { branch_bubble, statusline_gitdiff },
+        lualine_b = { filename_bubble_active, statusline_diagnostics },
         lualine_c = {},
-        -- right: location → filename → cap
+        -- right: location → git branch → cap
         lualine_x = {},
-        lualine_y = { location_bubble, filename_bubble_active },
+        lualine_y = { location_bubble, branch_bubble },
         lualine_z = { right_cap },
       },
 
@@ -268,11 +268,11 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left navic breadcrumbs, right diagnostics for easy spotting
+      -- WINBAR: left navic breadcrumbs, right git diff
       winbar = {
         lualine_a = { winbar_navic },
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
-        lualine_z = { winbar_diagnostics },
+        lualine_z = { winbar_gitdiff },
       },
       inactive_winbar = {
         lualine_c = { winbar_filler }, -- blank but present
