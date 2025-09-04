@@ -20,6 +20,7 @@ return {
       gutter = "#3b4261",
       orange = "#ff9e64",
       purple = "#bb9af7",
+      pink = "#fca7ea",
     }
     local L, R = "", ""
 
@@ -45,7 +46,7 @@ return {
       elseif m:match("^R") then
         return C.red
       elseif m:match("^c") then
-        return C.yellow
+        return C.pink
       else
         return C.blue
       end
@@ -100,18 +101,18 @@ return {
         if not navic.is_available() then
           return ""
         end
-        
+
         local location = navic.get_location()
         if location == "" then
           return ""
         end
-        
+
         -- Custom truncation: keep first and last, truncate middle
         local parts = vim.split(location, " > ", { plain = true })
         if #parts <= 3 then
           return location -- no truncation needed
         end
-        
+
         -- Keep first, show "..", keep last two
         return parts[1] .. " > .. > " .. parts[#parts - 1] .. " > " .. parts[#parts]
       end,
@@ -122,7 +123,7 @@ return {
       end,
       color = { fg = C.blue, bg = C.bg }, -- use blue for better visibility
     }
-    
+
     -- diagnostics component (flat styling)
     local statusline_diagnostics = {
       "diagnostics",
