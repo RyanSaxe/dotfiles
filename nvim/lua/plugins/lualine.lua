@@ -20,6 +20,7 @@ return {
       gutter = "#3b4261",
       orange = "#ff9e64",
       purple = "#bb9af7",
+      pink = "#fca7ea",
     }
     local L, R = "", ""
 
@@ -45,7 +46,7 @@ return {
       elseif m:match("^R") then
         return C.red
       elseif m:match("^c") then
-        return C.yellow
+        return C.pink
       else
         return C.blue
       end
@@ -94,7 +95,37 @@ return {
     }
 
     -- WINBAR
-    local winbar_diagnostics = {
+    local winbar_navic = {
+      function()
+        local navic = require("nvim-navic")
+        if not navic.is_available() then
+          return ""
+        end
+
+        local location = navic.get_location()
+        if location == "" then
+          return ""
+        end
+
+        -- Custom truncation: keep first and last, truncate middle
+        local parts = vim.split(location, " > ", { plain = true })
+        if #parts <= 3 then
+          return location -- no truncation needed
+        end
+
+        -- Keep first, show "..", keep last two
+        return parts[1] .. " > .. > " .. parts[#parts - 1] .. " > " .. parts[#parts]
+      end,
+      cond = function()
+        local navic = require("nvim-navic")
+        -- only show on small screens (mobile/narrow terminals)
+        return navic.is_available() and vim.o.columns < 120
+      end,
+      color = { fg = C.blue, bg = C.bg }, -- use blue for better visibility
+    }
+
+    -- diagnostics component (flat styling)
+    local statusline_diagnostics = {
       "diagnostics",
       symbols = {
         error = icons.diagnostics.Error or " ",
@@ -105,7 +136,6 @@ return {
       colored = true,
       update_in_insert = false,
       color = { fg = C.fg, bg = C.bg },
-      -- no always_visible -> hides when zero
     }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
@@ -118,6 +148,7 @@ return {
         return { added = s.add, modified = s.change, removed = s.delete }
       end
     end
+    -- git diff component for winbar
     local winbar_gitdiff = {
       "diff",
       symbols = {
@@ -164,15 +195,15 @@ return {
       padding = { left = 1, right = 1 },
     }
 
+    -- git branch component with mode-based colors
     local branch_bubble = {
       "branch",
       icon = "",
       separator = { left = L, right = R },
-      color = { fg = C.bg, bg = C.gray },
-      padding = {
-        left = 1,
-        right = 1,
-      },
+      color = function()
+        return { fg = C.bg, bg = mode_bg() }
+      end,
+      padding = { left = 1, right = 1 },
     }
 
     local location_bubble = {
@@ -184,7 +215,7 @@ return {
       padding = { left = 1, right = 1 },
     }
 
-    -- FIX: stable width filename (no hidden status padding/markers)
+    -- filename component with file status indication
     local filename_bubble_active = {
       "filename",
       path = 1, -- 3 for absolute
@@ -193,7 +224,7 @@ return {
       symbols = { modified = "", readonly = "", unnamed = "" }, -- explicit noop
       separator = { left = L, right = R },
       color = function()
-        return { fg = C.bg, bg = mode_bg() }
+        return { fg = C.bg, bg = loc_bg() }
       end,
       padding = { left = 1, right = 1 },
     }
@@ -218,13 +249,13 @@ return {
 
       -- STATUSLINE
       sections = {
-        -- left: cap → mode → branch
+        -- left: cap → mode → filename → diagnostics
         lualine_a = { left_cap, mode_bubble },
-        lualine_b = { branch_bubble },
+        lualine_b = { filename_bubble_active, statusline_diagnostics },
         lualine_c = {},
-        -- right: location → filename → cap
+        -- right: location → git branch → cap
         lualine_x = {},
-        lualine_y = { location_bubble, filename_bubble_active },
+        lualine_y = { location_bubble, branch_bubble },
         lualine_z = { right_cap },
       },
 
@@ -237,9 +268,9 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left diagnostics, right git; keep a filler so it never collapses
+      -- WINBAR: left navic breadcrumbs, right git diff
       winbar = {
-        lualine_c = { winbar_diagnostics },
+        lualine_a = { winbar_navic },
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
         lualine_z = { winbar_gitdiff },
       },
