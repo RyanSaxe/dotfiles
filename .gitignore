@@ -16,5 +16,7 @@ claude/*
 !claude/settings.json
 !claude/statusline.sh
 ipython/*
+!ipython/profile_default/
+ipython/profile_default/*
 !ipython/profile_default/ipython_config.py
-!ipython/profile_default/startup/00-clear-screen.py
+!ipython/profile_default/startup/
