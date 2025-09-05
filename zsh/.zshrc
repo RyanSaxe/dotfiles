@@ -440,28 +440,11 @@ to() {
   fi
 
   local selected
-  if [[ -n "$TMUX" ]]; then
-    # Run inside a tmux popup and write selection to a temp file
-    local tmp; tmp=$(mktemp)
-
-    # Build a tmux-safe command string (no single quotes inside).
-    # Sort by 3rd CSV field descending, then pretty-print, then fzf.
-    # If your 3rd field is *epoch seconds*, change `-k3,3r` to `-k3,3nr`.
-    local cmd="sort -t, -k3,3r -- ${(q)cache_file} | column -t -s, | fzf --prompt=Select\\ repo:\\  > ${(q)tmp}"
-
-    # Quote the whole command once for sh -lc
-    tmux display-popup -E "sh -lc ${cmd:q}"
-
-    selected=$(<"$tmp")
-    rm -f -- "$tmp"
-  else 
-    # Normal terminal: capture fzf output directly
-    selected=$(
-      sort -t, -k3,3r -- "$cache_file" \
-      | column -t -s, \
-      | fzf --prompt="Select repo: "
-    )
-  fi
+  selected=$(
+    sort -t, -k3,3r -- "$cache_file" \
+    | column -t -s, \
+    | fzf --prompt="Select repo: "
+  )
 
   [[ -z "$selected" ]] && return 0
 
