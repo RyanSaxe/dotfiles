@@ -290,7 +290,7 @@ tm() {
     tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
   done
   
-  tmux select-window -t "$session_name:terminal"
+  tmux select-window -t "${session_name}:terminal"
   echo "Session '$session_name' created successfully. Attaching..."
   _tmux_attach_or_switch "${session_name}:terminal"
 }
