@@ -178,6 +178,20 @@ alias tk="tmux kill-session"
 alias tK="tmux kill-server"
 
 # Create a new tmux session with predefined windows and programs
+
+# Utility: attach or switch depending on whether we're in tmux
+_tmux_attach_or_switch() {
+  local target="$1"  # can be "session" or "session:window"
+  if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "$target"
+  else
+    # attach can't take a window directly, so select after attaching
+    # or use switch-client after attach
+    tmux attach-session -t "${target%%:*}"
+    [[ "$target" == *:* ]] && tmux switch-client -t "$target"
+  fi
+}
+
 tm() {
   # Define shortcut mappings: shortcut -> "command|window_name"
   local -A shortcuts_map=(
@@ -185,15 +199,22 @@ tm() {
     ["cc"]="claude|claude"
     ["pr"]="gh dash|PRs"
   )
-  
+
   local session_name="$(basename "$PWD")"
+  local start_dir=""
   local commands=()
-  
+
   # Parse flags and arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -n)
-        session_name="$2"
+        # If -n points to a directory, use it as the working dir and name the session after its basename.
+        if [[ -d "$2" ]]; then
+          start_dir="$(cd "$2" && pwd)"
+          session_name="$(basename "$start_dir")"
+        else
+          session_name="$2"
+        fi
         shift 2
         ;;
       -c)
@@ -207,29 +228,37 @@ tm() {
         ;;
     esac
   done
-  
+
   # Check if session already exists
   if tmux has-session -t "$session_name" 2>/dev/null; then
     echo "Session '$session_name' already exists. Attaching..."
-    tmux attach-session -t "$session_name"
+    _tmux_attach_or_switch "$session_name"
     return
   fi
-  
+
   # Create new session with first window (nvim)
-  tmux new-session -d -s "$session_name" -n "nvim"
+  if [[ -n "$start_dir" ]]; then
+    tmux new-session -d -s "$session_name" -n "nvim" -c "$start_dir"
+  else
+    tmux new-session -d -s "$session_name" -n "nvim"
+  fi
   tmux send-keys -t "$session_name:nvim" "nvim" Enter
-  
+
   # Create second window (terminal)
-  tmux new-window -t "$session_name" -n "terminal"
-  
+  if [[ -n "$start_dir" ]]; then
+    tmux new-window -t "$session_name" -n "terminal" -c "$start_dir"
+  else
+    tmux new-window -t "$session_name" -n "terminal"
+  fi
+
   # Track window names to prevent duplicates
   local window_names=("nvim" "terminal")
-  
+
   # Create additional windows for each command
   for cmd in "${commands[@]}"; do
     local window_name
     local command_to_run
-    
+
     # Check if it's a shortcut
     if [[ -n "${shortcuts_map[$cmd]}" ]]; then
       # Parse "command|window_name" format
@@ -240,25 +269,30 @@ tm() {
       command_to_run="$cmd"
       window_name="${cmd%% *}"
     fi
-    
+
     # Check for duplicate window names
     if [[ " ${window_names[*]} " =~ " ${window_name} " ]]; then
       echo "Error: Window name '$window_name' already exists in session '$session_name'"
       return 1
     fi
     window_names+=("$window_name")
-    
-    tmux new-window -t "$session_name" -n "$window_name"
-    # Clear screen first for TUI applications -- a delay prevents formatting issues
+
+    # Create the window (respect start_dir if provided)
+    if [[ -n "$start_dir" ]]; then
+      tmux new-window -t "$session_name" -n "$window_name" -c "$start_dir"
+    else
+      tmux new-window -t "$session_name" -n "$window_name"
+    fi
+
+    # Clear screen first for TUIs; short delay prevents formatting issues
     tmux send-keys -t "$session_name:$window_name" "clear" Enter
     sleep 0.1
     tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
   done
   
-  # Go back to first window and attach
-  tmux select-window -t "$session_name:nvim"
+  tmux select-window -t "$session_name:terminal"
   echo "Session '$session_name' created successfully. Attaching..."
-  tmux attach-session -t "$session_name"
+  _tmux_attach_or_switch "${session_name}:terminal"
 }
 
 # Switch tmux sessions with fzf (works inside and outside tmux)
@@ -266,23 +300,92 @@ ts() {
   local session
   session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --prompt="Switch to session: " --height=40% --reverse)
   if [[ -n "$session" ]]; then
-    if [[ -n "$TMUX" ]]; then
-      # Inside tmux - switch client
-      tmux switch-client -t "$session"
-    else
-      # Outside tmux - attach to session
-      tmux attach-session -t "$session"
-    fi
+    _tmux_attach_or_switch "$session"
+  else
+    echo "No session selected."
   fi
 }
 
+
+# Cache the CSV output of a function in ~/.cache/custom_scripts/<func>.csv
+# Usage:
+#   cache_csv [-f|--force] <function_name> [--] [args...]
+# - The target function must print CSV to stdout.
+# - If --force/-f is given, the function is re-run and the cache is overwritten.
+# - Otherwise, the function only runs if the cache file doesn't exist (or is empty).
+# - Returns (prints) the absolute path to the cached CSV file.
+cache_csv() {
+  emulate -L zsh -o pipefail
+
+  # Parse flags
+  local force=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -f|--force) force=1; shift ;;
+      --) shift; break ;;
+      -*) print -u2 "cache_csv: unknown flag: $1"; return 2 ;;
+      *) break ;;
+    esac
+  done
+
+  # Require the function name
+  local fn="${1:-}"
+  if [[ -z "$fn" ]]; then
+    print -u2 "cache_csv: missing <function_name>"
+    return 2
+  fi
+  shift
+
+  # Validate function exists
+  if ! typeset -f -- "$fn" >/dev/null; then
+    print -u2 "cache_csv: '$fn' is not a defined function"
+    return 2
+  fi
+
+  # Cache path
+  local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/custom_scripts"
+  local outfile="${cache_dir}/${fn}.csv"
+
+  # Ensure directory exists
+  mkdir -p "$cache_dir" || {
+    print -u2 "cache_csv: failed to create cache dir: $cache_dir"
+    return 1
+  }
+
+  # Decide whether to (re)generate
+  if (( force )) || [[ ! -s "$outfile" ]]; then
+    # Write atomically via temp file
+    local tmp
+    tmp="$(mktemp "${outfile}.XXXXXX")" || {
+      print -u2 "cache_csv: failed to create temp file"
+      return 1
+    }
+
+    # Call the function (with any extra args) and capture CSV
+    if "$fn" "$@" >| "$tmp"; then
+      mv -f -- "$tmp" "$outfile" || {
+        print -u2 "cache_csv: failed to move temp file into place"
+        rm -f -- "$tmp"
+        return 1
+      }
+    else
+      local rc=$?
+      rm -f -- "$tmp"
+      print -u2 "cache_csv: function '$fn' failed with exit code $rc"
+      return $rc
+    fi
+  fi
+
+  # Return the cached path
+  print -r -- "$outfile"
+}
+
 # Fuzzy find and cd into git repositories sorted by last commit date, then open tmux session
-# INTERFACE: tp [same exact arguments as 'tm']
+# INTERFACE: to [same exact arguments as 'tm']
 
-
-tp() {
+_to() {
   # Directories to search
-  search_dirs=("$HOME/generic" "$HOME/work" "$HOME/projects" "$HOME/generic")
+  search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic")
 
   # Date formatting for Linux/macOS
   if date -d @0 "+%Y" >/dev/null 2>&1; then
@@ -307,22 +410,66 @@ tp() {
       last_commit=${last_commit:-0}
       date_str=$(date_cmd "$last_commit")
       repo_name=$(basename "$repo")
-      repo_table+=("${repo_name}  ${repo} ${date_str}")
+      repo_table+=("${repo_name},${repo},${date_str}")
     fi
   done
 
-  # Sort by date (timestamp), format columns for fzf
-  selected=$(printf "%s\n" "${repo_table[@]}" \
-    | sort -r -k3 \
-    | column -t -s $' ' \
-    | fzf --prompt="Select repo: " \
-    )
+  printf "%s\n" "${repo_table[@]}"
+}
 
-  # Extract the repo path (second column)
-  repo=$(echo "$selected" | awk '{print $2}')
-  if [[ -n "$repo" ]]; then
-    cd "$repo" || return
-    tm "$@"
+
+to() {
+  emulate -L zsh
+  set -o pipefail
+
+  local -a args=()
+  local force=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -f|--force) force=1; shift ;;
+      *) args+=("$1"); shift ;;
+    esac
+  done
+
+  # Build cache file (with or without force)
+  local cache_file
+  if (( force )); then
+    cache_file=$(cache_csv -f _to)
+  else
+    cache_file=$(cache_csv _to)
   fi
+
+  local selected
+  if [[ -n "$TMUX" ]]; then
+    # Run inside a tmux popup and write selection to a temp file
+    local tmp; tmp=$(mktemp)
+
+    # Build a tmux-safe command string (no single quotes inside).
+    # Sort by 3rd CSV field descending, then pretty-print, then fzf.
+    # If your 3rd field is *epoch seconds*, change `-k3,3r` to `-k3,3nr`.
+    local cmd="sort -t, -k3,3r -- ${(q)cache_file} | column -t -s, | fzf --prompt=Select\\ repo:\\  > ${(q)tmp}"
+
+    # Quote the whole command once for sh -lc
+    tmux display-popup -E "sh -lc ${cmd:q}"
+
+    selected=$(<"$tmp")
+    rm -f -- "$tmp"
+  else 
+    # Normal terminal: capture fzf output directly
+    selected=$(
+      sort -t, -k3,3r -- "$cache_file" \
+      | column -t -s, \
+      | fzf --prompt="Select repo: "
+    )
+  fi
+
+  [[ -z "$selected" ]] && return 0
+
+  # Extract repo path (2nd visible column after `column -t`)
+  local repo
+  repo=$(awk -v FS='[[:space:]]+' '{print $2}' <<<"$selected")
+  [[ -z "$repo" ]] && return 0
+
+  tm -n "$repo" "${args[@]}"
 }
 
