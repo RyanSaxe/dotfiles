@@ -5,8 +5,5 @@
     "padding": 0
   },
   "vimMode": true,
-  "model": "opusplan",
-  "notificationsHook": {
-    "command": "bash $HOME/.claude/notify/from-hook.sh"
-  }
+  "model": "opusplan"
 }

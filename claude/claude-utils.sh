@@ -22,14 +22,7 @@ get_claude_panes() {
     done
 }
 
-# Determine if a pane has an unread flag via file state.
-# Looks for ~/.claude/notify/unread/<pane_id>
-_claude_has_unread() {
-    local pane_id="$1"
-    [[ -n "$pane_id" ]] || return 1
-    local flag_path="$HOME/.claude/notify/unread/${pane_id}"
-    [[ -f "$flag_path" ]]
-}
+# Note: File-based unread tracking removed - using tmux bells only
 
 # Function to format Claude pane for fzf display
 # Usage: format_claude_pane "session:window.pane" "title" "bell_flag" [pane_id]
@@ -39,18 +32,11 @@ format_claude_pane() {
     local bell="$3"
     local pane_id="$4"
 
-    local has_attention=0
-    if _claude_has_unread "$pane_id"; then
-        has_attention=1
-    elif [[ "$bell" == "1" ]]; then
-        has_attention=1
-    fi
-
     local status_icon
     local status_color
 
-    if [[ "$has_attention" -eq 1 ]]; then
-        # Needs attention (orange)
+    if [[ "$bell" == "1" ]]; then
+        # Needs attention (orange) - tmux bell detected
         status_icon="🔔"
         status_color="\033[38;2;255;158;100m"  # TokyoNight orange
     else
