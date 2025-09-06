@@ -1,9 +1,12 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "bash ~/.claude/statusline.sh",
+    "command": "bash $HOME/.claude/statusline.sh",
     "padding": 0
   },
   "vimMode": true,
-  "model": "opusplan"
+  "model": "opusplan",
+  "notificationsHook": {
+    "command": "bash $HOME/.claude/notify/from-hook.sh"
+  }
 }
