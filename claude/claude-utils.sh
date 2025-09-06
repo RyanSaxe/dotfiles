@@ -22,11 +22,28 @@ get_claude_panes() {
     done
 }
 
+# Function to get all panes with bell notifications
+# Returns: location|tty|title|bell_flag|pane_id (for all panes with bell=1)
+get_bell_panes() {
+    tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index}|#{pane_tty}|#{pane_title}|#{window_bell_flag}|#{pane_id}' | \
+    while IFS='|' read -r location tty title bell pane_id; do
+        if [[ "$bell" == "1" ]]; then
+            echo "${location}|${tty}|${title}|${bell}|${pane_id}"
+        fi
+    done
+}
+
 # Note: File-based unread tracking removed - using tmux bells only
 
 # Function to format Claude pane for fzf display
 # Usage: format_claude_pane "session:window.pane" "title" "bell_flag" [pane_id]
 format_claude_pane() {
+    format_pane "$1" "$2" "$3" "$4"
+}
+
+# Generic function to format any pane for fzf display
+# Usage: format_pane "session:window.pane" "title" "bell_flag" [pane_id]
+format_pane() {
     local location="$1"
     local title="$2"
     local bell="$3"
@@ -70,6 +87,12 @@ count_claude_instances() {
 # Function to switch to a specific Claude pane
 # Usage: switch_to_claude_pane "session:window.pane"
 switch_to_claude_pane() {
+    switch_to_pane "$1"
+}
+
+# Generic function to switch to any tmux pane
+# Usage: switch_to_pane "session:window.pane"
+switch_to_pane() {
     local target_location="$1"
     
     if [[ -z "$target_location" ]]; then
