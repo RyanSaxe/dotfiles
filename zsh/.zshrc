@@ -306,6 +306,83 @@ ts() {
   fi
 }
 
+# Switch to Claude instance in tmux (with attention indicators)
+tc() {
+  # Source utility functions (symlinked to this repo)
+  local claude_utils_path="${HOME}/.claude/claude-utils.sh"
+  if [[ -f "$claude_utils_path" ]]; then
+    source "$claude_utils_path"
+  else
+    echo "Error: claude-utils.sh not found at $claude_utils_path"
+    return 1
+  fi
+
+  # Ensure required helpers exist
+  typeset -f get_claude_panes >/dev/null || { echo "Missing get_claude_panes"; return 1; }
+  typeset -f format_claude_pane >/dev/null || { echo "Missing format_claude_pane"; return 1; }
+  typeset -f switch_to_claude_pane >/dev/null || { echo "Missing switch_to_claude_pane"; return 1; }
+
+  # Check if we're in tmux
+  if [[ -z "$TMUX" ]]; then
+    echo "Not in a tmux session"
+    return 1
+  fi
+
+  # Check fzf availability
+  if ! command -v fzf >/dev/null 2>&1; then
+    echo "fzf not installed (brew install fzf)"
+    return 1
+  fi
+
+  # Get all Claude panes
+  local claude_panes
+  claude_panes=$(get_claude_panes)
+
+  if [[ -z "$claude_panes" ]]; then
+    echo "No Claude instances found"
+    return 1
+  fi
+
+  # Fast path: only one Claude pane
+  if [[ $(wc -l <<<"$claude_panes" | tr -d ' ') -eq 1 ]]; then
+    local location tty title bell pane_id
+    IFS='|' read -r location tty title bell pane_id <<<"$claude_panes"
+    switch_to_claude_pane "$location"
+    return $?
+  fi
+
+  # Build fzf selection list with a machine-readable column
+  # Display (ANSI) in col 1, raw location in col 2 (tab-delimited)
+  local selection
+  selection=$(echo "$claude_panes" \
+    | while IFS='|' read -r location tty title bell pane_id; do
+        local display
+        display=$(format_claude_pane "$location" "$title" "$bell" "$pane_id")
+        printf '%s\t%s\n' "$display" "$location"
+      done \
+    | fzf \
+        --prompt="Select Claude instance: " \
+        --height=40% \
+        --reverse \
+        --ansi \
+        --with-nth=1 \
+        --delimiter='\t' \
+        --preview-window=hidden \
+        --header="🔔 = Waiting for input | ✓ = Running normally")
+
+  if [[ -z "$selection" ]]; then
+    echo "No Claude instance selected."
+    return 1
+  fi
+
+  local target_location
+  target_location=$(printf '%s' "$selection" | cut -f2)
+  [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
+
+  # Switch to the selected pane
+  switch_to_claude_pane "$target_location"
+}
+
 
 # Cache the CSV output of a function in ~/.cache/custom_scripts/<func>.csv
 # Usage:
@@ -455,4 +532,3 @@ to() {
 
   tm -n "$repo" "${args[@]}"
 }
-

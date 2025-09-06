@@ -4,5 +4,6 @@
     "command": "bash ~/.claude/statusline.sh",
     "padding": 0
   },
-  "vimMode": true
+  "vimMode": true,
+  "model": "opusplan"
 }
