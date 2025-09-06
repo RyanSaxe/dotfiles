@@ -54,7 +54,7 @@ format_pane() {
 
     if [[ "$bell" == "1" ]]; then
         # Needs attention (orange) - tmux bell detected
-        status_icon="🔔"
+        status_icon=" "
         status_color="\033[38;2;255;158;100m"  # TokyoNight orange
     else
         # Running normally (green)

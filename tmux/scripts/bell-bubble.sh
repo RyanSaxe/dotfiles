@@ -13,12 +13,13 @@ count_script="$script_dir/bell-count.sh"
 # Get notification count
 count=$("$count_script")
 
-# Only show bubble if there are notifications
+# Always show bubble - orange for notifications, gray for none
 if [[ "$count" -gt 0 ]]; then
-    # TokyoNight orange bubble with rounded edges
-    # Format: [left_rounded][orange_bg] 🔔 count [right_rounded]
-    echo "#[fg=#{@tokyonight_orange},bg=#{@tokyonight_bg}]#{@left_rounded}#[fg=#{@tokyonight_bg},bg=#{@tokyonight_orange},bold] 🔔 $count #[fg=#{@tokyonight_orange},bg=#{@tokyonight_bg}]#{@right_rounded}"
+    # TokyoNight orange bubble with rounded edges for notifications
+    # Format: [left_rounded][orange_bg]   count [right_rounded]
+    echo "#[fg=#{@tokyonight_orange},bg=#{@tokyonight_bg}]#{@left_rounded}#[fg=#{@tokyonight_bg},bg=#{@tokyonight_orange},bold]   $count #[fg=#{@tokyonight_orange},bg=#{@tokyonight_bg}]#{@right_rounded}"
 else
-    # No notifications - return empty string
-    echo ""
+    # Gray bubble when no notifications (matches other inactive elements)
+    # Format: [left_rounded][gray_bg]   0 [right_rounded]
+    echo "#[fg=#{@tokyonight_gray},bg=#{@tokyonight_bg}]#{@left_rounded}#[fg=#{@tokyonight_bg},bg=#{@tokyonight_gray},bold]   $count #[fg=#{@tokyonight_gray},bg=#{@tokyonight_bg}]#{@right_rounded}"
 fi
