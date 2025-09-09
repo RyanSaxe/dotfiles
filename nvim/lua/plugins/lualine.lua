@@ -40,9 +40,9 @@ return {
     local function mode_bg()
       local m = vim.fn.mode()
       if m:match("^[iI]") then
-        return C.green
-      elseif m:match("^[vV]") then
         return C.purple
+      elseif m:match("^[vV]") then
+        return C.green
       elseif m:match("^R") then
         return C.red
       elseif m:match("^c") then
