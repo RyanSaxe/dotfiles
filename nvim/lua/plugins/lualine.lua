@@ -59,7 +59,7 @@ return {
       if vim.api.nvim_buf_get_name(0) == "" then
         return C.purple
       end
-      if vim.bo.modified then
+      if vim.bo.modified and vim.api.nvim_get_mode().mode ~= "i" then
         return C.yellow
       end
       return C.gray
