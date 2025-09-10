@@ -72,12 +72,12 @@ return {
         c = { fg = C.fg, bg = C.bg },
       },
       insert = {
-        a = { fg = C.bg, bg = C.green, gui = "bold" },
+        a = { fg = C.bg, bg = C.purple, gui = "bold" },
         b = { fg = C.fg, bg = C.bg },
         c = { fg = C.fg, bg = C.bg },
       },
       visual = {
-        a = { fg = C.bg, bg = C.purple, gui = "bold" },
+        a = { fg = C.bg, bg = C.green, gui = "bold" },
         b = { fg = C.fg, bg = C.bg },
         c = { fg = C.fg, bg = C.bg },
       },
@@ -87,7 +87,7 @@ return {
         c = { fg = C.fg, bg = C.bg },
       },
       command = {
-        a = { fg = C.bg, bg = C.yellow, gui = "bold" },
+        a = { fg = C.bg, bg = C.pink, gui = "bold" },
         b = { fg = C.fg, bg = C.bg },
         c = { fg = C.fg, bg = C.bg },
       },
@@ -210,7 +210,7 @@ return {
       "location",
       separator = { left = L, right = R },
       color = function()
-        return { fg = C.bg, bg = loc_bg() }
+        return { fg = C.bg, bg = C.gray }
       end,
       padding = { left = 1, right = 1 },
     }
@@ -230,7 +230,7 @@ return {
     }
     local filename_bubble_inactive = vim.deepcopy(filename_bubble_active)
     filename_bubble_inactive.color = function()
-      return { fg = C.gutter, bg = mode_bg() }
+      return { fg = C.gray, bg = C.bg }
     end
 
     return {
@@ -264,8 +264,8 @@ return {
         lualine_b = { filename_bubble_inactive },
         lualine_c = {},
         lualine_x = {},
-        lualine_y = { location_bubble },
-        lualine_z = { right_cap },
+        lualine_y = {},
+        lualine_z = {},
       },
 
       -- WINBAR: left navic breadcrumbs, right git diff
