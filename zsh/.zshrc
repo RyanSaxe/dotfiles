@@ -361,6 +361,7 @@ tc() {
         --prompt="Select Claude instance: " \
         --height=40% \
         --reverse \
+        --ansi \
         --preview-window=hidden)
 
   if [[ -z "$selection" ]]; then
@@ -369,7 +370,8 @@ tc() {
   fi
 
   local target_location
-  target_location=$(printf '%s' "$selection" | cut -d' ' -f1)
+  # Extract the location (remove icons and everything after " - ")
+  target_location=$(printf '%s' "$selection" | sed 's/ - .*//' | sed 's/^[✓🔔] *//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane
@@ -421,24 +423,18 @@ tb() {
     return $?
   fi
 
-  # Build fzf selection list with a machine-readable column
-  # Display (ANSI) in col 1, raw location in col 2 (tab-delimited)
+  # Build fzf selection list
   local selection
   selection=$(echo "$bell_panes" \
     | while IFS='|' read -r location tty title bell pane_id; do
-        local display
-        display=$(format_pane "$location" "$title" "$bell" "$pane_id")
-        printf '%s\t%s\n' "$display" "$location"
+        format_pane "$location" "$title" "$bell" "$pane_id"
       done \
     | fzf \
         --prompt="Select pane with notification: " \
         --height=40% \
         --reverse \
         --ansi \
-        --with-nth=1 \
-        --delimiter=$'\t' \
-        --preview-window=hidden \
-        --header="🔔 = Has notification")
+        --preview-window=hidden)
 
   if [[ -z "$selection" ]]; then
     echo "No pane selected."
@@ -446,7 +442,8 @@ tb() {
   fi
 
   local target_location
-  target_location=$(printf '%s' "$selection" | cut -f2)
+  # Extract the location (remove icons and everything after " - ")
+  target_location=$(printf '%s' "$selection" | sed 's/ - .*//' | sed 's/^[✓🔔] *//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane

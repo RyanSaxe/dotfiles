@@ -4,18 +4,42 @@ set -euo pipefail
 # Resolve theme colors once from tmux; fall back to sane defaults if not set.
 tmux_get() { tmux show -gv "$1" 2>/dev/null || echo "$2"; }
 
-# PID guard: kill existing process and start fresh
-PID_OPT='@time_updater_pid'
-if existing_pid=$(tmux show -gv "$PID_OPT" 2>/dev/null); then
-  if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
-    # Kill the existing process to restart with updated logic
-    kill "$existing_pid" 2>/dev/null || true
-    sleep 0.1 # Brief pause to ensure cleanup
+# Robust single-instance guard using atomic directory locking (no dependencies)
+LOCK_DIR="$HOME/.cache/tmux-time-updater.lock"
+PID_FILE="$LOCK_DIR/pid"
+
+# Create cache directory if it doesn't exist
+mkdir -p "$(dirname "$LOCK_DIR")" 2>/dev/null || true
+
+# Try to acquire lock atomically using mkdir
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  # Lock exists - check if the process is still alive
+  if [ -f "$PID_FILE" ]; then
+    existing_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
+    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+      # Process is alive, exit silently to prevent duplicates
+      exit 0
+    fi
+  fi
+
+  # Lock is stale (process died), remove it and try again
+  rm -rf "$LOCK_DIR" 2>/dev/null || true
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    # Still couldn't acquire lock (race condition), exit
+    exit 0
   fi
 fi
-tmux set -gq "$PID_OPT" "$$"
+
+# Successfully acquired lock - store our PID
+echo "$$" > "$PID_FILE"
+
+# Set PID in tmux as well for compatibility
+tmux set -gq @time_updater_pid "$$"
+
+# Cleanup function to remove lock and clear tmux PID
 cleanup() {
-  tmux set -gq "$PID_OPT" ""
+  rm -rf "$LOCK_DIR" 2>/dev/null || true
+  tmux set -gq @time_updater_pid ""
 }
 trap cleanup EXIT INT TERM
 
