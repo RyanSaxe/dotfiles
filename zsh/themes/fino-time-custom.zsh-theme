@@ -161,7 +161,7 @@ function _conditional_time() {
     echo "${C_DIM}%*${RESET}"
   fi
 }
-RPROMPT="\$(_conditional_time)"
+RPROMPT="" # "\$(_conditional_time)"
 
 # Ensure prompt substitutions work (Oh My Zsh usually sets this, but just in case)
 setopt prompt_subst

@@ -246,13 +246,13 @@ tm() {
 
   # Create second window (terminal)
   if [[ -n "$start_dir" ]]; then
-    tmux new-window -t "$session_name" -n "terminal" -c "$start_dir"
+    tmux new-window -t "$session_name" -n "zsh" -c "$start_dir"
   else
-    tmux new-window -t "$session_name" -n "terminal"
+    tmux new-window -t "$session_name" -n "zsh"
   fi
 
   # Track window names to prevent duplicates
-  local window_names=("nvim" "terminal")
+  local window_names=("nvim" "zsh")
 
   # Create additional windows for each command
   for cmd in "${commands[@]}"; do
@@ -290,9 +290,9 @@ tm() {
     tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
   done
   
-  tmux select-window -t "${session_name}:terminal"
+  tmux select-window -t "${session_name}:zsh"
   echo "Session '$session_name' created successfully. Attaching..."
-  _tmux_attach_or_switch "${session_name}:terminal"
+  _tmux_attach_or_switch "${session_name}:zsh"
 }
 
 # Switch tmux sessions with fzf (works inside and outside tmux)

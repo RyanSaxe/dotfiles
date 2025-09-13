@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
 # Shared color logic for bell and time indicators
-# Color priority:
-# 1. Default: blue
-# 2. Notifications: green
-# 3. Special times (00, 29, 30, 59): red
-# 4. Notifications + Special time: yellow
+# Color priority (highest to lowest):
+# 1. Tmux prefix active: green
+# 2. Notifications: orange
+# 3. Default: blue
 
 set -euo pipefail
 
@@ -13,23 +12,21 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 count_script="$script_dir/bell-count.sh"
 
+# Check if tmux prefix is currently active
+prefix_active=$(tmux display-message -p '#{client_prefix}' 2>/dev/null || echo "0")
+
 # Get notification count
 count=$("$count_script")
 
-# Get current minute
-min=$(date +%M)
-
-# Determine color based on conditions
-if [[ "$count" -gt 0 ]] && [[ "$min" == "29" || "$min" == "30" || "$min" == "59" || "$min" == "00" ]]; then
-  # Notifications AND special time: yellow
-  echo "#e0af68"
-elif [[ "$min" == "29" || "$min" == "30" || "$min" == "59" || "$min" == "00" ]]; then
-  # Special time only: red
-  echo "#f7768e"
-elif [[ "$count" -gt 0 ]]; then
-  # Notifications only: green
-  echo "#9ece6a"
-else
-  # Default: blue
+# Determine color based on conditions (prefix takes precedence)
+if [[ "$prefix_active" == "1" ]]; then
+  # Prefix active: green (highest priority)
   echo "#7aa2f7"
+elif [[ "$count" -gt 0 ]]; then
+  # Notifications: orange
+  echo "#ff9e64"
+else
+  # Default: gray
+  echo "#565f89"
 fi
+
