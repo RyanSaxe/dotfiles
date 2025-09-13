@@ -19,13 +19,33 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Update time only - colors are handled by tmux format expansion
+# Update time block with minute-based coloring
 update_time_block() {
   time=$(date +%H:%M)
+  minute=$(date +%M)
 
-  # Store just the time - tmux.conf will handle color formatting
+  # Get TokyoNight colors
+  bg_color=$(tmux show -gv @tokyonight_bg 2>/dev/null || echo "#1a1b26")
+  gray_color=$(tmux show -gv @tokyonight_gray 2>/dev/null || echo "#565f89")
+  orange_color=$(tmux show -gv @tokyonight_orange 2>/dev/null || echo "#ff9e64")
+  left_rounded=$(tmux show -gv @left_rounded 2>/dev/null || echo "")
+  right_rounded=$(tmux show -gv @right_rounded 2>/dev/null || echo "")
+
+  # Determine color based on minute (orange for 00, 29, 30, 59)
+  if [[ "$minute" == "00" || "$minute" == "29" || "$minute" == "30" || "$minute" == "59" ]]; then
+    time_color="$orange_color"
+  else
+    time_color="$gray_color"
+  fi
+
+  # Build complete time block with colors
+  time_block="#[fg=${time_color},bg=${bg_color}]${left_rounded}#[fg=${bg_color},bg=${time_color},bold] ${time} #[fg=${time_color},bg=${bg_color}]${right_rounded}"
+
+  # Store the complete formatted time block and just the time
   tmux set -gq @current_time "$time"
-  # Smooth status redraw only (no content recompute).
+  tmux set -gq @time_block "$time_block"
+
+  # Smooth status redraw
   tmux refresh-client -S >/dev/null 2>&1 || true
 }
 

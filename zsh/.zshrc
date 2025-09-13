@@ -351,24 +351,17 @@ tc() {
     return $?
   fi
 
-  # Build fzf selection list with a machine-readable column
-  # Display (ANSI) in col 1, raw location in col 2 (tab-delimited)
+  # Build fzf selection list
   local selection
   selection=$(echo "$claude_panes" \
     | while IFS='|' read -r location tty title bell pane_id; do
-        local display
-        display=$(format_claude_pane "$location" "$title" "$bell" "$pane_id")
-        printf '%s\t%s\n' "$display" "$location"
+        format_claude_pane "$location" "$title" "$bell" "$pane_id"
       done \
     | fzf \
         --prompt="Select Claude instance: " \
         --height=40% \
         --reverse \
-        --ansi \
-        --with-nth=1 \
-        --delimiter='\t' \
-        --preview-window=hidden \
-        --header="🔔 = Waiting for input | ✓ = Running normally")
+        --preview-window=hidden)
 
   if [[ -z "$selection" ]]; then
     echo "No Claude instance selected."
@@ -376,7 +369,7 @@ tc() {
   fi
 
   local target_location
-  target_location=$(printf '%s' "$selection" | cut -f2)
+  target_location=$(printf '%s' "$selection" | cut -d' ' -f1)
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane
