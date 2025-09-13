@@ -12,3 +12,5 @@ vim.opt.relativenumber = false
 vim.opt.signcolumn = "number"
 
 vim.opt.swapfile = false
+-- enable system clipboard integration
+vim.opt.clipboard = "unnamedplus"

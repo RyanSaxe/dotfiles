@@ -19,6 +19,7 @@ RESET='\033[0m'
 model_name=$(echo "$input" | jq -r '.model.display_name // "Claude"')
 output_style=$(echo "$input" | jq -r '.output_style.name // "default"')
 current_dir=$(echo "$input" | jq -r '.workspace.current_dir // ""')
+transcript_path=$(echo "$input" | jq -r '.transcript_path // ""')
 
 # Get basename of current directory for display
 if [[ -n "$current_dir" ]]; then
@@ -58,8 +59,50 @@ if [[ -d "$current_dir/.git" ]] || git -C "$current_dir" rev-parse --git-dir >/d
   fi
 fi
 
-# Get current time
-current_time=$(date '+%H:%M:%S')
+# Extract token usage from transcript (cumulative session usage)
+token_info=""
+if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
+  # Calculate cumulative token usage across all messages in the session
+  total_input_tokens=0
+  total_output_tokens=0
+
+  while IFS= read -r line; do
+    if [[ -n "$line" ]]; then
+      # Sum up all usage data from assistant messages
+      if echo "$line" | jq -e '.type == "assistant" and (.message.usage | length > 0)' >/dev/null 2>&1; then
+        input_tokens=$(echo "$line" | jq -r '.message.usage.input_tokens // 0')
+        output_tokens=$(echo "$line" | jq -r '.message.usage.output_tokens // 0')
+        total_input_tokens=$((total_input_tokens + input_tokens))
+        total_output_tokens=$((total_output_tokens + output_tokens))
+      fi
+    fi
+  done < "$transcript_path"
+
+  # Calculate totals and percentage
+  if [[ $((total_input_tokens + total_output_tokens)) -gt 0 ]]; then
+    # Use input tokens as the context usage (this is what counts toward the limit)
+    context_tokens=$total_input_tokens
+    percentage=$((context_tokens * 100 / 200000))
+
+    # Format tokens (k for thousands)
+    if [[ $context_tokens -ge 1000 ]]; then
+      token_display="$(echo "scale=1; $context_tokens / 1000" | bc -l)k"
+    else
+      token_display="$context_tokens"
+    fi
+
+    # Choose color based on percentage
+    if [[ $percentage -lt 33 ]]; then
+      percent_color="$C_GREEN"
+    elif [[ $percentage -lt 66 ]]; then
+      percent_color="$C_YELLOW"
+    else
+      percent_color="$C_RED"
+    fi
+
+    token_info=" ${C_DIM}[${RESET}${C_DIM}${token_display}/200k${RESET} ${percent_color}(${percentage}%)${RESET}${C_DIM}]${RESET}"
+  fi
+fi
 
 # Build status line
 status_line="${C_DIM}in ${RESET}"
@@ -76,13 +119,8 @@ if [[ "$output_style" != "default" ]]; then
   status_line+=" ${C_DIM}(${output_style})${RESET}"
 fi
 
-# Time (simple left-aligned)
-status_line+=" ${C_DIM}at${RESET} ${C_DIM}${current_time}${RESET}"
-
-# # Virtual environment if available
-# if [[ -n "$venv_info" ]]; then
-#   status_line+=" ${C_DIM}${venv_info}${RESET} "
-# fi
+# Token usage info
+status_line+="${token_info}"
 
 # Output simple left-aligned status line
 printf "%b\n" "$status_line"

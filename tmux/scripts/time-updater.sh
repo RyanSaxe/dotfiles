@@ -38,6 +38,8 @@ trap cleanup EXIT INT TERM
 now=$(date +%s)
 sleep $((60 - now % 60))
 
+# No bell flashing - removed bell flash refresh loop
+
 while :; do
   min=$(date +%M)
   time=$(date +%H:%M)
