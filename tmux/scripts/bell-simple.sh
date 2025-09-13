@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
 
-# Simple bell indicator - shows a bell icon in orange when notifications exist, gray otherwise
+# Bell indicator with coupled color logic - matches time indicator colors
 
 set -euo pipefail
 
-# Get the directory of this script to find bell-count.sh
+# Get the directory of this script to find notification-color.sh
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-count_script="$script_dir/bell-count.sh"
+color_script="$script_dir/notification-color.sh"
 
-# Get notification count
-count=$("$count_script")
+# Get color based on notification and time state
+color=$("$color_script")
 
 # Bell icon
 bell=" "
 
-if [[ "$count" -gt 0 ]]; then
-  # Show orange bell when notifications exist
-  echo "#[fg=#ff9e64]$bell"
-else
-  # Show gray bell when no notifications
-  echo "#[fg=#565f89]$bell"
-fi
+# Show bell with dynamically determined color
+echo "#[fg=${color}]$bell"
 

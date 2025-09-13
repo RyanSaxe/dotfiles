@@ -44,12 +44,17 @@ while :; do
   min=$(date +%M)
   time=$(date +%H:%M)
 
-  # Keep *identical visible width* in both branches: "⟨cap⟩⟨space⟩HH:MM⟨space⟩⟨cap⟩"
-  if [[ "$min" == "29" || "$min" == "30" || "$min" == "59" || "$min" == "00" ]]; then
-    block="${left_yellow}${mid_yellow} ${time}${right_yellow}"
-  else
-    block="${left_gray}${mid_gray} ${time}${right_gray}"
-  fi
+  # Get current notification color using the shared color logic
+  script_dir="$(cd "$(dirname "$0")" && pwd)"
+  color=$("$script_dir/notification-color.sh")
+
+  # Get rounded separators from tmux
+  left_rounded=$(tmux show -gv @left_rounded 2>/dev/null || echo "")
+  right_rounded=$(tmux show -gv @right_rounded 2>/dev/null || echo "")
+  bg_color=$(tmux show -gv @tokyonight_bg 2>/dev/null || echo "#1a1b26")
+
+  # Create time block with same styling as session name (background color + rounded separators)
+  block="#[fg=${color},bg=${bg_color}]${left_rounded}#[fg=${bg_color},bg=${color},bold] ${time} #[fg=${color},bg=${bg_color}]${right_rounded} "
 
   # Store the fully-renderable string; no nested #{...} left to expand.
   tmux set -gq @time_block "$block"
