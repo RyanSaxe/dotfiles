@@ -47,24 +47,17 @@ format_pane() {
   local bell="$3"
   local pane_id="$4"
 
-  local status_icon
-  local status_color
-
-  if [[ "$bell" == "1" ]]; then
-    # Needs attention (orange) - tmux bell detected
-    status_icon=" "
-    status_color="\033[33m" # Yellow
-  else
-    # Running normally (green)
-    status_icon="✓ "
-    status_color="\033[32m" # Green
-  fi
-
   local reset="\033[0m"
   local dim="\033[90m" # Gray
 
-  # Format: [colored icon] session:window.pane - title
-  printf "%b%s%b%-20s %b- %s%b\n" "$status_color" "$status_icon" "$reset" "$location" "$dim" "$title" "$reset"
+  if [[ "$bell" == "1" ]]; then
+    # Needs attention (orange text) - tmux bell detected
+    local orange="\033[38;5;208m" # Orange color
+    printf "%b%-20s%b %b- %s%b\n" "$orange" "$location" "$reset" "$dim" "$title" "$reset"
+  else
+    # Running normally (default text color)
+    printf "%-20s %b- %s%b\n" "$location" "$dim" "$title" "$reset"
+  fi
 }
 
 # Function to count Claude instances by status
@@ -150,4 +143,3 @@ resolve_pane_id() {
 
   return 1
 }
-

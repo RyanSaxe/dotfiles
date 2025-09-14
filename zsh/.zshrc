@@ -370,8 +370,8 @@ tc() {
   fi
 
   local target_location
-  # Extract the location (remove icons and everything after " - ")
-  target_location=$(printf '%s' "$selection" | sed 's/ - .*//' | sed 's/^[✓🔔] *//')
+  # Extract the location (everything before " - ")
+  target_location=$(printf '%s' "$selection" | sed 's/ - .*//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane
@@ -442,8 +442,8 @@ tb() {
   fi
 
   local target_location
-  # Extract the location (remove icons and everything after " - ")
-  target_location=$(printf '%s' "$selection" | sed 's/ - .*//' | sed 's/^[✓🔔] *//')
+  # Extract the location (everything before " - ")
+  target_location=$(printf '%s' "$selection" | sed 's/ - .*//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane
