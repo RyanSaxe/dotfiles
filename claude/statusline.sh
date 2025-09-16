@@ -114,9 +114,9 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
     fi
 
     # Choose color based on percentage of 200k limit
-    if [[ $percentage -lt 40 ]]; then
+    if [[ $percentage -lt 33 ]]; then
       percent_color="$C_GREEN"
-    elif [[ $percentage -lt 80 ]]; then
+    elif [[ $percentage -lt 66 ]]; then
       percent_color="$C_YELLOW"
     else
       percent_color="$C_RED"

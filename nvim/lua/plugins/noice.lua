@@ -23,6 +23,7 @@ return {
     },
     presets = {
       command_palette = true, -- position the cmdline and popupmenu together
+      bottom_search = false,
       inc_rename = true, -- enables an input dialog for inc-rename.nvim
       lsp_doc_border = true, -- add a border to hover docs and signature help
     },
