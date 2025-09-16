@@ -118,7 +118,7 @@ const float DURATION = 0.08; // Trail duration in seconds - super fast animation
 // Adjust this value to control when trails appear:
 // - Lower values (0.01-0.02): Show trails for smaller movements
 // - Higher values (0.03-0.05): Only show trails for larger jumps
-const float MIN_DISTANCE_THRESHOLD = 0.025; // Normalized distance threshold
+const float MIN_DISTANCE_THRESHOLD = 0.045; // Normalized distance threshold - increased to prevent trails during typing
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord)
 {
