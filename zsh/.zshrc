@@ -246,13 +246,13 @@ tm() {
 
   # Create second window (terminal)
   if [[ -n "$start_dir" ]]; then
-    tmux new-window -t "$session_name" -n "terminal" -c "$start_dir"
+    tmux new-window -t "$session_name" -n "zsh" -c "$start_dir"
   else
-    tmux new-window -t "$session_name" -n "terminal"
+    tmux new-window -t "$session_name" -n "zsh"
   fi
 
   # Track window names to prevent duplicates
-  local window_names=("nvim" "terminal")
+  local window_names=("nvim" "zsh")
 
   # Create additional windows for each command
   for cmd in "${commands[@]}"; do
@@ -290,9 +290,9 @@ tm() {
     tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
   done
   
-  tmux select-window -t "${session_name}:terminal"
+  tmux select-window -t "${session_name}:zsh"
   echo "Session '$session_name' created successfully. Attaching..."
-  _tmux_attach_or_switch "${session_name}:terminal"
+  _tmux_attach_or_switch "${session_name}:zsh"
 }
 
 # Switch tmux sessions with fzf (works inside and outside tmux)
@@ -351,24 +351,18 @@ tc() {
     return $?
   fi
 
-  # Build fzf selection list with a machine-readable column
-  # Display (ANSI) in col 1, raw location in col 2 (tab-delimited)
+  # Build fzf selection list
   local selection
   selection=$(echo "$claude_panes" \
     | while IFS='|' read -r location tty title bell pane_id; do
-        local display
-        display=$(format_claude_pane "$location" "$title" "$bell" "$pane_id")
-        printf '%s\t%s\n' "$display" "$location"
+        format_claude_pane "$location" "$title" "$bell" "$pane_id"
       done \
     | fzf \
         --prompt="Select Claude instance: " \
         --height=40% \
         --reverse \
         --ansi \
-        --with-nth=1 \
-        --delimiter='\t' \
-        --preview-window=hidden \
-        --header="🔔 = Waiting for input | ✓ = Running normally")
+        --preview-window=hidden)
 
   if [[ -z "$selection" ]]; then
     echo "No Claude instance selected."
@@ -376,7 +370,8 @@ tc() {
   fi
 
   local target_location
-  target_location=$(printf '%s' "$selection" | cut -f2)
+  # Extract the location (everything before " - ")
+  target_location=$(printf '%s' "$selection" | sed 's/ - .*//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane
@@ -428,24 +423,18 @@ tb() {
     return $?
   fi
 
-  # Build fzf selection list with a machine-readable column
-  # Display (ANSI) in col 1, raw location in col 2 (tab-delimited)
+  # Build fzf selection list
   local selection
   selection=$(echo "$bell_panes" \
     | while IFS='|' read -r location tty title bell pane_id; do
-        local display
-        display=$(format_pane "$location" "$title" "$bell" "$pane_id")
-        printf '%s\t%s\n' "$display" "$location"
+        format_pane "$location" "$title" "$bell" "$pane_id"
       done \
     | fzf \
         --prompt="Select pane with notification: " \
         --height=40% \
         --reverse \
         --ansi \
-        --with-nth=1 \
-        --delimiter=$'\t' \
-        --preview-window=hidden \
-        --header="🔔 = Has notification")
+        --preview-window=hidden)
 
   if [[ -z "$selection" ]]; then
     echo "No pane selected."
@@ -453,7 +442,8 @@ tb() {
   fi
 
   local target_location
-  target_location=$(printf '%s' "$selection" | cut -f2)
+  # Extract the location (everything before " - ")
+  target_location=$(printf '%s' "$selection" | sed 's/ - .*//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
   # Switch to the selected pane

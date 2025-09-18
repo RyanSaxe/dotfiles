@@ -153,7 +153,7 @@ ZSH_THEME_GIT_PROMPT_DIRTY=" ${C_RED}✘${RESET}"
 ZSH_THEME_GIT_PROMPT_CLEAN=" ${C_GREEN}✔${RESET}"
 
 PROMPT="\$(get_prefix)${C_CYAN}%~${RESET}\$(git_prompt_info)${C_DIM}\$(_git_time_since_commit)${RESET}
-${C_DIM}╰\$(prompt_padding)\$(virtualenv_info) "
+${C_DIM}╰\$(prompt_padding)\$(virtualenv_info) ${C_FG}"
 
 # Right-aligned time in dim color (hide on small screens)
 function _conditional_time() {
@@ -161,7 +161,7 @@ function _conditional_time() {
     echo "${C_DIM}%*${RESET}"
   fi
 }
-RPROMPT="\$(_conditional_time)"
+RPROMPT="" # "\$(_conditional_time)"
 
 # Ensure prompt substitutions work (Oh My Zsh usually sets this, but just in case)
 setopt prompt_subst

@@ -19,6 +19,7 @@ RESET='\033[0m'
 model_name=$(echo "$input" | jq -r '.model.display_name // "Claude"')
 output_style=$(echo "$input" | jq -r '.output_style.name // "default"')
 current_dir=$(echo "$input" | jq -r '.workspace.current_dir // ""')
+transcript_path=$(echo "$input" | jq -r '.transcript_path // ""')
 
 # Get basename of current directory for display
 if [[ -n "$current_dir" ]]; then
@@ -58,8 +59,72 @@ if [[ -d "$current_dir/.git" ]] || git -C "$current_dir" rev-parse --git-dir >/d
   fi
 fi
 
-# Get current time
-current_time=$(date '+%H:%M:%S')
+# Extract context length from most recent transcript entry (matches ccstatusline approach)
+# This correctly handles /clear and /compress commands by using the latest usage data
+token_info=""
+if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
+  context_tokens=0
+
+  # Read transcript in reverse to find most recent assistant message with usage data
+  # Using tac for reverse reading, falling back to tail -r on macOS if needed
+  if command -v tac >/dev/null 2>&1; then
+    reverse_cmd="tac"
+  else
+    reverse_cmd="tail -r"
+  fi
+
+  # Find the most recent assistant message with usage data (not sidechain)
+  while IFS= read -r line; do
+    if [[ -n "$line" ]] && echo "$line" | jq -e . >/dev/null 2>&1; then
+      # Check if this is an assistant message with usage data and not a sidechain
+      is_assistant=$(echo "$line" | jq -r '.type // ""')
+      is_sidechain=$(echo "$line" | jq -r '.isSidechain // false')
+      has_usage=$(echo "$line" | jq -e '.message.usage' >/dev/null 2>&1 && echo "true" || echo "false")
+
+      if [[ "$is_assistant" == "assistant" && "$is_sidechain" == "false" && "$has_usage" == "true" ]]; then
+        # Extract all token types from the most recent main chain assistant message
+        input_tokens=$(echo "$line" | jq -r '.message.usage.input_tokens // 0')
+        output_tokens=$(echo "$line" | jq -r '.message.usage.output_tokens // 0')
+        cache_read_tokens=$(echo "$line" | jq -r '.message.usage.cache_read_input_tokens // 0')
+        cache_creation_tokens=$(echo "$line" | jq -r '.message.usage.cache_creation_input_tokens // 0')
+
+        # Context length = input + cache tokens (these count toward the 200k limit)
+        context_tokens=$((input_tokens + cache_read_tokens + cache_creation_tokens))
+
+        # Total tokens for potential future use (all token types)
+        total_tokens=$((input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens))
+
+        # Found what we need, stop processing
+        break
+      fi
+    fi
+  done < <($reverse_cmd "$transcript_path" 2>/dev/null)
+
+  # Display context info if we have data
+  if [[ $context_tokens -gt 0 ]]; then
+    percentage=$((context_tokens * 100 / 200000))
+
+    # Format context tokens for display (k for thousands, M for millions)
+    if [[ $context_tokens -ge 1000000 ]]; then
+      token_display="$(echo "scale=1; $context_tokens / 1000000" | bc -l)M"
+    elif [[ $context_tokens -ge 1000 ]]; then
+      token_display="$(echo "scale=1; $context_tokens / 1000" | bc -l)k"
+    else
+      token_display="$context_tokens"
+    fi
+
+    # Choose color based on percentage of 200k limit
+    if [[ $percentage -lt 33 ]]; then
+      percent_color="$C_GREEN"
+    elif [[ $percentage -lt 66 ]]; then
+      percent_color="$C_YELLOW"
+    else
+      percent_color="$C_RED"
+    fi
+
+    token_info=" ${C_DIM}[${RESET}${C_DIM}${token_display}/200k${RESET} ${percent_color}(${percentage}%)${RESET}${C_DIM}]${RESET}"
+  fi
+fi
 
 # Build status line
 status_line="${C_DIM}in ${RESET}"
@@ -76,13 +141,8 @@ if [[ "$output_style" != "default" ]]; then
   status_line+=" ${C_DIM}(${output_style})${RESET}"
 fi
 
-# Time (simple left-aligned)
-status_line+=" ${C_DIM}at${RESET} ${C_DIM}${current_time}${RESET}"
-
-# # Virtual environment if available
-# if [[ -n "$venv_info" ]]; then
-#   status_line+=" ${C_DIM}${venv_info}${RESET} "
-# fi
+# Token usage info
+status_line+="${token_info}"
 
 # Output simple left-aligned status line
 printf "%b\n" "$status_line"

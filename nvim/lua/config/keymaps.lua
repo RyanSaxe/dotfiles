@@ -9,6 +9,12 @@ vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv", { desc = "move lines up in visual s
 -- make escape go to normal mode when in a terminal
 vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true, desc = "Terminal: go to Normal mode" })
 
+-- Swap ; and : for easier command access
+-- ; now enters command mode (was :)
+-- : now repeats last f/t/F/T search (was ;)
+vim.keymap.set({ "n", "v" }, ";", ":", { desc = "Enter command mode" })
+vim.keymap.set({ "n", "v" }, ":", ";", { desc = "Repeat last f/t/F/T search" })
+
 -- TODO: set up full different set of git toggles
 -------------------------------------------------------------------------------
 -- 1) <leader>tg: “Toggle Diffview (fetch & diff against remote default HEAD)”

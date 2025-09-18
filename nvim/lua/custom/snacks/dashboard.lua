@@ -1,161 +1,28 @@
--- snacks_dashboard.lua  ── custom git dashboard for Snacks.nvim
+-- dashboard.lua  ── custom git dashboard configuration for Snacks.nvim
+-- Contains all dashboard sections, keys, and layout logic
 
--- some random utilities the dahsboard needs that I'll probably not reuse
-
----@param max integer|nil
----@return string[]
-local function recent_files_in_cwd(max)
-  max = max or 10
-  local cwd = vim.loop.cwd()
-  local list = {}
-  for _, abs in ipairs(vim.v.oldfiles) do
-    if vim.startswith(abs, cwd) and vim.fn.filereadable(abs) == 1 then
-      table.insert(list, vim.fn.fnamemodify(abs, ":.")) -- relative path
-      if #list == max then
-        break
-      end
-    end
-  end
-  return list
-end
-
--- Get time since most recent file was accessed
----@return string Time description like "2h ago", "5m ago", etc.
-local function get_recent_file_time()
-  local cwd = vim.loop.cwd()
-  local most_recent_time = 0
-
-  for _, abs in ipairs(vim.v.oldfiles) do
-    if vim.startswith(abs, cwd) and vim.fn.filereadable(abs) == 1 then
-      local stat = vim.loop.fs_stat(abs)
-      if stat and stat.mtime.sec > most_recent_time then
-        most_recent_time = stat.mtime.sec
-      end
-      break -- We only need the first (most recent) file
-    end
-  end
-
-  if most_recent_time == 0 then
-    return "none"
-  end
-
-  local now = os.time()
-  local diff = now - most_recent_time
-
-  if diff < 60 then
-    return math.floor(diff) .. "s ago"
-  elseif diff < 3600 then
-    return math.floor(diff / 60) .. "m ago"
-  elseif diff < 86400 then
-    return math.floor(diff / 3600) .. "h ago"
-  else
-    return math.floor(diff / 86400) .. "d ago"
-  end
-end
-
--- Normalize and format file paths for prettier display
----@param path string Path to normalize
----@param max_length? number Maximum display length (default: 40)
----@return string Normalized and formatted path
-local function normalize_path(path, max_length)
-  max_length = max_length or 40
-  local normalized = vim.fs.normalize(path)
-
-  if #normalized <= max_length then
-    return normalized
-  end
-
-  -- Keep filename and truncate from the middle
-  local parts = vim.split(normalized, "/")
-  local filename = parts[#parts]
-
-  if #filename >= max_length - 3 then
-    return "..." .. filename:sub(-(max_length - 3))
-  end
-
-  -- Build path keeping filename and as much directory structure as possible
-  local result = filename
-  for i = #parts - 1, 1, -1 do
-    local candidate = parts[i] .. "/" .. result
-    if #candidate > max_length - 3 then
-      return "..." .. result
-    end
-    result = candidate
-  end
-
-  return result
-end
-
+local utils = require("custom.snacks.utils")
 local git_pickers = require("custom.git.pickers")
 local git_utils = require("custom.git.utils")
-local Snacks = require("snacks")
 
--- Create title with right-aligned content by padding with spaces
----@param left string The left side content
----@param right string The right side content to align
----@param pane_width? number Width of the pane (default: 60)
----@return string Title with right-aligned content and proper spacing
-local function create_aligned_title(left, right, pane_width)
-  pane_width = pane_width or 60
-  local left_len = vim.fn.strdisplaywidth(left)
-  local right_len = vim.fn.strdisplaywidth(right)
-  local total_content = left_len + right_len
+local M = {}
 
-  if total_content >= pane_width then
-    -- If content is too long, just return left as-is
-    return left
-  end
+-- Global padding constant for snorlax alignment
+local SNORLAX_PADDING = 4
 
-  local spaces_needed = pane_width - total_content - 2 -- Account for parentheses
-  return left .. string.rep(" ", spaces_needed) .. "(" .. right .. ")"
+-- Check if we should show recent project toggle based on context
+local function recent_project_toggle()
+  local in_git = Snacks.git.get_root() ~= nil
+  local has_two_panes = utils.show_if_has_second_pane()
+  -- if in git and has one pane, then we disable
+  return not (in_git and not has_two_panes)
 end
 
-local show_if_has_second_pane = function()
-  -- taken from snacks.dashboard. Only enable this visual if snacks allows a second pane.
-  local width = vim.o.columns
-  local pane_width = 60 -- default ... make dynamic if configured
-  local pane_gap = 4 -- default ... make dynamic if configured
-  local max_panes = math.max(1, math.floor((width + pane_gap) / (pane_width + pane_gap)))
-  return max_panes > 1
-end
-
-local create_pane = function(header, specs, bottom_padding)
-  local pane = header.pane
-  header.padding = header.padding or 2
-  header.indent = header.indent or 0
-
-  local output = { header }
-  for i, spec in ipairs(specs) do
-    -- set padding on the spec itself
-    spec.padding = (i == #specs) and bottom_padding or 0
-
-    -- start with defaults
-    local row = {
-      pane = pane,
-      indent = 0,
-    }
-    -- copy all spec fields in
-    for k, v in pairs(spec) do
-      row[k] = v
-    end
-
-    table.insert(output, row)
-  end
-
-  return output -- ← you must return it!
-end
-
-local different_key_if_condition = function(condition, base_spec, git_spec, non_git_spec)
-  if condition then
-    return vim.tbl_deep_extend("force", {}, base_spec, git_spec)
-  else
-    return vim.tbl_deep_extend("force", {}, base_spec, non_git_spec)
-  end
-end
-local search_keys = function()
+-- Create search keys section for project operations
+local function search_keys()
   local cwd = vim.fn.getcwd()
   local project = vim.fn.fnamemodify(cwd, ":t")
-  local header = { pane = 1, title = create_aligned_title("Project", project) }
+  local header = { pane = 1, title = utils.create_aligned_title("Project", project) }
 
   local keys = {
     { key = "/", desc = "Grep Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
@@ -189,7 +56,7 @@ local search_keys = function()
   local find_file_base = { key = "f", desc = "Find File" }
   table.insert(
     keys,
-    different_key_if_condition(
+    utils.different_key_if_condition(
       Snacks.git.get_root() ~= nil,
       find_file_base,
       { action = ":lua Snacks.dashboard.pick('git_files')" },
@@ -197,14 +64,15 @@ local search_keys = function()
     )
   )
 
-  return create_pane(header, keys, 2)
+  return utils.create_pane(header, keys, 2)
 end
 
-local globalkeys = function()
+-- Create global keys section for neovim operations
+local function globalkeys()
   -- NOTE: consider the projects section that only shows up if not in a git repo
   local header = {
     pane = 1,
-    title = create_aligned_title(
+    title = utils.create_aligned_title(
       "Neovim",
       "v" .. vim.version().major .. "." .. vim.version().minor .. "." .. vim.version().patch
     ),
@@ -238,20 +106,14 @@ local globalkeys = function()
     },
   }
 
-  return create_pane(header, keys, 2)
-end
-local recent_project_toggle = function()
-  local in_git = Snacks.git.get_root() ~= nil
-  local has_two_panes = show_if_has_second_pane()
-  -- if in git and has one pane, then we disable
-  return not (in_git and not has_two_panes)
+  return utils.create_pane(header, keys, 2)
 end
 
-SNORLAX_PADDING = 4
-local get_recent_files = function()
+-- Get recent files for the dashboard
+local function get_recent_files()
   local out = {}
   local max_files = 5
-  local recent_files = recent_files_in_cwd(max_files)
+  local recent_files = utils.recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
   local final_padding = pane == 2 and max_files - n_files + SNORLAX_PADDING or 2
@@ -261,7 +123,7 @@ local get_recent_files = function()
       pane = pane,
       indent = 0,
       padding = (i == n_files) and final_padding or 0,
-      desc = normalize_path(rel),
+      desc = utils.normalize_path(rel),
       key = tostring(i),
       action = function()
         vim.cmd("edit " .. rel)
@@ -277,7 +139,7 @@ local get_recent_files = function()
       enabled = recent_project_toggle,
     }
   end
-  if pane == 1 and show_if_has_second_pane() then
+  if pane == 1 and utils.show_if_has_second_pane() then
     out[#out + 1] = {
       pane = 2,
       padding = n_files > 0 and n_files or 1,
@@ -286,17 +148,18 @@ local get_recent_files = function()
   return out
 end
 
-local create_sections = function()
+-- Create all dashboard sections
+function M.create_sections()
   local base_branch = git_utils.get_base_branch()
   local current_branch = git_utils.get_current_branch()
   local recent_files = get_recent_files()
   return {
 
     -- { pane = 1, padding = 2, indent = 0 },
-    -- { pane = 2, padding = 2, enabled = show_if_has_second_pane, indent = 0 },
+    -- { pane = 2, padding = 2, enabled = utils.show_if_has_second_pane, indent = 0 },
     search_keys,
     {
-      title = create_aligned_title("Recent Files", get_recent_file_time()),
+      title = utils.create_aligned_title("Recent Files", utils.get_recent_file_time()),
       pane = Snacks.git.get_root() and 2 or 1,
       indent = 0,
       padding = 2,
@@ -305,7 +168,7 @@ local create_sections = function()
     recent_files,
     {
       pane = 1,
-      title = create_aligned_title("Git", current_branch),
+      title = utils.create_aligned_title("Git", current_branch),
       indent = 0,
       padding = 2,
       enabled = Snacks.git.get_root() ~= nil,
@@ -417,7 +280,7 @@ local create_sections = function()
     -- first pane, and snorlax needs to be padded according to the number of lines in recent files
     {
       pane = 2,
-      enabled = show_if_has_second_pane,
+      enabled = utils.show_if_has_second_pane,
       padding = 2,
     },
     {
@@ -431,61 +294,21 @@ local create_sections = function()
       indent = 22,
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
-      enabled = show_if_has_second_pane,
+      enabled = utils.show_if_has_second_pane,
       padding = 0, --SNORLAX_PADDING - 1,
     },
     {
       pane = 2,
-      title = create_aligned_title("Startup", vim.fn.printf("%.1fms", require("lazy").stats().startuptime)),
+      title = utils.create_aligned_title("Startup", vim.fn.printf("%.1fms", require("lazy").stats().startuptime)),
       indent = 0,
-      enabled = show_if_has_second_pane,
+      enabled = utils.show_if_has_second_pane,
     },
     {
       pane = 1,
-      title = create_aligned_title("Time", os.date("%H:%M")),
+      title = utils.create_aligned_title("Time", os.date("%H:%M")),
       indent = 0,
     },
   }
 end
--- I like when search basically take the entire screen. Makes it much easier to see previews.
--- though I don't use this right now --- need to clean up code later
-local full_layout = {
-  layout = {
-    box = "vertical", -- stack children top→bottom
-    border = "rounded",
-    height = 0.99,
-    width = 0.99,
-    {
-      win = "input",
-      height = 1,
-      border = "bottom",
-    },
-    {
-      win = "list",
-      height = 0.33, -- exactly two rows tall
-      border = "bottom", -- optional separator
-    },
-    {
-      win = "preview",
-      -- no height ⇒ whatever is left
-    },
-  },
-}
-return {
-  {
-    "folke/snacks.nvim",
-    priority = 1000,
-    lazy = false,
-    dependencies = { "ibhagwan/fzf-lua", "folke/todo-comments.nvim" },
-    opts = {
-      dashboard = {
-        -- this is separated into a function so that the dashboard update can redraw it on .update()
-        sections = create_sections,
-        layout = { anchor = "center" },
-      },
-      -- picker = {
-      --   layout = full_layout,
-      -- },
-    },
-  },
-}
+
+return M

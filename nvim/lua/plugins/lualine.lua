@@ -230,7 +230,7 @@ return {
     }
     local filename_bubble_inactive = vim.deepcopy(filename_bubble_active)
     filename_bubble_inactive.color = function()
-      return { fg = C.gutter, bg = mode_bg() }
+      return { fg = C.bg, bg = C.gray }
     end
 
     return {

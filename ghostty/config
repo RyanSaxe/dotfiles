@@ -23,7 +23,7 @@ keybind = cmd+o=open_config
 # generic styling 
 
 font-size = 16
-theme = tokyonight_night
+theme = TokyoNight Night
 unfocused-split-opacity = 0.8
 
 # specific customizations
@@ -38,3 +38,5 @@ window-padding-color = background
 window-padding-balance = true
 ## allow multiline for claude code
 keybind = shift+enter=text:\n
+## shaders
+custom-shader = shaders/cursor_trail_tokyonight.glsl
