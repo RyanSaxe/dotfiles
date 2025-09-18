@@ -1,9 +1,10 @@
 {
-  "model": "opus",
+  "model": "opusplan",
   "statusLine": {
     "type": "command",
     "command": "bash $HOME/.claude/statusline.sh",
     "padding": 0
   },
-  "vimMode": true
+  "vimMode": true,
+  "autoUpdate": false
 }
