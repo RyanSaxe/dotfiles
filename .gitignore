@@ -17,7 +17,7 @@ claude/*
 !claude/settings.json
 !claude/statusline.sh
 !claude/claude-utils.sh
-!claude/send-email-notification.sh
+!claude/send-notification.sh
 ipython/*
 !ipython/profile_default/
 ipython/profile_default/*
