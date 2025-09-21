@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/send-email-notification.sh"
+            "command": "bash $HOME/.claude/send-notification.sh"
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/send-email-notification.sh"
+            "command": "bash $HOME/.claude/send-notification.sh"
           }
         ]
       }
