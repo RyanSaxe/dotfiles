@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a'"
+            "command": "bash $HOME/.claude/send-email-notification.sh"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a'"
+            "command": "bash $HOME/.claude/send-email-notification.sh"
           }
         ]
       }

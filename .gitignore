@@ -10,12 +10,14 @@ archive/
 backups/*
 !backups/README.txt
 .DS_STORE
+.env
 claude/*
 !claude/CLAUDE.md
 !claude/plugins/
 !claude/settings.json
 !claude/statusline.sh
 !claude/claude-utils.sh
+!claude/send-email-notification.sh
 ipython/*
 !ipython/profile_default/
 ipython/profile_default/*
