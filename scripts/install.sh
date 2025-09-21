@@ -295,6 +295,34 @@ main() {
     log "Mermaid CLI already installed—skipping re-install"
   fi
 
+  # Install ast-grep via npm on Linux only (on macOS it's installed via brew)
+  if [[ "$PM" == "apt" ]] && ! command -v ast-grep &>/dev/null && ! command -v sg &>/dev/null; then
+    log "Installing ast-grep via npm…"
+    sudo_if_needed npm install -g @ast-grep/cli || {
+      err "ast-grep install failed"
+      exit 1
+    }
+  else
+    if [[ "$PM" == "apt" ]]; then
+      log "ast-grep already installed—skipping re-install"
+    fi
+  fi
+
+  # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)
+  if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &>/dev/null; then
+    log "Installing git-split-diffs via npm…"
+    sudo_if_needed npm install -g git-split-diffs || {
+      err "git-split-diffs install failed"
+      exit 1
+    }
+  else
+    if [[ "$PM" == "apt" ]]; then
+      log "git-split-diffs already installed—skipping re-install"
+    fi
+  fi
+
+  # Note: dust is only installed via brew on macOS, not available on Linux
+
   # Astral UV installer
   if ! command -v uv &>/dev/null; then
     fetch_and_exec "https://astral.sh/uv/install.sh"
