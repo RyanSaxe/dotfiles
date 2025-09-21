@@ -7,7 +7,6 @@
   },
   "vimMode": true,
   "autoUpdate": false,
-  "preferredNotifChannel": "terminal_bell",
   "hooks": {
     "Notification": [
       {
@@ -15,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a'"
+            "command": "echo $'\\a'"
           }
         ]
       }
@@ -26,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a'"
+            "command": "echo $'\\a'"
           }
         ]
       }
