@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "tmux display-message -p '\\a' 2>/dev/null || true"
+            "command": "printf '\\a'"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "tmux display-message -p '\\a' 2>/dev/null || true"
+            "command": "printf '\\a'"
           }
         ]
       }
