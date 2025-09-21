@@ -1,26 +1,24 @@
-# Global Claude Code Instructions
+# Memory
 
-Always follow these guidelines. The only exception is if the CLAUDE.md file in the current repository specifies otherwise.
+Do not forget anything in this file. It specifies global rules for all actions you take.
 
 ## Code Quality & Style
 
-- **Atomic commits**: Make small, focused commits that do one thing well
-- **Minimal comments**: Only add comments when absolutely necessary - prefer self-documenting code
-- **Simple solutions**: Choose the simplest approach that works - avoid over-engineering
-- **Follow existing patterns**: Always check existing code style and conventions before making changes
+- **Minimal comments**: Only add comments when absolutely necessary - prefer self-documenting code.
+- **Simple solutions**: Choose the simplest approach that works - avoid over-engineering.
+- **Follow existing patterns**: Your code should match the style and structure of the existing codebase.
 
 ## Development Workflow
 
-- **Read before writing**: Always examine existing code structure before making changes
-- **Test your changes**: Run lints, tests, and builds when available
-- **Clean code**: Prioritize readability and maintainability over cleverness
+- **Atomic commits**: An atomic commit is a single, self-contained change in code that does one thing, is complete on its own, and can be applied or reverted without breaking the project. You are expected to work with this practice. Ask permission to commit your changes whenever you believe it is appropriate according to this definition.
+- **Read before writing**: Always examine existing code structure before making changes.
+- **Use TDD**: Write tests before implementing features or fixing bugs when appropriate.
+- **Test your changes**: A feature is not complete until it has been tested and verified to work as intended.
 
 ## Environment Assumptions
 
-- Primary editor: neovim
-- Shell: zsh with oh-my-zsh
-- Package manager: homebrew (macOS)
-- Theme preference: TokyoNight across all tools
-- Python version: 3.11 or higher
-- Python environment: `uv` for dependencies and virtual environments
+- **Shell**: zsh with oh-my-zsh
+- **Package manager**: homebrew (macOS)
+- **Python environment**: `uv` for dependencies and virtual environments unless the project clearly uses `poetry`.
+- **Dotfiles**: You can find dotfiles specified in `~/generic/dotfiles`. You can find where they are linked in `~/generic/dotfiles/scripts/symlink.sh`.
 

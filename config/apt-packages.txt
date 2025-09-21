@@ -21,3 +21,4 @@ ghostscript
 imagemagick
 software-properties-common
 luarocks
+tldr
