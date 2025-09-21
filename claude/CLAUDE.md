@@ -15,10 +15,17 @@ Do not forget anything in this file. It specifies global rules for all actions y
 - **Use TDD**: Write tests before implementing features or fixing bugs when appropriate.
 - **Test your changes**: A feature is not complete until it has been tested and verified to work as intended.
 
+## Command Line Tool Specifications
+
+- use `fd` instead of `find` for file searching.
+- use `rg` (ripgrep) instead of `grep` for searching within files.
+- use `sg` (ast-grep) instead of `rg` for more complex code searching.
+- use `tldr` for quick references on command usage.
+- use `--help` flag and `man` pages for detailed command documentation.
+
 ## Environment Assumptions
 
 - **Shell**: zsh with oh-my-zsh
 - **Package manager**: homebrew (macOS)
 - **Python environment**: `uv` for dependencies and virtual environments unless the project clearly uses `poetry`.
 - **Dotfiles**: You can find dotfiles specified in `~/generic/dotfiles`. You can find where they are linked in `~/generic/dotfiles/scripts/symlink.sh`.
-
