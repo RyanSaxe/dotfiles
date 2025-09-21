@@ -1,0 +1,34 @@
+# Ultra-minimal zsh configuration for tmux floating windows
+# Only the absolute essentials for fzf interfaces
+
+# Basic PATH setup
+. "$HOME/.local/bin/env"
+export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
+
+# Get the actual directory where this file is located
+local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"
+local zshrc_dir="${zshrc_real:h}"
+
+# Load only the essential tmux and git-repos functions for the popup commands
+source "${zshrc_dir}/functions/tmux.zsh"
+source "${zshrc_dir}/functions/git-repos.zsh"
+
+# Minimal prompt
+PROMPT='$ '
+
+# Essential history for fzf
+HISTFILE=~/.zsh_history
+HISTSIZE=1000
+SAVEHIST=1000
+
+# Basic completions (lightweight)
+autoload -Uz compinit
+compinit -d ~/.zcompdump-minimal
+
+# Command to upgrade to full shell if needed
+zsh-full() {
+  exec zsh
+}
+
+# Mark as minimal mode
+export ZSH_MODE="minimal"
