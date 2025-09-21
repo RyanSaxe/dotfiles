@@ -91,6 +91,7 @@ local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"
 local zshrc_dir="${zshrc_real:h}"
 
 # Source function files
+source "${zshrc_dir}/functions/env.zsh"
 source "${zshrc_dir}/functions/tmux.zsh"
 source "${zshrc_dir}/functions/venv.zsh"
 source "${zshrc_dir}/functions/vi-mode.zsh"
@@ -99,7 +100,8 @@ source "${zshrc_dir}/functions/git-repos.zsh"
 # Load shared aliases
 source "${zshrc_dir}/aliases.zsh"
 
-# Initialize vi mode and virtual environment auto-activation
+# Initialize environment loading, vi mode and virtual environment auto-activation
+env_init
 vi_mode_init
 venv_init
 
