@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo $'\\a'"
+            "command": "tmux display-message -p '\\a' 2>/dev/null || true"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo $'\\a'"
+            "command": "tmux display-message -p '\\a' 2>/dev/null || true"
           }
         ]
       }
