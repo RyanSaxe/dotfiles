@@ -1,12 +1,5 @@
 {
-  "model": "opus",
-  "statusLine": {
-    "type": "command",
-    "command": "bash $HOME/.claude/statusline.sh",
-    "padding": 0
-  },
-  "vimMode": true,
-  "autoUpdate": false,
+  "model": "opusplan",
   "hooks": {
     "Notification": [
       {
@@ -14,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a'"
+            "command": "bash $HOME/.claude/send-notification.sh"
           }
         ]
       }
@@ -25,10 +18,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a'"
+            "command": "bash $HOME/.claude/send-notification.sh"
           }
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash $HOME/.claude/statusline.sh",
+    "padding": 0
+  },
+  "vimMode": true,
+  "autoUpdate": false
 }

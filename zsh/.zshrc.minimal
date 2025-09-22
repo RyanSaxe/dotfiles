@@ -9,9 +9,13 @@ export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"
 local zshrc_dir="${zshrc_real:h}"
 
-# Load only the essential tmux and git-repos functions for the popup commands
+# Load environment variables and essential functions for the popup commands
+source "${zshrc_dir}/functions/env.zsh"
 source "${zshrc_dir}/functions/tmux.zsh"
 source "${zshrc_dir}/functions/git-repos.zsh"
+
+# Initialize environment loading (needed for notification hooks etc)
+env_init
 
 # Minimal prompt
 PROMPT='$ '
