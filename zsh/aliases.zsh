@@ -6,11 +6,6 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
-# Safety nets
-alias rm='rm -i'
-alias cp='cp -i'
-alias mv='mv -i'
-
 # Git shortcuts (minimal set)
 alias g='git'
 alias gs='git status'
@@ -29,16 +24,11 @@ alias ~='cd ~'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-alias grep='grep --color=auto'
+# alias grep='grep --color=auto' -- commenting due to claude using grep a lot 
 
 # Quick edits
 alias zshrc='$EDITOR ~/.zshrc'
-alias vimrc='$EDITOR ~/.config/nvim/init.lua'
 
 # Network and system info
 alias myip='curl -s ipinfo.io/ip'
 alias ports='netstat -tulanp'
-
-# Development shortcuts
-alias serve='python3 -m http.server'
-alias prettyjson='python3 -m json.tool'
