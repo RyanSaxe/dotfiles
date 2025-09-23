@@ -78,7 +78,7 @@ cache_csv() {
 # Finds all git repos and returns CSV data with last commit dates
 _to() {
   # Directories to search
-  search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic")
+  search_dirs=("$HOME/work" "$HOME/Work" "$HOME/projects" "$HOME/Projects" "$HOME/generic")
 
   # Date formatting for Linux/macOS compatibility
   if date -d @0 "+%Y" >/dev/null 2>&1; then

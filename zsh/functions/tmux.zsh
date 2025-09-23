@@ -12,12 +12,12 @@ alias tK="tmux kill-server"
 _tmux_attach_or_switch() {
   local target="$1"  # can be "session" or "session:window"
   if [[ -n "$TMUX" ]]; then
-    tmux switch-client -t "$target"
+    tmux switch-client -t "=$target"
   else
     # attach can't take a window directly, so select after attaching
     # or use switch-client after attach
-    tmux attach-session -t "${target%%:*}"
-    [[ "$target" == *:* ]] && tmux switch-client -t "$target"
+    tmux attach-session -t "=${target%%:*}"
+    [[ "$target" == *:* ]] && tmux switch-client -t "=$target"
   fi
 }
 
@@ -59,8 +59,13 @@ tm() {
     esac
   done
 
+  # Sanitize session name for tmux (allow only alnum, _ and -; replace others with -)
+  # This avoids issues with dots in names like "code-review.nvim"
+  session_name="${session_name//[^[:alnum:]_-]/-}"
+  [[ -z "$session_name" ]] && session_name="session"
+
   # Check if session already exists
-  if tmux has-session -t "$session_name" 2>/dev/null; then
+  if tmux has-session -t "=$session_name" 2>/dev/null; then
     echo "Session '$session_name' already exists. Attaching..."
     _tmux_attach_or_switch "$session_name"
     return
@@ -72,13 +77,13 @@ tm() {
   else
     tmux new-session -d -s "$session_name" -n "nvim"
   fi
-  tmux send-keys -t "$session_name:nvim" "nvim" Enter
+  tmux send-keys -t "=${session_name}:nvim" "nvim" Enter
 
   # Create second window (terminal)
   if [[ -n "$start_dir" ]]; then
-    tmux new-window -t "$session_name" -n "zsh" -c "$start_dir"
+    tmux new-window -t "=$session_name" -n "zsh" -c "$start_dir"
   else
-    tmux new-window -t "$session_name" -n "zsh"
+    tmux new-window -t "=$session_name" -n "zsh"
   fi
 
   # Track window names to prevent duplicates
@@ -109,18 +114,18 @@ tm() {
 
     # Create the window (respect start_dir if provided)
     if [[ -n "$start_dir" ]]; then
-      tmux new-window -t "$session_name" -n "$window_name" -c "$start_dir"
+      tmux new-window -t "=$session_name" -n "$window_name" -c "$start_dir"
     else
-      tmux new-window -t "$session_name" -n "$window_name"
+      tmux new-window -t "=$session_name" -n "$window_name"
     fi
 
     # Clear screen first for TUIs; short delay prevents formatting issues
-    tmux send-keys -t "$session_name:$window_name" "clear" Enter
+    tmux send-keys -t "=${session_name}:$window_name" "clear" Enter
     sleep 0.1
-    tmux send-keys -t "$session_name:$window_name" "$command_to_run" Enter
+    tmux send-keys -t "=${session_name}:$window_name" "$command_to_run" Enter
   done
 
-  tmux select-window -t "${session_name}:zsh"
+  tmux select-window -t "=${session_name}:zsh"
   echo "Session '$session_name' created successfully. Attaching..."
   _tmux_attach_or_switch "${session_name}:zsh"
 }
