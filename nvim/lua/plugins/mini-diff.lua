@@ -30,7 +30,7 @@ local function open_diff_overlay(base_branch, n)
 end
 
 return {
-  "echasnovski/mini.diff",
+  "nvim-mini/mini.diff",
   event = "VeryLazy",
   dependencies = { "folke/snacks.nvim" },
   keys = {
