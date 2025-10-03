@@ -14,3 +14,13 @@ vim.opt.signcolumn = "number"
 vim.opt.swapfile = false
 -- enable system clipboard integration
 vim.opt.clipboard = "unnamedplus"
+-- make split borders more visible with thicker characters
+vim.opt.fillchars = {
+  horiz = "━",
+  horizup = "┻",
+  horizdown = "┳",
+  vert = "┃",
+  vertleft = "┫",
+  vertright = "┣",
+  verthoriz = "╋",
+}

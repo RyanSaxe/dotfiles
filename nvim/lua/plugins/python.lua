@@ -19,9 +19,30 @@ return {
         init_options = {
           settings = {
             showSyntaxErrors = false,
-            lint = { enable = false }, -- linting comes from pyright. only use ruff for formatting.
+            lineLength = 120, -- set default line length to 120
+            lint = {
+              enable = true,
+              select = { "COM819" }, -- only enable COM819 rule to remove trailing commas
+            },
+            format = {
+              args = { "--line-length=120" }, -- ensure formatter also uses 120 character line length
+            },
           },
         },
+        -- Auto-fix COM819 (remove trailing commas) on save
+        -- Note: formatting and import organization is handled by conform.nvim
+        on_attach = function(client, bufnr)
+          vim.api.nvim_create_autocmd("BufWritePre", {
+            buffer = bufnr,
+            callback = function()
+              -- Run ruff's fixAll code action to apply COM819 fixes before formatting
+              vim.lsp.buf.code_action({
+                context = { only = { "source.fixAll" } },
+                apply = true,
+              })
+            end,
+          })
+        end,
       },
       basedpyright = {
         settings = {

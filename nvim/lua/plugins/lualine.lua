@@ -242,8 +242,8 @@ return {
         section_separators = { left = "", right = "" },
         refresh = { statusline = 120, winbar = 120, tabline = 300 },
         disabled_filetypes = {
-          statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard" },
-          winbar = { "dashboard", "alpha", "ministarter", "snacks_dashboard" },
+          statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler" },
+          winbar = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler" },
         },
       },
 
