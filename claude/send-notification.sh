@@ -154,4 +154,5 @@ else
 fi
 
 # Always play terminal bell as backup
-printf '\a'
+# Write directly to terminal device for better reliability across hook execution contexts
+tput bel > /dev/tty

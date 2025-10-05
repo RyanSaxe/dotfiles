@@ -20,7 +20,7 @@ keybind = global:cmd+g=toggle_quick_terminal
 keybind = cmd+r=reload_config
 keybind = cmd+o=open_config
 
-# generic styling 
+# generic styling
 
 font-size = 16
 theme = TokyoNight Night
