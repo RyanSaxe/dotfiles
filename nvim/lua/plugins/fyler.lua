@@ -31,7 +31,7 @@ return {
       "<leader>e",
       function()
         require("fyler").toggle({
-          kind = "split_left_most", -- (Optional) Use custom window layout
+          kind = "split_right_most", -- (Optional) Use custom window layout
         })
       end,
       desc = "Open Fyler Explorer (Split)",
