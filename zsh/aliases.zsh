@@ -32,3 +32,7 @@ alias zshrc='$EDITOR ~/.zshrc'
 # Network and system info
 alias myip='curl -s ipinfo.io/ip'
 alias ports='netstat -tulanp'
+
+# special local tools
+
+alias pptx='uvx --refresh --from ~/work/Reusable/ppt-generator ppt'

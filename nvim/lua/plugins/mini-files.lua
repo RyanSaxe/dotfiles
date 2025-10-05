@@ -1,4 +1,5 @@
 return {
+  -- enabled = false,
   "nvim-mini/mini.files",
   opts = {
     windows = {
@@ -13,7 +14,7 @@ return {
     },
     mappings = {
       go_in_plus = "<CR>",
-      synchronize = "w",
+      synchronize = "'",
     },
   },
 }

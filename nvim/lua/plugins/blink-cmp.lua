@@ -75,6 +75,20 @@ return {
         "snippet_forward",
         "fallback",
       },
+      -- Explicitly check for copilot suggestion and accept it
+      ["<S-Tab>"] = {
+        function(cmp)
+          -- First check if copilot suggestion is visible
+          if require("copilot.suggestion").is_visible() then
+            require("copilot.suggestion").accept()
+            return true -- stop processing
+          end
+          -- If no copilot suggestion, continue to next command
+          return false
+        end,
+        "snippet_backward",
+        "fallback",
+      },
 
       ["<Up>"] = { "select_prev", "fallback" },
       ["<Down>"] = { "select_next", "fallback" },

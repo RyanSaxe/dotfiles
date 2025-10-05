@@ -133,6 +133,10 @@ return {
       hl["SnacksDashboardTitle"] = { fg = Util.blend_bg(c.blue, 0.9) }
       hl["SnacksDashboardKey"] = { fg = "#FBE8B3" }
       hl["SnacksDashboardDesc"] = { fg = c.dark3 }
+      -- make split borders more visible with brighter colors
+      -- inactive splits use gray (matching tmux inactive pane borders)
+      hl["WinSeparator"] = { fg = c.fg_gutter }
+      hl["VertSplit"] = { fg = c.fg_gutter }
     end,
   },
 }
