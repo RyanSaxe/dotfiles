@@ -71,7 +71,7 @@ return {
 
     -- Ruff format configuration with line length 120
     opts.formatters.ruff_format = {
-      prepend_args = { "--line-length", "120" },
+      args = { "format", "--line-length", "120", "--stdin-filename", "$FILENAME", "-" },
     }
 
     -- isort configuration with line length 120 and black compatibility

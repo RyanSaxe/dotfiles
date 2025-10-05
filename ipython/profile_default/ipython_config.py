@@ -1,5 +1,6 @@
-import IPython
 from pygments.token import Token
+
+import IPython
 
 # get_config() is injected by IPython at startup
 c = get_config()
@@ -49,3 +50,4 @@ c.TerminalInteractiveShell.highlighting_style_overrides = {
     Token.Error: "bold #f7768e",
     Token.TB: "bold #f7768e",
 }
+
