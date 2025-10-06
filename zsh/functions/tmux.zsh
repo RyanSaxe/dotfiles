@@ -181,9 +181,10 @@ tc() {
     return $?
   fi
 
-  # Build fzf selection list
+  # Build fzf selection list (sorted with notifications first)
   local selection
   selection=$(echo "$claude_panes" \
+    | sort -t'|' -k4 -r \
     | while IFS='|' read -r location tty title bell pane_id; do
         format_claude_pane "$location" "$title" "$bell" "$pane_id"
       done \
