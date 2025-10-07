@@ -1,6 +1,19 @@
 # Tmux session management functions and aliases
 # Functions are loaded on-demand via autoload -Uz
 
+# Sanitize a string to be a valid tmux session name
+# tmux does not allow '.' or ':' in session names because:
+# - ':' separates session:window in target specifications
+# - '.' separates window.pane in target specifications
+# Usage: _sanitize_tmux_session_name "my.project:v2" → "my_project-v2"
+_sanitize_tmux_session_name() {
+  local name="$1"
+  # Replace '.' with '_' and ':' with '-'
+  name="${name//\./_}"
+  name="${name//:/-}"
+  print -r -- "$name"
+}
+
 # Basic tmux aliases
 alias ta="tmux attach"
 alias td="tmux detach"
@@ -30,7 +43,7 @@ tm() {
     ["pr"]="gh dash|PRs"
   )
 
-  local session_name="$(basename "$PWD")"
+  local session_name="$(_sanitize_tmux_session_name "$(basename "$PWD")")"
   local start_dir=""
   local commands=()
 
@@ -41,9 +54,9 @@ tm() {
         # If -n points to a directory, use it as the working dir and name the session after its basename.
         if [[ -d "$2" ]]; then
           start_dir="$(cd "$2" && pwd)"
-          session_name="$(basename "$start_dir")"
+          session_name="$(_sanitize_tmux_session_name "$(basename "$start_dir")")"
         else
-          session_name="$2"
+          session_name="$(_sanitize_tmux_session_name "$2")"
         fi
         shift 2
         ;;
