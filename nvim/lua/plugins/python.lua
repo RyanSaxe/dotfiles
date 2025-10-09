@@ -21,8 +21,8 @@ return {
             showSyntaxErrors = false,
             lineLength = 120, -- set default line length to 120
             lint = {
-              enable = true,
-              select = { "COM819" }, -- only enable COM819 rule to remove trailing commas
+              enable = false,
+              -- select = { "COM819" }, -- only enable COM819 rule to remove trailing commas
             },
             format = {
               args = { "--line-length=120" }, -- ensure formatter also uses 120 character line length

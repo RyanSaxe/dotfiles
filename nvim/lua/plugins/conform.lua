@@ -66,7 +66,7 @@ return {
 
     -- Black configuration with line length 120
     opts.formatters.black = {
-      prepend_args = { "--line-length", "120", "--skip-magic-trailing-comma" },
+      prepend_args = { "--line-length", "120" }, -- "--skip-magic-trailing-comma" },
     }
 
     -- Ruff format configuration with line length 120
