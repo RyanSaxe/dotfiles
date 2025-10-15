@@ -26,11 +26,6 @@ _auto_activate_venv() {
     if [[ "$VIRTUAL_ENV" != "$venv" ]]; then
       source "$venv/bin/activate"
     fi
-  else
-    # No venv found, deactivate if one is active
-    if [[ -n "$VIRTUAL_ENV" && "$(whence -w deactivate)" ]]; then
-      deactivate
-    fi
   fi
 }
 
