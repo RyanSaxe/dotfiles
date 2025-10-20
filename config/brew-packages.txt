@@ -24,4 +24,3 @@ ast-grep
 tldr
 dust
 git-split-diffs
-tree-sitter
