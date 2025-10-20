@@ -1,6 +1,6 @@
 return {
   -- TODO: explore this plugin.
-  enabled = false,
+  enabled = true,
   "rachartier/tiny-inline-diagnostic.nvim",
   event = "VeryLazy", -- Or `LspAttach`
   priority = 1000, -- needs to be loaded in first
