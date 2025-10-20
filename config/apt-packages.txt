@@ -22,3 +22,4 @@ imagemagick
 software-properties-common
 luarocks
 tldr
+tree-sitter

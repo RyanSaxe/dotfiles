@@ -308,6 +308,20 @@ main() {
     fi
   fi
 
+  # Install tree-sitter CLI via npm on Linux if not available via apt
+  # (on macOS it's installed via brew, on newer Ubuntu/Debian via apt)
+  if [[ "$PM" == "apt" ]] && ! command -v tree-sitter &>/dev/null; then
+    log "Installing tree-sitter CLI via npm (not available in apt)…"
+    sudo_if_needed npm install -g tree-sitter-cli || {
+      err "tree-sitter CLI install failed"
+      exit 1
+    }
+  else
+    if [[ "$PM" == "apt" ]] && command -v tree-sitter &>/dev/null; then
+      log "tree-sitter CLI already installed—skipping npm install"
+    fi
+  fi
+
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)
   if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &>/dev/null; then
     log "Installing git-split-diffs via npm…"
