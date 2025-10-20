@@ -28,7 +28,8 @@
     "command": "bash $HOME/.claude/statusline.sh",
     "padding": 0
   },
-  "alwaysThinkingEnabled": true,
+  "alwaysThinkingEnabled": false,
   "vimMode": true,
-  "autoUpdate": false
+  "autoUpdate": false,
+  "model": "opus"
 }

@@ -12,8 +12,8 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true, desc = "Terminal: g
 -- Swap ; and : for easier command access
 -- ; now enters command mode (was :)
 -- : now repeats last f/t/F/T search (was ;)
-vim.keymap.set({ "n", "v" }, ";", ":", { desc = "Enter command mode" })
-vim.keymap.set({ "n", "v" }, ":", ";", { desc = "Repeat last f/t/F/T search" })
+-- vim.keymap.set({ "n", "v" }, ";", ":", { desc = "Enter command mode" })
+-- vim.keymap.set({ "n", "v" }, ":", ";", { desc = "Repeat last f/t/F/T search" })
 
 -- TODO: set up full different set of git toggles
 -------------------------------------------------------------------------------

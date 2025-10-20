@@ -308,6 +308,18 @@ main() {
     fi
   fi
 
+  # Install tree-sitter CLI via npm for both macOS and Linux
+  # tree-sitter-cli provides the tree-sitter binary needed by Neovim plugins
+  if ! command -v tree-sitter &>/dev/null; then
+    log "Installing tree-sitter CLI via npm…"
+    sudo_if_needed npm install -g tree-sitter-cli || {
+      err "tree-sitter CLI install failed"
+      exit 1
+    }
+  else
+    log "tree-sitter CLI already installed—skipping re-install"
+  fi
+
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)
   if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &>/dev/null; then
     log "Installing git-split-diffs via npm…"

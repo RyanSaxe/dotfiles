@@ -19,6 +19,7 @@ return {
       -- c.bg = c.bg_dark
       -- c.bg_dark = old_bg
       c.bg_statusline = c.bg_dark1
+      c.bg_float = c.bg
       -- c.bg_float = old_bg
     end,
     on_highlights = function(hl, c)
