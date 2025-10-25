@@ -37,6 +37,6 @@ window-padding-y = 4
 window-padding-color = background
 window-padding-balance = true
 ## allow multiline for claude code
-keybind = shift+enter=text:\n
+keybind = shift+enter=text:\x1b\r
 ## shaders
 custom-shader = shaders/cursor_trail_tokyonight.glsl

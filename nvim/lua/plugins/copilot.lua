@@ -1,6 +1,3 @@
--- force copilot to use the current most up to date preview model
-vim.g.copilot_settings = { selectedCompletionModel = "gpt-4o-copilot-2025-04-03" }
-
 return {
   "zbirenbaum/copilot.lua",
   cmd = "Copilot",

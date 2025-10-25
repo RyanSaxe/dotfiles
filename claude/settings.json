@@ -1,4 +1,5 @@
 {
+  "model": "sonnet[1m]",
   "hooks": {
     "Notification": [
       {
@@ -28,8 +29,6 @@
     "command": "bash $HOME/.claude/statusline.sh",
     "padding": 0
   },
-  "alwaysThinkingEnabled": false,
-  "vimMode": true,
-  "autoUpdate": false,
-  "model": "opus"
+  "alwaysThinkingEnabled": true,
+  "vimMode": true
 }
