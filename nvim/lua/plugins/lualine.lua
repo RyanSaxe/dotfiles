@@ -117,6 +117,10 @@ return {
         return parts[1] .. " > .. > " .. parts[#parts - 1] .. " > " .. parts[#parts]
       end,
       cond = function()
+        -- Hide winbar for buffergolf practice and reference buffers
+        if vim.b.buffergolf_practice or vim.b.buffergolf_reference then
+          return false
+        end
         local navic = require("nvim-navic")
         -- only show on small screens (mobile/narrow terminals)
         return navic.is_available() and vim.o.columns < 120
@@ -157,12 +161,20 @@ return {
         removed = icons.git.removed or "-",
       },
       source = diff_source,
+      cond = function()
+        -- Hide winbar for buffergolf practice and reference buffers
+        return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
+      end,
       color = { fg = C.fg, bg = C.bg },
     }
     -- always-render filler so the winbar exists even if both sides are empty
     local winbar_filler = {
       function()
         return " "
+      end,
+      cond = function()
+        -- Hide winbar for buffergolf practice and reference buffers
+        return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
       end,
       color = { fg = C.bg, bg = C.bg },
     }
@@ -242,8 +254,8 @@ return {
         section_separators = { left = "", right = "" },
         refresh = { statusline = 120, winbar = 120, tabline = 300 },
         disabled_filetypes = {
-          statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler" },
-          winbar = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler" },
+          statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler", "BuffergolfStats" },
+          winbar = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler", "BuffergolfStats" },
         },
       },
 

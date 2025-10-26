@@ -1,7 +1,7 @@
 return {
   {
     -- "ryansaxe/keymash.nvim",
-    dir = "~/Projects/neovim/buffergolf.nvim",
+    dir = "~/projects/buffergolf.nvim",
     opts = {
       -- your override options here
     },
