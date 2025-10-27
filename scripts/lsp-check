@@ -1,0 +1,427 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Single-run LSP diagnostic collector (one headless Neovim), JSON + pretty stdout.
+# Finishes when no diagnostic updates have occurred for QUIET_MS after an initial WAIT,
+# or when TIMEOUT is reached. Tracks updates via both vim.diagnostic.set and on_publish.
+
+JSON_OUT="lsp_diagnostics.json"
+PRINT_STDOUT=1
+VERBOSE=0
+TIMEOUT=30    # hard cap (seconds)
+WAIT=1        # minimum settle time (seconds)
+QUIET_MS=1000 # silence window (milliseconds)
+MAX_FILES=200
+TARGETS=()
+
+# ---------- flags ----------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --json-out)
+    JSON_OUT="$2"
+    shift 2
+    ;;
+  --no-stdout)
+    PRINT_STDOUT=0
+    shift
+    ;;
+  --verbose)
+    VERBOSE=1
+    shift
+    ;;
+  --timeout)
+    TIMEOUT="$2"
+    shift 2
+    ;;
+  --wait)
+    WAIT="$2"
+    shift 2
+    ;;
+  --quiet-ms)
+    QUIET_MS="$2"
+    shift 2
+    ;;
+  --max-files)
+    MAX_FILES="$2"
+    shift 2
+    ;;
+  -h | --help)
+    cat <<'H'
+lsp-check — single-run LSP diagnostics via Neovim (quiet-window strategy)
+
+USAGE:
+  lsp-check [TARGET ...]
+            [--json-out PATH] [--no-stdout] [--verbose]
+            [--timeout SECS] [--wait SECS] [--quiet-ms MS]
+            [--max-files N]
+
+BEHAVIOR:
+  • Gathers files (common source extensions).
+  • Errors if files span multiple Git roots.
+  • Errors if file count > N (default 200).
+  • Runs a single headless Neovim and opens all files (argv).
+  • Enforces a minimum settle time (--wait, default 1s).
+  • Then waits until there have been NO diagnostic updates for --quiet-ms
+    (default 1000ms), or until --timeout (default 30s) is reached.
+  • Writes JSON (default lsp_diagnostics.json) and pretty-prints.
+
+EXAMPLES:
+  lsp-check .
+  lsp-check wt_ml/layers --verbose
+  lsp-check "src/**" --timeout 45 --wait 5 --quiet-ms 3000
+H
+    exit 0
+    ;;
+  --*)
+    echo "Unknown option: $1" >&2
+    exit 2
+    ;;
+  *)
+    TARGETS+=("$1")
+    shift
+    ;;
+  esac
+done
+[[ ${#TARGETS[@]} -gt 0 ]] || TARGETS+=(.)
+
+# sanity for numeric flags
+[[ "$TIMEOUT" =~ ^[0-9]+$ ]] || {
+  echo "--timeout must be integer seconds"
+  exit 2
+}
+[[ "$WAIT" =~ ^[0-9]+$ ]] || {
+  echo "--wait must be integer seconds"
+  exit 2
+}
+[[ "$QUIET_MS" =~ ^[0-9]+$ ]] || {
+  echo "--quiet-ms must be integer milliseconds"
+  exit 2
+}
+[[ "$MAX_FILES" =~ ^[0-9]+$ ]] || {
+  echo "--max-files must be integer count"
+  exit 2
+}
+
+# ---------- helpers ----------
+abs_path() {
+  local d b
+  d="$(cd "$(dirname "$1")" && pwd -P)"
+  b="$(basename "$1")"
+  printf '%s\n' "$d/$b"
+}
+
+git_root_of() {
+  local d r
+  d="$(dirname "$1")"
+  if r="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)"; then
+    printf '%s\n' "$r"
+  else
+    printf '%s\n' "$(cd "$d" && pwd -P)"
+  fi
+}
+
+# ---------- collect files ----------
+workdir="$(mktemp -d -t lspcheck.XXXXXX)"
+trap 'rm -rf "$workdir"' EXIT
+files_list="$workdir/files.list"
+: >"$files_list"
+
+add_dir() {
+  local d="$1"
+  find "$d" \
+    -path "*/.git" -prune -o \
+    -path "*/node_modules" -prune -o \
+    -path "*/__pycache__" -prune -o \
+    -type f \( \
+    -name "*.lua" -o -name "*.py" -o -name "*.pyi" -o -name "*.js" -o -name "*.ts" -o \
+    -name "*.jsx" -o -name "*.tsx" -o -name "*.rs" -o -name "*.go" -o \
+    -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.java" -o \
+    -name "*.cs" -o -name "*.rb" -o -name "*.php" -o -name "*.swift" -o \
+    -name "*.kt" -o -name "*.scala" -o -name "*.R" -o -name "*.r" -o \
+    -name "*.jl" -o -name "*.hs" -o -name "*.ml" -o -name "*.ex" -o \
+    -name "*.exs" -o -name "*.clj" -o -name "*.vim" -o -name "*.sh" \
+    \) -print >>"$files_list"
+}
+
+for t in "${TARGETS[@]}"; do
+  if [[ -d "$t" ]]; then
+    add_dir "$t"
+  elif [[ -f "$t" ]]; then
+    printf '%s\n' "$t" >>"$files_list"
+  else
+    shopt -s nullglob
+    matches=($t)
+    shopt -u nullglob
+    for f in "${matches[@]}"; do
+      [[ -f "$f" ]] && printf '%s\n' "$f" >>"$files_list"
+    done
+  fi
+done
+
+sort -u "$files_list" -o "$files_list"
+
+FILE_COUNT=$(wc -l <"$files_list" | tr -d ' ')
+((FILE_COUNT > 0)) || {
+  echo "No files found." >&2
+  exit 1
+}
+if ((FILE_COUNT > MAX_FILES)); then
+  echo "Too many files ($FILE_COUNT). Use --max-files to raise the cap (current: $MAX_FILES)." >&2
+  exit 1
+fi
+
+# ---------- single git root guard ----------
+roots_tmp="$workdir/roots.txt"
+: >"$roots_tmp"
+while IFS= read -r f; do git_root_of "$(abs_path "$f")"; done <"$files_list" | sort -u >"$roots_tmp"
+if (($(wc -l <"$roots_tmp") != 1)); then
+  echo "Multiple roots detected; please run per root." >&2
+  echo "Roots:" >&2
+  cat "$roots_tmp" >&2
+  exit 1
+fi
+ROOT="$(head -n1 "$roots_tmp")"
+
+# ---------- JSON_OUT absolute path ----------
+JSON_OUT_ABS="$(abs_path "$JSON_OUT")"
+mkdir -p "$(dirname "$JSON_OUT_ABS")"
+
+# ---------- Lua payload ----------
+lua_file="$workdir/lsp_check_internal.lua"
+cat >"$lua_file" <<'LUASCRIPT'
+vim.defer_fn(function()
+  local timeout  = tonumber(vim.g.lsp_timeout) or 30   -- seconds (hard cap)
+  local waitmin  = tonumber(vim.g.lsp_wait) or 1       -- seconds (minimum settle)
+  local quiet_ms = tonumber(vim.g.lsp_quiet_ms) or 1000
+  local json_out = vim.g.lsp_json_out
+  local verbose  = tonumber(vim.g.lsp_verbose) == 1
+  local root     = vim.g.lsp_root or ""
+
+  if root ~= "" then pcall(vim.cmd, "silent! cd " .. vim.fn.fnameescape(root)) end
+
+  -- Collect argv files
+  local files = {}
+  for _, arg in ipairs(vim.fn.argv()) do
+    if vim.fn.filereadable(arg) == 1 then table.insert(files, arg) end
+  end
+  if #files == 0 then
+    print("[INFO] No valid files to check\n")
+    vim.cmd("qa!"); return
+  end
+
+  -- Open all to trigger LSP
+  for _, file in ipairs(files) do
+    vim.cmd("edit " .. vim.fn.fnameescape(file))
+  end
+
+  -- === quiet-window tracking: record ANY diagnostic update ===
+  local function now_ms() return vim.loop.hrtime() / 1e6 end
+  local last_any_update_ms = nil
+
+  -- wrap diagnostic.set (pull path & many internal updates)
+  local orig_diag_set = vim.diagnostic.set
+  vim.diagnostic.set = function(namespace, bufnr, diags, opts)
+    last_any_update_ms = now_ms()
+    return orig_diag_set(namespace, bufnr, diags, opts)
+  end
+
+  -- also wrap on_publish (legacy push path)
+  local orig_on_publish = vim.diagnostic.on_publish
+  vim.diagnostic.on_publish = function(ns, bufnr, diags, opts)
+    last_any_update_ms = now_ms()
+    return orig_on_publish(ns, bufnr, diags, opts)
+  end
+
+  local function collect_json()
+    local result = {
+      generated = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+      files_checked = #files,
+      files = vim.empty_dict(),
+      summary = { total=0, errors=0, warnings=0, info=0, hints=0 },
+    }
+    local sevmap = {
+      [vim.diagnostic.severity.ERROR]="ERROR",
+      [vim.diagnostic.severity.WARN]="WARN",
+      [vim.diagnostic.severity.INFO]="INFO",
+      [vim.diagnostic.severity.HINT]="HINT",
+    }
+
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_is_loaded(buf) then
+        local name = vim.api.nvim_buf_get_name(buf)
+        if name ~= "" then
+          local diags = vim.diagnostic.get(buf)
+          if #diags > 0 then
+            local short = vim.fn.fnamemodify(name, ":.")
+            table.sort(diags, function(a, b)
+              if (a.lnum or 0) ~= (b.lnum or 0) then return (a.lnum or 0) < (b.lnum or 0) end
+              return (a.col or 0) < (b.col or 0)
+            end)
+            local items = {}
+            for _, d in ipairs(diags) do
+              local sev = sevmap[d.severity] or "UNKNOWN"
+              table.insert(items, {
+                line=(d.lnum or 0)+1,
+                col=(d.col or 0)+1,
+                severity=sev,
+                source=d.source or "lsp",
+                code=d.code,
+                message=d.message or ""
+              })
+              result.summary.total = result.summary.total + 1
+              if d.severity == vim.diagnostic.severity.ERROR   then result.summary.errors   = result.summary.errors + 1
+              elseif d.severity == vim.diagnostic.severity.WARN then result.summary.warnings = result.summary.warnings + 1
+              elseif d.severity == vim.diagnostic.severity.INFO then result.summary.info     = result.summary.info + 1
+              elseif d.severity == vim.diagnostic.severity.HINT then result.summary.hints    = result.summary.hints + 1 end
+            end
+            result.files[short] = items
+          end
+        end
+      end
+    end
+
+    local ok, fh = pcall(io.open, json_out, "w")
+    if not ok or not fh then
+      io.stderr:write("[ERROR] write json failed: " .. tostring(json_out) .. "\n")
+      -- restore hooks before error-quit
+      vim.diagnostic.set = orig_diag_set
+      vim.diagnostic.on_publish = orig_on_publish
+      vim.cmd("cq 1"); return
+    end
+    local enc = vim.json and vim.json.encode or vim.fn.json_encode
+    fh:write(enc(result)); fh:close()
+
+    print(string.format("[DONE] files=%d total=%d\n", result.files_checked, result.summary.total))
+    -- restore hooks before exiting
+    vim.diagnostic.set = orig_diag_set
+    vim.diagnostic.on_publish = orig_on_publish
+    vim.cmd("qa!")
+  end
+
+  -- Timing: min wait, then quiet window, all under a hard cap.
+  local first_wait = math.min(waitmin, timeout)
+  if first_wait > 0 then
+    if verbose then print(string.format("[WAIT] Minimum settle time: %ds\n", first_wait)) end
+    vim.wait(first_wait * 1000)
+  end
+
+  local remaining_ms = math.max(0, (timeout - first_wait) * 1000)
+  if verbose then
+    print(string.format("[MONITOR] Starting diagnostic collection (timeout: %.1fs, quiet window: %dms)\n", remaining_ms/1000, quiet_ms))
+  end
+
+  -- Progress tracking for verbose mode
+  local last_progress_ms = now_ms()
+  local last_diag_count = 0
+  local progress_interval_ms = 1000  -- Print progress every 1 second, not every 100ms
+  local start_monitor_ms = now_ms()
+  local waiting_for_first = true
+
+  if remaining_ms > 0 then
+    vim.wait(remaining_ms, function()
+      -- Only succeed if we've seen at least one diagnostics update,
+      -- AND the time since that update exceeds quiet_ms.
+      local current_ms = now_ms()
+      local elapsed_total = (current_ms - start_monitor_ms) / 1000  -- seconds
+
+      if not last_any_update_ms then
+        -- Only print "waiting for first update" once per second, not every 100ms
+        if verbose and (current_ms - last_progress_ms) >= progress_interval_ms then
+          print(string.format("[%.1fs] Waiting for LSP to start...\n", elapsed_total))
+          last_progress_ms = current_ms
+        end
+        return false
+      end
+
+      local silent_for = current_ms - last_any_update_ms
+
+      -- Count current diagnostics
+      local count = 0
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf) then
+          count = count + #vim.diagnostic.get(buf)
+        end
+      end
+
+      -- Only print verbose progress at intervals OR when diagnostic count changes
+      if verbose then
+        local should_print = false
+        local message = ""
+
+        -- Check if we should print based on time or change
+        if waiting_for_first and last_any_update_ms then
+          -- First diagnostics received!
+          print(string.format("[%.1fs] LSP started! First diagnostics received.\n", elapsed_total))
+          waiting_for_first = false
+          last_progress_ms = current_ms
+          last_diag_count = count
+        elseif count ~= last_diag_count then
+          -- Diagnostic count changed
+          local change = count - last_diag_count
+          local change_str = change > 0 and string.format("+%d", change) or tostring(change)
+          message = string.format("[%.1fs] Diagnostics: %d (%s) | Silent: %.1fs\n",
+            elapsed_total, count, change_str, silent_for/1000)
+          should_print = true
+          last_diag_count = count
+          last_progress_ms = current_ms
+        elseif (current_ms - last_progress_ms) >= progress_interval_ms then
+          -- Regular interval update
+          message = string.format("[%.1fs] Diagnostics: %d | Silent: %.1fs\n",
+            elapsed_total, count, silent_for/1000)
+          should_print = true
+          last_progress_ms = current_ms
+        end
+
+        if should_print and message ~= "" then
+          print(message)
+        end
+      end
+
+      return silent_for >= quiet_ms
+    end, 100)
+  end
+
+  collect_json()
+end, 2000)  -- small startup delay for lazy-loading
+LUASCRIPT
+
+# ---------- run Neovim ----------
+echo "Checking $FILE_COUNT files (wait: ${WAIT}s, timeout: ${TIMEOUT}s, quiet: ${QUIET_MS}ms)..."
+
+xargs -n 999999 nvim --headless \
+  +"let g:lsp_timeout = $TIMEOUT" \
+  +"let g:lsp_wait = $WAIT" \
+  +"let g:lsp_quiet_ms = $QUIET_MS" \
+  +"let g:lsp_verbose = $VERBOSE" \
+  +"let g:lsp_root = '$ROOT'" \
+  +"let g:lsp_json_out = '$JSON_OUT_ABS'" \
+  +"source $lua_file" \
+  <"$files_list"
+
+# ---------- pretty stdout ----------
+if ((PRINT_STDOUT)); then
+  if command -v jq >/dev/null 2>&1; then
+    echo
+    echo "LSP Diagnostic Report"
+    echo "Generated: $(jq -r '.generated' "$JSON_OUT_ABS")"
+    echo "Files:     $(jq -r '.files_checked // .summary.files_checked // 0' "$JSON_OUT_ABS")"
+    jq -r '
+      .summary as $s
+      | "Totals:  \($s.total)  (Errors: \($s.errors), Warnings: \($s.warnings), Info: \($s.info), Hints: \($s.hints))"
+    ' "$JSON_OUT_ABS"
+    echo
+    echo "Top files with issues:"
+    jq -r '
+      (.files // {}) | to_entries
+      | map({k: .key, c: (.value|length)})
+      | sort_by(-.c)[:10]
+      | .[] | "  \(.k): \(.c)"
+    ' "$JSON_OUT_ABS"
+    echo
+  else
+    echo
+    echo "(Install jq for pretty output.)"
+  fi
+fi
+
+echo "JSON saved to: $JSON_OUT_ABS"

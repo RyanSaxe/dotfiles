@@ -24,7 +24,10 @@ alias ~='cd ~'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-# alias grep='grep --color=auto' -- commenting due to claude using grep a lot 
+# alias grep='grep --color=auto' -- commenting due to claude using grep a lot
+
+# Development tools
+alias lsp-check='~/generic/dotfiles/scripts/lsp-check'
 
 # Quick edits
 alias zshrc='$EDITOR ~/.zshrc'
