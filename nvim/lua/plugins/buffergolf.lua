@@ -1,26 +1,56 @@
 return {
   {
-    -- "ryansaxe/keymash.nvim",
+    -- "ryansaxe/buffergolf.nvim",
     dir = "~/projects/buffergolf.nvim",
+    dependencies = { "nvim-mini/mini.diff" },
     opts = {
-      -- your override options here
+      -- Auto-detect and disable conflicting plugins (including Copilot)
+      disabled_plugins = "auto",
+
+      -- Automatic deindentation for consistent practice
+      auto_dedent = true,
+
+      -- Keymaps configuration
+      keymaps = {
+        toggle = "<leader>bg",
+        countdown = "<leader>bG",
+        golf = {
+          next_hunk = "]h",
+          prev_hunk = "[h",
+          first_hunk = "[H",
+          last_hunk = "]H",
+        },
+      },
+
+      -- Window positioning
+      windows = {
+        reference = {
+          position = "right", -- right side split for reference text
+          size = 50, -- 50 columns wide
+        },
+        stats = {
+          position = "bottom", -- stats window at the top
+          height = 3,
+        },
+      },
+
+      -- Mode-specific overrides
+      typing_mode = {
+        disabled_plugins = {
+          _inherit = true, -- inherit global disabled_plugins
+          matchparen = true, -- disable match parens in typing mode
+          treesitter_context = true, -- disable context in typing mode
+        },
+      },
+      golf_mode = {
+        disabled_plugins = {
+          _inherit = true,
+          matchparen = false, -- keep match parens enabled in golf mode
+        },
+      },
     },
     config = function(_, opts)
       require("buffergolf").setup(opts)
-
-      local group = vim.api.nvim_create_augroup("BufferGolfCopilotMute", { clear = true })
-      vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
-        group = group,
-        callback = function(event)
-          local buf = event.buf
-          local ok, is_practice = pcall(vim.api.nvim_buf_get_var, buf, "buffergolf_practice")
-          if ok and is_practice then
-            vim.b[buf].copilot_enabled = false
-          else
-            pcall(vim.api.nvim_buf_del_var, buf, "copilot_enabled")
-          end
-        end,
-      })
     end,
   },
 }

@@ -8,9 +8,12 @@ set -Eeuo pipefail
 JSON_OUT="lsp_diagnostics.json"
 PRINT_STDOUT=1
 VERBOSE=0
-TIMEOUT=30    # hard cap (seconds)
-WAIT=1        # minimum settle time (seconds)
-QUIET_MS=1000 # silence window (milliseconds)
+DETAILED=0             # detailed output with all diagnostics
+MIN_SEVERITY=""        # filter: minimum severity threshold (ERROR|WARN|INFO|HINT)
+FILTER_SOURCE=""       # filter: specific LSP source name
+TIMEOUT=30             # hard cap (seconds)
+WAIT=1                 # minimum settle time (seconds)
+QUIET_MS=1000          # silence window (milliseconds)
 MAX_FILES=200
 TARGETS=()
 
@@ -45,6 +48,18 @@ while [[ $# -gt 0 ]]; do
     MAX_FILES="$2"
     shift 2
     ;;
+  --detailed)
+    DETAILED=1
+    shift
+    ;;
+  --min-severity)
+    MIN_SEVERITY="$2"
+    shift 2
+    ;;
+  --source)
+    FILTER_SOURCE="$2"
+    shift 2
+    ;;
   -h | --help)
     cat <<'H'
 lsp-check — single-run LSP diagnostics via Neovim (quiet-window strategy)
@@ -54,6 +69,7 @@ USAGE:
             [--json-out PATH] [--no-stdout] [--verbose]
             [--timeout SECS] [--wait SECS] [--quiet-ms MS]
             [--max-files N]
+            [--detailed] [--min-severity LEVEL] [--source NAME]
 
 BEHAVIOR:
   • Gathers files (common source extensions).
@@ -65,10 +81,20 @@ BEHAVIOR:
     (default 1000ms), or until --timeout (default 30s) is reached.
   • Writes JSON (default lsp_diagnostics.json) and pretty-prints.
 
+OUTPUT OPTIONS:
+  --detailed           Show all diagnostics in detailed format (file-by-file)
+  --min-severity LEVEL Filter to show only diagnostics at or above severity
+                       level: ERROR > WARN > INFO > HINT (e.g., WARN shows
+                       warnings and errors)
+  --source NAME        Filter to show only diagnostics from specific LSP source
+                       (e.g., "pyright", "typescript-language-server")
+
 EXAMPLES:
   lsp-check .
   lsp-check wt_ml/layers --verbose
   lsp-check "src/**" --timeout 45 --wait 5 --quiet-ms 3000
+  lsp-check . --detailed --min-severity WARN
+  lsp-check . --detailed --source pyright
 H
     exit 0
     ;;
@@ -101,6 +127,16 @@ done
   echo "--max-files must be integer count"
   exit 2
 }
+# Validate --min-severity if provided
+if [[ -n "$MIN_SEVERITY" ]]; then
+  case "$MIN_SEVERITY" in
+  ERROR | WARN | INFO | HINT) ;;
+  *)
+    echo "--min-severity must be one of: ERROR, WARN, INFO, HINT"
+    exit 2
+    ;;
+  esac
+fi
 
 # ---------- helpers ----------
 abs_path() {
@@ -412,18 +448,115 @@ xargs -n 999999 nvim --headless \
 # ---------- pretty stdout ----------
 if ((PRINT_STDOUT)); then
   if command -v jq >/dev/null 2>&1; then
-    # Optimized: Single jq invocation instead of 4 (4x fewer file reads)
-    jq -r '
-      "\n",
-      "LSP Diagnostic Report",
-      "Generated: \(.generated)",
-      "Files:     \(.files_checked // .summary.files_checked // 0)",
-      (.summary as $s | "Totals:    \($s.total)  (Errors: \($s.errors), Warnings: \($s.warnings), Info: \($s.info), Hints: \($s.hints))"),
-      "",
-      "Top files with issues:",
-      ((.files // {}) | to_entries | map({k: .key, c: (.value|length)}) | sort_by(-.c)[:10] | .[] | "  \(.k): \(.c)"),
-      ""
-    ' "$JSON_OUT_ABS"
+    if ((DETAILED)); then
+      # Detailed output with filtering
+      # ANSI color codes (using printf to generate actual escape sequences)
+      RED=$(printf '\033[0;31m')
+      YELLOW=$(printf '\033[0;33m')
+      BLUE=$(printf '\033[0;34m')
+      GRAY=$(printf '\033[0;90m')
+      RESET=$(printf '\033[0m')
+      BOLD=$(printf '\033[1m')
+
+      # Build jq filter arguments
+      JQ_ARGS=(
+        --arg min_severity "$MIN_SEVERITY"
+        --arg filter_source "$FILTER_SOURCE"
+        --arg red "$RED"
+        --arg yellow "$YELLOW"
+        --arg blue "$BLUE"
+        --arg gray "$GRAY"
+        --arg reset "$RESET"
+        --arg bold "$BOLD"
+      )
+
+      jq -r "${JQ_ARGS[@]}" '
+        # Left-justify string to specified width
+        def ljust(width):
+          . + (" " * (width - length));
+
+        # Define severity ordering (lower number = more severe)
+        def severity_level:
+          if . == "ERROR" then 0
+          elif . == "WARN" then 1
+          elif . == "INFO" then 2
+          elif . == "HINT" then 3
+          else 999 end;
+
+        # Get minimum severity level from arg
+        def min_severity_level:
+          if $min_severity == "" then 999
+          else ($min_severity | severity_level) end;
+
+        # Filter diagnostics by severity and source
+        def filter_diagnostic:
+          ((.severity | severity_level) <= min_severity_level) and
+          (if $filter_source == "" then true else .source == $filter_source end);
+
+        # Color for severity
+        def severity_color:
+          if . == "ERROR" then $red
+          elif . == "WARN" then $yellow
+          elif . == "INFO" then $blue
+          elif . == "HINT" then $gray
+          else "" end;
+
+        # Format diagnostic line
+        def format_diagnostic:
+          "\((.severity | severity_color))\(.severity | ljust(7))\($reset)  [\(.line), \(.col)]  \(if .code then "\(.code) " else "" end)(\(.source))\n  \(.message)";
+
+        # Filter and collect diagnostics
+        .files as $all_files |
+        ($all_files | to_entries | map({
+          key: .key,
+          value: (.value | map(select(filter_diagnostic)))
+        }) | map(select(.value | length > 0)) | from_entries) as $filtered_files |
+
+        # Calculate filtered summary
+        ($filtered_files | [.[] | .[]] | {
+          total: length,
+          errors: map(select(.severity == "ERROR")) | length,
+          warnings: map(select(.severity == "WARN")) | length,
+          info: map(select(.severity == "INFO")) | length,
+          hints: map(select(.severity == "HINT")) | length
+        }) as $filtered_summary |
+
+        # Print header
+        "\n\($bold)LSP Diagnostic Report (Detailed)\($reset)",
+        "Generated: \(.generated)",
+        "Files:     \(.files_checked)",
+        (if $min_severity != "" or $filter_source != "" then
+          "Filters:   \(if $min_severity != "" then "min-severity=\($min_severity)" else "" end)\(if $min_severity != "" and $filter_source != "" then ", " else "" end)\(if $filter_source != "" then "source=\($filter_source)" else "" end)"
+        else empty end),
+        "Totals:    \($filtered_summary.total)  (Errors: \($filtered_summary.errors), Warnings: \($filtered_summary.warnings), Info: \($filtered_summary.info), Hints: \($filtered_summary.hints))",
+        "",
+
+        # Print diagnostics for each file
+        (if ($filtered_summary.total > 0) then
+          ($filtered_files | to_entries | sort_by(.key) | .[] |
+            "\($bold)\(.key)\($reset)",
+            "────────────────────────────────────────",
+            (.value | .[] | format_diagnostic),
+            ""
+          )
+        else
+          "No diagnostics match the specified filters."
+        end)
+      ' "$JSON_OUT_ABS"
+    else
+      # Summary output (original behavior)
+      jq -r '
+        "\n",
+        "LSP Diagnostic Report",
+        "Generated: \(.generated)",
+        "Files:     \(.files_checked // .summary.files_checked // 0)",
+        (.summary as $s | "Totals:    \($s.total)  (Errors: \($s.errors), Warnings: \($s.warnings), Info: \($s.info), Hints: \($s.hints))"),
+        "",
+        "Top files with issues:",
+        ((.files // {}) | to_entries | map({k: .key, c: (.value|length)}) | sort_by(-.c)[:10] | .[] | "  \(.k): \(.c)"),
+        ""
+      ' "$JSON_OUT_ABS"
+    fi
   else
     echo
     echo "(Install jq for pretty output.)"
