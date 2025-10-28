@@ -140,19 +140,12 @@ fi
 
 # ---------- helpers ----------
 abs_path() {
-  # Optimized: Use realpath if available (much faster, no subprocess spawning)
-  # Falls back to traditional method only if realpath isn't available
-  if command -v realpath >/dev/null 2>&1; then
-    realpath "$1"
-  elif command -v readlink >/dev/null 2>&1 && readlink -f /dev/null >/dev/null 2>&1; then
-    readlink -f "$1"
-  else
-    # Fallback to original method if neither tool is available
-    local d b
-    d="$(cd "$(dirname "$1")" && pwd -P)"
-    b="$(basename "$1")"
-    printf '%s\n' "$d/$b"
-  fi
+  # For files that don't exist yet, construct absolute path from directory + basename
+  # This works for both existing and non-existing files
+  local d b
+  d="$(cd "$(dirname "$1")" 2>/dev/null && pwd -P || pwd -P)"
+  b="$(basename "$1")"
+  printf '%s\n' "$d/$b"
 }
 
 git_root_of() {

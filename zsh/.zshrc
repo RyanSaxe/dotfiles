@@ -135,7 +135,8 @@ venv_init
 . "$HOME/.local/bin/env"
 export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 
-
+# Path to lazy.nvim for neovim plugin development testing
+export LAZY_PATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
 
 # Command to manually load full environment if needed from minimal shell
 zsh-full() {
