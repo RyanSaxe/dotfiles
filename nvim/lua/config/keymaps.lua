@@ -90,9 +90,9 @@ end
 
 vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
 
--- Generic dependency picker for multiple languages (Python, JS, Neovim plugins, Go, Rust)
--- See nvim/lua/config/dependency-picker.lua for implementation details
-local dep_picker = require("config.dependency-picker")
+-- Generic dependency picker for multiple languages (Neovim, JS/TS, Python, Go, Rust, Ruby, Lua)
+-- See nvim/lua/dependency-picker/ for implementation details
+local dep_picker = require("dependency-picker")
 
 -- LEADER KEYBINDINGS (global, with language selection)
 -- Grep mode
@@ -105,7 +105,7 @@ end, {
 })
 
 vim.keymap.set("n", "<leader>pS", function()
-  dep_picker.manual_grep("grep")
+  dep_picker.manual_search("grep")
 end, {
   noremap = true,
   silent = true,
@@ -122,7 +122,7 @@ end, {
 })
 
 vim.keymap.set("n", "<leader>pF", function()
-  dep_picker.manual_grep("files")
+  dep_picker.manual_search("files")
 end, {
   noremap = true,
   silent = true,
