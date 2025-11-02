@@ -138,8 +138,9 @@ function M.resolve_directory(root, crate_name)
 
     if type == "directory" then
       -- Match versioned crates: cratename-X.Y.Z
+      -- Pattern must end with version numbers to avoid matching metadata dirs
       -- Use vim.pesc to escape special pattern characters in crate_name
-      if name:match("^" .. vim.pesc(crate_name) .. "%-[%d%.]") then
+      if name:match("^" .. vim.pesc(crate_name) .. "%-[%d%.]+$") then
         table.insert(matches, name)
       end
     end

@@ -263,7 +263,8 @@ function M.resolve_package_dir(root, package_name, resolve_fn)
 
       if type == "directory" then
         -- Go format: packagename@vX.Y.Z
-        if name:match("^" .. vim.pesc(pkg_base) .. "@v[%d%.]") then
+        -- Pattern must end with version numbers to avoid matching metadata dirs
+        if name:match("^" .. vim.pesc(pkg_base) .. "@v[%d%.]+$") then
           table.insert(matches, parent_path .. "/" .. name)
         end
       end
@@ -292,7 +293,8 @@ function M.resolve_package_dir(root, package_name, resolve_fn)
 
     if type == "directory" then
       -- Versioned format: packagename-X.Y.Z (Ruby/Rust)
-      if name:match("^" .. vim.pesc(package_name) .. "%-[%d%.]") then
+      -- Pattern must end with version numbers to avoid matching metadata dirs like "pandas-2.3.3.dist-info"
+      if name:match("^" .. vim.pesc(package_name) .. "%-[%d%.]+$") then
         table.insert(matches, name)
       -- Exact match: packagename (JavaScript/Python)
       elseif name == package_name then

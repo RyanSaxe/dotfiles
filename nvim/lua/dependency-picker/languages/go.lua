@@ -173,8 +173,9 @@ function M.resolve_directory(root, module_name)
 
       if type == "directory" then
         -- Match Go modules: modulename@vX.Y.Z
+        -- Pattern must end with version numbers to avoid matching metadata dirs
         -- Use vim.pesc to escape special pattern characters in module_base
-        if name:match("^" .. vim.pesc(module_base) .. "@v[%d%.]") then
+        if name:match("^" .. vim.pesc(module_base) .. "@v[%d%.]+$") then
           table.insert(matches, parent_path .. "/" .. name)
         end
       end
@@ -203,8 +204,9 @@ function M.resolve_directory(root, module_name)
 
     if type == "directory" then
       -- Match Go modules: modulename@vX.Y.Z
+      -- Pattern must end with version numbers to avoid matching metadata dirs
       -- Use vim.pesc to escape special pattern characters in module_name
-      if name:match("^" .. vim.pesc(module_name) .. "@v[%d%.]") then
+      if name:match("^" .. vim.pesc(module_name) .. "@v[%d%.]+$") then
         table.insert(matches, name)
       end
     end

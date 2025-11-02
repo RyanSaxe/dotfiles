@@ -172,8 +172,9 @@ function M.resolve_directory(root, gem_name)
 
     if type == "directory" then
       -- Match versioned gems: gemname-X.Y.Z
+      -- Pattern must end with version numbers to avoid matching metadata dirs
       -- Use vim.pesc to escape special pattern characters in gem_name
-      if name:match("^" .. vim.pesc(gem_name) .. "%-[%d%.]") then
+      if name:match("^" .. vim.pesc(gem_name) .. "%-[%d%.]+$") then
         table.insert(matches, name)
       end
     end
