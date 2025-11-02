@@ -70,7 +70,20 @@ local function show_package_picker(lang_name, root, packages, mode)
       return
     end
 
-    local pkg_path = root .. "/" .. selected_package
+    -- Resolve the actual versioned directory name
+    -- Package names are displayed without versions (e.g., "rails", "serde")
+    -- but actual directories include versions (e.g., "rails-7.0.0", "serde-1.0.0")
+    local actual_dir = util.resolve_package_dir(root, selected_package)
+    if not actual_dir then
+      vim.notify(
+        string.format("Could not find directory for package: %s", selected_package),
+        vim.log.levels.ERROR,
+        { title = lang_name }
+      )
+      return
+    end
+
+    local pkg_path = root .. "/" .. actual_dir
 
     if mode == "files" then
       -- File search mode
@@ -117,8 +130,19 @@ function M.smart_search(mode)
         -- Check if we're already inside a dependency
         local pkg_name = util.extract_package_name(bufpath, result.root)
         if pkg_name and vim.tbl_contains(result.packages, pkg_name) then
+          -- Resolve the actual versioned directory name
+          local actual_dir = util.resolve_package_dir(result.root, pkg_name)
+          if not actual_dir then
+            vim.notify(
+              string.format("Could not find directory for package: %s", pkg_name),
+              vim.log.levels.ERROR,
+              { title = detector.name }
+            )
+            return
+          end
+
           -- Search directly in this package
-          local pkg_path = result.root .. "/" .. pkg_name
+          local pkg_path = result.root .. "/" .. actual_dir
 
           if mode == "files" then
             require("snacks").picker.files({

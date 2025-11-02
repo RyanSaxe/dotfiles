@@ -167,4 +167,86 @@ function M.scan_directories(dir_path, filter_fn)
   return results
 end
 
+-- Resolve a package name to its actual versioned directory name
+-- Handles different version formats:
+--   - Ruby/Rust: packagename-X.Y.Z (e.g., rails-7.0.0, serde-1.0.0)
+--   - Go: github.com/user/repo@vX.Y.Z (nested path with @version suffix)
+--
+-- For Go modules with nested paths (e.g., "github.com/user/repo"), this function
+-- scans the parent directory to find the versioned subdirectory.
+--
+-- Returns the full relative path with version, or nil if no match exists
+---@param root string Root path to search in (e.g., gems directory, GOMODCACHE)
+---@param package_name string Package name without version (e.g., "rails", "github.com/user/repo")
+---@return string|nil Full directory path (relative to root) with version, or nil if not found
+function M.resolve_package_dir(root, package_name)
+  -- Handle Go module paths (contain slashes)
+  -- For "github.com/user/repo", we need to:
+  -- 1. Extract parent path: "github.com/user"
+  -- 2. Extract package name: "repo"
+  -- 3. Scan in root/github.com/user/ for "repo@vX.Y.Z"
+  if package_name:match("/") then
+    local parent_path, pkg_base = package_name:match("^(.+)/([^/]+)$")
+    if not parent_path or not pkg_base then
+      return nil
+    end
+
+    local scan_dir = root .. "/" .. parent_path
+    local handle = M.safe_scandir(scan_dir)
+    if not handle then
+      return nil
+    end
+
+    local matches = {}
+    while true do
+      local name, type = vim.loop.fs_scandir_next(handle)
+      if not name then
+        break
+      end
+
+      if type == "directory" then
+        -- Go format: packagename@vX.Y.Z
+        if name:match("^" .. vim.pesc(pkg_base) .. "@v[%d%.]") then
+          table.insert(matches, parent_path .. "/" .. name)
+        end
+      end
+    end
+
+    if #matches > 0 then
+      table.sort(matches)
+      return matches[#matches] -- Return latest version
+    end
+
+    return nil
+  end
+
+  -- Handle simple package names (Ruby/Rust style)
+  local handle = M.safe_scandir(root)
+  if not handle then
+    return nil
+  end
+
+  local matches = {}
+  while true do
+    local name, type = vim.loop.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+
+    if type == "directory" then
+      -- Rust/Ruby format: packagename-X.Y.Z
+      if name:match("^" .. vim.pesc(package_name) .. "%-[%d%.]") then
+        table.insert(matches, name)
+      end
+    end
+  end
+
+  if #matches > 0 then
+    table.sort(matches)
+    return matches[#matches] -- Return latest version
+  end
+
+  return nil
+end
+
 return M

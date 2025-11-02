@@ -73,7 +73,9 @@ function M.detect()
     if type == "directory" and not name:match("^%.") then
       -- Extract crate name by stripping version suffix
       -- Pattern: cratename-X.Y.Z or cratename-X.Y.Z-something
-      local crate_name = name:match("^(.-)%-[%d%.]+")
+      -- Uses greedy match (.+) to properly handle multi-hyphenated names
+      -- like "serde-json-1.0.0" -> "serde-json"
+      local crate_name = name:match("^(.+)%-[%d%.]+")
       if crate_name and not seen[crate_name] then
         seen[crate_name] = true
         table.insert(packages, crate_name)

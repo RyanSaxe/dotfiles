@@ -57,7 +57,9 @@ local function scan_gems(gems_dir)
     if type == "directory" and not name:match("^%.") then
       -- Extract gem name by stripping version suffix
       -- Pattern: gemname-X.Y.Z or gemname-X.Y.Z.something
-      local gem_name = name:match("^(.-)%-[%d%.]+")
+      -- Uses greedy match (.+) to properly handle multi-hyphenated names
+      -- like "active-record-7.0.0" -> "active-record"
+      local gem_name = name:match("^(.+)%-[%d%.]+")
       if gem_name and not seen[gem_name] then
         seen[gem_name] = true
         table.insert(gems, gem_name)
