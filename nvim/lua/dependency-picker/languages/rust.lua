@@ -72,11 +72,9 @@ function M.detect()
 
     if type == "directory" and not name:match("^%.") then
       -- Extract crate name by stripping version suffix
-      -- Pattern: cratename-X.Y.Z or cratename-X.Y.Z-something
-      -- Uses greedy match (.+) to properly handle multi-hyphenated names
-      -- like "serde-json-1.0.0" -> "serde-json"
-      local crate_name = name:match("^(.+)%-[%d%.]+")
-      if crate_name and not seen[crate_name] then
+      -- Handles multi-hyphenated names like "serde-json-1.0.0" -> "serde-json"
+      local crate_name = util.strip_version_suffix(name)
+      if crate_name and crate_name ~= name and not seen[crate_name] then
         seen[crate_name] = true
         table.insert(packages, crate_name)
       end
@@ -88,6 +86,68 @@ function M.detect()
     -- Store hash_dir as first element for cache
     util.set_cache(cache_key, { packages = { hash_dir, unpack(packages) } })
     return { root = hash_dir, packages = packages }
+  end
+
+  return nil
+end
+
+-- ============================================================================
+-- OPTIONAL: Language-specific versioning functions
+-- These functions provide Rust-specific version handling for full extensibility
+-- ============================================================================
+
+-- Strip version suffix from Rust crate directory names
+-- Rust crates use format: cratename-X.Y.Z (e.g., serde-1.0.0 -> serde)
+-- Handles multi-hyphenated crates: serde-json-1.0.0 -> serde-json
+---@param name string Crate directory name (may include version)
+---@return string Crate name without version suffix
+function M.strip_version(name)
+  if not name then
+    return nil
+  end
+
+  -- Match crates with version suffix: cratename-X.Y.Z
+  -- The pattern matches the last hyphen followed by version numbers
+  local stripped = name:match("^(.+)%-[%d%.]+")
+  if stripped then
+    return stripped
+  end
+
+  -- No version pattern found, return as-is
+  return name
+end
+
+-- Resolve a crate name to its actual versioned directory
+-- Scans the cargo registry to find the versioned directory (e.g., serde -> serde-1.0.0)
+-- Returns the latest version if multiple versions exist
+---@param root string Cargo registry src directory path (hash directory)
+---@param crate_name string Crate name without version (e.g., "serde")
+---@return string|nil Versioned directory name (e.g., "serde-1.0.0"), or nil if not found
+function M.resolve_directory(root, crate_name)
+  local handle = util.safe_scandir(root)
+  if not handle then
+    return nil
+  end
+
+  local matches = {}
+  while true do
+    local name, type = vim.loop.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+
+    if type == "directory" then
+      -- Match versioned crates: cratename-X.Y.Z
+      -- Use vim.pesc to escape special pattern characters in crate_name
+      if name:match("^" .. vim.pesc(crate_name) .. "%-[%d%.]") then
+        table.insert(matches, name)
+      end
+    end
+  end
+
+  if #matches > 0 then
+    table.sort(matches)
+    return matches[#matches] -- Return latest version
   end
 
   return nil

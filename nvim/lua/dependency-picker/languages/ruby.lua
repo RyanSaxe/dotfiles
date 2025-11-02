@@ -56,11 +56,9 @@ local function scan_gems(gems_dir)
 
     if type == "directory" and not name:match("^%.") then
       -- Extract gem name by stripping version suffix
-      -- Pattern: gemname-X.Y.Z or gemname-X.Y.Z.something
-      -- Uses greedy match (.+) to properly handle multi-hyphenated names
-      -- like "active-record-7.0.0" -> "active-record"
-      local gem_name = name:match("^(.+)%-[%d%.]+")
-      if gem_name and not seen[gem_name] then
+      -- Handles multi-hyphenated names like "active-record-7.0.0" -> "active-record"
+      local gem_name = util.strip_version_suffix(name)
+      if gem_name and gem_name ~= name and not seen[gem_name] then
         seen[gem_name] = true
         table.insert(gems, gem_name)
       end
@@ -122,6 +120,68 @@ function M.detect(buffer_path)
     table.sort(packages)
     util.set_cache(cache_key, { packages = packages })
     return { root = gems_dir, packages = packages }
+  end
+
+  return nil
+end
+
+-- ============================================================================
+-- OPTIONAL: Language-specific versioning functions
+-- These functions provide Ruby-specific version handling for full extensibility
+-- ============================================================================
+
+-- Strip version suffix from Ruby gem directory names
+-- Ruby gems use format: gemname-X.Y.Z (e.g., rack-2.2.21 -> rack)
+-- Handles multi-hyphenated gems: rack-protection-3.2.0 -> rack-protection
+---@param name string Gem directory name (may include version)
+---@return string Gem name without version suffix
+function M.strip_version(name)
+  if not name then
+    return nil
+  end
+
+  -- Match gems with version suffix: gemname-X.Y.Z
+  -- The pattern matches the last hyphen followed by version numbers
+  local stripped = name:match("^(.+)%-[%d%.]+")
+  if stripped then
+    return stripped
+  end
+
+  -- No version pattern found, return as-is
+  return name
+end
+
+-- Resolve a gem name to its actual versioned directory
+-- Scans the gems directory to find the versioned directory (e.g., rack -> rack-2.2.21)
+-- Returns the latest version if multiple versions exist
+---@param root string Gems directory path
+---@param gem_name string Gem name without version (e.g., "rack")
+---@return string|nil Versioned directory name (e.g., "rack-2.2.21"), or nil if not found
+function M.resolve_directory(root, gem_name)
+  local handle = util.safe_scandir(root)
+  if not handle then
+    return nil
+  end
+
+  local matches = {}
+  while true do
+    local name, type = vim.loop.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+
+    if type == "directory" then
+      -- Match versioned gems: gemname-X.Y.Z
+      -- Use vim.pesc to escape special pattern characters in gem_name
+      if name:match("^" .. vim.pesc(gem_name) .. "%-[%d%.]") then
+        table.insert(matches, name)
+      end
+    end
+  end
+
+  if #matches > 0 then
+    table.sort(matches)
+    return matches[#matches] -- Return latest version
   end
 
   return nil

@@ -57,7 +57,8 @@ load_detectors()
 ---@param root string Root path of dependencies
 ---@param packages string[] List of package names
 ---@param mode string "grep" or "files"
-local function show_package_picker(lang_name, root, packages, mode)
+---@param detector table|nil Optional language detector module (for versioning functions)
+local function show_package_picker(lang_name, root, packages, mode, detector)
   if #packages == 0 then
     vim.notify("No packages found", vim.log.levels.WARN, { title = lang_name })
     return
@@ -73,7 +74,9 @@ local function show_package_picker(lang_name, root, packages, mode)
     -- Resolve the actual versioned directory name
     -- Package names are displayed without versions (e.g., "rails", "serde")
     -- but actual directories include versions (e.g., "rails-7.0.0", "serde-1.0.0")
-    local actual_dir = util.resolve_package_dir(root, selected_package)
+    -- Use language-specific resolution if available
+    local resolve_fn = detector and detector.resolve_directory
+    local actual_dir = util.resolve_package_dir(root, selected_package, resolve_fn)
     if not actual_dir then
       vim.notify(
         string.format("Could not find directory for package: %s", selected_package),
@@ -128,10 +131,14 @@ function M.smart_search(mode)
 
       if result then
         -- Check if we're already inside a dependency
-        local pkg_name = util.extract_package_name(bufpath, result.root)
+        -- Use language-specific version stripping if available
+        local strip_fn = detector.strip_version
+        local pkg_name = util.extract_package_name(bufpath, result.root, strip_fn)
         if pkg_name and vim.tbl_contains(result.packages, pkg_name) then
           -- Resolve the actual versioned directory name
-          local actual_dir = util.resolve_package_dir(result.root, pkg_name)
+          -- Use language-specific resolution if available
+          local resolve_fn = detector.resolve_directory
+          local actual_dir = util.resolve_package_dir(result.root, pkg_name, resolve_fn)
           if not actual_dir then
             vim.notify(
               string.format("Could not find directory for package: %s", pkg_name),
@@ -163,7 +170,7 @@ function M.smart_search(mode)
         end
 
         -- Not inside a package, show picker
-        show_package_picker(detector.name, result.root, result.packages, mode)
+        show_package_picker(detector.name, result.root, result.packages, mode, detector)
         return
       end
     end
@@ -198,6 +205,7 @@ function M.manual_search(mode)
         name = detector.name,
         root = result.root,
         packages = result.packages,
+        detector = detector, -- Store detector for versioning functions
       }
     end
   end
@@ -216,7 +224,7 @@ function M.manual_search(mode)
     end
 
     local data = lang_data[selected_lang]
-    show_package_picker(data.name, data.root, data.packages, mode)
+    show_package_picker(data.name, data.root, data.packages, mode, data.detector)
   end)
 end
 

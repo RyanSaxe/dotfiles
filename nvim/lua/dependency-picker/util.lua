@@ -45,6 +45,44 @@ end
 -- PATH UTILITIES
 -- ============================================================================
 
+-- Strip version suffix from package name
+-- Handles different version formats:
+--   - Ruby/Rust: packagename-X.Y.Z -> packagename
+--   - Go: packagename@vX.Y.Z -> packagename
+-- Returns original name if no version pattern found
+--
+-- Supports language-specific version stripping via optional strip_fn parameter
+---@param name string Package directory name (may include version)
+---@param strip_fn function|nil Optional language-specific version stripping function
+---@return string Package name without version suffix
+function M.strip_version_suffix(name, strip_fn)
+  if not name then
+    return nil
+  end
+
+  -- Use language-specific function if provided
+  if strip_fn then
+    return strip_fn(name)
+  end
+
+  -- Fallback: Built-in heuristics for common formats
+
+  -- Ruby/Rust format: packagename-X.Y.Z
+  local stripped = name:match("^(.+)%-[%d%.]+")
+  if stripped then
+    return stripped
+  end
+
+  -- Go format: packagename@vX.Y.Z
+  stripped = name:match("^(.+)@v[%d%.]+")
+  if stripped then
+    return stripped
+  end
+
+  -- No version pattern found, return as-is (e.g., JavaScript/Python packages)
+  return name
+end
+
 -- Search upward from start_path to find a directory containing one of the marker files
 -- Useful for finding project roots (e.g., package.json, go.mod, Gemfile)
 ---@param markers string[] List of marker files to search for
@@ -89,18 +127,27 @@ function M.is_path_within(path, parent)
 end
 
 -- Extract the package name from a path within a dependency root
--- Example: /path/to/node_modules/lodash/index.js -> "lodash"
+-- Automatically strips version suffixes for versioned packages
+-- Examples:
+--   - /path/to/node_modules/lodash/index.js -> "lodash"
+--   - /path/to/gems/rails-7.0.0/lib/rails.rb -> "rails"
+--   - /GOMODCACHE/github.com/user/repo@v1.2.3/file.go -> "repo"
+--
+-- Supports language-specific version stripping via optional strip_fn parameter
 ---@param path string Full path to current file
 ---@param dep_root string Dependency root path (e.g., site-packages, node_modules)
----@return string|nil First directory component after dep_root (the package name)
-function M.extract_package_name(path, dep_root)
+---@param strip_fn function|nil Optional language-specific version stripping function
+---@return string|nil Package name without version (suitable for lookup in packages list)
+function M.extract_package_name(path, dep_root, strip_fn)
   if not M.is_path_within(path, dep_root) then
     return nil
   end
 
   local rel = path:sub(#dep_root + 2) -- Strip dep_root + "/"
   local pkg = rel:match("^([^/]+)")
-  return pkg
+
+  -- Strip version suffix so it matches the deduplicated packages list
+  return M.strip_version_suffix(pkg, strip_fn)
 end
 
 -- ============================================================================
@@ -167,19 +214,29 @@ function M.scan_directories(dir_path, filter_fn)
   return results
 end
 
--- Resolve a package name to its actual versioned directory name
--- Handles different version formats:
---   - Ruby/Rust: packagename-X.Y.Z (e.g., rails-7.0.0, serde-1.0.0)
---   - Go: github.com/user/repo@vX.Y.Z (nested path with @version suffix)
+-- Resolve a package name to its actual directory name
+-- Handles different versioning strategies:
+--   1. Versioned packages (Ruby/Rust/Go): Finds packagename-X.Y.Z or packagename@vX.Y.Z
+--   2. Non-versioned packages (JavaScript/Python): Returns exact match
 --
 -- For Go modules with nested paths (e.g., "github.com/user/repo"), this function
 -- scans the parent directory to find the versioned subdirectory.
 --
--- Returns the full relative path with version, or nil if no match exists
----@param root string Root path to search in (e.g., gems directory, GOMODCACHE)
----@param package_name string Package name without version (e.g., "rails", "github.com/user/repo")
----@return string|nil Full directory path (relative to root) with version, or nil if not found
-function M.resolve_package_dir(root, package_name)
+-- Supports language-specific directory resolution via optional resolve_fn parameter
+--
+-- Returns the full relative path, or nil if no match exists
+---@param root string Root path to search in (e.g., gems directory, GOMODCACHE, node_modules)
+---@param package_name string Package name without version (e.g., "rails", "lodash", "github.com/user/repo")
+---@param resolve_fn function|nil Optional language-specific directory resolution function
+---@return string|nil Full directory path (relative to root), or nil if not found
+function M.resolve_package_dir(root, package_name, resolve_fn)
+  -- Use language-specific resolution function if provided
+  if resolve_fn then
+    return resolve_fn(root, package_name)
+  end
+
+  -- Fallback: Built-in heuristics for common formats
+
   -- Handle Go module paths (contain slashes)
   -- For "github.com/user/repo", we need to:
   -- 1. Extract parent path: "github.com/user"
@@ -220,7 +277,7 @@ function M.resolve_package_dir(root, package_name)
     return nil
   end
 
-  -- Handle simple package names (Ruby/Rust style)
+  -- Handle simple package names
   local handle = M.safe_scandir(root)
   if not handle then
     return nil
@@ -234,8 +291,11 @@ function M.resolve_package_dir(root, package_name)
     end
 
     if type == "directory" then
-      -- Rust/Ruby format: packagename-X.Y.Z
+      -- Versioned format: packagename-X.Y.Z (Ruby/Rust)
       if name:match("^" .. vim.pesc(package_name) .. "%-[%d%.]") then
+        table.insert(matches, name)
+      -- Exact match: packagename (JavaScript/Python)
+      elseif name == package_name then
         table.insert(matches, name)
       end
     end
@@ -243,7 +303,7 @@ function M.resolve_package_dir(root, package_name)
 
   if #matches > 0 then
     table.sort(matches)
-    return matches[#matches] -- Return latest version
+    return matches[#matches] -- Return latest version or exact match
   end
 
   return nil

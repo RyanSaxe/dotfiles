@@ -114,4 +114,108 @@ function M.detect(buffer_path)
   return nil
 end
 
+-- ============================================================================
+-- OPTIONAL: Language-specific versioning functions
+-- These functions provide Go-specific version handling for full extensibility
+-- ============================================================================
+
+-- Strip version suffix from Go module directory names
+-- Go modules use format: modulename@vX.Y.Z (e.g., repo@v1.2.3 -> repo)
+-- For nested paths: github.com/user/repo@v1.2.3 -> github.com/user/repo
+---@param name string Module directory name (may include version)
+---@return string Module name without version suffix
+function M.strip_version(name)
+  if not name then
+    return nil
+  end
+
+  -- Match Go modules with version suffix: modulename@vX.Y.Z
+  local stripped = name:match("^(.+)@v[%d%.]+")
+  if stripped then
+    return stripped
+  end
+
+  -- No version pattern found, return as-is
+  return name
+end
+
+-- Resolve a Go module name to its actual versioned directory
+-- For nested paths like "github.com/user/repo", scans the parent directory
+-- to find the versioned subdirectory (e.g., repo@v1.2.3)
+-- Returns the latest version if multiple versions exist
+---@param root string GOMODCACHE directory path
+---@param module_name string Module name without version (e.g., "github.com/user/repo")
+---@return string|nil Full relative path with version (e.g., "github.com/user/repo@v1.2.3"), or nil if not found
+function M.resolve_directory(root, module_name)
+  -- Handle nested module paths (contain slashes)
+  -- For "github.com/user/repo", we need to:
+  -- 1. Extract parent path: "github.com/user"
+  -- 2. Extract module base name: "repo"
+  -- 3. Scan in root/github.com/user/ for "repo@vX.Y.Z"
+  if module_name:match("/") then
+    local parent_path, module_base = module_name:match("^(.+)/([^/]+)$")
+    if not parent_path or not module_base then
+      return nil
+    end
+
+    local scan_dir = root .. "/" .. parent_path
+    local handle = util.safe_scandir(scan_dir)
+    if not handle then
+      return nil
+    end
+
+    local matches = {}
+    while true do
+      local name, type = vim.loop.fs_scandir_next(handle)
+      if not name then
+        break
+      end
+
+      if type == "directory" then
+        -- Match Go modules: modulename@vX.Y.Z
+        -- Use vim.pesc to escape special pattern characters in module_base
+        if name:match("^" .. vim.pesc(module_base) .. "@v[%d%.]") then
+          table.insert(matches, parent_path .. "/" .. name)
+        end
+      end
+    end
+
+    if #matches > 0 then
+      table.sort(matches)
+      return matches[#matches] -- Return latest version
+    end
+
+    return nil
+  end
+
+  -- Handle simple module names (no nested path)
+  local handle = util.safe_scandir(root)
+  if not handle then
+    return nil
+  end
+
+  local matches = {}
+  while true do
+    local name, type = vim.loop.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+
+    if type == "directory" then
+      -- Match Go modules: modulename@vX.Y.Z
+      -- Use vim.pesc to escape special pattern characters in module_name
+      if name:match("^" .. vim.pesc(module_name) .. "@v[%d%.]") then
+        table.insert(matches, name)
+      end
+    end
+  end
+
+  if #matches > 0 then
+    table.sort(matches)
+    return matches[#matches] -- Return latest version
+  end
+
+  return nil
+end
+
 return M
