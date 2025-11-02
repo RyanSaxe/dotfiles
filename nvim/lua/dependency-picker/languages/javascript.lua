@@ -81,4 +81,18 @@ function M.detect(buffer_path)
   return nil
 end
 
+-- Detect JavaScript/Node.js standard library (NOT IMPLEMENTED)
+-- TODO: Implement Node.js stdlib support
+-- Would require finding Node.js installation source or TypeScript definitions
+-- For now, stdlib detection is disabled for JavaScript/Node
+---@return table|nil { root = string, packages = string[] }
+function M.detect_stdlib()
+  -- Not implemented - Node.js stdlib is built into the runtime
+  -- Would need to either:
+  -- 1. Find Node.js source installation (complex, varies by install method)
+  -- 2. Use @types/node TypeScript definitions (if installed)
+  -- 3. Clone/download Node.js source from GitHub
+  return nil
+end
+
 return M

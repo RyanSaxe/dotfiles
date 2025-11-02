@@ -1,6 +1,6 @@
 -- Rust/Cargo detector
--- Scans Cargo registry for installed crates
--- Deduplicates crate names across versions (e.g., serde-1.0.0, serde-1.0.1 -> serde)
+-- Project-scoped: Detects crates from current Cargo.toml dependencies
+-- Resolves to Cargo registry paths for actual crate source code
 
 local util = require("dependency-picker.util")
 
@@ -9,12 +9,46 @@ local M = {}
 -- Language metadata
 M.name = "Rust"
 M.filetypes = { "rust" }
-M.requires_buffer_path = false
+M.requires_buffer_path = true
 
--- Detect Rust crates from Cargo registry
--- Automatically strips version suffixes to get unique crate names
----@return table|nil { root = string, packages = string[] }
-function M.detect()
+-- Parse Cargo.toml to extract dependency crate names
+-- Returns list of crate names from [dependencies] and [dev-dependencies]
+---@param cargo_toml_path string Path to Cargo.toml file
+---@return string[] List of crate names
+local function parse_cargo_toml(cargo_toml_path)
+  local file = io.open(cargo_toml_path, "r")
+  if not file then
+    return {}
+  end
+
+  local crates = {}
+  local in_dependencies = false
+
+  for line in file:lines() do
+    -- Check for dependency sections
+    if line:match("^%[dependencies%]") or line:match("^%[dev%-dependencies%]") then
+      in_dependencies = true
+    -- Exit section when we hit another [section]
+    elseif line:match("^%[") then
+      in_dependencies = false
+    -- Parse dependency lines
+    elseif in_dependencies then
+      -- Match lines like: serde = "1.0" or serde = { version = "1.0" }
+      local crate = line:match("^([%w_%-]+)%s*=")
+      if crate then
+        table.insert(crates, crate)
+      end
+    end
+  end
+
+  file:close()
+  return crates
+end
+
+-- Get cargo registry hash directory
+-- Example: ~/.cargo/registry/src/github.com-1ecc6299db9ec823/
+---@return string|nil Hash directory path
+local function get_cargo_hash_dir()
   local cargo_home = vim.env.CARGO_HOME or (vim.env.HOME .. "/.cargo")
   local registry_src = cargo_home .. "/registry/src"
 
@@ -23,16 +57,7 @@ function M.detect()
     return nil
   end
 
-  -- Check cache first
-  local cache_key = "rust:" .. registry_src
-  local cached = util.get_cache(cache_key)
-  if cached then
-    -- First item is actual src path (hash dir)
-    return { root = cached.packages[1], packages = vim.list_slice(cached.packages, 2) }
-  end
-
   -- Find the registry hash directory (usually only one)
-  -- Example: ~/.cargo/registry/src/github.com-1ecc6299db9ec823/
   local handle = util.safe_scandir(registry_src)
   if not handle then
     return nil
@@ -50,42 +75,44 @@ function M.detect()
     end
   end
 
+  return hash_dir
+end
+
+-- Detect Rust crates from current project's Cargo.toml dependencies
+-- Project-scoped: Only shows crates listed in Cargo.toml, not all global crates
+---@param buffer_path string Current buffer path
+---@return table|nil { root = string, packages = string[] }
+function M.detect(buffer_path)
+  -- Find nearest Cargo.toml
+  local project_root = util.find_marker_upward({ "Cargo.toml" }, vim.fn.fnamemodify(buffer_path, ":h"))
+  if not project_root then
+    return nil
+  end
+
+  local cargo_toml = project_root .. "/Cargo.toml"
+
+  -- Check cache first (keyed by Cargo.toml path)
+  local cache_key = "rust:" .. cargo_toml
+  local cached = util.get_cache(cache_key)
+  if cached then
+    -- First item is hash_dir, rest are packages
+    return { root = cached.packages[1], packages = vim.list_slice(cached.packages, 2) }
+  end
+
+  -- Get cargo registry hash directory
+  local hash_dir = get_cargo_hash_dir()
   if not hash_dir then
     return nil
   end
 
-  -- Scan crates in hash directory
-  -- Crate directories are named: cratename-version (e.g., serde-1.0.0)
-  local crates_handle = util.safe_scandir(hash_dir)
-  if not crates_handle then
-    return nil
-  end
+  -- Parse Cargo.toml to get project dependencies
+  local crates = parse_cargo_toml(cargo_toml)
 
-  local packages = {}
-  local seen = {} -- Track unique crate names (deduplicate versions)
-
-  while true do
-    local name, type = vim.loop.fs_scandir_next(crates_handle)
-    if not name then
-      break
-    end
-
-    if type == "directory" and not name:match("^%.") then
-      -- Extract crate name by stripping version suffix
-      -- Handles multi-hyphenated names like "serde-json-1.0.0" -> "serde-json"
-      local crate_name = util.strip_version_suffix(name)
-      if crate_name and crate_name ~= name and not seen[crate_name] then
-        seen[crate_name] = true
-        table.insert(packages, crate_name)
-      end
-    end
-  end
-
-  if #packages > 0 then
-    table.sort(packages)
+  if #crates > 0 then
+    table.sort(crates)
     -- Store hash_dir as first element for cache
-    util.set_cache(cache_key, { packages = { hash_dir, unpack(packages) } })
-    return { root = hash_dir, packages = packages }
+    util.set_cache(cache_key, { packages = { hash_dir, unpack(crates) } })
+    return { root = hash_dir, packages = crates }
   end
 
   return nil
@@ -149,6 +176,50 @@ function M.resolve_directory(root, crate_name)
   if #matches > 0 then
     table.sort(matches)
     return matches[#matches] -- Return latest version
+  end
+
+  return nil
+end
+
+-- Detect Rust standard library source
+-- Requires: rustup component add rust-src
+-- Returns stdlib crates like std, core, alloc, etc.
+---@return table|nil { root = string, packages = string[] }
+function M.detect_stdlib()
+  -- Get rustc sysroot
+  local handle = io.popen("rustc --print sysroot 2>/dev/null")
+  if not handle then
+    return nil
+  end
+
+  local sysroot = handle:read("*a"):gsub("%s+", "")
+  handle:close()
+
+  if not sysroot or sysroot == "" then
+    return nil
+  end
+
+  -- Stdlib source is in sysroot/lib/rustlib/src/rust/library
+  local stdlib_dir = sysroot .. "/lib/rustlib/src/rust/library"
+  local stat = util.safe_stat(stdlib_dir)
+  if not stat or stat.type ~= "directory" then
+    return nil
+  end
+
+  -- Check cache
+  local cache_key = "rust_stdlib:" .. stdlib_dir
+  local cached = util.get_cache(cache_key)
+  if cached then
+    return { root = stdlib_dir, packages = cached.packages }
+  end
+
+  -- Scan stdlib directory for crates
+  local packages = util.scan_directories(stdlib_dir)
+
+  if #packages > 0 then
+    table.sort(packages)
+    util.set_cache(cache_key, { packages = packages })
+    return { root = stdlib_dir, packages = packages }
   end
 
   return nil

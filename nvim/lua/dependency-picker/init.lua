@@ -228,6 +228,82 @@ function M.manual_search(mode)
   end)
 end
 
+-- ============================================================================
+-- STDLIB SEARCH API
+-- Search standard library modules instead of project dependencies
+-- ============================================================================
+
+-- Smart stdlib search: auto-detect language and search stdlib
+---@param mode string "grep" or "files"
+function M.smart_search_stdlib(mode)
+  mode = mode or "grep"
+
+  local filetype = vim.bo.filetype
+
+  -- Try each detector for current filetype
+  for _, detector in ipairs(detectors) do
+    if vim.tbl_contains(detector.filetypes, filetype) and detector.detect_stdlib then
+      -- Run stdlib detector
+      local result = detector.detect_stdlib()
+
+      if result and #result.packages > 0 then
+        show_package_picker(detector.name .. " stdlib", result.root, result.packages, mode, detector)
+        return
+      end
+    end
+  end
+
+  -- No stdlib detector matched
+  vim.notify(
+    string.format("No stdlib detector available for filetype: %s", filetype),
+    vim.log.levels.WARN,
+    { title = "Dependency Picker" }
+  )
+end
+
+-- Manual stdlib search: explicit language selection
+---@param mode string "grep" or "files"
+function M.manual_search_stdlib(mode)
+  mode = mode or "grep"
+
+  -- Collect available stdlib detectors with results
+  local available = {}
+  local lang_data = {}
+
+  for _, detector in ipairs(detectors) do
+    if detector.detect_stdlib then
+      local result = detector.detect_stdlib()
+      if result and #result.packages > 0 then
+        local lang_display = string.format("%s stdlib (%d modules)", detector.name, #result.packages)
+        table.insert(available, lang_display)
+        lang_data[lang_display] = {
+          name = detector.name .. " stdlib",
+          root = result.root,
+          packages = result.packages,
+          detector = detector,
+        }
+      end
+    end
+  end
+
+  if #available == 0 then
+    vim.notify("No stdlib detected for any language", vim.log.levels.WARN, { title = "Dependency Picker" })
+    return
+  end
+
+  -- Show language picker
+  require("snacks").picker.select(available, {
+    prompt = string.format("Select Stdlib (%s)", mode),
+  }, function(selected_lang)
+    if not selected_lang then
+      return
+    end
+
+    local data = lang_data[selected_lang]
+    show_package_picker(data.name, data.root, data.packages, mode, data.detector)
+  end)
+end
+
 -- Backward compatibility: keep original function names
 -- These just call the new unified smart_search function
 function M.smart_grep()

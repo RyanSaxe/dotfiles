@@ -1,5 +1,6 @@
 -- Lua/Luarocks detector
--- Detects luarocks packages from local lua_modules or ~/.luarocks
+-- Detects luarocks packages from local lua_modules or configured luarocks trees
+-- Dynamically queries luarocks config to support system-wide installs (e.g., Homebrew)
 -- Scans both share/lua and lib/lua directories
 
 local util = require("dependency-picker.util")
@@ -64,24 +65,48 @@ local function scan_rocks(rock_paths)
   return packages
 end
 
--- Detect Luarocks packages from local lua_modules or user .luarocks
+-- Get luarocks tree paths from luarocks configuration
+-- Dynamically queries luarocks to support system-wide installs (e.g., Homebrew)
+---@return string[] List of luarocks tree root paths
+local function get_luarocks_trees()
+  local handle = io.popen("luarocks config rocks_trees 2>/dev/null")
+  if not handle then
+    return {}
+  end
+
+  local output = handle:read("*a")
+  handle:close()
+
+  -- Parse Lua table output to extract root paths
+  -- Format: { { name = "user", root = "/path" }, { name = "system", root = "/path" } }
+  local trees = {}
+  for root in output:gmatch('root%s*=%s*"([^"]+)"') do
+    table.insert(trees, root)
+  end
+
+  return trees
+end
+
+-- Detect Luarocks packages from local lua_modules or configured luarocks trees
 ---@param buffer_path string Current buffer path
 ---@return table|nil { root = string, packages = string[] }
 function M.detect(buffer_path)
   local candidates = {}
 
-  -- Check for local lua_modules first (project-specific)
+  -- Check for local lua_modules first (project-specific, highest priority)
   local project_root = util.find_marker_upward({ "lua_modules" }, vim.fn.fnamemodify(buffer_path, ":h"))
   if project_root then
     local lua_modules = project_root .. "/lua_modules"
     table.insert(candidates, { name = "local", path = lua_modules })
   end
 
-  -- Check user luarocks directory
-  local luarocks_home = vim.env.HOME .. "/.luarocks"
-  table.insert(candidates, { name = "user", path = luarocks_home })
+  -- Get luarocks trees dynamically (supports user, system, and custom trees)
+  local luarocks_trees = get_luarocks_trees()
+  for _, tree_path in ipairs(luarocks_trees) do
+    table.insert(candidates, { name = "luarocks", path = tree_path })
+  end
 
-  -- Try each candidate
+  -- Try each candidate in order (local first, then luarocks trees)
   for _, candidate in ipairs(candidates) do
     local stat = util.safe_stat(candidate.path)
     if stat and stat.type == "directory" then

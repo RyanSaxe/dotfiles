@@ -220,4 +220,48 @@ function M.resolve_directory(root, module_name)
   return nil
 end
 
+-- Detect Go standard library packages
+-- Scans GOROOT/src for standard library packages
+---@return table|nil { root = string, packages = string[] }
+function M.detect_stdlib()
+  -- Get GOROOT
+  local handle = io.popen("go env GOROOT 2>/dev/null")
+  if not handle then
+    return nil
+  end
+
+  local goroot = handle:read("*a"):gsub("%s+", "")
+  handle:close()
+
+  if not goroot or goroot == "" then
+    return nil
+  end
+
+  -- Stdlib is in GOROOT/src
+  local stdlib_dir = goroot .. "/src"
+  local stat = util.safe_stat(stdlib_dir)
+  if not stat or stat.type ~= "directory" then
+    return nil
+  end
+
+  -- Check cache
+  local cache_key = "go_stdlib:" .. stdlib_dir
+  local cached = util.get_cache(cache_key)
+  if cached then
+    return { root = stdlib_dir, packages = cached.packages }
+  end
+
+  -- Scan stdlib directory for packages
+  -- Go stdlib packages can be nested (e.g., net/http)
+  local packages = util.scan_directories(stdlib_dir)
+
+  if #packages > 0 then
+    table.sort(packages)
+    util.set_cache(cache_key, { packages = packages })
+    return { root = stdlib_dir, packages = packages }
+  end
+
+  return nil
+end
+
 return M

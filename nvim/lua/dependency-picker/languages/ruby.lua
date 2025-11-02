@@ -188,4 +188,45 @@ function M.resolve_directory(root, gem_name)
   return nil
 end
 
+-- Detect Ruby standard library modules
+-- Queries Ruby for stdlib location and scans for available modules
+---@return table|nil { root = string, packages = string[] }
+function M.detect_stdlib()
+  -- Get Ruby stdlib directory
+  local handle = io.popen("ruby -e \"puts RbConfig::CONFIG['rubylibdir']\" 2>/dev/null")
+  if not handle then
+    return nil
+  end
+
+  local stdlib_dir = handle:read("*a"):gsub("%s+", "")
+  handle:close()
+
+  if not stdlib_dir or stdlib_dir == "" then
+    return nil
+  end
+
+  local stat = util.safe_stat(stdlib_dir)
+  if not stat or stat.type ~= "directory" then
+    return nil
+  end
+
+  -- Check cache
+  local cache_key = "ruby_stdlib:" .. stdlib_dir
+  local cached = util.get_cache(cache_key)
+  if cached then
+    return { root = stdlib_dir, packages = cached.packages }
+  end
+
+  -- Scan stdlib directory for modules
+  local packages = util.scan_directories(stdlib_dir)
+
+  if #packages > 0 then
+    table.sort(packages)
+    util.set_cache(cache_key, { packages = packages })
+    return { root = stdlib_dir, packages = packages }
+  end
+
+  return nil
+end
+
 return M
