@@ -502,8 +502,9 @@ function M.smart_files()
           local pkg_path = result.root .. "/" .. pkg_name
           require("snacks").picker.files({
             title = string.format("[%s] %s - Files", detector.name, pkg_name),
-            dirs = { pkg_path }, -- Use dirs (like grep) instead of cwd
+            dirs = { pkg_path },
             hidden = true,
+            ignored = true, -- Don't respect .gitignore (like grep does)
             follow = true, -- Follow symlinks (common in Python packages)
           })
           return
@@ -549,8 +550,9 @@ function M.show_package_picker(lang_name, root, packages, search_mode)
       -- File picker mode
       require("snacks").picker.files({
         title = string.format("[%s] %s - Files", lang_name, selected_package),
-        cwd = pkg_path,
+        dirs = { pkg_path },
         hidden = true,
+        ignored = true, -- Don't respect .gitignore (like grep does)
         follow = true, -- Follow symlinks (common in Python packages)
       })
     else
