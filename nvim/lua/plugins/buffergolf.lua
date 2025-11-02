@@ -5,7 +5,11 @@ return {
     dependencies = { "nvim-mini/mini.diff" },
     opts = {
       -- Auto-detect and disable conflicting plugins (including Copilot)
-      disabled_plugins = "auto",
+
+      disabled_plugins = {
+        _auto = true, -- Keep auto-disabling other plugins
+        blink = false, -- Don't disable blink.cmp
+      },
 
       -- Automatic deindentation for consistent practice
       auto_dedent = true,
@@ -29,7 +33,7 @@ return {
           size = 50, -- 50 columns wide
         },
         stats = {
-          position = "bottom", -- stats window at the top
+          position = "top", -- stats window at the top
           height = 3,
         },
       },
