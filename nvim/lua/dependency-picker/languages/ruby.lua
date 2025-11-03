@@ -10,6 +10,9 @@ local M = {}
 M.name = "Ruby"
 M.filetypes = { "ruby" }
 M.requires_buffer_path = true
+-- File extension for single-file stdlib modules (e.g., base64.rb, csv.rb)
+-- Used to resolve both gem directories and single-file stdlib modules
+M.file_extension = ".rb"
 
 -- Get GEM_HOME from environment or try to detect from ruby
 ---@return string|nil GEM_HOME path

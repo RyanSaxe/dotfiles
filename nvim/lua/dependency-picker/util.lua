@@ -228,8 +228,9 @@ end
 ---@param root string Root path to search in (e.g., gems directory, GOMODCACHE, node_modules)
 ---@param package_name string Package name without version (e.g., "rails", "lodash", "github.com/user/repo")
 ---@param resolve_fn function|nil Optional language-specific directory resolution function
----@return string|nil Full directory path (relative to root), or nil if not found
-function M.resolve_package_dir(root, package_name, resolve_fn)
+---@param file_extension string|nil Optional file extension to check for single-file modules (e.g., ".py", ".rb")
+---@return string|nil Full directory/file path (relative to root), or nil if not found
+function M.resolve_package_dir(root, package_name, resolve_fn, file_extension)
   -- Use language-specific resolution function if provided
   if resolve_fn then
     return resolve_fn(root, package_name)
@@ -306,6 +307,17 @@ function M.resolve_package_dir(root, package_name, resolve_fn)
   if #matches > 0 then
     table.sort(matches)
     return matches[#matches] -- Return latest version or exact match
+  end
+
+  -- If no directory found and file_extension provided, check for single-file module
+  -- E.g., Python: os.py, Ruby: base64.rb
+  if file_extension then
+    local file_name = package_name .. file_extension
+    local file_path = root .. "/" .. file_name
+    local stat = M.safe_stat(file_path)
+    if stat and stat.type == "file" then
+      return file_name
+    end
   end
 
   return nil

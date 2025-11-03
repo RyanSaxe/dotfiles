@@ -10,6 +10,9 @@ local M = {}
 M.name = "Python"
 M.filetypes = { "python" }
 M.requires_buffer_path = false
+-- File extension for single-file modules (e.g., os.py, sys.py)
+-- Used to resolve both directory packages and single-file modules
+M.file_extension = ".py"
 
 -- Detect Python packages in the active virtual environment
 -- Filters out metadata directories (dist-info, egg-info, __pycache__)
@@ -66,8 +69,80 @@ function M.detect()
   return nil
 end
 
+-- Find the system Python's stdlib directory
+-- Tries following symlinks first (fast), falls back to querying Python (reliable)
+-- @param venv string The VIRTUAL_ENV path
+-- @return string|nil The stdlib directory path (e.g., /usr/lib/python3.11/)
+local function find_system_stdlib_dir(venv)
+  -- Strategy 1: Follow symlinks from venv's python executable
+  -- Most venvs use symlinks: venv/bin/python -> /usr/bin/python3.11
+  local python_bin = venv .. "/bin/python"
+  -- Use fs_lstat (not fs_stat) to detect if it's a symlink
+  -- fs_stat follows symlinks, fs_lstat gives info about the link itself
+  local ok, stat = pcall(vim.loop.fs_lstat, python_bin)
+
+  if ok and stat and stat.type == "link" then
+    -- Follow the symlink to find the real Python executable
+    local real_python = vim.loop.fs_realpath(python_bin)
+    if real_python then
+      -- Real Python is typically at: /usr/bin/python3.11
+      -- Stdlib is at: /usr/lib/python3.11/
+      -- Extract version from executable name (e.g., python3.11 -> 3.11)
+      local version = real_python:match("python(%d+%.%d+)")
+      if version then
+        -- Construct potential stdlib paths based on common installation patterns
+        local python_base = vim.fn.fnamemodify(real_python, ":h:h") -- /usr/bin/python -> /usr
+        local candidates = {
+          python_base .. "/lib/python" .. version, -- Linux: /usr/lib/python3.11
+          python_base .. "/lib64/python" .. version, -- Some Linux distros use lib64
+        }
+
+        -- Check each candidate to see if it exists and contains stdlib modules
+        for _, candidate in ipairs(candidates) do
+          local candidate_stat = util.safe_stat(candidate)
+          if candidate_stat and candidate_stat.type == "directory" then
+            -- Verify it looks like a stdlib directory (should contain os.py or os/ directory)
+            local os_py = util.safe_stat(candidate .. "/os.py")
+            local os_dir = util.safe_stat(candidate .. "/os")
+            if os_py or (os_dir and os_dir.type == "directory") then
+              return candidate
+            end
+          end
+        end
+      end
+    end
+  end
+
+  -- Strategy 2: Query Python for its prefix
+  -- This is more reliable but requires executing Python
+  local python_exe = venv .. "/bin/python"
+  local cmd = string.format('%s -c "import sys; print(sys.prefix)" 2>/dev/null', python_exe)
+  local handle = io.popen(cmd)
+
+  if handle then
+    local sys_prefix = handle:read("*l")
+    handle:close()
+
+    if sys_prefix and sys_prefix ~= "" then
+      -- Find the lib/pythonX.Y directory under sys.prefix
+      local lib_pattern = sys_prefix .. "/lib/python*"
+      local raw = vim.fn.glob(lib_pattern, false, false)
+
+      if raw ~= "" then
+        local stdlib_dir = raw:match("([^\n]+)")
+        local stat_check = util.safe_stat(stdlib_dir)
+        if stat_check and stat_check.type == "directory" then
+          return stdlib_dir
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
 -- Detect Python standard library modules
--- Scans the parent directory of site-packages for stdlib .py files
+-- Finds the system Python installation and scans for stdlib .py files
 ---@return table|nil { root = string, packages = string[] }
 function M.detect_stdlib()
   local venv = vim.env.VIRTUAL_ENV
@@ -75,26 +150,9 @@ function M.detect_stdlib()
     return nil
   end
 
-  -- Find site-packages first
-  local raw = vim.fn.glob(venv .. "/lib/python*/site-packages", false, false)
-  local site_packages
-  if raw ~= "" then
-    site_packages = raw:match("([^\n]+)")
-  else
-    local tbl = vim.fn.globpath(venv, "**/site-packages", false, true)
-    if type(tbl) == "table" and #tbl > 0 then
-      site_packages = tbl[1]
-    end
-  end
-
-  if not site_packages or site_packages == "" then
-    return nil
-  end
-
-  -- Parent directory contains stdlib modules
-  local stdlib_dir = vim.fn.fnamemodify(site_packages, ":h")
-  local stat = util.safe_stat(stdlib_dir)
-  if not stat or stat.type ~= "directory" then
+  -- Find the system Python's stdlib directory
+  local stdlib_dir = find_system_stdlib_dir(venv)
+  if not stdlib_dir then
     return nil
   end
 

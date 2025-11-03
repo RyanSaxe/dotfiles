@@ -71,22 +71,32 @@ local function show_package_picker(lang_name, root, packages, mode, detector)
       return
     end
 
-    -- Resolve the actual versioned directory name
+    -- Resolve the actual versioned directory name or single-file module
     -- Package names are displayed without versions (e.g., "rails", "serde")
     -- but actual directories include versions (e.g., "rails-7.0.0", "serde-1.0.0")
     -- Use language-specific resolution if available
     local resolve_fn = detector and detector.resolve_directory
-    local actual_dir = util.resolve_package_dir(root, selected_package, resolve_fn)
-    if not actual_dir then
+    local file_extension = detector and detector.file_extension
+    local actual_path = util.resolve_package_dir(root, selected_package, resolve_fn, file_extension)
+    if not actual_path then
       vim.notify(
-        string.format("Could not find directory for package: %s", selected_package),
+        string.format("Could not find directory or file for package: %s", selected_package),
         vim.log.levels.ERROR,
         { title = lang_name }
       )
       return
     end
 
-    local pkg_path = root .. "/" .. actual_dir
+    local pkg_path = root .. "/" .. actual_path
+
+    -- Check if it's a file or directory
+    -- For single-file modules (e.g., os.py, base64.rb), open directly in editor
+    local is_directory = vim.fn.isdirectory(pkg_path) == 1
+    if not is_directory then
+      -- Single-file module: open directly
+      vim.cmd.edit(pkg_path)
+      return
+    end
 
     if mode == "files" then
       -- File search mode
