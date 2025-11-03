@@ -129,6 +129,23 @@ end, {
   desc = "Manual file search: select language then dependency",
 })
 
+-- Standard library search (builtins)
+vim.keymap.set("n", "<leader>pb", function()
+  dep_picker.smart_search_stdlib("grep")
+end, {
+  noremap = true,
+  silent = true,
+  desc = "Smart stdlib grep: auto-detect language stdlib",
+})
+
+vim.keymap.set("n", "<leader>pB", function()
+  dep_picker.manual_search_stdlib("grep")
+end, {
+  noremap = true,
+  silent = true,
+  desc = "Manual stdlib grep: select language stdlib",
+})
+
 -- LOCALLEADER KEYBINDINGS (filetype-specific, no language selection)
 -- These auto-detect based on current filetype and skip language picker
 vim.keymap.set("n", "<localleader>/", function()
