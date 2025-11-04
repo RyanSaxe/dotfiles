@@ -15,6 +15,33 @@ local util = require("dependency-picker.util")
 local M = {}
 
 -- ============================================================================
+-- HELPER FUNCTIONS
+-- ============================================================================
+
+-- Open a picker (files or grep) for the given package
+---@param mode string "files" or "grep"
+---@param lang_name string Language/detector name
+---@param pkg_name string Package name
+---@param pkg_path string Path to the package directory
+local function open_picker(mode, lang_name, pkg_name, pkg_path)
+  if mode == "files" then
+    require("snacks").picker.files({
+      title = string.format("[%s] %s - Files", lang_name, pkg_name),
+      dirs = { pkg_path },
+      hidden = true,
+      ignored = true,
+      follow = true,
+    })
+  else
+    require("snacks").picker.grep({
+      title = string.format("[%s] %s - Grep", lang_name, pkg_name),
+      dirs = { pkg_path },
+      ignored = true,
+    })
+  end
+end
+
+-- ============================================================================
 -- DETECTOR REGISTRY
 -- Auto-loads all language detectors from languages/ directory
 -- ============================================================================
@@ -71,13 +98,9 @@ local function show_package_picker(lang_name, root, packages, mode, detector)
       return
     end
 
-    -- Validate the selected package name for safety
-    if not util.is_safe_package_name(selected_package) then
-      vim.notify(
-        string.format("Invalid package name: %s", selected_package),
-        vim.log.levels.ERROR,
-        { title = lang_name }
-      )
+    -- Basic validation
+    if not selected_package or selected_package == "" then
+      vim.notify("Invalid package name", vim.log.levels.ERROR, { title = lang_name })
       return
     end
 
@@ -109,23 +132,7 @@ local function show_package_picker(lang_name, root, packages, mode, detector)
       return
     end
 
-    if mode == "files" then
-      -- File search mode
-      require("snacks").picker.files({
-        title = string.format("[%s] %s - Files", lang_name, selected_package),
-        dirs = { pkg_path },
-        hidden = true, -- Show hidden files
-        ignored = true, -- Don't respect .gitignore
-        follow = true, -- Follow symlinks (common in Python packages)
-      })
-    else
-      -- Grep mode (default)
-      require("snacks").picker.grep({
-        title = string.format("[%s] %s - Grep", lang_name, selected_package),
-        dirs = { pkg_path },
-        ignored = true, -- Don't respect .gitignore
-      })
-    end
+    open_picker(mode, lang_name, selected_package, pkg_path)
   end)
 end
 
@@ -143,11 +150,6 @@ function M.smart_search(mode)
   local bufpath = vim.api.nvim_buf_get_name(0)
   local filetype = vim.bo.filetype
 
-  -- Validate buffer path if present
-  if bufpath and bufpath ~= "" and not util.is_safe_path(bufpath) then
-    vim.notify("Cannot process buffer with unsafe path", vim.log.levels.ERROR)
-    return
-  end
 
   -- Try each detector for current filetype
   for _, detector in ipairs(detectors) do
@@ -179,21 +181,7 @@ function M.smart_search(mode)
           -- Search directly in this package
           local pkg_path = result.root .. "/" .. actual_dir
 
-          if mode == "files" then
-            require("snacks").picker.files({
-              title = string.format("[%s] %s - Files", detector.name, pkg_name),
-              dirs = { pkg_path },
-              hidden = true,
-              ignored = true,
-              follow = true,
-            })
-          else
-            require("snacks").picker.grep({
-              title = string.format("[%s] %s - Grep", detector.name, pkg_name),
-              dirs = { pkg_path },
-              ignored = true,
-            })
-          end
+          open_picker(mode, detector.name, pkg_name, pkg_path)
           return
         end
 
@@ -220,11 +208,6 @@ function M.manual_search(mode)
 
   local bufpath = vim.api.nvim_buf_get_name(0)
 
-  -- Validate buffer path if present
-  if bufpath and bufpath ~= "" and not util.is_safe_path(bufpath) then
-    vim.notify("Cannot process buffer with unsafe path", vim.log.levels.ERROR)
-    return
-  end
 
   -- LAZY LOADING: Collect all available languages without calling detect()
   -- This avoids the performance penalty of calling all detect() functions upfront

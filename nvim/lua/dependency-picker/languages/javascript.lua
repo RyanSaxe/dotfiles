@@ -1,23 +1,56 @@
--- JavaScript/TypeScript detector
--- Detects local node_modules based on nearest package.json
--- Handles scoped packages (@org/package) and caches results
-
 local util = require("dependency-picker.util")
 
 local M = {}
 
--- Language metadata
+---@param root string node_modules directory path
+---@return string[] List of packages including scoped packages
+local function scan_packages_with_scope(root)
+  local handle = util.safe_scandir(root)
+  if not handle then
+    return {}
+  end
+
+  local packages = {}
+
+  while true do
+    local name, type = vim.uv.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+
+    if type == "directory" and not name:match("^%.") then
+      if name:match("^@") then
+        local scope_path = root .. "/" .. name
+        local scope_handle = util.safe_scandir(scope_path)
+        if scope_handle then
+          while true do
+            local scope_pkg, scope_type = vim.uv.fs_scandir_next(scope_handle)
+            if not scope_pkg then
+              break
+            end
+
+            if scope_type == "directory" and not scope_pkg:match("^%.") then
+              local full_name = name .. "/" .. scope_pkg
+              table.insert(packages, full_name)
+            end
+          end
+        end
+      else
+        table.insert(packages, name)
+      end
+    end
+  end
+
+  return packages
+end
+
 M.name = "JavaScript"
--- Includes React/Vue/Svelte - they all use node_modules
 M.filetypes = { "javascript", "typescript", "javascriptreact", "typescriptreact", "json" }
 M.requires_buffer_path = true
 
--- Detect local node_modules packages
--- Requires buffer_path to find nearest package.json
 ---@param buffer_path string Current buffer path
 ---@return table|nil { root = string, packages = string[] }
 function M.detect(buffer_path)
-  -- Find nearest package.json by walking up the directory tree
   local project_root = util.find_marker_upward({ "package.json" }, vim.fn.fnamemodify(buffer_path, ":h"))
   if not project_root then
     return nil
@@ -28,16 +61,13 @@ function M.detect(buffer_path)
     return nil
   end
 
-  -- Check cache first (node_modules can be huge)
   local cache_key = util.make_cache_key("javascript", node_modules)
   local cached = util.get_cache(cache_key)
   if cached then
     return { root = node_modules, packages = cached.packages }
   end
 
-  -- Scan node_modules for packages, including scoped packages (@org/package)
-  local packages = util.scan_packages_with_scope(node_modules, "^@", nil)
-
+  local packages = scan_packages_with_scope(node_modules)
   if #packages > 0 then
     table.sort(packages)
     util.set_cache(cache_key, { packages = packages })
@@ -50,14 +80,8 @@ end
 -- Detect JavaScript/Node.js standard library (NOT IMPLEMENTED)
 -- TODO: Implement Node.js stdlib support
 -- Would require finding Node.js installation source or TypeScript definitions
--- For now, stdlib detection is disabled for JavaScript/Node
 ---@return table|nil { root = string, packages = string[] }
 function M.detect_stdlib()
-  -- Not implemented - Node.js stdlib is built into the runtime
-  -- Would need to either:
-  -- 1. Find Node.js source installation (complex, varies by install method)
-  -- 2. Use @types/node TypeScript definitions (if installed)
-  -- 3. Clone/download Node.js source from GitHub
   return nil
 end
 
