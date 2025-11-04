@@ -71,13 +71,24 @@ local function show_package_picker(lang_name, root, packages, mode, detector)
       return
     end
 
+    -- Validate the selected package name for safety
+    if not util.is_safe_package_name(selected_package) then
+      vim.notify(
+        string.format("Invalid package name: %s", selected_package),
+        vim.log.levels.ERROR,
+        { title = lang_name }
+      )
+      return
+    end
+
     -- Resolve the actual versioned directory name or single-file module
     -- Package names are displayed without versions (e.g., "rails", "serde")
     -- but actual directories include versions (e.g., "rails-7.0.0", "serde-1.0.0")
     -- Use language-specific resolution if available
     local resolve_fn = detector and detector.resolve_directory
     local file_extension = detector and detector.file_extension
-    local actual_path = util.resolve_package_dir(root, selected_package, resolve_fn, file_extension)
+    local exclude_patterns = detector and detector.exclude_patterns
+    local actual_path = util.resolve_package_dir(root, selected_package, resolve_fn, file_extension, exclude_patterns)
     if not actual_path then
       vim.notify(
         string.format("Could not find directory or file for package: %s", selected_package),
@@ -132,6 +143,12 @@ function M.smart_search(mode)
   local bufpath = vim.api.nvim_buf_get_name(0)
   local filetype = vim.bo.filetype
 
+  -- Validate buffer path if present
+  if bufpath and bufpath ~= "" and not util.is_safe_path(bufpath) then
+    vim.notify("Cannot process buffer with unsafe path", vim.log.levels.ERROR)
+    return
+  end
+
   -- Try each detector for current filetype
   for _, detector in ipairs(detectors) do
     -- Check if filetype matches
@@ -148,7 +165,8 @@ function M.smart_search(mode)
           -- Resolve the actual versioned directory name
           -- Use language-specific resolution if available
           local resolve_fn = detector.resolve_directory
-          local actual_dir = util.resolve_package_dir(result.root, pkg_name, resolve_fn)
+          local exclude_patterns = detector.exclude_patterns
+          local actual_dir = util.resolve_package_dir(result.root, pkg_name, resolve_fn, nil, exclude_patterns)
           if not actual_dir then
             vim.notify(
               string.format("Could not find directory for package: %s", pkg_name),
@@ -202,30 +220,28 @@ function M.manual_search(mode)
 
   local bufpath = vim.api.nvim_buf_get_name(0)
 
-  -- Collect available detectors with results
-  local available = {}
-  local lang_data = {} -- Map language display string to data
-
-  for _, detector in ipairs(detectors) do
-    local result = detector.requires_buffer_path and detector.detect(bufpath) or detector.detect()
-    if result and #result.packages > 0 then
-      local lang_display = string.format("%s (%d packages)", detector.name, #result.packages)
-      table.insert(available, lang_display)
-      lang_data[lang_display] = {
-        name = detector.name,
-        root = result.root,
-        packages = result.packages,
-        detector = detector, -- Store detector for versioning functions
-      }
-    end
-  end
-
-  if #available == 0 then
-    vim.notify("No dependencies detected for any language", vim.log.levels.WARN, { title = "Dependency Picker" })
+  -- Validate buffer path if present
+  if bufpath and bufpath ~= "" and not util.is_safe_path(bufpath) then
+    vim.notify("Cannot process buffer with unsafe path", vim.log.levels.ERROR)
     return
   end
 
-  -- Show language picker
+  -- LAZY LOADING: Collect all available languages without calling detect()
+  -- This avoids the performance penalty of calling all detect() functions upfront
+  local available = {}
+  local detector_map = {} -- Map language name to detector
+
+  for _, detector in ipairs(detectors) do
+    table.insert(available, detector.name)
+    detector_map[detector.name] = detector
+  end
+
+  if #available == 0 then
+    vim.notify("No language detectors available", vim.log.levels.WARN, { title = "Dependency Picker" })
+    return
+  end
+
+  -- Show language picker immediately (no detect() calls yet)
   require("snacks").picker.select(available, {
     prompt = string.format("Select Language (%s)", mode),
   }, function(selected_lang)
@@ -233,8 +249,26 @@ function M.manual_search(mode)
       return
     end
 
-    local data = lang_data[selected_lang]
-    show_package_picker(data.name, data.root, data.packages, mode, data.detector)
+    local detector = detector_map[selected_lang]
+    if not detector then
+      vim.notify("Language detector not found", vim.log.levels.ERROR)
+      return
+    end
+
+    -- NOW call detect() only for the selected language
+    local result = detector.requires_buffer_path and detector.detect(bufpath) or detector.detect()
+
+    if not result or #result.packages == 0 then
+      vim.notify(
+        string.format("No %s packages detected", detector.name),
+        vim.log.levels.WARN,
+        { title = "Dependency Picker" }
+      )
+      return
+    end
+
+    -- Show package picker with the detected packages
+    show_package_picker(detector.name, result.root, result.packages, mode, detector)
   end)
 end
 

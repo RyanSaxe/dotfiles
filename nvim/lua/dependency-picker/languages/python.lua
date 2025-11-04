@@ -13,6 +13,8 @@ M.requires_buffer_path = false
 -- File extension for single-file modules (e.g., os.py, sys.py)
 -- Used to resolve both directory packages and single-file modules
 M.file_extension = ".py"
+-- Exclusion patterns for filtering out metadata directories when resolving paths
+M.exclude_patterns = { "%.dist%-info$", "%.egg%-info$" }
 
 -- Detect Python packages in the active virtual environment
 -- Filters out metadata directories (dist-info, egg-info, __pycache__)
@@ -24,7 +26,7 @@ function M.detect()
   end
 
   -- Check cache first
-  local cache_key = "python:" .. venv
+  local cache_key = util.make_cache_key("python", venv)
   local cached = util.get_cache(cache_key)
   if cached then
     -- First item is root, rest are packages
@@ -99,12 +101,9 @@ local function find_system_stdlib_dir(venv)
 
         -- Check each candidate to see if it exists and contains stdlib modules
         for _, candidate in ipairs(candidates) do
-          local candidate_stat = util.safe_stat(candidate)
-          if candidate_stat and candidate_stat.type == "directory" then
+          if util.is_directory(candidate) then
             -- Verify it looks like a stdlib directory (should contain os.py or os/ directory)
-            local os_py = util.safe_stat(candidate .. "/os.py")
-            local os_dir = util.safe_stat(candidate .. "/os")
-            if os_py or (os_dir and os_dir.type == "directory") then
+            if util.exists(candidate .. "/os.py") or util.is_directory(candidate .. "/os") then
               return candidate
             end
           end
@@ -116,24 +115,18 @@ local function find_system_stdlib_dir(venv)
   -- Strategy 2: Query Python for its prefix
   -- This is more reliable but requires executing Python
   local python_exe = venv .. "/bin/python"
-  local cmd = string.format('%s -c "import sys; print(sys.prefix)" 2>/dev/null', python_exe)
-  local handle = io.popen(cmd)
+  local cmd = string.format('%s -c "import sys; print(sys.prefix)"', python_exe)
+  local sys_prefix = util.exec_command(cmd)
 
-  if handle then
-    local sys_prefix = handle:read("*l")
-    handle:close()
+  if sys_prefix then
+    -- Find the lib/pythonX.Y directory under sys.prefix
+    local lib_pattern = sys_prefix .. "/lib/python*"
+    local raw = vim.fn.glob(lib_pattern, false, false)
 
-    if sys_prefix and sys_prefix ~= "" then
-      -- Find the lib/pythonX.Y directory under sys.prefix
-      local lib_pattern = sys_prefix .. "/lib/python*"
-      local raw = vim.fn.glob(lib_pattern, false, false)
-
-      if raw ~= "" then
-        local stdlib_dir = raw:match("([^\n]+)")
-        local stat_check = util.safe_stat(stdlib_dir)
-        if stat_check and stat_check.type == "directory" then
-          return stdlib_dir
-        end
+    if raw ~= "" then
+      local stdlib_dir = raw:match("([^\n]+)")
+      if util.is_directory(stdlib_dir) then
+        return stdlib_dir
       end
     end
   end
@@ -157,7 +150,7 @@ function M.detect_stdlib()
   end
 
   -- Check cache
-  local cache_key = "python_stdlib:" .. stdlib_dir
+  local cache_key = util.make_cache_key("python_stdlib", stdlib_dir)
   local cached = util.get_cache(cache_key)
   if cached then
     return { root = stdlib_dir, packages = cached.packages }

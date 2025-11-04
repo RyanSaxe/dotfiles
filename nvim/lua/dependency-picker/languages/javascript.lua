@@ -24,53 +24,19 @@ function M.detect(buffer_path)
   end
 
   local node_modules = project_root .. "/node_modules"
-  local stat = util.safe_stat(node_modules)
-  if not stat or stat.type ~= "directory" then
+  if not util.is_directory(node_modules) then
     return nil
   end
 
   -- Check cache first (node_modules can be huge)
-  local cache_key = "javascript:" .. node_modules
+  local cache_key = util.make_cache_key("javascript", node_modules)
   local cached = util.get_cache(cache_key)
   if cached then
     return { root = node_modules, packages = cached.packages }
   end
 
-  -- Scan node_modules for packages
-  local handle = util.safe_scandir(node_modules)
-  if not handle then
-    return nil
-  end
-
-  local packages = {}
-  while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
-    if not name then
-      break
-    end
-
-    if type == "directory" then
-      -- Handle scoped packages (@org/package)
-      if name:match("^@") then
-        local scope_path = node_modules .. "/" .. name
-        local scope_handle = util.safe_scandir(scope_path)
-        if scope_handle then
-          while true do
-            local scope_pkg, scope_type = vim.loop.fs_scandir_next(scope_handle)
-            if not scope_pkg then
-              break
-            end
-            if scope_type == "directory" and not scope_pkg:match("^%.") then
-              table.insert(packages, name .. "/" .. scope_pkg)
-            end
-          end
-        end
-      elseif not name:match("^%.") then
-        -- Regular package (not hidden)
-        table.insert(packages, name)
-      end
-    end
-  end
+  -- Scan node_modules for packages, including scoped packages (@org/package)
+  local packages = util.scan_packages_with_scope(node_modules, "^@", nil)
 
   if #packages > 0 then
     table.sort(packages)

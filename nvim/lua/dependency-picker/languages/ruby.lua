@@ -24,51 +24,21 @@ local function get_gem_home()
   end
 
   -- Fallback: ask ruby for gem home
-  local handle = io.popen("ruby -e 'puts Gem.user_dir' 2>/dev/null")
-  if not handle then
-    return nil
-  end
-
-  local output = handle:read("*a"):gsub("%s+", "")
-  handle:close()
-
-  if output ~= "" then
-    return output
-  end
-
-  return nil
+  return util.exec_command("ruby -e 'puts Gem.user_dir'")
 end
 
 -- Scan a gems directory and extract unique gem names (strip versions)
+-- Filters out directories without version suffixes (likely metadata)
 ---@param gems_dir string Path to gems directory
 ---@return string[] List of unique gem names
 local function scan_gems(gems_dir)
-  local handle = util.safe_scandir(gems_dir)
-  if not handle then
-    return {}
-  end
-
-  local gems = {}
-  local seen = {} -- Track unique gem names (deduplicate versions)
-
-  while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
-    if not name then
-      break
-    end
-
-    if type == "directory" and not name:match("^%.") then
-      -- Extract gem name by stripping version suffix
-      -- Handles multi-hyphenated names like "active-record-7.0.0" -> "active-record"
-      local gem_name = util.strip_version_suffix(name)
-      if gem_name and gem_name ~= name and not seen[gem_name] then
-        seen[gem_name] = true
-        table.insert(gems, gem_name)
-      end
-    end
-  end
-
-  return gems
+  -- Use the generic scan_and_deduplicate with a filter for versioned gems only
+  return util.scan_and_deduplicate(gems_dir, nil, function(name)
+    -- Only include directories that have a version suffix
+    -- This filters out non-gem directories in the gems folder
+    local base = util.strip_version_suffix(name)
+    return base and base ~= name
+  end)
 end
 
 -- Detect Ruby gems from GEM_HOME or bundler paths
@@ -104,13 +74,12 @@ function M.detect(buffer_path)
     return nil
   end
 
-  local stat = util.safe_stat(gems_dir)
-  if not stat or stat.type ~= "directory" then
+  if not util.is_directory(gems_dir) then
     return nil
   end
 
   -- Check cache first
-  local cache_key = "ruby:" .. gems_dir
+  local cache_key = util.make_cache_key("ruby", gems_dir)
   local cached = util.get_cache(cache_key)
   if cached then
     return { root = gems_dir, packages = cached.packages }
@@ -130,65 +99,20 @@ end
 
 -- ============================================================================
 -- OPTIONAL: Language-specific versioning functions
--- These functions provide Ruby-specific version handling for full extensibility
 -- ============================================================================
 
--- Strip version suffix from Ruby gem directory names
--- Ruby gems use format: gemname-X.Y.Z (e.g., rack-2.2.21 -> rack)
--- Handles multi-hyphenated gems: rack-protection-3.2.0 -> rack-protection
----@param name string Gem directory name (may include version)
----@return string Gem name without version suffix
-function M.strip_version(name)
-  if not name then
-    return nil
-  end
-
-  -- Match gems with version suffix: gemname-X.Y.Z
-  -- The pattern matches the last hyphen followed by version numbers
-  local stripped = name:match("^(.+)%-[%d%.]+")
-  if stripped then
-    return stripped
-  end
-
-  -- No version pattern found, return as-is
-  return name
-end
+-- Note: Ruby version stripping is handled by util.strip_version_suffix
+-- which supports Ruby format: gemname-X.Y.Z including prereleases
 
 -- Resolve a gem name to its actual versioned directory
--- Scans the gems directory to find the versioned directory (e.g., rack -> rack-2.2.21)
--- Returns the latest version if multiple versions exist
+-- Uses the generic resolver with Ruby-specific version separator (-)
 ---@param root string Gems directory path
 ---@param gem_name string Gem name without version (e.g., "rack")
 ---@return string|nil Versioned directory name (e.g., "rack-2.2.21"), or nil if not found
 function M.resolve_directory(root, gem_name)
-  local handle = util.safe_scandir(root)
-  if not handle then
-    return nil
-  end
-
-  local matches = {}
-  while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
-    if not name then
-      break
-    end
-
-    if type == "directory" then
-      -- Match versioned gems: gemname-X.Y.Z
-      -- Pattern must end with version numbers to avoid matching metadata dirs
-      -- Use vim.pesc to escape special pattern characters in gem_name
-      if name:match("^" .. vim.pesc(gem_name) .. "%-[%d%.]+$") then
-        table.insert(matches, name)
-      end
-    end
-  end
-
-  if #matches > 0 then
-    table.sort(matches)
-    return matches[#matches] -- Return latest version
-  end
-
-  return nil
+  -- Use the generic versioned package resolver with Ruby's - separator
+  -- Also check for .rb files (single-file stdlib modules)
+  return util.resolve_versioned_package(root, gem_name, "%-", M.file_extension)
 end
 
 -- Detect Ruby standard library modules
@@ -196,25 +120,17 @@ end
 ---@return table|nil { root = string, packages = string[] }
 function M.detect_stdlib()
   -- Get Ruby stdlib directory
-  local handle = io.popen("ruby -e \"puts RbConfig::CONFIG['rubylibdir']\" 2>/dev/null")
-  if not handle then
+  local stdlib_dir = util.exec_command("ruby -e \"puts RbConfig::CONFIG['rubylibdir']\"")
+  if not stdlib_dir then
     return nil
   end
 
-  local stdlib_dir = handle:read("*a"):gsub("%s+", "")
-  handle:close()
-
-  if not stdlib_dir or stdlib_dir == "" then
-    return nil
-  end
-
-  local stat = util.safe_stat(stdlib_dir)
-  if not stat or stat.type ~= "directory" then
+  if not util.is_directory(stdlib_dir) then
     return nil
   end
 
   -- Check cache
-  local cache_key = "ruby_stdlib:" .. stdlib_dir
+  local cache_key = util.make_cache_key("ruby_stdlib", stdlib_dir)
   local cached = util.get_cache(cache_key)
   if cached then
     return { root = stdlib_dir, packages = cached.packages }

@@ -69,13 +69,10 @@ end
 -- Dynamically queries luarocks to support system-wide installs (e.g., Homebrew)
 ---@return string[] List of luarocks tree root paths
 local function get_luarocks_trees()
-  local handle = io.popen("luarocks config rocks_trees 2>/dev/null")
-  if not handle then
+  local output = util.exec_command("luarocks config rocks_trees")
+  if not output then
     return {}
   end
-
-  local output = handle:read("*a")
-  handle:close()
 
   -- Parse Lua table output to extract root paths
   -- Format: { { name = "user", root = "/path" }, { name = "system", root = "/path" } }
@@ -108,10 +105,9 @@ function M.detect(buffer_path)
 
   -- Try each candidate in order (local first, then luarocks trees)
   for _, candidate in ipairs(candidates) do
-    local stat = util.safe_stat(candidate.path)
-    if stat and stat.type == "directory" then
+    if util.is_directory(candidate.path) then
       -- Check cache first
-      local cache_key = "lua:" .. candidate.path
+      local cache_key = util.make_cache_key("lua", candidate.path)
       local cached = util.get_cache(cache_key)
       if cached then
         return { root = candidate.path, packages = cached.packages }

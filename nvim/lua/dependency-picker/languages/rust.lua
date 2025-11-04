@@ -16,33 +16,26 @@ M.requires_buffer_path = true
 ---@param cargo_toml_path string Path to Cargo.toml file
 ---@return string[] List of crate names
 local function parse_cargo_toml(cargo_toml_path)
-  local file = io.open(cargo_toml_path, "r")
-  if not file then
-    return {}
-  end
-
-  local crates = {}
+  -- Use the generic config parser with a custom function
+  -- to handle TOML dependency sections
   local in_dependencies = false
 
-  for line in file:lines() do
+  return util.parse_config_file(cargo_toml_path, function(line)
     -- Check for dependency sections
     if line:match("^%[dependencies%]") or line:match("^%[dev%-dependencies%]") then
       in_dependencies = true
+      return nil
     -- Exit section when we hit another [section]
     elseif line:match("^%[") then
       in_dependencies = false
+      return nil
     -- Parse dependency lines
     elseif in_dependencies then
       -- Match lines like: serde = "1.0" or serde = { version = "1.0" }
-      local crate = line:match("^([%w_%-]+)%s*=")
-      if crate then
-        table.insert(crates, crate)
-      end
+      return line:match("^([%w_%-]+)%s*=")
     end
-  end
-
-  file:close()
-  return crates
+    return nil
+  end)
 end
 
 -- Get cargo registry hash directory
@@ -52,8 +45,7 @@ local function get_cargo_hash_dir()
   local cargo_home = vim.env.CARGO_HOME or (vim.env.HOME .. "/.cargo")
   local registry_src = cargo_home .. "/registry/src"
 
-  local stat = util.safe_stat(registry_src)
-  if not stat or stat.type ~= "directory" then
+  if not util.is_directory(registry_src) then
     return nil
   end
 
@@ -92,7 +84,7 @@ function M.detect(buffer_path)
   local cargo_toml = project_root .. "/Cargo.toml"
 
   -- Check cache first (keyed by Cargo.toml path)
-  local cache_key = "rust:" .. cargo_toml
+  local cache_key = util.make_cache_key("rust", cargo_toml)
   local cached = util.get_cache(cache_key)
   if cached then
     -- First item is hash_dir, rest are packages
@@ -120,65 +112,19 @@ end
 
 -- ============================================================================
 -- OPTIONAL: Language-specific versioning functions
--- These functions provide Rust-specific version handling for full extensibility
 -- ============================================================================
 
--- Strip version suffix from Rust crate directory names
--- Rust crates use format: cratename-X.Y.Z (e.g., serde-1.0.0 -> serde)
--- Handles multi-hyphenated crates: serde-json-1.0.0 -> serde-json
----@param name string Crate directory name (may include version)
----@return string Crate name without version suffix
-function M.strip_version(name)
-  if not name then
-    return nil
-  end
-
-  -- Match crates with version suffix: cratename-X.Y.Z
-  -- The pattern matches the last hyphen followed by version numbers
-  local stripped = name:match("^(.+)%-[%d%.]+")
-  if stripped then
-    return stripped
-  end
-
-  -- No version pattern found, return as-is
-  return name
-end
+-- Note: Rust version stripping is handled by util.strip_version_suffix
+-- which supports Rust format: cratename-X.Y.Z including prereleases
 
 -- Resolve a crate name to its actual versioned directory
--- Scans the cargo registry to find the versioned directory (e.g., serde -> serde-1.0.0)
--- Returns the latest version if multiple versions exist
+-- Uses the generic resolver with Rust-specific version separator (-)
 ---@param root string Cargo registry src directory path (hash directory)
 ---@param crate_name string Crate name without version (e.g., "serde")
 ---@return string|nil Versioned directory name (e.g., "serde-1.0.0"), or nil if not found
 function M.resolve_directory(root, crate_name)
-  local handle = util.safe_scandir(root)
-  if not handle then
-    return nil
-  end
-
-  local matches = {}
-  while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
-    if not name then
-      break
-    end
-
-    if type == "directory" then
-      -- Match versioned crates: cratename-X.Y.Z
-      -- Pattern must end with version numbers to avoid matching metadata dirs
-      -- Use vim.pesc to escape special pattern characters in crate_name
-      if name:match("^" .. vim.pesc(crate_name) .. "%-[%d%.]+$") then
-        table.insert(matches, name)
-      end
-    end
-  end
-
-  if #matches > 0 then
-    table.sort(matches)
-    return matches[#matches] -- Return latest version
-  end
-
-  return nil
+  -- Use the generic versioned package resolver with Rust's - separator
+  return util.resolve_versioned_package(root, crate_name, "%-", nil)
 end
 
 -- Detect Rust standard library source
@@ -187,27 +133,19 @@ end
 ---@return table|nil { root = string, packages = string[] }
 function M.detect_stdlib()
   -- Get rustc sysroot
-  local handle = io.popen("rustc --print sysroot 2>/dev/null")
-  if not handle then
-    return nil
-  end
-
-  local sysroot = handle:read("*a"):gsub("%s+", "")
-  handle:close()
-
-  if not sysroot or sysroot == "" then
+  local sysroot = util.exec_command("rustc --print sysroot")
+  if not sysroot then
     return nil
   end
 
   -- Stdlib source is in sysroot/lib/rustlib/src/rust/library
   local stdlib_dir = sysroot .. "/lib/rustlib/src/rust/library"
-  local stat = util.safe_stat(stdlib_dir)
-  if not stat or stat.type ~= "directory" then
+  if not util.is_directory(stdlib_dir) then
     return nil
   end
 
   -- Check cache
-  local cache_key = "rust_stdlib:" .. stdlib_dir
+  local cache_key = util.make_cache_key("rust_stdlib", stdlib_dir)
   local cached = util.get_cache(cache_key)
   if cached then
     return { root = stdlib_dir, packages = cached.packages }

@@ -26,8 +26,7 @@ function M.detect()
 
   -- Find the first existing plugin directory
   for _, candidate in ipairs(candidates) do
-    local stat = util.safe_stat(candidate.path)
-    if stat and stat.type == "directory" then
+    if util.is_directory(candidate.path) then
       -- Get list of plugins (directories only, no hidden files)
       local packages = util.scan_directories(candidate.path)
 
