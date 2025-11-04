@@ -41,7 +41,7 @@ function M.get_cache(key)
   -- Return a copy to prevent external mutations
   return {
     packages = vim.deepcopy(cached.packages),
-    timestamp = cached.timestamp
+    timestamp = cached.timestamp,
   }
 end
 
@@ -76,7 +76,7 @@ function M.get_cache_stats()
   local oldest = nil
   local current_time = os.time()
 
-  for key, entry in pairs(cache) do
+  for _, entry in pairs(cache) do
     count = count + 1
     local age = current_time - entry.timestamp
     if not oldest or age > oldest then
@@ -87,7 +87,7 @@ function M.get_cache_stats()
   return {
     entry_count = count,
     oldest_age_seconds = oldest,
-    ttl_seconds = CACHE_TTL
+    ttl_seconds = CACHE_TTL,
   }
 end
 
@@ -166,9 +166,9 @@ end
 -- Returns original name if no version pattern found
 --
 -- Supports language-specific version stripping via optional strip_fn parameter
----@param name string Package directory name (may include version)
+---@param name string|nil Package directory name (may include version)
 ---@param strip_fn function|nil Optional language-specific version stripping function
----@return string Package name without version suffix
+---@return string|nil Package name without version suffix
 function M.strip_version_suffix(name, strip_fn)
   if not name then
     return nil
@@ -208,13 +208,13 @@ end
 ---@return string|nil Directory containing the first found marker, or nil
 function M.find_marker_upward(markers, start_path)
   local current = start_path
-  local root = vim.loop.os_homedir() or "/"
+  local root = vim.uv.os_homedir() or "/"
 
   -- Walk up the directory tree until we hit the root
   while current and current ~= root do
     for _, marker in ipairs(markers) do
       local marker_path = current .. "/" .. marker
-      if vim.loop.fs_stat(marker_path) then
+      if vim.uv.fs_stat(marker_path) then
         return current
       end
     end
@@ -276,9 +276,9 @@ end
 -- Safely check if a path exists and return its stat info
 -- Returns nil on error instead of throwing
 ---@param path string Path to check
----@return table|nil Stat info from vim.loop.fs_stat, or nil on error
+---@return table|nil Stat info from vim.uv.fs_stat, or nil on error
 function M.safe_stat(path)
-  local ok, stat = pcall(vim.loop.fs_stat, path)
+  local ok, stat = pcall(vim.uv.fs_stat, path)
   if not ok then
     return nil
   end
@@ -294,9 +294,8 @@ end
 -- Automatically handles stderr redirection and output trimming
 -- Returns nil on error or empty output
 ---@param cmd string Command to execute
----@param timeout number|nil Optional timeout in seconds (not implemented)
 ---@return string|nil Trimmed output string, or nil on error
-function M.exec_command(cmd, timeout)
+function M.exec_command(cmd, _)
   -- Add stderr redirection if not already present
   local full_cmd = cmd
   if not cmd:match("2>") then
@@ -370,9 +369,9 @@ end
 -- Safely open a directory for scanning
 -- Returns nil and logs error on failure
 ---@param path string Directory path to scan
----@return userdata|nil Directory handle from vim.loop.fs_scandir, or nil on error
+---@return any|nil Directory handle from vim.uv.fs_scandir, or nil on error
 function M.safe_scandir(path)
-  local ok, handle = pcall(vim.loop.fs_scandir, path)
+  local ok, handle = pcall(vim.uv.fs_scandir, path)
   if not ok or not handle then
     -- Silent failure - callers will check for nil
     return nil
@@ -398,7 +397,7 @@ function M.scan_directories(dir_path, filter_fn)
 
   local results = {}
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end
@@ -457,7 +456,7 @@ function M.resolve_package_dir(root, package_name, resolve_fn, file_extension, e
 
     local matches = {}
     while true do
-      local name, type = vim.loop.fs_scandir_next(handle)
+      local name, type = vim.uv.fs_scandir_next(handle)
       if not name then
         break
       end
@@ -500,7 +499,7 @@ function M.resolve_package_dir(root, package_name, resolve_fn, file_extension, e
 
   local matches = {}
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end
@@ -575,7 +574,7 @@ function M.scan_and_deduplicate(dir_path, strip_fn, filter_fn)
   local results = {}
 
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end
@@ -624,7 +623,7 @@ function M.resolve_versioned_package(root, package_name, version_separator, file
 
     local matches = {}
     while true do
-      local name, type = vim.loop.fs_scandir_next(handle)
+      local name, type = vim.uv.fs_scandir_next(handle)
       if not name then
         break
       end
@@ -668,7 +667,7 @@ function M.resolve_versioned_package(root, package_name, version_separator, file
 
   local matches = {}
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end
@@ -732,7 +731,7 @@ function M.parse_config_file(file_path, pattern, options)
   local in_block = options and options.in_block or false
   local current_block = false
 
-  local ok, err = pcall(function()
+  local ok, _ = pcall(function()
     for line in file:lines() do
       -- Handle block-based parsing (e.g., TOML sections)
       if options and options.block_start then
@@ -787,7 +786,7 @@ function M.scan_packages_with_scope(root, scope_pattern, filter_fn)
   local packages = {}
 
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end
@@ -800,7 +799,7 @@ function M.scan_packages_with_scope(root, scope_pattern, filter_fn)
         local scope_handle = M.safe_scandir(scope_path)
         if scope_handle then
           while true do
-            local scope_pkg, scope_type = vim.loop.fs_scandir_next(scope_handle)
+            local scope_pkg, scope_type = vim.uv.fs_scandir_next(scope_handle)
             if not scope_pkg then
               break
             end

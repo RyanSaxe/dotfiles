@@ -54,9 +54,7 @@ function M.detect()
   -- Scan site-packages for actual package directories
   -- Filter function excludes metadata and cache directories
   local filter = function(name)
-    return not name:match("%.dist%-info$")
-      and not name:match("%.egg%-info$")
-      and name ~= "__pycache__"
+    return not name:match("%.dist%-info$") and not name:match("%.egg%-info$") and name ~= "__pycache__"
   end
 
   local packages = util.scan_directories(site_packages, filter)
@@ -81,11 +79,11 @@ local function find_system_stdlib_dir(venv)
   local python_bin = venv .. "/bin/python"
   -- Use fs_lstat (not fs_stat) to detect if it's a symlink
   -- fs_stat follows symlinks, fs_lstat gives info about the link itself
-  local ok, stat = pcall(vim.loop.fs_lstat, python_bin)
+  local ok, stat = pcall(vim.uv.fs_lstat, python_bin)
 
   if ok and stat and stat.type == "link" then
     -- Follow the symlink to find the real Python executable
-    local real_python = vim.loop.fs_realpath(python_bin)
+    local real_python = vim.uv.fs_realpath(python_bin)
     if real_python then
       -- Real Python is typically at: /usr/bin/python3.11
       -- Stdlib is at: /usr/lib/python3.11/
@@ -166,7 +164,7 @@ function M.detect_stdlib()
   local seen = {}
 
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end

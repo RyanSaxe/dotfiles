@@ -57,7 +57,7 @@ local function get_cargo_hash_dir()
 
   local hash_dir
   while true do
-    local name, type = vim.loop.fs_scandir_next(handle)
+    local name, type = vim.uv.fs_scandir_next(handle)
     if not name then
       break
     end
