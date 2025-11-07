@@ -3,6 +3,50 @@
 
 local M = {}
 
+-- Stores the original resolved layout for each picker instance
+-- This allows us to restore the exact layout that was active when the picker opened
+local picker_states = {}
+
+-- Captures and stores the original resolved layout configuration
+-- Called once per picker instance to save the initial layout state
+---@param picker snacks.Picker
+local function ensure_original_layout_stored(picker)
+  if not picker_states[picker.id] then
+    -- Store the resolved layout (not picker.opts.layout) because:
+    -- - resolved_layout is the fully processed layout that's currently active
+    -- - It includes all merged presets, customizations, and defaults
+    -- - set_layout() can handle it directly without further resolution
+    local original = picker.resolved_layout and vim.deepcopy(picker.resolved_layout) or nil
+
+    picker_states[picker.id] = {
+      original = original,
+    }
+  end
+end
+
+-- Switches the picker layout to vertical (custom_vertical)
+---@param picker snacks.Picker
+function M.switch_to_vertical_layout(picker)
+  ensure_original_layout_stored(picker)
+  picker:set_layout("custom_vertical")
+end
+
+-- Switches the picker layout to default
+---@param picker snacks.Picker
+function M.switch_to_default_layout(picker)
+  ensure_original_layout_stored(picker)
+  picker:set_layout("default")
+end
+
+-- Restores the picker layout to its original configuration
+-- The original layout is captured when the picker first opens
+---@param picker snacks.Picker
+function M.restore_original_layout(picker)
+  ensure_original_layout_stored(picker)
+  local state = picker_states[picker.id]
+  picker:set_layout(state.original)
+end
+
 -- Save buffer action for buffer picker
 -- Saves all selected buffers that have unsaved changes
 ---@param picker snacks.picker.Picker
