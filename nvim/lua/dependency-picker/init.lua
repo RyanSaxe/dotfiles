@@ -17,6 +17,7 @@ local config = {
   select_detector = nil,
 }
 
+---@diagnostic disable-next-line: unused-local
 local function default_select_detector(matching_detectors, context)
   return matching_detectors[1]
 end
@@ -33,11 +34,7 @@ function M.setup(opts)
 
   if opts.enabled_languages then
     if type(opts.enabled_languages) ~= "table" then
-      vim.notify(
-        "enabled_languages must be a table/array",
-        vim.log.levels.ERROR,
-        { title = "Dependency Picker" }
-      )
+      vim.notify("enabled_languages must be a table/array", vim.log.levels.ERROR, { title = "Dependency Picker" })
       return
     end
     config.enabled_languages = opts.enabled_languages
@@ -45,11 +42,7 @@ function M.setup(opts)
 
   if opts.select_detector then
     if type(opts.select_detector) ~= "function" then
-      vim.notify(
-        "select_detector must be a function",
-        vim.log.levels.ERROR,
-        { title = "Dependency Picker" }
-      )
+      vim.notify("select_detector must be a function", vim.log.levels.ERROR, { title = "Dependency Picker" })
       return
     end
     config.select_detector = opts.select_detector

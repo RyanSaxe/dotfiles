@@ -44,8 +44,6 @@ function M.set_cache(key, data)
   }
 end
 
-
-
 -- ============================================================================
 -- PATH UTILITIES
 -- ============================================================================
@@ -229,7 +227,6 @@ function M.is_directory(path)
   local stat = M.safe_stat(path)
   return stat ~= nil and stat.type == "directory"
 end
-
 
 -- Check if a path exists (file or directory)
 ---@param path string Path to check
@@ -491,7 +488,6 @@ function M.scan_and_deduplicate(dir_path, strip_fn, filter_fn)
   return results
 end
 
-
 -- Parse a configuration file line by line
 -- Supports extracting dependencies from various config formats
 ---@param file_path string Path to configuration file
@@ -547,6 +543,5 @@ function M.parse_config_file(file_path, pattern, options)
 
   return results
 end
-
 
 return M
