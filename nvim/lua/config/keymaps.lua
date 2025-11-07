@@ -94,6 +94,24 @@ vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Togg
 -- See nvim/lua/dependency-picker/ for implementation details
 local dep_picker = require("dependency-picker")
 
+-- Configure dependency picker behavior
+-- Smart detector selection: prefer Neovim packages when "nvim" is in the file path
+dep_picker.setup({
+  -- All languages enabled by default
+  select_detector = function(matching_detectors, context)
+    -- If "nvim" is anywhere in the absolute path, prefer Neovim detector
+    if context.bufpath:match("nvim") then
+      for _, match in ipairs(matching_detectors) do
+        if match.detector.name == "Neovim" then
+          return match
+        end
+      end
+    end
+    -- Default: return first match
+    return matching_detectors[1]
+  end,
+})
+
 -- LEADER KEYBINDINGS (global, with language selection)
 -- Grep mode
 vim.keymap.set("n", "<leader>ps", function()

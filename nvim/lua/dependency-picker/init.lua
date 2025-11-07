@@ -3,16 +3,142 @@
 --
 -- Main features:
 -- - Smart detection: auto-detects language and current package context
+-- - Multi-detector handling: when multiple package ecosystems match your filetype,
+--   shows a picker to choose (e.g., Lua files can be Lua packages or Neovim plugins)
+-- - Language filtering: configure which languages to enable/disable
 -- - Manual selection: choose language and package explicitly
 -- - Dual modes: grep content or search files
 --
 -- Public API:
+--   M.setup(opts)           - Configure the dependency picker
 --   M.smart_search(mode)    - Auto-detect and search (mode: "grep" or "files")
 --   M.manual_search(mode)   - Manual language/package selection (mode: "grep" or "files")
+--
+-- Configuration Example:
+--   Call M.setup() with options table to configure behavior:
+--
+--   require("dependency-picker").setup({
+--     -- Optional: Whitelist specific languages (case-insensitive)
+--     -- Available: "neovim", "lua", "python", "javascript", "go", "rust", "ruby"
+--     -- Default: nil (all languages enabled)
+--     enabled_languages = nil,
+--
+--     -- Optional: Custom function to select which detector to use when multiple match
+--     -- Receives: matching_detectors (array of {detector, result}), context {bufpath, filetype}
+--     -- Returns: selected match from matching_detectors array, or nil to use first match
+--     -- Default: returns first match
+--     select_detector = function(matching_detectors, context)
+--       -- Example: prefer Neovim detector if "nvim" is in the file path
+--       if context.bufpath:match("nvim") then
+--         for _, match in ipairs(matching_detectors) do
+--           if match.detector.name == "Neovim" then
+--             return match
+--           end
+--         end
+--       end
+--       -- Default: return first match
+--       return matching_detectors[1]
+--     end
+--   })
+--
+-- How Multi-Detector Resolution Works:
+--   When you're in a lua file and press <leader>ps:
+--   1. Both "Lua" and "Neovim" detectors match the lua filetype
+--   2. The select_detector function is called to choose which one to use
+--   3. Proceeds automatically with the selected detector (no picker shown)
+--   4. Then the package picker appears for your selected ecosystem
 
 local util = require("dependency-picker.util")
 
 local M = {}
+
+-- Configuration storage
+-- Defaults:
+--   - All languages enabled (nil = no filtering)
+--   - First matching detector is selected when multiple match
+local config = {
+  enabled_languages = nil,  -- nil = all enabled, or array like { "neovim", "lua", "python" }
+  select_detector = nil,    -- nil = use default (first match), or custom function
+}
+
+-- Default detector selection logic: returns the first matching detector
+local function default_select_detector(matching_detectors, context)
+  return matching_detectors[1]
+end
+
+-- ============================================================================
+-- CONFIGURATION
+-- ============================================================================
+
+-- Setup function to configure dependency picker behavior
+-- @param opts table Configuration options:
+--   - enabled_languages: Array of language names to enable (whitelist)
+--                        Example: { "neovim", "lua", "python" }
+--                        Default: nil (all languages enabled)
+--   - select_detector: Function to select which detector to use when multiple match
+--                      Signature: function(matching_detectors, context) -> selected_match
+--                      Parameters:
+--                        - matching_detectors: array of { detector = detector_module, result = detect_result }
+--                        - context: { bufpath = string, filetype = string }
+--                      Returns: selected match from matching_detectors array
+--                      Default: returns first match
+function M.setup(opts)
+  opts = opts or {}
+
+  if opts.enabled_languages then
+    -- Validate that it's a table
+    if type(opts.enabled_languages) ~= "table" then
+      vim.notify(
+        "enabled_languages must be a table/array",
+        vim.log.levels.ERROR,
+        { title = "Dependency Picker" }
+      )
+      return
+    end
+    config.enabled_languages = opts.enabled_languages
+  end
+
+  if opts.select_detector then
+    -- Validate that it's a function
+    if type(opts.select_detector) ~= "function" then
+      vim.notify(
+        "select_detector must be a function",
+        vim.log.levels.ERROR,
+        { title = "Dependency Picker" }
+      )
+      return
+    end
+    config.select_detector = opts.select_detector
+  end
+end
+
+-- Filter detectors based on enabled_languages config
+-- Returns a new list containing only enabled detectors
+-- Performs case-insensitive matching
+-- @param detector_list table List of detector modules
+-- @return table Filtered list of detectors
+local function filter_enabled_detectors(detector_list)
+  -- If no whitelist configured, return all detectors
+  if not config.enabled_languages or #config.enabled_languages == 0 then
+    return detector_list
+  end
+
+  -- Normalize enabled_languages to lowercase for case-insensitive matching
+  local normalized_enabled = {}
+  for _, lang in ipairs(config.enabled_languages) do
+    table.insert(normalized_enabled, lang:lower())
+  end
+
+  -- Filter based on whitelist (case-insensitive)
+  local filtered = {}
+  for _, detector in ipairs(detector_list) do
+    if vim.tbl_contains(normalized_enabled, detector.name:lower()) then
+      table.insert(filtered, detector)
+    end
+  end
+
+  return filtered
+end
 
 -- ============================================================================
 -- HELPER FUNCTIONS
@@ -143,6 +269,7 @@ end
 -- Smart search: auto-detect language and current package context
 -- If already inside a dependency, search it directly
 -- Otherwise, show package picker for current language
+-- When multiple detectors match the filetype, shows a picker to choose
 ---@param mode string "grep" or "files"
 function M.smart_search(mode)
   mode = mode or "grep"
@@ -150,54 +277,80 @@ function M.smart_search(mode)
   local bufpath = vim.api.nvim_buf_get_name(0)
   local filetype = vim.bo.filetype
 
+  -- Filter detectors based on enabled_languages configuration
+  local enabled_detectors = filter_enabled_detectors(detectors)
 
-  -- Try each detector for current filetype
-  for _, detector in ipairs(detectors) do
+  -- Collect ALL matching detectors for this filetype
+  -- This allows us to handle ambiguous cases (e.g., lua files could be Lua or Neovim packages)
+  local matching_detectors = {}
+
+  for _, detector in ipairs(enabled_detectors) do
     -- Check if filetype matches
     if vim.tbl_contains(detector.filetypes, filetype) then
-      -- Run detector
+      -- Run detector to see if packages are available
       local result = detector.requires_buffer_path and detector.detect(bufpath) or detector.detect()
 
       if result then
-        -- Check if we're already inside a dependency
-        -- Use language-specific version stripping if available
-        local strip_fn = detector.strip_version
-        local pkg_name = util.extract_package_name(bufpath, result.root, strip_fn)
-        if pkg_name and vim.tbl_contains(result.packages, pkg_name) then
-          -- Resolve the actual versioned directory name
-          -- Use language-specific resolution if available
-          local resolve_fn = detector.resolve_directory
-          local exclude_patterns = detector.exclude_patterns
-          local actual_dir = util.resolve_package_dir(result.root, pkg_name, resolve_fn, nil, exclude_patterns)
-          if not actual_dir then
-            vim.notify(
-              string.format("Could not find directory for package: %s", pkg_name),
-              vim.log.levels.ERROR,
-              { title = detector.name }
-            )
-            return
-          end
-
-          -- Search directly in this package
-          local pkg_path = result.root .. "/" .. actual_dir
-
-          open_picker(mode, detector.name, pkg_name, pkg_path)
-          return
-        end
-
-        -- Not inside a package, show picker
-        show_package_picker(detector.name, result.root, result.packages, mode, detector)
-        return
+        table.insert(matching_detectors, {
+          detector = detector,
+          result = result,
+        })
       end
     end
   end
 
-  -- No detector matched
-  vim.notify(
-    string.format("No dependency detector available for filetype: %s", filetype),
-    vim.log.levels.WARN,
-    { title = "Dependency Picker" }
-  )
+  -- Handle results based on number of matches
+  if #matching_detectors == 0 then
+    -- No detector matched
+    vim.notify(
+      string.format("No dependency detector available for filetype: %s", filetype),
+      vim.log.levels.WARN,
+      { title = "Dependency Picker" }
+    )
+    return
+  end
+
+  -- Select which detector to use (using configured selection logic or default)
+  local select_fn = config.select_detector or default_select_detector
+  local context = {
+    bufpath = bufpath,
+    filetype = filetype,
+  }
+  local selected_match = select_fn(matching_detectors, context)
+
+  if not selected_match then
+    -- Selection function returned nil, use first match as fallback
+    selected_match = matching_detectors[1]
+  end
+
+  local detector = selected_match.detector
+  local result = selected_match.result
+
+  -- Check if we're already inside a dependency
+  local strip_fn = detector.strip_version
+  local pkg_name = util.extract_package_name(bufpath, result.root, strip_fn)
+  if pkg_name and vim.tbl_contains(result.packages, pkg_name) then
+    -- Resolve the actual versioned directory name
+    local resolve_fn = detector.resolve_directory
+    local exclude_patterns = detector.exclude_patterns
+    local actual_dir = util.resolve_package_dir(result.root, pkg_name, resolve_fn, nil, exclude_patterns)
+    if not actual_dir then
+      vim.notify(
+        string.format("Could not find directory for package: %s", pkg_name),
+        vim.log.levels.ERROR,
+        { title = detector.name }
+      )
+      return
+    end
+
+    -- Search directly in this package
+    local pkg_path = result.root .. "/" .. actual_dir
+    open_picker(mode, detector.name, pkg_name, pkg_path)
+    return
+  end
+
+  -- Not inside a package, show package picker
+  show_package_picker(detector.name, result.root, result.packages, mode, detector)
 end
 
 -- Manual search: explicit language and package selection
@@ -208,13 +361,15 @@ function M.manual_search(mode)
 
   local bufpath = vim.api.nvim_buf_get_name(0)
 
+  -- Filter detectors based on enabled_languages configuration
+  local enabled_detectors = filter_enabled_detectors(detectors)
 
   -- LAZY LOADING: Collect all available languages without calling detect()
   -- This avoids the performance penalty of calling all detect() functions upfront
   local available = {}
   local detector_map = {} -- Map language name to detector
 
-  for _, detector in ipairs(detectors) do
+  for _, detector in ipairs(enabled_detectors) do
     table.insert(available, detector.name)
     detector_map[detector.name] = detector
   end
@@ -265,27 +420,57 @@ end
 function M.smart_search_stdlib(mode)
   mode = mode or "grep"
 
+  local bufpath = vim.api.nvim_buf_get_name(0)
   local filetype = vim.bo.filetype
 
-  -- Try each detector for current filetype
-  for _, detector in ipairs(detectors) do
+  -- Filter detectors based on enabled_languages configuration
+  local enabled_detectors = filter_enabled_detectors(detectors)
+
+  -- Collect ALL matching stdlib detectors for this filetype
+  local matching_detectors = {}
+
+  for _, detector in ipairs(enabled_detectors) do
     if vim.tbl_contains(detector.filetypes, filetype) and detector.detect_stdlib then
       -- Run stdlib detector
       local result = detector.detect_stdlib()
 
       if result and #result.packages > 0 then
-        show_package_picker(detector.name .. " stdlib", result.root, result.packages, mode, detector)
-        return
+        table.insert(matching_detectors, {
+          detector = detector,
+          result = result,
+        })
       end
     end
   end
 
-  -- No stdlib detector matched
-  vim.notify(
-    string.format("No stdlib detector available for filetype: %s", filetype),
-    vim.log.levels.WARN,
-    { title = "Dependency Picker" }
-  )
+  -- Handle results based on number of matches
+  if #matching_detectors == 0 then
+    -- No stdlib detector matched
+    vim.notify(
+      string.format("No stdlib detector available for filetype: %s", filetype),
+      vim.log.levels.WARN,
+      { title = "Dependency Picker" }
+    )
+    return
+  end
+
+  -- Select which detector to use (using configured selection logic or default)
+  local select_fn = config.select_detector or default_select_detector
+  local context = {
+    bufpath = bufpath,
+    filetype = filetype,
+  }
+  local selected_match = select_fn(matching_detectors, context)
+
+  if not selected_match then
+    -- Selection function returned nil, use first match as fallback
+    selected_match = matching_detectors[1]
+  end
+
+  local detector = selected_match.detector
+  local result = selected_match.result
+
+  show_package_picker(detector.name .. " stdlib", result.root, result.packages, mode, detector)
 end
 
 -- Manual stdlib search: explicit language selection
@@ -293,11 +478,14 @@ end
 function M.manual_search_stdlib(mode)
   mode = mode or "grep"
 
+  -- Filter detectors based on enabled_languages configuration
+  local enabled_detectors = filter_enabled_detectors(detectors)
+
   -- Collect available stdlib detectors with results
   local available = {}
   local lang_data = {}
 
-  for _, detector in ipairs(detectors) do
+  for _, detector in ipairs(enabled_detectors) do
     if detector.detect_stdlib then
       local result = detector.detect_stdlib()
       if result and #result.packages > 0 then
