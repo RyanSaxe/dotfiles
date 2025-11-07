@@ -8,6 +8,9 @@ return {
     vim.o.showmode = false
   end,
   opts = function()
+    -- Import tokyonight util for color blending
+    local Util = require("tokyonight.util")
+
     local C = {
       bg = "#1a1b26",
       fg = "#c0caf5",
@@ -179,6 +182,17 @@ return {
       color = { fg = C.bg, bg = C.bg },
     }
 
+    -- filename component for inactive winbar - DISABLED (returns empty)
+    local inactive_winbar_filename = {
+      function()
+        return "" -- Always return empty string to hide filename
+      end,
+      cond = function()
+        return false -- Never show this component
+      end,
+      color = { fg = C.bg, bg = C.bg }, -- invisible just in case
+    }
+
     -- invisible caps so outer edges match bg
     local left_cap = {
       function()
@@ -248,7 +262,7 @@ return {
     return {
       options = {
         theme = theme,
-        globalstatus = false,
+        globalstatus = true,
         icons_enabled = false,
         component_separators = { left = "", right = "" },
         section_separators = { left = "", right = "" },
@@ -287,8 +301,9 @@ return {
         lualine_z = { winbar_gitdiff },
       },
       inactive_winbar = {
-        lualine_c = { winbar_filler }, -- blank but present
-        lualine_z = {},
+        lualine_a = {},
+        lualine_x = { winbar_filler }, -- ensures bar exists even when inactive
+        lualine_z = { inactive_winbar_filename }, -- show filename in inactive splits (top right)
       },
 
       extensions = { "neo-tree", "lazy", "fzf" },

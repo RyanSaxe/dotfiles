@@ -4,14 +4,24 @@
 return {
   "folke/snacks.nvim",
   opts = {
-    -- uncomment below to enable fyler
-    -- explorer = { enabled = false },
     picker = {
       layout = {
         preset = "custom_vertical",
       },
       sources = {
         buffers = require("custom.snacks.picker").buffer_config,
+        -- Configure explorer to show hidden files by default
+        explorer = {
+          hidden = true,
+          -- Ensure the input window doesn't overlap the main window's winbar
+          layout = {
+            preset = "sidebar",
+            preview = false,
+            layout = {
+              row = 1, -- Start 1 row down to leave space for winbar
+            },
+          },
+        },
       },
       layouts = {
         custom_vertical = {
