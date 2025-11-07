@@ -43,9 +43,7 @@ local function set_layout_with_state_preservation(picker, layout_name)
     picker.layout:update()
   end
 
-  -- Re-enable redraw and force single redraw
   vim.o.lazyredraw = old_lazyredraw
-  vim.cmd.redraw()
 end
 
 ---@param picker snacks.Picker

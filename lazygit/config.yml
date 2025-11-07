@@ -1,0 +1,92 @@
+gui:
+  # Show borders and use nerd fonts for icons
+  showBorder: true
+  showFileIcons: true
+  nerdFontsVersion: "3"
+  # TokyoNight Night theme colors matching your neovim setup
+  theme:
+    # Active panel border - bright blue
+    activeBorderColor:
+      - "#7aa2f7" # TokyoNight blue
+      - bold
+    # Inactive panel border - muted gray
+    inactiveBorderColor:
+      - "#545c7e" # TokyoNight dark3
+    # Search border - orange highlight
+    searchingActiveBorderColor:
+      - "#ff9e64" # TokyoNight orange
+      - bold
+    # Options text - cyan
+    optionsTextColor:
+      - "#7dcfff" # TokyoNight cyan
+    # Selected line background - subtle highlight
+    selectedLineBgColor:
+      - "#283457" # Darker blue tint
+    # Selected range background
+    selectedRangeBgColor:
+      - "#283457"
+    # Cherry-picked commit colors
+    cherryPickedCommitBgColor:
+      - "#2d3f76"
+    cherryPickedCommitFgColor:
+      - "#bb9af7" # TokyoNight purple
+    # Unstaged changes - teal (matching your GitSignsAdd)
+    unstagedChangesColor:
+      - "#73daca" # TokyoNight teal
+    # Default foreground
+    defaultFgColor:
+      - "#c0caf5" # TokyoNight fg
+  # UI preferences
+  showCommandLog: false
+  showBottomLine: true
+  splitDiff: "auto"
+  skipNoStagedFilesWarning: false
+  skipDiscardChangeWarning: false
+git:
+  # Use delta with TokyoNight theme for syntax-highlighted diffs
+  paging:
+    colorArg: always
+    pager: delta --paging=never --syntax-theme=tokyonight_night
+  # Always show commit graph
+  log:
+    showGraph: "always"
+  # Commit settings
+  skipHookPrefix: "WIP"
+  parseEmoji: true
+  disableForcePushing: false
+  # Support for conventional commits (atomic commits)
+  commitPrefix:
+    - pattern: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(.+\\))?: .+"
+      replace: ""
+# Keybindings - mostly defaults
+keybinding:
+  universal:
+    prevItem: '<up>'
+    nextItem: '<down>'
+    prevPage: ','
+    nextPage: '.'
+    scrollLeft: 'H'
+    scrollRight: 'L'
+    togglePanel: '<tab>'
+    refresh: 'R'
+# Custom commands for workflow enhancement
+customCommands:
+  # Open commit in browser (GitHub)
+  - key: 'b'
+    context: 'commits'
+    command: 'gh browse {{.SelectedCommit.Sha}}'
+    description: 'Open commit in browser'
+  # Copy commit SHA to clipboard
+  - key: 'y'
+    context: 'commits'
+    command: 'echo {{.SelectedCommit.Sha}} | pbcopy'
+    description: 'Copy commit SHA'
+# Refresher settings
+refresher:
+  refreshInterval: 10
+  fetchInterval: 60
+# Confirmation settings
+confirmOnQuit: false
+quitOnTopLevelReturn: false
+notARepository: 'quit'
+promptToReturnFromSubprocess: true

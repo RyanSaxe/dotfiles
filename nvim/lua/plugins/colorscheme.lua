@@ -108,7 +108,7 @@ return {
       hl["TodoFgTest"] = "Comment" -- { fg = Util.blend_bg(c.orange, 0.5) }
       -- git not properly reading overrides so specifying them here
       hl["DiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.2) }
-      hl["DiffChange"] = { bg = Util.blend_bg(c.git_purple, 0.5) }
+      hl["DiffChange"] = { bg = c.bg } -- Util.blend_bg(c.git_purple, 0.5) }
       hl["DiffDelete"] = { bg = Util.blend_bg("#FF0000", 0.2) }
       hl["DiffAdded"] = { bg = Util.blend_bg("#00FF00", 0.3) }
       hl["DiffChanged"] = { bg = Util.blend_bg(c.git_purple, 0.5) }
@@ -126,7 +126,8 @@ return {
       -- so we make the background identical to the change to avoid the double-highlighting effect
       -- in mini diff, however, we do apply different styling since we can properly apply them to base
       -- and the change. NOTE: possibly could implement something similar for diffview.
-      hl["DiffText"] = { bg = Util.blend_bg(c.git_purple, 0.5) }
+      hl["DiffText"] = { bg = c.bg } -- Util.blend_bg(c.git_purple, 0.5) }
+      -- hl["SnacksDiffContext"] = { bg = c.bg }
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg(c.git_purple, 0.5) }
       hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.2) }

@@ -2,7 +2,7 @@
 	name = Ryan Saxe
 	email = ryancsaxe+1@gmail.com
 [core]
-	pager = git-split-diffs --color --word-diff | less -RFX
+	pager = delta --side-by-side --syntax-theme=tokyonight_night
 	editor = nvim
 	autocrlf = input
 [push]
