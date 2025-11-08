@@ -1,5 +1,6 @@
 return {
   "akinsho/bufferline.nvim",
+  enabled = true,
   keys = {
     {
       "<leader>uB",
@@ -55,4 +56,3 @@ return {
     },
   },
 }
-

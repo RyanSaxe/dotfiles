@@ -1,6 +1,7 @@
 return {
   "nvim-lualine/lualine.nvim",
   event = "VeryLazy",
+  enabled = true,
   init = function()
     vim.opt.termguicolors = true
     vim.opt.cmdheight = 0
