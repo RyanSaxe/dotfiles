@@ -142,6 +142,8 @@ return {
       -- ultra-minimal bufferline: just text with simple color coding
       -- IMPORTANT: all backgrounds MUST be c.bg for seamless integration
       hl["BufferLineFill"] = { bg = c.bg }
+      -- match tabline background to normal background for seamless integration
+      hl["TabLineFill"] = { bg = c.bg }
 
       -- offset backgrounds (for Neo-tree sidebar, etc) - also use normal background
       hl["BufferLineOffsetSeparator"] = { bg = c.bg }
