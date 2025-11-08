@@ -54,13 +54,14 @@ end, {
 })
 
 -- LSP related toggles
--- NOTE: consider extending this to other LSP servers as needed
--- NOTE: consider extensind to other types of analysis settings like type checking strictness
--- TODO: look into seeing if sonarlint can also be executed workspace wide
-local function toggle_pyright_diagnostic_mode()
+-- NOTE: The diagnosticMode setting is specific to basedpyright (and other Pyright variants).
+--       Most LSPs (including Ruff and Pyrefly) do not have this capability.
+-- NOTE: Consider extending to other analysis settings like type checking strictness.
+-- TODO: Explore if sonarlint or other LSPs support workspace-wide analysis toggles.
+local function toggle_basedpyright_type_checking_scope()
   local clients = vim.lsp.get_clients({ bufnr = vim.api.nvim_get_current_buf(), name = "basedpyright" })
   if vim.tbl_isempty(clients) then
-    vim.notify("basedpyright isn’t attached here", vim.log.levels.WARN)
+    vim.notify("basedpyright isn't attached here", vim.log.levels.WARN)
     return
   end
 
@@ -84,9 +85,14 @@ local function toggle_pyright_diagnostic_mode()
     client.notify("workspace/didChangeConfiguration", { settings = nil })
     -- vim.cmd("LspRestart basedpyright")
 
-    vim.notify(("basedpyright diagnosticMode → %s"):format(next_mode), vim.log.levels.INFO)
+    vim.notify(("basedpyright type checking scope → %s"):format(next_mode), vim.log.levels.INFO)
   end
 end
 
-vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
+vim.keymap.set(
+  "n",
+  "<leader>tp",
+  toggle_basedpyright_type_checking_scope,
+  { desc = "Toggle basedpyright type checking scope (openFilesOnly ↔ workspace)" }
+)
 
