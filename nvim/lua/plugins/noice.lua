@@ -8,7 +8,7 @@ return {
         filter = {
           event = "lsp",
           kind = "progress",
-          -- This function checks if the message is from sonarlint
+          -- This function checks if the message is from sonarlint because sonarlint spams messages
           cond = function(message)
             local client = vim.tbl_get(message.opts, "progress", "client")
             return client == "sonarlint"

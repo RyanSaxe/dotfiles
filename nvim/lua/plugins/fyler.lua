@@ -1,3 +1,6 @@
+-- File Explorer that functions like a neovim buffer
+-- disabled for now in favor of LazyVim's Snacks explorer
+-- because fyler still has some rough edges
 return {
   enabled = false,
   "A7Lavinraj/fyler.nvim",

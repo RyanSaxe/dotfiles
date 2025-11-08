@@ -23,6 +23,9 @@ return {
             lineLength = 120,
             lint = {
               enable = true, -- Enable linting diagnostics (Ruff is extremely fast)
+              -- Disable F821 to avoid duplication with basedpyright's reportUndefinedVariable
+              -- (which must stay enabled for auto-import code actions)
+              ignore = { "F821" }, -- undefined-name (basedpyright handles this + provides auto-import)
             },
             format = {
               args = { "--line-length=120" },
@@ -45,6 +48,7 @@ return {
           client.server_capabilities.completionProvider = false
           client.server_capabilities.definitionProvider = false
           client.server_capabilities.documentHighlightProvider = false
+          client.server_capabilities.documentSymbolProvider = false -- Prevents navic conflict with Pyrefly
           -- hoverProvider ENABLED - basedpyright provides more comprehensive type information
           client.server_capabilities.renameProvider = false
           client.server_capabilities.semanticTokensProvider = false
@@ -65,6 +69,27 @@ return {
               useLibraryCodeForTypes = true, -- Improves type inference by analyzing library source
               typeCheckingMode = "standard",
             },
+            -- Disable checks that overlap with Ruff or hurt performance (20-40% performance improvement)
+            -- Ruff overlaps (9 reports)
+            reportUnusedImport = "none", -- Ruff F401 handles this
+            reportUnusedVariable = "none", -- Ruff F841 handles this
+            reportUnusedClass = "none", -- Ruff handles this
+            reportUnusedFunction = "none", -- Ruff handles this
+            reportDuplicateImport = "none", -- Ruff handles this
+            reportWildcardImportFromLibrary = "none", -- Ruff F405 handles this
+            reportRedeclaration = "none", -- Ruff F811 handles this
+            reportImplicitStringConcatenation = "none", -- Ruff ISC001/ISC002 handles this
+            reportConstantRedefinition = "none", -- Ruff handles this
+            -- Performance-expensive (1 report)
+            reportImportCycles = "none", -- Explicitly noted as slow in basedpyright docs
+            -- Optional strictness - reduces noise (6 reports)
+            reportOptionalSubscript = "none", -- Generates noise, strictNullChecks-like behavior
+            reportOptionalMemberAccess = "none",
+            reportOptionalCall = "none",
+            reportOptionalIterable = "none",
+            reportOptionalContextManager = "none",
+            reportOptionalOperand = "none",
+            -- Keep reportUndefinedVariable enabled (needed for auto-import code actions)
           },
         },
       },

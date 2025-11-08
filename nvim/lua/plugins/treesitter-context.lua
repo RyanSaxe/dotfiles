@@ -1,4 +1,5 @@
 return {
+  -- enable this if you want to have context (e.g. the class you're in) shown at the top of the window
   enabled = false,
   "nvim-treesitter/nvim-treesitter-context",
   event = "LazyFile",

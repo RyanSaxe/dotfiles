@@ -1,3 +1,6 @@
+-- LazyVim comes with lots of toggles accessible via <leader>u (for ui)
+-- I wanted to create a keybind that was very specific to things I personally toggle often
+-- so I have this specific config to place those uncer <leader>t (for toggle)
 return {
   "folke/snacks.nvim",
   priority = 1000,
@@ -10,7 +13,6 @@ return {
         Snacks.toggle.option("spell", { name = "Spelling" }):map("<leader>ts")
         Snacks.toggle.diagnostics({ name = "Diagnostics" }):map("<leader>td")
         Snacks.toggle.inlay_hints():map("<leader>th")
-        Snacks.toggle.dim():map("<leader>tz")
 
         -- Add Copilot toggle
         local copilot_exists = pcall(require, "copilot")

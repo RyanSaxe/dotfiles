@@ -8,22 +8,25 @@ return {
     vim.o.showmode = false
   end,
   opts = function()
-    -- Import tokyonight util for color blending
+    -- Import tokyonight util for color blending and colors from colorscheme
     local Util = require("tokyonight.util")
+    -- Get colors directly from tokyonight - will update automatically when theme changes
+    local c = require("tokyonight.colors").setup()
 
+    -- Create alias C for backwards compatibility with existing code
     local C = {
-      bg = "#1a1b26",
-      fg = "#c0caf5",
-      blue = "#7aa2f7",
-      cyan = "#7dcfff",
-      green = "#1abc9c",
-      red = "#f7768e",
-      yellow = "#e0af68",
-      gray = "#565f89",
-      gutter = "#3b4261",
-      orange = "#ff9e64",
-      purple = "#bb9af7",
-      pink = "#fca7ea",
+      bg = c.bg,
+      fg = c.fg,
+      blue = c.blue,
+      cyan = c.cyan,
+      green = c.teal,
+      red = c.red,
+      yellow = c.yellow,
+      gray = c.comment,
+      gutter = c.fg_gutter,
+      orange = c.orange,
+      purple = c.purple,
+      pink = c.moon_pink or c.magenta2, -- use custom moon_pink if available
     }
     local L, R = "", ""
 
@@ -90,7 +93,7 @@ return {
         c = { fg = C.fg, bg = C.bg },
       },
       command = {
-        a = { fg = C.bg, bg = C.yellow, gui = "bold" },
+        a = { fg = C.bg, bg = C.pink, gui = "bold" },
         b = { fg = C.fg, bg = C.bg },
         c = { fg = C.fg, bg = C.bg },
       },
@@ -98,39 +101,6 @@ return {
     }
 
     -- WINBAR
-    local winbar_navic = {
-      function()
-        local navic = require("nvim-navic")
-        if not navic.is_available() then
-          return ""
-        end
-
-        local location = navic.get_location()
-        if location == "" then
-          return ""
-        end
-
-        -- Custom truncation: keep first and last, truncate middle
-        local parts = vim.split(location, " > ", { plain = true })
-        if #parts <= 3 then
-          return location -- no truncation needed
-        end
-
-        -- Keep first, show "..", keep last two
-        return parts[1] .. " > .. > " .. parts[#parts - 1] .. " > " .. parts[#parts]
-      end,
-      cond = function()
-        -- Hide winbar for buffergolf practice and reference buffers
-        if vim.b.buffergolf_practice or vim.b.buffergolf_reference then
-          return false
-        end
-        local navic = require("nvim-navic")
-        -- only show on small screens (mobile/narrow terminals)
-        return navic.is_available() and vim.o.columns < 120
-      end,
-      color = { fg = C.blue, bg = C.bg }, -- use blue for better visibility
-    }
-
     -- diagnostics component (flat styling)
     local statusline_diagnostics = {
       "diagnostics",
@@ -294,9 +264,9 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left navic breadcrumbs, right git diff
+      -- WINBAR: left empty, right git diff
       winbar = {
-        lualine_a = { winbar_navic },
+        lualine_a = {},
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
         lualine_z = { winbar_gitdiff },
       },

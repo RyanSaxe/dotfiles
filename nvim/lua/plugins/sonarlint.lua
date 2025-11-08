@@ -1,6 +1,7 @@
 -- NOTE: this requires openjdk@17 to be installed
+-- TODO: this is disabled for now until I can figure out how to properly hook it into the online sonarqube server
 return {
-  enabled = true,
+  enabled = false,
   url = "https://gitlab.com/schrieveslaach/sonarlint.nvim",
   ft = { "python" },
   config = function()
