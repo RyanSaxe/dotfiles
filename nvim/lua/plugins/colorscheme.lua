@@ -107,12 +107,12 @@ return {
       hl["TodoFgTodo"] = "Comment" -- { fg = Util.blend_bg(c.cyan, 0.5) }
       hl["TodoFgTest"] = "Comment" -- { fg = Util.blend_bg(c.orange, 0.5) }
       -- git not properly reading overrides so specifying them here
-      hl["DiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.2) }
-      hl["DiffChange"] = { bg = Util.blend_bg(c.git_purple, 0.5) }
-      hl["DiffDelete"] = { bg = Util.blend_bg("#FF0000", 0.2) }
-      hl["DiffAdded"] = { bg = Util.blend_bg("#00FF00", 0.3) }
-      hl["DiffChanged"] = { bg = Util.blend_bg(c.git_purple, 0.5) }
-      hl["DiffDeleted"] = { bg = Util.blend_bg("#FF0000", 0.2) }
+      hl["DiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.1) }
+      hl["DiffChange"] = { bg = Util.blend_bg("#0000FF", 0.1) } -- Util.blend_bg(c.git_purple, 0.5) }
+      hl["DiffDelete"] = { bg = Util.blend_bg("#FF0000", 0.1) }
+      hl["DiffAdded"] = { bg = Util.blend_bg("#00FF00", 0.1) }
+      hl["DiffChanged"] = { bg = Util.blend_bg("#0000FF", 0.1) }
+      hl["DiffDeleted"] = { bg = Util.blend_bg("#FF0000", 0.1) }
       hl["MiniDiffSignAdd"] = { fg = Util.blend_bg(c.teal, 0.7) }
       hl["MiniDiffSignChange"] = { fg = Util.blend_bg(c.purple, 0.7) }
       hl["MiniDiffSignDelete"] = { fg = Util.blend_bg(c.red, 0.7) }
@@ -126,10 +126,11 @@ return {
       -- so we make the background identical to the change to avoid the double-highlighting effect
       -- in mini diff, however, we do apply different styling since we can properly apply them to base
       -- and the change. NOTE: possibly could implement something similar for diffview.
-      hl["DiffText"] = { bg = Util.blend_bg(c.git_purple, 0.5) }
+      hl["DiffText"] = { bg = c.bg }
+      hl["SnacksDiffContext"] = { bg = c.bg }
       -- mini diff special highlighting for readable overlay
-      hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg(c.git_purple, 0.5) }
-      hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.2) }
+      hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
+      hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.1) }
       -- default blue slightly darker looks like snorlax color for really clean dashboard
       hl["SnacksDashboardTitle"] = { fg = Util.blend_bg(c.blue, 0.9) }
       hl["SnacksDashboardKey"] = { fg = "#FBE8B3" }
@@ -138,6 +139,98 @@ return {
       -- inactive splits use gray (matching tmux inactive pane borders)
       hl["WinSeparator"] = { fg = c.fg_gutter }
       hl["VertSplit"] = { fg = c.fg_gutter }
+      -- ultra-minimal bufferline: just text with simple color coding
+      -- IMPORTANT: all backgrounds MUST be c.bg for seamless integration
+      hl["BufferLineFill"] = { bg = c.bg }
+
+      -- offset backgrounds (for Neo-tree sidebar, etc) - also use normal background
+      hl["BufferLineOffsetSeparator"] = { bg = c.bg }
+      hl["BufferLineTruncMarker"] = { fg = c.dark3, bg = c.bg }
+
+      hl["BufferLineBufferSelected"] = {
+        fg = c.blue,
+        bg = c.bg,
+      }
+
+      -- visible buffers (in other windows) - slightly dimmed white text
+      hl["BufferLineBufferVisible"] = {
+        fg = Util.blend_bg(c.fg, 0.8), -- slightly dimmed white (80% brightness)
+        bg = c.bg,
+      }
+
+      -- inactive buffers (hidden) - gray text
+      hl["BufferLineBuffer"] = {
+        fg = c.dark3, -- dull gray
+        bg = c.bg,
+      }
+
+      -- separators are invisible - same as background
+      hl["BufferLineSeparatorSelected"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLineSeparatorVisible"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLineSeparator"] = { fg = c.bg, bg = c.bg }
+
+      -- indicators also invisible
+      hl["BufferLineIndicatorSelected"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLineIndicatorVisible"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLineIndicator"] = { fg = c.bg, bg = c.bg }
+
+      -- modified/unsaved buffers - hierarchy: selected > visible > inactive
+      hl["BufferLineModified"] = {
+        fg = Util.blend_bg(c.orange, 0.3), -- very dull orange for inactive
+        bg = c.bg,
+      }
+      hl["BufferLineModifiedSelected"] = {
+        fg = c.orange, -- full orange when active
+        bg = c.bg,
+      }
+      hl["BufferLineModifiedVisible"] = {
+        fg = Util.blend_bg(c.orange, 0.6), -- medium dimmed orange for visible
+        bg = c.bg,
+      }
+
+      -- close buttons - hierarchy: selected > visible > inactive
+      hl["BufferLineCloseButton"] = {
+        fg = Util.blend_bg(c.red, 0.3), -- very dull red for inactive
+        bg = c.bg,
+      }
+      hl["BufferLineCloseButtonVisible"] = {
+        fg = Util.blend_bg(c.red, 0.6), -- medium dimmed red for visible
+        bg = c.bg,
+      }
+      hl["BufferLineCloseButtonSelected"] = {
+        fg = c.red, -- full red for active
+        bg = c.bg,
+      }
+
+      -- tabs - match exact buffer formatting
+      hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg } -- inactive = gray
+      hl["BufferLineTabSelected"] = { fg = c.blue, bg = c.bg } -- active = blue
+      hl["BufferLineTabSeparator"] = { fg = c.bg, bg = c.bg } -- invisible separators
+      hl["BufferLineTabSeparatorSelected"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLineTabClose"] = { fg = Util.blend_bg(c.red, 0.5), bg = c.bg } -- dim red X
+
+      -- background elements - all should match editor background
+      hl["BufferLineBackground"] = { fg = c.dark3, bg = c.bg } -- fallback gray text
+
+      -- duplicate buffers (files with similar names) - match regular buffer colors
+      hl["BufferLineDuplicate"] = { fg = c.dark3, bg = c.bg } -- hidden duplicates = gray
+      hl["BufferLineDuplicateSelected"] = { fg = c.blue, bg = c.bg } -- active duplicate = blue
+      hl["BufferLineDuplicateVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg } -- visible duplicate = slightly dimmed white
+
+      -- group and pin backgrounds - also use normal background
+      hl["BufferLineGroupLabel"] = { fg = c.dark3, bg = c.bg }
+      hl["BufferLineGroupSeparator"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLinePick"] = { fg = c.red, bg = c.bg }
+      hl["BufferLinePickSelected"] = { fg = c.red, bg = c.bg }
+      hl["BufferLinePickVisible"] = { fg = c.red, bg = c.bg }
+
+      -- ensure ALL text-bearing elements use our color scheme
+      -- this is comprehensive to catch any edge cases
+      hl["BufferLineTabSelected"] = { fg = c.blue, bg = c.bg }
+      hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg }
+      hl["BufferLineNumbersSelected"] = { fg = c.blue, bg = c.bg }
+      hl["BufferLineNumbersVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg } -- slightly dimmed white
+      hl["BufferLineNumbers"] = { fg = c.dark3, bg = c.bg }
     end,
   },
 }

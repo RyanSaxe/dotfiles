@@ -85,6 +85,10 @@ plugins=(git vi-mode)
 
 source $ZSH/oh-my-zsh.sh
 
+# Disable mail checking to prevent "You have mail" messages
+# This is zsh's default behavior when /var/mail/$USER exists
+unset MAILCHECK
+
 # Setup functions from dotfiles repo
 # Get the actual directory where this .zshrc file is located (resolving symlink)
 local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"

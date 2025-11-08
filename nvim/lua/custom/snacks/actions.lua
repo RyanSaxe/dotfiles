@@ -3,6 +3,68 @@
 
 local M = {}
 
+-- Stores the original resolved layout for each picker instance
+-- This allows us to restore the exact layout that was active when the picker opened
+local picker_states = {}
+
+-- Captures and stores the original resolved layout configuration
+-- Called once per picker instance to save the initial layout state
+---@param picker snacks.Picker
+local function ensure_original_layout_stored(picker)
+  if not picker_states[picker.id] then
+    local original = picker.resolved_layout and vim.deepcopy(picker.resolved_layout) or nil
+
+    picker_states[picker.id] = {
+      original = original,
+    }
+  end
+end
+
+-- Switches layout while preserving state and eliminating flicker
+---@param picker snacks.Picker
+---@param layout_name string
+local function set_layout_with_state_preservation(picker, layout_name)
+  local old_lazyredraw = vim.o.lazyredraw
+
+  -- Capture state before switch
+  local fullscreen = picker.layout and picker.layout.opts.fullscreen or false
+  local hidden = picker.layout and vim.deepcopy(picker.layout.opts.hidden) or {}
+
+  -- Prevent flicker by disabling redraw during transition
+  vim.o.lazyredraw = true
+
+  -- Switch layout
+  picker:set_layout(layout_name)
+
+  -- Restore state
+  picker.layout.opts.fullscreen = fullscreen
+  picker.layout.opts.hidden = hidden
+  if fullscreen or next(hidden) then
+    picker.layout:update()
+  end
+
+  vim.o.lazyredraw = old_lazyredraw
+end
+
+---@param picker snacks.Picker
+function M.switch_to_vertical_layout(picker)
+  ensure_original_layout_stored(picker)
+  set_layout_with_state_preservation(picker, "custom_vertical")
+end
+
+---@param picker snacks.Picker
+function M.switch_to_horizontal_layout(picker)
+  ensure_original_layout_stored(picker)
+  set_layout_with_state_preservation(picker, "custom_horizontal")
+end
+
+---@param picker snacks.Picker
+function M.restore_original_layout(picker)
+  ensure_original_layout_stored(picker)
+  local state = picker_states[picker.id]
+  set_layout_with_state_preservation(picker, state.original)
+end
+
 -- Save buffer action for buffer picker
 -- Saves all selected buffers that have unsaved changes
 ---@param picker snacks.picker.Picker

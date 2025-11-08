@@ -1,7 +1,6 @@
 return {
   {
-    -- "ryansaxe/buffergolf.nvim",
-    dir = "~/projects/buffergolf.nvim",
+    "ryansaxe/buffergolf.nvim",
     dependencies = { "nvim-mini/mini.diff" },
     opts = {
       -- Auto-detect and disable conflicting plugins (including Copilot)

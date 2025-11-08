@@ -18,6 +18,14 @@ success() { printf "\033[1;32m[OK  ]\033[0m %s\n" "$*"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Platform-specific paths
+# macOS uses ~/Library/Application Support for lazygit, Linux uses ~/.config
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export LAZYGIT_CONFIG_DIR="$HOME/Library/Application Support/lazygit"
+else
+    export LAZYGIT_CONFIG_DIR="$HOME/.config/lazygit"
+fi
+
 # Load dotfile mappings from config file
 DOTFILE_MAPPINGS=()
 while IFS= read -r line || [[ -n "$line" ]]; do
