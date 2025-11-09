@@ -174,8 +174,9 @@ end
 ---@param pokemon_name string The name of the pokemon
 ---@param is_shiny boolean|nil Whether to show shiny variant
 ---@param form string|nil Optional form name
+---@param use_big boolean|nil Whether to add -b flag for larger sprites
 ---@return string command The command string to execute
-function M.build_pokemon_command(pokemon_name, is_shiny, form)
+function M.build_pokemon_command(pokemon_name, is_shiny, form, use_big)
   local cmd = string.format("pokemon-colorscripts -n %s", pokemon_name)
 
   if is_shiny then
@@ -186,9 +187,91 @@ function M.build_pokemon_command(pokemon_name, is_shiny, form)
     cmd = cmd .. " --form " .. form
   end
 
+  if use_big then
+    cmd = cmd .. " -b"
+  end
+
   cmd = cmd .. " --no-title; sleep 0.01"
 
   return cmd
+end
+
+---Detect dimensions of a pokemon sprite
+---@param pokemon_name string The name of the pokemon
+---@param is_shiny boolean|nil Whether to show shiny variant
+---@param form string|nil Optional form name
+---@param use_big boolean|nil Whether to use -b flag for detection
+---@return number|nil width Width in characters
+---@return number|nil height Height in lines
+function M.detect_sprite_dimensions(pokemon_name, is_shiny, form, use_big)
+  local cmd = M.build_pokemon_command(pokemon_name, is_shiny, form, use_big)
+
+  -- Execute command and capture output
+  local handle = io.popen(cmd)
+  if not handle then
+    vim.notify("Failed to execute pokemon command for dimension detection", vim.log.levels.ERROR)
+    return nil, nil
+  end
+
+  local output = handle:read("*a")
+  handle:close()
+
+  -- Count lines and measure width
+  local height = 0
+  local max_width = 0
+
+  for line in output:gmatch("[^\r\n]+") do
+    height = height + 1
+
+    -- Strip ANSI escape codes to get true width
+    -- ANSI codes look like: \x1b[38;2;R;G;Bm or \x1b[0m
+    local stripped = line:gsub("\x1b%[[0-9;]*m", "")
+    local width = vim.fn.strwidth(stripped)
+
+    if width > max_width then
+      max_width = width
+    end
+  end
+
+  return max_width, height
+end
+
+---Detect sprite dimensions with two-pass auto-sizing
+---@param pokemon_name string The name of the pokemon
+---@param is_shiny boolean|nil Whether to show shiny variant
+---@param form string|nil Optional form name
+---@param force_small boolean User preference to keep small sprites small
+---@return number|nil width Final sprite width
+---@return number|nil height Final sprite height
+---@return boolean use_big Whether -b flag should be used
+function M.detect_sprite_dimensions_auto(pokemon_name, is_shiny, form, force_small)
+  -- Pass 1: Detect without -b flag
+  local width, height = M.detect_sprite_dimensions(pokemon_name, is_shiny, form, false)
+
+  if not width or not height then
+    return nil, nil, false
+  end
+
+  -- Determine if sprite is small (using snorlax as reference)
+  -- Snorlax is approximately 40x18, so anything smaller is considered "small"
+  local is_small = width < 40 or height < 18
+
+  -- Check if we should use big version
+  local use_big = is_small and not force_small
+
+  -- Pass 2: Re-detect with -b if needed
+  if use_big then
+    local big_width, big_height = M.detect_sprite_dimensions(pokemon_name, is_shiny, form, true)
+    if big_width and big_height then
+      return big_width, big_height, true
+    else
+      -- Fallback to small version if -b detection failed
+      return width, height, false
+    end
+  end
+
+  -- No need for -b, return original dimensions
+  return width, height, false
 end
 
 ---Resolve a color value from various sources and apply adjustments

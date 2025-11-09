@@ -118,6 +118,12 @@ function M.show_if_has_second_pane()
 end
 
 -- Create a pane structure for dashboard sections
+-- Returns both the sections array and the total height they occupy
+---@param header table Header section config
+---@param specs table Array of spec entries
+---@param bottom_padding number Padding to add after last entry
+---@return table sections Array of section configs
+---@return number height Total height of sections (1 for header + N for specs + bottom_padding)
 function M.create_pane(header, specs, bottom_padding)
   local pane = header.pane
   header.padding = header.padding or 2
@@ -141,7 +147,11 @@ function M.create_pane(header, specs, bottom_padding)
     table.insert(output, row)
   end
 
-  return output -- ← you must return it!
+  -- Calculate height: 1 (header with its padding) + N (specs) + bottom_padding (on last spec)
+  -- Header padding is accounted for separately
+  local height = 1 + header.padding + #specs + bottom_padding
+
+  return output, height
 end
 
 -- Conditionally select between git and non-git spec configurations
