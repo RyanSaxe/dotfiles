@@ -18,7 +18,7 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "rayquaza",
+    name = "wartortle",
 
     -- Set to true for shiny variant
     is_shiny = false,
@@ -36,7 +36,7 @@ local CONFIG = {
     -- Force regeneration of pokemon colors even if they exist in database
     -- Set to true when testing algorithm changes or new threshold values
     -- WARNING: This will regenerate colors on every dashboard open!
-    force_regenerate = true,
+    force_regenerate = false,
 
     -- Colorfulness threshold for prominent color selection (default: 500, previous: 2000)
     -- Lower values favor frequency over saturation (more muted but common colors)

@@ -211,10 +211,7 @@ local function resolve_color(value, sprite_color, fallback_hlgroup, brighten_par
       if hl and hl.fg then
         value = string.format("#%06x", hl.fg)
       else
-        vim.notify(
-          string.format("Could not resolve highlight group '%s', using fallback", value),
-          vim.log.levels.WARN
-        )
+        vim.notify(string.format("Could not resolve highlight group '%s', using fallback", value), vim.log.levels.WARN)
         value = nil -- Fall through to use sprite_color or fallback
       end
     end
@@ -355,7 +352,15 @@ end
 ---@param generation_config table|nil Optional generation config: {force_regenerate, colorfulness_threshold}
 ---@param color_sources table|nil Optional color source config for applying colors after generation
 ---@return table|nil colors Table with dark/light color variants, or nil if not found/generating
-function M.ensure_pokemon_colors(pokemon_name, is_shiny, form, on_complete, background_mode, generation_config, color_sources)
+function M.ensure_pokemon_colors(
+  pokemon_name,
+  is_shiny,
+  form,
+  on_complete,
+  background_mode,
+  generation_config,
+  color_sources
+)
   -- Extract generation config options
   local config = generation_config or {}
   local force_regenerate = config.force_regenerate or false
@@ -390,13 +395,14 @@ function M.ensure_pokemon_colors(pokemon_name, is_shiny, form, on_complete, back
   local cmd = {
     "zsh",
     "-c",
-    string.format("COLORFULNESS_THRESHOLD=%d %s %s --update-db%s%s",
+    string.format(
+      "COLORFULNESS_THRESHOLD=%d %s %s --update-db%s%s",
       colorfulness_threshold,
       vim.fn.shellescape(script_path),
       vim.fn.shellescape(pokemon_name),
       is_shiny and " --shiny" or "",
       (form and form ~= "") and " --form " .. vim.fn.shellescape(form) or ""
-    )
+    ),
   }
 
   -- Run the generation script asynchronously

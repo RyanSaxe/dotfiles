@@ -270,12 +270,9 @@ end
 
 ### Small Sprite Detection
 
-A sprite is considered "small" if:
+call pokemon colorscripts on snorlax, as that is like "the nice normal size I like". So lets define small as something some percentage smaller than that? like the size of charmeleon is CLEARLY small. So look at those sizes for an example.
 
-- **Width < 40 characters** OR
-- **Height < 18 lines**
-
-These thresholds are based on typical pokemon-colorscripts output sizes.
+Regardless though ... we should also let users pass -b directly too if they want.
 
 ### Two-Pass Detection with Auto-Sizing
 
