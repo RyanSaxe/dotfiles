@@ -209,10 +209,7 @@ local function resolve_color(value, sprite_color, fallback_hlgroup)
     if hl and hl.fg then
       return string.format("#%06x", hl.fg)
     else
-      vim.notify(
-        string.format("Could not resolve highlight group '%s', using fallback", value),
-        vim.log.levels.WARN
-      )
+      vim.notify(string.format("Could not resolve highlight group '%s', using fallback", value), vim.log.levels.WARN)
       -- Fall through to use sprite_color or fallback
     end
   end
@@ -229,10 +226,7 @@ local function resolve_color(value, sprite_color, fallback_hlgroup)
   end
 
   -- Ultimate fallback: return nil and let Neovim use defaults
-  vim.notify(
-    string.format("Could not resolve color from highlight group '%s'", fallback_hlgroup),
-    vim.log.levels.WARN
-  )
+  vim.notify(string.format("Could not resolve color from highlight group '%s'", fallback_hlgroup), vim.log.levels.WARN)
   return nil
 end
 

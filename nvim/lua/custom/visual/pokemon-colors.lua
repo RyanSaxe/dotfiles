@@ -1423,4 +1423,62 @@ return {
       dim = "#7B837B",
     },
   },
+  ["snorlax"] = {
+    _meta = {
+      name = "snorlax",
+      is_shiny = false,
+      form = nil,
+    },
+    colors = {
+      "#000000",
+      "#395273",
+      "#417394",
+      "#FFEECD",
+      "#414141",
+      "#D5CD9C",
+      "#FFFFFF",
+      "#BDA483",
+      "#FFF6DE",
+      "#BDBDC5",
+      "#946A31",
+      "#B48B39",
+    },
+    dark = {
+      prominent = "#946A31",
+      bright = "#417394",
+      dim = "#414141",
+    },
+    light = {
+      prominent = "#946A31",
+      bright = "#417394",
+      dim = "#414141",
+    },
+  },
+  ["munchlax-shiny"] = {
+    _meta = {
+      name = "munchlax",
+      is_shiny = true,
+      form = nil,
+    },
+    colors = {
+      "#000000",
+      "#375DC2",
+      "#414141",
+      "#4789EE",
+      "#ADC5D6",
+      "#FFFFFF",
+      "#C5AD63",
+      "#F2E382",
+    },
+    dark = {
+      prominent = "#4789EE",
+      bright = "#F2E382",
+      dim = "#414141",
+    },
+    light = {
+      prominent = "#4789EE",
+      bright = "#414141",
+      dim = "#414141",
+    },
+  },
 }

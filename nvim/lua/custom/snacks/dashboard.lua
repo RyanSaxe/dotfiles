@@ -18,10 +18,10 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "mewtwo",
+    name = "munchlax",
 
     -- Set to true for shiny variant
-    is_shiny = false,
+    is_shiny = true,
 
     -- Optional form (e.g., "alola", "galar", "mega-x"), set to nil if not applicable
     form = nil,
@@ -48,7 +48,7 @@ local CONFIG = {
     key_source = "auto",
 
     -- Description color (maps to dim color from sprite, used for SnacksDashboardDesc)
-    desc_source = "auto",
+    desc_source = "Comment", --"auto",
   },
 
   -- Layout configuration

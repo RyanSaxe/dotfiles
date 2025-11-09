@@ -449,18 +449,18 @@ select_prominent_color() {
     local sat="${SAT[$idx]}"
     local colorful_score="${COLORFUL[$idx]}"
 
-    # IMPORTANT: Reject colors too close to white/black (off-whites, pastels, dark grays)
-    # These fail the "actually colorful" test even if they have decent saturation
+    # IMPORTANT: Reject colors too close to white/black (off-whites, pastels, dark grays, near-blacks)
+    # For prominent selection, we want genuinely COLORFUL colors, not neutrals
+    # This applies to BOTH modes - colorfulness is mode-independent
     local too_close_to_neutral=0
-    if [[ $mode == "dark" ]]; then
-      # For dark mode, reject near-whites: any color where min distance to white < 100 in RGB space
-      local dist_to_white=$(perlcalc "sqrt((255-$r)**2 + (255-$g)**2 + (255-$b)**2)")
-      (( $(perlcalc "$dist_to_white < 100") )) && too_close_to_neutral=1
-    else
-      # For light mode, reject near-blacks: any color where min distance to black < 80 in RGB space
-      local dist_to_black=$(perlcalc "sqrt($r**2 + $g**2 + $b**2)")
-      (( $(perlcalc "$dist_to_black < 80") )) && too_close_to_neutral=1
-    fi
+
+    # Calculate distance from both white and black
+    local dist_to_white=$(perlcalc "sqrt((255-$r)**2 + (255-$g)**2 + (255-$b)**2)")
+    local dist_to_black=$(perlcalc "sqrt($r**2 + $g**2 + $b**2)")
+
+    # Reject if too close to either white OR black (both are neutral, non-colorful)
+    (( $(perlcalc "$dist_to_white < 100") )) && too_close_to_neutral=1
+    (( $(perlcalc "$dist_to_black < 100") )) && too_close_to_neutral=1
 
     # Skip if too close to neutral
     (( too_close_to_neutral )) && continue
