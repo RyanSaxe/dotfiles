@@ -18,10 +18,10 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "munchlax",
+    name = "gengar",
 
     -- Set to true for shiny variant
-    is_shiny = true,
+    is_shiny = false,
 
     -- Optional form (e.g., "alola", "galar", "mega-x"), set to nil if not applicable
     form = nil,
@@ -49,6 +49,22 @@ local CONFIG = {
 
     -- Description color (maps to dim color from sprite, used for SnacksDashboardDesc)
     desc_source = "Comment", --"auto",
+
+    -- Color adjustments using tokyonight.util functions
+    -- Applied after resolving the base color from source
+
+    -- Brighten adjustments: {lightness_amount, saturation_amount}
+    -- lightness_amount: increases lightness (default if omitted: 0.05)
+    -- saturation_amount: increases saturation/vividness (default if omitted: 0.2)
+    title_brighten = nil, -- e.g., {0.1, 0.3} to make prominent more vibrant
+    key_brighten = nil, -- e.g., {0.05, 0.15} to boost key saturation
+    desc_brighten = nil, -- e.g., {0, 0.1} to increase saturation only
+
+    -- Dim adjustments: number (0-1)
+    -- Blends color with background (0 = no change, 1 = full background color)
+    title_dim = nil, -- e.g., 0.2 to dim prominent slightly
+    key_dim = nil, -- e.g., 0.15 to reduce key contrast
+    desc_dim = nil, -- e.g., 0.3 to make descriptions more subtle
   },
 
   -- Layout configuration
@@ -85,11 +101,17 @@ if utils.show_if_has_second_pane() then
 
   if pokemon_colors then
     -- Apply colors to Snacks dashboard highlight groups
-    -- Pass background_mode configuration and color source overrides
+    -- Pass background_mode configuration, color source overrides, and adjustments
     visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, {
       title_source = CONFIG.colors.title_source,
       key_source = CONFIG.colors.key_source,
       desc_source = CONFIG.colors.desc_source,
+      title_brighten = CONFIG.colors.title_brighten,
+      key_brighten = CONFIG.colors.key_brighten,
+      desc_brighten = CONFIG.colors.desc_brighten,
+      title_dim = CONFIG.colors.title_dim,
+      key_dim = CONFIG.colors.key_dim,
+      desc_dim = CONFIG.colors.desc_dim,
     })
   end
 end
@@ -253,6 +275,12 @@ function M.create_sections()
       title_source = CONFIG.colors.title_source,
       key_source = CONFIG.colors.key_source,
       desc_source = CONFIG.colors.desc_source,
+      title_brighten = CONFIG.colors.title_brighten,
+      key_brighten = CONFIG.colors.key_brighten,
+      desc_brighten = CONFIG.colors.desc_brighten,
+      title_dim = CONFIG.colors.title_dim,
+      key_dim = CONFIG.colors.key_dim,
+      desc_dim = CONFIG.colors.desc_dim,
     })
   end
 

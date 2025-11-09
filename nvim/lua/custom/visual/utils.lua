@@ -191,49 +191,98 @@ function M.build_pokemon_command(pokemon_name, is_shiny, form)
   return cmd
 end
 
----Resolve a color value from various sources
+---Resolve a color value from various sources and apply adjustments
 ---@param value string Color source: 'auto', a hex color, or a highlight group name
 ---@param sprite_color string|nil Color from sprite data (may be 'fallback')
 ---@param fallback_hlgroup string Default highlight group to use if sprite_color is 'fallback'
----@return string|nil color Resolved hex color, or nil if resolution failed
-local function resolve_color(value, sprite_color, fallback_hlgroup)
+---@param brighten_params table|nil Optional brighten parameters: {lightness_amount, saturation_amount}
+---@param dim_amount number|nil Optional dim amount (0-1) to blend with background
+---@param bg_color string|nil Background color for dimming (defaults to Normal bg)
+---@return string|nil color Resolved and adjusted hex color, or nil if resolution failed
+local function resolve_color(value, sprite_color, fallback_hlgroup, brighten_params, dim_amount, bg_color)
   -- If user specified a direct override (not 'auto'), use it
   if value ~= "auto" then
     -- Check if it's a hex color
     if value:match("^#%x%x%x%x%x%x$") then
-      return value
-    end
-
-    -- Otherwise, treat it as a highlight group name
-    local hl = vim.api.nvim_get_hl(0, { name = value, link = false })
-    if hl and hl.fg then
-      return string.format("#%06x", hl.fg)
+      value = value -- Already a hex color
     else
-      vim.notify(string.format("Could not resolve highlight group '%s', using fallback", value), vim.log.levels.WARN)
-      -- Fall through to use sprite_color or fallback
+      -- Otherwise, treat it as a highlight group name
+      local hl = vim.api.nvim_get_hl(0, { name = value, link = false })
+      if hl and hl.fg then
+        value = string.format("#%06x", hl.fg)
+      else
+        vim.notify(
+          string.format("Could not resolve highlight group '%s', using fallback", value),
+          vim.log.levels.WARN
+        )
+        value = nil -- Fall through to use sprite_color or fallback
+      end
+    end
+  else
+    -- User specified 'auto', so use sprite data
+    if sprite_color and sprite_color ~= "fallback" then
+      value = sprite_color
+    else
+      -- Sprite data says 'fallback' or is nil, use the fallback highlight group
+      local hl = vim.api.nvim_get_hl(0, { name = fallback_hlgroup, link = false })
+      if hl and hl.fg then
+        value = string.format("#%06x", hl.fg)
+      else
+        vim.notify(
+          string.format("Could not resolve color from highlight group '%s'", fallback_hlgroup),
+          vim.log.levels.WARN
+        )
+        return nil
+      end
     end
   end
 
-  -- User specified 'auto', so use sprite data
-  if sprite_color and sprite_color ~= "fallback" then
-    return sprite_color
+  -- At this point, value should be a hex color or nil
+  if not value then
+    return nil
   end
 
-  -- Sprite data says 'fallback' or is nil, use the fallback highlight group
-  local hl = vim.api.nvim_get_hl(0, { name = fallback_hlgroup, link = false })
-  if hl and hl.fg then
-    return string.format("#%06x", hl.fg)
+  -- Apply color adjustments if specified
+  local color = value
+
+  -- Apply brighten adjustment (increases lightness + saturation in HSLuv space)
+  if brighten_params and type(brighten_params) == "table" then
+    local ok, util = pcall(require, "tokyonight.util")
+    if ok then
+      local lightness = brighten_params[1]
+      local saturation = brighten_params[2]
+      color = util.brighten(color, lightness, saturation)
+    else
+      vim.notify("tokyonight.util not available for brighten adjustment", vim.log.levels.WARN)
+    end
   end
 
-  -- Ultimate fallback: return nil and let Neovim use defaults
-  vim.notify(string.format("Could not resolve color from highlight group '%s'", fallback_hlgroup), vim.log.levels.WARN)
-  return nil
+  -- Apply dim adjustment (blend with background)
+  if dim_amount and dim_amount > 0 then
+    local ok, util = pcall(require, "tokyonight.util")
+    if ok then
+      -- Get background color if not provided
+      if not bg_color then
+        local normal_hl = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
+        if normal_hl and normal_hl.bg then
+          bg_color = string.format("#%06x", normal_hl.bg)
+        else
+          bg_color = "#000000" -- Fallback to black if no background found
+        end
+      end
+      color = util.blend_bg(color, dim_amount, bg_color)
+    else
+      vim.notify("tokyonight.util not available for dim adjustment", vim.log.levels.WARN)
+    end
+  end
+
+  return color
 end
 
 ---Apply pokemon colors to Snacks dashboard highlight groups
 ---@param pokemon_data table Pokemon color data from database
 ---@param background_mode string|nil Optional background mode override: "auto", "light", "dark" (default: "auto")
----@param color_sources table|nil Optional color source overrides: {title_source, key_source, desc_source}
+---@param color_sources table|nil Optional config: {title_source, key_source, desc_source, *_brighten, *_dim}
 function M.apply_dashboard_colors(pokemon_data, background_mode, color_sources)
   if not pokemon_data then
     return
@@ -251,22 +300,42 @@ function M.apply_dashboard_colors(pokemon_data, background_mode, color_sources)
   local key_source = sources.key_source or "auto"
   local desc_source = sources.desc_source or "auto"
 
-  -- Resolve each color with appropriate fallbacks
+  -- Extract adjustment parameters
+  local title_brighten = sources.title_brighten
+  local key_brighten = sources.key_brighten
+  local desc_brighten = sources.desc_brighten
+  local title_dim = sources.title_dim
+  local key_dim = sources.key_dim
+  local desc_dim = sources.desc_dim
+
+  -- Get background color once for dimming operations
+  local bg_color
+  local normal_hl = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
+  if normal_hl and normal_hl.bg then
+    bg_color = string.format("#%06x", normal_hl.bg)
+  else
+    bg_color = "#000000" -- Fallback to black
+  end
+
+  -- Resolve each color with appropriate fallbacks and adjustments
   -- Note: prominent/title should NEVER have 'fallback' in sprite data, but we handle it defensively
-  local title_color = resolve_color(title_source, colors.prominent, "Normal")
-  local key_color = resolve_color(key_source, colors.bright, "Normal")
-  local desc_color = resolve_color(desc_source, colors.dim, "Comment")
+  local title_color = resolve_color(title_source, colors.prominent, "Normal", title_brighten, title_dim, bg_color)
+  local key_color = resolve_color(key_source, colors.bright, "Normal", key_brighten, key_dim, bg_color)
+  local desc_color = resolve_color(desc_source, colors.dim, "Comment", desc_brighten, desc_dim, bg_color)
 
   -- Update Snacks dashboard highlight groups
   -- SnacksDashboardTitle: prominent (used for main titles/headers)
   -- SnacksDashboardKey: bright (used for key hints/important text)
   -- SnacksDashboardDesc: dim (used for descriptions/secondary text)
+  -- SnacksDashboardIcon: icons (mapped to key color for visual consistency)
 
   if title_color then
     vim.api.nvim_set_hl(0, "SnacksDashboardTitle", { fg = title_color })
   end
   if key_color then
     vim.api.nvim_set_hl(0, "SnacksDashboardKey", { fg = key_color })
+    -- Map dashboard icons to key color for consistency
+    vim.api.nvim_set_hl(0, "SnacksDashboardIcon", { fg = key_color })
   end
   if desc_color then
     vim.api.nvim_set_hl(0, "SnacksDashboardDesc", { fg = desc_color })
