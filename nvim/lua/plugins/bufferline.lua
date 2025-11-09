@@ -1,6 +1,6 @@
 return {
   "akinsho/bufferline.nvim",
-  enabled = true,
+  enabled = false,
   keys = {
     {
       "<leader>uB",
@@ -48,6 +48,19 @@ return {
 
       max_name_length = 18,
       tab_size = 18,
+
+      -- Don't show bufferline on these filetypes to prevent flickering
+      custom_filter = function(buf_number)
+        local filetype = vim.bo[buf_number].filetype
+        -- Hide bufferline on dashboard and other special buffers
+        local excluded_filetypes = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler", "BuffergolfStats" }
+        for _, ft in ipairs(excluded_filetypes) do
+          if filetype == ft then
+            return false
+          end
+        end
+        return true
+      end,
 
       -- LazyVim defaults remain for functionality:
       -- - Offsets for Neo-tree and Snacks
