@@ -3,7 +3,7 @@ return {
   enabled = true,
   keys = {
     {
-      "<leader>uB",
+      "<leader>tb",
       function()
         -- Toggle bufferline visibility while keeping the padding
         -- Store the original tabline function

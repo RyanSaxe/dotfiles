@@ -131,7 +131,7 @@ return {
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
       hl["MiniDiffOverChangeBuf"] = { bg = Util.blend_bg("#00FF00", 0.1) }
-      -- default blue slightly darker looks like snorlax color for really clean dashboard
+      -- default dashboard colors (will be overridden by pokemon colors when dashboard opens)
       hl["SnacksDashboardTitle"] = { fg = Util.blend_bg(c.blue, 0.9) }
       hl["SnacksDashboardKey"] = { fg = "#FBE8B3" }
       hl["SnacksDashboardDesc"] = { fg = c.dark3 }

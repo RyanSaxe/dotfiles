@@ -4,11 +4,85 @@
 local utils = require("custom.snacks.utils")
 local git_pickers = require("custom.git.pickers")
 local git_utils = require("custom.git.utils")
+local visual_utils = require("custom.visual.utils")
 
 local M = {}
 
--- Global padding constant for snorlax alignment
-local SNORLAX_PADDING = 4
+-- ══════════════════════════════════════════════════════════════════════════════
+-- CONFIGURATION
+-- Configure your dashboard appearance here. Changes require restarting Neovim.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+local CONFIG = {
+  -- Pokemon display configuration
+  pokemon = {
+    -- Set to nil to select a random pokemon from the database
+    -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
+    name = "charizard",
+
+    -- Set to true for shiny variant
+    is_shiny = true,
+
+    -- Optional form (e.g., "alola", "galar", "mega-x"), set to nil if not applicable
+    form = nil,
+
+    -- Force small sprite size (don't add -b flag even if sprite is small)
+    -- This is useful if you prefer the smaller sprite aesthetic
+    force_small = false,
+  },
+
+  -- Color theme configuration
+  colors = {
+    -- Background mode: "auto" (uses vim.o.background), "dark", or "light"
+    -- Controls which color palette to use from pokemon color data
+    background_mode = "dark",
+  },
+
+  -- Layout configuration
+  layout = {
+    -- Padding value for aligning recent files with pokemon display
+    pokemon_padding = 4,
+  },
+}
+
+-- Calculate pokemon selection and colors (only done once at startup)
+-- This ensures the pokemon doesn't change on dashboard redraws
+local pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors
+
+-- Only calculate if we would show a pokemon (has two panes)
+if utils.show_if_has_second_pane() then
+  if CONFIG.pokemon.name == nil then
+    -- Random selection from database
+    pokemon_name, pokemon_shiny, pokemon_form = visual_utils.select_random_pokemon()
+  else
+    -- Use configured pokemon
+    pokemon_name = CONFIG.pokemon.name
+    pokemon_shiny = CONFIG.pokemon.is_shiny
+    pokemon_form = CONFIG.pokemon.form
+  end
+
+  -- Load color data for the selected pokemon
+  -- This will auto-generate if not in database (async)
+  pokemon_colors = visual_utils.ensure_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, function()
+    -- Callback: when generation completes, update the dashboard
+    if Snacks and Snacks.dashboard and Snacks.dashboard.update then
+      Snacks.dashboard.update()
+    end
+  end, CONFIG.colors.background_mode)
+
+  if pokemon_colors then
+    -- Apply colors to Snacks dashboard highlight groups
+    -- Pass background_mode configuration to override automatic detection
+    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode)
+  end
+end
+
+-- Build the pokemon command to execute
+-- Note: force_small will be used in future sprite positioning logic (see SPRITE_POSITIONING.md)
+local POKEMON_CMD = visual_utils.build_pokemon_command(pokemon_name or "pikachu", pokemon_shiny or false, pokemon_form)
+
+-- Global padding constant for pokemon alignment (access from CONFIG)
+local POKEMON_PADDING = CONFIG.layout.pokemon_padding
 
 -- Check if we should show recent project toggle based on context
 local function recent_project_toggle()
@@ -116,7 +190,7 @@ local function get_recent_files()
   local recent_files = utils.recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
-  local final_padding = pane == 2 and max_files - n_files + SNORLAX_PADDING or 2
+  local final_padding = pane == 2 and max_files - n_files + POKEMON_PADDING or 2
 
   for i, rel in ipairs(recent_files) do
     out[#out + 1] = {
@@ -135,7 +209,7 @@ local function get_recent_files()
     out[1] = {
       pane = pane,
       indent = 0,
-      padding = pane == 2 and max_files + SNORLAX_PADDING - 1 or 2,
+      padding = pane == 2 and max_files + POKEMON_PADDING - 1 or 2,
       enabled = recent_project_toggle,
     }
   end
@@ -150,6 +224,17 @@ end
 
 -- Create all dashboard sections
 function M.create_sections()
+  -- Re-check for pokemon colors (in case async generation completed)
+  if not pokemon_colors and pokemon_name then
+    pokemon_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
+  end
+
+  -- Re-apply pokemon colors when dashboard opens
+  -- This ensures colors are correct even after colorscheme reloads or async generation
+  if pokemon_colors then
+    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode)
+  end
+
   local base_branch = git_utils.get_base_branch()
   local current_branch = git_utils.get_current_branch()
   local recent_files = get_recent_files()
@@ -276,8 +361,8 @@ function M.create_sections()
     },
     -- hotkeys,
     globalkeys,
-    -- if snorlax is being shown and there is no git operations, then the recent files move to the
-    -- first pane, and snorlax needs to be padded according to the number of lines in recent files
+    -- if pokemon is being shown and there is no git operations, then the recent files move to the
+    -- first pane, and the pokemon needs to be padded according to the number of lines in recent files
     {
       pane = 2,
       enabled = utils.show_if_has_second_pane,
@@ -286,16 +371,14 @@ function M.create_sections()
     {
       pane = 2,
       section = "terminal",
-      -- the commented out command below will have an animated ascii aquarium
-      -- cmd = 'curl "http://asciiquarium.live?cols=$(tput cols)&rows=$(tput lines)"',
-      -- NOTE: for some reason, sleep 10 makes it never flicker, but also only causes a 1 second pause
-      cmd = "pokemon-colorscripts -n snorlax -s --no-title; sleep 0.01",
+      -- Pokemon sprite display using configured pokemon from top of file
+      cmd = POKEMON_CMD,
       ttl = math.huge, -- make the cache last forever so the 1 second pause is only the first time opening a project
-      indent = 22,
+      indent = 10, -- if your pokemon renders weird, adjust this number. Higher values push the pokemon right.
       -- 21 is the exact number of lines to make right and left bar aligned
       height = 21,
       enabled = utils.show_if_has_second_pane,
-      padding = 0, --SNORLAX_PADDING - 1,
+      padding = 0,
     },
     {
       pane = 2,
