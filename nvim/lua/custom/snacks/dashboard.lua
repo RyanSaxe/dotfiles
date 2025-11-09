@@ -18,7 +18,7 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "gengar",
+    name = "rayquaza",
 
     -- Set to true for shiny variant
     is_shiny = false,
@@ -29,6 +29,20 @@ local CONFIG = {
     -- Force small sprite size (don't add -b flag even if sprite is small)
     -- This is useful if you prefer the smaller sprite aesthetic
     force_small = false,
+  },
+
+  -- Color generation configuration (for testing algorithm changes)
+  generation = {
+    -- Force regeneration of pokemon colors even if they exist in database
+    -- Set to true when testing algorithm changes or new threshold values
+    -- WARNING: This will regenerate colors on every dashboard open!
+    force_regenerate = true,
+
+    -- Colorfulness threshold for prominent color selection (default: 500, previous: 2000)
+    -- Lower values favor frequency over saturation (more muted but common colors)
+    -- Higher values favor vivid colors over frequency (more saturated but rare colors)
+    -- Examples: 500 (balanced), 800 (moderately vivid), 1500 (very vivid), 2000 (original - very strict)
+    colorfulness_threshold = 500,
   },
 
   -- Color theme configuration
@@ -48,7 +62,7 @@ local CONFIG = {
     key_source = "auto",
 
     -- Description color (maps to dim color from sprite, used for SnacksDashboardDesc)
-    desc_source = "Comment", --"auto",
+    desc_source = "auto",
 
     -- Color adjustments using tokyonight.util functions
     -- Applied after resolving the base color from source
@@ -76,7 +90,7 @@ local CONFIG = {
 
 -- Calculate pokemon selection and colors (only done once at startup)
 -- This ensures the pokemon doesn't change on dashboard redraws
-local pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors
+local pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, color_sources, force_regenerate_active
 
 -- Only calculate if we would show a pokemon (has two panes)
 if utils.show_if_has_second_pane() then
@@ -90,29 +104,45 @@ if utils.show_if_has_second_pane() then
     pokemon_form = CONFIG.pokemon.form
   end
 
+  -- Build color sources config to pass through to generation
+  -- This ensures regenerated colors use the same configuration
+  color_sources = {
+    title_source = CONFIG.colors.title_source,
+    key_source = CONFIG.colors.key_source,
+    desc_source = CONFIG.colors.desc_source,
+    title_brighten = CONFIG.colors.title_brighten,
+    key_brighten = CONFIG.colors.key_brighten,
+    desc_brighten = CONFIG.colors.desc_brighten,
+    title_dim = CONFIG.colors.title_dim,
+    key_dim = CONFIG.colors.key_dim,
+    desc_dim = CONFIG.colors.desc_dim,
+  }
+
   -- Load color data for the selected pokemon
   -- This will auto-generate if not in database (async)
-  pokemon_colors = visual_utils.ensure_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, function()
-    -- Callback: when generation completes, update the dashboard
-    if Snacks and Snacks.dashboard and Snacks.dashboard.update then
-      Snacks.dashboard.update()
-    end
-  end, CONFIG.colors.background_mode)
+  pokemon_colors = visual_utils.ensure_pokemon_colors(
+    pokemon_name,
+    pokemon_shiny,
+    pokemon_form,
+    function()
+      -- Callback: when generation completes, update the dashboard
+      if Snacks and Snacks.dashboard and Snacks.dashboard.update then
+        Snacks.dashboard.update()
+      end
+    end,
+    CONFIG.colors.background_mode,
+    CONFIG.generation, -- Pass generation config (force_regenerate, colorfulness_threshold)
+    color_sources -- Pass color sources config for consistent application after generation
+  )
+
+  -- Track if force_regenerate is active to ensure colors are reloaded on every dashboard render
+  -- This prevents stale cached colors from being re-applied after async regeneration completes
+  force_regenerate_active = CONFIG.generation.force_regenerate
 
   if pokemon_colors then
     -- Apply colors to Snacks dashboard highlight groups
     -- Pass background_mode configuration, color source overrides, and adjustments
-    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, {
-      title_source = CONFIG.colors.title_source,
-      key_source = CONFIG.colors.key_source,
-      desc_source = CONFIG.colors.desc_source,
-      title_brighten = CONFIG.colors.title_brighten,
-      key_brighten = CONFIG.colors.key_brighten,
-      desc_brighten = CONFIG.colors.desc_brighten,
-      title_dim = CONFIG.colors.title_dim,
-      key_dim = CONFIG.colors.key_dim,
-      desc_dim = CONFIG.colors.desc_dim,
-    })
+    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
   end
 end
 
@@ -264,24 +294,18 @@ end
 -- Create all dashboard sections
 function M.create_sections()
   -- Re-check for pokemon colors (in case async generation completed)
-  if not pokemon_colors and pokemon_name then
+  -- Always reload when force_regenerate is active to pick up newly regenerated colors
+  if (not pokemon_colors or force_regenerate_active) and pokemon_name then
+    -- Reload the pokemon-colors module to pick up any newly generated colors
+    -- This is important when force_regenerate=true and colors are being regenerated
+    package.loaded["custom.visual.pokemon-colors"] = nil
     pokemon_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
   end
 
   -- Re-apply pokemon colors when dashboard opens
   -- This ensures colors are correct even after colorscheme reloads or async generation
   if pokemon_colors then
-    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, {
-      title_source = CONFIG.colors.title_source,
-      key_source = CONFIG.colors.key_source,
-      desc_source = CONFIG.colors.desc_source,
-      title_brighten = CONFIG.colors.title_brighten,
-      key_brighten = CONFIG.colors.key_brighten,
-      desc_brighten = CONFIG.colors.desc_brighten,
-      title_dim = CONFIG.colors.title_dim,
-      key_dim = CONFIG.colors.key_dim,
-      desc_dim = CONFIG.colors.desc_dim,
-    })
+    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
   end
 
   local base_branch = git_utils.get_base_branch()

@@ -28,10 +28,15 @@ Examples:
   generate-pokemon-colors meowth --form alola
   generate-pokemon-colors bulbasaur --update-db  # Updates the lua database file
   generate-pokemon-colors --clear                # Clears all pokemon entries
+  COLORFULNESS_THRESHOLD=800 generate-pokemon-colors rayquaza --update-db  # Test with higher threshold
 
 Flags:
   --update-db  Update nvim/lua/custom/visual/pokemon-colors.lua with generated entry
   --clear      Clear all pokemon entries from the database file
+
+Environment Variables:
+  COLORFULNESS_THRESHOLD  Override colorfulness threshold (default: 500, previous: 2000)
+                          Lower = favor frequency, Higher = favor vivid colors
 EOF
   exit 1
 }
@@ -435,7 +440,10 @@ find_color_index() {
 select_prominent_color() {
   local mode=$1  # "dark" or "light"
 
-  local colorful_threshold=2000  # Threshold for truly colorful colors
+  # Threshold for colorful colors (lowered from 2000 to better favor frequency)
+  # Previous value (2000) was too high and selected vivid accent colors over muted dominant colors
+  # Can be overridden via COLORFULNESS_THRESHOLD environment variable (for testing from dashboard.lua)
+  local colorful_threshold="${COLORFULNESS_THRESHOLD:-500}"
   local max_colorful_score=0
   local max_colorful_idx=-1
   local selected_idx=-1

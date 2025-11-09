@@ -345,19 +345,30 @@ end
 ---Ensure pokemon colors exist, generating them if necessary (ASYNC)
 ---This function will:
 ---1. Try to load colors for the pokemon
----2. If not found, start async generation and return nil immediately
+---2. If not found (or force_regenerate is true), start async generation and return nil immediately
 ---3. When generation completes, reload colors and update dashboard
 ---@param pokemon_name string The name of the pokemon
 ---@param is_shiny boolean|nil Whether this is a shiny variant
 ---@param form string|nil Optional form name
 ---@param on_complete function|nil Callback to run after generation completes
 ---@param background_mode string|nil Optional background mode override: "auto", "light", "dark" (default: "auto")
+---@param generation_config table|nil Optional generation config: {force_regenerate, colorfulness_threshold}
+---@param color_sources table|nil Optional color source config for applying colors after generation
 ---@return table|nil colors Table with dark/light color variants, or nil if not found/generating
-function M.ensure_pokemon_colors(pokemon_name, is_shiny, form, on_complete, background_mode)
+function M.ensure_pokemon_colors(pokemon_name, is_shiny, form, on_complete, background_mode, generation_config, color_sources)
+  -- Extract generation config options
+  local config = generation_config or {}
+  local force_regenerate = config.force_regenerate or false
+  local colorfulness_threshold = config.colorfulness_threshold or 500
+
   -- First, try to load the colors normally (without fallback to ensure exact match)
-  local colors = M.get_pokemon_colors(pokemon_name, is_shiny, form, false)
-  if colors then
-    return colors
+  -- Skip this check if force_regenerate is true (for testing)
+  local colors = nil
+  if not force_regenerate then
+    colors = M.get_pokemon_colors(pokemon_name, is_shiny, form, false)
+    if colors then
+      return colors
+    end
   end
 
   -- Colors not found - start async generation
@@ -374,15 +385,19 @@ function M.ensure_pokemon_colors(pokemon_name, is_shiny, form, on_complete, back
     return nil
   end
 
-  -- Build command
-  local cmd = { "zsh", script_path, pokemon_name, "--update-db" }
-  if is_shiny then
-    table.insert(cmd, "--shiny")
-  end
-  if form and form ~= "" then
-    table.insert(cmd, "--form")
-    table.insert(cmd, form)
-  end
+  -- Build command with environment variable prefix
+  -- Pass colorfulness_threshold via environment variable
+  local cmd = {
+    "zsh",
+    "-c",
+    string.format("COLORFULNESS_THRESHOLD=%d %s %s --update-db%s%s",
+      colorfulness_threshold,
+      vim.fn.shellescape(script_path),
+      vim.fn.shellescape(pokemon_name),
+      is_shiny and " --shiny" or "",
+      (form and form ~= "") and " --form " .. vim.fn.shellescape(form) or ""
+    )
+  }
 
   -- Run the generation script asynchronously
   vim.fn.jobstart(cmd, {
@@ -403,10 +418,11 @@ function M.ensure_pokemon_colors(pokemon_name, is_shiny, form, on_complete, back
       if new_colors then
         vim.notify(string.format("Successfully generated colors for %s", display_name), vim.log.levels.INFO)
 
-        -- Apply the new colors with the provided background_mode
-        M.apply_dashboard_colors(new_colors, background_mode)
+        -- Apply the new colors with the provided background_mode and color sources
+        -- This ensures we use the same configuration as the initial application
+        M.apply_dashboard_colors(new_colors, background_mode, color_sources)
 
-        -- Call the completion callback if provided
+        -- Call the completion callback if provided to trigger dashboard redraw
         if on_complete then
           vim.schedule(on_complete)
         end
