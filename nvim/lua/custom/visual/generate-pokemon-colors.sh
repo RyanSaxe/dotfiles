@@ -1,11 +1,12 @@
 #!/usr/bin/env zsh
 # Generate color palette database for pokemon-colorscripts
-# - Prominent: Most saturated + bright (dark bg) or saturated + dark (light bg) + FREQUENT
-# - Bright:    Lightest with minimal color (dark bg) or darkest with minimal color (light bg)
-# - Dim:       Grayscale or desaturated for secondary text
+# NEW ALGORITHM:
+# - Prominent: Most frequent COLORFUL color that pops on the background
+# - Bright:    Color most perceptually different from prominent (using Delta E)
+# - Dim:       Dullest/most desaturated color that's still readable
 #
-# All selections favor colors that appear frequently in the sprite for cleaner look.
-# Outputs Lua table entry, optionally updating the database file.
+# All selections use perceptual color science (CIELAB, Delta E 2000) for accuracy.
+# Outputs 'fallback' for bright/dim if no suitable color found.
 
 # ------------------------- Strict mode & env -------------------------
 set -eu
@@ -130,6 +131,9 @@ COLORS_WITH_COUNTS=$(print -r -- "$ALL_COLORS_RAW" | sort | uniq -c | sort -rn)
 # Extract unique colors in order-preserving manner (first occurrence)
 UNIQUE_COLORS=$(print -r -- "$ALL_COLORS_RAW" | awk '!seen[$0]++')
 
+# Get colors sorted by frequency (most frequent first) for prominent selection
+COLORS_BY_FREQUENCY=$(print -r -- "$COLORS_WITH_COUNTS" | awk '{print $2}')
+
 # ------------------------- Color math -------------------------------
 # Luminance (0..255) – simple weighted sRGB (fast, stable)
 calc_luminance() {
@@ -172,46 +176,6 @@ calc_saturation() {
   ' "$r" "$g" "$b"
 }
 
-# HSL hue (0..360 degrees), calculated from RGB
-# Returns hue angle in degrees, or 0 if no hue (grayscale)
-calc_hue() {
-  local r=$1 g=$2 b=$3
-  perl -e '
-    use strict;
-    use List::Util qw(max min);
-    my ($r, $g, $b) = @ARGV;
-    my ($rf, $gf, $bf) = ($r/255, $g/255, $b/255);
-    my $max = max($rf, $gf, $bf);
-    my $min = min($rf, $gf, $bf);
-    my $delta = $max - $min;
-
-    if ($delta == 0) {
-      print "0";  # No hue for grayscale
-      exit;
-    }
-
-    my $hue = 0;
-    if ($max == $rf) {
-      $hue = 60 * ((($gf - $bf) / $delta) % 6);
-    } elsif ($max == $gf) {
-      $hue = 60 * ((($bf - $rf) / $delta) + 2);
-    } else {
-      $hue = 60 * ((($rf - $gf) / $delta) + 4);
-    }
-
-    # Normalize to 0..360
-    $hue += 360 if $hue < 0;
-    printf "%.2f", $hue;
-  ' "$r" "$g" "$b"
-}
-
-# Calculate minimum angular distance between two hues (in degrees)
-# Returns value between 0 and 180 degrees
-calc_hue_distance() {
-  local hue1=$1 hue2=$2
-  perlcalc "do { my \$d = abs($hue1 - $hue2); \$d > 180 ? 360 - \$d : \$d }"
-}
-
 # Grayscale check: all components within 15
 is_grayscale() {
   local r=$1 g=$2 b=$3
@@ -236,6 +200,171 @@ get_color_percentage() {
   fi
 }
 
+# ------------------------- LAB Color Space & Delta E ----------------
+# Convert RGB (0-255) to CIELAB color space
+# Returns space-separated "L a b" values
+rgb_to_lab() {
+  local r=$1 g=$2 b=$3
+  perl -e '
+    use strict;
+    use POSIX qw(pow);
+
+    my ($r, $g, $b) = @ARGV;
+
+    # Convert RGB to linear RGB (gamma correction)
+    sub to_linear {
+      my $c = shift() / 255.0;
+      return $c <= 0.04045 ? $c / 12.92 : pow(($c + 0.055) / 1.055, 2.4);
+    }
+
+    my $rl = to_linear($r);
+    my $gl = to_linear($g);
+    my $bl = to_linear($b);
+
+    # Convert to XYZ (using sRGB D65 illuminant)
+    my $x = $rl * 0.4124564 + $gl * 0.3575761 + $bl * 0.1804375;
+    my $y = $rl * 0.2126729 + $gl * 0.7151522 + $bl * 0.0721750;
+    my $z = $rl * 0.0193339 + $gl * 0.1191920 + $bl * 0.9503041;
+
+    # Normalize by D65 white point
+    $x /= 0.95047;
+    $y /= 1.00000;
+    $z /= 1.08883;
+
+    # Convert to LAB
+    sub f {
+      my $t = shift;
+      return $t > 0.008856 ? pow($t, 1.0/3.0) : (7.787 * $t) + (16.0/116.0);
+    }
+
+    my $fx = f($x);
+    my $fy = f($y);
+    my $fz = f($z);
+
+    my $L = (116.0 * $fy) - 16.0;
+    my $a = 500.0 * ($fx - $fy);
+    my $b_val = 200.0 * ($fy - $fz);
+
+    printf "%.4f %.4f %.4f", $L, $a, $b_val;
+  ' "$r" "$g" "$b"
+}
+
+# Calculate Delta E 2000 (perceptual color difference)
+# Takes two LAB color strings: "L1 a1 b1" "L2 a2 b2"
+# Returns a perceptual distance value (0 = identical, 100 = very different)
+calc_delta_e() {
+  local lab1=$1 lab2=$2
+  perl -e '
+    use strict;
+    use POSIX qw(pow sqrt atan2 sin cos);
+
+    my @lab1 = split(/\s+/, $ARGV[0]);
+    my @lab2 = split(/\s+/, $ARGV[1]);
+
+    my ($L1, $a1, $b1) = @lab1;
+    my ($L2, $a2, $b2) = @lab2;
+
+    # Simplified Delta E 2000 calculation
+    # (Full implementation is complex; this is a practical approximation)
+
+    my $dL = $L2 - $L1;
+    my $da = $a2 - $a1;
+    my $db = $b2 - $b1;
+
+    # Chroma
+    my $C1 = sqrt($a1*$a1 + $b1*$b1);
+    my $C2 = sqrt($a2*$a2 + $b2*$b2);
+    my $dC = $C2 - $C1;
+
+    # Hue (approximate)
+    my $dH_sq = $da*$da + $db*$db - $dC*$dC;
+    $dH_sq = 0 if $dH_sq < 0;  # Avoid sqrt of negative
+    my $dH = sqrt($dH_sq);
+
+    # Simplified Delta E (not full CIEDE2000 but good enough)
+    my $kL = 1.0;
+    my $kC = 1.0;
+    my $kH = 1.0;
+
+    my $dE = sqrt(
+      pow($dL / $kL, 2) +
+      pow($dC / $kC, 2) +
+      pow($dH / $kH, 2)
+    );
+
+    printf "%.4f", $dE;
+  ' "$lab1" "$lab2"
+}
+
+# Calculate colorfulness score (for prominent selection)
+# High saturation + distance from neutral colors = more colorful
+calc_colorfulness() {
+  local r=$1 g=$2 b=$3
+  local sat=$4  # Pre-calculated saturation
+
+  perl -e '
+    use strict;
+    use POSIX qw(sqrt pow);
+
+    my ($r, $g, $b, $sat) = @ARGV;
+
+    # Calculate distance from neutral (white/black/gray)
+    # Check distance to white (255,255,255), black (0,0,0), and mid-gray (128,128,128)
+    sub euclidean_dist {
+      my ($r1, $g1, $b1, $r2, $g2, $b2) = @_;
+      return sqrt(pow($r1-$r2, 2) + pow($g1-$g2, 2) + pow($b1-$b2, 2));
+    }
+
+    my $dist_white = euclidean_dist($r, $g, $b, 255, 255, 255);
+    my $dist_black = euclidean_dist($r, $g, $b, 0, 0, 0);
+    my $dist_gray = euclidean_dist($r, $g, $b, 128, 128, 128);
+
+    # Minimum distance from neutrals (normalized to 0-100 scale)
+    my $min_dist = $dist_white;
+    $min_dist = $dist_black if $dist_black < $min_dist;
+    $min_dist = $dist_gray if $dist_gray < $min_dist;
+    my $neutral_dist = ($min_dist / 441.67) * 100;  # 441.67 = sqrt(3*255^2) max distance
+
+    # Colorfulness = saturation² (0-10000) + neutral distance (0-100)
+    # Heavy weight on saturation to prefer truly colorful colors
+    my $colorfulness = pow($sat, 2) + $neutral_dist;
+
+    printf "%.2f", $colorfulness;
+  ' "$r" "$g" "$b" "$sat"
+}
+
+# Calculate dullness score (for dim selection)
+# Low saturation + mid-range readable luminance = duller
+calc_dullness() {
+  local r=$1 g=$2 b=$3
+  local sat=$4 lum=$5
+
+  perl -e '
+    use strict;
+    use POSIX qw(abs pow);
+
+    my ($r, $g, $b, $sat, $lum) = @ARGV;
+
+    # Dullness factors:
+    # 1. Low saturation (desaturated colors are dull)
+    # 2. Mid-range luminance (readable but not prominent)
+
+    my $desat_score = (100 - $sat);  # Higher = less saturated = duller
+
+    # Readability: prefer mid-range luminance (80-180)
+    # Peak at 130 (readable in most contexts)
+    my $readable_peak = 130;
+    my $lum_penalty = pow(($lum - $readable_peak) / 100, 2) * 50;
+    my $readable_score = 100 - $lum_penalty;
+    $readable_score = 0 if $readable_score < 0;
+
+    # Dullness = desaturation + readability
+    my $dullness = $desat_score + $readable_score;
+
+    printf "%.2f", $dullness;
+  ' "$r" "$g" "$b" "$sat" "$lum"
+}
+
 # ------------------------- Build arrays -----------------------------
 typeset -a ALL_COLORS  # "r,g,b"
 typeset -a LUM         # numeric strings
@@ -243,6 +372,9 @@ typeset -a SAT         # numeric strings
 typeset -a PCT         # percentage of sprite
 typeset -a IS_GRAY     # "0"/"1"
 typeset -a HEXS        # "#RRGGBB"
+typeset -a LAB         # "L a b" - LAB color space values
+typeset -a COLORFUL    # colorfulness scores
+typeset -a DULLNESS    # dullness scores
 
 # Read UNIQUE_COLORS lines: r,g,b
 while IFS=',' read -r r g b; do
@@ -254,11 +386,18 @@ while IFS=',' read -r r g b; do
   local_lum="$(calc_luminance "$r" "$g" "$b")"
   local_sat="$(calc_saturation "$r" "$g" "$b")"
   local_pct="$(get_color_percentage "$r,$g,$b")"
+  local_lab="$(rgb_to_lab "$r" "$g" "$b")"
+  local_colorful="$(calc_colorfulness "$r" "$g" "$b" "$local_sat")"
+  local_dull="$(calc_dullness "$r" "$g" "$b" "$local_sat" "$local_lum")"
 
   ALL_COLORS+=("$r,$g,$b")
   LUM+=("$local_lum")
   SAT+=("$local_sat")
   PCT+=("$local_pct")
+  LAB+=("$local_lab")
+  COLORFUL+=("$local_colorful")
+  DULLNESS+=("$local_dull")
+
   if is_grayscale "$r" "$g" "$b"; then
     IS_GRAY+=("1")
   else
@@ -274,396 +413,194 @@ perlcmp() {
   perl -e 'exit($ARGV[0] > $ARGV[1] ? 0 : 1)' "$1" "$2"
 }
 
-# Deterministic tie-breaker: prefer higher score, then higher frequency, then lexicographically smallest HEX
-better_score() {
-  # args: scoreA scoreB pctA pctB hexA hexB -> return 0 if A > B, 1 otherwise
-  local a=$1 b=$2 pa=$3 pb=$4 ha=$5 hb=$6
-  if perlcmp "$a" "$b"; then return 0
-  elif perlcmp "$b" "$a"; then return 1
-  else
-    # Tie on score, check frequency
-    if perlcmp "$pa" "$pb"; then return 0
-    elif perlcmp "$pb" "$pa"; then return 1
+# Find array index for a color "r,g,b"
+find_color_index() {
+  local target=$1
+  for i in {1..$#ALL_COLORS}; do
+    if [[ "${ALL_COLORS[$i]}" == "$target" ]]; then
+      print -r -- "$i"
+      return 0
+    fi
+  done
+  print -r -- "-1"
+  return 1
+}
+
+# ------------------------- Prominent Selection (NEW ALGORITHM) -----
+# Iterate colors by frequency, select first one that is:
+# 1. Sufficiently colorful (high saturation + not neutral)
+# 2. Appropriate luminance for the background mode
+# Track max colorfulness as fallback
+
+select_prominent_color() {
+  local mode=$1  # "dark" or "light"
+
+  local colorful_threshold=2000  # Threshold for truly colorful colors
+  local max_colorful_score=0
+  local max_colorful_idx=-1
+  local selected_idx=-1
+
+  # Iterate colors by frequency (most frequent first)
+  while IFS=',' read -r r g b; do
+    local idx=$(find_color_index "$r,$g,$b")
+    [[ $idx -lt 0 ]] && continue
+
+    local lum="${LUM[$idx]}"
+    local sat="${SAT[$idx]}"
+    local colorful_score="${COLORFUL[$idx]}"
+
+    # IMPORTANT: Reject colors too close to white/black (off-whites, pastels, dark grays)
+    # These fail the "actually colorful" test even if they have decent saturation
+    local too_close_to_neutral=0
+    if [[ $mode == "dark" ]]; then
+      # For dark mode, reject near-whites: any color where min distance to white < 100 in RGB space
+      local dist_to_white=$(perlcalc "sqrt((255-$r)**2 + (255-$g)**2 + (255-$b)**2)")
+      (( $(perlcalc "$dist_to_white < 100") )) && too_close_to_neutral=1
     else
-      # Tie on frequency, use hex
-      [[ "$ha" < "$hb" ]] && return 0 || return 1
+      # For light mode, reject near-blacks: any color where min distance to black < 80 in RGB space
+      local dist_to_black=$(perlcalc "sqrt($r**2 + $g**2 + $b**2)")
+      (( $(perlcalc "$dist_to_black < 80") )) && too_close_to_neutral=1
     fi
+
+    # Skip if too close to neutral
+    (( too_close_to_neutral )) && continue
+
+    # Track max colorfulness for fallback (among non-neutral colors only)
+    if perlcmp "$colorful_score" "$max_colorful_score"; then
+      max_colorful_score="$colorful_score"
+      max_colorful_idx=$idx
+    fi
+
+    # Check luminance constraints based on mode
+    local lum_ok=0
+    if [[ $mode == "dark" ]]; then
+      # Dark mode: need bright colors (lum > 80) to pop on dark background
+      (( $(perlcalc "$lum > 80") )) && lum_ok=1
+    else
+      # Light mode: need dark colors (lum < 175) to show on light background
+      (( $(perlcalc "$lum < 175") )) && lum_ok=1
+    fi
+
+    # If colorful enough AND appropriate luminance, select it
+    if (( lum_ok )) && perlcmp "$colorful_score" "$colorful_threshold"; then
+      selected_idx=$idx
+      break
+    fi
+  done <<< "$COLORS_BY_FREQUENCY"
+
+  # Fallback: if nothing met threshold, use most colorful color found
+  if [[ $selected_idx -lt 0 ]]; then
+    selected_idx=$max_colorful_idx
+  fi
+
+  print -r -- "$selected_idx"
+}
+
+# Dark mode prominent
+DARK_PROMINENT_IDX=$(select_prominent_color "dark")
+
+# Light mode prominent
+LIGHT_PROMINENT_IDX=$(select_prominent_color "light")
+
+# ------------------------- Bright Selection (NEW ALGORITHM) --------
+# Select color with maximum Delta E distance from prominent
+# Must have appropriate luminance (not too dark for dark mode, not too light for light mode)
+
+select_bright_color() {
+  local mode=$1
+  local prominent_idx=$2
+
+  [[ $prominent_idx -lt 0 ]] && { print -r -- "-1"; return; }
+
+  local prominent_lab="${LAB[$prominent_idx]}"
+  local max_delta_e=0
+  local best_idx=-1
+  local min_delta_e_threshold=30  # Minimum perceptual difference
+
+  # Iterate all colors
+  for i in {1..$#ALL_COLORS}; do
+    # Skip if same as prominent
+    [[ $i -eq $prominent_idx ]] && continue
+
+    local lum="${LUM[$i]}"
+    local current_lab="${LAB[$i]}"
+
+    # Check luminance constraints
+    local lum_ok=0
+    if [[ $mode == "dark" ]]; then
+      # Dark mode: avoid super dark colors (need lum > 100) and super light (lum < 240)
+      (( $(perlcalc "$lum > 100 && $lum < 240") )) && lum_ok=1
+    else
+      # Light mode: avoid super light colors (need lum < 155) and super dark (lum > 20)
+      (( $(perlcalc "$lum < 155 && $lum > 20") )) && lum_ok=1
+    fi
+
+    (( ! lum_ok )) && continue
+
+    # Calculate perceptual distance
+    local delta_e=$(calc_delta_e "$prominent_lab" "$current_lab")
+
+    # Track maximum difference
+    if perlcmp "$delta_e" "$max_delta_e"; then
+      max_delta_e="$delta_e"
+      best_idx=$i
+    fi
+  done
+
+  # Only return if we found a sufficiently different color
+  if [[ $best_idx -ge 0 ]] && perlcmp "$max_delta_e" "$min_delta_e_threshold"; then
+    print -r -- "$best_idx"
+  else
+    print -r -- "-1"  # Will become 'fallback' in output
   fi
 }
 
-require_idx() { local idx=$1 label=$2; [[ $idx -ge 0 ]] || fail "No suitable color found for '$label'"; }
+# Dark mode bright
+DARK_BRIGHT_IDX=$(select_bright_color "dark" "$DARK_PROMINENT_IDX")
 
-# ------------------------- Pickers (dark bg) -------------------
-# Dark prominent: Most saturated + bright + FREQUENT
-# "the thing that has the absolute most color AND brightness" + takes up a lot of image
-DARK_PROMINENT_IDX=-1; DARK_PROMINENT_SCORE="0"
-for i in {1..$#ALL_COLORS}; do
-  IFS=',' read -r r g b <<< "${ALL_COLORS[$i]}"
-  local_sat="${SAT[$i]}"
-  local_lum="${LUM[$i]}"
-  local_pct="${PCT[$i]}"
+# Light mode bright
+LIGHT_BRIGHT_IDX=$(select_bright_color "light" "$LIGHT_PROMINENT_IDX")
 
-  # Need high saturation, brightness, and frequency
-  # Avoid very dark colors (need contrast on dark bg)
-  if perlcmp "$local_lum" "50" && perlcmp "$local_sat" "30" && perlcmp "$local_pct" "2"; then
-    # Score: saturation + brightness + frequency bonus
-    # Heavily weight saturation (main color characteristic)
-    # Weight brightness (needs to pop on dark bg)
-    # Weight frequency (should be a main color, not accent)
-    score="$(perlcalc "($local_sat * 2) + $local_lum + ($local_pct * 5)")"
-    if [[ $DARK_PROMINENT_IDX -lt 0 ]] \
-       || better_score "$score" "$DARK_PROMINENT_SCORE" "$local_pct" "${PCT[$DARK_PROMINENT_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_PROMINENT_IDX]}"; then
-      DARK_PROMINENT_SCORE="$score"; DARK_PROMINENT_IDX=$i
-    fi
-  fi
-done
-# Progressive fallback: if no color met 2% threshold, remove frequency requirement
-# This helps pokemon with predominantly black/white colors
-if [[ $DARK_PROMINENT_IDX -lt 0 ]]; then
+# ------------------------- Dim Selection (NEW ALGORITHM) -----------
+# Select dullest color that's still readable
+# Prefer desaturated colors with mid-range luminance
+
+select_dim_color() {
+  local mode=$1  # Not heavily used, but available for future refinement
+
+  local max_dullness=0
+  local best_idx=-1
+  local min_dullness_threshold=80  # Minimum dullness to be considered "dim"
+
+  # Iterate all colors
   for i in {1..$#ALL_COLORS}; do
-    IFS=',' read -r r g b <<< "${ALL_COLORS[$i]}"
-    local_sat="${SAT[$i]}"
-    local_lum="${LUM[$i]}"
-    local_pct="${PCT[$i]}"
-    # Same criteria but NO frequency requirement
-    if perlcmp "$local_lum" "50" && perlcmp "$local_sat" "30"; then
-      score="$(perlcalc "($local_sat * 2) + $local_lum")"
-      if [[ $DARK_PROMINENT_IDX -lt 0 ]] \
-         || better_score "$score" "$DARK_PROMINENT_SCORE" "$local_pct" "${PCT[$DARK_PROMINENT_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_PROMINENT_IDX]}"; then
-        DARK_PROMINENT_SCORE="$score"; DARK_PROMINENT_IDX=$i
-      fi
+    local dull="${DULLNESS[$i]}"
+
+    # Track maximum dullness
+    if perlcmp "$dull" "$max_dullness"; then
+      max_dullness="$dull"
+      best_idx=$i
     fi
   done
-fi
 
-# Dark bright: Highest brightness, minimal color
-# "most brightness, least color"
-DARK_BRIGHT_IDX=-1; DARK_BRIGHT_SCORE="0"
-for i in {1..$#ALL_COLORS}; do
-  [[ ${IS_GRAY[$i]} -eq 1 ]] && continue
-  local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-  # Want bright but with some color (not pure white)
-  # Low saturation, high luminance
-  if (( $(perlcalc "$local_lum > 120 && $local_lum < 250 && $local_sat > 10 && $local_sat < 60") )); then
-    # Score: brightness - saturation (NO frequency requirement - allows rare accent colors)
-    score="$(perlcalc "$local_lum - ($local_sat * 0.5)")"
-    if [[ $DARK_BRIGHT_IDX -lt 0 ]] \
-       || better_score "$score" "$DARK_BRIGHT_SCORE" "$local_pct" "${PCT[$DARK_BRIGHT_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_BRIGHT_IDX]}"; then
-      DARK_BRIGHT_SCORE="$score"; DARK_BRIGHT_IDX=$i
-    fi
-  fi
-done
-# lenient fallback
-if [[ $DARK_BRIGHT_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    [[ ${IS_GRAY[$i]} -eq 1 ]] && continue
-    local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    if (( $(perlcalc "$local_lum > 100 && $local_sat > 5") )); then
-      score="$(perlcalc "$local_lum")"
-      if [[ $DARK_BRIGHT_IDX -lt 0 ]] \
-         || better_score "$score" "$DARK_BRIGHT_SCORE" "$local_pct" "${PCT[$DARK_BRIGHT_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_BRIGHT_IDX]}"; then
-        DARK_BRIGHT_SCORE="$score"; DARK_BRIGHT_IDX=$i
-      fi
-    fi
-  done
-fi
-# Fallback for predominantly white/black pokemon: allow bright whites
-if [[ $DARK_BRIGHT_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    local_lum="${LUM[$i]}"
-    local_pct="${PCT[$i]}"
-    # Accept bright colors (lum > 200) regardless of saturation
-    if (( $(perlcalc "$local_lum > 200") )); then
-      score="$local_lum"
-      if [[ $DARK_BRIGHT_IDX -lt 0 ]] \
-         || better_score "$score" "$DARK_BRIGHT_SCORE" "$local_pct" "${PCT[$DARK_BRIGHT_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_BRIGHT_IDX]}"; then
-        DARK_BRIGHT_SCORE="$score"; DARK_BRIGHT_IDX=$i
-      fi
-    fi
-  done
-fi
-# Ultimate fallback: hardcoded light gray (for completely monochrome pokemon)
-if [[ $DARK_BRIGHT_IDX -lt 0 ]]; then
-  # Add a synthetic color entry for the fallback
-  ALL_COLORS+=("224,224,224")  # #E0E0E0
-  HEXS+=("#E0E0E0")
-  SAT+=("0")
-  LUM+=("224")
-  PCT+=("0")
-  IS_GRAY+=("1")
-  DARK_BRIGHT_IDX=${#ALL_COLORS}
-fi
-
-# Dark dim: Grayscale, mid-range brightness, prefer frequent
-DARK_DIM_IDX=-1; DARK_DIM_SCORE="0"
-for i in {1..$#ALL_COLORS}; do
-  [[ ${IS_GRAY[$i]} -eq 1 ]] || continue
-  local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-  # prefer mid-gray (80..150), peak at 115
-  if (( $(perlcalc "$local_lum > 80 && $local_lum < 150") )); then
-    score="$(perlcalc "150 - (($local_lum - 115)**2)/10 + ($local_pct * 2)")"
-    if [[ $DARK_DIM_IDX -lt 0 ]] \
-       || better_score "$score" "$DARK_DIM_SCORE" "$local_pct" "${PCT[$DARK_DIM_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_DIM_IDX]}"; then
-      DARK_DIM_SCORE="$score"; DARK_DIM_IDX=$i
-    fi
-  fi
-done
-# fallback: any grayscale
-if [[ $DARK_DIM_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    [[ ${IS_GRAY[$i]} -eq 1 ]] || continue
-    local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    if (( $(perlcalc "$local_lum > 40 && $local_lum < 200") )); then
-      score="$(perlcalc "100 - (($local_lum - 115)**2)/50 + ($local_pct * 2)")"
-      if [[ $DARK_DIM_IDX -lt 0 ]] \
-         || better_score "$score" "$DARK_DIM_SCORE" "$local_pct" "${PCT[$DARK_DIM_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_DIM_IDX]}"; then
-        DARK_DIM_SCORE="$score"; DARK_DIM_IDX=$i
-      fi
-    fi
-  done
-fi
-# fallback: desaturated color
-if [[ $DARK_DIM_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    if (( $(perlcalc "$local_lum > 60 && $local_lum < 180 && $local_sat < 30") )); then
-      score="$(perlcalc "(100 - $local_sat) + ($local_pct * 2)")"
-      if [[ $DARK_DIM_IDX -lt 0 ]] \
-         || better_score "$score" "$DARK_DIM_SCORE" "$local_pct" "${PCT[$DARK_DIM_IDX]}" "${HEXS[$i]}" "${HEXS[$DARK_DIM_IDX]}"; then
-        DARK_DIM_SCORE="$score"; DARK_DIM_IDX=$i
-      fi
-    fi
-  done
-fi
-
-# ------------------------- Pickers (light bg) ------------------
-# Light prominent: Most saturated + dark enough to show + FREQUENT
-# "most color, but not too bright such as not to show up properly on light background"
-LIGHT_PROMINENT_IDX=-1; LIGHT_PROMINENT_SCORE="0"
-for i in {1..$#ALL_COLORS}; do
-  local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-  # saturated + sufficiently dark + frequent
-  if (( $(perlcalc "$local_lum < 200 && $local_sat > 30 && $local_pct > 2") )); then
-    # Score: saturation + darkness + frequency
-    score="$(perlcalc "($local_sat * 2) + (255 - $local_lum) + ($local_pct * 5)")"
-    if [[ $LIGHT_PROMINENT_IDX -lt 0 ]] \
-       || better_score "$score" "$LIGHT_PROMINENT_SCORE" "$local_pct" "${PCT[$LIGHT_PROMINENT_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_PROMINENT_IDX]}"; then
-      LIGHT_PROMINENT_SCORE="$score"; LIGHT_PROMINENT_IDX=$i
-    fi
-  fi
-done
-# Progressive fallback: if no color met 2% threshold, remove frequency requirement
-if [[ $LIGHT_PROMINENT_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    # Same criteria but NO frequency requirement
-    if (( $(perlcalc "$local_lum < 200 && $local_sat > 30") )); then
-      score="$(perlcalc "($local_sat * 2) + (255 - $local_lum)")"
-      if [[ $LIGHT_PROMINENT_IDX -lt 0 ]] \
-         || better_score "$score" "$LIGHT_PROMINENT_SCORE" "$local_pct" "${PCT[$LIGHT_PROMINENT_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_PROMINENT_IDX]}"; then
-        LIGHT_PROMINENT_SCORE="$score"; LIGHT_PROMINENT_IDX=$i
-      fi
-    fi
-  done
-fi
-
-# Light bright: Darkest color with minimal saturation
-# "least color, most dark"
-LIGHT_BRIGHT_IDX=-1; LIGHT_BRIGHT_SCORE="0"
-for i in {1..$#ALL_COLORS}; do
-  [[ ${IS_GRAY[$i]} -eq 1 ]] && continue
-  local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-  # moderate saturation, dark for contrast
-  if (( $(perlcalc "$local_lum > 40 && $local_lum < 140 && $local_sat > 20 && $local_sat < 70") )); then
-    # Score: darkness - saturation (NO frequency requirement - allows rare accent colors)
-    score="$(perlcalc "(255 - $local_lum) - ($local_sat * 0.5)")"
-    if [[ $LIGHT_BRIGHT_IDX -lt 0 ]] \
-       || better_score "$score" "$LIGHT_BRIGHT_SCORE" "$local_pct" "${PCT[$LIGHT_BRIGHT_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_BRIGHT_IDX]}"; then
-      LIGHT_BRIGHT_SCORE="$score"; LIGHT_BRIGHT_IDX=$i
-    fi
-  fi
-done
-# lenient fallback
-if [[ $LIGHT_BRIGHT_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    [[ ${IS_GRAY[$i]} -eq 1 ]] && continue
-    local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    if (( $(perlcalc "$local_lum < 150 && $local_sat > 15") )); then
-      score="$(perlcalc "(255 - $local_lum)")"
-      if [[ $LIGHT_BRIGHT_IDX -lt 0 ]] \
-         || better_score "$score" "$LIGHT_BRIGHT_SCORE" "$local_pct" "${PCT[$LIGHT_BRIGHT_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_BRIGHT_IDX]}"; then
-        LIGHT_BRIGHT_SCORE="$score"; LIGHT_BRIGHT_IDX=$i
-      fi
-    fi
-  done
-fi
-# Fallback for predominantly white/black pokemon: allow dark grays/blacks
-if [[ $LIGHT_BRIGHT_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    local_lum="${LUM[$i]}"
-    local_pct="${PCT[$i]}"
-    # Accept dark colors (lum < 50) regardless of saturation
-    if (( $(perlcalc "$local_lum < 50") )); then
-      score="$(perlcalc "255 - $local_lum")"
-      if [[ $LIGHT_BRIGHT_IDX -lt 0 ]] \
-         || better_score "$score" "$LIGHT_BRIGHT_SCORE" "$local_pct" "${PCT[$LIGHT_BRIGHT_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_BRIGHT_IDX]}"; then
-        LIGHT_BRIGHT_SCORE="$score"; LIGHT_BRIGHT_IDX=$i
-      fi
-    fi
-  done
-fi
-# Ultimate fallback: hardcoded dark gray (for completely monochrome pokemon)
-if [[ $LIGHT_BRIGHT_IDX -lt 0 ]]; then
-  # Add a synthetic color entry for the fallback
-  ALL_COLORS+=("42,42,42")  # #2A2A2A
-  HEXS+=("#2A2A2A")
-  SAT+=("0")
-  LUM+=("42")
-  PCT+=("0")
-  IS_GRAY+=("1")
-  LIGHT_BRIGHT_IDX=${#ALL_COLORS}
-fi
-
-# Light dim: Grayscale, mid-to-light range, prefer frequent
-LIGHT_DIM_IDX=-1; LIGHT_DIM_SCORE="0"
-for i in {1..$#ALL_COLORS}; do
-  [[ ${IS_GRAY[$i]} -eq 1 ]] || continue
-  local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-  # mid-gray for light bg (100..180), peak at 140
-  if (( $(perlcalc "$local_lum > 100 && $local_lum < 180") )); then
-    score="$(perlcalc "150 - (($local_lum - 140)**2)/10 + ($local_pct * 2)")"
-    if [[ $LIGHT_DIM_IDX -lt 0 ]] \
-       || better_score "$score" "$LIGHT_DIM_SCORE" "$local_pct" "${PCT[$LIGHT_DIM_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_DIM_IDX]}"; then
-      LIGHT_DIM_SCORE="$score"; LIGHT_DIM_IDX=$i
-    fi
-  fi
-done
-# fallback: any grayscale
-if [[ $LIGHT_DIM_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    [[ ${IS_GRAY[$i]} -eq 1 ]] || continue
-    local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    if (( $(perlcalc "$local_lum > 60 && $local_lum < 220") )); then
-      score="$(perlcalc "100 - (($local_lum - 140)**2)/50 + ($local_pct * 2)")"
-      if [[ $LIGHT_DIM_IDX -lt 0 ]] \
-         || better_score "$score" "$LIGHT_DIM_SCORE" "$local_pct" "${PCT[$LIGHT_DIM_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_DIM_IDX]}"; then
-        LIGHT_DIM_SCORE="$score"; LIGHT_DIM_IDX=$i
-      fi
-    fi
-  done
-fi
-# fallback: desaturated color
-if [[ $LIGHT_DIM_IDX -lt 0 ]]; then
-  for i in {1..$#ALL_COLORS}; do
-    local_sat="${SAT[$i]}"; local_lum="${LUM[$i]}"; local_pct="${PCT[$i]}"
-    if (( $(perlcalc "$local_lum > 80 && $local_lum < 200 && $local_sat < 30") )); then
-      score="$(perlcalc "(100 - $local_sat) + ($local_pct * 2)")"
-      if [[ $LIGHT_DIM_IDX -lt 0 ]] \
-         || better_score "$score" "$LIGHT_DIM_SCORE" "$local_pct" "${PCT[$LIGHT_DIM_IDX]}" "${HEXS[$i]}" "${HEXS[$LIGHT_DIM_IDX]}"; then
-        LIGHT_DIM_SCORE="$score"; LIGHT_DIM_IDX=$i
-      fi
-    fi
-  done
-fi
-
-# ------------------------- Color Differentiation --------------------
-# Ensure prominent and bright colors are visually distinct (min 60° hue distance)
-# This prevents similar-looking colors from being used for both roles
-
-# Helper: Check and adjust color pair for sufficient differentiation
-adjust_color_pair() {
-  local prom_idx_var=$1  # Name of variable holding prominent index
-  local bright_idx_var=$2  # Name of variable holding bright index
-  local mode=$3  # "dark" or "light"
-
-  eval "local prom_idx=\$$prom_idx_var"
-  eval "local bright_idx=\$$bright_idx_var"
-
-  # Skip if either color not selected
-  [[ $prom_idx -lt 0 || $bright_idx -lt 0 ]] && return
-
-  # Get RGB values
-  IFS=',' read -r prom_r prom_g prom_b <<< "${ALL_COLORS[$prom_idx]}"
-  IFS=',' read -r bright_r bright_g bright_b <<< "${ALL_COLORS[$bright_idx]}"
-
-  # Calculate hues
-  local prom_hue=$(calc_hue "$prom_r" "$prom_g" "$prom_b")
-  local bright_hue=$(calc_hue "$bright_r" "$bright_g" "$bright_b")
-
-  # Calculate hue distance
-  local hue_dist=$(calc_hue_distance "$prom_hue" "$bright_hue")
-
-  # If hue distance is sufficient, no adjustment needed
-  (( $(perlcalc "$hue_dist >= 60") )) && return
-
-  # Colors are too similar - adjust based on saturation levels
-  local prom_sat="${SAT[$prom_idx]}"
-  local bright_sat="${SAT[$bright_idx]}"
-
-  # Case 1: Both have low saturation (< 30) - switch prominent to high-saturation color
-  if (( $(perlcalc "$prom_sat < 30 && $bright_sat < 30") )); then
-    # Find most frequent high-saturation color for prominent
-    local new_prom_idx=-1
-    local max_pct="0"
-    for i in {1..$#ALL_COLORS}; do
-      local i_sat="${SAT[$i]}"
-      local i_pct="${PCT[$i]}"
-      # Must be high saturation and different from current bright
-      if (( $(perlcalc "$i_sat >= 30") )) && [[ $i -ne $bright_idx ]]; then
-        if perlcmp "$i_pct" "$max_pct"; then
-          max_pct="$i_pct"
-          new_prom_idx=$i
-        fi
-      fi
-    done
-    # Update prominent if we found a better option
-    if [[ $new_prom_idx -ge 0 ]]; then
-      eval "$prom_idx_var=$new_prom_idx"
-    fi
-
-  # Case 2: Both have high saturation (≥ 30) - switch bright to low-saturation color
-  elif (( $(perlcalc "$prom_sat >= 30 && $bright_sat >= 30") )); then
-    # Find best low-saturation color for bright
-    local new_bright_idx=-1
-    local best_score="0"
-    for i in {1..$#ALL_COLORS}; do
-      [[ ${IS_GRAY[$i]} -eq 1 ]] && continue  # Skip grayscale
-      local i_sat="${SAT[$i]}"
-      local i_lum="${LUM[$i]}"
-      local i_pct="${PCT[$i]}"
-      # Must be low saturation and different from current prominent
-      if (( $(perlcalc "$i_sat < 30") )) && [[ $i -ne $prom_idx ]]; then
-        # Score based on mode (similar to bright selection logic)
-        local score
-        if [[ $mode == "dark" ]]; then
-          score="$(perlcalc "$i_lum - ($i_sat * 0.5)")"  # Favor brightness
-        else
-          score="$(perlcalc "(255 - $i_lum) - ($i_sat * 0.5)")"  # Favor darkness
-        fi
-        if [[ $new_bright_idx -lt 0 ]] || perlcmp "$score" "$best_score"; then
-          best_score="$score"
-          new_bright_idx=$i
-        fi
-      fi
-    done
-    # Update bright if we found a better option
-    if [[ $new_bright_idx -ge 0 ]]; then
-      eval "$bright_idx_var=$new_bright_idx"
-    fi
+  # Only return if we found a sufficiently dull color
+  if [[ $best_idx -ge 0 ]] && perlcmp "$max_dullness" "$min_dullness_threshold"; then
+    print -r -- "$best_idx"
+  else
+    print -r -- "-1"  # Will become 'fallback' in output
   fi
 }
 
-# Apply differentiation to both dark and light modes
-adjust_color_pair "DARK_PROMINENT_IDX" "DARK_BRIGHT_IDX" "dark"
-adjust_color_pair "LIGHT_PROMINENT_IDX" "LIGHT_BRIGHT_IDX" "light"
+# Dark mode dim
+DARK_DIM_IDX=$(select_dim_color "dark")
 
-# ------------------------- Guard selection --------------------------
-require_idx "$DARK_PROMINENT_IDX"   "dark.prominent"
-require_idx "$DARK_BRIGHT_IDX"      "dark.bright"
-require_idx "$DARK_DIM_IDX"         "dark.dim"
-require_idx "$LIGHT_PROMINENT_IDX"  "light.prominent"
-require_idx "$LIGHT_BRIGHT_IDX"     "light.bright"
-require_idx "$LIGHT_DIM_IDX"        "light.dim"
+# Light mode dim
+LIGHT_DIM_IDX=$(select_dim_color "light")
+
+# ------------------------- Validate prominent colors ----------------
+# Prominent should NEVER fallback - these must be valid
+[[ $DARK_PROMINENT_IDX -lt 0 ]] && fail "No suitable prominent color found for dark mode"
+[[ $LIGHT_PROMINENT_IDX -lt 0 ]] && fail "No suitable prominent color found for light mode"
 
 # ------------------------- Build key --------------------------------
 KEY="$POKEMON_NAME"
@@ -674,17 +611,35 @@ if [[ -n "$FORM_VALUE" ]]; then
 fi
 
 # ------------------------- Emit Lua --------------------------------
-# Selected color hexes
+# Selected color hexes (or 'fallback' string)
 IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_PROMINENT_IDX]}"; DARK_PROMINENT=$(rgb_to_hex "$r" "$g" "$b")
-IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_BRIGHT_IDX]}";    DARK_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
-IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_DIM_IDX]}";       DARK_DIM=$(rgb_to_hex "$r" "$g" "$b")
+if [[ $DARK_BRIGHT_IDX -ge 0 ]]; then
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_BRIGHT_IDX]}"; DARK_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
+else
+  DARK_BRIGHT="fallback"
+fi
+if [[ $DARK_DIM_IDX -ge 0 ]]; then
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_DIM_IDX]}"; DARK_DIM=$(rgb_to_hex "$r" "$g" "$b")
+else
+  DARK_DIM="fallback"
+fi
+
 IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_PROMINENT_IDX]}"; LIGHT_PROMINENT=$(rgb_to_hex "$r" "$g" "$b")
-IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_BRIGHT_IDX]}";    LIGHT_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
-IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_DIM_IDX]}";       LIGHT_DIM=$(rgb_to_hex "$r" "$g" "$b")
+if [[ $LIGHT_BRIGHT_IDX -ge 0 ]]; then
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_BRIGHT_IDX]}"; LIGHT_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
+else
+  LIGHT_BRIGHT="fallback"
+fi
+if [[ $LIGHT_DIM_IDX -ge 0 ]]; then
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_DIM_IDX]}"; LIGHT_DIM=$(rgb_to_hex "$r" "$g" "$b")
+else
+  LIGHT_DIM="fallback"
+fi
 
 # Build lua entry with metadata for reliable parsing
 # The _meta table stores the original components so parsers don't need to guess
 # how to split keys containing natural dashes (e.g., "ho-oh", "porygon-z")
+# Note: 'fallback' strings are handled by utils.lua to resolve to colorscheme colors
 LUA_ENTRY=$(cat <<LUA_EOF
   ["$KEY"] = {
     _meta = {

@@ -191,27 +191,92 @@ function M.build_pokemon_command(pokemon_name, is_shiny, form)
   return cmd
 end
 
+---Resolve a color value from various sources
+---@param value string Color source: 'auto', a hex color, or a highlight group name
+---@param sprite_color string|nil Color from sprite data (may be 'fallback')
+---@param fallback_hlgroup string Default highlight group to use if sprite_color is 'fallback'
+---@return string|nil color Resolved hex color, or nil if resolution failed
+local function resolve_color(value, sprite_color, fallback_hlgroup)
+  -- If user specified a direct override (not 'auto'), use it
+  if value ~= "auto" then
+    -- Check if it's a hex color
+    if value:match("^#%x%x%x%x%x%x$") then
+      return value
+    end
+
+    -- Otherwise, treat it as a highlight group name
+    local hl = vim.api.nvim_get_hl(0, { name = value, link = false })
+    if hl and hl.fg then
+      return string.format("#%06x", hl.fg)
+    else
+      vim.notify(
+        string.format("Could not resolve highlight group '%s', using fallback", value),
+        vim.log.levels.WARN
+      )
+      -- Fall through to use sprite_color or fallback
+    end
+  end
+
+  -- User specified 'auto', so use sprite data
+  if sprite_color and sprite_color ~= "fallback" then
+    return sprite_color
+  end
+
+  -- Sprite data says 'fallback' or is nil, use the fallback highlight group
+  local hl = vim.api.nvim_get_hl(0, { name = fallback_hlgroup, link = false })
+  if hl and hl.fg then
+    return string.format("#%06x", hl.fg)
+  end
+
+  -- Ultimate fallback: return nil and let Neovim use defaults
+  vim.notify(
+    string.format("Could not resolve color from highlight group '%s'", fallback_hlgroup),
+    vim.log.levels.WARN
+  )
+  return nil
+end
+
 ---Apply pokemon colors to Snacks dashboard highlight groups
 ---@param pokemon_data table Pokemon color data from database
 ---@param background_mode string|nil Optional background mode override: "auto", "light", "dark" (default: "auto")
-function M.apply_dashboard_colors(pokemon_data, background_mode)
+---@param color_sources table|nil Optional color source overrides: {title_source, key_source, desc_source}
+function M.apply_dashboard_colors(pokemon_data, background_mode, color_sources)
   if not pokemon_data then
     return
   end
 
+  -- Get colors from pokemon data for the current background
   local colors = M.get_colors_for_background(pokemon_data, background_mode)
   if not colors then
     return
   end
+
+  -- Default color sources to 'auto' if not provided
+  local sources = color_sources or {}
+  local title_source = sources.title_source or "auto"
+  local key_source = sources.key_source or "auto"
+  local desc_source = sources.desc_source or "auto"
+
+  -- Resolve each color with appropriate fallbacks
+  -- Note: prominent/title should NEVER have 'fallback' in sprite data, but we handle it defensively
+  local title_color = resolve_color(title_source, colors.prominent, "Normal")
+  local key_color = resolve_color(key_source, colors.bright, "Normal")
+  local desc_color = resolve_color(desc_source, colors.dim, "Comment")
 
   -- Update Snacks dashboard highlight groups
   -- SnacksDashboardTitle: prominent (used for main titles/headers)
   -- SnacksDashboardKey: bright (used for key hints/important text)
   -- SnacksDashboardDesc: dim (used for descriptions/secondary text)
 
-  vim.api.nvim_set_hl(0, "SnacksDashboardTitle", { fg = colors.prominent })
-  vim.api.nvim_set_hl(0, "SnacksDashboardKey", { fg = colors.bright })
-  vim.api.nvim_set_hl(0, "SnacksDashboardDesc", { fg = colors.dim })
+  if title_color then
+    vim.api.nvim_set_hl(0, "SnacksDashboardTitle", { fg = title_color })
+  end
+  if key_color then
+    vim.api.nvim_set_hl(0, "SnacksDashboardKey", { fg = key_color })
+  end
+  if desc_color then
+    vim.api.nvim_set_hl(0, "SnacksDashboardDesc", { fg = desc_color })
+  end
 end
 
 ---Ensure pokemon colors exist, generating them if necessary (ASYNC)

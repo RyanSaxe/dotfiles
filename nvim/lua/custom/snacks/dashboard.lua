@@ -18,10 +18,10 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "charizard",
+    name = "mewtwo",
 
     -- Set to true for shiny variant
-    is_shiny = true,
+    is_shiny = false,
 
     -- Optional form (e.g., "alola", "galar", "mega-x"), set to nil if not applicable
     form = nil,
@@ -36,6 +36,19 @@ local CONFIG = {
     -- Background mode: "auto" (uses vim.o.background), "dark", or "light"
     -- Controls which color palette to use from pokemon color data
     background_mode = "dark",
+
+    -- Color source overrides (applied to SnacksDashboard highlight groups)
+    -- Each can be: 'auto' (from sprite), a highlight group name (e.g., 'Comment', 'Normal'), or a hex color (e.g., '#FF5733')
+    -- Note: Highlight group names are case-sensitive!
+
+    -- Title color (maps to prominent color from sprite, used for SnacksDashboardTitle)
+    title_source = "auto",
+
+    -- Key color (maps to bright color from sprite, used for SnacksDashboardKey)
+    key_source = "auto",
+
+    -- Description color (maps to dim color from sprite, used for SnacksDashboardDesc)
+    desc_source = "auto",
   },
 
   -- Layout configuration
@@ -72,8 +85,12 @@ if utils.show_if_has_second_pane() then
 
   if pokemon_colors then
     -- Apply colors to Snacks dashboard highlight groups
-    -- Pass background_mode configuration to override automatic detection
-    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode)
+    -- Pass background_mode configuration and color source overrides
+    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, {
+      title_source = CONFIG.colors.title_source,
+      key_source = CONFIG.colors.key_source,
+      desc_source = CONFIG.colors.desc_source,
+    })
   end
 end
 
@@ -232,7 +249,11 @@ function M.create_sections()
   -- Re-apply pokemon colors when dashboard opens
   -- This ensures colors are correct even after colorscheme reloads or async generation
   if pokemon_colors then
-    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode)
+    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, {
+      title_source = CONFIG.colors.title_source,
+      key_source = CONFIG.colors.key_source,
+      desc_source = CONFIG.colors.desc_source,
+    })
   end
 
   local base_branch = git_utils.get_base_branch()
