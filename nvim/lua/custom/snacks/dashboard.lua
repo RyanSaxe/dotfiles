@@ -437,9 +437,9 @@ local function get_recent_files()
 
   -- Calculate height: files + final_padding
   -- Note: The "Recent Files" title is added separately in create_sections()
-  -- If files exist: n_files + final_padding
-  -- If no files: 1 (empty entry) + final_padding
-  local entries_height = n_files > 0 and n_files or 1
+  -- Height is just the number of actual file entries + padding
+  -- When n_files = 0, no entry sections are created, so height is just final_padding
+  local entries_height = n_files
   local height = entries_height + final_padding
 
   out[#out + 1] = {
