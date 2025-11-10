@@ -7,13 +7,11 @@ set -euo pipefail
 
 mode="${1:-inactive}"
 
-# Get the directory of this script to find other scripts
-script_dir="$(cd "$(dirname "$0")" && pwd)"
-
-# Get pokemon colors
-dim_color=$("$script_dir/pokemon-color.sh" dim)
-prominent_color=$("$script_dir/pokemon-color.sh" prominent)
-bright_color=$("$script_dir/pokemon-color.sh" bright)
+# Get pokemon colors from cached tmux variables (set by color-cache-updater.sh)
+# This is MUCH faster than calling pokemon-color.sh on every window render
+dim_color=$(tmux show -gv @pokemon_dim 2>/dev/null || echo "#565f89")
+prominent_color=$(tmux show -gv @pokemon_prominent 2>/dev/null || echo "#7aa2f7")
+bright_color=$(tmux show -gv @pokemon_bright 2>/dev/null || echo "#ff9e64")
 
 # Get static colors and separators from tmux
 bg_color=$(tmux show -gv @tokyonight_bg 2>/dev/null || echo "#1a1b26")
