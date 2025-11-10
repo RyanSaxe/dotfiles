@@ -1,6 +1,7 @@
 return {
   "nvim-lualine/lualine.nvim",
   event = "VeryLazy",
+  enabled = true,
   init = function()
     vim.opt.termguicolors = true
     vim.opt.cmdheight = 0
@@ -13,13 +14,34 @@ return {
     -- Get colors directly from tokyonight - will update automatically when theme changes
     local c = require("tokyonight.colors").setup()
 
+    -- Load pokemon colors from cache file (created by dashboard)
+    -- This allows lualine to match the pokemon theme automatically
+    local pokemon_prominent = c.blue -- fallback to TokyoNight blue
+    local pokemon_bright = c.teal    -- fallback to TokyoNight green/teal
+
+    local env_file = vim.fn.expand("~/.cache/pokemon-colors.env")
+    if vim.fn.filereadable(env_file) == 1 then
+      -- Read and parse the env file
+      local lines = vim.fn.readfile(env_file)
+      for _, line in ipairs(lines) do
+        local color = line:match('POKEMON_COLOR_PROMINENT="([^"]+)"')
+        if color then
+          pokemon_prominent = color
+        end
+        color = line:match('POKEMON_COLOR_BRIGHT="([^"]+)"')
+        if color then
+          pokemon_bright = color
+        end
+      end
+    end
+
     -- Create alias C for backwards compatibility with existing code
     local C = {
       bg = c.bg,
       fg = c.fg,
-      blue = c.blue,
+      blue = pokemon_prominent,  -- Use pokemon prominent color for normal mode
       cyan = c.cyan,
-      green = c.teal,
+      green = pokemon_bright,    -- Use pokemon bright color for insert mode
       red = c.red,
       yellow = c.yellow,
       gray = c.comment,
