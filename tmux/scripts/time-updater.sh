@@ -48,10 +48,12 @@ update_time_block() {
   time=$(date +%H:%M)
   minute=$(date +%M)
 
-  # Get TokyoNight colors
+  # Get colors (TokyoNight static + Pokemon dynamic)
   bg_color=$(tmux show -gv @tokyonight_bg 2>/dev/null || echo "#1a1b26")
-  gray_color=$(tmux show -gv @tokyonight_gray 2>/dev/null || echo "#565f89")
-  orange_color=$(tmux show -gv @tokyonight_orange 2>/dev/null || echo "#ff9e64")
+  # Get pokemon colors directly from script (same as tmux uses)
+  script_dir="$(cd "$(dirname "$0")" && pwd)"
+  gray_color=$("$script_dir/pokemon-color.sh" dim 2>/dev/null || echo "#565f89")
+  orange_color=$("$script_dir/pokemon-color.sh" bright 2>/dev/null || echo "#ff9e64")
   left_rounded=$(tmux show -gv @left_rounded 2>/dev/null || echo "")
   right_rounded=$(tmux show -gv @right_rounded 2>/dev/null || echo "")
 

@@ -23,6 +23,23 @@ return {
       -- c.bg_float = old_bg
     end,
     on_highlights = function(hl, c)
+      -- Load pokemon colors from cache file (created by dashboard)
+      -- This allows bufferline and other highlights to match the pokemon theme
+      local pokemon_prominent = c.blue -- fallback to TokyoNight blue
+
+      local env_file = vim.fn.expand("~/.cache/pokemon-colors.env")
+      if vim.fn.filereadable(env_file) == 1 then
+        -- Read and parse the env file
+        local lines = vim.fn.readfile(env_file)
+        for _, line in ipairs(lines) do
+          local color = line:match('POKEMON_COLOR_PROMINENT="([^"]+)"')
+          if color then
+            pokemon_prominent = color
+            break
+          end
+        end
+      end
+
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
       -- I prefer when the literals are the same color and dont pop out at me
@@ -150,7 +167,7 @@ return {
       hl["BufferLineTruncMarker"] = { fg = c.dark3, bg = c.bg }
 
       hl["BufferLineBufferSelected"] = {
-        fg = c.blue,
+        fg = pokemon_prominent,  -- Pokemon prominent color for active buffer
         bg = c.bg,
       }
 
@@ -206,7 +223,7 @@ return {
 
       -- tabs - match exact buffer formatting
       hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg } -- inactive = gray
-      hl["BufferLineTabSelected"] = { fg = c.blue, bg = c.bg } -- active = blue
+      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active = pokemon prominent
       hl["BufferLineTabSeparator"] = { fg = c.bg, bg = c.bg } -- invisible separators
       hl["BufferLineTabSeparatorSelected"] = { fg = c.bg, bg = c.bg }
       hl["BufferLineTabClose"] = { fg = Util.blend_bg(c.red, 0.5), bg = c.bg } -- dim red X
@@ -216,7 +233,7 @@ return {
 
       -- duplicate buffers (files with similar names) - match regular buffer colors
       hl["BufferLineDuplicate"] = { fg = c.dark3, bg = c.bg } -- hidden duplicates = gray
-      hl["BufferLineDuplicateSelected"] = { fg = c.blue, bg = c.bg } -- active duplicate = blue
+      hl["BufferLineDuplicateSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active duplicate = pokemon prominent
       hl["BufferLineDuplicateVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg } -- visible duplicate = slightly dimmed white
 
       -- group and pin backgrounds - also use normal background
@@ -228,9 +245,9 @@ return {
 
       -- ensure ALL text-bearing elements use our color scheme
       -- this is comprehensive to catch any edge cases
-      hl["BufferLineTabSelected"] = { fg = c.blue, bg = c.bg }
+      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg }
       hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg }
-      hl["BufferLineNumbersSelected"] = { fg = c.blue, bg = c.bg }
+      hl["BufferLineNumbersSelected"] = { fg = pokemon_prominent, bg = c.bg }
       hl["BufferLineNumbersVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg } -- slightly dimmed white
       hl["BufferLineNumbers"] = { fg = c.dark3, bg = c.bg }
     end,

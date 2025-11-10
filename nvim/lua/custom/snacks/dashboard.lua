@@ -91,7 +91,7 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "pikachu",
+    name = "gengar",
 
     -- Set to true for shiny variant
     is_shiny = false,
