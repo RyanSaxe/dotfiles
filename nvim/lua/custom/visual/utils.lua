@@ -40,7 +40,8 @@ function M.get_pokemon_colors(pokemon_name, is_shiny, form, allow_fallback)
       end
     end
 
-    vim.notify(string.format("Pokemon colors not found for: %s", key), vim.log.levels.WARN)
+    -- commented out even though useful because another notify will say it is generating the data
+    -- vim.notify(string.format("Pokemon colors not found for: %s", key), vim.log.levels.WARN)
     return nil
   end
 
@@ -216,13 +217,30 @@ function M.detect_sprite_dimensions(pokemon_name, is_shiny, form, use_big)
   local output = handle:read("*a")
   handle:close()
 
-  -- Count lines and measure width
-  local height = 0
+  -- Collect all lines first
+  local lines = {}
+  for line in output:gmatch("[^\r\n]+") do
+    table.insert(lines, line)
+  end
+
+  -- Strip trailing empty lines (lines that only contain whitespace/ANSI codes)
+  -- Pokemon sprites often have trailing empty lines that cause alignment issues
+  while #lines > 0 do
+    local last_line = lines[#lines]
+    -- Strip ANSI codes and check if line is empty or whitespace-only
+    local stripped = last_line:gsub("\x1b%[[0-9;]*m", ""):gsub("^%s*$", "")
+    if stripped == "" then
+      table.remove(lines) -- Remove trailing empty line
+    else
+      break -- Found content, stop stripping
+    end
+  end
+
+  -- Count lines and measure width from remaining lines
+  local height = #lines
   local max_width = 0
 
-  for line in output:gmatch("[^\r\n]+") do
-    height = height + 1
-
+  for _, line in ipairs(lines) do
     -- Strip ANSI escape codes to get true width
     -- ANSI codes look like: \x1b[38;2;R;G;Bm or \x1b[0m
     local stripped = line:gsub("\x1b%[[0-9;]*m", "")

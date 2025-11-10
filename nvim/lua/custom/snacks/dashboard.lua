@@ -487,7 +487,7 @@ local function calculate_horizontal_position(sprite_width, pane_width, position)
     -- Center horizontally
     -- Use ceil to bias rightward when available_space is odd (more space on left)
     local available_space = pane_width - sprite_width
-    indent = math.ceil(available_space / 2)
+    indent = math.floor(available_space / 2)
   elseif horizontal == "right" then
     -- Align to right edge with small margin
     local available_space = pane_width - sprite_width
@@ -550,8 +550,9 @@ local function calculate_vertical_position(sprite_height, section_height, positi
     padding_bottom = available_space
   elseif vertical == "middle" then
     -- Center vertically, split padding evenly
-    -- Use ceil to bias downward when available_space is odd (more padding on top)
-    padding_top = math.ceil(available_space / 2)
+    -- Add 1 extra to padding_top to compensate for the startup line below sprite
+    -- This ensures visual symmetry: distance to sprite center from top = distance from sprite center to bottom
+    padding_top = math.floor(available_space / 2) + 1
     padding_bottom = available_space - padding_top
   elseif vertical == "bottom" then
     -- All padding at top, no padding at bottom
@@ -748,7 +749,7 @@ local function create_pokemon_section(target_height)
       cmd = pokemon_cmd,
       ttl = math.huge, -- Cache forever so the 1 second pause is only the first time
       indent = indent,
-      height = sprite_height,
+      height = pokemon_section_height - padding_top - padding_bottom,
       enabled = utils.show_if_has_second_pane,
     },
     -- Bottom padding section (if any)
