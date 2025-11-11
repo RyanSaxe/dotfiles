@@ -2,6 +2,9 @@ return {
   "neovim/nvim-lspconfig",
   opts = {
     servers = {
+      -- disabling lsps on my machine that I'm experimenting with
+      ty = false,
+      zuban = false,
       -- Three-LSP setup for optimal Python performance:
       -- 1. Ruff: Fast linting and syntax error diagnostics
       -- 2. Basedpyright: Type checking diagnostics only
