@@ -797,7 +797,19 @@ function M.create_sections()
   local global_sections, _ = globalkeys()
 
   -- Flatten ALL sections (except pokemon) into one list for dynamic height calculation
-  local all_sections = {}
+  local all_sections = {
+    -- start with some light padding at the top
+    -- this is because the tmux statusline makes things not look centered
+    -- so we add a little padding to make it look centered if you ignore the statusline
+    {
+      pane = 1,
+      padding = 1,
+    },
+    {
+      pane = 2,
+      padding = 1,
+    },
+  }
 
   -- Search keys section
   vim.list_extend(all_sections, search_sections)
