@@ -163,7 +163,7 @@ local function format_notification_row(item, picker)
   -- Add new activity indicator
   local activity_indicator = ""
   if new_discussion then
-    activity_indicator = "🔥 " -- Hot discussion!
+    activity_indicator = "🔥 " -- New comments since last read
   elseif new_activity then
     activity_indicator = "🆕 " -- New activity
   else
@@ -209,7 +209,7 @@ local function generate_preview(ctx)
   local status = item.unread and "🔴 **UNREAD**" or "✅ **READ**"
   local activity_badge = ""
   if has_new_discussion(item) then
-    activity_badge = " 🔥 **HOT DISCUSSION**"
+    activity_badge = " 💬 **NEW COMMENTS**"
   elseif has_new_activity(item) then
     activity_badge = " 🆕 **NEW ACTIVITY**"
   end
@@ -264,13 +264,13 @@ local function generate_preview(ctx)
   lines[#lines + 1] = "| **Reason** | " .. reason_desc .. " |"
   lines[#lines + 1] = "| **Updated** | " .. iso_to_relative(item.updated_at) .. " |"
 
-  if item.last_read_at then
+  if item.last_read_at and item.last_read_at ~= vim.NIL then
     lines[#lines + 1] = "| **Last Read** | " .. iso_to_relative(item.last_read_at) .. " |"
   end
 
   -- Show activity status
   if has_new_discussion(item) then
-    lines[#lines + 1] = "| **Activity Status** | 🔥 New discussion activity! |"
+    lines[#lines + 1] = "| **Activity Status** | 💬 Comments made since last viewed |"
   elseif has_new_activity(item) then
     lines[#lines + 1] = "| **Activity Status** | 🆕 Updated since last read |"
   end
@@ -375,7 +375,7 @@ local function mark_as_read(item)
 
   -- Update the item to reflect it's been read
   item.unread = false
-  vim.notify(string.format("✓ Marked '%s' as read", item.title), vim.log.levels.INFO)
+  -- Notification removed - now shown immediately in confirm action for better UX
 end
 
 -- Main notification picker function
@@ -385,6 +385,33 @@ M.picker = function()
     format = format_notification_row,
     preview = generate_preview,
     layout = "custom_horizontal", -- Use the custom horizontal layout for better preview display
+    -- Try defining keys at the top level to override defaults
+    keys = {
+      ["<S-CR>"] = function(picker)
+        local item = picker:current()
+        if not item then return end
+
+        -- Mark as read
+        mark_as_read(item)
+
+        -- Fetch and open URL
+        local url = vim.fn.system({
+          "gh",
+          "api",
+          (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
+          "--jq",
+          ".html_url",
+        })
+        url = vim.trim(url)
+
+        if url == "" then
+          vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+          return
+        end
+
+        vim.ui.open(url)
+      end,
+    },
     actions = {
       mark_read = function(picker, item)
         if item then
@@ -419,26 +446,61 @@ M.picker = function()
         picker:find()
         vim.notify("🔄 Refreshed notifications", vim.log.levels.INFO)
       end,
+      open_in_browser = function(picker, item)
+        -- Open notification in browser, marking it as read
+        if not item then return end
+
+        -- First mark as read since user wants this behavior
+        mark_as_read(item)
+
+        -- Fetch browser URL using existing logic
+        local url = vim.fn.system({
+          "gh",
+          "api",
+          -- Get the latest comment URL if it exists, otherwise use the API URL
+          (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
+          "--jq",
+          ".html_url",
+        })
+        url = vim.trim(url)
+
+        if url == "" then
+          vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+          return
+        end
+
+        -- Open in browser (no notification as requested)
+        vim.ui.open(url)
+      end,
     },
     confirm = function(picker, item)
-      -- First, mark the notification as read since we're opening it
+      -- Extract PR/Issue number if available
+      local number = extract_number_from_url(item.api_url)
+
+      -- Show notification IMMEDIATELY before any async operations
+      if item.type == "PullRequest" and number then
+        vim.notify("📋 Opening PR #" .. number .. " in Neovim...", vim.log.levels.INFO)
+      elseif item.type == "Issue" and number then
+        vim.notify("📋 Opening Issue #" .. number .. " in Neovim...", vim.log.levels.INFO)
+      elseif item.type then
+        vim.notify("🌐 Opening " .. item.type .. " in browser...", vim.log.levels.INFO)
+      else
+        vim.notify("🌐 Opening notification in browser...", vim.log.levels.INFO)
+      end
+
+      -- Now mark the notification as read (this is synchronous and can be slow)
       mark_as_read(item)
 
       -- Close the picker
       picker:close()
 
-      -- Extract PR/Issue number if available
-      local number = extract_number_from_url(item.api_url)
-
       -- Smart routing based on notification type
       if item.type == "PullRequest" and number then
         -- Open native PR viewer in Neovim
-        vim.notify("📋 Opening PR #" .. number .. " in Neovim", vim.log.levels.INFO)
         Snacks.picker.gh_pr({ search = "#" .. number })
 
       elseif item.type == "Issue" and number then
         -- Open native Issue viewer in Neovim
-        vim.notify("📋 Opening Issue #" .. number .. " in Neovim", vim.log.levels.INFO)
         Snacks.picker.gh_issue({ search = "#" .. number })
 
       else
@@ -463,9 +525,7 @@ M.picker = function()
           return
         end
 
-        -- Notify about browser opening with type info
-        local type_msg = item.type or "notification"
-        vim.notify("🌐 Opening " .. type_msg .. " in browser (no native viewer yet)", vim.log.levels.INFO)
+        -- Open in browser (notification already shown above)
         vim.ui.open(url)
       end
     end,
@@ -476,6 +536,7 @@ M.picker = function()
           ["m"] = { "mark_read", desc = "Mark as read", mode = { "n" } },
           ["M"] = { "mark_all_read", desc = "Mark all as read", mode = { "n" } },
           ["R"] = { "refresh", desc = "Refresh notifications", mode = { "n" } },
+          ["b"] = { "open_in_browser", desc = "Open in browser", mode = { "n" } },
         },
       },
       list = {
@@ -483,6 +544,7 @@ M.picker = function()
           ["m"] = { "mark_read", desc = "Mark as read" },
           ["M"] = { "mark_all_read", desc = "Mark all as read" },
           ["R"] = { "refresh", desc = "Refresh notifications" },
+          ["b"] = { "open_in_browser", desc = "Open in browser" },
         },
       },
       preview = {
@@ -490,6 +552,7 @@ M.picker = function()
           ["m"] = { "mark_read", desc = "Mark as read" },
           ["M"] = { "mark_all_read", desc = "Mark all as read" },
           ["R"] = { "refresh", desc = "Refresh notifications" },
+          ["b"] = { "open_in_browser", desc = "Open in browser" },
         },
       },
     },

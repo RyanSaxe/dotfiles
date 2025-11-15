@@ -931,23 +931,9 @@ function M.create_sections(dashboard)
 
     -- If pane 1 height exceeds terminal height, we need to hide sections
     if pane1_height > terminal_height then
-      vim.notify(
-        string.format(
-          "Pane 1 height (%d) exceeds terminal height (%d), hiding git and recent files sections",
-          pane1_height,
-          terminal_height
-        ),
-        vim.log.levels.INFO
-      )
-
       -- Calculate the height of git and recent files sections from temp_sections
       local git_height = utils.calculate_git_sections_height(temp_sections)
       local recent_height = utils.calculate_recent_files_height(temp_sections)
-
-      vim.notify(
-        string.format("Git section height: %d, Recent files height: %d", git_height, recent_height),
-        vim.log.levels.DEBUG
-      )
 
       -- Simple strategy: hide both if their combined height would make it fit
       local reduced_height = pane1_height - git_height - recent_height
@@ -983,18 +969,6 @@ function M.create_sections(dashboard)
 
     -- Convert vertical rows to equivalent horizontal columns
     local equivalent_horizontal_margin = math.floor(vertical_margin_rows * aspect_ratio)
-
-    vim.notify(
-      string.format(
-        "Dashboard height: %d, Pane height: %d, V-margin: %d rows → H-margin: %d cols (ratio: %.1f)",
-        dashboard._size.height,
-        pane1_height,
-        vertical_margin_rows,
-        equivalent_horizontal_margin,
-        aspect_ratio
-      ),
-      vim.log.levels.DEBUG
-    )
 
     -- Use max(4, ...) as minimum padding for aesthetics
     local edge_margin = math.max(4, equivalent_horizontal_margin)
