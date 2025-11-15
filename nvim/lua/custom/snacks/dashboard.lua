@@ -803,10 +803,13 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
       pane = 1,
       padding = 1,
     })
-    table.insert(sections, {
-      pane = 2,
-      padding = 1,
-    })
+    -- Only add padding for pane 2 if it will actually be shown
+    if utils.show_if_has_second_pane() then
+      table.insert(sections, {
+        pane = 2,
+        padding = 1,
+      })
+    end
   end
 
   -- Add separator to pane 2 for visual balance in these cases:
