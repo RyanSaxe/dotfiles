@@ -1,2 +1,4 @@
-**/.claude/settings.local.json
-lsp_diagnostics.json
+**/*.local.*
+TODOS/
+TASKS/
+SPECS/

@@ -91,7 +91,7 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "gengar",
+    name = "ho-oh",
 
     -- Set to true for shiny variant
     is_shiny = false,
@@ -164,67 +164,67 @@ local CONFIG = {
 
 -- Calculate pokemon selection and colors (only done once at startup)
 -- This ensures the pokemon doesn't change on dashboard redraws
+-- Colors are always initialized regardless of pane count, but sprite only shows in dual-pane mode
 local pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, color_sources, force_regenerate_active
 
--- Only calculate if we would show a pokemon (has two panes)
-if utils.show_if_has_second_pane() then
-  if CONFIG.pokemon.name == nil then
-    -- Random selection from database
-    pokemon_name, pokemon_shiny, pokemon_form = visual_utils.select_random_pokemon()
-  else
-    -- Use configured pokemon
-    pokemon_name = CONFIG.pokemon.name
-    pokemon_shiny = CONFIG.pokemon.is_shiny
-    pokemon_form = CONFIG.pokemon.form
-  end
+-- Always select and load pokemon colors, even in single-pane mode
+-- This ensures consistent theming across dashboard, tmux, and shell
+if CONFIG.pokemon.name == nil then
+  -- Random selection from database
+  pokemon_name, pokemon_shiny, pokemon_form = visual_utils.select_random_pokemon()
+else
+  -- Use configured pokemon
+  pokemon_name = CONFIG.pokemon.name
+  pokemon_shiny = CONFIG.pokemon.is_shiny
+  pokemon_form = CONFIG.pokemon.form
+end
 
-  -- Build color sources config to pass through to generation
-  -- This ensures regenerated colors use the same configuration
-  color_sources = {
-    title_source = CONFIG.colors.title_source,
-    key_source = CONFIG.colors.key_source,
-    desc_source = CONFIG.colors.desc_source,
-    title_brighten = CONFIG.colors.title_brighten,
-    key_brighten = CONFIG.colors.key_brighten,
-    desc_brighten = CONFIG.colors.desc_brighten,
-    title_dim = CONFIG.colors.title_dim,
-    key_dim = CONFIG.colors.key_dim,
-    desc_dim = CONFIG.colors.desc_dim,
-  }
+-- Build color sources config to pass through to generation
+-- This ensures regenerated colors use the same configuration
+color_sources = {
+  title_source = CONFIG.colors.title_source,
+  key_source = CONFIG.colors.key_source,
+  desc_source = CONFIG.colors.desc_source,
+  title_brighten = CONFIG.colors.title_brighten,
+  key_brighten = CONFIG.colors.key_brighten,
+  desc_brighten = CONFIG.colors.desc_brighten,
+  title_dim = CONFIG.colors.title_dim,
+  key_dim = CONFIG.colors.key_dim,
+  desc_dim = CONFIG.colors.desc_dim,
+}
 
-  -- Load color data for the selected pokemon
-  -- This will auto-generate if not in database (async)
-  pokemon_colors = visual_utils.ensure_pokemon_colors(
-    pokemon_name,
-    pokemon_shiny,
-    pokemon_form,
-    function()
-      -- Callback: when generation completes, re-export colors and update the dashboard
-      local updated_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
-      if updated_colors then
-        export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, updated_colors, CONFIG.colors.background_mode)
-      end
-      if Snacks and Snacks.dashboard and Snacks.dashboard.update then
-        Snacks.dashboard.update()
-      end
-    end,
-    CONFIG.colors.background_mode,
-    CONFIG.generation, -- Pass generation config (force_regenerate, colorfulness_threshold)
-    color_sources -- Pass color sources config for consistent application after generation
-  )
+-- Load color data for the selected pokemon
+-- This will auto-generate if not in database (async)
+pokemon_colors = visual_utils.ensure_pokemon_colors(
+  pokemon_name,
+  pokemon_shiny,
+  pokemon_form,
+  function()
+    -- Callback: when generation completes, re-export colors and update the dashboard
+    local updated_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
+    if updated_colors then
+      export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, updated_colors, CONFIG.colors.background_mode)
+    end
+    if Snacks and Snacks.dashboard and Snacks.dashboard.update then
+      Snacks.dashboard.update()
+    end
+  end,
+  CONFIG.colors.background_mode,
+  CONFIG.generation, -- Pass generation config (force_regenerate, colorfulness_threshold)
+  color_sources -- Pass color sources config for consistent application after generation
+)
 
-  -- Track if force_regenerate is active to ensure colors are reloaded on every dashboard render
-  -- This prevents stale cached colors from being re-applied after async regeneration completes
-  force_regenerate_active = CONFIG.generation.force_regenerate
+-- Track if force_regenerate is active to ensure colors are reloaded on every dashboard render
+-- This prevents stale cached colors from being re-applied after async regeneration completes
+force_regenerate_active = CONFIG.generation.force_regenerate
 
-  if pokemon_colors then
-    -- Apply colors to Snacks dashboard highlight groups
-    -- Pass background_mode configuration, color source overrides, and adjustments
-    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
+if pokemon_colors then
+  -- Apply colors to Snacks dashboard highlight groups
+  -- Pass background_mode configuration, color source overrides, and adjustments
+  visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
 
-    -- Export pokemon colors to env file for tmux/shell integration
-    export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, CONFIG.colors.background_mode)
-  end
+  -- Export pokemon colors to env file for tmux/shell integration
+  export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, CONFIG.colors.background_mode)
 end
 
 -- Check if we should show recent project toggle based on context
@@ -428,12 +428,7 @@ local function get_recent_files()
       enabled = recent_project_toggle,
     }
   end
-  local final_padding
-  if pane == 2 then
-    final_padding = max_files - n_files + 1
-  else
-    final_padding = max_files - n_files + 2
-  end
+  local final_padding = max_files - n_files + 1
 
   -- Calculate height: files + final_padding
   -- Note: The "Recent Files" title is added separately in create_sections()
@@ -453,7 +448,7 @@ local function get_recent_files()
       pane = 2,
       padding = 0,
       indent = 0,
-      title = "------------------------------------------------------------",
+      title = utils.create_separator(),
       enabled = recent_project_toggle,
     }
     height = height + 1
@@ -636,8 +631,8 @@ local function create_git_sections(base_branch, current_branch)
     {
       pane = 1,
       indent = 0,
-      -- 60 ticks is exactly the size of a line (width 60, indent = 0)
-      title = "------------------------------------------------------------",
+      -- Dynamic separator line that scales with pane width
+      title = utils.create_separator(),
       padding = 1,
       enabled = in_git,
     },
@@ -720,16 +715,23 @@ local function create_pokemon_section(target_height)
     }
   end
 
-  -- Get pane width from Snacks configuration (respects user customizations)
-  local pane_width = Snacks.config.dashboard.width or 60
-
   -- Calculate horizontal position (indent)
-  local indent = calculate_horizontal_position(sprite_width, pane_width, position)
+  -- Uses Snacks.config.dashboard.width which is set dynamically by create_sections()
+  local indent = calculate_horizontal_position(sprite_width, Snacks.config.dashboard.width, position)
 
   -- Calculate vertical position within fixed-height section
-  -- Note: We need to account for the startup time line (1 line) at the bottom
-  -- So the actual available height for pokemon positioning is target_height - 1
-  local pokemon_section_height = target_height - 4
+  -- Note: We need to account for the startup time line and extra padding sources that somehow are not identified
+  -- which ends up being different if there is one or two panes.
+
+  local pokemon_section_height = target_height
+
+  local in_git = Snacks.git.get_root() ~= nil
+  if utils.show_if_has_second_pane() and in_git then
+    pokemon_section_height = target_height - 4
+  else
+    pokemon_section_height = target_height - 2
+  end
+  -- local pokemon_section_height = target_height - 4
   local padding_top, padding_bottom = calculate_vertical_position(sprite_height, pokemon_section_height, position)
 
   -- Build pokemon command with correct -b flag
@@ -769,7 +771,19 @@ local function create_pokemon_section(target_height)
 end
 
 -- Create all dashboard sections
-function M.create_sections()
+-- Called by Snacks dashboard with self (dashboard instance) as parameter
+---@param dashboard snacks.dashboard.Class Dashboard instance
+function M.create_sections(dashboard)
+  -- Always set dynamic pane width for responsive layout
+  -- Recalculates on every dashboard render to adapt to terminal resizing
+  -- Use dashboard window width for accurate calculations
+  if dashboard and dashboard._size then
+    local dynamic_width = utils.calculate_dynamic_pane_width(dashboard._size.width)
+    -- Set both for Snacks internal layout AND our utility functions
+    dashboard.opts.width = dynamic_width
+    Snacks.config.dashboard.width = dynamic_width
+  end
+
   -- Re-check for pokemon colors (in case async generation completed)
   -- Always reload when force_regenerate is active to pick up newly regenerated colors
   if (not pokemon_colors or force_regenerate_active) and pokemon_name then
@@ -810,6 +824,17 @@ function M.create_sections()
       padding = 1,
     },
   }
+
+  -- in this case, recent files are in left pane, and to look symmetrical we add a separator
+  if not in_git and utils.show_if_has_second_pane() then
+    -- Add separator between panes when not in git and using two panes
+    table.insert(all_sections, {
+      pane = 2,
+      title = utils.create_separator(),
+      indent = 0,
+      padding = 0,
+    })
+  end
 
   -- Search keys section
   vim.list_extend(all_sections, search_sections)
