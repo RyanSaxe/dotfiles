@@ -1,5 +1,14 @@
 -- dashboard.lua  ── custom git dashboard configuration for Snacks.nvim
 -- Contains all dashboard sections, keys, and layout logic
+--
+-- TODO: Future dashboard improvements
+-- 1. Replace "Find Project" with daily note functionality
+-- 2. Replace grep with workspace diagnostics searching once proper LSP support
+--    is figured out for most regularly used LSPs
+-- 3. Dashboard philosophy: Provide keybinds for common operations when opening
+--    neovim for a project that ARE NOT common keymaps during normal coding.
+--    Normal keymaps still work and muscle memory knows them - the dashboard is
+--    for operations that are contextual to "just opened the project"
 
 local utils = require("custom.snacks.utils")
 local notifications = require("custom.git.notifications")
@@ -340,17 +349,6 @@ local function search_keys()
     },
   }
 
-  local find_file_base = { key = "f", desc = "Find File" }
-  table.insert(
-    keys,
-    utils.different_key_if_condition(
-      Snacks.git.get_root() ~= nil,
-      find_file_base,
-      { action = ":lua Snacks.dashboard.pick('git_files')" },
-      { action = ":lua Snacks.dashboard.pick('files')" }
-    )
-  )
-
   return utils.create_pane(header, keys, 2)
 end
 
@@ -389,11 +387,6 @@ local function globalkeys()
       enabled = package.loaded.lazy ~= nil,
     },
     { key = "r", desc = "Restore Session", section = "session" },
-    {
-      key = "c",
-      desc = "Search Neovim Config",
-      action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
-    },
   }
 
   return utils.create_pane(header, keys, 2)
@@ -407,7 +400,7 @@ end
 ---@return number height Total height of this section
 local function get_recent_files(force_hide)
   local out = {}
-  local max_files = 5
+  local max_files = 4
   local recent_files = utils.recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
@@ -501,10 +494,6 @@ local function calculate_horizontal_position(sprite_width, pane_width, position)
 
   -- Handle overflow: if sprite is wider than pane, just left-align
   if sprite_width > pane_width then
-    vim.notify(
-      string.format("Pokemon sprite (width %d) is wider than pane (width %d), left-aligning", sprite_width, pane_width),
-      vim.log.levels.WARN
-    )
     indent = 0
   end
 
@@ -532,14 +521,6 @@ local function calculate_vertical_position(sprite_height, section_height, positi
 
   -- Handle overflow: if sprite is taller than section, allocate all to sprite
   if available_space < 0 then
-    vim.notify(
-      string.format(
-        "Pokemon sprite (height %d) is taller than section (height %d), no padding",
-        sprite_height,
-        section_height
-      ),
-      vim.log.levels.WARN
-    )
     return 0, 0
   end
 
