@@ -205,5 +205,140 @@ function M.different_key_if_condition(condition, base_spec, git_spec, non_git_sp
   end
 end
 
+-- Evaluate if a section is enabled (handles both function and boolean)
+-- Moved from dashboard.lua to allow reuse across all section creators
+---@param section table Section configuration
+---@return boolean enabled Whether the section is enabled
+function M.is_section_enabled(section)
+  if section.enabled == nil then
+    return true -- Default to enabled if not specified
+  end
+  if type(section.enabled) == "function" then
+    return section.enabled() -- Call the function to get boolean result
+  end
+  return section.enabled -- Use the boolean value directly
+end
+
+-- Calculate total height of a section group
+-- Dynamically calculates height by iterating through sections and respecting enabled state
+---@param sections table Array of section configurations
+---@return number height Total height of enabled sections
+function M.calculate_section_group_height(sections)
+  local height = 0
+  for _, section in ipairs(sections) do
+    if M.is_section_enabled(section) then
+      -- Add main content height
+      if section.section == "terminal" then
+        height = height + (section.height or 1)
+      elseif section.title or section.desc or section.key then
+        height = height + 1
+      end
+
+      -- Add padding
+      if section.padding then
+        height = height + section.padding
+      end
+    end
+  end
+  return height
+end
+
+-- Extract height of git sections from a sections array
+-- Identifies git sections by checking for specific git-related keys
+---@param sections table Array of all sections
+---@return number height Total height of git sections
+function M.calculate_git_sections_height(sections)
+  local height = 0
+  local in_git_section = false
+
+  for _, section in ipairs(sections) do
+    -- Identify start of git section (usually has "Git" in title or specific git keys)
+    if section.title and section.title:match("Git") then
+      in_git_section = true
+    end
+
+    -- Check for git-specific keys (b/B for branches, s for status, etc)
+    if section.key and (section.key == "b" or section.key == "B" or section.key == "s"
+                        or section.key == "l" or section.key == "d" or section.key == "c"
+                        or section.key == "p" or section.key == "P" or section.key == "z") then
+      in_git_section = true
+    end
+
+    -- Count height if in git section
+    if in_git_section and M.is_section_enabled(section) then
+      if section.section == "terminal" then
+        height = height + (section.height or 1)
+      elseif section.title or section.desc or section.key then
+        height = height + 1
+      end
+      if section.padding then
+        height = height + section.padding
+      end
+    end
+
+    -- End of git section detection (when we hit a separator or different section)
+    if in_git_section and section.desc and section.desc:match("^%-+$") then
+      -- This is the git section separator, count it and stop
+      if M.is_section_enabled(section) then
+        height = height + 1
+        if section.padding then
+          height = height + section.padding
+        end
+      end
+      break
+    end
+  end
+
+  return height
+end
+
+-- Extract height of recent files sections from a sections array
+-- Identifies recent files by checking for specific patterns in descriptions
+---@param sections table Array of all sections
+---@return number height Total height of recent files sections
+function M.calculate_recent_files_height(sections)
+  local height = 0
+  local in_recent_section = false
+
+  for _, section in ipairs(sections) do
+    -- Identify recent files section by title
+    if section.title and section.title:match("[Rr]ecent") then
+      in_recent_section = true
+    end
+
+    -- Check for file-like descriptions (paths with extensions)
+    if section.desc and section.desc:match("%.%w+$") then
+      -- This looks like a file path
+      in_recent_section = true
+    end
+
+    -- Count height if in recent section
+    if in_recent_section and M.is_section_enabled(section) then
+      if section.section == "terminal" then
+        height = height + (section.height or 1)
+      elseif section.title or section.desc or section.key then
+        height = height + 1
+      end
+      if section.padding then
+        height = height + section.padding
+      end
+    end
+
+    -- End of recent section detection (separator after recent files)
+    if in_recent_section and section.desc and section.desc:match("^%-+$") then
+      -- This is the recent files separator, count it and stop
+      if M.is_section_enabled(section) then
+        height = height + 1
+        if section.padding then
+          height = height + section.padding
+        end
+      end
+      break
+    end
+  end
+
+  return height
+end
+
 return M
 
