@@ -2,7 +2,7 @@
 -- Contains all dashboard sections, keys, and layout logic
 
 local utils = require("custom.snacks.utils")
-local git_pickers = require("custom.git.pickers")
+local notifications = require("custom.git.notifications")
 local git_utils = require("custom.git.utils")
 local visual_utils = require("custom.visual.utils")
 
@@ -327,8 +327,7 @@ local function search_keys()
       desc = "Grep Dependencies",
       key = "s",
       action = function()
-        -- TODO: this currently only works with python projects ... generalize to other languages
-        vim.cmd("GrepVenvSelectPackage")
+        require("dependency-picker").manual_search("grep")
       end,
     },
     {
@@ -616,11 +615,12 @@ local function create_git_sections(base_branch, current_branch, force_hide)
     },
     {
       pane = 1,
-      desc = string.format("Search Diff vs %s", base_branch),
+      desc = string.format("Open Diff vs %s", base_branch),
       key = "d",
       indent = 0,
       action = function()
-        git_pickers.diff_picker(base_branch)
+        local diff = require("custom.git.diff")
+        diff.fetch_and_diff(base_branch)
       end,
       enabled = in_git,
     },
@@ -660,7 +660,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
       indent = 0,
       action = function()
         vim.notify("Fetching Notifications from GitHub...")
-        vim.defer_fn(git_pickers.notification_picker, 100)
+        vim.defer_fn(notifications.picker, 100)
       end,
       enabled = in_git,
     },
@@ -670,8 +670,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
       indent = 0,
       key = "P",
       action = function()
-        vim.notify("Fetching open PRs from GitHub...")
-        vim.defer_fn(git_pickers.pr_picker, 100)
+        Snacks.picker.gh_pr()
       end,
       enabled = in_git,
     },
@@ -681,8 +680,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
       key = "I",
       indent = 0,
       action = function()
-        vim.notify("Fetching open issues from GitHub...")
-        vim.defer_fn(git_pickers.issue_picker, 100)
+        Snacks.picker.gh_issue()
       end,
       enabled = in_git,
     },

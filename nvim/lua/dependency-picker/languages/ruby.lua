@@ -5,7 +5,7 @@ local M = {}
 M.name = "Ruby"
 M.filetypes = { "ruby" }
 M.requires_buffer_path = true
-M.file_extension = ".rb"
+M.file_extensions = { "rb", "rake", "gemspec" }  -- Ruby source, Rakefile, gem specifications
 
 ---@return string|nil GEM_HOME path
 local function get_gem_home()
@@ -73,7 +73,7 @@ end
 ---@param gem_name string Gem name without version
 ---@return string|nil Versioned directory name, or nil if not found
 function M.resolve_directory(root, gem_name)
-  return util.resolve_package_dir(root, gem_name, nil, M.file_extension, nil, "%-")
+  return util.resolve_package_dir(root, gem_name, nil, "." .. M.file_extensions[1], nil, "%-")
 end
 
 ---@return table|nil { root = string, packages = string[] }

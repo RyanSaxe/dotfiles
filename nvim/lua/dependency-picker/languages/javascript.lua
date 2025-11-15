@@ -47,6 +47,7 @@ end
 M.name = "JavaScript"
 M.filetypes = { "javascript", "typescript", "javascriptreact", "typescriptreact", "json" }
 M.requires_buffer_path = true
+M.file_extensions = { "js", "jsx", "ts", "tsx", "mjs", "cjs" }  -- All JS/TS variants
 
 ---@param buffer_path string Current buffer path
 ---@return table|nil { root = string, packages = string[] }

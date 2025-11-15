@@ -5,7 +5,7 @@ local M = {}
 M.name = "Python"
 M.filetypes = { "python" }
 M.requires_buffer_path = false
-M.file_extension = ".py"
+M.file_extensions = { "py", "pyw", "pyi" }  -- Python source, Windows Python, type stubs
 M.exclude_patterns = { "%.dist%-info$", "%.egg%-info$" }
 
 ---@return table|nil { root = string, packages = string[] }

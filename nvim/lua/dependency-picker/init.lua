@@ -72,8 +72,11 @@ local function filter_enabled_detectors(detector_list)
 end
 
 -- ============================================================================
--- HELPER FUNCTIONS
+-- HELPER FUNCTIONS (to be defined after detectors are loaded)
 -- ============================================================================
+
+-- Forward declaration for detect_available_languages
+local detect_available_languages
 
 ---@param mode string "files" or "grep"
 ---@param lang_name string Language/detector name
@@ -127,6 +130,61 @@ end
 
 load_detectors()
 
+-- Now define detect_available_languages after detectors are loaded
+---Detect available languages based on file extensions in the project
+---Uses rg --files to get all files and counts extensions
+---Returns languages sorted by file count (most files first)
+---@return string[] Available language names sorted by prevalence
+detect_available_languages = function()
+  -- Get enabled detectors
+  local enabled_detectors = filter_enabled_detectors(detectors)
+
+  -- Build extension to languages map (multiple languages can handle same extension)
+  local ext_to_langs = {}
+  for _, detector in ipairs(enabled_detectors) do
+    if detector.file_extensions then
+      for _, ext in ipairs(detector.file_extensions) do
+        -- Remove leading dot if present
+        ext = ext:gsub("^%.", "")
+        ext_to_langs[ext] = ext_to_langs[ext] or {}
+        table.insert(ext_to_langs[ext], detector.name)
+      end
+    end
+  end
+
+  -- Get all extensions with counts (sorted by frequency)
+  local cmd = "rg --files 2>/dev/null | sed -n 's/.*\\.//p' | sort | uniq -c | sort -nr"
+  local output = vim.fn.system(cmd)
+
+  -- Parse and map to languages
+  local lang_counts = {}
+  for line in output:gmatch("[^\n]+") do
+    local count, ext = line:match("^%s*(%d+)%s+(.+)$")
+    if count and ext and ext_to_langs[ext] then
+      -- Add count to ALL languages that handle this extension
+      for _, lang in ipairs(ext_to_langs[ext]) do
+        -- Use highest count if language has multiple extensions
+        lang_counts[lang] = math.max(lang_counts[lang] or 0, tonumber(count))
+      end
+    end
+  end
+
+  -- Sort by file count
+  local available = {}
+  for lang, count in pairs(lang_counts) do
+    table.insert(available, {name = lang, count = count})
+  end
+  table.sort(available, function(a, b) return a.count > b.count end)
+
+  -- Return sorted language names
+  local result = {}
+  for _, item in ipairs(available) do
+    table.insert(result, item.name)
+  end
+
+  return result
+end
+
 -- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
@@ -159,7 +217,8 @@ local function show_package_picker(lang_name, root, packages, mode, detector)
     -- but actual directories include versions (e.g., "rails-7.0.0", "serde-1.0.0")
     -- Use language-specific resolution if available
     local resolve_fn = detector and detector.resolve_directory
-    local file_extension = detector and detector.file_extension
+    -- For single-file module detection, use the first extension
+    local file_extension = detector and detector.file_extensions and ("." .. detector.file_extensions[1])
     local exclude_patterns = detector and detector.exclude_patterns
     local actual_path = util.resolve_package_dir(root, selected_package, resolve_fn, file_extension, exclude_patterns)
     if not actual_path then
@@ -267,25 +326,22 @@ function M.manual_search(mode)
 
   local bufpath = vim.api.nvim_buf_get_name(0)
 
-  local enabled_detectors = filter_enabled_detectors(detectors)
-
-  -- LAZY LOADING: Collect languages without calling detect() upfront
-  local available = {}
-  local detector_map = {}
-
-  for _, detector in ipairs(enabled_detectors) do
-    table.insert(available, detector.name)
-    detector_map[detector.name] = detector
-  end
+  -- Use fast detection to get available languages sorted by prevalence
+  local available = detect_available_languages()
 
   if #available == 0 then
-    vim.notify("No language detectors available", vim.log.levels.WARN, { title = "Dependency Picker" })
+    vim.notify("No language files detected in project", vim.log.levels.WARN, { title = "Dependency Picker" })
     return
   end
 
-  require("snacks").picker.select(available, {
-    prompt = string.format("Select Language (%s)", mode),
-  }, function(selected_lang)
+  -- Build detector map
+  local detector_map = {}
+  for _, detector in ipairs(detectors) do
+    detector_map[detector.name] = detector
+  end
+
+  -- Function to handle language selection
+  local function handle_selection(selected_lang)
     if not selected_lang then
       return
     end
@@ -296,10 +352,11 @@ function M.manual_search(mode)
       return
     end
 
-    -- NOW call detect() only for the selected language
+    -- Call detect() for the selected language
     local result = detector.requires_buffer_path and detector.detect(bufpath) or detector.detect()
 
     if not result or #result.packages == 0 then
+      -- Just show the warning and return - no fallback
       vim.notify(
         string.format("No %s packages detected", detector.name),
         vim.log.levels.WARN,
@@ -309,7 +366,17 @@ function M.manual_search(mode)
     end
 
     show_package_picker(detector.name, result.root, result.packages, mode, detector)
-  end)
+  end
+
+  -- Auto-select if only one language is available
+  if #available == 1 then
+    handle_selection(available[1])
+  else
+    -- Show picker with languages sorted by file count
+    require("snacks").picker.select(available, {
+      prompt = string.format("Select Language (%s)", mode),
+    }, handle_selection)
+  end
 end
 
 -- ============================================================================
@@ -370,13 +437,22 @@ end
 function M.manual_search_stdlib(mode)
   mode = mode or "grep"
 
-  local enabled_detectors = filter_enabled_detectors(detectors)
+  -- Use fast detection to get available languages sorted by prevalence
+  local detected_langs = detect_available_languages()
 
+  -- Build detector map
+  local detector_map = {}
+  for _, detector in ipairs(detectors) do
+    detector_map[detector.name] = detector
+  end
+
+  -- Filter to only languages with stdlib support and detected files
   local available = {}
   local lang_data = {}
 
-  for _, detector in ipairs(enabled_detectors) do
-    if detector.detect_stdlib then
+  for _, lang_name in ipairs(detected_langs) do
+    local detector = detector_map[lang_name]
+    if detector and detector.detect_stdlib then
       local result = detector.detect_stdlib()
       if result and #result.packages > 0 then
         local lang_display = string.format("%s stdlib (%d modules)", detector.name, #result.packages)
@@ -396,16 +472,25 @@ function M.manual_search_stdlib(mode)
     return
   end
 
-  require("snacks").picker.select(available, {
-    prompt = string.format("Select Stdlib (%s)", mode),
-  }, function(selected_lang)
-    if not selected_lang then
-      return
-    end
+  -- Auto-select if only one language with stdlib is available
+  local selected_lang
+  if #available == 1 then
+    selected_lang = available[1]
+  else
+    -- Show picker with languages sorted by file count
+    require("snacks").picker.select(available, {
+      prompt = string.format("Select Stdlib (%s)", mode),
+    }, function(lang)
+      selected_lang = lang
+    end)
+  end
 
-    local data = lang_data[selected_lang]
-    show_package_picker(data.name, data.root, data.packages, mode, data.detector)
-  end)
+  if not selected_lang then
+    return
+  end
+
+  local data = lang_data[selected_lang]
+  show_package_picker(data.name, data.root, data.packages, mode, data.detector)
 end
 
 -- Backward compatibility: keep original function names
@@ -416,6 +501,28 @@ end
 
 function M.smart_files()
   M.smart_search("files")
+end
+
+-- Dashboard integration: Try smart search first, fall back to manual
+function M.dependency_search()
+  -- Try smart search first
+  local filetype = vim.bo.filetype
+  local has_matching_detector = false
+
+  local enabled_detectors = filter_enabled_detectors(detectors)
+  for _, detector in ipairs(enabled_detectors) do
+    if vim.tbl_contains(detector.filetypes, filetype) then
+      has_matching_detector = true
+      break
+    end
+  end
+
+  if has_matching_detector then
+    M.smart_search("grep")
+  else
+    -- Fall back to manual search with auto-detection
+    M.manual_search("grep")
+  end
 end
 
 -- Export for testing/debugging
