@@ -91,7 +91,7 @@ local CONFIG = {
   pokemon = {
     -- Set to nil to select a random pokemon from the database
     -- Otherwise, specify a pokemon name like "pikachu", "snorlax", "ho-oh", etc.
-    name = "ho-oh",
+    name = "gengar",
 
     -- Set to true for shiny variant
     is_shiny = false,
@@ -770,13 +770,77 @@ local function create_pokemon_section(target_height)
   }
 end
 
+-- Helper function to create all non-pokemon sections
+-- Extracted to allow two-pass creation for proper width calculation
+local function create_all_sections_without_pokemon(in_git, base_branch, current_branch)
+  -- Build all section groups (must be inside helper to use correct width)
+  local search_sections, _ = search_keys()
+  local files_sections, _ = get_recent_files()
+  local git_sections, _ = create_git_sections(base_branch, current_branch)
+  local global_sections, _ = globalkeys()
+
+  local sections = {
+    -- start with some light padding at the top
+    -- this is because the tmux statusline makes things not look centered since its an extra line
+    -- so we add a little padding to make it look centered if you ignore the statusline
+    {
+      pane = 1,
+      padding = 1,
+    },
+    {
+      pane = 2,
+      padding = 1,
+    },
+  }
+
+  -- in this case, recent files are in left pane, and to look symmetrical we add a separator
+  if not in_git and utils.show_if_has_second_pane() then
+    -- Add separator between panes when not in git and using two panes
+    table.insert(sections, {
+      pane = 2,
+      title = utils.create_separator(),
+      indent = 0,
+      padding = 0,
+    })
+  end
+
+  -- Search keys section
+  vim.list_extend(sections, search_sections)
+
+  -- Recent files title
+  table.insert(sections, {
+    title = utils.create_aligned_title("Recent Files", utils.get_recent_file_time()),
+    pane = in_git and 2 or 1,
+    indent = 0,
+    padding = 2,
+    enabled = recent_project_toggle,
+  })
+
+  -- Recent files entries
+  vim.list_extend(sections, files_sections)
+
+  -- Git sections (automatically disabled if not in git via enabled field)
+  vim.list_extend(sections, git_sections)
+
+  -- Global keys section
+  -- vim.list_extend(sections, global_sections)
+
+  -- Time section
+  table.insert(sections, {
+    pane = 1,
+    title = utils.create_aligned_title("Time", os.date("%H:%M")),
+    indent = 0,
+  })
+
+  return sections
+end
+
 -- Create all dashboard sections
 -- Called by Snacks dashboard with self (dashboard instance) as parameter
 ---@param dashboard snacks.dashboard.Class Dashboard instance
 function M.create_sections(dashboard)
-  -- Always set dynamic pane width for responsive layout
-  -- Recalculates on every dashboard render to adapt to terminal resizing
-  -- Use dashboard window width for accurate calculations
+  -- Always set initial dynamic pane width for responsive layout
+  -- This will be recalculated after height calculation for perfect centering
   if dashboard and dashboard._size then
     local dynamic_width = utils.calculate_dynamic_pane_width(dashboard._size.width)
     -- Set both for Snacks internal layout AND our utility functions
@@ -804,75 +868,56 @@ function M.create_sections(dashboard)
   local current_branch = git_utils.get_current_branch()
   local in_git = Snacks.git.get_root() ~= nil
 
-  -- Build all section groups (ignore returned heights - we'll calculate dynamically)
-  local search_sections, _ = search_keys()
-  local files_sections, _ = get_recent_files()
-  local git_sections, _ = create_git_sections(base_branch, current_branch)
-  local global_sections, _ = globalkeys()
+  -- FIRST PASS: Create sections to calculate height
+  -- This pass is only for height calculation, sections will be recreated
+  local temp_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch)
 
-  -- Flatten ALL sections (except pokemon) into one list for dynamic height calculation
-  local all_sections = {
-    -- start with some light padding at the top
-    -- this is because the tmux statusline makes things not look centered
-    -- so we add a little padding to make it look centered if you ignore the statusline
-    {
-      pane = 1,
-      padding = 1,
-    },
-    {
-      pane = 2,
-      padding = 1,
-    },
-  }
+  -- ✨ Calculate both pane heights from first pass
+  local pane1_height, pane2_height = calculate_pane_heights(temp_sections)
 
-  -- in this case, recent files are in left pane, and to look symmetrical we add a separator
-  if not in_git and utils.show_if_has_second_pane() then
-    -- Add separator between panes when not in git and using two panes
-    table.insert(all_sections, {
-      pane = 2,
-      title = utils.create_separator(),
-      indent = 0,
-      padding = 0,
-    })
+  -- 🎨 Recalculate width with exact vertical margin for perfect centering
+  -- Account for terminal character aspect ratio (chars are taller than wide)
+  if dashboard and dashboard._size then
+    -- Calculate vertical margin in rows (using dashboard height for accuracy)
+    local vertical_margin_rows = math.max(math.floor((dashboard._size.height - pane1_height) / 2), 0)
+
+    -- on my setup this looks right --- unclear how to make this dynamic
+    local aspect_ratio = 2.5 -- Adjust this if your font looks different
+
+    -- Convert vertical rows to equivalent horizontal columns
+    local equivalent_horizontal_margin = math.floor(vertical_margin_rows * aspect_ratio)
+
+    vim.notify(
+      string.format(
+        "Dashboard height: %d, Pane height: %d, V-margin: %d rows → H-margin: %d cols (ratio: %.1f)",
+        dashboard._size.height,
+        pane1_height,
+        vertical_margin_rows,
+        equivalent_horizontal_margin,
+        aspect_ratio
+      ),
+      vim.log.levels.DEBUG
+    )
+
+    -- Use max(4, ...) as minimum padding for aesthetics
+    local edge_margin = math.max(4, equivalent_horizontal_margin)
+    local optimized_width = utils.calculate_dynamic_pane_width(dashboard._size.width, edge_margin)
+    -- Update both for Snacks internal layout AND our utility functions
+    dashboard.opts.width = optimized_width
+    Snacks.config.dashboard.width = optimized_width
   end
 
-  -- Search keys section
-  vim.list_extend(all_sections, search_sections)
-
-  -- Recent files title
-  table.insert(all_sections, {
-    title = utils.create_aligned_title("Recent Files", utils.get_recent_file_time()),
-    pane = in_git and 2 or 1,
-    indent = 0,
-    padding = 2,
-    enabled = recent_project_toggle,
-  })
-
-  -- Recent files entries
-  vim.list_extend(all_sections, files_sections)
-
-  -- Git sections (automatically disabled if not in git via enabled field)
-  vim.list_extend(all_sections, git_sections)
-
-  -- Global keys section
-  vim.list_extend(all_sections, global_sections)
-
-  -- Time section
-  table.insert(all_sections, {
-    pane = 1,
-    title = utils.create_aligned_title("Time", os.date("%H:%M")),
-    indent = 0,
-  })
-
-  -- ✨ Calculate both pane heights in a single pass
-  local pane1_height, pane2_height = calculate_pane_heights(all_sections)
+  -- SECOND PASS: Recreate sections with the correct width for proper title alignment
+  -- This two-pass approach ensures that titles are aligned with the final calculated width
+  -- Performance impact is negligible (microseconds) as we're just creating Lua tables
+  local final_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch)
 
   -- Create pokemon section to fill the gap between pane2 and pane1
   -- This ensures both panes have identical total heights
   local pokemon_sections = create_pokemon_section(pane1_height - pane2_height)
-  vim.list_extend(all_sections, pokemon_sections)
+  vim.list_extend(final_sections, pokemon_sections)
 
-  return all_sections
+  return final_sections
 end
 
 return M

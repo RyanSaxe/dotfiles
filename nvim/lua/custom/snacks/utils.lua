@@ -117,13 +117,14 @@ end
 
 -- Calculate dynamic pane width based on terminal/window size
 -- Returns optimal pane width that prioritizes readability (wider panes, fewer columns)
--- Accounts for edge margins (4 chars on left, 4 chars on right)
+-- Edge margins can match vertical centering for perfectly balanced appearance
 ---@param window_width? number Optional window width (defaults to vim.o.columns)
+---@param edge_margin? number Optional edge margin (defaults to 4)
 ---@return number pane_width Calculated width between 45-75 characters
-function M.calculate_dynamic_pane_width(window_width)
+function M.calculate_dynamic_pane_width(window_width, edge_margin)
   local width = window_width or vim.o.columns
   local gap = 4 -- Gap between panes
-  local edge_margin = 4 -- Minimum margin on left and right edges
+  edge_margin = edge_margin or 4 -- Default margin if not specified
   local min_width = 45
   local max_width = 75
 
@@ -205,3 +206,4 @@ function M.different_key_if_condition(condition, base_spec, git_spec, non_git_sp
 end
 
 return M
+
