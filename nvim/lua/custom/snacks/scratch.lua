@@ -1,6 +1,7 @@
 -- https://github.com/folke/snacks.nvim/discussions/765
 -- edited from above for my own preferences
 local M = {}
+local utils = require("custom.snacks.utils")
 
 local column_widths = { 0, 0, 0, 0 }
 
@@ -108,8 +109,17 @@ function M.select_scratch()
 end
 
 function M.new_scratch(filetypes)
+  -- Dynamically detect available filetypes if not provided
+  filetypes = filetypes or utils.detect_available_filetypes()
+
+  -- Auto-select if only one filetype is available
+  if #filetypes == 1 then
+    Snacks.scratch({ ft = filetypes[1].text })
+    return
+  end
+
+  -- Show picker for multiple filetypes
   Snacks.picker.pick({
-    source = "scratch",
     items = filetypes,
     format = "text",
     layout = {

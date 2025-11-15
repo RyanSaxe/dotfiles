@@ -5,6 +5,7 @@ local utils = require("custom.snacks.utils")
 local notifications = require("custom.git.notifications")
 local git_utils = require("custom.git.utils")
 local visual_utils = require("custom.visual.utils")
+local todos = require("custom.todos")
 
 local M = {}
 
@@ -334,10 +335,7 @@ local function search_keys()
       desc = "Open TODO List",
       key = "t",
       action = function()
-        Snacks.scratch.open({
-          name = "TODO", -- this name makes it such that checkmate.nvim runs on this.
-          ft = "markdown",
-        })
+        todos.open_todo()
       end,
     },
   }

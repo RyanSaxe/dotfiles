@@ -28,7 +28,38 @@ local function iso_to_relative(iso)
   end
 end
 
--- Removed helper functions for fetching extra details - keeping it simple
+-- Helper: Extract PR/Issue/Release number from API URL
+local function extract_number_from_url(api_url)
+  if not api_url then return nil end
+  -- Try to extract number from various GitHub API URL patterns
+  return api_url:match("/pulls/(%d+)$") or
+         api_url:match("/issues/(%d+)$") or
+         api_url:match("/releases/(%d+)$")
+end
+
+-- Helper: Check if notification has new activity since last read
+local function has_new_activity(item)
+  -- If never read, it's all new
+  if not item.last_read_at or item.last_read_at == vim.NIL then
+    return true
+  end
+
+  -- If no updated_at, assume no new activity
+  if not item.updated_at or item.updated_at == vim.NIL then
+    return false
+  end
+
+  -- ISO 8601 timestamps can be compared as strings (they're lexicographically sortable)
+  -- Use tostring to ensure both values are strings (in case one is userdata)
+  return tostring(item.updated_at) > tostring(item.last_read_at)
+end
+
+-- Helper: Check if notification has new activity AND comments
+local function has_new_discussion(item)
+  return has_new_activity(item) and
+         item.latest_comment_url and
+         item.latest_comment_url ~= ""
+end
 
 -- Fetch notifications from GitHub using the gh CLI with full data
 local function fetch_notifications()
@@ -70,7 +101,7 @@ local function fetch_notifications()
         title = subj.title or "",
         type = subj.type or "", -- "PullRequest", "Issue", "Release", etc.
         api_url = subj.url or "",
-        comment_url = subj.latest_comment_url or "",
+        latest_comment_url = subj.latest_comment_url or "",
 
         -- Subscription info
         subscription_url = obj.subscription_url,
@@ -95,14 +126,58 @@ end
 local function format_notification_row(item, picker)
   local align = require("snacks.picker.util").align
   local ret = {}
-  -- if there is a new comment on the PR/issue I have not read, show the type as red
-  if item.comment_url ~= "" then
-    ret[#ret + 1] = { align(item.type or "", 12), item.unread and "SnacksPickerSelected" or "SnacksIndent" }
-  else
-    ret[#ret + 1] = { align(item.type or "", 12), item.unread and "SnacksPickerIdx" or "SnacksIndent" }
+
+  -- Build type display with PR/Issue number if available
+  local type_display = item.type or ""
+  local number = extract_number_from_url(item.api_url)
+  if number then
+    if item.type == "PullRequest" then
+      type_display = "PR #" .. number
+    elseif item.type == "Issue" then
+      type_display = "Issue #" .. number
+    else
+      type_display = item.type .. " #" .. number
+    end
   end
+
+  -- Check for new discussion activity (new activity + has comments)
+  local new_discussion = has_new_discussion(item)
+  local new_activity = has_new_activity(item)
+
+  -- Choose highlight based on activity status
+  local type_highlight
+  if new_discussion then
+    -- BRIGHT highlight for items with NEW activity AND comments (most important!)
+    type_highlight = item.unread and "DiagnosticError" or "DiagnosticWarn"
+  elseif new_activity then
+    -- Medium highlight for new activity without comments
+    type_highlight = item.unread and "SnacksPickerSelected" or "SnacksPickerIdx"
+  else
+    -- Normal highlight for old items
+    type_highlight = item.unread and "SnacksPickerIdx" or "SnacksIndent"
+  end
+
+  -- Add type with appropriate highlighting
+  ret[#ret + 1] = { align(type_display, 12), type_highlight }
+
+  -- Add new activity indicator
+  local activity_indicator = ""
+  if new_discussion then
+    activity_indicator = "🔥 " -- Hot discussion!
+  elseif new_activity then
+    activity_indicator = "🆕 " -- New activity
+  else
+    activity_indicator = "   " -- Spacing for alignment
+  end
+  ret[#ret + 1] = { activity_indicator, new_discussion and "DiagnosticError" or "SnacksIndent" }
+
+  -- Reason
   ret[#ret + 1] = { align(item.reason or "?", 12), item.unread and "SnacksIndent2" or "SnacksIndent" }
+
+  -- Time
   ret[#ret + 1] = { " " .. iso_to_relative(item.updated_at), item.unread and "SnacksIndent1" or "SnacksIndent" }
+
+  -- Title
   ret[#ret + 1] =
     { " " .. (item.title ~= "" and item.title or "<no title>"), item.unread and "SnacksIndent4" or "SnacksIndent" }
   -- Make fuzzy searchable
@@ -116,7 +191,7 @@ local function format_notification_row(item, picker)
   return ret
 end
 
--- Generate clean preview content for the selected notification
+-- Generate clean markdown preview for the selected notification
 ---@param ctx table The picker context with ctx.item and ctx.preview
 local function generate_preview(ctx)
   -- Reset the preview
@@ -130,22 +205,46 @@ local function generate_preview(ctx)
 
   local lines = {}
 
-  -- Header with notification status
-  lines[#lines + 1] = string.format("╭─ %s ─╮", item.unread and "🔴 UNREAD" or "✅ READ")
-  lines[#lines + 1] = ""
-
-  -- Title and type
-  lines[#lines + 1] = "📋 " .. item.type .. ": " .. item.title
-  lines[#lines + 1] = ""
-  lines[#lines + 1] = "─────────────────────────────────────"
-  lines[#lines + 1] = ""
-
-  -- Core information
-  lines[#lines + 1] = "📍 Repository: " .. item.repo_full_name
-  if item.repo_private then
-    lines[#lines + 1] = "🔒 Private repository"
+  -- Header with notification status and activity indicator
+  local status = item.unread and "🔴 **UNREAD**" or "✅ **READ**"
+  local activity_badge = ""
+  if has_new_discussion(item) then
+    activity_badge = " 🔥 **HOT DISCUSSION**"
+  elseif has_new_activity(item) then
+    activity_badge = " 🆕 **NEW ACTIVITY**"
   end
+  lines[#lines + 1] = "# " .. status .. activity_badge
   lines[#lines + 1] = ""
+
+  -- Title and type with PR/Issue number
+  local number = extract_number_from_url(item.api_url)
+  local type_display = item.type
+  if number then
+    if item.type == "PullRequest" then
+      type_display = "PR #" .. number
+    elseif item.type == "Issue" then
+      type_display = "Issue #" .. number
+    else
+      type_display = item.type .. " #" .. number
+    end
+  end
+  lines[#lines + 1] = "## " .. type_display .. ": " .. item.title
+  lines[#lines + 1] = ""
+  lines[#lines + 1] = "---"
+  lines[#lines + 1] = ""
+
+  -- Core information as a table
+  lines[#lines + 1] = "### 📋 Notification Details"
+  lines[#lines + 1] = ""
+  lines[#lines + 1] = "| Field | Value |"
+  lines[#lines + 1] = "|-------|-------|"
+  lines[#lines + 1] = "| **Repository** | `" .. item.repo_full_name .. "` |"
+
+  if item.repo_private then
+    lines[#lines + 1] = "| **Visibility** | 🔒 Private |"
+  else
+    lines[#lines + 1] = "| **Visibility** | 🌍 Public |"
+  end
 
   -- Notification reason with better descriptions
   local reason_descriptions = {
@@ -162,47 +261,98 @@ local function generate_preview(ctx)
     team_mention = "Your team was mentioned",
   }
   local reason_desc = reason_descriptions[item.reason] or item.reason
-  lines[#lines + 1] = "🔔 Reason: " .. reason_desc
-  lines[#lines + 1] = ""
+  lines[#lines + 1] = "| **Reason** | " .. reason_desc .. " |"
+  lines[#lines + 1] = "| **Updated** | " .. iso_to_relative(item.updated_at) .. " |"
 
-  -- Timing information
-  lines[#lines + 1] = "🕒 Updated: " .. iso_to_relative(item.updated_at)
   if item.last_read_at then
-    lines[#lines + 1] = "👁️  Last read: " .. iso_to_relative(item.last_read_at)
-  end
-  lines[#lines + 1] = ""
-
-  -- URLs
-  lines[#lines + 1] = "─────────────────────────────────────"
-  lines[#lines + 1] = ""
-  if item.comment_url and item.comment_url ~= "" then
-    lines[#lines + 1] = "💬 Has new comments"
+    lines[#lines + 1] = "| **Last Read** | " .. iso_to_relative(item.last_read_at) .. " |"
   end
 
-  -- Raw notification data (for debugging/curiosity)
+  -- Show activity status
+  if has_new_discussion(item) then
+    lines[#lines + 1] = "| **Activity Status** | 🔥 New discussion activity! |"
+  elseif has_new_activity(item) then
+    lines[#lines + 1] = "| **Activity Status** | 🆕 Updated since last read |"
+  end
+
+  if item.latest_comment_url and item.latest_comment_url ~= "" then
+    lines[#lines + 1] = "| **Comments** | 💬 Has comments |"
+  end
+
+  lines[#lines + 1] = ""
+
+  -- Raw notification data as a nice table
   if item._raw then
+    lines[#lines + 1] = "---"
     lines[#lines + 1] = ""
-    lines[#lines + 1] = "─────────────────────────────────────"
-    lines[#lines + 1] = "📊 Raw Notification Data:"
+    lines[#lines + 1] = "### 📊 Full Notification Data"
     lines[#lines + 1] = ""
+    lines[#lines + 1] = "| Property | Value |"
+    lines[#lines + 1] = "|----------|-------|"
 
-    -- Show formatted JSON of the raw notification
-    local ok, formatted = pcall(vim.json.encode, item._raw)
-    if ok then
-      -- Pretty print the JSON
-      local json_lines = vim.split(formatted, "\n")
-      for i, line in ipairs(json_lines) do
-        if i <= 30 then -- Limit to first 30 lines
-          lines[#lines + 1] = line
+    -- Helper function to safely get string value
+    local function safe_tostring(val)
+      if type(val) == "string" then
+        return val:gsub("|", "\\|") -- Escape pipes for markdown tables
+      elseif type(val) == "boolean" then
+        return val and "true" or "false"
+      elseif type(val) == "number" then
+        return tostring(val)
+      elseif val == nil then
+        return "null"
+      elseif type(val) == "table" then
+        -- For tables, just show the type/count
+        if vim.tbl_islist(val) then
+          return "Array[" .. #val .. "]"
+        else
+          local count = 0
+          for _ in pairs(val) do count = count + 1 end
+          return "Object{" .. count .. "}"
         end
+      else
+        return type(val)
       end
-      if #json_lines > 30 then
-        lines[#lines + 1] = "... (" .. (#json_lines - 30) .. " more lines)"
+    end
+
+    -- Add main properties
+    if item._raw.id then
+      lines[#lines + 1] = "| **ID** | `" .. safe_tostring(item._raw.id) .. "` |"
+    end
+    if item._raw.unread ~= nil then
+      lines[#lines + 1] = "| **Unread** | " .. safe_tostring(item._raw.unread) .. " |"
+    end
+    if item._raw.reason then
+      lines[#lines + 1] = "| **Reason** | " .. safe_tostring(item._raw.reason) .. " |"
+    end
+    if item._raw.updated_at then
+      lines[#lines + 1] = "| **Updated At** | `" .. safe_tostring(item._raw.updated_at) .. "` |"
+    end
+    if item._raw.last_read_at then
+      lines[#lines + 1] = "| **Last Read At** | `" .. safe_tostring(item._raw.last_read_at) .. "` |"
+    end
+
+    -- Add subject properties
+    if item._raw.subject then
+      lines[#lines + 1] = "| **Subject Type** | " .. safe_tostring(item._raw.subject.type) .. " |"
+      lines[#lines + 1] = "| **Subject Title** | " .. safe_tostring(item._raw.subject.title) .. " |"
+      if item._raw.subject.url then
+        lines[#lines + 1] = "| **API URL** | `" .. safe_tostring(item._raw.subject.url):sub(1, 50) .. "...` |"
       end
+      if item._raw.subject.latest_comment_url then
+        lines[#lines + 1] = "| **Latest Comment URL** | `...` |"
+      end
+    end
+
+    -- Add repository info
+    if item._raw.repository then
+      lines[#lines + 1] = "| **Repository Name** | " .. safe_tostring(item._raw.repository.name) .. " |"
+      lines[#lines + 1] = "| **Repository Owner** | " .. safe_tostring(item._raw.repository.owner and item._raw.repository.owner.login) .. " |"
     end
   end
 
   ctx.preview:set_lines(lines)
+  -- Enable markdown rendering for nice table display
+  ctx.preview:highlight({ ft = "markdown" })
 end
 
 -- Helper: Mark a notification as read
@@ -211,12 +361,8 @@ local function mark_as_read(item)
     return
   end
 
-  local owner, repo = current_repo()
-  if owner == "" or repo == "" then
-    return
-  end
-
-  local endpoint = string.format("/repos/%s/%s/notifications/threads/%s", owner, repo, item.id)
+  -- Use the global notifications endpoint (not repository-scoped)
+  local endpoint = string.format("/notifications/threads/%s", item.id)
   vim.fn.system({
     "gh",
     "api",
@@ -238,6 +384,7 @@ M.picker = function()
     finder = fetch_notifications,
     format = format_notification_row,
     preview = generate_preview,
+    layout = "custom_horizontal", -- Use the custom horizontal layout for better preview display
     actions = {
       mark_read = function(picker, item)
         if item then
@@ -274,21 +421,53 @@ M.picker = function()
       end,
     },
     confirm = function(picker, item)
+      -- First, mark the notification as read since we're opening it
+      mark_as_read(item)
+
+      -- Close the picker
       picker:close()
-      local url = vim.fn.system({
-        "gh",
-        "api",
-        -- get the comment URL if it exists, otherwise use the API URL
-        item.comment_url ~= "" and item.comment_url or item.api_url,
-        "--jq",
-        ".html_url",
-      })
-      url = vim.trim(url) -- remove trailing newline
-      if url == "" then
-        vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
-        return
+
+      -- Extract PR/Issue number if available
+      local number = extract_number_from_url(item.api_url)
+
+      -- Smart routing based on notification type
+      if item.type == "PullRequest" and number then
+        -- Open native PR viewer in Neovim
+        vim.notify("📋 Opening PR #" .. number .. " in Neovim", vim.log.levels.INFO)
+        Snacks.picker.gh_pr({ search = "#" .. number })
+
+      elseif item.type == "Issue" and number then
+        -- Open native Issue viewer in Neovim
+        vim.notify("📋 Opening Issue #" .. number .. " in Neovim", vim.log.levels.INFO)
+        Snacks.picker.gh_issue({ search = "#" .. number })
+
+      else
+        -- For other types (Release, Commit, Discussion), open in browser
+        -- TODO: Implement native viewers for:
+        --   - Releases (gh_release picker)
+        --   - Commits (gh_commit picker)
+        --   - Discussions (gh_discussion picker)
+        --   These would need custom implementation with Snacks.picker
+
+        local url = vim.fn.system({
+          "gh",
+          "api",
+          -- get the latest comment URL if it exists, otherwise use the API URL
+          (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
+          "--jq",
+          ".html_url",
+        })
+        url = vim.trim(url) -- remove trailing newline
+        if url == "" then
+          vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+          return
+        end
+
+        -- Notify about browser opening with type info
+        local type_msg = item.type or "notification"
+        vim.notify("🌐 Opening " .. type_msg .. " in browser (no native viewer yet)", vim.log.levels.INFO)
+        vim.ui.open(url)
       end
-      vim.ui.open(url)
     end,
     win = {
       input = {

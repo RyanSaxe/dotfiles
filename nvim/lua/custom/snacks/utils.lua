@@ -340,5 +340,86 @@ function M.calculate_recent_files_height(sections)
   return height
 end
 
+-- Find git root directory, fallback to current working directory
+---@return string The git root or current working directory
+local function find_git_root()
+  -- Try to find .git directory walking up from cwd
+  local cwd = vim.loop.cwd()
+  local git_root = vim.fn.finddir(".git", cwd .. ";")
+
+  if git_root ~= "" then
+    -- Return the parent directory of .git
+    return vim.fn.fnamemodify(git_root, ":h")
+  end
+
+  -- Fallback to current working directory
+  return cwd
+end
+
+-- Detect available filetypes by scanning files in the git repository
+-- Uses rg to find all files, extracts extensions, maps to Neovim filetypes,
+-- and returns them sorted by prevalence (most common first)
+---@return table[] Array of filetype objects { text = "filetype" }, sorted by prevalence
+function M.detect_available_filetypes()
+  local search_root = find_git_root()
+
+  -- Use rg to get all files, extract extensions, count them, and sort by count
+  -- Command breakdown:
+  --   rg --files: List all files (respects .gitignore)
+  --   grep -o '\.[^.]*$': Extract file extensions (everything after last dot)
+  --   sort: Sort extensions alphabetically
+  --   uniq -c: Count unique extensions
+  --   sort -rn: Sort by count (reverse numeric, most common first)
+  local cmd = string.format(
+    "cd %s && rg --files 2>/dev/null | grep -o '\\.[^.]*$' | sort | uniq -c | sort -rn",
+    vim.fn.shellescape(search_root)
+  )
+
+  local output = vim.fn.system(cmd)
+
+  -- Handle errors (no files found, rg not available, etc.)
+  if vim.v.shell_error ~= 0 or output == "" then
+    -- Fallback to a minimal set of common filetypes
+    return {
+      { text = "markdown" },
+      { text = "lua" },
+      { text = "python" },
+    }
+  end
+
+  -- Parse output and build filetype list
+  local filetypes = {}
+  local seen = {} -- Track seen filetypes to avoid duplicates
+
+  for line in output:gmatch("[^\r\n]+") do
+    -- Extract extension from lines like "  123 .lua"
+    local ext = line:match("%s+%d+%s+%.(%S+)")
+
+    if ext and ext ~= "" then
+      -- Map extension to Neovim filetype using vim.filetype.match
+      -- This uses Neovim's built-in filetype detection, so it handles all known extensions
+      local dummy_filename = "dummy." .. ext
+      local filetype = vim.filetype.match({ filename = dummy_filename })
+
+      -- Only add if we got a valid filetype and haven't seen it before
+      if filetype and filetype ~= "" and not seen[filetype] then
+        seen[filetype] = true
+        table.insert(filetypes, { text = filetype })
+      end
+    end
+  end
+
+  -- If we didn't find any valid filetypes, return fallback
+  if #filetypes == 0 then
+    return {
+      { text = "markdown" },
+      { text = "lua" },
+      { text = "python" },
+    }
+  end
+
+  return filetypes
+end
+
 return M
 

@@ -1,7 +1,7 @@
--- another plugin like fyler to manage files as neovim buffer
--- currently disabling as I want to get used to snacks explorer
+-- enabling this as it's more intuitive to use for some navigation and file
+-- changes than snacks explorere
 return {
-  enabled = false,
+  enabled = true,
   "nvim-mini/mini.files",
   opts = {
     windows = {
