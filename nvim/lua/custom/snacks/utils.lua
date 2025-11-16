@@ -123,8 +123,9 @@ end
 ---@return number pane_width Calculated width between 45-75 characters
 function M.calculate_dynamic_pane_width(window_width, edge_margin)
   local width = window_width or vim.o.columns
-  local gap = 4 -- Gap between panes
   edge_margin = edge_margin or 4 -- Default margin if not specified
+  -- Use edge margin as gap between panes for visual consistency
+  local gap = edge_margin -- Gap between panes now matches edge margin
   local min_width = 45
   local max_width = 75
 
@@ -154,7 +155,8 @@ function M.show_if_has_second_pane()
   local width = vim.o.columns
   -- Use config width if set (by create_sections), otherwise calculate dynamically
   local pane_width = Snacks.config.dashboard.width or M.calculate_dynamic_pane_width()
-  local pane_gap = 4
+  -- Use actual pane_gap from config (set by dashboard based on feature flag), fallback to 4
+  local pane_gap = Snacks.config.dashboard.pane_gap or 4
   local max_panes = math.max(1, math.floor((width + pane_gap) / (pane_width + pane_gap)))
   return max_panes > 1
 end

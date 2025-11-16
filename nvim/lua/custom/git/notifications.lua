@@ -355,15 +355,18 @@ local function generate_preview(ctx)
   ctx.preview:highlight({ ft = "markdown" })
 end
 
--- Helper: Mark a notification as read
-local function mark_as_read(item)
+-- Helper: Mark a notification as read (async)
+-- @param item The notification item to mark as read
+-- @param callback Optional callback to run after marking as read
+local function mark_as_read(item, callback)
   if not item or not item.id then
+    if callback then callback() end
     return
   end
 
   -- Use the global notifications endpoint (not repository-scoped)
   local endpoint = string.format("/notifications/threads/%s", item.id)
-  vim.fn.system({
+  vim.system({
     "gh",
     "api",
     endpoint,
@@ -371,11 +374,16 @@ local function mark_as_read(item)
     "PATCH",
     "-f",
     "read=true",
-  })
-
-  -- Update the item to reflect it's been read
-  item.unread = false
-  -- Notification removed - now shown immediately in confirm action for better UX
+  }, {}, function(result)
+    vim.schedule(function()
+      if result.code == 0 then
+        -- Update the item to reflect it's been read
+        item.unread = false
+      end
+      -- Run callback whether success or failure
+      if callback then callback() end
+    end)
+  end)
 end
 
 -- Main notification picker function
@@ -391,33 +399,41 @@ M.picker = function()
         local item = picker:current()
         if not item then return end
 
-        -- Mark as read
-        mark_as_read(item)
+        -- Mark as read first (async)
+        mark_as_read(item, function()
+          -- Fetch and open URL asynchronously
+          vim.system({
+            "gh",
+            "api",
+            (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
+            "--jq",
+            ".html_url",
+          }, {}, function(result)
+            vim.schedule(function()
+              if result.code ~= 0 or not result.stdout then
+                vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+                return
+              end
 
-        -- Fetch and open URL
-        local url = vim.fn.system({
-          "gh",
-          "api",
-          (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
-          "--jq",
-          ".html_url",
-        })
-        url = vim.trim(url)
+              local url = vim.trim(result.stdout)
+              if url == "" then
+                vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+                return
+              end
 
-        if url == "" then
-          vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
-          return
-        end
-
-        vim.ui.open(url)
+              vim.ui.open(url)
+            end)
+          end)
+        end)
       end,
     },
     actions = {
       mark_read = function(picker, item)
         if item then
-          mark_as_read(item)
-          -- Refresh the picker to show updated status
-          picker:find()
+          mark_as_read(item, function()
+            -- Refresh the picker to show updated status
+            picker:find()
+          end)
         end
       end,
       mark_all_read = function(picker)
@@ -426,8 +442,11 @@ M.picker = function()
           return
         end
 
-        -- Mark all notifications as read
-        vim.fn.system({
+        -- Show notification immediately before async operation
+        vim.notify("Marking all notifications as read...", vim.log.levels.INFO)
+
+        -- Mark all notifications as read asynchronously
+        vim.system({
           "gh",
           "api",
           string.format("/repos/%s/%s/notifications", owner, repo),
@@ -435,11 +454,18 @@ M.picker = function()
           "PUT",
           "-f",
           "read=true",
-        })
+        }, {}, function(result)
+          vim.schedule(function()
+            if result.code ~= 0 then
+              vim.notify("Failed to mark all as read", vim.log.levels.ERROR)
+              return
+            end
 
-        vim.notify("✓ Marked all notifications as read", vim.log.levels.INFO)
-        -- Refresh the picker
-        picker:find()
+            vim.notify("✓ Marked all notifications as read", vim.log.levels.INFO)
+            -- Refresh the picker
+            picker:find()
+          end)
+        end)
       end,
       refresh = function(picker)
         -- Simply refresh the list
@@ -450,27 +476,34 @@ M.picker = function()
         -- Open notification in browser, marking it as read
         if not item then return end
 
-        -- First mark as read since user wants this behavior
-        mark_as_read(item)
+        -- First mark as read since user wants this behavior (async)
+        mark_as_read(item, function()
+          -- Fetch browser URL asynchronously
+          vim.system({
+            "gh",
+            "api",
+            -- Get the latest comment URL if it exists, otherwise use the API URL
+            (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
+            "--jq",
+            ".html_url",
+          }, {}, function(result)
+            vim.schedule(function()
+              if result.code ~= 0 or not result.stdout then
+                vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+                return
+              end
 
-        -- Fetch browser URL using existing logic
-        local url = vim.fn.system({
-          "gh",
-          "api",
-          -- Get the latest comment URL if it exists, otherwise use the API URL
-          (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
-          "--jq",
-          ".html_url",
-        })
-        url = vim.trim(url)
+              local url = vim.trim(result.stdout)
+              if url == "" then
+                vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+                return
+              end
 
-        if url == "" then
-          vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
-          return
-        end
-
-        -- Open in browser (no notification as requested)
-        vim.ui.open(url)
+              -- Open in browser (no notification as requested)
+              vim.ui.open(url)
+            end)
+          end)
+        end)
       end,
     },
     confirm = function(picker, item)
@@ -488,46 +521,55 @@ M.picker = function()
         vim.notify("🌐 Opening notification in browser...", vim.log.levels.INFO)
       end
 
-      -- Now mark the notification as read (this is synchronous and can be slow)
-      mark_as_read(item)
+      -- Mark the notification as read (async)
+      mark_as_read(item, function()
+        -- Close the picker
+        picker:close()
 
-      -- Close the picker
-      picker:close()
+        -- Smart routing based on notification type
+        if item.type == "PullRequest" and number then
+          -- Open native PR viewer in Neovim
+          Snacks.picker.gh_pr({ search = "#" .. number })
 
-      -- Smart routing based on notification type
-      if item.type == "PullRequest" and number then
-        -- Open native PR viewer in Neovim
-        Snacks.picker.gh_pr({ search = "#" .. number })
+        elseif item.type == "Issue" and number then
+          -- Open native Issue viewer in Neovim
+          Snacks.picker.gh_issue({ search = "#" .. number })
 
-      elseif item.type == "Issue" and number then
-        -- Open native Issue viewer in Neovim
-        Snacks.picker.gh_issue({ search = "#" .. number })
+        else
+          -- For other types (Release, Commit, Discussion), open in browser
+          -- TODO: Implement native viewers for:
+          --   - Releases (gh_release picker)
+          --   - Commits (gh_commit picker)
+          --   - Discussions (gh_discussion picker)
+          --   These would need custom implementation with Snacks.picker
 
-      else
-        -- For other types (Release, Commit, Discussion), open in browser
-        -- TODO: Implement native viewers for:
-        --   - Releases (gh_release picker)
-        --   - Commits (gh_commit picker)
-        --   - Discussions (gh_discussion picker)
-        --   These would need custom implementation with Snacks.picker
+          -- Fetch URL asynchronously
+          vim.system({
+            "gh",
+            "api",
+            -- get the latest comment URL if it exists, otherwise use the API URL
+            (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
+            "--jq",
+            ".html_url",
+          }, {}, function(result)
+            vim.schedule(function()
+              if result.code ~= 0 or not result.stdout then
+                vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+                return
+              end
 
-        local url = vim.fn.system({
-          "gh",
-          "api",
-          -- get the latest comment URL if it exists, otherwise use the API URL
-          (item.latest_comment_url and item.latest_comment_url ~= "" and item.latest_comment_url) or item.api_url,
-          "--jq",
-          ".html_url",
-        })
-        url = vim.trim(url) -- remove trailing newline
-        if url == "" then
-          vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
-          return
+              local url = vim.trim(result.stdout)
+              if url == "" then
+                vim.notify("Failed to fetch URL for notification: " .. item.title, vim.log.levels.ERROR)
+                return
+              end
+
+              -- Open in browser (notification already shown above)
+              vim.ui.open(url)
+            end)
+          end)
         end
-
-        -- Open in browser (notification already shown above)
-        vim.ui.open(url)
-      end
+      end)
     end,
     win = {
       input = {

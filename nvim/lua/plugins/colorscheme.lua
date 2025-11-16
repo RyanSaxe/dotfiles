@@ -143,7 +143,13 @@ return {
       -- so we make the background identical to the change to avoid the double-highlighting effect
       -- in mini diff, however, we do apply different styling since we can properly apply them to base
       -- and the change. NOTE: possibly could implement something similar for diffview.
-      hl["DiffText"] = { bg = c.bg }
+      hl["DiffText"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
+      -- diffview-specific diff highlights (override the plugin's defaults)
+      -- NOTE: DiffText is overridden by window namespaces (red left, green right) in diffview.lua
+      hl["DiffviewDiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.1) }
+      hl["DiffviewDiffChange"] = { bg = Util.blend_bg("#0000FF", 0.1) }
+      hl["DiffviewDiffDelete"] = { bg = Util.blend_bg("#FF0000", 0.1) }
+      hl["DiffviewDiffText"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
       hl["SnacksDiffContext"] = { bg = c.bg }
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
@@ -167,7 +173,7 @@ return {
       hl["BufferLineTruncMarker"] = { fg = c.dark3, bg = c.bg }
 
       hl["BufferLineBufferSelected"] = {
-        fg = pokemon_prominent,  -- Pokemon prominent color for active buffer
+        fg = pokemon_prominent, -- Pokemon prominent color for active buffer
         bg = c.bg,
       }
 

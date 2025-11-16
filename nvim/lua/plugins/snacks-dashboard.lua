@@ -13,5 +13,12 @@ return {
       layout = { anchor = "center" },
     },
   },
+  config = function(_, opts)
+    -- Setup snacks with opts
+    require("snacks").setup(opts)
+
+    -- Register custom GitHub actions
+    require("custom.snacks.gh").register()
+  end,
 }
 

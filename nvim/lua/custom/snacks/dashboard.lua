@@ -97,6 +97,11 @@ export POKEMON_COLOR_BRIGHT="%s"
 end
 
 local CONFIG = {
+  -- Dynamic gap configuration
+  -- When enabled, the gap between panes will match the edge margins for balanced appearance
+  -- When disabled, uses Snacks default gap of 4
+  dynamic_pane_gap = true,
+
   -- Pokemon display configuration
   pokemon = {
     -- Set to nil to select a random pokemon from the database
@@ -878,7 +883,11 @@ function M.create_sections(dashboard)
     local dynamic_width = utils.calculate_dynamic_pane_width(dashboard._size.width)
     -- Set both for Snacks internal layout AND our utility functions
     dashboard.opts.width = dynamic_width
+    dashboard.opts.pane_gap = 4 -- Initialize pane gap with default (will be recalculated later if dynamic)
     Snacks.config.dashboard.width = dynamic_width
+    -- Initialize with default values (will be recalculated later)
+    Snacks.config.dashboard.edge_margin = 4
+    Snacks.config.dashboard.pane_gap = 4
   end
 
   -- Re-check for pokemon colors (in case async generation completed)
@@ -959,7 +968,18 @@ function M.create_sections(dashboard)
     local optimized_width = utils.calculate_dynamic_pane_width(dashboard._size.width, edge_margin)
     -- Update both for Snacks internal layout AND our utility functions
     dashboard.opts.width = optimized_width
+    -- Set pane gap based on feature flag
+    local pane_gap
+    if CONFIG.dynamic_pane_gap then
+      pane_gap = edge_margin -- Use dynamic gap matching edge margins
+    else
+      pane_gap = 4 -- Use Snacks default gap
+    end
+    dashboard.opts.pane_gap = pane_gap -- Tell Snacks what gap to use
     Snacks.config.dashboard.width = optimized_width
+    -- Store both edge_margin and actual pane_gap for use in other functions
+    Snacks.config.dashboard.edge_margin = edge_margin -- Always store edge_margin
+    Snacks.config.dashboard.pane_gap = pane_gap -- Store actual gap being used
   end
 
   -- SECOND PASS: Recreate sections with the correct width for proper title alignment
