@@ -81,15 +81,11 @@ return {
     end
 
     local function loc_bg()
-      if vim.bo.readonly or not vim.bo.modifiable then
-        return C.red
-      end
-      if vim.api.nvim_buf_get_name(0) == "" then
-        return C.purple
-      end
+      -- Show yellow for modified buffers
       if vim.bo.modified then
         return C.yellow
       end
+      -- Use default gray for everything else (readonly, non-modifiable, unnamed, etc.)
       return C.gray
     end
 

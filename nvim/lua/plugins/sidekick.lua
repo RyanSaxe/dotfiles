@@ -4,6 +4,41 @@
 
 return {
   "folke/sidekick.nvim",
+  -- WORKAROUND: Prevent tmux backend from discovering external sessions
+  --
+  -- Problem: Setting mux.enabled = false only prevents CREATING new sessions in tmux,
+  -- but sidekick still REGISTERS tmux as a backend and DISCOVERS existing sessions.
+  --
+  -- In session/init.lua:124-131, the setup function registers tmux if executable,
+  -- without checking Config.cli.mux.enabled. This causes sidekick to find Claude
+  -- sessions running in other tmux windows and show a picker to select between them.
+  --
+  -- What we want: Each Neovim instance should only see its own Claude terminal,
+  -- never discover or attach to sessions from other tmux windows.
+  --
+  -- This workaround hooks into the Session module setup to prevent tmux/zellij
+  -- from ever being registered, ensuring Session.sessions() only queries the
+  -- "terminal" backend.
+  --
+  -- Ideally, sidekick should respect mux.enabled for both creation AND discovery,
+  -- but until that's fixed upstream, this workaround is necessary.
+  config = function(_, opts)
+    -- Override Session.register to block tmux/zellij registration
+    -- This must run before sidekick's setup, so we do it in config before calling setup
+    local Session = require("sidekick.cli.session")
+    local original_register = Session.register
+    Session.register = function(name, backend)
+      -- Only allow terminal backend, block tmux/zellij
+      -- this is because I often have a bunch of claude code sessions NOT managed by sidekick
+      -- and I don't want sidekick to try to attach to them
+      if name ~= "tmux" and name ~= "zellij" then
+        original_register(name, backend)
+      end
+    end
+
+    -- Now call the default sidekick setup
+    require("sidekick").setup(opts)
+  end,
   opts = {
     -- Next Edit Suggestions (NES) configuration
     nes = {
@@ -21,28 +56,29 @@ return {
 
       -- Terminal window configuration
       win = {
-        layout = "right", -- Open terminal on right side (good for wide monitors)
+        layout = "right", -- Open terminal on the right side
         split = {
-          width = 80, -- Terminal width in columns
-          height = 20, -- Terminal height (for horizontal splits)
+          width = 60, -- Terminal width in columns
+          height = 10, -- Terminal height (for horizontal splits)
         },
       },
 
-      -- Session persistence via tmux (DISABLED - Claude Code has native session management)
+      -- Session persistence via tmux (DISABLED)
+      -- if I want to restore a session, I can use /resume with Claude Code
+      -- and I would rather have all default sessions be their own unique terminal
       mux = {
-        enabled = false, -- Claude Code already handles sessions with --resume
-        backend = "tmux",
+        enabled = false,
+        -- backend = "tmux",
       },
 
       -- CLI Tools configuration - CLAUDE ONLY
       -- This overrides the default 10+ tools (aider, copilot, gemini, grok, etc.)
       tools = {
         claude = {
-          cmd = { "claude" }, -- Uses the installed Claude CLI at /opt/homebrew/bin/claude
-          -- Claude Code has native session management, no special flags needed
+          cmd = { "claude" },
         },
         -- All other tools (aider, amazon_q, codex, copilot, crush, cursor, gemini, grok, opencode, qwen) are removed
-        -- Only Claude will appear in the tool selection menu
+        -- Only Claude will appear in the tool selection menu when specifying CLI
       },
 
       -- Custom prompts for common workflows
@@ -103,22 +139,15 @@ return {
 
     -- Toggle Claude CLI terminal
     {
-      "<c-.>",
+      "<leader>ai",
       function() require("sidekick.cli").toggle() end,
-      desc = "Sidekick Toggle",
-      mode = { "n", "t", "i", "x" },
-    },
-    {
-      "<leader>aa",
-      function() require("sidekick.cli").toggle() end,
-      desc = "Sidekick Toggle CLI",
+      desc = "Sidekick Toggle Claude Code",
     },
 
-    -- Select CLI tool (will only show Claude since other tools are removed)
     {
       "<leader>as",
       function() require("sidekick.cli").select() end,
-      desc = "Select CLI",
+      desc = "Select from available CLIs",
     },
 
     -- Detach/close CLI session
@@ -153,13 +182,6 @@ return {
       function() require("sidekick.cli").prompt() end,
       mode = { "n", "x" },
       desc = "Sidekick Select Prompt",
-    },
-
-    -- Direct Claude toggle (same as <C-.> but with mnemonic <leader>ac for "AI Claude")
-    {
-      "<leader>ac",
-      function() require("sidekick.cli").toggle({ name = "claude", focus = true }) end,
-      desc = "Sidekick Toggle Claude",
     },
 
     -- Toggle NES on/off (useful for debugging or when it's distracting)
