@@ -26,19 +26,36 @@ return {
       -- Load pokemon colors from cache file (created by dashboard)
       -- This allows bufferline and other highlights to match the pokemon theme
       local pokemon_prominent = c.blue -- fallback to TokyoNight blue
+      local pokemon_bright = c.orange -- fallback to TokyoNight orange
 
       local env_file = vim.fn.expand("~/.cache/pokemon-colors.env")
       if vim.fn.filereadable(env_file) == 1 then
         -- Read and parse the env file
         local lines = vim.fn.readfile(env_file)
         for _, line in ipairs(lines) do
-          local color = line:match('POKEMON_COLOR_PROMINENT="([^"]+)"')
-          if color then
-            pokemon_prominent = color
-            break
+          local prominent = line:match('POKEMON_COLOR_PROMINENT="([^"]+)"')
+          if prominent then
+            pokemon_prominent = prominent
+          end
+          local bright = line:match('POKEMON_COLOR_BRIGHT="([^"]+)"')
+          if bright then
+            pokemon_bright = bright
           end
         end
       end
+
+      -- Snacks Picker: Override cyan -> pokemon prominent, orange -> pokemon bright
+      -- Orange highlights (input border, titles, accents)
+      hl["SnacksPickerInputBorder"] = { fg = pokemon_bright, bg = c.bg_float }
+      hl["SnacksPickerInputTitle"] = { fg = pokemon_bright, bg = c.bg_float }
+      hl["SnacksPickerBoxTitle"] = { fg = pokemon_bright, bg = c.bg_float }
+      hl["SnacksPickerPrompt"] = { fg = pokemon_bright }
+      -- Cyan/blue highlights (main borders, titles, and prominent elements)
+      hl["SnacksPickerBorder"] = { fg = pokemon_prominent, bg = c.bg_float }
+      hl["SnacksPickerTitle"] = { fg = pokemon_prominent, bg = c.bg_float }
+      hl["SnacksPickerToggle"] = { fg = pokemon_prominent, bg = Util.blend_bg(pokemon_prominent, 0.1) }
+      hl["FloatBorder"] = { fg = pokemon_prominent, bg = c.bg_float }
+      hl["FloatTitle"] = { fg = pokemon_prominent, bg = c.bg_float }
 
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
