@@ -80,7 +80,7 @@ def test_should_handle_various_numeric_inputs():
 
 # Also good: Separate tests if concepts are distinct
 def test_should_handle_negative_numbers():
-    assert calculate(--5, 3) == -2
+    assert calculate(-5, 3) == -2
 
 def test_should_handle_zeros():
     assert calculate(0, 0) == 0
