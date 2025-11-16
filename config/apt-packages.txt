@@ -21,4 +21,7 @@ ghostscript
 imagemagick
 software-properties-common
 luarocks
+ast-grep
 tldr
+tree
+claude-code

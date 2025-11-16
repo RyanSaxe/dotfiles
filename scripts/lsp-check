@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # Finishes when no diagnostic updates have occurred for QUIET_MS after an initial WAIT,
 # or when TIMEOUT is reached. Tracks updates via both vim.diagnostic.set and on_publish.
 
-JSON_OUT="lsp_diagnostics.json"
+JSON_OUT="lsp_diagnostics.local.json"
 PRINT_STDOUT=1
 VERBOSE=0
 DETAILED=0             # detailed output with all diagnostics

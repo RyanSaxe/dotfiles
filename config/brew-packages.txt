@@ -22,5 +22,6 @@ luarocks
 hammerspoon
 ast-grep
 tldr
+tree
 dust
-git-split-diffs
+claude-code
