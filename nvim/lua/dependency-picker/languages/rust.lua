@@ -5,6 +5,7 @@ local M = {}
 M.name = "Rust"
 M.filetypes = { "rust" }
 M.requires_buffer_path = true
+M.file_extensions = { "rs" }
 
 ---@param cargo_toml_path string Path to Cargo.toml file
 ---@return string[] List of crate names

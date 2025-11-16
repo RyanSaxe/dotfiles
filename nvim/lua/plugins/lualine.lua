@@ -260,8 +260,16 @@ return {
         section_separators = { left = "", right = "" },
         refresh = { statusline = 120, winbar = 120, tabline = 300 },
         disabled_filetypes = {
-          statusline = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler", "BuffergolfStats" },
-          winbar = { "dashboard", "alpha", "ministarter", "snacks_dashboard", "Fyler", "BuffergolfStats" },
+          statusline = {
+            "dashboard", "alpha", "ministarter", "snacks_dashboard",
+            "snacks_layout_box", "snacks_picker_input", "snacks_picker_list", "snacks_picker_preview",
+            "Fyler", "BuffergolfStats"
+          },
+          winbar = {
+            "dashboard", "alpha", "ministarter", "snacks_dashboard",
+            "snacks_layout_box", "snacks_picker_input", "snacks_picker_list", "snacks_picker_preview",
+            "Fyler", "BuffergolfStats"
+          },
         },
       },
 

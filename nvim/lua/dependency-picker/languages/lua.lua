@@ -5,6 +5,7 @@ local M = {}
 M.name = "Lua"
 M.filetypes = { "lua" }
 M.requires_buffer_path = true
+M.file_extensions = { "lua" }
 
 ---@param base_path string Base luarocks path
 ---@return string[] List of paths to scan

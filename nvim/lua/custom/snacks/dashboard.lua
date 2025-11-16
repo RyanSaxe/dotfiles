@@ -1,10 +1,20 @@
 -- dashboard.lua  ── custom git dashboard configuration for Snacks.nvim
 -- Contains all dashboard sections, keys, and layout logic
+--
+-- TODO: Future dashboard improvements
+-- 1. Replace "Find Project" with daily note functionality
+-- 2. Replace grep with workspace diagnostics searching once proper LSP support
+--    is figured out for most regularly used LSPs
+-- 3. Dashboard philosophy: Provide keybinds for common operations when opening
+--    neovim for a project that ARE NOT common keymaps during normal coding.
+--    Normal keymaps still work and muscle memory knows them - the dashboard is
+--    for operations that are contextual to "just opened the project"
 
 local utils = require("custom.snacks.utils")
-local git_pickers = require("custom.git.pickers")
+local notifications = require("custom.git.notifications")
 local git_utils = require("custom.git.utils")
 local visual_utils = require("custom.visual.utils")
+local todos = require("custom.todos")
 
 local M = {}
 
@@ -87,6 +97,11 @@ export POKEMON_COLOR_BRIGHT="%s"
 end
 
 local CONFIG = {
+  -- Dynamic gap configuration
+  -- When enabled, the gap between panes will match the edge margins for balanced appearance
+  -- When disabled, uses Snacks default gap of 4
+  dynamic_pane_gap = true,
+
   -- Pokemon display configuration
   pokemon = {
     -- Set to nil to select a random pokemon from the database
@@ -164,71 +179,79 @@ local CONFIG = {
 
 -- Calculate pokemon selection and colors (only done once at startup)
 -- This ensures the pokemon doesn't change on dashboard redraws
+-- Colors are always initialized regardless of pane count, but sprite only shows in dual-pane mode
 local pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, color_sources, force_regenerate_active
 
--- Only calculate if we would show a pokemon (has two panes)
-if utils.show_if_has_second_pane() then
-  if CONFIG.pokemon.name == nil then
-    -- Random selection from database
-    pokemon_name, pokemon_shiny, pokemon_form = visual_utils.select_random_pokemon()
-  else
-    -- Use configured pokemon
-    pokemon_name = CONFIG.pokemon.name
-    pokemon_shiny = CONFIG.pokemon.is_shiny
-    pokemon_form = CONFIG.pokemon.form
-  end
+-- Always select and load pokemon colors, even in single-pane mode
+-- This ensures consistent theming across dashboard, tmux, and shell
+if CONFIG.pokemon.name == nil then
+  -- Random selection from database
+  pokemon_name, pokemon_shiny, pokemon_form = visual_utils.select_random_pokemon()
+else
+  -- Use configured pokemon
+  pokemon_name = CONFIG.pokemon.name
+  pokemon_shiny = CONFIG.pokemon.is_shiny
+  pokemon_form = CONFIG.pokemon.form
+end
 
-  -- Build color sources config to pass through to generation
-  -- This ensures regenerated colors use the same configuration
-  color_sources = {
-    title_source = CONFIG.colors.title_source,
-    key_source = CONFIG.colors.key_source,
-    desc_source = CONFIG.colors.desc_source,
-    title_brighten = CONFIG.colors.title_brighten,
-    key_brighten = CONFIG.colors.key_brighten,
-    desc_brighten = CONFIG.colors.desc_brighten,
-    title_dim = CONFIG.colors.title_dim,
-    key_dim = CONFIG.colors.key_dim,
-    desc_dim = CONFIG.colors.desc_dim,
-  }
+-- Build color sources config to pass through to generation
+-- This ensures regenerated colors use the same configuration
+color_sources = {
+  title_source = CONFIG.colors.title_source,
+  key_source = CONFIG.colors.key_source,
+  desc_source = CONFIG.colors.desc_source,
+  title_brighten = CONFIG.colors.title_brighten,
+  key_brighten = CONFIG.colors.key_brighten,
+  desc_brighten = CONFIG.colors.desc_brighten,
+  title_dim = CONFIG.colors.title_dim,
+  key_dim = CONFIG.colors.key_dim,
+  desc_dim = CONFIG.colors.desc_dim,
+}
 
-  -- Load color data for the selected pokemon
-  -- This will auto-generate if not in database (async)
-  pokemon_colors = visual_utils.ensure_pokemon_colors(
-    pokemon_name,
-    pokemon_shiny,
-    pokemon_form,
-    function()
-      -- Callback: when generation completes, re-export colors and update the dashboard
-      local updated_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
-      if updated_colors then
-        export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, updated_colors, CONFIG.colors.background_mode)
-      end
-      if Snacks and Snacks.dashboard and Snacks.dashboard.update then
-        Snacks.dashboard.update()
-      end
-    end,
-    CONFIG.colors.background_mode,
-    CONFIG.generation, -- Pass generation config (force_regenerate, colorfulness_threshold)
-    color_sources -- Pass color sources config for consistent application after generation
-  )
+-- Load color data for the selected pokemon
+-- This will auto-generate if not in database (async)
+pokemon_colors = visual_utils.ensure_pokemon_colors(
+  pokemon_name,
+  pokemon_shiny,
+  pokemon_form,
+  function()
+    -- Callback: when generation completes, re-export colors and update the dashboard
+    local updated_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
+    if updated_colors then
+      export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, updated_colors, CONFIG.colors.background_mode)
+    end
+    if Snacks and Snacks.dashboard and Snacks.dashboard.update then
+      Snacks.dashboard.update()
+    end
+  end,
+  CONFIG.colors.background_mode,
+  CONFIG.generation, -- Pass generation config (force_regenerate, colorfulness_threshold)
+  color_sources -- Pass color sources config for consistent application after generation
+)
 
-  -- Track if force_regenerate is active to ensure colors are reloaded on every dashboard render
-  -- This prevents stale cached colors from being re-applied after async regeneration completes
-  force_regenerate_active = CONFIG.generation.force_regenerate
+-- Track if force_regenerate is active to ensure colors are reloaded on every dashboard render
+-- This prevents stale cached colors from being re-applied after async regeneration completes
+force_regenerate_active = CONFIG.generation.force_regenerate
 
-  if pokemon_colors then
-    -- Apply colors to Snacks dashboard highlight groups
-    -- Pass background_mode configuration, color source overrides, and adjustments
-    visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
+if pokemon_colors then
+  -- Apply colors to Snacks dashboard highlight groups
+  -- Pass background_mode configuration, color source overrides, and adjustments
+  visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
 
-    -- Export pokemon colors to env file for tmux/shell integration
-    export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, CONFIG.colors.background_mode)
-  end
+  -- Export pokemon colors to env file for tmux/shell integration
+  export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, CONFIG.colors.background_mode)
 end
 
 -- Check if we should show recent project toggle based on context
-local function recent_project_toggle()
+-- Now accepts optional force_hide parameter to override normal logic
+---@param force_hide? boolean Optional flag to force disable recent files
+---@return boolean enabled Whether recent files should be shown
+local function recent_project_toggle(force_hide)
+  -- If force_hide is true, always return false
+  if force_hide then
+    return false
+  end
+
   local in_git = Snacks.git.get_root() ~= nil
   local has_two_panes = utils.show_if_has_second_pane()
   -- if in git and has one pane, then we disable
@@ -266,18 +289,8 @@ local function validate_position(position)
   return "middle-middle"
 end
 
----Evaluate if a section is enabled (handles both function and boolean)
----@param section table Section configuration
----@return boolean enabled Whether the section is enabled
-local function is_section_enabled(section)
-  if section.enabled == nil then
-    return true -- Default to enabled if not specified
-  end
-  if type(section.enabled) == "function" then
-    return section.enabled() -- Call the function to get boolean result
-  end
-  return section.enabled -- Use the boolean value directly
-end
+-- Note: is_section_enabled has been moved to utils.lua for reuse
+-- Use utils.is_section_enabled throughout this file
 
 ---Calculate heights for both panes in a single pass through sections
 ---@param sections table Array of all section configurations
@@ -287,7 +300,7 @@ local function calculate_pane_heights(sections)
   local heights = { [1] = 0, [2] = 0 }
 
   for _, section in ipairs(sections) do
-    if is_section_enabled(section) and section.pane then
+    if utils.is_section_enabled(section) and section.pane then
       local pane = section.pane
 
       -- Add main content height
@@ -329,32 +342,17 @@ local function search_keys()
       desc = "Grep Dependencies",
       key = "s",
       action = function()
-        -- TODO: this currently only works with python projects ... generalize to other languages
-        vim.cmd("GrepVenvSelectPackage")
+        require("dependency-picker").manual_search("grep")
       end,
     },
     {
       desc = "Open TODO List",
       key = "t",
       action = function()
-        Snacks.scratch.open({
-          name = "TODO", -- this name makes it such that checkmate.nvim runs on this.
-          ft = "markdown",
-        })
+        todos.open_todo()
       end,
     },
   }
-
-  local find_file_base = { key = "f", desc = "Find File" }
-  table.insert(
-    keys,
-    utils.different_key_if_condition(
-      Snacks.git.get_root() ~= nil,
-      find_file_base,
-      { action = ":lua Snacks.dashboard.pick('git_files')" },
-      { action = ":lua Snacks.dashboard.pick('files')" }
-    )
-  )
 
   return utils.create_pane(header, keys, 2)
 end
@@ -394,11 +392,6 @@ local function globalkeys()
       enabled = package.loaded.lazy ~= nil,
     },
     { key = "r", desc = "Restore Session", section = "session" },
-    {
-      key = "c",
-      desc = "Search Neovim Config",
-      action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
-    },
   }
 
   return utils.create_pane(header, keys, 2)
@@ -406,14 +399,21 @@ end
 
 -- Get recent files for the dashboard
 -- Returns sections and total height
+-- Now accepts optional force_hide parameter to override normal logic
+---@param force_hide? boolean Optional flag to force disable recent files
 ---@return table sections Array of section configs
 ---@return number height Total height of this section
-local function get_recent_files()
+local function get_recent_files(force_hide)
   local out = {}
-  local max_files = 5
+  local max_files = 4
   local recent_files = utils.recent_files_in_cwd(max_files)
   local n_files = #recent_files
   local pane = Snacks.git.get_root() and 2 or 1
+
+  -- Create a function that includes force_hide in its closure
+  local function enabled_check()
+    return recent_project_toggle(force_hide)
+  end
 
   for i, rel in ipairs(recent_files) do
     out[#out + 1] = {
@@ -425,15 +425,10 @@ local function get_recent_files()
       action = function()
         vim.cmd("edit " .. rel)
       end,
-      enabled = recent_project_toggle,
+      enabled = enabled_check,
     }
   end
-  local final_padding
-  if pane == 2 then
-    final_padding = max_files - n_files + 1
-  else
-    final_padding = max_files - n_files + 2
-  end
+  local final_padding = max_files - n_files + 1
 
   -- Calculate height: files + final_padding
   -- Note: The "Recent Files" title is added separately in create_sections()
@@ -446,17 +441,22 @@ local function get_recent_files()
     pane = pane,
     indent = 0,
     padding = final_padding,
-    enabled = recent_project_toggle,
+    enabled = enabled_check,
   }
   if pane == 2 then
     out[#out + 1] = {
       pane = 2,
       padding = 0,
       indent = 0,
-      title = "------------------------------------------------------------",
-      enabled = recent_project_toggle,
+      title = utils.create_separator(),
+      enabled = enabled_check,
     }
     height = height + 1
+  end
+
+  -- If force_hide is true, return 0 height to reflect that sections are hidden
+  if force_hide then
+    height = 0
   end
 
   return out, height
@@ -499,10 +499,6 @@ local function calculate_horizontal_position(sprite_width, pane_width, position)
 
   -- Handle overflow: if sprite is wider than pane, just left-align
   if sprite_width > pane_width then
-    vim.notify(
-      string.format("Pokemon sprite (width %d) is wider than pane (width %d), left-aligning", sprite_width, pane_width),
-      vim.log.levels.WARN
-    )
     indent = 0
   end
 
@@ -530,14 +526,6 @@ local function calculate_vertical_position(sprite_height, section_height, positi
 
   -- Handle overflow: if sprite is taller than section, allocate all to sprite
   if available_space < 0 then
-    vim.notify(
-      string.format(
-        "Pokemon sprite (height %d) is taller than section (height %d), no padding",
-        sprite_height,
-        section_height
-      ),
-      vim.log.levels.WARN
-    )
     return 0, 0
   end
 
@@ -569,11 +557,18 @@ end
 ---@param current_branch string Current branch name
 ---@return table sections Array of git section configs
 ---@return number height Total height of git sections (0 if not in git)
-local function create_git_sections(base_branch, current_branch)
+-- Create git sections with optional force_hide parameter
+-- When force_hide is true, sections are created but disabled for height calculation
+---@param base_branch string Base branch name (usually main or master)
+---@param current_branch string Current branch name
+---@param force_hide? boolean Optional flag to force disable git sections
+---@return table sections Array of git section configs
+---@return number height Total height of git sections
+local function create_git_sections(base_branch, current_branch, force_hide)
   local in_git = Snacks.git.get_root() ~= nil
 
-  -- If not in git repo, return empty sections with 0 height
-  if not in_git then
+  -- If not in git repo or forced to hide, return empty sections with 0 height
+  if not in_git or force_hide then
     return {}, 0
   end
 
@@ -604,11 +599,12 @@ local function create_git_sections(base_branch, current_branch)
     },
     {
       pane = 1,
-      desc = string.format("Search Diff vs %s", base_branch),
+      desc = string.format("Open Diff vs %s", base_branch),
       key = "d",
       indent = 0,
       action = function()
-        git_pickers.diff_picker(base_branch)
+        local diff = require("custom.git.diff")
+        diff.fetch_and_diff(base_branch)
       end,
       enabled = in_git,
     },
@@ -636,8 +632,8 @@ local function create_git_sections(base_branch, current_branch)
     {
       pane = 1,
       indent = 0,
-      -- 60 ticks is exactly the size of a line (width 60, indent = 0)
-      title = "------------------------------------------------------------",
+      -- Dynamic separator line that scales with pane width
+      title = utils.create_separator(),
       padding = 1,
       enabled = in_git,
     },
@@ -648,7 +644,7 @@ local function create_git_sections(base_branch, current_branch)
       indent = 0,
       action = function()
         vim.notify("Fetching Notifications from GitHub...")
-        vim.defer_fn(git_pickers.notification_picker, 100)
+        vim.defer_fn(notifications.picker, 100)
       end,
       enabled = in_git,
     },
@@ -658,8 +654,7 @@ local function create_git_sections(base_branch, current_branch)
       indent = 0,
       key = "P",
       action = function()
-        vim.notify("Fetching open PRs from GitHub...")
-        vim.defer_fn(git_pickers.pr_picker, 100)
+        Snacks.picker.gh_pr()
       end,
       enabled = in_git,
     },
@@ -669,8 +664,7 @@ local function create_git_sections(base_branch, current_branch)
       key = "I",
       indent = 0,
       action = function()
-        vim.notify("Fetching open issues from GitHub...")
-        vim.defer_fn(git_pickers.issue_picker, 100)
+        Snacks.picker.gh_issue()
       end,
       enabled = in_git,
     },
@@ -687,20 +681,19 @@ local function create_git_sections(base_branch, current_branch)
     },
   }
 
-  -- Calculate height:
-  -- 1 (Git title) + 2 (title padding) +
-  -- 4 (branch, diff, uncommitted, lazygit) + 1 (lazygit padding) +
-  -- 1 (separator) + 1 (separator padding) +
-  -- 4 (notifications, PRs, issues, browse) + 2 (browse padding)
-  local height = 1 + 2 + 4 + 1 + 1 + 1 + 4 + 2
+  -- Calculate height dynamically from sections
+  -- This replaces the hardcoded calculation and ensures accuracy
+  local height = utils.calculate_section_group_height(sections)
 
   return sections, height
 end
 
 ---Create pokemon section with fixed height matching other pane
 ---@param target_height number Total height this section must occupy
+---@param hide_git? boolean Whether git sections are hidden
+---@param hide_recent? boolean Whether recent files sections are hidden
 ---@return table sections Pokemon section configuration
-local function create_pokemon_section(target_height)
+local function create_pokemon_section(target_height, hide_git, hide_recent)
   -- Validate position configuration
   local position = validate_position(CONFIG.pokemon.position)
 
@@ -720,16 +713,31 @@ local function create_pokemon_section(target_height)
     }
   end
 
-  -- Get pane width from Snacks configuration (respects user customizations)
-  local pane_width = Snacks.config.dashboard.width or 60
-
   -- Calculate horizontal position (indent)
-  local indent = calculate_horizontal_position(sprite_width, pane_width, position)
+  -- Uses Snacks.config.dashboard.width which is set dynamically by create_sections()
+  local indent = calculate_horizontal_position(sprite_width, Snacks.config.dashboard.width, position)
 
   -- Calculate vertical position within fixed-height section
-  -- Note: We need to account for the startup time line (1 line) at the bottom
-  -- So the actual available height for pokemon positioning is target_height - 1
-  local pokemon_section_height = target_height - 4
+  -- Note: We need to account for the startup time line and extra padding sources that somehow are not identified
+  -- which ends up being different if there is one or two panes.
+
+  local pokemon_section_height = target_height
+
+  local in_git = Snacks.git.get_root() ~= nil
+  local both_hidden = hide_git and hide_recent
+
+  -- Adjust height based on what sections are shown:
+  -- - If both git and recent are hidden: -3
+  -- - If has two panes and in git: -4
+  -- - Otherwise: -2
+  if both_hidden then
+    pokemon_section_height = target_height - 3
+  elseif utils.show_if_has_second_pane() and in_git then
+    pokemon_section_height = target_height - 4
+  else
+    pokemon_section_height = target_height - 2
+  end
+  -- local pokemon_section_height = target_height - 4
   local padding_top, padding_bottom = calculate_vertical_position(sprite_height, pokemon_section_height, position)
 
   -- Build pokemon command with correct -b flag
@@ -768,8 +776,120 @@ local function create_pokemon_section(target_height)
   }
 end
 
+-- Helper function to create all non-pokemon sections
+-- Extracted to allow two-pass creation for proper width calculation
+-- Now accepts optional hiding flags to control git and recent files visibility
+---@param in_git boolean Whether we're in a git repository
+---@param base_branch string Base branch name (usually main or master)
+---@param current_branch string Current branch name
+---@param hide_git? boolean Optional flag to force hide git sections
+---@param hide_recent? boolean Optional flag to force hide recent files sections
+local function create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+  -- Build all section groups (must be inside helper to use correct width)
+  -- Pass hiding flags to the relevant section creators
+  local search_sections, _ = search_keys()
+  local files_sections, _ = get_recent_files(hide_recent)
+  local git_sections, _ = create_git_sections(base_branch, current_branch, hide_git)
+  local global_sections, _ = globalkeys()
+
+  local sections = {}
+
+  -- Add top padding if we're in tmux OR not in fullscreen
+  -- Tmux statusline and window decorations make things not look centered
+  -- So we add a little padding to make it look centered
+  local in_tmux = vim.env.TMUX ~= nil
+  local terminal_height = vim.o.lines
+  -- Consider it "not fullscreen" if height is less than 50 lines
+  -- Most fullscreen terminals are 50+ lines, windowed ones are typically 24-40
+  local not_fullscreen = terminal_height < 50
+
+  if in_tmux or not_fullscreen then
+    table.insert(sections, {
+      pane = 1,
+      padding = 1,
+    })
+    -- Only add padding for pane 2 if it will actually be shown
+    if utils.show_if_has_second_pane() then
+      table.insert(sections, {
+        pane = 2,
+        padding = 1,
+      })
+    end
+  end
+
+  -- Add separator to pane 2 for visual balance in these cases:
+  -- 1. When BOTH git and recent are hidden (always show for visual balance)
+  -- 2. When recent files are in pane 1 (not in git) and shown
+  -- 3. When recent files would be in pane 2 (in git) but are hidden
+  local both_hidden = hide_git and hide_recent
+  local show_pane2_separator = utils.show_if_has_second_pane() and (
+    both_hidden or                                           -- Case 1: Both hidden, always need separator
+    (not in_git and recent_project_toggle(hide_recent)) or  -- Case 2: Recent in left pane and shown
+    (in_git and not recent_project_toggle(hide_recent))      -- Case 3: Recent would be in right pane but hidden
+  )
+
+  if show_pane2_separator then
+    table.insert(sections, {
+      pane = 2,
+      title = utils.create_separator(),
+      indent = 0,
+      padding = 0,
+    })
+  end
+
+  -- Search keys section
+  vim.list_extend(sections, search_sections)
+
+  -- Recent files title
+  -- Create enabled function that checks hide_recent flag
+  local function recent_title_enabled()
+    return recent_project_toggle(hide_recent)
+  end
+
+  table.insert(sections, {
+    title = utils.create_aligned_title("Recent Files", utils.get_recent_file_time()),
+    pane = in_git and 2 or 1,
+    indent = 0,
+    padding = 2,
+    enabled = recent_title_enabled,
+  })
+
+  -- Recent files entries
+  vim.list_extend(sections, files_sections)
+
+  -- Git sections (automatically disabled if not in git via enabled field)
+  vim.list_extend(sections, git_sections)
+
+  -- Global keys section
+  vim.list_extend(sections, global_sections)
+
+  -- Time section
+  table.insert(sections, {
+    pane = 1,
+    title = utils.create_aligned_title("Time", os.date("%H:%M")),
+    indent = 0,
+  })
+
+  return sections
+end
+
 -- Create all dashboard sections
-function M.create_sections()
+-- Called by Snacks dashboard with self (dashboard instance) as parameter
+---@param dashboard snacks.dashboard.Class Dashboard instance
+function M.create_sections(dashboard)
+  -- Always set initial dynamic pane width for responsive layout
+  -- This will be recalculated after height calculation for perfect centering
+  if dashboard and dashboard._size then
+    local dynamic_width = utils.calculate_dynamic_pane_width(dashboard._size.width)
+    -- Set both for Snacks internal layout AND our utility functions
+    dashboard.opts.width = dynamic_width
+    dashboard.opts.pane_gap = 4 -- Initialize pane gap with default (will be recalculated later if dynamic)
+    Snacks.config.dashboard.width = dynamic_width
+    -- Initialize with default values (will be recalculated later)
+    Snacks.config.dashboard.edge_margin = 4
+    Snacks.config.dashboard.pane_gap = 4
+  end
+
   -- Re-check for pokemon colors (in case async generation completed)
   -- Always reload when force_regenerate is active to pick up newly regenerated colors
   if (not pokemon_colors or force_regenerate_active) and pokemon_name then
@@ -790,64 +910,91 @@ function M.create_sections()
   local current_branch = git_utils.get_current_branch()
   local in_git = Snacks.git.get_root() ~= nil
 
-  -- Build all section groups (ignore returned heights - we'll calculate dynamically)
-  local search_sections, _ = search_keys()
-  local files_sections, _ = get_recent_files()
-  local git_sections, _ = create_git_sections(base_branch, current_branch)
-  local global_sections, _ = globalkeys()
+  -- FIRST PASS: Create sections to calculate height
+  -- This pass is only for height calculation, sections will be recreated
+  local temp_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch)
 
-  -- Flatten ALL sections (except pokemon) into one list for dynamic height calculation
-  local all_sections = {
-    -- start with some light padding at the top
-    -- this is because the tmux statusline makes things not look centered
-    -- so we add a little padding to make it look centered if you ignore the statusline
-    {
-      pane = 1,
-      padding = 1,
-    },
-    {
-      pane = 2,
-      padding = 1,
-    },
-  }
+  -- ✨ Calculate both pane heights from first pass
+  local pane1_height, pane2_height = calculate_pane_heights(temp_sections)
 
-  -- Search keys section
-  vim.list_extend(all_sections, search_sections)
+  -- Check if we need to hide sections due to height constraints
+  local hide_git, hide_recent = false, false
+  if dashboard and dashboard._size then
+    local terminal_height = dashboard._size.height
 
-  -- Recent files title
-  table.insert(all_sections, {
-    title = utils.create_aligned_title("Recent Files", utils.get_recent_file_time()),
-    pane = in_git and 2 or 1,
-    indent = 0,
-    padding = 2,
-    enabled = recent_project_toggle,
-  })
+    -- If pane 1 height exceeds terminal height, we need to hide sections
+    if pane1_height > terminal_height then
+      -- Calculate the height of git and recent files sections from temp_sections
+      local git_height = utils.calculate_git_sections_height(temp_sections)
+      local recent_height = utils.calculate_recent_files_height(temp_sections)
 
-  -- Recent files entries
-  vim.list_extend(all_sections, files_sections)
+      -- Simple strategy: hide both if their combined height would make it fit
+      local reduced_height = pane1_height - git_height - recent_height
+      if reduced_height <= terminal_height then
+        hide_git = true
+        hide_recent = true
 
-  -- Git sections (automatically disabled if not in git via enabled field)
-  vim.list_extend(all_sections, git_sections)
+        -- Recalculate heights with hiding flags to get accurate new heights
+        temp_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+        pane1_height, pane2_height = calculate_pane_heights(temp_sections)
+      else
+        -- Even with both hidden, still too tall - hide them anyway for best effort
+        hide_git = true
+        hide_recent = true
 
-  -- Global keys section
-  vim.list_extend(all_sections, global_sections)
+        vim.notify("Dashboard content still exceeds terminal height even with sections hidden", vim.log.levels.WARN)
 
-  -- Time section
-  table.insert(all_sections, {
-    pane = 1,
-    title = utils.create_aligned_title("Time", os.date("%H:%M")),
-    indent = 0,
-  })
+        -- Recalculate heights with hiding flags
+        temp_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+        pane1_height, pane2_height = calculate_pane_heights(temp_sections)
+      end
+    end
+  end
 
-  -- ✨ Calculate both pane heights in a single pass
-  local pane1_height, pane2_height = calculate_pane_heights(all_sections)
+  -- 🎨 Recalculate width with exact vertical margin for perfect centering
+  -- Account for terminal character aspect ratio (chars are taller than wide)
+  if dashboard and dashboard._size then
+    -- Calculate vertical margin in rows (using dashboard height for accuracy)
+    local vertical_margin_rows = math.max(math.floor((dashboard._size.height - pane1_height) / 2), 0)
+
+    -- on my setup this looks right --- unclear how to make this dynamic
+    local aspect_ratio = 2.5 -- Adjust this if your font looks different
+
+    -- Convert vertical rows to equivalent horizontal columns
+    local equivalent_horizontal_margin = math.floor(vertical_margin_rows * aspect_ratio)
+
+    -- Use max(4, ...) as minimum padding for aesthetics
+    local edge_margin = math.max(4, equivalent_horizontal_margin)
+    local optimized_width = utils.calculate_dynamic_pane_width(dashboard._size.width, edge_margin)
+    -- Update both for Snacks internal layout AND our utility functions
+    dashboard.opts.width = optimized_width
+    -- Set pane gap based on feature flag
+    local pane_gap
+    if CONFIG.dynamic_pane_gap then
+      pane_gap = edge_margin -- Use dynamic gap matching edge margins
+    else
+      pane_gap = 4 -- Use Snacks default gap
+    end
+    dashboard.opts.pane_gap = pane_gap -- Tell Snacks what gap to use
+    Snacks.config.dashboard.width = optimized_width
+    -- Store both edge_margin and actual pane_gap for use in other functions
+    Snacks.config.dashboard.edge_margin = edge_margin -- Always store edge_margin
+    Snacks.config.dashboard.pane_gap = pane_gap -- Store actual gap being used
+  end
+
+  -- SECOND PASS: Recreate sections with the correct width for proper title alignment
+  -- This two-pass approach ensures that titles are aligned with the final calculated width
+  -- Now also applies the hiding flags determined in Pass 1
+  -- Performance impact is negligible (microseconds) as we're just creating Lua tables
+  local final_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
 
   -- Create pokemon section to fill the gap between pane2 and pane1
   -- This ensures both panes have identical total heights
-  local pokemon_sections = create_pokemon_section(pane1_height - pane2_height)
-  vim.list_extend(all_sections, pokemon_sections)
+  -- Pass hiding flags to adjust height calculation properly
+  local pokemon_sections = create_pokemon_section(pane1_height - pane2_height, hide_git, hide_recent)
+  vim.list_extend(final_sections, pokemon_sections)
 
-  return all_sections
+  return final_sections
 end
 
 return M

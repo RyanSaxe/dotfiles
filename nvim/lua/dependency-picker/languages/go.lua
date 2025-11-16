@@ -5,6 +5,7 @@ local M = {}
 M.name = "Go"
 M.filetypes = { "go" }
 M.requires_buffer_path = true
+M.file_extensions = { "go" }
 
 ---@param go_mod_path string Path to go.mod file
 ---@return string[] List of module paths
