@@ -2,30 +2,40 @@
 
 Do not forget anything in this file. It specifies global rules for all actions you take.
 
+## Structure
+
+This configuration uses a **skills-based architecture**:
+- **skills/**: Auto-invoked by Claude based on context (language-specific rules, code practices)
+- **references/**: Detailed documentation linked from skills and this file
+
 ## Code Quality & Style
 
-- **Minimal comments**: Only add comments when absolutely necessary - prefer self-documenting code.
-- **Simple solutions**: Choose the simplest approach that works - avoid over-engineering.
-- **Follow existing patterns**: Your code should match the style and structure of the existing codebase.
+- **Minimal comments**: Only when absolutely necessary - prefer self-documenting code
+- **Simple solutions**: Simplest approach that works - avoid over-engineering
+- **Follow existing patterns**: Match the style and structure of the existing codebase
+
+**Further reading**: [Style Guide](references/style.md)
 
 ## Development Workflow
 
-- **Atomic commits**: An atomic commit is a single, self-contained change in code that does one thing, is complete on its own, and can be applied or reverted without breaking the project. You are expected to work with this practice. Ask permission to commit your changes whenever you believe it is appropriate according to this definition.
-- **Read before writing**: Always examine existing code structure before making changes.
-- **Use TDD**: Write tests before implementing features or fixing bugs when appropriate.
-- **Test your changes**: A feature is not complete until it has been tested and verified to work as intended.
+- **Atomic commits**: Single, self-contained change. Ask permission to commit when appropriate
+- **Read before writing**: Examine existing code structure before making changes
+- **Use TDD when appropriate**: Write tests first for features/bugs when it makes sense
+- **Test your changes**: Feature isn't complete until tested and verified
 
-## Command Line Tool Specifications
+**Further reading**: [Development Workflow](references/development.md), [Testing Guide](references/testing.md)
 
-- use `fd` instead of `find` for file searching.
-- use `rg` (ripgrep) instead of `grep` for searching within files.
-- use `sg` (ast-grep) instead of `rg` for more complex code searching.
-- use `tldr` for quick references on command usage.
-- use `--help` flag and `man` pages for detailed command documentation.
+## Command Line Tools
 
-## Environment Assumptions
+- **File search**: `fd` (NOT `find`)
+- **Content search**: `rg` / ripgrep (NOT `grep`)
+- **Structural code search**: `sg` / ast-grep (for complex patterns)
+- **Quick reference**: `tldr`
+- **Detailed docs**: `--help` flag and `man` pages
+
+## Environment
 
 - **Shell**: zsh with oh-my-zsh
 - **Package manager**: homebrew (macOS)
-- **Python environment**: `uv` for dependencies and virtual environments unless the project clearly uses `poetry`.
-- **Dotfiles**: You can find dotfiles specified in `~/generic/dotfiles`. You can find where they are linked in `~/generic/dotfiles/scripts/symlink.sh`.
+- **Python**: `uv` for dependencies/virtualenvs (unless project uses `poetry`)
+- **Dotfiles**: `~/generic/dotfiles` (symlink mappings in `scripts/symlink.sh`)

@@ -18,6 +18,8 @@ claude/*
 !claude/statusline.sh
 !claude/claude-utils.sh
 !claude/send-notification.sh
+!claude/skills/
+!claude/references/
 ipython/*
 !ipython/profile_default/
 ipython/profile_default/*
