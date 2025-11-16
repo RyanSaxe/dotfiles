@@ -153,6 +153,10 @@ return {
       },
       source = diff_source,
       cond = function()
+        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
+        if vim.bo.buftype == "terminal" then
+          return false
+        end
         -- Hide winbar for buffergolf practice and reference buffers
         return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
       end,
@@ -164,6 +168,10 @@ return {
         return " "
       end,
       cond = function()
+        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
+        if vim.bo.buftype == "terminal" then
+          return false
+        end
         -- Hide winbar for buffergolf practice and reference buffers
         return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
       end,
@@ -207,6 +215,10 @@ return {
         return string.format("%d  ", total_hunks) -- Copilot icon with hunk count
       end,
       cond = function()
+        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
+        if vim.bo.buftype == "terminal" then
+          return false
+        end
         -- Hide for buffergolf buffers
         if vim.b.buffergolf_practice or vim.b.buffergolf_reference then
           return false

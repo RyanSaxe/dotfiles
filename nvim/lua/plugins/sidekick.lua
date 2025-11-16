@@ -140,8 +140,8 @@ return {
     -- Toggle Claude CLI terminal
     {
       "<leader>ai",
-      function() require("sidekick.cli").toggle() end,
-      desc = "Sidekick Toggle Claude Code",
+      function() require("sidekick.cli").toggle({ name = "claude", focus = true }) end,
+      desc = "Sidekick Toggle Claude",
     },
 
     {
