@@ -189,6 +189,6 @@ If the package isn't installed locally:
 ## Related Resources
 
 - [ast-grep guide](../../../references/tools/ast-grep.md) - Complete structural search patterns
-- [Python skill](../../language/python/SKILL.md) - Python package exploration
-- [Neovim skill](../../language/neovim/SKILL.md) - Plugin exploration
+- [Python skill](../lang-python/SKILL.md) - Python package exploration
+- [Neovim skill](../lang-neovim/SKILL.md) - Plugin exploration
 - [Development workflow](../../../references/development.md) - Development process

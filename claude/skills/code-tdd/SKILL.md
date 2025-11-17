@@ -171,8 +171,8 @@ Keep the cycle tight - minutes per iteration.
 ## Language-Specific Testing
 
 For testing frameworks and patterns:
-- **Python**: [python skill](../../language/python/SKILL.md) - pytest patterns
-- **Lua/Neovim**: [neovim skill](../../language/neovim/SKILL.md) - mini.test patterns
+- **Python**: [python skill](../lang-python/SKILL.md) - pytest patterns
+- **Lua/Neovim**: [neovim skill](../lang-neovim/SKILL.md) - mini.test patterns
 - **JavaScript/TypeScript**: Check project for vitest/jest setup
 
 Claude will auto-invoke the relevant language skill for your context.
@@ -184,5 +184,5 @@ Claude will auto-invoke the relevant language skill for your context.
 - [Testing guide](../../../references/testing.md) - Comprehensive patterns and philosophy
 - [Clean code](../clean/SKILL.md) - Refactoring step of TDD cycle
 - [Development workflow](../../../references/development.md) - Where TDD fits in process
-- [Python testing](../../language/python/SKILL.md) - pytest specifics
-- [Neovim testing](../../language/neovim/SKILL.md) - mini.test specifics
+- [Python testing](../lang-python/SKILL.md) - pytest specifics
+- [Neovim testing](../lang-neovim/SKILL.md) - mini.test specifics

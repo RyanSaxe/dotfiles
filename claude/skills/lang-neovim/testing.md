@@ -121,7 +121,7 @@ assert.matches("pattern", string)
 - Use `before_each`/`after_each` for setup/teardown
 - Test one concept per test (multiple assertions are fine if related)
 - Test error cases and nil handling
-- See [TDD skill](../../code/tdd/SKILL.md) for test-driven development workflow
+- See [TDD skill](../code-tdd/SKILL.md) for test-driven development workflow
 
 ## Testing Configuration
 
@@ -138,5 +138,5 @@ nvim --startuptime startup.log
 
 ## Related
 
-- [TDD skill](../../code/tdd/SKILL.md) - Test-driven development workflow
+- [TDD skill](../code-tdd/SKILL.md) - Test-driven development workflow
 - [Testing guide](../../../references/testing.md) - General testing patterns

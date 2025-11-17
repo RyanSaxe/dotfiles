@@ -146,7 +146,7 @@ pytest -n auto
 - **AAA structure**: Arrange, Act, Assert - clear separation
 - **Use fixtures**: For common setup/teardown
 - **One concept per test**: Multiple assertions OK if testing same concept
-- See [TDD skill](../../code/tdd/SKILL.md) for test-driven workflow
+- See [TDD skill](../code-tdd/SKILL.md) for test-driven workflow
 
 [Complete testing patterns →](../../../references/testing.md)
 
@@ -252,5 +252,5 @@ uv run pytest
 - [uv tool guide](../../../references/tools/uv.md) - Environment and dependency management
 - [Style guide](../../../references/style.md) - General code style
 - [Testing patterns](../../../references/testing.md) - Comprehensive testing guidance
-- [TDD workflow](../../code/tdd/SKILL.md) - Test-driven development
+- [TDD workflow](../code-tdd/SKILL.md) - Test-driven development
 - [Development workflow](../../../references/development.md) - Development process
