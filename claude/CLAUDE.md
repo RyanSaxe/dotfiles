@@ -5,6 +5,7 @@ Do not forget anything in this file. It specifies global rules for all actions y
 ## Structure
 
 This configuration uses a **skills-based architecture**:
+
 - **skills/**: Auto-invoked by Claude based on context (language-specific rules, code practices)
 - **references/**: Detailed documentation linked from skills and this file
 
@@ -31,7 +32,7 @@ This configuration uses a **skills-based architecture**:
 - **Content search**: `rg` / ripgrep (NOT `grep`)
 - **Structural code search**: `sg` / ast-grep (for complex patterns)
 - **Run Python tools**: `uvx <tool>` (runs without global install - great for one-off tools)
-- **LSP diagnostics**: `lsp-check` (verify code health before commits)
+- **LSP diagnostics**: `lsp-check files/folders` (verify code health with respect to files you change)
 - **Quick reference**: `tldr`
 - **Detailed docs**: `--help` flag and `man` pages
 

@@ -15,6 +15,7 @@ TIMEOUT=30             # hard cap (seconds)
 WAIT=1                 # minimum settle time (seconds)
 QUIET_MS=1000          # silence window (milliseconds)
 MAX_FILES=200
+NO_IGNORE=0            # respect .gitignore by default (set to 1 to override)
 TARGETS=()
 
 # ---------- flags ----------
@@ -60,6 +61,10 @@ while [[ $# -gt 0 ]]; do
     FILTER_SOURCE="$2"
     shift 2
     ;;
+  --no-ignore)
+    NO_IGNORE=1
+    shift
+    ;;
   -h | --help)
     cat <<'H'
 lsp-check — single-run LSP diagnostics via Neovim (quiet-window strategy)
@@ -68,11 +73,13 @@ USAGE:
   lsp-check [TARGET ...]
             [--json-out PATH] [--no-stdout] [--verbose]
             [--timeout SECS] [--wait SECS] [--quiet-ms MS]
-            [--max-files N]
+            [--max-files N] [--no-ignore]
             [--detailed] [--min-severity LEVEL] [--source NAME]
 
 BEHAVIOR:
   • Gathers files (common source extensions).
+  • Respects .gitignore by default (use --no-ignore to override).
+  • Always excludes .git/ directory.
   • Errors if files span multiple Git roots.
   • Errors if file count > N (default 200).
   • Runs a single headless Neovim and opens all files (argv).
@@ -80,6 +87,9 @@ BEHAVIOR:
   • Then waits until there have been NO diagnostic updates for --quiet-ms
     (default 1000ms), or until --timeout (default 30s) is reached.
   • Writes JSON (default lsp_diagnostics.json) and pretty-prints.
+
+FILE COLLECTION:
+  --no-ignore          Override .gitignore and check ALL files (rarely needed)
 
 OUTPUT OPTIONS:
   --detailed           Show all diagnostics in detailed format (file-by-file)
@@ -90,11 +100,13 @@ OUTPUT OPTIONS:
                        (e.g., "pyright", "typescript-language-server")
 
 EXAMPLES:
-  lsp-check .
-  lsp-check wt_ml/layers --verbose
-  lsp-check "src/**" --timeout 45 --wait 5 --quiet-ms 3000
-  lsp-check . --detailed --min-severity WARN
-  lsp-check . --detailed --source pyright
+  lsp-check src/                                     # Check specific directory
+  lsp-check src/ tests/                              # Check multiple directories
+  lsp-check src/ --verbose                           # With verbose output
+  lsp-check "src/**/*.py" --timeout 45               # With glob pattern
+  lsp-check src/ --detailed --min-severity WARN      # Detailed with filtering
+  lsp-check src/ --detailed --source pyright         # Filter by LSP source
+  lsp-check . --no-ignore                            # Check everything (override .gitignore)
 H
     exit 0
     ;;
@@ -167,16 +179,25 @@ files_list="$workdir/files.list"
 add_dir() {
   local d="$1"
   # Use fd for much faster file discovery (5-10x speedup)
-  # fd automatically excludes .git by default, but we explicitly exclude common dirs
-  fd --type f --hidden --no-ignore \
-    --exclude .git \
-    --exclude node_modules \
-    --exclude __pycache__ \
-    -e lua -e py -e pyi -e js -e ts -e jsx -e tsx -e rs -e go \
-    -e c -e cpp -e h -e java -e cs -e rb -e php -e swift \
-    -e kt -e scala -e R -e r -e jl -e hs -e ml -e ex -e exs \
-    -e clj -e vim -e sh \
-    . "$d" >>"$files_list"
+  # Respects .gitignore by default unless --no-ignore is specified
+  # Always excludes .git directory
+  local fd_args=(--type f --hidden --exclude .git)
+
+  # Add --no-ignore flag if NO_IGNORE is set (overrides .gitignore)
+  if [[ "$NO_IGNORE" -eq 1 ]]; then
+    fd_args+=(--no-ignore)
+  fi
+
+  # Add file extensions
+  fd_args+=(
+    -e lua -e py -e pyi -e js -e ts -e jsx -e tsx -e rs -e go
+    -e c -e cpp -e h -e java -e cs -e rb -e php -e swift
+    -e kt -e scala -e R -e r -e jl -e hs -e ml -e ex -e exs
+    -e clj -e vim -e sh
+    . "$d"
+  )
+
+  fd "${fd_args[@]}" >>"$files_list"
 }
 
 for t in "${TARGETS[@]}"; do

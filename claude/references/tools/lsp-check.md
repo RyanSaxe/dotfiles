@@ -4,13 +4,22 @@ Automated LSP diagnostic collection using headless Neovim. Opens files, triggers
 
 ## Quick Reference
 
+**⚠️ IMPORTANT: Always run lsp-check on targeted files/folders, not entire repositories!**
+
 **Most common commands:**
 ```bash
-lsp-check .                        # Summary of errors/warnings
-lsp-check . --detailed             # Show all diagnostics
-lsp-check . --min-severity ERROR   # Only errors
-lsp-check src/ tests/              # Specific directories
-lsp-check . --source pyright       # Filter by LSP source
+# Target specific files or directories you're working on
+lsp-check src/mymodule/            # Check specific module
+lsp-check src/main.py tests/       # Check specific files/dirs
+lsp-check "src/**/*.py"            # Check with glob pattern
+
+# Detailed output with filtering
+lsp-check src/ --detailed          # Show all diagnostics
+lsp-check src/ --min-severity ERROR # Only errors
+lsp-check src/ --source pyright    # Filter by LSP source
+
+# AVOID: Running on entire repo (includes dependencies, build artifacts, etc.)
+# lsp-check .                      # ❌ DON'T DO THIS unless you really mean it
 ```
 
 **Related:**
@@ -26,13 +35,35 @@ lsp-check . --source pyright       # Filter by LSP source
 - Collects diagnostics with smart settling (waits for diagnostic updates to stabilize)
 - Outputs structured JSON + pretty-formatted results
 - Supports filtering by severity and LSP source
+- **Respects .gitignore by default** to avoid checking dependencies and build artifacts
 
 ## Basic Usage
 
-### Check Current Directory
+### ⚠️ Always Target Specific Files/Folders
+
+**Best practice:** Run lsp-check on the specific files or directories you're working on, not the entire repository. This avoids checking dependencies (node_modules, venv), build artifacts, and other irrelevant files.
 
 ```bash
+# Good: Check specific module
+lsp-check src/mymodule/
+
+# Good: Check specific files
+lsp-check src/main.py src/utils.py
+
+# Good: Check multiple directories
+lsp-check src/ tests/
+```
+
+### Check Entire Repository (Use With Caution)
+
+Only use this when you specifically need to check everything:
+
+```bash
+# Checks all files respecting .gitignore (still may include many files)
 lsp-check .
+
+# Override .gitignore to check EVERYTHING (rarely needed)
+lsp-check . --no-ignore
 ```
 
 Output shows summary with top files containing issues.
@@ -40,7 +71,7 @@ Output shows summary with top files containing issues.
 ### Detailed Diagnostics
 
 ```bash
-lsp-check . --detailed
+lsp-check src/ --detailed
 ```
 
 Shows all diagnostics file-by-file with:
@@ -52,11 +83,11 @@ Shows all diagnostics file-by-file with:
 ### Filter by Severity
 
 ```bash
-# Only errors
-lsp-check . --detailed --min-severity ERROR
+# Only errors in specific directory
+lsp-check src/ --detailed --min-severity ERROR
 
 # Warnings and errors (excludes info/hints)
-lsp-check . --detailed --min-severity WARN
+lsp-check src/ --detailed --min-severity WARN
 ```
 
 Severity levels (most to least severe): `ERROR` > `WARN` > `INFO` > `HINT`
@@ -64,11 +95,11 @@ Severity levels (most to least severe): `ERROR` > `WARN` > `INFO` > `HINT`
 ### Filter by LSP Source
 
 ```bash
-# Only pyright diagnostics
-lsp-check . --detailed --source pyright
+# Only pyright diagnostics in specific directory
+lsp-check src/ --detailed --source pyright
 
 # Only typescript diagnostics
-lsp-check . --detailed --source typescript-language-server
+lsp-check src/ --detailed --source typescript-language-server
 ```
 
 ### Check Specific Directories or Files
@@ -89,17 +120,34 @@ lsp-check "src/**/*.py"
 
 ## Advanced Options
 
+### Gitignore Control
+
+```bash
+# Default: respects .gitignore (excludes dependencies, build artifacts)
+lsp-check src/
+
+# Override .gitignore to check ALL files (rarely needed)
+lsp-check . --no-ignore
+```
+
+**When to use --no-ignore:**
+- Debugging issues in ignored files (e.g., generated code)
+- Checking vendored dependencies
+- Rare cases where you need complete repository analysis
+
+**Note:** Even with --no-ignore, `.git/` directory is always excluded.
+
 ### Timing Control
 
 ```bash
 # Longer timeout for large projects
-lsp-check . --timeout 60
+lsp-check src/ --timeout 60
 
 # Longer minimum wait for slow LSPs
-lsp-check . --wait 5
+lsp-check src/ --wait 5
 
 # Longer quiet window for chatty LSPs
-lsp-check . --quiet-ms 3000
+lsp-check src/ --quiet-ms 3000
 ```
 
 **Timing strategy:**
@@ -141,7 +189,8 @@ lsp-check . --no-stdout
 
 1. **File Collection**: Uses `fd` to find source files (fast!)
    - Supports: Python, Lua, JS/TS, Rust, Go, Java, C/C++, and many more
-   - Excludes: `.git/`, `node_modules/`, `__pycache__/`
+   - **Respects .gitignore by default** (use `--no-ignore` to override)
+   - Always excludes: `.git/` directory
 
 2. **Git Root Check**: Ensures all files are in same git repository
    - Prevents LSP confusion from multiple projects
@@ -209,8 +258,8 @@ Shows every diagnostic with full context.
 ### Before Committing
 
 ```bash
-# Check for any errors before committing
-lsp-check . --min-severity ERROR
+# Check files you changed (recommended approach)
+lsp-check src/mymodule/ tests/test_mymodule.py --min-severity ERROR
 ```
 
 Only commit if exit code is 0 and no errors shown.
@@ -218,8 +267,8 @@ Only commit if exit code is 0 and no errors shown.
 ### After Refactoring
 
 ```bash
-# Verify no new warnings introduced
-lsp-check . --detailed --min-severity WARN
+# Verify no new warnings in affected modules
+lsp-check src/affected_module/ --detailed --min-severity WARN
 ```
 
 Compare diagnostic counts before/after refactoring.
@@ -228,30 +277,38 @@ Compare diagnostic counts before/after refactoring.
 
 ```bash
 # Quick check of current file
-lsp-check main.py
+lsp-check src/main.py
 
-# Check module
+# Check module you're working on
 lsp-check src/mymodule/
+
+# Check specific related files
+lsp-check src/api/ src/models/
 ```
 
 ### CI/CD Integration
 
 ```bash
-# Fail build on errors
-lsp-check . --no-stdout --json-out diagnostics.json
+# Fail build on errors in source directories
+lsp-check src/ --no-stdout --json-out diagnostics.json
 if jq -e '.summary.errors > 0' diagnostics.json; then
   echo "Build failed: LSP errors detected"
   exit 1
 fi
+
+# Or check all files respecting .gitignore
+lsp-check . --no-stdout --json-out diagnostics.json
 ```
 
 ## Tips
 
-- **Use --verbose for slow LSPs**: See what's happening
+- **Target your changes**: Only check files/folders you're actively working on
+- **Use --verbose for slow LSPs**: See what's happening during collection
 - **Filter to focus**: Use --min-severity and --source to reduce noise
-- **Check before push**: Make it a habit to run lsp-check before committing
-- **Set up aliases**: `alias lsp-errors='lsp-check . --min-severity ERROR'`
-- **CI integration**: Add lsp-check to your CI pipeline
+- **Check before push**: Run lsp-check on modified files before committing
+- **Set up aliases**: `alias lsp-errors='lsp-check --min-severity ERROR'` (then use: `lsp-errors src/`)
+- **CI integration**: Add lsp-check to your CI pipeline with targeted paths
+- **Respects .gitignore**: By default excludes ignored files (use --no-ignore if needed)
 
 ## Limitations
 

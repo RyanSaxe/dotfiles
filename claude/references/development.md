@@ -308,14 +308,19 @@ See [Clean Code Skill](../skills/code/clean/SKILL.md) for detailed refactoring p
 Use `lsp-check` to verify code health before committing:
 
 ```bash
-# Check for errors
-lsp-check .
+# Check specific files/directories you changed (recommended)
+lsp-check src/mymodule/ tests/
 
 # Detailed output with specific severity
-lsp-check . --detailed --min-severity WARN
+lsp-check src/ --detailed --min-severity WARN
+
+# Check entire repo respecting .gitignore (use with caution)
+lsp-check .
 
 # See [Diagnostics Skill](../skills/code/diagnostics/SKILL.md) for full guide
 ```
+
+**Best practice:** Always target specific files or directories you're working on rather than checking the entire repository.
 
 ## Related Guides
 
