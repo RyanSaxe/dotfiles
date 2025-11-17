@@ -1,5 +1,3 @@
-# Git Workflow Skill
-
 ---
 name: git
 description: Git workflow patterns and commit practices. Use when committing changes, resolving conflicts, managing branches, or following atomic commit principles. Ensures clean git history.
@@ -8,11 +6,13 @@ description: Git workflow patterns and commit practices. Use when committing cha
 ## Quick Reference
 
 **Atomic commit:**
+
 - One logical change
 - Tests pass before and after
 - Can be reverted cleanly
 
 **Commit message format:**
+
 ```
 Add feature to handle user authentication
 
@@ -27,6 +27,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 **Base branch:** Check repo's default (usually `main`, `master`, or `develop`)
 
 **Related:**
+
 - [Development workflow](../../../references/development.md) - Full workflow guidance
 - [Style guide](../../../references/style.md) - Code quality standards
 
@@ -37,6 +38,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 **Definition:** A single, self-contained change that can stand alone.
 
 **Characteristics:**
+
 - **One logical change**: Don't mix refactoring with new features
 - **Tests pass**: Before and after the commit
 - **Can be reverted**: Without breaking other functionality
@@ -161,6 +163,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ### Identifying Base Branch
 
 Different repos use different base branches:
+
 - `main` (most common for new repos)
 - `master` (older repos)
 - `develop` or `dev` (some workflows)

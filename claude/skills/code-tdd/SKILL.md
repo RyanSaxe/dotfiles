@@ -1,5 +1,3 @@
-# Test-Driven Development (TDD) Skill
-
 ---
 name: tdd
 description: Test-Driven Development workflow for writing tests first before implementation. Use when implementing features where behavior should be defined by tests first, fixing bugs that need regression tests, or working with functional units that benefit from TDD approach.
@@ -8,6 +6,7 @@ description: Test-Driven Development workflow for writing tests first before imp
 ## Quick Reference
 
 **TDD Cycle:**
+
 1. **Red** - Write failing test
 2. **Green** - Minimal code to pass
 3. **Refactor** - Improve while tests green
@@ -15,6 +14,7 @@ description: Test-Driven Development workflow for writing tests first before imp
 **Goal:** Confident, concise tests (not exhaustive test suites)
 
 **Related:**
+
 - [Testing guide](../../../references/testing.md) - Comprehensive testing patterns
 - [Clean code](../clean/SKILL.md) - Refactoring guidance
 - Language skills - Testing frameworks and patterns
@@ -42,6 +42,7 @@ Keep the cycle tight and fast - minutes, not hours.
 ## When to Use TDD
 
 ✅ **TDD is ideal for:**
+
 - **Functional units** (pure functions, algorithms, business logic)
 - Features with clear, well-defined requirements
 - Bug fixes (write test that reproduces bug first)
@@ -50,6 +51,7 @@ Keep the cycle tight and fast - minutes, not hours.
 - When interface/contract is clear before implementation
 
 ⚠️ **TDD is NOT ideal for:**
+
 - **E2E tests** - write after implementation unless requested
 - **Integration tests** - usually after components work individually
 - **UI/visual elements** - need experimentation and visual verification
@@ -80,6 +82,7 @@ Keep the cycle tight and fast - minutes, not hours.
 - **Simple utilities**: String formatters, calculators, validators
 
 **Why minimize mocking?**
+
 - Mocks test expectations, not actual behavior
 - Mocks can drift from real implementations
 - Over-mocking makes tests brittle
@@ -171,6 +174,7 @@ Keep the cycle tight - minutes per iteration.
 ## Language-Specific Testing
 
 For testing frameworks and patterns:
+
 - **Python**: [python skill](../lang-python/SKILL.md) - pytest patterns
 - **Lua/Neovim**: [neovim skill](../lang-neovim/SKILL.md) - mini.test patterns
 - **JavaScript/TypeScript**: Check project for vitest/jest setup

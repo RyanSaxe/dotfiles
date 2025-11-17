@@ -1,5 +1,3 @@
-# Python Development Skill
-
 ---
 name: python
 description: Python language-specific development rules, testing patterns, and tooling preferences. Use when writing Python code, setting up Python environments, choosing between type hint syntaxes, configuring pytest tests, or managing dependencies with uv.
@@ -8,12 +6,14 @@ description: Python language-specific development rules, testing patterns, and t
 ## Quick Reference
 
 **Type hints (Python 3.9+):**
+
 ```python
 def process(items: list[dict[str, Any]]) -> dict[str, int]:
     return {"total": len(items)}
 ```
 
 **pytest structure:**
+
 ```python
 def test_should_return_sum():
     # Arrange
@@ -25,10 +25,12 @@ def test_should_return_sum():
 ```
 
 **Environment:**
+
 - Use `uv` for dependencies and virtual environments
 - `uvx <tool>` to run tools without installing
 
 **Related:**
+
 - [uv tool guide](../../../references/tools/uv.md) - Complete uv documentation
 - [Testing patterns](../../../references/testing.md) - General testing guidance
 - [Style guide](../../../references/style.md) - Code style principles

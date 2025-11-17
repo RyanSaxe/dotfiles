@@ -1,5 +1,3 @@
-# Package Search Skill
-
 ---
 name: package-search
 description: Search for installed packages on local machine before fetching from external sources. Use when user asks about a package, library, or dependency to explore its code, understand its API, or debug issues.
@@ -8,6 +6,7 @@ description: Search for installed packages on local machine before fetching from
 ## Quick Reference
 
 **Always search locally first:**
+
 ```bash
 # Python
 python -c "import pkg; print(pkg.__file__)"
@@ -21,11 +20,13 @@ fd -t d "plugin-name" ~/.local/share/nvim/lazy/
 ```
 
 **Tools:**
+
 - `fd` - Fast directory search
 - `rg` - Text-based code search
 - `sg` (ast-grep) - Structural code search
 
 **Related:**
+
 - [ast-grep guide](../../../references/tools/ast-grep.md) - Structural search patterns
 - Language skills - Package locations and patterns
 
@@ -36,6 +37,7 @@ fd -t d "plugin-name" ~/.local/share/nvim/lazy/
 **Always search for packages on the local machine first** before fetching from external sources.
 
 **Why local-first:**
+
 - **Faster** than external sources
 - **More accurate** (matches their actual version)
 - **More complete** (includes all implementation details)
@@ -104,6 +106,7 @@ sg -p 'export const $NAME = $$$' /path/to/package
 ```
 
 **When to use ast-grep:**
+
 - Finding function/class definitions with specific signatures
 - Searching for patterns with unknown variable names
 - Finding all usages of a specific API pattern
@@ -114,6 +117,7 @@ sg -p 'export const $NAME = $$$' /path/to/package
 ### 5. Read Relevant Files
 
 Use Read tool to examine:
+
 - Entry points (`__init__.py`, `index.js`, `init.lua`)
 - Specific modules the user asks about
 - Type definitions (`.pyi`, `.d.ts` files)

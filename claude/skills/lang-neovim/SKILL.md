@@ -1,5 +1,3 @@
-# Neovim Development Skill
-
 ---
 name: neovim
 description: Neovim and Lua configuration patterns, plugin development, and LazyVim conventions. Use when working with Neovim configs, writing Lua scripts, creating plugins, customizing LazyVim, debugging Neovim issues, or matching TokyoNight theme colors.
@@ -8,6 +6,7 @@ description: Neovim and Lua configuration patterns, plugin development, and Lazy
 ## Quick Reference
 
 **LazyVim plugin structure:**
+
 ```lua
 return {
   "author/plugin-name",
@@ -17,11 +16,13 @@ return {
 ```
 
 **Neovim API:**
+
 - Keymaps: `vim.keymap.set("n", "<leader>x", fn, { desc = "..." })`
 - Autocommands: `vim.api.nvim_create_autocmd("Event", { ... })`
 - Commands: `vim.api.nvim_create_user_command("Name", fn, {})`
 
 **Related:**
+
 - [Testing Neovim plugins](testing.md) - mini.test patterns
 - [Style guide](../../../references/style.md) - Code style principles
 - [LazyVim docs](https://lazyvim.org)

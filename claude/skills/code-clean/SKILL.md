@@ -1,5 +1,3 @@
-# Clean Code Skill
-
 ---
 name: clean
 description: Clean code refactoring workflow. Use when you see nested conditionals, unclear naming, large functions (>50 lines), high cognitive complexity, magic numbers, or during TDD refactor phase. Transforms working code into maintainable code.
@@ -12,6 +10,7 @@ description: Clean code refactoring workflow. Use when you see nested conditiona
 This skill: **How to transform working code into maintainable code**
 
 **Quick reminders:**
+
 - Descriptive names, guard clauses, small functions
 - WET > DRY (write twice before abstracting)
 - Keep tests green throughout
@@ -115,6 +114,7 @@ def create_user(name: str, email: str, age: int, address: Address,
 ```
 
 **When to group:**
+
 - 4+ related parameters → consider grouping
 - 8+ parameters → definitely group (code smell)
 
@@ -147,12 +147,14 @@ if user.age >= LEGAL_AGE and amount > FREE_SHIPPING_THRESHOLD:
 ## When to Extract Functions
 
 Extract when:
+
 - **Cognitive complexity** is high (nested logic, many conditions)
 - **Doing multiple things** (violates single responsibility)
 - **Reused logic** (but write twice before extracting)
 - **Natural conceptual boundary** (clear name exists)
 
 **Don't extract when:**
+
 - Function would be 1-2 lines (over-extraction)
 - Name would just restate code
 - Makes code harder to follow (deep call stacks)
@@ -178,11 +180,13 @@ def process(items: list[dict]) -> list[dict]:
 ## Comments: Only When Necessary
 
 **Add comments when:**
+
 - Explaining **why** (not what) - when reason isn't obvious
 - Warning about non-obvious behavior
 - Documenting public APIs
 
 **Don't comment:**
+
 - Obvious code (`counter += 1  # increment counter`)
 - What better naming would explain
 - Outdated/wrong information
@@ -234,6 +238,7 @@ def ensure_connection() -> None:
 ```
 
 **When to abstract:**
+
 - 3+ duplications AND pattern is obvious
 - Abstraction makes code clearer (not more complex)
 - Confident pattern won't diverge
@@ -253,6 +258,7 @@ def ensure_connection() -> None:
 ## Refactoring Red Flags
 
 Watch for these code smells:
+
 - Functions >50 lines
 - Nesting depth >3 levels
 - 8+ function parameters

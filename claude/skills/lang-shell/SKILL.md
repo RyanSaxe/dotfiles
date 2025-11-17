@@ -1,5 +1,3 @@
-# Shell Scripting Skill
-
 ---
 name: shell
 description: Shell scripting patterns for bash/zsh. Use when writing shell scripts, debugging script errors, ensuring portability across macOS and Linux, or handling edge cases in shell scripting.
@@ -8,22 +6,26 @@ description: Shell scripting patterns for bash/zsh. Use when writing shell scrip
 ## Quick Reference
 
 **Error handling:**
+
 ```bash
 set -euo pipefail  # Exit on error, unset vars, pipe failures
 ```
 
 **Quoting:**
+
 ```bash
 "$var"      # Always quote variables
 "${array[@]}"  # Quote array expansions
 ```
 
 **Portability checks:**
+
 - Test on both macOS and Linux (this repo supports both)
 - Use `[[ ]]` for conditionals (bash/zsh), not `[ ]`
 - Check command availability: `command -v tool >/dev/null`
 
 **Related:**
+
 - [Development workflow](../../../references/development.md) - Script testing
 - [Style guide](../../../references/style.md) - General principles
 
