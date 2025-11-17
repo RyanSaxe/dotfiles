@@ -1,19 +1,31 @@
----
-name: diagnostics
-description: LSP diagnostics extraction and analysis using lsp-check tool. Use when investigating errors, warnings, or code issues, before commits, or after refactoring to verify code health.
----
+# lsp-check - LSP Diagnostics Tool
 
-# Diagnostics Skill
+Automated LSP diagnostic collection using headless Neovim. Opens files, triggers LSP servers, and collects diagnostics with smart settling logic.
 
-Use this skill when investigating errors, warnings, or code issues reported by language servers (LSP), or when verifying code health before commits or after refactoring.
+## Quick Reference
+
+**Most common commands:**
+```bash
+lsp-check .                        # Summary of errors/warnings
+lsp-check . --detailed             # Show all diagnostics
+lsp-check . --min-severity ERROR   # Only errors
+lsp-check src/ tests/              # Specific directories
+lsp-check . --source pyright       # Filter by LSP source
+```
+
+**Related:**
+- [Diagnostics skill](../../skills/code/diagnostics/SKILL.md) - Workflow integration
+- [Development workflow](../development.md) - How diagnostics fit into your process
+- Script location: `~/generic/dotfiles/scripts/lsp-check`
+
+---
 
 ## Purpose
 
-The `lsp-check` tool provides automated LSP diagnostic collection by:
-- Opening files in headless Neovim to trigger LSP servers
-- Collecting diagnostics with smart settling (waits for diagnostic updates to stabilize)
-- Outputting structured JSON + pretty-formatted results
-- Supporting filtering by severity and LSP source
+- Opens files in headless Neovim to trigger LSP servers
+- Collects diagnostics with smart settling (waits for diagnostic updates to stabilize)
+- Outputs structured JSON + pretty-formatted results
+- Supports filtering by severity and LSP source
 
 ## Basic Usage
 
@@ -148,47 +160,6 @@ lsp-check . --no-stdout
    - JSON for programmatic use
    - Colored stdout for human reading
 
-## Integration with Development Workflow
-
-### Before Committing
-
-```bash
-# Check for any errors before committing
-lsp-check . --min-severity ERROR
-```
-
-Only commit if exit code is 0 and no errors shown.
-
-### After Refactoring
-
-```bash
-# Verify no new warnings introduced
-lsp-check . --detailed --min-severity WARN
-```
-
-Compare diagnostic counts before/after refactoring.
-
-### During Development
-
-```bash
-# Quick check of current file
-lsp-check main.py
-
-# Check module
-lsp-check src/mymodule/
-```
-
-### CI/CD Integration
-
-```bash
-# Fail build on errors
-lsp-check . --no-stdout --json-out diagnostics.json
-if jq -e '.summary.errors > 0' diagnostics.json; then
-  echo "Build failed: LSP errors detected"
-  exit 1
-fi
-```
-
 ## Common Diagnostic Sources
 
 Different LSPs will show as different sources:
@@ -233,14 +204,46 @@ WARN     [58, 10]  unused-variable (Ruff)
 
 Shows every diagnostic with full context.
 
-## Diagnostic Workflow
+## Use Cases
 
-1. **Run diagnostics**: `lsp-check . --detailed`
-2. **Prioritize errors**: Fix ERROR severity first
-3. **Address warnings**: Then WARN severity
-4. **Consider info/hints**: HINT and INFO can often be ignored
-5. **Re-run**: `lsp-check .` to verify fixes
-6. **Commit**: When clean (or acceptable)
+### Before Committing
+
+```bash
+# Check for any errors before committing
+lsp-check . --min-severity ERROR
+```
+
+Only commit if exit code is 0 and no errors shown.
+
+### After Refactoring
+
+```bash
+# Verify no new warnings introduced
+lsp-check . --detailed --min-severity WARN
+```
+
+Compare diagnostic counts before/after refactoring.
+
+### During Development
+
+```bash
+# Quick check of current file
+lsp-check main.py
+
+# Check module
+lsp-check src/mymodule/
+```
+
+### CI/CD Integration
+
+```bash
+# Fail build on errors
+lsp-check . --no-stdout --json-out diagnostics.json
+if jq -e '.summary.errors > 0' diagnostics.json; then
+  echo "Build failed: LSP errors detected"
+  exit 1
+fi
+```
 
 ## Tips
 
@@ -256,15 +259,3 @@ Shows every diagnostic with full context.
 - **Single git root**: Can't check files across multiple repos in one run
 - **LSP must be configured**: Your Neovim must have working LSP for the file types
 - **File limit**: Default 200 files (configurable with --max-files)
-
-## Language-Specific Notes
-
-For language-specific LSP setup and configuration:
-- **Python**: See [python skill](../../language/python/SKILL.md)
-- **Lua/Neovim**: See [neovim skill](../../language/neovim/SKILL.md)
-
-## Further Reading
-
-- [Development Workflow](../../../references/development.md)
-- [Clean Code](../clean/SKILL.md) - for fixing diagnostic issues
-- Script location: `~/generic/dotfiles/scripts/lsp-check`

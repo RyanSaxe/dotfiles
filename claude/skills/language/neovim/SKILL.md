@@ -1,34 +1,49 @@
----
-name: neovim
-description: Neovim and Lua configuration patterns, plugin development, and LazyVim conventions. Use when working with Neovim configs, Lua scripts, or plugin customization.
----
-
 # Neovim Development Skill
 
-Use this skill when working with Neovim configuration, Lua scripts, or plugin development.
+---
+name: neovim
+description: Neovim and Lua configuration patterns, plugin development, and LazyVim conventions. Use when working with Neovim configs, writing Lua scripts, creating plugins, customizing LazyVim, debugging Neovim issues, or matching TokyoNight theme colors.
+---
+
+## Quick Reference
+
+**LazyVim plugin structure:**
+```lua
+return {
+  "author/plugin-name",
+  opts = { --[[options]] },
+  keys = { { "<leader>x", "<cmd>Cmd<cr>", desc = "Desc" } },
+}
+```
+
+**Neovim API:**
+- Keymaps: `vim.keymap.set("n", "<leader>x", fn, { desc = "..." })`
+- Autocommands: `vim.api.nvim_create_autocmd("Event", { ... })`
+- Commands: `vim.api.nvim_create_user_command("Name", fn, {})`
+
+**Related:**
+- [Testing Neovim plugins](testing.md) - mini.test patterns
+- [Style guide](../../../references/style.md) - Code style principles
+- [LazyVim docs](https://lazyvim.org)
+
+---
 
 ## Core Principles
 
-- **LazyVim Base**: This configuration is LazyVim-based with custom plugins in `nvim/lua/plugins/`
-- **Lua Version**: Lua 5.4.7 (used by Neovim 0.11.2)
-- **Theme**: Always match TokyoNight theme colors for customizations
+- **LazyVim Base**: Configuration uses LazyVim with custom plugins in `nvim/lua/plugins/`
+- **Lua Version**: 5.4.7 (Neovim 0.11.2)
+- **Detailed Comments**: Unlike other languages, leave detailed comments in Lua/Neovim config
+  - **Why**: Neovim APIs are hard to understand without context, configs are read/modified frequently
+- **Theme Consistency**: Match TokyoNight theme colors for customizations
   - Reference: `nvim/lua/plugins/colorscheme.lua`
-- **Comments**: Unlike other languages, leave **detailed comments** in Lua/Neovim config for clarity
 
-## Theme Colors
+[General style principles →](../../../references/style.md)
 
-When customizing colors, always reference TokyoNight:
-```lua
--- Find colors at:
--- ~/.local/share/nvim/lazy/tokyonight.nvim/lua/tokyonight/colors/
--- ~/.local/share/nvim/lazy/tokyonight.nvim/lua/tokyonight/groups/
-
-local colors = require("tokyonight.colors").setup()
-```
+---
 
 ## Plugin Structure (LazyVim)
 
-Plugins are defined in `nvim/lua/plugins/` with the Lazy.nvim spec:
+Plugins are defined in `nvim/lua/plugins/` using Lazy.nvim spec:
 
 ```lua
 -- nvim/lua/plugins/example.lua
@@ -36,21 +51,24 @@ return {
   "author/plugin-name",
   dependencies = { "dependency/plugin" },
   opts = {
-    -- Plugin options
+    -- Plugin options (passed to setup())
   },
   keys = {
     { "<leader>x", "<cmd>Command<cr>", desc = "Description" },
   },
   config = function()
-    -- Setup code
+    -- Custom setup code if needed
+    require("plugin-name").setup({
+      -- options
+    })
   end,
 }
 ```
 
-### Common Patterns
+### Lazy Loading Patterns
 
 ```lua
--- Conditional loading
+-- Load when command is executable
 {
   "plugin/name",
   cond = function()
@@ -58,40 +76,50 @@ return {
   end,
 }
 
--- Lazy loading by event
+-- Load on event
 {
   "plugin/name",
-  event = "BufReadPre",
+  event = "BufReadPre", -- or "VeryLazy", "InsertEnter", etc.
 }
 
--- Lazy loading by filetype
+-- Load on filetype
 {
   "plugin/name",
   ft = { "python", "lua" },
 }
+
+-- Load on keymap
+{
+  "plugin/name",
+  keys = { "<leader>x" },
+}
 ```
+
+---
 
 ## Lua Style Guide
 
-- **Leave detailed comments**: Explain configuration choices and complex logic
-- **Use local functions**: Keep scope minimal
+- **Detailed comments**: Explain configuration choices and complex logic
+- **Local functions**: Keep scope minimal (`local function name()`)
 - **Match existing patterns**: Follow LazyVim and existing plugin conventions
-- **Use vim.notify for messages**: `vim.notify("Message", vim.log.levels.INFO)`
+- **Use vim.notify**: `vim.notify("Message", vim.log.levels.INFO)` for user messages
 
 ### Example with Comments
 
 ```lua
--- Define a custom command to reload a module
--- This is useful during plugin development to test changes without restarting Neovim
+-- Define custom command to reload a module
+-- Useful during plugin development to test changes without restarting Neovim
 vim.api.nvim_create_user_command("ReloadModule", function(opts)
   local module = opts.args
-  -- Clear the module from package.loaded to force reload
+  -- Clear module from package.loaded to force reload
   package.loaded[module] = nil
-  -- Require it again to load the fresh version
+  -- Require again to load fresh version
   require(module)
   vim.notify("Reloaded " .. module, vim.log.levels.INFO)
 end, { nargs = 1 })
 ```
+
+---
 
 ## Neovim API Common Operations
 
@@ -111,163 +139,77 @@ vim.api.nvim_create_autocmd("FileType", {
 
 -- User commands
 vim.api.nvim_create_user_command("CommandName", function(opts)
-  -- Implementation
+  -- Implementation with opts.args, opts.fargs, etc.
 end, { nargs = "?" })
 
--- Buffer options
-vim.bo.filetype = "lua"
-vim.bo.expandtab = true
-
--- Window options
-vim.wo.number = true
-vim.wo.wrap = false
-
--- Global options
-vim.o.ignorecase = true
-vim.o.smartcase = true
+-- Options
+vim.bo.filetype = "lua"       -- Buffer options
+vim.wo.number = true          -- Window options
+vim.o.ignorecase = true       -- Global options
 ```
 
-## Testing Neovim Plugins with mini.test
+---
 
-Neovim plugin testing uses `mini.test` with `luassert` for assertions.
+## Theme Colors (TokyoNight)
 
-### Test Structure
+When customizing colors, reference TokyoNight:
 
 ```lua
-local MyModule = require("mymodule")
+-- Find colors at:
+-- ~/.local/share/nvim/lazy/tokyonight.nvim/lua/tokyonight/colors/
+-- ~/.local/share/nvim/lazy/tokyonight.nvim/lua/tokyonight/groups/
+
+local colors = require("tokyonight.colors").setup()
+
+-- Use in highlights
+vim.api.nvim_set_hl(0, "MyHighlight", {
+  fg = colors.blue,
+  bg = colors.bg_dark,
+})
+```
+
+Reference: `nvim/lua/plugins/colorscheme.lua` in this project
+
+---
+
+## Testing Neovim Plugins
+
+Use `mini.test` with `luassert` for testing Neovim plugins and configurations.
+
+```lua
 local assert = require("luassert")
 
-describe("mymodule functionality", function()
-  local state
-
-  before_each(function()
-    -- Setup: runs before each test
-    state = MyModule.new()
-  end)
-
-  after_each(function()
-    -- Cleanup: runs after each test
-    if state then
-      MyModule.cleanup(state)
-    end
-  end)
-
-  describe("initialization", function()
-    it("initializes with correct defaults", function()
-      MyModule.init(state)
-
-      -- Multiple assertions for related checks (testing same concept)
-      assert.equal(0, MyModule.get_count(state))
-      assert.is_true(MyModule.is_enabled(state))
-    end)
-
-    it("handles nil safely", function()
-      assert.has_no_errors(function()
-        MyModule.init(nil)
-      end)
-    end)
-  end)
-
-  describe("error handling", function()
-    it("propagates errors from wrapped function", function()
-      local success, err = pcall(function()
-        MyModule.with_handler(state, function()
-          error("test error")
-        end)
-      end)
-
-      assert.is_false(success)
-      assert.matches("test error", err)
-    end)
+describe("mymodule", function()
+  it("does something", function()
+    local result = require("mymodule").action()
+    assert.equal(expected, result)
   end)
 end)
 ```
 
-### Test Runner Setup (minit.lua)
+[Full testing patterns →](testing.md)
 
-```lua
-#!/usr/bin/env -S nvim -l
+---
 
--- Set up isolated test environment
-vim.env.LAZY_STDPATH = ".tests"
-
--- Setup lazy.nvim with test dependencies
-require("lazy.minit").setup({
-  spec = {
-    {
-      "echasnovski/mini.test",
-      rocks = { "luassert" },
-    },
-    {
-      dir = vim.uv.cwd(),
-      name = "your-plugin.nvim",
-      opts = {},
-    },
-  },
-  rocks = {
-    enabled = true,
-  },
-})
-```
-
-### Running Tests
+## Configuration Testing
 
 ```bash
-# Run tests with test runner
-nvim -l tests/minit.lua
-
-# Or if using a test script
-./tests/run_tests.sh
-```
-
-### Common Assertions
-
-```lua
--- Equality
-assert.equal(expected, actual)
-assert.not_equal(expected, actual)
-
--- Boolean
-assert.is_true(value)
-assert.is_false(value)
-
--- Nil checks
-assert.is_nil(value)
-assert.is_not_nil(value)
-
--- Errors
-assert.has_no_errors(function() ... end)
-assert.has_error(function() ... end)
-
--- Pattern matching
-assert.matches("pattern", string)
-```
-
-### Best Practices
-
-- Use descriptive test names that explain the behavior
-- Group related tests with `describe` blocks
-- Use `before_each`/`after_each` for setup/teardown
-- Test one concept per test (multiple assertions are fine if related)
-- Test error cases and nil handling
-- See [TDD skill](../../code/tdd/SKILL.md) for test-driven development workflow
-
-### Testing Configuration
-
-```bash
-# Test Neovim config loads without errors
+# Test config loads without errors
 nvim --headless +quit
 
-# Run Neovim with specific config
+# Run with specific config
 nvim -u /path/to/init.lua
 
 # Check startup time
 nvim --startuptime startup.log
 ```
 
-## Further Reading
+---
 
-- [Detailed Style Guide](../../../references/style.md)
-- [Development Workflow](../../../references/development.md)
-- LazyVim docs: https://lazyvim.org
-- Neovim API docs: `:h api`
+## Related Resources
+
+- [Testing patterns](testing.md) - mini.test and luassert
+- [Style guide](../../../references/style.md) - General code style
+- [Development workflow](../../../references/development.md) - Development process
+- [LazyVim docs](https://lazyvim.org) - LazyVim documentation
+- Neovim API: `:h api` or `:h lua-guide`

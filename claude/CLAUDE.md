@@ -30,6 +30,8 @@ This configuration uses a **skills-based architecture**:
 - **File search**: `fd` (NOT `find`)
 - **Content search**: `rg` / ripgrep (NOT `grep`)
 - **Structural code search**: `sg` / ast-grep (for complex patterns)
+- **Run Python tools**: `uvx <tool>` (runs without global install - great for one-off tools)
+- **LSP diagnostics**: `lsp-check` (verify code health before commits)
 - **Quick reference**: `tldr`
 - **Detailed docs**: `--help` flag and `man` pages
 

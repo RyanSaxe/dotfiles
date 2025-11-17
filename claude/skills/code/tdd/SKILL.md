@@ -1,11 +1,25 @@
+# Test-Driven Development (TDD) Skill
+
 ---
 name: tdd
 description: Test-Driven Development workflow for writing tests first before implementation. Use when implementing features where behavior should be defined by tests first, fixing bugs that need regression tests, or working with functional units that benefit from TDD approach.
 ---
 
-# Test-Driven Development (TDD) Skill
+## Quick Reference
 
-Use this skill when implementing features where tests should drive the design, or when TDD is the appropriate approach for the problem at hand.
+**TDD Cycle:**
+1. **Red** - Write failing test
+2. **Green** - Minimal code to pass
+3. **Refactor** - Improve while tests green
+
+**Goal:** Confident, concise tests (not exhaustive test suites)
+
+**Related:**
+- [Testing guide](../../../references/testing.md) - Comprehensive testing patterns
+- [Clean code](../clean/SKILL.md) - Refactoring guidance
+- Language skills - Testing frameworks and patterns
+
+---
 
 ## Core Philosophy
 
@@ -13,98 +27,89 @@ Use this skill when implementing features where tests should drive the design, o
 
 **NOT the goal**: Writing 500 lines of test code to test 50 lines of real code. Extensive test suites should be rare exceptions, not the norm.
 
-## TDD Cycle
+---
 
-Follow the Red-Green-Refactor cycle:
+## TDD Cycle: Red-Green-Refactor
 
 1. **Red**: Write a failing test that defines desired behavior
 2. **Green**: Write minimal code to make the test pass
-3. **Refactor**: Improve code while keeping tests green (use [clean code skill](../clean/SKILL.md) for guidance)
+3. **Refactor**: Improve code while keeping tests green ([clean code skill](../clean/SKILL.md))
+
+Keep the cycle tight and fast - minutes, not hours.
+
+---
 
 ## When to Use TDD
 
 ✅ **TDD is ideal for:**
-- Testing **functional units** (pure functions, algorithms, business logic)
-- Implementing features with clear, well-defined requirements
-- Fixing bugs (write test that reproduces bug first)
-- Building APIs, libraries, or utility functions
+- **Functional units** (pure functions, algorithms, business logic)
+- Features with clear, well-defined requirements
+- Bug fixes (write test that reproduces bug first)
+- APIs, libraries, utility functions
 - Complex logic that needs to be proven correct
-- When the interface/contract is clear before implementation
+- When interface/contract is clear before implementation
 
 ⚠️ **TDD is NOT ideal for:**
-- **End-to-end (e2e) tests** - these should be written after implementation unless explicitly requested
-- **Integration tests** - usually written after components are working individually
-- **UI/visual elements** - often need experimentation and visual verification
-- **Exploratory prototyping** - when you're still figuring out what to build
+- **E2E tests** - write after implementation unless requested
+- **Integration tests** - usually after components work individually
+- **UI/visual elements** - need experimentation and visual verification
+- **Exploratory prototyping** - still figuring out what to build
 - **Unclear requirements** - TDD requires knowing what "correct" looks like
-- **External API integrations** - hard to test-drive without mocking extensively (see mocking section)
-- **Performance optimization** - often needs profiling and experimentation first
-- **Configuration/setup code** - usually better to test the behavior it enables
-- **Glue code** - code that just connects components often doesn't need test-first approach
+- **Performance optimization** - needs profiling and experimentation first
+- **Glue code** - connecting components often doesn't need test-first
 
-## Mocking: Avoid Unless Absolutely Necessary
+---
 
-**Strong stance**: Mocking should be fully avoided except in rare, specific cases.
+## Mocking: Use Sparingly
 
-### When Mocking IS Necessary
+**Philosophy**: Prefer real objects when practical. Mocks are useful tools but come with costs (brittleness, false confidence).
 
-- **External paid APIs**: Don't want to incur costs during test runs
-- **Slow operations**: Database queries, file I/O that would make tests too slow
-- **Non-deterministic behavior**: Random number generation, current time, external data sources
-- **Unavailable dependencies**: Third-party service that doesn't have a test environment
-- **Hardware interactions**: Serial ports, GPIO pins, cameras, etc.
+### When Mocks Make Sense
 
-### When Mocking Is NOT Necessary (Use Real Objects Instead)
+- **External paid APIs**: Don't incur costs during test runs
+- **Genuinely slow operations**: Database queries that slow tests significantly
+- **Non-deterministic behavior**: Random numbers, current time, external data
+- **Unavailable dependencies**: Third-party service without test environment
+- **Hardware interactions**: Serial ports, GPIO pins, cameras
 
-- **Internal modules**: Test with the real implementations
-- **Pure functions**: No need to mock, they're deterministic
-- **In-memory data structures**: Lists, dicts, objects - use the real thing
-- **Simple utilities**: String formatters, calculators, validators - test the real code
+### Prefer Real Objects When
 
-**Why avoid mocks?**
-- Mocks test your expectations, not actual behavior
+- **Internal modules**: Test with real implementations
+- **Pure functions**: Already deterministic, no need to mock
+- **In-memory data structures**: Lists, dicts, objects - cheap to use
+- **Simple utilities**: String formatters, calculators, validators
+
+**Why minimize mocking?**
+- Mocks test expectations, not actual behavior
 - Mocks can drift from real implementations
-- Over-mocking makes tests brittle and hard to maintain
-- Real objects often aren't that expensive to use in tests
+- Over-mocking makes tests brittle
+- Real objects often aren't expensive in tests
+
+**Trade-off**: Some mocking is pragmatic. Use judgment based on test speed and complexity.
+
+---
 
 ## Test Organization
 
-- **Use descriptive test names**: `test_should_<expected_behavior>_when_<condition>()`
-- **Follow AAA pattern**: Arrange, Act, Assert
-- **Test one concept per test**: Multiple assertions are fine if they test the same concept
-- **Use setup/teardown**: `before_each`, `after_each`, or fixtures for common setup
+- **Descriptive names**: `test_should_<behavior>_when_<condition>()`
+- **AAA pattern**: Arrange, Act, Assert
+- **One concept per test**: Multiple assertions OK if testing same concept
+- **Setup/teardown**: Use fixtures or `before_each`/`after_each` for common setup
 
-## Language-Specific Testing
+---
 
-For detailed testing patterns, examples, and best practices for specific languages:
-- **Python**: See [python skill](../../language/python/SKILL.md) for pytest patterns
-- **Lua/Neovim**: See [neovim skill](../../language/neovim/SKILL.md) for mini.test patterns
-- **JavaScript/TypeScript**: Check project for vitest/jest setup
+## TDD Workflow Example
 
-Each language skill contains testing examples and conventions specific to that ecosystem.
-
-## Test Coverage Philosophy
-
-- Focus on **confidence**, not coverage percentage
-- **Test behavior**, not implementation details
-- **Test edge cases** and error conditions for critical logic
-- **Don't obsess** over 100% coverage
-- More code doesn't mean better tests - conciseness and clarity matter
-
-## TDD Workflow
-
-### 1. Align on the Interface
-
-Define the function signature, inputs, outputs, and expected behavior before writing any code or tests.
+### 1. Align on Interface
 
 ```python
 # What we're building:
 # Function: add(a: int, b: int) -> int
 # Behavior: Returns sum of two integers
-# Edge cases: Should handle negative numbers, zeros
+# Edge cases: Handle negatives, zeros
 ```
 
-### 2. Write the Test First (Red)
+### 2. Write Test First (Red)
 
 ```python
 def test_should_return_sum_of_two_numbers():
@@ -113,7 +118,7 @@ def test_should_return_sum_of_two_numbers():
     assert result == 5
 ```
 
-### 3. Run the Test (Should Fail)
+### 3. Run Test (Should Fail)
 
 ```bash
 pytest test_calculator.py
@@ -124,11 +129,11 @@ pytest test_calculator.py
 
 ```python
 class Calculator:
-    def add(self, a, b):
+    def add(self, a: int, b: int) -> int:
         return a + b
 ```
 
-### 5. Run the Test (Should Pass)
+### 5. Run Test (Should Pass)
 
 ```bash
 pytest test_calculator.py
@@ -137,16 +142,47 @@ pytest test_calculator.py
 
 ### 6. Refactor (If Needed)
 
-Improve code quality while keeping tests green. Reference the [clean code skill](../clean/SKILL.md) for refactoring guidance.
+Improve code quality while keeping tests green.
+See [clean code skill](../clean/SKILL.md) for refactoring guidance.
 
-### 7. Repeat
+### 7. Repeat for Edge Cases
 
-Add more tests for edge cases, then implement. Keep the cycle tight and fast.
+```python
+def test_should_handle_negative_numbers():
+    calculator = Calculator()
+    assert calculator.add(-5, 3) == -2
+    assert calculator.add(-1, -1) == -2
+```
 
-## Further Reading
+Keep the cycle tight - minutes per iteration.
 
-- [Detailed Testing Guide](../../../references/testing.md)
-- [Clean Code Principles](../clean/SKILL.md) - for refactoring step
-- [Development Workflow](../../../references/development.md)
-- [Python Testing](../../language/python/SKILL.md)
-- [Neovim Testing](../../language/neovim/SKILL.md)
+---
+
+## Test Coverage Philosophy
+
+- **Confidence over coverage**: Better 80% coverage with trusted tests than 100% with brittle ones
+- **Test behavior**, not implementation details
+- **Test edge cases** for critical logic
+- **Don't obsess** over 100% coverage
+- Conciseness and clarity matter more than line count
+
+---
+
+## Language-Specific Testing
+
+For testing frameworks and patterns:
+- **Python**: [python skill](../../language/python/SKILL.md) - pytest patterns
+- **Lua/Neovim**: [neovim skill](../../language/neovim/SKILL.md) - mini.test patterns
+- **JavaScript/TypeScript**: Check project for vitest/jest setup
+
+Claude will auto-invoke the relevant language skill for your context.
+
+---
+
+## Related Resources
+
+- [Testing guide](../../../references/testing.md) - Comprehensive patterns and philosophy
+- [Clean code](../clean/SKILL.md) - Refactoring step of TDD cycle
+- [Development workflow](../../../references/development.md) - Where TDD fits in process
+- [Python testing](../../language/python/SKILL.md) - pytest specifics
+- [Neovim testing](../../language/neovim/SKILL.md) - mini.test specifics
