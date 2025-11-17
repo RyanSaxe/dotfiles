@@ -15,11 +15,10 @@ claude/*
 !claude/CLAUDE.md
 !claude/plugins/
 !claude/settings.json
-!claude/statusline.sh
-!claude/claude-utils.sh
-!claude/send-notification.sh
+!claude/utility-scripts/
 !claude/skills/
 !claude/references/
+!claude/hooks/
 ipython/*
 !ipython/profile_default/
 ipython/profile_default/*

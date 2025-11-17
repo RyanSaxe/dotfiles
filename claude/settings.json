@@ -1,13 +1,35 @@
 {
   "model": "sonnet[1m]",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/post-todowrite.sh"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/send-notification.sh"
+            "command": "bash $HOME/.claude/utility-scripts/send-notification.sh"
           }
         ]
       }
@@ -18,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/send-notification.sh"
+            "command": "bash $HOME/.claude/utility-scripts/send-notification.sh"
           }
         ]
       }
@@ -26,7 +48,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash $HOME/.claude/statusline.sh",
+    "command": "bash $HOME/.claude/utility-scripts/statusline.sh",
     "padding": 0
   },
   "alwaysThinkingEnabled": true,
