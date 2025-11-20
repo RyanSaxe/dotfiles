@@ -4,6 +4,7 @@
 
 return {
   "epwalsh/obsidian.nvim",
+  enabled = false,
   version = "*",
   lazy = true,
   -- Load when opening markdown files or when in the notes directory

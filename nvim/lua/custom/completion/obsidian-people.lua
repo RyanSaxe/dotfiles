@@ -1,8 +1,12 @@
 -- obsidian-people.lua  ── Custom blink.cmp source for @ people mentions
 -- Provides completion for people notes in the people/ folder
--- Integrates with obsidian.nvim vault structure
+-- Works with or without obsidian.nvim plugin enabled
 
 local M = {}
+
+-- Fallback vault configuration (used if obsidian.nvim is not available)
+local FALLBACK_VAULT_PATH = vim.fn.expand("~/generic/notes")
+local PEOPLE_FOLDER = "people"
 
 -- Create a new instance of the source
 -- This is called by blink.cmp when the source is first used
@@ -17,21 +21,26 @@ function M:get_trigger_characters()
 end
 
 -- Check if the source should be enabled
--- Only enable in markdown files within the obsidian vault
+-- Only enable in markdown files
 function M:is_available()
   local ft = vim.bo.filetype
-  if ft ~= "markdown" then
-    return false
-  end
+  return ft == "markdown"
+end
 
-  -- Check if we're in an obsidian vault
+-- Get the vault directory path
+-- Try obsidian.nvim first, fall back to hardcoded path
+local function get_vault_dir()
+  -- Try to get vault from obsidian.nvim if available
   local ok, obsidian = pcall(require, "obsidian")
-  if not ok then
-    return false
+  if ok then
+    local client = obsidian.get_client()
+    if client and client.dir then
+      return client.dir
+    end
   end
 
-  local client = obsidian.get_client()
-  return client ~= nil
+  -- Fall back to hardcoded vault path
+  return require("plenary.path"):new(FALLBACK_VAULT_PATH)
 end
 
 -- Get completions for @ mentions
@@ -53,21 +62,15 @@ function M:get_completions(context, callback)
   -- Get the text after @ for filtering
   local after_at = before_cursor:match("@([%w-]*)$") or ""
 
-  -- Get obsidian client
-  local ok, obsidian = pcall(require, "obsidian")
-  if not ok then
-    callback({ is_incomplete_forward = false, is_incomplete_backward = false, items = {} })
-    return
-  end
-
-  local client = obsidian.get_client()
-  if not client then
+  -- Get vault directory (try obsidian.nvim first, fall back to hardcoded path)
+  local vault_dir = get_vault_dir()
+  if not vault_dir then
     callback({ is_incomplete_forward = false, is_incomplete_backward = false, items = {} })
     return
   end
 
   -- Check if people/ folder exists
-  local people_dir = client.dir / "people"
+  local people_dir = vault_dir / PEOPLE_FOLDER
   if not people_dir:is_dir() then
     callback({ is_incomplete_forward = false, is_incomplete_backward = false, items = {} })
     return
@@ -75,8 +78,13 @@ function M:get_completions(context, callback)
 
   -- Scan people/ folder for markdown files
   local items = {}
-  for file in people_dir:fs_iterdir() do
-    local filename = file:match("([^/]+)%.md$")
+
+  -- Get absolute path string for glob
+  local people_path_str = tostring(people_dir)
+  local files = vim.fn.glob(people_path_str .. "/*.md", false, true)
+
+  for _, file in ipairs(files) do
+    local filename = vim.fn.fnamemodify(file, ":t:r") -- Get filename without path and extension
     if filename then
       -- Convert first-last to First Last for display
       local display_name = filename:gsub("-", " "):gsub("(%a)([%w_']*)", function(first, rest)

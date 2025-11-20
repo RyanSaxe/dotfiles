@@ -56,7 +56,8 @@ return {
 
     -- AI CLI Terminal Integration
     cli = {
-      watch = true, -- Automatically reload files when modified by AI tools
+      -- NOTE: below is disabled because I think it's causing breaking of "undo"
+      watch = false, -- Automatically reload files when modified by AI tools
 
       -- Terminal window configuration
       win = {
