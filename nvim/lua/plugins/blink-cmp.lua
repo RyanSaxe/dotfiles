@@ -125,10 +125,11 @@ return {
       default = function()
         -- base set of sources everywhere
         local result = { "lsp", "path" }
-        -- only load dictionary for markdown
+        -- only load dictionary, buffer, and obsidian people completion for markdown
         if vim.bo.filetype == "markdown" then
           table.insert(result, "dictionary")
           table.insert(result, "buffer")
+          table.insert(result, "obsidian_people")
         end
         return result
       end,
@@ -142,6 +143,14 @@ return {
           opts = {
             dictionary_directories = { vim.fn.expand("~/.config/nvim/dictionaries") },
           },
+        },
+        -- Custom source for @ people mentions in obsidian vault
+        -- Triggers on @ and completes with [[first-last]] wikilinks
+        obsidian_people = {
+          module = "custom.completion.obsidian-people",
+          name = "People",
+          min_keyword_length = 0, -- Show completions immediately after @
+          score_offset = 15, -- Prioritize people completions over buffer/dictionary
         },
         -- copilot = {
         --   name = "copilot",

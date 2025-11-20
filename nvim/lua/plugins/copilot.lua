@@ -18,7 +18,8 @@ return {
     },
     panel = { enabled = false }, -- Panel is distracting, keep disabled
     filetypes = {
-      markdown = true,
+      markdown = false, -- Disabled for note-taking (obsidian.nvim)
+      text = false, -- Disabled for plain text files
       help = true,
       gitcommit = true, -- Enable for git commit messages
       typr = false, -- Disable for typing practice game

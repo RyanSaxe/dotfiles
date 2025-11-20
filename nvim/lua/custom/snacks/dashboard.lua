@@ -2,10 +2,9 @@
 -- Contains all dashboard sections, keys, and layout logic
 --
 -- TODO: Future dashboard improvements
--- 1. Replace "Find Project" with daily note functionality
--- 2. Replace grep with workspace diagnostics searching once proper LSP support
+-- 1. Replace grep with workspace diagnostics searching once proper LSP support
 --    is figured out for most regularly used LSPs
--- 3. Dashboard philosophy: Provide keybinds for common operations when opening
+-- 2. Dashboard philosophy: Provide keybinds for common operations when opening
 --    neovim for a project that ARE NOT common keymaps during normal coding.
 --    Normal keymaps still work and muscle memory knows them - the dashboard is
 --    for operations that are contextual to "just opened the project"
@@ -373,16 +372,18 @@ local function globalkeys()
   local keys = {
     { key = "q", desc = "Quit", action = ":qa" },
     {
-      key = "p",
-      desc = "Find Project",
+      key = "d",
+      desc = "Open Daily Note",
       action = function()
-        return Snacks.picker.projects({
-          confirm = function(picker, item)
-            picker:close()
-            vim.api.nvim_set_current_dir(item.file)
-            Snacks.dashboard.update()
-          end,
-        })
+        -- Check if obsidian.nvim is available
+        local ok, obsidian = pcall(require, "obsidian")
+        if not ok then
+          vim.notify("Obsidian.nvim not loaded", vim.log.levels.WARN)
+          return
+        end
+
+        -- Open today's daily note
+        vim.cmd("ObsidianToday")
       end,
     },
     {
