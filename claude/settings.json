@@ -12,17 +12,6 @@
         ]
       }
     ],
-    "PreToolUse": [
-      {
-        "matcher": "TodoWrite",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/pre-todowrite.sh"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "TodoWrite",

@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 # PostToolUse hook for TodoWrite tool
-# Triggers after TodoWrite completes
+# Reminds Claude to check skills only when tasks are marked in_progress
 
 set -euo pipefail
 
-# Read input from stdin (PostToolUse provides tool execution context)
-# Not currently used, but available for future enhancements
+# Read input from stdin
 input=$(cat)
 
-# Output JSON with skill activation reminder
-# This fires after Claude updates the todo list (starting or completing tasks)
-cat <<EOF
+# Check if any tasks are in_progress
+has_in_progress=$(echo "$input" | jq -r '.tool_input.todos[]? | select(.status=="in_progress") | .content' 2>/dev/null)
+
+# Only provide skill reminder if there are in_progress tasks
+if [[ -n "$has_in_progress" ]]; then
+  cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "<IMPORTANT>Before starting the next task, check if any of your available skills are relevant and invoke all appropriate ones using the Skill tool</IMPORTANT>"
+    "additionalContext": "<IMPORTANT>You have tasks marked as in_progress. Review your available skills and invoke any that are relevant to the current in_progress task(s) using the Skill tool.</IMPORTANT>"
   }
 }
 EOF
+else
+  echo "{}"
+fi
 
 exit 0
