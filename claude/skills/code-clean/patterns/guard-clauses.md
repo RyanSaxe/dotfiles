@@ -26,6 +26,7 @@ def process_order(order: Order | None) -> PaymentResult | None:
 ```
 
 **Problems:**
+
 - Main logic is 4-5 levels deep
 - Hard to follow the happy path
 - Error handling mixed with business logic
@@ -53,6 +54,7 @@ def process_order(order: Order | None) -> PaymentResult | None:
 ```
 
 **Benefits:**
+
 - Happy path is at lowest indentation (easy to scan)
 - Failures happen early (fail-fast principle)
 - Each guard clause is independent and clear
@@ -61,6 +63,7 @@ def process_order(order: Order | None) -> PaymentResult | None:
 ## Pattern: Extract Guard Clauses
 
 **Steps:**
+
 1. Identify nested conditionals checking for errors/edge cases
 2. Invert the conditions (if x: → if not x:)
 3. Move to top of function
@@ -72,6 +75,7 @@ def process_order(order: Order | None) -> PaymentResult | None:
 ### Example: Null Checks
 
 **Before:**
+
 ```python
 def get_user_email(user_id: int) -> str | None:
     user = find_user(user_id)
@@ -89,6 +93,7 @@ def get_user_email(user_id: int) -> str | None:
 ```
 
 **After:**
+
 ```python
 def get_user_email(user_id: int) -> str | None:
     user = find_user(user_id)
@@ -108,6 +113,7 @@ def get_user_email(user_id: int) -> str | None:
 ### Example: Permission Checks
 
 **Before:**
+
 ```python
 def delete_post(post_id: int, user: User) -> bool:
     post = find_post(post_id)
@@ -125,6 +131,7 @@ def delete_post(post_id: int, user: User) -> bool:
 ```
 
 **After:**
+
 ```python
 def delete_post(post_id: int, user: User) -> bool:
     post = find_post(post_id)
@@ -146,10 +153,12 @@ def delete_post(post_id: int, user: User) -> bool:
 **Guideline:** Keep nesting depth ≤ 3 levels
 
 If you have deeper nesting:
+
 1. Extract guard clauses first
 2. If still deep, extract helper functions
 
 **Example - Extracting Helper Functions:**
+
 ```python
 def process_complex_data(data: DataModel) -> ResultModel:
     if not is_valid_data(data):
@@ -171,6 +180,7 @@ def transform_data(data: DataModel) -> list[str]:
 ## When NOT to Use Guard Clauses
 
 **Appropriate nesting for related logic:**
+
 ```python
 def process_items(items: list[Item]) -> list[ProcessedItem]:
     results = []
@@ -183,6 +193,7 @@ def process_items(items: list[Item]) -> list[ProcessedItem]:
 This is fine - the if statement is part of the loop's logic, not a guard clause.
 
 **Don't over-extract:**
+
 ```python
 # Bad - over-extracted guard clauses
 def calculate(x: int, y: int) -> int:

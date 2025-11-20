@@ -5,6 +5,7 @@
 ## Quick Reference
 
 **Most common commands:**
+
 ```bash
 uvx <tool>              # Run tool without installing (e.g., uvx ruff check .)
 uv add <package>        # Add dependency
@@ -14,6 +15,7 @@ uv venv                 # Create virtual environment
 ```
 
 **Related:**
+
 - [Python skill](../../skills/language/python/SKILL.md) - Python-specific usage patterns
 - [Official uv docs](https://github.com/astral-sh/uv)
 - [PEP 723 - Inline script metadata](https://peps.python.org/pep-0723/)
@@ -78,6 +80,7 @@ uvx --with pandas python -c "import pandas; print(pandas.__version__)"
 ```
 
 **Benefits:**
+
 - No global installation clutter
 - Always use latest version (or specify version)
 - Works in any directory
@@ -85,6 +88,7 @@ uvx --with pandas python -c "import pandas; print(pandas.__version__)"
 - Isolates tool dependencies
 
 **Common use cases for Claude:**
+
 ```bash
 # Format code without installing formatter
 uvx black .
@@ -172,6 +176,7 @@ if __name__ == "__main__":
 ```
 
 **Key points:**
+
 - Shebang line: `#!/usr/bin/env -S uv run`
 - Dependency block between `# /// script` and `# ///`
 - Specify Python version requirement
@@ -247,12 +252,14 @@ uv run ruff check .
 ### For Standalone Scripts
 
 When creating reusable scripts within skills:
+
 1. Use `#!/usr/bin/env -S uv run` shebang
 2. Add inline dependency block
 3. Use `uv add --script` to manage dependencies
 4. Make executable with `chmod +x`
 
 **Example:**
+
 ```bash
 # Create skill script
 cat > scripts/process_data.py << 'EOF'
@@ -281,6 +288,7 @@ uv add --script scripts/process_data.py pandas
 ### For Project Work
 
 When working in a Python project:
+
 1. Check for existing `pyproject.toml` or `uv.lock`
 2. Use `uv sync` to set up environment
 3. Use `uv run` to execute commands in project context
@@ -289,18 +297,21 @@ When working in a Python project:
 ## Comparison with Other Tools
 
 ### vs pip
+
 - Much faster (10-100x in many cases)
 - Better dependency resolution
 - Lock file support
 - Integrated venv management
 
 ### vs poetry
+
 - Faster
 - Compatible with standard `pyproject.toml`
 - Simpler mental model
 - Better for monorepos
 
 ### vs pipx
+
 - `uvx` is similar to `pipx` but faster
 - Better isolation
 - More flexible (can specify dependencies with `--with`)
@@ -308,6 +319,7 @@ When working in a Python project:
 ## Common Workflows
 
 ### One-off Tool Execution
+
 ```bash
 # Instead of: pip install tool && tool
 # Use: uvx tool
@@ -315,6 +327,7 @@ uvx black .
 ```
 
 ### Project Dependency Management
+
 ```bash
 # Add dependency
 uv add requests
@@ -328,6 +341,7 @@ uv lock --upgrade --dry-run
 ```
 
 ### Running Tests
+
 ```bash
 # In project
 uv run pytest
@@ -343,4 +357,3 @@ uv run pytest --cov=mymodule
 3. **Inline scripts for skills** - Make scripts self-contained with dependencies
 4. **Fast sync** - `uv sync` is very fast, run often
 5. **Version specificity** - Use `uvx tool@version` for specific versions
-

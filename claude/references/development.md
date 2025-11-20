@@ -15,32 +15,19 @@ This document describes the development process, workflow practices, and collabo
 ### What is an Atomic Commit?
 
 An atomic commit is a single, self-contained change that:
+
 - Does one thing (and does it completely)
 - Can be applied or reverted independently
 - Doesn't break the project
 - Has a clear, focused purpose
 
-### Examples
-
-**Good atomic commits:**
-- "Add user authentication to login endpoint"
-- "Fix null pointer error in payment processing"
-- "Refactor database connection handling for better error recovery"
-- "Add unit tests for email validation"
-
-**Bad commits (not atomic):**
-- "Fix bugs and add features" (multiple things)
-- "WIP" (incomplete, breaks project)
-- "Update files" (unclear purpose)
-- "Part 1 of 3 for feature X" (not self-contained)
-
 ### When to Commit
 
 Ask for permission to commit when:
+
 - You've completed a self-contained change
 - Tests pass
 - The change is complete (not work-in-progress)
-- You can describe it in one clear sentence
 
 ## Development Cycle
 
@@ -58,6 +45,7 @@ sg -p 'class $NAME' src/  # Structural search
 ```
 
 **Questions to ask:**
+
 - How is this currently implemented?
 - What patterns does the codebase use?
 - Are there similar features to learn from?
@@ -85,6 +73,7 @@ Before writing code:
 **Standard implementation:**
 
 Follow these guidelines:
+
 - Follow existing code style and patterns (see [Style Guide](style.md))
 - Write minimal comments (self-documenting code preferred)
 - Use appropriate abstractions (but avoid over-engineering)
@@ -93,6 +82,7 @@ Follow these guidelines:
 **3a. Test-Driven Development (TDD) Alternative:**
 
 When using TDD, **tests come first** (see [TDD Skill](../skills/code/tdd/SKILL.md)):
+
 1. Write failing test that defines behavior
 2. Implement minimal code to pass test
 3. Refactor while keeping tests green
@@ -101,17 +91,17 @@ When using TDD, **tests come first** (see [TDD Skill](../skills/code/tdd/SKILL.m
 ### 4. Test (for non-TDD workflow)
 
 **Testing checklist:**
+
 - [ ] Write tests for new functionality
 - [ ] Run existing tests to ensure nothing broke
 - [ ] Test happy path
 - [ ] Test realistic error cases (see "Error Handling Balance" below)
-- [ ] Run linters and type checkers
+- [ ] Run linters and type checkers according to the project configuration
 
 ```bash
 # Python example
 pytest
 ruff check .
-lsp-check .  # Check for diagnostics
 ```
 
 ### 5. Review
@@ -135,7 +125,7 @@ git diff
 # Stage relevant files
 git add path/to/files
 
-# Commit with descriptive message
+# Commit with a short, yet descriptive, message following the below format
 git commit -m "Add user validation to registration endpoint
 
 Validates email format and password strength during user registration.
@@ -146,76 +136,12 @@ Returns 400 with specific error messages for invalid inputs.
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-## Error Handling Balance
+**REQUIRED Commit Format:**
 
-### Handle Realistic Cases, Not Every Possible Edge Case
-
-**Good error handling:**
-- Validates inputs that users can reasonably provide incorrectly
-- Handles expected failure cases (missing files, network errors)
-- Fails fast with clear error messages
-- Focuses on realistic scenarios
-
-**Bad error handling (code smell):**
-- Excessive validation for unrealistic scenarios
-- Defensive checks for things that "can't happen"
-- Nested validation that duplicates checks
-- Paranoid type checking when type system handles it
-
-### Examples
-
-```python
-# Good: Balanced error handling
-def withdraw(account: Account, amount: float) -> None:
-    if amount <= 0:
-        raise ValueError("Amount must be positive")
-    if amount > account.balance:
-        raise ValueError("Insufficient funds")
-    account.balance -= amount
-
-# Bad: Excessive validation (code smell)
-def withdraw(account: Account, amount: float) -> None:
-    if account is None:
-        raise ValueError("Account cannot be None")  # Type system handles this
-    if not isinstance(amount, (int, float)):
-        raise TypeError("Amount must be numeric")  # Type hints handle this
-    if amount <= 0:
-        raise ValueError("Amount must be positive")
-    if amount > account.balance:
-        raise ValueError("Insufficient funds")
-    if amount > 1000000:
-        raise ValueError("Amount too large")  # Unrealistic edge case
-    if account.balance < 0:
-        raise ValueError("Account corrupted")  # "Can't happen" defensive check
-    if not hasattr(account, 'balance'):
-        raise AttributeError("Invalid account")  # Already checked above
-    account.balance -= amount
-```
-
-### Guidelines
-
-**Do validate:**
-- User inputs (emails, passwords, amounts)
-- External data (API responses, file contents)
-- Business rules (balance checks, age requirements)
-
-**Don't validate:**
-- Things your type system guarantees
-- "Impossible" states (unless debugging)
-- Every conceivable edge case (focus on realistic ones)
-- Same thing multiple times
-
-**Remember:** A billion validation checks is itself a code smell. Good code has focused, meaningful error handling.
-
-## Git Workflow
-
-### Commit Messages
-
-**Format:**
 ```
 <type>: <short summary>
 
-<optional body explaining why, not what>
+<optional body explaining why, not what. No more than two lines.>
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -223,40 +149,13 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `refactor`: Code restructuring without behavior change
 - `test`: Adding or updating tests
 - `docs`: Documentation changes
 - `chore`: Tooling, dependencies, etc.
-
-**Good commit messages:**
-- "feat: Add password reset functionality"
-- "fix: Handle null values in user profile display"
-- "refactor: Extract database connection logic into separate module"
-- "test: Add integration tests for payment processing"
-
-**Bad commit messages:**
-- "Update code"
-- "Fix bug"
-- "Changes"
-- "WIP"
-
-### Branch Workflow
-
-**Create feature branches:**
-```bash
-# Create and switch to feature branch
-git checkout -b feature/user-authentication
-
-# Or for bug fixes
-git checkout -b fix/null-pointer-error
-```
-
-**Keep branches focused:**
-- One feature or fix per branch
-- Branch from main/master
-- Keep branches short-lived (days, not weeks)
 
 ## Debugging Workflow
 
@@ -283,6 +182,7 @@ git blame path/to/file.py
 - Read surrounding code
 - Check related tests
 - Review documentation/comments
+- Ask questions if needed
 
 ### 4. Fix and Verify
 
@@ -294,33 +194,15 @@ git blame path/to/file.py
 
 ## Refactoring Workflow
 
-See [Clean Code Skill](../skills/code/clean/SKILL.md) for detailed refactoring patterns and processes.
+See [Clean Code Skill](../skills/code/clean/SKILL.md) for detailed refactoring patterns and processes. Use this skill.
 
 **Refactoring checklist:**
+
 - [ ] Tests pass before refactoring
 - [ ] Make small, incremental changes
 - [ ] Run tests after each change
 - [ ] Don't mix refactoring with feature work
 - [ ] Commit refactoring separately from features
-
-## LSP Diagnostics
-
-Use `lsp-check` to verify code health before committing:
-
-```bash
-# Check specific files/directories you changed (recommended)
-lsp-check src/mymodule/ tests/
-
-# Detailed output with specific severity
-lsp-check src/ --detailed --min-severity WARN
-
-# Check entire repo respecting .gitignore (use with caution)
-lsp-check .
-
-# See [Diagnostics Skill](../skills/code/diagnostics/SKILL.md) for full guide
-```
-
-**Best practice:** Always target specific files or directories you're working on rather than checking the entire repository.
 
 ## Related Guides
 

@@ -42,3 +42,4 @@ This configuration uses a **skills-based architecture**:
 - **Package manager**: homebrew (macOS)
 - **Python**: `uv` for dependencies/virtualenvs (unless project uses `poetry`)
 - **Dotfiles**: `~/generic/dotfiles` (symlink mappings in `scripts/symlink.sh`)
+- **Editor**: Neovim v0.11.4

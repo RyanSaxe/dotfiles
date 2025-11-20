@@ -170,7 +170,6 @@ def process(items: list[dict]) -> list[dict]:
 
 # Good - clear and direct
 def process(items: list[dict]) -> list[dict]:
-    """Filter active items and sort by priority."""
     active = [item for item in items if item["status"] == "active"]
     return sorted(active, key=lambda x: x["priority"])
 ```
@@ -271,11 +270,7 @@ Watch for these code smells:
 
 ## Language-Specific Patterns
 
-Refactoring patterns vary by language. See `skills/language/` for specifics.
-
-Common languages: Python, Neovim/Lua, Shell
-
-Claude will auto-invoke the relevant language skill for your context.
+Refactoring patterns vary by language. See `skills/lang-[language-name]/` for specifics.
 
 ---
 

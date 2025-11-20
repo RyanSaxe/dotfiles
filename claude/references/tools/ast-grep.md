@@ -5,6 +5,7 @@
 ## Quick Reference
 
 **Most common patterns:**
+
 ```bash
 sg -p 'def $FUNC($$$):'                    # Find all function definitions (Python)
 sg -p 'class $CLASS($BASE):'               # Find class with inheritance
@@ -13,6 +14,7 @@ sg -p 'export const $NAME = $$$'           # Find all exports (JS)
 ```
 
 **Related:**
+
 - [Package search skill](../../skills/code/package-search/SKILL.md) - Using sg for package exploration
 - [Official ast-grep docs](https://ast-grep.github.io/)
 
@@ -21,12 +23,14 @@ sg -p 'export const $NAME = $$$'           # Find all exports (JS)
 ## When to Use ast-grep Over ripgrep
 
 **Use `sg` (ast-grep) when:**
+
 - Finding function/class definitions with specific signatures
 - Searching for patterns with variable names you don't know
 - Finding all usages of a specific API pattern
 - Understanding complex nested structures
 
 **Use `rg` (ripgrep) when:**
+
 - Simple text search (faster)
 - Searching strings, comments, or documentation
 - You know the exact text you're looking for
@@ -117,12 +121,14 @@ sg -p 'match $EXPR { $$$ }'
 ### Understanding Package APIs
 
 **Find all public functions in Python package:**
+
 ```bash
 cd /path/to/package
 sg -p 'def $FUNC($$$):' --json | jq '.[] | select(.text | test("^def [^_]"))'
 ```
 
 **Find all exports in JavaScript package:**
+
 ```bash
 sg -p 'export function $NAME($$$) { $$$ }' /path/to/package
 sg -p 'export const $NAME = $$$' /path/to/package
@@ -131,11 +137,13 @@ sg -p 'export const $NAME = $$$' /path/to/package
 ### Finding API Usage Patterns
 
 **Find all calls to specific function:**
+
 ```bash
 sg -p 'api_function($$$)' src/
 ```
 
 **Find all class instantiations:**
+
 ```bash
 # Python
 sg -p 'ClassName($$$)' src/
@@ -147,12 +155,14 @@ sg -p 'new ClassName($$$)' src/
 ### Refactoring Assistance
 
 **Find all functions with >3 parameters:**
+
 ```bash
 # Python (requires manual filtering of results)
 sg -p 'def $FUNC($P1, $P2, $P3, $P4, $$$):' src/
 ```
 
 **Find all error handling patterns:**
+
 ```bash
 # Python try-except
 sg -p 'try: $$$ except $EXCEPT: $$$' src/
@@ -164,6 +174,7 @@ sg -p 'try { $$$ } catch ($ERR) { $$$ }' src/
 ### Finding Implementation Patterns
 
 **Find all implementations of interface/base class:**
+
 ```bash
 # Python
 sg -p 'class $CLASS(BaseClass):' src/
@@ -173,6 +184,7 @@ sg -p 'class $CLASS implements $INTERFACE { $$$ }' src/
 ```
 
 **Find callback patterns:**
+
 ```bash
 # JavaScript callbacks
 sg -p '$FUNC(function($$$) { $$$ })' src/
@@ -243,18 +255,21 @@ sg -p 'def $FUNC($$$):' --json src/ | jq -r '.[] | "\(.file):\(.line) - \(.meta_
 ## Common Patterns Library
 
 ### Python
+
 - Functions: `def $FUNC($$$):`
 - Classes: `class $CLASS($$$):`
 - Imports: `from $MOD import $$$`
 - Decorators: `@$DECORATOR`
 
 ### JavaScript/TypeScript
+
 - Functions: `function $NAME($$$) { $$$ }`
 - Arrow functions: `($$$) => $$$`
 - Exports: `export $$$`
 - Imports: `import $$$`
 
 ### Lua
+
 - Functions: `function $NAME($$$) $$$ end`
 - Local functions: `local function $NAME($$$) $$$ end`
 - Tables: `$TABLE = { $$$ }`

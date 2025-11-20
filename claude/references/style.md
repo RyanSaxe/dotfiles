@@ -2,6 +2,8 @@
 
 This document defines what good code looks like - the standards, conventions, and patterns to follow when writing code.
 
+NOTE: the code examples in this file are python, but they apply to all languages. Any language that wants to deviate will specify in the corresponding skill located in skills/lang-[name-of-language].
+
 ## Core Principles
 
 Good code exhibits these qualities:
@@ -17,6 +19,7 @@ Good code exhibits these qualities:
 ### Variables and Functions
 
 **Rules:**
+
 - Use descriptive names that reveal intent
 - Use consistent terminology throughout
 - Match domain/business language
@@ -24,6 +27,7 @@ Good code exhibits these qualities:
 - Use verbs for functions, nouns for data
 
 **Good naming:**
+
 ```python
 # Variables: Clear nouns
 user_count = len(users)
@@ -41,6 +45,7 @@ def validate_email(email: str) -> bool:
 ```
 
 **Bad naming:**
+
 ```python
 # Too short, unclear
 def proc_data(x, y, z):
@@ -69,7 +74,7 @@ API_BASE_URL = "https://api.example.com"
 
 ### Classes and Types
 
-Use PascalCase for classes and types:
+Use CamelCase for classes and types:
 
 ```python
 class UserAccount:
@@ -93,11 +98,9 @@ Each function should do one thing and do it well:
 ```python
 # Good: One clear purpose
 def calculate_discount(price: float, discount_rate: float) -> float:
-    """Calculate discounted price."""
     return price * (1 - discount_rate)
 
 def apply_discount_to_order(order: Order, discount_rate: float) -> Order:
-    """Apply discount to all items in order."""
     for item in order.items:
         item.price = calculate_discount(item.price, discount_rate)
     return order
@@ -120,6 +123,8 @@ def process_order(order: Order, discount_rate: float) -> Order:
 
     return order
 ```
+
+<IMPORTANT>Do not go overboard here. Functions with only a few lines that call other functions can be problematic and increase cognitive complexity. This principal is NOT about size of the function, but just about avoiding having a function do too many things.</IMPORTANT>
 
 ### Parameter Count
 
@@ -194,19 +199,19 @@ class UserCreationContext:
 Prefer pure functions (no side effects, deterministic):
 
 ```python
-# Good: Pure function
-def calculate_total(items: list[float]) -> float:
-    return sum(items)
+# Good: does not mutate the input list
+def square(items: list[float]) -> list[float]:
+    return [item ** 2 for item in items]
 
 # Acceptable: Side effect is the point
 def save_user(user: User) -> None:
     database.save(user)
 
-# Bad: Hidden side effect
-def calculate_total(items: list[float]) -> float:
-    total = sum(items)
-    log.info(f"Calculated total: {total}")  # Unexpected side effect!
-    return total
+# Bad: mutates the input list
+def square(items: list[float]) -> list[float]:
+    for i in range(len(items)):
+      items[i] = items[i] ** 2
+    return items
 ```
 
 ## Code Structure
@@ -303,6 +308,7 @@ def can_process_order(user: User, order: Order) -> bool:
 **Do comment when:**
 
 1. **Explaining WHY** (not what):
+
 ```python
 # Good: Explains non-obvious reasoning
 # Use exponential backoff to avoid overwhelming the API
@@ -311,6 +317,7 @@ retry_delay = base_delay * (2 ** attempt_count)
 ```
 
 2. **Warning about side effects:**
+
 ```python
 # Warning: This modifies the global cache
 # Call clear_cache() before running tests
@@ -319,6 +326,7 @@ def update_user_preferences(user_id: int, prefs: dict) -> None:
 ```
 
 3. **Documenting public APIs:**
+
 ```python
 def calculate_compound_interest(
     principal: float,
@@ -339,15 +347,12 @@ def calculate_compound_interest(
     return principal * (1 + rate) ** periods
 ```
 
-4. **Project-specific requirements:**
-   - Lua/Neovim: Detailed comments are encouraged
-   - Other language-specific conventions in the codebase
-
 ### When NOT to Comment
 
 **Don't comment when:**
 
 1. **Restating the obvious:**
+
 ```python
 # Bad: Comment adds no value
 # Increment counter by 1
@@ -359,6 +364,7 @@ for user in users:
 ```
 
 2. **Code is self-documenting:**
+
 ```python
 # Bad: Comment should be function name
 # Check if user has admin write permissions
@@ -374,6 +380,7 @@ if has_admin_write_access(user):
 ```
 
 3. **Outdated or wrong information:**
+
 ```python
 # Bad: Outdated comment
 # Returns a list of users
@@ -408,7 +415,6 @@ def process_data(
     items: list[dict[str, Any]],
     weights: dict[str, float],
 ) -> dict[str, float]:
-    """Calculate weighted scores."""
     return {
         name: score * weights.get(name, 1.0)
         for name, score in items
@@ -417,7 +423,7 @@ def process_data(
 
 ## Magic Numbers
 
-Replace magic numbers with named constants:
+Replace magic numbers with named constants or parameters:
 
 ```python
 # Bad: Magic numbers
@@ -491,17 +497,19 @@ def calculate_total(items: list[Item]) -> float:
 ```
 
 **When to use try/except:**
+
 - Interacting with external systems (files, network, databases)
 - Providing meaningful fallbacks
 - Converting one error type to another more appropriate one
 - Adding context to errors before re-raising
 
 **When NOT to use try/except:**
+
 - "Just in case" error handling
 - Hiding bugs
 - As a substitute for proper validation
 
-### Explicit Error Cases
+### Only Validate Necessary Cases
 
 ```python
 # Good: Return None for missing data
@@ -514,6 +522,24 @@ def withdraw(account: Account, amount: float) -> None:
         raise ValueError("Amount must be positive")
     if amount > account.balance:
         raise ValueError("Insufficient funds")
+    account.balance -= amount
+
+# Bad: Excessive validation (code smell)
+def withdraw(account: Account, amount: float) -> None:
+    if account is None:
+        raise ValueError("Account cannot be None")  # Type system handles this
+    if not isinstance(amount, (int, float)):
+        raise TypeError("Amount must be numeric")  # Type hints handle this
+    if amount <= 0:
+        raise ValueError("Amount must be positive")
+    if amount > account.balance:
+        raise ValueError("Insufficient funds")
+    if amount > 1000000:
+        raise ValueError("Amount too large")  # Unrealistic edge case
+    if account.balance < 0:
+        raise ValueError("Account corrupted")  # "Can't happen" defensive check
+    if not hasattr(account, 'balance'):
+        raise AttributeError("Invalid account")  # Already checked above
     account.balance -= amount
 ```
 
@@ -544,6 +570,7 @@ def calculate_total(subtotal: float, tax_rate: float) -> str:
 Use classes when you need to:
 
 1. **Maintain state across multiple operations:**
+
 ```python
 class ShoppingCart:
     def __init__(self):
@@ -562,6 +589,7 @@ class ShoppingCart:
 ```
 
 2. **Group related behavior with shared data:**
+
 ```python
 class DatabaseConnection:
     def __init__(self, connection_string: str):
@@ -581,6 +609,7 @@ class DatabaseConnection:
 ```
 
 3. **Need instances with different configurations:**
+
 ```python
 class APIClient:
     def __init__(self, base_url: str, api_key: str):
@@ -598,6 +627,7 @@ test_client = APIClient("https://api.test.com", test_key)
 ```
 
 4. **Implementing interfaces/protocols:**
+
 ```python
 class PaymentProcessor(Protocol):
     def process_payment(self, amount: float) -> bool:
@@ -724,20 +754,16 @@ dog = Animal(name="Dog", movement_fn=walk, vocalization_fn=bark)
 ```
 
 **Inheritance is acceptable when:**
+
 - You're implementing interfaces/protocols
 - You're extending framework classes (Django models, etc.)
 - There's a clear "is-a" relationship and shallow hierarchy (1-2 levels)
 
 **Language considerations:**
+
 - Python: Functions are first-class, prefer them
 - Lua: Tables and functions are often more idiomatic than classes
 - Java/C#: Classes are more fundamental, but still prefer simple over complex hierarchies
-
-## Language-Specific Style
-
-For language-specific conventions and examples:
-- [Python Style Guide](../skills/language/python/SKILL.md) - PEP 8, type hints, comprehensions
-- [Neovim/Lua Style Guide](../skills/language/neovim/SKILL.md) - Detailed comments, module patterns
 
 ## Related Guides
 

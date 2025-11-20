@@ -7,6 +7,7 @@ Automated LSP diagnostic collection using headless Neovim. Opens files, triggers
 **⚠️ IMPORTANT: Always run lsp-check on targeted files/folders, not entire repositories!**
 
 **Most common commands:**
+
 ```bash
 # Target specific files or directories you're working on
 lsp-check src/mymodule/            # Check specific module
@@ -23,6 +24,7 @@ lsp-check src/ --source pyright    # Filter by LSP source
 ```
 
 **Related:**
+
 - [Diagnostics skill](../../skills/code/diagnostics/SKILL.md) - Workflow integration
 - [Development workflow](../development.md) - How diagnostics fit into your process
 - Script location: `~/generic/dotfiles/scripts/lsp-check`
@@ -75,6 +77,7 @@ lsp-check src/ --detailed
 ```
 
 Shows all diagnostics file-by-file with:
+
 - Color-coded severity (ERROR=red, WARN=yellow, INFO=blue, HINT=gray)
 - Line and column numbers
 - Diagnostic codes and sources
@@ -131,6 +134,7 @@ lsp-check . --no-ignore
 ```
 
 **When to use --no-ignore:**
+
 - Debugging issues in ignored files (e.g., generated code)
 - Checking vendored dependencies
 - Rare cases where you need complete repository analysis
@@ -151,6 +155,7 @@ lsp-check src/ --quiet-ms 3000
 ```
 
 **Timing strategy:**
+
 1. **--wait** (default 1s): Minimum settle time before monitoring starts
 2. **--quiet-ms** (default 1000ms): How long with no updates before considering "done"
 3. **--timeout** (default 30s): Hard cap on total time
@@ -171,6 +176,7 @@ lsp-check . --verbose
 ```
 
 Shows real-time progress:
+
 - LSP startup status
 - Diagnostic count changes
 - Silent duration tracking

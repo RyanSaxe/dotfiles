@@ -7,6 +7,7 @@ This document provides comprehensive testing patterns, methodologies, and best p
 **Tests are the absolute best form of documentation.**
 
 Why tests are superior documentation:
+
 - **Show actual usage**: Real inputs and outputs, not theoretical examples
 - **Always up-to-date**: If they pass, they reflect current behavior
 - **Executable**: Prove they work by running them
@@ -117,6 +118,7 @@ def test_calculate_tax_returns_correct_amount():
 ```
 
 **Characteristics:**
+
 - Fast (milliseconds)
 - Isolated (no external dependencies)
 - Deterministic (same input = same output)
@@ -136,6 +138,7 @@ def test_order_processing_updates_inventory():
 ```
 
 **Characteristics:**
+
 - Slower (seconds)
 - May use databases, files, or services
 - Test component interactions
@@ -157,6 +160,7 @@ def test_user_can_complete_purchase():
 ```
 
 **Characteristics:**
+
 - Slowest (seconds to minutes)
 - Tests entire system
 - Catches integration issues
@@ -191,12 +195,14 @@ def test_user_creation(database, sample_user):
 **See [TDD Skill](../skills/code/tdd/SKILL.md) for comprehensive mocking guidelines.**
 
 **Use mocks only when:**
+
 - External paid APIs (avoid costs)
 - Slow operations (database, network)
 - Non-deterministic behavior (time, random)
 - Unavailable services (third-party APIs)
 
 **Prefer real objects when:**
+
 - Testing internal code
 - Pure functions
 - In-memory data structures
@@ -243,17 +249,20 @@ def test_update_user():
 For comprehensive TDD workflow, see [TDD Skill](../skills/code/tdd/SKILL.md).
 
 **Brief overview:**
+
 1. Write test defining desired behavior (Red)
 2. Write minimal code to pass (Green)
 3. Refactor while keeping tests green
 
 **When TDD is ideal:**
+
 - Clear requirements
 - Functional units (pure functions, algorithms)
 - Bug fixes (test the bug first)
 - APIs and libraries
 
 **When TDD is not ideal:**
+
 - Exploratory work
 - UI/visual elements
 - Unclear requirements

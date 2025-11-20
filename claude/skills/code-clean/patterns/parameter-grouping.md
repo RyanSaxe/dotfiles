@@ -24,6 +24,7 @@ def create_user(
 ```
 
 **Problems:**
+
 - Too many parameters (cognitive overload)
 - Hard to remember order
 - Error-prone (easy to swap values)
@@ -33,6 +34,7 @@ def create_user(
 ## When to Group Parameters
 
 **Guidelines:**
+
 - **4+ related parameters** → consider grouping
 - **8+ parameters** → definitely group (code smell)
 - **Parameters often passed together** → create context object
@@ -70,6 +72,7 @@ def create_user(
 ```
 
 **Benefits:**
+
 - Reduced parameter count (10 → 5)
 - Clear relationships (related data grouped)
 - Easier to extend (add to struct, not new parameter)
@@ -81,6 +84,7 @@ def create_user(
 ### API Configuration
 
 **Before:**
+
 ```python
 def make_request(
     url: str,
@@ -96,6 +100,7 @@ def make_request(
 ```
 
 **After:**
+
 ```python
 @dataclass
 class APIConfig:

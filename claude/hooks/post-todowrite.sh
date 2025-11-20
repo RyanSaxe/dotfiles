@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # PostToolUse hook for TodoWrite tool
-# Triggers after TodoWrite completes - perfect timing to remind about skills
-# before starting the next task
+# Triggers after TodoWrite completes
 
 set -euo pipefail
 

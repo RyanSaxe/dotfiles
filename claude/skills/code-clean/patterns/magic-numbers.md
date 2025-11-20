@@ -20,6 +20,7 @@ def process_payment(amount: float, user: User) -> bool:
 ```
 
 **Problems:**
+
 - What is 21? What is 100? What is 0.1? What is 5?
 - No context for these values
 - Hard to update (scattered throughout code)
@@ -48,6 +49,7 @@ def process_payment(amount: float, user: User) -> bool:
 ```
 
 **Benefits:**
+
 - Self-documenting (names explain meaning)
 - Easy to update (change in one place)
 - Searchable and reusable
@@ -56,12 +58,14 @@ def process_payment(amount: float, user: User) -> bool:
 ## When to Extract Constants
 
 **Extract when:**
+
 - Number/string has business meaning
 - Same value used multiple times
 - Value might change in future
 - Meaning isn't obvious from context
 
 **Don't extract when:**
+
 - Meaning is obvious from context
 - Used only once in obvious context
 - Standard mathematical operations
