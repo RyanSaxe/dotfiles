@@ -372,21 +372,6 @@ local function globalkeys()
   local keys = {
     { key = "q", desc = "Quit", action = ":qa" },
     {
-      key = "d",
-      desc = "Open Daily Note",
-      action = function()
-        -- Check if obsidian.nvim is available
-        local ok, obsidian = pcall(require, "obsidian")
-        if not ok then
-          vim.notify("Obsidian.nvim not loaded", vim.log.levels.WARN)
-          return
-        end
-
-        -- Open today's daily note
-        vim.cmd("ObsidianToday")
-      end,
-    },
-    {
       key = "l",
       desc = "Manage Lua Plugins",
       action = ":Lazy",
@@ -394,6 +379,31 @@ local function globalkeys()
     },
     { key = "r", desc = "Restore Session", section = "session" },
   }
+
+  local ok, _ = pcall(require, "obsidian")
+  if ok then
+    table.insert(keys, 2, {
+      key = "d",
+      desc = "Open Daily Note",
+      action = function()
+        vim.cmd("ObsidianToday")
+      end,
+    })
+  else
+    table.insert(keys, 2, {
+      key = "p",
+      desc = "Find Project",
+      action = function()
+        return Snacks.picker.projects({
+          confirm = function(picker, item)
+            picker:close()
+            vim.api.nvim_set_current_dir(item.file)
+            Snacks.dashboard.update()
+          end,
+        })
+      end,
+    })
+  end
 
   return utils.create_pane(header, keys, 2)
 end
@@ -823,11 +833,12 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
   -- 2. When recent files are in pane 1 (not in git) and shown
   -- 3. When recent files would be in pane 2 (in git) but are hidden
   local both_hidden = hide_git and hide_recent
-  local show_pane2_separator = utils.show_if_has_second_pane() and (
-    both_hidden or                                           -- Case 1: Both hidden, always need separator
-    (not in_git and recent_project_toggle(hide_recent)) or  -- Case 2: Recent in left pane and shown
-    (in_git and not recent_project_toggle(hide_recent))      -- Case 3: Recent would be in right pane but hidden
-  )
+  local show_pane2_separator = utils.show_if_has_second_pane()
+    and (
+      both_hidden -- Case 1: Both hidden, always need separator
+      or (not in_git and recent_project_toggle(hide_recent)) -- Case 2: Recent in left pane and shown
+      or (in_git and not recent_project_toggle(hide_recent)) -- Case 3: Recent would be in right pane but hidden
+    )
 
   if show_pane2_separator then
     table.insert(sections, {
