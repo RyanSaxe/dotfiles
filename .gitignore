@@ -19,6 +19,7 @@ claude/*
 !claude/skills/
 !claude/references/
 !claude/hooks/
+!claude/commands/
 ipython/*
 !ipython/profile_default/
 ipython/profile_default/*
