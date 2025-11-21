@@ -1,5 +1,5 @@
 ---
-description: Python development with uv, type hints, and modern Python practices
+description: Python standards and best practices that are not specified in the general style guide.
 ---
 
 # Task
@@ -14,9 +14,7 @@ Write Python code following modern practices with proper type hints and tooling.
 - **Code Style**: Follow PEP 8, prefer comprehensions when readable
 - **Minimal docstrings**: Only write docstrings when truly necessary (see criteria below)
 
-## Workflow
-
-### 1. Project Setup
+## Project Setup
 
 Check project structure first:
 
@@ -57,7 +55,7 @@ poetry run python script.py
 poetry run pytest
 ```
 
-### 2. Type Hints
+## Type Hints
 
 Use type hints for clarity:
 
@@ -79,7 +77,7 @@ def apply(func: Callable[[int], int], value: int) -> int:
 
 **Don't prioritize backward compatibility** unless CLAUDE.md requires it.
 
-### 3. When to Write Docstrings
+## When to Write Docstrings
 
 <IMPORTANT>Only write docstrings if one of these is true:</IMPORTANT>
 
@@ -121,147 +119,6 @@ class DataProcessor:
     Thread-safe for concurrent processing.
     """
     ...
-```
-
-### 4. Code Style
-
-**Comprehensions for simple transformations:**
-
-```python
-# Good - readable comprehension
-squared = [x**2 for x in numbers]
-evens = [x for x in numbers if x % 2 == 0]
-lookup = {user.id: user for user in users}
-
-# Bad - too complex
-result = [
-    transform(process(x))
-    for x in items
-    if validate(x) and check(x)
-    for y in x.related
-    if y.active
-]
-
-# Better - use explicit loop
-result = []
-for x in items:
-    if not (validate(x) and check(x)):
-        continue
-    for y in x.related:
-        if y.active:
-            result.append(transform(process(x)))
-```
-
-**Match existing patterns:**
-
-```python
-# Check project conventions first
-rg "class.*:" --type py | head -5
-rg "def.*:" --type py | head -5
-
-# Follow what you find
-```
-
-### 5. Error Handling
-
-```python
-# Specific exceptions
-try:
-    data = load_config(path)
-except FileNotFoundError:
-    logger.error(f"Config not found: {path}")
-    return default_config()
-except json.JSONDecodeError as e:
-    logger.error(f"Invalid JSON in {path}: {e}")
-    raise
-
-# Early returns (guard clauses)
-def process_order(order: Order | None) -> PaymentResult:
-    if order is None:
-        raise ValueError("Order cannot be None")
-    if not order.is_valid():
-        raise ValueError("Invalid order")
-    if not order.items:
-        return PaymentResult.empty()
-
-    # Main logic at lowest indentation
-    return calculate_payment(order)
-```
-
-### 6. Testing
-
-```bash
-# Run tests
-uv run pytest
-
-# With coverage
-uv run pytest --cov
-
-# Specific test
-uv run pytest tests/test_module.py::test_function
-
-# Watch mode (if available)
-uv run pytest-watch
-```
-
-For TDD workflow, use `/tdd` command.
-
-### 7. Common Patterns
-
-**Context managers:**
-
-```python
-from contextlib import contextmanager
-
-@contextmanager
-def database_transaction():
-    conn = connect()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-```
-
-**Dataclasses:**
-
-```python
-from dataclasses import dataclass
-
-@dataclass
-class User:
-    id: int
-    name: str
-    email: str
-    is_active: bool = True
-```
-
-**Enums:**
-
-```python
-from enum import Enum
-
-class Status(Enum):
-    PENDING = "pending"
-    ACTIVE = "active"
-    COMPLETE = "complete"
-```
-
-## Debugging
-
-```python
-# Breakpoint (Python 3.7+)
-breakpoint()
-
-# Or use pdb
-import pdb; pdb.set_trace()
-
-# Rich for better output
-from rich import print
-print(complex_object)
 ```
 
 ## Related Documentation

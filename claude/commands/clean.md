@@ -11,4 +11,3 @@ Read the [Style Guide](~/.claude/references/style.md) and clean up the code by f
 5. 🔁 **Repeat** until clean
 6. 🛑 **Stop when good enough** (perfect is enemy of good)
 7. Scan the repo for unused code and remove it, then run tests again.
-

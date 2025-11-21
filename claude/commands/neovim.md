@@ -16,9 +16,7 @@ Work with Neovim configuration, Lua scripts, LazyVim plugins, and ensure TokyoNi
 - **Theme Consistency**: Match TokyoNight colors for any customizations
   - Reference: `nvim/lua/plugins/colorscheme.lua`
 
-## Workflow
-
-### 1. Understand LazyVim Structure
+## LazyVim Structure
 
 LazyVim plugins live in `nvim/lua/plugins/`:
 
@@ -40,7 +38,7 @@ return {
 }
 ```
 
-### 2. Lazy Loading Patterns
+## Lazy Loading Patterns
 
 Load plugins efficiently:
 
@@ -58,7 +56,7 @@ Load plugins efficiently:
 { "plugin/name", keys = { "<leader>x" } }
 ```
 
-### 3. Neovim API Patterns
+## Neovim API Patterns
 
 Common operations:
 
@@ -88,7 +86,7 @@ vim.wo.number = true          -- Window options
 vim.o.ignorecase = true       -- Global options
 ```
 
-### 4. Theme Colors (TokyoNight)
+## Theme Colors (TokyoNight)
 
 When customizing colors:
 
@@ -107,7 +105,7 @@ vim.api.nvim_set_hl(0, "MyHighlight", {
 
 **Reference:** `nvim/lua/plugins/colorscheme.lua` in this dotfiles repo
 
-### 5. Write Detailed Comments
+## Write Detailed Comments
 
 **Example:**
 
@@ -124,7 +122,7 @@ vim.api.nvim_create_user_command("ReloadModule", function(opts)
 end, { nargs = 1 })
 ```
 
-### 6. Testing Configuration
+## Testing Configuration
 
 ```bash
 # Test config loads without errors
@@ -137,25 +135,7 @@ nvim --startuptime startup.log
 nvim -u /path/to/init.lua
 ```
 
-## Quick Reference
-
-**LazyVim plugin structure:**
-
-```lua
-return {
-  "author/plugin-name",
-  opts = { --[[options]] },
-  keys = { { "<leader>x", "<cmd>Cmd<cr>", desc = "Desc" } },
-}
-```
-
-**Neovim API:**
-
-- Keymaps: `vim.keymap.set("n", "<leader>x", fn, { desc = "..." })`
-- Autocommands: `vim.api.nvim_create_autocmd("Event", { ... })`
-- Commands: `vim.api.nvim_create_user_command("Name", fn, {})`
-
-**Related Documentation:**
+## Related Documentation
 
 - [Style Guide](~/.claude/references/style.md) - General code style
 - [LazyVim docs](https://lazyvim.org) - LazyVim documentation

@@ -1,8 +1,18 @@
 -- Custom note creation with directory picker
 -- This module provides a note creation workflow that prompts the user
 -- to select a target directory before creating a new note
+-- Templates are automatically applied based on the selected directory
 
 local M = {}
+
+-- Directory to template mapping
+-- Add directory names here to automatically apply templates
+local DIRECTORY_TEMPLATES = {
+  people = "person", -- people/ directory uses person.md template
+  -- Add more mappings as needed:
+  -- projects = "project",
+  -- meetings = "meeting",
+}
 
 -- Get all subdirectories in the vault (excluding special folders)
 local function get_note_directories()
@@ -45,21 +55,35 @@ local function get_note_directories()
   return result
 end
 
--- Create a note in a specific directory
-local function create_note_in_dir(title, dir_path)
-  local Note = require("obsidian.note")
+-- Create a note in a specific directory with optional template
+local function create_note_in_dir(title, dir_path, dir_name)
+  -- Check if this directory has an associated template
+  local template_name = DIRECTORY_TEMPLATES[dir_name]
 
-  -- Create the note using Note.create
-  local note = Note.create({
-    title = title,
-    dir = dir_path,
-  })
+  if template_name then
+    -- Create note with template using ObsidianNewFromTemplate
+    -- This ensures the template is properly applied
+    vim.cmd(string.format(
+      "ObsidianNewFromTemplate %s %s/%s",
+      template_name,
+      dir_path,
+      title:gsub(" ", "-"):gsub("[^A-Za-z0-9-]", ""):lower() .. ".md"
+    ))
+  else
+    -- Create note without template (default behavior)
+    local Note = require("obsidian.note")
 
-  -- Open the note and write to buffer
-  note:open({ sync = true })
-  note:write_to_buffer()
+    local note = Note.create({
+      title = title,
+      dir = dir_path,
+    })
 
-  return note
+    -- Open the note and write to buffer
+    note:open({ sync = true })
+    note:write_to_buffer()
+
+    return note
+  end
 end
 
 -- Show directory picker first, then prompt for note name
@@ -84,7 +108,7 @@ function M.prompt_and_create()
     -- Second: Prompt for note title
     vim.ui.input({ prompt = "Note title: " }, function(title)
       if title and title ~= "" then
-        create_note_in_dir(title, selected_dir.path)
+        create_note_in_dir(title, selected_dir.path, selected_dir.name:lower())
       end
     end)
   end)

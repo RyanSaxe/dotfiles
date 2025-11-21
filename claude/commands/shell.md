@@ -53,6 +53,7 @@ fi
 ```
 
 **Quote everything:**
+
 - `"$var"`
 - `"${array[@]}"`
 - Command substitutions: `"$(command)"`
@@ -75,6 +76,7 @@ sed 's/old/new/' file.txt > file.tmp && mv file.tmp file.txt
 ```
 
 **Common differences:**
+
 - `sed -i` syntax (macOS needs `''`)
 - `date` command options
 - `readlink` (use `realpath` on Linux, `greadlink` on macOS)
@@ -83,12 +85,14 @@ sed 's/old/new/' file.txt > file.tmp && mv file.tmp file.txt
 ### 4. Use Bash 3.2 Compatible Features
 
 **Available in Bash 3.2:**
+
 - Arrays: `arr=(a b c)`
 - `[[ ]]` conditionals
 - `$()` command substitution
 - String manipulation: `${var#pattern}`, `${var%pattern}`
 
 **NOT available in Bash 3.2:**
+
 - Associative arrays: `declare -A` (use bash 4+ or zsh)
 - `readarray` / `mapfile`
 - `&>>` redirect operator
