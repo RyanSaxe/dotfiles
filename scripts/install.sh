@@ -36,12 +36,14 @@ detect_pm() {
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 BREW_DEPS=()
 while IFS= read -r line || [[ -n "$line" ]]; do
-  [[ -n "$line" ]] && BREW_DEPS[${#BREW_DEPS[@]}]="$line"
+  # Skip empty lines and comments
+  [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]] && BREW_DEPS[${#BREW_DEPS[@]}]="$line"
 done < "$DOTFILES_DIR/config/brew-packages.txt"
 
 APT_DEPS=()
 while IFS= read -r line || [[ -n "$line" ]]; do
-  [[ -n "$line" ]] && APT_DEPS[${#APT_DEPS[@]}]="$line"
+  # Skip empty lines and comments
+  [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]] && APT_DEPS[${#APT_DEPS[@]}]="$line"
 done < "$DOTFILES_DIR/config/apt-packages.txt"
 # NOTE: below is the explanation for each of the above dependencies. They are either here due to commonly being used directly
 #       or because :checkhealth in neovim raises warnings/errors if they are not installed.

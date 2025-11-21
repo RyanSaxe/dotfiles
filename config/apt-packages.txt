@@ -24,4 +24,7 @@ luarocks
 ast-grep
 tldr
 tree
-claude-code
+
+# NOTE: claude-code is not available as an apt package
+# Install via npm: npm install -g @anthropic-ai/claude-code
+# Or via curl: curl -fsSL https://claude.ai/install.sh | bash
