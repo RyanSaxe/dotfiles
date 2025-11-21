@@ -383,7 +383,7 @@ local function globalkeys()
   local ok, _ = pcall(require, "obsidian")
   if ok then
     table.insert(keys, 2, {
-      key = "d",
+      key = "n",
       desc = "Open Daily Note",
       action = function()
         vim.cmd("ObsidianToday")

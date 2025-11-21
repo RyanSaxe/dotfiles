@@ -102,8 +102,6 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
 
   # Display context info if we have data
   if [[ $context_tokens -gt 0 ]]; then
-    percentage=$((context_tokens * 100 / 200000))
-
     # Format context tokens for display (k for thousands, M for millions)
     if [[ $context_tokens -ge 1000000 ]]; then
       token_display="$(echo "scale=1; $context_tokens / 1000000" | bc -l)M"
@@ -113,16 +111,17 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
       token_display="$context_tokens"
     fi
 
-    # Choose color based on percentage of 200k limit
-    if [[ $percentage -lt 33 ]]; then
-      percent_color="$C_GREEN"
-    elif [[ $percentage -lt 66 ]]; then
-      percent_color="$C_YELLOW"
+    # Choose color based on hardcoded thresholds
+    # Green: 0-50k, Orange: 50-100k, Red: 100k+
+    if [[ $context_tokens -lt 50000 ]]; then
+      token_color="$C_GREEN"
+    elif [[ $context_tokens -lt 100000 ]]; then
+      token_color="$C_YELLOW"
     else
-      percent_color="$C_RED"
+      token_color="$C_RED"
     fi
 
-    token_info=" ${C_DIM}[${RESET}${C_DIM}${token_display}/200k${RESET} ${percent_color}(${percentage}%)${RESET}${C_DIM}]${RESET}"
+    token_info=" ${C_DIM}[ctx: ${RESET}${token_color}${token_display}${RESET}${C_DIM}]${RESET}"
   fi
 fi
 
