@@ -152,7 +152,7 @@ ts() {
 # Switch to Claude instance in tmux (with attention indicators)
 tc() {
   # Source utility functions (symlinked to this repo)
-  local claude_utils_path="${HOME}/.claude/claude-utils.sh"
+  local claude_utils_path="${HOME}/.claude/utility-scripts/claude-utils.sh"
   if [[ -f "$claude_utils_path" ]]; then
     source "$claude_utils_path"
   else
@@ -225,7 +225,7 @@ tc() {
 # Switch to any tmux pane with bell notifications
 tb() {
   # Source utility functions (symlinked to this repo)
-  local claude_utils_path="${HOME}/.claude/claude-utils.sh"
+  local claude_utils_path="${HOME}/.claude/utility-scripts/claude-utils.sh"
   if [[ -f "$claude_utils_path" ]]; then
     source "$claude_utils_path"
   else

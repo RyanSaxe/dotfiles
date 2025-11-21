@@ -68,23 +68,37 @@ return {
         "snippet_backward",
         "fallback",
       },
+      -- Smart Tab: Copilot → blink menu → NES → snippets → fallback
+      -- (C-Tab explicitly accepts Copilot, C-BS dismisses)
       ["<Tab>"] = {
         function(cmp)
-          return cmp.select_next()
-        end,
-        "snippet_forward",
-        "fallback",
-      },
-      -- Explicitly check for copilot suggestion and accept it
-      ["<S-Tab>"] = {
-        function(cmp)
-          -- First check if copilot suggestion is visible
+          -- 1. FIRST: Check for Copilot inline suggestion (ghost text)
           if require("copilot.suggestion").is_visible() then
             require("copilot.suggestion").accept()
             return true -- stop processing
           end
-          -- If no copilot suggestion, continue to next command
+
+          -- 2. SECOND: Navigate blink-cmp menu if it's open
+          if cmp.is_visible() then
+            return cmp.select_next()
+          end
+
+          -- 3. THIRD: Check for NES (sidekick) multi-line edits
+          local ok, sidekick = pcall(require, "sidekick")
+          if ok and sidekick.nes_jump_or_apply() then
+            return true -- stop processing
+          end
+
+          -- Otherwise continue to snippet_forward and fallback
           return false
+        end,
+        "snippet_forward", -- 4. FOURTH: Jump to next snippet field
+        "fallback", -- 5. LAST: Regular tab/indentation
+      },
+      -- Shift-Tab: Go backwards through menus and snippets
+      ["<S-Tab>"] = {
+        function(cmp)
+          return cmp.select_prev()
         end,
         "snippet_backward",
         "fallback",
@@ -111,10 +125,11 @@ return {
       default = function()
         -- base set of sources everywhere
         local result = { "lsp", "path" }
-        -- only load dictionary for markdown
+        -- only load dictionary and buffer for markdown
         if vim.bo.filetype == "markdown" then
           table.insert(result, "dictionary")
           table.insert(result, "buffer")
+          -- obsidian sources are auto-added by obsidian.nvim when blink = true
         end
         return result
       end,
@@ -129,6 +144,8 @@ return {
             dictionary_directories = { vim.fn.expand("~/.config/nvim/dictionaries") },
           },
         },
+        -- Obsidian providers (obsidian, obsidian_new, obsidian_tags) are
+        -- automatically registered by obsidian.nvim when completion.blink = true
         -- copilot = {
         --   name = "copilot",
         --   module = "blink-cmp-copilot",

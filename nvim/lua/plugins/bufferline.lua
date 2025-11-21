@@ -44,8 +44,9 @@ return {
       show_buffer_close_icons = true,
       show_close_icon = true,
 
-      -- Don't always show - this prevents showing on dashboard when it's the only buffer
+      -- Always show bufferline to display NES indicators
       always_show_bufferline = false,
+
 
       max_name_length = 18,
       tab_size = 18,

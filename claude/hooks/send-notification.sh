@@ -154,5 +154,13 @@ else
 fi
 
 # Always play terminal bell as backup
-# Write directly to terminal device for better reliability across hook execution contexts
-tput bel > /dev/tty
+# If running inside Neovim (via sidekick.nvim), use RPC to send bell to parent terminal
+# Otherwise, write to /dev/tty for better reliability across hook execution contexts
+if [[ -n "$NVIM" ]]; then
+  # Inside Neovim terminal - use nvim RPC to execute code in parent Neovim that writes bell
+  # This writes the bell to the parent terminal (outside Neovim)
+  nvim --server "$NVIM" --remote-expr 'execute("lua io.stderr:write(\"\\007\")")' 2>/dev/null || true
+else
+  # Normal terminal - use tput to /dev/tty
+  tput bel > /dev/tty 2>/dev/null || printf '\007'
+fi

@@ -17,7 +17,7 @@ return {
     -- Load pokemon colors from cache file (created by dashboard)
     -- This allows lualine to match the pokemon theme automatically
     local pokemon_prominent = c.blue -- fallback to TokyoNight blue
-    local pokemon_bright = c.teal    -- fallback to TokyoNight green/teal
+    local pokemon_bright = c.orange -- fallback to TokyoNight orange
 
     local env_file = vim.fn.expand("~/.cache/pokemon-colors.env")
     if vim.fn.filereadable(env_file) == 1 then
@@ -39,9 +39,9 @@ return {
     local C = {
       bg = c.bg,
       fg = c.fg,
-      blue = pokemon_prominent,  -- Use pokemon prominent color for normal mode
+      blue = pokemon_prominent, -- Use pokemon prominent color for normal mode
       cyan = c.cyan,
-      green = pokemon_bright,    -- Use pokemon bright color for insert mode
+      green = pokemon_bright, -- Use pokemon bright color for insert mode
       red = c.red,
       yellow = c.yellow,
       gray = c.comment,
@@ -81,15 +81,11 @@ return {
     end
 
     local function loc_bg()
-      if vim.bo.readonly or not vim.bo.modifiable then
-        return C.red
-      end
-      if vim.api.nvim_buf_get_name(0) == "" then
-        return C.purple
-      end
+      -- Show yellow for modified buffers
       if vim.bo.modified then
         return C.yellow
       end
+      -- Use default gray for everything else (readonly, non-modifiable, unnamed, etc.)
       return C.gray
     end
 
@@ -157,6 +153,10 @@ return {
       },
       source = diff_source,
       cond = function()
+        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
+        if vim.bo.buftype == "terminal" then
+          return false
+        end
         -- Hide winbar for buffergolf practice and reference buffers
         return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
       end,
@@ -168,6 +168,10 @@ return {
         return " "
       end,
       cond = function()
+        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
+        if vim.bo.buftype == "terminal" then
+          return false
+        end
         -- Hide winbar for buffergolf practice and reference buffers
         return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
       end,
@@ -183,6 +187,48 @@ return {
         return false -- Never show this component
       end,
       color = { fg = C.bg, bg = C.bg }, -- invisible just in case
+    }
+
+    -- NES (Next Edit Suggestions) indicator for winbar
+    -- Shows copilot icon with hunk count in pokemon_bright color
+    local winbar_nes = {
+      function()
+        local ok, Nes = pcall(require, "sidekick.nes")
+        if not ok then
+          return ""
+        end
+
+        -- Get edits for CURRENT buffer only
+        local buf = vim.api.nvim_get_current_buf()
+        local edits = Nes.get(buf)
+        if #edits == 0 then
+          return ""
+        end
+
+        -- Count total hunks for current buffer
+        local total_hunks = 0
+        for _, edit in ipairs(edits) do
+          local diff = edit:diff()
+          total_hunks = total_hunks + #diff.hunks
+        end
+
+        return string.format("%d  ", total_hunks) -- Copilot icon with hunk count
+      end,
+      cond = function()
+        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
+        if vim.bo.buftype == "terminal" then
+          return false
+        end
+        -- Hide for buffergolf buffers
+        if vim.b.buffergolf_practice or vim.b.buffergolf_reference then
+          return false
+        end
+        -- Only show when NES suggestions exist in current buffer
+        local ok, Nes = pcall(require, "sidekick.nes")
+        return ok and Nes.have()
+      end,
+      color = { fg = pokemon_bright, bg = C.bg }, -- Use pokemon_bright color
+      padding = { left = 1, right = 1 },
     }
 
     -- invisible caps so outer edges match bg
@@ -261,14 +307,28 @@ return {
         refresh = { statusline = 120, winbar = 120, tabline = 300 },
         disabled_filetypes = {
           statusline = {
-            "dashboard", "alpha", "ministarter", "snacks_dashboard",
-            "snacks_layout_box", "snacks_picker_input", "snacks_picker_list", "snacks_picker_preview",
-            "Fyler", "BuffergolfStats"
+            "dashboard",
+            "alpha",
+            "ministarter",
+            "snacks_dashboard",
+            "snacks_layout_box",
+            "snacks_picker_input",
+            "snacks_picker_list",
+            "snacks_picker_preview",
+            "Fyler",
+            "BuffergolfStats",
           },
           winbar = {
-            "dashboard", "alpha", "ministarter", "snacks_dashboard",
-            "snacks_layout_box", "snacks_picker_input", "snacks_picker_list", "snacks_picker_preview",
-            "Fyler", "BuffergolfStats"
+            "dashboard",
+            "alpha",
+            "ministarter",
+            "snacks_dashboard",
+            "snacks_layout_box",
+            "snacks_picker_input",
+            "snacks_picker_list",
+            "snacks_picker_preview",
+            "Fyler",
+            "BuffergolfStats",
           },
         },
       },
@@ -294,9 +354,9 @@ return {
         lualine_z = { right_cap },
       },
 
-      -- WINBAR: left empty, right git diff
+      -- WINBAR: left NES indicator (pokemon_bright copilot icon + count), right git diff
       winbar = {
-        lualine_a = {},
+        lualine_a = { winbar_nes }, -- Shows copilot icon with hunk count when NES exists
         lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
         lualine_z = { winbar_gitdiff },
       },

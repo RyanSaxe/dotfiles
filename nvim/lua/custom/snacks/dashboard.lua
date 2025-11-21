@@ -2,10 +2,9 @@
 -- Contains all dashboard sections, keys, and layout logic
 --
 -- TODO: Future dashboard improvements
--- 1. Replace "Find Project" with daily note functionality
--- 2. Replace grep with workspace diagnostics searching once proper LSP support
+-- 1. Replace grep with workspace diagnostics searching once proper LSP support
 --    is figured out for most regularly used LSPs
--- 3. Dashboard philosophy: Provide keybinds for common operations when opening
+-- 2. Dashboard philosophy: Provide keybinds for common operations when opening
 --    neovim for a project that ARE NOT common keymaps during normal coding.
 --    Normal keymaps still work and muscle memory knows them - the dashboard is
 --    for operations that are contextual to "just opened the project"
@@ -373,6 +372,25 @@ local function globalkeys()
   local keys = {
     { key = "q", desc = "Quit", action = ":qa" },
     {
+      key = "l",
+      desc = "Manage Lua Plugins",
+      action = ":Lazy",
+      enabled = package.loaded.lazy ~= nil,
+    },
+    { key = "r", desc = "Restore Session", section = "session" },
+  }
+
+  local ok, _ = pcall(require, "obsidian")
+  if ok then
+    table.insert(keys, 2, {
+      key = "n",
+      desc = "Open Daily Note",
+      action = function()
+        vim.cmd("ObsidianToday")
+      end,
+    })
+  else
+    table.insert(keys, 2, {
       key = "p",
       desc = "Find Project",
       action = function()
@@ -384,15 +402,8 @@ local function globalkeys()
           end,
         })
       end,
-    },
-    {
-      key = "l",
-      desc = "Manage Lua Plugins",
-      action = ":Lazy",
-      enabled = package.loaded.lazy ~= nil,
-    },
-    { key = "r", desc = "Restore Session", section = "session" },
-  }
+    })
+  end
 
   return utils.create_pane(header, keys, 2)
 end
@@ -822,11 +833,12 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
   -- 2. When recent files are in pane 1 (not in git) and shown
   -- 3. When recent files would be in pane 2 (in git) but are hidden
   local both_hidden = hide_git and hide_recent
-  local show_pane2_separator = utils.show_if_has_second_pane() and (
-    both_hidden or                                           -- Case 1: Both hidden, always need separator
-    (not in_git and recent_project_toggle(hide_recent)) or  -- Case 2: Recent in left pane and shown
-    (in_git and not recent_project_toggle(hide_recent))      -- Case 3: Recent would be in right pane but hidden
-  )
+  local show_pane2_separator = utils.show_if_has_second_pane()
+    and (
+      both_hidden -- Case 1: Both hidden, always need separator
+      or (not in_git and recent_project_toggle(hide_recent)) -- Case 2: Recent in left pane and shown
+      or (in_git and not recent_project_toggle(hide_recent)) -- Case 3: Recent would be in right pane but hidden
+    )
 
   if show_pane2_separator then
     table.insert(sections, {
