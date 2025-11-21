@@ -3,9 +3,9 @@
 -- Integrates with blink.cmp for @ completion of people notes
 
 return {
-  "epwalsh/obsidian.nvim",
+  "obsidian-nvim/obsidian.nvim",
   enabled = true,
-  version = "*",
+  version = "v3.13.0", -- Pinned to avoid buggy LSP-based link following in v3.14.0+
   lazy = true,
   -- Load when opening markdown files or when in the notes directory
   ft = "markdown",
@@ -20,14 +20,17 @@ return {
       },
     },
 
+    -- Link style configuration
+    preferred_link_style = "wiki",
+
     -- Daily notes configuration
     -- Daily notes are stored in the daily/ folder with YYYY-MM-DD.md format
     daily_notes = {
       folder = "daily",
       date_format = "%Y-%m-%d",
-      -- Template to use for new daily notes (optional)
+      -- Template to use for new daily notes
       -- Will look for templates/daily.md
-      template = nil,
+      template = "daily",
     },
 
     -- Templates configuration
@@ -42,7 +45,9 @@ return {
     -- This enables @ completion for people notes in the people/ folder
     completion = {
       nvim_cmp = false, -- We're using blink.cmp instead
-      min_chars = 1, -- Start completing after 1 character
+      blink = true, -- Enable blink.cmp integration (v3.13.0+)
+      min_chars = 0, -- Start completing after 1 character
+      create_new = false, -- Disable "create" in completions, use <leader>on instead
     },
 
     -- Note path and ID functions
@@ -72,17 +77,15 @@ return {
       brackets = "[[",
     },
 
-    -- Disable some features we don't need
-    ui = {
-      enable = true, -- Enable UI improvements for markdown
-      checkboxes = {
-        -- Use standard markdown checkboxes
-        [" "] = { char = "󰄱", hl_group = "ObsidianTodo" },
-        ["x"] = { char = "", hl_group = "ObsidianDone" },
-        [">"] = { char = "", hl_group = "ObsidianRightArrow" },
-        ["~"] = { char = "󰰱", hl_group = "ObsidianTilde" },
-      },
+    -- Checkbox configuration
+    -- The 'checkbox' table defines the order when cycling through states
+    checkbox = {
+      -- Order that checkboxes cycle through when toggled
+      order = { " ", "x" },
     },
+
+    -- UI configuration for checkbox visual representation
+    ui = { enable = false },
 
     -- Follow link behavior
     follow_url_func = function(url)
@@ -91,12 +94,16 @@ return {
     end,
 
     -- Picker configuration
-    -- Use fzf-lua for pickers (consistent with rest of config)
+    -- Use snacks picker (modern, integrated picker)
     picker = {
-      name = "fzf-lua",
-      mappings = {
+      name = "snacks.pick",
+      note_mappings = {
         new = "<C-x>",
         insert_link = "<C-l>",
+      },
+      tag_mappings = {
+        tag_note = "<C-x>",
+        insert_tag = "<C-l>",
       },
     },
 
@@ -106,37 +113,58 @@ return {
     },
   },
 
-  -- Keybindings for obsidian commands
+  -- Keybindings for obsidian commands (using <leader>o prefix)
   keys = {
     -- Daily notes
-    { "<leader>nd", "<cmd>ObsidianToday<cr>", desc = "Open today's daily note" },
-    { "<leader>ny", "<cmd>ObsidianYesterday<cr>", desc = "Open yesterday's daily note" },
-    { "<leader>nD", "<cmd>ObsidianTomorrow<cr>", desc = "Open tomorrow's daily note" },
+    { "<leader>od", "<cmd>ObsidianToday<cr>", desc = "Open today's daily note" },
+    { "<leader>oy", "<cmd>ObsidianYesterday<cr>", desc = "Open yesterday's daily note" },
+    { "<leader>oD", "<cmd>ObsidianTomorrow<cr>", desc = "Open tomorrow's daily note" },
 
     -- Note creation and search
-    { "<leader>nn", "<cmd>ObsidianNew<cr>", desc = "Create new note" },
-    { "<leader>nf", "<cmd>ObsidianQuickSwitch<cr>", desc = "Find note" },
-    { "<leader>ns", "<cmd>ObsidianSearch<cr>", desc = "Search in notes" },
+    {
+      "<leader>on",
+      function()
+        require("custom.obsidian.create-note").prompt_and_create()
+      end,
+      desc = "Create new note (with directory picker)",
+    },
+    { "<leader>of", "<cmd>ObsidianQuickSwitch<cr>", desc = "Find note" },
+    { "<leader>os", "<cmd>ObsidianSearch<cr>", desc = "Search in notes" },
 
     -- Navigation
-    { "<leader>nb", "<cmd>ObsidianBacklinks<cr>", desc = "Show backlinks" },
-    { "<leader>nl", "<cmd>ObsidianLinks<cr>", desc = "Show links in current note" },
+    { "<leader>ob", "<cmd>ObsidianBacklinks<cr>", desc = "Show backlinks" },
+    { "<leader>ol", "<cmd>ObsidianLinks<cr>", desc = "Show links in current note" },
     { "gf", "<cmd>ObsidianFollowLink<cr>", desc = "Follow link under cursor", ft = "markdown" },
 
     -- Templates
-    { "<leader>nt", "<cmd>ObsidianTemplate<cr>", desc = "Insert template" },
+    { "<leader>oT", "<cmd>ObsidianTemplate<cr>", desc = "Insert template" },
+
+    -- Tasks
+    {
+      "<leader>ot",
+      function()
+        require("custom.obsidian.tasks").open_picker()
+      end,
+      desc = "Show all incomplete tasks",
+    },
+
+    -- Date insertion
+    {
+      "<leader>oi",
+      function()
+        require("custom.obsidian.insert-due").insert_due_date()
+      end,
+      desc = "Insert due date",
+      ft = "markdown",
+    },
 
     -- Utility
-    { "<leader>nw", "<cmd>ObsidianWorkspace<cr>", desc = "Switch workspace" },
-    { "<leader>nx", "<cmd>ObsidianToggleCheckbox<cr>", desc = "Toggle checkbox" },
+    { "<leader>ow", "<cmd>ObsidianWorkspace<cr>", desc = "Switch workspace" },
+    { "<leader>ox", "<cmd>ObsidianToggleCheckbox<cr>", desc = "Toggle checkbox" },
   },
 
   config = function(_, opts)
     local obsidian = require("obsidian")
     obsidian.setup(opts)
-
-    -- The @ people completion is handled by a custom blink.cmp source
-    -- See: nvim/lua/custom/completion/obsidian-people.lua
-    -- Integration: nvim/lua/plugins/blink-cmp.lua
   end,
 }

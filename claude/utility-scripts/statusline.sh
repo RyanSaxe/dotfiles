@@ -12,7 +12,8 @@ C_MAGENTA='\033[38;2;187;154;247m' # #bb9af7
 C_GREEN='\033[38;2;158;206;106m'   # #9ece6a
 C_RED='\033[38;2;247;118;142m'     # #f7768e
 C_DIM='\033[38;2;86;95;137m'       # #565f89
-C_YELLOW='\033[38;2;255;158;100m'  # #ff9e64
+C_ORANGE='\033[38;2;255;158;100m'  # #ff9e64
+C_YELLOW='\033[38;2;224;175;104m'  # #e0af68
 RESET='\033[0m'
 
 # Extract data from JSON
@@ -112,7 +113,7 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
     fi
 
     # Choose color based on hardcoded thresholds
-    # Green: 0-50k, Orange: 50-100k, Red: 100k+
+    # Green: 0-50k, Yellow: 50-100k, Red: 100k+
     if [[ $context_tokens -lt 50000 ]]; then
       token_color="$C_GREEN"
     elif [[ $context_tokens -lt 100000 ]]; then
@@ -135,7 +136,7 @@ status_line+="${C_CYAN}${dir_name}${RESET}"
 status_line+="${git_info}"
 
 # Model and output style
-status_line+=" ${C_DIM}with${RESET} ${C_YELLOW}${model_name}${RESET}"
+status_line+=" ${C_DIM}with${RESET} ${C_ORANGE}${model_name}${RESET}"
 if [[ "$output_style" != "default" ]]; then
   status_line+=" ${C_DIM}(${output_style})${RESET}"
 fi
