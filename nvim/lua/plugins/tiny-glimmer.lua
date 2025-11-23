@@ -1,5 +1,8 @@
 -- tiny-glimmer.nvim: smooth animations for yank, paste, search, undo, and redo operations
 -- Uses dynamic highlight groups to adapt to colorscheme changes
+-- TODO: currently this seems to not trigger when too many lines/characters are selected
+--       I need to look into why and see if I either want a clean non-animated fallback
+--       or if it's safe to unbound the animation
 return {
   "rachartier/tiny-glimmer.nvim",
   event = "VeryLazy",

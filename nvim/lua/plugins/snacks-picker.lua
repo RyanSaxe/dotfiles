@@ -18,6 +18,7 @@ return {
             preset = "sidebar",
             preview = false,
             layout = {
+              -- NOTE: probably want to delete this eventually, especially if bufferline background changes.
               row = 1, -- Start 1 row down to leave space for winbar
             },
           },
