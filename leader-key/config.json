@@ -1,0 +1,111 @@
+{
+  "type": "group",
+  "actions": [
+    {
+      "key": "t",
+      "label": "Terminal (Ghostty)",
+      "type": "application",
+      "value": "/Applications/Ghostty.app"
+    },
+    {
+      "key": "b",
+      "label": "Browser",
+      "type": "group",
+      "actions": [
+        {
+          "key": "space",
+          "label": "Open Chrome",
+          "type": "application",
+          "value": "/Applications/Google Chrome.app"
+        },
+        {
+          "key": "a",
+          "label": "ChatGPT (focus if open)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainOrOpen(\"chatgpt.com\", \"https://chatgpt.com\")'"
+        },
+        {
+          "key": "y",
+          "label": "YouTube (focus if open)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainOrOpen(\"youtube.com\", \"https://youtube.com\")'"
+        },
+        {
+          "key": "g",
+          "label": "GitHub (focus if open)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainOrOpen(\"github.com\", \"https://github.com\")'"
+        }
+      ]
+    },
+    {
+      "key": "g",
+      "label": "Git",
+      "type": "group",
+      "actions": [
+        {
+          "key": "s",
+          "label": "Git Status",
+          "type": "command",
+          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"git status\" & return'"
+        },
+        {
+          "key": "d",
+          "label": "Git Diff",
+          "type": "command",
+          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"git diff\" & return'"
+        },
+        {
+          "key": "l",
+          "label": "LazyGit",
+          "type": "command",
+          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"lazygit\" & return'"
+        }
+      ]
+    },
+    {
+      "key": "s",
+      "label": "System",
+      "type": "group",
+      "actions": [
+        {
+          "key": "l",
+          "label": "Lock Screen",
+          "type": "command",
+          "value": "pmset displaysleepnow"
+        },
+        {
+          "key": "d",
+          "label": "Display Settings",
+          "type": "command",
+          "value": "open 'x-apple.systempreferences:com.apple.preference.displays'"
+        }
+      ]
+    },
+    {
+      "key": "d",
+      "label": "Development",
+      "type": "group",
+      "actions": [
+        {
+          "key": "c",
+          "label": "Claude Code",
+          "type": "command",
+          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"claude\" & return'"
+        },
+        {
+          "key": "n",
+          "label": "Neovim",
+          "type": "command",
+          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"nvim\" & return'"
+        },
+        {
+          "key": "p",
+          "label": "Python REPL",
+          "type": "command",
+          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"ipython\" & return'"
+        }
+      ]
+    }
+  ]
+}

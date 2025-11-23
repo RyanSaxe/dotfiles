@@ -9,3 +9,4 @@ zsh/themes:$HOME/.zsh-custom/themes
 ipython:$HOME/.ipython
 hammerspoon:$HOME/.hammerspoon
 claude:$HOME/.claude
+leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json

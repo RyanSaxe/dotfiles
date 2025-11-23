@@ -1,14 +1,13 @@
--- Simple Hammerspoon config: URL shortcuts + terminal switching
+-- Hammerspoon config: Tab focusing automation for Leader Key
 -- Focus an existing Chrome tab by domain; otherwise open a new one.
+--
+-- NOTE: Currently Chrome-only for simplicity and guaranteed instant performance.
+-- Could be expanded to support other Chromium-based browsers (Arc, Brave, Edge)
+-- by detecting default browser and swapping app name in AppleScript.
+-- Firefox and Safari have different/limited AppleScript APIs.
 
-local sites = {
-	-- key  = {domain, fallback URL}
-	A = { "chatgpt.com", "https://chatgpt.com" },
-	G = { "github.com", "https://github.com" },
-	Y = { "youtube.com", "https://youtube.com" },
-	M = { "outlook.com", "https://outlook.com" },
-	S = { "google.com", "https://google.com" },
-}
+-- Enable IPC so the 'hs' command-line tool can communicate with Hammerspoon
+hs.ipc.cliInstall()
 
 -- Replace your tab enumeration with window IDs (stable)
 local function getAllChromeTabs()
@@ -72,7 +71,9 @@ local function domainMatches(host, domain)
 	return host == domain or host:sub(-(#domain + 1)) == ("." .. domain)
 end
 
-local function focusByDomainOrOpen(domain, url)
+-- Main function: focus existing Chrome tab or open URL
+-- Exposed globally so Leader Key can call it: hs -c 'focusByDomainOrOpen("example.com", "https://example.com")'
+function focusByDomainOrOpen(domain, url)
 	local chrome = hs.application.find("Google Chrome")
 	if chrome then
 		for _, line in ipairs(getAllChromeTabs()) do
@@ -89,37 +90,7 @@ local function focusByDomainOrOpen(domain, url)
 	hs.urlevent.openURL(url)
 end
 
--- Create hotkeys for each site (Cmd+Shift+Letter)
-for key, cfg in pairs(sites) do
-	local domain, url = cfg[1], cfg[2]
-	hs.hotkey.bind({ "cmd", "shift" }, key, function()
-		focusByDomainOrOpen(domain, url)
-	end)
-end
-
--- Terminal focus (Cmd+Shift+T)
-hs.hotkey.bind({ "cmd", "shift" }, "T", function()
-	hs.application.launchOrFocus("Ghostty")
-end)
-
--- Toggle between browser and terminal (Cmd+Shift+Delete)
-hs.hotkey.bind({ "cmd", "shift" }, "delete", function()
-	local chrome = hs.application.find("Google Chrome")
-	local ghostty = hs.application.find("Ghostty")
-	if chrome and chrome:isFrontmost() then
-		if ghostty then
-			ghostty:activate()
-			hs.alert.show("Terminal")
-		end
-	else
-		if chrome then
-			chrome:activate()
-			hs.alert.show("Browser")
-		end
-	end
-end)
-
 -- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
-hs.alert.show("Hammerspoon loaded")
+hs.notify.new({title="Hammerspoon", informativeText="Config loaded"}):send()
