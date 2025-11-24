@@ -23,7 +23,16 @@ nvim/
 │   │   ├── keymaps.lua          # Custom keybindings
 │   │   ├── lazy.lua             # Lazy.nvim bootstrap
 │   │   └── options.lua          # Vim options
-│   ├── plugins/                 # Plugin specifications (36 files)
+│   ├── plugins/                 # Plugin specifications (organized by category)
+│   │   ├── ai/                  # AI-powered tools (Sidekick)
+│   │   ├── completion/          # Blink.cmp, Copilot
+│   │   ├── extra/               # Miscellaneous plugins (Buffergolf)
+│   │   ├── git/                 # Diffview, mini.diff
+│   │   ├── lsp/                 # LSP configs, linting, formatting
+│   │   ├── markdown/            # Obsidian, render-markdown, bullets, todo-comments
+│   │   ├── navigation/          # Flash, vim-tmux-navigator, file/buffer/dependency navigation
+│   │   ├── snacks/              # Snacks.nvim plugins (dashboard, picker, scratch, toggle)
+│   │   └── ui/                  # Lualine, bufferline, noice, which-key, colorscheme, visual enhancements
 │   ├── custom/                  # Custom modules
 │   │   ├── git/                 # Git diff utilities
 │   │   ├── obsidian/            # Obsidian task picker
@@ -133,7 +142,7 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 - [ ] Extract dependency-picker into standalone plugin for distribution
 - [ ] Cleanup which-key: organize groups, add proper names and icons, reduce LazyVim default clutter
 - [ ] Revisit markdown setup: linting, formatting, blink integration, frontmatter handling for Claude/Obsidian
-- [ ] Reorganize plugins from flat structure to folders (lsp/, snacks/, git/, ui/, editing/)
+- [x] Reorganize plugins from flat structure to organized folders by category
 
 ### Unclear How Hard
 - [ ] Comprehensive LSP/Conform linting review and optimization
