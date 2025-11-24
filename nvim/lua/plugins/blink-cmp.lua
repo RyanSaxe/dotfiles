@@ -68,7 +68,7 @@ return {
         "snippet_backward",
         "fallback",
       },
-      -- Smart Tab: Copilot → blink menu → NES → snippets → fallback
+      -- Smart Tab: Copilot → blink menu → NES → snippets → tab insertion
       -- (C-Tab explicitly accepts Copilot, C-BS dismisses)
       ["<Tab>"] = {
         function(cmp)
@@ -89,11 +89,16 @@ return {
             return true -- stop processing
           end
 
-          -- Otherwise continue to snippet_forward and fallback
+          -- Otherwise continue to snippet_forward
           return false
         end,
         "snippet_forward", -- 4. FOURTH: Jump to next snippet field
-        "fallback", -- 5. LAST: Regular tab/indentation
+        -- 5. LAST: Explicitly insert tab character when nothing else applies
+        -- Without this explicit insertion, the Tab key becomes disabled when all conditions fail
+        function()
+          vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "n", false)
+          return true
+        end,
       },
       -- Shift-Tab: Go backwards through menus and snippets
       ["<S-Tab>"] = {
