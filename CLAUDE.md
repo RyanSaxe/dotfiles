@@ -37,6 +37,16 @@ You can always check versions via the command line, but here are the key version
 
 The Neovim configuration is LazyVim-based with custom plugins in `nvim/lua/plugins/`. Make sure to read through the LazyVim documentation for understanding the base setup.
 
+## Documentation
+
+- **Keep READMEs current** - When modifying tool configurations, update the corresponding README.md file
+- Each tool directory should have a README documenting:
+  - Key features and configuration highlights
+  - Usage examples and common workflows
+  - Tool-specific TODOs and known issues
+  - Customization guidance
+- Root README.md contains only repository-wide and cross-cutting TODOs
+
 ## Important Notes
 
 - The `tasks/` directory contains development TODOs and ideas

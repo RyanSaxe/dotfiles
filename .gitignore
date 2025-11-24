@@ -21,6 +21,7 @@ claude/*
 !claude/hooks/
 !claude/commands/
 ipython/*
+!ipython/README.md
 !ipython/profile_default/
 ipython/profile_default/*
 !ipython/profile_default/ipython_config.py
