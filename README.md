@@ -43,8 +43,9 @@ git clone https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
 cd ~/generic/dotfiles
 ./scripts/install.sh # install all necessary dependencies and apps
 ./scripts/symlink.sh # symlink configs to the right place so apps recognize them
-# TODO: the below does not exist yet and needs to handle cloning my private notes if used by me
-./script/setup-notes.sh # create all scaffolding for obsidian notes to work with neovim according to how I use them
+./scripts/setup-notes.sh # create all scaffolding for obsidian notes to work with neovim
+# Optional: clone your private notes repository (requires SSH access)
+./scripts/setup-notes.sh --clone-private
 ```
 
 Note that, especially for symlinks, you may want to see what will happen first by running these commands:
@@ -100,7 +101,7 @@ Repository-wide tasks and cross-cutting improvements. Tool-specific TODOs are in
 
 ### Simple
 
-- [ ] Create the `scripts/setup-notes.sh` script for Obsidian notes scaffolding
+- [x] Create the `scripts/setup-notes.sh` script for Obsidian notes scaffolding
 - [ ] Setup CI/CD: release automation, linting/formatting, precommit hooks
 - [ ] Implement "stacked PR" command for claude-code to break work into multiple linked PRs
 
