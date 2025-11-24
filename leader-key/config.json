@@ -8,6 +8,12 @@
       "value": "/Applications/Ghostty.app"
     },
     {
+      "key": "a",
+      "label": "ChatGPT (Web)",
+      "type": "command",
+      "value": "hs -c 'focusByDomainOrOpen(\"chatgpt.com\", \"https://chatgpt.com\")'"
+    },
+    {
       "key": "b",
       "label": "Browser",
       "type": "group",
@@ -39,31 +45,6 @@
       ]
     },
     {
-      "key": "g",
-      "label": "Git",
-      "type": "group",
-      "actions": [
-        {
-          "key": "s",
-          "label": "Git Status",
-          "type": "command",
-          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"git status\" & return'"
-        },
-        {
-          "key": "d",
-          "label": "Git Diff",
-          "type": "command",
-          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"git diff\" & return'"
-        },
-        {
-          "key": "l",
-          "label": "LazyGit",
-          "type": "command",
-          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"lazygit\" & return'"
-        }
-      ]
-    },
-    {
       "key": "s",
       "label": "System",
       "type": "group",
@@ -82,30 +63,5 @@
         }
       ]
     },
-    {
-      "key": "d",
-      "label": "Development",
-      "type": "group",
-      "actions": [
-        {
-          "key": "c",
-          "label": "Claude Code",
-          "type": "command",
-          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"claude\" & return'"
-        },
-        {
-          "key": "n",
-          "label": "Neovim",
-          "type": "command",
-          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"nvim\" & return'"
-        },
-        {
-          "key": "p",
-          "label": "Python REPL",
-          "type": "command",
-          "value": "open -a Ghostty && sleep 0.5 && osascript -e 'tell application \"System Events\" to keystroke \"ipython\" & return'"
-        }
-      ]
-    }
   ]
 }
