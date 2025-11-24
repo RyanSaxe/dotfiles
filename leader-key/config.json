@@ -2,10 +2,41 @@
   "type": "group",
   "actions": [
     {
+      "key": "s",
+      "label": "Spotlight",
+      "type": "command",
+      "value": "osascript -e 'tell application \"System Events\" to keystroke space using command down'"
+    },
+    {
       "key": "t",
       "label": "Terminal (Ghostty)",
       "type": "application",
       "value": "/Applications/Ghostty.app"
+    },
+    {
+      "key": "m",
+      "label": "Messages & Mail",
+      "type": "group",
+      "actions": [
+        {
+          "key": "g",
+          "label": "Gmail",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Gmail\", \"/Applications/Gmail.app\", \"https://mail.google.com\")'"
+        },
+        {
+          "key": "o",
+          "label": "Outlook",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\")'"
+        },
+        {
+          "key": "t",
+          "label": "Teams",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\")'"
+        }
+      ]
     },
     {
       "key": "a",
@@ -43,25 +74,6 @@
           "value": "hs -c 'focusByDomainOrOpen(\"github.com\", \"https://github.com\")'"
         }
       ]
-    },
-    {
-      "key": "s",
-      "label": "System",
-      "type": "group",
-      "actions": [
-        {
-          "key": "l",
-          "label": "Lock Screen",
-          "type": "command",
-          "value": "pmset displaysleepnow"
-        },
-        {
-          "key": "d",
-          "label": "Display Settings",
-          "type": "command",
-          "value": "open 'x-apple.systempreferences:com.apple.preference.displays'"
-        }
-      ]
-    },
+    }
   ]
 }

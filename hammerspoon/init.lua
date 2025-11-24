@@ -90,6 +90,29 @@ function focusByDomainOrOpen(domain, url)
 	hs.urlevent.openURL(url)
 end
 
+-- Function to open app if it exists, otherwise open web URL
+function openAppOrWeb(appName, appPath, webUrl)
+	-- Check if the app exists
+	local file = io.open(appPath, "r")
+	if file then
+		file:close()
+		-- App exists, open it
+		hs.application.open(appPath)
+	else
+		-- App doesn't exist, open web version
+		local domain = webUrl:match("^https?://([^/]+)")
+		if domain then
+			-- Remove protocol and use our existing function
+			domain = domain:lower():gsub("^www%.", "")
+			focusByDomainOrOpen(domain, webUrl)
+		else
+			-- Fallback to just opening the URL
+			hs.urlevent.openURL(webUrl)
+		end
+	end
+end
+
+
 -- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
