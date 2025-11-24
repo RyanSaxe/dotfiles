@@ -16,7 +16,7 @@ keybind = cmd+shift+left=resize_split:left,10
 keybind = cmd+shift+right=resize_split:right,10
 
 
-keybind = global:cmd+g=toggle_quick_terminal
+keybind = global:cmd+grave_accent=toggle_quick_terminal
 keybind = cmd+r=reload_config
 keybind = cmd+o=open_config
 
