@@ -77,11 +77,16 @@ SonarLint is the LSP server for SonarQube so that we can get real SonarQube feed
 
 ### Leader Key
 
-Leader Key must have some of it's configuration (e.g. was the actual leader key is, how quickly the popup opens) set through the MacOS application settings directly. I have personally set it up such that Command + Space triggers it and then I change Spotlight to be Command + Space + Space. But you can set it however you would like. You just do need to manually enable this one.
+Leader Key must have some of it's configuration (e.g. was the actual leader key is, how quickly the popup opens) set through the MacOS application settings directly. I have personally set it up such that right_shift triggers it, but you can set it however you would like. You just do need to manually enable this one.
+
+Additionally, I recommend setting Leader Key to
+
+1. Always show cheatsheet
+2. show leader key on the monitor with the mouse. Other options have issues when using full screen.
 
 ### Accessibility Settings
 
-Ghostty, Leader Key, and Hammerspoon need to be enabled with special permissions and accessibility settings. Additionally, I personally recommend Leader Key and Hammerspoon to open when you login for the smoothest experience.
+Ghostty, Karabiner, Leader Key, and Hammerspoon need to be enabled with special permissions and accessibility settings. Additionally, I personally recommend Leader Key and Hammerspoon to open when you login for the smoothest experience.
 
 ## 🎨 Theme
 
@@ -102,8 +107,10 @@ Note: will move most of these TODOs to downstream README.md files once the todo 
 
 ### Simple
 
+- [ ] Look into proper usage of things like surround and what automatically fills parentheticals, but where "tab" can effectively break you out of it instead of having to go back to normal mode.
+- [ ] Change completion prioritization such that TAB always cycles through blink completions if available. In that case, Shift Tab should take the copilot completion instead of cycling backwards through blink completions.
 - [ ] generalize the obsidian todo list picker to actually take a working directory, so it can search across markdown files in any directory. This also of course means letting the setting the due date mechanism work here too.
-- [ ] Explore not having exact same background color (c.bg in colorscheme.lua) for all statuslines (including tmux) and even my Ghostty background. Debating moving to equivalent of exactly how snacks sets up the opacity for picker backgrounds blended so that when opening a picker that has a partially transparent dark background, it perfectly melds into these borders. I would want the active bufferline tab and such to have c.bg as a very clean visual indicator for it too.
+- [ ] Explore not having exact same background color (c.bg in colorscheme.lua) for all statuslines (including tmux) and even my Ghostty background. Debating moving to equivalent of exactly how snacks sets up the opacity for picker backgrounds blended so that when opening a picker that has a partially transparent dark background, it perfectly melds into these borders. Another option is to actually go FULL #000000 black so that it blends into the edges of a Mac itself, though this only will look good in full screen. I would want the active bufferline tab and such to have c.bg as a very clean visual indicator for it too.
 - [ ] Add README.md to relevant subfolders to make it easier to explore and communicate the normal way of using the tool and working.
 - [ ] Break out my dependency picker into a real neovim plugin instead.
 - [ ] Create the `scripts/setup-notes.sh` script.
@@ -133,7 +140,6 @@ Note: will move most of these TODOs to downstream README.md files once the todo 
 
 Things I have not explored yet but am interested in taking a look at
 
-- [ ] Karibiner: for customizing the keyboard. Importantly, making numbers, symbols, and brackets much easier to type
 - [ ] Aerospace: Tiling window manager
 - [ ] SkechyBar: MacOS Statusline
 - [ ] Zoxide:    Smart directory navigation (e.g. replace for cd)
