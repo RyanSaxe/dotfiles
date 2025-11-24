@@ -10,7 +10,7 @@ return {
       debounce = 75, -- Wait 75ms after typing stops before requesting suggestions (reduces API calls)
       hide_during_completion = true, -- Hide Copilot suggestions when blink-cmp menu is open (prevents visual conflicts)
       keymap = {
-        accept = "<Tab>", -- Tab accepts Copilot (actual logic in blink-cmp.lua smart Tab)
+        accept = false, -- Disabled (actual logic in blink-cmp.lua: Shift+Tab accepts, Tab accepts when blink menu is closed)
         next = "<Right>", -- Cycle to next Copilot suggestion
         prev = "<Left>", -- Cycle to previous Copilot suggestion
         dismiss = "<C-]>", -- Control-]: Fallback dismiss key

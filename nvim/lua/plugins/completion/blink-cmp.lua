@@ -68,19 +68,19 @@ return {
         "snippet_backward",
         "fallback",
       },
-      -- Smart Tab: Copilot → blink menu → NES → snippets → tab insertion
-      -- (C-Tab explicitly accepts Copilot, C-BS dismisses)
+      -- Smart Tab: blink menu → Copilot → NES → snippets → tab insertion
+      -- Shift-Tab: Accept Copilot (useful when blink menu is open) → select_prev → snippet_backward
       ["<Tab>"] = {
         function(cmp)
-          -- 1. FIRST: Check for Copilot inline suggestion (ghost text)
+          -- 1. FIRST: Navigate blink-cmp menu if it's open
+          if cmp.is_visible() then
+            return cmp.select_next()
+          end
+
+          -- 2. SECOND: Check for Copilot inline suggestion (ghost text)
           if require("copilot.suggestion").is_visible() then
             require("copilot.suggestion").accept()
             return true -- stop processing
-          end
-
-          -- 2. SECOND: Navigate blink-cmp menu if it's open
-          if cmp.is_visible() then
-            return cmp.select_next()
           end
 
           -- 3. THIRD: Check for NES (sidekick) multi-line edits
@@ -100,10 +100,23 @@ return {
           return true
         end,
       },
-      -- Shift-Tab: Go backwards through menus and snippets
+      -- Shift-Tab: Accept Copilot suggestion, or go backwards through menus and snippets
       ["<S-Tab>"] = {
         function(cmp)
-          return cmp.select_prev()
+          -- 1. FIRST: Check for Copilot inline suggestion (ghost text)
+          -- This allows accepting Copilot even when blink menu is open
+          if require("copilot.suggestion").is_visible() then
+            require("copilot.suggestion").accept()
+            return true -- stop processing
+          end
+
+          -- 2. SECOND: Navigate backwards in blink-cmp menu if open
+          if cmp.is_visible() then
+            return cmp.select_prev()
+          end
+
+          -- Otherwise continue to snippet_backward
+          return false
         end,
         "snippet_backward",
         "fallback",
