@@ -1,0 +1,79 @@
+{
+  "type": "group",
+  "actions": [
+    {
+      "key": "s",
+      "label": "Spotlight",
+      "type": "command",
+      "value": "osascript -e 'tell application \"System Events\" to keystroke space using command down'"
+    },
+    {
+      "key": "t",
+      "label": "Terminal (Ghostty)",
+      "type": "application",
+      "value": "/Applications/Ghostty.app"
+    },
+    {
+      "key": "m",
+      "label": "Messages & Mail",
+      "type": "group",
+      "actions": [
+        {
+          "key": "g",
+          "label": "Gmail",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Gmail\", \"/Applications/Gmail.app\", \"https://mail.google.com\")'"
+        },
+        {
+          "key": "o",
+          "label": "Outlook",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\")'"
+        },
+        {
+          "key": "t",
+          "label": "Teams",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\")'"
+        }
+      ]
+    },
+    {
+      "key": "a",
+      "label": "ChatGPT (Web)",
+      "type": "command",
+      "value": "hs -c 'focusByDomainOrOpen(\"chatgpt.com\", \"https://chatgpt.com\")'"
+    },
+    {
+      "key": "b",
+      "label": "Browser",
+      "type": "group",
+      "actions": [
+        {
+          "key": "space",
+          "label": "Open Chrome",
+          "type": "application",
+          "value": "/Applications/Google Chrome.app"
+        },
+        {
+          "key": "a",
+          "label": "ChatGPT (focus if open)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainOrOpen(\"chatgpt.com\", \"https://chatgpt.com\")'"
+        },
+        {
+          "key": "y",
+          "label": "YouTube (focus if open)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainOrOpen(\"youtube.com\", \"https://youtube.com\")'"
+        },
+        {
+          "key": "g",
+          "label": "GitHub (focus if open)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainOrOpen(\"github.com\", \"https://github.com\")'"
+        }
+      ]
+    }
+  ]
+}

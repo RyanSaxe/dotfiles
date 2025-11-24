@@ -49,6 +49,7 @@ function M.format_buffer(item, picker)
 end
 
 -- Configuration for enhanced buffer picker
+-- TODO: consider if this should be deleted
 M.buffer_config = {
   finder = "buffers",
   format = M.format_buffer,
@@ -77,3 +78,4 @@ M.buffer_config = {
 }
 
 return M
+

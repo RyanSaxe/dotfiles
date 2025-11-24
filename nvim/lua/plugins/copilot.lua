@@ -2,7 +2,7 @@ return {
   "zbirenbaum/copilot.lua",
   cmd = "Copilot",
   build = ":Copilot auth",
-  event = "InsertEnter", -- Load on insert mode for better performance (was BufReadPost)
+  event = "InsertEnter", -- Load on insert mode for better performance
   opts = {
     suggestion = {
       enabled = true,
@@ -24,10 +24,42 @@ return {
       gitcommit = true, -- Enable for git commit messages
       typr = false, -- Disable for typing practice game
     },
+    -- Explicit should_attach override to prevent markdown attachment
+    -- This provides an additional layer of protection beyond filetypes
+    should_attach = function(bufnr)
+      -- Get the default checks (buflisted, buftype)
+      if not vim.bo[bufnr].buflisted then
+        return false
+      end
+      if vim.bo[bufnr].buftype ~= "" then
+        return false
+      end
+
+      -- Explicitly block markdown files
+      local filetype = vim.bo[bufnr].filetype
+      if filetype == "markdown" or filetype == "text" then
+        return false
+      end
+
+      return true
+    end,
   },
   -- Custom configuration to override C-c behavior with higher priority
   config = function(_, opts)
     require("copilot").setup(opts)
+
+    -- Force detach from markdown/text buffers after setup
+    -- This handles cases where buffers were attached before config loaded
+    vim.schedule(function()
+      for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(bufnr) then
+          local ft = vim.bo[bufnr].filetype
+          if ft == "markdown" or ft == "text" then
+            require("copilot.client").buf_detach_if_attached(bufnr)
+          end
+        end
+      end
+    end)
 
     -- Override C-c in insert mode: Universal cancel key that closes EVERYTHING
     -- Closes blink-cmp menu AND Copilot suggestion in one press

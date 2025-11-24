@@ -25,3 +25,5 @@ tldr
 tree
 dust
 claude-code
+leader-key
+karabiner-elements

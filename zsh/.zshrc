@@ -8,6 +8,20 @@ if [[ -n "$TMUX_POPUP" ]] || [[ "$ZSH_MODE" == "minimal" ]]; then
     return
 fi
 
+# Clean up stale $TMUX environment variable
+# This can happen after force quitting terminal or when tmux crashes
+# Validates that $TMUX points to an actual running client
+if [[ -n "$TMUX" ]]; then
+  # Extract socket path from $TMUX (format: /path/to/socket,pid,session_id)
+  local tmux_socket="${TMUX%%,*}"
+
+  # Check if the socket still exists and is valid
+  if ! tmux -S "$tmux_socket" list-clients &>/dev/null; then
+    unset TMUX
+    unset TMUX_PANE
+  fi
+fi
+
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
 
