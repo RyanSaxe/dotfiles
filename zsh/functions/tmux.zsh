@@ -24,6 +24,7 @@ alias tK="tmux kill-server"
 # Utility: attach or switch depending on whether we're in tmux
 _tmux_attach_or_switch() {
   local target="$1"  # can be "session" or "session:window"
+
   if [[ -n "$TMUX" ]]; then
     tmux switch-client -t "$target"
   else

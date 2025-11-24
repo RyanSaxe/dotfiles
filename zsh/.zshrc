@@ -8,17 +8,34 @@ if [[ -n "$TMUX_POPUP" ]] || [[ "$ZSH_MODE" == "minimal" ]]; then
     return
 fi
 
-# Clean up stale $TMUX environment variable
-# This can happen after force quitting terminal or when tmux crashes
-# Validates that $TMUX points to an actual running client
+# Clean up stale or inherited $TMUX environment variable
+# This can happen in three cases:
+# 1. After force quitting terminal or when tmux crashes
+# 2. When opening a new terminal window that inherits $TMUX from parent
+# 3. When $TMUX points to a socket that no longer exists
 if [[ -n "$TMUX" ]]; then
   # Extract socket path from $TMUX (format: /path/to/socket,pid,session_id)
   local tmux_socket="${TMUX%%,*}"
 
   # Check if the socket still exists and is valid
   if ! tmux -S "$tmux_socket" list-clients &>/dev/null; then
+    # Socket is dead, unset everything
     unset TMUX
     unset TMUX_PANE
+  else
+    # Socket exists, but check if THIS terminal is actually a tmux client
+    # by comparing the current TTY with all active tmux client TTYs
+    local current_tty
+    current_tty=$(tty 2>/dev/null)
+
+    if [[ -n "$current_tty" ]]; then
+      # If our TTY is not in the list of tmux client TTYs, we inherited $TMUX
+      if ! tmux -S "$tmux_socket" list-clients -F "#{client_tty}" 2>/dev/null | grep -Fxq "$current_tty"; then
+        # We're not actually a tmux client, just inherited the variable
+        unset TMUX
+        unset TMUX_PANE
+      fi
+    fi
   fi
 fi
 
