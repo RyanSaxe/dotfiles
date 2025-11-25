@@ -28,12 +28,15 @@ unfocused-split-opacity = 0.8
 
 # specific customizations
 
+## Override background to match Neovim's c.bg_dark from TokyoNight
+background = #16161e
+
 ## no need to type the shortcut for copying highlighted text
 copy-on-select = clipboard
 
-## makes lualine look nicer
-window-padding-x = 4
-window-padding-y = 4
+## makes lualine look nicer with generous padding for clarity
+window-padding-x = 20
+window-padding-y = 20
 window-padding-color = background
 window-padding-balance = true
 ## allow multiline for claude code
