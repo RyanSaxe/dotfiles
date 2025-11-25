@@ -15,7 +15,7 @@ LazyVim-based Neovim configuration with extensive customizations for Python deve
 
 ## Configuration Structure
 
-```
+```text
 nvim/
 ├── lua/
 │   ├── config/

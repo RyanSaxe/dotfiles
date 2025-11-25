@@ -547,9 +547,7 @@ def withdraw(account: Account, amount: float) -> None:
 
 ### Prefer Functions Over Classes
 
-**Default choice: Functions**
-
-Functions are simpler, easier to test, and more composable:
+Functions are the default choice. They are simpler, easier to test, and more composable:
 
 ```python
 # Good: Simple functions

@@ -15,7 +15,7 @@ Oh My Zsh-based shell configuration with custom theme, vi mode, automatic Python
 
 ## Configuration Structure
 
-```
+```text
 zsh/
 ├── .zshrc                  # Main configuration (detects minimal mode)
 ├── .zshrc.minimal          # Lightweight config for tmux popups

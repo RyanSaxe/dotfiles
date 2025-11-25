@@ -6,7 +6,7 @@ Bat is a `cat` clone with syntax highlighting and Git integration, configured he
 
 The `config` file contains:
 
-```
+```ini
 --theme="tokyonight_night"
 ```
 

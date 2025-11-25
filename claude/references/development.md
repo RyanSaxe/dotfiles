@@ -138,7 +138,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **REQUIRED Commit Format:**
 
-```
+```text
 <type>: <short summary>
 
 <optional body explaining why, not what. No more than two lines.>

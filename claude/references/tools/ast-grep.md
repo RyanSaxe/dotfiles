@@ -254,21 +254,21 @@ sg -p 'def $FUNC($$$):' --json src/ | jq -r '.[] | "\(.file):\(.line) - \(.meta_
 
 ## Common Patterns Library
 
-### Python
+### Python Patterns
 
 - Functions: `def $FUNC($$$):`
 - Classes: `class $CLASS($$$):`
 - Imports: `from $MOD import $$$`
 - Decorators: `@$DECORATOR`
 
-### JavaScript/TypeScript
+### JavaScript/TypeScript Patterns
 
 - Functions: `function $NAME($$$) { $$$ }`
 - Arrow functions: `($$$) => $$$`
 - Exports: `export $$$`
 - Imports: `import $$$`
 
-### Lua
+### Lua Patterns
 
 - Functions: `function $NAME($$$) $$$ end`
 - Local functions: `local function $NAME($$$) $$$ end`

@@ -24,14 +24,14 @@ The "Hyper" key is a modifier combination (`Cmd+Ctrl+Opt+Shift`) that's rarely u
 
 ### Right Shift Behavior
 
-```
+```text
 Tap (< 200ms)    → F18 (triggers Leader Key)
 Hold (≥ 200ms)   → Hyper (Cmd+Ctrl+Opt+Shift)
 ```
 
 ### Hyper + HJKL (Vim Navigation)
 
-```
+```text
 Hyper + H  → Left Arrow
 Hyper + J  → Down Arrow
 Hyper + K  → Up Arrow
@@ -55,7 +55,7 @@ See the `complex_modifications.rules` array in `karabiner.json` for the complete
 
 ## Configuration Structure
 
-```
+```text
 karabiner/
 ├── karabiner.json              # Main configuration
 └── automatic_backups/          # Auto-generated backups

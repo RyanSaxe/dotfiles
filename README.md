@@ -6,7 +6,7 @@ The main assumption is that personal machines are MacOS, but that this continues
 
 ## 📁 Structure
 
-```
+```text
 config/                    # Configuration files for dependencies and symlinks
 ├── brew-packages.txt      # Homebrew packages (one per line)
 ├── apt-packages.txt       # APT packages (one per line)

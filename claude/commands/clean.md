@@ -2,6 +2,8 @@
 description: Refactor code to improve readability and maintainability while preserving functionality
 ---
 
+# Clean Command
+
 Read the [Style Guide](~/.claude/references/style.md) and clean up the code by following the steps below.
 
 1. ✅ **Tests are green** before starting. If they are red, fix them first.

@@ -16,7 +16,7 @@ brew install --cask leader-key
 
 The symlink is already configured in `config/symlinks.txt`:
 
-```
+```text
 leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json
 ```
 

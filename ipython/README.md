@@ -10,7 +10,7 @@ IPython REPL configuration with TokyoNight Night color scheme for syntax highlig
 
 ## Configuration Structure
 
-```
+```text
 ipython/
 ├── profile_default/
 │   ├── ipython_config.py          # Main config with TokyoNight colors

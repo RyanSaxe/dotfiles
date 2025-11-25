@@ -19,7 +19,7 @@ Comprehensive tmux configuration with TokyoNight Night theme, Pokemon-themed dyn
 
 ### Pane Navigation & Management
 
-```
+```text
 # Smart navigation (works with vim-tmux-navigator)
 Ctrl+H/J/K/L    - Navigate left/down/up/right (works across tmux/vim)
 
@@ -36,7 +36,7 @@ Prefix + -        - Split vertically (down)
 
 ### Window Navigation
 
-```
+```text
 # Quick window switching (no prefix needed)
 Alt+1 to Alt+9   - Jump to window 1-9
 Alt+N            - New window
@@ -45,7 +45,7 @@ Alt+Q            - Detach from session
 
 ### Popup Session Management
 
-```
+```text
 # With prefix
 Prefix + s       - Switch tmux sessions (ts)
 Prefix + o       - Navigate to git repo (to)
@@ -61,7 +61,7 @@ Alt+B            - Jump to panes with notifications
 
 ### Copy Mode
 
-```
+```text
 Prefix + [       - Enter copy mode
 v                - Begin selection (in copy mode)
 Ctrl+V           - Rectangle selection toggle
@@ -70,13 +70,13 @@ y                - Copy selection and exit
 
 ### Other
 
-```
+```text
 Prefix + r       - Reload tmux configuration
 ```
 
 ## Configuration Structure
 
-```
+```text
 tmux/
 ├── tmux.conf                          # Main configuration
 └── scripts/
