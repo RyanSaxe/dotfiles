@@ -102,8 +102,9 @@ Repository-wide tasks and cross-cutting improvements. Tool-specific TODOs are in
 ### Simple
 
 - [x] Create the `scripts/setup-notes.sh` script for Obsidian notes scaffolding
-- [ ] Setup CI/CD: release automation, linting/formatting, precommit hooks
-- [ ] Implement "stacked PR" command for claude-code to break work into multiple linked PRs
+- [x] Setup CI/CD for linting/formatting and precommit hooks
+- [ ] Setup CI/CD for release automation
+- [x] Implement "stacked PR" command for claude-code to break work into multiple linked PRs
 
 ### Complex
 
