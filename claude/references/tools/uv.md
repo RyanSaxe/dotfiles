@@ -1,8 +1,6 @@
 # uv - Python Package and Environment Manager
 
-`uv` is an extremely fast Python package installer and resolver, written in
-Rust. It's used for dependency management, virtual environments, and running
-Python tools.
+`uv` is an extremely fast Python package installer and resolver, written in Rust. It's used for dependency management, virtual environments, and running Python tools.
 
 ## Quick Reference
 
@@ -18,8 +16,7 @@ uv venv                 # Create virtual environment
 
 **Related:**
 
-- [Python skill](../../skills/language/python/SKILL.md) - Python-specific usage
-  patterns
+- [Python skill](../../skills/language/python/SKILL.md) - Python-specific usage patterns
 - [Official uv docs](https://github.com/astral-sh/uv)
 - [PEP 723 - Inline script metadata](https://peps.python.org/pep-0723/)
 
@@ -64,8 +61,7 @@ uv lock --upgrade
 
 ### Running Tools Without Installation (uvx)
 
-**This is incredibly useful for Claude Code!** `uvx` allows running Python tools
-without installing them globally:
+**This is incredibly useful for Claude Code!** `uvx` allows running Python tools without installing them globally:
 
 ```bash
 # Run a tool without installing it
@@ -111,8 +107,7 @@ uvx ipython  # Interactive Python shell with IPython
 
 ## Python Scripts with Inline Dependencies (PEP 723)
 
-`uv` supports inline script dependencies, allowing self-contained Python
-scripts:
+`uv` supports inline script dependencies, allowing self-contained Python scripts:
 
 ### Creating a Script
 

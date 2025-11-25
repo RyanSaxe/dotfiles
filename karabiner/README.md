@@ -1,22 +1,17 @@
 # Karabiner-Elements Configuration
 
-Advanced keyboard remapping system that transforms Right Shift into a
-dual-purpose key (F18 tap / Hyper hold) and enables vim-style navigation
-globally across macOS.
+Advanced keyboard remapping system that transforms Right Shift into a dual-purpose key (F18 tap / Hyper hold) and enables vim-style navigation globally across macOS.
 
 ## Features
 
-- **Right Shift dual-purpose** - Tap for F18 (Leader Key trigger), hold for
-  Hyper key
+- **Right Shift dual-purpose** - Tap for F18 (Leader Key trigger), hold for Hyper key
 - **Hyper key** - `Cmd+Ctrl+Opt+Shift` held by Right Shift
 - **Vim navigation** - `Hyper + HJKL` for arrow keys system-wide
 - **Hyper + other keys** - Additional ergonomic shortcuts for common actions
 
 ## Key Concept: Hyper Key
 
-The "Hyper" key is a modifier combination (`Cmd+Ctrl+Opt+Shift`) that's rarely
-used by default applications, making it perfect for custom global shortcuts
-without conflicts.
+The "Hyper" key is a modifier combination (`Cmd+Ctrl+Opt+Shift`) that's rarely used by default applications, making it perfect for custom global shortcuts without conflicts.
 
 ### Why Right Shift?
 
@@ -52,8 +47,7 @@ This enables vim-style navigation in:
 
 ### Additional Hyper Keybindings
 
-See the `complex_modifications.rules` array in `karabiner.json` for the complete
-list of Hyper key combinations. Common patterns include:
+See the `complex_modifications.rules` array in `karabiner.json` for the complete list of Hyper key combinations. Common patterns include:
 
 - **Navigation** - Browser controls, tab switching
 - **Window management** - Move/resize windows (if combined with window managers)
@@ -84,21 +78,11 @@ Each rule has:
   "manipulators": [
     {
       "type": "basic",
-      "from": {
-        /* source key(s) */
-      },
-      "to_if_alone": [
-        /* tap action */
-      ],
-      "to_if_held_down": [
-        /* hold action */
-      ],
-      "to": [
-        /* normal press action */
-      ],
-      "parameters": {
-        /* timing thresholds */
-      }
+      "from": { /* source key(s) */ },
+      "to_if_alone": [ /* tap action */ ],
+      "to_if_held_down": [ /* hold action */ ],
+      "to": [ /* normal press action */ ],
+      "parameters": { /* timing thresholds */ }
     }
   ]
 }
@@ -107,19 +91,15 @@ Each rule has:
 ### Key Parameters
 
 - **`to_if_alone_timeout_milliseconds`** - Max time for "tap" (default: 200ms)
-- **`to_if_held_down_threshold_milliseconds`** - Min time for "hold" (default:
-  200ms)
+- **`to_if_held_down_threshold_milliseconds`** - Min time for "hold" (default: 200ms)
 
 ## Integration with Leader Key
 
-The F18 tap action is what triggers Leader Key (configured to listen for F18 in
-Leader Key app settings). This creates a "leader key pattern" similar to
-Vim/Tmux:
+The F18 tap action is what triggers Leader Key (configured to listen for F18 in Leader Key app settings). This creates a "leader key pattern" similar to Vim/Tmux:
 
 1. Tap Right Shift → F18 → Leader Key menu appears
 2. Type key sequence → Execute action
-3. Result: Fast, discoverable shortcuts without memorizing complex modifier
-   combinations
+3. Result: Fast, discoverable shortcuts without memorizing complex modifier combinations
 
 ## Customization
 
@@ -131,21 +111,17 @@ Edit `karabiner.json` to:
 - Create multiple profiles for different use cases
 - Remap other keys (Caps Lock, function keys, etc.)
 
-**Note:** Karabiner-Elements GUI (`Karabiner-Elements Preferences`) can also be
-used to:
+**Note:** Karabiner-Elements GUI (`Karabiner-Elements Preferences`) can also be used to:
 
 - Enable/disable rules
 - Import/export configurations
 - Test modifications
 - View event logs for debugging
 
-See [Karabiner-Elements docs](https://karabiner-elements.pqrs.org/docs/) for
-complete reference.
+See [Karabiner-Elements docs](https://karabiner-elements.pqrs.org/docs/) for complete reference.
 
 ## Troubleshooting
 
-- **Karabiner not working** - Check System Settings → Privacy & Security → Input
-  Monitoring (Karabiner needs permission)
+- **Karabiner not working** - Check System Settings → Privacy & Security → Input Monitoring (Karabiner needs permission)
 - **Wrong timing** - Adjust `parameters` milliseconds in the rule
-- **Conflicts** - Check for overlapping system shortcuts in System Settings →
-  Keyboard → Keyboard Shortcuts
+- **Conflicts** - Check for overlapping system shortcuts in System Settings → Keyboard → Keyboard Shortcuts

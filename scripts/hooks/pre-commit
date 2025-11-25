@@ -7,7 +7,8 @@ set -euo pipefail
 # Supported formatters:
 # - stylua: Lua files
 # - shfmt: Shell scripts (sh, bash, zsh)
-# - prettier: JSON and Markdown files
+# - prettier: JSON files
+# - markdownlint: Markdown files (no line wrapping)
 #
 # To enable this hook for the dotfiles repo:
 #   git config core.hooksPath scripts/hooks
@@ -113,8 +114,8 @@ main() {
     warn "prettier not found, skipping JSON formatting"
   fi
 
-  # ── Markdown files (prettier) ───────────────────────────────────────────────
-  if has_cmd prettier; then
+  # ── Markdown files (markdownlint) ────────────────────────────────────────────
+  if has_cmd markdownlint; then
     local md_files=()
     while IFS= read -r -d '' file; do
       md_files+=("$file")
@@ -122,10 +123,13 @@ main() {
 
     if [[ ${#md_files[@]} -gt 0 ]]; then
       has_changes=true
-      info "Formatting ${#md_files[@]} Markdown file(s) with prettier..."
-      prettier --prose-wrap always --write "${md_files[@]}"
+      info "Formatting ${#md_files[@]} Markdown file(s) with markdownlint..."
+      # --fix auto-fixes issues, --config uses dotfiles config
+      markdownlint --fix --config "$HOME/.config/nvim/.markdownlint.yaml" "${md_files[@]}" || true
       git add "${md_files[@]}"
     fi
+  else
+    warn "markdownlint not found, skipping Markdown formatting"
   fi
 
   if [[ "$has_changes" == true ]]; then

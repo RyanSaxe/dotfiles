@@ -1,20 +1,17 @@
 ---
-description:
-  Shell scripting patterns for bash/zsh with macOS and Linux portability
+description: Shell scripting patterns for bash/zsh with macOS and Linux portability
 ---
 
 # Task
 
-Write robust, portable shell scripts that work across macOS and Linux
-(Ubuntu/Debian).
+Write robust, portable shell scripts that work across macOS and Linux (Ubuntu/Debian).
 
 ## Core Principles
 
 - **Portability First**: Code must work on both macOS and Linux
 - **Bash 3.2.57**: macOS default - limited features, no associative arrays
 - **Zsh 5.9**: Primary shell - feature-rich, preferred when available
-- **Detailed Comments**: Unlike other code, leave detailed comments in shell
-  scripts
+- **Detailed Comments**: Unlike other code, leave detailed comments in shell scripts
   - Shell edge cases are subtle and configs are frequently modified
 
 ## Workflow
@@ -250,7 +247,6 @@ DRY_RUN=true ./script.sh
 ## Related Documentation
 
 - [Style Guide](~/.claude/references/style.md) - General code style
-- [Development Workflow](~/.claude/references/development.md) - Development
-  process
+- [Development Workflow](~/.claude/references/development.md) - Development process
 
 For shell-specific issues, check `man bash` or `man zsh`.

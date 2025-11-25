@@ -1,14 +1,11 @@
 # Git Configuration
 
-Git configuration with delta for syntax-highlighted diffs, TokyoNight theme
-integration, and useful aliases.
+Git configuration with delta for syntax-highlighted diffs, TokyoNight theme integration, and useful aliases.
 
 ## Features
 
-- **Delta integration** - Syntax-highlighted side-by-side diffs with TokyoNight
-  Night theme
-- **zdiff3 merge style** - Enhanced conflict markers showing original, ours, and
-  theirs
+- **Delta integration** - Syntax-highlighted side-by-side diffs with TokyoNight Night theme
+- **zdiff3 merge style** - Enhanced conflict markers showing original, ours, and theirs
 - **Auto-setup remote** - Automatically sets up remote tracking for new branches
 - **Rebase by default** - Pull with rebase instead of merge
 - **Useful aliases** - Common git shortcuts
@@ -49,8 +46,7 @@ integration, and useful aliases.
 
 ## Global Ignore
 
-The `ignore` file defines patterns to exclude globally across all repositories
-(e.g., `.DS_Store`, editor files, etc.).
+The `ignore` file defines patterns to exclude globally across all repositories (e.g., `.DS_Store`, editor files, etc.).
 
 ## Customization
 

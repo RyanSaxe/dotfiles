@@ -1,22 +1,17 @@
 # Zsh Configuration
 
-Oh My Zsh-based shell configuration with custom theme, vi mode, automatic Python
-virtual environment activation, and comprehensive tmux/git repository
-management.
+Oh My Zsh-based shell configuration with custom theme, vi mode, automatic Python virtual environment activation, and comprehensive tmux/git repository management.
 
 ## Features
 
 - **Oh My Zsh** - Framework for managing zsh configuration
 - **Custom theme** - `fino-time-custom` (TokyoNight-inspired prompt)
 - **Vi mode** - Vim keybindings in command line with visual mode indicator
-- **Auto virtualenv** - Automatically activates Python virtual environments when
-  entering project directories
-- **Environment loading** - Auto-loads `.env` files with directory-specific
-  caching
+- **Auto virtualenv** - Automatically activates Python virtual environments when entering project directories
+- **Environment loading** - Auto-loads `.env` files with directory-specific caching
 - **Tmux integration** - Session management and popup windows
 - **Git repository navigation** - Fast fuzzy finding across projects
-- **Minimal mode** - Lightweight configuration for tmux popups (automatic
-  detection)
+- **Minimal mode** - Lightweight configuration for tmux popups (automatic detection)
 
 ## Configuration Structure
 
@@ -55,8 +50,7 @@ zsh/
 
 ### Git Repository Navigation (`git-repos.zsh`)
 
-- **`to`** - Navigate to git repos with FZF (searches `~/generic`, `~/work`,
-  `~/projects`)
+- **`to`** - Navigate to git repos with FZF (searches `~/generic`, `~/work`, `~/projects`)
 - **`cache_csv`** - Caching utility for expensive operations
 
 ### Environment Management
@@ -67,8 +61,7 @@ zsh/
 
 ## Minimal Mode
 
-When `$TMUX_POPUP` is set or `ZSH_MODE=minimal`, zsh automatically loads
-`.zshrc.minimal` instead of the full configuration. This provides:
+When `$TMUX_POPUP` is set or `ZSH_MODE=minimal`, zsh automatically loads `.zshrc.minimal` instead of the full configuration. This provides:
 
 - Faster startup for tmux popup windows
 - Essential functions only (no heavy plugins)
@@ -97,8 +90,7 @@ Enhanced vi mode with:
 
 ## Aliases
 
-Common aliases are defined in `aliases.zsh`. These are shared between full and
-minimal modes.
+Common aliases are defined in `aliases.zsh`. These are shared between full and minimal modes.
 
 ## Customization
 

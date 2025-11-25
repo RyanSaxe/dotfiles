@@ -1,7 +1,6 @@
 # Testing Guide
 
-This document provides comprehensive testing patterns, methodologies, and best
-practices.
+This document provides comprehensive testing patterns, methodologies, and best practices.
 
 ## Core Philosophy
 
@@ -15,19 +14,15 @@ Why tests are superior documentation:
 - **Show edge cases**: Document boundaries and error handling
 - **Cannot become stale**: Unlike comments or docs, failing tests force updates
 
-Write tests with documentation in mind - they're examples for future developers
-(including yourself).
+Write tests with documentation in mind - they're examples for future developers (including yourself).
 
 ## Testing Principles
 
-1. **Confidence over coverage**: Goal is confidence code works, not 100%
-   coverage
+1. **Confidence over coverage**: Goal is confidence code works, not 100% coverage
 2. **Behavior over implementation**: Test what code does, not how it does it
 3. **Concise and clear**: Aim for minimal tests that give maximum confidence
-4. **One concept per test**: Multiple assertions are fine if testing same
-   concept
-5. **Avoid excessive tests**: 500 lines of tests for 50 lines of code is usually
-   wrong
+4. **One concept per test**: Multiple assertions are fine if testing same concept
+5. **Avoid excessive tests**: 500 lines of tests for 50 lines of code is usually wrong
 
 ## Test Organization
 
@@ -96,18 +91,19 @@ def test_should_handle_zeros():
 
 ### Test These
 
-✅ **Business logic**: Core algorithms and calculations ✅ **Public APIs**:
-Functions/methods other code depends on ✅ **Edge cases**: Boundary conditions
-and error paths ✅ **Bug fixes**: Regression tests to prevent reintroduction ✅
-**Complex conditionals**: Logic with multiple branches
+✅ **Business logic**: Core algorithms and calculations
+✅ **Public APIs**: Functions/methods other code depends on
+✅ **Edge cases**: Boundary conditions and error paths
+✅ **Bug fixes**: Regression tests to prevent reintroduction
+✅ **Complex conditionals**: Logic with multiple branches
 
 ### Don't Test These
 
-❌ **Framework code**: Don't test Django/Flask/etc. functionality ❌
-**Third-party libraries**: Trust pytest, requests, pandas, etc. ❌ **Trivial
-code**: Getters/setters with no logic ❌ **Implementation details**: Private
-methods (test through public API) ❌ **External services**: Mock or use test
-doubles instead
+❌ **Framework code**: Don't test Django/Flask/etc. functionality
+❌ **Third-party libraries**: Trust pytest, requests, pandas, etc.
+❌ **Trivial code**: Getters/setters with no logic
+❌ **Implementation details**: Private methods (test through public API)
+❌ **External services**: Mock or use test doubles instead
 
 ## Test Types
 
@@ -196,8 +192,7 @@ def test_user_creation(database, sample_user):
 
 ### Avoid Mocking Unless Necessary
 
-**See [TDD Skill](../skills/code/tdd/SKILL.md) for comprehensive mocking
-guidelines.**
+**See [TDD Skill](../skills/code/tdd/SKILL.md) for comprehensive mocking guidelines.**
 
 **Use mocks only when:**
 
@@ -426,7 +421,5 @@ pytest -n auto
 - [TDD Skill](../skills/code/tdd/SKILL.md) - Test-driven development workflow
 - [Style Guide](style.md) - Code style standards
 - [Development Workflow](development.md) - Development process
-- [Python Testing](../skills/language/python/SKILL.md) - Python-specific
-  patterns
-- [Neovim Testing](../skills/language/neovim/SKILL.md) - Lua/Neovim testing
-  patterns
+- [Python Testing](../skills/language/python/SKILL.md) - Python-specific patterns
+- [Neovim Testing](../skills/language/neovim/SKILL.md) - Lua/Neovim testing patterns

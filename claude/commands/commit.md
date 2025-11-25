@@ -1,14 +1,11 @@
 ---
-allowed-tools:
-  Bash(git add:*), Bash(git status:*), Bash(git commit:*), Bash(git diff:*)
+allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*), Bash(git diff:*)
 description: Create an atomic git commit with proper formatting
 ---
 
 # Task
 
-The goal of this command is to help create very clean git commit histories by
-making it incredibly easy to create atomic commits, even when working in ways
-that are not fully atomic.
+The goal of this command is to help create very clean git commit histories by making it incredibly easy to create atomic commits, even when working in ways that are not fully atomic.
 
 Follow these steps:
 
@@ -31,9 +28,7 @@ Ensure changes represent ONE logical change:
 - ❌ Mixed changes (feature + refactor)
 - ❌ Incomplete work (WIP)
 
-If the commit is not atomic, present the user with a plan and options for what
-to do. Such that you can correctly make sure the commit(s) you write here will
-be atomic.
+If the commit is not atomic, present the user with a plan and options for what to do. Such that you can correctly make sure the commit(s) you write here will be atomic.
 
 ## 3. Draft Commit Message
 
@@ -93,6 +88,4 @@ If pre-commit hooks modify files:
 - If both true: amend commit with modified files
 - Otherwise: create NEW commit
 
-Additionally, if the pre-commit hook has failures that were not auto-fixed,
-immediately go into planning mode and give the user a plan for how you intend to
-fix those failures. The last item in that plan should be to commit.
+Additionally, if the pre-commit hook has failures that were not auto-fixed, immediately go into planning mode and give the user a plan for how you intend to fix those failures. The last item in that plan should be to commit.

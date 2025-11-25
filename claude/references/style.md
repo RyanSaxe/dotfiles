@@ -1,11 +1,8 @@
 # Code Style Guide
 
-This document defines what good code looks like - the standards, conventions,
-and patterns to follow when writing code.
+This document defines what good code looks like - the standards, conventions, and patterns to follow when writing code.
 
-NOTE: the code examples in this file are python, but they apply to all
-languages. Any language that wants to deviate will specify in the corresponding
-skill located in skills/lang-[name-of-language].
+NOTE: the code examples in this file are python, but they apply to all languages. Any language that wants to deviate will specify in the corresponding skill located in skills/lang-[name-of-language].
 
 ## Core Principles
 
@@ -127,15 +124,13 @@ def process_order(order: Order, discount_rate: float) -> Order:
     return order
 ```
 
-<IMPORTANT>Do not go overboard here. Functions with only a few lines that call
-other functions can be problematic and increase cognitive complexity. This
-principal is NOT about size of the function, but just about avoiding having a
-function do too many things.</IMPORTANT>
+<IMPORTANT>Do not go overboard here. Functions with only a few lines that call other functions can be problematic and increase cognitive complexity. This principal is NOT about size of the function, but just about avoiding having a function do too many things.</IMPORTANT>
 
 ### Parameter Count
 
-**Ideal:** 0-3 parameters **Acceptable:** 4-7 parameters **Code smell:** 8+
-parameters
+**Ideal:** 0-3 parameters
+**Acceptable:** 4-7 parameters
+**Code smell:** 8+ parameters
 
 For many related parameters, group them logically:
 
@@ -258,7 +253,8 @@ def process_order(order: Order | None) -> str:
 
 ### Nesting Depth
 
-**Maximum recommended:** 3 levels of nesting **Ideal:** 1-2 levels
+**Maximum recommended:** 3 levels of nesting
+**Ideal:** 1-2 levels
 
 ```python
 # Good: Flat structure
@@ -320,7 +316,7 @@ def can_process_order(user: User, order: Order) -> bool:
 retry_delay = base_delay * (2 ** attempt_count)
 ```
 
-2. **Warning about side effects:**
+1. **Warning about side effects:**
 
 ```python
 # Warning: This modifies the global cache
@@ -329,7 +325,7 @@ def update_user_preferences(user_id: int, prefs: dict) -> None:
     GLOBAL_CACHE[user_id] = prefs
 ```
 
-3. **Documenting public APIs:**
+1. **Documenting public APIs:**
 
 ```python
 def calculate_compound_interest(
@@ -367,7 +363,7 @@ for user in users:
     ...
 ```
 
-2. **Code is self-documenting:**
+1. **Code is self-documenting:**
 
 ```python
 # Bad: Comment should be function name
@@ -383,7 +379,7 @@ if has_admin_write_access(user):
     ...
 ```
 
-3. **Outdated or wrong information:**
+1. **Outdated or wrong information:**
 
 ```python
 # Bad: Outdated comment
@@ -592,7 +588,7 @@ class ShoppingCart:
             self.total -= item.price
 ```
 
-2. **Group related behavior with shared data:**
+1. **Group related behavior with shared data:**
 
 ```python
 class DatabaseConnection:
@@ -612,7 +608,7 @@ class DatabaseConnection:
             self.transaction.rollback()
 ```
 
-3. **Need instances with different configurations:**
+1. **Need instances with different configurations:**
 
 ```python
 class APIClient:
@@ -630,7 +626,7 @@ prod_client = APIClient("https://api.prod.com", prod_key)
 test_client = APIClient("https://api.test.com", test_key)
 ```
 
-4. **Implementing interfaces/protocols:**
+1. **Implementing interfaces/protocols:**
 
 ```python
 class PaymentProcessor(Protocol):
@@ -767,13 +763,10 @@ dog = Animal(name="Dog", movement_fn=walk, vocalization_fn=bark)
 
 - Python: Functions are first-class, prefer them
 - Lua: Tables and functions are often more idiomatic than classes
-- Java/C#: Classes are more fundamental, but still prefer simple over complex
-  hierarchies
+- Java/C#: Classes are more fundamental, but still prefer simple over complex hierarchies
 
 ## Related Guides
 
-- [Clean Code Skill](../skills/code/clean/SKILL.md) - How to transform code to
-  meet these standards
+- [Clean Code Skill](../skills/code/clean/SKILL.md) - How to transform code to meet these standards
 - [Testing Guide](testing.md) - Testing serves as executable documentation
-- [Development Workflow](development.md) - Development process and best
-  practices
+- [Development Workflow](development.md) - Development process and best practices

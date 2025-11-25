@@ -1,13 +1,11 @@
 # LazyGit Configuration
 
-LazyGit TUI configuration with TokyoNight Night theme and delta integration for
-syntax-highlighted diffs.
+LazyGit TUI configuration with TokyoNight Night theme and delta integration for syntax-highlighted diffs.
 
 ## Features
 
 - **TokyoNight theme** - Custom colors matching Neovim/Tmux color scheme
-- **Delta integration** - Syntax-highlighted diffs via delta with TokyoNight
-  theme
+- **Delta integration** - Syntax-highlighted diffs via delta with TokyoNight theme
 - **Nerd Fonts** - File icons using Nerd Fonts v3
 - **Borders & UI** - Enhanced visual layout with borders and bottom status line
 
@@ -33,8 +31,7 @@ git:
     pager: delta --paging=never --syntax-theme=tokyonight_night
 ```
 
-Provides syntax-highlighted diffs within LazyGit, consistent with command-line
-git.
+Provides syntax-highlighted diffs within LazyGit, consistent with command-line git.
 
 ## Usage
 
@@ -55,6 +52,4 @@ Edit `config.yml` to:
 - Adjust git behavior (paging, commit graph, etc.)
 - Add custom keybindings
 
-See
-[LazyGit docs](https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md)
-for all available options.
+See [LazyGit docs](https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md) for all available options.

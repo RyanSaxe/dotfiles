@@ -1,17 +1,14 @@
 ---
-description:
-  Test-Driven Development workflow - write tests first, implement second
+description: Test-Driven Development workflow - write tests first, implement second
 ---
 
 # Task
 
-Follow the Test-Driven Development (TDD) cycle to build features with confidence
-through test-first development.
+Follow the Test-Driven Development (TDD) cycle to build features with confidence through test-first development.
 
 ## Core Philosophy
 
-**Goal:** Write the most concise and clear set of tests such that you are
-confident your code does what you want it to do.
+**Goal:** Write the most concise and clear set of tests such that you are confident your code does what you want it to do.
 
 **NOT the goal:** Writing 500 lines of test code to test 50 lines of real code.
 
@@ -184,8 +181,7 @@ Use fixtures or `before_each`/`after_each` for common setup.
 
 ## Test Coverage Philosophy
 
-- **Confidence over coverage**: 80% coverage with trusted tests > 100% with
-  brittle ones
+- **Confidence over coverage**: 80% coverage with trusted tests > 100% with brittle ones
 - **Test behavior**, not implementation details
 - **Test edge cases** for critical logic
 - **Don't obsess** over 100% coverage
@@ -194,8 +190,7 @@ Conciseness and clarity matter more than line count.
 
 ## Related Documentation
 
-- [Testing Guide](~/.claude/references/testing.md) - Comprehensive testing
-  patterns
+- [Testing Guide](~/.claude/references/testing.md) - Comprehensive testing patterns
 - [Style Guide](~/.claude/references/style.md) - Code style principles
 
 See your language-specific documentation for testing frameworks.

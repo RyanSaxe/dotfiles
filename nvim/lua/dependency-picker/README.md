@@ -1,8 +1,6 @@
 # Dependency Picker
 
-Smart dependency navigation for multiple programming languages. Navigate and
-search through project dependencies and standard libraries with intelligent
-auto-detection and configurable behavior.
+Smart dependency navigation for multiple programming languages. Navigate and search through project dependencies and standard libraries with intelligent auto-detection and configurable behavior.
 
 ## Supported Languages
 
@@ -17,10 +15,8 @@ auto-detection and configurable behavior.
 ## Features
 
 - **Smart detection**: Auto-detects language from current filetype
-- **Context awareness**: If you're inside a package directory, searches that
-  package directly
-- **Multi-detector handling**: Configurable logic for choosing between multiple
-  package ecosystems
+- **Context awareness**: If you're inside a package directory, searches that package directly
+- **Multi-detector handling**: Configurable logic for choosing between multiple package ecosystems
 - **Language filtering**: Enable/disable specific languages
 - **Dual modes**: Grep content or search files
 - **Stdlib support**: Search language standard libraries
@@ -40,7 +36,7 @@ require("dependency-picker").setup({
   select_detector = function(matching_detectors, context)
     -- matching_detectors: array of { detector = module, result = detect_result }
     -- context: { bufpath = string, filetype = string }
-
+    
     -- Return the selected match, or nil to use first match
     return matching_detectors[1]
   end
@@ -49,8 +45,7 @@ require("dependency-picker").setup({
 
 ### Example: Path-Based Selection
 
-Prefer Neovim packages when "nvim" is in the file path, otherwise use Lua
-packages:
+Prefer Neovim packages when "nvim" is in the file path, otherwise use Lua packages:
 
 ```lua
 require("dependency-picker").setup({
@@ -135,7 +130,7 @@ Configure the dependency picker. See Configuration section above.
 
 Auto-detect language and search. Modes: `"grep"` or `"files"`
 
-### `M.manual_search(mode)`
+### `M.manual_search(mode)`  
 
 Manual language selection, then search. Modes: `"grep"` or `"files"`
 

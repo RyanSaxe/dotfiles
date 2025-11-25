@@ -35,8 +35,8 @@ jobs:
           chmod +x shfmt
           sudo mv shfmt /usr/local/bin/
 
-      - name: Install prettier
-        run: npm install -g prettier
+      - name: Install prettier and markdownlint
+        run: npm install -g prettier markdownlint-cli
 
       - name: Check Shell formatting (shfmt)
         run: |
@@ -63,13 +63,12 @@ jobs:
           done
           echo "All JSON files are formatted correctly"
 
-      - name: Check Markdown formatting (prettier)
+      - name: Check Markdown formatting (markdownlint)
         run: |
           echo "Checking Markdown files..."
-          find . -name "*.md" -type f ! -path "./node_modules/*" | while read -r file; do
-            if ! prettier --prose-wrap always --check "$file" > /dev/null 2>&1; then
-              echo "::error file=$file::Markdown file is not formatted correctly"
-              exit 1
-            fi
-          done
-          echo "All Markdown files are formatted correctly"
+          # Use the dotfiles markdownlint config
+          markdownlint --config nvim/.markdownlint.yaml "**/*.md" || {
+            echo "::error::Markdown files have linting issues. Run 'markdownlint --fix' locally."
+            exit 1
+          }
+          echo "All Markdown files pass linting"

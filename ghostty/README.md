@@ -1,13 +1,11 @@
 # Ghostty Configuration
 
-Ghostty terminal emulator configuration with TokyoNight Night theme, vim-style
-split management, and custom cursor trail shader.
+Ghostty terminal emulator configuration with TokyoNight Night theme, vim-style split management, and custom cursor trail shader.
 
 ## Features
 
 - **TokyoNight Night theme** - Consistent with Neovim/Tmux color scheme
-- **Vim-style splits** - Navigate and create splits using vim-inspired
-  keybindings
+- **Vim-style splits** - Navigate and create splits using vim-inspired keybindings
 - **Global quick terminal** - Toggle terminal overlay with `Cmd+G` from anywhere
 - **Copy-on-select** - Automatic clipboard copy when selecting text
 - **Custom cursor shader** - TokyoNight-themed cursor trail effect

@@ -5,7 +5,6 @@ return {
   "folke/snacks.nvim",
   priority = 1000,
   lazy = false,
-  dependencies = { "ibhagwan/fzf-lua", "folke/todo-comments.nvim" },
   opts = {
     dashboard = {
       -- Use the modular dashboard configuration

@@ -2,7 +2,8 @@
 -- Python: Auto-detects black/ruff/isort based on pyproject.toml
 -- Lua: stylua (respects .stylua.toml if present)
 -- Shell: shfmt for bash/sh/zsh scripts
--- JSON/Markdown: prettier for consistent formatting
+-- JSON: prettier for consistent formatting
+-- Markdown: markdownlint for style enforcement (no line wrapping)
 
 return {
   "stevearc/conform.nvim",
@@ -126,9 +127,9 @@ return {
     opts.formatters_by_ft.json = { "prettier" }
     opts.formatters_by_ft.jsonc = { "prettier" }
 
-    -- Markdown: prettier for formatting
-    -- Note: markdownlint is used separately via nvim-lint for linting
-    opts.formatters_by_ft.markdown = { "prettier" }
+    -- Markdown: markdownlint with --fix for auto-formatting
+    -- Does NOT wrap lines (markdown is read with word wrap enabled)
+    opts.formatters_by_ft.markdown = { "markdownlint" }
 
     -- ══════════════════════════════════════════════════════════════════════════
     -- Individual formatter settings
@@ -194,11 +195,15 @@ return {
       prepend_args = { "-i", "2", "-ci", "-bn", "-sr" },
     }
 
-    -- prettier configuration for JSON and Markdown
+    -- prettier configuration for JSON
     -- Uses project's .prettierrc if present, otherwise sensible defaults
-    -- --prose-wrap always: Wrap markdown prose at print width
-    opts.formatters.prettier = {
-      prepend_args = { "--prose-wrap", "always" },
+    -- No special args needed for JSON formatting
+
+    -- markdownlint configuration
+    -- --fix: Auto-fix fixable issues
+    -- --config: Use the dotfiles markdownlint config
+    opts.formatters.markdownlint = {
+      prepend_args = { "--fix", "--config", vim.fn.expand("~/.config/nvim/.markdownlint.yaml") },
     }
 
     return opts
