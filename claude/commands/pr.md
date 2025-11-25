@@ -56,6 +56,7 @@ Analyze the current branch and create either a single PR or multiple stacked PRs
 
    d) **Verify correctness**:
       - After creating all branches, verify the combined changes match the original:
+
         ```bash
         # Create a test branch merging all PR branches
         git checkout -b verify-stack $BASE_BRANCH
@@ -72,6 +73,7 @@ Analyze the current branch and create either a single PR or multiple stacked PRs
       - Create PRs in order:
 
         **For independent PRs**:
+
         ```bash
         gh pr create --draft --base $BASE_BRANCH --title "Title" --body "$(cat <<'EOF'
         ## Summary
@@ -94,6 +96,7 @@ Analyze the current branch and create either a single PR or multiple stacked PRs
         ```
 
         **For dependent PRs**:
+
         ```bash
         gh pr create --draft --base <previous-pr-branch> --title "Title" --body "$(cat <<'EOF'
         ## Summary
@@ -122,7 +125,8 @@ Analyze the current branch and create either a single PR or multiple stacked PRs
 7. **Provide summary**:
    - List all created PRs with their URLs
    - Show the dependency graph visually:
-     ```
+
+     ```text
      Stack created successfully:
 
      BASE_BRANCH ($BASE_BRANCH)
@@ -133,11 +137,13 @@ Analyze the current branch and create either a single PR or multiple stacked PRs
 
      Merge order: #123, #124, #125, #126 (or #123/#124 in any order, then #125, then #126)
      ```
+
    - Confirm that merging all PRs will achieve the same final state
 
 ## Example Workflow
 
 If the branch has commits:
+
 - `abc123 Add user authentication`
 - `def456 Fix authentication tests`
 - `ghi789 Refactor database connection`
@@ -145,6 +151,7 @@ If the branch has commits:
 - `mno345 Update logging tests`
 
 Suggest grouping as:
+
 1. **PR 1**: Database refactor (independent, base: $BASE_BRANCH)
    - `ghi789 Refactor database connection`
 2. **PR 2**: Authentication feature (independent, base: $BASE_BRANCH)

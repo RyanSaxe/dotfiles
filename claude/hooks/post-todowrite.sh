@@ -8,11 +8,11 @@ set -euo pipefail
 input=$(cat)
 
 # Check if any tasks are in_progress
-has_in_progress=$(echo "$input" | jq -r '.tool_input.todos[]? | select(.status=="in_progress") | .content' 2>/dev/null)
+has_in_progress=$(echo "$input" | jq -r '.tool_input.todos[]? | select(.status=="in_progress") | .content' 2> /dev/null)
 
 # Only provide reminder if there are in_progress tasks
 if [[ -n "$has_in_progress" ]]; then
-  cat <<EOF
+  cat << EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "PostToolUse",

@@ -13,6 +13,7 @@ Git configuration with delta for syntax-highlighted diffs, TokyoNight theme inte
 ## Configuration Highlights
 
 ### Diff & Merge
+
 ```gitconfig
 [core]
     pager = delta --side-by-side --syntax-theme=tokyonight_night
@@ -23,6 +24,7 @@ Git configuration with delta for syntax-highlighted diffs, TokyoNight theme inte
 ```
 
 ### Workflow Settings
+
 ```gitconfig
 [push]
     autoSetupRemote = true    # Auto-track remote branches
@@ -33,6 +35,7 @@ Git configuration with delta for syntax-highlighted diffs, TokyoNight theme inte
 ```
 
 ### Aliases
+
 - `git co` → `checkout`
 - `git br` → `branch`
 - `git ci` → `commit`
@@ -48,6 +51,7 @@ The `ignore` file defines patterns to exclude globally across all repositories (
 ## Customization
 
 Edit `config` to:
+
 - Add new aliases
 - Modify delta display options (remove `--side-by-side` for unified diffs)
 - Change merge conflict style

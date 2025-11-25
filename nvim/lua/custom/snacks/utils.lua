@@ -260,9 +260,20 @@ function M.calculate_git_sections_height(sections)
     end
 
     -- Check for git-specific keys (b/B for branches, s for status, etc)
-    if section.key and (section.key == "b" or section.key == "B" or section.key == "s"
-                        or section.key == "l" or section.key == "d" or section.key == "c"
-                        or section.key == "p" or section.key == "P" or section.key == "z") then
+    if
+      section.key
+      and (
+        section.key == "b"
+        or section.key == "B"
+        or section.key == "s"
+        or section.key == "l"
+        or section.key == "d"
+        or section.key == "c"
+        or section.key == "p"
+        or section.key == "P"
+        or section.key == "z"
+      )
+    then
       in_git_section = true
     end
 
@@ -424,4 +435,3 @@ function M.detect_available_filetypes()
 end
 
 return M
-

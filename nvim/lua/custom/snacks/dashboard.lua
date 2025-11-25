@@ -805,29 +805,6 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
 
   local sections = {}
 
-  -- Add top padding if we're in tmux OR not in fullscreen
-  -- Tmux statusline and window decorations make things not look centered
-  -- So we add a little padding to make it look centered
-  local in_tmux = vim.env.TMUX ~= nil
-  local terminal_height = vim.o.lines
-  -- Consider it "not fullscreen" if height is less than 50 lines
-  -- Most fullscreen terminals are 50+ lines, windowed ones are typically 24-40
-  local not_fullscreen = terminal_height < 50
-
-  if in_tmux or not_fullscreen then
-    table.insert(sections, {
-      pane = 1,
-      padding = 1,
-    })
-    -- Only add padding for pane 2 if it will actually be shown
-    if utils.show_if_has_second_pane() then
-      table.insert(sections, {
-        pane = 2,
-        padding = 1,
-      })
-    end
-  end
-
   -- Add separator to pane 2 for visual balance in these cases:
   -- 1. When BOTH git and recent are hidden (always show for visual balance)
   -- 2. When recent files are in pane 1 (not in git) and shown
@@ -889,6 +866,25 @@ end
 -- Called by Snacks dashboard with self (dashboard instance) as parameter
 ---@param dashboard snacks.dashboard.Class Dashboard instance
 function M.create_sections(dashboard)
+  -- Ensure tabline is always shown to prevent layout shifts (only in tmux)
+  -- This prevents the dashboard from jumping when switching buffers in tmux
+  -- Outside tmux, we don't need this workaround as there's no tmux status bar
+  if vim.env.TMUX then
+    local original_tabline = vim.o.tabline
+    vim.o.tabline = " "
+    vim.o.showtabline = 2
+
+    -- Restore tabline when leaving dashboard
+    vim.api.nvim_create_autocmd("BufLeave", {
+      pattern = "*",
+      once = true,
+      callback = function()
+        if vim.bo.filetype == "snacks_dashboard" then
+          vim.o.tabline = original_tabline
+        end
+      end,
+    })
+  end
   -- Always set initial dynamic pane width for responsive layout
   -- This will be recalculated after height calculation for perfect centering
   if dashboard and dashboard._size then

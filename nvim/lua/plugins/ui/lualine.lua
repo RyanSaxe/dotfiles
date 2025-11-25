@@ -13,6 +13,7 @@ return {
 
     -- Load pokemon colors from cache file (created by dashboard)
     -- This allows lualine to match the pokemon theme automatically
+    local pokemon_dim = c.comment -- fallback to TokyoNight comment
     local pokemon_prominent = c.blue -- fallback to TokyoNight blue
     local pokemon_bright = c.orange -- fallback to TokyoNight orange
 
@@ -21,7 +22,11 @@ return {
       -- Read and parse the env file
       local lines = vim.fn.readfile(env_file)
       for _, line in ipairs(lines) do
-        local color = line:match('POKEMON_COLOR_PROMINENT="([^"]+)"')
+        local color = line:match('POKEMON_COLOR_DIM="([^"]+)"')
+        if color then
+          pokemon_dim = color
+        end
+        color = line:match('POKEMON_COLOR_PROMINENT="([^"]+)"')
         if color then
           pokemon_prominent = color
         end
@@ -41,7 +46,7 @@ return {
       green = pokemon_bright, -- Use pokemon bright color for insert mode
       red = c.red,
       yellow = c.yellow,
-      gray = c.comment,
+      gray = pokemon_dim, -- Use pokemon dim color for inactive/unmodified states
       gutter = c.fg_gutter,
       orange = c.orange,
       purple = c.purple,

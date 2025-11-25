@@ -231,7 +231,7 @@ Use `--source` to filter to specific LSP when multiple are running.
 
 ### Summary Mode (default)
 
-```
+```text
 LSP Diagnostic Report
 Generated: 2025-01-16T12:00:00Z
 Files:     42
@@ -247,7 +247,7 @@ Shows overview with top problematic files.
 
 ### Detailed Mode (--detailed)
 
-```
+```text
 src/main.py
 ────────────────────────────────────────
 ERROR    [42, 5]  type-error (Pyright)

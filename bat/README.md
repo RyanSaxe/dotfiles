@@ -5,7 +5,8 @@ Bat is a `cat` clone with syntax highlighting and Git integration, configured he
 ## Configuration
 
 The `config` file contains:
-```
+
+```ini
 --theme="tokyonight_night"
 ```
 
@@ -32,6 +33,7 @@ bat -r 10:20 file.js
 ## Customization
 
 Edit `config` to change the theme or add other options. For available themes:
+
 ```bash
 bat --list-themes
 ```

@@ -14,7 +14,8 @@ Ghostty terminal emulator configuration with TokyoNight Night theme, vim-style s
 ## Key Bindings
 
 ### Split Management
-```
+
+```text
 # Create splits (vim-style hjkl)
 Cmd+Shift+L  - New split right
 Cmd+Shift+H  - New split left
@@ -32,7 +33,8 @@ Cmd+Shift+Arrow  - Resize split in arrow direction by 10 pixels
 ```
 
 ### Other
-```
+
+```text
 Cmd+G (global)  - Toggle quick terminal
 Cmd+R           - Reload configuration
 Cmd+O           - Open configuration file
@@ -42,13 +44,15 @@ Shift+Enter     - Multi-line input (for Claude Code)
 ## Configuration Highlights
 
 ### Styling
+
 - **Font size** - 16pt
 - **Unfocused opacity** - 0.8 (dims inactive splits)
 - **Window padding** - 4px on all sides (improves lualine appearance)
 - **Padding color** - Matches background
 
 ### Custom Shader
-```
+
+```ini
 custom-shader = shaders/cursor_trail_tokyonight.glsl
 ```
 
@@ -57,6 +61,7 @@ Provides a subtle cursor trail effect with TokyoNight colors.
 ## Customization
 
 Edit `config` to:
+
 - Modify keybindings (use `keybind = key=action` format)
 - Change font size or family
 - Adjust opacity and padding

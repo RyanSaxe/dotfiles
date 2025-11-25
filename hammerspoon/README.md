@@ -27,6 +27,7 @@ focusOrOpenTab("github.com")
 ```
 
 This function:
+
 - Searches all Chrome tabs for URLs containing "github.com"
 - If found, brings Chrome to front and activates that tab (even if minimized)
 - If not found, opens a new tab with the URL
@@ -55,6 +56,7 @@ This pattern allows Leader Key to serve as a simple launcher while delegating co
 ## Customization
 
 Edit `init.lua` to:
+
 - Add new automation functions
 - Support additional browsers
 - Create window management shortcuts
@@ -66,6 +68,7 @@ See [Hammerspoon docs](https://www.hammerspoon.org/docs/) for the full API refer
 ## TODO
 
 ### Unclear How Hard
+
 - [ ] Refactor init.lua into a proper Spoon
 - [ ] Create additional Spoons with automation that integrates cleanly with Leader Key
 - [ ] Expand browser support beyond Chrome

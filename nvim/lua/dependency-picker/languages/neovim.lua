@@ -5,7 +5,7 @@ local M = {}
 M.name = "Neovim"
 M.filetypes = { "lua", "vim" }
 M.requires_buffer_path = false
-M.file_extensions = { "lua", "vim" }  -- Both Lua and Vimscript
+M.file_extensions = { "lua", "vim" } -- Both Lua and Vimscript
 
 ---@return table|nil { root = string, packages = string[] }
 function M.detect()

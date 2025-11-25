@@ -1,5 +1,9 @@
--- Auto-detect Python formatters based on pyproject.toml configuration
--- Supports: black, ruff, isort
+-- Formatter configuration for multiple languages
+-- Python: Auto-detects black/ruff/isort based on pyproject.toml
+-- Lua: stylua (respects .stylua.toml if present)
+-- Shell: shfmt for bash/sh/zsh scripts
+-- JSON: prettier for consistent formatting
+-- Markdown: markdownlint for style enforcement (no line wrapping)
 
 return {
   "stevearc/conform.nvim",
@@ -53,9 +57,7 @@ return {
               local content = file:read("*all")
               file:close()
               -- Check for any formatter tool sections
-              if content:match("%[tool%.ruff") or
-                 content:match("%[tool%.black") or
-                 content:match("%[tool%.isort") then
+              if content:match("%[tool%.ruff") or content:match("%[tool%.black") or content:match("%[tool%.isort") then
                 return true
               end
             end
@@ -103,11 +105,35 @@ return {
       return formatters
     end
 
-    -- Configure Python formatters
+    -- ══════════════════════════════════════════════════════════════════════════
+    -- Formatter assignments by filetype
+    -- ══════════════════════════════════════════════════════════════════════════
     opts.formatters_by_ft = opts.formatters_by_ft or {}
+
+    -- Python: Dynamic detection based on project config (see get_python_formatters above)
     opts.formatters_by_ft.python = get_python_formatters
 
-    -- Configure individual formatter settings
+    -- Lua: stylua is the de facto standard, respects .stylua.toml if present
+    opts.formatters_by_ft.lua = { "stylua" }
+
+    -- Shell scripts: shfmt handles bash, sh, and zsh
+    -- Note: shfmt uses Google's shell style guide by default
+    opts.formatters_by_ft.sh = { "shfmt" }
+    opts.formatters_by_ft.bash = { "shfmt" }
+    opts.formatters_by_ft.zsh = { "shfmt" }
+
+    -- JSON/JSONC: prettier provides consistent formatting
+    -- JSONC is JSON with comments (used in VSCode configs, tsconfig, etc.)
+    opts.formatters_by_ft.json = { "prettier" }
+    opts.formatters_by_ft.jsonc = { "prettier" }
+
+    -- Markdown: markdownlint with --fix for auto-formatting
+    -- Does NOT wrap lines (markdown is read with word wrap enabled)
+    opts.formatters_by_ft.markdown = { "markdownlint" }
+
+    -- ══════════════════════════════════════════════════════════════════════════
+    -- Individual formatter settings
+    -- ══════════════════════════════════════════════════════════════════════════
     opts.formatters = opts.formatters or {}
 
     -- Black configuration with conditional line length
@@ -158,6 +184,26 @@ return {
           return { "--line-length", "120", "--profile", "black" }
         end
       end,
+    }
+
+    -- shfmt configuration for shell scripts
+    -- -i 2: Use 2-space indentation (consistent with most style guides)
+    -- -ci: Indent switch cases
+    -- -bn: Binary operators at start of line (for line continuation)
+    -- -sr: Redirect operators with space (> file instead of >file)
+    opts.formatters.shfmt = {
+      prepend_args = { "-i", "2", "-ci", "-bn", "-sr" },
+    }
+
+    -- prettier configuration for JSON
+    -- Uses project's .prettierrc if present, otherwise sensible defaults
+    -- No special args needed for JSON formatting
+
+    -- markdownlint configuration
+    -- --fix: Auto-fix fixable issues
+    -- --config: Use the dotfiles markdownlint config
+    opts.formatters.markdownlint = {
+      prepend_args = { "--fix", "--config", vim.fn.expand("~/.config/nvim/.markdownlint.yaml") },
     }
 
     return opts

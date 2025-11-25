@@ -89,4 +89,3 @@ local function toggle_pyright_diagnostic_mode()
 end
 
 vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
-

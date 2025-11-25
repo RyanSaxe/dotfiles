@@ -26,22 +26,22 @@ LOCK_DIR="$HOME/.cache/tmux-color-cache-updater.lock"
 PID_FILE="$LOCK_DIR/pid"
 
 # Create cache directory if it doesn't exist
-mkdir -p "$(dirname "$LOCK_DIR")" 2>/dev/null || true
+mkdir -p "$(dirname "$LOCK_DIR")" 2> /dev/null || true
 
 # Try to acquire lock atomically using mkdir
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+if ! mkdir "$LOCK_DIR" 2> /dev/null; then
   # Lock exists - check if the process is still alive
   if [ -f "$PID_FILE" ]; then
-    existing_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
-    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+    existing_pid=$(cat "$PID_FILE" 2> /dev/null || echo "")
+    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2> /dev/null; then
       # Process is alive, exit silently to prevent duplicates
       exit 0
     fi
   fi
 
   # Lock is stale (process died), remove it and try again
-  rm -rf "$LOCK_DIR" 2>/dev/null || true
-  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  rm -rf "$LOCK_DIR" 2> /dev/null || true
+  if ! mkdir "$LOCK_DIR" 2> /dev/null; then
     # Still couldn't acquire lock (race condition), exit
     exit 0
   fi
@@ -52,7 +52,7 @@ echo "$$" > "$PID_FILE"
 
 # Cleanup function to remove lock
 cleanup() {
-  rm -rf "$LOCK_DIR" 2>/dev/null || true
+  rm -rf "$LOCK_DIR" 2> /dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -61,9 +61,9 @@ get_mtime() {
   local file="$1"
   if [[ -f "$file" ]]; then
     # Use stat command (cross-platform: macOS uses -f, Linux uses -c)
-    if stat -f "%m" "$file" 2>/dev/null; then
+    if stat -f "%m" "$file" 2> /dev/null; then
       return
-    elif stat -c "%Y" "$file" 2>/dev/null; then
+    elif stat -c "%Y" "$file" 2> /dev/null; then
       return
     fi
   fi
@@ -74,9 +74,9 @@ get_mtime() {
 # Usage: blend_colors "#ff9e64" "#1a1b26" 50
 # Returns: blended color (50% first color, 50% second color)
 blend_colors() {
-  local color1="$1"  # First color (e.g., pokemon bright)
-  local color2="$2"  # Second color (e.g., background)
-  local weight="$3"  # Weight of first color (0-100)
+  local color1="$1" # First color (e.g., pokemon bright)
+  local color2="$2" # Second color (e.g., background)
+  local weight="$3" # Weight of first color (0-100)
 
   # Remove # prefix and convert to uppercase
   color1="${color1#\#}"
@@ -92,9 +92,9 @@ blend_colors() {
   local b2=$((16#${color2:4:2}))
 
   # Blend colors: new = (color1 * weight + color2 * (100-weight)) / 100
-  local r=$(( (r1 * weight + r2 * (100 - weight)) / 100 ))
-  local g=$(( (g1 * weight + g2 * (100 - weight)) / 100 ))
-  local b=$(( (b1 * weight + b2 * (100 - weight)) / 100 ))
+  local r=$(((r1 * weight + r2 * (100 - weight)) / 100))
+  local g=$(((g1 * weight + g2 * (100 - weight)) / 100))
+  local b=$(((b1 * weight + b2 * (100 - weight)) / 100))
 
   # Convert back to hex and format
   printf "#%02x%02x%02x" "$r" "$g" "$b"
@@ -105,9 +105,9 @@ update_color_cache() {
   # Call pokemon-color.sh once for each color type and cache in tmux variables
   local dim_color prominent_color bright_color
 
-  dim_color=$("$pokemon_color_script" dim 2>/dev/null || echo "#565f89")
-  prominent_color=$("$pokemon_color_script" prominent 2>/dev/null || echo "#7aa2f7")
-  bright_color=$("$pokemon_color_script" bright 2>/dev/null || echo "#ff9e64")
+  dim_color=$("$pokemon_color_script" dim 2> /dev/null || echo "#565f89")
+  prominent_color=$("$pokemon_color_script" prominent 2> /dev/null || echo "#7aa2f7")
+  bright_color=$("$pokemon_color_script" bright 2> /dev/null || echo "#ff9e64")
 
   # Store in tmux variables (these are fast to read)
   tmux set -gq @pokemon_dim "$dim_color"
@@ -115,7 +115,7 @@ update_color_cache() {
   tmux set -gq @pokemon_bright "$bright_color"
 
   # Trigger a smooth status refresh
-  tmux refresh-client -S >/dev/null 2>&1 || true
+  tmux refresh-client -S > /dev/null 2>&1 || true
 }
 
 # Initialize cache on startup
@@ -132,8 +132,8 @@ while :; do
   current_config_mtime=$(get_mtime "$config_file")
 
   # Update cache if either file changed
-  if [[ "$current_cache_mtime" != "$last_cache_mtime" ]] || \
-     [[ "$current_config_mtime" != "$last_config_mtime" ]]; then
+  if [[ "$current_cache_mtime" != "$last_cache_mtime" ]] \
+    || [[ "$current_config_mtime" != "$last_config_mtime" ]]; then
     update_color_cache
     last_cache_mtime="$current_cache_mtime"
     last_config_mtime="$current_config_mtime"

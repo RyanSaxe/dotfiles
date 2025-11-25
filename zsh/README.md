@@ -15,7 +15,7 @@ Oh My Zsh-based shell configuration with custom theme, vi mode, automatic Python
 
 ## Configuration Structure
 
-```
+```text
 zsh/
 ├── .zshrc                  # Main configuration (detects minimal mode)
 ├── .zshrc.minimal          # Lightweight config for tmux popups
@@ -35,6 +35,7 @@ zsh/
 ### Tmux Management (`tmux.zsh`)
 
 - **`tm [options] [commands...]`** - Create/attach to tmux sessions
+
   ```bash
   tm                    # Create session named after current directory
   tm -n myproject       # Create session with custom name
@@ -69,6 +70,7 @@ When `$TMUX_POPUP` is set or `ZSH_MODE=minimal`, zsh automatically loads `.zshrc
 ## Theme Customization
 
 The `fino-time-custom` theme provides:
+
 - Git status indicators
 - Python virtualenv display
 - Current directory with smart truncation
@@ -80,6 +82,7 @@ Customize by editing `themes/fino-time-custom.zsh-theme`.
 ## Vi Mode
 
 Enhanced vi mode with:
+
 - Visual mode indicator in prompt
 - Vim-style line editing
 - History search with vim bindings
@@ -92,6 +95,7 @@ Common aliases are defined in `aliases.zsh`. These are shared between full and m
 ## Customization
 
 Edit `.zshrc` to:
+
 - Add/remove Oh My Zsh plugins
 - Change theme
 - Modify function behavior
@@ -103,6 +107,7 @@ Edit function files in `functions/` to customize specific behaviors.
 ## Environment Variables
 
 Key variables set by this configuration:
+
 - `$ZSH` - Oh My Zsh installation path (`~/.oh-my-zsh`)
 - `$ZSH_CUSTOM` - Custom Oh My Zsh files (`~/.zsh-custom`)
 - `$VIRTUAL_ENV_DISABLE_PROMPT` - Prevents duplicate virtualenv display

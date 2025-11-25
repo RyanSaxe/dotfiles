@@ -18,7 +18,7 @@ export PATH
 
 # ------------------------- Usage & helpers --------------------------
 usage() {
-  cat <<'EOF'
+  cat << 'EOF'
 Usage: generate-pokemon-colors <pokemon_name> [--shiny|-s] [--form|-f FORM] [--update-db]
        generate-pokemon-colors --clear  # Clear all entries from database
 
@@ -41,17 +41,24 @@ EOF
   exit 1
 }
 
-fail() { print -r -- "Error: $*" >&2; exit 1; }
+fail() {
+  print -r -- "Error: $*" >&2
+  exit 1
+}
 
 need() {
-  command -v "$1" >/dev/null 2>&1 || fail "Required command '$1' not found in PATH"
+  command -v "$1" > /dev/null 2>&1 || fail "Required command '$1' not found in PATH"
 }
 
 # Perl math wrapper (replaces bc for cross-platform compatibility)
 perlcalc() { perl -e "print ($*)"; }
 
 # Integer abs
-iabs() { local x=$1; (( x < 0 )) && x=$(( -x )); print -r -- "$x"; }
+iabs() {
+  local x=$1
+  ((x < 0)) && x=$((-x))
+  print -r -- "$x"
+}
 
 # ------------------------- Args -------------------------------------
 POKEMON_NAME=""
@@ -63,19 +70,34 @@ CLEAR_DB=0
 [[ $# -eq 0 ]] && usage
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --shiny|-s) SHINY=1; shift ;;
-    --form|-f)
-      [[ -n ${2-} ]] || { print -r -- "Error: --form needs a value"; usage; }
-      FORM_VALUE="$2"; shift 2 ;;
-    --update-db) UPDATE_DB=1; shift ;;
-    --clear) CLEAR_DB=1; shift ;;
-    --help|-h) usage ;;
+    --shiny | -s)
+      SHINY=1
+      shift
+      ;;
+    --form | -f)
+      [[ -n ${2-} ]] || {
+        print -r -- "Error: --form needs a value"
+        usage
+      }
+      FORM_VALUE="$2"
+      shift 2
+      ;;
+    --update-db)
+      UPDATE_DB=1
+      shift
+      ;;
+    --clear)
+      CLEAR_DB=1
+      shift
+      ;;
+    --help | -h) usage ;;
     -*)
       fail "Unknown flag '$1'"
       ;;
     *)
       if [[ -z "$POKEMON_NAME" ]]; then
-        POKEMON_NAME="$1"; shift
+        POKEMON_NAME="$1"
+        shift
       else
         fail "Unexpected argument '$1'"
       fi
@@ -84,7 +106,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Handle clear mode - doesn't need a pokemon name
-if (( CLEAR_DB )); then
+if ((CLEAR_DB)); then
   SCRIPT_DIR="${0:A:h}"
   DB_FILE="${SCRIPT_DIR}/pokemon-colors.lua"
 
@@ -112,7 +134,7 @@ need awk
 # Build command as an array (zsh: no word-splitting issues)
 typeset -a cmd
 cmd=(pokemon-colorscripts -n "$POKEMON_NAME" --no-title)
-(( SHINY ))      && cmd+=("--shiny")
+((SHINY)) && cmd+=("--shiny")
 [[ -n "$FORM_VALUE" ]] && cmd+=("--form" "$FORM_VALUE")
 
 # Capture output; don't abort if pokemon-colorscripts returns nonzero
@@ -122,7 +144,7 @@ OUTPUT="$("${cmd[@]}" 2>&1 || true)"
 # Match ANSI 38;2;R;G;B or 48;2;R;G;B, preserve all occurrences for frequency
 ALL_COLORS_RAW=$(
   print -r -- "$OUTPUT" \
-  | perl -ne 'while(/[34]8;2;(\d+);(\d+);(\d+)/g){print "$1,$2,$3\n"}'
+    | perl -ne 'while(/[34]8;2;(\d+);(\d+);(\d+)/g){print "$1,$2,$3\n"}'
 )
 
 [[ -n "$ALL_COLORS_RAW" ]] || fail "No colors found in pokemon-colorscripts output for '$POKEMON_NAME'"
@@ -185,10 +207,10 @@ calc_saturation() {
 is_grayscale() {
   local r=$1 g=$2 b=$3
   local d1 d2 d3
-  d1=$(iabs $(( r - g )))
-  d2=$(iabs $(( g - b )))
-  d3=$(iabs $(( r - b )))
-  (( d1 <= 15 && d2 <= 15 && d3 <= 15 )) && return 0 || return 1
+  d1=$(iabs $((r - g)))
+  d2=$(iabs $((g - b)))
+  d3=$(iabs $((r - b)))
+  ((d1 <= 15 && d2 <= 15 && d3 <= 15)) && return 0 || return 1
 }
 
 # RGB -> #RRGGBB
@@ -305,7 +327,7 @@ calc_delta_e() {
 # High saturation + distance from neutral colors = more colorful
 calc_colorfulness() {
   local r=$1 g=$2 b=$3
-  local sat=$4  # Pre-calculated saturation
+  local sat=$4 # Pre-calculated saturation
 
   perl -e '
     use strict;
@@ -371,22 +393,25 @@ calc_dullness() {
 }
 
 # ------------------------- Build arrays -----------------------------
-typeset -a ALL_COLORS  # "r,g,b"
-typeset -a LUM         # numeric strings
-typeset -a SAT         # numeric strings
-typeset -a PCT         # percentage of sprite
-typeset -a IS_GRAY     # "0"/"1"
-typeset -a HEXS        # "#RRGGBB"
-typeset -a LAB         # "L a b" - LAB color space values
-typeset -a COLORFUL    # colorfulness scores
-typeset -a DULLNESS    # dullness scores
+typeset -a ALL_COLORS # "r,g,b"
+typeset -a LUM        # numeric strings
+typeset -a SAT        # numeric strings
+typeset -a PCT        # percentage of sprite
+typeset -a IS_GRAY    # "0"/"1"
+typeset -a HEXS       # "#RRGGBB"
+typeset -a LAB        # "L a b" - LAB color space values
+typeset -a COLORFUL   # colorfulness scores
+typeset -a DULLNESS   # dullness scores
 
 # Read UNIQUE_COLORS lines: r,g,b
 while IFS=',' read -r r g b; do
   # sanity clamp [0,255]
-  (( r < 0 )) && r=0; (( r > 255 )) && r=255
-  (( g < 0 )) && g=0; (( g > 255 )) && g=255
-  (( b < 0 )) && b=0; (( b > 255 )) && b=255
+  ((r < 0)) && r=0
+  ((r > 255)) && r=255
+  ((g < 0)) && g=0
+  ((g > 255)) && g=255
+  ((b < 0)) && b=0
+  ((b > 255)) && b=255
 
   local_lum="$(calc_luminance "$r" "$g" "$b")"
   local_sat="$(calc_saturation "$r" "$g" "$b")"
@@ -438,7 +463,7 @@ find_color_index() {
 # Track max colorfulness as fallback
 
 select_prominent_color() {
-  local mode=$1  # "dark" or "light"
+  local mode=$1 # "dark" or "light"
 
   # Threshold for colorful colors (lowered from 2000 to better favor frequency)
   # Previous value (2000) was too high and selected vivid accent colors over muted dominant colors
@@ -467,11 +492,11 @@ select_prominent_color() {
     local dist_to_black=$(perlcalc "sqrt($r**2 + $g**2 + $b**2)")
 
     # Reject if too close to either white OR black (both are neutral, non-colorful)
-    (( $(perlcalc "$dist_to_white < 100") )) && too_close_to_neutral=1
-    (( $(perlcalc "$dist_to_black < 100") )) && too_close_to_neutral=1
+    (($(perlcalc "$dist_to_white < 100"))) && too_close_to_neutral=1
+    (($(perlcalc "$dist_to_black < 100"))) && too_close_to_neutral=1
 
     # Skip if too close to neutral
-    (( too_close_to_neutral )) && continue
+    ((too_close_to_neutral)) && continue
 
     # Track max colorfulness for fallback (among non-neutral colors only)
     if perlcmp "$colorful_score" "$max_colorful_score"; then
@@ -483,14 +508,14 @@ select_prominent_color() {
     local lum_ok=0
     if [[ $mode == "dark" ]]; then
       # Dark mode: need bright colors (lum > 80) to pop on dark background
-      (( $(perlcalc "$lum > 80") )) && lum_ok=1
+      (($(perlcalc "$lum > 80"))) && lum_ok=1
     else
       # Light mode: need dark colors (lum < 175) to show on light background
-      (( $(perlcalc "$lum < 175") )) && lum_ok=1
+      (($(perlcalc "$lum < 175"))) && lum_ok=1
     fi
 
     # If colorful enough AND appropriate luminance, select it
-    if (( lum_ok )) && perlcmp "$colorful_score" "$colorful_threshold"; then
+    if ((lum_ok)) && perlcmp "$colorful_score" "$colorful_threshold"; then
       selected_idx=$idx
       break
     fi
@@ -518,12 +543,15 @@ select_bright_color() {
   local mode=$1
   local prominent_idx=$2
 
-  [[ $prominent_idx -lt 0 ]] && { print -r -- "-1"; return; }
+  [[ $prominent_idx -lt 0 ]] && {
+    print -r -- "-1"
+    return
+  }
 
   local prominent_lab="${LAB[$prominent_idx]}"
   local max_delta_e=0
   local best_idx=-1
-  local min_delta_e_threshold=30  # Minimum perceptual difference
+  local min_delta_e_threshold=30 # Minimum perceptual difference
 
   # Iterate all colors
   for i in {1..$#ALL_COLORS}; do
@@ -537,13 +565,13 @@ select_bright_color() {
     local lum_ok=0
     if [[ $mode == "dark" ]]; then
       # Dark mode: avoid super dark colors (need lum > 100) and super light (lum < 240)
-      (( $(perlcalc "$lum > 100 && $lum < 240") )) && lum_ok=1
+      (($(perlcalc "$lum > 100 && $lum < 240"))) && lum_ok=1
     else
       # Light mode: avoid super light colors (need lum < 155) and super dark (lum > 20)
-      (( $(perlcalc "$lum < 155 && $lum > 20") )) && lum_ok=1
+      (($(perlcalc "$lum < 155 && $lum > 20"))) && lum_ok=1
     fi
 
-    (( ! lum_ok )) && continue
+    ((!lum_ok)) && continue
 
     # Calculate perceptual distance
     local delta_e=$(calc_delta_e "$prominent_lab" "$current_lab")
@@ -559,7 +587,7 @@ select_bright_color() {
   if [[ $best_idx -ge 0 ]] && perlcmp "$max_delta_e" "$min_delta_e_threshold"; then
     print -r -- "$best_idx"
   else
-    print -r -- "-1"  # Will become 'fallback' in output
+    print -r -- "-1" # Will become 'fallback' in output
   fi
 }
 
@@ -574,11 +602,11 @@ LIGHT_BRIGHT_IDX=$(select_bright_color "light" "$LIGHT_PROMINENT_IDX")
 # Prefer desaturated colors with mid-range luminance
 
 select_dim_color() {
-  local mode=$1  # Not heavily used, but available for future refinement
+  local mode=$1 # Not heavily used, but available for future refinement
 
   local max_dullness=0
   local best_idx=-1
-  local min_dullness_threshold=80  # Minimum dullness to be considered "dim"
+  local min_dullness_threshold=80 # Minimum dullness to be considered "dim"
 
   # Iterate all colors
   for i in {1..$#ALL_COLORS}; do
@@ -595,7 +623,7 @@ select_dim_color() {
   if [[ $best_idx -ge 0 ]] && perlcmp "$max_dullness" "$min_dullness_threshold"; then
     print -r -- "$best_idx"
   else
-    print -r -- "-1"  # Will become 'fallback' in output
+    print -r -- "-1" # Will become 'fallback' in output
   fi
 }
 
@@ -612,7 +640,7 @@ LIGHT_DIM_IDX=$(select_dim_color "light")
 
 # ------------------------- Build key --------------------------------
 KEY="$POKEMON_NAME"
-(( SHINY )) && KEY="${KEY}-shiny"
+((SHINY)) && KEY="${KEY}-shiny"
 if [[ -n "$FORM_VALUE" ]]; then
   # normalize: lower-kebab
   KEY="${KEY}-$(print -r -- "$FORM_VALUE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
@@ -620,26 +648,32 @@ fi
 
 # ------------------------- Emit Lua --------------------------------
 # Selected color hexes (or 'fallback' string)
-IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_PROMINENT_IDX]}"; DARK_PROMINENT=$(rgb_to_hex "$r" "$g" "$b")
+IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_PROMINENT_IDX]}"
+DARK_PROMINENT=$(rgb_to_hex "$r" "$g" "$b")
 if [[ $DARK_BRIGHT_IDX -ge 0 ]]; then
-  IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_BRIGHT_IDX]}"; DARK_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_BRIGHT_IDX]}"
+  DARK_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
 else
   DARK_BRIGHT="fallback"
 fi
 if [[ $DARK_DIM_IDX -ge 0 ]]; then
-  IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_DIM_IDX]}"; DARK_DIM=$(rgb_to_hex "$r" "$g" "$b")
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$DARK_DIM_IDX]}"
+  DARK_DIM=$(rgb_to_hex "$r" "$g" "$b")
 else
   DARK_DIM="fallback"
 fi
 
-IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_PROMINENT_IDX]}"; LIGHT_PROMINENT=$(rgb_to_hex "$r" "$g" "$b")
+IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_PROMINENT_IDX]}"
+LIGHT_PROMINENT=$(rgb_to_hex "$r" "$g" "$b")
 if [[ $LIGHT_BRIGHT_IDX -ge 0 ]]; then
-  IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_BRIGHT_IDX]}"; LIGHT_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_BRIGHT_IDX]}"
+  LIGHT_BRIGHT=$(rgb_to_hex "$r" "$g" "$b")
 else
   LIGHT_BRIGHT="fallback"
 fi
 if [[ $LIGHT_DIM_IDX -ge 0 ]]; then
-  IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_DIM_IDX]}"; LIGHT_DIM=$(rgb_to_hex "$r" "$g" "$b")
+  IFS=',' read -r r g b <<< "${ALL_COLORS[$LIGHT_DIM_IDX]}"
+  LIGHT_DIM=$(rgb_to_hex "$r" "$g" "$b")
 else
   LIGHT_DIM="fallback"
 fi
@@ -648,12 +682,13 @@ fi
 # The _meta table stores the original components so parsers don't need to guess
 # how to split keys containing natural dashes (e.g., "ho-oh", "porygon-z")
 # Note: 'fallback' strings are handled by utils.lua to resolve to colorscheme colors
-LUA_ENTRY=$(cat <<LUA_EOF
+LUA_ENTRY=$(
+  cat << LUA_EOF
   ["$KEY"] = {
     _meta = {
       name = "$POKEMON_NAME",
-      is_shiny = $( (( SHINY )) && print -r -- "true" || print -r -- "false" ),
-      form = $( [[ -n "$FORM_VALUE" ]] && print -r -- "\"$FORM_VALUE\"" || print -r -- "nil" ),
+      is_shiny = $( ((SHINY)) && print -r -- "true" || print -r -- "false"),
+      form = $([[ -n "$FORM_VALUE" ]] && print -r -- "\"$FORM_VALUE\"" || print -r -- "nil"),
     },
     colors = {
 $(for hex in "${HEXS[@]}"; do print -r -- "      \"$hex\","; done)
@@ -673,9 +708,9 @@ LUA_EOF
 )
 
 # If --update-db flag is set, update the lua file
-if (( UPDATE_DB )); then
+if ((UPDATE_DB)); then
   # Find the database file (in the same directory as this script)
-  SCRIPT_DIR="${0:A:h}"  # Get absolute directory of this script
+  SCRIPT_DIR="${0:A:h}" # Get absolute directory of this script
   DB_FILE="${SCRIPT_DIR}/pokemon-colors.lua"
 
   if [[ ! -f "$DB_FILE" ]]; then

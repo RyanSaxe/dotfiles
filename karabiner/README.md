@@ -23,13 +23,15 @@ The "Hyper" key is a modifier combination (`Cmd+Ctrl+Opt+Shift`) that's rarely u
 ## Primary Mappings
 
 ### Right Shift Behavior
-```
+
+```text
 Tap (< 200ms)    → F18 (triggers Leader Key)
 Hold (≥ 200ms)   → Hyper (Cmd+Ctrl+Opt+Shift)
 ```
 
 ### Hyper + HJKL (Vim Navigation)
-```
+
+```text
 Hyper + H  → Left Arrow
 Hyper + J  → Down Arrow
 Hyper + K  → Up Arrow
@@ -37,6 +39,7 @@ Hyper + L  → Right Arrow
 ```
 
 This enables vim-style navigation in:
+
 - Web browsers (scrolling, form fields)
 - Text editors (native macOS text fields)
 - System dialogs
@@ -52,7 +55,7 @@ See the `complex_modifications.rules` array in `karabiner.json` for the complete
 
 ## Configuration Structure
 
-```
+```text
 karabiner/
 ├── karabiner.json              # Main configuration
 └── automatic_backups/          # Auto-generated backups
@@ -60,6 +63,7 @@ karabiner/
 ```
 
 The `karabiner.json` file contains:
+
 - `global` - General Karabiner settings
 - `profiles` - Named keyboard mapping profiles (e.g., "Ryan's Profile")
 - `complex_modifications.rules` - Advanced key remapping logic
@@ -67,6 +71,7 @@ The `karabiner.json` file contains:
 ## How Complex Modifications Work
 
 Each rule has:
+
 ```json
 {
   "description": "Human-readable description",
@@ -99,6 +104,7 @@ The F18 tap action is what triggers Leader Key (configured to listen for F18 in 
 ## Customization
 
 Edit `karabiner.json` to:
+
 - Add new Hyper key combinations
 - Change timing thresholds for tap/hold detection
 - Add additional complex modifications
@@ -106,6 +112,7 @@ Edit `karabiner.json` to:
 - Remap other keys (Caps Lock, function keys, etc.)
 
 **Note:** Karabiner-Elements GUI (`Karabiner-Elements Preferences`) can also be used to:
+
 - Enable/disable rules
 - Import/export configurations
 - Test modifications

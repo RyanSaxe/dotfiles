@@ -316,7 +316,7 @@ def can_process_order(user: User, order: Order) -> bool:
 retry_delay = base_delay * (2 ** attempt_count)
 ```
 
-2. **Warning about side effects:**
+1. **Warning about side effects:**
 
 ```python
 # Warning: This modifies the global cache
@@ -325,7 +325,7 @@ def update_user_preferences(user_id: int, prefs: dict) -> None:
     GLOBAL_CACHE[user_id] = prefs
 ```
 
-3. **Documenting public APIs:**
+1. **Documenting public APIs:**
 
 ```python
 def calculate_compound_interest(
@@ -363,7 +363,7 @@ for user in users:
     ...
 ```
 
-2. **Code is self-documenting:**
+1. **Code is self-documenting:**
 
 ```python
 # Bad: Comment should be function name
@@ -379,7 +379,7 @@ if has_admin_write_access(user):
     ...
 ```
 
-3. **Outdated or wrong information:**
+1. **Outdated or wrong information:**
 
 ```python
 # Bad: Outdated comment
@@ -547,9 +547,7 @@ def withdraw(account: Account, amount: float) -> None:
 
 ### Prefer Functions Over Classes
 
-**Default choice: Functions**
-
-Functions are simpler, easier to test, and more composable:
+Functions are the default choice. They are simpler, easier to test, and more composable:
 
 ```python
 # Good: Simple functions
@@ -588,7 +586,7 @@ class ShoppingCart:
             self.total -= item.price
 ```
 
-2. **Group related behavior with shared data:**
+1. **Group related behavior with shared data:**
 
 ```python
 class DatabaseConnection:
@@ -608,7 +606,7 @@ class DatabaseConnection:
             self.transaction.rollback()
 ```
 
-3. **Need instances with different configurations:**
+1. **Need instances with different configurations:**
 
 ```python
 class APIClient:
@@ -626,7 +624,7 @@ prod_client = APIClient("https://api.prod.com", prod_key)
 test_client = APIClient("https://api.test.com", test_key)
 ```
 
-4. **Implementing interfaces/protocols:**
+1. **Implementing interfaces/protocols:**
 
 ```python
 class PaymentProcessor(Protocol):

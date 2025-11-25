@@ -12,13 +12,13 @@ session_name=$("$script_dir/session-name.sh")
 
 # Calculate notification color based on cached values (much faster than calling scripts)
 # Color priority: prefix (prominent) > bells (bright) > default (dim)
-prefix_active=$(tmux display-message -p '#{client_prefix}' 2>/dev/null || echo "0")
-bell_count=$(tmux show -gv @bell_count 2>/dev/null || echo "0")
+prefix_active=$(tmux display-message -p '#{client_prefix}' 2> /dev/null || echo "0")
+bell_count=$(tmux show -gv @bell_count 2> /dev/null || echo "0")
 
 # Get pokemon colors from cached tmux variables (set by color-cache-updater.sh)
-dim_color=$(tmux show -gv @pokemon_dim 2>/dev/null || echo "#565f89")
-prominent_color=$(tmux show -gv @pokemon_prominent 2>/dev/null || echo "#7aa2f7")
-bright_color=$(tmux show -gv @pokemon_bright 2>/dev/null || echo "#ff9e64")
+dim_color=$(tmux show -gv @pokemon_dim 2> /dev/null || echo "#565f89")
+prominent_color=$(tmux show -gv @pokemon_prominent 2> /dev/null || echo "#7aa2f7")
+bright_color=$(tmux show -gv @pokemon_bright 2> /dev/null || echo "#ff9e64")
 
 # Determine notification color
 if [[ "$prefix_active" == "1" ]]; then
@@ -30,9 +30,9 @@ else
 fi
 
 # Get static colors and separators from tmux
-bg_color=$(tmux show -gv @tokyonight_bg 2>/dev/null || echo "#1a1b26")
-left_rounded=$(tmux show -gv @left_rounded 2>/dev/null || echo "")
-right_rounded=$(tmux show -gv @right_rounded 2>/dev/null || echo "")
+bg_color=$(tmux show -gv @tokyonight_bg 2> /dev/null || echo "#1a1b26")
+left_rounded=$(tmux show -gv @left_rounded 2> /dev/null || echo "")
+right_rounded=$(tmux show -gv @right_rounded 2> /dev/null || echo "")
 
 # Build the complete formatted block (same structure as @left_block)
 # Format: <rounded left><session name><rounded right>

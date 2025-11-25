@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # Output JSON with command activation reminder
-cat <<EOF
+cat << EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",

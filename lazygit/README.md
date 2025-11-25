@@ -14,6 +14,7 @@ LazyGit TUI configuration with TokyoNight Night theme and delta integration for 
 ### Theme Colors
 
 Carefully matched to TokyoNight Night palette:
+
 - **Active border** - Bright blue (`#7aa2f7`)
 - **Inactive border** - Muted gray (`#545c7e`)
 - **Search border** - Orange highlight (`#ff9e64`)
@@ -35,6 +36,7 @@ Provides syntax-highlighted diffs within LazyGit, consistent with command-line g
 ## Usage
 
 Launch LazyGit from any git repository:
+
 ```bash
 lazygit
 ```
@@ -44,6 +46,7 @@ Or use the Neovim integration (if configured) via keybindings.
 ## Customization
 
 Edit `config.yml` to:
+
 - Modify theme colors (all colors defined in `gui.theme` section)
 - Change UI preferences (`showCommandLog`, `splitDiff`, etc.)
 - Adjust git behavior (paging, commit graph, etc.)

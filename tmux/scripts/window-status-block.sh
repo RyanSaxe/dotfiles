@@ -9,15 +9,15 @@ mode="${1:-inactive}"
 
 # Get pokemon colors from cached tmux variables (set by color-cache-updater.sh)
 # This is MUCH faster than calling pokemon-color.sh on every window render
-dim_color=$(tmux show -gv @pokemon_dim 2>/dev/null || echo "#565f89")
-prominent_color=$(tmux show -gv @pokemon_prominent 2>/dev/null || echo "#7aa2f7")
-bright_color=$(tmux show -gv @pokemon_bright 2>/dev/null || echo "#ff9e64")
+dim_color=$(tmux show -gv @pokemon_dim 2> /dev/null || echo "#565f89")
+prominent_color=$(tmux show -gv @pokemon_prominent 2> /dev/null || echo "#7aa2f7")
+bright_color=$(tmux show -gv @pokemon_bright 2> /dev/null || echo "#ff9e64")
 
 # Get static colors and separators from tmux
-bg_color=$(tmux show -gv @tokyonight_bg 2>/dev/null || echo "#1a1b26")
-fg_gutter=$(tmux show -gv @tokyonight_fg_gutter 2>/dev/null || echo "#3b4261")
-left_rounded=$(tmux show -gv @left_rounded 2>/dev/null || echo "")
-right_rounded=$(tmux show -gv @right_rounded 2>/dev/null || echo "")
+bg_color=$(tmux show -gv @tokyonight_bg 2> /dev/null || echo "#1a1b26")
+fg_gutter=$(tmux show -gv @tokyonight_fg_gutter 2> /dev/null || echo "#3b4261")
+left_rounded=$(tmux show -gv @left_rounded 2> /dev/null || echo "")
+right_rounded=$(tmux show -gv @right_rounded 2> /dev/null || echo "")
 
 if [[ "$mode" == "active" ]]; then
   # Active window: pokemon prominent for number, pokemon bright for separator, pokemon prominent for window name

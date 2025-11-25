@@ -18,7 +18,7 @@ local function sanitize_branch_name(branch)
   -- Replace forward slashes, spaces, and other special chars with hyphens
   -- Convert to lowercase for consistency
   local sanitized = branch:lower()
-  sanitized = sanitized:gsub("[/%s*?\"<>|\\:]+", "-")
+  sanitized = sanitized:gsub('[/%s*?"<>|\\:]+', "-")
   -- Remove leading/trailing hyphens
   sanitized = sanitized:gsub("^-+", ""):gsub("-+$", "")
 

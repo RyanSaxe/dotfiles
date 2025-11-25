@@ -39,7 +39,9 @@ return {
         style = "none",
       },
       show_buffer_icons = false,
-      always_show_bufferline = false,
+      -- Always show bufferline when in tmux to prevent layout shifts with tmux status bar
+      -- Outside tmux, only show when there are multiple buffers (default behavior)
+      always_show_bufferline = vim.env.TMUX ~= nil,
     },
   },
 }

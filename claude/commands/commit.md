@@ -34,7 +34,7 @@ If the commit is not atomic, present the user with a plan and options for what t
 
 Create message following this REQUIRED format:
 
-```
+```text
 <Concise first line summary>
 
 <OPTIONAL: 1-2 SHORT sentences or bullets explaining what/why>

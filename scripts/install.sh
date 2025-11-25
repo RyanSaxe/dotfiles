@@ -24,7 +24,7 @@ sudo_if_needed() {
 # ──────────────────────────────────────────────────────
 detect_pm() {
   for pm in brew apt; do
-    if command -v "$pm" &>/dev/null; then
+    if command -v "$pm" &> /dev/null; then
       echo "$pm"
       return 0
     fi
@@ -77,7 +77,7 @@ install_brew() {
 
 install_apt() {
   # Check if we're on Ubuntu before adding Ubuntu-specific PPA
-  . /etc/os-release 2>/dev/null || true
+  . /etc/os-release 2> /dev/null || true
   if [[ "${ID:-}" = "ubuntu" || "${ID_LIKE:-}" == *ubuntu* ]]; then
     log "Adding Neovim PPA for latest stable (>= 0.11)…"
     sudo_if_needed apt-get update -qq
@@ -93,7 +93,7 @@ install_apt() {
   log "Installing: ${APT_DEPS[*]}"
   # Install packages that are available, skip those that aren't
   for pkg in "${APT_DEPS[@]}"; do
-    if sudo_if_needed apt-get install -y "$pkg" 2>/dev/null; then
+    if sudo_if_needed apt-get install -y "$pkg" 2> /dev/null; then
       log "✓ Installed $pkg"
     else
       warn "⚠ Failed to install $pkg (may not be available in this repository)"
@@ -101,7 +101,7 @@ install_apt() {
   done
 
   # fd-find → fd symlink
-  if ! command -v fd &>/dev/null; then
+  if ! command -v fd &> /dev/null; then
     FD_PATH=$(command -v fdfind || true)
     if [[ -n "$FD_PATH" ]]; then
       log "Linking fdfind → fd"
@@ -112,13 +112,13 @@ install_apt() {
   fi
 
   # bat → batcat symlink (common on Debian/Ubuntu)
-  if ! command -v bat &>/dev/null && command -v batcat &>/dev/null; then
+  if ! command -v bat &> /dev/null && command -v batcat &> /dev/null; then
     log "Linking batcat → bat"
     sudo_if_needed ln -sf "$(command -v batcat)" /usr/local/bin/bat
   fi
 
   # tectonic (not in apt)
-  if ! command -v tectonic &>/dev/null; then
+  if ! command -v tectonic &> /dev/null; then
     install_tectonic || {
       err "Tectonic install failed"
       exit 1
@@ -127,7 +127,7 @@ install_apt() {
     log "Tectonic already installed—skipping re-install"
   fi
   # lazygit (not in apt)
-  if ! command -v lazygit &>/dev/null; then
+  if ! command -v lazygit &> /dev/null; then
     install_lazygit || {
       err "lazygit install failed"
       exit 1
@@ -145,29 +145,29 @@ install_apt() {
 install_tectonic() {
   log "Installing latest Tectonic…"
   local version arch deb_arch url deb_name tmpdir
-  version=$(curl -fsSL https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest |
-    grep -Po '"tag_name":\s*"v?\K[^"]+')
-  arch=$(dpkg --print-architecture 2>/dev/null || uname -m)
+  version=$(curl -fsSL https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest \
+    | grep -Po '"tag_name":\s*"v?\K[^"]+')
+  arch=$(dpkg --print-architecture 2> /dev/null || uname -m)
   case "$arch" in
-  amd64 | x86_64) deb_arch=amd64 ;;
-  arm64 | aarch64) deb_arch=arm64 ;;
-  *)
-    err "Unsupported architecture: $arch"
-    return 1
-    ;;
+    amd64 | x86_64) deb_arch=amd64 ;;
+    arm64 | aarch64) deb_arch=arm64 ;;
+    *)
+      err "Unsupported architecture: $arch"
+      return 1
+      ;;
   esac
   deb_name="tectonic_${version}_${deb_arch}.deb"
   url="https://github.com/tectonic-typesetting/tectonic/releases/download/v${version}/${deb_name}"
   tmpdir=$(mktemp -d)
   curl -fsSL -o "$tmpdir/$deb_name" "$url"
-  
+
   # Install the package and fix any dependency issues
   if ! sudo_if_needed dpkg -i "$tmpdir/$deb_name"; then
     log "Fixing dependencies for tectonic..."
     sudo_if_needed apt-get -f install -y
     sudo_if_needed dpkg -i "$tmpdir/$deb_name"
   fi
-  
+
   rm -rf "$tmpdir"
   log "Tectonic $version installed successfully."
 }
@@ -176,19 +176,19 @@ install_lazygit() {
   local arch version url tmp
 
   case "$(uname -m)" in
-  x86_64 | amd64) arch="Linux_x86_64" ;;
-  aarch64 | arm64) arch="Linux_arm64" ;;
-  armv7l | armv6l) arch="Linux_armv6" ;;
-  i?86) arch="Linux_32-bit" ;;
-  *)
-    err "Unsupported CPU architecture: $(uname -m)"
-    return 1
-    ;;
+    x86_64 | amd64) arch="Linux_x86_64" ;;
+    aarch64 | arm64) arch="Linux_arm64" ;;
+    armv7l | armv6l) arch="Linux_armv6" ;;
+    i?86) arch="Linux_32-bit" ;;
+    *)
+      err "Unsupported CPU architecture: $(uname -m)"
+      return 1
+      ;;
   esac
 
   version=$(
-    curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest |
-      grep -Po '"tag_name":\s*"v\K[^"]+'
+    curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest \
+      | grep -Po '"tag_name":\s*"v\K[^"]+'
   ) || {
     err "Could not fetch latest lazygit version"
     return 1
@@ -196,8 +196,8 @@ install_lazygit() {
 
   url="https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_${arch}.tar.gz"
   tmp=$(mktemp -d)
-  curl -fsSL "$url" | tar -xz -C "$tmp" lazygit ||
-    {
+  curl -fsSL "$url" | tar -xz -C "$tmp" lazygit \
+    || {
       err "Failed to download/extract lazygit"
       rm -rf "$tmp"
       return 1
@@ -220,12 +220,12 @@ install_pokemon_colorscripts() {
   git clone https://gitlab.com/phoneybadger/pokemon-colorscripts.git "$tmp"
 
   # 2) from inside that temp clone, run the upstream installer
-  pushd "$tmp" >/dev/null || {
+  pushd "$tmp" > /dev/null || {
     err "Cannot cd to $tmp"
     return 1
   }
   sudo_if_needed bash install.sh
-  popd >/dev/null
+  popd > /dev/null
 
   # 3) clean up
   rm -rf "$tmp"
@@ -233,9 +233,9 @@ install_pokemon_colorscripts() {
 
 install_tpm() {
   log "Installing TPM (Tmux Plugin Manager)…"
-  
+
   local tpm_dir="$HOME/.config/tmux/plugins/tpm"
-  
+
   if [[ ! -d "$tpm_dir" ]]; then
     git clone https://github.com/tmux-plugins/tpm "$tpm_dir" || {
       err "Failed to clone TPM repository"
@@ -249,9 +249,9 @@ install_tpm() {
 # ──────────────────────────────────────────────────────
 fetch_and_exec() {
   local url=$1
-  if command -v curl &>/dev/null; then
+  if command -v curl &> /dev/null; then
     curl -fsSL "$url" | sh
-  elif command -v wget &>/dev/null; then
+  elif command -v wget &> /dev/null; then
     wget -qO- "$url" | sh
   else
     err "curl & wget missing; installing curl first"
@@ -277,7 +277,7 @@ main() {
   fi
 
   # ── Warn if < 256 colors ────────────────────────────────
-  colors=$(tput colors 2>/dev/null || echo 0)
+  colors=$(tput colors 2> /dev/null || echo 0)
   if ((colors < 256)); then
     err "Terminal only supports $colors colors. Use TERM=xterm-256color for full theming."
   fi
@@ -287,7 +287,7 @@ main() {
 
   install_"$PM"
 
-  if ! command -v mmdc &>/dev/null; then
+  if ! command -v mmdc &> /dev/null; then
     log "Installing Mermaid CLI via npm…"
     sudo_if_needed npm install -g @mermaid-js/mermaid-cli || {
       err "Mermaid CLI install failed"
@@ -298,7 +298,7 @@ main() {
   fi
 
   # Install ast-grep via npm on Linux only (on macOS it's installed via brew)
-  if [[ "$PM" == "apt" ]] && ! command -v ast-grep &>/dev/null && ! command -v sg &>/dev/null; then
+  if [[ "$PM" == "apt" ]] && ! command -v ast-grep &> /dev/null && ! command -v sg &> /dev/null; then
     log "Installing ast-grep via npm…"
     sudo_if_needed npm install -g @ast-grep/cli || {
       err "ast-grep install failed"
@@ -312,7 +312,7 @@ main() {
 
   # Install tree-sitter CLI via npm for both macOS and Linux
   # tree-sitter-cli provides the tree-sitter binary needed by Neovim plugins
-  if ! command -v tree-sitter &>/dev/null; then
+  if ! command -v tree-sitter &> /dev/null; then
     log "Installing tree-sitter CLI via npm…"
     sudo_if_needed npm install -g tree-sitter-cli || {
       err "tree-sitter CLI install failed"
@@ -323,7 +323,7 @@ main() {
   fi
 
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)
-  if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &>/dev/null; then
+  if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &> /dev/null; then
     log "Installing git-split-diffs via npm…"
     sudo_if_needed npm install -g git-split-diffs || {
       err "git-split-diffs install failed"
@@ -335,10 +335,46 @@ main() {
     fi
   fi
 
+  # Install formatters via npm on Linux (on macOS they're installed via brew)
+  if [[ "$PM" == "apt" ]]; then
+    # prettier - multi-language formatter for JSON, Markdown, etc.
+    if ! command -v prettier &> /dev/null; then
+      log "Installing prettier via npm…"
+      sudo_if_needed npm install -g prettier || {
+        err "prettier install failed"
+        exit 1
+      }
+    else
+      log "prettier already installed—skipping re-install"
+    fi
+
+    # markdownlint-cli - Markdown linter with auto-fix
+    if ! command -v markdownlint &> /dev/null; then
+      log "Installing markdownlint-cli via npm…"
+      sudo_if_needed npm install -g markdownlint-cli || {
+        err "markdownlint-cli install failed"
+        exit 1
+      }
+    else
+      log "markdownlint-cli already installed—skipping re-install"
+    fi
+
+    # stylua - Lua formatter (not available in apt, use npm package)
+    if ! command -v stylua &> /dev/null; then
+      log "Installing stylua via npm…"
+      sudo_if_needed npm install -g @johnnymorganz/stylua-bin || {
+        err "stylua install failed"
+        exit 1
+      }
+    else
+      log "stylua already installed—skipping re-install"
+    fi
+  fi
+
   # Note: dust is only installed via brew on macOS, not available on Linux
 
   # Astral UV installer
-  if ! command -v uv &>/dev/null; then
+  if ! command -v uv &> /dev/null; then
     fetch_and_exec "https://astral.sh/uv/install.sh"
   else
     log "Astral UV already present—skipping"
@@ -353,7 +389,7 @@ main() {
   fi
 
   # Ensure default shell is Zsh
-  if command -v zsh &>/dev/null && [[ ! "$SHELL" =~ zsh$ ]]; then
+  if command -v zsh &> /dev/null && [[ ! "$SHELL" =~ zsh$ ]]; then
     log "Changing default shell to Zsh for $(whoami)…"
     sudo_if_needed chsh -s "$(command -v zsh)" "$(whoami)"
     log "Default shell set to $(command -v zsh). Logout/Login to apply."

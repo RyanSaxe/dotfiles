@@ -98,11 +98,13 @@ require("dependency-picker").setup({
 The plugin provides several search modes:
 
 ### Smart Search (Auto-detect)
+
 - `M.smart_search("grep")` - Auto-detect language and grep packages
 - `M.smart_search("files")` - Auto-detect language and search files
 - `M.smart_search_stdlib("grep")` - Auto-detect and search stdlib
 
 ### Manual Search (Choose language)
+
 - `M.manual_search("grep")` - Choose language, then grep packages
 - `M.manual_search("files")` - Choose language, then search files
 - `M.manual_search_stdlib("grep")` - Choose stdlib, then search
@@ -121,18 +123,23 @@ Without a custom `select_detector`, the first matching detector is used.
 ## API
 
 ### `M.setup(opts)`
+
 Configure the dependency picker. See Configuration section above.
 
 ### `M.smart_search(mode)`
+
 Auto-detect language and search. Modes: `"grep"` or `"files"`
 
 ### `M.manual_search(mode)`  
+
 Manual language selection, then search. Modes: `"grep"` or `"files"`
 
 ### `M.smart_search_stdlib(mode)`
+
 Auto-detect language and search stdlib. Modes: `"grep"` or `"files"`
 
 ### `M.manual_search_stdlib(mode)`
+
 Manual stdlib selection, then search. Modes: `"grep"` or `"files"`
 
 ## Keybindings Example
