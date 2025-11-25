@@ -15,7 +15,7 @@ LazyVim-based Neovim configuration with extensive customizations for Python deve
 
 ## Configuration Structure
 
-```
+```markdown
 nvim/
 ├── lua/
 │   ├── config/
@@ -46,6 +46,7 @@ nvim/
 ## Key Plugin Highlights
 
 ### LSP & Completion
+
 - **basedpyright** - Python type checking and LSP
 - **blink.cmp** - Fast completion engine
 - **copilot.lua** - GitHub Copilot integration (disabled in markdown)
@@ -53,22 +54,26 @@ nvim/
 - **nvim-lint** - Linting integration
 
 ### Git
+
 - **diffview.nvim** - Side-by-side diffs with remote branch comparison
 - **mini.diff** - Inline git hunks
 - **gitsigns.nvim** - Git signs in gutter
 
 ### UI
+
 - **lualine.nvim** - Statusline with Git info, diagnostics, LSP status
 - **bufferline.nvim** - Buffer tabs at top
 - **noice.nvim** - Enhanced UI for messages, cmdline, and popover
 - **which-key.nvim** - Keybinding hints
 
 ### Obsidian
+
 - **obsidian.nvim** - Obsidian vault integration
 - **render-markdown.nvim** - Markdown rendering
 - **Custom task picker** - Search and manage TODO items across notes
 
 ### Navigation
+
 - **flash.nvim** - Fast motion plugin
 - **vim-tmux-navigator** - Seamless Neovim ↔ Tmux pane navigation
 - **dependency-picker** - Navigate dependencies in Python, JS, Rust, Go, Ruby, Lua, Neovim
@@ -78,24 +83,29 @@ nvim/
 Key mappings beyond LazyVim defaults (see `lua/config/keymaps.lua`):
 
 ### Visual Mode
+
 - `J` - Move selected lines down
 - `K` - Move selected lines up
 
 ### Terminal Mode
+
 - `<Esc>` - Enter normal mode
 
 ### Git Toggles
+
 - `<leader>tg` - Toggle Diffview (compare against remote default branch)
 - `<leader>tG` - Toggle Diffview (prompt for branch name)
 - `<leader>tp` - Toggle basedpyright diagnostic mode (openFilesOnly ↔ workspace)
 
 ### Obsidian (see `lua/plugins/obsidian.lua`)
+
 - `<leader>ot` - Open Obsidian task picker
 - `<leader>on` - Create new note
 - `<leader>os` - Search notes
 - `<leader>ol` - Insert link
 
 ### Dependency Navigation (see `lua/plugins/dependency-picker.lua`)
+
 - `<leader>ps` - Smart dependency grep (auto-detect language)
 - `<leader>pS` - Manual dependency grep (choose language)
 - `<leader>pf` - Smart dependency files
@@ -112,6 +122,7 @@ The dashboard displays a random Pokemon sprite with matching TokyoNight colors. 
 ### Dependency Picker
 
 Multi-language dependency navigation supporting:
+
 - **Neovim** - Plugin directories (lazy.nvim, packer, vim-plug)
 - **Python** - site-packages, stdlib
 - **JavaScript/TypeScript** - node_modules
@@ -125,6 +136,7 @@ See `lua/dependency-picker/README.md` for detailed usage.
 ### Git Diff Utilities
 
 Custom utilities in `lua/custom/git/diff.lua` for:
+
 - Fetching remote default branch
 - Opening Diffview against remote HEAD or custom branch
 - Smart toggling with state tracking
@@ -132,9 +144,11 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 ## TODO
 
 ### Bugs
+
 - [ ] In rare scenarios, the `u` command for undo doesn't work and requires restart
 
 ### Simple
+
 - [ ] Improve surround and auto-pair plugins - make Tab break out of parentheticals without exiting insert mode
 - [ ] Change completion priority: Tab always cycles blink completions, Shift+Tab takes Copilot suggestion
 - [ ] Generalize Obsidian task picker to work with any markdown directory (not just Obsidian vault)
@@ -145,11 +159,13 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 - [x] Reorganize plugins from flat structure to organized folders by category
 
 ### Unclear How Hard
+
 - [ ] Comprehensive LSP/Conform linting review and optimization
 - [ ] Properly configure SonarLint - integrate with lsp-check beyond Python
 - [ ] Revisit snippets: find optimal UX that doesn't clutter completion menu
 
 ### Complex
+
 - [ ] Deep dive into Python LSP ecosystem - prepare for 'ty' release, support pyproject.toml-specified LSPs
 - [ ] Optimize git workflow UX across snacks.nvim gh module, diffview, mini.diff, gh-dash, lazygit
 
@@ -158,6 +174,7 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 ### Adding Plugins
 
 Create new files in `lua/plugins/` following LazyVim conventions:
+
 ```lua
 return {
   "author/plugin-name",
