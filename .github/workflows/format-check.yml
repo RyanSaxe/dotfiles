@@ -20,29 +20,23 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install formatters
-        run: |
-          # Install stylua
-          curl -fsSL https://github.com/JohnnyMorganz/StyLua/releases/latest/download/stylua-linux-x86_64.zip -o stylua.zip
-          unzip stylua.zip
-          chmod +x stylua
-          sudo mv stylua /usr/local/bin/
+      - name: Install stylua
+        uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check .
 
-          # Install shfmt
-          curl -fsSL https://github.com/mvdan/sh/releases/latest/download/shfmt_v3.8.0_linux_amd64 -o shfmt
+      - name: Install shfmt
+        run: |
+          # Get latest shfmt release URL via GitHub API
+          SHFMT_URL=$(curl -fsSL https://api.github.com/repos/mvdan/sh/releases/latest | grep -o 'https://[^"]*shfmt_v[^"]*_linux_amd64' | head -1)
+          curl -fsSL "$SHFMT_URL" -o shfmt
           chmod +x shfmt
           sudo mv shfmt /usr/local/bin/
 
-          # Install prettier via npm
-          npm install -g prettier
-
-      - name: Check Lua formatting (stylua)
-        run: |
-          echo "Checking Lua files..."
-          stylua --check . || {
-            echo "::error::Lua files are not formatted. Run 'stylua .' locally."
-            exit 1
-          }
+      - name: Install prettier
+        run: npm install -g prettier
 
       - name: Check Shell formatting (shfmt)
         run: |
