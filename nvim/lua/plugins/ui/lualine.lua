@@ -9,9 +9,6 @@ return {
     vim.o.showmode = false
   end,
   opts = function()
-    -- Import tokyonight util for color blending and colors from colorscheme
-    local Util = require("tokyonight.util")
-    -- Get colors directly from tokyonight - will update automatically when theme changes
     local c = require("tokyonight.colors").setup()
 
     -- Load pokemon colors from cache file (created by dashboard)
@@ -35,9 +32,9 @@ return {
       end
     end
 
-    -- Create alias C for backwards compatibility with existing code
+    -- Create alias C for statusline colors (no winbar, so everything uses dark bg)
     local C = {
-      bg = c.bg,
+      bg = c.bg_dark, -- Dark background for all statusline components
       fg = c.fg,
       blue = pokemon_prominent, -- Use pokemon prominent color for normal mode
       cyan = c.cyan,
@@ -48,13 +45,13 @@ return {
       gutter = c.fg_gutter,
       orange = c.orange,
       purple = c.purple,
-      pink = c.moon_pink or c.magenta2, -- use custom moon_pink if available
+      pink = "#fca7ea",
     }
     local L, R = "", ""
 
-    -- ensure bar fill matches background (prevents edge artifacts)
-    vim.api.nvim_set_hl(0, "StatusLine", { bg = C.bg, fg = C.fg })
-    vim.api.nvim_set_hl(0, "StatusLineNC", { bg = C.bg, fg = C.gray })
+    -- ensure statusline uses darker UI chrome background (matches bufferline)
+    vim.api.nvim_set_hl(0, "StatusLine", { bg = c.bg_dark, fg = C.fg })
+    vim.api.nvim_set_hl(0, "StatusLineNC", { bg = c.bg_dark, fg = C.gray })
 
     local icons = (function()
       local ok, LV = pcall(require, "lazyvim.util")
@@ -115,7 +112,11 @@ return {
         b = { fg = C.fg, bg = C.bg },
         c = { fg = C.fg, bg = C.bg },
       },
-      inactive = { a = { fg = C.fg, bg = C.bg }, b = { fg = C.fg, bg = C.bg }, c = { fg = C.fg, bg = C.bg } },
+      inactive = {
+        a = { fg = C.fg, bg = C.bg },
+        b = { fg = C.fg, bg = C.bg },
+        c = { fg = C.fg, bg = C.bg },
+      },
     }
 
     -- WINBAR
@@ -130,7 +131,7 @@ return {
       },
       colored = true,
       update_in_insert = false,
-      color = { fg = C.fg, bg = C.bg },
+      color = { fg = C.fg, bg = c.bg_dark }, -- statusline uses dark bg
     }
     local function diff_source()
       local ok, mini = pcall(require, "mini.diff")
@@ -143,95 +144,7 @@ return {
         return { added = s.add, modified = s.change, removed = s.delete }
       end
     end
-    -- git diff component for winbar
-    local winbar_gitdiff = {
-      "diff",
-      symbols = {
-        added = icons.git.added or "+",
-        modified = icons.git.modified or "~",
-        removed = icons.git.removed or "-",
-      },
-      source = diff_source,
-      cond = function()
-        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
-        if vim.bo.buftype == "terminal" then
-          return false
-        end
-        -- Hide winbar for buffergolf practice and reference buffers
-        return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
-      end,
-      color = { fg = C.fg, bg = C.bg },
-    }
-    -- always-render filler so the winbar exists even if both sides are empty
-    local winbar_filler = {
-      function()
-        return " "
-      end,
-      cond = function()
-        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
-        if vim.bo.buftype == "terminal" then
-          return false
-        end
-        -- Hide winbar for buffergolf practice and reference buffers
-        return not (vim.b.buffergolf_practice or vim.b.buffergolf_reference)
-      end,
-      color = { fg = C.bg, bg = C.bg },
-    }
 
-    -- filename component for inactive winbar - DISABLED (returns empty)
-    local inactive_winbar_filename = {
-      function()
-        return "" -- Always return empty string to hide filename
-      end,
-      cond = function()
-        return false -- Never show this component
-      end,
-      color = { fg = C.bg, bg = C.bg }, -- invisible just in case
-    }
-
-    -- NES (Next Edit Suggestions) indicator for winbar
-    -- Shows copilot icon with hunk count in pokemon_bright color
-    local winbar_nes = {
-      function()
-        local ok, Nes = pcall(require, "sidekick.nes")
-        if not ok then
-          return ""
-        end
-
-        -- Get edits for CURRENT buffer only
-        local buf = vim.api.nvim_get_current_buf()
-        local edits = Nes.get(buf)
-        if #edits == 0 then
-          return ""
-        end
-
-        -- Count total hunks for current buffer
-        local total_hunks = 0
-        for _, edit in ipairs(edits) do
-          local diff = edit:diff()
-          total_hunks = total_hunks + #diff.hunks
-        end
-
-        return string.format("%d  ", total_hunks) -- Copilot icon with hunk count
-      end,
-      cond = function()
-        -- Hide winbar for terminal buffers (fixes flicker in sidekick split)
-        if vim.bo.buftype == "terminal" then
-          return false
-        end
-        -- Hide for buffergolf buffers
-        if vim.b.buffergolf_practice or vim.b.buffergolf_reference then
-          return false
-        end
-        -- Only show when NES suggestions exist in current buffer
-        local ok, Nes = pcall(require, "sidekick.nes")
-        return ok and Nes.have()
-      end,
-      color = { fg = pokemon_bright, bg = C.bg }, -- Use pokemon_bright color
-      padding = { left = 1, right = 1 },
-    }
-
-    -- invisible caps so outer edges match bg
     local left_cap = {
       function()
         return ""
@@ -297,6 +210,50 @@ return {
       return { fg = C.bg, bg = C.gray }
     end
 
+    -- Git diff component for statusline (moved from winbar)
+    local statusline_gitdiff = {
+      "diff",
+      symbols = {
+        added = icons.git.added or "+",
+        modified = icons.git.modified or "~",
+        removed = icons.git.removed or "-",
+      },
+      source = diff_source,
+      colored = true,
+    }
+
+    -- NES (Next Edit Suggestions) indicator for statusline (moved from winbar)
+    local statusline_nes = {
+      function()
+        local ok, Nes = pcall(require, "sidekick.nes")
+        if not ok then
+          return ""
+        end
+
+        -- Get edits for CURRENT buffer only
+        local buf = vim.api.nvim_get_current_buf()
+        local edits = Nes.get(buf)
+        if #edits == 0 then
+          return ""
+        end
+
+        -- Count total hunks for current buffer
+        local total_hunks = 0
+        for _, edit in ipairs(edits) do
+          local diff = edit:diff()
+          total_hunks = total_hunks + #diff.hunks
+        end
+
+        return string.format("%d  ", total_hunks) -- Copilot icon with hunk count
+      end,
+      cond = function()
+        local ok, Nes = pcall(require, "sidekick.nes")
+        return ok and Nes.have()
+      end,
+      color = { fg = pokemon_bright },
+      padding = { left = 1, right = 1 },
+    }
+
     return {
       options = {
         theme = theme,
@@ -311,36 +268,19 @@ return {
             "alpha",
             "ministarter",
             "snacks_dashboard",
-            "snacks_layout_box",
-            "snacks_picker_input",
-            "snacks_picker_list",
-            "snacks_picker_preview",
-            "Fyler",
-            "BuffergolfStats",
-          },
-          winbar = {
-            "dashboard",
-            "alpha",
-            "ministarter",
-            "snacks_dashboard",
-            "snacks_layout_box",
-            "snacks_picker_input",
-            "snacks_picker_list",
-            "snacks_picker_preview",
-            "Fyler",
             "BuffergolfStats",
           },
         },
       },
 
-      -- STATUSLINE
+      -- STATUSLINE (no winbar - all info here)
       sections = {
-        -- left: cap → mode → filename → diagnostics
+        -- left: cap → mode → filename → NES → diagnostics
         lualine_a = { left_cap, mode_bubble },
-        lualine_b = { filename_bubble_active, statusline_diagnostics },
+        lualine_b = { filename_bubble_active, statusline_nes, statusline_diagnostics },
         lualine_c = {},
-        -- right: location → git branch → cap
-        lualine_x = {},
+        -- right: git diff → location → branch → cap
+        lualine_x = { statusline_gitdiff },
         lualine_y = { location_bubble, branch_bubble },
         lualine_z = { right_cap },
       },
@@ -352,18 +292,6 @@ return {
         lualine_x = {},
         lualine_y = { location_bubble },
         lualine_z = { right_cap },
-      },
-
-      -- WINBAR: left NES indicator (pokemon_bright copilot icon + count), right git diff
-      winbar = {
-        lualine_a = { winbar_nes }, -- Shows copilot icon with hunk count when NES exists
-        lualine_x = { winbar_filler }, -- ensures bar exists even if both sides empty
-        lualine_z = { winbar_gitdiff },
-      },
-      inactive_winbar = {
-        lualine_a = {},
-        lualine_x = { winbar_filler }, -- ensures bar exists even when inactive
-        lualine_z = { inactive_winbar_filename }, -- show filename in inactive splits (top right)
       },
 
       extensions = { "neo-tree", "lazy", "fzf" },

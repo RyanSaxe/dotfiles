@@ -70,6 +70,36 @@ get_mtime() {
   echo "0"
 }
 
+# Function to blend two hex colors at a given weight
+# Usage: blend_colors "#ff9e64" "#1a1b26" 50
+# Returns: blended color (50% first color, 50% second color)
+blend_colors() {
+  local color1="$1"  # First color (e.g., pokemon bright)
+  local color2="$2"  # Second color (e.g., background)
+  local weight="$3"  # Weight of first color (0-100)
+
+  # Remove # prefix and convert to uppercase
+  color1="${color1#\#}"
+  color2="${color2#\#}"
+
+  # Parse RGB components (hex to decimal)
+  local r1=$((16#${color1:0:2}))
+  local g1=$((16#${color1:2:2}))
+  local b1=$((16#${color1:4:2}))
+
+  local r2=$((16#${color2:0:2}))
+  local g2=$((16#${color2:2:2}))
+  local b2=$((16#${color2:4:2}))
+
+  # Blend colors: new = (color1 * weight + color2 * (100-weight)) / 100
+  local r=$(( (r1 * weight + r2 * (100 - weight)) / 100 ))
+  local g=$(( (g1 * weight + g2 * (100 - weight)) / 100 ))
+  local b=$(( (b1 * weight + b2 * (100 - weight)) / 100 ))
+
+  # Convert back to hex and format
+  printf "#%02x%02x%02x" "$r" "$g" "$b"
+}
+
 # Function to update cached colors in tmux variables
 update_color_cache() {
   # Call pokemon-color.sh once for each color type and cache in tmux variables

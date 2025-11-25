@@ -14,13 +14,10 @@ return {
       -- purple in the moon theme is this nice pink I like to reuse
       c.moon_pink = "#fca7ea"
       c.git_purple = "#ba55d3"
-      -- experimentally trying an even darker background with lighter popups
-      -- local old_bg = c.bg
-      -- c.bg = c.bg_dark
-      -- c.bg_dark = old_bg
-      c.bg_statusline = c.bg
-      c.bg_float = c.bg
-      -- c.bg_float = old_bg
+
+      -- Use TokyoNight's natural darker background for floats
+      -- bg_dark defaults to #16161e (slightly darker than main bg #1a1b26)
+      c.bg_float = c.bg_dark
     end,
     on_highlights = function(hl, c)
       -- Load pokemon colors from cache file (created by dashboard)
@@ -179,100 +176,110 @@ return {
       -- inactive splits use gray (matching tmux inactive pane borders)
       hl["WinSeparator"] = { fg = c.fg_gutter }
       hl["VertSplit"] = { fg = c.fg_gutter }
-      -- ultra-minimal bufferline: just text with simple color coding
-      -- IMPORTANT: all backgrounds MUST be c.bg for seamless integration
-      hl["BufferLineFill"] = { bg = c.bg }
-      -- match tabline background to normal background for seamless integration
-      hl["TabLineFill"] = { bg = c.bg }
 
-      -- offset backgrounds (for Neo-tree sidebar, etc) - also use normal background
-      hl["BufferLineOffsetSeparator"] = { bg = c.bg }
-      hl["BufferLineTruncMarker"] = { fg = c.dark3, bg = c.bg }
+      -- Statusline: darker background for UI chrome (even when lualine is disabled)
+      hl["StatusLine"] = { fg = c.fg, bg = c.bg_dark }
+      hl["StatusLineNC"] = { fg = c.dark3, bg = c.bg_dark } -- non-current windows
 
+      -- Bufferline: Tab-style appearance with slanted separators
+      -- Active tab uses normal bg (raised), inactive tabs use dark bg (recessed)
+      hl["BufferLineFill"] = { bg = c.bg_dark }
+      hl["TabLineFill"] = { bg = c.bg_dark }
+
+      -- offset backgrounds (for Neo-tree sidebar, etc)
+      hl["BufferLineOffsetSeparator"] = { bg = c.bg_dark }
+      hl["BufferLineTruncMarker"] = { fg = c.dark3, bg = c.bg_dark }
+
+      -- Active buffer: normal bg with pokemon prominent text (looks like raised tab)
       hl["BufferLineBufferSelected"] = {
-        fg = pokemon_prominent, -- Pokemon prominent color for active buffer
-        bg = c.bg,
+        fg = pokemon_prominent,
+        bg = c.bg, -- raised appearance with normal bg
       }
 
-      -- visible buffers (in other windows) - slightly dimmed white text
+      -- visible buffers (in other windows) - slightly dimmed on dark bg
       hl["BufferLineBufferVisible"] = {
-        fg = Util.blend_bg(c.fg, 0.8), -- slightly dimmed white (80% brightness)
-        bg = c.bg,
+        fg = Util.blend_bg(c.fg, 0.8),
+        bg = c.bg_dark,
       }
 
-      -- inactive buffers (hidden) - gray text
+      -- inactive buffers (hidden) - gray text on dark bg
       hl["BufferLineBuffer"] = {
-        fg = c.dark3, -- dull gray
-        bg = c.bg,
+        fg = c.dark3,
+        bg = c.bg_dark,
       }
 
-      -- separators are invisible - same as background
-      hl["BufferLineSeparatorSelected"] = { fg = c.bg, bg = c.bg }
-      hl["BufferLineSeparatorVisible"] = { fg = c.bg, bg = c.bg }
-      hl["BufferLineSeparator"] = { fg = c.bg, bg = c.bg }
+      -- Slanted separators create tab appearance for active buffer
+      -- Active: dark slant creates shadow/edge for raised tab effect
+      hl["BufferLineSeparatorSelected"] = {
+        fg = c.bg_dark, -- dark slant creates shadow/depth
+        bg = c.bg, -- active tab background
+      }
+      -- Inactive: invisible separators (same color as background)
+      hl["BufferLineSeparatorVisible"] = { fg = c.bg_dark, bg = c.bg_dark }
+      hl["BufferLineSeparator"] = { fg = c.bg_dark, bg = c.bg_dark }
 
-      -- indicators also invisible
-      hl["BufferLineIndicatorSelected"] = { fg = c.bg, bg = c.bg }
-      hl["BufferLineIndicatorVisible"] = { fg = c.bg, bg = c.bg }
-      hl["BufferLineIndicator"] = { fg = c.bg, bg = c.bg }
+      -- indicators match their respective backgrounds
+      hl["BufferLineIndicatorSelected"] = { fg = c.bg, bg = c.bg } -- selected uses normal bg
+      hl["BufferLineIndicatorVisible"] = { fg = c.bg_dark, bg = c.bg_dark }
+      hl["BufferLineIndicator"] = { fg = c.bg_dark, bg = c.bg_dark }
 
       -- modified/unsaved buffers - hierarchy: selected > visible > inactive
       hl["BufferLineModified"] = {
         fg = Util.blend_bg(c.orange, 0.3), -- very dull orange for inactive
-        bg = c.bg,
+        bg = c.bg_dark,
       }
       hl["BufferLineModifiedSelected"] = {
         fg = c.orange, -- full orange when active
-        bg = c.bg,
+        bg = c.bg, -- selected uses normal bg
       }
       hl["BufferLineModifiedVisible"] = {
         fg = Util.blend_bg(c.orange, 0.6), -- medium dimmed orange for visible
-        bg = c.bg,
+        bg = c.bg_dark,
       }
 
       -- close buttons - hierarchy: selected > visible > inactive
       hl["BufferLineCloseButton"] = {
         fg = Util.blend_bg(c.red, 0.3), -- very dull red for inactive
-        bg = c.bg,
+        bg = c.bg_dark,
       }
       hl["BufferLineCloseButtonVisible"] = {
         fg = Util.blend_bg(c.red, 0.6), -- medium dimmed red for visible
-        bg = c.bg,
+        bg = c.bg_dark,
       }
       hl["BufferLineCloseButtonSelected"] = {
         fg = c.red, -- full red for active
-        bg = c.bg,
+        bg = c.bg, -- selected uses normal bg
       }
 
       -- tabs - match exact buffer formatting
-      hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg } -- inactive = gray
-      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active = pokemon prominent
-      hl["BufferLineTabSeparator"] = { fg = c.bg, bg = c.bg } -- invisible separators
+      hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg_dark } -- inactive = gray on dark bg
+      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active = pokemon prominent on normal bg
+      hl["BufferLineTabSeparator"] = { fg = c.bg_dark, bg = c.bg_dark } -- invisible separators
       hl["BufferLineTabSeparatorSelected"] = { fg = c.bg, bg = c.bg }
-      hl["BufferLineTabClose"] = { fg = Util.blend_bg(c.red, 0.5), bg = c.bg } -- dim red X
+      hl["BufferLineTabClose"] = { fg = Util.blend_bg(c.red, 0.5), bg = c.bg_dark } -- dim red X
 
-      -- background elements - all should match editor background
-      hl["BufferLineBackground"] = { fg = c.dark3, bg = c.bg } -- fallback gray text
+      -- background elements - use darker background
+      hl["BufferLineBackground"] = { fg = c.dark3, bg = c.bg_dark } -- fallback gray text
 
       -- duplicate buffers (files with similar names) - match regular buffer colors
-      hl["BufferLineDuplicate"] = { fg = c.dark3, bg = c.bg } -- hidden duplicates = gray
-      hl["BufferLineDuplicateSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active duplicate = pokemon prominent
-      hl["BufferLineDuplicateVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg } -- visible duplicate = slightly dimmed white
+      hl["BufferLineDuplicate"] = { fg = c.dark3, bg = c.bg_dark } -- hidden duplicates = gray
+      hl["BufferLineDuplicateSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active duplicate = pokemon prominent on normal bg
+      hl["BufferLineDuplicateVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg_dark } -- visible duplicate = slightly dimmed white
 
-      -- group and pin backgrounds - also use normal background
-      hl["BufferLineGroupLabel"] = { fg = c.dark3, bg = c.bg }
-      hl["BufferLineGroupSeparator"] = { fg = c.bg, bg = c.bg }
-      hl["BufferLinePick"] = { fg = c.red, bg = c.bg }
-      hl["BufferLinePickSelected"] = { fg = c.red, bg = c.bg }
-      hl["BufferLinePickVisible"] = { fg = c.red, bg = c.bg }
+      -- group and pin backgrounds - use darker background
+      hl["BufferLineGroupLabel"] = { fg = c.dark3, bg = c.bg_dark }
+      hl["BufferLineGroupSeparator"] = { fg = c.bg_dark, bg = c.bg_dark }
+      hl["BufferLinePick"] = { fg = c.red, bg = c.bg_dark }
+      hl["BufferLinePickSelected"] = { fg = c.red, bg = c.bg } -- selected uses normal bg
+      hl["BufferLinePickVisible"] = { fg = c.red, bg = c.bg_dark }
 
       -- ensure ALL text-bearing elements use our color scheme
       -- this is comprehensive to catch any edge cases
       hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg }
-      hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg }
+      hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg_dark }
       hl["BufferLineNumbersSelected"] = { fg = pokemon_prominent, bg = c.bg }
-      hl["BufferLineNumbersVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg } -- slightly dimmed white
-      hl["BufferLineNumbers"] = { fg = c.dark3, bg = c.bg }
+      hl["BufferLineNumbersVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg_dark } -- slightly dimmed white
+      hl["BufferLineNumbers"] = { fg = c.dark3, bg = c.bg_dark }
     end,
   },
 }
