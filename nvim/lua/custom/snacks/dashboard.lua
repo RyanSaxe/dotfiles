@@ -866,6 +866,13 @@ end
 -- Called by Snacks dashboard with self (dashboard instance) as parameter
 ---@param dashboard snacks.dashboard.Class Dashboard instance
 function M.create_sections(dashboard)
+  -- Ensure tabline is always shown to prevent layout shifts (only in tmux)
+  -- This prevents the dashboard from jumping when switching buffers in tmux
+  -- Outside tmux, we don't need this workaround as there's no tmux status bar
+  if vim.env.TMUX then
+    vim.o.tabline = " "
+    vim.o.showtabline = 2
+  end
   -- Always set initial dynamic pane width for responsive layout
   -- This will be recalculated after height calculation for perfect centering
   if dashboard and dashboard._size then
