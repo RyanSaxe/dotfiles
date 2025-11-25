@@ -1,0 +1,81 @@
+name: Format Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  format:
+    name: Check formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install formatters
+        run: |
+          # Install stylua
+          curl -fsSL https://github.com/JohnnyMorganz/StyLua/releases/latest/download/stylua-linux-x86_64.zip -o stylua.zip
+          unzip stylua.zip
+          chmod +x stylua
+          sudo mv stylua /usr/local/bin/
+
+          # Install shfmt
+          curl -fsSL https://github.com/mvdan/sh/releases/latest/download/shfmt_v3.8.0_linux_amd64 -o shfmt
+          chmod +x shfmt
+          sudo mv shfmt /usr/local/bin/
+
+          # Install prettier via npm
+          npm install -g prettier
+
+      - name: Check Lua formatting (stylua)
+        run: |
+          echo "Checking Lua files..."
+          stylua --check . || {
+            echo "::error::Lua files are not formatted. Run 'stylua .' locally."
+            exit 1
+          }
+
+      - name: Check Shell formatting (shfmt)
+        run: |
+          echo "Checking shell files..."
+          # Find all .sh files and check formatting
+          # Using same options as conform.nvim and pre-commit hook
+          find . -name "*.sh" -type f | while read -r file; do
+            if ! shfmt -i 2 -ci -bn -sr -d "$file" > /dev/null 2>&1; then
+              echo "::error file=$file::Shell file is not formatted correctly"
+              shfmt -i 2 -ci -bn -sr -d "$file" || true
+              exit 1
+            fi
+          done
+          echo "All shell files are formatted correctly"
+
+      - name: Check JSON formatting (prettier)
+        run: |
+          echo "Checking JSON files..."
+          find . -name "*.json" -type f ! -path "./node_modules/*" | while read -r file; do
+            if ! prettier --check "$file" > /dev/null 2>&1; then
+              echo "::error file=$file::JSON file is not formatted correctly"
+              exit 1
+            fi
+          done
+          echo "All JSON files are formatted correctly"
+
+      - name: Check Markdown formatting (prettier)
+        run: |
+          echo "Checking Markdown files..."
+          find . -name "*.md" -type f ! -path "./node_modules/*" | while read -r file; do
+            if ! prettier --prose-wrap always --check "$file" > /dev/null 2>&1; then
+              echo "::error file=$file::Markdown file is not formatted correctly"
+              exit 1
+            fi
+          done
+          echo "All Markdown files are formatted correctly"
