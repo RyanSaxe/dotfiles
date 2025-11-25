@@ -95,8 +95,7 @@ function M.save_buffer(picker)
 
   -- Provide user feedback
   if saved_count > 0 then
-    local message = saved_count == 1
-      and "Saved: " .. saved_files[1]
+    local message = saved_count == 1 and "Saved: " .. saved_files[1]
       or "Saved " .. saved_count .. " buffers: " .. table.concat(saved_files, ", ")
     vim.notify(message, vim.log.levels.INFO)
 

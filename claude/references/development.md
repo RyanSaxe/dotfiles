@@ -1,6 +1,7 @@
 # Development Workflow Guide
 
-This document describes the development process, workflow practices, and collaboration patterns.
+This document describes the development process, workflow practices, and
+collaboration patterns.
 
 ## Core Workflow Principles
 
@@ -81,7 +82,8 @@ Follow these guidelines:
 
 **3a. Test-Driven Development (TDD) Alternative:**
 
-When using TDD, **tests come first** (see [TDD Skill](../skills/code/tdd/SKILL.md)):
+When using TDD, **tests come first** (see
+[TDD Skill](../skills/code/tdd/SKILL.md)):
 
 1. Write failing test that defines behavior
 2. Implement minimal code to pass test
@@ -194,7 +196,8 @@ git blame path/to/file.py
 
 ## Refactoring Workflow
 
-See [Clean Code Skill](../skills/code/clean/SKILL.md) for detailed refactoring patterns and processes. Use this skill.
+See [Clean Code Skill](../skills/code/clean/SKILL.md) for detailed refactoring
+patterns and processes. Use this skill.
 
 **Refactoring checklist:**
 

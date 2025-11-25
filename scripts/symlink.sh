@@ -21,9 +21,9 @@ DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 # Platform-specific paths
 # macOS uses ~/Library/Application Support for lazygit, Linux uses ~/.config
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    export LAZYGIT_CONFIG_DIR="$HOME/Library/Application Support/lazygit"
+  export LAZYGIT_CONFIG_DIR="$HOME/Library/Application Support/lazygit"
 else
-    export LAZYGIT_CONFIG_DIR="$HOME/.config/lazygit"
+  export LAZYGIT_CONFIG_DIR="$HOME/.config/lazygit"
 fi
 
 # Load dotfile mappings from config file
@@ -36,86 +36,86 @@ done < "$DOTFILES_DIR/config/symlinks.txt"
 # Helper functions
 
 create_symlink() {
-    local source=$1
-    local target=$2
-    
-    # Create target directory if it doesn't exist
-    mkdir -p "$(dirname "$target")"
-    
-    # Handle existing files/symlinks safely
-    if [[ -e "$target" || -L "$target" ]]; then
-        if [[ -L "$target" ]]; then
-            # It's a symlink, safe to remove
-            rm -f "$target"
-        else
-            # It's a real file/directory, back it up
-            local timestamp=$(date +%Y%m%d_%H%M%S)
-            local backup_name="$(basename "$target")_${timestamp}"
-            local backup_path="$DOTFILES_DIR/backups/$backup_name"
-            mv "$target" "$backup_path"
-            
-            # Create restore instructions
-            echo "$backup_path → $target" >> "$DOTFILES_DIR/backups/RESTORE_INSTRUCTIONS.txt"
-            warn "Backed up existing file to $backup_path"
-        fi
-    fi
-    
-    # Create the symlink (use -n for BSD/macOS compatibility)
-    if ln -sfn "$source" "$target"; then
-        success "✓ $target → $source"
-        return 0
+  local source=$1
+  local target=$2
+
+  # Create target directory if it doesn't exist
+  mkdir -p "$(dirname "$target")"
+
+  # Handle existing files/symlinks safely
+  if [[ -e "$target" || -L "$target" ]]; then
+    if [[ -L "$target" ]]; then
+      # It's a symlink, safe to remove
+      rm -f "$target"
     else
-        err "✗ Failed to create symlink: $target → $source"
-        return 1
+      # It's a real file/directory, back it up
+      local timestamp=$(date +%Y%m%d_%H%M%S)
+      local backup_name="$(basename "$target")_${timestamp}"
+      local backup_path="$DOTFILES_DIR/backups/$backup_name"
+      mv "$target" "$backup_path"
+
+      # Create restore instructions
+      echo "$backup_path → $target" >> "$DOTFILES_DIR/backups/RESTORE_INSTRUCTIONS.txt"
+      warn "Backed up existing file to $backup_path"
     fi
+  fi
+
+  # Create the symlink (use -n for BSD/macOS compatibility)
+  if ln -sfn "$source" "$target"; then
+    success "✓ $target → $source"
+    return 0
+  else
+    err "✗ Failed to create symlink: $target → $source"
+    return 1
+  fi
 }
 
 # ──────────────────────────────────────────────────────
 # Main symlink function
 
 symlink_dotfiles() {
-    local failed=0
-    
-    log "Starting dotfiles symlinking..."
-    log "Dotfiles directory: $DOTFILES_DIR"
-    echo
-    
-    # Verify dotfiles directory exists
-    if [[ ! -d "$DOTFILES_DIR" ]]; then
-        err "Dotfiles directory not found: $DOTFILES_DIR"
-        exit 1
+  local failed=0
+
+  log "Starting dotfiles symlinking..."
+  log "Dotfiles directory: $DOTFILES_DIR"
+  echo
+
+  # Verify dotfiles directory exists
+  if [[ ! -d "$DOTFILES_DIR" ]]; then
+    err "Dotfiles directory not found: $DOTFILES_DIR"
+    exit 1
+  fi
+
+  # Process each dotfile mapping
+  for mapping in "${DOTFILE_MAPPINGS[@]}"; do
+    IFS=: read -r src_path target_path <<< "$mapping"
+    local source="$DOTFILES_DIR/$src_path"
+    local target=$(eval echo "$target_path")
+
+    if [[ ! -e "$source" ]]; then
+      warn "Source not found, skipping: $source"
+      continue
     fi
-    
-    # Process each dotfile mapping
-    for mapping in "${DOTFILE_MAPPINGS[@]}"; do
-        IFS=: read -r src_path target_path <<<"$mapping"
-        local source="$DOTFILES_DIR/$src_path"
-        local target=$(eval echo "$target_path")
-        
-        if [[ ! -e "$source" ]]; then
-            warn "Source not found, skipping: $source"
-            continue
-        fi
-        
-        if ! create_symlink "$source" "$target"; then
-            ((failed++))
-        fi
-    done
-    
-    echo
-    if ((failed == 0)); then
-        success "✅ All dotfiles symlinked successfully!"
-    else
-        err "❌ $failed symlinks failed"
-        exit 1
+
+    if ! create_symlink "$source" "$target"; then
+      ((failed++))
     fi
+  done
+
+  echo
+  if ((failed == 0)); then
+    success "✅ All dotfiles symlinked successfully!"
+  else
+    err "❌ $failed symlinks failed"
+    exit 1
+  fi
 }
 
 # ──────────────────────────────────────────────────────
 # Command line options
 
 show_help() {
-    cat << EOF
+  cat << EOF
 Dotfiles Symlink Manager
 
 USAGE:
@@ -135,86 +135,86 @@ EOF
 }
 
 list_mappings() {
-    log "Configured dotfile mappings:"
-    echo
-    local total_lines expected_mappings
-    total_lines=$(wc -l < "$DOTFILES_DIR/config/symlinks.txt" 2>/dev/null || echo 0)
-    expected_mappings=${#DOTFILE_MAPPINGS[@]}
-    
-    if [[ $expected_mappings -ne $total_lines ]]; then
-        warn "⚠ Found $expected_mappings mappings but $total_lines lines in config - possible missing newline issue"
-    fi
-    
-    for mapping in "${DOTFILE_MAPPINGS[@]}"; do
-        IFS=: read -r src_path target_path <<<"$mapping"
-        local source="$DOTFILES_DIR/$src_path"
-        local target=$(eval echo "$target_path")
-        printf "  %-30s → %s\n" "$source" "$target"
-    done
+  log "Configured dotfile mappings:"
+  echo
+  local total_lines expected_mappings
+  total_lines=$(wc -l < "$DOTFILES_DIR/config/symlinks.txt" 2> /dev/null || echo 0)
+  expected_mappings=${#DOTFILE_MAPPINGS[@]}
+
+  if [[ $expected_mappings -ne $total_lines ]]; then
+    warn "⚠ Found $expected_mappings mappings but $total_lines lines in config - possible missing newline issue"
+  fi
+
+  for mapping in "${DOTFILE_MAPPINGS[@]}"; do
+    IFS=: read -r src_path target_path <<< "$mapping"
+    local source="$DOTFILES_DIR/$src_path"
+    local target=$(eval echo "$target_path")
+    printf "  %-30s → %s\n" "$source" "$target"
+  done
 }
 
 dry_run() {
-    log "DRY RUN - showing what would be done:"
-    echo
-    
-    for mapping in "${DOTFILE_MAPPINGS[@]}"; do
-        IFS=: read -r src_path target_path <<<"$mapping"
-        local source="$DOTFILES_DIR/$src_path"
-        local target=$(eval echo "$target_path")
-        
-        if [[ ! -e "$source" ]]; then
-            warn "SKIP: Source not found - $source"
-            continue
-        fi
-        
-        if [[ -e "$target" || -L "$target" ]]; then
-            if [[ -L "$target" ]]; then
-                warn "REMOVE: Existing symlink at $target"
-            else
-                warn "BACKUP: Existing file at $target"
-            fi
-        fi
-        
-        log "LINK: $target → $source"
-    done
+  log "DRY RUN - showing what would be done:"
+  echo
+
+  for mapping in "${DOTFILE_MAPPINGS[@]}"; do
+    IFS=: read -r src_path target_path <<< "$mapping"
+    local source="$DOTFILES_DIR/$src_path"
+    local target=$(eval echo "$target_path")
+
+    if [[ ! -e "$source" ]]; then
+      warn "SKIP: Source not found - $source"
+      continue
+    fi
+
+    if [[ -e "$target" || -L "$target" ]]; then
+      if [[ -L "$target" ]]; then
+        warn "REMOVE: Existing symlink at $target"
+      else
+        warn "BACKUP: Existing file at $target"
+      fi
+    fi
+
+    log "LINK: $target → $source"
+  done
 }
 
 # ──────────────────────────────────────────────────────
 # Main execution
 
 main() {
-    local dry_run_mode=false
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            -l|--list)
-                list_mappings
-                exit 0
-                ;;
-            -d|--dry-run)
-                dry_run_mode=true
-                shift
-                ;;
-            *)
-                err "Unknown option: $1"
-                show_help
-                exit 1
-                ;;
-        esac
-    done
-    
-    if [[ "$dry_run_mode" == true ]]; then
-        dry_run
-    else
-        symlink_dotfiles
-    fi
+  local dry_run_mode=false
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -h | --help)
+        show_help
+        exit 0
+        ;;
+      -l | --list)
+        list_mappings
+        exit 0
+        ;;
+      -d | --dry-run)
+        dry_run_mode=true
+        shift
+        ;;
+      *)
+        err "Unknown option: $1"
+        show_help
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ "$dry_run_mode" == true ]]; then
+    dry_run
+  else
+    symlink_dotfiles
+  fi
 }
 
 # Only run main if script is executed directly (not sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
+  main "$@"
 fi

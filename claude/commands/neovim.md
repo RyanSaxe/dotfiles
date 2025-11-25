@@ -1,16 +1,21 @@
 ---
-description: Neovim and Lua development with LazyVim conventions and TokyoNight theme consistency
+description:
+  Neovim and Lua development with LazyVim conventions and TokyoNight theme
+  consistency
 ---
 
 # Task
 
-Work with Neovim configuration, Lua scripts, LazyVim plugins, and ensure TokyoNight theme consistency.
+Work with Neovim configuration, Lua scripts, LazyVim plugins, and ensure
+TokyoNight theme consistency.
 
 ## Core Principles
 
-- **LazyVim Base**: This config uses LazyVim with custom plugins in `nvim/lua/plugins/`
+- **LazyVim Base**: This config uses LazyVim with custom plugins in
+  `nvim/lua/plugins/`
 - **Lua 5.4.7**: Target Lua 5.4.7 (Neovim 0.11.2)
-- **Detailed Comments**: Unlike other code, leave detailed comments in Neovim/Lua configs
+- **Detailed Comments**: Unlike other code, leave detailed comments in
+  Neovim/Lua configs
   - APIs are complex and configs are frequently modified
   - Explain WHY, not just WHAT
 - **Theme Consistency**: Match TokyoNight colors for any customizations

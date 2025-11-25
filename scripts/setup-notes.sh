@@ -28,7 +28,7 @@ while [[ $# -gt 0 ]]; do
       CLONE_PRIVATE=true
       shift
       ;;
-    -h|--help)
+    -h | --help)
       echo "Usage: $0 [--clone-private]"
       echo ""
       echo "Setup Obsidian notes scaffolding for Neovim integration"
@@ -141,7 +141,7 @@ fi
 DAILY_TEMPLATE="$NOTES_DIR/templates/daily.md"
 if [[ ! -f "$DAILY_TEMPLATE" ]]; then
   echo "Creating daily note template..."
-  cat > "$DAILY_TEMPLATE" <<'EOF'
+  cat > "$DAILY_TEMPLATE" << 'EOF'
 # Daily Note
 
 ## Tasks
@@ -162,7 +162,7 @@ fi
 PERSON_TEMPLATE="$NOTES_DIR/templates/person.md"
 if [[ ! -f "$PERSON_TEMPLATE" ]]; then
   echo "Creating person note template..."
-  cat > "$PERSON_TEMPLATE" <<'EOF'
+  cat > "$PERSON_TEMPLATE" << 'EOF'
 ## Tasks
 
 ## Summary
@@ -181,7 +181,7 @@ fi
 GITIGNORE="$NOTES_DIR/.gitignore"
 if [[ ! -f "$GITIGNORE" ]]; then
   echo "Creating .gitignore..."
-  cat > "$GITIGNORE" <<'EOF'
+  cat > "$GITIGNORE" << 'EOF'
 # Obsidian workspace files
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json

@@ -1,6 +1,8 @@
 # Dependency Picker
 
-Smart dependency navigation for multiple programming languages. Navigate and search through project dependencies and standard libraries with intelligent auto-detection and configurable behavior.
+Smart dependency navigation for multiple programming languages. Navigate and
+search through project dependencies and standard libraries with intelligent
+auto-detection and configurable behavior.
 
 ## Supported Languages
 
@@ -15,8 +17,10 @@ Smart dependency navigation for multiple programming languages. Navigate and sea
 ## Features
 
 - **Smart detection**: Auto-detects language from current filetype
-- **Context awareness**: If you're inside a package directory, searches that package directly
-- **Multi-detector handling**: Configurable logic for choosing between multiple package ecosystems
+- **Context awareness**: If you're inside a package directory, searches that
+  package directly
+- **Multi-detector handling**: Configurable logic for choosing between multiple
+  package ecosystems
 - **Language filtering**: Enable/disable specific languages
 - **Dual modes**: Grep content or search files
 - **Stdlib support**: Search language standard libraries
@@ -36,7 +40,7 @@ require("dependency-picker").setup({
   select_detector = function(matching_detectors, context)
     -- matching_detectors: array of { detector = module, result = detect_result }
     -- context: { bufpath = string, filetype = string }
-    
+
     -- Return the selected match, or nil to use first match
     return matching_detectors[1]
   end
@@ -45,7 +49,8 @@ require("dependency-picker").setup({
 
 ### Example: Path-Based Selection
 
-Prefer Neovim packages when "nvim" is in the file path, otherwise use Lua packages:
+Prefer Neovim packages when "nvim" is in the file path, otherwise use Lua
+packages:
 
 ```lua
 require("dependency-picker").setup({
@@ -98,11 +103,13 @@ require("dependency-picker").setup({
 The plugin provides several search modes:
 
 ### Smart Search (Auto-detect)
+
 - `M.smart_search("grep")` - Auto-detect language and grep packages
 - `M.smart_search("files")` - Auto-detect language and search files
 - `M.smart_search_stdlib("grep")` - Auto-detect and search stdlib
 
 ### Manual Search (Choose language)
+
 - `M.manual_search("grep")` - Choose language, then grep packages
 - `M.manual_search("files")` - Choose language, then search files
 - `M.manual_search_stdlib("grep")` - Choose stdlib, then search
@@ -121,18 +128,23 @@ Without a custom `select_detector`, the first matching detector is used.
 ## API
 
 ### `M.setup(opts)`
+
 Configure the dependency picker. See Configuration section above.
 
 ### `M.smart_search(mode)`
+
 Auto-detect language and search. Modes: `"grep"` or `"files"`
 
-### `M.manual_search(mode)`  
+### `M.manual_search(mode)`
+
 Manual language selection, then search. Modes: `"grep"` or `"files"`
 
 ### `M.smart_search_stdlib(mode)`
+
 Auto-detect language and search stdlib. Modes: `"grep"` or `"files"`
 
 ### `M.manual_search_stdlib(mode)`
+
 Manual stdlib selection, then search. Modes: `"grep"` or `"files"`
 
 ## Keybindings Example

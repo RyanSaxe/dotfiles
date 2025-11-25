@@ -78,4 +78,3 @@ M.buffer_config = {
 }
 
 return M
-

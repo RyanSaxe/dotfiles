@@ -45,11 +45,11 @@ fi
 
 # Git status (simplified, avoiding locks)
 git_info=""
-if [[ -d "$current_dir/.git" ]] || git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
-  branch=$(git -C "$current_dir" branch --show-current 2>/dev/null || echo "detached")
+if [[ -d "$current_dir/.git" ]] || git -C "$current_dir" rev-parse --git-dir > /dev/null 2>&1; then
+  branch=$(git -C "$current_dir" branch --show-current 2> /dev/null || echo "detached")
   if [[ -n "$branch" ]]; then
     # Check if working directory is clean (simplified)
-    if git -C "$current_dir" diff-index --quiet HEAD -- 2>/dev/null; then
+    if git -C "$current_dir" diff-index --quiet HEAD -- 2> /dev/null; then
       git_status="✔"
       status_color="$C_GREEN"
     else
@@ -68,7 +68,7 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
 
   # Read transcript in reverse to find most recent assistant message with usage data
   # Using tac for reverse reading, falling back to tail -r on macOS if needed
-  if command -v tac >/dev/null 2>&1; then
+  if command -v tac > /dev/null 2>&1; then
     reverse_cmd="tac"
   else
     reverse_cmd="tail -r"
@@ -76,11 +76,11 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
 
   # Find the most recent assistant message with usage data (not sidechain)
   while IFS= read -r line; do
-    if [[ -n "$line" ]] && echo "$line" | jq -e . >/dev/null 2>&1; then
+    if [[ -n "$line" ]] && echo "$line" | jq -e . > /dev/null 2>&1; then
       # Check if this is an assistant message with usage data and not a sidechain
       is_assistant=$(echo "$line" | jq -r '.type // ""')
       is_sidechain=$(echo "$line" | jq -r '.isSidechain // false')
-      has_usage=$(echo "$line" | jq -e '.message.usage' >/dev/null 2>&1 && echo "true" || echo "false")
+      has_usage=$(echo "$line" | jq -e '.message.usage' > /dev/null 2>&1 && echo "true" || echo "false")
 
       if [[ "$is_assistant" == "assistant" && "$is_sidechain" == "false" && "$has_usage" == "true" ]]; then
         # Extract all token types from the most recent main chain assistant message
@@ -99,7 +99,7 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
         break
       fi
     fi
-  done < <($reverse_cmd "$transcript_path" 2>/dev/null)
+  done < <($reverse_cmd "$transcript_path" 2> /dev/null)
 
   # Display context info if we have data
   if [[ $context_tokens -gt 0 ]]; then

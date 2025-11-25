@@ -1,29 +1,52 @@
+# Core editor and shell
 neovim
+zsh
+tmux
+
+# Search and navigation
 ripgrep
 fzf
 fd
-git
-lazygit
-node
-tmux
-gh
-python3
-ipython
-jq
-openjdk@17
-wget
-git-delta
-zsh
-bat
-ghostscript
-imagemagick
-tectonic
-luarocks
-hammerspoon
-ast-grep
-tldr
 tree
 dust
-claude-code
+
+# Version control
+git
+lazygit
+gh
+git-delta
+
+# Languages and runtimes
+node
+python3
+ipython
+openjdk@17
+luarocks
+
+# Code analysis
+ast-grep
+
+# Formatters and linters
+stylua
+shfmt
+prettier
+markdownlint-cli
+
+# Document processing
+tectonic
+ghostscript
+imagemagick
+
+# Utilities
+jq
+wget
+bat
+tldr
+
+# macOS applications
+hammerspoon
 leader-key
 karabiner-elements
+
+# AI tools
+claude-code

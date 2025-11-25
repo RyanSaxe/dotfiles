@@ -1,8 +1,11 @@
 # Code Style Guide
 
-This document defines what good code looks like - the standards, conventions, and patterns to follow when writing code.
+This document defines what good code looks like - the standards, conventions,
+and patterns to follow when writing code.
 
-NOTE: the code examples in this file are python, but they apply to all languages. Any language that wants to deviate will specify in the corresponding skill located in skills/lang-[name-of-language].
+NOTE: the code examples in this file are python, but they apply to all
+languages. Any language that wants to deviate will specify in the corresponding
+skill located in skills/lang-[name-of-language].
 
 ## Core Principles
 
@@ -124,13 +127,15 @@ def process_order(order: Order, discount_rate: float) -> Order:
     return order
 ```
 
-<IMPORTANT>Do not go overboard here. Functions with only a few lines that call other functions can be problematic and increase cognitive complexity. This principal is NOT about size of the function, but just about avoiding having a function do too many things.</IMPORTANT>
+<IMPORTANT>Do not go overboard here. Functions with only a few lines that call
+other functions can be problematic and increase cognitive complexity. This
+principal is NOT about size of the function, but just about avoiding having a
+function do too many things.</IMPORTANT>
 
 ### Parameter Count
 
-**Ideal:** 0-3 parameters
-**Acceptable:** 4-7 parameters
-**Code smell:** 8+ parameters
+**Ideal:** 0-3 parameters **Acceptable:** 4-7 parameters **Code smell:** 8+
+parameters
 
 For many related parameters, group them logically:
 
@@ -253,8 +258,7 @@ def process_order(order: Order | None) -> str:
 
 ### Nesting Depth
 
-**Maximum recommended:** 3 levels of nesting
-**Ideal:** 1-2 levels
+**Maximum recommended:** 3 levels of nesting **Ideal:** 1-2 levels
 
 ```python
 # Good: Flat structure
@@ -763,10 +767,13 @@ dog = Animal(name="Dog", movement_fn=walk, vocalization_fn=bark)
 
 - Python: Functions are first-class, prefer them
 - Lua: Tables and functions are often more idiomatic than classes
-- Java/C#: Classes are more fundamental, but still prefer simple over complex hierarchies
+- Java/C#: Classes are more fundamental, but still prefer simple over complex
+  hierarchies
 
 ## Related Guides
 
-- [Clean Code Skill](../skills/code/clean/SKILL.md) - How to transform code to meet these standards
+- [Clean Code Skill](../skills/code/clean/SKILL.md) - How to transform code to
+  meet these standards
 - [Testing Guide](testing.md) - Testing serves as executable documentation
-- [Development Workflow](development.md) - Development process and best practices
+- [Development Workflow](development.md) - Development process and best
+  practices

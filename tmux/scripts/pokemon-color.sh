@@ -26,13 +26,13 @@ cache_file="$HOME/.cache/pokemon-colors.env"
 # Get TokyoNight default for this color type
 case "$color_type" in
   dim)
-    default_color="#565f89"  # gray
+    default_color="#565f89" # gray
     ;;
   prominent)
-    default_color="#7aa2f7"  # blue
+    default_color="#7aa2f7" # blue
     ;;
   bright)
-    default_color="#ff9e64"  # orange
+    default_color="#ff9e64" # orange
     ;;
   *)
     echo "Invalid color type: $color_type" >&2

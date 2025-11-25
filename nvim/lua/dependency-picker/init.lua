@@ -172,9 +172,11 @@ detect_available_languages = function()
   -- Sort by file count
   local available = {}
   for lang, count in pairs(lang_counts) do
-    table.insert(available, {name = lang, count = count})
+    table.insert(available, { name = lang, count = count })
   end
-  table.sort(available, function(a, b) return a.count > b.count end)
+  table.sort(available, function(a, b)
+    return a.count > b.count
+  end)
 
   -- Return sorted language names
   local result = {}

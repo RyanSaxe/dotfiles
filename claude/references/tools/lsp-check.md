@@ -1,10 +1,12 @@
 # lsp-check - LSP Diagnostics Tool
 
-Automated LSP diagnostic collection using headless Neovim. Opens files, triggers LSP servers, and collects diagnostics with smart settling logic.
+Automated LSP diagnostic collection using headless Neovim. Opens files, triggers
+LSP servers, and collects diagnostics with smart settling logic.
 
 ## Quick Reference
 
-**⚠️ IMPORTANT: Always run lsp-check on targeted files/folders, not entire repositories!**
+**⚠️ IMPORTANT: Always run lsp-check on targeted files/folders, not entire
+repositories!**
 
 **Most common commands:**
 
@@ -25,8 +27,10 @@ lsp-check src/ --source pyright    # Filter by LSP source
 
 **Related:**
 
-- [Diagnostics skill](../../skills/code/diagnostics/SKILL.md) - Workflow integration
-- [Development workflow](../development.md) - How diagnostics fit into your process
+- [Diagnostics skill](../../skills/code/diagnostics/SKILL.md) - Workflow
+  integration
+- [Development workflow](../development.md) - How diagnostics fit into your
+  process
 - Script location: `~/generic/dotfiles/scripts/lsp-check`
 
 ---
@@ -34,16 +38,20 @@ lsp-check src/ --source pyright    # Filter by LSP source
 ## Purpose
 
 - Opens files in headless Neovim to trigger LSP servers
-- Collects diagnostics with smart settling (waits for diagnostic updates to stabilize)
+- Collects diagnostics with smart settling (waits for diagnostic updates to
+  stabilize)
 - Outputs structured JSON + pretty-formatted results
 - Supports filtering by severity and LSP source
-- **Respects .gitignore by default** to avoid checking dependencies and build artifacts
+- **Respects .gitignore by default** to avoid checking dependencies and build
+  artifacts
 
 ## Basic Usage
 
 ### ⚠️ Always Target Specific Files/Folders
 
-**Best practice:** Run lsp-check on the specific files or directories you're working on, not the entire repository. This avoids checking dependencies (node_modules, venv), build artifacts, and other irrelevant files.
+**Best practice:** Run lsp-check on the specific files or directories you're
+working on, not the entire repository. This avoids checking dependencies
+(node_modules, venv), build artifacts, and other irrelevant files.
 
 ```bash
 # Good: Check specific module
@@ -157,7 +165,8 @@ lsp-check src/ --quiet-ms 3000
 **Timing strategy:**
 
 1. **--wait** (default 1s): Minimum settle time before monitoring starts
-2. **--quiet-ms** (default 1000ms): How long with no updates before considering "done"
+2. **--quiet-ms** (default 1000ms): How long with no updates before considering
+   "done"
 3. **--timeout** (default 30s): Hard cap on total time
 
 ### File Limits
@@ -312,13 +321,16 @@ lsp-check . --no-stdout --json-out diagnostics.json
 - **Use --verbose for slow LSPs**: See what's happening during collection
 - **Filter to focus**: Use --min-severity and --source to reduce noise
 - **Check before push**: Run lsp-check on modified files before committing
-- **Set up aliases**: `alias lsp-errors='lsp-check --min-severity ERROR'` (then use: `lsp-errors src/`)
+- **Set up aliases**: `alias lsp-errors='lsp-check --min-severity ERROR'` (then
+  use: `lsp-errors src/`)
 - **CI integration**: Add lsp-check to your CI pipeline with targeted paths
-- **Respects .gitignore**: By default excludes ignored files (use --no-ignore if needed)
+- **Respects .gitignore**: By default excludes ignored files (use --no-ignore if
+  needed)
 
 ## Limitations
 
 - **Requires Neovim**: Uses your Neovim config and LSP setup
 - **Single git root**: Can't check files across multiple repos in one run
-- **LSP must be configured**: Your Neovim must have working LSP for the file types
+- **LSP must be configured**: Your Neovim must have working LSP for the file
+  types
 - **File limit**: Default 200 files (configurable with --max-files)

@@ -8,14 +8,14 @@
 is_claude_pane() {
   local tty="$1"
   # Check for claude process on the specified TTY (headerless output)
-  ps -t "$(basename "$tty")" -o comm= 2>/dev/null | grep -qx 'claude'
+  ps -t "$(basename "$tty")" -o comm= 2> /dev/null | grep -qx 'claude'
 }
 
 # Function to get all Claude panes with details
 # Returns: location|tty|title|bell_flag|pane_id
 get_claude_panes() {
-  tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index}|#{pane_tty}|#{pane_title}|#{window_bell_flag}|#{pane_id}' |
-    while IFS='|' read -r location tty title bell pane_id; do
+  tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index}|#{pane_tty}|#{pane_title}|#{window_bell_flag}|#{pane_id}' \
+    | while IFS='|' read -r location tty title bell pane_id; do
       if is_claude_pane "$tty"; then
         echo "${location}|${tty}|${title}|${bell}|${pane_id}"
       fi
@@ -25,8 +25,8 @@ get_claude_panes() {
 # Function to get all panes with bell notifications
 # Returns: location|tty|title|bell_flag|pane_id (for all panes with bell=1)
 get_bell_panes() {
-  tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index}|#{pane_tty}|#{pane_title}|#{window_bell_flag}|#{pane_id}' |
-    while IFS='|' read -r location tty title bell pane_id; do
+  tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index}|#{pane_tty}|#{pane_title}|#{window_bell_flag}|#{pane_id}' \
+    | while IFS='|' read -r location tty title bell pane_id; do
       if [[ "$bell" == "1" ]]; then
         echo "${location}|${tty}|${title}|${bell}|${pane_id}"
       fi
@@ -98,7 +98,7 @@ switch_to_pane() {
   local pane="${window_pane#*.}"
 
   # Switch to the target
-  if tmux switch-client -t "$session" 2>/dev/null || tmux attach-session -t "$session"; then
+  if tmux switch-client -t "$session" 2> /dev/null || tmux attach-session -t "$session"; then
     tmux select-window -t "$session:$window"
     tmux select-pane -t "$session:$window.$pane"
     return 0
@@ -130,14 +130,14 @@ resolve_pane_id() {
 
   # session:window.pane form
   if [[ "$input" == *:*.* ]]; then
-    tmux display -p -t "$input" '#{pane_id}' 2>/dev/null && return 0
+    tmux display -p -t "$input" '#{pane_id}' 2> /dev/null && return 0
     return 1
   fi
 
   # TTY form
   if [[ "$input" == /dev/* ]]; then
-    tmux list-panes -a -F '#{pane_tty} #{pane_id}' |
-      awk -v tty="$input" '$1==tty {print $2; found=1} END{exit !found}'
+    tmux list-panes -a -F '#{pane_tty} #{pane_id}' \
+      | awk -v tty="$input" '$1==tty {print $2; found=1} END{exit !found}'
     return $?
   fi
 

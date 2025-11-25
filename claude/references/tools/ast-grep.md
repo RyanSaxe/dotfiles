@@ -1,6 +1,8 @@
 # ast-grep (sg) - Structural Code Search
 
-`sg` (ast-grep) is a tool for structural code search using Abstract Syntax Tree patterns. Unlike text-based search (ripgrep), it understands code structure and syntax.
+`sg` (ast-grep) is a tool for structural code search using Abstract Syntax Tree
+patterns. Unlike text-based search (ripgrep), it understands code structure and
+syntax.
 
 ## Quick Reference
 
@@ -15,7 +17,8 @@ sg -p 'export const $NAME = $$$'           # Find all exports (JS)
 
 **Related:**
 
-- [Package search skill](../../skills/code/package-search/SKILL.md) - Using sg for package exploration
+- [Package search skill](../../skills/code/package-search/SKILL.md) - Using sg
+  for package exploration
 - [Official ast-grep docs](https://ast-grep.github.io/)
 
 ---

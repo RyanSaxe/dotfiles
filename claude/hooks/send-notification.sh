@@ -25,12 +25,12 @@ if [ ! -t 0 ]; then
   json_input=$(cat)
 
   # Parse the JSON using jq if available
-  if command -v jq >/dev/null 2>&1; then
+  if command -v jq > /dev/null 2>&1; then
     # Extract fields that Claude Code actually provides
-    hook_event=$(echo "$json_input" | jq -r '.hook_event_name // empty' 2>/dev/null)
-    message_field=$(echo "$json_input" | jq -r '.message // empty' 2>/dev/null)
-    session_id=$(echo "$json_input" | jq -r '.session_id // empty' 2>/dev/null)
-    cwd=$(echo "$json_input" | jq -r '.cwd // empty' 2>/dev/null)
+    hook_event=$(echo "$json_input" | jq -r '.hook_event_name // empty' 2> /dev/null)
+    message_field=$(echo "$json_input" | jq -r '.message // empty' 2> /dev/null)
+    session_id=$(echo "$json_input" | jq -r '.session_id // empty' 2> /dev/null)
+    cwd=$(echo "$json_input" | jq -r '.cwd // empty' 2> /dev/null)
 
     # Customize message based on hook event type
     case "$hook_event" in
@@ -67,7 +67,7 @@ if [ ! -t 0 ]; then
 
       "PreToolUse")
         # Extract tool name if available
-        tool_name=$(echo "$json_input" | jq -r '.tool_name // empty' 2>/dev/null)
+        tool_name=$(echo "$json_input" | jq -r '.tool_name // empty' 2> /dev/null)
         if [[ -n "$tool_name" ]]; then
           TITLE="Claude Code: Using Tool"
           MESSAGE="Using tool: $tool_name"
@@ -81,7 +81,7 @@ if [ ! -t 0 ]; then
 
       "PostToolUse")
         # Extract tool name if available
-        tool_name=$(echo "$json_input" | jq -r '.tool_name // empty' 2>/dev/null)
+        tool_name=$(echo "$json_input" | jq -r '.tool_name // empty' 2> /dev/null)
         if [[ -n "$tool_name" ]]; then
           TITLE="Claude Code: Tool Complete"
           MESSAGE="Completed tool: $tool_name"
@@ -135,7 +135,7 @@ elif [[ -n "$1" ]]; then
 fi
 
 # Send notification via ntfy.sh
-if command -v curl >/dev/null 2>&1; then
+if command -v curl > /dev/null 2>&1; then
   # Send the notification with all the customized fields
   response=$(curl -s \
     -H "Title: ${TITLE}" \
@@ -159,8 +159,8 @@ fi
 if [[ -n "$NVIM" ]]; then
   # Inside Neovim terminal - use nvim RPC to execute code in parent Neovim that writes bell
   # This writes the bell to the parent terminal (outside Neovim)
-  nvim --server "$NVIM" --remote-expr 'execute("lua io.stderr:write(\"\\007\")")' 2>/dev/null || true
+  nvim --server "$NVIM" --remote-expr 'execute("lua io.stderr:write(\"\\007\")")' 2> /dev/null || true
 else
   # Normal terminal - use tput to /dev/tty
-  tput bel > /dev/tty 2>/dev/null || printf '\007'
+  tput bel > /dev/tty 2> /dev/null || printf '\007'
 fi

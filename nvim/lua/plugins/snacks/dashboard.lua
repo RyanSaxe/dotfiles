@@ -21,4 +21,3 @@ return {
     require("custom.snacks.gh").register()
   end,
 }
-

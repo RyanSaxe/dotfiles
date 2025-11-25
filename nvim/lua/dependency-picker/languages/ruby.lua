@@ -5,7 +5,7 @@ local M = {}
 M.name = "Ruby"
 M.filetypes = { "ruby" }
 M.requires_buffer_path = true
-M.file_extensions = { "rb", "rake", "gemspec" }  -- Ruby source, Rakefile, gem specifications
+M.file_extensions = { "rb", "rake", "gemspec" } -- Ruby source, Rakefile, gem specifications
 
 ---@return string|nil GEM_HOME path
 local function get_gem_home()

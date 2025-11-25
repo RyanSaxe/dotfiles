@@ -15,22 +15,22 @@ LOCK_DIR="$HOME/.cache/tmux-bell-cache-updater.lock"
 PID_FILE="$LOCK_DIR/pid"
 
 # Create cache directory if it doesn't exist
-mkdir -p "$(dirname "$LOCK_DIR")" 2>/dev/null || true
+mkdir -p "$(dirname "$LOCK_DIR")" 2> /dev/null || true
 
 # Try to acquire lock atomically using mkdir
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+if ! mkdir "$LOCK_DIR" 2> /dev/null; then
   # Lock exists - check if the process is still alive
   if [ -f "$PID_FILE" ]; then
-    existing_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
-    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+    existing_pid=$(cat "$PID_FILE" 2> /dev/null || echo "")
+    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2> /dev/null; then
       # Process is alive, exit silently to prevent duplicates
       exit 0
     fi
   fi
 
   # Lock is stale (process died), remove it and try again
-  rm -rf "$LOCK_DIR" 2>/dev/null || true
-  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  rm -rf "$LOCK_DIR" 2> /dev/null || true
+  if ! mkdir "$LOCK_DIR" 2> /dev/null; then
     # Still couldn't acquire lock (race condition), exit
     exit 0
   fi
@@ -41,14 +41,14 @@ echo "$$" > "$PID_FILE"
 
 # Cleanup function to remove lock
 cleanup() {
-  rm -rf "$LOCK_DIR" 2>/dev/null || true
+  rm -rf "$LOCK_DIR" 2> /dev/null || true
 }
 trap cleanup EXIT INT TERM
 
 # Function to get current bell count
 # Counts panes with window_bell_flag=1 across all sessions
 get_bell_count() {
-  tmux list-panes -a -F '#{window_bell_flag}' 2>/dev/null | { grep -c '^1$' || true; }
+  tmux list-panes -a -F '#{window_bell_flag}' 2> /dev/null | { grep -c '^1$' || true; }
 }
 
 # Initialize with current bell count
@@ -66,7 +66,7 @@ while :; do
     last_bell_count="$current_bell_count"
 
     # Trigger a smooth status refresh only when bell count changes
-    tmux refresh-client -S >/dev/null 2>&1 || true
+    tmux refresh-client -S > /dev/null 2>&1 || true
   fi
 
   # Poll every 1 second (balance between responsiveness and CPU usage)

@@ -1,5 +1,7 @@
 ---
-description: Python standards and best practices that are not specified in the general style guide.
+description:
+  Python standards and best practices that are not specified in the general
+  style guide.
 ---
 
 # Task
@@ -8,11 +10,15 @@ Write Python code following modern practices with proper type hints and tooling.
 
 ## Core Principles
 
-- **Environment Management**: Use `uv` for dependencies and virtual environments (unless project uses `poetry`)
-- **Type Hints**: Use type hints for function signatures and complex data structures
-- **Modern Python**: Use native types (`list`, `dict`) over `typing.List` (Python 3.9+)
+- **Environment Management**: Use `uv` for dependencies and virtual environments
+  (unless project uses `poetry`)
+- **Type Hints**: Use type hints for function signatures and complex data
+  structures
+- **Modern Python**: Use native types (`list`, `dict`) over `typing.List`
+  (Python 3.9+)
 - **Code Style**: Follow PEP 8, prefer comprehensions when readable
-- **Minimal docstrings**: Only write docstrings when truly necessary (see criteria below)
+- **Minimal docstrings**: Only write docstrings when truly necessary (see
+  criteria below)
 
 ## Project Setup
 
@@ -81,10 +87,13 @@ def apply(func: Callable[[int], int], value: int) -> int:
 
 <IMPORTANT>Only write docstrings if one of these is true:</IMPORTANT>
 
-1. **Function name/signature insufficient**: The name and signature can't convey enough detail
+1. **Function name/signature insufficient**: The name and signature can't convey
+   enough detail
    - First check if improving the name/signature would help
-2. **Public API**: Class, function, or module used by others needs comprehensive documentation
-3. **Critical/unintuitive behavior**: Something non-obvious that needs explanation
+2. **Public API**: Class, function, or module used by others needs comprehensive
+   documentation
+3. **Critical/unintuitive behavior**: Something non-obvious that needs
+   explanation
 
 **Examples where docstrings are NOT needed:**
 

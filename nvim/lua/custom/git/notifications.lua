@@ -30,11 +30,11 @@ end
 
 -- Helper: Extract PR/Issue/Release number from API URL
 local function extract_number_from_url(api_url)
-  if not api_url then return nil end
+  if not api_url then
+    return nil
+  end
   -- Try to extract number from various GitHub API URL patterns
-  return api_url:match("/pulls/(%d+)$") or
-         api_url:match("/issues/(%d+)$") or
-         api_url:match("/releases/(%d+)$")
+  return api_url:match("/pulls/(%d+)$") or api_url:match("/issues/(%d+)$") or api_url:match("/releases/(%d+)$")
 end
 
 -- Helper: Check if notification has new activity since last read
@@ -56,9 +56,7 @@ end
 
 -- Helper: Check if notification has new activity AND comments
 local function has_new_discussion(item)
-  return has_new_activity(item) and
-         item.latest_comment_url and
-         item.latest_comment_url ~= ""
+  return has_new_activity(item) and item.latest_comment_url and item.latest_comment_url ~= ""
 end
 
 -- Fetch notifications from GitHub using the gh CLI with full data
@@ -306,7 +304,9 @@ local function generate_preview(ctx)
           return "Array[" .. #val .. "]"
         else
           local count = 0
-          for _ in pairs(val) do count = count + 1 end
+          for _ in pairs(val) do
+            count = count + 1
+          end
           return "Object{" .. count .. "}"
         end
       else
@@ -346,7 +346,9 @@ local function generate_preview(ctx)
     -- Add repository info
     if item._raw.repository then
       lines[#lines + 1] = "| **Repository Name** | " .. safe_tostring(item._raw.repository.name) .. " |"
-      lines[#lines + 1] = "| **Repository Owner** | " .. safe_tostring(item._raw.repository.owner and item._raw.repository.owner.login) .. " |"
+      lines[#lines + 1] = "| **Repository Owner** | "
+        .. safe_tostring(item._raw.repository.owner and item._raw.repository.owner.login)
+        .. " |"
     end
   end
 
@@ -360,7 +362,9 @@ end
 -- @param callback Optional callback to run after marking as read
 local function mark_as_read(item, callback)
   if not item or not item.id then
-    if callback then callback() end
+    if callback then
+      callback()
+    end
     return
   end
 
@@ -381,7 +385,9 @@ local function mark_as_read(item, callback)
         item.unread = false
       end
       -- Run callback whether success or failure
-      if callback then callback() end
+      if callback then
+        callback()
+      end
     end)
   end)
 end
@@ -397,7 +403,9 @@ M.picker = function()
     keys = {
       ["<S-CR>"] = function(picker)
         local item = picker:current()
-        if not item then return end
+        if not item then
+          return
+        end
 
         -- Mark as read first (async)
         mark_as_read(item, function()
@@ -474,7 +482,9 @@ M.picker = function()
       end,
       open_in_browser = function(picker, item)
         -- Open notification in browser, marking it as read
-        if not item then return end
+        if not item then
+          return
+        end
 
         -- First mark as read since user wants this behavior (async)
         mark_as_read(item, function()
@@ -530,11 +540,9 @@ M.picker = function()
         if item.type == "PullRequest" and number then
           -- Open native PR viewer in Neovim
           Snacks.picker.gh_pr({ search = "#" .. number })
-
         elseif item.type == "Issue" and number then
           -- Open native Issue viewer in Neovim
           Snacks.picker.gh_issue({ search = "#" .. number })
-
         else
           -- For other types (Release, Commit, Discussion), open in browser
           -- TODO: Implement native viewers for:

@@ -1,15 +1,18 @@
 # Bat Configuration
 
-Bat is a `cat` clone with syntax highlighting and Git integration, configured here with the TokyoNight Night theme for consistent styling.
+Bat is a `cat` clone with syntax highlighting and Git integration, configured
+here with the TokyoNight Night theme for consistent styling.
 
 ## Configuration
 
 The `config` file contains:
+
 ```
 --theme="tokyonight_night"
 ```
 
-This ensures all syntax highlighting uses the TokyoNight Night color scheme, matching Neovim, Tmux, Ghostty, and other tools in this repository.
+This ensures all syntax highlighting uses the TokyoNight Night color scheme,
+matching Neovim, Tmux, Ghostty, and other tools in this repository.
 
 ## Usage
 
@@ -32,6 +35,7 @@ bat -r 10:20 file.js
 ## Customization
 
 Edit `config` to change the theme or add other options. For available themes:
+
 ```bash
 bat --list-themes
 ```

@@ -27,10 +27,7 @@ local function get_note_directories()
   local exclude_dirs = { "daily", "templates", "assets", ".obsidian", ".git" }
 
   -- Get all directories using fd (faster than find)
-  local cmd = string.format(
-    "fd --type d --max-depth 1 --base-directory %s",
-    vim.fn.shellescape(vault_path)
-  )
+  local cmd = string.format("fd --type d --max-depth 1 --base-directory %s", vim.fn.shellescape(vault_path))
 
   local dirs = vim.fn.systemlist(cmd)
 
@@ -63,12 +60,14 @@ local function create_note_in_dir(title, dir_path, dir_name)
   if template_name then
     -- Create note with template using ObsidianNewFromTemplate
     -- This ensures the template is properly applied
-    vim.cmd(string.format(
-      "ObsidianNewFromTemplate %s %s/%s",
-      template_name,
-      dir_path,
-      title:gsub(" ", "-"):gsub("[^A-Za-z0-9-]", ""):lower() .. ".md"
-    ))
+    vim.cmd(
+      string.format(
+        "ObsidianNewFromTemplate %s %s/%s",
+        template_name,
+        dir_path,
+        title:gsub(" ", "-"):gsub("[^A-Za-z0-9-]", ""):lower() .. ".md"
+      )
+    )
   else
     -- Create note without template (default behavior)
     local Note = require("obsidian.note")

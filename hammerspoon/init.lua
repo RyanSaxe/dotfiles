@@ -112,8 +112,7 @@ function openAppOrWeb(appName, appPath, webUrl)
 	end
 end
 
-
 -- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
-hs.notify.new({title="Hammerspoon", informativeText="Config loaded"}):send()
+hs.notify.new({ title = "Hammerspoon", informativeText = "Config loaded" }):send()
