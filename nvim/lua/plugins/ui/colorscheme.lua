@@ -280,6 +280,44 @@ return {
       hl["BufferLineNumbersSelected"] = { fg = pokemon_prominent, bg = c.bg }
       hl["BufferLineNumbersVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg_dark } -- slightly dimmed white
       hl["BufferLineNumbers"] = { fg = c.dark3, bg = c.bg_dark }
+
+      -- Diagnostic indicators - ensure backgrounds match tab state
+      -- Error diagnostics (red themed)
+      hl["BufferLineError"] = { fg = Util.blend_bg(c.red, 0.3), bg = c.bg_dark }
+      hl["BufferLineErrorVisible"] = { fg = Util.blend_bg(c.red, 0.6), bg = c.bg_dark }
+      hl["BufferLineErrorSelected"] = { fg = c.red, bg = c.bg }
+      hl["BufferLineErrorDiagnostic"] = { fg = Util.blend_bg(c.red, 0.3), bg = c.bg_dark }
+      hl["BufferLineErrorDiagnosticVisible"] = { fg = Util.blend_bg(c.red, 0.6), bg = c.bg_dark }
+      hl["BufferLineErrorDiagnosticSelected"] = { fg = c.red, bg = c.bg }
+
+      -- Warning diagnostics (yellow themed)
+      hl["BufferLineWarning"] = { fg = Util.blend_bg(c.yellow, 0.3), bg = c.bg_dark }
+      hl["BufferLineWarningVisible"] = { fg = Util.blend_bg(c.yellow, 0.6), bg = c.bg_dark }
+      hl["BufferLineWarningSelected"] = { fg = c.yellow, bg = c.bg }
+      hl["BufferLineWarningDiagnostic"] = { fg = Util.blend_bg(c.yellow, 0.3), bg = c.bg_dark }
+      hl["BufferLineWarningDiagnosticVisible"] = { fg = Util.blend_bg(c.yellow, 0.6), bg = c.bg_dark }
+      hl["BufferLineWarningDiagnosticSelected"] = { fg = c.yellow, bg = c.bg }
+
+      -- Info diagnostics (cyan themed)
+      hl["BufferLineInfo"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
+      hl["BufferLineInfoVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
+      hl["BufferLineInfoSelected"] = { fg = c.cyan, bg = c.bg }
+      hl["BufferLineInfoDiagnostic"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
+      hl["BufferLineInfoDiagnosticVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
+      hl["BufferLineInfoDiagnosticSelected"] = { fg = c.cyan, bg = c.bg }
+
+      -- Hint diagnostics (teal themed)
+      hl["BufferLineHint"] = { fg = Util.blend_bg(c.teal, 0.3), bg = c.bg_dark }
+      hl["BufferLineHintVisible"] = { fg = Util.blend_bg(c.teal, 0.6), bg = c.bg_dark }
+      hl["BufferLineHintSelected"] = { fg = c.teal, bg = c.bg }
+      hl["BufferLineHintDiagnostic"] = { fg = Util.blend_bg(c.teal, 0.3), bg = c.bg_dark }
+      hl["BufferLineHintDiagnosticVisible"] = { fg = Util.blend_bg(c.teal, 0.6), bg = c.bg_dark }
+      hl["BufferLineHintDiagnosticSelected"] = { fg = c.teal, bg = c.bg }
+
+      -- Generic diagnostic (fallback)
+      hl["BufferLineDiagnostic"] = { fg = c.dark3, bg = c.bg_dark }
+      hl["BufferLineDiagnosticVisible"] = { fg = Util.blend_bg(c.fg, 0.6), bg = c.bg_dark }
+      hl["BufferLineDiagnosticSelected"] = { fg = c.fg, bg = c.bg }
     end,
   },
 }
