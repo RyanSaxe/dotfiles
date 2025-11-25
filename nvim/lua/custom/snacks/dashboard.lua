@@ -870,8 +870,20 @@ function M.create_sections(dashboard)
   -- This prevents the dashboard from jumping when switching buffers in tmux
   -- Outside tmux, we don't need this workaround as there's no tmux status bar
   if vim.env.TMUX then
+    local original_tabline = vim.o.tabline
     vim.o.tabline = " "
     vim.o.showtabline = 2
+
+    -- Restore tabline when leaving dashboard
+    vim.api.nvim_create_autocmd("BufLeave", {
+      pattern = "*",
+      once = true,
+      callback = function()
+        if vim.bo.filetype == "snacks_dashboard" then
+          vim.o.tabline = original_tabline
+        end
+      end,
+    })
   end
   -- Always set initial dynamic pane width for responsive layout
   -- This will be recalculated after height calculation for perfect centering
