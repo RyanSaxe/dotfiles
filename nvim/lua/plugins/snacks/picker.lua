@@ -3,6 +3,10 @@
 
 return {
   "folke/snacks.nvim",
+  dependencies = {
+    -- todo_comments is required for snacks todo_comments picker
+    "folke/todo-comments.nvim",
+  },
   opts = {
     picker = {
       layout = {
