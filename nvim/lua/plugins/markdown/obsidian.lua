@@ -149,13 +149,13 @@ return {
     },
 
     -- Date insertion
+    -- Works in any file type to support TODO.local files (not just markdown)
     {
       "<leader>oi",
       function()
         require("custom.obsidian.insert-due").insert_due_date()
       end,
       desc = "Insert due date",
-      ft = "markdown",
     },
 
     -- Utility

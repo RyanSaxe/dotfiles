@@ -13,7 +13,6 @@ local TASK_PATTERN = "^%s*%-%s*%[%s%]%s*(.+)" -- Match - [ ] task text
 ---@return string|nil vault_path Path to vault, or nil if Obsidian not initialized
 local function get_vault_path()
   if not Obsidian or not Obsidian.dir then
-    vim.notify("Obsidian not initialized. Open a markdown file in your vault first.", vim.log.levels.WARN)
     return nil
   end
   return tostring(Obsidian.dir)
@@ -281,13 +280,53 @@ local function create_picker_config(items)
   return {
     title = "Obsidian Tasks",
     items = items,
+    -- Custom preview: handle separators specially, delegate to file preview for tasks
+    preview = function(ctx)
+      if ctx.item.is_separator then
+        -- Show simple text for separator items
+        ctx.preview:reset()
+        ctx.preview:set_lines({ "", "  Section: " .. (ctx.item.text or ""), "" })
+        return
+      end
+      -- Delegate to default file previewer for task items
+      Snacks.picker.preview.file(ctx)
+    end,
     format = function(item)
+      -- Handle separator items (non-selectable headers)
+      if item.is_separator then
+        return { { item.text or "", "Comment" } }
+      end
+
+      -- Handle placeholder items (dimmed, indicates action to create TODO)
+      if item.is_placeholder then
+        return { { item.text or "", "Comment" } }
+      end
+
+      -- Handle regular task items
       if item.task then
         return format_task(item.task, nil)
       end
+
+      -- Fallback for any other items
       return { { item.text or "", "Normal" } }
     end,
     confirm = function(picker, item)
+      -- Separators are not actionable
+      if item and item.is_separator then
+        return
+      end
+
+      -- Placeholder opens the TODO file for editing (creates it if needed)
+      if item and item.is_placeholder then
+        picker:close()
+        local ok, todos = pcall(require, "custom.todos")
+        if ok then
+          todos.open_todo()
+        end
+        return
+      end
+
+      -- Regular task items: navigate to file and line
       if item and item.file and item.pos then
         picker:close()
         vim.cmd("edit " .. vim.fn.fnameescape(item.file))
@@ -336,37 +375,106 @@ local function create_picker_config(items)
   }
 end
 
----Open task picker
-function M.open_picker()
-  local tasks = M.scan_tasks()
+---Convert a task to a picker item with proper display format
+---@param task table Task data from scan_tasks or scan_project_todos
+---@return table item Picker item with text, file, pos, task fields
+local function task_to_picker_item(task)
+  local icon = get_category_icon(task.category)
+  local due_text = task.due_date and (task.due_date .. " ") or "           "
+  local task_text = task.text
+  if #task_text > 50 then
+    task_text = task_text:sub(1, 47) .. "..."
+  end
+  local display = icon .. due_text .. task_text .. " (" .. task.rel_path .. ":" .. task.line .. ")"
 
-  if #tasks == 0 then
-    vim.notify("No incomplete tasks found", vim.log.levels.INFO)
+  return {
+    text = display,
+    file = task.file,
+    pos = { task.line, 0 },
+    task = task, -- Store full task data for actions
+  }
+end
+
+---Create a separator item for the picker
+---@param label string Label to display in separator
+---@return table item Separator picker item
+local function create_separator_item(label)
+  return {
+    text = "── " .. label .. " ──",
+    is_separator = true,
+  }
+end
+
+---Create a placeholder item for starting a new project TODO list
+---@param todo_path string Path to the TODO file
+---@return table item Placeholder picker item
+local function create_placeholder_item(todo_path)
+  return {
+    text = "○ Start project TODO list...",
+    file = todo_path,
+    pos = { 1, 0 },
+    is_placeholder = true,
+  }
+end
+
+---Open task picker
+---Shows project TODOs first (if any), then Obsidian tasks with separator
+function M.open_picker()
+  -- Scan both sources
+  local obsidian_tasks = M.scan_tasks()
+
+  -- Always scan project TODOs
+  local todos_module = nil
+  local project_tasks = {}
+  local ok, todos = pcall(require, "custom.todos")
+  if ok then
+    todos_module = todos
+    project_tasks = todos.scan_project_todos()
+  end
+
+  -- Check if we have any tasks at all
+  local has_project_tasks = #project_tasks > 0
+  local has_obsidian_tasks = #obsidian_tasks > 0
+
+  -- No tasks at all - offer to create project TODOs
+  if not has_project_tasks and not has_obsidian_tasks then
+    local todo_path = todos_module and todos_module.get_todo_file_path()
+    if todo_path then
+      todos_module.open_todo()
+      return
+    end
+    vim.notify("No tasks found", vim.log.levels.INFO)
     return
   end
 
-  -- Convert tasks to picker items with proper format
+  -- Build the items list: project tasks first (no header), then Obsidian with separator
   local items = {}
-  for _, task in ipairs(tasks) do
-    -- Build display text
-    local icon = get_category_icon(task.category)
-    local due_text = task.due_date and (task.due_date .. " ") or "           "
-    local task_text = task.text
-    if #task_text > 50 then
-      task_text = task_text:sub(1, 47) .. "..."
-    end
-    local display = icon .. due_text .. task_text .. " (" .. task.rel_path .. ":" .. task.line .. ")"
 
-    table.insert(items, {
-      text = display,
-      file = task.file,
-      pos = { task.line, 0 },
-      task = task, -- Store full task data for actions
-    })
+  -- Project tasks first (no separator header)
+  if has_project_tasks then
+    for _, task in ipairs(project_tasks) do
+      table.insert(items, task_to_picker_item(task))
+    end
+  else
+    -- No project tasks - add placeholder to create them
+    local todo_path = todos_module and todos_module.get_todo_file_path()
+    if todo_path then
+      table.insert(items, create_placeholder_item(todo_path))
+    end
   end
 
-  -- Open picker with custom configuration
-  Snacks.picker(create_picker_config(items))
+  -- Add Obsidian section with separator (only if there are Obsidian tasks)
+  if has_obsidian_tasks then
+    table.insert(items, create_separator_item("Obsidian Tasks"))
+    for _, task in ipairs(obsidian_tasks) do
+      table.insert(items, task_to_picker_item(task))
+    end
+  end
+
+  -- Open picker with unified title
+  local config = create_picker_config(items)
+  config.title = "All Tasks"
+  Snacks.picker(config)
 end
 
 return M

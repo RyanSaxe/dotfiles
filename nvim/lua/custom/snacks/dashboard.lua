@@ -319,6 +319,23 @@ local function calculate_pane_heights(sections)
   return heights[1], heights[2]
 end
 
+---Get the description for "Open TODO List" with optional urgency indicator
+---Shows 🔴 prefix when there are tasks due today or overdue
+---@return string desc Description with or without urgency indicator
+local function get_todo_desc()
+  -- Check if there are urgent tasks (due today or overdue)
+  -- Uses pcall since this runs at dashboard creation time and todos module
+  -- might not be fully loaded yet
+  local ok, has_urgent = pcall(function()
+    return todos.has_urgent_todos()
+  end)
+
+  if ok and has_urgent then
+    return "🔴 Open TODO List"
+  end
+  return "Open TODO List"
+end
+
 -- Create search keys section for project operations
 -- Returns sections and total height
 ---@return table sections Array of section configs
@@ -345,10 +362,11 @@ local function search_keys()
       end,
     },
     {
-      desc = "Open TODO List",
+      -- Dynamic description shows 🔴 when urgent items exist
+      desc = get_todo_desc(),
       key = "t",
       action = function()
-        todos.open_todo()
+        require("custom.obsidian.tasks").open_picker()
       end,
     },
   }
