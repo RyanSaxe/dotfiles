@@ -31,10 +31,10 @@ return {
       layouts = {
         custom_vertical = {
           layout = {
+            backdrop = false,
             box = "vertical",
-            width = 0.8,
-            min_width = 120,
-            height = 0.8,
+            width = 0,
+            height = 0,
             border = true,
             title = "{title} {live} {flags}",
             { win = "preview", border = "bottom" },
@@ -44,10 +44,10 @@ return {
         },
         custom_horizontal = {
           layout = {
+            backdrop = false,
             box = "horizontal",
-            width = 0.8,
-            min_width = 120,
-            height = 0.8,
+            width = 0,
+            height = 0,
             {
               box = "vertical",
               border = true,
