@@ -172,7 +172,7 @@ function M.scan_tasks()
         -- Categorize and get sort priority
         local category, sort_priority = categorize_task(rel_path, due_date, today, today_file)
 
-        -- Add task to list
+        -- Add task to list with source = "notes" for unified picker
         table.insert(tasks, {
           file = file, -- Absolute path for opening
           rel_path = rel_path, -- Relative path for display
@@ -182,6 +182,7 @@ function M.scan_tasks()
           due_date = due_date,
           category = category,
           sort_priority = sort_priority,
+          source = "notes", -- Source identifier for unified picker badge [N]
         })
       end
     end
@@ -247,27 +248,39 @@ local function toggle_task(item)
   vim.notify("Task toggled", vim.log.levels.INFO)
 end
 
----Format task item for picker display
----@param item table Task item
----@param picker table Snacks picker instance
+---Format task item for picker display with source badges
+---Shows: [icon] [date] [source badge] task text (file:line)
+---@param item table Task item with source field
 ---@return table highlights Array of {text, hl_group} pairs
-local function format_task(item, picker)
+local function format_task(item)
   local ret = {}
 
-  -- Category icon with color
+  -- Category icon with color (urgency indicator)
   local icon = get_category_icon(item.category)
   local hl = get_category_highlight(item.category)
   ret[#ret + 1] = { icon, hl }
 
-  -- Task text (truncate if too long)
-  local max_text_len = 50
-  local text = item.text
-  if #text > max_text_len then
-    text = text:sub(1, max_text_len - 3) .. "..."
-  end
-  ret[#ret + 1] = { text .. " ", "Normal" }
+  -- Due date (padded for alignment, 10 chars for YYYY-MM-DD or spaces)
+  local due_text = item.due_date or "          "
+  ret[#ret + 1] = { due_text .. " ", "Comment" }
 
-  -- File path (dimmed)
+  -- Source badge with color: [L]=cyan, [G]=purple, [N]=teal
+  -- Use bracket syntax for "local" since it's a Lua reserved keyword
+  local badge_hl = {
+    ["local"] = "DiagnosticInfo", -- Cyan for local TODO.local tasks
+    ["global"] = "Statement", -- Purple for project-wide markdown tasks
+    ["notes"] = "DiagnosticHint", -- Teal for Obsidian vault tasks
+  }
+  local source = item.source or "notes" -- Default to notes for backwards compatibility
+  local badge = "[" .. source:sub(1, 1):upper() .. "] "
+  ret[#ret + 1] = { badge, badge_hl[source] or "Comment" }
+
+  -- Task text - let the picker handle truncation, show full text
+  ret[#ret + 1] = { item.text .. " ", "Normal" }
+
+  -- File path (dimmed) - show full relative path for project files, shorter for notes
+  -- Project files (local/global) need full path since there may be multiple README.md files
+  -- Notes files can use shorter paths since they're in a separate vault context
   ret[#ret + 1] = { "(" .. item.rel_path .. ":" .. item.line .. ")", "Comment" }
 
   return ret
@@ -280,23 +293,9 @@ local function create_picker_config(items)
   return {
     title = "Obsidian Tasks",
     items = items,
-    -- Custom preview: handle separators specially, delegate to file preview for tasks
-    preview = function(ctx)
-      if ctx.item.is_separator then
-        -- Show simple text for separator items
-        ctx.preview:reset()
-        ctx.preview:set_lines({ "", "  Section: " .. (ctx.item.text or ""), "" })
-        return
-      end
-      -- Delegate to default file previewer for task items
-      Snacks.picker.preview.file(ctx)
-    end,
+    -- Use default file previewer for task items
+    preview = Snacks.picker.preview.file,
     format = function(item)
-      -- Handle separator items (non-selectable headers)
-      if item.is_separator then
-        return { { item.text or "", "Comment" } }
-      end
-
       -- Handle placeholder items (dimmed, indicates action to create TODO)
       if item.is_placeholder then
         return { { item.text or "", "Comment" } }
@@ -304,18 +303,13 @@ local function create_picker_config(items)
 
       -- Handle regular task items
       if item.task then
-        return format_task(item.task, nil)
+        return format_task(item.task)
       end
 
       -- Fallback for any other items
       return { { item.text or "", "Normal" } }
     end,
     confirm = function(picker, item)
-      -- Separators are not actionable
-      if item and item.is_separator then
-        return
-      end
-
       -- Placeholder opens the TODO file for editing (creates it if needed)
       if item and item.is_placeholder then
         picker:close()
@@ -376,33 +370,21 @@ local function create_picker_config(items)
   }
 end
 
----Convert a task to a picker item with proper display format
----@param task table Task data from scan_tasks or scan_project_todos
+---Convert a task to a picker item
+---The text field is used for filtering/searching, format_task handles display
+---@param task table Task data from any scan function
 ---@return table item Picker item with text, file, pos, task fields
 local function task_to_picker_item(task)
-  local icon = get_category_icon(task.category)
-  local due_text = task.due_date and (task.due_date .. " ") or "           "
-  local task_text = task.text
-  if #task_text > 50 then
-    task_text = task_text:sub(1, 47) .. "..."
-  end
-  local display = icon .. due_text .. task_text .. " (" .. task.rel_path .. ":" .. task.line .. ")"
+  -- Build searchable text (used for filtering) - include full task text and path
+  local source_badge = task.source and ("[" .. task.source:sub(1, 1):upper() .. "]") or ""
+  local due_text = task.due_date or ""
+  local display = source_badge .. " " .. due_text .. " " .. task.text .. " " .. task.rel_path
 
   return {
-    text = display,
+    text = display, -- Used for filtering/searching
     file = task.file,
     pos = { task.line, 0 },
-    task = task, -- Store full task data for actions
-  }
-end
-
----Create a separator item for the picker
----@param label string Label to display in separator
----@return table item Separator picker item
-local function create_separator_item(label)
-  return {
-    text = "── " .. label .. " ──",
-    is_separator = true,
+    task = task, -- Store full task data for format_task and actions
   }
 end
 
@@ -418,27 +400,40 @@ local function create_placeholder_item(todo_path)
   }
 end
 
----Open task picker
----Shows project TODOs first (if any), then Obsidian tasks with separator
+---Open unified task picker
+---Merges tasks from three sources: Local (TODO.local), Global (project *.md), Notes (Obsidian)
+---All tasks are sorted by urgency (overdue → today → week → later → no date)
+---Source badges [L], [G], [N] indicate where each task comes from
 function M.open_picker()
-  -- Scan both sources
-  local obsidian_tasks = M.scan_tasks()
-
-  -- Always scan project TODOs
+  -- Load the todos module for local and global scanning
   local todos_module = nil
-  local project_tasks = {}
   local ok, todos = pcall(require, "custom.todos")
   if ok then
     todos_module = todos
-    project_tasks = todos.scan_project_todos()
   end
 
-  -- Check if we have any tasks at all
-  local has_project_tasks = #project_tasks > 0
-  local has_obsidian_tasks = #obsidian_tasks > 0
+  -- Collect tasks from all three sources
+  -- Each task already has a .source field ("local", "global", or "notes")
+  local all_tasks = {}
+
+  -- 1. Local TODOs from TODO.local/[branch]/*.md
+  if todos_module then
+    local local_tasks = todos_module.scan_project_todos()
+    vim.list_extend(all_tasks, local_tasks)
+  end
+
+  -- 2. Global TODOs from project-wide *.md files (excluding TODO.local)
+  if todos_module then
+    local global_tasks = todos_module.scan_global_markdown_todos()
+    vim.list_extend(all_tasks, global_tasks)
+  end
+
+  -- 3. Notes TODOs from Obsidian vault
+  local notes_tasks = M.scan_tasks()
+  vim.list_extend(all_tasks, notes_tasks)
 
   -- No tasks at all - offer to create project TODOs
-  if not has_project_tasks and not has_obsidian_tasks then
+  if #all_tasks == 0 then
     local todo_path = todos_module and todos_module.get_todo_file_path()
     if todo_path then
       todos_module.open_todo()
@@ -448,28 +443,29 @@ function M.open_picker()
     return
   end
 
-  -- Build the items list: project tasks first (no header), then Obsidian with separator
+  -- Sort all tasks uniformly by urgency, then due date, then file
+  -- This ensures urgent tasks from ANY source appear at the top
+  table.sort(all_tasks, function(a, b)
+    -- Primary sort: urgency (sort_priority: 1=today, 2=overdue, 3=week, 4=later)
+    if a.sort_priority ~= b.sort_priority then
+      return a.sort_priority < b.sort_priority
+    end
+    -- Secondary sort: due date (earlier dates first)
+    if a.due_date and b.due_date then
+      return a.due_date < b.due_date
+    elseif a.due_date then
+      return true -- Tasks with dates before tasks without
+    elseif b.due_date then
+      return false
+    end
+    -- Tertiary sort: file path for stable ordering
+    return a.rel_path < b.rel_path
+  end)
+
+  -- Convert tasks to picker items (no separators - unified list)
   local items = {}
-
-  -- Project tasks first (no separator header)
-  if has_project_tasks then
-    for _, task in ipairs(project_tasks) do
-      table.insert(items, task_to_picker_item(task))
-    end
-  else
-    -- No project tasks - add placeholder to create them
-    local todo_path = todos_module and todos_module.get_todo_file_path()
-    if todo_path then
-      table.insert(items, create_placeholder_item(todo_path))
-    end
-  end
-
-  -- Add Obsidian section with separator (only if there are Obsidian tasks)
-  if has_obsidian_tasks then
-    table.insert(items, create_separator_item("Obsidian Tasks"))
-    for _, task in ipairs(obsidian_tasks) do
-      table.insert(items, task_to_picker_item(task))
-    end
+  for _, task in ipairs(all_tasks) do
+    table.insert(items, task_to_picker_item(task))
   end
 
   -- Open picker with unified title

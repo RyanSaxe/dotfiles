@@ -11,6 +11,16 @@ local git_utils = require("custom.git.utils")
 local DATE_PATTERN = "📅%s*(%d%d%d%d%-%d%d%-%d%d)" -- Match 📅 YYYY-MM-DD
 local TASK_PATTERN = "^%s*%-%s*%[%s%]%s*(.+)" -- Match - [ ] task text
 
+-- ══════════════════════════════════════════════════════════════════════════════
+-- PARTIAL EXCLUSION CONFIG
+-- Folders that should be mostly excluded but allow specific files (like README.md)
+-- These are global defaults; projects can override via TODO.local/config.lua
+-- ══════════════════════════════════════════════════════════════════════════════
+local DEFAULT_PARTIAL_EXCLUDES = {
+  -- .claude folder contains non-task checklists, but README.md may have real tasks
+  [".claude"] = { "README.md" },
+}
+
 -- Sanitize branch name for filesystem use
 -- Replaces special characters with hyphens and converts to lowercase
 -- @param branch string: The git branch name to sanitize
@@ -176,10 +186,10 @@ local function categorize_project_task(due_date, today)
   return "later", 4
 end
 
----Get the path to the current project's TODO file
----Returns the path without creating the file (for placeholder functionality)
----@return string|nil todo_path Path to TODO.local/[branch]/SUMMARY.md, or nil if not determinable
-function M.get_todo_file_path()
+---Get the path to the current project's TODO directory
+---Returns the directory path (not file path) for scanning all *.md files
+---@return string|nil todo_dir Path to TODO.local/[branch]/, or nil if not determinable
+function M.get_todo_dir_path()
   local cwd = vim.fn.getcwd()
   local todos_dir = cwd .. "/TODO.local"
 
@@ -189,69 +199,136 @@ function M.get_todo_file_path()
     if branch and branch ~= "" and not branch:match("^fatal:") then
       local sanitized_branch = sanitize_branch_name(branch)
       if sanitized_branch then
-        return todos_dir .. "/" .. sanitized_branch .. "/SUMMARY.md"
+        return todos_dir .. "/" .. sanitized_branch
       end
     end
   end
 
-  -- Fallback to root TODO.local/SUMMARY.md
-  return todos_dir .. "/SUMMARY.md"
+  -- Fallback to root TODO.local/
+  return todos_dir
 end
 
----Scan the project TODO file for incomplete tasks
----Uses same format as Obsidian: - [ ] task text 📅 YYYY-MM-DD
----@return table[] tasks Array of task items with file, line, text, due_date, category, sort_priority
+---Get the path to the current project's TODO file (SUMMARY.md)
+---Returns the path without creating the file (for placeholder functionality)
+---@return string|nil todo_path Path to TODO.local/[branch]/SUMMARY.md, or nil if not determinable
+function M.get_todo_file_path()
+  local todo_dir = M.get_todo_dir_path()
+  if not todo_dir then
+    return nil
+  end
+  return todo_dir .. "/SUMMARY.md"
+end
+
+---Load project-specific TODO configuration from TODO.local/config.lua
+---Config is project-wide (not branch-specific) since exclusions apply to the whole project
+---Example config.lua:
+---   return { partial_excludes = { ["claude"] = { "README.md" } } }
+---@return table config Project config table, or empty table if not found
+local function load_project_config()
+  local cwd = vim.fn.getcwd()
+  local config_path = cwd .. "/TODO.local/config.lua"
+  local stat = vim.loop.fs_stat(config_path)
+  if not stat then
+    return {} -- No project config file
+  end
+
+  -- Safely load the Lua config file
+  local ok, config = pcall(dofile, config_path)
+  if ok and type(config) == "table" then
+    return config
+  end
+
+  -- Log warning if config exists but failed to load
+  if not ok then
+    vim.notify("Failed to load TODO config: " .. config_path, vim.log.levels.WARN)
+  end
+  return {}
+end
+
+---Get merged partial exclusions (global defaults + project-local overrides)
+---@return table partial_excludes Map of folder -> allowed filenames
+local function get_partial_excludes()
+  local excludes = vim.deepcopy(DEFAULT_PARTIAL_EXCLUDES)
+  local project_config = load_project_config()
+
+  -- Merge project-specific partial excludes
+  if project_config.partial_excludes then
+    for folder, files in pairs(project_config.partial_excludes) do
+      excludes[folder] = files
+    end
+  end
+
+  return excludes
+end
+
+---Scan ALL markdown files in TODO.local/[branch]/ for incomplete tasks
+---Uses ripgrep for fast scanning across multiple files
+---Each task gets source = "local" for the unified picker
+---@return table[] tasks Array of task items with file, line, text, due_date, category, sort_priority, source
 function M.scan_project_todos()
-  local todo_path = M.get_todo_file_path()
-  if not todo_path then
+  local todo_dir = M.get_todo_dir_path()
+  if not todo_dir then
     return {}
   end
 
-  -- Check if file exists
-  local stat = vim.loop.fs_stat(todo_path)
+  -- Check if directory exists
+  local stat = vim.loop.fs_stat(todo_dir)
   if not stat then
-    return {} -- File doesn't exist yet, no tasks
+    return {} -- Directory doesn't exist yet, no tasks
   end
 
+  local cwd = vim.fn.getcwd()
   local today = get_today()
   local tasks = {}
 
-  -- Read file line by line
-  local file = io.open(todo_path, "r")
-  if not file then
-    return {}
+  -- Use ripgrep with JSON output to find all incomplete tasks in all *.md files
+  -- This allows multiple TODO files (SUMMARY.md, BACKLOG.md, etc.) in the same directory
+  local cmd = string.format('rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" --glob "*.md" %s', todo_dir)
+  local output = vim.fn.systemlist(cmd)
+
+  -- Exit code 1 means no matches found, which is fine
+  if vim.v.shell_error ~= 0 and vim.v.shell_error ~= 1 then
+    return tasks
   end
 
-  local line_num = 0
-  for line in file:lines() do
-    line_num = line_num + 1
+  -- Parse ripgrep JSON output
+  for _, json_line in ipairs(output) do
+    local ok, decoded = pcall(vim.json.decode, json_line)
+    if ok and decoded.type == "match" then
+      local data = decoded.data
+      local file = data.path.text
+      local line_num = data.line_number
+      local line_text = data.lines.text:gsub("\n$", "") -- Remove trailing newline
 
-    -- Check if line matches task pattern
-    local task_text = line:match(TASK_PATTERN)
-    if task_text then
-      -- Parse due date from task text
-      local due_date = parse_due_date(task_text)
+      -- Extract task text from the matched line
+      local task_text = line_text:match(TASK_PATTERN)
+      if task_text then
+        -- Convert absolute path to relative path from project root for display
+        local rel_path = file:gsub("^" .. vim.pesc(cwd) .. "/", "")
 
-      -- Categorize and get sort priority
-      local category, sort_priority = categorize_project_task(due_date, today)
+        -- Parse due date from task text
+        local due_date = parse_due_date(task_text)
 
-      -- Add task to list
-      table.insert(tasks, {
-        file = todo_path, -- Absolute path for opening
-        rel_path = "TODO.local", -- Short display name for project todos
-        line = line_num,
-        text = task_text,
-        raw_line = line, -- Store raw line for toggling
-        due_date = due_date,
-        category = category,
-        sort_priority = sort_priority,
-        is_project_todo = true, -- Flag to identify project todos
-      })
+        -- Categorize and get sort priority
+        local category, sort_priority = categorize_project_task(due_date, today)
+
+        -- Add task to list with source = "local" for unified picker
+        table.insert(tasks, {
+          file = file, -- Absolute path for opening
+          rel_path = rel_path, -- Relative path for display (e.g., TODO.local/main/SUMMARY.md)
+          line = line_num,
+          text = task_text,
+          raw_line = line_text, -- Store raw line for toggling
+          due_date = due_date,
+          category = category,
+          sort_priority = sort_priority,
+          source = "local", -- Source identifier for unified picker badge [L]
+        })
+      end
     end
   end
-  file:close()
 
-  -- Sort tasks by priority, then by due date
+  -- Sort tasks by priority, then by due date, then by file
   table.sort(tasks, function(a, b)
     if a.sort_priority ~= b.sort_priority then
       return a.sort_priority < b.sort_priority
@@ -263,7 +340,131 @@ function M.scan_project_todos()
     elseif b.due_date then
       return false
     end
-    return a.line < b.line
+    return a.rel_path < b.rel_path
+  end)
+
+  return tasks
+end
+
+---Parse ripgrep JSON output and add tasks to the provided tasks table
+---@param output string[] Lines of ripgrep JSON output
+---@param tasks table[] Table to append tasks to
+---@param cwd string Current working directory for relative path calculation
+---@param today string Today's date for categorization
+local function parse_ripgrep_output(output, tasks, cwd, today)
+  for _, json_line in ipairs(output) do
+    local ok, decoded = pcall(vim.json.decode, json_line)
+    if ok and decoded.type == "match" then
+      local data = decoded.data
+      local file = data.path.text
+      local line_num = data.line_number
+      local line_text = data.lines.text:gsub("\n$", "") -- Remove trailing newline
+
+      -- Extract task text from the matched line
+      local task_text = line_text:match(TASK_PATTERN)
+      if task_text then
+        -- Convert absolute path to relative path from project root for display
+        local rel_path = file:gsub("^" .. vim.pesc(cwd) .. "/", "")
+
+        -- Parse due date from task text
+        local due_date = parse_due_date(task_text)
+
+        -- Categorize and get sort priority
+        local category, sort_priority = categorize_project_task(due_date, today)
+
+        -- Add task to list with source = "global" for unified picker
+        table.insert(tasks, {
+          file = file, -- Absolute path for opening
+          rel_path = rel_path, -- Relative path for display (e.g., README.md, docs/TODO.md)
+          line = line_num,
+          text = task_text,
+          raw_line = line_text, -- Store raw line for toggling
+          due_date = due_date,
+          category = category,
+          sort_priority = sort_priority,
+          source = "global", -- Source identifier for unified picker badge [G]
+        })
+      end
+    end
+  end
+end
+
+---Scan ALL markdown files in the project (excluding TODO.local) for incomplete tasks
+---Uses ripgrep for fast scanning with exclusion patterns for common vendor directories
+---Supports partial exclusions: folders can be excluded but allow specific files (e.g., README.md)
+---Each task gets source = "global" for the unified picker
+---@return table[] tasks Array of task items with file, line, text, due_date, category, sort_priority, source
+function M.scan_global_markdown_todos()
+  local cwd = vim.fn.getcwd()
+  local today = get_today()
+  local tasks = {}
+
+  -- Get partial exclusions (global defaults merged with project-local config)
+  local partial_excludes = get_partial_excludes()
+
+  -- Build exclusion globs for ripgrep
+  -- Always exclude: TODO.local, .git, node_modules, vendor, .venv, __pycache__
+  local exclude_globs = {
+    "!TODO.local/**",
+    "!.git/**",
+    "!node_modules/**",
+    "!vendor/**",
+    "!.venv/**",
+    "!__pycache__/**",
+  }
+
+  -- Add partial exclusion folders to the exclusion list
+  -- These will be scanned separately with only their allowlisted files
+  for folder, _ in pairs(partial_excludes) do
+    table.insert(exclude_globs, "!" .. folder .. "/**")
+  end
+
+  -- Build the main ripgrep command with all exclusions
+  local glob_args = table.concat(
+    vim.tbl_map(function(g)
+      return '--glob "' .. g .. '"'
+    end, exclude_globs),
+    " "
+  )
+
+  local cmd = string.format('rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" --glob "*.md" %s %s', glob_args, cwd)
+  local output = vim.fn.systemlist(cmd)
+
+  -- Exit code 1 means no matches found, which is fine
+  if vim.v.shell_error == 0 or vim.v.shell_error == 1 then
+    parse_ripgrep_output(output, tasks, cwd, today)
+  end
+
+  -- Second pass: scan only allowlisted files in partial exclusion folders
+  -- This allows folders like .claude/ to be mostly excluded but still scan README.md
+  for folder, allowed_files in pairs(partial_excludes) do
+    for _, filename in ipairs(allowed_files) do
+      local file_path = cwd .. "/" .. folder .. "/" .. filename
+      local stat = vim.loop.fs_stat(file_path)
+      if stat then
+        -- File exists, scan it with ripgrep
+        local allowlist_cmd = string.format('rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" %s', file_path)
+        local allowlist_output = vim.fn.systemlist(allowlist_cmd)
+        if vim.v.shell_error == 0 or vim.v.shell_error == 1 then
+          parse_ripgrep_output(allowlist_output, tasks, cwd, today)
+        end
+      end
+    end
+  end
+
+  -- Sort tasks by priority, then by due date, then by file
+  table.sort(tasks, function(a, b)
+    if a.sort_priority ~= b.sort_priority then
+      return a.sort_priority < b.sort_priority
+    end
+    if a.due_date and b.due_date then
+      return a.due_date < b.due_date
+    elseif a.due_date then
+      return true
+    elseif b.due_date then
+      return false
+    end
+    return a.rel_path < b.rel_path
   end)
 
   return tasks
