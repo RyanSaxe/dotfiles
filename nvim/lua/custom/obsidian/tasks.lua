@@ -261,7 +261,15 @@ local function format_task(item)
   ret[#ret + 1] = { icon, hl }
 
   -- Due date (padded for alignment, 10 chars for YYYY-MM-DD or spaces)
-  local due_text = item.due_date or "          "
+  -- Show "today" for daily note tasks without explicit due dates
+  local due_text
+  if item.due_date then
+    due_text = item.due_date
+  elseif item.category == "today" then
+    due_text = "today     " -- Padded to match YYYY-MM-DD width
+  else
+    due_text = "          "
+  end
   ret[#ret + 1] = { due_text .. " ", "Comment" }
 
   -- Source badge with color: [L]=cyan, [G]=purple, [N]=teal
@@ -296,6 +304,11 @@ local function create_picker_config(items)
     -- Use default file previewer for task items
     preview = Snacks.picker.preview.file,
     format = function(item)
+      -- Handle navigation items (distinctive → icon)
+      if item.is_navigation then
+        return { { "→ " .. item.nav_label, "DiagnosticHint" } }
+      end
+
       -- Handle placeholder items (dimmed, indicates action to create TODO)
       if item.is_placeholder then
         return { { item.text or "", "Comment" } }
@@ -310,6 +323,13 @@ local function create_picker_config(items)
       return { { item.text or "", "Normal" } }
     end,
     confirm = function(picker, item)
+      -- Navigation items: open file directly
+      if item and item.is_navigation then
+        picker:close()
+        vim.cmd("edit " .. vim.fn.fnameescape(item.file))
+        return
+      end
+
       -- Placeholder opens the TODO file for editing (creates it if needed)
       if item and item.is_placeholder then
         picker:close()
@@ -399,6 +419,23 @@ local function create_placeholder_item(todo_path)
   }
 end
 
+---Create a navigation item for quick access to related files
+---@param label string Display label (e.g., "Go to daily note")
+---@param file string|nil File path to open
+---@return table|nil item Navigation picker item, or nil if file unavailable
+local function create_navigation_item(label, file)
+  if not file then
+    return nil
+  end
+  return {
+    text = label,
+    file = file,
+    pos = { 1, 0 },
+    is_navigation = true,
+    nav_label = label,
+  }
+end
+
 ---Open unified task picker
 ---Merges tasks from three sources: Local (TODO.local), Global (project *.md), Notes (Obsidian)
 ---All tasks are sorted by urgency (overdue → today → week → later → no date)
@@ -431,17 +468,6 @@ function M.open_picker()
   local notes_tasks = M.scan_tasks()
   vim.list_extend(all_tasks, notes_tasks)
 
-  -- No tasks at all - offer to create project TODOs
-  if #all_tasks == 0 then
-    local todo_path = todos_module and todos_module.get_todo_file_path()
-    if todo_path then
-      todos_module.open_todo()
-      return
-    end
-    vim.notify("No tasks found", vim.log.levels.INFO)
-    return
-  end
-
   -- Sort all tasks uniformly by urgency, then due date, then file
   -- This ensures urgent tasks from ANY source appear at the top
   table.sort(all_tasks, function(a, b)
@@ -461,10 +487,40 @@ function M.open_picker()
     return a.rel_path < b.rel_path
   end)
 
-  -- Convert tasks to picker items (no separators - unified list)
+  -- Create navigation items at the top for quick access
+  local nav_items = {}
+
+  -- 1. Go to daily note
+  local vault_path = get_vault_path()
+  if vault_path then
+    local _, today_file = get_today_info()
+    local daily_path = vault_path .. "/" .. today_file
+    local nav = create_navigation_item("Go to daily note", daily_path)
+    if nav then
+      table.insert(nav_items, nav)
+    end
+  end
+
+  -- 2. Go to local todo list
+  if todos_module then
+    local todo_path = todos_module.get_todo_file_path()
+    local nav = create_navigation_item("Go to local todo list", todo_path)
+    if nav then
+      table.insert(nav_items, nav)
+    end
+  end
+
+  -- Build final items: navigation first, then tasks
   local items = {}
+  vim.list_extend(items, nav_items)
   for _, task in ipairs(all_tasks) do
     table.insert(items, task_to_picker_item(task))
+  end
+
+  -- If no items at all (no nav items and no tasks), notify user
+  if #items == 0 then
+    vim.notify("No tasks found", vim.log.levels.INFO)
+    return
   end
 
   -- Open picker with unified title
