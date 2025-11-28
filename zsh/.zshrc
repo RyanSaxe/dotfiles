@@ -23,15 +23,15 @@ if [[ -n "$TMUX" ]]; then
     unset TMUX
     unset TMUX_PANE
   else
-    # Socket exists, but check if THIS terminal is actually a tmux client
-    # by comparing the current TTY with all active tmux client TTYs
+    # Socket exists, but check if THIS terminal is actually in a tmux pane
+    # by comparing the current TTY with all active tmux pane TTYs
     local current_tty
     current_tty=$(tty 2>/dev/null)
 
     if [[ -n "$current_tty" ]]; then
-      # If our TTY is not in the list of tmux client TTYs, we inherited $TMUX
-      if ! tmux -S "$tmux_socket" list-clients -F "#{client_tty}" 2>/dev/null | grep -Fxq "$current_tty"; then
-        # We're not actually a tmux client, just inherited the variable
+      # If our TTY is not in the list of tmux pane TTYs, we inherited $TMUX
+      if ! tmux -S "$tmux_socket" list-panes -a -F "#{pane_tty}" 2>/dev/null | grep -Fxq "$current_tty"; then
+        # We're not actually in a tmux pane, just inherited the variable
         unset TMUX
         unset TMUX_PANE
       fi
