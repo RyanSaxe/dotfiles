@@ -134,7 +134,7 @@ Edit scripts in `scripts/` to customize statusline components.
 
 ### Bugs
 
-- [ ] Text highlighting doesn't display correctly with proper background color in tmux sessions
+- [x] Text highlighting doesn't display correctly with proper background color in tmux sessions
 
 ### Unclear How Hard
 
