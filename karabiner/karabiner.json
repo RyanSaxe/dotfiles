@@ -30,7 +30,7 @@
             ]
           },
           {
-            "description": "Right Shift: Tap for F20, Hold for Hyper",
+            "description": "Right Shift: Tap for F18, Hold for Right Shift",
             "manipulators": [
               {
                 "type": "basic",
@@ -47,8 +47,7 @@
                 ],
                 "to_if_held_down": [
                   {
-                    "key_code": "left_command",
-                    "modifiers": ["left_control", "left_option", "left_shift"]
+                    "key_code": "right_shift"
                   }
                 ],
                 "parameters": {
@@ -59,19 +58,14 @@
             ]
           },
           {
-            "description": "Hyper + hjkl for Arrow Keys",
+            "description": "Ctrl + hjkl for Arrow Keys",
             "manipulators": [
               {
                 "type": "basic",
                 "from": {
                   "key_code": "h",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
@@ -85,12 +79,7 @@
                 "from": {
                   "key_code": "j",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
@@ -104,12 +93,7 @@
                 "from": {
                   "key_code": "k",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
@@ -123,12 +107,7 @@
                 "from": {
                   "key_code": "l",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
