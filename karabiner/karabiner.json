@@ -11,6 +11,25 @@
       "complex_modifications": {
         "rules": [
           {
+            "description": "Caps Lock to Escape",
+            "manipulators": [
+              {
+                "type": "basic",
+                "from": {
+                  "key_code": "caps_lock",
+                  "modifiers": {
+                    "optional": ["any"]
+                  }
+                },
+                "to": [
+                  {
+                    "key_code": "escape"
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "description": "Right Shift: Tap for F20, Hold for Hyper",
             "manipulators": [
               {
