@@ -457,7 +457,11 @@ local function get_recent_files(force_hide)
       enabled = enabled_check,
     }
   end
-  local final_padding = max_files - n_files + 1
+  local final_padding = 1
+
+  if pane == 2 then
+    final_padding = final_padding + max_files - n_files -- in second pane add extra padding for vertical alignment
+  end
 
   -- Calculate height: files + final_padding
   -- Note: The "Recent Files" title is added separately in create_sections()
@@ -821,6 +825,8 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
   local git_sections, _ = create_git_sections(base_branch, current_branch, hide_git)
   local global_sections, _ = globalkeys()
 
+  -- TODO: right now there can be a lack of balance of margins if the height from snacks - height from sections is odd
+  --       since then we can't split the difference evenly. Consider adding an extra padding line somewhere to fix this?
   local sections = {}
 
   -- Add separator to pane 2 for visual balance in these cases:
@@ -884,10 +890,19 @@ end
 -- Called by Snacks dashboard with self (dashboard instance) as parameter
 ---@param dashboard snacks.dashboard.Class Dashboard instance
 function M.create_sections(dashboard)
-  -- Ensure tabline is always shown to prevent layout shifts (only in tmux)
-  -- This prevents the dashboard from jumping when switching buffers in tmux
-  -- Outside tmux, we don't need this workaround as there's no tmux status bar
+  -- TMUX tabline strip: Show empty tabline for aesthetic border matching tmux statusline.
+  -- This creates a dark bar that visually separates neovim from tmux status bubbles.
+  --
+  -- Snacks sets showtabline=0 before rendering. When we set it to 2, it triggers WinResized
+  -- and causes the dashboard to re-render. To prevent visible shift, we pre-adjust _size.height
+  -- so both renders calculate identical margins.
   if vim.env.TMUX then
+    -- Pre-adjust height before Snacks uses it for centering (prevents position shift on re-render)
+    if vim.o.showtabline == 0 and dashboard and dashboard._size then
+      dashboard._size.height = dashboard._size.height - 1
+    end
+
+    -- Show empty tabline strip
     local original_tabline = vim.o.tabline
     vim.o.tabline = " "
     vim.o.showtabline = 2
@@ -977,21 +992,15 @@ function M.create_sections(dashboard)
     end
   end
 
-  -- 🎨 Recalculate width with exact vertical margin for perfect centering
+  -- Recalculate width with exact vertical margin for perfect centering
   -- Account for terminal character aspect ratio (chars are taller than wide)
   if dashboard and dashboard._size then
-    -- Calculate vertical margin in rows (using dashboard height for accuracy)
     local vertical_margin_rows = math.max(math.floor((dashboard._size.height - pane1_height) / 2), 0)
-
-    -- on my setup this looks right --- unclear how to make this dynamic
-    local aspect_ratio = 2.5 -- Adjust this if your font looks different
-
-    -- Convert vertical rows to equivalent horizontal columns
+    local aspect_ratio = 2.5 -- Character aspect ratio (chars are taller than wide)
     local equivalent_horizontal_margin = math.floor(vertical_margin_rows * aspect_ratio)
-
-    -- Use max(4, ...) as minimum padding for aesthetics
     local edge_margin = math.max(4, equivalent_horizontal_margin)
     local optimized_width = utils.calculate_dynamic_pane_width(dashboard._size.width, edge_margin)
+
     -- Update both for Snacks internal layout AND our utility functions
     dashboard.opts.width = optimized_width
     -- Set pane gap based on feature flag
