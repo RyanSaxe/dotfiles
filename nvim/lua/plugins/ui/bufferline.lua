@@ -1,5 +1,7 @@
 return {
   "akinsho/bufferline.nvim",
+  lazy = false,
+  priority = 1001, -- Load before snacks dashboard (priority 1000)
   enabled = true,
   keys = {
     {
@@ -41,7 +43,7 @@ return {
       show_buffer_icons = false,
       -- Always show bufferline when in tmux to prevent layout shifts with tmux status bar
       -- Outside tmux, only show when there are multiple buffers (default behavior)
-      always_show_bufferline = vim.env.TMUX ~= nil,
+      always_show_bufferline = true, -- vim.env.TMUX ~= nil,
     },
   },
 }
