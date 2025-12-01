@@ -375,6 +375,7 @@ local function create_picker_config(items)
       end,
     },
     win = {
+      preview = require("custom.snacks.picker").preview_with_wrap,
       input = {
         keys = {
           ["<c-t>"] = { "toggle", mode = { "n", "i" }, desc = "Toggle task completion" },
