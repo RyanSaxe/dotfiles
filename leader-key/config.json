@@ -34,7 +34,7 @@
           "key": "t",
           "label": "Teams",
           "type": "command",
-          "value": "hs -c 'openAppOrWeb(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\")'"
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"g\", {\"cmd\"}, \"g\", {\"cmd\", \"alt\"})'"
         }
       ]
     },
