@@ -63,6 +63,7 @@ return {
         switch_to_vertical_layout = require("custom.snacks.actions").switch_to_vertical_layout,
         switch_to_horizontal_layout = require("custom.snacks.actions").switch_to_horizontal_layout,
         restore_original_layout = require("custom.snacks.actions").restore_original_layout,
+        toggle_preview_wrap = require("custom.snacks.actions").toggle_preview_wrap,
       },
       win = {
         input = {
@@ -70,6 +71,7 @@ return {
             ["<a-->"] = { "switch_to_vertical_layout", mode = { "n", "i" }, desc = "Switch to vertical layout" },
             ["<a-\\>"] = { "switch_to_horizontal_layout", mode = { "n", "i" }, desc = "Switch to horizontal layout" },
             ["<a-'>"] = { "restore_original_layout", mode = { "n", "i" }, desc = "Restore original layout" },
+            ["<c-w>"] = { "toggle_preview_wrap", mode = { "n", "i" }, desc = "Toggle preview wrap" },
           },
         },
         list = {
@@ -77,6 +79,7 @@ return {
             ["<a-->"] = { "switch_to_vertical_layout", desc = "Switch to vertical layout" },
             ["<a-\\>"] = { "switch_to_horizontal_layout", desc = "Switch to horizontal layout" },
             ["<a-'>"] = { "restore_original_layout", desc = "Restore original layout" },
+            ["<c-w>"] = { "toggle_preview_wrap", desc = "Toggle preview wrap" },
           },
         },
         preview = {
@@ -84,6 +87,7 @@ return {
             ["<a-->"] = { "switch_to_vertical_layout", desc = "Switch to vertical layout" },
             ["<a-\\>"] = { "switch_to_horizontal_layout", desc = "Switch to horizontal layout" },
             ["<a-'>"] = { "restore_original_layout", desc = "Restore original layout" },
+            ["<c-w>"] = { "toggle_preview_wrap", desc = "Toggle preview wrap" },
           },
         },
       },

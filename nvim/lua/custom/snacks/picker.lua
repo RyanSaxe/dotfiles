@@ -48,6 +48,16 @@ function M.format_buffer(item, picker)
   return ret
 end
 
+-- Preview window options with wrap enabled
+-- Useful for markdown files or any picker where long lines should wrap
+M.preview_with_wrap = {
+  wo = {
+    wrap = true,
+    linebreak = true, -- Break at word boundaries
+    breakindent = true, -- Preserve indentation on wrapped lines
+  },
+}
+
 -- Configuration for enhanced buffer picker
 -- TODO: consider if this should be deleted
 M.buffer_config = {
