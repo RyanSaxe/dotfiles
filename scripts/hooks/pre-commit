@@ -9,6 +9,7 @@ set -euo pipefail
 # - shfmt: Shell scripts (sh, bash, zsh)
 # - prettier: JSON files
 # - markdownlint: Markdown files (no line wrapping)
+# - ruff: Python files (format + lint fix)
 #
 # To enable this hook for the dotfiles repo:
 #   git config core.hooksPath scripts/hooks
@@ -130,6 +131,25 @@ main() {
     fi
   else
     warn "markdownlint not found, skipping Markdown formatting"
+  fi
+
+  # ── Python files (ruff) ────────────────────────────────────────────────────────
+  if has_cmd ruff; then
+    local py_files=()
+    while IFS= read -r -d '' file; do
+      py_files+=("$file")
+    done < <(staged_files '\.py$')
+
+    if [[ ${#py_files[@]} -gt 0 ]]; then
+      has_changes=true
+      info "Formatting ${#py_files[@]} Python file(s) with ruff..."
+      # Format first, then fix lint issues
+      ruff format "${py_files[@]}"
+      ruff check --fix "${py_files[@]}" || true
+      git add "${py_files[@]}"
+    fi
+  else
+    warn "ruff not found, skipping Python formatting"
   fi
 
   if [[ "$has_changes" == true ]]; then
