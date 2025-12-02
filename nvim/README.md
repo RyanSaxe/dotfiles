@@ -152,7 +152,7 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 - [ ] Improve surround and auto-pair plugins - make Tab break out of parentheticals without exiting insert mode
 - [x] Change completion priority: Tab always cycles blink completions, Shift+Tab takes Copilot suggestion
 - [x] Generalize Obsidian task picker to work with any markdown directory (not just Obsidian vault)
-- [ ] Explore alternative background colors - consider picker-style blended opacity or full black (#000000) for seamless Mac edges
+- [x] Explore alternative background colors - consider picker-style blended opacity or full black (#000000) for seamless Mac edges
 - [ ] Extract dependency-picker into standalone plugin for distribution
 - [ ] Cleanup which-key: organize groups, add proper names and icons, reduce LazyVim default clutter
 - [ ] Revisit markdown setup: linting, formatting, blink integration, frontmatter handling for Claude/Obsidian
