@@ -1,0 +1,89 @@
+name: Create Release
+
+# Manual trigger only - creates official releases from main
+# Main branch moves fast; releases are stable points users can depend on
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-latest
+
+    # Only allow releases from main branch
+    if: github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for tags
+
+      - name: Calculate next version
+        id: version
+        run: |
+          # Get the latest release tag (sorted by version, not date)
+          LATEST=$(git tag -l 'v*' | sort -V | tail -n1)
+
+          if [[ -z "$LATEST" ]]; then
+            # No releases yet - start at 0.1.0
+            NEXT="v0.1.0"
+            echo "No previous releases found, starting at $NEXT"
+          else
+            # Parse current version (strip 'v' prefix)
+            VERSION="${LATEST#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+            # Bump based on input
+            case "${{ inputs.bump }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+            echo "Bumping from $LATEST to $NEXT (${{ inputs.bump }})"
+          fi
+
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
