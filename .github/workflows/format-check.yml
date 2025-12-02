@@ -72,3 +72,13 @@ jobs:
             exit 1
           }
           echo "All Markdown files pass linting"
+
+      - name: Check Python formatting (ruff format)
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check"
+
+      - name: Check Python linting (ruff check)
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check"
