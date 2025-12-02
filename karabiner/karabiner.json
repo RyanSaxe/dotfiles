@@ -57,7 +57,7 @@
             ]
           },
           {
-            "description": "Ctrl + hjkl for Arrow Keys",
+            "description": "Ctrl + hjkl for Arrow Keys (except terminals)",
             "manipulators": [
               {
                 "type": "basic",
@@ -70,6 +70,19 @@
                 "to": [
                   {
                     "key_code": "left_arrow"
+                  }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
                   }
                 ]
               },
@@ -85,6 +98,19 @@
                   {
                     "key_code": "down_arrow"
                   }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
+                  }
                 ]
               },
               {
@@ -99,6 +125,19 @@
                   {
                     "key_code": "up_arrow"
                   }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
+                  }
                 ]
               },
               {
@@ -112,6 +151,19 @@
                 "to": [
                   {
                     "key_code": "right_arrow"
+                  }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
                   }
                 ]
               }
