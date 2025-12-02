@@ -74,6 +74,49 @@
           "value": "hs -c 'focusByDomainOrOpen(\"github.com\", \"https://github.com\")'"
         }
       ]
+    },
+    {
+      "key": "w",
+      "label": "Window",
+      "type": "group",
+      "actions": [
+        {
+          "key": "h",
+          "label": "Left Half",
+          "type": "command",
+          "value": "hs -c 'tileLeft()'"
+        },
+        {
+          "key": "l",
+          "label": "Right Half",
+          "type": "command",
+          "value": "hs -c 'tileRight()'"
+        },
+        {
+          "key": "k",
+          "label": "Top Half",
+          "type": "command",
+          "value": "hs -c 'tileTop()'"
+        },
+        {
+          "key": "j",
+          "label": "Bottom Half",
+          "type": "command",
+          "value": "hs -c 'tileBottom()'"
+        },
+        {
+          "key": "m",
+          "label": "Maximize",
+          "type": "command",
+          "value": "hs -c 'windowMaximize()'"
+        },
+        {
+          "key": "f",
+          "label": "Fullscreen",
+          "type": "command",
+          "value": "hs -c 'windowFullscreen()'"
+        }
+      ]
     }
   ]
 }
