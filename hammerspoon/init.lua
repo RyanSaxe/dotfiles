@@ -173,6 +173,56 @@ function openAppWithKey(appName, appPath, webUrl, appKey, appModifiers, webKey, 
 	end
 end
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- Window Tiling Functions (called via Leader Key)
+-- ════════════════════════════════════════════════════════════════════════════
+
+function tileLeft()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x, y = screen.y, w = screen.w / 2, h = screen.h })
+	end
+end
+
+function tileRight()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x + screen.w / 2, y = screen.y, w = screen.w / 2, h = screen.h })
+	end
+end
+
+function tileTop()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x, y = screen.y, w = screen.w, h = screen.h / 2 })
+	end
+end
+
+function tileBottom()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x, y = screen.y + screen.h / 2, w = screen.w, h = screen.h / 2 })
+	end
+end
+
+function windowMaximize()
+	local win = hs.window.focusedWindow()
+	if win then
+		win:maximize()
+	end
+end
+
+function windowFullscreen()
+	local win = hs.window.focusedWindow()
+	if win then
+		win:toggleFullScreen()
+	end
+end
+
 -- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
