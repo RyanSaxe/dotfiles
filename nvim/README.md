@@ -168,6 +168,7 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 
 - [ ] Deep dive into Python LSP ecosystem - prepare for 'ty' release, support pyproject.toml-specified LSPs
 - [ ] Optimize git workflow UX across snacks.nvim gh module, diffview, mini.diff, gh-dash, lazygit
+- [ ] Make Snacks dashboard perfectly centered regardless of odd/even row counts and window dimensions - investigate edge cases with smaller/thinner windows
 
 ## Customization
 
