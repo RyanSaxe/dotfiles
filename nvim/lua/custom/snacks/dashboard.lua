@@ -825,8 +825,13 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
   local git_sections, _ = create_git_sections(base_branch, current_branch, hide_git)
   local global_sections, _ = globalkeys()
 
-  -- TODO: right now there can be a lack of balance of margins if the height from snacks - height from sections is odd
-  --       since then we can't split the difference evenly. Consider adding an extra padding line somewhere to fix this?
+  -- TODO: Make dashboard perfectly centered regardless of odd/even row counts
+  --       Currently, when (terminal_height - content_height) is odd, top/bottom margins differ by 1 row.
+  --       Similarly, left/right margins should always match top/bottom for visual symmetry.
+  --       Possible approach: dynamically adjust content height by 1 row (drop a recent file, remove separator,
+  --       or add a placeholder) to flip parity and ensure even margin distribution.
+  --       Need to recalculate pane heights after adjustment to keep horizontal margins in sync.
+  --       Additionally, there are other edge cases with smaller or thinner windows that need investigation.
   local sections = {}
 
   -- Add separator to pane 2 for visual balance in these cases:
