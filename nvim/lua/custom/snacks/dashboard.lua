@@ -827,14 +827,6 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
   local files_sections, _ = get_recent_files(hide_recent)
   local git_sections, _ = create_git_sections(base_branch, current_branch, git_hide_mode)
   local global_sections, _ = globalkeys()
-
-  -- TODO: Make dashboard perfectly centered regardless of odd/even row counts
-  --       Currently, when (terminal_height - content_height) is odd, top/bottom margins differ by 1 row.
-  --       Similarly, left/right margins should always match top/bottom for visual symmetry.
-  --       Possible approach: dynamically adjust content height by 1 row (drop a recent file, remove separator,
-  --       or add a placeholder) to flip parity and ensure even margin distribution.
-  --       Need to recalculate pane heights after adjustment to keep horizontal margins in sync.
-  --       Additionally, there are other edge cases with smaller or thinner windows that need investigation.
   local sections = {}
 
   -- Add separator to pane 2 for visual balance in these cases:
@@ -1047,6 +1039,41 @@ function M.create_sections(dashboard)
     -- Store both edge_margin and actual pane_gap for use in other functions
     Snacks.config.dashboard.edge_margin = edge_margin -- Always store edge_margin
     Snacks.config.dashboard.pane_gap = pane_gap -- Store actual gap being used
+  end
+
+  -- Perfect centering: toggle statusline based on delta parity
+  -- When delta is odd, showing statusline absorbs the extra row for symmetric margins
+  -- Snacks compensates for laststatus in size() calculation, so we DON'T pre-adjust _size.height
+  -- The statusline naturally takes the "extra" row that would cause asymmetric margins
+  local show_statusline_for_centering = false
+  if dashboard and dashboard._size then
+    local delta = dashboard._size.height - pane1_height
+    if delta % 2 == 1 then
+      show_statusline_for_centering = true
+    end
+  end
+
+  -- Set statusline visibility synchronously (no vim.schedule needed since we don't pre-adjust _size)
+  -- Snacks' size() compensates: height = window_height + (laststatus >= 2 ? 1 : 0)
+  -- So toggling laststatus won't cause size mismatch and trigger re-renders
+  if show_statusline_for_centering then
+    vim.wo.statusline = " "
+    vim.o.laststatus = 2
+
+    -- Restore statusline when leaving dashboard
+    vim.api.nvim_create_autocmd("BufLeave", {
+      pattern = "*",
+      once = true,
+      callback = function()
+        if vim.bo.filetype == "snacks_dashboard" then
+          vim.wo.statusline = ""
+        end
+      end,
+    })
+  else
+    -- Actively hide statusline when delta is even (important for resize handling)
+    vim.wo.statusline = ""
+    vim.o.laststatus = 0
   end
 
   -- SECOND PASS: Recreate sections with the correct width for proper title alignment
