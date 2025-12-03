@@ -58,10 +58,16 @@ end
 ---@param today_file string Path to today's daily note
 ---@return string category Category: "today", "overdue", "week", "later"
 ---@return number sort_priority Sort priority (lower = earlier in list)
+---@return number|nil days_diff Days until/since due (negative = overdue, nil = no date)
 local function categorize_task(file, due_date, today, today_file)
   -- Green: Tasks in today's daily note (no due date required)
   if file == today_file then
-    return "today", 1
+    -- If task has a due date, calculate days_diff for display
+    if due_date then
+      local days_diff = days_between(today, due_date)
+      return "today", 1, days_diff
+    end
+    return "today", 1, nil
   end
 
   -- Red: Overdue or due today
@@ -69,13 +75,13 @@ local function categorize_task(file, due_date, today, today_file)
     local days_diff = days_between(today, due_date)
     if days_diff <= 0 then
       -- Overdue or due today
-      return "overdue", 2
+      return "overdue", 2, days_diff
     elseif days_diff <= 7 then
       -- Orange: Due in next 7 days
-      return "week", 3
+      return "week", 3, days_diff
     else
       -- Gray: Due later than 7 days
-      return "later", 4
+      return "later", 4, days_diff
     end
   end
 
@@ -86,13 +92,14 @@ local function categorize_task(file, due_date, today, today_file)
       local days_diff = days_between(date_match, today)
       if days_diff > 0 then
         -- Old daily note = overdue (date_match is in the past)
-        return "overdue", 2
+        -- days_diff is positive (today - old_date), convert to negative for consistency
+        return "overdue", 2, -days_diff
       end
     end
   end
 
   -- Gray: Everything else (no due date, not in daily notes)
-  return "later", 4
+  return "later", 4, nil
 end
 
 ---Get highlight group for task category
@@ -104,25 +111,36 @@ local function get_category_highlight(category)
   elseif category == "overdue" then
     return "DiagnosticError" -- Red
   elseif category == "week" then
-    return "DiagnosticWarn" -- Orange
+    return "DiagnosticOk" -- Green (still good, due within 7 days)
   else
     return "Comment" -- Gray
   end
 end
 
----Get category icon
+---Get category icon - shows number of days when due date exists, dot otherwise
 ---@param category string Category: "today", "overdue", "week", "later"
----@return string icon Icon to display
-local function get_category_icon(category)
-  if category == "today" then
-    return "● " -- Green dot
-  elseif category == "overdue" then
-    return "● " -- Red dot
-  elseif category == "week" then
-    return "● " -- Orange dot
-  else
-    return "○ " -- Gray circle
+---@param days_diff number|nil Days until/since due (negative = overdue, nil = no date)
+---@return string icon Icon to display (number or dot)
+local function get_category_icon(category, days_diff)
+  -- No due date = gray circle (unchanged behavior)
+  if days_diff == nil then
+    return "○ "
   end
+
+  -- Format number: negative values show as positive (days overdue)
+  -- Positive values show days until due
+  -- Pad to 2 chars for alignment (e.g., " 3" or "12")
+  local display_num
+  if days_diff <= 0 then
+    -- Overdue or due today: show absolute value (days overdue)
+    display_num = math.abs(days_diff)
+  else
+    -- Future: show days until due
+    display_num = days_diff
+  end
+
+  -- Format with padding for alignment (right-aligned in 2-char width)
+  return string.format("%2d ", display_num)
 end
 
 ---Scan vault for all incomplete tasks using ripgrep (much faster for large vaults)
@@ -169,8 +187,8 @@ function M.scan_tasks()
         -- Parse due date from task text
         local due_date = parse_due_date(task_text)
 
-        -- Categorize and get sort priority
-        local category, sort_priority = categorize_task(rel_path, due_date, today, today_file)
+        -- Categorize and get sort priority (days_diff for numeric display)
+        local category, sort_priority, days_diff = categorize_task(rel_path, due_date, today, today_file)
 
         -- Add task to list with source = "notes" for unified picker
         table.insert(tasks, {
@@ -182,6 +200,7 @@ function M.scan_tasks()
           due_date = due_date,
           category = category,
           sort_priority = sort_priority,
+          days_diff = days_diff, -- Days until/since due (nil = no date)
           source = "notes", -- Source identifier for unified picker badge [N]
         })
       end
@@ -256,7 +275,8 @@ local function format_task(item)
   local ret = {}
 
   -- Category icon with color (urgency indicator)
-  local icon = get_category_icon(item.category)
+  -- Pass days_diff to show number instead of dot when due date exists
+  local icon = get_category_icon(item.category, item.days_diff)
   local hl = get_category_highlight(item.category)
   ret[#ret + 1] = { icon, hl }
 

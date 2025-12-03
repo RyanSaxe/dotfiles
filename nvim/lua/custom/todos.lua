@@ -167,23 +167,24 @@ end
 ---@param today string Today's date
 ---@return string category Category: "overdue", "week", "later"
 ---@return number sort_priority Sort priority (lower = earlier in list)
+---@return number|nil days_diff Days until/since due (negative = overdue, nil = no date)
 local function categorize_project_task(due_date, today)
   if due_date then
     local days_diff = days_between(today, due_date)
     if days_diff <= 0 then
       -- Due today or overdue
-      return "overdue", 2
+      return "overdue", 2, days_diff
     elseif days_diff <= 7 then
       -- Due within 7 days
-      return "week", 3
+      return "week", 3, days_diff
     else
       -- Due later than 7 days
-      return "later", 4
+      return "later", 4, days_diff
     end
   end
 
   -- No due date = treat as later (gray)
-  return "later", 4
+  return "later", 4, nil
 end
 
 ---Get the path to the current project's TODO directory
@@ -309,8 +310,8 @@ function M.scan_project_todos()
         -- Parse due date from task text
         local due_date = parse_due_date(task_text)
 
-        -- Categorize and get sort priority
-        local category, sort_priority = categorize_project_task(due_date, today)
+        -- Categorize and get sort priority (days_diff for numeric display)
+        local category, sort_priority, days_diff = categorize_project_task(due_date, today)
 
         -- Add task to list with source = "local" for unified picker
         table.insert(tasks, {
@@ -322,6 +323,7 @@ function M.scan_project_todos()
           due_date = due_date,
           category = category,
           sort_priority = sort_priority,
+          days_diff = days_diff, -- Days until/since due (nil = no date)
           source = "local", -- Source identifier for unified picker badge [L]
         })
       end
@@ -369,8 +371,8 @@ local function parse_ripgrep_output(output, tasks, cwd, today)
         -- Parse due date from task text
         local due_date = parse_due_date(task_text)
 
-        -- Categorize and get sort priority
-        local category, sort_priority = categorize_project_task(due_date, today)
+        -- Categorize and get sort priority (days_diff for numeric display)
+        local category, sort_priority, days_diff = categorize_project_task(due_date, today)
 
         -- Add task to list with source = "global" for unified picker
         table.insert(tasks, {
@@ -382,6 +384,7 @@ local function parse_ripgrep_output(output, tasks, cwd, today)
           due_date = due_date,
           category = category,
           sort_priority = sort_priority,
+          days_diff = days_diff, -- Days until/since due (nil = no date)
           source = "global", -- Source identifier for unified picker badge [G]
         })
       end
