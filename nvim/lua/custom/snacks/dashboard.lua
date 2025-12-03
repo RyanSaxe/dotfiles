@@ -584,26 +584,27 @@ local function calculate_vertical_position(sprite_height, section_height, positi
   return padding_top, padding_bottom
 end
 
--- Create git sections for git operations
--- Returns sections and total height (returns 0 height if not in git repo)
----@param base_branch string Base branch name
----@param current_branch string Current branch name
----@return table sections Array of git section configs
----@return number height Total height of git sections (0 if not in git)
--- Create git sections with optional force_hide parameter
--- When force_hide is true, sections are created but disabled for height calculation
+-- Git section hide modes:
+-- "none"    - Show all git sections (default)
+-- "partial" - Hide first 4 keys + separator (saves 7 rows), keep title and GitHub keys
+-- "full"    - Hide all git sections
 ---@param base_branch string Base branch name (usually main or master)
 ---@param current_branch string Current branch name
----@param force_hide? boolean Optional flag to force disable git sections
+---@param hide_mode? string "none", "partial", or "full" (default: "none")
 ---@return table sections Array of git section configs
 ---@return number height Total height of git sections
-local function create_git_sections(base_branch, current_branch, force_hide)
+local function create_git_sections(base_branch, current_branch, hide_mode)
+  hide_mode = hide_mode or "none"
   local in_git = Snacks.git.get_root() ~= nil
 
-  -- If not in git repo or forced to hide, return empty sections with 0 height
-  if not in_git or force_hide then
+  -- If not in git repo or fully hidden, return empty sections with 0 height
+  if not in_git or hide_mode == "full" then
     return {}, 0
   end
+
+  -- Check if a section should be shown based on hide_mode
+  -- partial mode hides the first 4 keys and separator
+  local show_local_keys = hide_mode ~= "partial"
 
   local sections = {
     {
@@ -627,7 +628,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
           end,
         })
       end,
-      enabled = in_git,
+      enabled = in_git and show_local_keys,
       indent = 0,
     },
     {
@@ -639,7 +640,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
         local diff = require("custom.git.diff")
         diff.fetch_and_diff(base_branch)
       end,
-      enabled = in_git,
+      enabled = in_git and show_local_keys,
     },
     {
       pane = 1,
@@ -649,7 +650,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
       action = function()
         Snacks.picker.git_status()
       end,
-      enabled = in_git,
+      enabled = in_git and show_local_keys,
     },
     {
       pane = 1,
@@ -660,7 +661,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
         Snacks.lazygit({ cwd = LazyVim.root.git() })
       end,
       padding = 1,
-      enabled = in_git,
+      enabled = in_git and show_local_keys,
     },
     {
       pane = 1,
@@ -668,7 +669,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
       -- Dynamic separator line that scales with pane width
       title = utils.create_separator(),
       padding = 1,
-      enabled = in_git,
+      enabled = in_git and show_local_keys,
     },
     {
       pane = 1,
@@ -714,8 +715,7 @@ local function create_git_sections(base_branch, current_branch, force_hide)
     },
   }
 
-  -- Calculate height dynamically from sections
-  -- This replaces the hardcoded calculation and ensures accuracy
+  -- Calculate height dynamically from sections (respects enabled flags)
   local height = utils.calculate_section_group_height(sections)
 
   return sections, height
@@ -723,10 +723,11 @@ end
 
 ---Create pokemon section with fixed height matching other pane
 ---@param target_height number Total height this section must occupy
----@param hide_git? boolean Whether git sections are hidden
+---@param git_hide_mode? string "none", "partial", or "full" (default: "none")
 ---@param hide_recent? boolean Whether recent files sections are hidden
 ---@return table sections Pokemon section configuration
-local function create_pokemon_section(target_height, hide_git, hide_recent)
+local function create_pokemon_section(target_height, git_hide_mode, hide_recent)
+  git_hide_mode = git_hide_mode or "none"
   -- Validate position configuration
   local position = validate_position(CONFIG.pokemon.position)
 
@@ -757,13 +758,13 @@ local function create_pokemon_section(target_height, hide_git, hide_recent)
   local pokemon_section_height = target_height
 
   local in_git = Snacks.git.get_root() ~= nil
-  local both_hidden = hide_git and hide_recent
+  local both_fully_hidden = git_hide_mode == "full" and hide_recent
 
   -- Adjust height based on what sections are shown:
-  -- - If both git and recent are hidden: -3
+  -- - If both git and recent are fully hidden: -3
   -- - If has two panes and in git: -4
   -- - Otherwise: -2
-  if both_hidden then
+  if both_fully_hidden then
     pokemon_section_height = target_height - 3
   elseif utils.show_if_has_second_pane() and in_git then
     pokemon_section_height = target_height - 4
@@ -815,14 +816,16 @@ end
 ---@param in_git boolean Whether we're in a git repository
 ---@param base_branch string Base branch name (usually main or master)
 ---@param current_branch string Current branch name
----@param hide_git? boolean Optional flag to force hide git sections
+---@param git_hide_mode? string "none", "partial", or "full" (default: "none")
 ---@param hide_recent? boolean Optional flag to force hide recent files sections
-local function create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+local function create_all_sections_without_pokemon(in_git, base_branch, current_branch, git_hide_mode, hide_recent)
+  git_hide_mode = git_hide_mode or "none"
+
   -- Build all section groups (must be inside helper to use correct width)
   -- Pass hiding flags to the relevant section creators
   local search_sections, _ = search_keys()
   local files_sections, _ = get_recent_files(hide_recent)
-  local git_sections, _ = create_git_sections(base_branch, current_branch, hide_git)
+  local git_sections, _ = create_git_sections(base_branch, current_branch, git_hide_mode)
   local global_sections, _ = globalkeys()
 
   -- TODO: Make dashboard perfectly centered regardless of odd/even row counts
@@ -835,13 +838,13 @@ local function create_all_sections_without_pokemon(in_git, base_branch, current_
   local sections = {}
 
   -- Add separator to pane 2 for visual balance in these cases:
-  -- 1. When BOTH git and recent are hidden (always show for visual balance)
+  -- 1. When git is fully hidden AND recent is hidden (always show for visual balance)
   -- 2. When recent files are in pane 1 (not in git) and shown
   -- 3. When recent files would be in pane 2 (in git) but are hidden
-  local both_hidden = hide_git and hide_recent
+  local both_fully_hidden = git_hide_mode == "full" and hide_recent
   local show_pane2_separator = utils.show_if_has_second_pane()
     and (
-      both_hidden -- Case 1: Both hidden, always need separator
+      both_fully_hidden -- Case 1: Both fully hidden, always need separator
       or (not in_git and recent_project_toggle(hide_recent)) -- Case 2: Recent in left pane and shown
       or (in_git and not recent_project_toggle(hide_recent)) -- Case 3: Recent would be in right pane but hidden
     )
@@ -964,34 +967,54 @@ function M.create_sections(dashboard)
   local pane1_height, pane2_height = calculate_pane_heights(temp_sections)
 
   -- Check if we need to hide sections due to height constraints
-  local hide_git, hide_recent = false, false
+  -- min_vertical_margin ensures we always have some breathing room at top/bottom
+  -- Without this, content exactly at terminal height would have 0 margin and risk cutoff
+  local git_hide_mode = "none" ---@type "none"|"partial"|"full"
+  local hide_recent = false
+  local min_vertical_margin = 1 -- Minimum rows of padding on each edge (top + bottom)
+  local partial_git_savings = 7 -- Rows saved by hiding first 4 git keys + separator
+
   if dashboard and dashboard._size then
     local terminal_height = dashboard._size.height
+    local usable_height = terminal_height - (min_vertical_margin * 2)
+    local overflow = pane1_height - usable_height
 
-    -- If pane 1 height exceeds terminal height, we need to hide sections
-    if pane1_height > terminal_height then
-      -- Calculate the height of git and recent files sections from temp_sections
+    -- Progressive hiding strategy:
+    -- 1. Try partial git hiding first (saves ~7 rows)
+    -- 2. If not enough, try full git + recent hiding
+    -- 3. Otherwise, do best effort with full hiding
+    if overflow > 0 then
+      -- Calculate heights for each hiding level
       local git_height = utils.calculate_git_sections_height(temp_sections)
       local recent_height = utils.calculate_recent_files_height(temp_sections)
 
-      -- Simple strategy: hide both if their combined height would make it fit
-      local reduced_height = pane1_height - git_height - recent_height
-      if reduced_height <= terminal_height then
-        hide_git = true
+      if overflow <= partial_git_savings then
+        -- Partial git hiding is enough
+        git_hide_mode = "partial"
+
+        -- Recalculate heights with partial git hiding
+        temp_sections =
+          create_all_sections_without_pokemon(in_git, base_branch, current_branch, git_hide_mode, hide_recent)
+        pane1_height, pane2_height = calculate_pane_heights(temp_sections)
+      elseif overflow <= git_height + recent_height then
+        -- Need full hiding of git and recent
+        git_hide_mode = "full"
         hide_recent = true
 
-        -- Recalculate heights with hiding flags to get accurate new heights
-        temp_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+        -- Recalculate heights with full hiding
+        temp_sections =
+          create_all_sections_without_pokemon(in_git, base_branch, current_branch, git_hide_mode, hide_recent)
         pane1_height, pane2_height = calculate_pane_heights(temp_sections)
       else
-        -- Even with both hidden, still too tall - hide them anyway for best effort
-        hide_git = true
+        -- Even with everything hidden, still too tall - hide anyway for best effort
+        git_hide_mode = "full"
         hide_recent = true
 
-        vim.notify("Dashboard content still exceeds terminal height even with sections hidden", vim.log.levels.WARN)
+        vim.notify("Dashboard content still exceeds usable height even with sections hidden", vim.log.levels.WARN)
 
-        -- Recalculate heights with hiding flags
-        temp_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+        -- Recalculate heights with full hiding
+        temp_sections =
+          create_all_sections_without_pokemon(in_git, base_branch, current_branch, git_hide_mode, hide_recent)
         pane1_height, pane2_height = calculate_pane_heights(temp_sections)
       end
     end
@@ -1003,7 +1026,11 @@ function M.create_sections(dashboard)
     local vertical_margin_rows = math.max(math.floor((dashboard._size.height - pane1_height) / 2), 0)
     local aspect_ratio = 2.5 -- Character aspect ratio (chars are taller than wide)
     local equivalent_horizontal_margin = math.floor(vertical_margin_rows * aspect_ratio)
-    local edge_margin = math.max(4, equivalent_horizontal_margin)
+    -- Cap edge_margin to prevent it from growing so large that it eliminates the second pane
+    -- Without this cap, hiding sections creates more vertical space, which triggers larger
+    -- horizontal margins, which can push the terminal below the 2-pane threshold
+    local max_edge_margin = 20
+    local edge_margin = math.min(max_edge_margin, math.max(4, equivalent_horizontal_margin))
     local optimized_width = utils.calculate_dynamic_pane_width(dashboard._size.width, edge_margin)
 
     -- Update both for Snacks internal layout AND our utility functions
@@ -1024,14 +1051,15 @@ function M.create_sections(dashboard)
 
   -- SECOND PASS: Recreate sections with the correct width for proper title alignment
   -- This two-pass approach ensures that titles are aligned with the final calculated width
-  -- Now also applies the hiding flags determined in Pass 1
+  -- Now also applies the hiding mode determined in Pass 1
   -- Performance impact is negligible (microseconds) as we're just creating Lua tables
-  local final_sections = create_all_sections_without_pokemon(in_git, base_branch, current_branch, hide_git, hide_recent)
+  local final_sections =
+    create_all_sections_without_pokemon(in_git, base_branch, current_branch, git_hide_mode, hide_recent)
 
   -- Create pokemon section to fill the gap between pane2 and pane1
   -- This ensures both panes have identical total heights
-  -- Pass hiding flags to adjust height calculation properly
-  local pokemon_sections = create_pokemon_section(pane1_height - pane2_height, hide_git, hide_recent)
+  -- Pass hide mode to adjust height calculation properly
+  local pokemon_sections = create_pokemon_section(pane1_height - pane2_height, git_hide_mode, hide_recent)
   vim.list_extend(final_sections, pokemon_sections)
 
   return final_sections
