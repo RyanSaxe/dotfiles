@@ -115,18 +115,41 @@ local function get_current_repo()
 end
 
 -- Convert ISO 8601 timestamp to relative time string (e.g., "2h ago")
+-- GitHub timestamps are UTC, so we need to handle timezone conversion properly
 local function iso_to_relative(iso)
   if not iso or iso == "" then
     return "?"
   end
-  local ok, t = pcall(function()
-    return vim.fn.strptime("%Y-%m-%dT%H:%M:%SZ", iso)
-  end)
-  if not ok or not t then
+  -- Parse ISO 8601 format: "2024-01-15T10:30:45Z"
+  local year, month, day, hour, min, sec = iso:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+  if not year then
     return "?"
   end
-  local delta = os.time() - t
-  if delta < 60 then
+
+  -- os.time() interprets the table as local time, but our input is UTC
+  -- Calculate timezone offset to correct for this
+  local now = os.time()
+  local now_utc_table = os.date("!*t", now) --[[@as osdateparam]]
+  now_utc_table.isdst = false
+  local tz_offset = now - os.time(now_utc_table)
+
+  -- Parse the UTC timestamp (os.time interprets as local, so we correct with tz_offset)
+  -- tonumber() returns number|nil, but we've validated the pattern match above
+  ---@diagnostic disable: assign-type-mismatch
+  local t = os.time({
+    year = tonumber(year),
+    month = tonumber(month),
+    day = tonumber(day),
+    hour = tonumber(hour),
+    min = tonumber(min),
+    sec = tonumber(sec),
+  }) + tz_offset
+  ---@diagnostic enable: assign-type-mismatch
+
+  local delta = now - t
+  if delta < 0 then
+    return "now" -- Handle edge case of slight clock skew
+  elseif delta < 60 then
     return delta .. "s"
   elseif delta < 3600 then
     return math.floor(delta / 60) .. "m"
@@ -151,17 +174,36 @@ local function truncate(str, max_len)
 end
 
 -- Convert ISO 8601 timestamp to Unix timestamp
+-- GitHub timestamps are UTC, so we handle timezone conversion properly
 local function iso_to_unix(iso)
   if not iso or iso == "" then
     return nil
   end
-  local ok, t = pcall(function()
-    return vim.fn.strptime("%Y-%m-%dT%H:%M:%SZ", iso)
-  end)
-  if not ok or not t then
+  -- Parse ISO 8601 format: "2024-01-15T10:30:45Z"
+  local year, month, day, hour, min, sec = iso:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+  if not year then
     return nil
   end
-  return t
+
+  -- os.time() interprets the table as local time, but our input is UTC
+  -- Calculate timezone offset to correct for this
+  local now = os.time()
+  local now_utc_table = os.date("!*t", now) --[[@as osdateparam]]
+  now_utc_table.isdst = false
+  local tz_offset = now - os.time(now_utc_table)
+
+  -- Parse the UTC timestamp (os.time interprets as local, so we correct with tz_offset)
+  -- tonumber() returns number|nil, but we've validated the pattern match above
+  ---@diagnostic disable: assign-type-mismatch
+  return os.time({
+    year = tonumber(year),
+    month = tonumber(month),
+    day = tonumber(day),
+    hour = tonumber(hour),
+    min = tonumber(min),
+    sec = tonumber(sec),
+  }) + tz_offset
+  ---@diagnostic enable: assign-type-mismatch
 end
 
 -- Filter items by hidden state
@@ -441,10 +483,10 @@ end
 --
 -- @param comments table - Array of comments in the thread
 -- @param my_username string - Current user's GitHub username
--- @param item_author string|nil - Author of the PR/Issue
+-- @param _item_author string|nil - Author of the PR/Issue (unused, kept for API consistency)
 -- @param is_my_item boolean - Whether this is my own PR/Issue
 -- @return string|nil - Thread type or nil to skip
-local function classify_thread(comments, my_username, item_author, is_my_item)
+local function classify_thread(comments, my_username, _item_author, is_my_item)
   if not comments or #comments == 0 then
     return nil
   end
@@ -832,9 +874,9 @@ end
 -- Format a single item for picker display
 -- Display: [TYPE] PR #123 repo/name "body..." 2h
 -- @param item table - Picker item
--- @param picker table - Snacks picker instance
+-- @param _picker table - Snacks picker instance (required by Snacks API, unused here)
 -- @return table - Array of {text, highlight} tuples
-local function format_item(item, picker)
+local function format_item(item, _picker)
   local align = require("snacks.picker.util").align
   local ret = {}
 
@@ -874,13 +916,13 @@ local function format_item(item, picker)
   end
   ret[#ret + 1] = { " " .. align(repo_display, 20), is_current_repo and "SnacksPickerDir" or "Comment" }
 
+  -- Time since comment (between repo and comment for easy scanning)
+  local time_str = iso_to_relative(item.comment_created_at)
+  ret[#ret + 1] = { " " .. align(time_str, 4), is_current_repo and "SnacksPickerIdx" or "Comment" }
+
   -- Comment body preview (truncated)
   local body_preview = truncate(item.comment_body, 40)
   ret[#ret + 1] = { ' "' .. body_preview .. '"', is_current_repo and "SnacksPickerComment" or "Comment" }
-
-  -- Time since comment
-  local time_str = iso_to_relative(item.comment_created_at)
-  ret[#ret + 1] = { " " .. time_str, is_current_repo and "SnacksPickerIdx" or "Comment" }
 
   -- Build fuzzy searchable text
   item.text = table.concat(
@@ -1081,7 +1123,7 @@ M.picker = function()
 
       -- Custom actions
       actions = {
-        -- Refresh: re-fetch all threads
+        -- Refresh: re-fetch all threads from GitHub
         refresh = function(picker)
           vim.notify("Refreshing threads...", vim.log.levels.INFO)
           fetch_threads(function(new_items)
@@ -1090,29 +1132,31 @@ M.picker = function()
               local new_filtered = apply_filters(new_items)
               local new_sorted = sort_items(new_filtered)
               -- Update the finder to return new items
-              picker.opts.finder = function()
+              picker.finder._find = function()
                 return new_sorted
               end
-              picker:find({ refresh = true })
+              picker:refresh()
               vim.notify("✅ Refreshed " .. #new_sorted .. " threads", vim.log.levels.INFO)
             end
           end)
         end,
 
-        -- Toggle resolved view (<C-S-x>)
+        -- Toggle resolved view (<M-x>)
+        -- Switch between showing unresolved vs resolved threads
         toggle_resolved_view = function(picker)
           state.show_resolved = not state.show_resolved
           local new_filtered = apply_filters(state.items)
           local new_sorted = sort_items(new_filtered)
-          picker.opts.finder = function()
+          -- Replace finder with new filtered/sorted items
+          picker.finder._find = function()
             return new_sorted
           end
-          picker:find({ refresh = true })
-          local mode = state.show_resolved and "resolved" or "unresolved"
-          vim.notify("Showing " .. mode .. " threads (" .. #new_sorted .. ")", vim.log.levels.INFO)
+          -- Use refresh() for proper UI update (as Snacks.gh does)
+          picker:refresh()
         end,
 
         -- Toggle thread resolved (<C-x>)
+        -- Mark a single thread as resolved or unresolved via GitHub API
         toggle_resolved = function(picker, item)
           if not item then
             return
@@ -1125,49 +1169,50 @@ M.picker = function()
             -- Refresh the list after toggling
             local new_filtered = apply_filters(state.items)
             local new_sorted = sort_items(new_filtered)
-            picker.opts.finder = function()
+            picker.finder._find = function()
               return new_sorted
             end
-            picker:find({ refresh = true })
+            picker:refresh()
           end)
         end,
 
-        -- Toggle thread hidden (<C-d>)
-        toggle_hidden = function(picker, item)
+        -- Hide/unhide thread (<C-d>)
+        -- NOTE: Named 'hide_thread' to avoid collision with Snacks' built-in 'toggle_hidden'
+        -- action which toggles hidden files in file pickers
+        -- Hidden threads are stored locally and will auto-unhide when new activity is detected
+        hide_thread = function(picker, item)
           if not item then
             return
           end
           if state.hidden_threads[item.comment_url] then
             state.hidden_threads[item.comment_url] = nil
-            vim.notify("Thread unhidden", vim.log.levels.INFO)
           else
             state.hidden_threads[item.comment_url] = os.time()
-            vim.notify("Thread hidden (will reappear on new activity)", vim.log.levels.INFO)
           end
           save_hidden_threads()
           local new_filtered = apply_filters(state.items)
           local new_sorted = sort_items(new_filtered)
-          picker.opts.finder = function()
+          picker.finder._find = function()
             return new_sorted
           end
-          picker:find({ refresh = true })
+          picker:refresh()
         end,
 
-        -- Toggle hidden view (<C-S-d>)
-        toggle_hidden_view = function(picker)
+        -- View hidden threads (<M-d>)
+        -- NOTE: Named 'view_hidden_threads' to avoid collision with Snacks' built-in actions
+        -- Switch between showing active threads vs hidden threads
+        view_hidden_threads = function(picker)
           state.show_hidden = not state.show_hidden
           local new_filtered = apply_filters(state.items)
           local new_sorted = sort_items(new_filtered)
-          picker.opts.finder = function()
+          picker.finder._find = function()
             return new_sorted
           end
-          picker:find({ refresh = true })
-          local mode = state.show_hidden and "hidden" or "active"
-          vim.notify("Showing " .. mode .. " threads (" .. #new_sorted .. ")", vim.log.levels.INFO)
+          picker:refresh()
         end,
 
         -- Open in browser (S-CR)
-        open_in_browser = function(picker, item)
+        open_in_browser = function(_picker, item)
           if not item then
             return
           end
@@ -1186,8 +1231,9 @@ M.picker = function()
             return
           end
 
-          -- For PR review thread comments, use the replies endpoint
-          if item.kind == "pr" and item.comment_database_id then
+          -- For PR review thread comments (diff comments), use the /replies endpoint
+          -- These have thread_id set - flat PR comments (conversation tab) don't have thread_id
+          if item.kind == "pr" and item.thread_id and item.comment_database_id then
             local owner, repo_name = item.repo:match("(.+)/(.+)")
             if not owner or not repo_name then
               vim.notify("Invalid repo format", vim.log.levels.ERROR)
@@ -1202,6 +1248,7 @@ M.picker = function()
             end
 
             -- Open scratch buffer at bottom of preview (context visible above)
+            -- Uses same pattern as Snacks.gh for proper picker integration
             local height = 10
             Snacks.scratch({
               ft = "markdown",
@@ -1212,13 +1259,16 @@ M.picker = function()
                 win = preview_win.win,
                 width = 0,
                 height = height,
+                backdrop = false, -- Prevent backdrop from interfering with picker
                 border = "top_bottom",
                 row = function(win)
                   local border = win:border_size()
                   return win:parent_size().height - height - border.top - border.bottom
                 end,
                 wo = { winhighlight = "NormalFloat:Normal,FloatTitle:SnacksPickerTitle,FloatBorder:SnacksPickerBorder" },
-                on_win = function()
+                on_win = function(win)
+                  -- Register window for picker's cycle_win navigation
+                  vim.g.snacks_picker_cycle_win = win.win
                   vim.schedule(function()
                     vim.cmd.startinsert()
                   end)
@@ -1233,7 +1283,7 @@ M.picker = function()
                         return
                       end
 
-                      -- Use the correct /replies endpoint
+                      -- Use the correct /replies endpoint for review thread comments
                       local endpoint = string.format(
                         "/repos/%s/%s/pulls/%d/comments/%d/replies",
                         owner,
@@ -1268,6 +1318,84 @@ M.picker = function()
                 },
               },
             })
+          elseif item.kind == "pr" and not item.thread_id then
+            -- For flat PR comments (conversation tab), use the issues endpoint
+            -- Flat comments don't support reply threading - we add a new comment to the PR
+            -- (PRs are also issues in GitHub's API, so /issues/{pr}/comments works)
+            local owner, repo_name = item.repo:match("(.+)/(.+)")
+            if not owner or not repo_name then
+              vim.notify("Invalid repo format", vim.log.levels.ERROR)
+              return
+            end
+
+            local preview_win = picker.preview and picker.preview.win
+            if not preview_win or not preview_win:valid() then
+              vim.notify("Preview window required for comment", vim.log.levels.WARN)
+              return
+            end
+
+            local height = 10
+            Snacks.scratch({
+              ft = "markdown",
+              icon = " ",
+              name = "Comment on PR #" .. item.number,
+              win = {
+                relative = "win",
+                win = preview_win.win,
+                width = 0,
+                height = height,
+                backdrop = false, -- Prevent backdrop from interfering with picker
+                border = "top_bottom",
+                row = function(win)
+                  local border = win:border_size()
+                  return win:parent_size().height - height - border.top - border.bottom
+                end,
+                wo = { winhighlight = "NormalFloat:Normal,FloatTitle:SnacksPickerTitle,FloatBorder:SnacksPickerBorder" },
+                on_win = function(win)
+                  -- Register window for picker's cycle_win navigation
+                  vim.g.snacks_picker_cycle_win = win.win
+                  vim.schedule(function()
+                    vim.cmd.startinsert()
+                  end)
+                end,
+                keys = {
+                  submit = {
+                    "<C-s>",
+                    function(win)
+                      local body = vim.trim(win:text())
+                      if body == "" then
+                        vim.notify("Comment cannot be empty", vim.log.levels.WARN)
+                        return
+                      end
+
+                      -- Use issues endpoint for flat PR comments (PRs are issues in GitHub API)
+                      local endpoint = string.format("/repos/%s/%s/issues/%d/comments", owner, repo_name, item.number)
+                      vim.system({
+                        "gh",
+                        "api",
+                        endpoint,
+                        "-X",
+                        "POST",
+                        "-f",
+                        "body=" .. body,
+                      }, { text = true }, function(result)
+                        vim.schedule(function()
+                          if result.code ~= 0 then
+                            vim.notify("Failed to post comment: " .. (result.stderr or ""), vim.log.levels.ERROR)
+                          else
+                            vim.notify("✅ Comment posted", vim.log.levels.INFO)
+                            win:close()
+                            picker.opts.actions.refresh(picker)
+                          end
+                        end)
+                      end)
+                    end,
+                    desc = "Submit comment",
+                    mode = { "n", "i" },
+                  },
+                },
+              },
+            })
           elseif item.kind == "issue" then
             -- For issues, post a new comment (no threading)
             local owner, repo_name = item.repo:match("(.+)/(.+)")
@@ -1292,13 +1420,16 @@ M.picker = function()
                 win = preview_win.win,
                 width = 0,
                 height = height,
+                backdrop = false, -- Prevent backdrop from interfering with picker
                 border = "top_bottom",
                 row = function(win)
                   local border = win:border_size()
                   return win:parent_size().height - height - border.top - border.bottom
                 end,
                 wo = { winhighlight = "NormalFloat:Normal,FloatTitle:SnacksPickerTitle,FloatBorder:SnacksPickerBorder" },
-                on_win = function()
+                on_win = function(win)
+                  -- Register window for picker's cycle_win navigation
+                  vim.g.snacks_picker_cycle_win = win.win
                   vim.schedule(function()
                     vim.cmd.startinsert()
                   end)
@@ -1355,10 +1486,10 @@ M.picker = function()
             ["<C-x>"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n", "i" } },
             ["<C-a>"] = { "reply", desc = "Reply to comment", mode = { "n", "i" } },
             ["<C-o>"] = { "open_in_browser", desc = "Open in browser", mode = { "n", "i" } },
-            ["<C-d>"] = { "toggle_hidden", desc = "Hide/unhide thread", mode = { "n", "i" } },
+            ["<C-d>"] = { "hide_thread", desc = "Hide/unhide thread", mode = { "n", "i" } },
             -- Toggles (Alt)
             ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
-            ["<M-d>"] = { "toggle_hidden_view", desc = "Toggle hidden view", mode = { "n", "i" } },
+            ["<M-d>"] = { "view_hidden_threads", desc = "View hidden threads", mode = { "n", "i" } },
           },
         },
         list = {
@@ -1368,10 +1499,10 @@ M.picker = function()
             ["<C-x>"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n", "i" } },
             ["<C-a>"] = { "reply", desc = "Reply to comment", mode = { "n", "i" } },
             ["<C-o>"] = { "open_in_browser", desc = "Open in browser", mode = { "n", "i" } },
-            ["<C-d>"] = { "toggle_hidden", desc = "Hide/unhide thread", mode = { "n", "i" } },
+            ["<C-d>"] = { "hide_thread", desc = "Hide/unhide thread", mode = { "n", "i" } },
             -- Toggles (Alt)
             ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
-            ["<M-d>"] = { "toggle_hidden_view", desc = "Toggle hidden view", mode = { "n", "i" } },
+            ["<M-d>"] = { "view_hidden_threads", desc = "View hidden threads", mode = { "n", "i" } },
           },
         },
         preview = {
@@ -1381,10 +1512,10 @@ M.picker = function()
             ["<C-x>"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n", "i" } },
             ["<C-a>"] = { "reply", desc = "Reply to comment", mode = { "n", "i" } },
             ["<C-o>"] = { "open_in_browser", desc = "Open in browser", mode = { "n", "i" } },
-            ["<C-d>"] = { "toggle_hidden", desc = "Hide/unhide thread", mode = { "n", "i" } },
+            ["<C-d>"] = { "hide_thread", desc = "Hide/unhide thread", mode = { "n", "i" } },
             -- Toggles (Alt)
             ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
-            ["<M-d>"] = { "toggle_hidden_view", desc = "Toggle hidden view", mode = { "n", "i" } },
+            ["<M-d>"] = { "view_hidden_threads", desc = "View hidden threads", mode = { "n", "i" } },
           },
         },
       },
