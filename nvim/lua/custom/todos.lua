@@ -160,25 +160,29 @@ end
 
 ---Categorize a project task based on its due date
 ---Uses same color scheme as Obsidian tasks for consistency:
----  - "overdue" (red): due today or past
----  - "week" (orange): due within 7 days
+---  - "overdue" (red): past due
+---  - "due_today" (orange): due today
+---  - "week" (green): due within 7 days
 ---  - "later" (gray): due later or no date
 ---@param due_date string|nil Due date from task text
 ---@param today string Today's date
----@return string category Category: "overdue", "week", "later"
+---@return string category Category: "overdue", "due_today", "week", "later"
 ---@return number sort_priority Sort priority (lower = earlier in list)
 ---@return number|nil days_diff Days until/since due (negative = overdue, nil = no date)
 local function categorize_project_task(due_date, today)
   if due_date then
     local days_diff = days_between(today, due_date)
-    if days_diff <= 0 then
-      -- Due today or overdue
+    if days_diff < 0 then
+      -- Overdue - red
       return "overdue", 2, days_diff
+    elseif days_diff == 0 then
+      -- Due today - orange
+      return "due_today", 1, days_diff
     elseif days_diff <= 7 then
-      -- Due within 7 days
+      -- Due within 7 days - green
       return "week", 3, days_diff
     else
-      -- Due later than 7 days
+      -- Due later than 7 days - gray
       return "later", 4, days_diff
     end
   end
@@ -480,7 +484,8 @@ function M.has_urgent_todos()
   -- Check project TODOs first (faster, local file)
   local project_tasks = M.scan_project_todos()
   for _, task in ipairs(project_tasks) do
-    if task.category == "overdue" then
+    -- Urgent categories: overdue (red), due_today (orange)
+    if task.category == "overdue" or task.category == "due_today" then
       return true
     end
   end
@@ -493,8 +498,8 @@ function M.has_urgent_todos()
 
   if ok and obsidian_tasks then
     for _, task in ipairs(obsidian_tasks) do
-      -- Obsidian uses "overdue" and "today" categories for urgent items
-      if task.category == "overdue" or task.category == "today" then
+      -- Urgent categories: overdue (red), due_today (orange), today (green, in daily note)
+      if task.category == "overdue" or task.category == "due_today" or task.category == "today" then
         return true
       end
     end

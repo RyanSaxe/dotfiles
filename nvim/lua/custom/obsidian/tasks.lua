@@ -56,31 +56,48 @@ end
 ---@param due_date string|nil Due date from task text
 ---@param today string Today's date
 ---@param today_file string Path to today's daily note
----@return string category Category: "today", "overdue", "week", "later"
+---@return string category Category: "today", "due_today", "overdue", "week", "later"
 ---@return number sort_priority Sort priority (lower = earlier in list)
 ---@return number|nil days_diff Days until/since due (negative = overdue, nil = no date)
 local function categorize_task(file, due_date, today, today_file)
-  -- Green: Tasks in today's daily note (no due date required)
+  -- Tasks in today's daily note
   if file == today_file then
-    -- If task has a due date, calculate days_diff for display
+    -- If task has an explicit due date, use that for categorization
+    -- This allows adding future tasks to daily notes without them being marked urgent
     if due_date then
       local days_diff = days_between(today, due_date)
-      return "today", 1, days_diff
+      if days_diff < 0 then
+        -- Overdue - red
+        return "overdue", 2, days_diff
+      elseif days_diff == 0 then
+        -- Due today - orange
+        return "due_today", 1, days_diff
+      elseif days_diff <= 7 then
+        -- Due within a week - green, not urgent
+        return "week", 3, days_diff
+      else
+        -- Due later - gray, not urgent
+        return "later", 4, days_diff
+      end
     end
+    -- No explicit due date = implicitly due today (green)
     return "today", 1, nil
   end
 
-  -- Red: Overdue or due today
+  -- Tasks with explicit due dates (not in today's daily note)
   if due_date then
     local days_diff = days_between(today, due_date)
-    if days_diff <= 0 then
-      -- Overdue or due today
+    if days_diff < 0 then
+      -- Overdue - red
       return "overdue", 2, days_diff
+    elseif days_diff == 0 then
+      -- Due today - orange
+      return "due_today", 1, days_diff
     elseif days_diff <= 7 then
-      -- Orange: Due in next 7 days
+      -- Due within a week - green
       return "week", 3, days_diff
     else
-      -- Gray: Due later than 7 days
+      -- Due later - gray
       return "later", 4, days_diff
     end
   end
@@ -103,28 +120,30 @@ local function categorize_task(file, due_date, today, today_file)
 end
 
 ---Get highlight group for task category
----@param category string Category: "today", "overdue", "week", "later"
+---@param category string Category: "today", "due_today", "overdue", "week", "later"
 ---@return string hl_group Highlight group name
 local function get_category_highlight(category)
   if category == "today" then
-    return "DiagnosticOk" -- Green
+    return "DiagnosticOk" -- Green (in daily note, no explicit date)
+  elseif category == "due_today" then
+    return "DiagnosticWarn" -- Orange (explicit due date is today)
   elseif category == "overdue" then
     return "DiagnosticError" -- Red
   elseif category == "week" then
-    return "DiagnosticOk" -- Green (still good, due within 7 days)
+    return "DiagnosticOk" -- Green (due within 7 days)
   else
     return "Comment" -- Gray
   end
 end
 
 ---Get category icon - shows number of days when due date exists, dot otherwise
----@param category string Category: "today", "overdue", "week", "later"
+---@param category string Category: "today", "due_today", "overdue", "week", "later"
 ---@param days_diff number|nil Days until/since due (negative = overdue, nil = no date)
 ---@return string icon Icon to display (number or dot)
 local function get_category_icon(category, days_diff)
   -- No due date = gray circle (unchanged behavior)
   if days_diff == nil then
-    return "○ "
+    return " ○ "
   end
 
   -- Format number: negative values show as positive (days overdue)
@@ -186,6 +205,12 @@ function M.scan_tasks()
 
         -- Parse due date from task text
         local due_date = parse_due_date(task_text)
+
+        -- If no explicit due date but file is a daily note, derive from filename
+        -- This allows daily note tasks to show their implicit due date in the picker
+        if not due_date and rel_path:match("^" .. DAILY_FOLDER .. "/") then
+          due_date = rel_path:match("(%d%d%d%d%-%d%d%-%d%d)")
+        end
 
         -- Categorize and get sort priority (days_diff for numeric display)
         local category, sort_priority, days_diff = categorize_task(rel_path, due_date, today, today_file)
