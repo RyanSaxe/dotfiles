@@ -20,11 +20,25 @@ return {
         Snacks.toggle.inlay_hints():map("<leader>th")
         Snacks.toggle.option("wrap", { name = "Line Wrap" }):map("<leader>tw")
 
-        -- Add Copilot toggle
+        -- Buffer-local Copilot toggle (remembers state per buffer for the session)
+        -- Uses CopilotBuffer from plugins/completion/copilot.lua
+        if _G.CopilotBuffer then
+          Snacks.toggle({
+            name = "Copilot (Buffer)",
+            get = function()
+              return _G.CopilotBuffer.get_state()
+            end,
+            set = function(state)
+              _G.CopilotBuffer.set_state(nil, state)
+            end,
+          }):map("<leader>tc")
+        end
+
+        -- Global Copilot toggle (enables/disables for entire session)
         local copilot_exists = pcall(require, "copilot")
         if copilot_exists then
           Snacks.toggle({
-            name = "Copilot Completion",
+            name = "Copilot (Global)",
             get = function()
               return not require("copilot.client").is_disabled()
             end,
@@ -35,7 +49,7 @@ return {
                 require("copilot.command").disable()
               end
             end,
-          }):map("<leader>tc")
+          }):map("<leader>tC")
         end
         --
       end,

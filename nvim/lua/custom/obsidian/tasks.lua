@@ -13,7 +13,6 @@ local TASK_PATTERN = "^%s*%-%s*%[%s%]%s*(.+)" -- Match - [ ] task text
 ---@return string|nil vault_path Path to vault, or nil if Obsidian not initialized
 local function get_vault_path()
   if not Obsidian or not Obsidian.dir then
-    vim.notify("Obsidian not initialized. Open a markdown file in your vault first.", vim.log.levels.WARN)
     return nil
   end
   return tostring(Obsidian.dir)
@@ -59,10 +58,16 @@ end
 ---@param today_file string Path to today's daily note
 ---@return string category Category: "today", "overdue", "week", "later"
 ---@return number sort_priority Sort priority (lower = earlier in list)
+---@return number|nil days_diff Days until/since due (negative = overdue, nil = no date)
 local function categorize_task(file, due_date, today, today_file)
   -- Green: Tasks in today's daily note (no due date required)
   if file == today_file then
-    return "today", 1
+    -- If task has a due date, calculate days_diff for display
+    if due_date then
+      local days_diff = days_between(today, due_date)
+      return "today", 1, days_diff
+    end
+    return "today", 1, nil
   end
 
   -- Red: Overdue or due today
@@ -70,13 +75,13 @@ local function categorize_task(file, due_date, today, today_file)
     local days_diff = days_between(today, due_date)
     if days_diff <= 0 then
       -- Overdue or due today
-      return "overdue", 2
+      return "overdue", 2, days_diff
     elseif days_diff <= 7 then
       -- Orange: Due in next 7 days
-      return "week", 3
+      return "week", 3, days_diff
     else
       -- Gray: Due later than 7 days
-      return "later", 4
+      return "later", 4, days_diff
     end
   end
 
@@ -87,13 +92,14 @@ local function categorize_task(file, due_date, today, today_file)
       local days_diff = days_between(date_match, today)
       if days_diff > 0 then
         -- Old daily note = overdue (date_match is in the past)
-        return "overdue", 2
+        -- days_diff is positive (today - old_date), convert to negative for consistency
+        return "overdue", 2, -days_diff
       end
     end
   end
 
   -- Gray: Everything else (no due date, not in daily notes)
-  return "later", 4
+  return "later", 4, nil
 end
 
 ---Get highlight group for task category
@@ -105,25 +111,36 @@ local function get_category_highlight(category)
   elseif category == "overdue" then
     return "DiagnosticError" -- Red
   elseif category == "week" then
-    return "DiagnosticWarn" -- Orange
+    return "DiagnosticOk" -- Green (still good, due within 7 days)
   else
     return "Comment" -- Gray
   end
 end
 
----Get category icon
+---Get category icon - shows number of days when due date exists, dot otherwise
 ---@param category string Category: "today", "overdue", "week", "later"
----@return string icon Icon to display
-local function get_category_icon(category)
-  if category == "today" then
-    return "● " -- Green dot
-  elseif category == "overdue" then
-    return "● " -- Red dot
-  elseif category == "week" then
-    return "● " -- Orange dot
-  else
-    return "○ " -- Gray circle
+---@param days_diff number|nil Days until/since due (negative = overdue, nil = no date)
+---@return string icon Icon to display (number or dot)
+local function get_category_icon(category, days_diff)
+  -- No due date = gray circle (unchanged behavior)
+  if days_diff == nil then
+    return "○ "
   end
+
+  -- Format number: negative values show as positive (days overdue)
+  -- Positive values show days until due
+  -- Pad to 2 chars for alignment (e.g., " 3" or "12")
+  local display_num
+  if days_diff <= 0 then
+    -- Overdue or due today: show absolute value (days overdue)
+    display_num = math.abs(days_diff)
+  else
+    -- Future: show days until due
+    display_num = days_diff
+  end
+
+  -- Format with padding for alignment (right-aligned in 2-char width)
+  return string.format("%2d ", display_num)
 end
 
 ---Scan vault for all incomplete tasks using ripgrep (much faster for large vaults)
@@ -170,10 +187,10 @@ function M.scan_tasks()
         -- Parse due date from task text
         local due_date = parse_due_date(task_text)
 
-        -- Categorize and get sort priority
-        local category, sort_priority = categorize_task(rel_path, due_date, today, today_file)
+        -- Categorize and get sort priority (days_diff for numeric display)
+        local category, sort_priority, days_diff = categorize_task(rel_path, due_date, today, today_file)
 
-        -- Add task to list
+        -- Add task to list with source = "notes" for unified picker
         table.insert(tasks, {
           file = file, -- Absolute path for opening
           rel_path = rel_path, -- Relative path for display
@@ -183,6 +200,8 @@ function M.scan_tasks()
           due_date = due_date,
           category = category,
           sort_priority = sort_priority,
+          days_diff = days_diff, -- Days until/since due (nil = no date)
+          source = "notes", -- Source identifier for unified picker badge [N]
         })
       end
     end
@@ -248,27 +267,48 @@ local function toggle_task(item)
   vim.notify("Task toggled", vim.log.levels.INFO)
 end
 
----Format task item for picker display
----@param item table Task item
----@param picker table Snacks picker instance
+---Format task item for picker display with source badges
+---Shows: [icon] [date] [source badge] task text (file:line)
+---@param item table Task item with source field
 ---@return table highlights Array of {text, hl_group} pairs
-local function format_task(item, picker)
+local function format_task(item)
   local ret = {}
 
-  -- Category icon with color
-  local icon = get_category_icon(item.category)
+  -- Category icon with color (urgency indicator)
+  -- Pass days_diff to show number instead of dot when due date exists
+  local icon = get_category_icon(item.category, item.days_diff)
   local hl = get_category_highlight(item.category)
   ret[#ret + 1] = { icon, hl }
 
-  -- Task text (truncate if too long)
-  local max_text_len = 50
-  local text = item.text
-  if #text > max_text_len then
-    text = text:sub(1, max_text_len - 3) .. "..."
+  -- Due date (padded for alignment, 10 chars for YYYY-MM-DD or spaces)
+  -- Show "today" for daily note tasks without explicit due dates
+  local due_text
+  if item.due_date then
+    due_text = item.due_date
+  elseif item.category == "today" then
+    due_text = "today     " -- Padded to match YYYY-MM-DD width
+  else
+    due_text = "          "
   end
-  ret[#ret + 1] = { text .. " ", "Normal" }
+  ret[#ret + 1] = { due_text .. " ", "Comment" }
 
-  -- File path (dimmed)
+  -- Source badge with color: [L]=cyan, [G]=purple, [N]=teal
+  -- Use bracket syntax for "local" since it's a Lua reserved keyword
+  local badge_hl = {
+    ["local"] = "DiagnosticInfo", -- Cyan for local TODO.local tasks
+    ["global"] = "Statement", -- Purple for project-wide markdown tasks
+    ["notes"] = "DiagnosticHint", -- Teal for Obsidian vault tasks
+  }
+  local source = item.source or "notes" -- Default to notes for backwards compatibility
+  local badge = "[" .. source:sub(1, 1):upper() .. "] "
+  ret[#ret + 1] = { badge, badge_hl[source] or "Comment" }
+
+  -- Task text - let the picker handle truncation, show full text
+  ret[#ret + 1] = { item.text .. " ", "Normal" }
+
+  -- File path (dimmed) - show full relative path for project files, shorter for notes
+  -- Project files (local/global) need full path since there may be multiple README.md files
+  -- Notes files can use shorter paths since they're in a separate vault context
   ret[#ret + 1] = { "(" .. item.rel_path .. ":" .. item.line .. ")", "Comment" }
 
   return ret
@@ -281,13 +321,46 @@ local function create_picker_config(items)
   return {
     title = "Obsidian Tasks",
     items = items,
+    -- Use default file previewer for task items
+    preview = Snacks.picker.preview.file,
     format = function(item)
-      if item.task then
-        return format_task(item.task, nil)
+      -- Handle navigation items (distinctive → icon)
+      if item.is_navigation then
+        return { { "→ " .. item.nav_label, "DiagnosticHint" } }
       end
+
+      -- Handle placeholder items (dimmed, indicates action to create TODO)
+      if item.is_placeholder then
+        return { { item.text or "", "Comment" } }
+      end
+
+      -- Handle regular task items
+      if item.task then
+        return format_task(item.task)
+      end
+
+      -- Fallback for any other items
       return { { item.text or "", "Normal" } }
     end,
     confirm = function(picker, item)
+      -- Navigation items: open file directly
+      if item and item.is_navigation then
+        picker:close()
+        vim.cmd("edit " .. vim.fn.fnameescape(item.file))
+        return
+      end
+
+      -- Placeholder opens the TODO file for editing (creates it if needed)
+      if item and item.is_placeholder then
+        picker:close()
+        local ok, todos = pcall(require, "custom.todos")
+        if ok then
+          todos.open_todo()
+        end
+        return
+      end
+
+      -- Regular task items: navigate to file and line
       if item and item.file and item.pos then
         picker:close()
         vim.cmd("edit " .. vim.fn.fnameescape(item.file))
@@ -337,37 +410,144 @@ local function create_picker_config(items)
   }
 end
 
----Open task picker
-function M.open_picker()
-  local tasks = M.scan_tasks()
+---Convert a task to a picker item
+---The text field is used for filtering/searching, format_task handles display
+---@param task table Task data from any scan function
+---@return table item Picker item with text, file, pos, task fields
+local function task_to_picker_item(task)
+  -- Build searchable text (used for filtering) - include full task text and path
+  local source_badge = task.source and ("[" .. task.source:sub(1, 1):upper() .. "]") or ""
+  local due_text = task.due_date or ""
+  local display = source_badge .. " " .. due_text .. " " .. task.text .. " " .. task.rel_path
 
-  if #tasks == 0 then
-    vim.notify("No incomplete tasks found", vim.log.levels.INFO)
+  return {
+    text = display, -- Used for filtering/searching
+    file = task.file,
+    pos = { task.line, 0 },
+    task = task, -- Store full task data for format_task and actions
+  }
+end
+
+---Create a placeholder item for starting a new project TODO list
+---@param todo_path string Path to the TODO file
+---@return table item Placeholder picker item
+local function create_placeholder_item(todo_path)
+  return {
+    text = "○ Start project TODO list...",
+    file = todo_path,
+    pos = { 1, 0 },
+    is_placeholder = true,
+  }
+end
+
+---Create a navigation item for quick access to related files
+---@param label string Display label (e.g., "Go to daily note")
+---@param file string|nil File path to open
+---@return table|nil item Navigation picker item, or nil if file unavailable
+local function create_navigation_item(label, file)
+  if not file then
+    return nil
+  end
+  return {
+    text = label,
+    file = file,
+    pos = { 1, 0 },
+    is_navigation = true,
+    nav_label = label,
+  }
+end
+
+---Open unified task picker
+---Merges tasks from three sources: Local (TODO.local), Global (project *.md), Notes (Obsidian)
+---All tasks are sorted by urgency (overdue → today → week → later → no date)
+---Source badges [L], [G], [N] indicate where each task comes from
+function M.open_picker()
+  -- Load the todos module for local and global scanning
+  local todos_module = nil
+  local ok, todos = pcall(require, "custom.todos")
+  if ok then
+    todos_module = todos
+  end
+
+  -- Collect tasks from all three sources
+  -- Each task already has a .source field ("local", "global", or "notes")
+  local all_tasks = {}
+
+  -- 1. Local TODOs from TODO.local/[branch]/*.md
+  if todos_module then
+    local local_tasks = todos_module.scan_project_todos()
+    vim.list_extend(all_tasks, local_tasks)
+  end
+
+  -- 2. Global TODOs from project-wide *.md files (excluding TODO.local)
+  if todos_module then
+    local global_tasks = todos_module.scan_global_markdown_todos()
+    vim.list_extend(all_tasks, global_tasks)
+  end
+
+  -- 3. Notes TODOs from Obsidian vault
+  local notes_tasks = M.scan_tasks()
+  vim.list_extend(all_tasks, notes_tasks)
+
+  -- Sort all tasks uniformly by urgency, then due date, then file
+  -- This ensures urgent tasks from ANY source appear at the top
+  table.sort(all_tasks, function(a, b)
+    -- Primary sort: urgency (sort_priority: 1=today, 2=overdue, 3=week, 4=later)
+    if a.sort_priority ~= b.sort_priority then
+      return a.sort_priority < b.sort_priority
+    end
+    -- Secondary sort: due date (earlier dates first)
+    if a.due_date and b.due_date then
+      return a.due_date < b.due_date
+    elseif a.due_date then
+      return true -- Tasks with dates before tasks without
+    elseif b.due_date then
+      return false
+    end
+    -- Tertiary sort: file path for stable ordering
+    return a.rel_path < b.rel_path
+  end)
+
+  -- Create navigation items at the top for quick access
+  local nav_items = {}
+
+  -- 1. Go to daily note
+  local vault_path = get_vault_path()
+  if vault_path then
+    local _, today_file = get_today_info()
+    local daily_path = vault_path .. "/" .. today_file
+    local nav = create_navigation_item("Go to daily note", daily_path)
+    if nav then
+      table.insert(nav_items, nav)
+    end
+  end
+
+  -- 2. Go to local todo list
+  if todos_module then
+    local todo_path = todos_module.get_todo_file_path()
+    local nav = create_navigation_item("Go to local todo list", todo_path)
+    if nav then
+      table.insert(nav_items, nav)
+    end
+  end
+
+  -- Build final items: navigation first, then tasks
+  local items = {}
+  vim.list_extend(items, nav_items)
+  for _, task in ipairs(all_tasks) do
+    table.insert(items, task_to_picker_item(task))
+  end
+
+  -- If no items at all (no nav items and no tasks), notify user
+  if #items == 0 then
+    vim.notify("No tasks found", vim.log.levels.INFO)
     return
   end
 
-  -- Convert tasks to picker items with proper format
-  local items = {}
-  for _, task in ipairs(tasks) do
-    -- Build display text
-    local icon = get_category_icon(task.category)
-    local due_text = task.due_date and (task.due_date .. " ") or "           "
-    local task_text = task.text
-    if #task_text > 50 then
-      task_text = task_text:sub(1, 47) .. "..."
-    end
-    local display = icon .. due_text .. task_text .. " (" .. task.rel_path .. ":" .. task.line .. ")"
-
-    table.insert(items, {
-      text = display,
-      file = task.file,
-      pos = { task.line, 0 },
-      task = task, -- Store full task data for actions
-    })
-  end
-
-  -- Open picker with custom configuration
-  Snacks.picker(create_picker_config(items))
+  -- Open picker with unified title
+  local config = create_picker_config(items)
+  config.title = "All Tasks"
+  Snacks.picker(config)
 end
 
 return M

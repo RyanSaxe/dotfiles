@@ -1,3 +1,60 @@
+-- Buffer-local Copilot state tracking
+-- nil = use filetype default, true = force enabled, false = force disabled
+local M = {}
+M.buffer_state = {}
+M.disabled_filetypes = {
+  markdown = true,
+  text = true,
+  typr = true,
+}
+
+-- Get effective Copilot state for a buffer
+function M.get_state(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  local explicit = M.buffer_state[bufnr]
+  if explicit ~= nil then
+    return explicit
+  end
+  -- Use filetype default (enabled unless in disabled_filetypes)
+  local ft = vim.bo[bufnr].filetype
+  return not M.disabled_filetypes[ft]
+end
+
+-- Set Copilot state for a buffer and attach/detach accordingly
+function M.set_state(bufnr, state)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  M.buffer_state[bufnr] = state
+  if state then
+    -- Force attach after enabling
+    vim.schedule(function()
+      local client = require("copilot.client")
+      if not client.buf_is_attached(bufnr) then
+        client.buf_attach(bufnr)
+      end
+    end)
+  else
+    require("copilot.client").buf_detach_if_attached(bufnr)
+  end
+end
+
+-- Toggle Copilot for current buffer, returns new state
+function M.toggle(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  local new_state = not M.get_state(bufnr)
+  M.set_state(bufnr, new_state)
+  return new_state
+end
+
+-- Expose globally for toggle.lua to access
+_G.CopilotBuffer = M
+
+-- Clean up state when buffers are deleted (prevent memory leak)
+vim.api.nvim_create_autocmd("BufDelete", {
+  callback = function(args)
+    M.buffer_state[args.buf] = nil
+  end,
+})
+
 return {
   "zbirenbaum/copilot.lua",
   cmd = "Copilot",
@@ -18,48 +75,26 @@ return {
     },
     panel = { enabled = false }, -- Panel is distracting, keep disabled
     filetypes = {
-      markdown = false, -- Disabled for note-taking (obsidian.nvim)
-      text = false, -- Disabled for plain text files
-      help = true,
-      gitcommit = true, -- Enable for git commit messages
-      typr = false, -- Disable for typing practice game
+      gitcommit = true, -- Enable for git commit messages (disabled by default)
+      -- Other disabled filetypes handled by M.disabled_filetypes + should_attach
     },
-    -- Explicit should_attach override to prevent markdown attachment
-    -- This provides an additional layer of protection beyond filetypes
+    -- Use buffer-local state tracking for attachment decisions
+    -- This allows per-buffer toggling with session memory
     should_attach = function(bufnr)
-      -- Get the default checks (buflisted, buftype)
+      -- Standard checks (buflisted, buftype)
       if not vim.bo[bufnr].buflisted then
         return false
       end
       if vim.bo[bufnr].buftype ~= "" then
         return false
       end
-
-      -- Explicitly block markdown files
-      local filetype = vim.bo[bufnr].filetype
-      if filetype == "markdown" or filetype == "text" then
-        return false
-      end
-
-      return true
+      -- Use our buffer state tracking (respects per-buffer overrides)
+      return M.get_state(bufnr)
     end,
   },
   -- Custom configuration to override C-c behavior with higher priority
   config = function(_, opts)
     require("copilot").setup(opts)
-
-    -- Force detach from markdown/text buffers after setup
-    -- This handles cases where buffers were attached before config loaded
-    vim.schedule(function()
-      for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(bufnr) then
-          local ft = vim.bo[bufnr].filetype
-          if ft == "markdown" or ft == "text" then
-            require("copilot.client").buf_detach_if_attached(bufnr)
-          end
-        end
-      end
-    end)
 
     -- Override C-c in insert mode: Universal cancel key that closes EVERYTHING
     -- Closes blink-cmp menu AND Copilot suggestion in one press
