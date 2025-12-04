@@ -3,7 +3,7 @@ from pygments.token import Token
 import IPython
 
 # get_config() is injected by IPython at startup
-c = get_config()
+c = get_config()  # noqa: F821
 
 # always tell IPython we're on a dark terminal:
 c.TerminalInteractiveShell.colors = "linux"
