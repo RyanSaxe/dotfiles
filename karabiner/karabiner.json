@@ -11,7 +11,26 @@
       "complex_modifications": {
         "rules": [
           {
-            "description": "Right Shift: Tap for F20, Hold for Hyper",
+            "description": "Caps Lock to Escape",
+            "manipulators": [
+              {
+                "type": "basic",
+                "from": {
+                  "key_code": "caps_lock",
+                  "modifiers": {
+                    "optional": ["any"]
+                  }
+                },
+                "to": [
+                  {
+                    "key_code": "escape"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "description": "Right Shift: Tap for F18, Hold for Right Shift",
             "manipulators": [
               {
                 "type": "basic",
@@ -21,43 +40,49 @@
                     "optional": ["any"]
                   }
                 },
+                "to": [
+                  {
+                    "key_code": "right_shift"
+                  }
+                ],
                 "to_if_alone": [
                   {
                     "key_code": "f18"
                   }
                 ],
-                "to_if_held_down": [
-                  {
-                    "key_code": "left_command",
-                    "modifiers": ["left_control", "left_option", "left_shift"]
-                  }
-                ],
                 "parameters": {
-                  "basic.to_if_alone_timeout_milliseconds": 200,
-                  "basic.to_if_held_down_threshold_milliseconds": 200
+                  "basic.to_if_alone_timeout_milliseconds": 200
                 }
               }
             ]
           },
           {
-            "description": "Hyper + hjkl for Arrow Keys",
+            "description": "Ctrl + hjkl for Arrow Keys (except terminals)",
             "manipulators": [
               {
                 "type": "basic",
                 "from": {
                   "key_code": "h",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
                   {
                     "key_code": "left_arrow"
+                  }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
                   }
                 ]
               },
@@ -66,17 +91,25 @@
                 "from": {
                   "key_code": "j",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
                   {
                     "key_code": "down_arrow"
+                  }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
                   }
                 ]
               },
@@ -85,17 +118,25 @@
                 "from": {
                   "key_code": "k",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
                   {
                     "key_code": "up_arrow"
+                  }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
                   }
                 ]
               },
@@ -104,17 +145,25 @@
                 "from": {
                   "key_code": "l",
                   "modifiers": {
-                    "mandatory": [
-                      "left_command",
-                      "left_control",
-                      "left_option",
-                      "left_shift"
-                    ]
+                    "mandatory": ["control"]
                   }
                 },
                 "to": [
                   {
                     "key_code": "right_arrow"
+                  }
+                ],
+                "conditions": [
+                  {
+                    "type": "frontmost_application_unless",
+                    "bundle_identifiers": [
+                      "^com\\.apple\\.Terminal$",
+                      "^com\\.googlecode\\.iterm2$",
+                      "^com\\.mitchellh\\.ghostty$",
+                      "^net\\.kovidgoyal\\.kitty$",
+                      "^org\\.alacritty$",
+                      "^com\\.github\\.wez\\.wezterm$"
+                    ]
                   }
                 ]
               }
