@@ -3,6 +3,10 @@
 
 return {
   "folke/snacks.nvim",
+  dependencies = {
+    -- todo_comments is required for snacks todo_comments picker
+    "folke/todo-comments.nvim",
+  },
   opts = {
     picker = {
       layout = {
@@ -27,10 +31,10 @@ return {
       layouts = {
         custom_vertical = {
           layout = {
+            backdrop = false,
             box = "vertical",
-            width = 0.8,
-            min_width = 120,
-            height = 0.8,
+            width = 0,
+            height = 0,
             border = true,
             title = "{title} {live} {flags}",
             { win = "preview", border = "bottom" },
@@ -40,10 +44,10 @@ return {
         },
         custom_horizontal = {
           layout = {
+            backdrop = false,
             box = "horizontal",
-            width = 0.8,
-            min_width = 120,
-            height = 0.8,
+            width = 0,
+            height = 0,
             {
               box = "vertical",
               border = true,
@@ -59,6 +63,7 @@ return {
         switch_to_vertical_layout = require("custom.snacks.actions").switch_to_vertical_layout,
         switch_to_horizontal_layout = require("custom.snacks.actions").switch_to_horizontal_layout,
         restore_original_layout = require("custom.snacks.actions").restore_original_layout,
+        toggle_preview_wrap = require("custom.snacks.actions").toggle_preview_wrap,
       },
       win = {
         input = {
@@ -66,6 +71,7 @@ return {
             ["<a-->"] = { "switch_to_vertical_layout", mode = { "n", "i" }, desc = "Switch to vertical layout" },
             ["<a-\\>"] = { "switch_to_horizontal_layout", mode = { "n", "i" }, desc = "Switch to horizontal layout" },
             ["<a-'>"] = { "restore_original_layout", mode = { "n", "i" }, desc = "Restore original layout" },
+            ["<c-w>"] = { "toggle_preview_wrap", mode = { "n", "i" }, desc = "Toggle preview wrap" },
           },
         },
         list = {
@@ -73,6 +79,7 @@ return {
             ["<a-->"] = { "switch_to_vertical_layout", desc = "Switch to vertical layout" },
             ["<a-\\>"] = { "switch_to_horizontal_layout", desc = "Switch to horizontal layout" },
             ["<a-'>"] = { "restore_original_layout", desc = "Restore original layout" },
+            ["<c-w>"] = { "toggle_preview_wrap", desc = "Toggle preview wrap" },
           },
         },
         preview = {
@@ -80,6 +87,7 @@ return {
             ["<a-->"] = { "switch_to_vertical_layout", desc = "Switch to vertical layout" },
             ["<a-\\>"] = { "switch_to_horizontal_layout", desc = "Switch to horizontal layout" },
             ["<a-'>"] = { "restore_original_layout", desc = "Restore original layout" },
+            ["<c-w>"] = { "toggle_preview_wrap", desc = "Toggle preview wrap" },
           },
         },
       },

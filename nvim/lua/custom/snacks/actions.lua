@@ -65,6 +65,21 @@ function M.restore_original_layout(picker)
   set_layout_with_state_preservation(picker, state.original)
 end
 
+-- Toggle wrap in preview window
+-- Toggles all wrap-related options: wrap, linebreak, breakindent
+---@param picker snacks.Picker
+function M.toggle_preview_wrap(picker)
+  local win = picker.preview.win
+  if win and win:valid() then
+    local current = vim.wo[win.win].wrap
+    local new_value = not current
+    -- Toggle all wrap-related options together
+    vim.wo[win.win].wrap = new_value
+    vim.wo[win.win].linebreak = new_value -- Break at word boundaries
+    vim.wo[win.win].breakindent = new_value -- Preserve indentation on wrapped lines
+  end
+end
+
 -- Save buffer action for buffer picker
 -- Saves all selected buffers that have unsaved changes
 ---@param picker snacks.picker.Picker
