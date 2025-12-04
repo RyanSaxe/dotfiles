@@ -343,10 +343,17 @@ local function create_picker_config(items)
       return { { item.text or "", "Normal" } }
     end,
     confirm = function(picker, item)
-      -- Navigation items: open file directly
+      -- Navigation items: open file (use ObsidianToday for daily notes to apply template)
       if item and item.is_navigation then
         picker:close()
-        vim.cmd("edit " .. vim.fn.fnameescape(item.file))
+        -- Check if this is the daily note and doesn't exist yet
+        local is_daily = item.file and item.file:match("/daily/%d%d%d%d%-%d%d%-%d%d%.md$")
+        if is_daily and vim.fn.filereadable(item.file) == 0 then
+          -- Use ObsidianToday to create with template
+          vim.cmd("ObsidianToday")
+        else
+          vim.cmd("edit " .. vim.fn.fnameescape(item.file))
+        end
         return
       end
 
