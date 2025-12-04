@@ -50,4 +50,3 @@ c.TerminalInteractiveShell.highlighting_style_overrides = {
     Token.Error: "bold #f7768e",
     Token.TB: "bold #f7768e",
 }
-
