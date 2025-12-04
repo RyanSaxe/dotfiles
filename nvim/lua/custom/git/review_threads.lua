@@ -37,9 +37,55 @@ local CONFIG = {
 local state = {
   items = {}, -- All parsed thread items
   show_resolved = false, -- Toggle: false = unresolved, true = resolved
+  show_hidden = false, -- Toggle: false = active threads, true = hidden threads
+  hidden_threads = {}, -- comment_url -> hide_timestamp (unix time)
   current_repo = nil, -- Detected from git remote (cached)
   username = nil, -- GitHub username (cached)
 }
+
+-------------------------------------------------------------------------------
+-- Hidden Thread Persistence
+-------------------------------------------------------------------------------
+
+-- Path for storing hidden thread state
+local function get_hidden_threads_path()
+  local data_dir = vim.fn.stdpath("data") .. "/snacks"
+  vim.fn.mkdir(data_dir, "p")
+  return data_dir .. "/hidden_threads.json"
+end
+
+-- Load hidden threads from disk
+local function load_hidden_threads()
+  local filepath = get_hidden_threads_path()
+  local f = io.open(filepath, "r")
+  if f then
+    local content = f:read("*a")
+    f:close()
+    local ok, data = pcall(vim.json.decode, content)
+    if ok and data then
+      state.hidden_threads = data
+    end
+  end
+end
+
+-- Save hidden threads to disk
+local function save_hidden_threads()
+  local filepath = get_hidden_threads_path()
+  local f = io.open(filepath, "w")
+  if f then
+    f:write(vim.json.encode(state.hidden_threads))
+    f:close()
+  end
+end
+
+-- Register autocommand to save on exit
+vim.api.nvim_create_autocmd("ExitPre", {
+  group = vim.api.nvim_create_augroup("review_threads_persist", { clear = true }),
+  callback = save_hidden_threads,
+})
+
+-- Load hidden threads on module init
+load_hidden_threads()
 
 -------------------------------------------------------------------------------
 -- Helper Functions
@@ -102,6 +148,46 @@ local function truncate(str, max_len)
     return str
   end
   return str:sub(1, max_len - 1) .. "…"
+end
+
+-- Convert ISO 8601 timestamp to Unix timestamp
+local function iso_to_unix(iso)
+  if not iso or iso == "" then
+    return nil
+  end
+  local ok, t = pcall(function()
+    return vim.fn.strptime("%Y-%m-%dT%H:%M:%SZ", iso)
+  end)
+  if not ok or not t then
+    return nil
+  end
+  return t
+end
+
+-- Filter items by hidden state
+-- @param items table - Array of picker items
+-- @param show_hidden boolean - Whether to show hidden (true) or active (false)
+-- @return table - Filtered items
+local function filter_by_hidden(items, show_hidden)
+  return vim.tbl_filter(function(item)
+    local is_hidden = state.hidden_threads[item.comment_url] ~= nil
+    -- Check for new activity on hidden items
+    if is_hidden then
+      local comment_time = iso_to_unix(item.comment_created_at)
+      local hide_timestamp = state.hidden_threads[item.comment_url]
+      if comment_time and hide_timestamp and comment_time > hide_timestamp then
+        -- Auto-unhide due to new activity
+        state.hidden_threads[item.comment_url] = nil
+        is_hidden = false
+      end
+    end
+
+    if show_hidden then
+      return is_hidden
+    else
+      return not is_hidden
+    end
+  end, items)
 end
 
 -------------------------------------------------------------------------------
@@ -639,6 +725,15 @@ local function filter_by_resolved(items, show_resolved)
   end, items)
 end
 
+-- Apply all filters in order: resolved -> hidden
+-- @param items table - Array of all items
+-- @return table - Filtered items based on current state
+local function apply_filters(items)
+  local filtered = filter_by_resolved(items, state.show_resolved)
+  filtered = filter_by_hidden(filtered, state.show_hidden)
+  return filtered
+end
+
 -- Sort items: current repo first, then by type priority, then by recency
 -- @param items table - Array of picker items
 -- @return table - Sorted items (in place)
@@ -954,13 +1049,14 @@ M.picker = function()
     -- Store items in state for toggle functionality
     state.items = items
 
-    -- Apply initial filter and sort
-    local filtered = filter_by_resolved(items, state.show_resolved)
+    -- Apply initial filters and sort
+    local filtered = apply_filters(items)
     local sorted = sort_items(filtered)
 
     if #sorted == 0 then
-      local msg = state.show_resolved and "No resolved threads found" or "No threads requiring attention"
-      vim.notify(msg, vim.log.levels.INFO)
+      local resolved_str = state.show_resolved and "resolved" or "unresolved"
+      local hidden_str = state.show_hidden and "hidden" or "active"
+      vim.notify("No " .. hidden_str .. " " .. resolved_str .. " threads found", vim.log.levels.INFO)
       return
     end
 
@@ -991,32 +1087,32 @@ M.picker = function()
           fetch_threads(function(new_items)
             if new_items then
               state.items = new_items
-              local new_filtered = filter_by_resolved(new_items, state.show_resolved)
+              local new_filtered = apply_filters(new_items)
               local new_sorted = sort_items(new_filtered)
               -- Update the finder to return new items
               picker.opts.finder = function()
                 return new_sorted
               end
-              picker:find()
+              picker:find({ refresh = true })
               vim.notify("✅ Refreshed " .. #new_sorted .. " threads", vim.log.levels.INFO)
             end
           end)
         end,
 
-        -- Toggle resolved view (X key)
+        -- Toggle resolved view (<C-S-x>)
         toggle_resolved_view = function(picker)
           state.show_resolved = not state.show_resolved
-          local new_filtered = filter_by_resolved(state.items, state.show_resolved)
+          local new_filtered = apply_filters(state.items)
           local new_sorted = sort_items(new_filtered)
           picker.opts.finder = function()
             return new_sorted
           end
-          picker:find()
+          picker:find({ refresh = true })
           local mode = state.show_resolved and "resolved" or "unresolved"
           vim.notify("Showing " .. mode .. " threads (" .. #new_sorted .. ")", vim.log.levels.INFO)
         end,
 
-        -- Toggle thread resolved (x key)
+        -- Toggle thread resolved (<C-x>)
         toggle_resolved = function(picker, item)
           if not item then
             return
@@ -1027,13 +1123,47 @@ M.picker = function()
           end
           toggle_thread_resolved(item, not item.is_resolved, function()
             -- Refresh the list after toggling
-            local new_filtered = filter_by_resolved(state.items, state.show_resolved)
+            local new_filtered = apply_filters(state.items)
             local new_sorted = sort_items(new_filtered)
             picker.opts.finder = function()
               return new_sorted
             end
-            picker:find()
+            picker:find({ refresh = true })
           end)
+        end,
+
+        -- Toggle thread hidden (<C-d>)
+        toggle_hidden = function(picker, item)
+          if not item then
+            return
+          end
+          if state.hidden_threads[item.comment_url] then
+            state.hidden_threads[item.comment_url] = nil
+            vim.notify("Thread unhidden", vim.log.levels.INFO)
+          else
+            state.hidden_threads[item.comment_url] = os.time()
+            vim.notify("Thread hidden (will reappear on new activity)", vim.log.levels.INFO)
+          end
+          save_hidden_threads()
+          local new_filtered = apply_filters(state.items)
+          local new_sorted = sort_items(new_filtered)
+          picker.opts.finder = function()
+            return new_sorted
+          end
+          picker:find({ refresh = true })
+        end,
+
+        -- Toggle hidden view (<C-S-d>)
+        toggle_hidden_view = function(picker)
+          state.show_hidden = not state.show_hidden
+          local new_filtered = apply_filters(state.items)
+          local new_sorted = sort_items(new_filtered)
+          picker.opts.finder = function()
+            return new_sorted
+          end
+          picker:find({ refresh = true })
+          local mode = state.show_hidden and "hidden" or "active"
+          vim.notify("Showing " .. mode .. " threads (" .. #new_sorted .. ")", vim.log.levels.INFO)
         end,
 
         -- Open in browser (S-CR)
@@ -1056,115 +1186,205 @@ M.picker = function()
             return
           end
 
-          -- For PR review thread comments, we can use the reply API
+          -- For PR review thread comments, use the replies endpoint
           if item.kind == "pr" and item.comment_database_id then
-            -- Build the gh command to reply
-            -- gh api /repos/{owner}/{repo}/pulls/{number}/comments -f body="..." -f in_reply_to=ID
-            vim.ui.input({ prompt = "Reply: " }, function(input)
-              if not input or input == "" then
-                return
-              end
+            local owner, repo_name = item.repo:match("(.+)/(.+)")
+            if not owner or not repo_name then
+              vim.notify("Invalid repo format", vim.log.levels.ERROR)
+              return
+            end
 
-              local owner, repo_name = item.repo:match("(.+)/(.+)")
-              if not owner or not repo_name then
-                vim.notify("Invalid repo format", vim.log.levels.ERROR)
-                return
-              end
+            -- Get preview window for scratch buffer positioning
+            local preview_win = picker.preview and picker.preview.win
+            if not preview_win or not preview_win:valid() then
+              vim.notify("Preview window required for reply", vim.log.levels.WARN)
+              return
+            end
 
-              local endpoint = string.format("/repos/%s/%s/pulls/%d/comments", owner, repo_name, item.number)
-              vim.system({
-                "gh",
-                "api",
-                endpoint,
-                "-X",
-                "POST",
-                "-f",
-                "body=" .. input,
-                "-f",
-                "in_reply_to=" .. item.comment_database_id,
-              }, { text = true }, function(result)
-                vim.schedule(function()
-                  if result.code ~= 0 then
-                    vim.notify("Failed to post reply: " .. (result.stderr or ""), vim.log.levels.ERROR)
-                  else
-                    vim.notify("✅ Reply posted", vim.log.levels.INFO)
-                    -- Refresh the picker
-                    picker.opts.actions.refresh(picker)
-                  end
-                end)
-              end)
-            end)
+            -- Open scratch buffer at bottom of preview (context visible above)
+            local height = 10
+            Snacks.scratch({
+              ft = "markdown",
+              icon = " ",
+              name = "Reply to " .. item.comment_author,
+              win = {
+                relative = "win",
+                win = preview_win.win,
+                width = 0,
+                height = height,
+                border = "top_bottom",
+                row = function(win)
+                  local border = win:border_size()
+                  return win:parent_size().height - height - border.top - border.bottom
+                end,
+                wo = { winhighlight = "NormalFloat:Normal,FloatTitle:SnacksPickerTitle,FloatBorder:SnacksPickerBorder" },
+                on_win = function()
+                  vim.schedule(function()
+                    vim.cmd.startinsert()
+                  end)
+                end,
+                keys = {
+                  submit = {
+                    "<C-s>",
+                    function(win)
+                      local body = vim.trim(win:text())
+                      if body == "" then
+                        vim.notify("Reply cannot be empty", vim.log.levels.WARN)
+                        return
+                      end
+
+                      -- Use the correct /replies endpoint
+                      local endpoint = string.format(
+                        "/repos/%s/%s/pulls/%d/comments/%d/replies",
+                        owner,
+                        repo_name,
+                        item.number,
+                        item.comment_database_id
+                      )
+
+                      vim.system({
+                        "gh",
+                        "api",
+                        endpoint,
+                        "-X",
+                        "POST",
+                        "-f",
+                        "body=" .. body,
+                      }, { text = true }, function(result)
+                        vim.schedule(function()
+                          if result.code ~= 0 then
+                            vim.notify("Failed to post reply: " .. (result.stderr or ""), vim.log.levels.ERROR)
+                          else
+                            vim.notify("✅ Reply posted", vim.log.levels.INFO)
+                            win:close()
+                            picker.opts.actions.refresh(picker)
+                          end
+                        end)
+                      end)
+                    end,
+                    desc = "Submit reply",
+                    mode = { "n", "i" },
+                  },
+                },
+              },
+            })
           elseif item.kind == "issue" then
             -- For issues, post a new comment (no threading)
-            vim.ui.input({ prompt = "Comment: " }, function(input)
-              if not input or input == "" then
-                return
-              end
+            local owner, repo_name = item.repo:match("(.+)/(.+)")
+            if not owner or not repo_name then
+              vim.notify("Invalid repo format", vim.log.levels.ERROR)
+              return
+            end
 
-              local owner, repo_name = item.repo:match("(.+)/(.+)")
-              if not owner or not repo_name then
-                vim.notify("Invalid repo format", vim.log.levels.ERROR)
-                return
-              end
+            local preview_win = picker.preview and picker.preview.win
+            if not preview_win or not preview_win:valid() then
+              vim.notify("Preview window required for comment", vim.log.levels.WARN)
+              return
+            end
 
-              local endpoint = string.format("/repos/%s/%s/issues/%d/comments", owner, repo_name, item.number)
-              vim.system({
-                "gh",
-                "api",
-                endpoint,
-                "-X",
-                "POST",
-                "-f",
-                "body=" .. input,
-              }, { text = true }, function(result)
-                vim.schedule(function()
-                  if result.code ~= 0 then
-                    vim.notify("Failed to post comment: " .. (result.stderr or ""), vim.log.levels.ERROR)
-                  else
-                    vim.notify("✅ Comment posted", vim.log.levels.INFO)
-                    picker.opts.actions.refresh(picker)
-                  end
-                end)
-              end)
-            end)
+            local height = 10
+            Snacks.scratch({
+              ft = "markdown",
+              icon = " ",
+              name = "Comment on Issue #" .. item.number,
+              win = {
+                relative = "win",
+                win = preview_win.win,
+                width = 0,
+                height = height,
+                border = "top_bottom",
+                row = function(win)
+                  local border = win:border_size()
+                  return win:parent_size().height - height - border.top - border.bottom
+                end,
+                wo = { winhighlight = "NormalFloat:Normal,FloatTitle:SnacksPickerTitle,FloatBorder:SnacksPickerBorder" },
+                on_win = function()
+                  vim.schedule(function()
+                    vim.cmd.startinsert()
+                  end)
+                end,
+                keys = {
+                  submit = {
+                    "<C-s>",
+                    function(win)
+                      local body = vim.trim(win:text())
+                      if body == "" then
+                        vim.notify("Comment cannot be empty", vim.log.levels.WARN)
+                        return
+                      end
+
+                      local endpoint = string.format("/repos/%s/%s/issues/%d/comments", owner, repo_name, item.number)
+                      vim.system({
+                        "gh",
+                        "api",
+                        endpoint,
+                        "-X",
+                        "POST",
+                        "-f",
+                        "body=" .. body,
+                      }, { text = true }, function(result)
+                        vim.schedule(function()
+                          if result.code ~= 0 then
+                            vim.notify("Failed to post comment: " .. (result.stderr or ""), vim.log.levels.ERROR)
+                          else
+                            vim.notify("✅ Comment posted", vim.log.levels.INFO)
+                            win:close()
+                            picker.opts.actions.refresh(picker)
+                          end
+                        end)
+                      end)
+                    end,
+                    desc = "Submit comment",
+                    mode = { "n", "i" },
+                  },
+                },
+              },
+            })
           else
             vim.notify("Reply not supported for this item type", vim.log.levels.WARN)
           end
         end,
       },
 
-      -- Keybindings
-      keys = {
-        ["<S-CR>"] = function(picker)
-          local item = picker:current()
-          if item then
-            picker.opts.actions.open_in_browser(picker, item)
-          end
-        end,
-      },
+      -- Keybindings: <C-key> = actions, <M-key> = toggles
       win = {
         input = {
           keys = {
-            ["R"] = { "refresh", desc = "Refresh threads", mode = { "n" } },
-            ["X"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n" } },
-            ["x"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n" } },
-            ["r"] = { "reply", desc = "Reply to comment", mode = { "n" } },
+            -- Actions (Ctrl)
+            ["<C-g>"] = { "refresh", desc = "Refresh threads", mode = { "n", "i" } },
+            ["<C-x>"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n", "i" } },
+            ["<C-a>"] = { "reply", desc = "Reply to comment", mode = { "n", "i" } },
+            ["<C-o>"] = { "open_in_browser", desc = "Open in browser", mode = { "n", "i" } },
+            ["<C-d>"] = { "toggle_hidden", desc = "Hide/unhide thread", mode = { "n", "i" } },
+            -- Toggles (Alt)
+            ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
+            ["<M-d>"] = { "toggle_hidden_view", desc = "Toggle hidden view", mode = { "n", "i" } },
           },
         },
         list = {
           keys = {
-            ["R"] = { "refresh", desc = "Refresh threads" },
-            ["X"] = { "toggle_resolved_view", desc = "Toggle resolved view" },
-            ["x"] = { "toggle_resolved", desc = "Resolve/unresolve thread" },
-            ["r"] = { "reply", desc = "Reply to comment" },
+            -- Actions (Ctrl)
+            ["<C-g>"] = { "refresh", desc = "Refresh threads", mode = { "n", "i" } },
+            ["<C-x>"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n", "i" } },
+            ["<C-a>"] = { "reply", desc = "Reply to comment", mode = { "n", "i" } },
+            ["<C-o>"] = { "open_in_browser", desc = "Open in browser", mode = { "n", "i" } },
+            ["<C-d>"] = { "toggle_hidden", desc = "Hide/unhide thread", mode = { "n", "i" } },
+            -- Toggles (Alt)
+            ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
+            ["<M-d>"] = { "toggle_hidden_view", desc = "Toggle hidden view", mode = { "n", "i" } },
           },
         },
         preview = {
           keys = {
-            ["R"] = { "refresh", desc = "Refresh threads" },
-            ["X"] = { "toggle_resolved_view", desc = "Toggle resolved view" },
-            ["x"] = { "toggle_resolved", desc = "Resolve/unresolve thread" },
-            ["r"] = { "reply", desc = "Reply to comment" },
+            -- Actions (Ctrl)
+            ["<C-g>"] = { "refresh", desc = "Refresh threads", mode = { "n", "i" } },
+            ["<C-x>"] = { "toggle_resolved", desc = "Resolve/unresolve thread", mode = { "n", "i" } },
+            ["<C-a>"] = { "reply", desc = "Reply to comment", mode = { "n", "i" } },
+            ["<C-o>"] = { "open_in_browser", desc = "Open in browser", mode = { "n", "i" } },
+            ["<C-d>"] = { "toggle_hidden", desc = "Hide/unhide thread", mode = { "n", "i" } },
+            -- Toggles (Alt)
+            ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
+            ["<M-d>"] = { "toggle_hidden_view", desc = "Toggle hidden view", mode = { "n", "i" } },
           },
         },
       },
