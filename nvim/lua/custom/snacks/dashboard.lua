@@ -10,7 +10,7 @@
 --    for operations that are contextual to "just opened the project"
 
 local utils = require("custom.snacks.utils")
-local notifications = require("custom.git.notifications")
+local review_threads = require("custom.git.review_threads")
 local git_utils = require("custom.git.utils")
 local visual_utils = require("custom.visual.utils")
 local todos = require("custom.todos")
@@ -655,12 +655,12 @@ local function create_git_sections(base_branch, current_branch, hide_mode)
     },
     {
       pane = 1,
-      desc = "Search Recent Notifications",
-      key = "N",
+      desc = "Review Comment Threads",
+      key = "C",
       indent = 0,
       action = function()
-        vim.notify("Fetching Notifications from GitHub...")
-        vim.defer_fn(notifications.picker, 100)
+        -- Uses review_threads module which fetches via GraphQL and shows its own notification
+        vim.defer_fn(review_threads.picker, 100)
       end,
       enabled = in_git,
     },
