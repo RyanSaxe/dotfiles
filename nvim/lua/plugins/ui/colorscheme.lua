@@ -306,13 +306,18 @@ return {
       hl["BufferLineInfoDiagnosticVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
       hl["BufferLineInfoDiagnosticSelected"] = { fg = c.cyan, bg = c.bg }
 
-      -- Hint diagnostics (teal themed)
-      hl["BufferLineHint"] = { fg = Util.blend_bg(c.teal, 0.3), bg = c.bg_dark }
-      hl["BufferLineHintVisible"] = { fg = Util.blend_bg(c.teal, 0.6), bg = c.bg_dark }
-      hl["BufferLineHintSelected"] = { fg = c.teal, bg = c.bg }
-      hl["BufferLineHintDiagnostic"] = { fg = Util.blend_bg(c.teal, 0.3), bg = c.bg_dark }
-      hl["BufferLineHintDiagnosticVisible"] = { fg = Util.blend_bg(c.teal, 0.6), bg = c.bg_dark }
-      hl["BufferLineHintDiagnosticSelected"] = { fg = c.teal, bg = c.bg }
+      -- Hint diagnostics (cyan themed - prefer cyan over teal for hints)
+      hl["DiagnosticHint"] = { fg = c.cyan }
+      hl["DiagnosticSignHint"] = { fg = c.cyan }
+      hl["DiagnosticVirtualTextHint"] = { fg = c.cyan }
+      hl["DiagnosticUnderlineHint"] = { sp = c.cyan, undercurl = true }
+      hl["DiagnosticFloatingHint"] = { fg = c.cyan }
+      hl["BufferLineHint"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
+      hl["BufferLineHintVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
+      hl["BufferLineHintSelected"] = { fg = c.cyan, bg = c.bg }
+      hl["BufferLineHintDiagnostic"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
+      hl["BufferLineHintDiagnosticVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
+      hl["BufferLineHintDiagnosticSelected"] = { fg = c.cyan, bg = c.bg }
 
       -- Generic diagnostic (fallback)
       hl["BufferLineDiagnostic"] = { fg = c.dark3, bg = c.bg_dark }
