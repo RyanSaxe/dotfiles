@@ -112,6 +112,117 @@ function openAppOrWeb(appName, appPath, webUrl)
 	end
 end
 
+-- Function to open app and send a keystroke once focused
+-- Supports different keystrokes for native app vs web version
+-- appKey/appModifiers: keystroke to send when opening native app (optional)
+-- webKey/webModifiers: keystroke to send when opening web version (optional)
+function openAppWithKey(appName, appPath, webUrl, appKey, appModifiers, webKey, webModifiers)
+	appModifiers = appModifiers or {}
+	webModifiers = webModifiers or {}
+
+	-- Helper to send keystroke after app/page is focused
+	local function sendKeystrokeWhenFocused(targetAppName, key, modifiers)
+		if not key then
+			return
+		end
+
+		-- Check if app is already frontmost
+		local app = hs.application.find(targetAppName)
+		if app and app:isFrontmost() then
+			hs.eventtap.keyStroke(modifiers, key, 50000)
+			return
+		end
+
+		-- Set up watcher to send keystroke when app is activated
+		local watcher
+		watcher = hs.application.watcher.new(function(name, event, _)
+			if event == hs.application.watcher.activated and name == targetAppName then
+				-- Small delay to ensure window is ready
+				hs.timer.doAfter(0.15, function()
+					hs.eventtap.keyStroke(modifiers, key, 50000)
+				end)
+				watcher:stop()
+			end
+		end)
+		watcher:start()
+
+		-- Safety timeout: stop watcher after 5 seconds
+		hs.timer.doAfter(5, function()
+			watcher:stop()
+		end)
+	end
+
+	-- Check if the native app exists
+	local file = io.open(appPath, "r")
+	if file then
+		file:close()
+		-- App exists, open it and send app keystroke
+		hs.application.open(appPath)
+		sendKeystrokeWhenFocused(appName, appKey, appModifiers)
+	else
+		-- App doesn't exist, open web version
+		local domain = webUrl:match("^https?://([^/]+)")
+		if domain then
+			domain = domain:lower():gsub("^www%.", "")
+			focusByDomainOrOpen(domain, webUrl)
+		else
+			hs.urlevent.openURL(webUrl)
+		end
+		-- Send web keystroke (Chrome will be the focused app)
+		sendKeystrokeWhenFocused("Google Chrome", webKey, webModifiers)
+	end
+end
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Window Tiling Functions (called via Leader Key)
+-- ════════════════════════════════════════════════════════════════════════════
+
+function tileLeft()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x, y = screen.y, w = screen.w / 2, h = screen.h })
+	end
+end
+
+function tileRight()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x + screen.w / 2, y = screen.y, w = screen.w / 2, h = screen.h })
+	end
+end
+
+function tileTop()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x, y = screen.y, w = screen.w, h = screen.h / 2 })
+	end
+end
+
+function tileBottom()
+	local win = hs.window.focusedWindow()
+	if win then
+		local screen = win:screen():frame()
+		win:setFrame({ x = screen.x, y = screen.y + screen.h / 2, w = screen.w, h = screen.h / 2 })
+	end
+end
+
+function windowMaximize()
+	local win = hs.window.focusedWindow()
+	if win then
+		win:maximize()
+	end
+end
+
+function windowFullscreen()
+	local win = hs.window.focusedWindow()
+	if win then
+		win:toggleFullScreen()
+	end
+end
+
 -- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
