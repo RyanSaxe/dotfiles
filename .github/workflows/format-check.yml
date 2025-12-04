@@ -55,7 +55,11 @@ jobs:
       - name: Check JSON formatting (prettier)
         run: |
           echo "Checking JSON files..."
-          find . -name "*.json" -type f ! -path "./node_modules/*" | while read -r file; do
+          # Exclude node_modules and auto-generated lock files
+          find . -name "*.json" -type f \
+            ! -path "./node_modules/*" \
+            ! -name "lazy-lock.json" \
+            | while read -r file; do
             if ! prettier --check "$file" > /dev/null 2>&1; then
               echo "::error file=$file::JSON file is not formatted correctly"
               exit 1
@@ -72,3 +76,13 @@ jobs:
             exit 1
           }
           echo "All Markdown files pass linting"
+
+      - name: Check Python formatting (ruff format)
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check"
+
+      - name: Check Python linting (ruff check)
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check"
