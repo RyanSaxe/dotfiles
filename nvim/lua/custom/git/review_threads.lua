@@ -28,6 +28,19 @@ local CONFIG = {
   flat_comments_limit = 100,
 }
 
+-- GraphQL fragment for comment fields (used in all comment queries)
+-- Includes viewerHasReacted to detect user acknowledgment of others' comments
+local COMMENT_FIELDS = [[
+                author { login }
+                body
+                createdAt
+                url
+                databaseId
+                reactionGroups {
+                  viewerHasReacted
+                }
+]]
+
 -------------------------------------------------------------------------------
 -- State Management
 -------------------------------------------------------------------------------
@@ -263,22 +276,18 @@ local function build_graphql_query(repo)
             isResolved
             comments(first: %d) {
               nodes {
-                author { login }
-                body
-                createdAt
-                url
-                databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
               }
             }
           }
         }
         comments(last: %d) {
           nodes {
-            author { login }
-            body
-            createdAt
-            url
-            databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
           }
         }
       }
@@ -299,22 +308,18 @@ local function build_graphql_query(repo)
             isResolved
             comments(first: %d) {
               nodes {
-                author { login }
-                body
-                createdAt
-                url
-                databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
               }
             }
           }
         }
         comments(last: %d) {
           nodes {
-            author { login }
-            body
-            createdAt
-            url
-            databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
           }
         }
       }
@@ -335,22 +340,18 @@ local function build_graphql_query(repo)
             isResolved
             comments(first: %d) {
               nodes {
-                author { login }
-                body
-                createdAt
-                url
-                databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
               }
             }
           }
         }
         comments(last: %d) {
           nodes {
-            author { login }
-            body
-            createdAt
-            url
-            databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
           }
         }
       }
@@ -367,11 +368,9 @@ local function build_graphql_query(repo)
         repository { nameWithOwner }
         comments(last: %d) {
           nodes {
-            author { login }
-            body
-            createdAt
-            url
-            databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
           }
         }
       }
@@ -388,11 +387,9 @@ local function build_graphql_query(repo)
         repository { nameWithOwner }
         comments(last: %d) {
           nodes {
-            author { login }
-            body
-            createdAt
-            url
-            databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
           }
         }
       }
@@ -409,11 +406,9 @@ local function build_graphql_query(repo)
         repository { nameWithOwner }
         comments(last: %d) {
           nodes {
-            author { login }
-            body
-            createdAt
-            url
-            databaseId
+]]
+      .. COMMENT_FIELDS
+      .. [[
           }
         }
       }
@@ -486,6 +481,22 @@ local function is_participating(comments, my_username)
   return false
 end
 
+-- Check if viewer (current user) has reacted to a comment
+-- Used to detect acknowledgment: if I reacted to someone else's comment, I've seen it
+-- @param reaction_groups table|nil - reactionGroups array from GraphQL
+-- @return boolean - true if viewer has any reaction on this comment
+local function viewer_has_reacted(reaction_groups)
+  if not reaction_groups then
+    return false
+  end
+  for _, group in ipairs(reaction_groups) do
+    if group.viewerHasReacted then
+      return true
+    end
+  end
+  return false
+end
+
 -- Classify a thread into one of: "pending", "needs_attention", or nil (skip)
 --
 -- Classification rules:
@@ -525,7 +536,11 @@ local function classify_thread(comments, my_username, _item_author, is_my_item)
       return "pending" -- Waiting on them to respond
     end
   else
-    -- Someone else has the last word - needs my response
+    -- Someone else has the last word
+    -- But if I've reacted to it, I've acknowledged - nothing more to do
+    if viewer_has_reacted(last_comment.reactionGroups) then
+      return nil
+    end
     return "needs_attention"
   end
 end
