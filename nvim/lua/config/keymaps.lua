@@ -89,3 +89,8 @@ local function toggle_pyright_diagnostic_mode()
 end
 
 vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
+
+-- GitHub Comments picker (review threads needing attention)
+vim.keymap.set("n", "<leader>gc", function()
+  require("custom.git.review_threads").picker()
+end, { desc = "GitHub Comments" })

@@ -1535,4 +1535,59 @@ M.get_thread_counts = function()
   return counts
 end
 
+-- Get actionable thread count (for shell scripts calling headless Neovim)
+-- Performs a synchronous fetch and returns count of threads needing response
+-- @return number - Count of needs_attention + my_pr threads
+M.get_actionable_count = function()
+  local query = build_graphql_query()
+  local my_username = get_username()
+
+  if not my_username or my_username == "" then
+    return 0
+  end
+
+  -- Synchronous fetch using :wait()
+  local result = vim
+    .system({
+      "gh",
+      "api",
+      "graphql",
+      "-f",
+      "query=" .. query,
+    }, { text = true })
+    :wait()
+
+  if result.code ~= 0 then
+    return 0
+  end
+
+  local ok, response = pcall(vim.json.decode, result.stdout)
+  if not ok or not response.data then
+    return 0
+  end
+
+  -- Parse and count actionable threads
+  local items = parse_graphql_response(response.data, my_username)
+  local count = 0
+  for _, item in ipairs(items) do
+    -- Count unresolved needs_attention and my_pr threads (excluding hidden)
+    if not item.is_resolved and (item.type == "needs_attention" or item.type == "my_pr") then
+      -- Check if hidden (same logic as filter_by_hidden)
+      local is_hidden = state.hidden_threads[item.comment_url] ~= nil
+      if is_hidden then
+        local comment_time = iso_to_unix(item.comment_created_at)
+        local hide_timestamp = state.hidden_threads[item.comment_url]
+        if comment_time and hide_timestamp and comment_time > hide_timestamp then
+          is_hidden = false -- Auto-unhide due to new activity
+        end
+      end
+      if not is_hidden then
+        count = count + 1
+      end
+    end
+  end
+
+  return count
+end
+
 return M
