@@ -323,6 +323,14 @@ return {
       hl["BufferLineDiagnostic"] = { fg = c.dark3, bg = c.bg_dark }
       hl["BufferLineDiagnosticVisible"] = { fg = Util.blend_bg(c.fg, 0.6), bg = c.bg_dark }
       hl["BufferLineDiagnosticSelected"] = { fg = c.fg, bg = c.bg }
+
+      -- GitHub Review Threads picker columns
+      -- Used by custom/git/review_threads.lua picker
+      hl["ReviewThreadsAuthor"] = { fg = c.purple }
+      hl["ReviewThreadsCommentAuthor"] = { fg = c.blue }
+      hl["ReviewThreadsKind"] = { fg = c.orange }
+      hl["ReviewThreadsRepo"] = { fg = c.teal }
+      hl["ReviewThreadsTime"] = { fg = c.moon_pink }
     end,
   },
 }
