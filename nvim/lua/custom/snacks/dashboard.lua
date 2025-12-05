@@ -678,7 +678,10 @@ local function create_git_sections(base_branch, current_branch, hide_mode)
       indent = 0,
       action = function()
         -- Uses review_threads module which fetches via GraphQL and shows its own notification
-        vim.defer_fn(review_threads.picker, 100)
+        -- Scoped to current repo for faster queries
+        vim.defer_fn(function()
+          review_threads.picker({ repo = review_threads.get_current_repo() })
+        end, 100)
       end,
       enabled = in_git,
     },

@@ -91,6 +91,13 @@ end
 vim.keymap.set("n", "<leader>tp", toggle_pyright_diagnostic_mode, { desc = "Toggle basedpyright diagnosticMode" })
 
 -- GitHub Comments picker (review threads needing attention)
+-- <leader>gc = current repo (falls back to all if not in git repo)
+-- <leader>gC = all repos
 vim.keymap.set("n", "<leader>gc", function()
+  local rt = require("custom.git.review_threads")
+  rt.picker({ repo = rt.get_current_repo() })
+end, { desc = "GitHub Comments (repo)" })
+
+vim.keymap.set("n", "<leader>gC", function()
   require("custom.git.review_threads").picker()
-end, { desc = "GitHub Comments" })
+end, { desc = "GitHub Comments (all)" })

@@ -4,10 +4,9 @@
 -- Bypasses the broken notification API (where `reason` reflects relationship,
 -- not what happened) by directly querying thread state via GraphQL.
 --
--- Categories:
---   PENDING (yellow)        - I'm in this thread AND I have the last word -> waiting on them
---   NEEDS_ATTENTION (red)   - I'm in this thread AND someone else has the last word -> needs my response
---   MY_PR (orange)          - Thread on MY PR/Issue where I don't have last word -> needs my response
+-- Categories (shown via row coloring, not as a column):
+--   PENDING (dimmed)        - I have the last word -> waiting on them
+--   NEEDS_ATTENTION (full)  - Someone else has the last word -> needs my response
 
 local M = {}
 
@@ -38,6 +37,7 @@ local state = {
   items = {}, -- All parsed thread items
   show_resolved = false, -- Toggle: false = unresolved, true = resolved
   show_hidden = false, -- Toggle: false = active threads, true = hidden threads
+  show_pending = true, -- Toggle: true = show pending threads, false = hide them
   hidden_threads = {}, -- comment_url -> hide_timestamp (unix time)
   current_repo = nil, -- Detected from git remote (cached)
   username = nil, -- GitHub username (cached)
@@ -239,13 +239,17 @@ end
 -- Build the GraphQL query with 6 search aliases:
 -- commentedPRs, mentionedPRs, myPRs, commentedIssues, mentionedIssues, myIssues
 --
+-- @param repo string|nil - Optional "owner/name" to scope query to a specific repository
+--                          When nil, queries across all repositories (slower but comprehensive)
 -- Important: Use `last:` not `first:` for reviewThreads to get most recent threads
-local function build_graphql_query()
+local function build_graphql_query(repo)
   local limits = CONFIG
+  -- Build repo filter suffix: empty string for all repos, or " repo:owner/name" for specific repo
+  local repo_filter = repo and (" repo:" .. repo) or ""
   return string.format(
     [[
 {
-  commentedPRs: search(query: "is:open is:pr commenter:@me -author:@me", type: ISSUE, first: %d) {
+  commentedPRs: search(query: "is:open is:pr commenter:@me -author:@me%s", type: ISSUE, first: %d) {
     nodes {
       ... on PullRequest {
         number
@@ -281,7 +285,7 @@ local function build_graphql_query()
     }
   }
 
-  mentionedPRs: search(query: "is:open is:pr mentions:@me -author:@me -commenter:@me", type: ISSUE, first: %d) {
+  mentionedPRs: search(query: "is:open is:pr mentions:@me -author:@me -commenter:@me%s", type: ISSUE, first: %d) {
     nodes {
       ... on PullRequest {
         number
@@ -317,12 +321,13 @@ local function build_graphql_query()
     }
   }
 
-  myPRs: search(query: "is:open is:pr author:@me", type: ISSUE, first: %d) {
+  myPRs: search(query: "is:open is:pr author:@me%s", type: ISSUE, first: %d) {
     nodes {
       ... on PullRequest {
         number
         title
         url
+        author { login }
         repository { nameWithOwner }
         reviewThreads(last: %d) {
           nodes {
@@ -352,7 +357,7 @@ local function build_graphql_query()
     }
   }
 
-  commentedIssues: search(query: "is:open is:issue commenter:@me -author:@me", type: ISSUE, first: %d) {
+  commentedIssues: search(query: "is:open is:issue commenter:@me -author:@me%s", type: ISSUE, first: %d) {
     nodes {
       ... on Issue {
         number
@@ -373,7 +378,7 @@ local function build_graphql_query()
     }
   }
 
-  mentionedIssues: search(query: "is:open is:issue mentions:@me -author:@me -commenter:@me", type: ISSUE, first: %d) {
+  mentionedIssues: search(query: "is:open is:issue mentions:@me -author:@me -commenter:@me%s", type: ISSUE, first: %d) {
     nodes {
       ... on Issue {
         number
@@ -394,12 +399,13 @@ local function build_graphql_query()
     }
   }
 
-  myIssues: search(query: "is:open is:issue author:@me", type: ISSUE, first: %d) {
+  myIssues: search(query: "is:open is:issue author:@me%s", type: ISSUE, first: %d) {
     nodes {
       ... on Issue {
         number
         title
         url
+        author { login }
         repository { nameWithOwner }
         comments(last: %d) {
           nodes {
@@ -416,27 +422,33 @@ local function build_graphql_query()
 }
 ]],
     -- commentedPRs
+    repo_filter,
     limits.search_limit,
     limits.review_threads_limit,
     limits.thread_comments_limit,
     limits.flat_comments_limit,
     -- mentionedPRs
+    repo_filter,
     limits.search_limit,
     limits.review_threads_limit,
     limits.thread_comments_limit,
     limits.flat_comments_limit,
     -- myPRs
+    repo_filter,
     limits.search_limit,
     limits.review_threads_limit,
     limits.thread_comments_limit,
     limits.flat_comments_limit,
     -- commentedIssues
+    repo_filter,
     limits.search_limit,
     limits.flat_comments_limit,
     -- mentionedIssues
+    repo_filter,
     limits.search_limit,
     limits.flat_comments_limit,
     -- myIssues
+    repo_filter,
     limits.search_limit,
     limits.flat_comments_limit
   )
@@ -474,12 +486,12 @@ local function is_participating(comments, my_username)
   return false
 end
 
--- Classify a thread into one of: "pending", "needs_attention", "my_pr", or nil (skip)
+-- Classify a thread into one of: "pending", "needs_attention", or nil (skip)
 --
 -- Classification rules:
---   - PENDING: I'm in this thread AND I have the last word -> waiting on them
---   - NEEDS_ATTENTION: I'm in this thread AND someone else has the last word -> needs my response
---   - MY_PR: Thread on MY PR/Issue where I don't have last word -> needs my response
+--   - PENDING: I have the last word -> waiting on them
+--   - NEEDS_ATTENTION: Someone else has the last word -> needs my response
+--     (This includes threads on my own PRs/Issues where someone else commented)
 --
 -- @param comments table - Array of comments in the thread
 -- @param my_username string - Current user's GitHub username
@@ -505,20 +517,16 @@ local function classify_thread(comments, my_username, _item_author, is_my_item)
 
   local i_have_last_word = (last_comment.author.login == my_username)
 
-  if is_my_item then
-    -- It's my PR/Issue
-    if i_have_last_word then
-      return nil -- I responded, nothing to do
+  if i_have_last_word then
+    -- I have the last word - if it's my PR/Issue, nothing to do; otherwise waiting on them
+    if is_my_item then
+      return nil -- I responded on my own PR/Issue, nothing to do
     else
-      return "my_pr" -- Someone commented, need to respond
+      return "pending" -- Waiting on them to respond
     end
   else
-    -- Someone else's PR/Issue
-    if i_have_last_word then
-      return "pending" -- Waiting on them
-    else
-      return "needs_attention" -- They replied, need to respond
-    end
+    -- Someone else has the last word - needs my response
+    return "needs_attention"
   end
 end
 
@@ -559,6 +567,7 @@ local function parse_pr_review_threads(pr, my_username, is_my_pr)
         number = pr.number,
         title = pr.title or "",
         pr_url = pr.url or "",
+        item_author = pr_author, -- PR/Issue author (for column display)
 
         -- Thread-specific (for PR review threads)
         thread_id = thread.id, -- Node ID for resolve/unresolve mutations
@@ -613,6 +622,7 @@ local function parse_pr_flat_comments(pr, my_username, is_my_pr)
     number = pr.number,
     title = pr.title or "",
     pr_url = pr.url or "",
+    item_author = pr_author, -- PR/Issue author (for column display)
 
     thread_id = nil, -- No thread ID for flat comments
 
@@ -657,6 +667,7 @@ local function parse_issue_comments(issue, my_username, is_my_issue)
     number = issue.number,
     title = issue.title or "",
     pr_url = issue.url or "", -- Using pr_url field for consistency
+    item_author = issue_author, -- PR/Issue author (for column display)
 
     thread_id = nil,
 
@@ -767,12 +778,27 @@ local function filter_by_resolved(items, show_resolved)
   end, items)
 end
 
--- Apply all filters in order: resolved -> hidden
+-- Filter items by pending state
+-- When show_pending is false, hide items of type "pending"
+-- @param items table - Array of picker items
+-- @param show_pending boolean - Whether to include pending items
+-- @return table - Filtered items
+local function filter_by_pending(items, show_pending)
+  if show_pending then
+    return items -- Show everything
+  end
+  return vim.tbl_filter(function(item)
+    return item.type ~= "pending"
+  end, items)
+end
+
+-- Apply all filters in order: resolved -> hidden -> pending
 -- @param items table - Array of all items
 -- @return table - Filtered items based on current state
 local function apply_filters(items)
   local filtered = filter_by_resolved(items, state.show_resolved)
   filtered = filter_by_hidden(filtered, state.show_hidden)
+  filtered = filter_by_pending(filtered, state.show_pending)
   return filtered
 end
 
@@ -781,7 +807,8 @@ end
 -- @return table - Sorted items (in place)
 local function sort_items(items)
   local current_repo = get_current_repo()
-  local type_priority = { needs_attention = 1, my_pr = 2, pending = 3 }
+  -- Sort priority: needs_attention first (actionable), then pending (waiting)
+  local type_priority = { needs_attention = 1, pending = 2 }
 
   table.sort(items, function(a, b)
     local a_is_current = a.repo == current_repo
@@ -811,9 +838,10 @@ end
 -------------------------------------------------------------------------------
 
 -- Fetch all threads from GitHub via GraphQL (async)
+-- @param repo string|nil - Optional "owner/name" to scope query to a specific repository
 -- @param callback function - Called with parsed items or nil on error
-local function fetch_threads(callback)
-  local query = build_graphql_query()
+local function fetch_threads(repo, callback)
+  local query = build_graphql_query(repo)
   local my_username = get_username()
 
   if not my_username or my_username == "" then
@@ -872,7 +900,9 @@ end
 -------------------------------------------------------------------------------
 
 -- Format a single item for picker display
--- Display: [TYPE] PR #123 repo/name "body..." 2h
+-- Columns: [Author] [Comment Author] [Kind] [Repo] [Time] [Context]
+-- Colors: Author=purple, CommentAuthor=blue, Kind=orange, Repo=teal, Time=pink, Context=dim
+-- Row coloring: pending = all dimmed, needs_attention = colored columns
 -- @param item table - Picker item
 -- @param _picker table - Snacks picker instance (required by Snacks API, unused here)
 -- @return table - Array of {text, highlight} tuples
@@ -880,49 +910,48 @@ local function format_item(item, _picker)
   local align = require("snacks.picker.util").align
   local ret = {}
 
-  local current_repo = get_current_repo()
-  local is_current_repo = item.repo == current_repo
+  -- Row coloring based on type
+  -- pending = dimmed (waiting on them), needs_attention = colored (needs my response)
+  local is_pending = item.type == "pending"
 
-  -- Type badge with color based on type and repo
-  local type_display = ({
-    needs_attention = "ATTENTION",
-    my_pr = "MY_PR",
-    pending = "PENDING",
-  })[item.type] or item.type:upper()
-
-  local type_hl
-  if not is_current_repo then
-    type_hl = "Comment" -- Dimmed for other repos
-  elseif item.type == "needs_attention" then
-    type_hl = "DiagnosticError" -- Red
-  elseif item.type == "my_pr" then
-    type_hl = "DiagnosticWarn" -- Orange
-  else -- pending
-    type_hl = "DiagnosticHint" -- Yellow
+  -- Helper to get highlight based on pending state
+  -- TODO: Add conditional highlighting for Author/Comment columns when they match current user
+  local function get_hl(colored_hl)
+    return is_pending and "Comment" or colored_hl
   end
 
-  ret[#ret + 1] = { align("[" .. type_display .. "]", 12), type_hl }
+  -- Helper to truncate and align (align only pads, doesn't truncate)
+  local function truncate_align(str, width)
+    if #str > width then
+      return str:sub(1, width - 1) .. "…"
+    end
+    return align(str, width)
+  end
 
-  -- Kind and number (PR/Issue #123)
+  -- Author column (PR/Issue author) - purple
+  local author = item.item_author or ""
+  ret[#ret + 1] = { truncate_align(author, 14), get_hl("ReviewThreadsAuthor") }
+
+  -- Comment author column (who wrote the last comment) - blue
+  local comment_author = item.comment_author or ""
+  ret[#ret + 1] = { " " .. truncate_align(comment_author, 14), get_hl("ReviewThreadsCommentAuthor") }
+
+  -- Kind and number (PR #123 or Issue #45) - orange
   local kind_display = item.kind == "pr" and "PR" or "Issue"
   local number_text = kind_display .. " #" .. item.number
-  ret[#ret + 1] = { " " .. align(number_text, 12), is_current_repo and "SnacksPickerIdx" or "Comment" }
+  ret[#ret + 1] = { " " .. truncate_align(number_text, 10), get_hl("ReviewThreadsKind") }
 
-  -- Repository name (truncated)
-  local repo_display = item.repo
-  if #repo_display > 20 then
-    -- Show just the repo name if too long
-    repo_display = repo_display:match("/(.+)$") or repo_display
-  end
-  ret[#ret + 1] = { " " .. align(repo_display, 20), is_current_repo and "SnacksPickerDir" or "Comment" }
+  -- Repository name (show just repo name, not owner/repo) - teal
+  local repo_display = item.repo:match("/(.+)$") or item.repo
+  ret[#ret + 1] = { " " .. truncate_align(repo_display, 16), get_hl("ReviewThreadsRepo") }
 
-  -- Time since comment (between repo and comment for easy scanning)
+  -- Time since comment - pink
   local time_str = iso_to_relative(item.comment_created_at)
-  ret[#ret + 1] = { " " .. align(time_str, 4), is_current_repo and "SnacksPickerIdx" or "Comment" }
+  ret[#ret + 1] = { " " .. truncate_align(time_str, 5), get_hl("ReviewThreadsTime") }
 
-  -- Comment body preview (truncated)
+  -- Comment body preview (context) - always dim
   local body_preview = truncate(item.comment_body, 40)
-  ret[#ret + 1] = { ' "' .. body_preview .. '"', is_current_repo and "SnacksPickerComment" or "Comment" }
+  ret[#ret + 1] = { ' "' .. body_preview .. '"', "Comment" }
 
   -- Build fuzzy searchable text
   item.text = table.concat(
@@ -957,7 +986,6 @@ local function generate_preview(ctx)
   -- Header with type badge
   local type_display = ({
     needs_attention = "🔴 NEEDS ATTENTION",
-    my_pr = "🟠 MY PR",
     pending = "🟡 PENDING",
   })[item.type] or item.type:upper()
 
@@ -1079,11 +1107,22 @@ end
 -------------------------------------------------------------------------------
 
 -- Open the comment thread picker
-M.picker = function()
-  -- Show loading notification
-  vim.notify("Fetching comment threads...", vim.log.levels.INFO)
+-- @param opts table|nil - Optional configuration:
+--   - repo: string|nil - "owner/name" to scope to specific repo (nil = all repos)
+--   - show_pending: boolean - Whether to show pending threads (default: true)
+M.picker = function(opts)
+  opts = opts or {}
+  local repo = opts.repo -- nil means all repos
 
-  fetch_threads(function(items)
+  -- Set initial pending visibility from opts (default: true)
+  -- This allows code-review session to start with pending hidden
+  state.show_pending = opts.show_pending ~= false
+
+  -- Show loading notification
+  local scope_msg = repo and (" for " .. repo) or ""
+  vim.notify("Fetching comment threads" .. scope_msg .. "...", vim.log.levels.INFO)
+
+  fetch_threads(repo, function(items)
     if not items then
       return
     end
@@ -1124,9 +1163,10 @@ M.picker = function()
       -- Custom actions
       actions = {
         -- Refresh: re-fetch all threads from GitHub
+        -- Note: repo is captured from the outer scope (opts.repo)
         refresh = function(picker)
           vim.notify("Refreshing threads...", vim.log.levels.INFO)
-          fetch_threads(function(new_items)
+          fetch_threads(repo, function(new_items)
             if new_items then
               state.items = new_items
               local new_filtered = apply_filters(new_items)
@@ -1203,6 +1243,18 @@ M.picker = function()
         -- Switch between showing active threads vs hidden threads
         view_hidden_threads = function(picker)
           state.show_hidden = not state.show_hidden
+          local new_filtered = apply_filters(state.items)
+          local new_sorted = sort_items(new_filtered)
+          picker.finder._find = function()
+            return new_sorted
+          end
+          picker:refresh()
+        end,
+
+        -- Toggle pending visibility (<M-c>)
+        -- Show/hide pending threads (threads where I have the last word)
+        toggle_pending = function(picker)
+          state.show_pending = not state.show_pending
           local new_filtered = apply_filters(state.items)
           local new_sorted = sort_items(new_filtered)
           picker.finder._find = function()
@@ -1490,6 +1542,7 @@ M.picker = function()
             -- Toggles (Alt)
             ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
             ["<M-d>"] = { "view_hidden_threads", desc = "View hidden threads", mode = { "n", "i" } },
+            ["<M-c>"] = { "toggle_pending", desc = "Toggle pending threads", mode = { "n", "i" } },
           },
         },
         list = {
@@ -1503,6 +1556,7 @@ M.picker = function()
             -- Toggles (Alt)
             ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
             ["<M-d>"] = { "view_hidden_threads", desc = "View hidden threads", mode = { "n", "i" } },
+            ["<M-c>"] = { "toggle_pending", desc = "Toggle pending threads", mode = { "n", "i" } },
           },
         },
         preview = {
@@ -1516,6 +1570,7 @@ M.picker = function()
             -- Toggles (Alt)
             ["<M-x>"] = { "toggle_resolved_view", desc = "Toggle resolved view", mode = { "n", "i" } },
             ["<M-d>"] = { "view_hidden_threads", desc = "View hidden threads", mode = { "n", "i" } },
+            ["<M-c>"] = { "toggle_pending", desc = "Toggle pending threads", mode = { "n", "i" } },
           },
         },
       },
@@ -1524,9 +1579,9 @@ M.picker = function()
 end
 
 -- Get thread counts for dashboard display (optional)
--- @return table - { pending = N, needs_attention = N, my_pr = N }
+-- @return table - { pending = N, needs_attention = N }
 M.get_thread_counts = function()
-  local counts = { pending = 0, needs_attention = 0, my_pr = 0 }
+  local counts = { pending = 0, needs_attention = 0 }
   for _, item in ipairs(state.items) do
     if not item.is_resolved and counts[item.type] then
       counts[item.type] = counts[item.type] + 1
@@ -1537,7 +1592,7 @@ end
 
 -- Get actionable thread count (for shell scripts calling headless Neovim)
 -- Performs a synchronous fetch and returns count of threads needing response
--- @return number - Count of needs_attention + my_pr threads
+-- @return number - Count of needs_attention threads (threads needing my response)
 M.get_actionable_count = function()
   local query = build_graphql_query()
   local my_username = get_username()
@@ -1570,8 +1625,8 @@ M.get_actionable_count = function()
   local items = parse_graphql_response(response.data, my_username)
   local count = 0
   for _, item in ipairs(items) do
-    -- Count unresolved needs_attention and my_pr threads (excluding hidden)
-    if not item.is_resolved and (item.type == "needs_attention" or item.type == "my_pr") then
+    -- Count unresolved needs_attention threads (excluding hidden)
+    if not item.is_resolved and item.type == "needs_attention" then
       -- Check if hidden (same logic as filter_by_hidden)
       local is_hidden = state.hidden_threads[item.comment_url] ~= nil
       if is_hidden then
@@ -1589,5 +1644,9 @@ M.get_actionable_count = function()
 
   return count
 end
+
+-- Export get_current_repo for external use (keymaps, dashboard)
+-- Returns "owner/repo" or nil if not in a git repo
+M.get_current_repo = get_current_repo
 
 return M

@@ -128,7 +128,10 @@ while :; do
     case "$key" in
       "") # Enter key
         # Open Neovim with the GitHub Comments picker
-        nvim -c "lua require('custom.git.review_threads').picker()"
+        # show_pending=false hides threads where I have the last word (waiting on others)
+        # This focuses the code-review session on actionable items only
+        # Use <M-c> in the picker to toggle pending visibility if needed
+        nvim -c "lua require('custom.git.review_threads').picker({ show_pending = false })"
         ;;
       "r" | "R")
         # Refresh - just loop again to redisplay
