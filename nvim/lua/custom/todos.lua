@@ -400,9 +400,20 @@ end
 ---Uses ripgrep for fast scanning with exclusion patterns for common vendor directories
 ---Supports partial exclusions: folders can be excluded but allow specific files (e.g., README.md)
 ---Each task gets source = "global" for the unified picker
+---NOTE: Skips scanning if cwd is the Obsidian vault to avoid duplicating [N] tasks as [G]
 ---@return table[] tasks Array of task items with file, line, text, due_date, category, sort_priority, source
 function M.scan_global_markdown_todos()
   local cwd = vim.fn.getcwd()
+
+  -- Skip global scan if cwd is the Obsidian vault
+  -- This prevents duplicate tasks appearing as both [G] and [N] when inside the notes project
+  if Obsidian and Obsidian.dir then
+    local vault_path = tostring(Obsidian.dir)
+    if cwd == vault_path then
+      return {} -- Let the Obsidian scanner handle these tasks with [N] badge
+    end
+  end
+
   local today = get_today()
   local tasks = {}
 
