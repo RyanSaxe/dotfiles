@@ -38,6 +38,7 @@ ghostscript
 imagemagick
 
 # Utilities
+coreutils
 jq
 wget
 bat

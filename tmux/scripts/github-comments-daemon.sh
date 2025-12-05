@@ -55,6 +55,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Cross-platform timeout command
+# macOS: gtimeout (from coreutils), Linux: timeout
+if command -v gtimeout &> /dev/null; then
+  TIMEOUT_CMD="gtimeout"
+elif command -v timeout &> /dev/null; then
+  TIMEOUT_CMD="timeout"
+else
+  TIMEOUT_CMD=""
+fi
+
 # Function to get actionable thread count via headless Neovim
 # Returns the count of threads needing response (needs_attention + my_pr)
 get_actionable_count() {
@@ -62,9 +72,16 @@ get_actionable_count() {
   # The function does a fresh GraphQL fetch and returns the count
   # Timeout after 60 seconds to prevent hanging
   local count
-  count=$(timeout 60 nvim --headless \
-    -c "lua print(require('custom.git.review_threads').get_actionable_count())" \
-    -c "qa" 2>&1 | tail -1)
+  if [[ -n "$TIMEOUT_CMD" ]]; then
+    count=$($TIMEOUT_CMD 60 nvim --headless \
+      -c "lua print(require('custom.git.review_threads').get_actionable_count())" \
+      -c "qa" 2>&1 | tail -1)
+  else
+    # No timeout command available - run directly (may hang if network issues)
+    count=$(nvim --headless \
+      -c "lua print(require('custom.git.review_threads').get_actionable_count())" \
+      -c "qa" 2>&1 | tail -1)
+  fi
 
   # Validate that we got a number
   if [[ "$count" =~ ^[0-9]+$ ]]; then
