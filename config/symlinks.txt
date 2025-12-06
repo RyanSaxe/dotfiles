@@ -11,3 +11,4 @@ hammerspoon:$HOME/.hammerspoon
 claude:$HOME/.claude
 karabiner:$HOME/.config/karabiner
 leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json
+harper/dictionary.txt:$HOME/.config/harper-ls/dictionary.txt

@@ -19,6 +19,9 @@ local glimmer_spec = require("lazy.core.config").spec.plugins["tiny-glimmer.nvim
 if glimmer_spec and glimmer_spec.enabled ~= false then
   vim.api.nvim_create_augroup("lazyvim_highlight_yank", { clear = true })
 end
+
+-- Disable LazyVim's spell autocmd - Harper provides LSP-based spell checking
+vim.api.nvim_create_augroup("lazyvim_wrap_spell", { clear = true })
 -- Truncate LSP log file if it exceeds a certain size
 local uv = vim.uv or vim.loop
 local log = vim.fn.stdpath("state") .. "/lsp.log"

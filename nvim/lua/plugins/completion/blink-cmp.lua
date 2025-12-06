@@ -168,7 +168,11 @@ return {
           min_keyword_length = 3,
           max_items = 3,
           opts = {
+            -- Base dictionary for word completions (large word list)
             dictionary_directories = { vim.fn.expand("~/.config/nvim/dictionaries") },
+            -- Harper user dictionary (custom words added via code actions)
+            -- This ensures words you add to Harper also appear in completions
+            dictionary_files = { vim.fn.expand("~/.config/harper-ls/dictionary.txt") },
             -- WordNet definitions are auto-enabled when 'wn' command is available
             -- Install via: brew install wordnet (macOS) or apt install wordnet (Linux)
           },

@@ -14,8 +14,37 @@ return {
     vim.api.nvim_create_autocmd("User", {
       pattern = "VeryLazy",
       callback = function()
-        -- Create some toggle mappings
-        Snacks.toggle.option("spell", { name = "Spelling" }):map("<leader>ts")
+        -- Harper grammar/spell toggle (replaces Vim's built-in spell)
+        -- Toggles the harper_ls LSP client for the current buffer
+        -- Works on ANY filetype, not just prose files where Harper auto-attaches
+        Snacks.toggle({
+          name = "Harper Grammar",
+          get = function()
+            local clients = vim.lsp.get_clients({ name = "harper_ls", bufnr = 0 })
+            return #clients > 0
+          end,
+          set = function(state)
+            local bufnr = vim.api.nvim_get_current_buf()
+            if state then
+              -- Start Harper for this buffer, bypassing filetype restrictions
+              -- Get the default config from lspconfig and start manually
+              local harper = require("lspconfig").harper_ls
+              local config = harper.config_def.default_config
+              vim.lsp.start({
+                name = "harper_ls",
+                cmd = config.cmd,
+                root_dir = vim.fn.getcwd(),
+                single_file_support = true,
+              }, { bufnr = bufnr })
+            else
+              -- Detach Harper from this buffer only
+              local clients = vim.lsp.get_clients({ name = "harper_ls", bufnr = bufnr })
+              for _, client in ipairs(clients) do
+                vim.lsp.buf_detach_client(bufnr, client.id)
+              end
+            end
+          end,
+        }):map("<leader>ts")
         Snacks.toggle.diagnostics({ name = "Diagnostics" }):map("<leader>td")
         Snacks.toggle.inlay_hints():map("<leader>th")
         Snacks.toggle.option("wrap", { name = "Line Wrap" }):map("<leader>tw")
