@@ -9,6 +9,16 @@
 -- Enable IPC so the 'hs' command-line tool can communicate with Hammerspoon
 hs.ipc.cliInstall()
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- Spotlight (faster than AppleScript)
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Open Spotlight using keystroke (much faster than osascript)
+-- Called via: hs -c 'openSpotlight()'
+function openSpotlight()
+	hs.eventtap.keyStroke({ "cmd" }, "space")
+end
+
 -- Replace your tab enumeration with window IDs (stable)
 local function getAllChromeTabs()
 	local script = [[
