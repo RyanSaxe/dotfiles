@@ -38,6 +38,7 @@ wget
 curl
 bat
 tldr
+wordnet
 
 # Build tools
 build-essential
