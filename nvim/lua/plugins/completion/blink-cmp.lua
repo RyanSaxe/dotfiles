@@ -1,5 +1,12 @@
 -- this is still very experimental, but trying to make things simpler and not have too many results show up
 
+-- Filetypes where we want buffer and dictionary completions (prose writing)
+local prose_filetypes = { "markdown", "text", "gitcommit", "mail", "plaintex" }
+
+local function is_prose_filetype()
+  return vim.tbl_contains(prose_filetypes, vim.bo.filetype)
+end
+
 return {
   "saghen/blink.cmp",
   dependencies = {
@@ -59,7 +66,7 @@ return {
       preset = nil, -- disable the preset
       ["<CR>"] = { "accept", "fallback" },
       ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
-      ["<S-space>"] = { "show", "show_documentation", "hide_documentation" },
+      ["<C-k>"] = { "show_documentation", "hide_documentation" }, -- toggle docs (like S-k for code)
       ["<C-e>"] = { "hide", "fallback" },
       ["<S-BS>"] = {
         function(cmp)
@@ -142,11 +149,11 @@ return {
       -- copilot is removed since that is always set to ghost text with tab completion
       default = function()
         -- base set of sources everywhere
-        local result = { "lsp", "path" }
-        -- only load dictionary and buffer for markdown
-        if vim.bo.filetype == "markdown" then
+        -- TODO: need to make snippets something I like and then re-add it
+        local result = { "lsp", "path", "buffer" }
+        -- add dictionary for prose filetypes (markdown, gitcommit, etc.)
+        if is_prose_filetype() then
           table.insert(result, "dictionary")
-          table.insert(result, "buffer")
           -- obsidian sources are auto-added by obsidian.nvim when blink = true
         end
         return result
@@ -155,12 +162,22 @@ return {
         dictionary = {
           module = "blink-cmp-dictionary",
           name = "Dict",
+          score_offset = 20, -- lower priority than buffer (25) and lsp (90)
           -- Make sure this is at least 2.
           -- 3 is recommended
           min_keyword_length = 3,
+          max_items = 3,
           opts = {
             dictionary_directories = { vim.fn.expand("~/.config/nvim/dictionaries") },
+            -- WordNet definitions are auto-enabled when 'wn' command is available
+            -- Install via: brew install wordnet (macOS) or apt install wordnet (Linux)
           },
+        },
+        buffer = {
+          name = "Buffer",
+          score_offset = 25, -- higher than dictionary, lower than lsp
+          min_keyword_length = 2,
+          max_items = 3,
         },
         -- Obsidian providers (obsidian, obsidian_new, obsidian_tags) are
         -- automatically registered by obsidian.nvim when completion.blink = true
@@ -179,7 +196,7 @@ return {
         -- },
         lsp = {
           min_keyword_length = 0, -- Number of characters to trigger provider
-          score_offset = 10, -- Boost/penalize the score of the items
+          score_offset = 90, -- highest priority - code symbols first
           override = {
             -- allow a . to trigger autocomplete for faster lookup of imports
             get_trigger_characters = function(self)
@@ -192,9 +209,11 @@ return {
         path = {
           min_keyword_length = 0,
         },
-        -- TODO: learn more about snippets and best way to use -- the defaults from lazyvim are distracting at least for python
+        -- Disable the snippets source (friendly-snippets).
+        -- NOTE: LSP servers can still send snippet-style completions (e.g., function
+        -- signatures with placeholders). To filter those, add transform_items to the
+        -- lsp provider that filters out CompletionItemKind.Snippet.
         snippets = {
-          -- disables snippets. Not sure why I cant disable these by deleting the block.
           should_show_items = function()
             return false
           end,
