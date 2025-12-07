@@ -66,28 +66,23 @@ return {
       preset = nil, -- disable the preset
       ["<CR>"] = { "accept", "fallback" },
       ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
-      ["<C-k>"] = { "show_documentation", "hide_documentation" }, -- toggle docs (like S-k for code)
-      ["<C-e>"] = { "hide", "fallback" },
-      ["<S-BS>"] = {
-        function(cmp)
-          return cmp.select_prev()
-        end,
-        "snippet_backward",
-        "fallback",
-      },
-      -- Smart Tab: blink menu → Copilot → NES → snippets → tab insertion
-      -- Shift-Tab: Accept Copilot (useful when blink menu is open) → select_prev → snippet_backward
+      ["<C-K>"] = { "show_documentation", "hide_documentation" }, -- toggle docs (like S-K for code)
+      ["<C-c>"] = { "hide", "fallback" },
+      -- set navigation to Ctrl-j/k for standardization across plugins
+      ["<C-k>"] = { "select_prev", "fallback" },
+      ["<C-j>"] = { "select_next", "fallback" },
+      -- Smart Tab: Copilot -> blink menu → NES → snippets → tab insertion
       ["<Tab>"] = {
         function(cmp)
-          -- 1. FIRST: Navigate blink-cmp menu if it's open
-          if cmp.is_visible() then
-            return cmp.select_next()
-          end
-
-          -- 2. SECOND: Check for Copilot inline suggestion (ghost text)
+          -- 1. FIRST: Check for Copilot inline suggestion (ghost text)
           if require("copilot.suggestion").is_visible() then
             require("copilot.suggestion").accept()
             return true -- stop processing
+          end
+
+          -- 2. SECOND: Navigate blink-cmp menu if it's open
+          if cmp.is_visible() then
+            return cmp.select_next()
           end
 
           -- 3. THIRD: Check for NES (sidekick) multi-line edits
@@ -107,35 +102,15 @@ return {
           return true
         end,
       },
-      -- Shift-Tab: Accept Copilot suggestion, or go backwards through menus and snippets
-      ["<S-Tab>"] = {
-        function(cmp)
-          -- 1. FIRST: Check for Copilot inline suggestion (ghost text)
-          -- This allows accepting Copilot even when blink menu is open
-          if require("copilot.suggestion").is_visible() then
-            require("copilot.suggestion").accept()
-            return true -- stop processing
-          end
 
-          -- 2. SECOND: Navigate backwards in blink-cmp menu if open
-          if cmp.is_visible() then
-            return cmp.select_prev()
-          end
-
-          -- Otherwise continue to snippet_backward
-          return false
-        end,
-        "snippet_backward",
-        "fallback",
-      },
-
+      -- these are the normal default navigation keys (except for tab as that is now for copilot)
       ["<Up>"] = { "select_prev", "fallback" },
       ["<Down>"] = { "select_next", "fallback" },
       ["<C-p>"] = { "select_prev", "fallback" },
       ["<C-n>"] = { "select_next", "fallback" },
       ["<C-y>"] = { "accept", "select_and_accept", "fallback" },
-      ["<C-up>"] = { "scroll_documentation_up", "fallback" },
-      ["<C-down>"] = { "scroll_documentation_down", "fallback" },
+      ["<C-b>"] = { "scroll_documentation_up", "fallback" },
+      ["<C-f>"] = { "scroll_documentation_down", "fallback" },
     },
 
     -- Experimental signature help support
@@ -224,11 +199,6 @@ return {
           min_keyword_length = 2,
           score_offset = 0,
         },
-        -- buffer = {
-        --   min_keyword_length = 3,
-        --   max_items = 5,
-        --   score_offset = 11,
-        -- },
       },
     },
   },
