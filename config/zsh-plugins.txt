@@ -1,0 +1,9 @@
+# Zsh plugins (cloned to ~/.zsh-custom/plugins/)
+# One git URL per line - plugin name extracted from URL
+# Order matters: fast-syntax-highlighting must be last in the plugins array
+
+https://github.com/zsh-users/zsh-autosuggestions.git
+https://github.com/zsh-users/zsh-completions.git
+https://github.com/zsh-users/zsh-history-substring-search.git
+https://github.com/Aloxaf/fzf-tab.git
+https://github.com/zdharma-continuum/fast-syntax-highlighting.git

@@ -112,9 +112,25 @@ ZSH_CUSTOM="$HOME/.zsh-custom"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git vi-mode)
+# Plugins loaded from ~/.zsh-custom/plugins/ (installed via scripts/install.sh)
+# Order matters: fast-syntax-highlighting must be last
+plugins=(
+  git
+  vi-mode
+  zsh-autosuggestions
+  zsh-completions
+  zsh-history-substring-search
+  fzf-tab
+  fast-syntax-highlighting
+)
 
 source $ZSH/oh-my-zsh.sh
+
+# Autosuggestion configuration (ghost text from command history)
+# Color: muted gray matching TokyoNight comments
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#545c7e'
+
+# Note: Keybindings are set after vi_mode_init to avoid being reset by `set -o vi`
 
 # Disable mail checking to prevent "You have mail" messages
 # This is zsh's default behavior when /var/mail/$USER exists
@@ -139,6 +155,14 @@ source "${zshrc_dir}/aliases.zsh"
 env_init
 vi_mode_init
 venv_init
+
+# Plugin keybindings (must be after vi_mode_init since `set -o vi` resets bindings)
+bindkey -M viins '^I' autosuggest-accept              # Tab: accept ghost text
+bindkey -M viins '^[[Z' fzf-tab-complete              # Shift-Tab: fzf completion
+bindkey -M viins '^[[A' history-substring-search-up
+bindkey -M viins '^[[B' history-substring-search-down
+bindkey -M vicmd '^[[A' history-substring-search-up
+bindkey -M vicmd '^[[B' history-substring-search-down
 
 # User configuration
 

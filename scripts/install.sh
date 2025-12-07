@@ -246,6 +246,52 @@ install_tpm() {
     log "TPM already installed—skipping re-install"
   fi
 }
+
+# ────────────────────────────────────────────────────────────────────────
+# Zsh plugin management (declarative via config/zsh-plugins.txt)
+# ────────────────────────────────────────────────────────────────────────
+install_zsh_plugins() {
+  log "Installing Zsh plugins..."
+  local zsh_custom="${ZSH_CUSTOM:-$HOME/.zsh-custom}"
+  local plugins_dir="$zsh_custom/plugins"
+  mkdir -p "$plugins_dir"
+
+  # Read plugin URLs from config file
+  while IFS= read -r url || [[ -n "$url" ]]; do
+    # Skip empty lines and comments
+    [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
+
+    # Extract plugin name from URL (e.g., "zsh-autosuggestions" from "...zsh-autosuggestions.git")
+    local name="${url##*/}"
+    name="${name%.git}"
+    local dest="$plugins_dir/$name"
+
+    if [[ -d "$dest" ]]; then
+      log "$name already installed—skipping"
+    else
+      git clone --depth 1 "$url" "$dest" || {
+        err "Failed to clone $name"
+        continue
+      }
+      log "✓ Installed $name"
+    fi
+  done < "$DOTFILES_DIR/config/zsh-plugins.txt"
+}
+
+update_zsh_plugins() {
+  log "Updating Zsh plugins..."
+  local zsh_custom="${ZSH_CUSTOM:-$HOME/.zsh-custom}"
+  local plugins_dir="$zsh_custom/plugins"
+
+  # Iterate through all plugin directories and pull updates
+  for plugin_dir in "$plugins_dir"/*/; do
+    [[ -d "$plugin_dir/.git" ]] || continue
+    local name="${plugin_dir%/}"
+    name="${name##*/}"
+    log "Updating $name..."
+    git -C "$plugin_dir" pull --ff-only || warn "Failed to update $name"
+  done
+}
 # ──────────────────────────────────────────────────────
 fetch_and_exec() {
   local url=$1
@@ -270,6 +316,12 @@ fetch_and_exec() {
 
 # ──────────────────────────────────────────────────────
 main() {
+  # Handle --update-plugins flag for updating zsh plugins only
+  if [[ "${1:-}" == "--update-plugins" ]]; then
+    update_zsh_plugins
+    return 0
+  fi
+
   # ── Make sure TERM is valid for tput ─────────────────────
   if [[ -z "${TERM:-}" || "${TERM}" == "unknown" ]]; then
     log "TERM is unset/unknown; defaulting to xterm-256color for this run"
@@ -387,6 +439,12 @@ main() {
   else
     log "Oh My Zsh already installed—skipping re-install"
   fi
+
+  # Zsh plugins (must come after Oh My Zsh)
+  install_zsh_plugins || {
+    err "Failed to install Zsh plugins"
+    exit 1
+  }
 
   # Ensure default shell is Zsh
   if command -v zsh &> /dev/null && [[ ! "$SHELL" =~ zsh$ ]]; then

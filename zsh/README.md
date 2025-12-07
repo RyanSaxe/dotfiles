@@ -13,6 +13,41 @@ Oh My Zsh-based shell configuration with custom theme, vi mode, automatic Python
 - **Git repository navigation** - Fast fuzzy finding across projects
 - **Minimal mode** - Lightweight configuration for tmux popups (automatic detection)
 
+## Plugins
+
+Plugins are managed declaratively via `config/zsh-plugins.txt` and installed to `~/.zsh-custom/plugins/` by `scripts/install.sh`.
+
+### Included Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| **zsh-autosuggestions** | Fish-like ghost text suggestions from history |
+| **zsh-completions** | Additional completion definitions |
+| **zsh-history-substring-search** | Vim-style history search with up/down arrows |
+| **fzf-tab** | Fuzzy completion menu powered by fzf |
+| **fast-syntax-highlighting** | Real-time command syntax coloring |
+
+### Keybindings
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Accept ghost text (if visible), otherwise fzf-tab completion |
+| `Shift-Tab` | Accept suggestion word-by-word |
+| `Escape` + `Tab` | Clear ghost text, then trigger fzf-tab |
+| `↑` / `↓` | Search history for commands containing current input |
+
+### Managing Plugins
+
+```bash
+# Install plugins (runs automatically with install.sh)
+./scripts/install.sh
+
+# Update all plugins to latest
+./scripts/install.sh --update-plugins
+
+# Add a new plugin: edit config/zsh-plugins.txt, then re-run install.sh
+```
+
 ## Configuration Structure
 
 ```text
