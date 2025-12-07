@@ -89,6 +89,25 @@ Additionally, I recommend setting Leader Key to
 
 Ghostty, Karabiner, Leader Key, and Hammerspoon need to be enabled with special permissions and accessibility settings. Additionally, I personally recommend Leader Key and Hammerspoon to open when you login for the smoothest experience.
 
+### Zsh Autosuggestions
+
+Ghost text suggestions from command history (like fish shell). Installed via `brew`/`apt` but requires manual sourcing since Oh My Zsh doesn't find package manager installs.
+
+After running the install script, source the plugin for your platform:
+
+```bash
+# macOS (Apple Silicon)
+source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# macOS (Intel)
+source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# Linux (apt)
+source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+```
+
+Keybindings (configured in `.zshrc`): **Tab** accepts full suggestion, **Shift-Tab** accepts word-by-word.
+
 ## 🎨 Theme
 
 Generally speaking, all applications are set up to share as close to the same dark theme as possible, which is a branch off of Tokyonight Night theme.
@@ -115,7 +134,7 @@ Repository-wide tasks and cross-cutting improvements. Tool-specific TODOs are in
 
 Things I have not explored yet but am interested in taking a look at
 
-- [ ] Aerospace: Tiling window manager
+- [ ] Aerospace or Yabai: Tiling window manager -- This will be a large update with Leader Key to set spaces and keybinds for much easier control of things like teams meetings.
 - [ ] SkechyBar: MacOS Statusline
 - [ ] Zoxide:    Smart directory navigation (e.g. replace for cd)
 - [ ] I don't remember the name, but it's a neovim plugin for merging the statusline with tmux for a much cleaner look. Though I would want to not have tmux in the middle as it's default and would want tmux to the left and neovim to the right, which might be complicated.

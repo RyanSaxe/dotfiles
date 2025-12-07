@@ -169,6 +169,13 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 - [ ] Deep dive into Python LSP ecosystem - prepare for 'ty' release, support pyproject.toml-specified LSPs
 - [ ] Optimize git workflow UX across snacks.nvim gh module, diffview, mini.diff, gh-dash, lazygit
 - [x] Make Snacks dashboard perfectly centered regardless of odd/even row counts (dynamic statusline toggle absorbs extra row)
+- [ ] Set up Jupyter notebook integration with nice UI and cell execution
+  - Research molten.nvim (image rendering, output display) vs vim-slime (simpler REPL approach) vs jupytext (convert .ipynb to .py)
+  - Configure image rendering in terminal (kitty graphics protocol, sixel, or ueberzug fallback)
+  - Set up cell markers (# %% style) with syntax highlighting and folding
+  - Add keybindings for cell execution, cell navigation, kernel management
+  - Consider quarto.nvim or otter.nvim for enhanced LSP support in code cells
+  - Integrate output display (inline images, dataframes, plots) with TokyoNight theming
 
 ## Customization
 
