@@ -10,14 +10,19 @@ data="$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index}|#
 curr="${data%%|*}"
 stored="${data#*|}"
 
-# Only update if location changed, stored exists, and stored isn't a format string
-# Using case for POSIX-compatible pattern matching (faster than calling external tools)
+# Skip if stored is still an unexpanded format string (tmux bug workaround)
 case "$stored" in
-  *'#{'*) exit 0 ;; # Still a format string, skip
-  '') exit 0 ;;     # Empty, skip
+  *'#{'*) exit 0 ;;
 esac
 
-[ "$curr" = "$stored" ] && exit 0 # No movement, skip
+# No movement - skip update
+[ "$curr" = "$stored" ] && exit 0
 
-# Set both options in single tmux call
+# Bootstrap case: stored is empty, just initialize CURR_PANE (no previous to track yet)
+if [ -z "$stored" ]; then
+  tmux set-option -g @TMUX_CURR_PANE "$curr"
+  exit 0
+fi
+
+# Normal case: store previous and update current in single tmux call
 tmux set-option -g @TMUX_PREV_PANE "$stored" \; set-option -g @TMUX_CURR_PANE "$curr"
