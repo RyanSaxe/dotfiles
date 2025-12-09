@@ -31,10 +31,11 @@ Plugins are managed declaratively via `config/zsh-plugins.txt` and installed to 
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Accept ghost text (if visible), otherwise fzf-tab completion |
-| `Shift-Tab` | Accept suggestion word-by-word |
-| `Escape` + `Tab` | Clear ghost text, then trigger fzf-tab |
+| `Tab` | FZF-tab completion menu (normal completions) |
+| `Shift-Tab` | Accept ghost text from history (autosuggestions) |
 | `↑` / `↓` | Search history for commands containing current input |
+
+> **Convention**: `Tab` = normal completions, `Shift-Tab` = ghost text (consistent with Neovim)
 
 ### Managing Plugins
 

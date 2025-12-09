@@ -61,7 +61,7 @@ return {
       },
     },
 
-    -- My super-TAB configuration
+    -- Keybinding convention: Tab = normal completions, Shift-Tab = ghost text / AI suggestions
     keymap = {
       preset = nil, -- disable the preset
       ["<CR>"] = { "accept", "fallback" },
@@ -71,39 +71,52 @@ return {
       -- set navigation to Ctrl-j/k for standardization across plugins
       ["<C-k>"] = { "select_prev", "fallback" },
       ["<C-j>"] = { "select_next", "fallback" },
-      -- Smart Tab: Copilot -> blink menu → NES → snippets → tab insertion
+      -- Tab: Normal completions (blink menu -> snippets -> literal tab)
+      -- Ghost text (Copilot, NES) is handled by Shift-Tab for consistency across tools
       ["<Tab>"] = {
         function(cmp)
-          -- 1. FIRST: Check for Copilot inline suggestion (ghost text)
-          if require("copilot.suggestion").is_visible() then
-            require("copilot.suggestion").accept()
-            return true -- stop processing
-          end
-
-          -- 2. SECOND: Navigate blink-cmp menu if it's open
+          -- Navigate blink-cmp menu if it's open
           if cmp.is_visible() then
             return cmp.select_next()
           end
-
-          -- 3. THIRD: Check for NES (sidekick) multi-line edits
-          local ok, sidekick = pcall(require, "sidekick")
-          if ok and sidekick.nes_jump_or_apply() then
-            return true -- stop processing
-          end
-
-          -- Otherwise continue to snippet_forward
+          -- Continue to snippet_forward
           return false
         end,
-        "snippet_forward", -- 4. FOURTH: Jump to next snippet field
-        -- 5. LAST: Explicitly insert tab character when nothing else applies
-        -- Without this explicit insertion, the Tab key becomes disabled when all conditions fail
+        "snippet_forward", -- Jump to next snippet field if in snippet
+        -- Insert literal tab character when nothing else applies
+        -- Without this explicit insertion, Tab becomes disabled when all conditions fail
         function()
           vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "n", false)
           return true
         end,
       },
 
-      -- these are the normal default navigation keys (except for tab as that is now for copilot)
+      -- Shift-Tab: Accept ghost text and AI suggestions (Copilot -> NES -> menu backwards)
+      -- This maintains consistency with Zsh where Shift-Tab accepts autosuggestions
+      ["<S-Tab>"] = {
+        function(cmp)
+          -- 1. Accept Copilot inline suggestion (ghost text) if visible
+          if require("copilot.suggestion").is_visible() then
+            require("copilot.suggestion").accept()
+            return true
+          end
+
+          -- 2. Apply NES (sidekick) multi-line edit suggestion if available
+          local ok, sidekick = pcall(require, "sidekick")
+          if ok and sidekick.nes_jump_or_apply() then
+            return true
+          end
+
+          -- 3. Navigate blink-cmp menu backwards as fallback
+          if cmp.is_visible() then
+            return cmp.select_prev()
+          end
+
+          return false
+        end,
+      },
+
+      -- Standard navigation keys
       ["<Up>"] = { "select_prev", "fallback" },
       ["<Down>"] = { "select_next", "fallback" },
       ["<C-p>"] = { "select_prev", "fallback" },

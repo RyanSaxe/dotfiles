@@ -1,11 +1,11 @@
 # Auto-detect minimal mode for tmux popup windows
 # Check if this is a tmux popup or if minimal mode is explicitly requested
 if [[ -n "$TMUX_POPUP" ]] || [[ "$ZSH_MODE" == "minimal" ]]; then
-    # Get the actual directory where this .zshrc file is located (resolving symlink)
-    local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"
-    local zshrc_dir="${zshrc_real:h}"
-    source "${zshrc_dir}/.zshrc.minimal"
-    return
+  # Get the actual directory where this .zshrc file is located (resolving symlink)
+  local zshrc_real="$(readlink -f ~/.zshrc 2> /dev/null || readlink ~/.zshrc)"
+  local zshrc_dir="${zshrc_real:h}"
+  source "${zshrc_dir}/.zshrc.minimal"
+  return
 fi
 
 # Clean up stale or inherited $TMUX environment variable
@@ -18,7 +18,7 @@ if [[ -n "$TMUX" ]]; then
   local tmux_socket="${TMUX%%,*}"
 
   # Check if the socket still exists and is valid
-  if ! tmux -S "$tmux_socket" list-clients &>/dev/null; then
+  if ! tmux -S "$tmux_socket" list-clients &> /dev/null; then
     # Socket is dead, unset everything
     unset TMUX
     unset TMUX_PANE
@@ -26,11 +26,11 @@ if [[ -n "$TMUX" ]]; then
     # Socket exists, but check if THIS terminal is actually in a tmux pane
     # by comparing the current TTY with all active tmux pane TTYs
     local current_tty
-    current_tty=$(tty 2>/dev/null)
+    current_tty=$(tty 2> /dev/null)
 
     if [[ -n "$current_tty" ]]; then
       # If our TTY is not in the list of tmux pane TTYs, we inherited $TMUX
-      if ! tmux -S "$tmux_socket" list-panes -a -F "#{pane_tty}" 2>/dev/null | grep -Fxq "$current_tty"; then
+      if ! tmux -S "$tmux_socket" list-panes -a -F "#{pane_tty}" 2> /dev/null | grep -Fxq "$current_tty"; then
         # We're not actually in a tmux pane, just inherited the variable
         unset TMUX
         unset TMUX_PANE
@@ -138,7 +138,7 @@ unset MAILCHECK
 
 # Setup functions from dotfiles repo
 # Get the actual directory where this .zshrc file is located (resolving symlink)
-local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"
+local zshrc_real="$(readlink -f ~/.zshrc 2> /dev/null || readlink ~/.zshrc)"
 local zshrc_dir="${zshrc_real:h}"
 
 # Source function files
@@ -157,8 +157,9 @@ vi_mode_init
 venv_init
 
 # Plugin keybindings (must be after vi_mode_init since `set -o vi` resets bindings)
-bindkey -M viins '^I' autosuggest-accept              # Tab: accept ghost text
-bindkey -M viins '^[[Z' fzf-tab-complete              # Shift-Tab: fzf completion
+# Convention: Tab = normal completions, Shift-Tab = ghost text (consistent with Neovim)
+bindkey -M viins '^I' fzf-tab-complete     # Tab: fzf-tab completion menu
+bindkey -M viins '^[[Z' autosuggest-accept # Shift-Tab: accept ghost text from history
 bindkey -M viins '^[[A' history-substring-search-up
 bindkey -M viins '^[[B' history-substring-search-down
 bindkey -M vicmd '^[[A' history-substring-search-up
@@ -189,7 +190,6 @@ bindkey -M vicmd '^[[B' history-substring-search-down
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-
 
 . "$HOME/.local/bin/env"
 export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
