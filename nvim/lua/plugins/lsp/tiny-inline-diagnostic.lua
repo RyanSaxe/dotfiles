@@ -87,9 +87,9 @@ return {
       },
 
       -- Show all diagnostics on the current cursor line, not just those under the cursor
-      show_all_diags_on_cursorline = false,
+      show_all_diags_on_cursorline = true,
       -- If true, only show diagnostics under the cursor
-      show_diags_only_under_cursor = true,
+      show_diags_only_under_cursor = false,
       -- Display related diagnostics from LSP relatedInformation
       show_related = {
         enabled = false, -- Enable displaying related diagnostics
