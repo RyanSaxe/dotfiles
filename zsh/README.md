@@ -20,7 +20,7 @@ Plugins are managed declaratively via `config/zsh-plugins.txt` and installed to 
 ### Included Plugins
 
 | Plugin | Description |
-|--------|-------------|
+| -------- | ------------- |
 | **zsh-autosuggestions** | Fish-like ghost text suggestions from history |
 | **zsh-completions** | Additional completion definitions |
 | **zsh-history-substring-search** | Vim-style history search with up/down arrows |
@@ -30,7 +30,7 @@ Plugins are managed declaratively via `config/zsh-plugins.txt` and installed to 
 ### Keybindings
 
 | Key | Action |
-|-----|--------|
+| ----- | -------- |
 | `Tab` | FZF-tab completion menu (normal completions) |
 | `Shift-Tab` | Accept ghost text from history (autosuggestions) |
 | `↑` / `↓` | Search history for commands containing current input |

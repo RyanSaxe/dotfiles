@@ -50,4 +50,3 @@ The Neovim configuration is LazyVim-based with custom plugins in `nvim/lua/plugi
 ## Important Notes
 
 - The `tasks/` directory contains development TODOs and ideas
-

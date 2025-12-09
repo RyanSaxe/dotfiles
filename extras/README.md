@@ -20,7 +20,7 @@ fast-theme ~/.config/fsh/tokyonight.ini
 **Color mapping:**
 
 | Element | Color | Hex |
-|---------|-------|-----|
+| --------- | ------- | ----- |
 | commands/builtins | orange | `#ff9e64` |
 | keywords (if/for/while) | purple | `#9d7cd8` |
 | strings | yellow | `#e0af68` |
