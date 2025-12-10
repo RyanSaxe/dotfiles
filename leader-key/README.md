@@ -143,4 +143,3 @@ Edit `~/generic/dotfiles/leader-key/config.json` to add your own shortcuts. Chan
 - Use descriptive `label` values for the cheatsheet
 - Group related actions under a common prefix (e.g., all git commands under `g`)
 - Use `type: "group"` for nested menus to keep the top level clean
-

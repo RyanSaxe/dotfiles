@@ -136,8 +136,9 @@ return {
   -- Keybindings - these match the LazyVim extras defaults
   -- stylua: ignore
   keys = {
-    -- NES navigation in normal mode (Tab already handled in blink-cmp.lua for insert mode)
-    { "<tab>", LazyVim.cmp.map({ "ai_nes" }, "<tab>"), mode = { "n" }, expr = true, desc = "Next Edit Suggestion" },
+    -- NES in normal mode: Shift-Tab for consistency (Tab = normal completions, Shift-Tab = AI suggestions)
+    -- Insert mode NES is handled in blink-cmp.lua's Shift-Tab handler
+    { "<S-Tab>", LazyVim.cmp.map({ "ai_nes" }, "<S-Tab>"), mode = { "n" }, expr = true, desc = "Next Edit Suggestion" },
 
     -- AI leader key group
     { "<leader>a", "", desc = "+ai", mode = { "n", "v" } },

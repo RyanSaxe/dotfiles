@@ -186,6 +186,32 @@ local function truncate(str, max_len)
   return str:sub(1, max_len - 1) .. "…"
 end
 
+-- Generate a stable key for hiding a thread
+-- The key must be stable across fetches - same thread always gets same key
+-- Previously used comment_url which changes when the last comment changes,
+-- and breaks when the same thread appears from multiple search aliases
+--
+-- Key strategy:
+--   - PR review threads: Use thread_id (GraphQL node ID like "PRRT_xxx")
+--     This is stable and unique per review thread
+--   - PR flat comments: Use "repo/pr/number/flat" to distinguish from review threads
+--     Only ONE flat comment item exists per PR (all conversation tab comments combined)
+--   - Issue comments: Use "repo/issue/number"
+--     Only ONE item exists per issue (all comments combined)
+--
+-- @param item table - Picker item with thread info
+-- @return string - Stable key for the hidden_threads table
+local function get_hidden_key(item)
+  -- PR review threads have a stable GraphQL node ID
+  if item.thread_id then
+    return item.thread_id
+  end
+  -- PR flat comments use "flat" suffix to distinguish from review threads on same PR
+  -- Issue comments just use the kind (no review threads on issues)
+  local suffix = (item.kind == "pr") and "/flat" or ""
+  return string.format("%s/%s/%d%s", item.repo, item.kind, item.number, suffix)
+end
+
 -- Convert ISO 8601 timestamp to Unix timestamp
 -- GitHub timestamps are UTC, so we handle timezone conversion properly
 local function iso_to_unix(iso)
@@ -220,20 +246,28 @@ local function iso_to_unix(iso)
 end
 
 -- Filter items by hidden state
+-- Uses stable keys (thread_id or repo/kind/number) instead of comment_url
+-- Auto-unhides threads when new activity is detected (comment newer than hide time)
 -- @param items table - Array of picker items
 -- @param show_hidden boolean - Whether to show hidden (true) or active (false)
 -- @return table - Filtered items
 local function filter_by_hidden(items, show_hidden)
-  return vim.tbl_filter(function(item)
-    local is_hidden = state.hidden_threads[item.comment_url] ~= nil
+  local needs_save = false
+
+  local filtered = vim.tbl_filter(function(item)
+    local hidden_key = get_hidden_key(item)
+    local is_hidden = state.hidden_threads[hidden_key] ~= nil
+
     -- Check for new activity on hidden items
+    -- If the last comment is newer than when we hid the thread, auto-unhide it
     if is_hidden then
       local comment_time = iso_to_unix(item.comment_created_at)
-      local hide_timestamp = state.hidden_threads[item.comment_url]
+      local hide_timestamp = state.hidden_threads[hidden_key]
       if comment_time and hide_timestamp and comment_time > hide_timestamp then
-        -- Auto-unhide due to new activity
-        state.hidden_threads[item.comment_url] = nil
+        -- Auto-unhide due to new activity - mark for save
+        state.hidden_threads[hidden_key] = nil
         is_hidden = false
+        needs_save = true
       end
     end
 
@@ -243,6 +277,14 @@ local function filter_by_hidden(items, show_hidden)
       return not is_hidden
     end
   end, items)
+
+  -- Persist auto-unhide changes to disk
+  -- Previously mutations weren't saved, causing state drift between memory and disk
+  if needs_save then
+    save_hidden_threads()
+  end
+
+  return filtered
 end
 
 -------------------------------------------------------------------------------
@@ -1239,10 +1281,12 @@ M.picker = function(opts)
           if not item then
             return
           end
-          if state.hidden_threads[item.comment_url] then
-            state.hidden_threads[item.comment_url] = nil
+          -- Use stable key (thread_id or repo/kind/number) instead of volatile comment_url
+          local hidden_key = get_hidden_key(item)
+          if state.hidden_threads[hidden_key] then
+            state.hidden_threads[hidden_key] = nil
           else
-            state.hidden_threads[item.comment_url] = os.time()
+            state.hidden_threads[hidden_key] = os.time()
           end
           save_hidden_threads()
           local new_filtered = apply_filters(state.items)
@@ -1642,11 +1686,12 @@ M.get_actionable_count = function()
   for _, item in ipairs(items) do
     -- Count unresolved needs_attention threads (excluding hidden)
     if not item.is_resolved and item.type == "needs_attention" then
-      -- Check if hidden (same logic as filter_by_hidden)
-      local is_hidden = state.hidden_threads[item.comment_url] ~= nil
+      -- Check if hidden using stable key (same logic as filter_by_hidden)
+      local hidden_key = get_hidden_key(item)
+      local is_hidden = state.hidden_threads[hidden_key] ~= nil
       if is_hidden then
         local comment_time = iso_to_unix(item.comment_created_at)
-        local hide_timestamp = state.hidden_threads[item.comment_url]
+        local hide_timestamp = state.hidden_threads[hidden_key]
         if comment_time and hide_timestamp and comment_time > hide_timestamp then
           is_hidden = false -- Auto-unhide due to new activity
         end
