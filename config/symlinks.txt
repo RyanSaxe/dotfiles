@@ -5,6 +5,7 @@ git:$HOME/.config/git
 lazygit/config.yml:${LAZYGIT_CONFIG_DIR}/config.yml
 tmux:$HOME/.config/tmux
 zsh/.zshrc:$HOME/.zshrc
+zsh/.zshenv:$HOME/.zshenv
 zsh/themes:$HOME/.zsh-custom/themes
 ipython:$HOME/.ipython
 hammerspoon:$HOME/.hammerspoon

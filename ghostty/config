@@ -43,3 +43,6 @@ window-padding-balance = true
 keybind = shift+enter=text:\x1b\r
 ## shaders
 custom-shader = shaders/cursor_trail_tokyonight.glsl
+## exploring options targeted nicer non-full screen experience
+## hidden title bar ... since moving windows is done with leader-key shortcuts
+macos-titlebar-style = hidden

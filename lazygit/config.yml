@@ -44,9 +44,9 @@ gui:
   skipDiscardChangeWarning: false
 git:
   # Use delta with TokyoNight theme for syntax-highlighted diffs
-  paging:
-    colorArg: always
-    pager: delta --paging=never --syntax-theme=tokyonight_night
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never --syntax-theme=tokyonight_night
   # Always show commit graph
   log:
     showGraph: "always"

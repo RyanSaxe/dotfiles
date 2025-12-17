@@ -5,7 +5,7 @@
   },
   "SchemaStore.nvim": {
     "branch": "main",
-    "commit": "21645280ad06fce01ef109e82d76302dcbe62756"
+    "commit": "c103ea363c4776ea9079eccaae54b42aa537a80e"
   },
   "blink-cmp-dictionary": {
     "branch": "master",
@@ -25,7 +25,7 @@
   },
   "bullets.vim": {
     "branch": "master",
-    "commit": "455fc88626b7b42d53a8cc29fedea2f7e476e5fe"
+    "commit": "89294b8930e660936374fb763ac48a1ac51dd29c"
   },
   "catppuccin": {
     "branch": "main",
@@ -37,7 +37,7 @@
   },
   "copilot.lua": {
     "branch": "master",
-    "commit": "881f99b827d65b41f522eecc21b112cf518028ac"
+    "commit": "a064570939f23ef155698654c98c81e0fc2dc54a"
   },
   "dial.nvim": {
     "branch": "master",
@@ -89,7 +89,7 @@
   },
   "mason-lspconfig.nvim": {
     "branch": "main",
-    "commit": "0b9bb925c000ae649ff7e7149c8cd00031f4b539"
+    "commit": "c55bd8a8fb191e24176c206a7af1dd51ce7276a5"
   },
   "mason.nvim": {
     "branch": "main",
@@ -137,15 +137,15 @@
   },
   "nvim-lint": {
     "branch": "master",
-    "commit": "ebe535956106c60405b02220246e135910f6853d"
+    "commit": "54c5f839f8b3e3e69afbf2e074be8ac7e5b793b9"
   },
   "nvim-lspconfig": {
     "branch": "master",
-    "commit": "9c923997123ff9071198ea3b594d4c1931fab169"
+    "commit": "a2bd1cf7b0446a7414aaf373cea5e4ca804c9c69"
   },
   "nvim-treesitter": {
     "branch": "main",
-    "commit": "596923959a50d8d975ec129f531f6673ea72fc21"
+    "commit": "b6271b678e035a5cbf62d637364f3eeca0890171"
   },
   "nvim-treesitter-context": {
     "branch": "master",
@@ -153,7 +153,7 @@
   },
   "nvim-treesitter-textobjects": {
     "branch": "main",
-    "commit": "dfbf9596f8aa8b4bed5301647485594ff7252955"
+    "commit": "76deedf0f1cec4496ef8d49b6d1f020f6d0c6ec9"
   },
   "nvim-ts-autotag": {
     "branch": "main",
@@ -197,7 +197,7 @@
   },
   "tiny-inline-diagnostic.nvim": {
     "branch": "main",
-    "commit": "38b06435305c30966b7ceb0a43e460dc43acaada"
+    "commit": "9b55d36b797875b6e513f6bcc526e17cb9fe31f4"
   },
   "todo-comments.nvim": {
     "branch": "main",
