@@ -474,6 +474,27 @@ main() {
     warn "Symlink script not found at $SCRIPT_DIR/symlink.sh - skipping dotfiles setup"
   fi
 
+  # Apply fast-syntax-highlighting theme (one-time)
+  local fsh_theme="$HOME/.config/fsh/tokyonight.ini"
+  if [[ -f "$fsh_theme" ]]; then
+    if command -v zsh &> /dev/null; then
+      # Try via interactive zsh so plugin-provided fast-theme is available
+      if ! zsh -i -c "fast-theme \"$fsh_theme\"" &> /dev/null; then
+        # Fallback: call the script directly if present
+        local fsh_bin="$HOME/.zsh-custom/plugins/fast-syntax-highlighting/bin/fast-theme"
+        if [[ -x "$fsh_bin" ]]; then
+          "$fsh_bin" "$fsh_theme" || warn "Failed to apply fast-syntax-highlighting theme via direct script"
+        else
+          warn "fast-theme command not found; open a new zsh and run: fast-theme \"$fsh_theme\""
+        fi
+      else
+        log "Applied fast-syntax-highlighting theme"
+      fi
+    fi
+  else
+    warn "fast-syntax-highlighting theme not found at $fsh_theme"
+  fi
+
   log "✅ All done! Your development environment is ready."
 }
 
