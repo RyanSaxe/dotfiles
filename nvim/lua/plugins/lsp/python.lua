@@ -10,16 +10,12 @@ return {
       pylsp = false,
       -- enabling ty and ruff with custom settings
       ty = {
-        init_options = {
-          logLevel = "debug",
-          logFile = vim.fn.stdpath("cache") .. "/ty.log",
-        },
         settings = {
           ty = {
             diagnosticMode = "workspace",
             inlayHints = {
-              variableTypes = false,
-              callArgumentNames = false,
+              variableTypes = true,
+              callArgumentNames = true,
             },
           },
         },

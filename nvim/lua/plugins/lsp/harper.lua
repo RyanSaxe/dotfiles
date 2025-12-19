@@ -10,17 +10,18 @@
 -- By default, Harper only auto-attaches to prose filetypes (markdown, text, etc.)
 -- Use <leader>ts to manually enable Harper for any buffer (e.g., code files)
 
--- Filetypes where Harper auto-attaches (prose/writing files)
+-- Filetypes where Harper auto-attaches
+-- currently disabled by default because it's pretty annoying
 local prose_filetypes = {
-  "markdown",
-  "text",
-  "gitcommit",
-  "mail",
-  "plaintex",
-  "tex",
-  "asciidoc",
-  "rst",
-  "org",
+  -- "markdown",
+  -- "text",
+  -- "gitcommit",
+  -- "mail",
+  -- "plaintex",
+  -- "tex",
+  -- "asciidoc",
+  -- "rst",
+  -- "org",
 }
 
 return {

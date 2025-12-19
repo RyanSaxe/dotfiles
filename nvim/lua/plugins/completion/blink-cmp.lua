@@ -66,7 +66,7 @@ return {
       preset = nil, -- disable the preset
       ["<CR>"] = { "accept", "fallback" },
       ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
-      ["<C-K>"] = { "show_documentation", "hide_documentation" }, -- toggle docs (like S-K for code)
+      ["<C-e>"] = { "show_documentation", "hide_documentation" }, -- toggle docs, i for info
       ["<C-c>"] = { "hide", "fallback" },
       -- set navigation to Ctrl-j/k for standardization across plugins
       ["<C-k>"] = { "select_prev", "fallback" },
