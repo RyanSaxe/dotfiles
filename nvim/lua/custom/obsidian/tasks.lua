@@ -288,8 +288,6 @@ local function toggle_task(item)
     file:write(line .. "\n")
   end
   file:close()
-
-  vim.notify("Task toggled", vim.log.levels.INFO)
 end
 
 ---Format task item for picker display with source badges
@@ -417,7 +415,6 @@ local function create_picker_config(items)
           -- Update picker with remaining tasks
           if #items == 0 then
             picker:close()
-            vim.notify("All tasks completed!", vim.log.levels.INFO)
           else
             picker:close()
             -- Reopen with updated items (no rescan - just use filtered list)

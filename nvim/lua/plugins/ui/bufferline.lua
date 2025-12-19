@@ -17,12 +17,10 @@ return {
           -- Restore bufferline
           vim.o.tabline = vim.g.bufferline_original_tabline
           vim.g.bufferline_hidden = false
-          vim.notify("Bufferline shown", vim.log.levels.INFO)
         else
           -- Hide bufferline but keep the space (blank tabline)
           vim.o.tabline = " "
           vim.g.bufferline_hidden = true
-          vim.notify("Bufferline hidden", vim.log.levels.INFO)
         end
       end,
       desc = "Toggle Bufferline",
