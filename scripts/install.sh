@@ -435,7 +435,7 @@ main() {
   # Rustup (Rust toolchain installer)
   if ! command -v rustup &> /dev/null; then
     log "Installing Rust via rustup..."
-    fetch_and_exec "https://sh.rustup.rs" -s -- -y --no-modify-path
+    curl -fsSL https://sh.rustup.rs | sh -s -- -y --no-modify-path
     # Source cargo env for current session so subsequent checks work
     [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
   else
