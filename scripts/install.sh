@@ -432,6 +432,16 @@ main() {
     log "Astral UV already present—skipping"
   fi
 
+  # Rustup (Rust toolchain installer)
+  if ! command -v rustup &> /dev/null; then
+    log "Installing Rust via rustup..."
+    fetch_and_exec "https://sh.rustup.rs" -s -- -y --no-modify-path
+    # Source cargo env for current session so subsequent checks work
+    [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+  else
+    log "Rustup already present—skipping"
+  fi
+
   # Oh My Zsh (non-interactive)
   if [[ ! -d "${ZSH:-$HOME/.oh-my-zsh}" ]]; then
     export RUNZSH=no CHSH=no

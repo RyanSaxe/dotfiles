@@ -31,3 +31,4 @@ case "$OSTYPE" in
     export PATH
     ;;
 esac
+. "$HOME/.cargo/env"
