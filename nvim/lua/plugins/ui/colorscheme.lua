@@ -56,6 +56,8 @@ return {
 
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
+      -- astral ty has a specific modifier with higher priority we need to hook into
+      hl["@lsp.typemod.string.documentation.python"] = { fg = Util.blend_bg(c.purple, 0.5) }
       -- I prefer when the literals are the same color and dont pop out at me
       local muted_literal = { fg = Util.blend_bg(c.fg, 0.7) }
       hl["@string"] = muted_literal
