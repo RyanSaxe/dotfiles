@@ -175,7 +175,12 @@ function M.scan_tasks()
 
   -- Use ripgrep with JSON output to find all incomplete tasks in one pass
   -- This is MUCH faster than fd + reading every file, especially for large vaults
-  local cmd = string.format('rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" %s', vault_path)
+
+  local cmd = string.format(
+    'rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" --glob "!**/templates/**" %s',
+    vim.fn.shellescape(vault_path)
+  )
+
   local output = vim.fn.systemlist(cmd)
 
   if vim.v.shell_error ~= 0 and vim.v.shell_error ~= 1 then
@@ -344,6 +349,7 @@ local function create_picker_config(items)
   return {
     title = "Obsidian Tasks",
     items = items,
+    layout = "custom_horizontal",
     -- Use default file previewer for task items
     preview = Snacks.picker.preview.file,
     format = function(item)

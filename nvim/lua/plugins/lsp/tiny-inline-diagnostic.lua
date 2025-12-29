@@ -71,8 +71,8 @@ return {
       -- NOTE: When using display_count = true, you need to enable multiline diagnostics with multilines.enabled = true
       --       If you want them to always be displayed, you can also set multilines.always_show = true.
       add_messages = {
-        messages = false, -- Show full diagnostic messages
-        display_count = true, -- Show diagnostic count instead of messages when cursor not on line
+        messages = true, -- Show full diagnostic messages
+        display_count = false, -- Show diagnostic count instead of messages when cursor not on line
         use_max_severity = false, -- When counting, only show the most severe diagnostic
         show_multiple_glyphs = false, -- Show multiple icons for multiple diagnostics of same severity
       },
@@ -89,7 +89,7 @@ return {
       -- Show all diagnostics on the current cursor line, not just those under the cursor
       show_all_diags_on_cursorline = false,
       -- If true, only show diagnostics under the cursor
-      show_diags_only_under_cursor = true,
+      show_diags_only_under_cursor = false,
       -- Display related diagnostics from LSP relatedInformation
       show_related = {
         enabled = false, -- Enable displaying related diagnostics
