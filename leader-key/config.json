@@ -40,15 +40,9 @@
         },
         {
           "key": "s",
-          "label": "Search Person",
+          "label": "Search",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"e\", {\"cmd\"})'"
-        },
-        {
-          "key": "/",
-          "label": "Grep Mail (Search)",
-          "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"e\", {\"cmd\"})'"
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"f\", {\"cmd\", \"shift\"})'"
         },
         {
           "key": "r",
@@ -90,13 +84,13 @@
         },
         {
           "key": "s",
-          "label": "Search Person",
+          "label": "Go To",
           "type": "command",
           "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"g\", {\"cmd\"})'"
         },
         {
           "key": "/",
-          "label": "Grep Chats (Search)",
+          "label": "Search",
           "type": "command",
           "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\"})'"
         },
