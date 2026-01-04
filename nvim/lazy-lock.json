@@ -5,7 +5,7 @@
   },
   "SchemaStore.nvim": {
     "branch": "main",
-    "commit": "60f1b3d1bde39396cdfb1362dd207970ec57e731"
+    "commit": "1bc1227ee1f5ad02f6796701539e9aaf6c5e77e6"
   },
   "blink-cmp-dictionary": {
     "branch": "master",
@@ -33,11 +33,11 @@
   },
   "conform.nvim": {
     "branch": "master",
-    "commit": "5420c4b5ea0aeb99c09cfbd4fd0b70d257b44f25"
+    "commit": "df83eeaab265dacd2eef139a78e502a3f8926618"
   },
   "copilot.lua": {
     "branch": "master",
-    "commit": "a064570939f23ef155698654c98c81e0fc2dc54a"
+    "commit": "e78d1ffebdf6ccb6fd8be4e6898030c1cf5f9b64"
   },
   "dial.nvim": {
     "branch": "master",
@@ -141,7 +141,7 @@
   },
   "nvim-lspconfig": {
     "branch": "master",
-    "commit": "d696e36d5792daf828f8c8e8d4b9aa90c1a10c2a"
+    "commit": "41ceb6bba3a40128b7841f5b7f5a9dae7201e823"
   },
   "nvim-treesitter": {
     "branch": "main",

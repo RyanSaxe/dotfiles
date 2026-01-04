@@ -7,43 +7,152 @@
       "type": "command",
       "value": "hs -c 'openSpotlight()'"
     },
+
     {
-      "key": "t",
+      "key": "g",
       "label": "Terminal (Ghostty)",
       "type": "application",
       "value": "/Applications/Ghostty.app"
     },
+
     {
-      "key": "m",
-      "label": "Messages & Mail",
+      "key": "o",
+      "label": "Outlook",
       "type": "group",
       "actions": [
         {
-          "key": "g",
-          "label": "Gmail",
-          "type": "command",
-          "value": "hs -c 'openAppOrWeb(\"Gmail\", \"/Applications/Gmail.app\", \"https://mail.google.com\")'"
-        },
-        {
-          "key": "o",
-          "label": "Outlook",
+          "key": "space",
+          "label": "Focus / Open Outlook",
           "type": "command",
           "value": "hs -c 'openAppOrWeb(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\")'"
         },
         {
-          "key": "t",
-          "label": "Teams",
+          "key": "n",
+          "label": "New Mail",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"g\", {\"cmd\"}, \"g\", {\"cmd\", \"alt\"})'"
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"n\", {\"cmd\"})'"
+        },
+        {
+          "key": "c",
+          "label": "Calendar",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"2\", {\"cmd\"})'"
+        },
+        {
+          "key": "s",
+          "label": "Search Person",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"e\", {\"cmd\"})'"
+        },
+        {
+          "key": "/",
+          "label": "Grep Mail (Search)",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"e\", {\"cmd\"})'"
+        },
+        {
+          "key": "r",
+          "label": "Reply All",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"r\", {\"cmd\", \"shift\"})'"
+        },
+        {
+          "key": "f",
+          "label": "Forward",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"j\", {\"cmd\"})'"
+        },
+        {
+          "key": "M",
+          "label": "Mark All as Read",
+          "type": "command",
+          "value": "hs -c 'outlookMarkAllAsRead()'"
         }
       ]
     },
+
+    {
+      "key": "t",
+      "label": "Teams",
+      "type": "group",
+      "actions": [
+        {
+          "key": "space",
+          "label": "Focus / Open Teams",
+          "type": "command",
+          "value": "hs -c 'openAppOrWeb(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\")'"
+        },
+        {
+          "key": "c",
+          "label": "Calendar",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"3\", {\"cmd\"})'"
+        },
+        {
+          "key": "s",
+          "label": "Search Person",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"g\", {\"cmd\"})'"
+        },
+        {
+          "key": "/",
+          "label": "Grep Chats (Search)",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\"})'"
+        },
+        {
+          "key": "m",
+          "label": "Meeting: Toggle Mute",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"m\", {\"cmd\", \"shift\"})'"
+        },
+        {
+          "key": "v",
+          "label": "Meeting: Toggle Video",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"o\", {\"cmd\", \"shift\"})'"
+        },
+        {
+          "key": "p",
+          "label": "Meeting: Share Screen",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\", \"shift\"})'"
+        },
+        {
+          "key": "u",
+          "label": "Command Bar (Availability, etc.)",
+          "type": "command",
+          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\"})'"
+        },
+
+        {
+          "key": "x",
+          "label": "Toggle Camera (OBS Face/Tablet)",
+          "type": "command",
+          "value": "hs -c 'toggleObsCamera()'"
+        },
+        {
+          "key": "1",
+          "label": "Camera: Force Face",
+          "type": "command",
+          "value": "hs -c 'obsCameraFace()'"
+        },
+        {
+          "key": "2",
+          "label": "Camera: Force Tablet",
+          "type": "command",
+          "value": "hs -c 'obsCameraTablet()'"
+        }
+      ]
+    },
+
     {
       "key": "a",
       "label": "ChatGPT (Web)",
       "type": "command",
       "value": "hs -c 'focusByDomainOrOpen(\"chatgpt.com\", \"https://chatgpt.com\")'"
     },
+
     {
       "key": "b",
       "label": "Browser",
@@ -75,6 +184,7 @@
         }
       ]
     },
+
     {
       "key": "w",
       "label": "Window",

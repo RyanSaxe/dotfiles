@@ -233,6 +233,58 @@ function windowFullscreen()
 	end
 end
 
+-- === OBS Virtual Camera scene control ===
+-- You set these in OBS:
+--   Switch to Scene: VirtualCameraFace   -> alt+cmd+1
+--   Switch to Scene: VirtualCameraTablet -> alt+cmd+2
+
+local _obsCam = "face" -- local state: "face" or "tablet"
+
+function obsCameraFace()
+	hs.eventtap.keyStroke({ "alt", "cmd" }, "1", 0)
+	_obsCam = "face"
+end
+
+function obsCameraTablet()
+	hs.eventtap.keyStroke({ "alt", "cmd" }, "2", 0)
+	_obsCam = "tablet"
+end
+
+function toggleObsCamera()
+	if _obsCam == "face" then
+		obsCameraTablet()
+	else
+		obsCameraFace()
+	end
+end
+
+-- === Outlook helpers ===
+function outlookMarkAllAsRead()
+	local app = hs.appfinder.appFromName("Microsoft Outlook")
+	if not app then
+		hs.application.open("/Applications/Microsoft Outlook.app")
+		return
+	end
+	app:activate()
+
+	-- Menu path can vary slightly; these are the common ones.
+	-- We'll try a couple in order.
+	local candidates = {
+		{ "Message", "Mark All as Read" },
+		{ "Message", "Mark as Read", "Mark All as Read" },
+		{ "Edit", "Mark All as Read" },
+	}
+
+	for _, path in ipairs(candidates) do
+		local ok = app:selectMenuItem(path)
+		if ok then
+			return
+		end
+	end
+
+	hs.alert.show("Outlook: couldn't find 'Mark All as Read' menu item")
+end
+
 -- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
