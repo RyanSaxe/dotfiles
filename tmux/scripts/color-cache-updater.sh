@@ -114,7 +114,13 @@ update_color_cache() {
   tmux set -gq @pokemon_prominent "$prominent_color"
   tmux set -gq @pokemon_bright "$bright_color"
 
-  # Trigger a smooth status refresh
+  # Update JankyBorders colors (do this BEFORE tmux refresh)
+  # If borders is running, this updates the existing process with the new color
+  # If not running, this starts borders with the new color (only active_color, no other settings)
+  local borders_color="0xff${prominent_color#\#}"
+  borders active_color="$borders_color" > /dev/null 2>&1 || true
+
+  # Trigger a smooth status refresh (after all color updates are complete)
   tmux refresh-client -S > /dev/null 2>&1 || true
 }
 

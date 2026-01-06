@@ -1,0 +1,277 @@
+# Place a copy of this config to ~/.aerospace.toml
+# After that, you can edit ~/.aerospace.toml to your liking
+#
+# NOTES: below has links to docs that govern things I ran into:
+#
+# 1. you must set your monitor arrangement to have corner gaps: https://nikitabobko.github.io/AeroSpace/guide#proper-monitor-arrangement
+# 2. 
+
+# Config version for compatibility and deprecations
+# Fallback value (if you omit the key): config-version = 1
+config-version = 2
+
+start-at-login = true
+
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+accordion-padding = 100
+
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+
+on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+
+# Only keep *your* workspaces alive
+persistent-workspaces = [
+  "email",
+  "chat",
+  "browser",
+  "code",
+  "notes",
+  "background",
+]
+
+
+# ----------------------------
+# STARTUP: open apps
+# ----------------------------
+# We:
+# - open apps (windows will be routed by on-window-detected rules below)
+
+
+after-startup-command = [
+  'exec-and-forget borders',
+  'exec-and-forget /usr/bin/open -a "Google Chrome"',
+  # Ghostty CODE window
+  'exec-and-forget /usr/bin/open -n -a "Ghostty" --args --title="WT:code"',
+  # Ghostty NOTES window
+  'exec-and-forget /usr/bin/open -n -a "Ghostty" --args --title="WT:notes"',
+  # Wait for first Teams window, then move it to chat (left monitor)
+  'exec-and-forget /usr/bin/open -a "Microsoft Teams"',
+
+  '''exec-and-forget /bin/sh -lc '
+    for i in $(seq 1 80); do
+      id=$(
+        aerospace list-windows --all \
+          | grep -E "Microsoft Teams" \
+          | sed -E "s/^ *([0-9]+).*/\\1/" \
+          | head -n 1
+      )
+      if [ -n "$id" ]; then
+        aerospace move-node-to-workspace --window-id "$id" --focus-follows-window chat
+        exit 0
+      fi
+      sleep 0.1
+    done
+  ' ''',
+  # wait for NOTES window, then move it to notes (right monitor)
+  '''exec-and-forget /bin/sh -lc '
+    for i in $(seq 1 80); do
+      id=$(
+        aerospace list-windows --all \
+          | grep -E "Ghostty | WT:notes" \
+          | sed -E "s/^ *([0-9]+).*/\\1/" \
+          | head -n 1
+      )
+      if [ -n "$id" ]; then
+        aerospace move-node-to-workspace --window-id "$id" --focus-follows-window notes
+        exit 0
+      fi
+      sleep 0.1
+    done
+  ' ''',
+
+  'exec-and-forget /usr/bin/open -a "Microsoft Outlook"',
+]
+
+# ----------------------------
+# WORKSPACES -> MONITORS
+# ----------------------------
+# Monitor patterns:
+# 1 = left-to-right sequence number (1-based)
+# 'main' = whatever macOS marks as main display
+[workspace-to-monitor-force-assignment]
+email = 1
+chat = 1
+browser = 2
+code = 2
+background = 2
+notes = 3
+
+
+# ----------------------------
+# WINDOW ROUTING (APP -> WORKSPACE)
+# ----------------------------
+
+# Outlook -> email (vertical)
+[[on-window-detected]]
+if.app-id = 'com.microsoft.Outlook'
+run = ['move-node-to-workspace --focus-follows-window email', 'layout v_tiles']
+
+# Teams: everything else (meetings/calls/etc) -> notes (vertical)
+[[on-window-detected]]
+if.app-id = 'com.microsoft.teams2'
+run = ['move-node-to-workspace --focus-follows-window notes', 'layout v_tiles']
+
+
+# Teams: chat windows -> chat (vertical)
+[[on-window-detected]]
+if.app-id = 'com.microsoft.teams2'
+if.window-title-regex-substring = '^Chat \\|'
+run = ['move-node-to-workspace --focus-follows-window chat', 'layout v_tiles']
+
+# Chrome -> browser (horizontal)
+[[on-window-detected]]
+if.app-id = 'com.google.Chrome'
+run = [
+  'move-node-to-workspace --focus-follows-window browser',
+  'layout h_tiles',
+]
+
+# Ghostty code window -> code (horizontal)
+[[on-window-detected]]
+if.app-id = 'com.mitchellh.ghostty'
+run = ['move-node-to-workspace --focus-follows-window code', 'layout h_tiles']
+
+# Floating windows for system apps
+[[on-window-detected]]
+if.app-id = 'com.apple.finder'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.ActivityMonitor'
+run = 'layout floating'
+
+# -----------------------------------------------------------------------------
+# Gaps Configuration
+# -----------------------------------------------------------------------------
+# Defines spacing around and between windows.
+[gaps]
+# Space between adjacent tiled windows.
+# NOTE: I like the look best with this set to 10, but my company has control over 
+#       my machine's wallpaper and so spaces between windows can be distracting.
+inner.horizontal = 3
+inner.vertical = 3
+
+# Space between the outermost windows and the screen edges.
+# Ensure these are numbers (Integers), not strings (no quotes needed).
+outer.left = 3
+outer.bottom = 3
+outer.top = 3
+outer.right = 3
+# ----------------------------
+# KEYBINDINGS (NO ALT; COMMAND-BASED)
+# ----------------------------
+[key-mapping]
+preset = 'qwerty'
+
+[mode.main.binding]
+
+alt-cmd-1 = 'workspace monitor-1'
+alt-cmd-2 = 'workspace monitor-2'
+alt-cmd-3 = 'workspace monitor-3'
+# Move to left most monitor in a temp workspace
+alt-cmd-shift-1 = [
+  'move-node-to-workspace monitor-1',
+  'workspace monitor-1',
+  'move-workspace-to-monitor 1',
+  'layout v_accordion',
+]
+
+# Move to center monitor in a temp workspace
+alt-cmd-shift-2 = [
+  'move-node-to-workspace monitor-2',
+  'workspace monitor-2',
+  'move-workspace-to-monitor 2',
+  'layout h_accordion',
+]
+
+# Move to right most monitor in a temp workspace
+alt-cmd-shift-3 = [
+  'move-node-to-workspace monitor-3',
+  'workspace monitor-3',
+  'move-workspace-to-monitor 3',
+  'layout v_accordion',
+]
+
+# Focus (cmd+ctrl+h/j/k/l)
+cmd-alt-h = 'focus left --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-j = 'focus down --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-k = 'focus up --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-l = 'focus right --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+
+# Move windows (cmd+ctrl+shift+h/j/k/l)
+cmd-alt-shift-h = 'move left'
+cmd-alt-shift-j = 'move down'
+cmd-alt-shift-k = 'move up'
+cmd-alt-shift-l = 'move right'
+
+# Toggle orientation
+cmd-alt-slash = 'layout horizontal vertical'
+
+# Workspace switching (cmd+ctrl + letter mnemonic)
+cmd-alt-e = 'workspace email'
+cmd-alt-t = 'workspace chat'
+cmd-alt-b = 'workspace browser'
+cmd-alt-g = 'workspace code'
+cmd-alt-n = 'workspace notes'
+
+# Send focused window to workspace (cmd+ctrl+shift + letter)
+cmd-alt-shift-e = [
+  'move-node-to-workspace email',
+  'workspace email',
+  'layout v_tiles',
+]
+cmd-alt-shift-t = [
+  'move-node-to-workspace chat',
+  'workspace chat',
+  'layout v_tiles',
+]
+cmd-alt-shift-b = [
+  'move-node-to-workspace browser',
+  'workspace browser',
+  'layout h_tiles',
+]
+cmd-alt-shift-g = [
+  'move-node-to-workspace code',
+  'workspace code',
+  'layout h_tiles',
+]
+cmd-alt-shift-n = [
+  'move-node-to-workspace notes',
+  'workspace notes',
+  'layout v_tiles',
+]
+
+# Focus monitor 
+
+# Back and forth
+cmd-alt-tab = 'workspace-back-and-forth'
+cmd-alt-shift-r = 'reload-config'
+cmd-alt-f = 'fullscreen'
+
+# modes
+cmd-alt-shift-semicolon = 'mode service'
+cmd-alt-r = 'mode resize'
+
+[mode.resize.binding]
+h = 'resize width -50'
+j = 'resize height +50'
+k = 'resize height -50'
+l = 'resize width +50'
+enter = 'mode main'
+esc = 'mode main'
+[mode.service.binding]
+esc = ['reload-config', 'mode main']
+r = ['flatten-workspace-tree', 'mode main']                # reset layout
+f = ['layout floating tiling', 'mode main']                # toggle floating/tiling
+backspace = ['close-all-windows-but-current', 'mode main']
+cmd-alt-h = ['join-with left', 'mode main']
+cmd-alt-j = ['join-with down', 'mode main']
+cmd-alt-k = ['join-with up', 'mode main']
+cmd-alt-l = ['join-with right', 'mode main']

@@ -49,6 +49,7 @@ wordnet
 hammerspoon
 leader-key
 karabiner-elements
+aerospace
 
 # AI tools
 claude-code

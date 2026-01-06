@@ -285,7 +285,6 @@ function outlookMarkAllAsRead()
 	hs.alert.show("Outlook: couldn't find 'Mark All as Read' menu item")
 end
 
--- Reload config (Cmd+Shift+R)
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
 
-hs.notify.new({ title = "Hammerspoon", informativeText = "Config loaded" }):send()
+hs.alert.show("Hammerspoon config loaded ✅", 2)
