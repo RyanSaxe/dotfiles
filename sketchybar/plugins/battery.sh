@@ -31,15 +31,19 @@ if [[ -n "$CHARGING" ]]; then
 fi
 
 if [[ "$PERCENTAGE" -lt 20 ]]; then
-  COLOR="$RED"
+  ICON_CLR="$RED"
+  LABEL_CLR="$RED"
 elif [[ "$PERCENTAGE" -lt 40 ]]; then
-  COLOR="$YELLOW"
+  ICON_CLR="$YELLOW"
+  LABEL_CLR="$YELLOW"
 else
-  COLOR="$ICON_COLOR"
+  ICON_CLR="$ICON_COLOR"
+  LABEL_CLR="$LABEL_COLOR"
 fi
 
 sketchybar --set "$NAME" \
   icon="$ICON" \
-  icon.color="$COLOR" \
+  icon.color="$ICON_CLR" \
   label="${PERCENTAGE}%" \
+  label.color="$LABEL_CLR" \
   drawing=on

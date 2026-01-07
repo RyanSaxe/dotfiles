@@ -3,7 +3,7 @@
 # Floating rounded bar with TokyoNight theme and pokemon color accents
 #
 # Layout:
-# - Left: Aerospace workspace indicators (E T B G N BG)
+# - Left: Front app (icon + name), Aerospace workspace indicators (V B N M 1 2 3)
 # - Right: CPU, Memory, WiFi, Battery, Clock (with date)
 
 setopt ERR_EXIT NO_UNSET PIPE_FAIL
@@ -58,22 +58,45 @@ default=(
 sketchybar --default "${default[@]}"
 
 # -----------------------------------------------------------------------------
+# Custom Events (must be defined before items subscribe to them)
+# -----------------------------------------------------------------------------
+sketchybar --add event aerospace_workspace_change
+sketchybar --add event pokemon_colors_changed
+sketchybar --add event tmux_bell_change
+
+# -----------------------------------------------------------------------------
+# Front App (Left - far left, before workspaces)
+# -----------------------------------------------------------------------------
+# Displays currently focused application icon and name
+sketchybar --add item front_app left \
+  --set front_app \
+  script="$PLUGIN_DIR/front_app.sh" \
+  icon.background.image.scale=0.5 \
+  icon.padding_right=12 \
+  icon.padding_left=0 \
+  icon.background.drawing=on \
+  label.drawing=off \
+  --subscribe front_app front_app_switched pokemon_colors_changed
+
+# -----------------------------------------------------------------------------
 # Aerospace Workspace Indicators (Left)
 # -----------------------------------------------------------------------------
 # Display keybinding letters matching aerospace.toml keybindings
 # Using zsh associative array (works in zsh 5.9)
+# Keys align with bottom row (V B N M) and match monitor layout left-to-right
 typeset -A WORKSPACE_KEYS
 WORKSPACE_KEYS=(
-  email "E"
-  chat "T"
-  browser "B"
-  code "G"
-  notes "N"
-  background "BG"
+  message "V" # mail/messages (left monitor)
+  browser "B" # center monitor
+  code "N"    # center monitor
+  meeting "M" # Teams meetings (right monitor)
+  monitor-1 "1"
+  monitor-2 "2"
+  monitor-3 "3"
 )
 
-# Workspace order (left to right in bar)
-WORKSPACES=("email" "chat" "browser" "code" "notes" "background")
+# Workspace order (left to right in bar, matches monitor layout)
+WORKSPACES=("monitor-1" "monitor-2" "monitor-3" "message" "browser" "code" "meeting")
 
 for workspace in "${WORKSPACES[@]}"; do
   key="${WORKSPACE_KEYS[$workspace]}"
@@ -88,23 +111,43 @@ for workspace in "${WORKSPACES[@]}"; do
     background.corner_radius=6 \
     background.height=22 \
     click_script="aerospace workspace $workspace" \
-    script="$PLUGIN_DIR/aerospace.sh" \
-    --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
+    script="$PLUGIN_DIR/aerospace.sh"
+
+  # Subscribe to events - code workspace also listens for tmux bell changes
+  if [[ "$workspace" == "code" ]]; then
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed tmux_bell_change
+  else
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
+  fi
 done
 
 # -----------------------------------------------------------------------------
 # Right Side Items (ordered right-to-left)
 # -----------------------------------------------------------------------------
 
-# Clock with date (rightmost)
+# Clock (rightmost) - time with clock icon
+# Orange highlight at meeting reminder times (00, 29, 30, 59 minutes)
 sketchybar --add item clock right \
   --set clock \
-  update_freq=30 \
-  icon.drawing=off \
+  update_freq=15 \
+  icon="󰥔" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
   label.font="JetBrainsMono Nerd Font:Bold:12.0" \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/clock.sh" \
+  padding_right=0 \
   --subscribe clock system_woke pokemon_colors_changed
+
+# Date - with calendar icon
+sketchybar --add item date right \
+  --set date \
+  update_freq=60 \
+  icon="󰃭" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
+  label.font="JetBrainsMono Nerd Font:Regular:12.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/date.sh" \
+  --subscribe date system_woke
 
 # Battery
 sketchybar --add item battery right \
@@ -122,29 +165,23 @@ sketchybar --add item wifi right \
   script="$PLUGIN_DIR/wifi.sh" \
   --subscribe wifi wifi_change
 
-# Memory (with label)
+# Memory (with icon)
 sketchybar --add item memory right \
   --set memory \
   update_freq=10 \
-  icon="MEM" \
-  icon.font="JetBrainsMono Nerd Font:Bold:10.0" \
+  icon="󰍛" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/memory.sh"
 
-# CPU (with label)
+# CPU (with icon)
 sketchybar --add item cpu right \
   --set cpu \
   update_freq=5 \
-  icon="CPU" \
-  icon.font="JetBrainsMono Nerd Font:Bold:10.0" \
+  icon="󰌢" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/cpu.sh"
-
-# -----------------------------------------------------------------------------
-# Custom Events
-# -----------------------------------------------------------------------------
-sketchybar --add event aerospace_workspace_change
-sketchybar --add event pokemon_colors_changed
 
 # -----------------------------------------------------------------------------
 # Force Initial Update

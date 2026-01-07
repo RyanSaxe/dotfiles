@@ -8,15 +8,19 @@ CPU=$(top -l 1 -n 0 2> /dev/null | grep "CPU usage" | awk '{print int($3)}')
 
 if [[ -z "$CPU" ]]; then
   CPU="--"
-  COLOR="$ICON_COLOR"
+  ICON_CLR="$ICON_COLOR"
+  LABEL_CLR="$LABEL_COLOR"
 else
   if [[ "$CPU" -gt 80 ]]; then
-    COLOR="$RED"
+    ICON_CLR="$RED"
+    LABEL_CLR="$RED"
   elif [[ "$CPU" -gt 50 ]]; then
-    COLOR="$YELLOW"
+    ICON_CLR="$YELLOW"
+    LABEL_CLR="$YELLOW"
   else
-    COLOR="$ICON_COLOR"
+    ICON_CLR="$ICON_COLOR"
+    LABEL_CLR="$LABEL_COLOR"
   fi
 fi
 
-sketchybar --set "$NAME" label="${CPU}%" icon.color="$COLOR"
+sketchybar --set "$NAME" label="${CPU}%" icon.color="$ICON_CLR" label.color="$LABEL_CLR"

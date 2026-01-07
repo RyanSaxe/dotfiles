@@ -1,19 +1,20 @@
 #!/usr/bin/env zsh
-# Clock plugin with date and meeting reminder coloring
+# Clock plugin - time only with meeting reminder highlighting
 # Minutes 00, 29, 30, 59 = orange (meeting reminders)
 
 source "$HOME/.config/sketchybar/colors.sh"
 
-# Get current date and time
-DATE=$(date '+%a %b %d')
 TIME=$(date '+%H:%M')
 MINUTE=$(date '+%M')
 
-# Determine color based on minute (meeting reminder logic)
+# Highlight at meeting reminder times (start/end of hour, half hour)
 if [[ "$MINUTE" == "00" || "$MINUTE" == "29" || "$MINUTE" == "30" || "$MINUTE" == "59" ]]; then
-  TIME_COLOR="$TIME_HIGHLIGHT"
+  COLOR="$TIME_HIGHLIGHT"
 else
-  TIME_COLOR="$TIME_NORMAL"
+  COLOR="$WORKSPACE_ACTIVE_FG"
 fi
 
-sketchybar --set "$NAME" label="$DATE  $TIME" label.color="$TIME_COLOR"
+sketchybar --set "$NAME" \
+  icon.color="$COLOR" \
+  label="$TIME" \
+  label.color="$COLOR"

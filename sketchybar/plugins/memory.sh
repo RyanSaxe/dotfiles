@@ -13,13 +13,17 @@ else
 fi
 
 if [[ "$MEM" == "--" ]]; then
-  COLOR="$ICON_COLOR"
+  ICON_CLR="$ICON_COLOR"
+  LABEL_CLR="$LABEL_COLOR"
 elif [[ "$MEM" -gt 80 ]]; then
-  COLOR="$RED"
+  ICON_CLR="$RED"
+  LABEL_CLR="$RED"
 elif [[ "$MEM" -gt 60 ]]; then
-  COLOR="$YELLOW"
+  ICON_CLR="$YELLOW"
+  LABEL_CLR="$YELLOW"
 else
-  COLOR="$ICON_COLOR"
+  ICON_CLR="$ICON_COLOR"
+  LABEL_CLR="$LABEL_COLOR"
 fi
 
-sketchybar --set "$NAME" label="${MEM}%" icon.color="$COLOR"
+sketchybar --set "$NAME" label="${MEM}%" icon.color="$ICON_CLR" label.color="$LABEL_CLR"

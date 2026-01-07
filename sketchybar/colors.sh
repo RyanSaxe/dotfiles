@@ -33,7 +33,8 @@ hex_to_argb_alpha() {
 # -----------------------------------------------------------------------------
 export BAR_COLOR="0xff16161e"
 export ITEM_BG="0x00000000"
-export LABEL_COLOR="0xffc0caf5"
+export LABEL_COLOR=$(hex_to_argb "$POKEMON_DIM") # Muted gray for labels (alerts override)
+# export LABEL_WHITE="0xffc0caf5"                   # White for important info (time)
 export FG_GUTTER="0xff3b4261"
 
 export GREEN="0xff9ece6a"
@@ -58,3 +59,7 @@ export TIME_HIGHLIGHT=$(hex_to_argb "$POKEMON_BRIGHT")
 
 export ACCENT_COLOR=$(hex_to_argb "$POKEMON_PROMINENT")
 export ALERT_COLOR=$(hex_to_argb "$POKEMON_BRIGHT")
+
+# Bell notification color (for tmux bell -> sketchybar integration)
+export BELL_FG=$(hex_to_argb "$POKEMON_BRIGHT")
+export BELL_BG=$(hex_to_argb_alpha "${POKEMON_BRIGHT#\#}" "33")
