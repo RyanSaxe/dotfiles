@@ -47,7 +47,7 @@ persistent-workspaces = [
 # We:
 # - open apps (windows will be routed by on-window-detected rules below)
 
-
+# TODO: consider making this more involved and moving it to a startup script
 after-startup-command = [
   'exec-and-forget borders',
   'exec-and-forget sketchybar',
