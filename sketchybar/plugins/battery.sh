@@ -30,10 +30,10 @@ if [[ -n "$CHARGING" ]]; then
   ICON="󰂄"
 fi
 
-if [[ "$PERCENTAGE" -lt 20 ]]; then
+if [[ "$PERCENTAGE" -lt 25 ]]; then
   ICON_CLR="$RED"
   LABEL_CLR="$RED"
-elif [[ "$PERCENTAGE" -lt 40 ]]; then
+elif [[ "$PERCENTAGE" -lt 50 ]]; then
   ICON_CLR="$YELLOW"
   LABEL_CLR="$YELLOW"
 else

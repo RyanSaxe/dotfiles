@@ -11,7 +11,7 @@ if [[ -z "$CPU" ]]; then
   ICON_CLR="$ICON_COLOR"
   LABEL_CLR="$LABEL_COLOR"
 else
-  if [[ "$CPU" -gt 80 ]]; then
+  if [[ "$CPU" -gt 75 ]]; then
     ICON_CLR="$RED"
     LABEL_CLR="$RED"
   elif [[ "$CPU" -gt 50 ]]; then

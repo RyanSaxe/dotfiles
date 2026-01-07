@@ -15,10 +15,10 @@ fi
 if [[ "$MEM" == "--" ]]; then
   ICON_CLR="$ICON_COLOR"
   LABEL_CLR="$LABEL_COLOR"
-elif [[ "$MEM" -gt 80 ]]; then
+elif [[ "$MEM" -gt 75 ]]; then
   ICON_CLR="$RED"
   LABEL_CLR="$RED"
-elif [[ "$MEM" -gt 60 ]]; then
+elif [[ "$MEM" -gt 50 ]]; then
   ICON_CLR="$YELLOW"
   LABEL_CLR="$YELLOW"
 else
