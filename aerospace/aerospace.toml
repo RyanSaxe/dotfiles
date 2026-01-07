@@ -31,10 +31,10 @@ exec-on-workspace-change = [
 
 # Only keep *your* workspaces alive
 persistent-workspaces = [
-  "message",  # mail/messages (merged email+chat) - key V
-  "browser",  # key B
-  "code",     # key N
-  "meeting",  # Teams meetings/calls - key M
+  "message",   # mail/messages (merged email+chat) - key V
+  "browser",   # key B
+  "code",      # key N
+  "meeting",   # Teams meetings/calls - key M
   "monitor-1",
   "monitor-2",
   "monitor-3",
@@ -51,7 +51,6 @@ persistent-workspaces = [
 after-startup-command = [
   'exec-and-forget borders',
   'exec-and-forget sketchybar',
-  'exec-and-forget /usr/bin/open -a "Google Chrome"',
   # Ghostty CODE window
   'exec-and-forget /usr/bin/open -n -a "Ghostty" --args --title="WT:code"',
   # Ghostty NOTES window
@@ -101,38 +100,48 @@ after-startup-command = [
 # 1 = left-to-right sequence number (1-based)
 # 'main' = whatever macOS marks as main display
 [workspace-to-monitor-force-assignment]
-message = 1   # mail/messages (left monitor, key V)
-browser = 2   # center monitor, key B
-code = 2      # center monitor, key N
-meeting = 3   # Teams meetings (right monitor, key M)
+message = 1      # mail/messages (left monitor, key V)
+browser = "main" # center monitor, key B
+code = "main"    # center monitor, key N
+meeting = 3      # Teams meetings (right monitor, key M)
 
 
 # ----------------------------
 # WINDOW ROUTING (APP -> WORKSPACE)
 # ----------------------------
 
-# Outlook -> message (accordion for stacked mail/messages)
+# Outlook -> message 
 [[on-window-detected]]
 if.app-id = 'com.microsoft.Outlook'
-run = ['move-node-to-workspace --focus-follows-window message', 'layout v_accordion']
+run = [
+  'move-node-to-workspace --focus-follows-window message',
+  'layout v_tiles',
+]
 
 # Teams: everything else (meetings/calls/etc) -> meeting (vertical tiles)
 [[on-window-detected]]
 if.app-id = 'com.microsoft.teams2'
-run = ['move-node-to-workspace --focus-follows-window meeting', 'layout v_tiles']
+run = [
+  'move-node-to-workspace --focus-follows-window meeting',
+  'layout v_tiles',
+]
 
-# Teams: chat windows -> message (accordion)
+# Teams: chat windows
 [[on-window-detected]]
 if.app-id = 'com.microsoft.teams2'
 if.window-title-regex-substring = '^Chat \\|'
-run = ['move-node-to-workspace --focus-follows-window message', 'layout v_accordion']
-
-# Teams: calendar window -> message (accordion)
-# NOTE: verify the exact title pattern with `aerospace list-windows` after popping out calendar
+run = [
+  'move-node-to-workspace --focus-follows-window message',
+  'layout v_tiles',
+]
+# Teams: calendar windows
 [[on-window-detected]]
 if.app-id = 'com.microsoft.teams2'
-if.window-title-regex-substring = 'Calendar'
-run = ['move-node-to-workspace --focus-follows-window message', 'layout v_accordion']
+if.window-title-regex-substring = '^Calendar \\|'
+run = [
+  'move-node-to-workspace --focus-follows-window message',
+  'layout v_tiles',
+]
 
 # Chrome -> browser (horizontal)
 [[on-window-detected]]
@@ -168,15 +177,15 @@ run = 'layout floating'
 # Space between adjacent tiled windows.
 # NOTE: I like the look best with this set to 10, but my company has control over 
 #       my machine's wallpaper and so spaces between windows can be distracting.
-inner.horizontal = 3
-inner.vertical = 3
+inner.horizontal = 1
+inner.vertical = 1
 
 # Space between the outermost windows and the screen edges.
 # Ensure these are numbers (Integers), not strings (no quotes needed).
-outer.left = 3
-outer.bottom = 3
-outer.top = 43
-outer.right = 3
+outer.left = 1
+outer.bottom = 1
+outer.top = 36
+outer.right = 1
 # ----------------------------
 # KEYBINDINGS (NO ALT; COMMAND-BASED)
 # ----------------------------
@@ -185,10 +194,11 @@ preset = 'qwerty'
 
 [mode.main.binding]
 
+# each monitor has an accordion workspace to send things to
+# for example, I like to read docs and chatgpt on my left monitor where I can easily cycle through them
 alt-cmd-1 = 'workspace monitor-1'
 alt-cmd-2 = 'workspace monitor-2'
 alt-cmd-3 = 'workspace monitor-3'
-# Move to left most monitor in a temp workspace
 alt-cmd-shift-1 = [
   'move-node-to-workspace monitor-1',
   'workspace monitor-1',
@@ -228,16 +238,16 @@ cmd-alt-shift-l = 'move right'
 cmd-alt-slash = 'layout horizontal vertical'
 
 # Workspace switching (cmd+alt + bottom row keys, left-to-right matches monitors)
-cmd-alt-v = 'workspace message'  # left monitor - mail/messages
-cmd-alt-b = 'workspace browser'  # center monitor
-cmd-alt-n = 'workspace code'     # center monitor
-cmd-alt-m = 'workspace meeting'  # right monitor - Teams meetings
+cmd-alt-v = 'workspace message' # left monitor - mail/messages
+cmd-alt-b = 'workspace browser' # center monitor
+cmd-alt-n = 'workspace code'    # center monitor
+cmd-alt-m = 'workspace meeting' # right monitor - Teams meetings
 
 # Send focused window to workspace (cmd+alt+shift + letter)
 cmd-alt-shift-v = [
   'move-node-to-workspace message',
   'workspace message',
-  'layout v_accordion',
+  'layout v_tiles',
 ]
 cmd-alt-shift-b = [
   'move-node-to-workspace browser',

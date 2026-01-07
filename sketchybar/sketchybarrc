@@ -24,7 +24,7 @@ source "$CONFIG_DIR/colors.sh"
 bar=(
   position=top
   height=32
-  margin=3
+  margin=1
   corner_radius=10
   color="$BAR_COLOR"
   border_color="$WORKSPACE_BORDER"
@@ -33,7 +33,7 @@ bar=(
   shadow=on
   sticky=on
   topmost=off
-  y_offset=3
+  y_offset=1
   notch_width=0
 )
 sketchybar --bar "${bar[@]}"
