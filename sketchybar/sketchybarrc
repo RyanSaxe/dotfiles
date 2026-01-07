@@ -1,0 +1,152 @@
+#!/usr/bin/env zsh
+# Sketchybar configuration
+# Floating rounded bar with TokyoNight theme and pokemon color accents
+#
+# Layout:
+# - Left: Aerospace workspace indicators (E T B G N BG)
+# - Right: CPU, Memory, WiFi, Battery, Clock (with date)
+
+setopt ERR_EXIT NO_UNSET PIPE_FAIL
+
+# -----------------------------------------------------------------------------
+# Configuration Paths
+# -----------------------------------------------------------------------------
+CONFIG_DIR="$HOME/.config/sketchybar"
+PLUGIN_DIR="$CONFIG_DIR/plugins"
+
+# Load color definitions (sources pokemon colors)
+source "$CONFIG_DIR/colors.sh"
+
+# -----------------------------------------------------------------------------
+# Bar Configuration
+# -----------------------------------------------------------------------------
+# Floating rounded bar with TokyoNight background
+bar=(
+  position=top
+  height=32
+  margin=3
+  corner_radius=10
+  color="$BAR_COLOR"
+  border_color="$WORKSPACE_BORDER"
+  border_width=1
+  blur_radius=30
+  shadow=on
+  sticky=on
+  topmost=off
+  y_offset=3
+  notch_width=0
+)
+sketchybar --bar "${bar[@]}"
+
+# -----------------------------------------------------------------------------
+# Default Item Configuration
+# -----------------------------------------------------------------------------
+default=(
+  padding_left=4
+  padding_right=4
+  background.height=26
+  background.corner_radius=6
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0"
+  icon.color="$ICON_COLOR"
+  icon.padding_left=6
+  icon.padding_right=2
+  label.font="JetBrainsMono Nerd Font:Regular:12.0"
+  label.color="$LABEL_COLOR"
+  label.padding_left=2
+  label.padding_right=6
+)
+sketchybar --default "${default[@]}"
+
+# -----------------------------------------------------------------------------
+# Aerospace Workspace Indicators (Left)
+# -----------------------------------------------------------------------------
+# Display keybinding letters matching aerospace.toml keybindings
+# Using zsh associative array (works in zsh 5.9)
+typeset -A WORKSPACE_KEYS
+WORKSPACE_KEYS=(
+  email "E"
+  chat "T"
+  browser "B"
+  code "G"
+  notes "N"
+  background "BG"
+)
+
+# Workspace order (left to right in bar)
+WORKSPACES=("email" "chat" "browser" "code" "notes" "background")
+
+for workspace in "${WORKSPACES[@]}"; do
+  key="${WORKSPACE_KEYS[$workspace]}"
+  sketchybar --add item "space.$workspace" left \
+    --set "space.$workspace" \
+    icon="$key" \
+    icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+    icon.padding_left=8 \
+    icon.padding_right=8 \
+    label.drawing=off \
+    background.color="$WORKSPACE_INACTIVE_BG" \
+    background.corner_radius=6 \
+    background.height=22 \
+    click_script="aerospace workspace $workspace" \
+    script="$PLUGIN_DIR/aerospace.sh" \
+    --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
+done
+
+# -----------------------------------------------------------------------------
+# Right Side Items (ordered right-to-left)
+# -----------------------------------------------------------------------------
+
+# Clock with date (rightmost)
+sketchybar --add item clock right \
+  --set clock \
+  update_freq=30 \
+  icon.drawing=off \
+  label.font="JetBrainsMono Nerd Font:Bold:12.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/clock.sh" \
+  --subscribe clock system_woke pokemon_colors_changed
+
+# Battery
+sketchybar --add item battery right \
+  --set battery \
+  update_freq=60 \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/battery.sh" \
+  --subscribe battery power_source_change system_woke
+
+# WiFi
+sketchybar --add item wifi right \
+  --set wifi \
+  update_freq=30 \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/wifi.sh" \
+  --subscribe wifi wifi_change
+
+# Memory (with label)
+sketchybar --add item memory right \
+  --set memory \
+  update_freq=10 \
+  icon="MEM" \
+  icon.font="JetBrainsMono Nerd Font:Bold:10.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/memory.sh"
+
+# CPU (with label)
+sketchybar --add item cpu right \
+  --set cpu \
+  update_freq=5 \
+  icon="CPU" \
+  icon.font="JetBrainsMono Nerd Font:Bold:10.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/cpu.sh"
+
+# -----------------------------------------------------------------------------
+# Custom Events
+# -----------------------------------------------------------------------------
+sketchybar --add event aerospace_workspace_change
+sketchybar --add event pokemon_colors_changed
+
+# -----------------------------------------------------------------------------
+# Force Initial Update
+# -----------------------------------------------------------------------------
+sketchybar --update

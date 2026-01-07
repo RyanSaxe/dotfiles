@@ -50,6 +50,8 @@ hammerspoon
 leader-key
 karabiner-elements
 aerospace
+sketchybar
+jankyborders
 
 # AI tools
 claude-code

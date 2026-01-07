@@ -16,3 +16,4 @@ harper/dictionary.txt:$HOME/.config/harper-ls/dictionary.txt
 extras/fsh:$HOME/.config/fsh
 aerospace/:$HOME/.config/aerospace
 borders/bordersrc:$HOME/.config/borders/bordersrc
+sketchybar:$HOME/.config/sketchybar
