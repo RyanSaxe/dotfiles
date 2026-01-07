@@ -34,5 +34,6 @@ fi
 sketchybar --set "$NAME" \
   icon="$ICON" \
   icon.color="$COLOR" \
+  label.color="$LABEL_COLOR" \
   label="$LABEL" \
   label.drawing=$([[ -n "$LABEL" ]] && echo "on" || echo "off")
