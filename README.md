@@ -134,8 +134,8 @@ Repository-wide tasks and cross-cutting improvements. Tool-specific TODOs are in
 
 Things I have not explored yet but am interested in taking a look at
 
-- [ ] Aerospace or Yabai: Tiling window manager -- This will be a large update with Leader Key to set spaces and keybinds for much easier control of things like teams meetings.
-- [ ] SkechyBar: MacOS Statusline
+- [x] Aerospace or Yabai: Tiling window manager -- This will be a large update with Leader Key to set spaces and keybinds for much easier control of things like teams meetings.
+- [x] SkechyBar: MacOS Statusline
 - [ ] Zoxide:    Smart directory navigation (e.g. replace for cd)
 - [ ] I don't remember the name, but it's a neovim plugin for merging the statusline with tmux for a much cleaner look. Though I would want to not have tmux in the middle as it's default and would want tmux to the left and neovim to the right, which might be complicated.
-- [ ] Vimium:    Chrome Extension for vim navigation of chrome. Right now I do have it enabled, but have not customized it. The extension has a restore option from a JSON file, so we can have a config here. I'd like to disable A LOT in it so it doesn't conflict with native keybinds. And instead use things like either karibiner or leader key to natively map things like pageup/pagedown as well as arrow keys and stuff so it's not specific to chrome. But this way I can keep link navigation and make vimium look nicer (the default css is gross)
+- [x] Vimium:    Chrome Extension for vim navigation of chrome. Right now I do have it enabled, but have not customized it. The extension has a restore option from a JSON file, so we can have a config here. I'd like to disable A LOT in it so it doesn't conflict with native keybinds. And instead use things like either karibiner or leader key to natively map things like pageup/pagedown as well as arrow keys and stuff so it's not specific to chrome. But this way I can keep link navigation and make vimium look nicer (the default css is gross)
