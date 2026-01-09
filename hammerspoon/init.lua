@@ -273,8 +273,7 @@ function toggleObsCamera()
 end
 
 -- === Outlook Web helpers ===
--- Mark all as read in Outlook Web: Select all (Cmd+A) then mark as read (Q)
--- In Outlook Web, single-key shortcuts work when focus is on the message list
+-- Mark all as read in Outlook Web: Select all (Cmd+A), mark as read (Q), deselect (Esc)
 function outlookMarkAllAsRead()
 	-- Focus Outlook Web first
 	focusByDomainOrOpen("outlook.office.com", "https://outlook.office.com")
@@ -283,10 +282,13 @@ function outlookMarkAllAsRead()
 	hs.timer.doAfter(0.3, function()
 		-- Select all messages (Cmd+A on Mac)
 		hs.eventtap.keyStroke({ "cmd" }, "a", 50000)
-		-- Small delay between keystrokes
 		hs.timer.doAfter(0.15, function()
-			-- Mark as read - just "q" key in Outlook Web (single-key shortcut)
+			-- Mark as read (single-key shortcut)
 			hs.eventtap.keyStroke({}, "q", 50000)
+			hs.timer.doAfter(0.15, function()
+				-- Deselect all
+				hs.eventtap.keyStroke({}, "escape", 50000)
+			end)
 		end)
 	end)
 end
