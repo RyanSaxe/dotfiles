@@ -15,7 +15,7 @@ start-at-login = true
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
 
-accordion-padding = 100
+accordion-padding = 300
 
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'auto'
@@ -51,46 +51,6 @@ persistent-workspaces = [
 after-startup-command = [
   'exec-and-forget borders',
   'exec-and-forget sketchybar',
-  # Ghostty CODE window
-  'exec-and-forget /usr/bin/open -n -a "Ghostty" --args --title="WT:code"',
-  # Ghostty NOTES window
-  'exec-and-forget /usr/bin/open -n -a "Ghostty" --args --title="WT:notes"',
-  # Wait for first Teams window, then move it to message (left monitor)
-  'exec-and-forget /usr/bin/open -a "Microsoft Teams"',
-
-  '''exec-and-forget /bin/sh -lc '
-    for i in $(seq 1 80); do
-      id=$(
-        aerospace list-windows --all \
-          | grep -E "Microsoft Teams" \
-          | sed -E "s/^ *([0-9]+).*/\\1/" \
-          | head -n 1
-      )
-      if [ -n "$id" ]; then
-        aerospace move-node-to-workspace --window-id "$id" --focus-follows-window message
-        exit 0
-      fi
-      sleep 0.1
-    done
-  ' ''',
-  # wait for NOTES window, then move it to meeting (right monitor)
-  '''exec-and-forget /bin/sh -lc '
-    for i in $(seq 1 80); do
-      id=$(
-        aerospace list-windows --all \
-          | grep -E "Ghostty | WT:notes" \
-          | sed -E "s/^ *([0-9]+).*/\\1/" \
-          | head -n 1
-      )
-      if [ -n "$id" ]; then
-        aerospace move-node-to-workspace --window-id "$id" --focus-follows-window meeting
-        exit 0
-      fi
-      sleep 0.1
-    done
-  ' ''',
-
-  'exec-and-forget /usr/bin/open -a "Microsoft Outlook"',
 ]
 
 # ----------------------------
@@ -104,57 +64,6 @@ message = 1      # mail/messages (left monitor, key V)
 browser = "main" # center monitor, key B
 code = "main"    # center monitor, key N
 meeting = 3      # Teams meetings (right monitor, key M)
-
-
-# ----------------------------
-# WINDOW ROUTING (APP -> WORKSPACE)
-# ----------------------------
-
-# Outlook -> message 
-[[on-window-detected]]
-if.app-id = 'com.microsoft.Outlook'
-run = [
-  'move-node-to-workspace --focus-follows-window message',
-  'layout v_tiles',
-]
-
-# Teams: everything else (meetings/calls/etc) -> meeting (vertical tiles)
-[[on-window-detected]]
-if.app-id = 'com.microsoft.teams2'
-run = [
-  'move-node-to-workspace --focus-follows-window meeting',
-  'layout v_tiles',
-]
-
-# Teams: chat windows
-[[on-window-detected]]
-if.app-id = 'com.microsoft.teams2'
-if.window-title-regex-substring = '^Chat \\|'
-run = [
-  'move-node-to-workspace --focus-follows-window message',
-  'layout v_tiles',
-]
-# Teams: calendar windows
-[[on-window-detected]]
-if.app-id = 'com.microsoft.teams2'
-if.window-title-regex-substring = '^Calendar \\|'
-run = [
-  'move-node-to-workspace --focus-follows-window message',
-  'layout v_tiles',
-]
-
-# Chrome -> browser (horizontal)
-[[on-window-detected]]
-if.app-id = 'com.google.Chrome'
-run = [
-  'move-node-to-workspace --focus-follows-window browser',
-  'layout h_tiles',
-]
-
-# Ghostty code window -> code (horizontal)
-[[on-window-detected]]
-if.app-id = 'com.mitchellh.ghostty'
-run = ['move-node-to-workspace --focus-follows-window code', 'layout h_tiles']
 
 # Floating windows for system apps
 [[on-window-detected]]
@@ -265,16 +174,14 @@ cmd-alt-shift-m = [
   'layout v_tiles',
 ]
 
-# Focus monitor 
-
-# Back and forth
+# utils
 cmd-alt-tab = 'workspace-back-and-forth'
-cmd-alt-shift-r = 'reload-config'
+cmd-alt-r = 'reload-config'
 cmd-alt-f = 'fullscreen'
 
 # modes
 cmd-alt-shift-semicolon = 'mode service'
-cmd-alt-r = 'mode resize'
+cmd-alt-shift-r = 'mode resize'
 
 [mode.resize.binding]
 h = 'resize width -50'
