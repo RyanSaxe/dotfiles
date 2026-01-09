@@ -17,44 +17,38 @@
 
     {
       "key": "o",
-      "label": "Outlook",
+      "label": "Outlook (Web)",
       "type": "group",
       "actions": [
         {
           "key": "space",
           "label": "Focus / Open Outlook",
           "type": "command",
-          "value": "hs -c 'openAppOrWeb(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\")'"
+          "value": "hs -c 'focusByDomainOrOpen(\"outlook.office.com\", \"https://outlook.office.com\")'"
         },
         {
           "key": "n",
           "label": "New Mail",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"n\", {\"cmd\"})'"
-        },
-        {
-          "key": "c",
-          "label": "Calendar",
-          "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"2\", {\"cmd\"})'"
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"n\", {})'"
         },
         {
           "key": "s",
-          "label": "Search",
+          "label": "Search (Alt+Q)",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"f\", {\"cmd\", \"shift\"})'"
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"q\", {\"alt\"})'"
         },
         {
           "key": "r",
           "label": "Reply All",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"r\", {\"cmd\", \"shift\"})'"
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"r\", {\"ctrl\", \"shift\"})'"
         },
         {
           "key": "f",
           "label": "Forward",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\", \"j\", {\"cmd\"})'"
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"f\", {\"ctrl\", \"shift\"})'"
         },
         {
           "key": "M",
@@ -67,56 +61,56 @@
 
     {
       "key": "t",
-      "label": "Teams",
+      "label": "Teams (Web)",
       "type": "group",
       "actions": [
         {
-          "key": "space",
-          "label": "Focus / Open Teams",
-          "type": "command",
-          "value": "hs -c 'openAppOrWeb(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\")'"
-        },
-        {
           "key": "c",
-          "label": "Calendar",
+          "label": "Chat",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"3\", {\"cmd\"})'"
-        },
-        {
-          "key": "s",
-          "label": "Go To",
-          "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"g\", {\"cmd\"})'"
-        },
-        {
-          "key": "/",
-          "label": "Search",
-          "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\"})'"
+          "value": "hs -c 'focusByDomainAndTitle(\"teams.microsoft.com\", \"Chat\", \"https://teams.microsoft.com\")'"
         },
         {
           "key": "m",
+          "label": "Calendar (Meetings)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainAndTitle(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\")'"
+        },
+        {
+          "key": "n",
+          "label": "New Meeting",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"n\", {})'"
+        },
+        {
+          "key": "s",
+          "label": "Go To (Search)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Chat\", \"https://teams.microsoft.com\", \"g\", {\"alt\", \"cmd\"})'"
+        },
+        {
+          "key": "/",
+          "label": "Command Bar (Availability, etc.)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Chat\", \"https://teams.microsoft.com\", \"e\", {\"alt\", \"cmd\"})'"
+        },
+        {
+          "key": "M",
           "label": "Meeting: Toggle Mute",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"m\", {\"cmd\", \"shift\"})'"
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"m\", {\"cmd\", \"shift\"})'"
         },
         {
           "key": "v",
           "label": "Meeting: Toggle Video",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"o\", {\"cmd\", \"shift\"})'"
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"o\", {\"cmd\", \"shift\"})'"
         },
         {
           "key": "p",
           "label": "Meeting: Share Screen",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\", \"shift\"})'"
-        },
-        {
-          "key": "u",
-          "label": "Command Bar (Availability, etc.)",
-          "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"e\", {\"cmd\"})'"
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"e\", {\"cmd\", \"shift\"})'"
         },
 
         {

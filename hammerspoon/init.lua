@@ -19,7 +19,7 @@ function openSpotlight()
 	hs.eventtap.keyStroke({ "cmd" }, "space")
 end
 
--- Replace your tab enumeration with window IDs (stable)
+-- Get all Chrome tabs with window ID, tab index, URL, and title
 local function getAllChromeTabs()
 	local script = [[
     set out to {}
@@ -29,7 +29,9 @@ local function getAllChromeTabs()
         set tIndex to 0
         repeat with t in tabs of w
           set tIndex to tIndex + 1
-          set end of out to (wid as string) & "|" & (tIndex as string) & "|" & (URL of t as string)
+          set tabTitle to title of t
+          set tabURL to URL of t
+          set end of out to (wid as string) & "|" & (tIndex as string) & "|" & tabURL & "|" & tabTitle
         end repeat
       end repeat
     end tell
@@ -87,100 +89,112 @@ function focusByDomainOrOpen(domain, url)
 	local chrome = hs.application.find("Google Chrome")
 	if chrome then
 		for _, line in ipairs(getAllChromeTabs()) do
-			local wid, t, u = line:match("^(%d+)|(%d+)|(.+)$")
+			-- Format: windowID|tabIndex|URL|title
+			local wid, t, u = line:match("^(%d+)|(%d+)|([^|]+)")
 			if wid and t and u then
 				local host = hostFromURL(u)
 				if domainMatches(host, domain) then
 					focusChromeTabByWinID(tonumber(wid), tonumber(t))
-					return
+					return true
 				end
 			end
 		end
 	end
 	hs.urlevent.openURL(url)
+	return false
 end
 
--- Function to open app if it exists, otherwise open web URL
-function openAppOrWeb(appName, appPath, webUrl)
-	-- Check if the app exists
-	local file = io.open(appPath, "r")
-	if file then
-		file:close()
-		-- App exists, open it
-		hs.application.open(appPath)
-	else
-		-- App doesn't exist, open web version
-		local domain = webUrl:match("^https?://([^/]+)")
-		if domain then
-			-- Remove protocol and use our existing function
-			domain = domain:lower():gsub("^www%.", "")
-			focusByDomainOrOpen(domain, webUrl)
-		else
-			-- Fallback to just opening the URL
-			hs.urlevent.openURL(webUrl)
-		end
-	end
-end
-
--- Function to open app and send a keystroke once focused
--- Supports different keystrokes for native app vs web version
--- appKey/appModifiers: keystroke to send when opening native app (optional)
--- webKey/webModifiers: keystroke to send when opening web version (optional)
-function openAppWithKey(appName, appPath, webUrl, appKey, appModifiers, webKey, webModifiers)
-	appModifiers = appModifiers or {}
-	webModifiers = webModifiers or {}
-
-	-- Helper to send keystroke after app/page is focused
-	local function sendKeystrokeWhenFocused(targetAppName, key, modifiers)
-		if not key then
-			return
-		end
-
-		-- Check if app is already frontmost
-		local app = hs.application.find(targetAppName)
-		if app and app:isFrontmost() then
-			hs.eventtap.keyStroke(modifiers, key, 50000)
-			return
-		end
-
-		-- Set up watcher to send keystroke when app is activated
-		local watcher
-		watcher = hs.application.watcher.new(function(name, event, _)
-			if event == hs.application.watcher.activated and name == targetAppName then
-				-- Small delay to ensure window is ready
-				hs.timer.doAfter(0.15, function()
-					hs.eventtap.keyStroke(modifiers, key, 50000)
-				end)
-				watcher:stop()
+-- Focus a Chrome tab by domain AND title pattern
+-- titlePattern: Lua pattern to match against tab title (e.g., "Chat", "Calendar")
+-- Returns true if tab was found and focused
+function focusByDomainAndTitle(domain, titlePattern, fallbackUrl)
+	local chrome = hs.application.find("Google Chrome")
+	if chrome then
+		for _, line in ipairs(getAllChromeTabs()) do
+			-- Format: windowID|tabIndex|URL|title
+			local wid, t, u, title = line:match("^(%d+)|(%d+)|([^|]+)|(.*)$")
+			if wid and t and u and title then
+				local host = hostFromURL(u)
+				if domainMatches(host, domain) and title:match(titlePattern) then
+					focusChromeTabByWinID(tonumber(wid), tonumber(t))
+					return true
+				end
 			end
-		end)
-		watcher:start()
-
-		-- Safety timeout: stop watcher after 5 seconds
-		hs.timer.doAfter(5, function()
-			watcher:stop()
-		end)
-	end
-
-	-- Check if the native app exists
-	local file = io.open(appPath, "r")
-	if file then
-		file:close()
-		-- App exists, open it and send app keystroke
-		hs.application.open(appPath)
-		sendKeystrokeWhenFocused(appName, appKey, appModifiers)
-	else
-		-- App doesn't exist, open web version
-		local domain = webUrl:match("^https?://([^/]+)")
-		if domain then
-			domain = domain:lower():gsub("^www%.", "")
-			focusByDomainOrOpen(domain, webUrl)
-		else
-			hs.urlevent.openURL(webUrl)
 		end
-		-- Send web keystroke (Chrome will be the focused app)
-		sendKeystrokeWhenFocused("Google Chrome", webKey, webModifiers)
 	end
+	-- Tab not found, open fallback URL
+	if fallbackUrl then
+		hs.urlevent.openURL(fallbackUrl)
+	end
+	return false
+end
+
+-- Focus tab by domain+title and send keystroke
+function focusByDomainTitleAndSendKey(domain, titlePattern, fallbackUrl, key, modifiers)
+	modifiers = modifiers or {}
+
+	local found = focusByDomainAndTitle(domain, titlePattern, fallbackUrl)
+
+	local chrome = hs.application.find("Google Chrome")
+	if found and chrome and chrome:isFrontmost() then
+		hs.timer.doAfter(0.05, function()
+			hs.eventtap.keyStroke(modifiers, key, 50000)
+		end)
+		return
+	end
+
+	-- Wait for Chrome to activate
+	local watcher
+	watcher = hs.application.watcher.new(function(name, event, _)
+		if event == hs.application.watcher.activated and name == "Google Chrome" then
+			hs.timer.doAfter(0.15, function()
+				hs.eventtap.keyStroke(modifiers, key, 50000)
+			end)
+			watcher:stop()
+		end
+	end)
+	watcher:start()
+
+	hs.timer.doAfter(5, function()
+		watcher:stop()
+	end)
+end
+
+-- Focus web app and send keystroke after focused
+-- For browser-only workflows (Outlook web, Teams web, etc.)
+-- Called via: hs -c 'focusWebAndSendKey("outlook.office.com", "https://outlook.office.com", "n", {})'
+function focusWebAndSendKey(domain, url, key, modifiers)
+	modifiers = modifiers or {}
+
+	-- Focus or open the web app
+	local wasAlreadyOpen = focusByDomainOrOpen(domain, url)
+
+	-- If tab was already open and Chrome is frontmost, send key immediately
+	local chrome = hs.application.find("Google Chrome")
+	if wasAlreadyOpen and chrome and chrome:isFrontmost() then
+		hs.timer.doAfter(0.05, function()
+			hs.eventtap.keyStroke(modifiers, key, 50000)
+		end)
+		return
+	end
+
+	-- Otherwise wait for Chrome to activate, then send keystroke
+	local watcher
+	watcher = hs.application.watcher.new(function(name, event, _)
+		if event == hs.application.watcher.activated and name == "Google Chrome" then
+			-- Delay to ensure page is ready (especially for new tabs)
+			hs.timer.doAfter(0.3, function()
+				hs.eventtap.keyStroke(modifiers, key, 50000)
+			end)
+			watcher:stop()
+		end
+	end)
+	watcher:start()
+
+	-- Safety timeout
+	hs.timer.doAfter(5, function()
+		watcher:stop()
+	end)
 end
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -258,31 +272,23 @@ function toggleObsCamera()
 	end
 end
 
--- === Outlook helpers ===
+-- === Outlook Web helpers ===
+-- Mark all as read in Outlook Web: Select all (Cmd+A) then mark as read (Q)
+-- In Outlook Web, single-key shortcuts work when focus is on the message list
 function outlookMarkAllAsRead()
-	local app = hs.appfinder.appFromName("Microsoft Outlook")
-	if not app then
-		hs.application.open("/Applications/Microsoft Outlook.app")
-		return
-	end
-	app:activate()
+	-- Focus Outlook Web first
+	focusByDomainOrOpen("outlook.office.com", "https://outlook.office.com")
 
-	-- Menu path can vary slightly; these are the common ones.
-	-- We'll try a couple in order.
-	local candidates = {
-		{ "Message", "Mark All as Read" },
-		{ "Message", "Mark as Read", "Mark All as Read" },
-		{ "Edit", "Mark All as Read" },
-	}
-
-	for _, path in ipairs(candidates) do
-		local ok = app:selectMenuItem(path)
-		if ok then
-			return
-		end
-	end
-
-	hs.alert.show("Outlook: couldn't find 'Mark All as Read' menu item")
+	-- Wait for Chrome to be ready, then send keystrokes
+	hs.timer.doAfter(0.3, function()
+		-- Select all messages (Cmd+A on Mac)
+		hs.eventtap.keyStroke({ "cmd" }, "a", 50000)
+		-- Small delay between keystrokes
+		hs.timer.doAfter(0.15, function()
+			-- Mark as read - just "q" key in Outlook Web (single-key shortcut)
+			hs.eventtap.keyStroke({}, "q", 50000)
+		end)
+	end)
 end
 
 hs.hotkey.bind({ "cmd", "shift" }, "R", hs.reload)
