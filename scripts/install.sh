@@ -71,8 +71,33 @@ done < "$DOTFILES_DIR/config/apt-packages.txt"
 install_brew() {
   log "Updating Homebrew…"
   brew update --quiet || true
-  log "Installing: ${BREW_DEPS[*]}"
-  brew install "${BREW_DEPS[@]}"
+
+  # Add required taps for macOS-specific tools
+  log "Adding required Homebrew taps…"
+  brew tap nikitabobko/tap     # aerospace (tiling window manager)
+  brew tap FelixKratz/formulae # sketchybar, borders
+
+  # Separate casks from formulae (casks need --cask flag)
+  local casks=()
+  local formulae=()
+  for pkg in "${BREW_DEPS[@]}"; do
+    case "$pkg" in
+      aerospace) casks+=("$pkg") ;;
+      *) formulae+=("$pkg") ;;
+    esac
+  done
+
+  # Install formulae
+  if [[ ${#formulae[@]} -gt 0 ]]; then
+    log "Installing formulae: ${formulae[*]}"
+    brew install "${formulae[@]}"
+  fi
+
+  # Install casks
+  if [[ ${#casks[@]} -gt 0 ]]; then
+    log "Installing casks: ${casks[*]}"
+    brew install --cask "${casks[@]}"
+  fi
 }
 
 install_apt() {

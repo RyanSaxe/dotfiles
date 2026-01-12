@@ -51,7 +51,7 @@ leader-key
 karabiner-elements
 aerospace
 sketchybar
-jankyborders
+borders
 
 # AI tools
 claude-code

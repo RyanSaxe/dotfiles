@@ -86,15 +86,15 @@ run = 'layout floating'
 # Space between adjacent tiled windows.
 # NOTE: I like the look best with this set to 10, but my company has control over 
 #       my machine's wallpaper and so spaces between windows can be distracting.
-inner.horizontal = 1
-inner.vertical = 1
+inner.horizontal = 10
+inner.vertical = 10
 
 # Space between the outermost windows and the screen edges.
 # Ensure these are numbers (Integers), not strings (no quotes needed).
-outer.left = 1
-outer.bottom = 1
-outer.top = 36
-outer.right = 1
+outer.left = 10
+outer.bottom = 10
+outer.top = 56
+outer.right = 10
 # ----------------------------
 # KEYBINDINGS (NO ALT; COMMAND-BASED)
 # ----------------------------

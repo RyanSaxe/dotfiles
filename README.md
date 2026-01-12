@@ -89,6 +89,14 @@ Additionally, I recommend setting Leader Key to
 
 Ghostty, Karabiner, Leader Key, and Hammerspoon need to be enabled with special permissions and accessibility settings. Additionally, I personally recommend Leader Key and Hammerspoon to open when you login for the smoothest experience.
 
+### Sketchybar WiFi Plugin
+
+The WiFi plugin requires verbose ipconfig output to display the network SSID. Run this once:
+
+```bash
+sudo ipconfig setverbose 1
+```
+
 ### Zsh Autosuggestions
 
 Ghost text suggestions from command history (like fish shell). Installed via `brew`/`apt` but requires manual sourcing since Oh My Zsh doesn't find package manager installs.
