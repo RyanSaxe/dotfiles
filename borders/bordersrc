@@ -12,7 +12,8 @@ POKEMON_COLOR_PROMINENT="${POKEMON_COLOR_PROMINENT:-#7aa2f7}"
 
 # Convert #RRGGBB to 0xAARRGGBB
 # Use 0x00 for inactive (fully transparent = no border)
-inactive_color="0x00000000"
+# inactive_color="0x00000000"
+inactive_color="0xff${POKEMON_COLOR_DIM#\#}"
 active_color="0xff${POKEMON_COLOR_PROMINENT#\#}"
 
 options=(

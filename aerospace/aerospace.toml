@@ -31,13 +31,13 @@ exec-on-workspace-change = [
 
 # Only keep *your* workspaces alive
 persistent-workspaces = [
-  "message",   # mail/messages (merged email+chat) - key V
-  "browser",   # key B
-  "code",      # key N
-  "meeting",   # Teams meetings/calls - key M
-  "monitor-1",
-  "monitor-2",
-  "monitor-3",
+  "message", # mail/messages (merged email+chat) - key V
+  "browser", # key B
+  "code",    # key N
+  "meeting", # Teams meetings/calls - key M
+  # "monitor-1",
+  # "monitor-2",
+  # "monitor-3",
 ]
 
 
@@ -105,9 +105,10 @@ preset = 'qwerty'
 
 # each monitor has an accordion workspace to send things to
 # for example, I like to read docs and chatgpt on my left monitor where I can easily cycle through them
-alt-cmd-1 = 'workspace monitor-1'
-alt-cmd-2 = 'workspace monitor-2'
-alt-cmd-3 = 'workspace monitor-3'
+# these workspaces are created on-demand (not persistent) and will be cleaned up when empty
+alt-cmd-1 = ['workspace monitor-1', 'move-workspace-to-monitor 1', 'layout v_accordion']
+alt-cmd-2 = ['workspace monitor-2', 'move-workspace-to-monitor 2', 'layout h_accordion']
+alt-cmd-3 = ['workspace monitor-3', 'move-workspace-to-monitor 3', 'layout v_accordion']
 alt-cmd-shift-1 = [
   'move-node-to-workspace monitor-1',
   'workspace monitor-1',
