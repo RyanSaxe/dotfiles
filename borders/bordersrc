@@ -18,7 +18,7 @@ active_color="0xff${POKEMON_COLOR_PROMINENT#\#}"
 
 options=(
   style=rounded
-  width=5.0
+  width=4.0
   active_color="$active_color"
   inactive_color="$inactive_color"
 )

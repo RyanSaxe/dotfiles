@@ -28,13 +28,30 @@ local M = {}
 -- This allows tmux and other tools to use the same pokemon theme colors
 -- ══════════════════════════════════════════════════════════════════════════════
 
+---Build the database key for a pokemon (matches format in pokemon-colors.lua)
+---@param name string Pokemon name
+---@param shiny boolean Whether shiny variant
+---@param form string|nil Form variant
+---@return string key Database lookup key
+local function build_pokemon_key(name, shiny, form)
+  local key = name:lower()
+  if shiny then
+    key = key .. "-shiny"
+  end
+  if form and form ~= "" then
+    key = key .. "-" .. form:lower():gsub(" ", "-")
+  end
+  return key
+end
+
 ---Export pokemon colors to env file for use by tmux and shell
 ---@param name string Pokemon name
 ---@param shiny boolean Whether shiny variant
 ---@param form string|nil Form variant (e.g., "mega", "alola")
 ---@param colors table Color data from pokemon-colors.lua
 ---@param background_mode string "dark" or "light"
-local function export_pokemon_to_env(name, shiny, form, colors, background_mode)
+---@param swap_list table|nil List of pokemon keys to swap prominent/bright
+local function export_pokemon_to_env(name, shiny, form, colors, background_mode, swap_list)
   -- Get colors for the current background mode
   local mode_colors = colors[background_mode]
   if not mode_colors then
@@ -59,9 +76,13 @@ local function export_pokemon_to_env(name, shiny, form, colors, background_mode)
   local prominent_default = "#7aa2f7" -- blue
   local bright_default = "#ff9e64" -- orange
 
+  -- Check if colors should be swapped for this pokemon
+  local pokemon_key = build_pokemon_key(name, shiny, form)
+  local should_swap = swap_list and vim.tbl_contains(swap_list, pokemon_key)
+
   local dim = resolve_color(mode_colors.dim, dim_default)
-  local prominent = resolve_color(mode_colors.prominent, prominent_default)
-  local bright = resolve_color(mode_colors.bright, bright_default)
+  local prominent = resolve_color(should_swap and mode_colors.bright or mode_colors.prominent, prominent_default)
+  local bright = resolve_color(should_swap and mode_colors.prominent or mode_colors.bright, bright_default)
 
   -- Build env file content
   local env_content = string.format(
@@ -173,6 +194,11 @@ local CONFIG = {
     title_dim = nil, -- e.g., 0.2 to dim prominent slightly
     key_dim = nil, -- e.g., 0.15 to reduce key contrast
     desc_dim = nil, -- e.g., 0.3 to make descriptions more subtle
+
+    -- List of pokemon names where prominent and bright colors should be swapped
+    -- Useful when the auto-generated color selection doesn't match your preference
+    -- Format: { "suicune-shiny", "ho-oh" } - use key format from pokemon-colors.lua
+    swap_prominent_bright = { "raikou" },
   },
 }
 
@@ -205,6 +231,11 @@ color_sources = {
   title_dim = CONFIG.colors.title_dim,
   key_dim = CONFIG.colors.key_dim,
   desc_dim = CONFIG.colors.desc_dim,
+  -- Pokemon info needed for swap lookup
+  pokemon_name = pokemon_name,
+  is_shiny = pokemon_shiny,
+  form = pokemon_form,
+  swap_prominent_bright = CONFIG.colors.swap_prominent_bright,
 }
 
 -- Load color data for the selected pokemon
@@ -217,7 +248,14 @@ pokemon_colors = visual_utils.ensure_pokemon_colors(
     -- Callback: when generation completes, re-export colors and update the dashboard
     local updated_colors = visual_utils.get_pokemon_colors(pokemon_name, pokemon_shiny, pokemon_form, false)
     if updated_colors then
-      export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, updated_colors, CONFIG.colors.background_mode)
+      export_pokemon_to_env(
+        pokemon_name,
+        pokemon_shiny,
+        pokemon_form,
+        updated_colors,
+        CONFIG.colors.background_mode,
+        CONFIG.colors.swap_prominent_bright
+      )
     end
     if Snacks and Snacks.dashboard and Snacks.dashboard.update then
       Snacks.dashboard.update()
@@ -238,7 +276,14 @@ if pokemon_colors then
   visual_utils.apply_dashboard_colors(pokemon_colors, CONFIG.colors.background_mode, color_sources)
 
   -- Export pokemon colors to env file for tmux/shell integration
-  export_pokemon_to_env(pokemon_name, pokemon_shiny, pokemon_form, pokemon_colors, CONFIG.colors.background_mode)
+  export_pokemon_to_env(
+    pokemon_name,
+    pokemon_shiny,
+    pokemon_form,
+    pokemon_colors,
+    CONFIG.colors.background_mode,
+    CONFIG.colors.swap_prominent_bright
+  )
 end
 
 -- Check if we should show recent project toggle based on context

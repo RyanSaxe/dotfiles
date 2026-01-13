@@ -28,6 +28,7 @@ alias free='free -h'
 
 # Development tools
 alias lsp-check='~/generic/dotfiles/scripts/lsp-check'
+alias nvim-clean='~/generic/dotfiles/scripts/nvim-clean.sh'
 
 # Quick edits
 alias zshrc='$EDITOR ~/.zshrc'

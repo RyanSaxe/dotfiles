@@ -93,7 +93,7 @@ inner.vertical = 10
 # Ensure these are numbers (Integers), not strings (no quotes needed).
 outer.left = 10
 outer.bottom = 10
-outer.top = 56
+outer.top = 52
 outer.right = 10
 # ----------------------------
 # KEYBINDINGS (NO ALT; COMMAND-BASED)
@@ -106,9 +106,21 @@ preset = 'qwerty'
 # each monitor has an accordion workspace to send things to
 # for example, I like to read docs and chatgpt on my left monitor where I can easily cycle through them
 # these workspaces are created on-demand (not persistent) and will be cleaned up when empty
-alt-cmd-1 = ['workspace monitor-1', 'move-workspace-to-monitor 1', 'layout v_accordion']
-alt-cmd-2 = ['workspace monitor-2', 'move-workspace-to-monitor 2', 'layout h_accordion']
-alt-cmd-3 = ['workspace monitor-3', 'move-workspace-to-monitor 3', 'layout v_accordion']
+alt-cmd-1 = [
+  'workspace monitor-1',
+  'move-workspace-to-monitor 1',
+  'layout v_accordion',
+]
+alt-cmd-2 = [
+  'workspace monitor-2',
+  'move-workspace-to-monitor 2',
+  'layout h_accordion',
+]
+alt-cmd-3 = [
+  'workspace monitor-3',
+  'move-workspace-to-monitor 3',
+  'layout v_accordion',
+]
 alt-cmd-shift-1 = [
   'move-node-to-workspace monitor-1',
   'workspace monitor-1',
