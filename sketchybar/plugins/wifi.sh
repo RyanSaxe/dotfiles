@@ -16,7 +16,7 @@ WIFI_ACTIVE=$(echo "$IPCONFIG_OUTPUT" | grep -c "SSID")
 
 if [[ "$WIFI_ACTIVE" -eq 0 && "$IPCONFIG_OUTPUT" != *"SSID"* ]]; then
   # WiFi is off - no SSID field in output at all
-  ICON="󰤭"
+  ICON="󰖪"
   COLOR="$RED"
   LABEL=""
 elif [[ -z "$SSID" ]]; then
@@ -26,7 +26,7 @@ elif [[ -z "$SSID" ]]; then
   LABEL=""
 else
   # Connected - show network name
-  ICON="󰤨"
+  ICON="󰖩"
   COLOR="$ICON_COLOR"
   LABEL="$SSID"
 fi
