@@ -20,7 +20,9 @@ accordion-padding = 300
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'auto'
 
-on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+# disabled ... it is super disorienting if monitor mouse changes when hovering between monitors
+# because at the edges of monitors the mouse can jump over and cause focus to change unexpectedly
+# on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 
 # Notify sketchybar when workspace changes (for workspace indicator updates)
 exec-on-workspace-change = [
@@ -29,9 +31,8 @@ exec-on-workspace-change = [
   'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE PREV_WORKSPACE=$AEROSPACE_PREV_WORKSPACE',
 ]
 
-# Only keep *your* workspaces alive
 persistent-workspaces = [
-  "message", # mail/messages (merged email+chat) - key V
+  "message", # mail/messages - key V
   "browser", # key B
   "code",    # key N
   "meeting", # Teams meetings/calls - key M
@@ -40,12 +41,6 @@ persistent-workspaces = [
   # "monitor-3",
 ]
 
-
-# ----------------------------
-# STARTUP: open apps
-# ----------------------------
-# We:
-# - open apps (windows will be routed by on-window-detected rules below)
 
 # TODO: consider making this more involved and moving it to a startup script
 after-startup-command = [
