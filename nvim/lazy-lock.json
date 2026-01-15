@@ -31,6 +31,10 @@
     "branch": "main",
     "commit": "ce8d176faa4643e026e597ae3c31db59b63cef09"
   },
+  "codediff.nvim": {
+    "branch": "main",
+    "commit": "9b3258557d92de7d2f03955066697ca62aabeb4e"
+  },
   "conform.nvim": {
     "branch": "master",
     "commit": "df83eeaab265dacd2eef139a78e502a3f8926618"

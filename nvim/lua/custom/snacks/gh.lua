@@ -5,9 +5,9 @@ local M = {}
 
 -- Define custom GitHub actions
 M.custom_actions = {
-  -- Open PR in Diffview
-  open_in_diffview = {
-    desc = "Open PR in Diffview",
+  -- Open PR in CodeDiff
+  open_in_codediff = {
+    desc = "Open PR in CodeDiff",
     icon = "󰊢",
     type = "pr",
     priority = 150,
@@ -24,12 +24,11 @@ M.custom_actions = {
             return
           end
 
-          -- Build the diff range using remote refs: origin/base...origin/head
-          -- This works even if the PR branch isn't checked out locally
-          local diff_range = string.format("origin/%s...origin/%s", item.baseRefName, item.headRefName)
-
-          -- Open in diffview
-          vim.cmd("DiffviewOpen " .. diff_range)
+          -- Open in codediff with two refs (ref-to-ref comparison, no working tree)
+          -- CodeDiff origin/base origin/head compares two remote refs directly
+          local base = "origin/" .. item.baseRefName
+          local head = "origin/" .. item.headRefName
+          vim.cmd(string.format("CodeDiff %s %s", base, head))
 
           -- Store PR context for potential future use
           vim.g.current_pr = {
@@ -39,7 +38,7 @@ M.custom_actions = {
             head = item.headRefName,
           }
 
-          vim.notify(string.format("Opened PR #%d in Diffview", item.number))
+          vim.notify(string.format("Opened PR #%d in CodeDiff", item.number))
         end)
       end)
     end,

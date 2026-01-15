@@ -27,8 +27,16 @@
 	diffFilter = delta --color-only
 [delta]
 	navigate = true
+[diff]
+	tool = codediff
+[difftool "codediff"]
+	cmd = nvim -c \"CodeDiff file $LOCAL $REMOTE\"
 [merge]
+	tool = codediff
 	conflictStyle = zdiff3
+[mergetool "codediff"]
+	cmd = nvim -c \"CodeDiff merge $MERGED\"
+	trustExitCode = true
 [status]
 	showUntrackedFiles = all
 [split-diffs]

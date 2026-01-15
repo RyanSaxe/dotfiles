@@ -7,7 +7,7 @@ LazyVim-based Neovim configuration with extensive customizations for Python deve
 - **LazyVim base** - Modern Neovim distribution with sensible defaults
 - **TokyoNight Night theme** - Heavily customized with Pokemon-themed dashboard
 - **Python development** - basedpyright LSP, robust linting/formatting, virtual environment integration
-- **Git workflows** - Diffview, mini.diff, gitsigns with smart toggling
+- **Git workflows** - CodeDiff, mini.diff, gitsigns with smart toggling
 - **Obsidian integration** - Full note-taking workflow with custom task picker
 - **Blink completion** - Fast completion engine with Copilot integration
 - **Custom pickers** - Dependency navigation across multiple languages
@@ -27,7 +27,7 @@ nvim/
 │   │   ├── ai/                  # AI-powered tools (Sidekick)
 │   │   ├── completion/          # Blink.cmp, Copilot
 │   │   ├── extra/               # Miscellaneous plugins (Buffergolf)
-│   │   ├── git/                 # Diffview, mini.diff
+│   │   ├── git/                 # CodeDiff, mini.diff
 │   │   ├── lsp/                 # LSP configs, linting, formatting
 │   │   ├── markdown/            # Obsidian, render-markdown, bullets, todo-comments
 │   │   ├── navigation/          # Flash, vim-tmux-navigator, file/buffer/dependency navigation
@@ -55,7 +55,7 @@ nvim/
 
 ### Git
 
-- **diffview.nvim** - Side-by-side diffs with remote branch comparison
+- **codediff.nvim** - VSCode-style side-by-side diffs, git difftool/mergetool support
 - **mini.diff** - Inline git hunks
 - **gitsigns.nvim** - Git signs in gutter
 
@@ -91,10 +91,19 @@ Key mappings beyond LazyVim defaults (see `lua/config/keymaps.lua`):
 
 - `<Esc>` - Enter normal mode
 
-### Git Toggles
+### Git Diff (see `lua/plugins/git/`)
 
-- `<leader>tg` - Toggle Diffview (compare against remote default branch)
-- `<leader>tG` - Toggle Diffview (prompt for branch name)
+Lowercase = pick commit (with diff preview), Uppercase = pick branch (base branch highlighted)
+
+- `<leader>gdo` - Overlay diff (pick commit) - inline hunks via mini.diff
+- `<leader>gdO` - Overlay diff (pick branch)
+- `<leader>gdf` - File diff (pick commit) - side-by-side via codediff
+- `<leader>gdF` - File diff (pick branch)
+- `<leader>gda` - All files diff (pick commit) - codediff explorer
+- `<leader>gdA` - All files diff (pick branch)
+
+### Toggles
+
 - `<leader>tp` - Toggle basedpyright diagnostic mode (openFilesOnly ↔ workspace)
 
 ### Obsidian (see `lua/plugins/obsidian.lua`)
@@ -135,11 +144,11 @@ See `lua/dependency-picker/README.md` for detailed usage.
 
 ### Git Diff Utilities
 
-Custom utilities in `lua/custom/git/diff.lua` for:
+Custom modules in `lua/custom/git/` provide:
 
-- Fetching remote default branch
-- Opening Diffview against remote HEAD or custom branch
-- Smart toggling with state tracking
+- **pickers.lua** - Snacks.nvim pickers for commit/branch selection with diff previews
+- **diff.lua** - CodeDiff integration for file and all-files diffs
+- **utils.lua** - Git helpers (fetch, branch detection, file content at refs)
 
 ## TODO
 
@@ -166,7 +175,7 @@ Custom utilities in `lua/custom/git/diff.lua` for:
 ### Complex
 
 - [ ] Deep dive into Python LSP ecosystem - prepare for 'ty' release, support pyproject.toml-specified LSPs
-- [ ] Optimize git workflow UX across snacks.nvim gh module, diffview, mini.diff, gh-dash, lazygit
+- [ ] Optimize git workflow UX across snacks.nvim gh module, codediff, mini.diff, gh-dash, lazygit
 - [x] Make Snacks dashboard perfectly centered regardless of odd/even row counts (dynamic statusline toggle absorbs extra row)
 - [ ] Set up Jupyter notebook integration with nice UI and cell execution
   - Research molten.nvim (image rendering, output display) vs vim-slime (simpler REPL approach) vs jupytext (convert .ipynb to .py)

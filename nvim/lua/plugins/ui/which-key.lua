@@ -9,6 +9,8 @@ return {
       { "<leader>o", group = "Obsidian", icon = "󰎞" },
       { "<leader>p", group = "Package", icon = "󰏗" },
       { "<leader>t", group = "Toggle", icon = "󰔡" },
+      -- Git diff groups
+      { "<leader>gd", group = "Diff", icon = "" },
     },
   },
 }
