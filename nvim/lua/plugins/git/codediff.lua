@@ -169,5 +169,25 @@ return {
         })
       end,
     })
+
+    -- Disable inlay hints when LSP attaches to buffers in codediff tabs.
+    -- The built-in disable_inlay_hints fires once at session creation, but:
+    -- 1. LSP may attach later and re-enable hints
+    -- 2. view.update() loads new buffers without disabling hints
+    -- 3. LspAttach fires during bufload() BEFORE the buffer is in the window
+    -- So we check if the current tab has a codediff session instead.
+    vim.api.nvim_create_autocmd("LspAttach", {
+      callback = function(ev)
+        vim.schedule(function()
+          local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+          if ok then
+            local current_tab = vim.api.nvim_get_current_tabpage()
+            if lifecycle.get_session(current_tab) then
+              vim.lsp.inlay_hint.enable(false, { bufnr = ev.buf })
+            end
+          end
+        end)
+      end,
+    })
   end,
 }
