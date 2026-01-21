@@ -13,7 +13,7 @@ backups/*
 .env
 claude/*
 !claude/CLAUDE.md
-!claude/plugins/
+claude/plugins/
 !claude/settings.json
 !claude/utility-scripts/
 !claude/skills/
