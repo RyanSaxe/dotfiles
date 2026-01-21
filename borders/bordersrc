@@ -1,0 +1,26 @@
+#!/bin/bash
+# NOTE: this unfortunately does not look good with multiple monitors
+#       with aerospace due to an overflow issue. So we don't enable it by default.
+# Source Pokemon colors
+if [[ -f ~/.cache/pokemon-colors.env ]]; then
+  source ~/.cache/pokemon-colors.env
+fi
+
+# Fallback to TokyoNight if Pokemon colors not available
+POKEMON_COLOR_DIM="${POKEMON_COLOR_DIM:-#565f89}"
+POKEMON_COLOR_PROMINENT="${POKEMON_COLOR_PROMINENT:-#7aa2f7}"
+
+# Convert #RRGGBB to 0xAARRGGBB
+# Use 0x00 for inactive (fully transparent = no border)
+# inactive_color="0x00000000"
+inactive_color="0xff${POKEMON_COLOR_DIM#\#}"
+active_color="0xff${POKEMON_COLOR_PROMINENT#\#}"
+
+options=(
+  style=rounded
+  width=4.0
+  active_color="$active_color"
+  inactive_color="$inactive_color"
+)
+
+borders "${options[@]}"

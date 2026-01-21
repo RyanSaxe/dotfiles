@@ -21,7 +21,15 @@ if glimmer_spec and glimmer_spec.enabled ~= false then
 end
 
 -- Disable LazyVim's spell autocmd - Harper provides LSP-based spell checking
+-- But keep the wrap behavior for text-based files (markdown, etc.)
 vim.api.nvim_create_augroup("lazyvim_wrap_spell", { clear = true })
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("custom_wrap", { clear = true }),
+  pattern = { "text", "plaintex", "typst", "gitcommit", "markdown" },
+  callback = function()
+    vim.opt_local.wrap = true
+  end,
+})
 -- Truncate LSP log file if it exceeds a certain size
 local uv = vim.uv or vim.loop
 local log = vim.fn.stdpath("state") .. "/lsp.log"

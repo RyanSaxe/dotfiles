@@ -175,7 +175,12 @@ function M.scan_tasks()
 
   -- Use ripgrep with JSON output to find all incomplete tasks in one pass
   -- This is MUCH faster than fd + reading every file, especially for large vaults
-  local cmd = string.format('rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" %s', vault_path)
+
+  local cmd = string.format(
+    'rg --json --line-number "^\\s*-\\s*\\[\\s\\]\\s*(.+)" --glob "!**/templates/**" %s',
+    vim.fn.shellescape(vault_path)
+  )
+
   local output = vim.fn.systemlist(cmd)
 
   if vim.v.shell_error ~= 0 and vim.v.shell_error ~= 1 then
@@ -315,10 +320,10 @@ local function format_task(item)
   end
   ret[#ret + 1] = { due_text .. " ", "Comment" }
 
-  -- Source badge with color: [L]=cyan, [G]=purple, [N]=teal
+  -- Source badge with color: [L]=yellow, [G]=purple, [N]=cyan
   -- Use bracket syntax for "local" since it's a Lua reserved keyword
   local badge_hl = {
-    ["local"] = "DiagnosticInfo", -- Cyan for local TODO.local tasks
+    ["local"] = "DiagnosticWarn", -- yellow for local TODO.local tasks
     ["global"] = "Statement", -- Purple for project-wide markdown tasks
     ["notes"] = "DiagnosticHint", -- Teal for Obsidian vault tasks
   }
@@ -344,6 +349,7 @@ local function create_picker_config(items)
   return {
     title = "Obsidian Tasks",
     items = items,
+    layout = "custom_horizontal",
     -- Use default file previewer for task items
     preview = Snacks.picker.preview.file,
     format = function(item)
@@ -518,8 +524,9 @@ function M.open_picker()
   local notes_tasks = M.scan_tasks()
   vim.list_extend(all_tasks, notes_tasks)
 
-  -- Sort all tasks uniformly by urgency, then due date, then file
+  -- Sort all tasks uniformly by urgency, then due date, then source, then file
   -- This ensures urgent tasks from ANY source appear at the top
+  -- Within same urgency/date, local tasks appear before global, then notes
   table.sort(all_tasks, function(a, b)
     -- Primary sort: urgency (sort_priority: 1=today, 2=overdue, 3=week, 4=later)
     if a.sort_priority ~= b.sort_priority then
@@ -533,7 +540,15 @@ function M.open_picker()
     elseif b.due_date then
       return false
     end
-    -- Tertiary sort: file path for stable ordering
+    -- Tertiary sort: source priority (local=1, global=2, notes=3)
+    -- This ensures contextually-relevant tasks appear first when urgency/date match
+    local source_priority = { ["local"] = 1, global = 2, notes = 3 }
+    local a_source = source_priority[a.source] or 999
+    local b_source = source_priority[b.source] or 999
+    if a_source ~= b_source then
+      return a_source < b_source
+    end
+    -- Quaternary sort: file path for stable ordering
     return a.rel_path < b.rel_path
   end)
 

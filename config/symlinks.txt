@@ -14,3 +14,7 @@ karabiner:$HOME/.config/karabiner
 leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json
 harper/dictionary.txt:$HOME/.config/harper-ls/dictionary.txt
 extras/fsh:$HOME/.config/fsh
+aerospace/:$HOME/.config/aerospace
+borders/bordersrc:$HOME/.config/borders/bordersrc
+sketchybar:$HOME/.config/sketchybar
+btop:$HOME/.config/btop

@@ -144,5 +144,12 @@ fi
 # Token usage info
 status_line+="${token_info}"
 
+# Cost info (rounded to nearest cent)
+total_cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
+if (($(echo "$total_cost > 0" | bc -l))); then
+  cost_rounded=$(printf "%.2f" "$total_cost")
+  status_line+=" ${C_DIM}[${RESET}${C_RED}\$${cost_rounded}${RESET}${C_DIM}]${RESET}"
+fi
+
 # Output simple left-aligned status line
 printf "%b\n" "$status_line"

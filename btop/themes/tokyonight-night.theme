@@ -1,0 +1,73 @@
+# Theme: TokyoNight Night
+# Custom theme matching nvim/lazygit TokyoNight configuration
+# Colors sourced from nvim/lua/plugins/ui/colorscheme.lua
+
+# Main background - matches ghostty bg_dark for seamless look
+theme[main_bg]="#16161e"
+
+# Main text color - TokyoNight foreground
+theme[main_fg]="#c0caf5"
+
+# Title color for boxes
+theme[title]="#c0caf5"
+
+# Highlight color for keyboard shortcuts - TokyoNight cyan
+theme[hi_fg]="#7dcfff"
+
+# Background color of selected item in processes box
+theme[selected_bg]="#283457"
+
+# Foreground color of selected item in processes box
+theme[selected_fg]="#c0caf5"
+
+# Color of inactive/disabled text - TokyoNight dark3
+theme[inactive_fg]="#545c7e"
+
+# Misc colors for processes box including mini cpu graphs, details memory graph and details status text
+theme[proc_misc]="#7dcfff"
+
+# Box outline colors - TokyoNight dark3 (matching inactive borders)
+theme[cpu_box]="#545c7e"
+theme[mem_box]="#545c7e"
+theme[net_box]="#545c7e"
+theme[proc_box]="#545c7e"
+
+# Box divider line and small boxes line color
+theme[div_line]="#545c7e"
+
+# Temperature graph colors - green to yellow to red gradient
+theme[temp_start]="#9ece6a"
+theme[temp_mid]="#e0af68"
+theme[temp_end]="#f7768e"
+
+# CPU graph colors - same gradient for consistency
+theme[cpu_start]="#9ece6a"
+theme[cpu_mid]="#e0af68"
+theme[cpu_end]="#f7768e"
+
+# Memory meters - teal to cyan to blue (cooler palette for memory)
+theme[free_start]="#73daca"
+theme[free_mid]="#7dcfff"
+theme[free_end]="#7aa2f7"
+
+theme[cached_start]="#bb9af7"
+theme[cached_mid]="#9d7cd8"
+theme[cached_end]="#7aa2f7"
+
+theme[available_start]="#73daca"
+theme[available_mid]="#7dcfff"
+theme[available_end]="#7aa2f7"
+
+theme[used_start]="#9ece6a"
+theme[used_mid]="#e0af68"
+theme[used_end]="#f7768e"
+
+# Download graph colors - teal to cyan to blue
+theme[download_start]="#73daca"
+theme[download_mid]="#7dcfff"
+theme[download_end]="#7aa2f7"
+
+# Upload graph colors - purple to magenta to orange
+theme[upload_start]="#bb9af7"
+theme[upload_mid]="#fca7ea"
+theme[upload_end]="#ff9e64"

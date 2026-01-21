@@ -43,10 +43,12 @@ return {
     -- Next Edit Suggestions (NES) configuration
     nes = {
       -- Disable NES for markdown and text files to avoid interference with note-taking
-      enabled = function()
-        local ft = vim.bo.filetype
-        return ft ~= "markdown" and ft ~= "text"
-      end,
+      -- enabled = function()
+      --   local ft = vim.bo.filetype
+      --   return ft ~= "markdown" and ft ~= "text"
+      -- end,
+      -- Disable NES as it seems to be buggy
+      enabled = false,
       debounce = 100, -- ms to wait after typing stops before requesting suggestions
       -- Diff visualization settings
       diff = {

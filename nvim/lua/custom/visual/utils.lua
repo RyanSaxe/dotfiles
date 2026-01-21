@@ -6,6 +6,22 @@ local M = {}
 -- Load the pokemon colors database
 local pokemon_colors = require("custom.visual.pokemon-colors")
 
+---Build the database key for a pokemon (matches format in pokemon-colors.lua)
+---@param name string Pokemon name
+---@param is_shiny boolean|nil Whether shiny variant
+---@param form string|nil Form variant
+---@return string key Database lookup key
+local function build_pokemon_key(name, is_shiny, form)
+  local key = name:lower()
+  if is_shiny then
+    key = key .. "-shiny"
+  end
+  if form and form ~= "" then
+    key = key .. "-" .. form:lower():gsub(" ", "-")
+  end
+  return key
+end
+
 ---Get colors for a specific pokemon
 ---@param pokemon_name string The name of the pokemon
 ---@param is_shiny boolean|nil Whether this is a shiny variant
@@ -415,10 +431,19 @@ function M.apply_dashboard_colors(pokemon_data, background_mode, color_sources)
     bg_color = "#000000" -- Fallback to black
   end
 
+  -- Check if colors should be swapped for this pokemon
+  local swap_list = sources.swap_prominent_bright or {}
+  local pokemon_key = build_pokemon_key(sources.pokemon_name or "", sources.is_shiny, sources.form)
+  local should_swap = #swap_list > 0 and vim.tbl_contains(swap_list, pokemon_key)
+
+  -- Get the appropriate colors (swapped if needed)
+  local prominent_color = should_swap and colors.bright or colors.prominent
+  local bright_color = should_swap and colors.prominent or colors.bright
+
   -- Resolve each color with appropriate fallbacks and adjustments
   -- Note: prominent/title should NEVER have 'fallback' in sprite data, but we handle it defensively
-  local title_color = resolve_color(title_source, colors.prominent, "Normal", title_brighten, title_dim, bg_color)
-  local key_color = resolve_color(key_source, colors.bright, "Normal", key_brighten, key_dim, bg_color)
+  local title_color = resolve_color(title_source, prominent_color, "Normal", title_brighten, title_dim, bg_color)
+  local key_color = resolve_color(key_source, bright_color, "Normal", key_brighten, key_dim, bg_color)
   local desc_color = resolve_color(desc_source, colors.dim, "Comment", desc_brighten, desc_dim, bg_color)
 
   -- Update Snacks dashboard highlight groups
@@ -447,7 +472,8 @@ end
 ---@param form string|nil Form variant (e.g., "mega", "alola")
 ---@param colors table Color data from pokemon-colors.lua (with dark/light keys)
 ---@param background_mode string "dark" or "light"
-function M.export_pokemon_to_env(name, shiny, form, colors, background_mode)
+---@param swap_list table|nil List of pokemon keys to swap prominent/bright
+function M.export_pokemon_to_env(name, shiny, form, colors, background_mode, swap_list)
   -- Get colors for the current background mode
   local mode_colors = colors[background_mode]
   if not mode_colors then
@@ -460,7 +486,7 @@ function M.export_pokemon_to_env(name, shiny, form, colors, background_mode)
 
   -- Resolve fallback colors to actual hex values
   -- If a color is "fallback", we use TokyoNight defaults
-  local function resolve_color(color, default)
+  local function resolve_fallback(color, default)
     if color == "fallback" then
       return default
     end
@@ -472,9 +498,13 @@ function M.export_pokemon_to_env(name, shiny, form, colors, background_mode)
   local prominent_default = "#7aa2f7" -- blue
   local bright_default = "#ff9e64" -- orange
 
-  local dim = resolve_color(mode_colors.dim, dim_default)
-  local prominent = resolve_color(mode_colors.prominent, prominent_default)
-  local bright = resolve_color(mode_colors.bright, bright_default)
+  -- Check if colors should be swapped for this pokemon
+  local pokemon_key = build_pokemon_key(name, shiny, form)
+  local should_swap = swap_list and #swap_list > 0 and vim.tbl_contains(swap_list, pokemon_key)
+
+  local dim = resolve_fallback(mode_colors.dim, dim_default)
+  local prominent = resolve_fallback(should_swap and mode_colors.bright or mode_colors.prominent, prominent_default)
+  local bright = resolve_fallback(should_swap and mode_colors.prominent or mode_colors.bright, bright_default)
 
   -- Build env file content
   local env_content = string.format(
@@ -599,7 +629,8 @@ function M.ensure_pokemon_colors(
 
         -- Export colors to env file BEFORE reloading colorscheme
         -- This ensures colorscheme.lua reads the fresh colors when it reloads
-        M.export_pokemon_to_env(pokemon_name, is_shiny or false, form, new_colors, background_mode)
+        local swap_list = color_sources and color_sources.swap_prominent_bright or {}
+        M.export_pokemon_to_env(pokemon_name, is_shiny or false, form, new_colors, background_mode, swap_list)
 
         -- Reload the colorscheme to pick up new pokemon colors in bufferline/floats/pickers
         -- Using vim.cmd("colorscheme") is the proper way to reload in Neovim because it:

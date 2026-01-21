@@ -67,6 +67,17 @@ while :; do
 
     # Trigger a smooth status refresh only when bell count changes
     tmux refresh-client -S > /dev/null 2>&1 || true
+
+    # Notify sketchybar about bell state change (for code workspace highlight)
+    # Write state to cache file so aerospace.sh can read it on any event
+    BELL_CACHE="$HOME/.cache/tmux-bell-active"
+    if [[ "$current_bell_count" -gt 0 ]]; then
+      echo "1" > "$BELL_CACHE"
+      sketchybar --trigger tmux_bell_change > /dev/null 2>&1 || true
+    else
+      echo "0" > "$BELL_CACHE"
+      sketchybar --trigger tmux_bell_change > /dev/null 2>&1 || true
+    fi
   fi
 
   # Poll every 1 second (balance between responsiveness and CPU usage)

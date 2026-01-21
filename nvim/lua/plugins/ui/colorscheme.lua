@@ -56,6 +56,8 @@ return {
 
       -- docstrings should be slightly different color than comments but still faded to the background
       hl["@string.documentation"] = { fg = Util.blend_bg(c.purple, 0.5) }
+      -- astral ty has a specific modifier with higher priority we need to hook into
+      hl["@lsp.typemod.string.documentation.python"] = { fg = Util.blend_bg(c.purple, 0.5) }
       -- I prefer when the literals are the same color and dont pop out at me
       local muted_literal = { fg = Util.blend_bg(c.fg, 0.7) }
       hl["@string"] = muted_literal
@@ -150,20 +152,9 @@ return {
       hl["GitSignsAdd"] = { fg = Util.blend_bg(c.teal, 0.7) }
       hl["GitSignsChange"] = { fg = Util.blend_bg(c.purple, 0.7) }
       hl["GitSignsDelete"] = { fg = Util.blend_bg(c.red, 0.7) }
-      -- diffview coloring in the file panel
-      hl["DiffviewFilePanelInsertions"] = { fg = c.teal }
-      hl["DiffviewFilePanelDeletions"] = { fg = c.red }
-      -- diff text is always shown on a git change. I find the extra coloring distracting in diff view
-      -- so we make the background identical to the change to avoid the double-highlighting effect
-      -- in mini diff, however, we do apply different styling since we can properly apply them to base
-      -- and the change. NOTE: possibly could implement something similar for diffview.
+      -- DiffText highlights the specific changed text within a DiffChange line
+      -- Using red foreground to make character-level changes stand out
       hl["DiffText"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
-      -- diffview-specific diff highlights (override the plugin's defaults)
-      -- NOTE: DiffText is overridden by window namespaces (red left, green right) in diffview.lua
-      hl["DiffviewDiffAdd"] = { bg = Util.blend_bg("#00FF00", 0.1) }
-      hl["DiffviewDiffChange"] = { bg = Util.blend_bg("#0000FF", 0.1) }
-      hl["DiffviewDiffDelete"] = { bg = Util.blend_bg("#FF0000", 0.1) }
-      hl["DiffviewDiffText"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }
       hl["SnacksDiffContext"] = { bg = c.bg }
       -- mini diff special highlighting for readable overlay
       hl["MiniDiffOverChange"] = { fg = c.red, bg = Util.blend_bg("#0000FF", 0.1) }

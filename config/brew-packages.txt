@@ -44,11 +44,15 @@ wget
 bat
 tldr
 wordnet
+btop
 
 # macOS applications
 hammerspoon
 leader-key
 karabiner-elements
+aerospace
+sketchybar
+borders
 
 # AI tools
 claude-code

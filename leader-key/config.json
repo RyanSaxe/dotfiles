@@ -2,48 +2,215 @@
   "type": "group",
   "actions": [
     {
-      "key": "s",
+      "key": "/",
       "label": "Spotlight",
       "type": "command",
       "value": "hs -c 'openSpotlight()'"
     },
+
     {
-      "key": "t",
+      "key": "s",
+      "label": "System",
+      "type": "group",
+      "actions": [
+        {
+          "key": "a",
+          "label": "Apps",
+          "type": "group",
+          "actions": [
+            {
+              "key": "f",
+              "label": "Finder",
+              "type": "application",
+              "value": "/System/Library/CoreServices/Finder.app"
+            },
+            {
+              "key": "s",
+              "label": "System Settings",
+              "type": "application",
+              "value": "/System/Applications/System Settings.app"
+            },
+            {
+              "key": "a",
+              "label": "Activity Monitor",
+              "type": "application",
+              "value": "/System/Applications/Utilities/Activity Monitor.app"
+            }
+          ]
+        },
+        {
+          "key": "m",
+          "label": "Mac",
+          "type": "group",
+          "actions": [
+            {
+              "key": "l",
+              "label": "Lock Screen",
+              "type": "command",
+              "value": "osascript -e 'tell application \"System Events\" to keystroke \"q\" using {control down, command down}'"
+            },
+            {
+              "key": "s",
+              "label": "Sleep",
+              "type": "command",
+              "value": "pmset sleepnow"
+            },
+            {
+              "key": "f",
+              "label": "Force Quit",
+              "type": "command",
+              "value": "osascript -e 'tell application \"System Events\" to keystroke \"escape\" using {option down, command down}'"
+            },
+            {
+              "key": "R",
+              "label": "Restart...",
+              "type": "command",
+              "value": "osascript -e 'tell app \"System Events\" to restart'"
+            },
+            {
+              "key": "S",
+              "label": "Shut Down...",
+              "type": "command",
+              "value": "osascript -e 'tell app \"System Events\" to shut down'"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "key": "g",
       "label": "Terminal (Ghostty)",
       "type": "application",
       "value": "/Applications/Ghostty.app"
     },
+
     {
-      "key": "m",
-      "label": "Messages & Mail",
+      "key": "o",
+      "label": "Outlook (Web)",
       "type": "group",
       "actions": [
         {
-          "key": "g",
-          "label": "Gmail",
+          "key": "space",
+          "label": "Focus / Open Outlook",
           "type": "command",
-          "value": "hs -c 'openAppOrWeb(\"Gmail\", \"/Applications/Gmail.app\", \"https://mail.google.com\")'"
+          "value": "hs -c 'focusByDomainOrOpen(\"outlook.office.com\", \"https://outlook.office.com\")'"
         },
         {
-          "key": "o",
-          "label": "Outlook",
+          "key": "n",
+          "label": "New Mail",
           "type": "command",
-          "value": "hs -c 'openAppOrWeb(\"Microsoft Outlook\", \"/Applications/Microsoft Outlook.app\", \"https://outlook.office.com\")'"
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"n\", {})'"
         },
         {
-          "key": "t",
-          "label": "Teams",
+          "key": "s",
+          "label": "Search (Alt+Q)",
           "type": "command",
-          "value": "hs -c 'openAppWithKey(\"Microsoft Teams\", \"/Applications/Microsoft Teams.app\", \"https://teams.microsoft.com\", \"g\", {\"cmd\"}, \"g\", {\"cmd\", \"alt\"})'"
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"q\", {\"alt\"})'"
+        },
+        {
+          "key": "r",
+          "label": "Reply All",
+          "type": "command",
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"r\", {\"ctrl\", \"shift\"})'"
+        },
+        {
+          "key": "f",
+          "label": "Forward",
+          "type": "command",
+          "value": "hs -c 'focusWebAndSendKey(\"outlook.office.com\", \"https://outlook.office.com\", \"f\", {\"ctrl\", \"shift\"})'"
+        },
+        {
+          "key": "M",
+          "label": "Mark All as Read",
+          "type": "command",
+          "value": "hs -c 'outlookMarkAllAsRead()'"
         }
       ]
     },
+
+    {
+      "key": "t",
+      "label": "Teams (Web)",
+      "type": "group",
+      "actions": [
+        {
+          "key": "c",
+          "label": "Chat",
+          "type": "command",
+          "value": "hs -c 'focusByDomainAndTitle(\"teams.microsoft.com\", \"Chat\", \"https://teams.microsoft.com\")'"
+        },
+        {
+          "key": "m",
+          "label": "Calendar (Meetings)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainAndTitle(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\")'"
+        },
+        {
+          "key": "n",
+          "label": "New Meeting",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"n\", {})'"
+        },
+        {
+          "key": "s",
+          "label": "Go To (Search)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Chat\", \"https://teams.microsoft.com\", \"g\", {\"alt\", \"cmd\"})'"
+        },
+        {
+          "key": "/",
+          "label": "Command Bar (Availability, etc.)",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Chat\", \"https://teams.microsoft.com\", \"e\", {\"alt\", \"cmd\"})'"
+        },
+        {
+          "key": "M",
+          "label": "Meeting: Toggle Mute",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"m\", {\"cmd\", \"shift\"})'"
+        },
+        {
+          "key": "v",
+          "label": "Meeting: Toggle Video",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"o\", {\"cmd\", \"shift\"})'"
+        },
+        {
+          "key": "p",
+          "label": "Meeting: Share Screen",
+          "type": "command",
+          "value": "hs -c 'focusByDomainTitleAndSendKey(\"teams.microsoft.com\", \"Calendar\", \"https://teams.microsoft.com\", \"e\", {\"cmd\", \"shift\"})'"
+        },
+
+        {
+          "key": "x",
+          "label": "Toggle Camera (OBS Face/Tablet)",
+          "type": "command",
+          "value": "hs -c 'toggleObsCamera()'"
+        },
+        {
+          "key": "1",
+          "label": "Camera: Force Face",
+          "type": "command",
+          "value": "hs -c 'obsCameraFace()'"
+        },
+        {
+          "key": "2",
+          "label": "Camera: Force Tablet",
+          "type": "command",
+          "value": "hs -c 'obsCameraTablet()'"
+        }
+      ]
+    },
+
     {
       "key": "a",
       "label": "ChatGPT (Web)",
       "type": "command",
       "value": "hs -c 'focusByDomainOrOpen(\"chatgpt.com\", \"https://chatgpt.com\")'"
     },
+
     {
       "key": "b",
       "label": "Browser",
@@ -72,9 +239,59 @@
           "label": "GitHub (focus if open)",
           "type": "command",
           "value": "hs -c 'focusByDomainOrOpen(\"github.com\", \"https://github.com\")'"
+        },
+        {
+          "key": "t",
+          "label": "Tab → Workspace",
+          "type": "group",
+          "actions": [
+            {
+              "key": "v",
+              "label": "→ Message",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"message\")'"
+            },
+            {
+              "key": "b",
+              "label": "→ Browser",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"browser\")'"
+            },
+            {
+              "key": "n",
+              "label": "→ Code",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"code\")'"
+            },
+            {
+              "key": "m",
+              "label": "→ Meeting",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"meeting\")'"
+            },
+            {
+              "key": "1",
+              "label": "→ Monitor 1",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"monitor-1\")'"
+            },
+            {
+              "key": "2",
+              "label": "→ Monitor 2",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"monitor-2\")'"
+            },
+            {
+              "key": "3",
+              "label": "→ Monitor 3",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"monitor-3\")'"
+            }
+          ]
         }
       ]
     },
+
     {
       "key": "w",
       "label": "Window",
@@ -82,39 +299,148 @@
       "actions": [
         {
           "key": "h",
-          "label": "Left Half",
+          "label": "Focus Left",
           "type": "command",
-          "value": "hs -c 'tileLeft()'"
-        },
-        {
-          "key": "l",
-          "label": "Right Half",
-          "type": "command",
-          "value": "hs -c 'tileRight()'"
-        },
-        {
-          "key": "k",
-          "label": "Top Half",
-          "type": "command",
-          "value": "hs -c 'tileTop()'"
+          "value": "aerospace focus left --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors"
         },
         {
           "key": "j",
-          "label": "Bottom Half",
+          "label": "Focus Down",
           "type": "command",
-          "value": "hs -c 'tileBottom()'"
+          "value": "aerospace focus down --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors"
+        },
+        {
+          "key": "k",
+          "label": "Focus Up",
+          "type": "command",
+          "value": "aerospace focus up --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors"
+        },
+        {
+          "key": "l",
+          "label": "Focus Right",
+          "type": "command",
+          "value": "aerospace focus right --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors"
+        },
+        {
+          "key": "H",
+          "label": "Move Left",
+          "type": "command",
+          "value": "aerospace move left"
+        },
+        {
+          "key": "J",
+          "label": "Move Down",
+          "type": "command",
+          "value": "aerospace move down"
+        },
+        {
+          "key": "K",
+          "label": "Move Up",
+          "type": "command",
+          "value": "aerospace move up"
+        },
+        {
+          "key": "L",
+          "label": "Move Right",
+          "type": "command",
+          "value": "aerospace move right"
+        },
+        {
+          "key": "v",
+          "label": "WS: Message",
+          "type": "command",
+          "value": "aerospace workspace message"
+        },
+        {
+          "key": "b",
+          "label": "WS: Browser",
+          "type": "command",
+          "value": "aerospace workspace browser"
+        },
+        {
+          "key": "n",
+          "label": "WS: Code",
+          "type": "command",
+          "value": "aerospace workspace code"
         },
         {
           "key": "m",
-          "label": "Maximize",
+          "label": "WS: Meeting",
           "type": "command",
-          "value": "hs -c 'windowMaximize()'"
+          "value": "aerospace workspace meeting"
+        },
+        {
+          "key": "V",
+          "label": "Move to Message",
+          "type": "command",
+          "value": "aerospace move-node-to-workspace message && aerospace workspace message"
+        },
+        {
+          "key": "B",
+          "label": "Move to Browser",
+          "type": "command",
+          "value": "aerospace move-node-to-workspace browser && aerospace workspace browser"
+        },
+        {
+          "key": "N",
+          "label": "Move to Code",
+          "type": "command",
+          "value": "aerospace move-node-to-workspace code && aerospace workspace code"
+        },
+        {
+          "key": "M",
+          "label": "Move to Meeting",
+          "type": "command",
+          "value": "aerospace move-node-to-workspace meeting && aerospace workspace meeting"
         },
         {
           "key": "f",
           "label": "Fullscreen",
           "type": "command",
-          "value": "hs -c 'windowFullscreen()'"
+          "value": "aerospace fullscreen"
+        },
+        {
+          "key": "/",
+          "label": "Layout H/V",
+          "type": "command",
+          "value": "aerospace layout horizontal vertical"
+        },
+        {
+          "key": "tab",
+          "label": "Back and Forth",
+          "type": "command",
+          "value": "aerospace workspace-back-and-forth"
+        },
+        {
+          "key": "r",
+          "label": "Resize",
+          "type": "group",
+          "actions": [
+            {
+              "key": "h",
+              "label": "Shrink Width",
+              "type": "command",
+              "value": "aerospace resize width -50"
+            },
+            {
+              "key": "l",
+              "label": "Grow Width",
+              "type": "command",
+              "value": "aerospace resize width +50"
+            },
+            {
+              "key": "k",
+              "label": "Shrink Height",
+              "type": "command",
+              "value": "aerospace resize height -50"
+            },
+            {
+              "key": "j",
+              "label": "Grow Height",
+              "type": "command",
+              "value": "aerospace resize height +50"
+            }
+          ]
         }
       ]
     }

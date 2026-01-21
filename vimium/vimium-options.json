@@ -1,0 +1,17 @@
+{
+  "settingsVersion": "2.3.1",
+  "exclusionRules": [
+    {
+      "passKeys": "",
+      "pattern": "https?://mail.google.com/*"
+    },
+    {
+      "passKeys": "n",
+      "pattern": "https?://teams.microsoft.com/*"
+    },
+    {
+      "passKeys": "d",
+      "pattern": "*.ipynb"
+    }
+  ]
+}
