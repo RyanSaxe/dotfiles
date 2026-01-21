@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# Pre-commit hook that runs the same checks as CI (format-check.yml)
+# This hook only checks staged files for efficiency
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+# Track if any check fails
+FAILED=0
+
+# Get staged files by extension
+# Using diff-index to get staged files, filtering by extension
+get_staged_files() {
+  local extension="$1"
+  git diff --cached --name-only --diff-filter=ACM | grep -E "\.${extension}$" || true
+}
+
+# Print section header
+print_header() {
+  echo -e "${YELLOW}Checking $1...${NC}"
+}
+
+# Print success
+print_success() {
+  echo -e "${GREEN}✓ $1 passed${NC}"
+}
+
+# Print failure
+print_failure() {
+  echo -e "${RED}✗ $1 failed${NC}"
+  FAILED=1
+}
+
+# Check if command exists
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# =============================================================================
+# Lua (stylua)
+# =============================================================================
+LUA_FILES=$(get_staged_files "lua")
+if [[ -n "$LUA_FILES" ]]; then
+  print_header "Lua formatting (stylua)"
+  if command_exists stylua; then
+    # shellcheck disable=SC2086
+    if stylua --check $LUA_FILES; then
+      print_success "stylua"
+    else
+      print_failure "stylua"
+      echo "  Run: stylua ."
+    fi
+  else
+    echo -e "${YELLOW}  stylua not found, skipping${NC}"
+  fi
+fi
+
+# =============================================================================
+# Shell (shfmt)
+# =============================================================================
+SH_FILES=$(get_staged_files "sh")
+if [[ -n "$SH_FILES" ]]; then
+  print_header "Shell formatting (shfmt)"
+  if command_exists shfmt; then
+    # Options match CI: -i 2 (indent), -ci (case indent), -bn (binary next line), -sr (space redirects)
+    # shellcheck disable=SC2086
+    if shfmt -i 2 -ci -bn -sr -d $SH_FILES >/dev/null 2>&1; then
+      print_success "shfmt"
+    else
+      print_failure "shfmt"
+      echo "  Run: shfmt -i 2 -ci -bn -sr -w <file>"
+      # Show diff for context
+      # shellcheck disable=SC2086
+      shfmt -i 2 -ci -bn -sr -d $SH_FILES || true
+    fi
+  else
+    echo -e "${YELLOW}  shfmt not found, skipping${NC}"
+  fi
+fi
+
+# =============================================================================
+# JSON (prettier)
+# =============================================================================
+JSON_FILES=$(get_staged_files "json" | grep -v "node_modules/" | grep -v "lazy-lock.json" || true)
+if [[ -n "$JSON_FILES" ]]; then
+  print_header "JSON formatting (prettier)"
+  if command_exists prettier; then
+    # shellcheck disable=SC2086
+    if prettier --check $JSON_FILES 2>/dev/null; then
+      print_success "prettier"
+    else
+      print_failure "prettier"
+      echo "  Run: prettier --write <file>"
+    fi
+  else
+    echo -e "${YELLOW}  prettier not found, skipping${NC}"
+  fi
+fi
+
+# =============================================================================
+# Markdown (markdownlint)
+# =============================================================================
+MD_FILES=$(get_staged_files "md")
+if [[ -n "$MD_FILES" ]]; then
+  print_header "Markdown linting (markdownlint)"
+  if command_exists markdownlint; then
+    # Use config from nvim/.markdownlint.yaml if it exists
+    CONFIG_FLAG=""
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+    if [[ -f "$REPO_ROOT/nvim/.markdownlint.yaml" ]]; then
+      CONFIG_FLAG="--config $REPO_ROOT/nvim/.markdownlint.yaml"
+    fi
+    # shellcheck disable=SC2086
+    if markdownlint $CONFIG_FLAG $MD_FILES; then
+      print_success "markdownlint"
+    else
+      print_failure "markdownlint"
+      echo "  Run: markdownlint --fix <file>"
+    fi
+  else
+    echo -e "${YELLOW}  markdownlint not found, skipping${NC}"
+  fi
+fi
+
+# =============================================================================
+# Python (ruff)
+# =============================================================================
+PY_FILES=$(get_staged_files "py")
+if [[ -n "$PY_FILES" ]]; then
+  print_header "Python formatting and linting (ruff)"
+
+  # Try ruff directly, fall back to uvx
+  RUFF_CMD=""
+  if command_exists ruff; then
+    RUFF_CMD="ruff"
+  elif command_exists uvx; then
+    RUFF_CMD="uvx ruff"
+  fi
+
+  if [[ -n "$RUFF_CMD" ]]; then
+    # Check formatting
+    # shellcheck disable=SC2086
+    if $RUFF_CMD format --check $PY_FILES 2>/dev/null; then
+      print_success "ruff format"
+    else
+      print_failure "ruff format"
+      echo "  Run: ruff format <file>"
+    fi
+
+    # Check linting
+    # shellcheck disable=SC2086
+    if $RUFF_CMD check $PY_FILES 2>/dev/null; then
+      print_success "ruff check"
+    else
+      print_failure "ruff check"
+      echo "  Run: ruff check --fix <file>"
+    fi
+  else
+    echo -e "${YELLOW}  ruff not found (install ruff or use uvx), skipping${NC}"
+  fi
+fi
+
+# =============================================================================
+# Final result
+# =============================================================================
+echo ""
+if [[ $FAILED -eq 1 ]]; then
+  echo -e "${RED}Pre-commit checks failed. Please fix the issues above.${NC}"
+  exit 1
+else
+  echo -e "${GREEN}All pre-commit checks passed!${NC}"
+fi

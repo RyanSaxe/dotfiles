@@ -509,6 +509,15 @@ main() {
     warn "Symlink script not found at $SCRIPT_DIR/symlink.sh - skipping dotfiles setup"
   fi
 
+  # Configure git to use repo's hooks directory (for pre-commit linting)
+  log "Setting up git hooks..."
+  if [[ -d "$DOTFILES_DIR/hooks" ]]; then
+    git -C "$DOTFILES_DIR" config core.hooksPath hooks
+    log "Git hooks configured to use $DOTFILES_DIR/hooks"
+  else
+    warn "Hooks directory not found at $DOTFILES_DIR/hooks - skipping git hooks setup"
+  fi
+
   # Apply fast-syntax-highlighting theme (one-time)
   local fsh_theme="$HOME/.config/fsh/tokyonight.ini"
   if [[ -f "$fsh_theme" ]]; then

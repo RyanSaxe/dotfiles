@@ -12,7 +12,7 @@ Terminal-based resource monitor with TokyoNight Night theme.
 ## Key Bindings
 
 | Key | Action |
-|-----|--------|
+| --- | ------ |
 | `h/j/k/l` | Navigate (vim-style) |
 | `g/G` | Go to top/bottom |
 | `H` | Help menu (Shift+h) |
