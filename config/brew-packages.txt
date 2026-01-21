@@ -44,6 +44,7 @@ wget
 bat
 tldr
 wordnet
+btop
 
 # macOS applications
 hammerspoon
