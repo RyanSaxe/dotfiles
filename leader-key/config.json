@@ -239,6 +239,55 @@
           "label": "GitHub (focus if open)",
           "type": "command",
           "value": "hs -c 'focusByDomainOrOpen(\"github.com\", \"https://github.com\")'"
+        },
+        {
+          "key": "t",
+          "label": "Tab → Workspace",
+          "type": "group",
+          "actions": [
+            {
+              "key": "v",
+              "label": "→ Message",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"message\")'"
+            },
+            {
+              "key": "b",
+              "label": "→ Browser",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"browser\")'"
+            },
+            {
+              "key": "n",
+              "label": "→ Code",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"code\")'"
+            },
+            {
+              "key": "m",
+              "label": "→ Meeting",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"meeting\")'"
+            },
+            {
+              "key": "1",
+              "label": "→ Monitor 1",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"monitor-1\")'"
+            },
+            {
+              "key": "2",
+              "label": "→ Monitor 2",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"monitor-2\")'"
+            },
+            {
+              "key": "3",
+              "label": "→ Monitor 3",
+              "type": "command",
+              "value": "hs -c 'breakTabToWorkspace(\"monitor-3\")'"
+            }
+          ]
         }
       ]
     },

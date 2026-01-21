@@ -272,6 +272,62 @@ function toggleObsCamera()
 	end
 end
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- Chrome Tab Operations
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Break current Chrome tab into a new window and move to aerospace workspace
+-- Called via: hs -c 'breakTabToWorkspace("code")'
+function breakTabToWorkspace(workspace)
+	-- Check if Chrome has a window and how many tabs
+	local checkScript = [[
+    tell application "Google Chrome"
+      if (count of windows) = 0 then return "no_window"
+      if (count of tabs of front window) < 2 then return "single_tab"
+      return "multi_tab"
+    end tell
+  ]]
+
+	local ok, result = hs.osascript.applescript(checkScript)
+	if not ok then
+		hs.alert.show("Failed to check Chrome", 1)
+		return
+	end
+
+	if result == "no_window" then
+		hs.alert.show("No Chrome window", 1)
+		return
+	end
+
+	if result == "single_tab" then
+		-- Only one tab, just move the whole window directly
+		hs.execute("aerospace move-node-to-workspace " .. workspace .. " && aerospace workspace " .. workspace, true)
+		return
+	end
+
+	-- Multiple tabs: use Chrome's native "Move Tab to New Window" menu item
+	local moveScript = [[
+    tell application "Google Chrome" to activate
+    delay 0.1
+    tell application "System Events"
+      tell process "Google Chrome"
+        click menu item "Move Tab to New Window" of menu "Tab" of menu bar 1
+      end tell
+    end tell
+  ]]
+
+	local moveOk = hs.osascript.applescript(moveScript)
+	if not moveOk then
+		hs.alert.show("Failed to move tab", 1)
+		return
+	end
+
+	-- Delay for new window creation, then move to workspace and follow
+	hs.timer.doAfter(0.2, function()
+		hs.execute("aerospace move-node-to-workspace " .. workspace .. " && aerospace workspace " .. workspace, true)
+	end)
+end
+
 -- === Outlook Web helpers ===
 -- Mark all as read in Outlook Web: Select all (Cmd+A), mark as read (Q), deselect (Esc)
 function outlookMarkAllAsRead()
