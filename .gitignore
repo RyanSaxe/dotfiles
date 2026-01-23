@@ -28,3 +28,4 @@ ipython/profile_default/*
 !ipython/profile_default/startup/
 test-projects/
 tmux/plugins/
+nvim/lua/custom/visual/pokemon-colors.lua
