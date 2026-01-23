@@ -146,10 +146,16 @@ return {
     { "<leader>a", "", desc = "+ai", mode = { "n", "v" } },
 
     -- Toggle Claude CLI terminal
+    -- <leader>ai is the sidekick convention, <leader>ta matches terminal keybinds (tt/tp/ta)
     {
       "<leader>ai",
       function() require("sidekick.cli").toggle({ name = "claude", focus = true }) end,
       desc = "Sidekick Toggle Claude",
+    },
+    {
+      "<leader>ta",
+      function() require("sidekick.cli").toggle({ name = "claude", focus = true }) end,
+      desc = "Toggle Claude (AI)",
     },
 
     {
