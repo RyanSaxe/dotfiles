@@ -54,6 +54,7 @@ Do not forget anything in this file. It specifies global rules for all actions y
 - **Content search**: `rg` / ripgrep (NOT `grep`)
 - **Structural code search**: `sg` / ast-grep (for complex patterns)
 - **Run tools**: `uvx <tool>` (runs without global install - great for one-off tools)
+- **Type checker**: `uvx ty check <files>` (NOT `uv run ty` - ty is run via uvx)
 - **LSP diagnostics**: `lsp-check files/folders` (verify code health with respect to files you change)
 - **Quick reference**: `tldr`
 - **Detailed docs**: `--help` flag and `man` pages

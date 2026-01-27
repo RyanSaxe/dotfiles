@@ -4,6 +4,7 @@
 -- Shell: shfmt for bash/sh/zsh scripts
 -- JSON: prettier for consistent formatting
 -- Markdown: markdownlint for style enforcement (no line wrapping)
+-- Web (JS/TS/CSS/HTML): prettier for consistent formatting
 
 return {
   "stevearc/conform.nvim",
@@ -130,6 +131,18 @@ return {
     -- Markdown: markdownlint with --fix for auto-formatting
     -- Does NOT wrap lines (markdown is read with word wrap enabled)
     opts.formatters_by_ft.markdown = { "markdownlint" }
+
+    -- Web development: prettier handles JS, TS, CSS, HTML, and variants
+    -- Uses project's .prettierrc if present, otherwise sensible defaults
+    opts.formatters_by_ft.javascript = { "prettier" }
+    opts.formatters_by_ft.javascriptreact = { "prettier" }
+    opts.formatters_by_ft.typescript = { "prettier" }
+    opts.formatters_by_ft.typescriptreact = { "prettier" }
+    opts.formatters_by_ft.css = { "prettier" }
+    opts.formatters_by_ft.html = { "prettier" }
+    opts.formatters_by_ft.vue = { "prettier" }
+    opts.formatters_by_ft.svelte = { "prettier" }
+    opts.formatters_by_ft.astro = { "prettier" }
 
     -- ══════════════════════════════════════════════════════════════════════════
     -- Individual formatter settings
