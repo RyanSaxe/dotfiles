@@ -1,5 +1,4 @@
 {
-  "model": "opus",
   "permissions": {
     "allow": [
       "Read",
@@ -191,5 +190,7 @@
     "padding": 0
   },
   "alwaysThinkingEnabled": true,
-  "vimMode": true
+  "vimMode": true,
+  "effortLevel": "high",
+  "model": "opus"
 }
