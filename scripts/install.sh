@@ -509,6 +509,12 @@ main() {
     warn "Symlink script not found at $SCRIPT_DIR/symlink.sh - skipping dotfiles setup"
   fi
 
+  # Configure aerospace notch detection (macOS only)
+  if [[ "$PM" == "brew" ]] && [[ -f "$DOTFILES_DIR/aerospace/configure.sh" ]]; then
+    log "Configuring aerospace display settings..."
+    bash "$DOTFILES_DIR/aerospace/configure.sh"
+  fi
+
   # Configure git to use repo's hooks directory (for pre-commit linting)
   log "Setting up git hooks..."
   if [[ -d "$DOTFILES_DIR/hooks" ]]; then
