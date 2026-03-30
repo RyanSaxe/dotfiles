@@ -4,6 +4,8 @@
 return {
   "folke/which-key.nvim",
   opts = {
+    -- show popup immediately (default is 200ms)
+    delay = 0,
     spec = {
       { "<leader>a", group = "AI", icon = "󰚩" },
       { "<leader>o", group = "Obsidian", icon = "󰎞" },
