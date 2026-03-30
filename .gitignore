@@ -1,3 +1,4 @@
+nvim/lua/custom/visual/pokemon-colors.lua
 tt.*
 .tests
 doc/tags

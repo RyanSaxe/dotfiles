@@ -6,8 +6,21 @@
 
 vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv", { desc = "move lines down in visual selection" })
 vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv", { desc = "move lines up in visual selection" })
--- make escape go to normal mode when in a terminal
-vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true, desc = "Terminal: go to Normal mode" })
+-- Double-escape exits terminal mode to Neovim normal mode
+-- Single escape is passed through to the terminal (needed for Claude Code's vim bindings)
+-- Alternative: use <C-\><C-n> directly if you prefer a single-key exit
+vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { silent = true, desc = "Terminal: exit to Normal mode" })
+
+-- Ensure leader key works in terminal normal mode
+-- By default, <Space> in terminal buffers may be mapped to send literal space
+-- This autocmd removes that mapping so leader key works as expected
+vim.api.nvim_create_autocmd("TermOpen", {
+  callback = function()
+    local opts = { buffer = 0 }
+    -- Remove any buffer-local space mapping that might interfere with leader
+    pcall(vim.keymap.del, "n", "<Space>", opts)
+  end,
+})
 
 -- Swap ; and : for easier command access
 -- ; now enters command mode (was :)
