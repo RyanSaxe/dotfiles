@@ -4,8 +4,19 @@
 return {
   "folke/which-key.nvim",
   opts = function(_, opts)
-    -- show popup quickly without triggering on normal command sequences like dd
-    opts.delay = 200
+    local wk_util = require("which-key.util")
+
+    -- Show leader/localleader immediately, but keep a delay for other prefixes
+    -- so normal command sequences like `dd` don't trigger the popup.
+    opts.delay = function(ctx)
+      if ctx.plugin then
+        return 0
+      end
+      if ctx.keys == wk_util.norm("<leader>") or ctx.keys == wk_util.norm("<localleader>") then
+        return 0
+      end
+      return 200
+    end
     opts.spec = opts.spec or {}
 
     local function remove_ui_group(specs)
