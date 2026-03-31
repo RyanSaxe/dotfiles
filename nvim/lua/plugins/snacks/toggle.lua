@@ -5,11 +5,26 @@ return {
   "folke/snacks.nvim",
   priority = 1000,
   lazy = false,
-  opts = {
-    words = {
-      enabled = false,
+  keys = {
+    { "<leader>un", false },
+    {
+      "<leader>Un",
+      function()
+        Snacks.notifier.hide()
+      end,
+      desc = "Dismiss All Notifications",
     },
   },
+  opts = function(_, opts)
+    opts.words = opts.words or {}
+    opts.words.enabled = false
+    opts.toggle = opts.toggle or {}
+    opts.toggle.which_key = false
+    opts.toggle.map = function(mode, lhs, rhs, map_opts)
+      lhs = lhs:gsub("^<leader>u", "<leader>U")
+      LazyVim.safe_keymap_set(mode, lhs, rhs, map_opts)
+    end
+  end,
   init = function()
     vim.api.nvim_create_autocmd("User", {
       pattern = "VeryLazy",

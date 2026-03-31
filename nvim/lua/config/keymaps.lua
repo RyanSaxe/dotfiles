@@ -39,3 +39,24 @@ end, { desc = "GitHub Comments (repo)" })
 vim.keymap.set("n", "<leader>gC", function()
   require("custom.git.review_threads").picker()
 end, { desc = "GitHub Comments (all)" })
+
+local function remap_ui_key(old_lhs, new_lhs, rhs, opts)
+  pcall(vim.keymap.del, "n", old_lhs)
+  vim.keymap.set("n", new_lhs, rhs, opts)
+end
+
+-- These three are plain LazyVim keymaps, not Snacks toggles, so move them explicitly.
+remap_ui_key(
+  "<leader>ur",
+  "<leader>Ur",
+  "<Cmd>nohlsearch<Bar>diffupdate<Bar>normal! <C-L><CR>",
+  { desc = "Redraw / Clear hlsearch / Diff Update" }
+)
+remap_ui_key("<leader>ui", "<leader>Ui", vim.show_pos, { desc = "Inspect Pos" })
+remap_ui_key("<leader>uI", "<leader>UI", function()
+  vim.treesitter.inspect_tree()
+  vim.api.nvim_input("I")
+end, { desc = "Inspect Tree" })
+
+vim.cmd("packadd nvim.undotree")
+vim.keymap.set("n", "<leader>u", require("undotree").open, { desc = "Undo Tree" })

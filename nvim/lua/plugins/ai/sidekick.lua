@@ -197,22 +197,5 @@ return {
       mode = { "n", "x" },
       desc = "Sidekick Select Prompt",
     },
-
-    -- Toggle NES on/off (useful for debugging or when it's distracting)
-    {
-      "<leader>uN",
-      function()
-        Snacks.toggle({
-          name = "Sidekick NES",
-          get = function()
-            return require("sidekick.nes").enabled
-          end,
-          set = function(state)
-            require("sidekick.nes").enable(state)
-          end,
-        })()
-      end,
-      desc = "Toggle Sidekick NES",
-    },
   },
 }

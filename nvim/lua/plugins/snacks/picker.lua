@@ -3,6 +3,16 @@
 
 return {
   "folke/snacks.nvim",
+  keys = {
+    { "<leader>uC", false },
+    {
+      "<leader>UC",
+      function()
+        Snacks.picker.colorschemes()
+      end,
+      desc = "Colorschemes",
+    },
+  },
   dependencies = {
     -- todo_comments is required for snacks todo_comments picker
     "folke/todo-comments.nvim",
