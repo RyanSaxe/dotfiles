@@ -40,7 +40,7 @@ return {
               -- Detach Harper from this buffer only
               local clients = vim.lsp.get_clients({ name = "harper_ls", bufnr = bufnr })
               for _, client in ipairs(clients) do
-                vim.lsp.buf_detach_client(bufnr, client.id)
+                client:detach(bufnr)
               end
             end
           end,

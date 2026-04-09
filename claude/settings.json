@@ -190,7 +190,6 @@
     "padding": 0
   },
   "alwaysThinkingEnabled": true,
-  "vimMode": true,
   "effortLevel": "high",
-  "model": "opus"
+  "vimMode": true
 }
