@@ -116,6 +116,27 @@ source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 Keybindings (configured in `.zshrc`): **Tab** accepts full suggestion, **Shift-Tab** accepts word-by-word.
 
+### Codex CLI
+
+Codex CLI is installed by `scripts/install.sh` via Homebrew on macOS and npm on Linux.
+
+After setup, authenticate once with:
+
+```bash
+codex login
+```
+
+For dotfiles, only keep the shareable Codex layers in this repo:
+
+- `~/.codex/AGENTS.md` for global reusable instructions
+- `~/.codex/rules/shared.rules` for reusable approval rules
+
+Keep mutable local state out of dotfiles:
+
+- `~/.codex/config.toml` because it can contain trusted-project and machine-specific settings
+- `~/.codex/rules/default.rules` because Codex writes approvals there automatically
+- auth/history/cache/session state under `~/.codex`
+
 ## 🎨 Theme
 
 Generally speaking, all applications are set up to share as close to the same dark theme as possible, which is a branch off of Tokyonight Night theme.

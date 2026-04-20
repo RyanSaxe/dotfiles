@@ -67,6 +67,7 @@ done < "$DOTFILES_DIR/config/apt-packages.txt"
 #       curl: command-line tool for transferring data with URLs, used for fetching scripts and packages
 #       zsh: a shell with a superset of features compared to bash, used as the default shell
 #       bat: a cat clone with syntax highlighting so that file outputs are readable and colored
+#       codex: OpenAI's terminal coding agent, installed via Homebrew on macOS and npm on Linux
 # ──────────────────────────────────────────────────────
 install_brew() {
   log "Updating Homebrew…"
@@ -82,7 +83,7 @@ install_brew() {
   local formulae=()
   for pkg in "${BREW_DEPS[@]}"; do
     case "$pkg" in
-      aerospace) casks+=("$pkg") ;;
+      aerospace | codex) casks+=("$pkg") ;;
       *) formulae+=("$pkg") ;;
     esac
   done
@@ -397,6 +398,19 @@ main() {
     }
   else
     log "tree-sitter CLI already installed—skipping re-install"
+  fi
+
+  # Install Codex CLI via npm on Linux (on macOS it's installed via brew)
+  if [[ "$PM" == "apt" ]] && ! command -v codex &> /dev/null; then
+    log "Installing Codex CLI via npm…"
+    sudo_if_needed npm install -g @openai/codex || {
+      err "Codex CLI install failed"
+      exit 1
+    }
+  else
+    if [[ "$PM" == "apt" ]]; then
+      log "Codex CLI already installed—skipping re-install"
+    fi
   fi
 
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)

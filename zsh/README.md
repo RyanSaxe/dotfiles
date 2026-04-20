@@ -128,6 +128,8 @@ Enhanced vi mode with:
 
 Common aliases are defined in `aliases.zsh`. These are shared between full and minimal modes.
 
+- `diagnose` runs `uvx ty check` in concise mode and prints a grouped `diagnostic: count` summary.
+
 ## Customization
 
 Edit `.zshrc` to:
