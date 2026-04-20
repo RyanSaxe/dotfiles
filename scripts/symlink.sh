@@ -32,8 +32,28 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   [[ -n "$line" ]] && DOTFILE_MAPPINGS[${#DOTFILE_MAPPINGS[@]}]="$line"
 done < "$DOTFILES_DIR/config/symlinks.txt"
 
+REQUESTED_PATHS=()
+
 # ──────────────────────────────────────────────────────
 # Helper functions
+
+is_stateful_runtime_dir() {
+  case "$1" in
+    "$HOME/.claude" | "$HOME/.codex" | "$HOME/.codex/rules" | "$HOME/.codex/hooks") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+preserve_runtime_state() {
+  local source=$1
+  local target=$2
+
+  if cp -R -n "$target"/. "$source"/ 2> /dev/null; then
+    success "✓ Preserved existing runtime state in $source"
+  else
+    warn "Could not preserve runtime state from $target before symlinking"
+  fi
+}
 
 create_symlink() {
   local source=$1
@@ -48,6 +68,10 @@ create_symlink() {
       # It's a symlink, safe to remove
       rm -f "$target"
     else
+      if [[ -d "$source" && -d "$target" ]] && is_stateful_runtime_dir "$target"; then
+        preserve_runtime_state "$source" "$target"
+      fi
+
       # It's a real file/directory, back it up
       local timestamp=$(date +%Y%m%d_%H%M%S)
       local backup_name="$(basename "$target")_${timestamp}"
@@ -92,6 +116,10 @@ symlink_dotfiles() {
     local source="$DOTFILES_DIR/$src_path"
     local target=$(eval echo "$target_path")
 
+    if ! should_process_mapping "$src_path"; then
+      continue
+    fi
+
     if [[ ! -e "$source" ]]; then
       warn "Source not found, skipping: $source"
       continue
@@ -125,13 +153,33 @@ OPTIONS:
     -h, --help      Show this help message
     -l, --list      List all configured symlinks
     -d, --dry-run   Show what would be done without making changes
+    -o, --only PATH Only process a specific source path from config/symlinks.txt
+                    Repeatable; e.g. --only codex/config.toml --only codex/rules
 
 EXAMPLES:
     $(basename "$0")                 # Create all symlinks
     $(basename "$0") --list          # Show configured mappings
     $(basename "$0") --dry-run       # Preview changes
+    $(basename "$0") --only codex/config.toml --only codex/rules
 
 EOF
+}
+
+should_process_mapping() {
+  local src_path=$1
+
+  if [[ ${#REQUESTED_PATHS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  local requested
+  for requested in "${REQUESTED_PATHS[@]}"; do
+    if [[ "$src_path" == "$requested" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 list_mappings() {
@@ -149,6 +197,11 @@ list_mappings() {
     IFS=: read -r src_path target_path <<< "$mapping"
     local source="$DOTFILES_DIR/$src_path"
     local target=$(eval echo "$target_path")
+
+    if ! should_process_mapping "$src_path"; then
+      continue
+    fi
+
     printf "  %-30s → %s\n" "$source" "$target"
   done
 }
@@ -161,6 +214,10 @@ dry_run() {
     IFS=: read -r src_path target_path <<< "$mapping"
     local source="$DOTFILES_DIR/$src_path"
     local target=$(eval echo "$target_path")
+
+    if ! should_process_mapping "$src_path"; then
+      continue
+    fi
 
     if [[ ! -e "$source" ]]; then
       warn "SKIP: Source not found - $source"
@@ -198,6 +255,14 @@ main() {
       -d | --dry-run)
         dry_run_mode=true
         shift
+        ;;
+      -o | --only)
+        if [[ $# -lt 2 ]]; then
+          err "Missing value for $1"
+          exit 1
+        fi
+        REQUESTED_PATHS[${#REQUESTED_PATHS[@]}]="$2"
+        shift 2
         ;;
       *)
         err "Unknown option: $1"

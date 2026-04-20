@@ -48,4 +48,4 @@ software-properties-common
 # - prettier
 # - markdownlint-cli
 # - stylua (via cargo or npm, not in apt)
-# NOTE: claude-code is installed via npm or curl installer
+# NOTE: claude-code and codex are installed outside apt
