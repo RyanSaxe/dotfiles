@@ -14,7 +14,9 @@ local help_lines = {
   "│           CodeDiff Keybindings              │",
   "├─────────────────────────────────────────────┤",
   "│  Navigation                                 │",
-  "│    ]c / [c     Next / previous hunk         │",
+  "│    <Tab>       Next hunk, else next file    │",
+  "│    <S-Tab>     Prev hunk, else prev file    │",
+  "│    ]h / [h     Next / previous hunk         │",
   "│    ]f / [f     Next / previous file         │",
   "│    <CR>        Open file (in explorer)      │",
   "│                                             │",
@@ -78,6 +80,85 @@ local function show_help()
   end, { buffer = buf, nowait = true })
 end
 
+local function next_review_step()
+  local navigation = require("codediff.ui.view.navigation")
+  if not navigation.next_hunk() then
+    navigation.next_file()
+  end
+end
+
+local function prev_review_step()
+  local lifecycle = require("codediff.ui.lifecycle")
+  local navigation = require("codediff.ui.view.navigation")
+
+  if navigation.prev_hunk() then
+    return
+  end
+
+  if not navigation.prev_file() then
+    return
+  end
+
+  local session = lifecycle.get_session(vim.api.nvim_get_current_tabpage())
+  if not session or not session.modified_bufnr or not session.modified_win then
+    return
+  end
+  if not vim.api.nvim_buf_is_valid(session.modified_bufnr) or not vim.api.nvim_win_is_valid(session.modified_win) then
+    return
+  end
+
+  vim.api.nvim_set_current_win(session.modified_win)
+  local last_line = vim.api.nvim_buf_line_count(session.modified_bufnr)
+  pcall(vim.api.nvim_win_set_cursor, session.modified_win, { last_line, 0 })
+  navigation.prev_hunk()
+end
+
+local function setup_custom_keymaps(tabpage, keymaps)
+  local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+  if not ok or not lifecycle.get_session(tabpage) then
+    return
+  end
+
+  if keymaps.help_popup then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.help_popup, show_help, {
+      desc = "Show CodeDiff help",
+    })
+  end
+
+  if keymaps.next_review_step then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.next_review_step, next_review_step, {
+      desc = "Next hunk, else next file",
+    })
+  end
+
+  if keymaps.prev_review_step then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.prev_review_step, prev_review_step, {
+      desc = "Previous hunk, else previous file",
+    })
+  end
+end
+
+local function ensure_custom_reapply(tabpage, keymaps)
+  local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+  if not ok then
+    return
+  end
+
+  local session = lifecycle.get_session(tabpage)
+  if not session or session.custom_keymaps_wrapped then
+    return
+  end
+
+  local original_reapply = session.reapply_keymaps
+  session.reapply_keymaps = function()
+    if original_reapply then
+      original_reapply()
+    end
+    setup_custom_keymaps(tabpage, keymaps)
+  end
+  session.custom_keymaps_wrapped = true
+end
+
 return {
   "esmuellert/codediff.nvim",
   dependencies = { "MunifTanjim/nui.nvim", "folke/snacks.nvim" },
@@ -119,22 +200,28 @@ return {
       position = "bottom", -- match previous diffview layout
       height = 10, -- match previous diffview height
       view_mode = "list", -- "list" or "tree"
+      focus_on_select = true,
     },
     diff = {
       original_position = "left", -- original (old) content on left
       disable_inlay_hints = true, -- inlay hints don't work well with diff highlighting
+      cycle_next_hunk = false,
+      cycle_next_file = false,
+      jump_to_first_change = true,
     },
     keymaps = {
       view = {
         quit = "q",
-        next_hunk = "]c",
-        prev_hunk = "[c",
+        next_hunk = "]h",
+        prev_hunk = "[h",
+        next_file = "]f",
+        prev_file = "[f",
+        next_review_step = "<Tab>",
+        prev_review_step = "<S-Tab>",
+        help_popup = "?",
       },
       explorer = {
-        quit = "q",
-        open = "<CR>",
-        next_file = "j",
-        prev_file = "k",
+        select = "<CR>",
       },
       conflict = {
         accept_current = "co", -- ours
@@ -147,26 +234,16 @@ return {
   },
   config = function(_, opts)
     require("codediff").setup(opts)
+    local augroup = vim.api.nvim_create_augroup("custom-codediff", { clear = true })
 
-    -- Add ? keymap for help in codediff buffers
-    vim.api.nvim_create_autocmd("FileType", {
-      pattern = { "codediff", "codediff-explorer" },
-      callback = function(ev)
-        vim.keymap.set("n", "?", show_help, {
-          buffer = ev.buf,
-          desc = "Show CodeDiff help",
-        })
-      end,
-    })
-
-    -- Also trigger on vscode-diff:// buffers (virtual diff files)
     vim.api.nvim_create_autocmd("BufEnter", {
-      pattern = "vscode-diff://*",
-      callback = function(ev)
-        vim.keymap.set("n", "?", show_help, {
-          buffer = ev.buf,
-          desc = "Show CodeDiff help",
-        })
+      group = augroup,
+      callback = function()
+        local tabpage = vim.api.nvim_get_current_tabpage()
+        vim.schedule(function()
+          ensure_custom_reapply(tabpage, opts.keymaps.view)
+          setup_custom_keymaps(tabpage, opts.keymaps.view)
+        end)
       end,
     })
 
@@ -177,6 +254,7 @@ return {
     -- 3. LspAttach fires during bufload() BEFORE the buffer is in the window
     -- So we check if the current tab has a codediff session instead.
     vim.api.nvim_create_autocmd("LspAttach", {
+      group = augroup,
       callback = function(ev)
         vim.schedule(function()
           local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")

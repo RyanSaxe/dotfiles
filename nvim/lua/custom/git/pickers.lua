@@ -35,7 +35,7 @@ function M.pick_commit(on_select, opts)
 end
 
 --- Open branch picker with base branch highlighted
--- Fetches from origin first to ensure all remote branches are visible
+-- Attempts to fetch from origin first, but falls back to cached refs offline
 -- Base branch (origin/main or similar) is scrolled to view on open
 -- @param on_select function(branch: string) Called with selected branch name (without origin/ prefix)
 -- @param opts table|nil Optional picker options:
@@ -45,7 +45,7 @@ function M.pick_branch(on_select, opts)
   opts = opts or {}
   local base_branch = git_utils.get_base_branch()
 
-  -- Fetch first to ensure remote branches are up to date
+  -- Fetch first to update remote branches when possible.
   git_utils.fetch_origin(function()
     Snacks.picker.git_branches({
       title = opts.title or "Select Branch",
@@ -73,7 +73,7 @@ function M.pick_branch(on_select, opts)
         end
       end,
     })
-  end)
+  end, nil, { use_cached_on_failure = true })
 end
 
 return M

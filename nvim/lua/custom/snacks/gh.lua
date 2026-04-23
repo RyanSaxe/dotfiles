@@ -2,6 +2,7 @@
 -- Adds custom actions to the GitHub picker action menu
 
 local M = {}
+local git_utils = require("custom.git.utils")
 
 -- Define custom GitHub actions
 M.custom_actions = {
@@ -15,32 +16,31 @@ M.custom_actions = {
       -- Show notification immediately (before blocking operation)
       vim.notify("Fetching latest refs...", vim.log.levels.INFO)
 
-      -- Fetch asynchronously so UI stays responsive
-      vim.system({ "git", "fetch", "origin" }, {}, function(result)
-        -- Schedule UI updates on main thread
-        vim.schedule(function()
-          if result.code ~= 0 then
-            vim.notify("Failed to fetch: " .. result.stderr, vim.log.levels.ERROR)
-            return
-          end
+      git_utils.fetch_origin(function()
+        -- Open in codediff with two refs (ref-to-ref comparison, no working tree)
+        local base = git_utils.resolve_branch_ref(item.baseRefName)
+        local head = git_utils.resolve_branch_ref(item.headRefName)
 
-          -- Open in codediff with two refs (ref-to-ref comparison, no working tree)
-          -- CodeDiff origin/base origin/head compares two remote refs directly
-          local base = "origin/" .. item.baseRefName
-          local head = "origin/" .. item.headRefName
-          vim.cmd(string.format("CodeDiff %s %s", base, head))
+        if not git_utils.ref_exists(base) or not git_utils.ref_exists(head) then
+          vim.notify(
+            "Unable to open PR in CodeDiff because the required refs are not available locally.",
+            vim.log.levels.ERROR
+          )
+          return
+        end
 
-          -- Store PR context for potential future use
-          vim.g.current_pr = {
-            repo = item.repo,
-            number = item.number,
-            base = item.baseRefName,
-            head = item.headRefName,
-          }
+        vim.cmd(string.format("CodeDiff %s %s", base, head))
 
-          vim.notify(string.format("Opened PR #%d in CodeDiff", item.number))
-        end)
-      end)
+        -- Store PR context for potential future use
+        vim.g.current_pr = {
+          repo = item.repo,
+          number = item.number,
+          base = item.baseRefName,
+          head = item.headRefName,
+        }
+
+        vim.notify(string.format("Opened PR #%d in CodeDiff", item.number))
+      end, { item.baseRefName, item.headRefName }, { notify_success = false, use_cached_on_failure = true })
     end,
   },
 }

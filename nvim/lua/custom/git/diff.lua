@@ -39,8 +39,8 @@ function M.file_diff_branch(branch)
     vim.notify("No file in current buffer", vim.log.levels.WARN)
     return
   end
-  -- Use origin/<branch> to compare against remote
-  vim.cmd(string.format("CodeDiff file origin/%s", branch))
+  local ref = git_utils.resolve_branch_ref(branch)
+  vim.cmd(string.format("CodeDiff file %s", ref))
 end
 
 -- Pick a commit and open file diff
@@ -74,11 +74,8 @@ end
 
 -- Open codediff explorer showing all changes against a branch
 function M.all_diff_branch(branch)
-  -- Fetch first to ensure we have latest, then open diff
-  git_utils.fetch_origin(function()
-    -- Use origin/<branch> to compare against remote
-    vim.cmd(string.format("CodeDiff origin/%s", branch))
-  end)
+  local ref = git_utils.resolve_branch_ref(branch)
+  vim.cmd(string.format("CodeDiff %s", ref))
 end
 
 -- Pick a commit and open all-files diff
