@@ -116,10 +116,23 @@ return {
       hl["LspInlayHint"] = { fg = c.dark3, bg = nil }
       hl["Comment"] = { fg = c.dark3 } -- comments and inlay hints in same format
       -- plugin specific changes
-      hl["CursorLine"] = { bg = c.bg } -- if i want to not highlight the line my cursor is on
-      hl["TreesitterContext"] = { bg = c.bg }
-      hl["TreesitterContextLineNumber"] = { fg = c.orange } -- TODO: change to point to the cursor line number
+      -- This is the no-context base state. custom.visual.treesitter_context_chrome
+      -- dynamically tints these same surfaces when Treesitter Context is visible.
+      local treesitter_context_bg = c.bg
+      hl["CursorLine"] = { bg = Util.blend_bg(c.purple, 0.1) }
+      hl["TreesitterContext"] = { bg = treesitter_context_bg }
+      hl["TreesitterContextLineNumber"] = { fg = c.orange, bg = treesitter_context_bg } -- TODO: change to point to the cursor line number
       hl["TreesitterContextSeparator"] = { fg = c.purple }
+      hl["TreesitterContextBottom"] = {
+        bg = treesitter_context_bg,
+        underline = true,
+        sp = Util.blend_bg(c.purple, 0.5),
+      }
+      hl["TreesitterContextLineNumberBottom"] = {
+        bg = treesitter_context_bg,
+        underline = true,
+        sp = Util.blend_bg(c.purple, 0.5),
+      }
       -- make ghost text lightly pink so it's easier to see
       hl["BlinkCmpGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
       hl["LspGhostText"] = { fg = Util.blend_bg(c.moon_pink, 0.5), bg = c.bg_dark }
@@ -184,7 +197,7 @@ return {
       -- Active buffer: normal bg with pokemon prominent text (looks like raised tab)
       hl["BufferLineBufferSelected"] = {
         fg = pokemon_prominent,
-        bg = c.bg, -- raised appearance with normal bg
+        bg = treesitter_context_bg, -- match Treesitter Context band
       }
 
       -- visible buffers (in other windows) - slightly dimmed on dark bg
@@ -203,14 +216,14 @@ return {
       -- Active: dark slant creates shadow/edge for raised tab effect
       hl["BufferLineSeparatorSelected"] = {
         fg = c.bg_dark, -- dark slant creates shadow/depth
-        bg = c.bg, -- active tab background
+        bg = treesitter_context_bg, -- active tab background
       }
       -- Inactive: invisible separators (same color as background)
       hl["BufferLineSeparatorVisible"] = { fg = c.bg_dark, bg = c.bg_dark }
       hl["BufferLineSeparator"] = { fg = c.bg_dark, bg = c.bg_dark }
 
       -- indicators match their respective backgrounds
-      hl["BufferLineIndicatorSelected"] = { fg = c.bg, bg = c.bg } -- selected uses normal bg
+      hl["BufferLineIndicatorSelected"] = { fg = treesitter_context_bg, bg = treesitter_context_bg }
       hl["BufferLineIndicatorVisible"] = { fg = c.bg_dark, bg = c.bg_dark }
       hl["BufferLineIndicator"] = { fg = c.bg_dark, bg = c.bg_dark }
 
@@ -221,7 +234,7 @@ return {
       }
       hl["BufferLineModifiedSelected"] = {
         fg = c.orange, -- full orange when active
-        bg = c.bg, -- selected uses normal bg
+        bg = treesitter_context_bg,
       }
       hl["BufferLineModifiedVisible"] = {
         fg = Util.blend_bg(c.orange, 0.6), -- medium dimmed orange for visible
@@ -239,14 +252,14 @@ return {
       }
       hl["BufferLineCloseButtonSelected"] = {
         fg = c.red, -- full red for active
-        bg = c.bg, -- selected uses normal bg
+        bg = treesitter_context_bg,
       }
 
       -- tabs - match exact buffer formatting
       hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg_dark } -- inactive = gray on dark bg
-      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active = pokemon prominent on normal bg
+      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = treesitter_context_bg }
       hl["BufferLineTabSeparator"] = { fg = c.bg_dark, bg = c.bg_dark } -- invisible separators
-      hl["BufferLineTabSeparatorSelected"] = { fg = c.bg, bg = c.bg }
+      hl["BufferLineTabSeparatorSelected"] = { fg = treesitter_context_bg, bg = treesitter_context_bg }
       hl["BufferLineTabClose"] = { fg = Util.blend_bg(c.red, 0.5), bg = c.bg_dark } -- dim red X
 
       -- background elements - use darker background
@@ -254,21 +267,21 @@ return {
 
       -- duplicate buffers (files with similar names) - match regular buffer colors
       hl["BufferLineDuplicate"] = { fg = c.dark3, bg = c.bg_dark } -- hidden duplicates = gray
-      hl["BufferLineDuplicateSelected"] = { fg = pokemon_prominent, bg = c.bg } -- active duplicate = pokemon prominent on normal bg
+      hl["BufferLineDuplicateSelected"] = { fg = pokemon_prominent, bg = treesitter_context_bg }
       hl["BufferLineDuplicateVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg_dark } -- visible duplicate = slightly dimmed white
 
       -- group and pin backgrounds - use darker background
       hl["BufferLineGroupLabel"] = { fg = c.dark3, bg = c.bg_dark }
       hl["BufferLineGroupSeparator"] = { fg = c.bg_dark, bg = c.bg_dark }
       hl["BufferLinePick"] = { fg = c.red, bg = c.bg_dark }
-      hl["BufferLinePickSelected"] = { fg = c.red, bg = c.bg } -- selected uses normal bg
+      hl["BufferLinePickSelected"] = { fg = c.red, bg = treesitter_context_bg }
       hl["BufferLinePickVisible"] = { fg = c.red, bg = c.bg_dark }
 
       -- ensure ALL text-bearing elements use our color scheme
       -- this is comprehensive to catch any edge cases
-      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = c.bg }
+      hl["BufferLineTabSelected"] = { fg = pokemon_prominent, bg = treesitter_context_bg }
       hl["BufferLineTab"] = { fg = c.dark3, bg = c.bg_dark }
-      hl["BufferLineNumbersSelected"] = { fg = pokemon_prominent, bg = c.bg }
+      hl["BufferLineNumbersSelected"] = { fg = pokemon_prominent, bg = treesitter_context_bg }
       hl["BufferLineNumbersVisible"] = { fg = Util.blend_bg(c.fg, 0.8), bg = c.bg_dark } -- slightly dimmed white
       hl["BufferLineNumbers"] = { fg = c.dark3, bg = c.bg_dark }
 
@@ -276,26 +289,26 @@ return {
       -- Error diagnostics (red themed)
       hl["BufferLineError"] = { fg = Util.blend_bg(c.red, 0.3), bg = c.bg_dark }
       hl["BufferLineErrorVisible"] = { fg = Util.blend_bg(c.red, 0.6), bg = c.bg_dark }
-      hl["BufferLineErrorSelected"] = { fg = c.red, bg = c.bg }
+      hl["BufferLineErrorSelected"] = { fg = c.red, bg = treesitter_context_bg }
       hl["BufferLineErrorDiagnostic"] = { fg = Util.blend_bg(c.red, 0.3), bg = c.bg_dark }
       hl["BufferLineErrorDiagnosticVisible"] = { fg = Util.blend_bg(c.red, 0.6), bg = c.bg_dark }
-      hl["BufferLineErrorDiagnosticSelected"] = { fg = c.red, bg = c.bg }
+      hl["BufferLineErrorDiagnosticSelected"] = { fg = c.red, bg = treesitter_context_bg }
 
       -- Warning diagnostics (yellow themed)
       hl["BufferLineWarning"] = { fg = Util.blend_bg(c.yellow, 0.3), bg = c.bg_dark }
       hl["BufferLineWarningVisible"] = { fg = Util.blend_bg(c.yellow, 0.6), bg = c.bg_dark }
-      hl["BufferLineWarningSelected"] = { fg = c.yellow, bg = c.bg }
+      hl["BufferLineWarningSelected"] = { fg = c.yellow, bg = treesitter_context_bg }
       hl["BufferLineWarningDiagnostic"] = { fg = Util.blend_bg(c.yellow, 0.3), bg = c.bg_dark }
       hl["BufferLineWarningDiagnosticVisible"] = { fg = Util.blend_bg(c.yellow, 0.6), bg = c.bg_dark }
-      hl["BufferLineWarningDiagnosticSelected"] = { fg = c.yellow, bg = c.bg }
+      hl["BufferLineWarningDiagnosticSelected"] = { fg = c.yellow, bg = treesitter_context_bg }
 
       -- Info diagnostics (cyan themed)
       hl["BufferLineInfo"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
       hl["BufferLineInfoVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
-      hl["BufferLineInfoSelected"] = { fg = c.cyan, bg = c.bg }
+      hl["BufferLineInfoSelected"] = { fg = c.cyan, bg = treesitter_context_bg }
       hl["BufferLineInfoDiagnostic"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
       hl["BufferLineInfoDiagnosticVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
-      hl["BufferLineInfoDiagnosticSelected"] = { fg = c.cyan, bg = c.bg }
+      hl["BufferLineInfoDiagnosticSelected"] = { fg = c.cyan, bg = treesitter_context_bg }
 
       -- Hint diagnostics (cyan themed - prefer cyan over teal for hints)
       hl["DiagnosticHint"] = { fg = c.cyan }
@@ -305,15 +318,15 @@ return {
       hl["DiagnosticFloatingHint"] = { fg = c.cyan }
       hl["BufferLineHint"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
       hl["BufferLineHintVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
-      hl["BufferLineHintSelected"] = { fg = c.cyan, bg = c.bg }
+      hl["BufferLineHintSelected"] = { fg = c.cyan, bg = treesitter_context_bg }
       hl["BufferLineHintDiagnostic"] = { fg = Util.blend_bg(c.cyan, 0.3), bg = c.bg_dark }
       hl["BufferLineHintDiagnosticVisible"] = { fg = Util.blend_bg(c.cyan, 0.6), bg = c.bg_dark }
-      hl["BufferLineHintDiagnosticSelected"] = { fg = c.cyan, bg = c.bg }
+      hl["BufferLineHintDiagnosticSelected"] = { fg = c.cyan, bg = treesitter_context_bg }
 
       -- Generic diagnostic (fallback)
       hl["BufferLineDiagnostic"] = { fg = c.dark3, bg = c.bg_dark }
       hl["BufferLineDiagnosticVisible"] = { fg = Util.blend_bg(c.fg, 0.6), bg = c.bg_dark }
-      hl["BufferLineDiagnosticSelected"] = { fg = c.fg, bg = c.bg }
+      hl["BufferLineDiagnosticSelected"] = { fg = c.fg, bg = treesitter_context_bg }
 
       -- GitHub Review Threads picker columns
       -- Used by custom/git/review_threads.lua picker

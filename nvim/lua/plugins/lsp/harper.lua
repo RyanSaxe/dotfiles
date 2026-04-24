@@ -8,7 +8,7 @@
 -- Add words to dictionary via code actions (<leader>ca on a flagged word)
 --
 -- By default, Harper only auto-attaches to prose filetypes (markdown, text, etc.)
--- Use <leader>ts to manually enable Harper for any buffer (e.g., code files)
+-- Use <leader>tg to manually enable Harper for any buffer (e.g., code files)
 
 -- Filetypes where Harper auto-attaches
 -- currently disabled by default because it's pretty annoying
@@ -30,7 +30,7 @@ return {
     servers = {
       harper_ls = {
         -- Only auto-attach to prose filetypes
-        -- Use <leader>ts to manually start Harper in code files
+        -- Use <leader>tg to manually start Harper in code files
         filetypes = prose_filetypes,
         settings = {
           ["harper-ls"] = {

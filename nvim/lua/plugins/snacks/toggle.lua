@@ -59,7 +59,22 @@ return {
               end
             end
           end,
+        }):map("<leader>tg")
+
+        Snacks.toggle({
+          name = "Treesitter Context",
+          get = function()
+            return require("treesitter-context").enabled()
+          end,
+          set = function(state)
+            if state then
+              require("treesitter-context").enable()
+            else
+              require("treesitter-context").disable()
+            end
+          end,
         }):map("<leader>ts")
+
         Snacks.toggle.diagnostics({ name = "Diagnostics" }):map("<leader>td")
         Snacks.toggle.inlay_hints():map("<leader>th")
         Snacks.toggle.option("wrap", { name = "Line Wrap" }):map("<leader>tw")

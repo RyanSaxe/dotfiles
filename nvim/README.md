@@ -106,6 +106,10 @@ Lowercase = pick commit (with diff preview), Uppercase = pick branch (base branc
 
 - `<leader>tp` - Toggle basedpyright diagnostic mode (openFilesOnly ↔ workspace)
 
+### Quit / Session
+
+- `<leader>qr` - Restart Neovim and restore the current layout/context via a temporary session
+
 ### Obsidian (see `lua/plugins/obsidian.lua`)
 
 - `<leader>ot` - Open Obsidian task picker

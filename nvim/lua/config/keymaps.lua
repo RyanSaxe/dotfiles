@@ -28,6 +28,10 @@ vim.api.nvim_create_autocmd("TermOpen", {
 -- vim.keymap.set({ "n", "v" }, ";", ":", { desc = "Enter command mode" })
 -- vim.keymap.set({ "n", "v" }, ":", ";", { desc = "Repeat last f/t/F/T search" })
 
+vim.keymap.set("n", "<leader>qr", function()
+  require("custom.session.restart").restart_here()
+end, { desc = "Restart Here" })
+
 -- GitHub Comments picker (review threads needing attention)
 -- <leader>gc = current repo (falls back to all if not in git repo)
 -- <leader>gC = all repos

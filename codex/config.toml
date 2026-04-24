@@ -2,9 +2,6 @@ model = "gpt-5.4"
 model_reasoning_effort = "xhigh"
 project_doc_fallback_filenames = ["CLAUDE.md"]
 
-[features]
-codex_hooks = true
-
 [projects."/Users/a10889158/generic/dotfiles"]
 trust_level = "trusted"
 
