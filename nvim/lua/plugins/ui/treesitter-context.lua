@@ -8,7 +8,7 @@ return {
     require("custom.visual.treesitter_context_chrome").setup()
   end,
   opts = {
-    max_lines = 2,
+    max_lines = 4,
     mode = "cursor",
     trim_scope = "inner",
     multiline_threshold = 1,
