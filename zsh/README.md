@@ -129,7 +129,7 @@ Enhanced vi mode with:
 Common aliases are defined in `aliases.zsh`. These are shared between full and minimal modes.
 
 - `diagnose` runs `uvx ty check` in concise mode and prints a grouped `diagnostic: count` summary.
-- `loc` shows Git-visible text line counts as a tree with one level expanded by default. Use `loc --depth 2` to expand more directories, or `loc --diff main --depth 2` to show colorized `+added/-deleted` Git diff totals with the same tree layout.
+- `loc` shows Git-visible text line counts in an aligned tree with one level expanded by default. Use `loc --depth 2` to expand more directories, or `loc --diff main --depth 2` to show colorized `+added/-deleted` Git diff totals with the same tree layout.
 
 ## Customization
 

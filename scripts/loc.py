@@ -32,6 +32,17 @@ class Node:
         return self.children[name]
 
 
+@dataclass
+class RenderRow:
+    tree_prefix: str
+    node: Node
+    root: bool = False
+
+    @property
+    def plain_path(self) -> str:
+        return f"{self.tree_prefix}{self.node.name}"
+
+
 class Colors:
     def __init__(self, enabled: bool) -> None:
         self.enabled = enabled
@@ -305,8 +316,16 @@ def sorted_children(node: Node) -> list[Node]:
     )
 
 
+def humanize(value: int) -> str:
+    absolute = abs(value)
+    for scale, suffix in ((1_000_000_000, "b"), (1_000_000, "m"), (1_000, "k")):
+        if absolute >= scale:
+            return f"{value / scale:.1f}{suffix}"
+    return str(value)
+
+
 def format_loc(node: Node, colors: Colors) -> str:
-    return colors.loc(f"{node.loc:,} loc")
+    return colors.loc(humanize(node.loc))
 
 
 def binary_marker(colors: Colors) -> str:
@@ -317,7 +336,7 @@ def format_diff(node: Node, colors: Colors) -> str:
     if node.added == 0 and node.deleted == 0 and node.binary_count:
         return binary_marker(colors)
 
-    metric = f"{colors.add(f'+{node.added:,}')}/{colors.delete(f'-{node.deleted:,}')}"
+    metric = f"{colors.add(f'+{humanize(node.added)}')}/{colors.delete(f'-{humanize(node.deleted)}')}"
     if node.binary_count:
         return f"{metric} {binary_marker(colors)}"
     return metric
@@ -328,9 +347,8 @@ def format_name(node: Node, colors: Colors, *, root: bool) -> str:
     return colors.bold(name) if root else name
 
 
-def render_tree(root: Node, *, depth: int, mode: str, colors: Colors) -> str:
-    metric = format_diff if mode == "diff" else format_loc
-    lines = [f"{format_name(root, colors, root=True)}  {metric(root, colors)}"]
+def visible_rows(root: Node, depth: int) -> list[RenderRow]:
+    rows = [RenderRow(tree_prefix="", node=root, root=True)]
 
     def visit(node: Node, prefix: str, level: int) -> None:
         if level >= depth:
@@ -340,14 +358,29 @@ def render_tree(root: Node, *, depth: int, mode: str, colors: Colors) -> str:
             is_last = index == len(children) - 1
             connector = "└── " if is_last else "├── "
             next_prefix = "    " if is_last else "│   "
-            lines.append(
-                f"{colors.dim(prefix + connector)}"
-                f"{format_name(child, colors, root=False)}  "
-                f"{metric(child, colors)}"
-            )
+            rows.append(RenderRow(tree_prefix=prefix + connector, node=child))
             visit(child, prefix + next_prefix, level + 1)
 
     visit(root, "", 0)
+    return rows
+
+
+def render_tree(root: Node, *, depth: int, mode: str, colors: Colors) -> str:
+    metric = format_diff if mode == "diff" else format_loc
+    metric_header = "DIFF" if mode == "diff" else "TOTAL"
+    rows = visible_rows(root, depth)
+    path_width = max(len("PATH"), *(len(row.plain_path) for row in rows))
+    gap = "  "
+    lines = [
+        f"{colors.bold('PATH'.ljust(path_width))}{gap}{colors.bold(metric_header)}",
+    ]
+
+    for row in rows:
+        tree_prefix = colors.dim(row.tree_prefix) if row.tree_prefix else ""
+        path = f"{tree_prefix}{format_name(row.node, colors, root=row.root)}"
+        padding = " " * (path_width - len(row.plain_path))
+        lines.append(f"{path}{padding}{gap}{metric(row.node, colors)}")
+
     return "\n".join(lines)
 
 
