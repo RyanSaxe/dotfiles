@@ -339,6 +339,44 @@ fetch_and_exec() {
   fi
 }
 
+install_latex_converter() {
+  if command -v utftex &> /dev/null; then
+    log "utftex already installed - skipping LaTeX converter setup"
+    return 0
+  fi
+
+  if command -v latex2text &> /dev/null; then
+    log "latex2text already installed - skipping LaTeX converter setup"
+    return 0
+  fi
+
+  if [[ "$PM" == "brew" ]]; then
+    log "Installing utftex for render-markdown LaTeX conversion..."
+    brew install utftex || {
+      warn "Failed to install utftex; render-markdown LaTeX will warn until utftex or latex2text is available"
+      return 0
+    }
+    return 0
+  fi
+
+  local uv_bin
+  uv_bin="$(command -v uv || true)"
+  if [[ -z "$uv_bin" && -x "$HOME/.local/bin/uv" ]]; then
+    uv_bin="$HOME/.local/bin/uv"
+  fi
+
+  if [[ -n "$uv_bin" ]]; then
+    log "Installing pylatexenc for render-markdown LaTeX conversion..."
+    "$uv_bin" tool install pylatexenc || {
+      warn "Failed to install pylatexenc; render-markdown LaTeX will warn until latex2text is available"
+      return 0
+    }
+    return 0
+  fi
+
+  warn "uv not found; render-markdown LaTeX will warn until utftex or latex2text is installed"
+}
+
 # ──────────────────────────────────────────────────────
 main() {
   # Handle --update-plugins flag for updating zsh plugins only
@@ -456,6 +494,8 @@ main() {
   else
     log "Astral UV already present—skipping"
   fi
+
+  install_latex_converter
 
   # Rustup (Rust toolchain installer)
   if ! command -v rustup &> /dev/null; then

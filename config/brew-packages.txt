@@ -34,8 +34,10 @@ markdownlint-cli
 
 # Document processing
 tectonic
+utftex
 ghostscript
 imagemagick
+pngpaste
 
 # Utilities
 coreutils

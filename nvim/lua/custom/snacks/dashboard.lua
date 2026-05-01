@@ -449,7 +449,7 @@ local function globalkeys()
       key = "n",
       desc = "Open Daily Note",
       action = function()
-        vim.cmd("ObsidianToday")
+        vim.cmd("Obsidian today")
       end,
     })
   else

@@ -58,16 +58,17 @@ local function create_note_in_dir(title, dir_path, dir_name)
   local template_name = DIRECTORY_TEMPLATES[dir_name]
 
   if template_name then
-    -- Create note with template using ObsidianNewFromTemplate
-    -- This ensures the template is properly applied
-    vim.cmd(
-      string.format(
-        "ObsidianNewFromTemplate %s %s/%s",
-        template_name,
-        dir_path,
-        title:gsub(" ", "-"):gsub("[^A-Za-z0-9-]", ""):lower() .. ".md"
-      )
-    )
+    local Note = require("obsidian.note")
+
+    local note = Note.create({
+      title = title,
+      dir = dir_path,
+      template = template_name,
+      should_write = true,
+    })
+
+    note:open({ sync = true })
+    return note
   else
     -- Create note without template (default behavior)
     local Note = require("obsidian.note")

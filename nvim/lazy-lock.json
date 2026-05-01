@@ -5,7 +5,7 @@
   },
   "SchemaStore.nvim": {
     "branch": "main",
-    "commit": "d09eb13366fe95deeecf3deba7a4639f0c82fcdc"
+    "commit": "6db1246640e9e1bdf8a1d1f6d27a940fc0a572d5"
   },
   "blink-cmp-dictionary": {
     "branch": "master",
@@ -41,7 +41,7 @@
   },
   "copilot.lua": {
     "branch": "master",
-    "commit": "adff470bca742b7658228ed144589250ecb3dc0a"
+    "commit": "78c638293f0ea6a2245eca46e9933ee271792d7e"
   },
   "dial.nvim": {
     "branch": "master",
@@ -65,7 +65,7 @@
   },
   "grug-far.nvim": {
     "branch": "main",
-    "commit": "21604255d0e8f9968322f61f2b6c09e5efe1285a"
+    "commit": "21790e59dd0109a92a70cb874dd002af186314f5"
   },
   "inc-rename.nvim": {
     "branch": "main",
@@ -81,7 +81,7 @@
   },
   "lualine.nvim": {
     "branch": "master",
-    "commit": "a905eeebc4e63fdc48b5135d3bf8aea5618fb21c"
+    "commit": "131a558e13f9f28b15cd235557150ccb23f89286"
   },
   "markdown-preview.nvim": {
     "branch": "master",
@@ -89,11 +89,11 @@
   },
   "mason-lspconfig.nvim": {
     "branch": "main",
-    "commit": "0a3b42c3e503df87aef6d6513e13148381495c3a"
+    "commit": "0c2823e0418f3d9230ff8b201c976e84de1cb401"
   },
   "mason.nvim": {
     "branch": "main",
-    "commit": "12ddd182d9efbdc848b540f16484a583d52da0fb"
+    "commit": "cb8445f8ce85d957416c106b780efd51c6298f89"
   },
   "mini.ai": {
     "branch": "main",
@@ -105,11 +105,11 @@
   },
   "mini.diff": {
     "branch": "main",
-    "commit": "ab11575a6c147ecfba894d676d0c93e855021d34"
+    "commit": "0ee0459152b141c0e1b0931eb6949105be4850a9"
   },
   "mini.files": {
     "branch": "main",
-    "commit": "e8db416c9f5dbce70f5501da28263d45c0a4df6b"
+    "commit": "3e247eb12ca8c05622ceb8745f9004f761b22ef8"
   },
   "mini.hipatterns": {
     "branch": "main",
@@ -141,7 +141,7 @@
   },
   "nvim-lspconfig": {
     "branch": "master",
-    "commit": "e146efacbafed3789ac568abcc5a981c5decaa58"
+    "commit": "31026a13eefb20681124706a79fc1df6bf11ab27"
   },
   "nvim-treesitter": {
     "branch": "main",
@@ -177,7 +177,7 @@
   },
   "render-markdown.nvim": {
     "branch": "main",
-    "commit": "d67113f11384c0dad96fced2f7b91f1fc811e97f"
+    "commit": "3f3eea97b80839f629c951ca660ffd125bfa5b34"
   },
   "sidekick.nvim": {
     "branch": "main",
@@ -193,7 +193,7 @@
   },
   "tiny-glimmer.nvim": {
     "branch": "main",
-    "commit": "1f1f26d84882b6f216cbeba548f2359c2118a876"
+    "commit": "cc285167914e947fc130523d02927fdaf24636a6"
   },
   "tiny-inline-diagnostic.nvim": {
     "branch": "main",

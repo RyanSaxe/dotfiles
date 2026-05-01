@@ -38,6 +38,10 @@ local help_lines = {
   "│  General                                    │",
   "│    q           Close codediff               │",
   "│    <leader>b   Toggle explorer visibility   │",
+  "│    \\t          Toggle inline / side-by-side │",
+  "│    \\=          Equalize layout              │",
+  "│    \\h / \\l     Shrink / grow width          │",
+  "│    \\j / \\k     Shrink / grow height         │",
   "│    ?           Show this help               │",
   "╰─────────────────────────────────────────────╯",
 }
@@ -50,7 +54,10 @@ local function show_help()
   vim.bo[buf].bufhidden = "wipe"
 
   -- Calculate window size and position
-  local width = 47 -- matches the box width
+  local width = 0
+  for _, line in ipairs(help_lines) do
+    width = math.max(width, vim.fn.strdisplaywidth(line))
+  end
   local height = #help_lines
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
@@ -78,6 +85,32 @@ local function show_help()
   vim.keymap.set("n", "<CR>", function()
     vim.api.nvim_win_close(win, true)
   end, { buffer = buf, nowait = true })
+end
+
+local function equalize_layout()
+  local ok, layout = pcall(require, "codediff.ui.layout")
+  if ok then
+    layout.arrange(vim.api.nvim_get_current_tabpage())
+  end
+end
+
+local function resize_window(width_delta, height_delta)
+  return function()
+    local win = vim.api.nvim_get_current_win()
+    if not vim.api.nvim_win_is_valid(win) then
+      return
+    end
+
+    if width_delta then
+      local width = math.max(20, vim.api.nvim_win_get_width(win) + width_delta)
+      pcall(vim.api.nvim_win_set_width, win, width)
+    end
+
+    if height_delta then
+      local height = math.max(5, vim.api.nvim_win_get_height(win) + height_delta)
+      pcall(vim.api.nvim_win_set_height, win, height)
+    end
+  end
 end
 
 local function next_review_step()
@@ -136,6 +169,36 @@ local function setup_custom_keymaps(tabpage, keymaps)
       desc = "Previous hunk, else previous file",
     })
   end
+
+  if keymaps.equalize_layout then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.equalize_layout, equalize_layout, {
+      desc = "Equalize CodeDiff layout",
+    })
+  end
+
+  if keymaps.shrink_width then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.shrink_width, resize_window(-10, nil), {
+      desc = "Shrink current CodeDiff window width",
+    })
+  end
+
+  if keymaps.grow_width then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.grow_width, resize_window(10, nil), {
+      desc = "Grow current CodeDiff window width",
+    })
+  end
+
+  if keymaps.shrink_height then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.shrink_height, resize_window(nil, -5), {
+      desc = "Shrink current CodeDiff window height",
+    })
+  end
+
+  if keymaps.grow_height then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.grow_height, resize_window(nil, 5), {
+      desc = "Grow current CodeDiff window height",
+    })
+  end
 end
 
 local function ensure_custom_reapply(tabpage, keymaps)
@@ -168,31 +231,31 @@ return {
     {
       "<leader>gdf",
       function()
-        require("custom.git.diff").pick_file_diff_commit()
+        require("custom.git.diff").pick_file_diff_branch()
       end,
-      desc = "File Diff (pick commit)",
+      desc = "File Diff (pick branch)",
     },
     {
       "<leader>gdF",
       function()
-        require("custom.git.diff").pick_file_diff_branch()
+        require("custom.git.diff").pick_file_diff_commit()
       end,
-      desc = "File Diff (pick branch)",
+      desc = "File Diff (pick commit)",
     },
     -- All files diff: explorer showing all changes
     {
       "<leader>gda",
       function()
-        require("custom.git.diff").pick_all_diff_commit()
+        require("custom.git.diff").pick_all_diff_branch()
       end,
-      desc = "All Files Diff (pick commit)",
+      desc = "All Files Diff (pick branch)",
     },
     {
       "<leader>gdA",
       function()
-        require("custom.git.diff").pick_all_diff_branch()
+        require("custom.git.diff").pick_all_diff_commit()
       end,
-      desc = "All Files Diff (pick branch)",
+      desc = "All Files Diff (pick commit)",
     },
   },
   opts = {
@@ -216,6 +279,12 @@ return {
         prev_hunk = "[h",
         next_file = "]f",
         prev_file = "[f",
+        toggle_layout = "<localleader>t",
+        equalize_layout = "<localleader>=",
+        shrink_width = "<localleader>h",
+        grow_width = "<localleader>l",
+        shrink_height = "<localleader>j",
+        grow_height = "<localleader>k",
         next_review_step = "<Tab>",
         prev_review_step = "<S-Tab>",
         help_popup = "?",

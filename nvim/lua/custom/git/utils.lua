@@ -19,6 +19,15 @@ M.get_current_branch = function()
   return lines[1] or ""
 end
 
+M.get_origin_repo = function()
+  local remote = (vim.fn.systemlist({ "git", "remote", "get-url", "origin" })[1] or ""):gsub("%.git$", "")
+  local owner, repo = remote:match("github%.com[:/](.-)/(.-)$")
+  if owner and repo then
+    return owner .. "/" .. repo
+  end
+  return nil
+end
+
 M.checkout_branch = function(branch)
   if not branch or branch == "" then
     vim.notify("⚠️  No branch specified for checkout.", vim.log.levels.WARN)

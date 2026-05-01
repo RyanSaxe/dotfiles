@@ -1,6 +1,5 @@
 -- Sidekick.nvim configuration
--- Provides Next Edit Suggestions (NES) from Copilot and Claude Code CLI integration
--- This overrides the LazyVim extras config to use Claude exclusively
+-- Provides Next Edit Suggestions (NES) from Copilot and neutral AI CLI integration.
 
 return {
   "folke/sidekick.nvim",
@@ -40,17 +39,14 @@ return {
     require("sidekick").setup(opts)
   end,
   opts = {
-    -- Next Edit Suggestions (NES) configuration
     nes = {
-      -- Disable NES for markdown and text files to avoid interference with note-taking
-      -- enabled = function()
-      --   local ft = vim.bo.filetype
-      --   return ft ~= "markdown" and ft ~= "text"
-      -- end,
-      -- Disable NES as it seems to be buggy
-      enabled = false,
+      -- Keep NES out of prose/note-taking buffers. The Copilot LSP is configured
+      -- separately with the same filetype exclusions.
+      enabled = function(buf)
+        local ft = vim.bo[buf].filetype
+        return ft ~= "markdown" and ft ~= "text" and ft ~= "typr"
+      end,
       debounce = 100, -- ms to wait after typing stops before requesting suggestions
-      -- Diff visualization settings
       diff = {
         inline = "words", -- Show word-level granularity in diffs
       },
@@ -58,8 +54,9 @@ return {
 
     -- AI CLI Terminal Integration
     cli = {
-      -- NOTE: below is disabled because I think it's causing breaking of "undo"
-      watch = false, -- Automatically reload files when modified by AI tools
+      -- Automatically check/reload unmodified buffers when AI tools edit files on disk.
+      -- Git/mini.diff remains the rollback surface for agent edits.
+      watch = true,
 
       -- Terminal window configuration
       win = {
@@ -78,18 +75,21 @@ return {
         -- backend = "tmux",
       },
 
-      -- CLI Tools configuration - CLAUDE ONLY
-      -- This overrides the default 10+ tools (aider, copilot, gemini, grok, etc.)
+      -- Keep the Sidekick picker focused on installed CLIs you actually use.
       tools = {
         claude = {
           cmd = { "claude" },
         },
-        -- All other tools (aider, amazon_q, codex, copilot, crush, cursor, gemini, grok, opencode, qwen) are removed
-        -- Only Claude will appear in the tool selection menu when specifying CLI
+        codex = {
+          cmd = { "codex" },
+        },
+        copilot = {
+          cmd = { "copilot", "--banner" },
+        },
       },
 
       -- Custom prompts for common workflows
-      -- Use with <leader>ap to select a prompt
+      -- Use with <leader>aP to select a prompt
       prompts = {
         -- Existing prompts from LazyVim extras (these are good!)
         changes = "Can you review my changes?",
@@ -145,23 +145,27 @@ return {
     -- AI leader key group
     { "<leader>a", "", desc = "+ai", mode = { "n", "v" } },
 
-    -- Toggle Claude CLI terminal
-    -- <leader>ai is the sidekick convention, <leader>ta matches terminal keybinds (tt/tp/ta)
+    -- Neutral AI CLI toggle/selectors
     {
       "<leader>ai",
-      function() require("sidekick.cli").toggle({ name = "claude", focus = true }) end,
-      desc = "Sidekick Toggle Claude",
+      function() require("sidekick.cli").select({ filter = { installed = true } }) end,
+      desc = "Select AI CLI",
     },
     {
-      "<leader>ta",
+      "<leader>ac",
       function() require("sidekick.cli").toggle({ name = "claude", focus = true }) end,
-      desc = "Toggle Claude (AI)",
+      desc = "Toggle Claude CLI",
     },
-
     {
-      "<leader>as",
-      function() require("sidekick.cli").select() end,
-      desc = "Select from available CLIs",
+      "<leader>ax",
+      function() require("sidekick.cli").toggle({ name = "codex", focus = true }) end,
+      desc = "Toggle Codex CLI",
+    },
+    {
+      "<leader>ap",
+      function() require("sidekick.cli").toggle({ name = "copilot", focus = true }) end,
+      mode = { "n", "x" },
+      desc = "Toggle Copilot CLI",
     },
 
     -- Detach/close CLI session
@@ -171,7 +175,7 @@ return {
       desc = "Detach a CLI Session",
     },
 
-    -- Send context to Claude
+    -- Send context to the active Sidekick CLI
     {
       "<leader>at",
       function() require("sidekick.cli").send({ msg = "{this}" }) end,
@@ -192,7 +196,7 @@ return {
 
     -- Prompt library
     {
-      "<leader>ap",
+      "<leader>aP",
       function() require("sidekick.cli").prompt() end,
       mode = { "n", "x" },
       desc = "Sidekick Select Prompt",
