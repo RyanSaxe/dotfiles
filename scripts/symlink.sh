@@ -39,7 +39,7 @@ REQUESTED_PATHS=()
 
 is_stateful_runtime_dir() {
   case "$1" in
-    "$HOME/.claude" | "$HOME/.codex" | "$HOME/.codex/rules" | "$HOME/.codex/hooks") return 0 ;;
+    "$HOME/.claude") return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -154,13 +154,13 @@ OPTIONS:
     -l, --list      List all configured symlinks
     -d, --dry-run   Show what would be done without making changes
     -o, --only PATH Only process a specific source path from config/symlinks.txt
-                    Repeatable; e.g. --only codex/config.toml --only codex/rules
+                    Repeatable; e.g. --only nvim --only zsh/.zshrc
 
 EXAMPLES:
     $(basename "$0")                 # Create all symlinks
     $(basename "$0") --list          # Show configured mappings
     $(basename "$0") --dry-run       # Preview changes
-    $(basename "$0") --only codex/config.toml --only codex/rules
+    $(basename "$0") --only nvim --only zsh/.zshrc
 
 EOF
 }

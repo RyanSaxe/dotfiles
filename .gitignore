@@ -21,15 +21,6 @@ claude/plugins/
 !claude/references/
 !claude/hooks/
 !claude/commands/
-codex/*
-!codex/README.md
-!codex/AGENTS.md
-!codex/config.toml
-!codex/rules/
-!codex/rules/**
-!codex/hooks.json
-!codex/hooks/
-!codex/hooks/**
 ipython/*
 !ipython/README.md
 !ipython/profile_default/

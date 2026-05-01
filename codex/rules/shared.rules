@@ -1,7 +1,0 @@
-# Shared Codex approval rules.
-#
-# Keep machine-local or auto-generated approvals in ~/.codex/rules/default.rules.
-# Put only reusable cross-machine rules in this file.
-#
-# Example:
-# prefix_rule(pattern=["uv", "run", "ruff"], decision="allow")
