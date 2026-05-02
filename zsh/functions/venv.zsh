@@ -7,6 +7,13 @@ typeset -gA _VENV_CACHE  # dir -> venv path (or empty)
 # Auto-activate virtual environments based on directory
 _auto_activate_venv() {
   local start="$PWD" dir="$PWD" venv=""
+
+  # `exec zsh` preserves environment variables but not shell functions.
+  # Rehydrate an inherited active venv so `deactivate` exists again.
+  if [[ -n "$VIRTUAL_ENV" ]] && ! whence -w deactivate >/dev/null 2>&1 && [[ -r "$VIRTUAL_ENV/bin/activate" ]]; then
+    source "$VIRTUAL_ENV/bin/activate"
+  fi
+
   # Cache hit?
   if [[ -n "${_VENV_CACHE[$start]-}" ]]; then
     venv="${_VENV_CACHE[$start]}"
@@ -22,8 +29,8 @@ _auto_activate_venv() {
   fi
 
   if [[ -n "$venv" ]]; then
-    # Only source if it's a different venv than the active one
-    if [[ "$VIRTUAL_ENV" != "$venv" ]]; then
+    # Re-source if the shell inherited VIRTUAL_ENV/PATH without the deactivate function.
+    if [[ "$VIRTUAL_ENV" != "$venv" ]] || ! whence -w deactivate >/dev/null 2>&1; then
       source "$venv/bin/activate"
     fi
   fi
