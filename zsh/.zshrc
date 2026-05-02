@@ -140,9 +140,11 @@ unset MAILCHECK
 # Get the actual directory where this .zshrc file is located (resolving symlink)
 local zshrc_real="$(readlink -f ~/.zshrc 2> /dev/null || readlink ~/.zshrc)"
 local zshrc_dir="${zshrc_real:h}"
+export DOTFILES_DIR="${zshrc_dir:h}"
 
 # Source function files
 source "${zshrc_dir}/functions/env.zsh"
+source "${zshrc_dir}/functions/ai-agents.zsh"
 source "${zshrc_dir}/functions/tmux.zsh"
 source "${zshrc_dir}/functions/venv.zsh"
 source "${zshrc_dir}/functions/vi-mode.zsh"

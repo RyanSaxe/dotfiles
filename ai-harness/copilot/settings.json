@@ -1,0 +1,34 @@
+{
+  "beep": true,
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "type": "command",
+        "bash": "AI_AGENT_SOURCE=copilot bash \"$HOME/.copilot/hooks/notify.sh\"",
+        "timeoutSec": 5
+      }
+    ],
+    "Notification": [
+      {
+        "type": "command",
+        "matcher": "permission_prompt|elicitation_dialog|agent_idle",
+        "bash": "AI_AGENT_SOURCE=copilot bash \"$HOME/.copilot/hooks/notify.sh\"",
+        "timeoutSec": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "bash": "AI_AGENT_SOURCE=copilot bash \"$HOME/.copilot/hooks/notify.sh\"",
+        "timeoutSec": 5
+      }
+    ],
+    "ErrorOccurred": [
+      {
+        "type": "command",
+        "bash": "AI_AGENT_SOURCE=copilot bash \"$HOME/.copilot/hooks/notify.sh\"",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

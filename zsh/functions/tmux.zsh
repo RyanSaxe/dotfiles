@@ -41,6 +41,8 @@ tm() {
   local -A shortcuts_map=(
     ["py"]="ipython|ipython"
     ["cc"]="claude|claude"
+    ["cx"]="codex|codex"
+    ["cp"]="copilot|copilot"
     ["pr"]="gh dash|PRs"
   )
 
@@ -150,108 +152,97 @@ ts() {
   fi
 }
 
-# Switch to Claude instance in tmux (with attention indicators)
-tc() {
-  # Source utility functions (symlinked to this repo)
-  local claude_utils_path="${HOME}/.claude/utility-scripts/claude-utils.sh"
-  if [[ -f "$claude_utils_path" ]]; then
-    source "$claude_utils_path"
+_ai_harness_source_tmux_utils() {
+  local utils_path="${DOTFILES_DIR:-$HOME/generic/dotfiles}/ai-harness/tmux/agent-utils.sh"
+  if [[ -f "$utils_path" ]]; then
+    source "$utils_path"
   else
-    echo "Error: claude-utils.sh not found at $claude_utils_path"
+    echo "Error: agent-utils.sh not found at $utils_path"
     return 1
   fi
+}
 
-  # Ensure required helpers exist
-  typeset -f get_claude_panes >/dev/null || { echo "Missing get_claude_panes"; return 1; }
-  typeset -f format_claude_pane >/dev/null || { echo "Missing format_claude_pane"; return 1; }
-  typeset -f switch_to_claude_pane >/dev/null || { echo "Missing switch_to_claude_pane"; return 1; }
+# Switch to an AI agent pane in tmux (with attention indicators)
+tai() {
+  _ai_harness_source_tmux_utils || return 1
 
-  # Check if we're in tmux
+  typeset -f get_ai_agent_panes >/dev/null || { echo "Missing get_ai_agent_panes"; return 1; }
+  typeset -f format_ai_agent_pane >/dev/null || { echo "Missing format_ai_agent_pane"; return 1; }
+  typeset -f switch_to_pane >/dev/null || { echo "Missing switch_to_pane"; return 1; }
+
   if [[ -z "$TMUX" ]]; then
     echo "Not in a tmux session"
     return 1
   fi
 
-  # Check fzf availability
   if ! command -v fzf >/dev/null 2>&1; then
     echo "fzf not installed (brew install fzf)"
     return 1
   fi
 
-  # Get all Claude panes
-  local claude_panes
-  claude_panes=$(get_claude_panes)
+  local ai_agent_panes
+  ai_agent_panes=$(get_ai_agent_panes)
 
-  if [[ -z "$claude_panes" ]]; then
-    echo "No Claude instances found"
+  if [[ -z "$ai_agent_panes" ]]; then
+    echo "No AI agent panes found"
     return 1
   fi
 
-  # Fast path: only one Claude pane
-  if [[ $(wc -l <<<"$claude_panes" | tr -d ' ') -eq 1 ]]; then
-    local location tty title bell pane_id
-    IFS='|' read -r location tty title bell pane_id <<<"$claude_panes"
-    switch_to_claude_pane "$location"
+  if [[ $(wc -l <<<"$ai_agent_panes" | tr -d ' ') -eq 1 ]]; then
+    local location tty title bell pane_id agent_name
+    IFS='|' read -r location tty title bell pane_id agent_name <<<"$ai_agent_panes"
+    switch_to_pane "$location"
     return $?
   fi
 
-  # Build fzf selection list (sorted with notifications first)
   local selection
-  selection=$(echo "$claude_panes" \
+  selection=$(echo "$ai_agent_panes" \
     | sort -t'|' -k4 -r \
-    | while IFS='|' read -r location tty title bell pane_id; do
-        format_claude_pane "$location" "$title" "$bell" "$pane_id"
+    | while IFS='|' read -r location tty title bell pane_id agent_name; do
+        format_ai_agent_pane "$location" "$title" "$bell" "$pane_id" "$agent_name"
       done \
     | fzf \
-        --prompt="Select Claude instance: " \
+        --prompt="Select AI agent: " \
         --height=40% \
         --reverse \
         --ansi \
         --preview-window=hidden)
 
   if [[ -z "$selection" ]]; then
-    echo "No Claude instance selected."
+    echo "No AI agent selected."
     return 1
   fi
 
   local target_location
-  # Extract the location (everything before " - ")
   target_location=$(printf '%s' "$selection" | sed 's/ - .*//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
-  # Switch to the selected pane
-  switch_to_claude_pane "$target_location"
+  switch_to_pane "$target_location"
+}
+
+# Backward-compatible name for older muscle memory.
+tc() {
+  tai "$@"
 }
 
 # Switch to any tmux pane with bell notifications
 tb() {
-  # Source utility functions (symlinked to this repo)
-  local claude_utils_path="${HOME}/.claude/utility-scripts/claude-utils.sh"
-  if [[ -f "$claude_utils_path" ]]; then
-    source "$claude_utils_path"
-  else
-    echo "Error: claude-utils.sh not found at $claude_utils_path"
-    return 1
-  fi
+  _ai_harness_source_tmux_utils || return 1
 
-  # Ensure required helpers exist
   typeset -f get_bell_panes >/dev/null || { echo "Missing get_bell_panes"; return 1; }
   typeset -f format_pane >/dev/null || { echo "Missing format_pane"; return 1; }
   typeset -f switch_to_pane >/dev/null || { echo "Missing switch_to_pane"; return 1; }
 
-  # Check if we're in tmux
   if [[ -z "$TMUX" ]]; then
     echo "Not in a tmux session"
     return 1
   fi
 
-  # Check fzf availability
   if ! command -v fzf >/dev/null 2>&1; then
     echo "fzf not installed (brew install fzf)"
     return 1
   fi
 
-  # Get all panes with bell notifications
   local bell_panes
   bell_panes=$(get_bell_panes)
 
@@ -260,7 +251,6 @@ tb() {
     return 1
   fi
 
-  # Fast path: only one pane with bell
   if [[ $(wc -l <<<"$bell_panes" | tr -d ' ') -eq 1 ]]; then
     local location tty title bell pane_id
     IFS='|' read -r location tty title bell pane_id <<<"$bell_panes"
@@ -268,7 +258,6 @@ tb() {
     return $?
   fi
 
-  # Build fzf selection list
   local selection
   selection=$(echo "$bell_panes" \
     | while IFS='|' read -r location tty title bell pane_id; do
@@ -287,10 +276,8 @@ tb() {
   fi
 
   local target_location
-  # Extract the location (everything before " - ")
   target_location=$(printf '%s' "$selection" | sed 's/ - .*//')
   [[ -z "$target_location" ]] && { echo "Invalid selection"; return 1; }
 
-  # Switch to the selected pane
   switch_to_pane "$target_location"
 }

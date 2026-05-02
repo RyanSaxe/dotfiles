@@ -8,9 +8,11 @@ export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 # Get the actual directory where this file is located
 local zshrc_real="$(readlink -f ~/.zshrc 2>/dev/null || readlink ~/.zshrc)"
 local zshrc_dir="${zshrc_real:h}"
+export DOTFILES_DIR="${zshrc_dir:h}"
 
 # Load environment variables and essential functions for the popup commands
 source "${zshrc_dir}/functions/env.zsh"
+source "${zshrc_dir}/functions/ai-agents.zsh"
 source "${zshrc_dir}/functions/tmux.zsh"
 source "${zshrc_dir}/functions/git-repos.zsh"
 

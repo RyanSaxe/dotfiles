@@ -55,6 +55,64 @@ preserve_runtime_state() {
   fi
 }
 
+resolve_existing_path() {
+  local path=$1
+  local dir
+  local base
+
+  dir="$(dirname "$path")"
+  base="$(basename "$path")"
+
+  if [[ -d "$path" ]]; then
+    (cd -P "$path" && pwd)
+  elif [[ -e "$path" || -L "$path" ]]; then
+    (cd -P "$dir" && printf '%s/%s\n' "$(pwd)" "$base")
+  else
+    return 1
+  fi
+}
+
+is_symlink_to_path() {
+  local link_path=$1
+  local expected_target=$2
+
+  [[ -L "$link_path" ]] || return 1
+
+  local resolved_link
+  local resolved_expected
+  resolved_link="$(resolve_existing_path "$link_path")" || return 1
+  resolved_expected="$(resolve_existing_path "$expected_target")" || return 1
+
+  [[ "$resolved_link" == "$resolved_expected" ]]
+}
+
+materialize_runtime_dir_if_needed() {
+  local source=$1
+  local target=$2
+
+  is_stateful_runtime_dir "$target" || return 0
+  is_symlink_to_path "$target" "$source" || return 0
+
+  local tmp_target="${target}.materializing.$$"
+
+  log "Materializing runtime directory: $target"
+  mkdir -p "$tmp_target"
+
+  if ! cp -R -p "$source"/. "$tmp_target"/; then
+    rm -rf "$tmp_target"
+    err "Could not copy runtime state from $source to $tmp_target"
+    return 1
+  fi
+
+  rm -f "$target"
+  mv "$tmp_target" "$target"
+  success "✓ Replaced broad symlink with real runtime directory at $target"
+}
+
+prepare_runtime_parent_dirs() {
+  materialize_runtime_dir_if_needed "$DOTFILES_DIR/claude" "$HOME/.claude"
+}
+
 create_symlink() {
   local source=$1
   local target=$2
@@ -109,6 +167,8 @@ symlink_dotfiles() {
     err "Dotfiles directory not found: $DOTFILES_DIR"
     exit 1
   fi
+
+  prepare_runtime_parent_dirs
 
   # Process each dotfile mapping
   for mapping in "${DOTFILE_MAPPINGS[@]}"; do
@@ -209,6 +269,10 @@ list_mappings() {
 dry_run() {
   log "DRY RUN - showing what would be done:"
   echo
+
+  if is_symlink_to_path "$HOME/.claude" "$DOTFILES_DIR/claude"; then
+    warn "MATERIALIZE: $HOME/.claude is a broad symlink; it would be replaced with a real runtime directory copied from $DOTFILES_DIR/claude"
+  fi
 
   for mapping in "${DOTFILE_MAPPINGS[@]}"; do
     IFS=: read -r src_path target_path <<< "$mapping"
