@@ -5,6 +5,14 @@ local M = {}
 local git_utils = require("custom.git.utils")
 local pickers = require("custom.git.pickers")
 
+local function codediff(...)
+  local args = { ... }
+  for i, arg in ipairs(args) do
+    args[i] = vim.fn.fnameescape(arg)
+  end
+  vim.cmd("CodeDiff " .. table.concat(args, " "))
+end
+
 -- Check if a codediff tab is currently open
 -- Looks for buffers with the vscode-diff:// scheme that codediff uses
 function M.is_codediff_open()
@@ -29,7 +37,7 @@ function M.file_diff_commit(commit)
     return
   end
   -- CodeDiff file <ref> compares current buffer against that ref
-  vim.cmd(string.format("CodeDiff file %s", commit))
+  codediff("file", commit)
 end
 
 -- Open codediff for current file against a branch
@@ -39,8 +47,8 @@ function M.file_diff_branch(branch)
     vim.notify("No file in current buffer", vim.log.levels.WARN)
     return
   end
-  -- Use origin/<branch> to compare against remote
-  vim.cmd(string.format("CodeDiff file origin/%s", branch))
+  local ref = git_utils.resolve_branch_ref(branch)
+  codediff("file", ref)
 end
 
 -- Pick a commit and open file diff
@@ -69,16 +77,28 @@ end
 -- Open codediff explorer showing all changes against a commit
 function M.all_diff_commit(commit)
   -- CodeDiff <ref> compares working tree against that ref
-  vim.cmd(string.format("CodeDiff %s", commit))
+  codediff(commit)
 end
 
 -- Open codediff explorer showing all changes against a branch
 function M.all_diff_branch(branch)
-  -- Fetch first to ensure we have latest, then open diff
+  local ref = git_utils.resolve_branch_ref(branch)
+  codediff(ref)
+end
+
+-- Fetch base branch and open PR-style diff against the merge-base.
+function M.fetch_and_diff(base_branch)
+  base_branch = base_branch or git_utils.get_base_branch()
+
   git_utils.fetch_origin(function()
-    -- Use origin/<branch> to compare against remote
-    vim.cmd(string.format("CodeDiff origin/%s", branch))
-  end)
+    local ref = git_utils.resolve_branch_ref(base_branch)
+    if not git_utils.ref_exists(ref) then
+      vim.notify("Unable to open CodeDiff because base ref is unavailable: " .. ref, vim.log.levels.ERROR)
+      return
+    end
+
+    codediff(ref .. "...")
+  end, { base_branch }, { notify_success = false, use_cached_on_failure = true })
 end
 
 -- Pick a commit and open all-files diff

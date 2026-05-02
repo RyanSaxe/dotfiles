@@ -9,8 +9,18 @@
 
 source "$HOME/.config/sketchybar/colors.sh"
 
-# Get current focused workspace from aerospace
-FOCUSED=$(aerospace list-workspaces --focused 2> /dev/null)
+# SketchyBar passes FOCUSED_WORKSPACE on aerospace_workspace_change.
+# Cache it so color/bell refreshes don't need to shell out to AeroSpace.
+FOCUSED_CACHE="$HOME/.cache/aerospace-focused-workspace"
+if [[ -n "${FOCUSED_WORKSPACE:-}" ]]; then
+  FOCUSED="$FOCUSED_WORKSPACE"
+  mkdir -p "${FOCUSED_CACHE:h}" 2> /dev/null || true
+  print -r -- "$FOCUSED" >| "$FOCUSED_CACHE"
+elif [[ -r "$FOCUSED_CACHE" ]]; then
+  FOCUSED=$(< "$FOCUSED_CACHE")
+else
+  FOCUSED=$(aerospace list-workspaces --focused 2> /dev/null)
+fi
 
 # Extract workspace name from item name (space.email -> email)
 WORKSPACE="${NAME#space.}"

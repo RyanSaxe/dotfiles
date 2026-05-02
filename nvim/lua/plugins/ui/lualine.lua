@@ -5,7 +5,7 @@ return {
   init = function()
     vim.opt.termguicolors = true
     vim.opt.cmdheight = 0
-    vim.opt.laststatus = 2
+    vim.opt.laststatus = 3
     vim.o.showmode = false
   end,
   opts = function()

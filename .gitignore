@@ -13,6 +13,7 @@ backups/*
 .DS_STORE
 .env
 claude/*
+!claude/AGENTS.md
 !claude/CLAUDE.md
 claude/plugins/
 !claude/settings.json

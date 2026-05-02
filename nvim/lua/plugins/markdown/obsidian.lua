@@ -1,11 +1,10 @@
 -- obsidian.nvim  ── Obsidian vault integration for note-taking
--- Provides wiki-link completion, daily notes, templates, and navigation
--- Integrates with blink.cmp for @ completion of people notes
+-- Provides wiki-link completion, daily notes, templates, and navigation.
 
 return {
   "obsidian-nvim/obsidian.nvim",
   enabled = true,
-  version = "v3.13.0", -- Pinned to avoid buggy LSP-based link following in v3.14.0+
+  version = "v3.16.2",
   lazy = true,
   -- Load when opening markdown files or when in the notes directory
   ft = "markdown",
@@ -20,12 +19,19 @@ return {
       },
     },
 
-    -- Link style configuration
-    preferred_link_style = "wiki",
+    legacy_commands = false,
+
+    -- Keep links Obsidian-compatible while preferring the shortest readable path.
+    link = {
+      style = "wiki",
+      format = "shortest",
+      auto_update = false,
+    },
 
     -- Daily notes configuration
     -- Daily notes are stored in the daily/ folder with YYYY-MM-DD.md format
     daily_notes = {
+      enabled = true,
       folder = "daily",
       date_format = "%Y-%m-%d",
       -- Template to use for new daily notes
@@ -36,17 +42,17 @@ return {
     -- Templates configuration
     -- Templates are stored in the templates/ folder
     templates = {
+      enabled = true,
       folder = "templates",
       date_format = "%Y-%m-%d",
       time_format = "%H:%M",
     },
 
     -- Completion configuration
-    -- This enables @ completion for people notes in the people/ folder
     completion = {
       nvim_cmp = false, -- We're using blink.cmp instead
       blink = true, -- Enable blink.cmp integration (v3.13.0+)
-      min_chars = 0, -- Start completing after 1 character
+      min_chars = 1,
       create_new = false, -- Disable "create" in completions, use <leader>on instead
     },
 
@@ -64,18 +70,9 @@ return {
     -- Note path function
     -- Determines where notes are created based on type
     note_path_func = function(spec)
-      -- For daily notes, use the daily/ folder (handled by daily_notes config)
-      -- For regular notes, use the vault root
       local path = spec.dir / spec.id
       return path:with_suffix(".md")
     end,
-
-    -- Wiki link handling
-    -- Creates [[first-last]] style links
-    wiki_links = {
-      enabled = true,
-      brackets = "[[",
-    },
 
     -- Checkbox configuration
     -- The 'checkbox' table defines the order when cycling through states
@@ -86,12 +83,6 @@ return {
 
     -- UI configuration for checkbox visual representation
     ui = { enable = false },
-
-    -- Follow link behavior
-    follow_url_func = function(url)
-      -- Open URLs in default browser
-      vim.fn.jobstart({ "open", url })
-    end,
 
     -- Picker configuration
     -- Use snacks picker (modern, integrated picker)
@@ -109,16 +100,17 @@ return {
 
     -- Attachments configuration
     attachments = {
-      img_folder = "assets",
+      folder = "assets",
+      confirm_img_paste = true,
     },
   },
 
   -- Keybindings for obsidian commands (using <leader>o prefix)
   keys = {
     -- Daily notes
-    { "<leader>od", "<cmd>ObsidianToday<cr>", desc = "Open today's daily note" },
-    { "<leader>oy", "<cmd>ObsidianYesterday<cr>", desc = "Open yesterday's daily note" },
-    { "<leader>oD", "<cmd>ObsidianTomorrow<cr>", desc = "Open tomorrow's daily note" },
+    { "<leader>od", "<cmd>Obsidian today<cr>", desc = "Open today's daily note" },
+    { "<leader>oy", "<cmd>Obsidian today -1<cr>", desc = "Open yesterday's daily note" },
+    { "<leader>oD", "<cmd>Obsidian today 1<cr>", desc = "Open tomorrow's daily note" },
 
     -- Note creation and search
     {
@@ -128,16 +120,19 @@ return {
       end,
       desc = "Create new note (with directory picker)",
     },
-    { "<leader>of", "<cmd>ObsidianQuickSwitch<cr>", desc = "Find note" },
-    { "<leader>os", "<cmd>ObsidianSearch<cr>", desc = "Search in notes" },
+    { "<leader>of", "<cmd>Obsidian quick_switch<cr>", desc = "Find note" },
+    { "<leader>os", "<cmd>Obsidian search<cr>", desc = "Search in notes" },
+    { "<leader>og", "<cmd>Obsidian tags<cr>", desc = "Search tags" },
 
     -- Navigation
-    { "<leader>ob", "<cmd>ObsidianBacklinks<cr>", desc = "Show backlinks" },
-    { "<leader>ol", "<cmd>ObsidianLinks<cr>", desc = "Show links in current note" },
-    { "gf", "<cmd>ObsidianFollowLink<cr>", desc = "Follow link under cursor", ft = "markdown" },
+    { "<leader>ob", "<cmd>Obsidian backlinks<cr>", desc = "Show backlinks" },
+    { "<leader>ol", "<cmd>Obsidian links<cr>", desc = "Show links in current note" },
+    { "<leader>oo", "<cmd>Obsidian open<cr>", desc = "Open current note in Obsidian" },
+    { "<leader>op", "<cmd>Obsidian paste_img<cr>", desc = "Paste image into note" },
+    -- v3.16+ configures includeexpr, so keep native gf behavior.
 
     -- Templates
-    { "<leader>oT", "<cmd>ObsidianTemplate<cr>", desc = "Insert template" },
+    { "<leader>oT", "<cmd>Obsidian template<cr>", desc = "Insert template" },
 
     -- Tasks
     {
@@ -151,6 +146,14 @@ return {
     -- Date insertion
     -- Works in any file type to support TODO.local files (not just markdown)
     {
+      "<leader>om",
+      function()
+        require("custom.obsidian.meeting").insert_meeting()
+      end,
+      desc = "Insert meeting heading",
+      ft = "markdown",
+    },
+    {
       "<leader>oi",
       function()
         require("custom.obsidian.insert-due").insert_due_date()
@@ -159,12 +162,18 @@ return {
     },
 
     -- Utility
-    { "<leader>ow", "<cmd>ObsidianWorkspace<cr>", desc = "Switch workspace" },
-    { "<leader>ox", "<cmd>ObsidianToggleCheckbox<cr>", desc = "Toggle checkbox" },
+    { "<leader>ow", "<cmd>Obsidian workspace<cr>", desc = "Switch workspace" },
+    { "<leader>ox", "<cmd>Obsidian toggle_checkbox<cr>", desc = "Toggle checkbox" },
+    { "<leader>oc", "<cmd>Obsidian check<cr>", desc = "Check vault" },
+    { "<leader>oC", "<cmd>checkhealth obsidian custom.markdown render-markdown<cr>", desc = "Check markdown health" },
   },
 
   config = function(_, opts)
     local obsidian = require("obsidian")
     obsidian.setup(opts)
+
+    vim.api.nvim_create_user_command("ObsidianMeeting", function()
+      require("custom.obsidian.meeting").insert_meeting()
+    end, { desc = "Insert a daily-note meeting heading" })
   end,
 }

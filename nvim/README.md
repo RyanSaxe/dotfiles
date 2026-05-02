@@ -93,18 +93,26 @@ Key mappings beyond LazyVim defaults (see `lua/config/keymaps.lua`):
 
 ### Git Diff (see `lua/plugins/git/`)
 
-Lowercase = pick commit (with diff preview), Uppercase = pick branch (base branch highlighted)
+Lowercase = pick branch (base branch highlighted), Uppercase = pick commit (with diff preview)
 
-- `<leader>gdo` - Overlay diff (pick commit) - inline hunks via mini.diff
-- `<leader>gdO` - Overlay diff (pick branch)
-- `<leader>gdf` - File diff (pick commit) - side-by-side via codediff
-- `<leader>gdF` - File diff (pick branch)
-- `<leader>gda` - All files diff (pick commit) - codediff explorer
-- `<leader>gdA` - All files diff (pick branch)
+- `<leader>gdo` - Overlay diff (pick branch) - inline hunks via mini.diff
+- `<leader>gdO` - Overlay diff (pick commit)
+- `<leader>gdf` - File diff (pick branch) - side-by-side via codediff
+- `<leader>gdF` - File diff (pick commit)
+- `<leader>gda` - All files diff (pick branch) - codediff explorer
+- `<leader>gdA` - All files diff (pick commit)
+- `\t` - Toggle CodeDiff inline / side-by-side layout
+- `\=` - Equalize CodeDiff layout
+- `\h` / `\l` - Shrink / grow current CodeDiff window width
+- `\j` / `\k` - Shrink / grow current CodeDiff window height
 
 ### Toggles
 
 - `<leader>tp` - Toggle basedpyright diagnostic mode (openFilesOnly ↔ workspace)
+
+### Quit / Session
+
+- `<leader>qr` - Restart Neovim and restore the current layout/context via a temporary session
 
 ### Obsidian (see `lua/plugins/obsidian.lua`)
 

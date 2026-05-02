@@ -2,8 +2,8 @@
 -- Keymaps use snacks.nvim pickers for commit/branch selection with diff previews
 --
 -- Keymaps:
---   <leader>gdo - Overlay diff: pick a commit (most recent first = HEAD)
---   <leader>gdO - Overlay diff: pick a branch (base branch highlighted)
+--   <leader>gdo - Overlay diff: pick a branch (base branch highlighted)
+--   <leader>gdO - Overlay diff: pick a commit (most recent first = HEAD)
 --   <leader>gdq - Close any diff view (mini.diff overlay or codediff)
 
 local git_utils = require("custom.git.utils")
@@ -77,9 +77,22 @@ return {
   event = "VeryLazy",
   dependencies = { "folke/snacks.nvim" },
   keys = {
-    -- gdo: Pick a commit for overlay (lowercase = commits)
+    -- gdo: Pick a branch for overlay (lowercase = branches)
     {
       "<leader>gdo",
+      function()
+        pickers.pick_branch(function(branch)
+          open_overlay_for_ref(branch, true)
+        end, {
+          title = "Overlay: Select Branch",
+        })
+      end,
+      desc = "Overlay Diff (pick branch)",
+    },
+
+    -- gdO: Pick a commit for overlay (uppercase = commits)
+    {
+      "<leader>gdO",
       function()
         pickers.pick_commit(function(commit)
           open_overlay_for_ref(commit, false)
@@ -89,19 +102,6 @@ return {
         })
       end,
       desc = "Overlay Diff (pick commit)",
-    },
-
-    -- gdO: Pick a branch for overlay (uppercase = branches)
-    {
-      "<leader>gdO",
-      function()
-        pickers.pick_branch(function(branch)
-          open_overlay_for_ref(branch, true)
-        end, {
-          title = "Overlay: Select Branch",
-        })
-      end,
-      desc = "Overlay Diff (pick branch)",
     },
 
     -- gdq: Unified close for any diff view (mini.diff overlay or codediff)

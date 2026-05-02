@@ -269,16 +269,17 @@ local function toggle_task(item)
   local lines = {}
   local line_num = 0
   for line in file:lines() do
+    local updated_line = line
     line_num = line_num + 1
     if line_num == item.line then
       -- Toggle checkbox: [ ] -> [x] or [x] -> [ ]
-      if line:match("%-%s*%[%s%]") then
-        line = line:gsub("%-%s*%[%s%]", "- [x]", 1)
-      elseif line:match("%-%s*%[x%]") then
-        line = line:gsub("%-%s*%[x%]", "- [ ]", 1)
+      if updated_line:match("%-%s*%[%s%]") then
+        updated_line = updated_line:gsub("%-%s*%[%s%]", "- [x]", 1)
+      elseif updated_line:match("%-%s*%[x%]") then
+        updated_line = updated_line:gsub("%-%s*%[x%]", "- [ ]", 1)
       end
     end
-    table.insert(lines, line)
+    table.insert(lines, updated_line)
   end
   file:close()
 
@@ -372,14 +373,13 @@ local function create_picker_config(items)
       return { { item.text or "", "Normal" } }
     end,
     confirm = function(picker, item)
-      -- Navigation items: open file (use ObsidianToday for daily notes to apply template)
+      -- Navigation items: open file (use Obsidian daily command for templates)
       if item and item.is_navigation then
         picker:close()
         -- Check if this is the daily note and doesn't exist yet
         local is_daily = item.file and item.file:match("/daily/%d%d%d%d%-%d%d%-%d%d%.md$")
         if is_daily and vim.fn.filereadable(item.file) == 0 then
-          -- Use ObsidianToday to create with template
-          vim.cmd("ObsidianToday")
+          vim.cmd("Obsidian today")
         else
           vim.cmd("edit " .. vim.fn.fnameescape(item.file))
         end

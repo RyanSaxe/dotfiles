@@ -27,7 +27,7 @@ You can always check versions via the command line, but here are the key version
 
 - **Bash**: 3.2.57 (macOS default - limited features, no associative arrays)
 - **Zsh**: 5.9 (primary shell, feature-rich)
-- **Neovim**: 0.11.2 (modern Lua configuration support)
+- **Neovim**: 0.12.0 (modern Lua configuration support)
 - **Lua**: 5.4.7 (used by Neovim)
 - **Tmux**: 3.5a (stable version)
 

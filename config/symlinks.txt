@@ -9,7 +9,21 @@ zsh/.zshenv:$HOME/.zshenv
 zsh/themes:$HOME/.zsh-custom/themes
 ipython:$HOME/.ipython
 hammerspoon:$HOME/.hammerspoon
-claude:$HOME/.claude
+ai-harness/AGENTS.md:$HOME/.claude/AGENTS.md
+ai-harness/AGENTS.md:$HOME/.codex/AGENTS.md
+ai-harness/AGENTS.md:$HOME/.copilot/copilot-instructions.md
+ai-harness/skills:$HOME/.agents/skills
+ai-harness/skills:$HOME/.claude/skills
+ai-harness/notify.sh:$HOME/.codex/hooks/notify.sh
+ai-harness/notify.sh:$HOME/.copilot/hooks/notify.sh
+ai-harness/codex/hooks.json:$HOME/.codex/hooks.json
+ai-harness/copilot/settings.json:$HOME/.copilot/settings.json
+claude/CLAUDE.md:$HOME/.claude/CLAUDE.md
+claude/settings.json:$HOME/.claude/settings.json
+claude/utility-scripts:$HOME/.claude/utility-scripts
+claude/references:$HOME/.claude/references
+claude/hooks:$HOME/.claude/hooks
+claude/commands:$HOME/.claude/commands
 karabiner:$HOME/.config/karabiner
 leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json
 harper/dictionary.txt:$HOME/.config/harper-ls/dictionary.txt

@@ -150,24 +150,48 @@
             "command": "bash $HOME/.claude/hooks/post-todowrite.sh"
           }
         ]
-      },
+      }
+    ],
+    "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/hooks/send-notification.sh"
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
           }
         ]
       }
     ],
     "Notification": [
       {
+        "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/hooks/send-notification.sh"
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
           }
         ]
       }
@@ -178,7 +202,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/hooks/send-notification.sh"
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
           }
         ]
       }
@@ -190,7 +225,6 @@
     "padding": 0
   },
   "alwaysThinkingEnabled": true,
-  "vimMode": true,
   "effortLevel": "high",
-  "model": "opus"
+  "vimMode": true
 }

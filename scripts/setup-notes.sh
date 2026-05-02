@@ -1,217 +1,169 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Setup Obsidian notes scaffolding for Neovim integration
+# Bootstrap the Obsidian vault used by the Neovim config.
 #
-# This script creates the necessary folder structure and templates for
-# Obsidian notes to work with the obsidian.nvim plugin configuration.
+# Behavior:
+#   - If the vault path already exists, leave it completely unchanged.
+#   - If it does not exist, try to clone the private notes repo.
+#   - If cloning fails, create a minimal fresh vault with the expected shape.
 #
-# Usage:
-#   ./scripts/setup-notes.sh [--clone-private]
-#
-# Options:
-#   --clone-private    Clone private notes repo (requires git SSH access)
+# Configuration:
+#   NOTES_DIR           Defaults to "$HOME/generic/notes"
+#   PRIVATE_NOTES_REPO  Defaults to "git@github.com:RyanSaxe/notes.git"
 
-# -e: Exit on error
-# -u: Exit on undefined variable
-# -o pipefail: Exit if any command in pipeline fails
-
-# Configuration
-NOTES_DIR="$HOME/generic/notes"
+NOTES_DIR="${NOTES_DIR:-$HOME/generic/notes}"
 PRIVATE_REPO_URL="${PRIVATE_NOTES_REPO:-git@github.com:RyanSaxe/notes.git}"
-CLONE_PRIVATE=false
 
-# Parse command line arguments
+usage() {
+  echo "Usage: $0"
+  echo ""
+  echo "Bootstraps the Obsidian vault if it does not already exist."
+  echo ""
+  echo "Environment:"
+  echo "  NOTES_DIR           Vault path. Default: \$HOME/generic/notes"
+  echo "  PRIVATE_NOTES_REPO  Git URL to clone first."
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --clone-private)
-      CLONE_PRIVATE=true
-      shift
-      ;;
     -h | --help)
-      echo "Usage: $0 [--clone-private]"
-      echo ""
-      echo "Setup Obsidian notes scaffolding for Neovim integration"
-      echo ""
-      echo "Options:"
-      echo "  --clone-private    Clone private notes repo (requires git SSH access)"
-      echo "  -h, --help         Show this help message"
+      usage
       exit 0
       ;;
     *)
       echo "Error: Unknown option: $1" >&2
-      echo "Run '$0 --help' for usage" >&2
+      usage >&2
       exit 1
       ;;
   esac
 done
 
-# Check if notes directory already exists
-if [[ -d "$NOTES_DIR" ]]; then
-  echo "✓ Notes directory already exists: $NOTES_DIR"
+if [[ -e "$NOTES_DIR" ]]; then
+  echo "Notes path already exists; leaving it unchanged: $NOTES_DIR"
+  exit 0
+fi
 
-  # Check if it's a git repository
-  if [[ -d "$NOTES_DIR/.git" ]]; then
-    echo "✓ Existing notes directory is a git repository"
-    exit 0
+write_file_once() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+
+  if [[ -e "$path" ]]; then
+    return
   fi
 
-  # If --clone-private is set but directory exists and isn't a repo, error
-  if [[ "$CLONE_PRIVATE" == "true" ]]; then
-    echo "Error: Notes directory exists but is not a git repository" >&2
-    echo "       Cannot clone private repo without removing existing directory" >&2
-    echo "       Directory: $NOTES_DIR" >&2
-    exit 1
+  cat > "$path"
+}
+
+clone_private_repo() {
+  local parent_dir
+  local clone_dir
+
+  parent_dir="$(dirname "$NOTES_DIR")"
+  mkdir -p "$parent_dir"
+  clone_dir="$(mktemp -d "$parent_dir/.notes-clone.XXXXXX")"
+
+  echo "Cloning private notes repository..."
+  echo "  Repository: $PRIVATE_REPO_URL"
+  echo "  Destination: $NOTES_DIR"
+
+  if git clone "$PRIVATE_REPO_URL" "$clone_dir"; then
+    mv "$clone_dir" "$NOTES_DIR"
+    echo "Cloned private notes repository."
+    return 0
   fi
 
-  # Continue with creating subdirectories if they don't exist
-  echo "Creating missing subdirectories..."
-else
-  # Notes directory doesn't exist
-  if [[ "$CLONE_PRIVATE" == "true" ]]; then
-    # Clone private repository
-    echo "Cloning private notes repository..."
-    echo "  Repository: $PRIVATE_REPO_URL"
-    echo "  Destination: $NOTES_DIR"
+  rm -rf "$clone_dir"
+  return 1
+}
 
-    # Ensure parent directory exists
-    mkdir -p "$(dirname "$NOTES_DIR")"
+create_basic_vault() {
+  echo "Creating basic notes vault..."
 
-    # Clone the repository
-    if git clone "$PRIVATE_REPO_URL" "$NOTES_DIR"; then
-      echo "✓ Successfully cloned private notes repository"
-      exit 0
-    else
-      echo "Error: Failed to clone private notes repository" >&2
-      echo "       Make sure you have SSH access configured" >&2
-      exit 1
-    fi
-  else
-    # Create fresh notes directory structure
-    echo "Creating notes directory structure..."
-    mkdir -p "$NOTES_DIR"
-  fi
-fi
+  mkdir -p \
+    "$NOTES_DIR/daily" \
+    "$NOTES_DIR/people" \
+    "$NOTES_DIR/projects" \
+    "$NOTES_DIR/sources" \
+    "$NOTES_DIR/wiki" \
+    "$NOTES_DIR/templates" \
+    "$NOTES_DIR/assets"
 
-# Create subdirectories for Obsidian
-# These directories are required by the obsidian.nvim configuration
-echo "Creating Obsidian subdirectories..."
+  write_file_once "$NOTES_DIR/templates/daily.md" << 'EOF'
+# {{date}}
 
-# Daily notes folder
-if [[ ! -d "$NOTES_DIR/daily" ]]; then
-  mkdir -p "$NOTES_DIR/daily"
-  echo "  ✓ Created daily/ folder"
-else
-  echo "  ✓ daily/ folder already exists"
-fi
-
-# Templates folder
-if [[ ! -d "$NOTES_DIR/templates" ]]; then
-  mkdir -p "$NOTES_DIR/templates"
-  echo "  ✓ Created templates/ folder"
-else
-  echo "  ✓ templates/ folder already exists"
-fi
-
-# People folder
-if [[ ! -d "$NOTES_DIR/people" ]]; then
-  mkdir -p "$NOTES_DIR/people"
-  echo "  ✓ Created people/ folder"
-else
-  echo "  ✓ people/ folder already exists"
-fi
-
-# Ideas folder
-if [[ ! -d "$NOTES_DIR/ideas" ]]; then
-  mkdir -p "$NOTES_DIR/ideas"
-  echo "  ✓ Created ideas/ folder"
-else
-  echo "  ✓ ideas/ folder already exists"
-fi
-
-# Projects folder
-if [[ ! -d "$NOTES_DIR/projects" ]]; then
-  mkdir -p "$NOTES_DIR/projects"
-  echo "  ✓ Created projects/ folder"
-else
-  echo "  ✓ projects/ folder already exists"
-fi
-
-# Create daily note template if it doesn't exist
-DAILY_TEMPLATE="$NOTES_DIR/templates/daily.md"
-if [[ ! -f "$DAILY_TEMPLATE" ]]; then
-  echo "Creating daily note template..."
-  cat > "$DAILY_TEMPLATE" << 'EOF'
-# Daily Note
-
-## Tasks
+## Today
 
 - [ ]
 
-## 06:00 - DESCRIPTION
-
-## Journal
-
-EOF
-  echo "  ✓ Created templates/daily.md"
-else
-  echo "  ✓ templates/daily.md already exists"
-fi
-
-# Create person note template if it doesn't exist
-PERSON_TEMPLATE="$NOTES_DIR/templates/person.md"
-if [[ ! -f "$PERSON_TEMPLATE" ]]; then
-  echo "Creating person note template..."
-  cat > "$PERSON_TEMPLATE" << 'EOF'
-## Tasks
-
-## Summary
-
-## Recent
+## Log
 
 ## Notes
 
+## Links
 EOF
-  echo "  ✓ Created templates/person.md"
-else
-  echo "  ✓ templates/person.md already exists"
-fi
 
-# Create .gitignore if it doesn't exist
-GITIGNORE="$NOTES_DIR/.gitignore"
-if [[ ! -f "$GITIGNORE" ]]; then
-  echo "Creating .gitignore..."
-  cat > "$GITIGNORE" << 'EOF'
-# Obsidian workspace files
+  write_file_once "$NOTES_DIR/templates/person.md" << 'EOF'
+---
+aliases: []
+---
+
+# {{title}}
+
+## Context
+
+## Current
+
+## Log
+EOF
+
+  write_file_once "$NOTES_DIR/AGENTS.md" << 'EOF'
+# Vault Instructions
+
+This vault separates working notes from durable synthesis.
+
+## Human Notes
+
+- `daily/`, `people/`, and `projects/` are human-authored working notes.
+- Do not rewrite these notes unless explicitly asked.
+- Prefer small edits, added links, and appended context over broad rewrites.
+
+## Sources
+
+- `sources/` stores raw or semi-raw inputs: articles, transcripts, research, copied context, and AI session outputs.
+- Preserve original meaning.
+- Summaries are allowed, but source notes do not need to be polished wiki pages.
+
+## Wiki
+
+- `wiki/` is the AI-maintained synthesis layer.
+- Wiki pages should explain durable concepts, tools, decisions, systems, and things worth reusing.
+- Create or update wiki pages when source material teaches something reusable.
+- Use subfolders when they help, but do not force a taxonomy up front.
+- Link related wiki pages.
+- Cite source notes when possible.
+- Update `wiki/index.md` when adding an important wiki page.
+EOF
+
+  write_file_once "$NOTES_DIR/wiki/index.md" << 'EOF'
+# Wiki
+
+Durable AI-maintained synthesis starts here.
+EOF
+
+  write_file_once "$NOTES_DIR/.gitignore" << 'EOF'
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
-
-# macOS
 .DS_Store
-
-# Neovim
 .nvim.lua
 EOF
-  echo "  ✓ Created .gitignore"
-else
-  echo "  ✓ .gitignore already exists"
+
+  echo "Created basic notes vault: $NOTES_DIR"
+}
+
+if clone_private_repo; then
+  exit 0
 fi
 
-echo ""
-echo "✓ Notes setup complete!"
-echo ""
-echo "Notes directory: $NOTES_DIR"
-echo "Structure:"
-echo "  ├── daily/            (daily notes)"
-echo "  ├── people/           (people notes)"
-echo "  ├── ideas/            (idea notes)"
-echo "  ├── projects/         (project notes)"
-echo "  ├── templates/        (note templates)"
-echo "  │   ├── daily.md      (daily note template)"
-echo "  │   └── person.md     (person note template)"
-echo "  └── .gitignore        (git ignore rules)"
-echo ""
-echo "You can now use Obsidian commands in Neovim:"
-echo "  <leader>on - Create new note"
-echo "  <leader>os - Search notes"
-echo "  <leader>ot - Open task picker"
+echo "Clone failed; falling back to a basic local vault."
+create_basic_vault

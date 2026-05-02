@@ -7,7 +7,7 @@ Comprehensive tmux configuration with TokyoNight Night theme, Pokemon-themed dyn
 - **TokyoNight Night theme** - Consistent color scheme with Neovim/Ghostty
 - **Pokemon theme integration** - Dynamic statusline colors that sync with Neovim dashboard Pokemon
 - **Vim navigation** - Seamless pane switching between tmux and Neovim (via vim-tmux-navigator)
-- **Popup windows** - FZF-powered session/Claude/notification management in floating popups
+- **Popup windows** - FZF-powered session/AI-agent/notification management in floating popups
 - **Prefix key** - `Ctrl+Space` (more ergonomic than default `Ctrl+B`)
 - **Mouse support** - Click to select panes, resize splits, scroll history
 
@@ -49,13 +49,13 @@ Alt+Q            - Detach from session
 # With prefix
 Prefix + s       - Switch tmux sessions (ts)
 Prefix + o       - Navigate to git repo (to)
-Prefix + a       - Switch to Claude instance (tc)
+Prefix + a       - Switch to AI agent pane (tai)
 Prefix + b       - Jump to panes with notifications (tb)
 
 # Without prefix (Alt key)
 Alt+S            - Switch tmux sessions
 Alt+O            - Navigate to git repo
-Alt+A            - Switch to Claude instance
+Alt+A            - Switch to AI agent pane
 Alt+B            - Jump to panes with notifications
 ```
 
@@ -87,6 +87,9 @@ tmux/
     └── bell-cache-updater.sh          # Notification tracking (background)
 ```
 
+AI-agent notification helpers live under `ai-harness/tmux/`; tmux starts the
+Codex `Action Required` watcher from there on config reload.
+
 ## Dynamic Pokemon Theme
 
 The statusline colors dynamically sync with the Pokemon displayed in your Neovim dashboard:
@@ -111,10 +114,11 @@ The configuration includes several zsh functions (defined in `zsh/functions/tmux
 - **`tm [options] [commands...]`** - Create tmux session with predefined windows
   - `-n name|dir` - Session name or directory
   - `-c cmd` - Additional commands to run in windows
-  - Shortcuts: `py` (ipython), `cc` (claude), `pr` (gh dash)
+  - Shortcuts: `py` (ipython), `cc` (claude), `cx` (codex), `cp` (copilot), `pr` (gh dash)
 
 - **`ts`** - Switch between sessions with FZF
-- **`tc`** - Jump to Claude instances (with attention indicators)
+- **`tai`** - Jump to AI agent panes (Claude, Codex, Copilot) with attention indicators
+- **`tc`** - Backward-compatible alias for `tai`
 - **`tb`** - Jump to panes with bell notifications
 - **`ta/td/tl/tk/tK`** - Basic tmux aliases (attach/detach/list/kill session/kill server)
 

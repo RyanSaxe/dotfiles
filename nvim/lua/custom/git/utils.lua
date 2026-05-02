@@ -19,6 +19,15 @@ M.get_current_branch = function()
   return lines[1] or ""
 end
 
+M.get_origin_repo = function()
+  local remote = (vim.fn.systemlist({ "git", "remote", "get-url", "origin" })[1] or ""):gsub("%.git$", "")
+  local owner, repo = remote:match("github%.com[:/](.-)/(.-)$")
+  if owner and repo then
+    return owner .. "/" .. repo
+  end
+  return nil
+end
+
 M.checkout_branch = function(branch)
   if not branch or branch == "" then
     vim.notify("⚠️  No branch specified for checkout.", vim.log.levels.WARN)
@@ -63,11 +72,29 @@ M.confirm_stash_uncommitted_changes_before_op = function(message, callback)
   end
 end
 
---- Fetch origin asynchronously, with optional specific refs and notifications.
+local function collect_output_lines(target, data)
+  if not data then
+    return
+  end
+
+  for _, line in ipairs(data) do
+    if line and line ~= "" then
+      table.insert(target, line)
+    end
+  end
+end
+
+--- Fetch origin asynchronously, with optional specific refs and cached-ref fallback.
+-- @param cb (optional) function(success:boolean, err:string|nil) run after fetch or fallback
 -- @param refs (optional) table of strings, e.g. { "main", "feature/x" }
--- @param cb (optional) function to run after a successful fetch
-function M.fetch_origin(cb, refs)
+-- @param opts (optional) table:
+--   - notify_success: boolean (default: true)
+--   - use_cached_on_failure: boolean (default: false)
+function M.fetch_origin(cb, refs, opts)
+  opts = opts or {}
   local cmd = { "git", "fetch", "origin" }
+  local stderr = {}
+
   if refs then
     for _, ref in ipairs(refs) do
       table.insert(cmd, ref)
@@ -78,25 +105,71 @@ function M.fetch_origin(cb, refs)
     stdout_buffered = true,
     stderr_buffered = true,
     on_stderr = function(_, data)
-      if data and #data > 0 then
-        vim.schedule(function()
-          vim.notify(table.concat(data, "\n"), vim.log.levels.WARN)
-        end)
-      end
+      collect_output_lines(stderr, data)
     end,
     on_exit = function(_, code)
       vim.schedule(function()
+        local err = table.concat(stderr, "\n")
+
         if code == 0 then
-          vim.notify("✅ git fetch origin completed", vim.log.levels.INFO)
+          if opts.notify_success ~= false then
+            vim.notify("✅ git fetch origin completed", vim.log.levels.INFO)
+          end
           if cb then
-            pcall(cb)
+            pcall(cb, true)
+          end
+        elseif opts.use_cached_on_failure then
+          local msg = err ~= "" and err or string.format("git fetch origin failed (exit code %d)", code)
+          vim.notify("Using cached git refs because fetch failed.\n" .. msg, vim.log.levels.WARN)
+          if cb then
+            pcall(cb, false, msg)
           end
         else
-          vim.notify(string.format("❌ git fetch origin failed (exit code %d)", code), vim.log.levels.ERROR)
+          local msg = err ~= "" and err or string.format("git fetch origin failed (exit code %d)", code)
+          vim.notify(msg, vim.log.levels.ERROR)
         end
       end)
     end,
   })
+end
+
+function M.ref_exists(ref)
+  if not ref or ref == "" then
+    return false
+  end
+
+  vim.fn.system({ "git", "rev-parse", "--verify", "--quiet", ref })
+  return vim.v.shell_error == 0
+end
+
+function M.resolve_branch_ref(branch)
+  if not branch or branch == "" then
+    return branch
+  end
+
+  if branch:match("^origin/") then
+    if M.ref_exists(branch) then
+      return branch
+    end
+
+    local local_branch = branch:gsub("^origin/", "")
+    if M.ref_exists(local_branch) then
+      return local_branch
+    end
+
+    return branch
+  end
+
+  local remote_branch = "origin/" .. branch
+  if M.ref_exists(remote_branch) then
+    return remote_branch
+  end
+
+  if M.ref_exists(branch) then
+    return branch
+  end
+
+  return remote_branch
 end
 
 -- Return the current buffer's file content as it was at local HEAD~N
@@ -127,11 +200,12 @@ end
 --- Get the text of the current buffer's file as it exists on `branch`.
 -- Returns an empty string if the file doesn’t exist there.
 function M.get_buffer_text_on_branch(branch)
+  local ref = M.resolve_branch_ref(branch)
+
   -- 1) figure out the path *relative* to the repo root
   local relpath = vim.fn.expand("%:.") -- e.g. "src/foo/bar.lua"
   -- 2) build and run the git-show command, silencing errors
-  local cmd =
-    string.format("git show origin/%s:%s 2>/dev/null", vim.fn.shellescape(branch), vim.fn.shellescape(relpath))
+  local cmd = string.format("git show %s:%s 2>/dev/null", vim.fn.shellescape(ref), vim.fn.shellescape(relpath))
   local lines = vim.fn.systemlist(cmd)
   -- 3) if git failed (file not present), systemlist still returns {}, but
   --    vim.v.shell_error will be non-zero
