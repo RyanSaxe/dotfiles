@@ -12,16 +12,6 @@ backups/*
 !backups/README.txt
 .DS_STORE
 .env
-claude/*
-!claude/AGENTS.md
-!claude/CLAUDE.md
-claude/plugins/
-!claude/settings.json
-!claude/utility-scripts/
-!claude/skills/
-!claude/references/
-!claude/hooks/
-!claude/commands/
 ipython/*
 !ipython/README.md
 !ipython/profile_default/

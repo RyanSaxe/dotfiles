@@ -58,3 +58,5 @@ borders
 
 # AI tools
 claude-code
+codex
+copilot-cli

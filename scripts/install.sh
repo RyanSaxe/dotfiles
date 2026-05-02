@@ -484,6 +484,27 @@ main() {
     else
       log "stylua already installed—skipping re-install"
     fi
+
+    # AI CLIs - on macOS these are casks (codex, copilot-cli); on Linux use npm
+    if ! command -v codex &> /dev/null; then
+      log "Installing OpenAI Codex CLI via npm…"
+      sudo_if_needed npm install -g @openai/codex || {
+        err "Codex CLI install failed"
+        exit 1
+      }
+    else
+      log "Codex CLI already installed—skipping re-install"
+    fi
+
+    if ! command -v copilot &> /dev/null; then
+      log "Installing GitHub Copilot CLI via npm…"
+      sudo_if_needed npm install -g @github/copilot || {
+        err "Copilot CLI install failed"
+        exit 1
+      }
+    else
+      log "Copilot CLI already installed—skipping re-install"
+    fi
   fi
 
   # Note: dust is only installed via brew on macOS, not available on Linux
