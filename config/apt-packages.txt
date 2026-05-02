@@ -49,3 +49,4 @@ software-properties-common
 # - markdownlint-cli
 # - stylua (via cargo or npm, not in apt)
 # NOTE: claude-code is installed via npm or curl installer
+# NOTE: codex (@openai/codex) and copilot (@github/copilot) are installed via npm in install.sh
