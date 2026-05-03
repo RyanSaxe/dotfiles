@@ -226,5 +226,6 @@
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
-  "vimMode": true
+  "vimMode": true,
+  "model": "opus[1m]"
 }
