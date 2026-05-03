@@ -87,7 +87,7 @@ tmux/
     └── bell-cache-updater.sh          # Notification tracking (background)
 ```
 
-AI-agent notification helpers live under `ai-harness/tmux/`; tmux starts the
+AI-agent notification helpers live under `ai-harness/scripts/`; tmux starts the
 Codex `Action Required` watcher from there on config reload.
 
 ## Dynamic Pokemon Theme

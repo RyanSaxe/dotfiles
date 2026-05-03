@@ -14,8 +14,8 @@ ai-harness/AGENTS.md:$HOME/.codex/AGENTS.md
 ai-harness/AGENTS.md:$HOME/.copilot/copilot-instructions.md
 ai-harness/skills:$HOME/.agents/skills
 ai-harness/skills:$HOME/.claude/skills
-ai-harness/notify.sh:$HOME/.codex/hooks/notify.sh
-ai-harness/notify.sh:$HOME/.copilot/hooks/notify.sh
+ai-harness/scripts/notify.sh:$HOME/.codex/hooks/notify.sh
+ai-harness/scripts/notify.sh:$HOME/.copilot/hooks/notify.sh
 ai-harness/codex/hooks.json:$HOME/.codex/hooks.json
 ai-harness/copilot/settings.json:$HOME/.copilot/settings.json
 ai-harness/claude/CLAUDE.md:$HOME/.claude/CLAUDE.md

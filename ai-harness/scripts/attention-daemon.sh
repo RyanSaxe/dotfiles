@@ -3,8 +3,7 @@ set -Eeuo pipefail
 shopt -s nocasematch
 
 script_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-harness_dir="$(cd "$script_dir/.." && pwd)"
-notify_script="$harness_dir/notify.sh"
+notify_script="$script_dir/notify.sh"
 
 # shellcheck source=agent-utils.sh
 source "$script_dir/agent-utils.sh"

@@ -153,7 +153,7 @@ ts() {
 }
 
 _ai_harness_source_tmux_utils() {
-  local utils_path="${DOTFILES_DIR:-$HOME/generic/dotfiles}/ai-harness/tmux/agent-utils.sh"
+  local utils_path="${DOTFILES_DIR:-$HOME/generic/dotfiles}/ai-harness/scripts/agent-utils.sh"
   if [[ -f "$utils_path" ]]; then
     source "$utils_path"
   else
