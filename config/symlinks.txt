@@ -18,13 +18,13 @@ ai-harness/notify.sh:$HOME/.codex/hooks/notify.sh
 ai-harness/notify.sh:$HOME/.copilot/hooks/notify.sh
 ai-harness/codex/hooks.json:$HOME/.codex/hooks.json
 ai-harness/copilot/settings.json:$HOME/.copilot/settings.json
-claude/CLAUDE.md:$HOME/.claude/CLAUDE.md
-claude/settings.json:$HOME/.claude/settings.json
-claude/utility-scripts:$HOME/.claude/utility-scripts
-claude/references:$HOME/.claude/references
-claude/hooks:$HOME/.claude/hooks
-claude/commands:$HOME/.claude/commands
-claude/themes:$HOME/.claude/themes
+ai-harness/claude/CLAUDE.md:$HOME/.claude/CLAUDE.md
+ai-harness/claude/settings.json:$HOME/.claude/settings.json
+ai-harness/claude/utility-scripts:$HOME/.claude/utility-scripts
+ai-harness/claude/references:$HOME/.claude/references
+ai-harness/claude/hooks:$HOME/.claude/hooks
+ai-harness/claude/commands:$HOME/.claude/commands
+ai-harness/claude/themes:$HOME/.claude/themes
 karabiner:$HOME/.config/karabiner
 leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json
 harper/dictionary.txt:$HOME/.config/harper-ls/dictionary.txt

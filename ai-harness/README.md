@@ -7,6 +7,7 @@ Shared configuration and utilities for AI coding agents.
 - `AGENTS.md`: global cross-agent instructions. This is model context only.
 - `skills/`: canonical local Agent Skills directory using the `SKILL.md` format.
 - `notify.sh`: deterministic notification hook target for Claude, Codex, and Copilot.
+- `claude/`: Claude-specific configs (CLAUDE.md, settings.json, commands, hooks, references, themes, utility-scripts).
 - `codex/hooks.json`: Codex lifecycle hook configuration.
 - `copilot/settings.json`: Copilot CLI user settings for hooks and built-in beep behavior.
 - `tmux/agent-utils.sh`: generic tmux helpers for finding AI agent panes.
