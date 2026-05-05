@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Adopt agent skills across the team</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css" id="theme">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body class="deck-pitch">
+
+<div class="reveal">
+  <div class="slides">
+
+    <!-- 1 — Title (big, centered, accent-pill cover) -->
+    <section class="title-slide">
+      <header class="slide-head"><span class="kicker">cover</span></header>
+      <div class="slide-body">
+        <span class="kicker-cover">Pitch · Eng leadership · Q2 2026</span>
+        <h1>Adopt agent skills across the team.</h1>
+        <p class="lead">A small structural change that compounds the longer we wait.</p>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>1 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 2 — The problem -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Problem</span>
+        <h2>We're paying for the same setup every week.</h2>
+      </header>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <span class="card-kicker">Onboarding</span>
+            <h4>Every engineer reinvents their own AI workflow.</h4>
+            <p>Custom prompts. Custom contexts. Custom tooling glue. None of it travels.</p>
+          </div>
+          <div class="card">
+            <span class="card-kicker">Tribal knowledge</span>
+            <h4>Every team rediscovers the same prompts.</h4>
+            <p>"Hey, do you have that prompt you used for the migration review?" — asked weekly, every team.</p>
+          </div>
+          <div class="card">
+            <span class="card-kicker">Decay</span>
+            <h4>None of it sticks.</h4>
+            <p>Workflows live in Notion pages, Slack threads, and personal dotfiles. They drift, rot, and disappear.</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>2 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 3 — Big number / cost (single dominant figure) -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Cost</span>
+        <h2>What it actually costs us.</h2>
+      </header>
+      <div class="slide-body">
+        <div class="split-l">
+          <div class="hero-metric">
+            <div class="display">6<span class="unit">hrs / eng / wk</span></div>
+            <p class="caption">Time spent re-prompting, re-explaining context, and re-deriving workflows that already exist on someone else's laptop.</p>
+          </div>
+          <div class="grid-2x2">
+            <div class="card flush">
+              <span class="card-kicker">Source</span>
+              <p>Internal survey, March 2026 (n=24).</p>
+            </div>
+            <div class="card flush">
+              <span class="card-kicker">Equivalent</span>
+              <p>~3 FTEs across the org, every month.</p>
+            </div>
+            <div class="card flush">
+              <span class="card-kicker">Trend</span>
+              <p>Up 40% YoY as AI usage grows.</p>
+            </div>
+            <div class="card flush">
+              <span class="card-kicker">Worst hit</span>
+              <p>New hires in their first quarter.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>3 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 4 — Pull-quote moment (pitch-specific dramatic beat) -->
+    <section class="title-slide">
+      <header class="slide-head"><span class="kicker">moment</span></header>
+      <div class="slide-body">
+        <span class="kicker-cover">The thesis</span>
+        <p class="pull-quote big">If it's not in a repo,<br>it's not infrastructure.</p>
+        <span class="pull-quote-cite">— what we keep relearning</span>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>4 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 5 — What we mean -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Definition</span>
+        <h2>A "skill" is a packaged workflow.</h2>
+      </header>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <span class="card-kicker">Property 01</span>
+            <h4>One folder. Versioned in git.</h4>
+            <p>Lives next to your code. Reviewed like your code. Changes show up in PRs.</p>
+          </div>
+          <div class="card">
+            <span class="card-kicker">Property 02</span>
+            <h4>Triggered by a name or phrase.</h4>
+            <p>Anyone can invoke <code>/migration-review</code>. No tribal-knowledge tax.</p>
+          </div>
+          <div class="card">
+            <span class="card-kicker">Property 03</span>
+            <h4>States its inputs and outputs.</h4>
+            <p>What you give it, what it produces, how to verify. A first-class artifact.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>Not</strong> a chat snippet. <strong>Not</strong> a prompt library. A first-class artifact in our repos.
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>5 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 6 — Before / After -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Shift</span>
+        <h2>Before. After.</h2>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card negative">
+            <span class="card-kicker">Today</span>
+            <h4>"Do you have that prompt you used last quarter?"</h4>
+            <p>"It's in a Notion page somewhere. Let me find it."</p>
+            <p>"Actually I think Sarah updated it. Or was it Kai?"</p>
+            <p>"Tell you what, I'll just rewrite it."</p>
+          </div>
+          <div class="card positive">
+            <span class="card-kicker">With shared skills</span>
+            <h4>/migration-review</h4>
+            <p>It runs. Same way. For everyone. Every time.</p>
+            <p>Improvements land in one place and ship to the whole team in a PR.</p>
+            <p>A new hire on day one is as effective as a senior on day 365.</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>6 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 7 — The proposal (steps) -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Proposal</span>
+        <h2>Three phases. One quarter.</h2>
+      </header>
+      <div class="slide-body">
+        <ol class="steps">
+          <li>
+            <h4>Phase 1 — Seed</h4>
+            <p>Port 5 high-leverage workflows already in someone's head into shared skills. Land them in the platform repo with reviews. <strong>2 weeks.</strong></p>
+          </li>
+          <li>
+            <h4>Phase 2 — Adopt</h4>
+            <p>Roll out to one team. Measure invocations, time saved, and what breaks. Iterate weekly with the team. <strong>4 weeks.</strong></p>
+          </li>
+          <li>
+            <h4>Phase 3 — Scale</h4>
+            <p>Open contribution. Anyone can author a skill. Review process matches code review. Public skill catalog. <strong>6 weeks.</strong></p>
+          </li>
+        </ol>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>7 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 8 — The ask -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Ask</span>
+        <h2>One engineer. One quarter.</h2>
+      </header>
+      <div class="slide-body">
+        <div class="split-l">
+          <div style="display: flex; flex-direction: column; gap: 14px; justify-content: center;">
+            <span class="card-kicker">Why this is small</span>
+            <h3 style="font-size: 32px; line-height: 1.2; margin: 0; color: var(--emphasis); font-weight: 600; letter-spacing: -0.02em;">No new infrastructure.<br>No procurement.<br>No vendor evaluation.</h3>
+            <div class="pill-row" style="margin-top: 12px;">
+              <span class="pill positive">Reuses existing tooling</span>
+              <span class="pill info">Reversible</span>
+              <span class="pill warn">Visible in 4 weeks</span>
+            </div>
+          </div>
+          <div class="grid-2x2">
+            <div class="card flush">
+              <span class="card-kicker">Headcount</span>
+              <h4>1 engineer, 12 weeks.</h4>
+            </div>
+            <div class="card flush">
+              <span class="card-kicker">Budget</span>
+              <h4>~$0 incremental.</h4>
+            </div>
+            <div class="card flush">
+              <span class="card-kicker">Risk</span>
+              <h4>Reversible at any phase.</h4>
+            </div>
+            <div class="card flush">
+              <span class="card-kicker">Decision date</span>
+              <h4>End of next sprint.</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>8 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 9 — Decision frame -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">Decision</span>
+        <h2>Two questions.</h2>
+      </header>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <span class="card-kicker">Question 01</span>
+            <h4>Is the cost of <em>not</em> having shared workflows obvious to you today?</h4>
+            <p>If yes — adoption is overdue, not premature.</p>
+          </div>
+          <div class="card">
+            <span class="card-kicker">Question 02</span>
+            <h4>Can we absorb one engineer for one quarter?</h4>
+            <p>If yes — we have the budget today. Waiting doesn't make it cheaper.</p>
+          </div>
+        </div>
+        <div class="callout accent">
+          If both are yes — we should do this.
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>9 / 10</span>
+      </footer>
+    </section>
+
+    <!-- 10 — Closing -->
+    <section class="title-slide">
+      <header class="slide-head"><span class="kicker">close</span></header>
+      <div class="slide-body">
+        <span class="kicker-cover">The ask, restated</span>
+        <p class="pull-quote big">The longer we wait,<br>the more we re-invent.</p>
+        <span class="pull-quote-cite">Let's start Monday.</span>
+      </div>
+      <footer class="slide-foot">
+        <span>Adopt agent skills <span class="dot"></span> Pitch</span>
+        <span>10 / 10</span>
+      </footer>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    transition: 'fade',
+    controls: true,
+    progress: true,
+    center: false,
+    width: 1280,
+    height: 800,
+    margin: 0,
+    minScale: 0.2,
+    maxScale: 2.0,
+  });
+</script>
+</body>
+</html>

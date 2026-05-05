@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{DECK_TITLE}}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css" id="theme">
+<!-- Optional: enable per deck. Uncomment what you need.
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-light.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+-->
+<link rel="stylesheet" href="theme.css">
+</head>
+<!-- Pick a variant: deck-pitch | deck-explainer | deck-tech (or coin a new one) -->
+<body class="deck-{{VARIANT}}">
+
+<div class="reveal">
+  <div class="slides">
+
+    <!-- 1 — Title -->
+    <section class="title-slide">
+      <header class="slide-head"><span class="kicker">cover</span></header>
+      <div class="slide-body">
+        <h1>{{DECK_TITLE}}</h1>
+        <p class="lead">{{ONE_LINE_THESIS}}</p>
+      </div>
+      <footer class="slide-foot">
+        <span>{{DECK_TITLE}} <span class="dot"></span> {{VARIANT}}</span>
+        <span>1 / N</span>
+      </footer>
+    </section>
+
+    <!-- 2 — Content slide template -->
+    <section>
+      <header class="slide-head">
+        <span class="kicker">{{SECTION_LABEL}}</span>
+        <h2>{{SLIDE_TITLE}}</h2>
+      </header>
+      <div class="slide-body">
+        <!-- pick a layout primitive from references/layouts.md -->
+      </div>
+      <footer class="slide-foot">
+        <span>{{DECK_TITLE}} <span class="dot"></span> {{VARIANT}}</span>
+        <span>2 / N</span>
+      </footer>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<!-- Optional: enable per deck.
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+-->
+<script>
+  Reveal.initialize({
+    hash: true,
+    transition: 'fade',
+    controls: true,
+    progress: true,
+    center: false,
+    width: 1280,
+    height: 800,
+    margin: 0,
+    minScale: 0.2,
+    maxScale: 2.0,
+  });
+  // Uncomment if using highlight.js:
+  // hljs.highlightAll();
+  // Uncomment if using KaTeX:
+  // renderMathInElement(document.body, {
+  //   delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }],
+  //   throwOnError: false,
+  // });
+</script>
+</body>
+</html>
