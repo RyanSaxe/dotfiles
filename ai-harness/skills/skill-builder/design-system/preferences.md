@@ -197,6 +197,7 @@ Include via CDN — no need to vendor. Recipients have wifi.
 | Code syntax highlighting   | **highlight.js**                 | Broad language support, easy CDN, low ceremony. Override the theme by remapping `.hljs-keyword`, `.hljs-string`, `.hljs-comment` etc. to your design-token values in your own stylesheet.    |
 | Charts / data viz          | **Chart.js**                     | Configure colors via `borderColor` / `backgroundColor` / `pointBackgroundColor` to use design tokens. Covers line / bar / donut / scatter. Reach for D3 only when Chart.js can't express it. |
 | Icons                      | **Lucide**                       | Consistent stroke weight, modern geometric, fits our type stack. Use the SVG component / Web pattern with `data-lucide="<name>"` and a single `lucide.createIcons()` call.                   |
+| Slide decks                | **Reveal.js**                    | Layer CSS as Reveal's theme → your `deck.css` → per-deck `custom.css`. Default theme `white.css`; swap to a dark theme deliberately when called for.                                         |
 
 **Why these and not others:**
 
