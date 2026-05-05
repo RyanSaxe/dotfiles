@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fortnight check-in · Fitness report</title>
+
+<!-- CDN libraries: Chart.js for charts, Lucide for icons. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="brand">
+    <i data-lucide="activity" class="brand-icon"></i>
+    <div>
+      <div class="brand-name">Fitness report</div>
+      <div class="brand-sub" id="dateRange">Loading…</div>
+    </div>
+  </div>
+
+  <nav class="segmented" role="tablist" aria-label="Time range" id="periodToggle">
+    <button type="button" data-period="day" role="tab">Day</button>
+    <button type="button" data-period="week" role="tab" class="is-active" aria-selected="true">Week</button>
+    <button type="button" data-period="month" role="tab">Month</button>
+  </nav>
+</header>
+
+<main class="page">
+
+  <header class="page-head">
+    <span class="label">Fortnight check-in</span>
+    <h1 class="page-title">How the last <span id="periodLabel">week</span> went</h1>
+    <p class="page-sub">A summary of your recovery, strain, sleep, and movement — with notes on what to do next.</p>
+  </header>
+
+  <!-- Hero: Recovery + Strain -->
+  <section class="hero-grid">
+
+    <article class="card hero">
+      <header class="card-head">
+        <span class="label"><i data-lucide="heart-pulse" class="inline-icon"></i> Recovery</span>
+        <span class="badge badge-positive" id="recoveryBadge">Ready to train</span>
+      </header>
+      <div class="hero-row">
+        <div class="hero-value" id="recoveryValue">—</div>
+        <div class="hero-spark"><canvas id="recoverySpark"></canvas></div>
+      </div>
+      <footer class="card-foot">
+        <span class="muted">vs prior week</span>
+        <span class="delta" id="recoveryDelta">—</span>
+      </footer>
+    </article>
+
+    <article class="card hero">
+      <header class="card-head">
+        <span class="label"><i data-lucide="zap" class="inline-icon"></i> Strain</span>
+        <span class="badge badge-negative" id="strainBadge">High — take it easy</span>
+      </header>
+      <div class="hero-row">
+        <div class="hero-value" id="strainValue">—</div>
+        <div class="hero-spark"><canvas id="strainSpark"></canvas></div>
+      </div>
+      <footer class="card-foot">
+        <span class="muted">vs prior week</span>
+        <span class="delta" id="strainDelta">—</span>
+      </footer>
+    </article>
+
+  </section>
+
+  <!-- Metric strip -->
+  <section class="metric-strip">
+
+    <article class="card metric">
+      <span class="label"><i data-lucide="heart" class="inline-icon"></i> Resting HR</span>
+      <div class="metric-row">
+        <div class="metric-value" id="rhrValue">—</div>
+        <div class="metric-unit">bpm</div>
+      </div>
+      <div class="metric-spark"><canvas id="rhrSpark"></canvas></div>
+      <div class="delta" id="rhrDelta">—</div>
+    </article>
+
+    <article class="card metric">
+      <span class="label"><i data-lucide="waves" class="inline-icon"></i> HRV</span>
+      <div class="metric-row">
+        <div class="metric-value" id="hrvValue">—</div>
+        <div class="metric-unit">ms</div>
+      </div>
+      <div class="metric-spark"><canvas id="hrvSpark"></canvas></div>
+      <div class="delta" id="hrvDelta">—</div>
+    </article>
+
+    <article class="card metric">
+      <span class="label"><i data-lucide="moon" class="inline-icon"></i> Sleep</span>
+      <div class="metric-row">
+        <div class="metric-value" id="sleepValue">—</div>
+        <div class="metric-unit">hr</div>
+      </div>
+      <div class="metric-spark"><canvas id="sleepSpark"></canvas></div>
+      <div class="delta" id="sleepDelta">—</div>
+    </article>
+
+    <article class="card metric">
+      <span class="label"><i data-lucide="footprints" class="inline-icon"></i> Steps</span>
+      <div class="metric-row">
+        <div class="metric-value" id="stepsValue">—</div>
+        <div class="metric-unit">avg/day</div>
+      </div>
+      <div class="metric-spark"><canvas id="stepsSpark"></canvas></div>
+      <div class="delta" id="stepsDelta">—</div>
+    </article>
+
+  </section>
+
+  <!-- Charts row: HRV trend (line) + Sleep stages (donut) -->
+  <section class="chart-grid">
+
+    <article class="card chart-card span-2">
+      <header class="card-head">
+        <span class="label">HRV trend</span>
+        <span class="muted small" id="hrvNote">28-day rolling baseline</span>
+      </header>
+      <div class="chart-canvas-wrap"><canvas id="hrvLine"></canvas></div>
+    </article>
+
+    <article class="card chart-card">
+      <header class="card-head">
+        <span class="label">Sleep stages</span>
+        <span class="muted small">avg per night</span>
+      </header>
+      <div class="chart-canvas-wrap donut-wrap">
+        <canvas id="sleepDonut"></canvas>
+        <div class="donut-center">
+          <div class="donut-center-value" id="sleepDonutCenter">—</div>
+          <div class="donut-center-label">total</div>
+        </div>
+      </div>
+      <ul class="legend" id="sleepLegend"></ul>
+    </article>
+
+  </section>
+
+  <!-- Activity heatmap + Daily steps (paired row — both are time-series activity views) -->
+  <section class="activity-row">
+
+    <article class="card heatmap-card">
+      <header class="card-head">
+        <span class="label">Activity</span>
+        <span class="muted small">last 12 weeks</span>
+      </header>
+
+      <div class="heatmap-frame">
+        <div class="heatmap-months" id="heatmapMonths" aria-hidden="true"></div>
+        <div class="heatmap-body">
+          <div class="heatmap-days" aria-hidden="true">
+            <span></span><span>Mon</span><span></span>
+            <span>Wed</span><span></span><span>Fri</span><span></span>
+          </div>
+          <div class="heatmap-grid" id="heatmap" aria-label="Activity heatmap"></div>
+        </div>
+      </div>
+
+      <footer class="heatmap-foot">
+        <span class="muted small" id="heatmapTotal">—</span>
+        <div class="heatmap-legend">
+          <span class="muted small">Less</span>
+          <span class="heatmap-swatch" data-level="0"></span>
+          <span class="heatmap-swatch" data-level="1"></span>
+          <span class="heatmap-swatch" data-level="2"></span>
+          <span class="heatmap-swatch" data-level="3"></span>
+          <span class="heatmap-swatch" data-level="4"></span>
+          <span class="muted small">More</span>
+        </div>
+      </footer>
+    </article>
+
+    <article class="card chart-card">
+      <header class="card-head">
+        <span class="label">Daily steps</span>
+        <span class="muted small">today highlighted</span>
+      </header>
+      <div class="chart-canvas-wrap"><canvas id="stepsBar"></canvas></div>
+    </article>
+
+  </section>
+
+  <!-- Recent workouts (full width — naturally tall, fits its own row) -->
+  <section>
+    <article class="card">
+      <header class="card-head">
+        <span class="label">Recent workouts</span>
+        <span class="muted small" id="workoutsCount">—</span>
+      </header>
+      <div class="table-wrap">
+        <table class="data-table" id="workoutsTable">
+          <thead>
+            <tr>
+              <th data-sort="date" class="th-sortable">Date</th>
+              <th data-sort="name" class="th-sortable">Activity</th>
+              <th data-sort="category" class="th-sortable">Type</th>
+              <th data-sort="duration_min" class="th-sortable th-num">Duration</th>
+              <th data-sort="strain" class="th-sortable th-num">Strain</th>
+              <th data-sort="status">Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <!-- Coach's note -->
+  <section>
+    <article class="card note-card">
+      <header class="card-head">
+        <span class="label"><i data-lucide="message-square-text" class="inline-icon"></i> Coach's note</span>
+      </header>
+      <p>Strain has been elevated this week — three rides plus the long run on Saturday accumulated more load than usual. HRV is holding, but resting HR is up two beats from baseline. <strong>Plan an easy week:</strong> swap Tuesday's tempo for a recovery walk, and protect Wednesday's rest day. Sleep is on target; keep the current bedtime.</p>
+      <p class="muted small">Generated automatically. Adjust by replying with <code>/fitness-report --re-plan</code>.</p>
+    </article>
+  </section>
+
+  <footer class="page-foot">
+    <span class="muted small">Generated 2026-05-04 by <code>/fitness-report --weeks=2</code> · Data is fictional, design-system example.</span>
+  </footer>
+
+</main>
+
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

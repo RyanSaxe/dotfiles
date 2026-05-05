@@ -1,0 +1,50 @@
+---
+name: <skill-name>
+description: <one paragraph. Front-load 4–6 trigger phrases. Be slightly pushy — agents under-trigger by default. Mention what artifact it produces.>
+allowed-tools: <comma-separated, optional>
+argument-hint: "<inline hint, optional>"
+---
+
+# <Skill Name>
+
+<One sentence: what it produces and why.>
+
+## Layout
+
+```text
+<skill-name>/
+├── SKILL.md             ← this file
+├── references/          ← deep-dive docs (read on demand)
+│   └── <file>.md        ← <when to read it>
+├── examples/            ← sample inputs/outputs (delete if unused)
+├── tools/               ← scripts the skill executes (delete if unused)
+└── templates/           ← files copied verbatim into output (delete if unused)
+```
+
+The user may provide a target, scope, focus, or other context. Use whatever is given; ask only if a critical detail is missing and cannot be inferred.
+
+## Alignment (delete this section if the skill executes without negotiation)
+
+Before executing, settle the following with the user:
+
+- <dimension 1 — e.g. audience, scope, target>
+- <dimension 2 — e.g. length, depth, style>
+- <dimension 3 — e.g. specific must-haves and must-avoids>
+
+<One sentence describing how hard the skill pushes for sign-off — e.g. "confirm one ambiguous point and proceed", "propose an approach and wait for thumbs-up", "do not produce any artifact until the user has explicitly approved a written outline".>
+
+## How to Run
+
+<5–10 numbered steps. Concrete actions. When depth is needed, point at a reference file rather than inlining.>
+
+## Output Contract
+
+**Outcome:** <one sentence — what exists or changes after this skill runs.>
+
+**Shape / schema:** <how the outcome is structured. Format + schema for files; message format + atomicity for commits; invariants for state changes; request/response shape for external side effects.>
+
+**Verification:** <how to confirm the skill succeeded — a runnable check, a `git` command, a test suite, an API response field.>
+
+## References
+
+- `references/<file>` — <when to read it>

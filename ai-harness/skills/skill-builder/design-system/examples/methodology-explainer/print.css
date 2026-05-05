@@ -1,0 +1,101 @@
+/* ----------------------------------------------------------------
+ * methodology-explainer / print.css
+ *
+ * Long-form explainers get printed (especially in academic and
+ * teaching contexts). The print version drops anything interactive,
+ * collapses the layout to one column, and removes chrome that's
+ * meaningful only on screen (sticky bars, hover states, action
+ * buttons, the "Step" / sliders for the figures).
+ *
+ * Rendered figures are kept — at the moment a print is taken, the
+ * SVG reflects the current interactive state, which is fine. Captions
+ * encourage that interpretation by saying "as shown" or similar.
+ * ---------------------------------------------------------------- */
+
+@page {
+  size: letter;
+  margin: 0.7in 0.8in;
+}
+
+body {
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: black;
+  background: white;
+}
+
+/* Strip on-screen chrome */
+.app-bar,
+.toc,
+.fig-controls,
+.btn,
+.reading-meta,
+.article-foot {
+  display: none !important;
+}
+
+/* Collapse the layout to a single column */
+.layout {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.article {
+  max-width: none;
+}
+
+/* Headings tighten up */
+.article-head h1 { font-size: 22pt; line-height: 1.15; }
+.article h2 { font-size: 14pt; margin-top: 18pt; }
+.article h3 { font-size: 12pt; margin-top: 12pt; }
+.lede { font-size: 11pt; }
+
+/* Avoid splitting things we want to read together */
+h2, h3 { break-after: avoid; }
+.figure, .compare-grid, .callout, pre, .math-display {
+  break-inside: avoid;
+  box-shadow: none;
+}
+
+/* Remove screen-only color washes that print as flat blocks; keep
+ * a thin border so the structure still reads. */
+.callout {
+  background: transparent;
+  border: 1px solid #ccc;
+  border-left: 3px solid #888;
+}
+
+.cell-good, .cell-bad, .cell-mid {
+  background: transparent;
+}
+.cell-good { border-left: 3px solid #16a34a; }
+.cell-bad  { border-left: 3px solid #dc2626; }
+.cell-mid  { border-left: 3px solid #999; }
+.cmp-mark { display: none; }
+
+/* Footnotes: full color (already grayscale-friendly), inline ↩ stripped */
+.fn-back { display: none; }
+
+/* Code: print-safe colors come from the highlight.js stylesheet,
+ * which is already light. Just remove the surface and add a hairline. */
+pre {
+  background: transparent;
+  border: 1px solid #ccc;
+}
+
+/* SVG figures: ensure they don't push past the page width */
+.fig-svg {
+  background: transparent;
+  border: 1px solid #ccc;
+  max-width: 100%;
+}
+
+/* Links: show URLs after them so paper reader can follow */
+a[href^="http"]::after {
+  content: " (" attr(href) ")";
+  font-size: 0.85em;
+  color: #555;
+}
+/* But not for in-document anchors or footnote refs */
+a[href^="#"]::after { content: ""; }
