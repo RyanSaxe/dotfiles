@@ -89,6 +89,41 @@ A 4px spacing scale (`--space-1`=4, `--space-2`=8, ..., `--space-8`=32). Common 
 
 This is the rule that's easy to miscalibrate. When in doubt: yellow for "you are here," black for "do this." Never both at once.
 
+## Variants — distinct character from shared tokens
+
+When one skill produces several artifacts that should *feel different but clearly share a system* (a deck of pitch-style decks vs. tech-talk decks vs. explainer-style decks; a report skill that outputs an exec summary vs. a deep-dive variant; etc.), express the difference as a **`body.<variant>` opt-in class** rather than as a separate stylesheet.
+
+The pattern:
+
+```css
+/* Base — everything shared */
+:root { /* tokens */ }
+.card { /* default */ }
+.slide-head h2 { font-size: 44px; }
+
+/* Variant overrides — only what differs */
+body.variant-pitch .slide-head h2 { font-size: 56px; }
+body.variant-pitch .slide-head .kicker {
+  background: var(--color-accent);
+  padding: 4px 10px;
+}
+body.variant-explainer .slide-head .kicker {
+  font-style: italic;
+  text-transform: none;
+  color: var(--viz-blue-3);
+}
+```
+
+**Why this and not separate themes:**
+
+- *Tokens stay shared.* Variants override sizes, weights, alignment, accent application — never colors, fonts, or spacing scale. If a variant needs a different palette, it isn't a variant — it's a different skill.
+- *The system stays visible.* A reader skimming several artifacts from the same skill should immediately see the family resemblance even when the tone differs. Shared tokens guarantee that.
+- *Cheap to add.* A new variant is ~30 lines of CSS appended to the same stylesheet, not a fork.
+
+**Failure mode to avoid:** variants that override so much they amount to a different design system. If you find yourself overriding the body font, the surface color, the radius scale, *and* the type ramp inside a single variant, stop — the requirement isn't a variant, it's a separate skill.
+
+This pattern emerged from the `presentation` skill (deck-pitch / deck-explainer / deck-tech). It generalizes to any skill where the user wants several flavors of the same output without re-litigating taste each time.
+
 ## Content palette
 
 The chrome rules above keep UI elements calm. They are **wrong** for content-rich areas where the *job* of color is to make N distinct things separable. Three such areas, all governed by this section:
