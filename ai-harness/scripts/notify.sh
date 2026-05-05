@@ -6,6 +6,14 @@ if [[ -z "$json_input" && ! -t 0 ]]; then
   json_input="$(cat || true)"
 fi
 
+# TEMP DEBUG: capture every notification fire so we can identify what's
+# producing the spurious "waiting for input" pings. Remove after diagnosis.
+{
+  printf '\n=== %s (pid=%s, source=%s) ===\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "$$" "${AI_AGENT_SOURCE:-unset}"
+  printf 'json_input: %s\n' "$json_input"
+} >> "$HOME/.cache/ai-harness-notify-debug.log" 2> /dev/null || true
+
 jq_value() {
   local expression=$1
   if [[ -z "$json_input" ]] || ! command -v jq > /dev/null 2>&1; then
@@ -55,7 +63,7 @@ case "$hook_event:$notification_type" in
   StopFailure:* | ErrorOccurred:* | errorOccurred:*) category="error" ;;
   PermissionRequest:* | permissionRequest:* | approval-requested:* | *:permission_prompt) category="permission" ;;
   Elicitation:* | plan-mode-prompt:* | request-user-input:* | *:elicitation_dialog) category="input" ;;
-  PreToolUse:* | *:agent_idle | *:idle_prompt) category="input" ;;
+  PreToolUse:*) category="input" ;;
   *:agent_completed) category="complete" ;;
 esac
 
