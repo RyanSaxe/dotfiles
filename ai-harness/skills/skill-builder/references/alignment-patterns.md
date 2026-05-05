@@ -116,6 +116,21 @@ Skip the sample-iteration loop when:
 
 For these, fall back to the lighter Discover → Scaffold → Verify path. Sample iteration is a *cost*; spend it where the user genuinely can't pre-specify "good."
 
+## Promoting from sample → reusable asset
+
+Phase 3 step 2 (extract assets) and step 3 (propose design-system backflow) are abstract until you've seen one case. Here's how it plays out for a hypothetical `/quality-audit` skill, drawn from the actual `design-system/examples/code-quality-report/` artifact in this repo.
+
+During Phase 2 iteration, two things crystallized that weren't in the design system or in any other skill:
+
+1. A **unified-diff renderer in JS** — `renderUnifiedDiff(before, after)` using `Diff.diffLines` + `Diff.diffWordsWithSpace` to produce GitHub-style line-and-word diff markup. Used across every "before/after" finding in the sample.
+2. A **translucent rgba word-diff overlay pattern** — `rgba(220,38,38,0.20)` on red lines and `rgba(22,163,74,0.22)` on green reads cleaner than solid background swatches.
+
+**Phase 3 step 2** (within-skill): the diff renderer is a real reusable asset — many findings use it, and a future invocation would want to call into it rather than re-derive. It graduates from inline `examples/code-quality-report/script.js` into `<skill>/templates/diff-renderer.js`. The new skill's SKILL.md instructs the agent to "render diffs using `templates/diff-renderer.js`." The sample stays in `examples/` verbatim — that's the artifact the user approved.
+
+**Phase 3 step 3** (design-system backflow): the translucent rgba overlay isn't specific to code review — anywhere two color-coded states overlay text, the same restraint reads better. That's a candidate for `design-system/preferences.md` § Content palette: a one-line note about preferring translucent overlays over solid swatches when text remains primary. Surface this to the user; if they say yes, propose the prose diff against `preferences.md` separately. If no, the skill keeps the pattern internal.
+
+Both flows in one case: the renderer is *skill-internal reusable*, the overlay convention is *design-system-wide reusable*. They're decided independently.
+
 ## Closing rule
 
 If you're unsure whether to include alignment, ask: *"will the user be able to tell, from the artifact alone, whether this matched their intent?"* If yes, skip alignment. If no, you need it — and the section should converge on whatever dimension makes the answer "yes."
