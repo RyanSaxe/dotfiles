@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>code-review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <button class="topbar-identity" id="btn-home" title="Back to inbox">
+        <i data-lucide="layout-list"></i>
+        <strong id="topbar-repo">code-review</strong>
+        <span class="sep" id="topbar-sep-1" hidden>·</span>
+        <span id="topbar-branch"></span>
+        <span class="sep" id="topbar-sep-2" hidden>·</span>
+        <span class="commit" id="topbar-commit"></span>
+        <span class="sep" id="topbar-sep-3" hidden>·</span>
+        <span id="topbar-pr-link"></span>
+        <span id="topbar-stale" hidden></span>
+      </button>
+      <div class="topbar-actions">
+        <button class="btn" id="btn-save-feedback" hidden>
+          <i data-lucide="save"></i>
+          Save feedback
+        </button>
+        <button class="btn btn-primary" id="btn-send-review" hidden>
+          <i data-lucide="send"></i>
+          Send full review
+        </button>
+      </div>
+    </header>
+
+    <div class="main">
+      <aside class="tree" id="file-tree" hidden></aside>
+      <main class="content" id="content"></main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- highlight.js common bundle: 32+ languages built-in. Long-tail languages
+       fall back to highlightAuto in app.js. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

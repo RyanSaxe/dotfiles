@@ -1,0 +1,52 @@
+version: 1
+generated_at: 2026-05-05T09:12:00Z
+generated_by: claude-opus-4-7
+
+target:
+  repo_root: /Users/ryansaxe/generic/dotfiles
+  commit: d598ced2047cd78b72d69b092ebb842bb85772d6
+  branch: ai-harness
+
+review:
+  event: COMMENT
+  summary: |
+    Reviewed the recent ai-harness/scripts/ work. Notification routing
+    and dedupe logic look solid. Two concerns worth addressing.
+
+  # Review-level feedback. Read on the next /code-review run, addressed,
+  # then cleared. Empty / missing = nothing to address.
+  feedback: |
+    The severity calibration feels too soft across the board. We hit the
+    TOCTOU bug last quarter and it caused a real outage — that should be
+    critical, not high. Also: please look at notify.sh's emit_bell — I
+    think there's a similar fall-through bug where a failed
+    `nvim --remote-expr` leaves us bell-less.
+
+  comments:
+    - id: rev-001
+      file: ai-harness/scripts/attention-daemon.sh
+      start_line: 18
+      line: 28
+      severity: high
+      category: correctness
+      body: |
+        TOCTOU race on lock recovery. ...
+      status: open
+      # Per-comment feedback. Read alongside review-level feedback;
+      # addressed and then cleared.
+      feedback: |
+        Reframe with the user-visible failure first ("duplicate
+        notifications when two daemons race; reproducible under tmux
+        socket reconnects"), then the mechanism. Bump severity per the
+        review-level feedback.
+
+    - id: rev-002
+      file: ai-harness/claude/hooks/send-notification.sh
+      line: 5
+      severity: medium
+      category: arch
+      body: |
+        `$script_dir/../..` hardcodes the hook's depth ...
+      status: resolved
+      # No feedback on rev-002 — user fixed it locally and flipped status
+      # to resolved. The submitter will skip it.

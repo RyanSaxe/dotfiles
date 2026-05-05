@@ -1,0 +1,25 @@
+version: 1
+generated_at: 2026-05-05T09:30:00Z
+generated_by: claude-opus-4-7
+
+target:
+  repo_root: /Users/me/projects/myapp
+  commit: 771ab92e4a6f3c8d9e0b1c2d3e4f5a6b7c8d9e0f
+
+review:
+  event: COMMENT
+  summary: |
+    One finding worth flagging.
+
+  comments:
+    - id: rev-001
+      file: src/utils/parse.py
+      line: 47
+      severity: medium
+      category: correctness
+      body: |
+        Returning `None` on parse failure makes callers either ignore the
+        signal or sprinkle `if x is None` checks everywhere. Raise a
+        specific exception (`ParseError`) so the failure path is
+        unambiguous.
+      status: open
