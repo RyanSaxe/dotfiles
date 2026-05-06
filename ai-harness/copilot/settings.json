@@ -40,6 +40,9 @@
     "command": "$HOME/.copilot/utility-scripts/statusline.sh",
     "padding": 0
   },
+  "enabledFeatureFlags": {
+    "STATUS_LINE": true
+  },
   "footer": {
     "showCustom": true
   }
