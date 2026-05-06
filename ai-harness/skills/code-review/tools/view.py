@@ -28,6 +28,8 @@ See ../references/viewer-usage.md for the full lifecycle and API surface.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
 import os
 import re
@@ -81,6 +83,7 @@ except ImportError:
 REVIEWS_DIR = Path.home() / ".reviews"
 CACHE_DIR = Path.home() / ".cache" / "code-review"
 STATE_FILE = CACHE_DIR / "viewer.json"
+ENSURE_LOCK_FILE = CACHE_DIR / ".ensure.lock"
 WEBAPP_DIR = Path(__file__).parent / "webapp"
 SERVICE_SIGNATURE = "code-review-viewer"
 DEFAULT_PORT_START = 51234
@@ -569,7 +572,21 @@ class ViewerHandler(BaseHTTPRequestHandler):
         if mode == "comment":
             cmd += ["--comment-id", comment_id]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # 90s is well above a normal `gh api` POST and well under any
+        # reasonable user patience for a stuck spinner. On timeout the
+        # local YAML mutation below is skipped — the user can retry
+        # after checking GitHub manually.
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        except subprocess.TimeoutExpired:
+            self._json(
+                504,
+                {
+                    "error": "submit timed out after 90s — check GitHub before retrying",
+                    "detail": "local YAML left untouched",
+                },
+            )
+            return
         if result.returncode != 0:
             self._json(502, {"error": "submit failed", "detail": result.stderr.strip()})
             return
@@ -752,47 +769,78 @@ def cmd_foreground(open_browser: bool, review_path_arg: Path | None) -> int:
     return 0
 
 
-def cmd_ensure(open_browser: bool, review_path_arg: Path | None) -> int:
-    existing = detect_running_daemon()
-    if existing is not None:
-        if open_browser:
-            webbrowser.open(deep_link(existing, review_path_arg))
-        print(existing["url"])
-        return 0
+@contextlib.contextmanager
+def ensure_lock():
+    """Serialize the detect→fork→write_state critical section in cmd_ensure.
 
-    # Spawn a daemonized child. Parent waits for the state file to appear,
-    # then prints URL and (optionally) opens the browser.
-    pid = os.fork()
-    if pid > 0:
-        # Parent — wait for daemon to write the state file.
-        for _ in range(50):
-            time.sleep(0.1)
-            state = detect_running_daemon()
-            if state is not None:
-                if open_browser:
-                    webbrowser.open(deep_link(state, review_path_arg))
-                print(state["url"])
-                return 0
-        print("daemon did not start within 5s", file=sys.stderr)
-        return 1
-
-    # Child — daemonize fully and serve.
-    daemonize()
+    Without this, two parallel `view.py --ensure` invocations both find
+    no daemon, both fork, both bind a port, both clobber the state file
+    — leaving one daemon orphaned. The lock is process-level (fcntl) so
+    any other Python invoking cmd_ensure on the same machine waits.
+    """
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    fd = os.open(ENSURE_LOCK_FILE, os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        port = find_free_port()
-        state = {
-            "pid": os.getpid(),
-            "port": port,
-            "url": f"http://127.0.0.1:{port}",
-            "started_at": datetime.now(timezone.utc).isoformat(),
-            "service": SERVICE_SIGNATURE,
-        }
-        write_state(state)
-        run_server(port, verbose=False)
-    except Exception:
-        remove_state()
-        os._exit(1)
-    os._exit(0)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        # flock is released on close — explicit unlock keeps the order
+        # obvious when reading the code.
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+def cmd_ensure(open_browser: bool, review_path_arg: Path | None) -> int:
+    # Lock held through the detect → fork → wait-for-state-file window.
+    # A concurrent `view.py --ensure` blocks here until the first
+    # invocation's daemon has either written its state file or timed
+    # out, at which point the second invocation's detect_running_daemon
+    # finds the first daemon and returns without spawning a duplicate.
+    with ensure_lock():
+        existing = detect_running_daemon()
+        if existing is not None:
+            if open_browser:
+                webbrowser.open(deep_link(existing, review_path_arg))
+            print(existing["url"])
+            return 0
+
+        # Spawn a daemonized child. Parent waits for the state file to
+        # appear, then prints URL and (optionally) opens the browser.
+        pid = os.fork()
+        if pid > 0:
+            # Parent — wait for daemon to write the state file.
+            for _ in range(50):
+                time.sleep(0.1)
+                state = detect_running_daemon()
+                if state is not None:
+                    if open_browser:
+                        webbrowser.open(deep_link(state, review_path_arg))
+                    print(state["url"])
+                    return 0
+            print("daemon did not start within 5s", file=sys.stderr)
+            return 1
+
+        # Child branch — escape via os._exit so the `with` cleanup never
+        # runs in this process; otherwise the daemon's flock release
+        # would race the parent's release on the shared OFD.
+        try:
+            daemonize()
+            port = find_free_port()
+            state = {
+                "pid": os.getpid(),
+                "port": port,
+                "url": f"http://127.0.0.1:{port}",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "service": SERVICE_SIGNATURE,
+            }
+            write_state(state)
+            run_server(port, verbose=False)
+        except Exception:
+            remove_state()
+            os._exit(1)
+        os._exit(0)
 
 
 # === Entry point ==================================================
