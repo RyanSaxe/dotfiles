@@ -139,6 +139,40 @@ button {
 .topbar-actions {
   display: flex;
   gap: var(--space-2);
+  align-items: center;
+}
+
+/* Mouse-friendly companion to Tab/Shift-Tab navigation: prev/next chevrons
+   with a "current / total" counter between them. */
+.topbar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  margin-right: var(--space-2);
+}
+
+.topbar-nav .btn {
+  padding: 2px;
+  border: none;
+  background: transparent;
+}
+
+.topbar-nav .btn:hover {
+  background: #f5f5f5;
+}
+
+.topbar-nav-counter {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  padding: 0 var(--space-2);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* === Buttons ====================================================== */

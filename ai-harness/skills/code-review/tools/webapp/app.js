@@ -281,6 +281,8 @@ function renderTopbar() {
   const sep3 = document.getElementById("topbar-sep-3");
   const saveBtn = document.getElementById("btn-save-feedback");
   const sendBtn = document.getElementById("btn-send-review");
+  const navWrap = document.getElementById("topbar-nav");
+  const navCounter = document.getElementById("topbar-nav-counter");
 
   if (state.route.view === "inbox" || !state.review) {
     repoEl.textContent = "code-review";
@@ -291,6 +293,7 @@ function renderTopbar() {
     sep1.hidden = sep2.hidden = sep3.hidden = true;
     saveBtn.hidden = true;
     sendBtn.hidden = true;
+    navWrap.hidden = true;
     return;
   }
 
@@ -337,6 +340,19 @@ function renderTopbar() {
 
   saveBtn.hidden = false;
   sendBtn.hidden = false;
+
+  const navComments = navigableComments();
+  if (navComments.length === 0) {
+    navWrap.hidden = true;
+  } else {
+    navWrap.hidden = false;
+    const cursorIdx = state.cursorCommentId
+      ? navComments.findIndex((c) => c.id === state.cursorCommentId)
+      : -1;
+    navCounter.textContent = cursorIdx === -1
+      ? `${navComments.length}`
+      : `${cursorIdx + 1} / ${navComments.length}`;
+  }
 }
 
 // === File tree =====================================================
@@ -512,6 +528,9 @@ function attachTreeHandlers(root) {
 // === Content rendering =============================================
 
 function renderContent() {
+  // Topbar reflects the navigation cursor counter — keep it in sync with
+  // every content render so Tab / button clicks update the "N / 9".
+  renderTopbar();
   const content = document.getElementById("content");
   if (state.error) {
     content.innerHTML = `<div class="error-banner">${escapeHtml(state.error)}</div>`;
@@ -1257,6 +1276,14 @@ async function cycleStatus(commentId) {
 
 document.getElementById("btn-home").addEventListener("click", () => {
   navigate({ view: "inbox" });
+});
+
+document.getElementById("btn-prev-comment").addEventListener("click", () => {
+  navigateToComment(-1);
+});
+
+document.getElementById("btn-next-comment").addEventListener("click", () => {
+  navigateToComment(+1);
 });
 
 document.getElementById("btn-save-feedback").addEventListener("click", async () => {
