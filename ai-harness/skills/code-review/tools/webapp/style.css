@@ -378,14 +378,39 @@ body.inbox-mode .main {
 .tree-item.dir {
   color: var(--color-muted);
   font-weight: 500;
+  /* Trim the gap between chevron and folder so they read as a single
+     "click target" pair rather than two equally-spaced icons. */
+  gap: var(--space-1);
 }
 
 .tree-item.dir .lucide {
   color: var(--color-faint);
 }
 
+.tree-item.dir:hover {
+  background: #f5f5f5;
+}
+
+/* Chevron rotates with collapse state via icon swap (chevron-down ↔
+   chevron-right) — no CSS animation needed, keeps the icon set consistent
+   with the rest of the tree. */
+.tree-chevron {
+  flex-shrink: 0;
+}
+
 .tree-item.file:hover {
   background: #f5f5f5;
+}
+
+/* Long filenames or deep folders shouldn't blow out the 280px sidebar.
+   Truncate with ellipsis; the full path is available via the `title`
+   attribute set on the row. */
+.tree-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .tree-item.file.active {

@@ -21,6 +21,7 @@ const state = {
   expandedComments: new Set(),
   cursorCommentId: null,              // last navigated/clicked comment — Tab/S-Tab anchor
   treeFilter: { query: "", showAll: false },
+  collapsedFolders: new Set(),        // folder paths the user has collapsed in the file tree
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
   editingBody: null,                  // commentId currently being edited inline
   editingSuggestion: null,            // commentId currently editing suggestion inline
@@ -231,6 +232,35 @@ async function submitReview(slug, key, body) {
 
 // === Route loader ==================================================
 
+// File-tree collapsed-folder state is per-review and persisted in localStorage
+// so the user's tree shape survives reloads. Key includes slug + key (the
+// same identifiers used in the route) so unrelated reviews don't share state.
+function collapsedFoldersKey(slug, key) {
+  return `code-review:collapsed-folders:${slug}:${key}`;
+}
+
+function loadCollapsedFolders(slug, key) {
+  try {
+    const raw = localStorage.getItem(collapsedFoldersKey(slug, key));
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCollapsedFolders() {
+  if (!state.review) return;
+  try {
+    localStorage.setItem(
+      collapsedFoldersKey(state.review._slug, state.review._key),
+      JSON.stringify(Array.from(state.collapsedFolders)),
+    );
+  } catch {
+    // localStorage disabled or full — collapse state stays in-memory only
+  }
+}
+
 async function loadRoute(route) {
   state.route = route;
   state.error = null;
@@ -244,6 +274,7 @@ async function loadRoute(route) {
       state.review = null;
       state.source = null;
       state.fullTree = null;
+      state.collapsedFolders = new Set();
       state.inbox = await fetchInbox();
     } else {
       state.inbox = null;
@@ -254,6 +285,7 @@ async function loadRoute(route) {
         data._key = route.key;
         state.review = data;
         state.fullTree = null;          // changed review → invalidate tree cache
+        state.collapsedFolders = loadCollapsedFolders(route.slug, route.key);
       }
       if (route.view === "file") {
         const content = await fetchSource(route.slug, route.key, route.file);
@@ -446,7 +478,7 @@ function buildTreeFromFiles(paths, commentCounts = {}) {
   return treeObjectToList(root);
 }
 
-function treeObjectToList(obj) {
+function treeObjectToList(obj, prefix = "") {
   return Object.keys(obj)
     .sort()
     .map((name) => {
@@ -454,30 +486,50 @@ function treeObjectToList(obj) {
       if (v.__leaf) {
         return { type: "file", name, path: v.path, count: v.count };
       }
-      return { type: "dir", name, children: treeObjectToList(v) };
+      const dirPath = prefix ? `${prefix}/${name}` : name;
+      const children = treeObjectToList(v, dirPath);
+      // Aggregate descendant comment counts so a collapsed folder can still
+      // show users "5 comments are hiding in here" via its pip.
+      const dirCount = children.reduce(
+        (sum, c) => sum + (c.type === "file" ? c.count : c.dirCount),
+        0,
+      );
+      return { type: "dir", name, path: dirPath, children, dirCount };
     });
 }
 
 function renderTreeNode(node) {
   if (node.type === "dir") {
+    const collapsed = state.collapsedFolders.has(node.path);
+    const chevronIcon = collapsed ? "chevron-right" : "chevron-down";
+    const folderIcon = collapsed ? "folder" : "folder-open";
+    // When collapsed, surface the descendant comment count so users still see
+    // "something's in there" without expanding. When expanded, child files
+    // already carry their own pips so a folder pip would be redundant.
+    const pip = collapsed && node.dirCount > 0
+      ? `<span class="comment-pip">${node.dirCount}</span>`
+      : "";
+    const childrenHtml = collapsed
+      ? ""
+      : `<ul class="tree-node tree-children">${node.children.map((c) => renderTreeNode(c)).join("")}</ul>`;
     return `
       <li>
-        <div class="tree-item dir">
-          <i data-lucide="folder"></i>
-          <span>${escapeHtml(node.name)}</span>
+        <div class="tree-item dir" data-folder="${escapeHtml(node.path)}" title="${escapeHtml(node.path)}">
+          <i data-lucide="${chevronIcon}" class="tree-chevron"></i>
+          <i data-lucide="${folderIcon}"></i>
+          <span class="tree-item-name">${escapeHtml(node.name)}</span>
+          ${pip}
         </div>
-        <ul class="tree-node tree-children">
-          ${node.children.map((c) => renderTreeNode(c)).join("")}
-        </ul>
+        ${childrenHtml}
       </li>
     `;
   }
   const isActive = state.route.view === "file" && state.route.file === node.path;
   return `
     <li>
-      <div class="tree-item file ${isActive ? "active" : ""}" data-file="${escapeHtml(node.path)}">
+      <div class="tree-item file ${isActive ? "active" : ""}" data-file="${escapeHtml(node.path)}" title="${escapeHtml(node.path)}">
         <i data-lucide="file-text"></i>
-        <span>${escapeHtml(node.name)}</span>
+        <span class="tree-item-name">${escapeHtml(node.name)}</span>
         ${node.count > 0 ? `<span class="comment-pip">${node.count}</span>` : ""}
       </div>
     </li>
@@ -494,6 +546,18 @@ function attachTreeHandlers(root) {
   root.querySelectorAll('[data-route="review"]').forEach((el) => {
     el.addEventListener("click", () => {
       navigate({ view: "review", slug: state.route.slug, key: state.route.key });
+    });
+  });
+  root.querySelectorAll("[data-folder]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const path = el.getAttribute("data-folder");
+      if (state.collapsedFolders.has(path)) {
+        state.collapsedFolders.delete(path);
+      } else {
+        state.collapsedFolders.add(path);
+      }
+      saveCollapsedFolders();
+      renderTree();
     });
   });
 
