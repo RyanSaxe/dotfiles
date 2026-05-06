@@ -24,7 +24,9 @@ target:
   commit: a3f2c1d8e9b0c4f5a6d7e8f9 # full SHA — the canonical anchor
   branch: feature/auth-refactor # optional
   pr_number: 142 # optional; presence enables direct submit
-  remote: origin # optional; helps resolve owner/repo for submit
+  owner: my-org # required when pr_number is set; powers the topbar PR link
+  repo: myapp # required when pr_number is set; powers the topbar PR link
+  remote: origin # optional; fallback for resolving owner/repo when not set
 
 review:
   event: COMMENT # COMMENT | REQUEST_CHANGES | APPROVE | PENDING

@@ -291,8 +291,25 @@ function renderTopbar() {
   repoEl.textContent = t.repo_root ? t.repo_root.split("/").pop() : state.route.slug;
   branchEl.textContent = t.branch || "—";
   commitEl.textContent = shortSha(t.commit);
-  if (t.pr_number) {
-    prEl.innerHTML = `<a href="https://github.com/${t.pr_number}" onclick="event.stopPropagation()">PR #${t.pr_number}</a>`;
+  prEl.textContent = "";
+  if (t.pr_number && t.owner && t.repo) {
+    // DOM-construct the link instead of innerHTML — pr_number/owner/repo
+    // come straight from a YAML on disk that nothing validates at read
+    // time, so an unescaped template here is an XSS sink.
+    const a = document.createElement("a");
+    a.href = `https://github.com/${encodeURIComponent(t.owner)}/${encodeURIComponent(t.repo)}/pull/${encodeURIComponent(t.pr_number)}`;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = `PR #${t.pr_number}`;
+    a.addEventListener("click", (e) => e.stopPropagation());
+    prEl.appendChild(a);
+    sendBtn.disabled = false;
+    sendBtn.title = "";
+  } else if (t.pr_number) {
+    // Have a PR number but no owner/repo — older YAMLs predate the schema
+    // bump. Show the number as text so submit still works (the daemon can
+    // resolve owner/repo at submit time), but no clickable link.
+    prEl.textContent = `PR #${t.pr_number}`;
     sendBtn.disabled = false;
     sendBtn.title = "";
   } else {
@@ -661,7 +678,7 @@ function renderInboxRow(r) {
       <td><span class="sha">${escapeHtml(r.short_sha)}</span></td>
       <td>${pipsHtml} ${feedback}</td>
       <td><span class="age">${relativeAge(r.modified)}</span></td>
-      <td>${r.pr_number ? `<span class="pr">#${r.pr_number}</span>` : `<span class="pr none">—</span>`}</td>
+      <td>${r.pr_number ? `<span class="pr">#${escapeHtml(r.pr_number)}</span>` : `<span class="pr none">—</span>`}</td>
       <td><button class="inbox-delete" title="Delete review" data-slug="${r.slug}" data-key="${r.key}"><i data-lucide="trash-2"></i></button></td>
     </tr>
   `;
@@ -695,12 +712,12 @@ function renderReviewOverview() {
 
   document.getElementById("content").innerHTML = `
     <div class="overview-header">
-      <h1>${shortSha(t.commit)} · ${escapeHtml(t.branch || "—")}</h1>
+      <h1>${escapeHtml(shortSha(t.commit))} · ${escapeHtml(t.branch || "—")}</h1>
       <div class="meta">${escapeHtml(t.repo_root || "")}</div>
     </div>
 
     <div class="overview-summary">
-      <div class="overview-summary-label">Summary · ${r.event}</div>
+      <div class="overview-summary-label">Summary · ${escapeHtml(r.event)}</div>
       <div class="overview-summary-body">${escapeHtml(r.summary)}</div>
     </div>
 
@@ -758,7 +775,7 @@ function renderFileView() {
     ].filter(Boolean).join(" ");
     const codeHtml = renderHighlightedLine(lineText, language);
     const gutterDataAttr = anchored.length > 0
-      ? `data-comment-id="${anchored[0].id}"`
+      ? `data-comment-id="${escapeHtml(anchored[0].id)}"`
       : `data-add-line="${lineNum}"`;
 
     let html = `
@@ -772,7 +789,7 @@ function renderFileView() {
     anchored.forEach((c) => {
       if (state.expandedComments.has(c.id)) {
         html += `
-          <tr class="comment-row" data-comment-row-id="${c.id}">
+          <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
             <td colspan="3"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
           </tr>
         `;
@@ -865,6 +882,14 @@ function renderCommentCard(c, opts = {}) {
   const sev = c.severity || "info";
   const language = opts.fileLanguage || detectLanguage(c.file);
 
+  // Severity / status / id are *expected* to be enum / pattern values, but
+  // validate.py is only run at generation time — a malicious YAML written
+  // into ~/.reviews/ by some other tool could carry any string. Escape
+  // every interpolation that lands in attributes or text content.
+  const sevSafe = escapeHtml(sev);
+  const statusSafe = escapeHtml(c.status);
+  const idSafe = escapeHtml(c.id);
+
   const suggestionHtml = c.suggestion
     ? renderSuggestionDiff(c, language, opts.sourceLines)
     : "";
@@ -878,44 +903,44 @@ function renderCommentCard(c, opts = {}) {
       <div class="comment-feedback-text">${escapeHtml(c.feedback)}</div>
     </div>
   ` : `
-    <textarea class="comment-feedback-input" data-comment-feedback="${c.id}" placeholder="Leave feedback for the AI to address on the next /code-review run…"></textarea>
+    <textarea class="comment-feedback-input" data-comment-feedback="${idSafe}" placeholder="Leave feedback for the AI to address on the next /code-review run…"></textarea>
   `;
 
   const lineRefHtml = opts.withLineRef ? `<span class="comment-line-ref">${lineRef}</span>` : "";
   const closeBtnHtml = opts.withLineRef ? "" :
-    `<button class="comment-close" data-collapse-comment="${c.id}" title="Close (Esc)"><i data-lucide="x"></i></button>`;
+    `<button class="comment-close" data-collapse-comment="${idSafe}" title="Close (Esc)"><i data-lucide="x"></i></button>`;
 
   const isEditing = state.editingBody === c.id;
   const bodyHtml = isEditing
     ? `
-      <textarea class="comment-body-edit" data-edit-body="${c.id}" autofocus>${escapeHtml(c.body)}</textarea>
+      <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(c.body)}</textarea>
       <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel</div>
     `
-    : `<div class="comment-body" data-edit-target="${c.id}" title="Click to edit">${renderMarkdown(c.body)}</div>`;
+    : `<div class="comment-body" data-edit-target="${idSafe}" title="Click to edit">${renderMarkdown(c.body)}</div>`;
 
   return `
-    <div class="comment-card" data-comment-card="${c.id}">
+    <div class="comment-card" data-comment-card="${idSafe}">
       <div class="comment-header">
-        <span class="severity-badge ${sev}">${sev}</span>
+        <span class="severity-badge ${sevSafe}">${sevSafe}</span>
         <span class="category-pill">${escapeHtml(c.category)}</span>
-        <button class="status-pill ${c.status}" data-cycle-status="${c.id}" title="Click to cycle: open → acknowledged → resolved → wontfix">${c.status}</button>
+        <button class="status-pill ${statusSafe}" data-cycle-status="${idSafe}" title="Click to cycle: open → acknowledged → resolved → wontfix">${statusSafe}</button>
         ${lineRefHtml}
-        <span class="comment-id">${c.id}</span>
+        <span class="comment-id">${idSafe}</span>
         ${closeBtnHtml}
       </div>
       ${bodyHtml}
       ${suggestionHtml}
       ${feedbackHtml}
       <div class="comment-actions">
-        <button class="btn btn-icon btn-danger" data-delete-comment="${c.id}" title="Delete comment">
+        <button class="btn btn-icon btn-danger" data-delete-comment="${idSafe}" title="Delete comment">
           <i data-lucide="trash-2"></i>
         </button>
         <div class="spacer"></div>
-        <button class="btn" data-save-comment-feedback="${c.id}">
+        <button class="btn" data-save-comment-feedback="${idSafe}">
           <i data-lucide="save"></i>
           Save feedback
         </button>
-        <button class="btn btn-primary" data-send-comment="${c.id}" ${state.review.target?.pr_number ? "" : "disabled"}>
+        <button class="btn btn-primary" data-send-comment="${idSafe}" ${state.review.target?.pr_number ? "" : "disabled"}>
           <i data-lucide="send"></i>
           Send this comment
         </button>

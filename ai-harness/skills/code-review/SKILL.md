@@ -57,7 +57,7 @@ One short turn — don't over-ask. Iteration mode auto-detects without asking.
 ## How to Run
 
 1. **Validate working tree.** `git status --porcelain` must be empty. If not, refuse: _"You have uncommitted changes — line numbers would shift. Want me to commit them first?"_ Then re-run after the commit.
-2. **Determine target.** If the user said "review PR #N" → run `gh pr checkout N` first. Read `git rev-parse HEAD` (full SHA), `git rev-parse --abbrev-ref HEAD` (branch), `git rev-parse --show-toplevel` (repo root), and `gh pr view --json number 2>/dev/null` (optional PR number).
+2. **Determine target.** If the user said "review PR #N" → run `gh pr checkout N` first. Read `git rev-parse HEAD` (full SHA), `git rev-parse --abbrev-ref HEAD` (branch), `git rev-parse --show-toplevel` (repo root), and (when a PR is in play) `gh pr view --json number -q .number 2>/dev/null` for the PR number plus `gh repo view --json owner,name -q '.owner.login + "/" + .name' 2>/dev/null` for `owner/repo` (split on `/` into `target.owner` and `target.repo` — both are required whenever `target.pr_number` is set, so the viewer can build a working PR link).
 3. **Compute review file path.** `~/.reviews/<repo-slug>/<short-sha>-<utc-timestamp>.review.yaml`. Create the parent directory if needed.
 4. **Check for existing review at HEAD's SHA.** If present:
    - With non-empty `review.feedback` or per-comment `feedback` → enter **iteration mode** (read feedback, address it, clear the fields, write the YAML in place). See [`references/iteration.md`](references/iteration.md).

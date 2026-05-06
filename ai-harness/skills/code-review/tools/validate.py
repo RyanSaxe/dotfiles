@@ -51,6 +51,15 @@ def validate(path: Path) -> list[str]:
         for key in ("repo_root", "commit"):
             if key not in target:
                 errors.append(f"target.{key} is required")
+        # owner/repo are required when pr_number is set — they power the
+        # topbar PR link in the viewer. Without them the link can't be
+        # built and we'd be back to the rev-001 bug.
+        if target.get("pr_number") is not None:
+            for key in ("owner", "repo"):
+                if not target.get(key):
+                    errors.append(
+                        f"target.{key} is required when target.pr_number is set"
+                    )
 
     review = data.get("review", {})
     if not isinstance(review, dict):
