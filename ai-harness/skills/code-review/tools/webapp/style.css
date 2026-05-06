@@ -525,19 +525,25 @@ body.inbox-mode .main {
   text-transform: uppercase;
 }
 
-/* Add-comment "+" in the gutter on hover */
-.code-table tr.uncommented:hover td.gutter-marker::before {
+/* Add-comment "+" in the gutter. Faint at rest so the gutter rhythm reads as
+   a stable column even on uncommented files; brighter on hover for affordance. */
+.code-table tr.uncommented td.gutter-marker {
+  cursor: pointer;
+}
+
+.code-table tr.uncommented td.gutter-marker::before {
   content: "+";
   display: inline-block;
   color: var(--color-faint);
   font-weight: 600;
-  cursor: pointer;
   font-size: 13px;
   line-height: 1;
+  opacity: 0.15;
+  transition: opacity 0.1s ease-in-out;
 }
 
-.code-table tr.uncommented td.gutter-marker {
-  cursor: pointer;
+.code-table tr.uncommented:hover td.gutter-marker::before {
+  opacity: 0.7;
 }
 
 /* New-comment form rendered inline below the clicked line */
@@ -661,8 +667,24 @@ body.inbox-mode .main {
   background: rgba(254, 243, 199, 0.25);
 }
 
+/* Horizontal-scroll wrapper. Gutter columns stay locked because the inner
+   table uses `table-layout: fixed` with explicit <col> widths — the code
+   column expands beyond the viewport, only the wrapper scrolls. */
+.code-table-scroll {
+  overflow-x: auto;
+}
+
 .code-table {
-  width: 100%;
+  /* Layout strategy:
+     - `table-layout: auto` lets the table grow past 100% when a long
+       `white-space: pre` line demands it (the wrapper then scrolls).
+     - `min-width: 100%` keeps the table at least filling its container.
+     - `min-width` on the gutter cells is the load-bearing line: with plain
+       `width:`, the auto algorithm treats it as a hint and shrinks the
+       gutters to fit the code column when content gets long. `min-width`
+       is enforced, so gutters stay at 56/18px regardless of code length. */
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 12.5px;
@@ -675,6 +697,7 @@ body.inbox-mode .main {
 
 .code-table td.gutter-num {
   width: 56px;
+  min-width: 56px;
   text-align: right;
   padding: 0 var(--space-3);
   color: var(--color-faint);
@@ -686,6 +709,7 @@ body.inbox-mode .main {
 
 .code-table td.gutter-marker {
   width: 18px;
+  min-width: 18px;
   padding: 0;
   text-align: center;
   user-select: none;
@@ -908,16 +932,21 @@ body.inbox-mode .main {
   gap: 4px;
 }
 
+/* Suggestion-diff scroll wrapper. Same rationale as .code-table-scroll. */
+.diff-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+}
+
 /* Unified-diff suggestion: original lines (red wash) above replacement (green wash) */
 .diff-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.6;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-input);
-  overflow: hidden;
 }
 
 .diff-line {
@@ -934,6 +963,7 @@ body.inbox-mode .main {
 
 .diff-line td.diff-num {
   width: 48px;
+  min-width: 48px;
   padding: 0 var(--space-2);
   text-align: right;
   color: var(--color-faint);
@@ -943,6 +973,7 @@ body.inbox-mode .main {
 
 .diff-line td.diff-marker {
   width: 18px;
+  min-width: 18px;
   text-align: center;
   color: var(--color-muted);
   user-select: none;

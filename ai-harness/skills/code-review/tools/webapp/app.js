@@ -822,7 +822,9 @@ function renderFileView() {
         <span class="lang-badge">${language || "auto"}</span>
         <span style="margin-left:auto">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
       </div>
-      <table class="code-table"><tbody>${rows}</tbody></table>
+      <div class="code-table-scroll">
+        <table class="code-table"><tbody>${rows}</tbody></table>
+      </div>
     </div>
   `;
   attachContentHandlers();
@@ -983,10 +985,12 @@ function renderSuggestionDiff(c, language, sourceLinesArg) {
         <i data-lucide="lightbulb"></i>
         Suggested change
       </div>
-      <table class="diff-table"><tbody>
-        ${removedRows}
-        ${addedRows}
-      </tbody></table>
+      <div class="diff-table-scroll">
+        <table class="diff-table"><tbody>
+          ${removedRows}
+          ${addedRows}
+        </tbody></table>
+      </div>
     </div>
   `;
 }
