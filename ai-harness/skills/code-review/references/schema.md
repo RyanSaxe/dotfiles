@@ -88,11 +88,24 @@ Free text. Common values: `correctness`, `security`, `arch`, `perf`, `style`, `d
 
 ### `body`
 
-Markdown. The viewer renders inline-code (backticks), bold, paragraph breaks. Lead with the _what_ and _why_; if the fix is non-obvious, end with a sentence on the _how_.
+GitHub-flavored Markdown. Lead with the _what_ and _why_; if the fix is non-obvious, end with a sentence on the _how_.
+
+Do not hard-wrap prose for YAML readability. A review comment paragraph should be one logical Markdown paragraph; use blank lines for paragraph breaks, bullets for lists, tables for tabular content, and fenced code blocks for code. Intentional Markdown structure should be explicit, not an artifact of YAML line width.
 
 ### `suggestion`
 
-Optional. **Raw code, no fences.** The submitter wraps it in ` ```suggestion\n…\n``` ` when posting to GitHub. The viewer renders it as a unified diff against the original line(s) at `start_line..line`.
+Optional. **Raw exact replacement code, no fences.** The submitter wraps it in ` ```suggestion\n…\n``` ` when posting to GitHub. The viewer renders it as a unified diff against the original line(s) at `start_line..line`.
+
+GitHub applies suggestions exactly. Include every leading tab or space required on every line. Suggestions do not inherit indentation from the commented line. Because YAML strips the block scalar's own indentation, replacement indentation must be written beyond the YAML nesting indentation:
+
+Single-line replacement inside an indented Python method:
+
+```yaml
+      suggestion: |
+                return price_multiplier["impacts"] * (
+                    keras.ops.sum(linear_effects, axis=-1) + intercepts
+                )
+```
 
 ### `status`
 

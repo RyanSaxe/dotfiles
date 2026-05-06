@@ -63,6 +63,8 @@ One short turn — don't over-ask. Iteration mode auto-detects without asking.
    - With non-empty `review.feedback` or per-comment `feedback` → enter **iteration mode** (read feedback, address it, clear the fields, write the YAML in place). See [`references/iteration.md`](references/iteration.md).
    - Without feedback → ask the user: open the viewer, append more comments, or overwrite from scratch?
 5. **Generate the review.** Walk relevant files for the scope. Produce comments per [`references/schema.md`](references/schema.md). Each comment gets a unique `rev-NNN` id (zero-padded), severity (`info | low | medium | high | critical`), category (free text — `correctness`, `security`, `arch`, `perf`, `style`, etc.), markdown body, optional suggestion (raw code, no fences), and `status: open`.
+   - Comment bodies are GitHub-flavored Markdown. Do not hard-wrap prose for YAML width; use Markdown structure for intentional breaks.
+   - Suggestions are exact GitHub replacement text. Include all leading whitespace; YAML block indentation is not part of the value.
 6. **Validate the YAML.** `uv run --script tools/validate.py <path>` — must exit 0. If it fails, fix the YAML and re-validate.
 7. **Open the viewer.** `uv run --script tools/view.py --ensure --open --review-path <path>`. Idempotent: if a viewer daemon is already running it just deep-links in the browser; otherwise it daemonizes a fresh one and then opens. See [`references/viewer-usage.md`](references/viewer-usage.md).
 8. **Tell the user where it is.** Print the deep-link URL and a one-line summary: `"<short-sha> · <N> comments (<sev breakdown>) · <url>/r/<slug>/<sha-ts>"`.

@@ -716,6 +716,36 @@ body.inbox-mode .main {
   min-height: 60px;
 }
 
+.new-comment-form .CodeMirror,
+.comment-card .CodeMirror {
+  border: 1px solid var(--color-emphasis);
+  border-radius: var(--radius-input);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-body);
+  height: auto;
+  min-height: 120px;
+  margin-bottom: var(--space-3);
+}
+
+.new-comment-form #new-body + .CodeMirror,
+.comment-card .comment-body-edit + .CodeMirror {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+.new-comment-form .CodeMirror-scroll,
+.comment-card .CodeMirror-scroll {
+  min-height: 120px;
+  max-height: 420px;
+}
+
+.new-comment-form .CodeMirror pre.CodeMirror-line,
+.comment-card .CodeMirror pre.CodeMirror-line {
+  padding: 0 var(--space-3);
+}
+
 .new-comment-form .form-actions {
   display: flex;
   gap: var(--space-2);
@@ -740,6 +770,34 @@ body.inbox-mode .main {
 
 .comment-body-edit:focus {
   outline: none;
+}
+
+.comment-editor-preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  padding: var(--space-3);
+  margin: 0 0 var(--space-3) 0;
+  background: #fafafa;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.comment-editor-preview:empty {
+  display: none;
+}
+
+.comment-editor-preview p {
+  margin: 0 0 var(--space-2) 0;
+}
+
+.comment-editor-preview p:last-child {
+  margin-bottom: 0;
+}
+
+.comment-editor-preview ul,
+.comment-editor-preview ol {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
 }
 
 .comment-body-edit-hint {
@@ -1121,6 +1179,21 @@ body.inbox-mode .comment-row-inner {
 
 .suggestion-edit:focus {
   outline: none;
+}
+
+.suggestion-warning {
+  margin: 0 0 var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid #facc15;
+  border-radius: var(--radius-input);
+  background: #fef9c3;
+  color: #854d0e;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.suggestion-preview {
+  margin-bottom: var(--space-3);
 }
 
 /* "Add suggested change" button when c.suggestion is empty. Inline with the

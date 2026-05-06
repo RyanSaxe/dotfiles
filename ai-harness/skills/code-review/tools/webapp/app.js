@@ -14,6 +14,7 @@ const state = {
   inbox: null,                        // { reviews: [...] }
   review: null,                       // parsed review YAML (per current slug/key)
   source: null,                       // { file, content }
+  sourceCache: new Map(),             // file path -> source content for editor previews
   fullTree: null,                     // { files: [...] } — fetched lazily on "show all" toggle
   // ui
   inboxFilter: "needs_triage",        // 'needs_triage' | 'iterating' | 'done' | 'stale'
@@ -25,6 +26,7 @@ const state = {
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
   editingBody: null,                  // commentId currently being edited inline
   editingSuggestion: null,            // commentId currently editing suggestion inline
+  suggestionDrafts: new Map(),         // commentId -> original source replacement text
   error: null,
 };
 
@@ -57,13 +59,31 @@ function escapeHtml(text) {
 function renderMarkdown(text) {
   // Defer to marked when the CDN script loaded; fall back to a
   // plain-escape on CDN miss so comment bodies always render *something*
-  // safe instead of throwing. marked.parse escapes HTML in the source by
-  // default, so user/AI-supplied <script> stays inert.
+  // safe instead of throwing. The sanitizer below removes dangerous raw
+  // HTML while preserving normal Markdown structure.
   const src = String(text ?? "");
   if (window.marked) {
-    return window.marked.parse(src, { breaks: true, gfm: true });
+    return sanitizeRenderedMarkdown(window.marked.parse(src, { breaks: false, gfm: true }));
   }
   return `<pre class="comment-body-fallback">${escapeHtml(src)}</pre>`;
+}
+
+function sanitizeRenderedMarkdown(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll("script, style, iframe, object, embed, link, meta, base").forEach((el) => {
+    el.remove();
+  });
+  template.content.querySelectorAll("*").forEach((el) => {
+    Array.from(el.attributes).forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim().toLowerCase();
+      if (name.startsWith("on") || value.startsWith("javascript:")) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.innerHTML;
 }
 
 function showToast(message) {
@@ -131,6 +151,179 @@ function renderHighlightedLine(line, language) {
   } catch {
     return escapeHtml(line) || "&nbsp;";
   }
+}
+
+const CODEMIRROR_MODE_URL = "https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/%N/%N.min.js";
+
+function codeMirrorModeInfo(filePath, language) {
+  if (!window.CodeMirror) return null;
+  const cm = window.CodeMirror;
+  if (language && cm.findModeByName) {
+    const byLanguage = cm.findModeByName(language);
+    if (byLanguage && byLanguage.mode !== "null") return byLanguage;
+  }
+  const filename = filePath ? filePath.split("/").pop() : "";
+  if (filename && cm.findModeByFileName) {
+    const byFilename = cm.findModeByFileName(filename);
+    if (byFilename && byFilename.mode !== "null") return byFilename;
+  }
+  const ext = filename && filename.includes(".") ? filename.split(".").pop() : "";
+  if (ext && cm.findModeByExtension) {
+    const byExtension = cm.findModeByExtension(ext);
+    if (byExtension && byExtension.mode !== "null") return byExtension;
+  }
+  return null;
+}
+
+function markdownModeInfo() {
+  if (!window.CodeMirror?.findModeByName) return { mode: "markdown", mime: "text/x-markdown" };
+  return window.CodeMirror.findModeByName("markdown") || { mode: "markdown", mime: "text/x-markdown" };
+}
+
+function modeSpec(modeInfo) {
+  return modeInfo?.mime || modeInfo?.mode || null;
+}
+
+function editorValue(el) {
+  return el?._cm ? el._cm.getValue() : (el?.value || "");
+}
+
+function normalizeSuggestionText(text) {
+  const value = String(text ?? "");
+  return /\S/.test(value) ? value.replace(/\n+$/, "") : "";
+}
+
+function sourceLinesForFile(filePath, sourceLinesArg = null) {
+  if (sourceLinesArg) return sourceLinesArg;
+  if (state.source?.file === filePath) return state.source.content.split("\n");
+  const cached = state.sourceCache.get(filePath);
+  return cached ? cached.split("\n") : null;
+}
+
+async function ensureSourceForFile(filePath) {
+  if (!filePath) return null;
+  if (state.source?.file === filePath) return state.source.content;
+  if (state.sourceCache.has(filePath)) return state.sourceCache.get(filePath);
+  const content = await fetchSource(state.route.slug, state.route.key, filePath);
+  state.sourceCache.set(filePath, content);
+  return content;
+}
+
+function sourceTextForRange(filePath, startLine, endLine, sourceLinesArg = null) {
+  const sourceLines = sourceLinesForFile(filePath, sourceLinesArg);
+  if (!sourceLines || !startLine || !endLine) return "";
+  return sourceLines.slice(startLine - 1, endLine).join("\n");
+}
+
+function originalTextForComment(c, sourceLinesArg = null) {
+  const [s, e] = commentLineRange(c);
+  return sourceTextForRange(c.file, s, e, sourceLinesArg);
+}
+
+function originalTextForNewComment() {
+  const t = state.newCommentTarget;
+  if (!t) return "";
+  return sourceTextForRange(t.file, t.line, t.endLine || t.line);
+}
+
+function leadingWhitespace(line) {
+  return (line.match(/^[\t ]*/) || [""])[0];
+}
+
+function indentationWarning(originalText, suggestedText) {
+  const suggested = normalizeSuggestionText(suggestedText);
+  if (!/\S/.test(suggested)) return "";
+  const originalLines = String(originalText ?? "").split("\n");
+  const suggestedLines = suggested.split("\n");
+  let changed = 0;
+  const pairedCount = Math.min(originalLines.length, suggestedLines.length);
+  for (let i = 0; i < pairedCount; i += 1) {
+    if (!/\S/.test(originalLines[i]) || !/\S/.test(suggestedLines[i])) continue;
+    if (leadingWhitespace(originalLines[i]) !== leadingWhitespace(suggestedLines[i])) {
+      changed += 1;
+    }
+  }
+  if (changed === 0) return "";
+  if (originalLines.length === 1 && suggestedLines.length === 1) {
+    return "Leading whitespace differs from the original line. GitHub will apply that indentation exactly.";
+  }
+  return changed === 1
+    ? "1 paired line changes its leading whitespace. GitHub will apply indentation exactly."
+    : `${changed} paired lines change their leading whitespace. GitHub will apply indentation exactly.`;
+}
+
+function splitDiffLines(text) {
+  const value = String(text ?? "").replace(/\n$/, "");
+  return value === "" ? [] : value.split("\n");
+}
+
+function renderSuggestionDiffTable(originalText, suggestedText, language, startLine = null) {
+  const originalLines = splitDiffLines(originalText);
+  const suggestedLines = splitDiffLines(suggestedText);
+  const removedRows = originalLines.map((line, i) => `
+    <tr class="diff-line removed">
+      <td class="diff-num">${startLine ? startLine + i : ""}</td>
+      <td class="diff-marker">−</td>
+      <td class="diff-code">${renderHighlightedLine(line, language)}</td>
+    </tr>
+  `).join("");
+  const addedRows = suggestedLines.map((line) => `
+    <tr class="diff-line added">
+      <td class="diff-num"></td>
+      <td class="diff-marker">+</td>
+      <td class="diff-code">${renderHighlightedLine(line, language)}</td>
+    </tr>
+  `).join("");
+  return `
+    <div class="diff-table-scroll">
+      <table class="diff-table"><tbody>
+        ${removedRows}
+        ${addedRows}
+      </tbody></table>
+    </div>
+  `;
+}
+
+function updateSuggestionPreview(previewEl, warningEl, originalText, suggestedText, language, startLine = null) {
+  if (previewEl) {
+    previewEl.innerHTML = renderSuggestionDiffTable(originalText, suggestedText, language, startLine);
+  }
+  if (warningEl) {
+    const warning = indentationWarning(originalText, suggestedText);
+    warningEl.textContent = warning;
+    warningEl.hidden = !warning;
+  }
+}
+
+function bindCodeEditor(textarea, opts = {}) {
+  if (!textarea || textarea._cm || !window.CodeMirror) return null;
+  window.CodeMirror.modeURL = CODEMIRROR_MODE_URL;
+  const editor = window.CodeMirror.fromTextArea(textarea, {
+    mode: modeSpec(opts.modeInfo) || null,
+    lineNumbers: false,
+    lineWrapping: opts.lineWrapping ?? false,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: opts.indentWithTabs ?? false,
+    viewportMargin: Infinity,
+    extraKeys: {
+      "Cmd-Enter": () => opts.onSave?.(),
+      "Ctrl-Enter": () => opts.onSave?.(),
+      "Esc": () => opts.onCancel?.(),
+      "Tab": (cm) => cm.execCommand("indentMore"),
+      "Shift-Tab": (cm) => cm.execCommand("indentLess"),
+    },
+  });
+  textarea._cm = editor;
+  if (opts.modeInfo?.mode && window.CodeMirror.autoLoadMode) {
+    window.CodeMirror.autoLoadMode(editor, opts.modeInfo.mode);
+  }
+  editor.on("change", () => {
+    editor.save();
+    opts.onChange?.(editor.getValue());
+  });
+  requestAnimationFrame(() => editor.refresh());
+  return editor;
 }
 
 // === Router ========================================================
@@ -268,6 +461,7 @@ async function loadRoute(route) {
   state.newCommentTarget = null;
   state.editingBody = null;
   state.editingSuggestion = null;
+  state.suggestionDrafts.clear();
 
   try {
     if (route.view === "inbox") {
@@ -284,12 +478,14 @@ async function loadRoute(route) {
         data._slug = route.slug;
         data._key = route.key;
         state.review = data;
+        state.sourceCache.clear();
         state.fullTree = null;          // changed review → invalidate tree cache
         state.collapsedFolders = loadCollapsedFolders(route.slug, route.key);
       }
       if (route.view === "file") {
         const content = await fetchSource(route.slug, route.key, route.file);
         state.source = { file: route.file, content };
+        state.sourceCache.set(route.file, content);
       } else {
         state.source = null;
       }
@@ -929,6 +1125,8 @@ function severityColorVar(sev) {
 
 function renderNewCommentForm() {
   const t = state.newCommentTarget;
+  const language = detectLanguage(t.file, state.source?.content);
+  const initialSuggestion = originalTextForNewComment();
   return `
     <div class="new-comment-form" data-new-comment-form>
       <div class="form-row">
@@ -951,7 +1149,16 @@ function renderNewCommentForm() {
         <input type="text" id="new-category" placeholder="category (correctness, security, perf, style, …)" />
       </div>
       <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
-      <textarea id="new-suggestion" class="suggestion" placeholder="Optional suggested change. Raw code — no fences. Replaces the line${t.isRange ? "s" : ""} above."></textarea>
+      <div class="comment-editor-preview" id="new-body-preview"></div>
+      <div class="comment-suggestion">
+        <div class="comment-suggestion-label">
+          <i data-lucide="lightbulb"></i>
+          Suggested change
+        </div>
+        <textarea id="new-suggestion" class="suggestion" data-suggestion-language="${escapeHtml(language || "")}" placeholder="Optional suggested change. Raw code — no fences. Replaces the line${t.isRange ? "s" : ""} above.">${escapeHtml(initialSuggestion)}</textarea>
+        <div class="suggestion-warning" id="new-suggestion-warning" hidden></div>
+        <div class="suggestion-preview" id="new-suggestion-preview"></div>
+      </div>
       <div class="form-actions">
         <button class="btn btn-primary" data-save-new>
           <i data-lucide="plus"></i>
@@ -991,13 +1198,19 @@ function renderCommentCard(c, opts = {}) {
   const isEditingSuggestion = state.editingSuggestion === c.id;
   let suggestionHtml = "";
   if (isEditingSuggestion) {
+    const draft = c.suggestion || state.suggestionDrafts.get(c.id) || "";
+    const originalText = originalTextForComment(c, opts.sourceLines);
     suggestionHtml = `
       <div class="comment-suggestion">
         <div class="comment-suggestion-label">
           <i data-lucide="lightbulb"></i>
           Suggested change
         </div>
-        <textarea class="suggestion-edit" data-edit-suggestion="${idSafe}" autofocus>${escapeHtml(c.suggestion || "")}</textarea>
+        <textarea class="suggestion-edit" data-edit-suggestion="${idSafe}" autofocus>${escapeHtml(draft)}</textarea>
+        <div class="suggestion-warning" data-suggestion-warning-for="${idSafe}" hidden></div>
+        <div class="suggestion-preview" data-suggestion-preview-for="${idSafe}">
+          ${renderSuggestionDiffTable(originalText, draft, language, s)}
+        </div>
         <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel · empty to remove</div>
       </div>
     `;
@@ -1033,6 +1246,7 @@ function renderCommentCard(c, opts = {}) {
   const bodyHtml = isEditing
     ? `
       <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(c.body)}</textarea>
+      <div class="comment-editor-preview" data-markdown-preview-for="${idSafe}">${renderMarkdown(c.body)}</div>
       <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel</div>
     `
     : `<div class="comment-body" data-edit-target="${idSafe}" title="Click to edit">${renderMarkdown(c.body)}</div>`;
@@ -1069,26 +1283,8 @@ function renderCommentCard(c, opts = {}) {
 }
 
 function renderSuggestionDiff(c, language, sourceLinesArg, idSafe) {
-  const [s, e] = commentLineRange(c);
-  const sourceLines = sourceLinesArg || (state.source?.content || "").split("\n");
-  const originalLines = sourceLines.length > 0 ? sourceLines.slice(s - 1, e) : [];
-  const suggestedLines = (c.suggestion || "").replace(/\n$/, "").split("\n");
-
-  const removedRows = originalLines.map((line, i) => `
-    <tr class="diff-line removed">
-      <td class="diff-num">${s + i}</td>
-      <td class="diff-marker">−</td>
-      <td class="diff-code">${renderHighlightedLine(line, language)}</td>
-    </tr>
-  `).join("");
-
-  const addedRows = suggestedLines.map((line) => `
-    <tr class="diff-line added">
-      <td class="diff-num"></td>
-      <td class="diff-marker">+</td>
-      <td class="diff-code">${renderHighlightedLine(line, language)}</td>
-    </tr>
-  `).join("");
+  const [s] = commentLineRange(c);
+  const originalText = originalTextForComment(c, sourceLinesArg);
 
   return `
     <div class="comment-suggestion">
@@ -1099,12 +1295,7 @@ function renderSuggestionDiff(c, language, sourceLinesArg, idSafe) {
           <i data-lucide="pencil"></i>
         </button>
       </div>
-      <div class="diff-table-scroll">
-        <table class="diff-table"><tbody>
-          ${removedRows}
-          ${addedRows}
-        </tbody></table>
-      </div>
+      ${renderSuggestionDiffTable(originalText, c.suggestion || "", language, s)}
     </div>
   `;
 }
@@ -1116,10 +1307,183 @@ async function persistReview() {
   await putReview(state.route.slug, state.route.key, payload);
 }
 
+async function saveEditedBody(id, newBody) {
+  const c = state.review.review.comments.find((x) => x.id === id);
+  if (!c) return;
+  if (newBody === c.body) {
+    state.editingBody = null;
+    renderContent();
+    return;
+  }
+  const original = c.body;
+  c.body = newBody;
+  try {
+    await persistReview();
+    state.editingBody = null;
+    renderContent();
+    showToast(`Edited ${id}`);
+  } catch (err) {
+    c.body = original;
+    showToast(err.message);
+  }
+}
+
+function cancelBodyEdit() {
+  state.editingBody = null;
+  renderContent();
+}
+
+async function beginSuggestionEdit(id) {
+  const c = state.review.review.comments.find((x) => x.id === id);
+  if (!c) return;
+  let source = null;
+  try {
+    source = await ensureSourceForFile(c.file);
+  } catch (err) {
+    showToast(err.message || "Could not load source for suggestion");
+  }
+  if (!c.suggestion && !state.suggestionDrafts.has(id)) {
+    if (source) {
+      const [s, e] = commentLineRange(c);
+      state.suggestionDrafts.set(id, source.split("\n").slice(s - 1, e).join("\n"));
+    } else {
+      state.suggestionDrafts.set(id, "");
+    }
+  }
+  state.editingSuggestion = id;
+  renderContent();
+  requestAnimationFrame(() => {
+    const editor = document.querySelector(`[data-edit-suggestion="${id}"]`)?._cm;
+    if (editor) {
+      editor.focus();
+      editor.setCursor(editor.lineCount() - 1);
+    } else {
+      const ta = document.querySelector(`[data-edit-suggestion="${id}"]`);
+      ta?.focus();
+      ta?.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  });
+}
+
+async function saveEditedSuggestion(id, rawValue) {
+  const c = state.review.review.comments.find((x) => x.id === id);
+  if (!c) return;
+  const hadSuggestion = Boolean(c.suggestion);
+  const originalSuggestion = c.suggestion;
+  const newSuggestion = normalizeSuggestionText(rawValue);
+  const originalSourceText = originalTextForComment(c);
+  const isUnchangedDraft = !hadSuggestion && newSuggestion === originalSourceText;
+  const finalSuggestion = isUnchangedDraft ? "" : newSuggestion;
+
+  if ((finalSuggestion || "") === (c.suggestion || "")) {
+    state.editingSuggestion = null;
+    state.suggestionDrafts.delete(id);
+    renderContent();
+    return;
+  }
+
+  if (finalSuggestion) c.suggestion = finalSuggestion;
+  else delete c.suggestion;
+  try {
+    await persistReview();
+    state.editingSuggestion = null;
+    state.suggestionDrafts.delete(id);
+    renderContent();
+    showToast(finalSuggestion ? `Edited suggestion on ${id}` : `Removed suggestion from ${id}`);
+  } catch (err) {
+    if (originalSuggestion !== undefined) c.suggestion = originalSuggestion;
+    else delete c.suggestion;
+    showToast(err.message);
+  }
+}
+
+function cancelSuggestionEdit(id) {
+  state.editingSuggestion = null;
+  state.suggestionDrafts.delete(id);
+  renderContent();
+}
+
+function initializeEditors(content) {
+  const newBodyEl = content.querySelector("#new-body");
+  if (newBodyEl) {
+    const previewEl = content.querySelector("#new-body-preview");
+    if (previewEl) previewEl.innerHTML = renderMarkdown(editorValue(newBodyEl));
+    bindCodeEditor(newBodyEl, {
+      modeInfo: markdownModeInfo(),
+      lineWrapping: true,
+      onSave: () => content.querySelector("[data-save-new]")?.click(),
+      onCancel: () => {
+        state.newCommentTarget = null;
+        renderContent();
+      },
+      onChange: (value) => {
+        if (previewEl) previewEl.innerHTML = renderMarkdown(value);
+      },
+    });
+  }
+
+  const newSuggestionEl = content.querySelector("#new-suggestion");
+  if (newSuggestionEl) {
+    const t = state.newCommentTarget;
+    const language = detectLanguage(t.file, state.source?.content);
+    const originalText = originalTextForNewComment();
+    const previewEl = content.querySelector("#new-suggestion-preview");
+    const warningEl = content.querySelector("#new-suggestion-warning");
+    updateSuggestionPreview(previewEl, warningEl, originalText, editorValue(newSuggestionEl), language, t.line);
+    bindCodeEditor(newSuggestionEl, {
+      modeInfo: codeMirrorModeInfo(t.file, language),
+      lineWrapping: false,
+      indentWithTabs: originalText.includes("\t"),
+      onSave: () => content.querySelector("[data-save-new]")?.click(),
+      onCancel: () => {
+        state.newCommentTarget = null;
+        renderContent();
+      },
+      onChange: (value) => updateSuggestionPreview(previewEl, warningEl, originalText, value, language, t.line),
+    });
+  }
+
+  content.querySelectorAll("[data-edit-body]").forEach((el) => {
+    const id = el.getAttribute("data-edit-body");
+    const previewEl = content.querySelector(`[data-markdown-preview-for="${id}"]`);
+    bindCodeEditor(el, {
+      modeInfo: markdownModeInfo(),
+      lineWrapping: true,
+      onSave: () => saveEditedBody(id, editorValue(el)),
+      onCancel: cancelBodyEdit,
+      onChange: (value) => {
+        if (previewEl) previewEl.innerHTML = renderMarkdown(value);
+      },
+    });
+  });
+
+  content.querySelectorAll("[data-edit-suggestion]").forEach((el) => {
+    const id = el.getAttribute("data-edit-suggestion");
+    const c = state.review.review.comments.find((x) => x.id === id);
+    if (!c) return;
+    const sourceContent = state.source?.file === c.file ? state.source.content : state.sourceCache.get(c.file);
+    const language = detectLanguage(c.file, sourceContent);
+    const [s] = commentLineRange(c);
+    const originalText = originalTextForComment(c);
+    const previewEl = content.querySelector(`[data-suggestion-preview-for="${id}"]`);
+    const warningEl = content.querySelector(`[data-suggestion-warning-for="${id}"]`);
+    updateSuggestionPreview(previewEl, warningEl, originalText, editorValue(el), language, s);
+    bindCodeEditor(el, {
+      modeInfo: codeMirrorModeInfo(c.file, language),
+      lineWrapping: false,
+      indentWithTabs: originalText.includes("\t"),
+      onSave: () => saveEditedSuggestion(id, editorValue(el)),
+      onCancel: () => cancelSuggestionEdit(id),
+      onChange: (value) => updateSuggestionPreview(previewEl, warningEl, originalText, value, language, s),
+    });
+  });
+}
+
 // === Content event handlers ========================================
 
 function attachContentHandlers() {
   const content = document.getElementById("content");
+  initializeEditors(content);
 
   content.querySelectorAll("[data-comment-id]").forEach((el) => {
     el.addEventListener("click", () => {
@@ -1139,7 +1503,9 @@ function attachContentHandlers() {
       };
       renderContent();
       requestAnimationFrame(() => {
-        document.getElementById("new-body")?.focus();
+        const bodyEl = document.getElementById("new-body");
+        if (bodyEl?._cm) bodyEl._cm.focus();
+        else bodyEl?.focus();
       });
     });
   });
@@ -1163,12 +1529,15 @@ function attachContentHandlers() {
   content.querySelectorAll("[data-save-new]").forEach((el) => {
     el.addEventListener("click", async () => {
       const t = state.newCommentTarget;
-      const body = document.getElementById("new-body").value.trim();
+      const bodyEl = document.getElementById("new-body");
+      const suggestionEl = document.getElementById("new-suggestion");
+      const body = editorValue(bodyEl).trim();
       const category = document.getElementById("new-category").value.trim() || "correctness";
       const severity = document.getElementById("new-severity").value;
-      const suggestion = document.getElementById("new-suggestion").value;
+      const suggestion = normalizeSuggestionText(editorValue(suggestionEl));
       const endLineEl = document.getElementById("new-end-line");
       const endLine = t.isRange && endLineEl ? parseInt(endLineEl.value, 10) : t.line;
+      const originalSuggestion = sourceTextForRange(t.file, t.line, endLine);
 
       if (!body) {
         showToast("Comment body is required");
@@ -1189,7 +1558,7 @@ function attachContentHandlers() {
         status: "open",
       };
       if (t.isRange && endLine !== t.line) newComment.start_line = t.line;
-      if (suggestion.trim()) newComment.suggestion = suggestion;
+      if (suggestion && suggestion !== originalSuggestion) newComment.suggestion = suggestion;
 
       state.review.review.comments.push(newComment);
       try {
@@ -1214,7 +1583,10 @@ function attachContentHandlers() {
       renderContent();
       requestAnimationFrame(() => {
         const ta = document.querySelector(`[data-edit-body="${state.editingBody}"]`);
-        if (ta) {
+        if (ta?._cm) {
+          ta._cm.focus();
+          ta._cm.setCursor(ta._cm.lineCount() - 1);
+        } else if (ta) {
           ta.focus();
           ta.setSelectionRange(ta.value.length, ta.value.length);
         }
@@ -1228,32 +1600,13 @@ function attachContentHandlers() {
       const id = el.getAttribute("data-edit-body");
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        const c = state.review.review.comments.find((x) => x.id === id);
-        if (!c) return;
-        const newBody = el.value;
-        if (newBody === c.body) {
-          state.editingBody = null;
-          renderContent();
-          return;
-        }
-        const original = c.body;
-        c.body = newBody;
-        try {
-          await persistReview();
-          state.editingBody = null;
-          renderContent();
-          showToast(`Edited ${id}`);
-        } catch (err) {
-          c.body = original;
-          showToast(err.message);
-        }
+        await saveEditedBody(id, editorValue(el));
       } else if (e.key === "Escape") {
         // Stop propagation so the global Esc handler doesn't *also* collapse
         // the surrounding comment. Esc here only exits edit mode.
         e.preventDefault();
         e.stopPropagation();
-        state.editingBody = null;
-        renderContent();
+        cancelBodyEdit();
       }
     });
   });
@@ -1261,17 +1614,9 @@ function attachContentHandlers() {
   // Pencil button on the suggestion label (or "Add suggested change" button
    // when no suggestion exists) → swap diff for an editable textarea.
   content.querySelectorAll("[data-edit-suggestion-target]").forEach((el) => {
-    el.addEventListener("click", (e) => {
+    el.addEventListener("click", async (e) => {
       e.stopPropagation();
-      state.editingSuggestion = el.getAttribute("data-edit-suggestion-target");
-      renderContent();
-      requestAnimationFrame(() => {
-        const ta = document.querySelector(`[data-edit-suggestion="${state.editingSuggestion}"]`);
-        if (ta) {
-          ta.focus();
-          ta.setSelectionRange(ta.value.length, ta.value.length);
-        }
-      });
+      await beginSuggestionEdit(el.getAttribute("data-edit-suggestion-target"));
     });
   });
 
@@ -1282,31 +1627,11 @@ function attachContentHandlers() {
       const id = el.getAttribute("data-edit-suggestion");
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        const c = state.review.review.comments.find((x) => x.id === id);
-        if (!c) return;
-        const newSuggestion = el.value.trim() ? el.value.replace(/\n+$/, "") : "";
-        if ((newSuggestion || "") === (c.suggestion || "")) {
-          state.editingSuggestion = null;
-          renderContent();
-          return;
-        }
-        const original = c.suggestion;
-        if (newSuggestion) c.suggestion = newSuggestion;
-        else delete c.suggestion;
-        try {
-          await persistReview();
-          state.editingSuggestion = null;
-          renderContent();
-          showToast(newSuggestion ? `Edited suggestion on ${id}` : `Removed suggestion from ${id}`);
-        } catch (err) {
-          if (original !== undefined) c.suggestion = original;
-          showToast(err.message);
-        }
+        await saveEditedSuggestion(id, editorValue(el));
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        state.editingSuggestion = null;
-        renderContent();
+        cancelSuggestionEdit(id);
       }
     });
   });
