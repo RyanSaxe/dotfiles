@@ -47,6 +47,10 @@
   <!-- highlight.js common bundle: 32+ languages built-in. Long-tail languages
        fall back to highlightAuto in app.js. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- marked: GitHub-flavored markdown renderer for comment bodies. Schema
+       claims comment bodies are Markdown; we honor the full GFM contract
+       (lists, links, code blocks, tables) instead of a homemade subset. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="/app.js"></script>
 </body>

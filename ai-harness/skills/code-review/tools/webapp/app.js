@@ -50,9 +50,15 @@ function escapeHtml(text) {
 }
 
 function renderMarkdown(text) {
-  return escapeHtml(text)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  // Defer to marked when the CDN script loaded; fall back to a
+  // plain-escape on CDN miss so comment bodies always render *something*
+  // safe instead of throwing. marked.parse escapes HTML in the source by
+  // default, so user/AI-supplied <script> stays inert.
+  const src = String(text ?? "");
+  if (window.marked) {
+    return window.marked.parse(src, { breaks: true, gfm: true });
+  }
+  return escapeHtml(src);
 }
 
 function showToast(message) {
