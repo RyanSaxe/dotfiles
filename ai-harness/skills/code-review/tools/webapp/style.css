@@ -136,6 +136,30 @@ button {
   height: 14px;
 }
 
+/* Leading "← Inbox · " affordance on the topbar identity pill. The pill
+   itself was already a button with cursor:pointer, but it read as a status
+   label. The chevron + word makes "click to go back to inbox" obvious. */
+.topbar-home-chevron {
+  color: var(--color-muted);
+}
+
+.topbar-home-label {
+  color: var(--color-emphasis);
+  font-weight: 500;
+}
+
+.topbar-home-sep {
+  color: var(--color-faint);
+}
+
+/* On the inbox view itself, "go to inbox" is a no-op — hide the leading
+   affordance so the pill reads cleanly as the repo identity. */
+body.inbox-mode .topbar-home-chevron,
+body.inbox-mode .topbar-home-label,
+body.inbox-mode .topbar-home-sep {
+  display: none;
+}
+
 .topbar-actions {
   display: flex;
   gap: var(--space-2);
