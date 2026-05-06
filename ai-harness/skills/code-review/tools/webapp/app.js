@@ -19,6 +19,7 @@ const state = {
   inboxFilter: "needs_triage",        // 'needs_triage' | 'iterating' | 'done' | 'stale'
   showStale: false,
   expandedComments: new Set(),
+  cursorCommentId: null,              // last navigated/clicked comment — Tab/S-Tab anchor
   treeFilter: { query: "", showAll: false },
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
   editingBody: null,                  // commentId currently being edited inline
@@ -158,7 +159,7 @@ function navigate(route, replace = false) {
   } else {
     window.history.pushState(route, "", path);
   }
-  loadRoute(route);
+  return loadRoute(route);
 }
 
 window.addEventListener("popstate", (e) => {
@@ -1222,8 +1223,12 @@ function attachContentHandlers() {
 }
 
 async function toggleComment(id) {
-  if (state.expandedComments.has(id)) state.expandedComments.delete(id);
-  else state.expandedComments.add(id);
+  if (state.expandedComments.has(id)) {
+    state.expandedComments.delete(id);
+  } else {
+    state.expandedComments.add(id);
+    state.cursorCommentId = id;
+  }
   renderContent();
   scrollCommentIntoView(id);
 }
@@ -1306,14 +1311,17 @@ function navigableComments() {
     );
 }
 
-function navigateToComment(direction) {
+async function navigateToComment(direction) {
   if (state.route.view === "inbox") return;
   const comments = navigableComments();
   if (comments.length === 0) return;
 
-  const expandedIds = [...state.expandedComments];
-  const currentIdx = expandedIds.length
-    ? comments.findIndex((c) => c.id === expandedIds[0])
+  // Use the explicit cursor instead of inferring from `expandedComments`. The
+  // Set's iteration order is insertion order, so clicking comments in any
+  // sequence and then tabbing was breaking the cycle (the "first" expanded id
+  // no longer matched the visually-current comment).
+  const currentIdx = state.cursorCommentId
+    ? comments.findIndex((c) => c.id === state.cursorCommentId)
     : -1;
 
   const nextIdx = currentIdx === -1
@@ -1321,15 +1329,17 @@ function navigateToComment(direction) {
     : (currentIdx + direction + comments.length) % comments.length;
 
   const target = comments[nextIdx];
-  state.expandedComments.clear();
-  state.expandedComments.add(target.id);
+  state.cursorCommentId = target.id;
 
   if (state.route.view !== "file" || state.route.file !== target.file) {
-    navigate({ view: "file", slug: state.route.slug, key: state.route.key, file: target.file });
-  } else {
-    renderContent();
-    scrollCommentIntoView(target.id);
+    // navigate() → loadRoute() clears expandedComments, so wait for it before
+    // expanding the target — otherwise the target ends up collapsed.
+    await navigate({ view: "file", slug: state.route.slug, key: state.route.key, file: target.file });
   }
+  state.expandedComments.clear();
+  state.expandedComments.add(target.id);
+  renderContent();
+  scrollCommentIntoView(target.id);
 }
 
 document.addEventListener("keydown", (e) => {
