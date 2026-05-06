@@ -564,6 +564,12 @@ body.inbox-mode .main {
   flex-wrap: wrap;
 }
 
+/* Push the close (X) to the right edge of the first form-row, mirroring
+   the comment card's header layout. */
+.new-comment-form .form-row .comment-close {
+  margin-left: auto;
+}
+
 .new-comment-form select,
 .new-comment-form input[type="text"],
 .new-comment-form input[type="number"] {
@@ -781,8 +787,27 @@ body.inbox-mode .main {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* Visually align the card with the source-code column rather than the table
+   edge: 56px (gutter-num) + 18px (gutter-marker) = 74px on the left, plus a
+   small breathing-room offset. Right inset stays balanced with the right
+   padding inside the code-pane.
+
+   `position: sticky; left: 0` keeps the card pinned to the visible left edge
+   when the user horizontally scrolls a wide file — without this, the card
+   would drift off-screen because the table cell spans the full table width.
+   The width is bounded to the visible chrome (sidebar 280px + content
+   padding 24px×2) so the card never extends past the viewport. */
 .comment-row-inner {
-  padding: var(--space-3) var(--space-5) var(--space-4) var(--space-5);
+  position: sticky;
+  left: 0;
+  width: calc(100vw - 280px - var(--space-6) * 2);
+  padding: var(--space-3) var(--space-5) var(--space-4) calc(74px + var(--space-2));
+  box-sizing: border-box;
+}
+
+/* Inbox/overview mode collapses the sidebar — no 280px to subtract. */
+body.inbox-mode .comment-row-inner {
+  width: calc(100vw - var(--space-6) * 2);
 }
 
 /* === Comment card ================================================= */

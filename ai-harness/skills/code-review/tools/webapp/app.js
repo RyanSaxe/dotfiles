@@ -848,6 +848,7 @@ function renderNewCommentForm() {
           Range
         </label>
         ${t.isRange ? `<span class="comment-line-ref">to line</span><input type="number" id="new-end-line" min="${t.line}" value="${t.endLine || t.line}" />` : ""}
+        <button class="comment-close" data-cancel-new title="Close (Esc)"><i data-lucide="x"></i></button>
       </div>
       <div class="form-row">
         <select id="new-severity">
@@ -862,7 +863,6 @@ function renderNewCommentForm() {
       <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
       <textarea id="new-suggestion" class="suggestion" placeholder="Optional suggested change. Raw code — no fences. Replaces the line${t.isRange ? "s" : ""} above."></textarea>
       <div class="form-actions">
-        <button class="btn" data-cancel-new>Cancel</button>
         <button class="btn btn-primary" data-save-new>
           <i data-lucide="plus"></i>
           Add comment
@@ -1354,12 +1354,15 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     navigateToComment(-1);
   } else if (e.key === "Escape") {
-    if (state.expandedComments.size > 0) {
+    if (state.newCommentTarget) {
+      state.newCommentTarget = null;
+      renderContent();
+    } else if (state.expandedComments.size > 0) {
       state.expandedComments.clear();
       renderContent();
     }
   } else if (e.key === "?") {
-    showToast("Keys: Tab/S-Tab or j/k → next/prev comment · Esc → collapse all");
+    showToast("Keys: Tab/S-Tab or j/k → next/prev comment · Esc → close");
   }
 });
 
