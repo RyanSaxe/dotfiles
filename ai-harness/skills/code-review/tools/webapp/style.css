@@ -13,9 +13,8 @@
 
   --color-accent: #facc15;       /* yellow — active state only */
   --color-accent-fg: #0a0a0a;
-  --color-primary: #155e75;
-  --color-primary-hover: #164e63;
-  --color-primary-soft: #cffafe;
+  --color-action: #525252;
+  --color-action-hover: #404040;
   --color-positive: #16a34a;
   --color-positive-soft: #dcfce7;
   --color-negative: #dc2626;
@@ -219,14 +218,14 @@ body.inbox-mode .topbar-home-sep {
 }
 
 .btn-primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-action);
+  border-color: var(--color-action);
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-action-hover);
+  border-color: var(--color-action-hover);
 }
 
 .btn-refresh-needed {
@@ -254,7 +253,7 @@ body.inbox-mode .topbar-home-sep {
 
 .btn-primary:disabled:hover,
 .btn-primary[disabled]:hover {
-  background: var(--color-primary);
+  background: var(--color-action);
 }
 
 .btn-refresh-needed:disabled:hover {
@@ -263,6 +262,11 @@ body.inbox-mode .topbar-home-sep {
 
 .btn-icon {
   padding: 6px;
+}
+
+.btn-compact {
+  padding: 4px 8px;
+  font-size: var(--text-xs);
 }
 
 .btn .lucide {
@@ -315,13 +319,14 @@ body.inbox-mode .main {
   margin-bottom: var(--space-2);
 }
 
-/* Tree filter row — search input, extension chips, and file-scope toggles. */
+/* Tree filter row — path search, compact extension combobox, and file-scope toggles. */
 .tree-filter {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
-.tree-filter-search {
+.tree-filter-search,
+.tree-extension-field {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -332,14 +337,16 @@ body.inbox-mode .main {
   background: var(--color-surface);
 }
 
-.tree-filter-search .lucide {
+.tree-filter-search .lucide,
+.tree-extension-field .lucide {
   width: 14px;
   height: 14px;
   color: var(--color-faint);
   flex: 0 0 auto;
 }
 
-.tree-filter input[type="text"] {
+.tree-filter input[type="text"],
+.tree-extension-field input[type="text"] {
   width: 100%;
   min-width: 0;
   padding: 6px 0;
@@ -350,25 +357,46 @@ body.inbox-mode .main {
   background: transparent;
 }
 
-.tree-filter-search:focus-within {
+.tree-filter-search:focus-within,
+.tree-extension-field:focus-within {
   outline: none;
   border-color: var(--color-emphasis);
 }
 
-.tree-filter input[type="text"]:focus {
+.tree-filter input[type="text"]:focus,
+.tree-extension-field input[type="text"]:focus {
   outline: none;
 }
 
-.tree-extension-chips {
+.tree-extension-combobox {
+  margin-top: var(--space-2);
+}
+
+.tree-extension-add {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.tree-extension-add:hover {
+  color: var(--color-emphasis);
+}
+
+.tree-extension-selected {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: var(--space-2);
-  max-height: 74px;
-  overflow-y: auto;
 }
 
-.tree-extension-chip {
+.tree-extension-token,
+.tree-extension-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: #f7f7f7;
@@ -379,15 +407,19 @@ body.inbox-mode .main {
   padding: 5px 8px;
 }
 
-.tree-extension-chip:hover {
+.tree-extension-token:hover,
+.tree-extension-clear:hover {
   border-color: var(--color-border-strong);
   color: var(--color-body);
 }
 
-.tree-extension-chip.active {
-  background: var(--color-primary-soft);
-  border-color: #67e8f9;
-  color: #155e75;
+.tree-extension-token .lucide {
+  width: 11px;
+  height: 11px;
+}
+
+.tree-extension-clear {
+  font-family: var(--font-sans);
 }
 
 .tree-filter-settings {
@@ -530,44 +562,6 @@ body.inbox-mode .main {
   padding: var(--space-6);
 }
 
-.comment-float-nav {
-  position: fixed;
-  right: var(--space-6);
-  bottom: var(--space-6);
-  z-index: 20;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: var(--shadow-pop);
-}
-
-.comment-float-nav .btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 999px;
-  background: transparent;
-  border-color: transparent;
-}
-
-.comment-float-nav .btn:hover {
-  background: #f5f5f5;
-}
-
-.comment-float-nav-counter {
-  min-width: 42px;
-  padding: 0 var(--space-1);
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Overview view (no file selected) */
 
 .overview-header {
@@ -659,6 +653,7 @@ body.inbox-mode .main {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   overflow: hidden;
+  container-type: inline-size;
 }
 
 .code-header {
@@ -674,6 +669,30 @@ body.inbox-mode .main {
 
 .code-header strong {
   color: var(--color-emphasis);
+}
+
+.code-comment-count {
+  color: var(--color-muted);
+}
+
+.code-header-spacer {
+  flex: 1;
+}
+
+.code-comment-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.code-comment-nav-counter {
+  min-width: 42px;
+  text-align: center;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .lang-badge {
@@ -1024,14 +1043,15 @@ body.inbox-mode .main {
 .comment-row-inner {
   position: sticky;
   left: 0;
-  width: calc(100vw - 280px - var(--space-6) * 2);
+  width: calc(100vw - 280px - var(--space-6) * 2 - var(--space-4));
   padding: var(--space-4);
   box-sizing: border-box;
 }
 
-/* Inbox/overview mode collapses the sidebar — no 280px to subtract. */
-body.inbox-mode .comment-row-inner {
-  width: calc(100vw - var(--space-6) * 2);
+@supports (width: 100cqw) {
+  .comment-row-inner {
+    width: calc(100cqw - 2px);
+  }
 }
 
 /* === Comment card ================================================= */
@@ -1168,7 +1188,8 @@ body.inbox-mode .comment-row-inner {
   font-family: var(--font-sans);
 }
 
-.status-chip:hover {
+.status-chip:hover,
+.status-menu[open] .status-chip {
   filter: brightness(0.98);
 }
 
@@ -1177,6 +1198,69 @@ body.inbox-mode .comment-row-inner {
 .status-chip.wontfix { color: var(--color-muted); border-color: var(--color-border-strong); background: #f5f5f5; }
 .status-chip.acknowledged { color: var(--sev-info); border-color: #bfdbfe; background: var(--sev-info-soft); }
 
+.status-menu,
+.comment-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.status-menu summary,
+.comment-menu summary {
+  list-style: none;
+}
+
+.status-menu summary::-webkit-details-marker,
+.comment-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.status-menu-popover,
+.comment-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 164px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.status-menu-item,
+.comment-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-input);
+  background: transparent;
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.status-menu-item:hover,
+.status-menu-item.active,
+.comment-menu-item:hover {
+  background: #f5f5f5;
+}
+
+.status-menu-item .lucide,
+.comment-menu-item .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--color-muted);
+}
+
+.comment-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .comment-id {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -1184,7 +1268,7 @@ body.inbox-mode .comment-row-inner {
   margin-left: auto;
 }
 
-.comment-edit-btn,
+.comment-menu-trigger,
 .comment-close {
   display: inline-flex;
   align-items: center;
@@ -1200,13 +1284,14 @@ body.inbox-mode .comment-row-inner {
   cursor: pointer;
 }
 
-.comment-edit-btn:hover,
+.comment-menu-trigger:hover,
+.comment-menu[open] .comment-menu-trigger,
 .comment-close:hover {
   background: #f5f5f5;
   color: var(--color-emphasis);
 }
 
-.comment-edit-btn .lucide,
+.comment-menu-trigger .lucide,
 .comment-close .lucide {
   width: 14px;
   height: 14px;
@@ -1251,31 +1336,148 @@ body.inbox-mode .comment-row-inner {
   margin-bottom: var(--space-3);
 }
 
-/* Tight, explicit block margins so spacing is consistent regardless of
-   browser defaults. We deliberately do NOT use `white-space: pre-wrap` here:
-   marked.js outputs real <p>/<ul>/<li> elements with `\n` between them, and
-   pre-wrap would render those literal newlines on top of the element margins,
-   which is exactly the "huge blank line" bug we're fixing. */
-.comment-body p {
+.markdown-body {
+  line-height: 1.6;
+}
+
+.markdown-body p,
+.markdown-body blockquote,
+.markdown-body pre,
+.markdown-body table,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body details {
   margin: 0 0 var(--space-2) 0;
 }
 
-.comment-body p:first-child {
+.markdown-body > :first-child {
   margin-top: 0;
 }
 
-.comment-body p:last-child {
+.markdown-body > :last-child {
   margin-bottom: 0;
 }
 
-.comment-body ul,
-.comment-body ol {
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--color-emphasis);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.markdown-body h1 { font-size: var(--text-lg); }
+.markdown-body h2 { font-size: 16px; }
+.markdown-body h3 { font-size: var(--text-md); }
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: var(--text-sm);
+}
+
+.markdown-body ul,
+.markdown-body ol {
   margin: var(--space-2) 0;
   padding-left: var(--space-5);
 }
 
-.comment-body li {
+.markdown-body li {
   margin: 2px 0;
+}
+
+.markdown-body input[type="checkbox"] {
+  margin: 0 6px 0 0;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin: 2px 0;
+}
+
+.markdown-body a {
+  color: var(--sev-info);
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body blockquote {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-border-strong);
+  background: #fafafa;
+  color: var(--color-muted);
+  border-radius: var(--radius-input);
+}
+
+.markdown-body pre {
+  overflow-x: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: #fafafa;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.markdown-body th {
+  background: #f5f5f5;
+  color: var(--color-emphasis);
+  font-weight: 600;
+}
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+.markdown-body kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--color-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: #f5f5f5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.markdown-body details {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: #fafafa;
+}
+
+.markdown-body summary {
+  cursor: pointer;
+  font-weight: 600;
 }
 
 /* Fallback path: when the marked CDN is unavailable, renderMarkdown returns
@@ -1288,7 +1490,7 @@ body.inbox-mode .comment-row-inner {
   white-space: pre-wrap;
 }
 
-.comment-body code {
+.markdown-body code {
   font-family: var(--font-mono);
   font-size: 12px;
   background: #f5f5f5;
@@ -1312,8 +1514,7 @@ body.inbox-mode .comment-row-inner {
   gap: 4px;
 }
 
-/* Pencil button on the suggestion label. Tucked at the right end of the
-   label row so it doesn't compete with the lightbulb icon for attention. */
+/* Small icon button tucked at the right end of a suggestion label. */
 .suggestion-edit-btn {
   margin-left: auto;
   padding: 2px;

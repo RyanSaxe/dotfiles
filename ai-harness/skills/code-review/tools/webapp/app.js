@@ -21,7 +21,7 @@ const state = {
   showStale: false,
   expandedComments: new Set(),
   cursorCommentId: null,              // last navigated/clicked comment — Tab/S-Tab anchor
-  treeFilter: { query: "", showAll: false, showIgnored: false, extension: "" },
+  treeFilter: { query: "", showAll: false, showIgnored: false, extensions: [] },
   collapsedFolders: new Set(),        // folder paths the user has collapsed in the file tree
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
   newCommentSuggestionExpanded: false,
@@ -31,8 +31,16 @@ const state = {
   suggestionDrafts: new Map(),         // commentId -> original source replacement text
   refreshStatus: null,                 // refresh readiness for current review
   refreshPollId: null,
+  suppressGlobalEscapeUntil: 0,
   error: null,
 };
+
+const STATUS_OPTIONS = [
+  { value: "open", label: "Open", icon: "circle-dot" },
+  { value: "acknowledged", label: "Acknowledged", icon: "eye" },
+  { value: "resolved", label: "Resolved", icon: "check-circle-2" },
+  { value: "wontfix", label: "Won't fix", icon: "ban" },
+];
 
 // === Helpers =======================================================
 
@@ -77,17 +85,16 @@ function uniqueSortedExtensions(paths) {
   return Array.from(new Set(paths.map(fileExtension).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
+function normalizeExtensionInput(value) {
+  return String(value || "").trim().replace(/^\./, "").toLowerCase();
+}
+
 function unionPaths(...pathLists) {
   return Array.from(new Set(pathLists.flat().filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
 function humanStatus(status) {
-  return {
-    open: "Open",
-    acknowledged: "Acknowledged",
-    resolved: "Resolved",
-    wontfix: "Won't fix",
-  }[status] || status || "Open";
+  return STATUS_OPTIONS.find((option) => option.value === status)?.label || status || "Open";
 }
 
 function chipIcon(kind, value) {
@@ -105,10 +112,7 @@ function chipIcon(kind, value) {
       low: "badge-alert",
     },
     status: {
-      open: "circle-dot",
-      acknowledged: "eye",
-      resolved: "check-circle-2",
-      wontfix: "ban",
+      ...Object.fromEntries(STATUS_OPTIONS.map((option) => [option.value, option.icon])),
     },
   };
   return maps[kind]?.[value] || "circle";
@@ -130,7 +134,7 @@ function renderMarkdown(text) {
   // HTML while preserving normal Markdown structure.
   const src = String(text ?? "");
   if (window.marked) {
-    return sanitizeRenderedMarkdown(window.marked.parse(src, { breaks: false, gfm: true }));
+    return enhanceRenderedMarkdown(sanitizeRenderedMarkdown(window.marked.parse(src, { breaks: false, gfm: true })));
   }
   return `<pre class="comment-body-fallback">${escapeHtml(src)}</pre>`;
 }
@@ -138,17 +142,101 @@ function renderMarkdown(text) {
 function sanitizeRenderedMarkdown(html) {
   const template = document.createElement("template");
   template.innerHTML = html;
-  template.content.querySelectorAll("script, style, iframe, object, embed, link, meta, base").forEach((el) => {
+  const dropWithContents = new Set(["script", "style", "iframe", "object", "embed", "link", "meta", "base"]);
+  const allowedTags = new Set([
+    "a", "blockquote", "br", "code", "del", "details", "em", "h1", "h2", "h3",
+    "h4", "h5", "h6", "hr", "input", "kbd", "li", "ol", "p", "pre", "s",
+    "strong", "sub", "summary", "sup", "table", "tbody", "td", "th", "thead",
+    "tr", "ul",
+  ]);
+  const allowedAttrs = {
+    a: new Set(["href", "title"]),
+    code: new Set(["class"]),
+    input: new Set(["checked", "disabled", "type"]),
+    details: new Set(["open"]),
+    th: new Set(["align"]),
+    td: new Set(["align"]),
+  };
+
+  template.content.querySelectorAll(Array.from(dropWithContents).join(",")).forEach((el) => {
     el.remove();
   });
-  template.content.querySelectorAll("*").forEach((el) => {
+
+  Array.from(template.content.querySelectorAll("*")).forEach((el) => {
+    const tag = el.tagName.toLowerCase();
+    if (!allowedTags.has(tag)) {
+      el.replaceWith(...Array.from(el.childNodes));
+      return;
+    }
+
     Array.from(el.attributes).forEach((attr) => {
       const name = attr.name.toLowerCase();
-      const value = attr.value.trim().toLowerCase();
-      if (name.startsWith("on") || value.startsWith("javascript:")) {
+      const rawValue = attr.value.trim();
+      const value = rawValue.toLowerCase();
+      const allowedForTag = allowedAttrs[tag] || new Set();
+      if (name.startsWith("on") || !allowedForTag.has(name)) {
         el.removeAttribute(attr.name);
+        return;
+      }
+      if (tag === "a" && name === "href" && !isSafeMarkdownHref(rawValue)) {
+        el.removeAttribute(attr.name);
+        return;
+      }
+      if (tag === "code" && name === "class" && !/^language-[a-z0-9_+-]+$/i.test(rawValue)) {
+        el.removeAttribute(attr.name);
+        return;
+      }
+      if (tag === "input") {
+        if (name === "type" && value !== "checkbox") {
+          el.removeAttribute(attr.name);
+          return;
+        }
+        if (name === "checked" || name === "disabled") {
+          el.setAttribute(name, "");
+          return;
+        }
       }
     });
+
+    if (tag === "a") {
+      el.setAttribute("target", "_blank");
+      el.setAttribute("rel", "noopener noreferrer");
+    }
+    if (tag === "input") {
+      el.setAttribute("disabled", "");
+    }
+  });
+  return template.innerHTML;
+}
+
+function isSafeMarkdownHref(href) {
+  const value = String(href || "").trim();
+  if (!value) return false;
+  if (value.startsWith("#") || value.startsWith("/") || value.startsWith("./") || value.startsWith("../")) return true;
+  try {
+    const url = new URL(value, window.location.href);
+    return ["http:", "https:", "mailto:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function enhanceRenderedMarkdown(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll("pre code").forEach((code) => {
+    if (!window.hljs) return;
+    const languageClass = Array.from(code.classList).find((cls) => cls.startsWith("language-"));
+    const language = languageClass ? languageClass.slice("language-".length) : "";
+    try {
+      const result = language && window.hljs.getLanguage(language)
+        ? window.hljs.highlight(code.textContent || "", { language, ignoreIllegals: true })
+        : window.hljs.highlightAuto(code.textContent || "");
+      code.innerHTML = result.value;
+      code.classList.add("hljs");
+    } catch {
+      code.textContent = code.textContent || "";
+    }
   });
   return template.innerHTML;
 }
@@ -447,7 +535,10 @@ function bindCodeEditor(textarea, opts = {}) {
     extraKeys: {
       "Cmd-Enter": () => opts.onSave?.(),
       "Ctrl-Enter": () => opts.onSave?.(),
-      "Esc": () => opts.onCancel?.(),
+      "Esc": () => {
+        suppressGlobalEscapeCollapse();
+        opts.onCancel?.();
+      },
       "Tab": (cm) => cm.execCommand("indentMore"),
       "Shift-Tab": (cm) => cm.execCommand("indentLess"),
     },
@@ -616,6 +707,14 @@ function saveCollapsedFolders() {
 function resetNewCommentSuggestion() {
   state.newCommentSuggestionExpanded = false;
   state.newCommentSuggestionDraft = "";
+}
+
+function suppressGlobalEscapeCollapse() {
+  state.suppressGlobalEscapeUntil = Date.now() + 250;
+}
+
+function shouldSuppressGlobalEscapeCollapse() {
+  return Date.now() < state.suppressGlobalEscapeUntil;
 }
 
 function stopRefreshPolling() {
@@ -794,7 +893,7 @@ function renderTopbar() {
   sendBtn.hidden = false;
 }
 
-function renderFloatingCommentNav() {
+function renderCommentHeaderNav() {
   const navComments = navigableComments();
   if (navComments.length < 2) {
     return "";
@@ -807,13 +906,15 @@ function renderFloatingCommentNav() {
     : `${cursorIdx + 1} / ${navComments.length}`;
 
   return `
-    <div class="comment-float-nav" aria-label="Comment navigation">
-      <button class="btn btn-icon" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment">
+    <div class="code-comment-nav" aria-label="Comment navigation">
+      <button class="btn btn-compact" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment">
         <i data-lucide="chevron-up"></i>
+        Prev comment
       </button>
-      <span class="comment-float-nav-counter">${escapeHtml(counter)}</span>
-      <button class="btn btn-icon" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment">
+      <span class="code-comment-nav-counter">${escapeHtml(counter)}</span>
+      <button class="btn btn-compact" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment">
         <i data-lucide="chevron-down"></i>
+        Next comment
       </button>
     </div>
   `;
@@ -834,7 +935,6 @@ function renderTree() {
 
   const counts = filesWithCommentCounts();
   const filterQuery = state.treeFilter.query.toLowerCase().trim();
-  const selectedExtension = state.treeFilter.extension;
 
   // Source set: by default just commented files; with showAll, the full repo
   // (fetched lazily on toggle and cached on state).
@@ -843,13 +943,11 @@ function renderTree() {
     : Object.keys(counts);
 
   const extensionOptions = uniqueSortedExtensions(allPaths);
-  if (selectedExtension && !extensionOptions.includes(selectedExtension)) {
-    state.treeFilter.extension = "";
-  }
-  const activeExtension = state.treeFilter.extension;
+  state.treeFilter.extensions = (state.treeFilter.extensions || []).filter((ext) => extensionOptions.includes(ext));
+  const selectedExtensions = state.treeFilter.extensions;
   const filteredPaths = allPaths.filter((p) => {
     const matchesQuery = !filterQuery || p.toLowerCase().includes(filterQuery);
-    const matchesExtension = !activeExtension || fileExtension(p) === activeExtension;
+    const matchesExtension = selectedExtensions.length === 0 || selectedExtensions.includes(fileExtension(p));
     return matchesQuery && matchesExtension;
   });
 
@@ -861,11 +959,29 @@ function renderTree() {
         <i data-lucide="search"></i>
         <input type="text" id="tree-filter-query" placeholder="Filter files…" value="${escapeHtml(state.treeFilter.query)}" />
       </div>
-      <div class="tree-extension-chips" aria-label="Filter by extension">
-        <button class="tree-extension-chip ${activeExtension ? "" : "active"}" data-tree-extension="" type="button">All</button>
-        ${extensionOptions.map((ext) => `
-          <button class="tree-extension-chip ${activeExtension === ext ? "active" : ""}" data-tree-extension="${escapeHtml(ext)}" type="button">.${escapeHtml(ext)}</button>
-        `).join("")}
+      <div class="tree-extension-combobox">
+        <div class="tree-extension-field">
+          <i data-lucide="filter"></i>
+          <input type="text" id="tree-extension-query" list="tree-extension-options" placeholder="${selectedExtensions.length ? "Add file type…" : "All file types"}" />
+          <button class="tree-extension-add" data-add-tree-extension type="button">Add</button>
+        </div>
+        <datalist id="tree-extension-options">
+          ${extensionOptions
+            .filter((ext) => !selectedExtensions.includes(ext))
+            .map((ext) => `<option value=".${escapeHtml(ext)}"></option>`)
+            .join("")}
+        </datalist>
+        ${selectedExtensions.length ? `
+          <div class="tree-extension-selected" aria-label="Selected file extensions">
+            ${selectedExtensions.map((ext) => `
+              <button class="tree-extension-token" data-remove-tree-extension="${escapeHtml(ext)}" type="button" title="Remove .${escapeHtml(ext)}">
+                .${escapeHtml(ext)}
+                <i data-lucide="x"></i>
+              </button>
+            `).join("")}
+            <button class="tree-extension-clear" data-clear-tree-extensions type="button">Clear</button>
+          </div>
+        ` : ""}
       </div>
       <div class="tree-filter-settings">
         <label class="tree-filter-toggle">
@@ -1033,11 +1149,53 @@ function attachTreeHandlers(root) {
     });
   }
 
-  root.querySelectorAll("[data-tree-extension]").forEach((el) => {
+  const addExtension = () => {
+    const input = root.querySelector("#tree-extension-query");
+    const ext = normalizeExtensionInput(input?.value);
+    if (!ext) return;
+    const counts = filesWithCommentCounts();
+    const allPaths = state.treeFilter.showAll && state.fullTree
+      ? unionPaths(state.fullTree.files || [], Object.keys(counts))
+      : Object.keys(counts);
+    const options = uniqueSortedExtensions(allPaths);
+    if (!options.includes(ext)) {
+      showToast(`No .${ext} files in this view`, { kind: "warning" });
+      input?.focus();
+      return;
+    }
+    if (!state.treeFilter.extensions.includes(ext)) {
+      state.treeFilter.extensions.push(ext);
+    }
+    renderTree();
+  };
+
+  root.querySelector("#tree-extension-query")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addExtension();
+    }
+  });
+  root.querySelector("#tree-extension-query")?.addEventListener("change", (e) => {
+    const ext = normalizeExtensionInput(e.target.value);
+    const counts = filesWithCommentCounts();
+    const allPaths = state.treeFilter.showAll && state.fullTree
+      ? unionPaths(state.fullTree.files || [], Object.keys(counts))
+      : Object.keys(counts);
+    if (uniqueSortedExtensions(allPaths).includes(ext)) {
+      addExtension();
+    }
+  });
+  root.querySelector("[data-add-tree-extension]")?.addEventListener("click", addExtension);
+  root.querySelectorAll("[data-remove-tree-extension]").forEach((el) => {
     el.addEventListener("click", () => {
-      state.treeFilter.extension = el.getAttribute("data-tree-extension") || "";
+      const ext = el.getAttribute("data-remove-tree-extension");
+      state.treeFilter.extensions = state.treeFilter.extensions.filter((item) => item !== ext);
       renderTree();
     });
+  });
+  root.querySelector("[data-clear-tree-extensions]")?.addEventListener("click", () => {
+    state.treeFilter.extensions = [];
+    renderTree();
   });
 
   const showAllToggle = root.querySelector("#tree-filter-show-all");
@@ -1306,7 +1464,6 @@ function renderReviewOverview() {
 
     <div class="overview-comments-label">${reviewThreads().length} comments across ${Object.keys(grouped).length} files</div>
     ${groupsHtml}
-    ${renderFloatingCommentNav()}
   `;
 
   attachContentHandlers();
@@ -1393,13 +1550,14 @@ function renderFileView() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
-        <span style="margin-left:auto">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
+        <span class="code-comment-count">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
+        <div class="code-header-spacer"></div>
+        ${renderCommentHeaderNav()}
       </div>
       <div class="code-table-scroll">
         <table class="code-table"><tbody>${rows}</tbody></table>
       </div>
     </div>
-    ${renderFloatingCommentNav()}
   `;
   attachContentHandlers();
   if (window.lucide) window.lucide.createIcons();
@@ -1464,7 +1622,7 @@ function renderNewCommentForm() {
         <input type="text" id="new-category" placeholder="category (correctness, security, perf, style, …)" />
       </div>
       <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
-      <div class="comment-editor-preview" id="new-body-preview"></div>
+      <div class="comment-editor-preview markdown-body" id="new-body-preview"></div>
       ${suggestionHtml}
       <div class="form-actions">
         <button class="btn btn-primary" data-save-new>
@@ -1520,6 +1678,52 @@ function renderMetaChip(kind, value, label = value) {
   `;
 }
 
+function renderStatusDropdown(c, idSafe) {
+  const status = STATUS_OPTIONS.some((option) => option.value === c.status) ? c.status : "open";
+  const statusSafe = escapeHtml(status);
+  return `
+    <details class="status-menu">
+      <summary class="metadata-chip status-chip ${statusSafe}" title="Change status">
+        <i data-lucide="${chipIcon("status", status)}"></i>
+        Status: ${escapeHtml(humanStatus(status))}
+      </summary>
+      <div class="status-menu-popover">
+        ${STATUS_OPTIONS.map((option) => `
+          <button class="status-menu-item ${status === option.value ? "active" : ""}" data-set-status="${idSafe}" data-status-value="${escapeHtml(option.value)}" type="button">
+            <i data-lucide="${option.icon}"></i>
+            ${escapeHtml(option.label)}
+          </button>
+        `).join("")}
+      </div>
+    </details>
+  `;
+}
+
+function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
+  const suggestionAction = c.suggestion
+    ? `
+      <button class="comment-menu-item" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"} type="button">
+        <i data-lucide="lightbulb"></i>
+        Edit suggestion
+      </button>
+    `
+    : "";
+  return `
+    <details class="comment-menu">
+      <summary class="comment-menu-trigger" title="Comment actions" aria-label="Comment actions">
+        <i data-lucide="more-horizontal"></i>
+      </summary>
+      <div class="comment-menu-popover">
+        <button class="comment-menu-item" data-edit-target="${idSafe}" type="button">
+          <i data-lucide="pencil"></i>
+          Edit comment
+        </button>
+        ${suggestionAction}
+      </div>
+    </details>
+  `;
+}
+
 function renderCommentCard(c, opts = {}) {
   const [s, e] = commentLineRange(c);
   const lineRef = s === e ? `L${s}` : `L${s}–${e}`;
@@ -1534,10 +1738,7 @@ function renderCommentCard(c, opts = {}) {
   // validate.py is only run at generation time — a malicious YAML written
   // into ~/.reviews/ by some other tool could carry any string. Escape
   // every interpolation that lands in attributes or text content.
-  const sevSafe = escapeHtml(sev);
-  const confidenceSafe = escapeHtml(confidence);
   const anchorSafe = escapeHtml(anchorStatus);
-  const statusSafe = escapeHtml(c.status);
   const idSafe = escapeHtml(c.id);
 
   const isEditingSuggestion = state.editingSuggestion === c.id;
@@ -1560,7 +1761,7 @@ function renderCommentCard(c, opts = {}) {
       </div>
     `;
   } else if (c.suggestion) {
-    suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines, idSafe, anchorCurrent);
+    suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines);
   } else {
     // No suggestion yet — offer a way to add one.
     suggestionHtml = `
@@ -1585,18 +1786,14 @@ function renderCommentCard(c, opts = {}) {
     `<button class="comment-close" data-collapse-comment="${idSafe}" title="Close (Esc)"><i data-lucide="x"></i></button>`;
 
   const isEditing = state.editingBody === c.id;
-  const editBodyButtonHtml = isEditing ? "" : `
-    <button class="comment-edit-btn" data-edit-target="${idSafe}" title="Edit comment body" aria-label="Edit comment body">
-      <i data-lucide="pencil"></i>
-    </button>
-  `;
+  const actionsMenuHtml = isEditing || isEditingSuggestion ? "" : renderCommentActionsMenu(c, idSafe, anchorCurrent);
   const bodyHtml = isEditing
     ? `
       <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(c.body)}</textarea>
-      <div class="comment-editor-preview" data-markdown-preview-for="${idSafe}">${renderMarkdown(c.body)}</div>
+      <div class="comment-editor-preview markdown-body" data-markdown-preview-for="${idSafe}">${renderMarkdown(c.body)}</div>
       <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel</div>
     `
-    : `<div class="comment-body">${renderMarkdown(c.body)}</div>`;
+    : `<div class="comment-body markdown-body">${renderMarkdown(c.body)}</div>`;
 
   return `
     <div class="comment-card" data-comment-card="${idSafe}">
@@ -1605,13 +1802,10 @@ function renderCommentCard(c, opts = {}) {
         ${renderMetaChip("severity", sev, sev)}
         ${renderMetaChip("confidence", confidence, `${confidence} confidence`)}
         <span class="category-pill">${escapeHtml(c.category)}</span>
-        <button class="metadata-chip status-chip ${statusSafe}" data-cycle-status="${idSafe}" title="Click to cycle: open → acknowledged → resolved → wontfix">
-          <i data-lucide="${chipIcon("status", c.status)}"></i>
-          ${escapeHtml(humanStatus(c.status))}
-        </button>
+        ${renderStatusDropdown(c, idSafe)}
         ${lineRefHtml}
         <span class="comment-id">${idSafe}</span>
-        ${editBodyButtonHtml}
+        ${actionsMenuHtml}
         ${closeBtnHtml}
       </div>
       ${anchorHtml}
@@ -1647,7 +1841,7 @@ function renderReplies(c) {
         return `
         <div class="thread-reply ${kind}">
           <div class="thread-reply-author">${renderAuthorBadge(author, "reply-author-badge")}</div>
-          <div class="thread-reply-body">${renderMarkdown(reply.body || "")}</div>
+          <div class="thread-reply-body markdown-body">${renderMarkdown(reply.body || "")}</div>
         </div>
       `;
       }).join("")}
@@ -1660,21 +1854,15 @@ function renderReplies(c) {
   `;
 }
 
-function renderSuggestionDiff(c, language, sourceLinesArg, idSafe, editable = true) {
+function renderSuggestionDiff(c, language, sourceLinesArg) {
   const [s] = commentLineRange(c);
   const originalText = originalTextForComment(c, sourceLinesArg);
-  const editButton = editable ? `
-    <button class="suggestion-edit-btn" data-edit-suggestion-target="${idSafe}" title="Edit suggestion">
-      <i data-lucide="pencil"></i>
-    </button>
-  ` : "";
 
   return `
     <div class="comment-suggestion">
       <div class="comment-suggestion-label">
         <i data-lucide="lightbulb"></i>
         Suggested change
-        ${editButton}
       </div>
       ${renderSuggestionDiffTable(originalText, c.suggestion || "", language, s)}
     </div>
@@ -2004,7 +2192,7 @@ function attachContentHandlers() {
     });
   });
 
-  // Click body → enter edit mode
+  // Header actions menu → enter comment-body edit mode
   content.querySelectorAll("[data-edit-target]").forEach((el) => {
     el.addEventListener("click", () => {
       state.editingBody = el.getAttribute("data-edit-target");
@@ -2034,6 +2222,7 @@ function attachContentHandlers() {
         // the surrounding comment. Esc here only exits edit mode.
         e.preventDefault();
         e.stopPropagation();
+        suppressGlobalEscapeCollapse();
         cancelBodyEdit();
       }
     });
@@ -2059,6 +2248,7 @@ function attachContentHandlers() {
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
+        suppressGlobalEscapeCollapse();
         cancelSuggestionEdit(id);
       }
     });
@@ -2083,11 +2273,12 @@ function attachContentHandlers() {
     });
   });
 
-  content.querySelectorAll("[data-cycle-status]").forEach((el) => {
+  content.querySelectorAll("[data-set-status]").forEach((el) => {
     el.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const id = el.getAttribute("data-cycle-status");
-      cycleStatus(id);
+      const id = el.getAttribute("data-set-status");
+      const status = el.getAttribute("data-status-value");
+      await setStatus(id, status);
     });
   });
 
@@ -2184,15 +2375,20 @@ function scrollCommentIntoView(id) {
   });
 }
 
-async function cycleStatus(commentId) {
-  const order = ["open", "acknowledged", "resolved", "wontfix"];
+async function setStatus(commentId, status) {
   const c = findThread(commentId);
   if (!c) return;
-  c.status = order[(order.indexOf(c.status) + 1) % order.length];
+  if (!STATUS_OPTIONS.some((option) => option.value === status) || c.status === status) {
+    renderContent();
+    return;
+  }
+  const original = c.status;
+  c.status = status;
   try {
     await persistReview();
     renderContent();
   } catch (err) {
+    c.status = original;
     showError(err, "Save failed");
   }
 }
@@ -2301,10 +2497,17 @@ async function navigateToComment(direction) {
 }
 
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && shouldSuppressGlobalEscapeCollapse()) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
   if (isTypingInInput()) {
     if (e.key === "Escape") {
       document.activeElement.blur();
       e.preventDefault();
+      e.stopPropagation();
     }
     return;
   }
