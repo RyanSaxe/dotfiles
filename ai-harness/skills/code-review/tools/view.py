@@ -87,6 +87,7 @@ STATE_FILE = CACHE_DIR / "viewer.json"
 ENSURE_LOCK_FILE = CACHE_DIR / ".ensure.lock"
 WEBAPP_DIR = Path(__file__).parent / "webapp"
 SERVICE_SIGNATURE = "code-review-viewer"
+VIEWER_API_VERSION = 2
 DEFAULT_PORT_START = 51234
 PORT_TRY_LIMIT = 10
 HEAD_CACHE_TTL_SECONDS = 60
@@ -128,14 +129,34 @@ def is_pid_alive(pid: int) -> bool:
     return True
 
 
-def is_our_viewer(url: str) -> bool:
-    """Confirm the process at url is actually our viewer (not a PID-reuse impostor)."""
+def viewer_ping_payload(url: str) -> dict[str, Any] | None:
+    """Return the viewer ping payload, or None if the URL is not a live viewer."""
     try:
         with urllib.request.urlopen(f"{url}/api/ping", timeout=1) as resp:
             payload = json.loads(resp.read())
-            return payload.get("service") == SERVICE_SIGNATURE
+            return payload if isinstance(payload, dict) else None
     except (OSError, json.JSONDecodeError, urllib.error.URLError):
-        return False
+        return None
+
+
+def is_current_viewer(payload: dict[str, Any] | None) -> bool:
+    """Confirm a live viewer speaks the backend/webapp contract this client expects."""
+    return (
+        payload is not None
+        and payload.get("service") == SERVICE_SIGNATURE
+        and payload.get("api_version") == VIEWER_API_VERSION
+    )
+
+
+def stop_pid(pid: int) -> None:
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, TypeError):
+        return
+    for _ in range(20):
+        if not is_pid_alive(pid):
+            break
+        time.sleep(0.05)
 
 
 def detect_running_daemon() -> dict[str, Any] | None:
@@ -146,7 +167,10 @@ def detect_running_daemon() -> dict[str, Any] | None:
     if not is_pid_alive(state.get("pid", 0)):
         remove_state()
         return None
-    if not is_our_viewer(state.get("url", "")):
+    payload = viewer_ping_payload(state.get("url", ""))
+    if not is_current_viewer(payload):
+        if payload and payload.get("service") == SERVICE_SIGNATURE:
+            stop_pid(state.get("pid", 0))
         remove_state()
         return None
     return state
@@ -671,7 +695,13 @@ class ViewerHandler(BaseHTTPRequestHandler):
 
         if path == "/api/ping":
             self._json(
-                200, {"ok": True, "service": SERVICE_SIGNATURE, "yaml": YAML_BACKEND}
+                200,
+                {
+                    "ok": True,
+                    "service": SERVICE_SIGNATURE,
+                    "api_version": VIEWER_API_VERSION,
+                    "yaml": YAML_BACKEND,
+                },
             )
             return
 
@@ -1058,6 +1088,7 @@ def cmd_foreground(open_browser: bool, review_path_arg: Path | None) -> int:
         "url": url,
         "started_at": datetime.now(timezone.utc).isoformat(),
         "service": SERVICE_SIGNATURE,
+        "api_version": VIEWER_API_VERSION,
     }
     write_state(state)
     print(f"viewer · pid {os.getpid()} · {url}", file=sys.stderr)
@@ -1134,6 +1165,7 @@ def cmd_ensure(open_browser: bool, review_path_arg: Path | None) -> int:
                 "url": f"http://127.0.0.1:{port}",
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "service": SERVICE_SIGNATURE,
+                "api_version": VIEWER_API_VERSION,
             }
             write_state(state)
             run_server(port, verbose=False)

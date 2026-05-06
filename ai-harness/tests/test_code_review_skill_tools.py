@@ -52,6 +52,27 @@ class ReviewToolTests(unittest.TestCase):
             "/api/refresh/repo/key",
         )
 
+    def test_viewer_ping_payload_must_match_current_api_version(self) -> None:
+        self.assertTrue(
+            view_mod.is_current_viewer(
+                {
+                    "service": view_mod.SERVICE_SIGNATURE,
+                    "api_version": view_mod.VIEWER_API_VERSION,
+                }
+            )
+        )
+        self.assertFalse(
+            view_mod.is_current_viewer({"service": view_mod.SERVICE_SIGNATURE})
+        )
+        self.assertFalse(
+            view_mod.is_current_viewer(
+                {
+                    "service": view_mod.SERVICE_SIGNATURE,
+                    "api_version": view_mod.VIEWER_API_VERSION - 1,
+                }
+            )
+        )
+
     def test_refresh_updates_only_obvious_anchors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -200,6 +221,46 @@ review:
             self.assertTrue(dirty["ok"])
             self.assertTrue(dirty["needs_refresh"])
             self.assertEqual(review_path.read_text(), before)
+
+    def test_refresh_status_reports_commit_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            self.run_git(root, "init")
+            self.run_git(root, "config", "user.email", "test@example.com")
+            self.run_git(root, "config", "user.name", "Test User")
+            (root / "sample.py").write_text("print('one')\n")
+            self.run_git(root, "add", "sample.py")
+            self.run_git(root, "commit", "-m", "initial")
+            initial_commit = subprocess.check_output(
+                ["git", "-C", str(root), "rev-parse", "HEAD"],
+                text=True,
+            ).strip()
+            (root / "sample.py").write_text("print('two')\n")
+            self.run_git(root, "add", "sample.py")
+            self.run_git(root, "commit", "-m", "second")
+
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                f"""
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: local
+  repo_root: {root}
+  commit: {initial_commit}
+review:
+  event: COMMENT
+  summary: test
+  threads: []
+"""
+            )
+
+            status = view_mod.refresh_status_for_review(review_path)
+
+            self.assertTrue(status["ok"])
+            self.assertTrue(status["needs_refresh"])
+            self.assertEqual(status["mode"], "commit")
 
     def test_submit_payload_excludes_replies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
