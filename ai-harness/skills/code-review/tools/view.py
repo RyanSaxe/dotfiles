@@ -573,12 +573,25 @@ class ViewerHandler(BaseHTTPRequestHandler):
             cmd += ["--comment-id", comment_id]
 
         # 90s is well above a normal `gh api` POST and well under any
-        # reasonable user patience for a stuck spinner. On timeout the
-        # local YAML mutation below is skipped — the user can retry
-        # after checking GitHub manually.
+        # reasonable user patience for a stuck spinner. start_new_session
+        # puts the child in its own process group so we can SIGKILL the
+        # whole group on timeout — otherwise `uv` would die but `gh` (its
+        # grandchild) would be reparented to init and keep going,
+        # eventually posting the review behind the user's back and
+        # silently double-submitting on retry.
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            stdout, stderr = proc.communicate(timeout=90)
         except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait()
             self._json(
                 504,
                 {
@@ -587,8 +600,8 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if result.returncode != 0:
-            self._json(502, {"error": "submit failed", "detail": result.stderr.strip()})
+        if proc.returncode != 0:
+            self._json(502, {"error": "submit failed", "detail": stderr.strip()})
             return
 
         # On success, mutate the local YAML.
@@ -614,7 +627,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
             )
             return
 
-        self._json(200, {"ok": True, "url": result.stdout.strip()})
+        self._json(200, {"ok": True, "url": stdout.strip()})
 
     # --- static + SPA fallback ---
 
