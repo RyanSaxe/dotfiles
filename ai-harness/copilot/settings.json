@@ -30,5 +30,17 @@
         "timeoutSec": 5
       }
     ]
+  },
+  "renderMarkdown": true,
+  "screenReader": false,
+  "theme": "auto",
+  "model": "claude-opus-4.6",
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.copilot/utility-scripts/statusline.sh",
+    "padding": 0
+  },
+  "footer": {
+    "showCustom": true
   }
 }
