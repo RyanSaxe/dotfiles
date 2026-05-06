@@ -479,7 +479,13 @@ body.inbox-mode .main {
 }
 
 .file-group {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.file-group-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .file-group-header {

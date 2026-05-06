@@ -729,10 +729,12 @@ function renderReviewOverview() {
         <span>·</span>
         <span>${comments.length} ${comments.length === 1 ? "comment" : "comments"}</span>
       </div>
-      ${comments
-        .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity))
-        .map((c) => renderCommentCard(c, { withLineRef: true, fileLanguage: detectLanguage(file) }))
-        .join("")}
+      <div class="file-group-cards">
+        ${comments
+          .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity))
+          .map((c) => renderCommentCard(c, { withLineRef: true, fileLanguage: detectLanguage(file) }))
+          .join("")}
+      </div>
     </div>
   `).join("");
 
