@@ -76,6 +76,14 @@ def validate(path: Path) -> list[str]:
         if required not in review:
             errors.append(f"review.{required} is required")
 
+    # review.feedback is optional, but when present must be a string —
+    # the inbox metadata code does (feedback or "").strip() and would
+    # raise if a list/dict slipped in via a hand-edited YAML.
+    if "feedback" in review and not isinstance(review["feedback"], str):
+        errors.append(
+            f"review.feedback must be a string when set, got {type(review['feedback']).__name__}"
+        )
+
     comments = review.get("comments", [])
     if not isinstance(comments, list):
         errors.append("review.comments must be a list")
@@ -112,6 +120,11 @@ def validate(path: Path) -> list[str]:
         if status is not None and status not in VALID_STATUSES:
             errors.append(
                 f"{prefix}.status must be one of {sorted(VALID_STATUSES)}, got {status!r}"
+            )
+
+        if "feedback" in c and not isinstance(c["feedback"], str):
+            errors.append(
+                f"{prefix}.feedback must be a string when set, got {type(c['feedback']).__name__}"
             )
 
         # Line targeting

@@ -114,7 +114,7 @@ Controls the GitHub submission type when sent:
 
 ### `review.feedback` and per-comment `feedback`
 
-Optional. Inputs for the iteration loop. If non-empty, the next `/code-review` reads them, addresses each, and clears the field. See [`iteration.md`](iteration.md).
+Optional **strings**. Inputs for the iteration loop. If non-empty, the next `/code-review` reads them, addresses each, and clears the field. See [`iteration.md`](iteration.md). Anything other than a string fails validation.
 
 ## Examples
 
