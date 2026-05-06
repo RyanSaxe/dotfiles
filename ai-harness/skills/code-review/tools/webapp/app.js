@@ -23,6 +23,7 @@ const state = {
   treeFilter: { query: "", showAll: false },
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
   editingBody: null,                  // commentId currently being edited inline
+  editingSuggestion: null,            // commentId currently editing suggestion inline
   error: null,
 };
 
@@ -234,6 +235,7 @@ async function loadRoute(route) {
   state.expandedComments.clear();
   state.newCommentTarget = null;
   state.editingBody = null;
+  state.editingSuggestion = null;
 
   try {
     if (route.view === "inbox") {
@@ -920,9 +922,30 @@ function renderCommentCard(c, opts = {}) {
   const statusSafe = escapeHtml(c.status);
   const idSafe = escapeHtml(c.id);
 
-  const suggestionHtml = c.suggestion
-    ? renderSuggestionDiff(c, language, opts.sourceLines)
-    : "";
+  const isEditingSuggestion = state.editingSuggestion === c.id;
+  let suggestionHtml = "";
+  if (isEditingSuggestion) {
+    suggestionHtml = `
+      <div class="comment-suggestion">
+        <div class="comment-suggestion-label">
+          <i data-lucide="lightbulb"></i>
+          Suggested change
+        </div>
+        <textarea class="suggestion-edit" data-edit-suggestion="${idSafe}" autofocus>${escapeHtml(c.suggestion || "")}</textarea>
+        <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel · empty to remove</div>
+      </div>
+    `;
+  } else if (c.suggestion) {
+    suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines, idSafe);
+  } else {
+    // No suggestion yet — offer a way to add one.
+    suggestionHtml = `
+      <button class="btn btn-suggestion-add" data-edit-suggestion-target="${idSafe}">
+        <i data-lucide="lightbulb"></i>
+        Add suggested change
+      </button>
+    `;
+  }
 
   const feedbackHtml = c.feedback ? `
     <div class="comment-feedback">
@@ -979,7 +1002,7 @@ function renderCommentCard(c, opts = {}) {
   `;
 }
 
-function renderSuggestionDiff(c, language, sourceLinesArg) {
+function renderSuggestionDiff(c, language, sourceLinesArg, idSafe) {
   const [s, e] = commentLineRange(c);
   const sourceLines = sourceLinesArg || (state.source?.content || "").split("\n");
   const originalLines = sourceLines.length > 0 ? sourceLines.slice(s - 1, e) : [];
@@ -1006,6 +1029,9 @@ function renderSuggestionDiff(c, language, sourceLinesArg) {
       <div class="comment-suggestion-label">
         <i data-lucide="lightbulb"></i>
         Suggested change
+        <button class="suggestion-edit-btn" data-edit-suggestion-target="${idSafe}" title="Edit suggestion">
+          <i data-lucide="pencil"></i>
+        </button>
       </div>
       <div class="diff-table-scroll">
         <table class="diff-table"><tbody>
@@ -1158,6 +1184,58 @@ function attachContentHandlers() {
       } else if (e.key === "Escape") {
         e.preventDefault();
         state.editingBody = null;
+        renderContent();
+      }
+    });
+  });
+
+  // Pencil button on the suggestion label (or "Add suggested change" button
+   // when no suggestion exists) → swap diff for an editable textarea.
+  content.querySelectorAll("[data-edit-suggestion-target]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.editingSuggestion = el.getAttribute("data-edit-suggestion-target");
+      renderContent();
+      requestAnimationFrame(() => {
+        const ta = document.querySelector(`[data-edit-suggestion="${state.editingSuggestion}"]`);
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+        }
+      });
+    });
+  });
+
+  // Edit-suggestion keyboard handlers (Cmd/Ctrl+Enter saves, Esc cancels,
+  // empty textarea on save removes the suggestion entirely).
+  content.querySelectorAll("[data-edit-suggestion]").forEach((el) => {
+    el.addEventListener("keydown", async (e) => {
+      const id = el.getAttribute("data-edit-suggestion");
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        const c = state.review.review.comments.find((x) => x.id === id);
+        if (!c) return;
+        const newSuggestion = el.value.trim() ? el.value.replace(/\n+$/, "") : "";
+        if ((newSuggestion || "") === (c.suggestion || "")) {
+          state.editingSuggestion = null;
+          renderContent();
+          return;
+        }
+        const original = c.suggestion;
+        if (newSuggestion) c.suggestion = newSuggestion;
+        else delete c.suggestion;
+        try {
+          await persistReview();
+          state.editingSuggestion = null;
+          renderContent();
+          showToast(newSuggestion ? `Edited suggestion on ${id}` : `Removed suggestion from ${id}`);
+        } catch (err) {
+          if (original !== undefined) c.suggestion = original;
+          showToast(err.message);
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        state.editingSuggestion = null;
         renderContent();
       }
     });
