@@ -196,6 +196,24 @@ body.inbox-mode .topbar-home-sep {
   align-items: center;
 }
 
+.topbar-comment-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-2);
+  margin-right: var(--space-1);
+  border-right: 1px solid var(--color-border);
+}
+
+.topbar-comment-nav-counter {
+  min-width: 42px;
+  text-align: center;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /* === Buttons ====================================================== */
 
 .btn {
@@ -673,26 +691,6 @@ body.inbox-mode .main {
 
 .code-comment-count {
   color: var(--color-muted);
-}
-
-.code-header-spacer {
-  flex: 1;
-}
-
-.code-comment-nav {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-}
-
-.code-comment-nav-counter {
-  min-width: 42px;
-  text-align: center;
-  color: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
 }
 
 .lang-badge {

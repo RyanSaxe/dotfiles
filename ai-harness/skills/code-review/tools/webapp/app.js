@@ -822,6 +822,7 @@ function renderTopbar() {
   const sep1 = document.getElementById("topbar-sep-1");
   const sep2 = document.getElementById("topbar-sep-2");
   const sep3 = document.getElementById("topbar-sep-3");
+  const commentNavEl = document.getElementById("topbar-comment-nav");
   const refreshBtn = document.getElementById("btn-refresh-review");
   const sendBtn = document.getElementById("btn-send-review");
 
@@ -832,6 +833,8 @@ function renderTopbar() {
     prEl.textContent = "";
     staleEl.hidden = true;
     sep1.hidden = sep2.hidden = sep3.hidden = true;
+    commentNavEl.hidden = true;
+    commentNavEl.innerHTML = "";
     refreshBtn.hidden = true;
     refreshBtn.disabled = false;
     refreshBtn.classList.remove("btn-refresh-needed");
@@ -870,6 +873,7 @@ function renderTopbar() {
     sendBtn.title = "Set target.pr_number to enable submitting";
   }
   sep1.hidden = sep2.hidden = sep3.hidden = false;
+  renderTopbarCommentNav(commentNavEl);
 
   const needsRefresh = Boolean(state.refreshStatus?.needs_refresh ?? state.review._stale);
   const refreshKnown = state.refreshStatus?.ok !== false;
@@ -891,32 +895,39 @@ function renderTopbar() {
       ? "No filesystem changes detected for this review"
       : state.refreshStatus?.reason || "Refresh status unavailable";
   sendBtn.hidden = false;
+  if (window.lucide) window.lucide.createIcons();
 }
 
-function renderCommentHeaderNav() {
-  const navComments = navigableComments();
-  if (navComments.length < 2) {
-    return "";
+function currentCommentIndex(navComments) {
+  if (navComments.length === 0) return -1;
+  if (state.cursorCommentId) {
+    const cursorIdx = navComments.findIndex((c) => c.id === state.cursorCommentId);
+    if (cursorIdx !== -1) return cursorIdx;
   }
-  const cursorIdx = state.cursorCommentId
-    ? navComments.findIndex((c) => c.id === state.cursorCommentId)
-    : -1;
-  const counter = cursorIdx === -1
-    ? `${navComments.length}`
-    : `${cursorIdx + 1} / ${navComments.length}`;
+  if (state.route.view === "file") {
+    const fileIdx = navComments.findIndex((c) => c.file === state.route.file);
+    if (fileIdx !== -1) return fileIdx;
+  }
+  return 0;
+}
 
-  return `
-    <div class="code-comment-nav" aria-label="Comment navigation">
-      <button class="btn btn-compact" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment">
-        <i data-lucide="chevron-up"></i>
-        Prev comment
-      </button>
-      <span class="code-comment-nav-counter">${escapeHtml(counter)}</span>
-      <button class="btn btn-compact" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment">
-        <i data-lucide="chevron-down"></i>
-        Next comment
-      </button>
-    </div>
+function renderTopbarCommentNav(navEl) {
+  const navComments = navigableComments();
+  const disabled = navComments.length === 0 ? "disabled" : "";
+  const cursorIdx = currentCommentIndex(navComments);
+  const counter = navComments.length === 0 ? "0 / 0" : `${cursorIdx + 1} / ${navComments.length}`;
+
+  navEl.hidden = false;
+  navEl.innerHTML = `
+    <button class="btn btn-compact" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment" ${disabled}>
+      <i data-lucide="chevron-up"></i>
+      Prev comment
+    </button>
+    <span class="topbar-comment-nav-counter">${escapeHtml(counter)}</span>
+    <button class="btn btn-compact" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment" ${disabled}>
+      <i data-lucide="chevron-down"></i>
+      Next comment
+    </button>
   `;
 }
 
@@ -1551,8 +1562,6 @@ function renderFileView() {
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
         <span class="code-comment-count">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
-        <div class="code-header-spacer"></div>
-        ${renderCommentHeaderNav()}
       </div>
       <div class="code-table-scroll">
         <table class="code-table"><tbody>${rows}</tbody></table>
@@ -2397,6 +2406,16 @@ async function setStatus(commentId, status) {
 
 document.getElementById("btn-home").addEventListener("click", () => {
   navigate({ view: "inbox" });
+});
+
+document.getElementById("topbar-comment-nav").addEventListener("click", (e) => {
+  const prev = e.target.closest("[data-prev-comment]");
+  const next = e.target.closest("[data-next-comment]");
+  if (prev) {
+    navigateToComment(-1);
+  } else if (next) {
+    navigateToComment(+1);
+  }
 });
 
 document.getElementById("btn-refresh-review").addEventListener("click", async () => {
