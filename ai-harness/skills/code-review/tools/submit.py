@@ -114,6 +114,8 @@ def build_review_payload(
             raise RuntimeError(f"comment id {only_comment_id!r} not found in review")
     else:
         comments = [c for c in comments if c.get("status") not in SKIP_STATUSES]
+        if not comments:
+            raise RuntimeError("nothing to send — every comment is resolved or wontfix")
 
     return {
         "commit_id": target["commit"],

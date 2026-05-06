@@ -619,10 +619,12 @@ class ViewerHandler(BaseHTTPRequestHandler):
     # --- static + SPA fallback ---
 
     def _serve_static(self, path: str) -> None:
-        # API routes already handled above. For everything else, look up a
-        # file in webapp/. If not found and the path looks like a client-side
-        # route ("/", "/r/...", etc.), serve index.html so the JS router
-        # picks it up.
+        # API routes already handled above. SPA routes (`/`, `/r/...`)
+        # always serve index.html. For anything else, look up a file in
+        # webapp/ and 404 if missing — falling back to index.html for
+        # arbitrary paths masks legitimate 404s on missing static assets
+        # (favicon, stale bundle URLs, typo'd hrefs) by handing the
+        # browser HTML where it expected CSS/JS/binary.
         if path == "/" or path.startswith("/r/"):
             self._send_file(WEBAPP_DIR / "index.html", "text/html")
             return
@@ -637,8 +639,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
             return
 
         if not candidate.exists() or not candidate.is_file():
-            # SPA fallback
-            self._send_file(WEBAPP_DIR / "index.html", "text/html")
+            self._text(404, "not found")
             return
 
         ct = guess_content_type(candidate)
