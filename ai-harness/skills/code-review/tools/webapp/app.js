@@ -1182,7 +1182,10 @@ function attachContentHandlers() {
           showToast(err.message);
         }
       } else if (e.key === "Escape") {
+        // Stop propagation so the global Esc handler doesn't *also* collapse
+        // the surrounding comment. Esc here only exits edit mode.
         e.preventDefault();
+        e.stopPropagation();
         state.editingBody = null;
         renderContent();
       }
@@ -1235,6 +1238,7 @@ function attachContentHandlers() {
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         state.editingSuggestion = null;
         renderContent();
       }
