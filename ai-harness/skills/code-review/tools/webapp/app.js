@@ -594,7 +594,7 @@ function renderTopbar() {
     a.href = `https://github.com/${encodeURIComponent(t.owner)}/${encodeURIComponent(t.repo)}/pull/${encodeURIComponent(t.pr_number)}`;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.textContent = `PR #${t.pr_number}`;
+    a.textContent = `Review for PR #${t.pr_number}`;
     a.addEventListener("click", (e) => e.stopPropagation());
     prEl.appendChild(a);
     sendBtn.disabled = false;
@@ -603,11 +603,11 @@ function renderTopbar() {
     // Have a PR number but no owner/repo — older YAMLs predate the schema
     // bump. Show the number as text so submit still works (the daemon can
     // resolve owner/repo at submit time), but no clickable link.
-    prEl.textContent = `PR #${t.pr_number}`;
+    prEl.textContent = `Review for PR #${t.pr_number}`;
     sendBtn.disabled = false;
     sendBtn.title = "";
   } else {
-    prEl.textContent = "scratch · no PR";
+    prEl.textContent = "Local Review";
     sendBtn.disabled = true;
     sendBtn.title = "Set target.pr_number to enable submitting";
   }
