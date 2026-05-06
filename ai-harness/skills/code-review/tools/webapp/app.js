@@ -230,26 +230,78 @@ function leadingWhitespace(line) {
   return (line.match(/^[\t ]*/) || [""])[0];
 }
 
+function nonBlankLines(text) {
+  return String(text ?? "").split("\n").filter((line) => /\S/.test(line));
+}
+
+function indentationWidth(prefix) {
+  return Array.from(prefix).reduce((width, ch) => width + (ch === "\t" ? 4 : 1), 0);
+}
+
+function minIndentWidth(lines) {
+  const indents = lines
+    .filter((line) => /\S/.test(line))
+    .map((line) => indentationWidth(leadingWhitespace(line)));
+  return indents.length ? Math.min(...indents) : 0;
+}
+
+function alignedIndentationChanged(originalLines, suggestedLines) {
+  const originalTrimmed = originalLines.map((line) => line.trimStart());
+  const suggestedTrimmed = suggestedLines.map((line) => line.trimStart());
+  const rows = originalLines.length + 1;
+  const cols = suggestedLines.length + 1;
+  const lcs = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+  for (let i = originalLines.length - 1; i >= 0; i -= 1) {
+    for (let j = suggestedLines.length - 1; j >= 0; j -= 1) {
+      if (originalTrimmed[i] === suggestedTrimmed[j]) {
+        lcs[i][j] = lcs[i + 1][j + 1] + 1;
+      } else {
+        lcs[i][j] = Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      }
+    }
+  }
+
+  let i = 0;
+  let j = 0;
+  while (i < originalLines.length && j < suggestedLines.length) {
+    if (originalTrimmed[i] === suggestedTrimmed[j]) {
+      if (leadingWhitespace(originalLines[i]) !== leadingWhitespace(suggestedLines[j])) {
+        return true;
+      }
+      i += 1;
+      j += 1;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      i += 1;
+    } else {
+      j += 1;
+    }
+  }
+  return false;
+}
+
+function looksLikeBlockDeindent(originalLines, suggestedLines) {
+  const originalIndent = minIndentWidth(originalLines);
+  const suggestedIndent = minIndentWidth(suggestedLines);
+  if (originalIndent === 0 || suggestedIndent >= originalIndent) return false;
+  const deindentedSuggestedLines = suggestedLines.filter((line) => (
+    /\S/.test(line) && indentationWidth(leadingWhitespace(line)) < originalIndent
+  ));
+  return deindentedSuggestedLines.length >= Math.max(1, Math.ceil(suggestedLines.length / 2));
+}
+
 function indentationWarning(originalText, suggestedText) {
   const suggested = normalizeSuggestionText(suggestedText);
   if (!/\S/.test(suggested)) return "";
-  const originalLines = String(originalText ?? "").split("\n");
-  const suggestedLines = suggested.split("\n");
-  let changed = 0;
-  const pairedCount = Math.min(originalLines.length, suggestedLines.length);
-  for (let i = 0; i < pairedCount; i += 1) {
-    if (!/\S/.test(originalLines[i]) || !/\S/.test(suggestedLines[i])) continue;
-    if (leadingWhitespace(originalLines[i]) !== leadingWhitespace(suggestedLines[i])) {
-      changed += 1;
-    }
+  const originalLines = nonBlankLines(originalText);
+  const suggestedLines = nonBlankLines(suggested);
+  if (
+    alignedIndentationChanged(originalLines, suggestedLines) ||
+    looksLikeBlockDeindent(originalLines, suggestedLines)
+  ) {
+    return "Possible indentation change; GitHub applies whitespace exactly.";
   }
-  if (changed === 0) return "";
-  if (originalLines.length === 1 && suggestedLines.length === 1) {
-    return "Leading whitespace differs from the original line. GitHub will apply that indentation exactly.";
-  }
-  return changed === 1
-    ? "1 paired line changes its leading whitespace. GitHub will apply indentation exactly."
-    : `${changed} paired lines change their leading whitespace. GitHub will apply indentation exactly.`;
+  return "";
 }
 
 function splitDiffLines(text) {

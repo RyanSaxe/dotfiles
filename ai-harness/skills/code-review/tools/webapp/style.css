@@ -30,6 +30,20 @@
   --sev-info: #2563eb;
   --sev-info-soft: #dbeafe;
 
+  /* Code syntax palette: GitHub-light adjacent, with stronger semantic separation. */
+  --code-text: #24292f;
+  --code-comment: #6e7781;
+  --code-keyword: #8250df;
+  --code-function: #bc4c00;
+  --code-type: #0550ae;
+  --code-string: #0a3069;
+  --code-number: #953800;
+  --code-variable: #24292f;
+  --code-property: #0550ae;
+  --code-meta: #cf222e;
+  --code-operator: #8250df;
+  --code-builtin: #116329;
+
   /* Typography */
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -1332,19 +1346,107 @@ body.inbox-mode .comment-row-inner {
   background: var(--color-negative-soft);
 }
 
-/* === highlight.js overrides per design system ===================== */
+/* === Shared code syntax theme ===================================== */
+
+.hljs,
+.CodeMirror,
+.CodeMirror pre.CodeMirror-line,
+.CodeMirror pre.CodeMirror-line-like {
+  color: var(--code-text) !important;
+}
+
+.hljs,
+.CodeMirror {
+  background: transparent !important;
+}
 
 .hljs {
-  background: transparent !important;
   padding: 0 !important;
 }
 
-/* atom-one-light's default string is green-ish — collides with our
-   positive-soft suggestion wash. Bump to deep blue. */
+.hljs-comment,
+.hljs-quote,
+.CodeMirror .cm-comment {
+  color: var(--code-comment) !important;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-template-tag,
+.hljs-doctag,
+.CodeMirror .cm-keyword {
+  color: var(--code-keyword) !important;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-function .hljs-title,
+.CodeMirror .cm-def {
+  color: var(--code-function) !important;
+}
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_,
+.hljs-built_in,
+.CodeMirror .cm-type {
+  color: var(--code-type) !important;
+}
+
 .hljs-string,
 .hljs-attribute,
-.hljs-meta-string {
-  color: #1e3a8a !important;
+.hljs-meta-string,
+.hljs-regexp,
+.CodeMirror .cm-string,
+.CodeMirror .cm-string-2 {
+  color: var(--code-string) !important;
+}
+
+.hljs-number,
+.hljs-literal,
+.CodeMirror .cm-number,
+.CodeMirror .cm-atom {
+  color: var(--code-number) !important;
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params,
+.CodeMirror .cm-variable,
+.CodeMirror .cm-variable-2,
+.CodeMirror .cm-variable-3 {
+  color: var(--code-variable) !important;
+}
+
+.hljs-property,
+.hljs-attr,
+.CodeMirror .cm-property,
+.CodeMirror .cm-attribute {
+  color: var(--code-property) !important;
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-deletion,
+.CodeMirror .cm-meta,
+.CodeMirror .cm-qualifier {
+  color: var(--code-meta) !important;
+}
+
+.hljs-operator,
+.hljs-punctuation,
+.CodeMirror .cm-operator,
+.CodeMirror .cm-punctuation {
+  color: var(--code-operator) !important;
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.CodeMirror .cm-builtin,
+.CodeMirror .cm-tag {
+  color: var(--code-builtin) !important;
 }
 
 /* === Inbox ======================================================== */
