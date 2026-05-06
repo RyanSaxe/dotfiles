@@ -13,8 +13,10 @@
 
   --color-accent: #facc15;       /* yellow — active state only */
   --color-accent-fg: #0a0a0a;
-  --color-action: #525252;
-  --color-action-hover: #404040;
+  --color-action: #dbeafe;
+  --color-action-hover: #bfdbfe;
+  --color-action-border: #93c5fd;
+  --color-action-fg: #1e3a8a;
   --color-positive: #16a34a;
   --color-positive-soft: #dcfce7;
   --color-negative: #dc2626;
@@ -223,27 +225,28 @@ body.inbox-mode .topbar-home-sep {
   padding: 6px 12px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--color-border-strong);
-  background: #f7f7f7;
+  background: linear-gradient(#ffffff, #f7f7f7);
   color: var(--color-body);
   font-size: var(--text-sm);
   font-weight: 500;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1px 1px rgba(0, 0, 0, 0.03);
+  transition: background 0.1s, border-color 0.1s, color 0.1s, box-shadow 0.1s;
 }
 
 .btn:hover {
-  background: #eeeeee;
+  background: linear-gradient(#fafafa, #eeeeee);
   border-color: #c7c7c7;
 }
 
 .btn-primary {
-  background: var(--color-action);
-  border-color: var(--color-action);
-  color: #ffffff;
+  background: linear-gradient(#eff6ff, var(--color-action));
+  border-color: var(--color-action-border);
+  color: var(--color-action-fg);
 }
 
 .btn-primary:hover {
-  background: var(--color-action-hover);
-  border-color: var(--color-action-hover);
+  background: linear-gradient(var(--color-action), var(--color-action-hover));
+  border-color: #60a5fa;
 }
 
 .btn-refresh-needed {
@@ -271,7 +274,7 @@ body.inbox-mode .topbar-home-sep {
 
 .btn-primary:disabled:hover,
 .btn-primary[disabled]:hover {
-  background: var(--color-action);
+  background: linear-gradient(#eff6ff, var(--color-action));
 }
 
 .btn-refresh-needed:disabled:hover {
@@ -337,14 +340,13 @@ body.inbox-mode .main {
   margin-bottom: var(--space-2);
 }
 
-/* Tree filter row — path search, compact extension combobox, and file-scope toggles. */
+/* Tree filter row — path search, compact extension picker, and file-scope toggles. */
 .tree-filter {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
-.tree-filter-search,
-.tree-extension-field {
+.tree-filter-search {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -355,16 +357,14 @@ body.inbox-mode .main {
   background: var(--color-surface);
 }
 
-.tree-filter-search .lucide,
-.tree-extension-field .lucide {
+.tree-filter-search .lucide {
   width: 14px;
   height: 14px;
   color: var(--color-faint);
   flex: 0 0 auto;
 }
 
-.tree-filter input[type="text"],
-.tree-extension-field input[type="text"] {
+.tree-filter input[type="text"] {
   width: 100%;
   min-width: 0;
   padding: 6px 0;
@@ -375,69 +375,140 @@ body.inbox-mode .main {
   background: transparent;
 }
 
-.tree-filter-search:focus-within,
-.tree-extension-field:focus-within {
+.tree-filter-search:focus-within {
   outline: none;
   border-color: var(--color-emphasis);
 }
 
-.tree-filter input[type="text"]:focus,
-.tree-extension-field input[type="text"]:focus {
+.tree-filter input[type="text"]:focus {
   outline: none;
 }
 
-.tree-extension-combobox {
+.tree-type-filter {
+  position: relative;
   margin-top: var(--space-2);
 }
 
-.tree-extension-add {
+.tree-type-filter summary {
+  list-style: none;
+}
+
+.tree-type-filter summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-type-filter-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: linear-gradient(#ffffff, #f7f7f7);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1px 1px rgba(0, 0, 0, 0.02);
+}
+
+.tree-type-filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tree-type-filter-summary:hover,
+.tree-type-filter[open] .tree-type-filter-summary {
+  border-color: var(--color-border-strong);
+  background: linear-gradient(#fafafa, #eeeeee);
+}
+
+.tree-type-filter-summary .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--color-muted);
+}
+
+.tree-type-filter-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.tree-type-filter-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+}
+
+.tree-type-filter-search .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--color-faint);
+}
+
+.tree-type-filter-options {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: var(--space-2);
+  padding-right: var(--space-1);
+}
+
+.tree-type-filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px 6px;
+  border-radius: var(--radius-input);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-body);
+}
+
+.tree-type-filter-option:hover {
+  background: #f5f5f5;
+}
+
+.tree-type-filter-option input {
+  margin: 0;
+}
+
+.tree-type-filter-empty {
+  padding: var(--space-2);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.tree-type-filter-clear {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 5px 6px;
   border: none;
+  border-radius: var(--radius-input);
   background: transparent;
   color: var(--color-muted);
   font-size: var(--text-xs);
   font-weight: 600;
-  padding: 2px 0;
+  text-align: left;
 }
 
-.tree-extension-add:hover {
-  color: var(--color-emphasis);
-}
-
-.tree-extension-selected {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: var(--space-2);
-}
-
-.tree-extension-token,
-.tree-extension-clear {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: #f7f7f7;
-  color: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1;
-  padding: 5px 8px;
-}
-
-.tree-extension-token:hover,
-.tree-extension-clear:hover {
-  border-color: var(--color-border-strong);
+.tree-type-filter-clear:hover {
+  background: #f5f5f5;
   color: var(--color-body);
-}
-
-.tree-extension-token .lucide {
-  width: 11px;
-  height: 11px;
-}
-
-.tree-extension-clear {
-  font-family: var(--font-sans);
 }
 
 .tree-filter-settings {
@@ -723,6 +794,11 @@ body.inbox-mode .main {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.topbar-stale.unavailable {
+  background: #f5f5f5;
+  color: var(--color-muted);
 }
 
 /* Add-comment "+" in the gutter. Faint at rest so the gutter rhythm reads as
@@ -1169,16 +1245,29 @@ body.inbox-mode .main {
   border-color: #bfdbfe;
 }
 
-.category-pill {
+.category-chip {
+  background: #f5f5f5;
+  border-color: var(--color-border);
+  color: var(--color-body);
+  font-family: var(--font-mono);
+}
+
+.category-chip .lucide {
+  color: var(--color-muted);
+}
+
+.status-button {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  gap: var(--space-2);
+  padding: 5px 10px;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
-  background: #f5f5f5;
-  color: var(--color-body);
-  font-size: var(--text-xs);
+  background: linear-gradient(#ffffff, #f7f7f7);
+  font-size: var(--text-sm);
   font-weight: 500;
-  font-family: var(--font-mono);
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1px 1px rgba(0, 0, 0, 0.02);
 }
 
 .status-chip {
@@ -1186,14 +1275,19 @@ body.inbox-mode .main {
   font-family: var(--font-sans);
 }
 
-.status-chip:hover,
-.status-menu[open] .status-chip {
-  filter: brightness(0.98);
+.status-button .lucide {
+  width: 14px;
+  height: 14px;
 }
 
-.status-chip.open { color: var(--color-emphasis); border-color: var(--color-border-strong); background: #f5f5f5; }
+.status-button:hover,
+.status-menu[open] .status-chip {
+  background: linear-gradient(#fafafa, #eeeeee);
+}
+
+.status-chip.open { color: var(--color-emphasis); border-color: var(--color-border-strong); }
 .status-chip.resolved { color: var(--color-positive); border-color: #86efac; background: var(--color-positive-soft); }
-.status-chip.wontfix { color: var(--color-muted); border-color: var(--color-border-strong); background: #f5f5f5; }
+.status-chip.wontfix { color: var(--color-muted); border-color: var(--color-border-strong); }
 .status-chip.acknowledged { color: var(--sev-info); border-color: #bfdbfe; background: var(--sev-info-soft); }
 
 .status-menu,
@@ -1247,11 +1341,29 @@ body.inbox-mode .main {
   background: #f5f5f5;
 }
 
+.comment-menu-divider {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--color-border);
+}
+
+.comment-menu-item.danger {
+  color: var(--color-negative);
+}
+
+.comment-menu-item.danger:hover {
+  background: var(--color-negative-soft);
+}
+
 .status-menu-item .lucide,
 .comment-menu-item .lucide {
   width: 14px;
   height: 14px;
   color: var(--color-muted);
+}
+
+.comment-menu-item.danger .lucide {
+  color: var(--color-negative);
 }
 
 .comment-menu-item:disabled {
@@ -1712,16 +1824,6 @@ body.inbox-mode .main {
 
 .comment-actions .spacer {
   flex: 1;
-}
-
-.comment-actions .btn-danger {
-  color: var(--color-negative);
-  border-color: transparent;
-  padding: 6px 8px;
-}
-
-.comment-actions .btn-danger:hover {
-  background: var(--color-negative-soft);
 }
 
 /* === Shared code syntax theme ===================================== */

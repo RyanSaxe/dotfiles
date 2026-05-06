@@ -21,7 +21,14 @@ const state = {
   showStale: false,
   expandedComments: new Set(),
   cursorCommentId: null,              // last navigated/clicked comment — Tab/S-Tab anchor
-  treeFilter: { query: "", showAll: false, showIgnored: false, extensions: [] },
+  treeFilter: {
+    query: "",
+    showAll: false,
+    showIgnored: false,
+    extensions: [],
+    extensionQuery: "",
+    extensionMenuOpen: false,
+  },
   collapsedFolders: new Set(),        // folder paths the user has collapsed in the file tree
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
   newCommentSuggestionExpanded: false,
@@ -89,6 +96,13 @@ function normalizeExtensionInput(value) {
   return String(value || "").trim().replace(/^\./, "").toLowerCase();
 }
 
+function formatExtensionSummary(extensions) {
+  if (!extensions.length) return "Types: All";
+  const visible = extensions.slice(0, 2).map((ext) => `.${ext}`).join(", ");
+  const overflow = extensions.length > 2 ? ` +${extensions.length - 2}` : "";
+  return `Types: ${visible}${overflow}`;
+}
+
 function unionPaths(...pathLists) {
   return Array.from(new Set(pathLists.flat().filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
@@ -114,8 +128,9 @@ function chipIcon(kind, value) {
     status: {
       ...Object.fromEntries(STATUS_OPTIONS.map((option) => [option.value, option.icon])),
     },
+    category: {},
   };
-  return maps[kind]?.[value] || "circle";
+  return maps[kind]?.[value] || (kind === "category" ? "tag" : "circle");
 }
 
 function escapeHtml(text) {
@@ -882,6 +897,11 @@ function renderTopbar() {
     staleEl.className = "topbar-stale";
     staleEl.hidden = false;
     staleEl.title = "The current folder differs from this review; refresh to reload files and anchors";
+  } else if (!refreshKnown) {
+    staleEl.textContent = "refresh unavailable";
+    staleEl.className = "topbar-stale unavailable";
+    staleEl.hidden = false;
+    staleEl.title = state.refreshStatus?.reason || "Refresh status unavailable";
   } else {
     staleEl.hidden = true;
   }
@@ -956,6 +976,8 @@ function renderTree() {
   const extensionOptions = uniqueSortedExtensions(allPaths);
   state.treeFilter.extensions = (state.treeFilter.extensions || []).filter((ext) => extensionOptions.includes(ext));
   const selectedExtensions = state.treeFilter.extensions;
+  const extensionQuery = normalizeExtensionInput(state.treeFilter.extensionQuery);
+  const visibleExtensionOptions = extensionOptions.filter((ext) => !extensionQuery || ext.includes(extensionQuery));
   const filteredPaths = allPaths.filter((p) => {
     const matchesQuery = !filterQuery || p.toLowerCase().includes(filterQuery);
     const matchesExtension = selectedExtensions.length === 0 || selectedExtensions.includes(fileExtension(p));
@@ -970,30 +992,34 @@ function renderTree() {
         <i data-lucide="search"></i>
         <input type="text" id="tree-filter-query" placeholder="Filter files…" value="${escapeHtml(state.treeFilter.query)}" />
       </div>
-      <div class="tree-extension-combobox">
-        <div class="tree-extension-field">
-          <i data-lucide="filter"></i>
-          <input type="text" id="tree-extension-query" list="tree-extension-options" placeholder="${selectedExtensions.length ? "Add file type…" : "All file types"}" />
-          <button class="tree-extension-add" data-add-tree-extension type="button">Add</button>
-        </div>
-        <datalist id="tree-extension-options">
-          ${extensionOptions
-            .filter((ext) => !selectedExtensions.includes(ext))
-            .map((ext) => `<option value=".${escapeHtml(ext)}"></option>`)
-            .join("")}
-        </datalist>
-        ${selectedExtensions.length ? `
-          <div class="tree-extension-selected" aria-label="Selected file extensions">
-            ${selectedExtensions.map((ext) => `
-              <button class="tree-extension-token" data-remove-tree-extension="${escapeHtml(ext)}" type="button" title="Remove .${escapeHtml(ext)}">
-                .${escapeHtml(ext)}
-                <i data-lucide="x"></i>
-              </button>
-            `).join("")}
-            <button class="tree-extension-clear" data-clear-tree-extensions type="button">Clear</button>
+      <details class="tree-type-filter" ${state.treeFilter.extensionMenuOpen ? "open" : ""}>
+        <summary class="tree-type-filter-summary">
+          <span>
+            <i data-lucide="filter"></i>
+            ${escapeHtml(formatExtensionSummary(selectedExtensions))}
+          </span>
+          <i data-lucide="chevron-down"></i>
+        </summary>
+        <div class="tree-type-filter-popover">
+          <div class="tree-type-filter-search">
+            <i data-lucide="search"></i>
+            <input type="text" id="tree-extension-query" placeholder="Find type…" value="${escapeHtml(state.treeFilter.extensionQuery)}" />
           </div>
-        ` : ""}
-      </div>
+          <div class="tree-type-filter-options">
+            ${visibleExtensionOptions.length
+              ? visibleExtensionOptions.map((ext) => `
+                <label class="tree-type-filter-option">
+                  <input type="checkbox" data-toggle-tree-extension="${escapeHtml(ext)}" ${selectedExtensions.includes(ext) ? "checked" : ""} />
+                  <span>.${escapeHtml(ext)}</span>
+                </label>
+              `).join("")
+              : `<div class="tree-type-filter-empty">No file types match.</div>`}
+          </div>
+          ${selectedExtensions.length ? `
+            <button class="tree-type-filter-clear" data-clear-tree-extensions type="button">Clear types</button>
+          ` : ""}
+        </div>
+      </details>
       <div class="tree-filter-settings">
         <label class="tree-filter-toggle">
           <input type="checkbox" id="tree-filter-show-all" ${state.treeFilter.showAll ? "checked" : ""} />
@@ -1160,52 +1186,38 @@ function attachTreeHandlers(root) {
     });
   }
 
-  const addExtension = () => {
-    const input = root.querySelector("#tree-extension-query");
-    const ext = normalizeExtensionInput(input?.value);
-    if (!ext) return;
-    const counts = filesWithCommentCounts();
-    const allPaths = state.treeFilter.showAll && state.fullTree
-      ? unionPaths(state.fullTree.files || [], Object.keys(counts))
-      : Object.keys(counts);
-    const options = uniqueSortedExtensions(allPaths);
-    if (!options.includes(ext)) {
-      showToast(`No .${ext} files in this view`, { kind: "warning" });
-      input?.focus();
-      return;
-    }
-    if (!state.treeFilter.extensions.includes(ext)) {
-      state.treeFilter.extensions.push(ext);
-    }
+  root.querySelector(".tree-type-filter")?.addEventListener("toggle", (e) => {
+    state.treeFilter.extensionMenuOpen = e.target.open;
+  });
+  root.querySelector("#tree-extension-query")?.addEventListener("input", (e) => {
+    state.treeFilter.extensionQuery = e.target.value;
+    state.treeFilter.extensionMenuOpen = true;
     renderTree();
-  };
-
-  root.querySelector("#tree-extension-query")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addExtension();
-    }
+    requestAnimationFrame(() => {
+      const newInput = document.getElementById("tree-extension-query");
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+      }
+    });
   });
-  root.querySelector("#tree-extension-query")?.addEventListener("change", (e) => {
-    const ext = normalizeExtensionInput(e.target.value);
-    const counts = filesWithCommentCounts();
-    const allPaths = state.treeFilter.showAll && state.fullTree
-      ? unionPaths(state.fullTree.files || [], Object.keys(counts))
-      : Object.keys(counts);
-    if (uniqueSortedExtensions(allPaths).includes(ext)) {
-      addExtension();
-    }
-  });
-  root.querySelector("[data-add-tree-extension]")?.addEventListener("click", addExtension);
-  root.querySelectorAll("[data-remove-tree-extension]").forEach((el) => {
-    el.addEventListener("click", () => {
-      const ext = el.getAttribute("data-remove-tree-extension");
-      state.treeFilter.extensions = state.treeFilter.extensions.filter((item) => item !== ext);
+  root.querySelectorAll("[data-toggle-tree-extension]").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const ext = el.getAttribute("data-toggle-tree-extension");
+      if (!ext) return;
+      if (e.target.checked) {
+        if (!state.treeFilter.extensions.includes(ext)) state.treeFilter.extensions.push(ext);
+      } else {
+        state.treeFilter.extensions = state.treeFilter.extensions.filter((item) => item !== ext);
+      }
+      state.treeFilter.extensionMenuOpen = true;
       renderTree();
     });
   });
   root.querySelector("[data-clear-tree-extensions]")?.addEventListener("click", () => {
     state.treeFilter.extensions = [];
+    state.treeFilter.extensionQuery = "";
+    state.treeFilter.extensionMenuOpen = true;
     renderTree();
   });
 
@@ -1679,8 +1691,9 @@ function renderMetaChip(kind, value, label = value) {
   const safeKind = escapeHtml(kind);
   const safeValue = escapeHtml(value || "");
   const safeLabel = escapeHtml(label || value || "");
+  const valueClass = kind === "category" ? "" : ` ${safeValue}`;
   return `
-    <span class="metadata-chip ${safeKind}-chip ${safeValue}">
+    <span class="metadata-chip ${safeKind}-chip${valueClass}">
       <i data-lucide="${chipIcon(kind, value)}"></i>
       ${safeLabel}
     </span>
@@ -1692,9 +1705,10 @@ function renderStatusDropdown(c, idSafe) {
   const statusSafe = escapeHtml(status);
   return `
     <details class="status-menu">
-      <summary class="metadata-chip status-chip ${statusSafe}" title="Change status">
+      <summary class="status-button status-chip ${statusSafe}" title="Change status">
         <i data-lucide="${chipIcon("status", status)}"></i>
         Status: ${escapeHtml(humanStatus(status))}
+        <i data-lucide="chevron-down"></i>
       </summary>
       <div class="status-menu-popover">
         ${STATUS_OPTIONS.map((option) => `
@@ -1709,25 +1723,41 @@ function renderStatusDropdown(c, idSafe) {
 }
 
 function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
+  const hasBody = Boolean((c.body || "").trim());
   const suggestionAction = c.suggestion
     ? `
       <button class="comment-menu-item" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"} type="button">
         <i data-lucide="lightbulb"></i>
         Edit suggestion
       </button>
+      <button class="comment-menu-item danger" data-delete-suggestion="${idSafe}" type="button">
+        <i data-lucide="trash-2"></i>
+        Delete suggestion
+      </button>
     `
-    : "";
+    : `
+      <button class="comment-menu-item" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"} type="button">
+        <i data-lucide="lightbulb"></i>
+        Add suggestion
+      </button>
+    `;
+  const bodyAction = hasBody ? "Edit comment" : "Add comment";
   return `
     <details class="comment-menu">
       <summary class="comment-menu-trigger" title="Comment actions" aria-label="Comment actions">
-        <i data-lucide="more-horizontal"></i>
+        <i data-lucide="pencil"></i>
       </summary>
       <div class="comment-menu-popover">
         <button class="comment-menu-item" data-edit-target="${idSafe}" type="button">
           <i data-lucide="pencil"></i>
-          Edit comment
+          ${bodyAction}
         </button>
         ${suggestionAction}
+        <div class="comment-menu-divider"></div>
+        <button class="comment-menu-item danger" data-delete-comment="${idSafe}" type="button">
+          <i data-lucide="trash-2"></i>
+          Delete comment
+        </button>
       </div>
     </details>
   `;
@@ -1742,6 +1772,7 @@ function renderCommentCard(c, opts = {}) {
   const anchorStatus = c.anchor_status || "current";
   const anchorCurrent = anchorStatus === "current" || anchorStatus === "moved";
   const language = opts.fileLanguage || detectLanguage(c.file);
+  const hasBody = Boolean((c.body || "").trim());
 
   // Severity / status / id are *expected* to be enum / pattern values, but
   // validate.py is only run at generation time — a malicious YAML written
@@ -1772,13 +1803,7 @@ function renderCommentCard(c, opts = {}) {
   } else if (c.suggestion) {
     suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines);
   } else {
-    // No suggestion yet — offer a way to add one.
-    suggestionHtml = `
-      <button class="btn btn-suggestion-add" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"}>
-        <i data-lucide="lightbulb"></i>
-        Add suggested change
-      </button>
-    `;
+    suggestionHtml = "";
   }
 
   const anchorHtml = anchorStatus === "current" ? "" : `
@@ -1802,7 +1827,7 @@ function renderCommentCard(c, opts = {}) {
       <div class="comment-editor-preview markdown-body" data-markdown-preview-for="${idSafe}">${renderMarkdown(c.body)}</div>
       <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel</div>
     `
-    : `<div class="comment-body markdown-body">${renderMarkdown(c.body)}</div>`;
+    : hasBody ? `<div class="comment-body markdown-body">${renderMarkdown(c.body)}</div>` : "";
 
   return `
     <div class="comment-card" data-comment-card="${idSafe}">
@@ -1810,8 +1835,7 @@ function renderCommentCard(c, opts = {}) {
         ${renderAuthorBadge(author)}
         ${renderMetaChip("severity", sev, sev)}
         ${renderMetaChip("confidence", confidence, `${confidence} confidence`)}
-        <span class="category-pill">${escapeHtml(c.category)}</span>
-        ${renderStatusDropdown(c, idSafe)}
+        ${renderMetaChip("category", c.category || "uncategorized", c.category || "uncategorized")}
         ${lineRefHtml}
         <span class="comment-id">${idSafe}</span>
         ${actionsMenuHtml}
@@ -1822,9 +1846,7 @@ function renderCommentCard(c, opts = {}) {
       ${suggestionHtml}
       ${repliesHtml}
       <div class="comment-actions">
-        <button class="btn btn-icon btn-danger" data-delete-comment="${idSafe}" title="Delete comment">
-          <i data-lucide="trash-2"></i>
-        </button>
+        ${renderStatusDropdown(c, idSafe)}
         <div class="spacer"></div>
         <button class="btn" data-add-reply="${idSafe}">
           <i data-lucide="message-square-plus"></i>
@@ -1976,6 +1998,22 @@ async function saveEditedSuggestion(id, rawValue) {
     if (originalSuggestion !== undefined) c.suggestion = originalSuggestion;
     else delete c.suggestion;
     showError(err, "Save failed");
+  }
+}
+
+async function deleteSuggestion(id) {
+  const c = findThread(id);
+  if (!c?.suggestion) return;
+  if (!confirm(`Delete suggestion from ${id}?`)) return;
+  const originalSuggestion = c.suggestion;
+  delete c.suggestion;
+  try {
+    await persistReview();
+    renderContent();
+    showToast(`Deleted suggestion from ${id}`, { kind: "success" });
+  } catch (err) {
+    c.suggestion = originalSuggestion;
+    showError(err, "Delete failed");
   }
 }
 
@@ -2291,10 +2329,17 @@ function attachContentHandlers() {
     });
   });
 
+  content.querySelectorAll("[data-delete-suggestion]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      await deleteSuggestion(el.getAttribute("data-delete-suggestion"));
+    });
+  });
+
   content.querySelectorAll("[data-delete-comment]").forEach((el) => {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-delete-comment");
       if (!confirm(`Delete comment ${id}?`)) return;
+      const originalThreads = [...reviewThreads()];
       state.review.review.threads = reviewThreads().filter((c) => c.id !== id);
       try {
         await persistReview();
@@ -2302,6 +2347,7 @@ function attachContentHandlers() {
         renderContent();
         showToast(`Deleted ${id}`, { kind: "success" });
       } catch (err) {
+        state.review.review.threads = originalThreads;
         showError(err, "Delete failed");
       }
     });
