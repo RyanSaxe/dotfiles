@@ -1338,10 +1338,26 @@ async function toggleComment(id) {
   scrollCommentIntoView(id);
 }
 
+// Pixels of breathing room between the topbar and the top of a navigated
+// comment card. Bigger = more code context visible above the comment (useful
+// in code-file view); smaller = comment dominates the viewport.
+const COMMENT_SCROLL_TOP_OFFSET = 120;
+
 function scrollCommentIntoView(id) {
   requestAnimationFrame(() => {
     const card = document.querySelector(`[data-comment-card="${id}"]`);
-    if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+    const content = document.getElementById("content");
+    if (!card || !content) return;
+    // Manual scrollTop math instead of scrollIntoView({block:"center"}):
+    // a tall expanded card centered in the viewport puts its header above
+    // the topbar, hiding the comment's most important line. Anchor the top
+    // edge at a fixed offset from .content's top instead.
+    const top =
+      card.getBoundingClientRect().top -
+      content.getBoundingClientRect().top +
+      content.scrollTop -
+      COMMENT_SCROLL_TOP_OFFSET;
+    content.scrollTo({ top, behavior: "smooth" });
   });
 }
 
