@@ -62,7 +62,7 @@ function renderMarkdown(text) {
   if (window.marked) {
     return window.marked.parse(src, { breaks: true, gfm: true });
   }
-  return escapeHtml(src);
+  return `<pre class="comment-body-fallback">${escapeHtml(src)}</pre>`;
 }
 
 function showToast(message) {

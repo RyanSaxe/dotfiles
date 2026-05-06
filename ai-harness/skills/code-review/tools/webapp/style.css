@@ -965,12 +965,44 @@ body.inbox-mode .comment-row-inner {
   font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--color-body);
-  white-space: pre-wrap;
   margin-bottom: var(--space-3);
+}
+
+/* Tight, explicit block margins so spacing is consistent regardless of
+   browser defaults. We deliberately do NOT use `white-space: pre-wrap` here:
+   marked.js outputs real <p>/<ul>/<li> elements with `\n` between them, and
+   pre-wrap would render those literal newlines on top of the element margins,
+   which is exactly the "huge blank line" bug we're fixing. */
+.comment-body p {
+  margin: 0 0 var(--space-2) 0;
 }
 
 .comment-body p:first-child {
   margin-top: 0;
+}
+
+.comment-body p:last-child {
+  margin-bottom: 0;
+}
+
+.comment-body ul,
+.comment-body ol {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+}
+
+.comment-body li {
+  margin: 2px 0;
+}
+
+/* Fallback path: when the marked CDN is unavailable, renderMarkdown returns
+   escaped plain text wrapped in this element so newlines still render. */
+.comment-body-fallback {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
 }
 
 .comment-body code {
