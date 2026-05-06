@@ -330,23 +330,88 @@ def review_is_stale(target: dict[str, Any]) -> bool:
     return is_stale(target_commit, repo_root) if target_commit else False
 
 
-def list_repo_files(repo_root: str) -> list[str]:
-    """Return all repo-tracked files (relative paths). Respects .gitignore."""
+def list_repo_files(repo_root: str, include_ignored: bool = False) -> list[str]:
+    """Return git-visible files, optionally including ignored untracked files."""
     try:
-        result = subprocess.run(
-            ["git", "-C", repo_root, "ls-files"],
+        visible = subprocess.run(
+            [
+                "git",
+                "-C",
+                repo_root,
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
             capture_output=True,
             text=True,
             check=True,
             timeout=5,
         )
-        return [line for line in result.stdout.splitlines() if line.strip()]
+        files = {line for line in visible.stdout.splitlines() if line.strip()}
+        if include_ignored:
+            ignored = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    repo_root,
+                    "ls-files",
+                    "--others",
+                    "--ignored",
+                    "--exclude-standard",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=5,
+            )
+            files.update(line for line in ignored.stdout.splitlines() if line.strip())
+        return sorted(files)
     except (
         subprocess.CalledProcessError,
         subprocess.TimeoutExpired,
         FileNotFoundError,
     ):
         return []
+
+
+def refresh_status_for_review(path: Path) -> dict[str, Any]:
+    """Return whether a review's target differs from the current repo state."""
+    data = yaml_load(path.read_text())
+    target = data.get("target") or {}
+    if not isinstance(target, dict):
+        return {
+            "ok": False,
+            "needs_refresh": False,
+            "reason": "review target is not a mapping",
+        }
+
+    repo_root = target.get("repo_root", "")
+    if not repo_root:
+        return {
+            "ok": False,
+            "needs_refresh": False,
+            "reason": "review has no target.repo_root",
+        }
+
+    fingerprint = target.get("fingerprint")
+    if fingerprint:
+        current = current_repo_fingerprint(repo_root)
+        return {
+            "ok": current is not None,
+            "needs_refresh": current is not None and current != fingerprint,
+            "mode": "fingerprint",
+            "reason": "" if current is not None else "could not fingerprint repo",
+        }
+
+    target_commit = target.get("commit", "")
+    head = current_head(repo_root) if target_commit else None
+    return {
+        "ok": bool(target_commit and head),
+        "needs_refresh": bool(target_commit and head and head != target_commit),
+        "mode": "commit",
+        "reason": "" if target_commit else "review has no target fingerprint or commit",
+    }
 
 
 # === Inbox metadata ===============================================
@@ -651,7 +716,30 @@ class ViewerHandler(BaseHTTPRequestHandler):
             if not repo_root:
                 self._json(400, {"error": "review has no target.repo_root"})
                 return
-            self._json(200, {"files": list_repo_files(repo_root)})
+            qs = urllib.parse.parse_qs(parsed.query)
+            include_ignored = (qs.get("include_ignored") or ["0"])[0] == "1"
+            self._json(
+                200,
+                {
+                    "files": list_repo_files(
+                        repo_root, include_ignored=include_ignored
+                    ),
+                    "include_ignored": include_ignored,
+                },
+            )
+            return
+
+        m = re.match(r"^/api/refresh-status/([^/]+)/([^/]+)$", path)
+        if m:
+            slug, key = m.group(1), m.group(2)
+            rp = review_path(slug, key)
+            if rp is None or not rp.exists():
+                self._json(404, {"error": "not found"})
+                return
+            try:
+                self._json(200, refresh_status_for_review(rp))
+            except Exception as e:
+                self._json(500, {"error": f"refresh status failed: {e}"})
             return
 
         if path == "/api/source":

@@ -21,12 +21,16 @@ const state = {
   showStale: false,
   expandedComments: new Set(),
   cursorCommentId: null,              // last navigated/clicked comment — Tab/S-Tab anchor
-  treeFilter: { query: "", showAll: false },
+  treeFilter: { query: "", showAll: false, showIgnored: false, extension: "" },
   collapsedFolders: new Set(),        // folder paths the user has collapsed in the file tree
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
+  newCommentSuggestionExpanded: false,
+  newCommentSuggestionDraft: "",
   editingBody: null,                  // commentId currently being edited inline
   editingSuggestion: null,            // commentId currently editing suggestion inline
   suggestionDrafts: new Map(),         // commentId -> original source replacement text
+  refreshStatus: null,                 // refresh readiness for current review
+  refreshPollId: null,
   error: null,
 };
 
@@ -60,6 +64,54 @@ function severityOrder(sev) {
 
 function confidenceOrder(confidence) {
   return { high: 0, medium: 1, low: 2 }[confidence] ?? 3;
+}
+
+function fileExtension(path) {
+  const filename = String(path || "").split("/").pop() || "";
+  if (!filename || filename.startsWith(".") && filename.indexOf(".", 1) === -1) return "";
+  const idx = filename.lastIndexOf(".");
+  return idx > 0 && idx < filename.length - 1 ? filename.slice(idx + 1).toLowerCase() : "";
+}
+
+function uniqueSortedExtensions(paths) {
+  return Array.from(new Set(paths.map(fileExtension).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function unionPaths(...pathLists) {
+  return Array.from(new Set(pathLists.flat().filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function humanStatus(status) {
+  return {
+    open: "Open",
+    acknowledged: "Acknowledged",
+    resolved: "Resolved",
+    wontfix: "Won't fix",
+  }[status] || status || "Open";
+}
+
+function chipIcon(kind, value) {
+  const maps = {
+    severity: {
+      critical: "octagon-alert",
+      high: "triangle-alert",
+      medium: "circle-alert",
+      low: "info",
+      info: "info",
+    },
+    confidence: {
+      high: "badge-check",
+      medium: "badge-help",
+      low: "badge-alert",
+    },
+    status: {
+      open: "circle-dot",
+      acknowledged: "eye",
+      resolved: "check-circle-2",
+      wontfix: "ban",
+    },
+  };
+  return maps[kind]?.[value] || "circle";
 }
 
 function escapeHtml(text) {
@@ -464,10 +516,20 @@ async function fetchReview(slug, key) {
   return r.json();
 }
 
-async function fetchTree(slug, key) {
-  const r = await fetch(`/api/tree/${encodeURIComponent(slug)}/${encodeURIComponent(key)}`);
+async function fetchTree(slug, key, opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.includeIgnored) params.set("include_ignored", "1");
+  const qs = params.toString();
+  const r = await fetch(`/api/tree/${encodeURIComponent(slug)}/${encodeURIComponent(key)}${qs ? `?${qs}` : ""}`);
   if (!r.ok) throw new Error(`tree load failed: ${r.status}`);
   return r.json();
+}
+
+async function fetchRefreshStatus(slug, key) {
+  const r = await fetch(`/api/refresh-status/${encodeURIComponent(slug)}/${encodeURIComponent(key)}`);
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(payload, `refresh status failed: ${r.status}`);
+  return payload;
 }
 
 async function fetchSource(slug, key, file) {
@@ -551,17 +613,61 @@ function saveCollapsedFolders() {
   }
 }
 
+function resetNewCommentSuggestion() {
+  state.newCommentSuggestionExpanded = false;
+  state.newCommentSuggestionDraft = "";
+}
+
+function stopRefreshPolling() {
+  if (state.refreshPollId) {
+    clearInterval(state.refreshPollId);
+    state.refreshPollId = null;
+  }
+  state.refreshStatus = null;
+}
+
+async function updateRefreshStatus() {
+  if (!state.review || state.route.view === "inbox") return;
+  const { slug, key } = state.route;
+  try {
+    const status = await fetchRefreshStatus(slug, key);
+    if (state.route.slug !== slug || state.route.key !== key) return;
+    state.refreshStatus = status;
+    state.review._stale = Boolean(status.needs_refresh);
+  } catch (err) {
+    if (state.route.slug !== slug || state.route.key !== key) return;
+    state.refreshStatus = {
+      ok: false,
+      needs_refresh: false,
+      reason: err?.message || "refresh status failed",
+    };
+  }
+  renderTopbar();
+}
+
+function startRefreshPolling() {
+  if (state.refreshPollId) clearInterval(state.refreshPollId);
+  if (!state.review || state.route.view === "inbox") return;
+  state.refreshPollId = setInterval(() => {
+    if (document.visibilityState !== "hidden") {
+      updateRefreshStatus();
+    }
+  }, 15000);
+}
+
 async function loadRoute(route) {
   state.route = route;
   state.error = null;
   state.expandedComments.clear();
   state.newCommentTarget = null;
+  resetNewCommentSuggestion();
   state.editingBody = null;
   state.editingSuggestion = null;
   state.suggestionDrafts.clear();
 
   try {
     if (route.view === "inbox") {
+      stopRefreshPolling();
       state.review = null;
       state.source = null;
       state.fullTree = null;
@@ -575,6 +681,11 @@ async function loadRoute(route) {
         data._slug = route.slug;
         data._key = route.key;
         state.review = data;
+        state.refreshStatus = {
+          ok: true,
+          needs_refresh: Boolean(data._stale),
+          mode: "initial",
+        };
         state.sourceCache.clear();
         state.fullTree = null;          // changed review → invalidate tree cache
         state.collapsedFolders = loadCollapsedFolders(route.slug, route.key);
@@ -595,6 +706,10 @@ async function loadRoute(route) {
   renderTopbar();
   renderTree();
   renderContent();
+  if (state.route.view !== "inbox") {
+    startRefreshPolling();
+    updateRefreshStatus();
+  }
 }
 
 // === Top bar =======================================================
@@ -619,6 +734,8 @@ function renderTopbar() {
     staleEl.hidden = true;
     sep1.hidden = sep2.hidden = sep3.hidden = true;
     refreshBtn.hidden = true;
+    refreshBtn.disabled = false;
+    refreshBtn.classList.remove("btn-refresh-needed");
     sendBtn.hidden = true;
     return;
   }
@@ -655,22 +772,31 @@ function renderTopbar() {
   }
   sep1.hidden = sep2.hidden = sep3.hidden = false;
 
-  if (state.review._stale) {
-    staleEl.textContent = "stale";
+  const needsRefresh = Boolean(state.refreshStatus?.needs_refresh ?? state.review._stale);
+  const refreshKnown = state.refreshStatus?.ok !== false;
+  if (needsRefresh) {
+    staleEl.textContent = "refresh ready";
     staleEl.className = "topbar-stale";
     staleEl.hidden = false;
-    staleEl.title = "The current folder no longer matches this review; refresh to reload files and anchors";
+    staleEl.title = "The current folder differs from this review; refresh to reload files and anchors";
   } else {
     staleEl.hidden = true;
   }
 
   refreshBtn.hidden = false;
+  refreshBtn.disabled = !needsRefresh;
+  refreshBtn.classList.toggle("btn-refresh-needed", needsRefresh);
+  refreshBtn.title = needsRefresh
+    ? "Refresh anchors from the current filesystem state"
+    : refreshKnown
+      ? "No filesystem changes detected for this review"
+      : state.refreshStatus?.reason || "Refresh status unavailable";
   sendBtn.hidden = false;
 }
 
-function renderTreeCommentNav() {
+function renderFloatingCommentNav() {
   const navComments = navigableComments();
-  if (navComments.length === 0) {
+  if (navComments.length < 2) {
     return "";
   }
   const cursorIdx = state.cursorCommentId
@@ -681,19 +807,14 @@ function renderTreeCommentNav() {
     : `${cursorIdx + 1} / ${navComments.length}`;
 
   return `
-    <div class="tree-comment-nav" aria-label="Comment navigation">
-      <div class="tree-comment-nav-header">
-        <span>Comments</span>
-        <span class="tree-comment-nav-counter">${escapeHtml(counter)}</span>
-      </div>
-      <div class="tree-comment-nav-actions">
-        <button class="btn btn-icon" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment">
-          <i data-lucide="chevron-up"></i>
-        </button>
-        <button class="btn btn-icon" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment">
-          <i data-lucide="chevron-down"></i>
-        </button>
-      </div>
+    <div class="comment-float-nav" aria-label="Comment navigation">
+      <button class="btn btn-icon" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment">
+        <i data-lucide="chevron-up"></i>
+      </button>
+      <span class="comment-float-nav-counter">${escapeHtml(counter)}</span>
+      <button class="btn btn-icon" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment">
+        <i data-lucide="chevron-down"></i>
+      </button>
     </div>
   `;
 }
@@ -709,48 +830,70 @@ function renderTree() {
   }
 
   root.hidden = false;
-  const total = reviewThreads().length;
   const isReviewRoot = state.route.view === "review";
 
   const counts = filesWithCommentCounts();
   const filterQuery = state.treeFilter.query.toLowerCase().trim();
+  const selectedExtension = state.treeFilter.extension;
 
   // Source set: by default just commented files; with showAll, the full repo
   // (fetched lazily on toggle and cached on state).
   const allPaths = state.treeFilter.showAll && state.fullTree
-    ? state.fullTree.files.slice()
+    ? unionPaths(state.fullTree.files || [], Object.keys(counts))
     : Object.keys(counts);
 
-  const filteredPaths = filterQuery
-    ? allPaths.filter((p) => p.toLowerCase().includes(filterQuery))
-    : allPaths;
+  const extensionOptions = uniqueSortedExtensions(allPaths);
+  if (selectedExtension && !extensionOptions.includes(selectedExtension)) {
+    state.treeFilter.extension = "";
+  }
+  const activeExtension = state.treeFilter.extension;
+  const filteredPaths = allPaths.filter((p) => {
+    const matchesQuery = !filterQuery || p.toLowerCase().includes(filterQuery);
+    const matchesExtension = !activeExtension || fileExtension(p) === activeExtension;
+    return matchesQuery && matchesExtension;
+  });
 
   const tree = buildTreeFromFiles(filteredPaths, counts);
 
   const filterHtml = `
     <div class="tree-filter">
-      <input type="text" id="tree-filter-query" placeholder="Filter files…" value="${escapeHtml(state.treeFilter.query)}" />
-      <label class="tree-filter-toggle">
-        <input type="checkbox" id="tree-filter-show-all" ${state.treeFilter.showAll ? "checked" : ""} />
-        Show all repo files
-      </label>
+      <div class="tree-filter-search">
+        <i data-lucide="search"></i>
+        <input type="text" id="tree-filter-query" placeholder="Filter files…" value="${escapeHtml(state.treeFilter.query)}" />
+      </div>
+      <div class="tree-extension-chips" aria-label="Filter by extension">
+        <button class="tree-extension-chip ${activeExtension ? "" : "active"}" data-tree-extension="" type="button">All</button>
+        ${extensionOptions.map((ext) => `
+          <button class="tree-extension-chip ${activeExtension === ext ? "active" : ""}" data-tree-extension="${escapeHtml(ext)}" type="button">.${escapeHtml(ext)}</button>
+        `).join("")}
+      </div>
+      <div class="tree-filter-settings">
+        <label class="tree-filter-toggle">
+          <input type="checkbox" id="tree-filter-show-all" ${state.treeFilter.showAll ? "checked" : ""} />
+          Show Git-visible files
+        </label>
+        <label class="tree-filter-toggle ${state.treeFilter.showAll ? "" : "disabled"}">
+          <input type="checkbox" id="tree-filter-show-ignored" ${state.treeFilter.showIgnored ? "checked" : ""} ${state.treeFilter.showAll ? "" : "disabled"} />
+          Include ignored
+        </label>
+      </div>
     </div>
   `;
 
-  const treeHtml = filteredPaths.length === 0
-    ? state.treeFilter.showAll && !state.fullTree
-      ? `<div class="tree-empty">Loading full repo tree…</div>`
-      : `<div class="tree-empty">No files match.</div>`
+  const loadingFullTree = state.treeFilter.showAll && !state.fullTree;
+  const treeHtml = loadingFullTree
+    ? `<div class="tree-empty">Loading file tree…</div>`
+    : filteredPaths.length === 0
+      ? `<div class="tree-empty">No files match.</div>`
     : `<ul class="tree-node">${tree.map((n) => renderTreeNode(n)).join("")}</ul>`;
 
   root.innerHTML = `
-    ${renderTreeCommentNav()}
     ${filterHtml}
     <div class="tree-overview">
       <div class="tree-item overview ${isReviewRoot ? "active" : ""}" data-route="review">
         <i data-lucide="layout-list"></i>
         <span>Overview</span>
-        <span class="comment-pip">${total}</span>
+        <span class="comment-pip">${reviewThreads().length}</span>
       </div>
     </div>
     <div class="tree-section-label">files</div>
@@ -890,6 +1033,13 @@ function attachTreeHandlers(root) {
     });
   }
 
+  root.querySelectorAll("[data-tree-extension]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.treeFilter.extension = el.getAttribute("data-tree-extension") || "";
+      renderTree();
+    });
+  });
+
   const showAllToggle = root.querySelector("#tree-filter-show-all");
   if (showAllToggle) {
     showAllToggle.addEventListener("change", async (e) => {
@@ -897,10 +1047,32 @@ function attachTreeHandlers(root) {
       if (state.treeFilter.showAll && !state.fullTree) {
         renderTree(); // Render the loading state immediately
         try {
-          state.fullTree = await fetchTree(state.route.slug, state.route.key);
+          state.fullTree = await fetchTree(state.route.slug, state.route.key, {
+            includeIgnored: state.treeFilter.showIgnored,
+          });
         } catch (err) {
           showError(err, "Could not load file tree");
           state.treeFilter.showAll = false;
+        }
+      }
+      renderTree();
+    });
+  }
+
+  const showIgnoredToggle = root.querySelector("#tree-filter-show-ignored");
+  if (showIgnoredToggle) {
+    showIgnoredToggle.addEventListener("change", async (e) => {
+      state.treeFilter.showIgnored = e.target.checked;
+      if (state.treeFilter.showAll) {
+        state.fullTree = null;
+        renderTree();
+        try {
+          state.fullTree = await fetchTree(state.route.slug, state.route.key, {
+            includeIgnored: state.treeFilter.showIgnored,
+          });
+        } catch (err) {
+          showError(err, "Could not load ignored files");
+          state.treeFilter.showIgnored = false;
         }
       }
       renderTree();
@@ -1134,6 +1306,7 @@ function renderReviewOverview() {
 
     <div class="overview-comments-label">${reviewThreads().length} comments across ${Object.keys(grouped).length} files</div>
     ${groupsHtml}
+    ${renderFloatingCommentNav()}
   `;
 
   attachContentHandlers();
@@ -1226,6 +1399,7 @@ function renderFileView() {
         <table class="code-table"><tbody>${rows}</tbody></table>
       </div>
     </div>
+    ${renderFloatingCommentNav()}
   `;
   attachContentHandlers();
   if (window.lucide) window.lucide.createIcons();
@@ -1240,7 +1414,29 @@ function severityColorVar(sev) {
 function renderNewCommentForm() {
   const t = state.newCommentTarget;
   const language = detectLanguage(t.file, state.source?.content);
-  const initialSuggestion = originalTextForNewComment();
+  const originalSuggestion = originalTextForNewComment();
+  const initialSuggestion = state.newCommentSuggestionDraft || originalSuggestion;
+  const suggestionHtml = state.newCommentSuggestionExpanded
+    ? `
+      <div class="comment-suggestion new-comment-suggestion">
+        <div class="comment-suggestion-label">
+          <i data-lucide="lightbulb"></i>
+          Suggested change
+          <button class="suggestion-edit-btn" data-collapse-new-suggestion title="Remove suggested change draft" aria-label="Remove suggested change draft">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <textarea id="new-suggestion" class="suggestion" data-suggestion-language="${escapeHtml(language || "")}" placeholder="Optional suggested change. Raw code — no fences. Replaces the line${t.isRange ? "s" : ""} above.">${escapeHtml(initialSuggestion)}</textarea>
+        <div class="suggestion-warning" id="new-suggestion-warning" hidden></div>
+        <div class="suggestion-preview" id="new-suggestion-preview"></div>
+      </div>
+    `
+    : `
+      <button class="btn btn-suggestion-add" data-expand-new-suggestion type="button">
+        <i data-lucide="lightbulb"></i>
+        Add suggested change
+      </button>
+    `;
   return `
     <div class="new-comment-form" data-new-comment-form>
       <div class="form-row">
@@ -1269,15 +1465,7 @@ function renderNewCommentForm() {
       </div>
       <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
       <div class="comment-editor-preview" id="new-body-preview"></div>
-      <div class="comment-suggestion">
-        <div class="comment-suggestion-label">
-          <i data-lucide="lightbulb"></i>
-          Suggested change
-        </div>
-        <textarea id="new-suggestion" class="suggestion" data-suggestion-language="${escapeHtml(language || "")}" placeholder="Optional suggested change. Raw code — no fences. Replaces the line${t.isRange ? "s" : ""} above.">${escapeHtml(initialSuggestion)}</textarea>
-        <div class="suggestion-warning" id="new-suggestion-warning" hidden></div>
-        <div class="suggestion-preview" id="new-suggestion-preview"></div>
-      </div>
+      ${suggestionHtml}
       <div class="form-actions">
         <button class="btn btn-primary" data-save-new>
           <i data-lucide="plus"></i>
@@ -1316,6 +1504,18 @@ function renderAuthorBadge(author, className = "author-badge") {
     <span class="${className} ${kind}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">
       <i data-lucide="${icon}"></i>
       <span class="visually-hidden">${escapeHtml(label)}</span>
+    </span>
+  `;
+}
+
+function renderMetaChip(kind, value, label = value) {
+  const safeKind = escapeHtml(kind);
+  const safeValue = escapeHtml(value || "");
+  const safeLabel = escapeHtml(label || value || "");
+  return `
+    <span class="metadata-chip ${safeKind}-chip ${safeValue}">
+      <i data-lucide="${chipIcon(kind, value)}"></i>
+      ${safeLabel}
     </span>
   `;
 }
@@ -1385,24 +1585,33 @@ function renderCommentCard(c, opts = {}) {
     `<button class="comment-close" data-collapse-comment="${idSafe}" title="Close (Esc)"><i data-lucide="x"></i></button>`;
 
   const isEditing = state.editingBody === c.id;
+  const editBodyButtonHtml = isEditing ? "" : `
+    <button class="comment-edit-btn" data-edit-target="${idSafe}" title="Edit comment body" aria-label="Edit comment body">
+      <i data-lucide="pencil"></i>
+    </button>
+  `;
   const bodyHtml = isEditing
     ? `
       <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(c.body)}</textarea>
       <div class="comment-editor-preview" data-markdown-preview-for="${idSafe}">${renderMarkdown(c.body)}</div>
       <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel</div>
     `
-    : `<div class="comment-body" data-edit-target="${idSafe}" title="Click to edit">${renderMarkdown(c.body)}</div>`;
+    : `<div class="comment-body">${renderMarkdown(c.body)}</div>`;
 
   return `
     <div class="comment-card" data-comment-card="${idSafe}">
       <div class="comment-header">
         ${renderAuthorBadge(author)}
-        <span class="severity-badge ${sevSafe}">Severity: ${sevSafe}</span>
-        <span class="confidence-badge ${confidenceSafe}">Confidence: ${confidenceSafe}</span>
+        ${renderMetaChip("severity", sev, sev)}
+        ${renderMetaChip("confidence", confidence, `${confidence} confidence`)}
         <span class="category-pill">${escapeHtml(c.category)}</span>
-        <button class="status-pill ${statusSafe}" data-cycle-status="${idSafe}" title="Click to cycle: open → acknowledged → resolved → wontfix">${statusSafe}</button>
+        <button class="metadata-chip status-chip ${statusSafe}" data-cycle-status="${idSafe}" title="Click to cycle: open → acknowledged → resolved → wontfix">
+          <i data-lucide="${chipIcon("status", c.status)}"></i>
+          ${escapeHtml(humanStatus(c.status))}
+        </button>
         ${lineRefHtml}
         <span class="comment-id">${idSafe}</span>
+        ${editBodyButtonHtml}
         ${closeBtnHtml}
       </div>
       ${anchorHtml}
@@ -1590,6 +1799,7 @@ function initializeEditors(content) {
       onSave: () => content.querySelector("[data-save-new]")?.click(),
       onCancel: () => {
         state.newCommentTarget = null;
+        resetNewCommentSuggestion();
         renderContent();
       },
       onChange: (value) => {
@@ -1613,9 +1823,13 @@ function initializeEditors(content) {
       onSave: () => content.querySelector("[data-save-new]")?.click(),
       onCancel: () => {
         state.newCommentTarget = null;
+        resetNewCommentSuggestion();
         renderContent();
       },
-      onChange: (value) => updateSuggestionPreview(previewEl, warningEl, originalText, value, language, t.line),
+      onChange: (value) => {
+        state.newCommentSuggestionDraft = value;
+        updateSuggestionPreview(previewEl, warningEl, originalText, value, language, t.line);
+      },
     });
   }
 
@@ -1661,6 +1875,13 @@ function attachContentHandlers() {
   const content = document.getElementById("content");
   initializeEditors(content);
 
+  content.querySelector("[data-prev-comment]")?.addEventListener("click", () => {
+    navigateToComment(-1);
+  });
+  content.querySelector("[data-next-comment]")?.addEventListener("click", () => {
+    navigateToComment(+1);
+  });
+
   content.querySelectorAll("[data-comment-id]").forEach((el) => {
     el.addEventListener("click", () => {
       toggleComment(el.getAttribute("data-comment-id"));
@@ -1677,6 +1898,7 @@ function attachContentHandlers() {
         isRange: false,
         endLine: line,
       };
+      resetNewCommentSuggestion();
       renderContent();
       requestAnimationFrame(() => {
         const bodyEl = document.getElementById("new-body");
@@ -1690,6 +1912,7 @@ function attachContentHandlers() {
   content.querySelectorAll("[data-cancel-new]").forEach((el) => {
     el.addEventListener("click", () => {
       state.newCommentTarget = null;
+      resetNewCommentSuggestion();
       renderContent();
     });
   });
@@ -1699,6 +1922,26 @@ function attachContentHandlers() {
       if (!state.newCommentTarget.isRange) {
         state.newCommentTarget.endLine = state.newCommentTarget.line;
       }
+      state.newCommentSuggestionDraft = "";
+      renderContent();
+    });
+  });
+  content.querySelectorAll("[data-expand-new-suggestion]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.newCommentSuggestionExpanded = true;
+      state.newCommentSuggestionDraft = originalTextForNewComment();
+      renderContent();
+      requestAnimationFrame(() => {
+        const suggestionEl = document.getElementById("new-suggestion");
+        if (suggestionEl?._cm) suggestionEl._cm.focus();
+        else suggestionEl?.focus();
+      });
+    });
+  });
+  content.querySelectorAll("[data-collapse-new-suggestion]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.newCommentSuggestionExpanded = false;
+      state.newCommentSuggestionDraft = "";
       renderContent();
     });
   });
@@ -1711,7 +1954,9 @@ function attachContentHandlers() {
       const category = document.getElementById("new-category").value.trim() || "correctness";
       const severity = document.getElementById("new-severity").value;
       const confidence = document.getElementById("new-confidence").value;
-      const suggestion = normalizeSuggestionText(editorValue(suggestionEl));
+      const suggestion = state.newCommentSuggestionExpanded
+        ? normalizeSuggestionText(editorValue(suggestionEl))
+        : "";
       const endLineEl = document.getElementById("new-end-line");
       const endLine = t.isRange && endLineEl ? parseInt(endLineEl.value, 10) : t.line;
       const originalSuggestion = sourceTextForRange(t.file, t.line, endLine);
@@ -1746,6 +1991,7 @@ function attachContentHandlers() {
       try {
         await persistReview();
         state.newCommentTarget = null;
+        resetNewCommentSuggestion();
         state.expandedComments.add(newComment.id);
         renderTree();
         renderContent();
@@ -1962,13 +2208,20 @@ document.getElementById("btn-refresh-review").addEventListener("click", async ()
     showToast("Open a review to refresh it", { kind: "warning" });
     return;
   }
+  const needsRefresh = Boolean(state.refreshStatus?.needs_refresh ?? state.review._stale);
+  if (!needsRefresh) {
+    showToast("No filesystem changes detected", { kind: "info" });
+    return;
+  }
   try {
     const res = await refreshReview(state.route.slug, state.route.key);
     state.review = null;
+    state.refreshStatus = null;
     state.source = null;
     state.fullTree = null;
     state.sourceCache.clear();
     await loadRoute(state.route);
+    await updateRefreshStatus();
     const counts = res.counts || {};
     showToast("Refreshed review", {
       kind: "success",
@@ -2071,6 +2324,7 @@ document.addEventListener("keydown", (e) => {
   } else if (e.key === "Escape") {
     if (state.newCommentTarget) {
       state.newCommentTarget = null;
+      resetNewCommentSuggestion();
       renderContent();
     } else if (state.expandedComments.size > 0) {
       state.expandedComments.clear();
@@ -2079,6 +2333,16 @@ document.addEventListener("keydown", (e) => {
   } else if (e.key === "?") {
     showToast("Keys: Tab/S-Tab or j/k → next/prev comment · Esc → close");
   }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden") {
+    updateRefreshStatus();
+  }
+});
+
+window.addEventListener("focus", () => {
+  updateRefreshStatus();
 });
 
 // === Boot ==========================================================
