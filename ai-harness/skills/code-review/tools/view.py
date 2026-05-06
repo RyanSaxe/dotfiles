@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import fcntl
 import json
 import os
@@ -261,6 +262,74 @@ def is_stale(target_commit: str, repo_root: str) -> bool:
     return head != target_commit
 
 
+def current_repo_fingerprint(repo_root: str) -> str | None:
+    """Return a lightweight fingerprint for the current checked-out folder state."""
+    h = hashlib.sha256()
+    try:
+        head = subprocess.run(
+            ["git", "-C", repo_root, "rev-parse", "HEAD"],
+            capture_output=True,
+            check=False,
+            timeout=2,
+        )
+        h.update(b"HEAD\0")
+        h.update(head.stdout.strip() if head.returncode == 0 else b"")
+
+        diff = subprocess.run(
+            ["git", "-C", repo_root, "diff", "HEAD", "--binary"],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        h.update(b"\0DIFF\0")
+        h.update(diff.stdout)
+
+        untracked = subprocess.run(
+            [
+                "git",
+                "-C",
+                repo_root,
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            ],
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        h.update(b"\0UNTRACKED\0")
+        if untracked.returncode == 0:
+            repo_root_p = Path(repo_root).resolve()
+            for raw in sorted(p for p in untracked.stdout.split(b"\0") if p):
+                rel = raw.decode("utf-8", errors="surrogateescape")
+                path = (repo_root_p / rel).resolve()
+                try:
+                    path.relative_to(repo_root_p)
+                    h.update(raw)
+                    h.update(b"\0")
+                    h.update(path.read_bytes())
+                except (OSError, ValueError):
+                    h.update(b"<unreadable>")
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+    return h.hexdigest()
+
+
+def review_is_stale(target: dict[str, Any]) -> bool:
+    repo_root = target.get("repo_root", "")
+    if not repo_root:
+        return False
+
+    fingerprint = target.get("fingerprint")
+    if fingerprint:
+        current = current_repo_fingerprint(repo_root)
+        return current is not None and current != fingerprint
+
+    target_commit = target.get("commit", "")
+    return is_stale(target_commit, repo_root) if target_commit else False
+
+
 def list_repo_files(repo_root: str) -> list[str]:
     """Return all repo-tracked files (relative paths). Respects .gitignore."""
     try:
@@ -297,7 +366,7 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
 
     target = data.get("target", {}) or {}
     review = data.get("review", {}) or {}
-    comments = review.get("comments", []) or []
+    threads = review.get("threads", []) or []
 
     severity_counts: dict[str, int] = {
         "critical": 0,
@@ -312,23 +381,28 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
         "resolved": 0,
         "wontfix": 0,
     }
-    has_per_comment_feedback = False
-    for c in comments:
+    has_user_reply = False
+    has_unanswered_user = False
+    for c in threads:
         sev = c.get("severity")
         if sev in severity_counts:
             severity_counts[sev] += 1
         st = c.get("status")
         if st in status_counts:
             status_counts[st] += 1
-        if (c.get("feedback") or "").strip():
-            has_per_comment_feedback = True
-
-    review_feedback = (review.get("feedback") or "").strip()
-    has_review_feedback = bool(review_feedback)
+        replies = c.get("replies") or []
+        if any(
+            (r.get("author") == "user" and (r.get("body") or "").strip())
+            for r in replies
+        ):
+            has_user_reply = True
+        last_author = replies[-1].get("author") if replies else None
+        if last_author == "user" or (c.get("author") == "user" and not replies):
+            has_unanswered_user = True
 
     repo_root = target.get("repo_root", "")
     target_commit = target.get("commit", "")
-    stale = is_stale(target_commit, repo_root) if target_commit and repo_root else False
+    stale = review_is_stale(target) if isinstance(target, dict) else False
 
     return {
         "slug": slug,
@@ -336,12 +410,14 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
         "repo_name": Path(repo_root).name if repo_root else slug,
         "branch": target.get("branch"),
         "short_sha": target_commit[:7] if target_commit else "",
+        "target_kind": target.get("kind"),
         "pr_number": target.get("pr_number"),
-        "comment_count": len(comments),
+        "thread_count": len(threads),
+        "comment_count": len(threads),
         "severity_counts": severity_counts,
         "status_counts": status_counts,
-        "has_review_feedback": has_review_feedback,
-        "has_per_comment_feedback": has_per_comment_feedback,
+        "has_user_reply": has_user_reply,
+        "has_unanswered_user": has_unanswered_user,
         "stale": stale,
         "generated_at": data.get("generated_at"),
         "modified": path.stat().st_mtime,
@@ -378,6 +454,106 @@ def safe_read_source(slug: str, key: str, file_arg: str) -> tuple[int, str]:
         return 200, requested.read_text()
     except (OSError, UnicodeDecodeError):
         return 415, "not a readable text file"
+
+
+# === Anchor refresh ================================================
+
+
+def line_range(thread: dict[str, Any]) -> tuple[int, int] | None:
+    line = thread.get("line")
+    start = thread.get("start_line") or line
+    if not isinstance(start, int) or not isinstance(line, int):
+        return None
+    if start < 1 or line < start:
+        return None
+    return start, line
+
+
+def text_for_range(lines: list[str], start: int, end: int) -> str:
+    return "\n".join(lines[start - 1 : end])
+
+
+def find_anchor_occurrences(
+    lines: list[str], anchor_text: str
+) -> list[tuple[int, int]]:
+    if anchor_text == "":
+        return []
+    anchor_lines = anchor_text.split("\n")
+    if not anchor_lines:
+        return []
+    width = len(anchor_lines)
+    occurrences: list[tuple[int, int]] = []
+    for idx in range(0, len(lines) - width + 1):
+        if lines[idx : idx + width] == anchor_lines:
+            start = idx + 1
+            occurrences.append((start, start + width - 1))
+    return occurrences
+
+
+def refresh_thread_anchor(repo_root: Path, thread: dict[str, Any]) -> str:
+    rel_file = thread.get("file")
+    anchor_text = thread.get("anchor_text")
+    current_range = line_range(thread)
+    if not isinstance(rel_file, str) or not isinstance(anchor_text, str):
+        thread["anchor_status"] = "missing"
+        return "missing"
+
+    source_path = (repo_root / rel_file).resolve()
+    try:
+        source_path.relative_to(repo_root)
+        lines = source_path.read_text().split("\n")
+    except (OSError, UnicodeDecodeError, ValueError):
+        thread["anchor_status"] = "missing"
+        return "missing"
+
+    if current_range is not None:
+        start, end = current_range
+        if end <= len(lines) and text_for_range(lines, start, end) == anchor_text:
+            thread["anchor_status"] = "current"
+            return "current"
+
+    occurrences = find_anchor_occurrences(lines, anchor_text)
+    if len(occurrences) == 1:
+        start, end = occurrences[0]
+        if end == start:
+            thread.pop("start_line", None)
+        else:
+            thread["start_line"] = start
+        thread["line"] = end
+        thread["anchor_status"] = "moved"
+        return "moved"
+
+    status = "missing" if len(occurrences) == 0 else "ambiguous"
+    thread["anchor_status"] = status
+    return status
+
+
+def refresh_review_file(path: Path) -> dict[str, Any]:
+    data = yaml_load(path.read_text())
+    target = data.get("target") or {}
+    repo_root = target.get("repo_root")
+    if not repo_root:
+        raise RuntimeError("review has no target.repo_root")
+
+    repo_root_p = Path(repo_root).resolve()
+    threads = (data.get("review") or {}).get("threads") or []
+    counts = {"current": 0, "moved": 0, "missing": 0, "ambiguous": 0}
+    for thread in threads:
+        if not isinstance(thread, dict):
+            continue
+        status = refresh_thread_anchor(repo_root_p, thread)
+        counts[status] += 1
+
+    fingerprint = current_repo_fingerprint(repo_root)
+    if fingerprint:
+        target["fingerprint"] = fingerprint
+    if target.get("commit") is None:
+        head = current_head(repo_root)
+        if head:
+            target["commit"] = head
+
+    path.write_text(yaml_dump(data))
+    return {"ok": True, "counts": counts, "review": data}
 
 
 # === HTTP request handler =========================================
@@ -446,10 +622,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 # Compute staleness and surface it on the response so the
                 # client can render a topbar badge without a second request.
                 target = data.get("target") or {}
-                if target.get("commit") and target.get("repo_root"):
-                    data["_stale"] = is_stale(target["commit"], target["repo_root"])
-                else:
-                    data["_stale"] = False
+                data["_stale"] = (
+                    review_is_stale(target) if isinstance(target, dict) else False
+                )
                 self._json(200, data)
             except Exception as e:
                 self._json(500, {"error": f"parse error: {e}"})
@@ -540,6 +715,21 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._json(200, {"ok": True})
 
     def do_POST(self) -> None:
+        m = re.match(r"^/api/refresh/([^/]+)/([^/]+)$", self.path)
+        if m:
+            slug, key = m.group(1), m.group(2)
+            rp = review_path(slug, key)
+            if rp is None or not rp.exists():
+                self._json(404, {"error": "not found"})
+                return
+            try:
+                payload = refresh_review_file(rp)
+            except Exception as e:
+                self._json(500, {"error": f"refresh failed: {e}"})
+                return
+            self._json(200, payload)
+            return
+
         m = re.match(r"^/api/submit/([^/]+)/([^/]+)$", self.path)
         if not m:
             self._json(404, {"error": "no such endpoint"})
@@ -557,7 +747,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
             return
 
         mode = req.get("mode")
-        comment_id = req.get("commentId")
+        comment_id = req.get("commentId") or req.get("threadId")
         if mode not in ("all", "comment"):
             self._json(400, {"error": "mode must be 'all' or 'comment'"})
             return
@@ -570,7 +760,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         # without depending on the env that's running view.py.
         cmd = ["uv", "run", "-q", "--script", str(submit_script), str(rp)]
         if mode == "comment":
-            cmd += ["--comment-id", comment_id]
+            cmd += ["--thread-id", comment_id]
 
         # 90s is well above a normal `gh api` POST and well under any
         # reasonable user patience for a stuck spinner. start_new_session
@@ -608,8 +798,8 @@ class ViewerHandler(BaseHTTPRequestHandler):
         try:
             data = yaml_load(rp.read_text())
             if mode == "comment":
-                data["review"]["comments"] = [
-                    c for c in data["review"]["comments"] if c.get("id") != comment_id
+                data["review"]["threads"] = [
+                    c for c in data["review"]["threads"] if c.get("id") != comment_id
                 ]
                 rp.write_text(yaml_dump(data))
             else:

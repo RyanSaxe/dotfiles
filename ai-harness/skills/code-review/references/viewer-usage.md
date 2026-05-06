@@ -61,30 +61,33 @@ The web app uses path-based routing (HTML5 history API):
 | --------------------------------------- | ----------------------------------- |
 | `/`                                     | Inbox — all reviews on the machine  |
 | `/r/<repo-slug>`                        | All reviews for one repo            |
-| `/r/<repo-slug>/<sha-timestamp>`        | Single review (overview + comments) |
+| `/r/<repo-slug>/<sha-timestamp>`        | Single review (overview + threads)  |
 | `/r/<repo-slug>/<sha-timestamp>/<file>` | File view within a review           |
 
 `<sha-timestamp>` is the YAML filename without `.review.yaml`. URLs are bookmarkable.
 
-## API surface
+## API Surface
 
 The web app talks to the daemon via these JSON endpoints:
 
-| Method | Path                                        | Purpose                                                                                                                                    |
-| ------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/api/ping`                                 | Liveness check (returns `{"ok": true, "service": "code-review-viewer"}`).                                                                  |
-| GET    | `/api/reviews`                              | Inbox — all reviews with metadata (severity counts, status counts, staleness, feedback flags).                                             |
-| GET    | `/api/review/<slug>/<key>`                  | Full review YAML parsed to JSON.                                                                                                           |
-| PUT    | `/api/review/<slug>/<key>`                  | Write back to YAML, preserving formatting via `ruamel.yaml` if available.                                                                  |
-| DELETE | `/api/review/<slug>/<key>`                  | Delete the review file (inbox cleanup).                                                                                                    |
-| GET    | `/api/source?file=<path>&review=<slug/key>` | File contents from `target.repo_root` for the given review.                                                                                |
-| POST   | `/api/submit/<slug>/<key>`                  | Body `{"mode": "all" \| "comment", "commentId"?: "rev-001"}`. Invokes `submit.py`. On success, removes the comment (or archives the file). |
+- `GET /api/ping` — liveness check.
+- `GET /api/reviews` — inbox metadata.
+- `GET /api/review/<slug>/<key>` — full review YAML parsed to JSON.
+- `PUT /api/review/<slug>/<key>` — write review YAML back to disk.
+- `DELETE /api/review/<slug>/<key>` — delete a review file.
+- `GET /api/source?file=<path>&review=<slug/key>` — read source file contents.
+- `POST /api/refresh/<slug>/<key>` — reload files, refresh obvious anchors,
+  and update the review fingerprint.
+- `POST /api/submit/<slug>/<key>` — invoke `submit.py`; body is
+  `{"mode": "all" | "comment", "commentId"?: "rev-001"}`.
 
 All filesystem access is restricted to `~/.reviews/` (for review files) and the `target.repo_root` declared in the review (for source files). The server refuses to read paths outside those scopes.
 
 ## Staleness
 
-A review is **stale** when `target.commit` doesn't match the current HEAD of `target.repo_root`. The server runs `git -C <repo_root> rev-parse HEAD` and compares (cached for 60s). The inbox dims stale rows; the user can still open them, just with a "stale" badge in the topbar.
+A review is **stale** when `target.fingerprint` no longer matches the current folder state. If a review has no fingerprint, the viewer falls back to comparing `target.commit` with current HEAD. The user can open stale reviews and click Refresh to reload files and update obvious anchors.
+
+Refresh only moves a thread when its `anchor_text` appears exactly once in the same file. Missing or ambiguous anchors stay at their old line and show an indicator.
 
 ## Failure modes
 

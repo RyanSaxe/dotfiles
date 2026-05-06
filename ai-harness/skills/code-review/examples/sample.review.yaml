@@ -1,192 +1,73 @@
-version: 1
 generated_at: 2026-05-05T09:12:00Z
-generated_by: claude-opus-4-7
+generated_by: codex
 
 target:
-  repo_root: /Users/ryansaxe/generic/dotfiles
+  kind: pr
+  repo_root: /Users/me/projects/dotfiles
+  branch: feature/agent-notifications
   commit: d598ced2047cd78b72d69b092ebb842bb85772d6
-  branch: ai-harness
+  fingerprint: c23ec50a7b7b75f012a9985da42698515c87a7e29501cb89f0b17a81ddf9f0aa
+  pr_number: 142
+  owner: me
+  repo: dotfiles
+  remote: origin
 
 review:
   event: COMMENT
   summary: |
-    Reviewed the dotfiles repo broadly: ai-harness scripts, zsh aliases,
-    neovim colorscheme, and tmux config. Two themes worth flagging:
-    (1) environment-pollution risks in tmux.conf — globally-set env vars
-    affect every tool inside the session, not just the one being targeted;
-    (2) host-specific assumptions leaking into shared dotfiles. Plus a
-    concurrency bug in the attention daemon's lock recovery, a perf nit in
-    the colorscheme on-highlights callback, and small style/correctness
-    items.
+    I reviewed the notification and shell helper changes. The main issue is a real lock-recovery race that can let two notification daemons run at once; the rest are smaller maintainability and portability notes.
 
-  feedback: ""
-
-  comments:
+  threads:
     - id: rev-001
-      file: ai-harness/scripts/attention-daemon.sh
+      author: ai
+      file: scripts/attention-daemon.sh
       start_line: 18
-      line: 28
+      line: 26
       severity: high
+      confidence: high
       category: correctness
       body: |
-        TOCTOU race on lock recovery. If `mkdir "$lock_dir"` (line 18) fails,
-        the recovery branch reads `pid_file` (line 19) — but a peer daemon
-        that just won the initial mkdir may not have written its PID yet
-        (the write happens at line 30, *after* this whole `if` block). In
-        that window we fall through to `rm -rf "$lock_dir"` on line 26,
-        clobber a healthy lock, and both daemons proceed.
-
-        Symptom: duplicate notifications when daemons race on startup. Fix
-        is design-level — either make PID write atomic with acquisition
-        (`mkdir lock_dir/pid-$$`), or sleep-and-retry on contention instead
-        of rm-and-retake.
+        The lock recovery path can delete a healthy lock. If `mkdir "$lock_dir"` fails because another daemon owns the lock, this branch removes the directory before proving it is stale, so both processes can continue and emit duplicate notifications.
       status: open
+      anchor_text: |
+        if ! mkdir "$lock_dir"; then
+          rm -rf "$lock_dir"
+          mkdir "$lock_dir"
+        fi
+      anchor_status: current
+      replies: []
 
     - id: rev-002
-      file: ai-harness/claude/hooks/send-notification.sh
-      line: 5
+      author: ai
+      file: zsh/aliases.zsh
+      line: 48
       severity: medium
-      category: arch
+      confidence: medium
+      category: portability
       body: |
-        `$script_dir/../..` hardcodes the hook's depth relative to
-        `ai-harness/`. If the hook ever moves (e.g., into a deeper
-        `claude/hooks/notifications/` subdir, or gets symlinked from
-        elsewhere), this silently resolves to the wrong directory and
-        `exec bash` runs whatever happens to be at that path — or fails
-        with a confusing "no such file."
-
-        Anchor on a stable marker (the `scripts/` sibling) so the hook
-        keeps working under reorganization.
+        This alias points at a host-specific absolute path. Anyone else sourcing the dotfiles will get a command that exists syntactically but fails at runtime.
       suggestion: |
-        harness_root="$script_dir"
-        while [[ "$harness_root" != "/" && ! -d "$harness_root/scripts" ]]; do
-          harness_root="$(dirname "$harness_root")"
-        done
-        harness_notify="$harness_root/scripts/notify.sh"
+        alias pptx='uv run -q --script ~/generic/dotfiles/scripts/pptx.py'
       status: open
+      anchor_text: |
+        alias pptx='/Users/me/private/scripts/pptx.py'
+      anchor_status: moved
+      replies:
+        - author: user
+          body: |
+            Good catch. Please keep this one but make the suggested path use the reusable script convention.
 
     - id: rev-003
-      file: ai-harness/scripts/agent-utils.sh
-      line: 12
+      author: user
+      file: scripts/notify.sh
+      line: 77
       severity: low
-      category: style
+      confidence: low
+      category: test
       body: |
-        The agent-name match mixes a case-sensitive `comm == "claude"` check
-        against unmodified `$1` with a case-insensitive regex on
-        `tolower($0)`. The two paths can disagree on a binary named `Claude`
-        (exact-case `comm` fails, regex catches it on the next iteration).
-        Either lowercase `comm` once at the top of the awk block, or drop
-        the comm shortcut and rely on the regex alone.
+        I am not sure this path is covered. Can the next review pass check whether the retry branch has a test?
       status: open
-      feedback: |
-        Low priority — on macOS/Linux the `comm` field from `ps` is
-        argv[0]'s basename, which is always lowercase for these binaries
-        in practice. Downgrade to `info` or drop the comment on next
-        iteration.
-
-    - id: rev-004
-      file: tmux/tmux.conf
-      start_line: 12
-      line: 19
-      severity: high
-      category: correctness
-      body: |
-        Three globally-set environment variables in a row (`COLORTERM`,
-        `FORCE_COLOR`, `LC_TERMINAL`) leak into *every* process started
-        inside this tmux session — not just Claude Code or chalk.
-        `FORCE_COLOR=3` in particular is read by Python's `rich`, `pip`,
-        `npm`, and many other CLIs; forcing truecolor where the consuming
-        terminal genuinely doesn't support it produces escape-sequence
-        garbage.
-
-        The `LC_TERMINAL=ghostty` lie (line 19) is the riskiest — any tool
-        that gates behavior on terminal identity (e.g., image protocols,
-        sixel, kitty graphics) will activate features the actual terminal
-        can't render.
-
-        Scope these to the specific commands that need them — wrap
-        claude/codex/etc. invocations with `env COLORTERM=truecolor …`
-        rather than setting globally.
-      status: open
-
-    - id: rev-005
-      file: tmux/tmux.conf
-      line: 21
-      severity: low
-      category: correctness
-      body: |
-        `set -g escape-time 0` is a footgun on slow networks (mosh, ssh) —
-        terminals interpret a real Escape press as the start of a CSI
-        sequence, and zero delay can turn a deliberate Esc into an aborted
-        partial sequence. The conventional safe value is 10–50ms.
-      status: open
-
-    - id: rev-006
-      file: nvim/lua/plugins/ui/colorscheme.lua
-      line: 5
-      severity: info
-      category: style
-      body: |
-        `priority = 100000000` (eight zeros) is far above the LazyVim
-        convention (`1000` is the highest typical priority for
-        colorschemes). Any value comfortably above other plugins works;
-        the eight-digit number doesn't communicate intent and looks like a
-        copy-paste artifact.
-      suggestion: |
-          priority = 1000,
-      status: open
-
-    - id: rev-007
-      file: nvim/lua/plugins/ui/colorscheme.lua
-      start_line: 28
-      line: 42
-      severity: medium
-      category: perf
-      body: |
-        Pokemon-color cache is read and parsed on every call to
-        `on_highlights`, which fires on every colorscheme reload
-        (`:colorscheme`, `:hi clear`, theme toggles, even some plugin
-        reloads). The file IO + line-by-line regex match isn't expensive
-        in absolute terms, but it's repeated work for a value that only
-        changes when the dashboard rewrites the cache.
-
-        Move the parse into module scope (or a memoized helper) so it
-        runs once per Neovim session unless explicitly invalidated.
-      status: open
-
-    - id: rev-008
-      file: zsh/aliases.zsh
-      line: 33
-      severity: low
-      category: correctness
-      body: |
-        `env -u TMUX claude` strips only `TMUX` — but `TMUX_PANE` and
-        `TMUX_TMPDIR` are still set in the environment. If Claude Code
-        (or any subprocess it spawns) checks for a tmux session via the
-        broader heuristic of "any TMUX*-prefixed var," the workaround is
-        incomplete.
-
-        Verify the upstream check is `process.env.TMUX` only; if so, this
-        is fine and the comment should drop. If it also checks the prefix
-        family, also unset `TMUX_PANE` and `TMUX_TMPDIR`.
-      status: open
-
-    - id: rev-009
-      file: zsh/aliases.zsh
-      line: 50
-      severity: high
-      category: arch
-      body: |
-        `alias pptx='uvx --refresh --from ~/work/Reusable/ppt-generator ppt'`
-        hardcodes a host-specific path (`~/work/Reusable/...`) into a file
-        that's symlinked across every machine running these dotfiles. On
-        any host without that directory, sourcing this file emits no error
-        (alias creation doesn't validate the target), but `pptx` will fail
-        at use-time with a confusing message.
-
-        Move host-specific aliases into a sourced-but-gitignored file
-        (e.g., `~/.zsh/local-aliases.zsh`) and have `aliases.zsh` source
-        it conditionally. The dotfiles repo's `# special local tools`
-        comment on line 48 already signals the author knew this wasn't
-        quite right.
-      status: open
+      anchor_text: |
+        retry_send "$payload"
+      anchor_status: ambiguous
+      replies: []

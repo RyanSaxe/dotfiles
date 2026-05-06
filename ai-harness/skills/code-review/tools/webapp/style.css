@@ -506,32 +506,6 @@ body.inbox-mode .main {
   white-space: pre-wrap;
 }
 
-.overview-feedback {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-5);
-  margin-bottom: var(--space-6);
-  box-shadow: var(--shadow-card);
-}
-
-.overview-feedback textarea {
-  width: 100%;
-  min-height: 80px;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-input);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  color: var(--color-body);
-  resize: vertical;
-}
-
-.overview-feedback textarea:focus {
-  outline: none;
-  border-color: var(--color-emphasis);
-}
-
 .overview-comments-label {
   font-size: var(--text-xs);
   font-weight: 600;
@@ -1007,6 +981,43 @@ body.inbox-mode .comment-row-inner {
 .severity-badge.low { background: var(--sev-low-soft); color: var(--sev-low); }
 .severity-badge.info { background: var(--sev-info-soft); color: var(--sev-info); }
 
+.author-badge,
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.author-badge.ai {
+  background: #f5f5f5;
+  color: var(--color-body);
+}
+
+.author-badge.user {
+  background: var(--sev-info-soft);
+  color: var(--sev-info);
+}
+
+.confidence-badge.high {
+  background: var(--color-positive-soft);
+  color: var(--color-positive);
+}
+
+.confidence-badge.medium {
+  background: var(--sev-medium-soft);
+  color: var(--sev-medium);
+}
+
+.confidence-badge.low {
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+}
+
 .category-pill {
   display: inline-flex;
   align-items: center;
@@ -1080,6 +1091,32 @@ body.inbox-mode .comment-row-inner {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--color-muted);
+}
+
+.anchor-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid #facc15;
+  border-radius: var(--radius-input);
+  background: #fef9c3;
+  color: #854d0e;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.anchor-warning.moved {
+  border-color: var(--sev-info);
+  background: var(--sev-info-soft);
+  color: var(--sev-info);
+}
+
+.anchor-warning .lucide {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
 }
 
 .comment-body {
@@ -1279,33 +1316,53 @@ body.inbox-mode .comment-row-inner {
   white-space: pre;
 }
 
-.comment-feedback {
+.thread-replies {
   margin: var(--space-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.thread-reply {
   padding: var(--space-3);
-  background: var(--sev-info-soft);
-  border-left: 3px solid var(--sev-info);
+  background: #fafafa;
+  border-left: 3px solid var(--color-border-strong);
   border-radius: var(--radius-input);
   font-size: var(--text-sm);
   color: var(--color-body);
 }
 
-.comment-feedback-text {
-  white-space: pre-wrap;
+.thread-reply.user {
+  border-left-color: var(--sev-info);
+  background: var(--sev-info-soft);
 }
 
-.comment-feedback-label {
+.thread-reply.ai {
+  border-left-color: var(--color-border-strong);
+}
+
+.thread-reply-author {
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--sev-info);
+  color: var(--color-muted);
   margin-bottom: var(--space-2);
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
-.comment-feedback-input {
+.thread-reply-body {
+  line-height: 1.6;
+}
+
+.thread-reply-body p {
+  margin: 0 0 var(--space-2) 0;
+}
+
+.thread-reply-body p:last-child {
+  margin-bottom: 0;
+}
+
+.thread-reply-input {
   width: 100%;
   min-height: 60px;
   padding: var(--space-2) var(--space-3);
@@ -1318,7 +1375,7 @@ body.inbox-mode .comment-row-inner {
   margin-top: var(--space-2);
 }
 
-.comment-feedback-input:focus {
+.thread-reply-input:focus {
   outline: none;
   border-color: var(--sev-info);
 }
@@ -1600,7 +1657,7 @@ body.inbox-mode .comment-row-inner {
   border-radius: 50%;
 }
 
-.feedback-flag {
+.reply-flag {
   display: inline-flex;
   padding: 1px 6px;
   border-radius: var(--radius-pill);

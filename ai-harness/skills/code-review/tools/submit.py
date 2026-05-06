@@ -6,13 +6,13 @@
 """Submit a review YAML to GitHub via `gh api`.
 
 Modes:
-  uv run --script submit.py <path>                       — send full review
-  uv run --script submit.py <path> --comment-id rev-001  — send a single comment
-  uv run --script submit.py <path> --dry-run             — print the payload, don't POST
+  uv run --script submit.py <path>                      — send full review
+  uv run --script submit.py <path> --thread-id rev-001  — send a single thread
+  uv run --script submit.py <path> --dry-run            — print the payload, don't POST
 
 On success (non-dry-run), prints the API response's `html_url` to stdout.
 The viewer is responsible for rewriting the local YAML afterward (removing
-the sent comment, or archiving the whole file).
+the sent thread, or archiving the whole file).
 
 Exits non-zero with the gh error printed verbatim on failure; the local
 YAML is left untouched.
@@ -80,8 +80,8 @@ def resolve_owner_repo(repo_root: str, remote_name: str | None) -> tuple[str, st
     return parsed
 
 
-def build_comment_payload(c: dict[str, Any]) -> dict[str, Any]:
-    """Map a review YAML comment to the GitHub Reviews API per-comment shape."""
+def build_thread_payload(c: dict[str, Any]) -> dict[str, Any]:
+    """Map a review YAML thread to the GitHub Reviews API per-comment shape."""
     body = c["body"].rstrip()
     if c.get("suggestion"):
         suggestion = c["suggestion"].rstrip("\n")
@@ -101,32 +101,32 @@ def build_comment_payload(c: dict[str, Any]) -> dict[str, Any]:
 
 def build_review_payload(
     review_data: dict[str, Any],
-    only_comment_id: str | None,
+    only_thread_id: str | None,
 ) -> dict[str, Any]:
     """Build the full POST body for /pulls/{n}/reviews."""
     target = review_data["target"]
     review = review_data["review"]
-    comments = review["comments"]
+    threads = review["threads"]
 
-    if only_comment_id is not None:
-        comments = [c for c in comments if c["id"] == only_comment_id]
-        if not comments:
-            raise RuntimeError(f"comment id {only_comment_id!r} not found in review")
+    if only_thread_id is not None:
+        threads = [c for c in threads if c["id"] == only_thread_id]
+        if not threads:
+            raise RuntimeError(f"thread id {only_thread_id!r} not found in review")
     else:
-        comments = [c for c in comments if c.get("status") not in SKIP_STATUSES]
-        if not comments:
-            raise RuntimeError("nothing to send — every comment is resolved or wontfix")
+        threads = [c for c in threads if c.get("status") not in SKIP_STATUSES]
+        if not threads:
+            raise RuntimeError("nothing to send — every thread is resolved or wontfix")
 
     return {
         "commit_id": target["commit"],
         "event": review["event"],
         "body": review.get("summary", "").rstrip(),
-        "comments": [build_comment_payload(c) for c in comments],
+        "comments": [build_thread_payload(c) for c in threads],
     }
 
 
 def submit(
-    path: Path, only_comment_id: str | None, dry_run: bool = False
+    path: Path, only_thread_id: str | None, dry_run: bool = False
 ) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text())
     target = data["target"]
@@ -137,7 +137,7 @@ def submit(
             "target.pr_number is not set — review is local-only, nothing to submit"
         )
 
-    payload = build_review_payload(data, only_comment_id)
+    payload = build_review_payload(data, only_thread_id)
 
     if dry_run:
         # Skip owner/repo lookup (may not be a real repo) — just emit the payload.
@@ -171,7 +171,12 @@ def main() -> int:
     parser.add_argument(
         "--comment-id",
         default=None,
-        help="If set, send only this comment instead of the full review.",
+        help="Deprecated alias for --thread-id.",
+    )
+    parser.add_argument(
+        "--thread-id",
+        default=None,
+        help="If set, send only this thread instead of the full review.",
     )
     parser.add_argument(
         "--dry-run",
@@ -181,7 +186,8 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        response = submit(args.path, args.comment_id, dry_run=args.dry_run)
+        thread_id = args.thread_id or args.comment_id
+        response = submit(args.path, thread_id, dry_run=args.dry_run)
     except (RuntimeError, FileNotFoundError, KeyError) as e:
         print(f"submit failed: {e}", file=sys.stderr)
         return 1

@@ -2,7 +2,7 @@
 // daemon via fetch. Path-based routing (HTML5 history API):
 //
 //   /                                     → inbox
-//   /r/<slug>/<key>                       → per-review (overview + comments)
+//   /r/<slug>/<key>                       → per-review (overview + threads)
 //   /r/<slug>/<key>/<file/path>           → file view inside a review
 //
 // State below is the union of route + lazily-fetched data + transient UI.
@@ -43,8 +43,23 @@ function commentLineRange(c) {
   return [c.line, c.line];
 }
 
+function reviewThreads() {
+  const review = state.review?.review;
+  if (!review) return [];
+  if (!Array.isArray(review.threads)) review.threads = [];
+  return review.threads;
+}
+
+function findThread(id) {
+  return reviewThreads().find((x) => x.id === id);
+}
+
 function severityOrder(sev) {
   return { critical: 0, high: 1, medium: 2, low: 3, info: 4 }[sev] ?? 5;
+}
+
+function confidenceOrder(confidence) {
+  return { high: 0, medium: 1, low: 2 }[confidence] ?? 3;
 }
 
 function escapeHtml(text) {
@@ -475,6 +490,15 @@ async function submitReview(slug, key, body) {
   return payload;
 }
 
+async function refreshReview(slug, key) {
+  const r = await fetch(`/api/refresh/${encodeURIComponent(slug)}/${encodeURIComponent(key)}`, {
+    method: "POST",
+  });
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(payload.error || `refresh failed: ${r.status}`);
+  return payload;
+}
+
 // === Route loader ==================================================
 
 // File-tree collapsed-folder state is per-review and persisted in localStorage
@@ -563,7 +587,7 @@ function renderTopbar() {
   const sep1 = document.getElementById("topbar-sep-1");
   const sep2 = document.getElementById("topbar-sep-2");
   const sep3 = document.getElementById("topbar-sep-3");
-  const saveBtn = document.getElementById("btn-save-feedback");
+  const refreshBtn = document.getElementById("btn-refresh-review");
   const sendBtn = document.getElementById("btn-send-review");
   const navWrap = document.getElementById("topbar-nav");
   const navCounter = document.getElementById("topbar-nav-counter");
@@ -575,7 +599,7 @@ function renderTopbar() {
     prEl.textContent = "";
     staleEl.hidden = true;
     sep1.hidden = sep2.hidden = sep3.hidden = true;
-    saveBtn.hidden = true;
+    refreshBtn.hidden = true;
     sendBtn.hidden = true;
     navWrap.hidden = true;
     return;
@@ -584,7 +608,7 @@ function renderTopbar() {
   const t = state.review.target || {};
   repoEl.textContent = t.repo_root ? t.repo_root.split("/").pop() : state.route.slug;
   branchEl.textContent = t.branch || "—";
-  commitEl.textContent = shortSha(t.commit);
+  commitEl.textContent = shortSha(t.commit || t.fingerprint);
   prEl.textContent = "";
   if (t.pr_number && t.owner && t.repo) {
     // DOM-construct the link instead of innerHTML — pr_number/owner/repo
@@ -617,12 +641,12 @@ function renderTopbar() {
     staleEl.textContent = "stale";
     staleEl.className = "topbar-stale";
     staleEl.hidden = false;
-    staleEl.title = "HEAD has moved past target.commit — line numbers may not match current files";
+    staleEl.title = "The current folder no longer matches this review; refresh to reload files and anchors";
   } else {
     staleEl.hidden = true;
   }
 
-  saveBtn.hidden = false;
+  refreshBtn.hidden = false;
   sendBtn.hidden = false;
 
   const navComments = navigableComments();
@@ -650,7 +674,7 @@ function renderTree() {
   }
 
   root.hidden = false;
-  const total = (state.review.review?.comments || []).length;
+  const total = reviewThreads().length;
   const isReviewRoot = state.route.view === "review";
 
   const counts = filesWithCommentCounts();
@@ -702,7 +726,7 @@ function renderTree() {
 
 function filesWithCommentCounts() {
   const counts = {};
-  (state.review.review?.comments || []).forEach((c) => {
+  reviewThreads().forEach((c) => {
     counts[c.file] = (counts[c.file] || 0) + 1;
   });
   return counts;
@@ -752,8 +776,8 @@ function renderTreeNode(node) {
     const chevronIcon = collapsed ? "chevron-right" : "chevron-down";
     const folderIcon = collapsed ? "folder" : "folder-open";
     // When collapsed, surface the descendant comment count so users still see
-    // "something's in there" without expanding. When expanded, child files
-    // already carry their own pips so a folder pip would be redundant.
+      // "something's in there" without expanding. When expanded, child files
+      // already carry their own pips so a folder pip would be redundant.
     const pip = collapsed && node.dirCount > 0
       ? `<span class="comment-pip">${node.dirCount}</span>`
       : "";
@@ -980,7 +1004,7 @@ function bucketReviews(reviews) {
       out.stale.push(r);
       return;
     }
-    if (r.has_review_feedback || r.has_per_comment_feedback) {
+    if (r.has_unanswered_user) {
       out.iterating.push(r);
       return;
     }
@@ -1009,8 +1033,7 @@ function renderInboxRow(r) {
     </span>
   `;
 
-  const feedback = (r.has_review_feedback || r.has_per_comment_feedback)
-    ? `<span class="feedback-flag">feedback</span>` : "";
+  const replies = r.has_user_reply ? `<span class="reply-flag">reply</span>` : "";
   const stale = r.stale ? `<span class="stale-flag">stale</span>` : "";
 
   return `
@@ -1018,7 +1041,7 @@ function renderInboxRow(r) {
       <td><span class="repo">${escapeHtml(r.repo_name)}</span> ${stale}</td>
       <td><span class="branch">${escapeHtml(r.branch || "—")}</span></td>
       <td><span class="sha">${escapeHtml(r.short_sha)}</span></td>
-      <td>${pipsHtml} ${feedback}</td>
+      <td>${pipsHtml} ${replies}</td>
       <td><span class="age">${relativeAge(r.modified)}</span></td>
       <td>${r.pr_number ? `<span class="pr">#${escapeHtml(r.pr_number)}</span>` : `<span class="pr none">—</span>`}</td>
       <td><button class="inbox-delete" title="Delete review" data-slug="${r.slug}" data-key="${r.key}"><i data-lucide="trash-2"></i></button></td>
@@ -1032,22 +1055,22 @@ function renderReviewOverview() {
   const r = state.review.review;
   const t = state.review.target;
   const grouped = {};
-  (r.comments || []).forEach((c) => {
+  reviewThreads().forEach((c) => {
     if (!grouped[c.file]) grouped[c.file] = [];
     grouped[c.file].push(c);
   });
 
-  const groupsHtml = Object.entries(grouped).map(([file, comments]) => `
+  const groupsHtml = Object.entries(grouped).map(([file, threads]) => `
     <div class="file-group">
       <div class="file-group-header" data-file="${escapeHtml(file)}">
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(file)}</strong>
         <span>·</span>
-        <span>${comments.length} ${comments.length === 1 ? "comment" : "comments"}</span>
+        <span>${threads.length} ${threads.length === 1 ? "thread" : "threads"}</span>
       </div>
       <div class="file-group-cards">
-        ${comments
-          .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity))
+        ${threads
+          .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity) || confidenceOrder(a.confidence) - confidenceOrder(b.confidence))
           .map((c) => renderCommentCard(c, { withLineRef: true, fileLanguage: detectLanguage(file) }))
           .join("")}
       </div>
@@ -1065,12 +1088,7 @@ function renderReviewOverview() {
       <div class="overview-summary-body">${escapeHtml(r.summary)}</div>
     </div>
 
-    <div class="overview-feedback">
-      <div class="overview-summary-label">Review-level feedback (read on next /code-review run)</div>
-      <textarea id="review-feedback-input" placeholder="Notes for the AI to address on the next iteration…">${escapeHtml(r.feedback || "")}</textarea>
-    </div>
-
-    <div class="overview-comments-label">${(r.comments || []).length} comments across ${Object.keys(grouped).length} files</div>
+    <div class="overview-comments-label">${reviewThreads().length} threads across ${Object.keys(grouped).length} files</div>
     ${groupsHtml}
   `;
 
@@ -1085,7 +1103,7 @@ function renderFileView() {
   const language = detectLanguage(filePath, state.source?.content);
   const source = state.source?.content || "(file content not available)";
   const lines = source.split("\n");
-  const fileComments = (state.review.review?.comments || [])
+  const fileComments = reviewThreads()
     .filter((c) => c.file === filePath)
     .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
 
@@ -1158,7 +1176,7 @@ function renderFileView() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
-        <span style="margin-left:auto">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
+        <span style="margin-left:auto">${fileComments.length} ${fileComments.length === 1 ? "thread" : "threads"}</span>
       </div>
       <div class="code-table-scroll">
         <table class="code-table"><tbody>${rows}</tbody></table>
@@ -1198,9 +1216,14 @@ function renderNewCommentForm() {
           <option value="low">low</option>
           <option value="info">info</option>
         </select>
+        <select id="new-confidence">
+          <option value="high">high confidence</option>
+          <option value="medium" selected>medium confidence</option>
+          <option value="low">low confidence</option>
+        </select>
         <input type="text" id="new-category" placeholder="category (correctness, security, perf, style, …)" />
       </div>
-      <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
+      <textarea id="new-body" placeholder="Thread body. Markdown — backticks for inline code."></textarea>
       <div class="comment-editor-preview" id="new-body-preview"></div>
       <div class="comment-suggestion">
         <div class="comment-suggestion-label">
@@ -1214,7 +1237,7 @@ function renderNewCommentForm() {
       <div class="form-actions">
         <button class="btn btn-primary" data-save-new>
           <i data-lucide="plus"></i>
-          Add comment
+          Add thread
         </button>
       </div>
     </div>
@@ -1222,7 +1245,7 @@ function renderNewCommentForm() {
 }
 
 function nextCommentId() {
-  const ids = (state.review.review.comments || []).map((c) => c.id);
+  const ids = reviewThreads().map((c) => c.id);
   let max = 0;
   ids.forEach((id) => {
     const m = /^rev-(\d+)$/.exec(id);
@@ -1237,6 +1260,10 @@ function renderCommentCard(c, opts = {}) {
   const [s, e] = commentLineRange(c);
   const lineRef = s === e ? `L${s}` : `L${s}–${e}`;
   const sev = c.severity || "info";
+  const confidence = c.confidence || "medium";
+  const author = c.author || "ai";
+  const anchorStatus = c.anchor_status || "current";
+  const anchorCurrent = anchorStatus === "current" || anchorStatus === "moved";
   const language = opts.fileLanguage || detectLanguage(c.file);
 
   // Severity / status / id are *expected* to be enum / pattern values, but
@@ -1244,6 +1271,9 @@ function renderCommentCard(c, opts = {}) {
   // into ~/.reviews/ by some other tool could carry any string. Escape
   // every interpolation that lands in attributes or text content.
   const sevSafe = escapeHtml(sev);
+  const confidenceSafe = escapeHtml(confidence);
+  const authorSafe = escapeHtml(author);
+  const anchorSafe = escapeHtml(anchorStatus);
   const statusSafe = escapeHtml(c.status);
   const idSafe = escapeHtml(c.id);
 
@@ -1267,28 +1297,25 @@ function renderCommentCard(c, opts = {}) {
       </div>
     `;
   } else if (c.suggestion) {
-    suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines, idSafe);
+    suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines, idSafe, anchorCurrent);
   } else {
     // No suggestion yet — offer a way to add one.
     suggestionHtml = `
-      <button class="btn btn-suggestion-add" data-edit-suggestion-target="${idSafe}">
+      <button class="btn btn-suggestion-add" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"}>
         <i data-lucide="lightbulb"></i>
         Add suggested change
       </button>
     `;
   }
 
-  const feedbackHtml = c.feedback ? `
-    <div class="comment-feedback">
-      <div class="comment-feedback-label">
-        <i data-lucide="message-square-warning"></i>
-        Feedback (read on next /code-review run)
-      </div>
-      <div class="comment-feedback-text">${escapeHtml(c.feedback)}</div>
+  const anchorHtml = anchorStatus === "current" ? "" : `
+    <div class="anchor-warning ${anchorSafe}">
+      <i data-lucide="${anchorStatus === "moved" ? "move-vertical" : "triangle-alert"}"></i>
+      ${anchorStatus === "moved" ? "Anchor moved by refresh." : anchorStatus === "missing" ? "Anchor text no longer appears in this file." : "Anchor text appears in multiple places."}
     </div>
-  ` : `
-    <textarea class="comment-feedback-input" data-comment-feedback="${idSafe}" placeholder="Leave feedback for the AI to address on the next /code-review run…"></textarea>
   `;
+
+  const repliesHtml = renderReplies(c);
 
   const lineRefHtml = opts.withLineRef ? `<span class="comment-line-ref">${lineRef}</span>` : "";
   const closeBtnHtml = opts.withLineRef ? "" :
@@ -1306,46 +1333,72 @@ function renderCommentCard(c, opts = {}) {
   return `
     <div class="comment-card" data-comment-card="${idSafe}">
       <div class="comment-header">
+        <span class="author-badge ${authorSafe}">${authorSafe}</span>
         <span class="severity-badge ${sevSafe}">${sevSafe}</span>
+        <span class="confidence-badge ${confidenceSafe}">${confidenceSafe} confidence</span>
         <span class="category-pill">${escapeHtml(c.category)}</span>
         <button class="status-pill ${statusSafe}" data-cycle-status="${idSafe}" title="Click to cycle: open → acknowledged → resolved → wontfix">${statusSafe}</button>
         ${lineRefHtml}
         <span class="comment-id">${idSafe}</span>
         ${closeBtnHtml}
       </div>
+      ${anchorHtml}
       ${bodyHtml}
       ${suggestionHtml}
-      ${feedbackHtml}
+      ${repliesHtml}
       <div class="comment-actions">
         <button class="btn btn-icon btn-danger" data-delete-comment="${idSafe}" title="Delete comment">
           <i data-lucide="trash-2"></i>
         </button>
         <div class="spacer"></div>
-        <button class="btn" data-save-comment-feedback="${idSafe}">
-          <i data-lucide="save"></i>
-          Save feedback
+        <button class="btn" data-add-reply="${idSafe}">
+          <i data-lucide="message-square-plus"></i>
+          Add reply
         </button>
-        <button class="btn btn-primary" data-send-comment="${idSafe}" ${state.review.target?.pr_number ? "" : "disabled"}>
+        <button class="btn btn-primary" data-send-comment="${idSafe}" ${state.review.target?.pr_number && anchorCurrent ? "" : "disabled"}>
           <i data-lucide="send"></i>
-          Send this comment
+          Send this thread
         </button>
       </div>
     </div>
   `;
 }
 
-function renderSuggestionDiff(c, language, sourceLinesArg, idSafe) {
+function renderReplies(c) {
+  const replies = Array.isArray(c.replies) ? c.replies : [];
+  const idSafe = escapeHtml(c.id);
+  const repliesHtml = replies.length === 0 ? "" : `
+    <div class="thread-replies">
+      ${replies.map((reply) => `
+        <div class="thread-reply ${escapeHtml(reply.author || "user")}">
+          <div class="thread-reply-author">${escapeHtml(reply.author || "user")}</div>
+          <div class="thread-reply-body">${renderMarkdown(reply.body || "")}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  return `
+    ${repliesHtml}
+    <textarea class="thread-reply-input" data-reply-input="${idSafe}" placeholder="Reply locally for the next terminal /code-review iteration…"></textarea>
+  `;
+}
+
+function renderSuggestionDiff(c, language, sourceLinesArg, idSafe, editable = true) {
   const [s] = commentLineRange(c);
   const originalText = originalTextForComment(c, sourceLinesArg);
+  const editButton = editable ? `
+    <button class="suggestion-edit-btn" data-edit-suggestion-target="${idSafe}" title="Edit suggestion">
+      <i data-lucide="pencil"></i>
+    </button>
+  ` : "";
 
   return `
     <div class="comment-suggestion">
       <div class="comment-suggestion-label">
         <i data-lucide="lightbulb"></i>
         Suggested change
-        <button class="suggestion-edit-btn" data-edit-suggestion-target="${idSafe}" title="Edit suggestion">
-          <i data-lucide="pencil"></i>
-        </button>
+        ${editButton}
       </div>
       ${renderSuggestionDiffTable(originalText, c.suggestion || "", language, s)}
     </div>
@@ -1360,7 +1413,7 @@ async function persistReview() {
 }
 
 async function saveEditedBody(id, newBody) {
-  const c = state.review.review.comments.find((x) => x.id === id);
+  const c = findThread(id);
   if (!c) return;
   if (newBody === c.body) {
     state.editingBody = null;
@@ -1386,8 +1439,12 @@ function cancelBodyEdit() {
 }
 
 async function beginSuggestionEdit(id) {
-  const c = state.review.review.comments.find((x) => x.id === id);
+  const c = findThread(id);
   if (!c) return;
+  if (c.anchor_status && c.anchor_status !== "current" && c.anchor_status !== "moved") {
+    showToast("Refresh or move the anchor before editing suggestions");
+    return;
+  }
   let source = null;
   try {
     source = await ensureSourceForFile(c.file);
@@ -1418,7 +1475,7 @@ async function beginSuggestionEdit(id) {
 }
 
 async function saveEditedSuggestion(id, rawValue) {
-  const c = state.review.review.comments.find((x) => x.id === id);
+  const c = findThread(id);
   if (!c) return;
   const hadSuggestion = Boolean(c.suggestion);
   const originalSuggestion = c.suggestion;
@@ -1511,7 +1568,7 @@ function initializeEditors(content) {
 
   content.querySelectorAll("[data-edit-suggestion]").forEach((el) => {
     const id = el.getAttribute("data-edit-suggestion");
-    const c = state.review.review.comments.find((x) => x.id === id);
+    const c = findThread(id);
     if (!c) return;
     const sourceContent = state.source?.file === c.file ? state.source.content : state.sourceCache.get(c.file);
     const language = detectLanguage(c.file, sourceContent);
@@ -1586,13 +1643,14 @@ function attachContentHandlers() {
       const body = editorValue(bodyEl).trim();
       const category = document.getElementById("new-category").value.trim() || "correctness";
       const severity = document.getElementById("new-severity").value;
+      const confidence = document.getElementById("new-confidence").value;
       const suggestion = normalizeSuggestionText(editorValue(suggestionEl));
       const endLineEl = document.getElementById("new-end-line");
       const endLine = t.isRange && endLineEl ? parseInt(endLineEl.value, 10) : t.line;
       const originalSuggestion = sourceTextForRange(t.file, t.line, endLine);
 
       if (!body) {
-        showToast("Comment body is required");
+        showToast("Thread body is required");
         return;
       }
       if (t.isRange && endLine < t.line) {
@@ -1602,17 +1660,22 @@ function attachContentHandlers() {
 
       const newComment = {
         id: nextCommentId(),
+        author: "user",
         file: t.file,
         line: endLine,
         severity,
         category,
+        confidence,
         body,
         status: "open",
+        anchor_text: originalSuggestion,
+        anchor_status: "current",
+        replies: [],
       };
       if (t.isRange && endLine !== t.line) newComment.start_line = t.line;
       if (suggestion && suggestion !== originalSuggestion) newComment.suggestion = suggestion;
 
-      state.review.review.comments.push(newComment);
+      reviewThreads().push(newComment);
       try {
         await persistReview();
         state.newCommentTarget = null;
@@ -1623,7 +1686,7 @@ function attachContentHandlers() {
       } catch (err) {
         showToast(err.message);
         // Roll back optimistic update
-        state.review.review.comments = state.review.review.comments.filter((c) => c.id !== newComment.id);
+        state.review.review.threads = reviewThreads().filter((c) => c.id !== newComment.id);
       }
     });
   });
@@ -1718,8 +1781,8 @@ function attachContentHandlers() {
   content.querySelectorAll("[data-delete-comment]").forEach((el) => {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-delete-comment");
-      if (!confirm(`Delete comment ${id}?`)) return;
-      state.review.review.comments = state.review.review.comments.filter((c) => c.id !== id);
+      if (!confirm(`Delete thread ${id}?`)) return;
+      state.review.review.threads = reviewThreads().filter((c) => c.id !== id);
       try {
         await persistReview();
         renderTree();
@@ -1731,17 +1794,23 @@ function attachContentHandlers() {
     });
   });
 
-  content.querySelectorAll("[data-save-comment-feedback]").forEach((el) => {
+  content.querySelectorAll("[data-add-reply]").forEach((el) => {
     el.addEventListener("click", async () => {
-      const id = el.getAttribute("data-save-comment-feedback");
-      const ta = content.querySelector(`[data-comment-feedback="${id}"]`);
-      const c = state.review.review.comments.find((x) => x.id === id);
+      const id = el.getAttribute("data-add-reply");
+      const ta = content.querySelector(`[data-reply-input="${id}"]`);
+      const c = findThread(id);
       if (!ta || !c) return;
-      c.feedback = ta.value;
+      const body = ta.value.trim();
+      if (!body) {
+        showToast("Reply body is required");
+        return;
+      }
+      if (!Array.isArray(c.replies)) c.replies = [];
+      c.replies.push({ author: "user", body });
       try {
         await persistReview();
         renderContent();
-        showToast(`Feedback saved on ${id}`);
+        showToast(`Reply added to ${id}`);
       } catch (err) {
         showToast(err.message);
       }
@@ -1757,7 +1826,7 @@ function attachContentHandlers() {
       }
       try {
         await submitReview(state.route.slug, state.route.key, { mode: "comment", commentId: id });
-        // Reload the review (server removed the comment).
+        // Reload the review (server removed the thread).
         state.review = null;
         await loadRoute(state.route);
         showToast(`Sent ${id}`);
@@ -1804,7 +1873,7 @@ function scrollCommentIntoView(id) {
 
 async function cycleStatus(commentId) {
   const order = ["open", "acknowledged", "resolved", "wontfix"];
-  const c = state.review.review.comments.find((x) => x.id === commentId);
+  const c = findThread(commentId);
   if (!c) return;
   c.status = order[(order.indexOf(c.status) + 1) % order.length];
   try {
@@ -1829,16 +1898,20 @@ document.getElementById("btn-next-comment").addEventListener("click", () => {
   navigateToComment(+1);
 });
 
-document.getElementById("btn-save-feedback").addEventListener("click", async () => {
-  const ta = document.getElementById("review-feedback-input");
-  if (!ta || !state.review) {
-    showToast("Open the review overview to edit review-level feedback");
+document.getElementById("btn-refresh-review").addEventListener("click", async () => {
+  if (!state.review) {
+    showToast("Open a review to refresh it");
     return;
   }
-  state.review.review.feedback = ta.value;
   try {
-    await persistReview();
-    showToast("Review-level feedback saved");
+    const res = await refreshReview(state.route.slug, state.route.key);
+    state.review = null;
+    state.source = null;
+    state.fullTree = null;
+    state.sourceCache.clear();
+    await loadRoute(state.route);
+    const counts = res.counts || {};
+    showToast(`Refreshed · ${counts.moved || 0} moved · ${counts.missing || 0} missing · ${counts.ambiguous || 0} ambiguous`);
   } catch (err) {
     showToast(err.message);
   }
@@ -1849,7 +1922,7 @@ document.getElementById("btn-send-review").addEventListener("click", async () =>
     showToast("No PR — set target.pr_number to enable sending");
     return;
   }
-  if (!confirm("Send all open + acknowledged comments to GitHub?")) return;
+  if (!confirm("Send all open + acknowledged threads to GitHub?")) return;
   try {
     const res = await submitReview(state.route.slug, state.route.key, { mode: "all" });
     showToast(`Sent · ${res.url || ""}`);
@@ -1870,7 +1943,7 @@ function isTypingInInput() {
 function navigableComments() {
   if (!state.review) return [];
   const grouped = {};
-  state.review.review.comments.forEach((c) => {
+  reviewThreads().forEach((c) => {
     if (!grouped[c.file]) grouped[c.file] = [];
     grouped[c.file].push(c);
   });
@@ -1942,7 +2015,7 @@ document.addEventListener("keydown", (e) => {
       renderContent();
     }
   } else if (e.key === "?") {
-    showToast("Keys: Tab/S-Tab or j/k → next/prev comment · Esc → close");
+    showToast("Keys: Tab/S-Tab or j/k → next/prev thread · Esc → close");
   }
 });
 

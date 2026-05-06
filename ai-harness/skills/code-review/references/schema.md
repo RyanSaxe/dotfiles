@@ -2,135 +2,129 @@
 
 **When to read this:** when generating, editing, or validating a review YAML file.
 
-## File location
+## File Location
 
-`~/.reviews/<repo-slug>/<short-sha>-<utc-timestamp>.review.yaml`
+`~/.reviews/<repo-slug>/<ref>-<utc-timestamp>.review.yaml`
 
-- `<repo-slug>` is the absolute path of the repo with `/` replaced by `-`. Example: `/Users/ryansaxe/projects/myapp` → `Users-ryansaxe-projects-myapp`.
-- `<short-sha>` is the first 7 chars of the target commit SHA.
-- `<utc-timestamp>` is `YYYYMMDDTHHMMSSZ` — UTC, no separators. Multiple reviews on the same commit get distinct timestamps.
+- `<repo-slug>` is the absolute repo path with `/` replaced by `-`.
+- `<ref>` is the short commit SHA when available, otherwise a short fingerprint label.
+- `<utc-timestamp>` is `YYYYMMDDTHHMMSSZ`.
 
-The directory is created lazily on the first review for a given repo. Reviews are never committed; this is personal scratch state.
-
-## Top-level structure
+## Top-Level Structure
 
 ```yaml
-version: 1
 generated_at: 2026-05-05T09:12:00Z
-generated_by: claude-opus-4-7 # informational; helps trace provenance
+generated_by: codex
 
 target:
-  repo_root: /Users/me/projects/myapp # absolute path at generation time
-  commit: a3f2c1d8e9b0c4f5a6d7e8f9 # full SHA — the canonical anchor
-  branch: feature/auth-refactor # optional
-  pr_number: 142 # optional; presence enables direct submit
-  owner: my-org # required when pr_number is set; powers the topbar PR link
-  repo: myapp # required when pr_number is set; powers the topbar PR link
-  remote: origin # optional; fallback for resolving owner/repo when not set
+  kind: local # local | pr
+  repo_root: /Users/me/projects/myapp
+  branch: feature/auth-refactor
+  commit: a3f2c1d8e9b0c4f5a6d7e8f9 # optional but preferred when available
+  fingerprint: 46f3c2... # current reviewed folder state, optional but preferred
+  pr_number: 142 # required for PR submission
+  owner: my-org # required when pr_number is set
+  repo: myapp # required when pr_number is set
+  remote: origin # optional fallback for resolving owner/repo
 
 review:
   event: COMMENT # COMMENT | REQUEST_CHANGES | APPROVE | PENDING
   summary: |
-    Two-to-five-sentence prose summary of what was reviewed and the headline
-    findings. Visible at the top of the per-review view in the viewer.
+    Two-to-five-sentence prose summary of what was reviewed and the headline findings.
 
-  feedback: | # free-form notes from the human; addressed on next /code-review
-    Optional. Empty / missing = nothing to address.
-
-  comments:
+  threads:
     - id: rev-001
+      author: ai # ai | user
       file: src/auth/session.py
-      line: 42 # single-line comment
+      line: 42
       severity: high # info | low | medium | high | critical
-      category: security # free-form: correctness, security, arch, perf, style, docs, test, naming, ...
+      confidence: medium # low | medium | high
+      category: security
       body: |
-        Markdown. Renders in the viewer and (when sent) on GitHub.
-      suggestion: | # optional; raw code (no fences). Submitter wraps it.
+        Markdown. Renders in the viewer and, if submitted, on GitHub.
+      suggestion: |
         cursor.execute(
             "SELECT * FROM sessions WHERE user_id = ?",
             (user_id,),
         )
       status: open # open | acknowledged | resolved | wontfix
-      feedback: | # optional per-comment feedback for next /code-review
-        Wrong — we use SQLAlchemy here, this isn't a raw query.
+      anchor_text: |
+        cursor.execute(f"SELECT * FROM sessions WHERE user_id = {user_id}")
+      anchor_status: current # current | moved | missing | ambiguous
+      replies:
+        - author: user
+          body: |
+            This path actually uses SQLAlchemy; please re-check.
+        - author: ai
+          body: |
+            Agreed. I removed the raw SQL suggestion and downgraded confidence.
 ```
 
-## Field rules
+## Field Rules
 
 ### `id`
 
-Unique within the file. Format `rev-NNN` zero-padded to three digits. IDs are stable across iterations — they're the user's handle for referencing comments in feedback (_"drop rev-002"_).
+Unique within the file. Use `rev-NNN`, zero-padded. IDs are stable handles for local discussion and should not change across iterations.
 
-### Line targeting
+### `author`
 
-Always references files **at `target.commit`**, on the present-state side (no diff LEFT/RIGHT).
+Use `ai` for threads or replies written by the reviewing agent. Use `user` for threads or replies created in the viewer by the human.
 
-- **Single-line:** `line: <N>`
-- **Range:** `start_line: <N>` plus `line: <M>` where `line` is the inclusive end. Mirrors the GitHub Reviews API.
+### Line Targeting
+
+Line numbers reference the current source file for the reviewed local state.
+
+- Single line: `line: <N>`
+- Range: `start_line: <N>` plus `line: <M>` where `line` is the inclusive end.
+
+### `anchor_text` and `anchor_status`
+
+`anchor_text` is the exact source text for the reviewed line or range at generation time. The viewer refresh uses it conservatively:
+
+- `current` — text still matches at the stored line/range.
+- `moved` — text appeared exactly once elsewhere and the viewer moved the line/range.
+- `missing` — text was not found.
+- `ambiguous` — text appeared multiple times.
+
+If `anchor_status` is `missing` or `ambiguous`, do not submit or edit suggestions until the AI or user moves the thread to the right location.
 
 ### `severity`
 
-Five-rung enum: `info | low | medium | high | critical`. Calibration:
+Five-rung enum: `info | low | medium | high | critical`.
 
-| Rung       | Meaning                                                       | Example                                             |
-| ---------- | ------------------------------------------------------------- | --------------------------------------------------- |
-| `critical` | Will hurt you. Data loss, security exploit, prod outage path. | SQL injection, secret committed in plaintext.       |
-| `high`     | Real bug or significant design flaw. Worth fixing soon.       | TOCTOU race, host-specific path in shared dotfiles. |
-| `medium`   | Worth addressing, not urgent.                                 | Hardcoded relative path, fragile parser.            |
-| `low`      | Minor correctness or style.                                   | Inconsistent comparison, unused variable.           |
-| `info`     | FYI. No action expected.                                      | "Consider this convention next time."               |
+Use the high end sparingly; if every thread is high, the rung loses meaning.
 
-Use the high end sparingly; if every comment is `high` the rung loses meaning.
+### `confidence`
+
+Three-rung enum: `low | medium | high`.
+
+Severity is impact if true. Confidence is how sure the reviewer is. A finding may be high severity but low confidence when it flags a plausible production risk that needs verification.
 
 ### `category`
 
-Free text. Common values: `correctness`, `security`, `arch`, `perf`, `style`, `docs`, `test`, `naming`. Don't enumerate; let it grow.
+Free text. Common values: `correctness`, `security`, `arch`, `perf`, `style`, `docs`, `test`, `naming`.
 
 ### `body`
 
-GitHub-flavored Markdown. Lead with the _what_ and _why_; if the fix is non-obvious, end with a sentence on the _how_.
-
-Do not hard-wrap prose for YAML readability. A review comment paragraph should be one logical Markdown paragraph; use blank lines for paragraph breaks, bullets for lists, tables for tabular content, and fenced code blocks for code. Intentional Markdown structure should be explicit, not an artifact of YAML line width.
+GitHub-flavored Markdown. Lead with what and why; if the fix is non-obvious, end with how. Do not hard-wrap prose for YAML width.
 
 ### `suggestion`
 
-Optional. **Raw exact replacement code, no fences.** The submitter wraps it in ` ```suggestion\n…\n``` ` when posting to GitHub. The viewer renders it as a unified diff against the original line(s) at `start_line..line`.
-
-GitHub applies suggestions exactly. Include every leading tab or space required on every line. Suggestions do not inherit indentation from the commented line. Because YAML strips the block scalar's own indentation, replacement indentation must be written beyond the YAML nesting indentation:
-
-Single-line replacement inside an indented Python method:
-
-```yaml
-      suggestion: |
-                return price_multiplier["impacts"] * (
-                    keras.ops.sum(linear_effects, axis=-1) + intercepts
-                )
-```
+Optional raw exact replacement code, no fences. The submitter wraps it in a GitHub suggestion block when posting. Include every leading tab or space required.
 
 ### `status`
 
-Lifecycle starts at `open`. Human flips to one of:
+- `open` — default; may be sent
+- `acknowledged` — valid finding, may be sent
+- `resolved` — fixed locally; skipped on submit
+- `wontfix` — intentionally not addressed; skipped on submit
 
-- `open` — default; will be sent on submit
-- `acknowledged` — valid finding, send to PR author for them to address (sent)
-- `resolved` — I'll fix this myself locally, no need to bother PR author (skipped on submit)
-- `wontfix` — disagree with the AI on this (skipped on submit)
+### `replies`
 
-### `event` (top-level)
-
-Controls the GitHub submission type when sent:
-
-- `COMMENT` — the default; non-blocking comments
-- `REQUEST_CHANGES` — blocks PR merge until addressed
-- `APPROVE` — green checkmark
-- `PENDING` — draft, doesn't send to PR author yet
-
-### `review.feedback` and per-comment `feedback`
-
-Optional **strings**. Inputs for the iteration loop. If non-empty, the next `/code-review` reads them, addresses each, and clears the field. See [`iteration.md`](iteration.md). Anything other than a string fails validation.
+Local-only thread discussion. The AI reads user replies on the next terminal `/code-review` run. GitHub submission ignores replies and sends only the thread `body` plus optional `suggestion`.
 
 ## Examples
 
-- [`examples/sample.review.yaml`](../examples/sample.review.yaml) — fully populated: 9 comments across 6 files, varied severity, one with a multi-line suggestion, one with a ranged anchor, one with populated feedback.
-- [`examples/minimal.review.yaml`](../examples/minimal.review.yaml) — one comment, no suggestion, no PR. Smallest valid file.
-- [`examples/iteration-input.review.yaml`](../examples/iteration-input.review.yaml) — review with both review-level and per-comment feedback populated. Documents what the AI reads on the next `/code-review`.
+- [`examples/sample.review.yaml`](../examples/sample.review.yaml)
+- [`examples/minimal.review.yaml`](../examples/minimal.review.yaml)
+- [`examples/iteration-input.review.yaml`](../examples/iteration-input.review.yaml)

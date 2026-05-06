@@ -1,25 +1,30 @@
-version: 1
 generated_at: 2026-05-05T09:30:00Z
-generated_by: claude-opus-4-7
+generated_by: codex
 
 target:
+  kind: local
   repo_root: /Users/me/projects/myapp
+  branch: feature/parser-cleanup
   commit: 771ab92e4a6f3c8d9e0b1c2d3e4f5a6b7c8d9e0f
+  fingerprint: 9f5d16d7ef3f1c245d2e5a62a22d9bb16839e94e6d225f5b98d59d8f49b90c3a
 
 review:
   event: COMMENT
   summary: |
     One finding worth flagging.
 
-  comments:
+  threads:
     - id: rev-001
+      author: ai
       file: src/utils/parse.py
       line: 47
       severity: medium
+      confidence: high
       category: correctness
       body: |
-        Returning `None` on parse failure makes callers either ignore the
-        signal or sprinkle `if x is None` checks everywhere. Raise a
-        specific exception (`ParseError`) so the failure path is
-        unambiguous.
+        Returning `None` on parse failure makes callers either ignore the signal or sprinkle `if x is None` checks everywhere. Raise a specific exception (`ParseError`) so the failure path is unambiguous.
       status: open
+      anchor_text: |
+        return None
+      anchor_status: current
+      replies: []
