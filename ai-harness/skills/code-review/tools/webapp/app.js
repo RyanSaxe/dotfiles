@@ -101,12 +101,31 @@ function sanitizeRenderedMarkdown(html) {
   return template.innerHTML;
 }
 
-function showToast(message) {
+function showToast(message, opts = {}) {
   const el = document.getElementById("toast");
-  el.textContent = message;
+  const kind = opts.kind || "info";
+  const title = opts.title || String(message || "");
+  const detail = opts.detail || "";
+  el.className = `toast ${kind}`;
+  el.innerHTML = `
+    <div class="toast-title">${escapeHtml(title)}</div>
+    ${detail ? `<div class="toast-detail">${escapeHtml(detail)}</div>` : ""}
+  `;
   el.classList.add("show");
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => el.classList.remove("show"), 2400);
+  showToast._t = setTimeout(() => el.classList.remove("show"), opts.duration || (kind === "error" ? 8000 : 3200));
+}
+
+function showError(err, title = "Action failed") {
+  const detail = err?.detail || err?.message || String(err || "");
+  showToast(title, { kind: "error", detail, duration: 9000 });
+}
+
+function apiError(payload, fallback) {
+  const err = new Error(payload.error || fallback);
+  if (payload.detail) err.detail = payload.detail;
+  if (payload.warning) err.detail = payload.warning;
+  return err;
 }
 
 function relativeAge(timestampSecs) {
@@ -467,16 +486,18 @@ async function putReview(slug, key, data) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!r.ok) throw new Error(`save failed: ${r.status}`);
-  return r.json();
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(payload, `save failed: ${r.status}`);
+  return payload;
 }
 
 async function deleteReview(slug, key) {
   const r = await fetch(`/api/review/${encodeURIComponent(slug)}/${encodeURIComponent(key)}`, {
     method: "DELETE",
   });
-  if (!r.ok) throw new Error(`delete failed: ${r.status}`);
-  return r.json();
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(payload, `delete failed: ${r.status}`);
+  return payload;
 }
 
 async function submitReview(slug, key, body) {
@@ -486,7 +507,7 @@ async function submitReview(slug, key, body) {
     body: JSON.stringify(body),
   });
   const payload = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(payload.error || `submit failed: ${r.status}`);
+  if (!r.ok) throw apiError(payload, `submit failed: ${r.status}`);
   return payload;
 }
 
@@ -495,7 +516,7 @@ async function refreshReview(slug, key) {
     method: "POST",
   });
   const payload = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(payload.error || `refresh failed: ${r.status}`);
+  if (!r.ok) throw apiError(payload, `refresh failed: ${r.status}`);
   return payload;
 }
 
@@ -589,8 +610,6 @@ function renderTopbar() {
   const sep3 = document.getElementById("topbar-sep-3");
   const refreshBtn = document.getElementById("btn-refresh-review");
   const sendBtn = document.getElementById("btn-send-review");
-  const navWrap = document.getElementById("topbar-nav");
-  const navCounter = document.getElementById("topbar-nav-counter");
 
   if (state.route.view === "inbox" || !state.review) {
     repoEl.textContent = "code-review";
@@ -601,7 +620,6 @@ function renderTopbar() {
     sep1.hidden = sep2.hidden = sep3.hidden = true;
     refreshBtn.hidden = true;
     sendBtn.hidden = true;
-    navWrap.hidden = true;
     return;
   }
 
@@ -648,19 +666,36 @@ function renderTopbar() {
 
   refreshBtn.hidden = false;
   sendBtn.hidden = false;
+}
 
+function renderTreeCommentNav() {
   const navComments = navigableComments();
   if (navComments.length === 0) {
-    navWrap.hidden = true;
-  } else {
-    navWrap.hidden = false;
-    const cursorIdx = state.cursorCommentId
-      ? navComments.findIndex((c) => c.id === state.cursorCommentId)
-      : -1;
-    navCounter.textContent = cursorIdx === -1
-      ? `${navComments.length}`
-      : `${cursorIdx + 1} / ${navComments.length}`;
+    return "";
   }
+  const cursorIdx = state.cursorCommentId
+    ? navComments.findIndex((c) => c.id === state.cursorCommentId)
+    : -1;
+  const counter = cursorIdx === -1
+    ? `${navComments.length}`
+    : `${cursorIdx + 1} / ${navComments.length}`;
+
+  return `
+    <div class="tree-comment-nav" aria-label="Comment navigation">
+      <div class="tree-comment-nav-header">
+        <span>Comments</span>
+        <span class="tree-comment-nav-counter">${escapeHtml(counter)}</span>
+      </div>
+      <div class="tree-comment-nav-actions">
+        <button class="btn btn-icon" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment">
+          <i data-lucide="chevron-up"></i>
+        </button>
+        <button class="btn btn-icon" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment">
+          <i data-lucide="chevron-down"></i>
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 // === File tree =====================================================
@@ -709,6 +744,7 @@ function renderTree() {
     : `<ul class="tree-node">${tree.map((n) => renderTreeNode(n)).join("")}</ul>`;
 
   root.innerHTML = `
+    ${renderTreeCommentNav()}
     ${filterHtml}
     <div class="tree-overview">
       <div class="tree-item overview ${isReviewRoot ? "active" : ""}" data-route="review">
@@ -809,6 +845,13 @@ function renderTreeNode(node) {
 }
 
 function attachTreeHandlers(root) {
+  root.querySelector("[data-prev-comment]")?.addEventListener("click", () => {
+    navigateToComment(-1);
+  });
+  root.querySelector("[data-next-comment]")?.addEventListener("click", () => {
+    navigateToComment(+1);
+  });
+
   root.querySelectorAll("[data-file]").forEach((el) => {
     el.addEventListener("click", () => {
       const file = el.getAttribute("data-file");
@@ -856,7 +899,7 @@ function attachTreeHandlers(root) {
         try {
           state.fullTree = await fetchTree(state.route.slug, state.route.key);
         } catch (err) {
-          showToast(err.message);
+          showError(err, "Could not load file tree");
           state.treeFilter.showAll = false;
         }
       }
@@ -868,9 +911,10 @@ function attachTreeHandlers(root) {
 // === Content rendering =============================================
 
 function renderContent() {
-  // Topbar reflects the navigation cursor counter — keep it in sync with
-  // every content render so Tab / button clicks update the "N / 9".
+  // Chrome reflects the navigation cursor counter — keep it in sync with
+  // every content render so Tab / button clicks update the tree rail.
   renderTopbar();
+  renderTree();
   const content = document.getElementById("content");
   if (state.error) {
     content.innerHTML = `<div class="error-banner">${escapeHtml(state.error)}</div>`;
@@ -987,10 +1031,10 @@ function renderInbox() {
       if (!confirm(`Delete review ${key}? The file will be removed.`)) return;
       try {
         await deleteReview(slug, key);
-        showToast("Deleted");
+        showToast("Deleted review", { kind: "success" });
         loadRoute(state.route);
       } catch (err) {
-        showToast(err.message);
+        showError(err, "Delete failed");
       }
     });
   });
@@ -1066,7 +1110,7 @@ function renderReviewOverview() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(file)}</strong>
         <span>·</span>
-        <span>${threads.length} ${threads.length === 1 ? "thread" : "threads"}</span>
+        <span>${threads.length} ${threads.length === 1 ? "comment" : "comments"}</span>
       </div>
       <div class="file-group-cards">
         ${threads
@@ -1088,7 +1132,7 @@ function renderReviewOverview() {
       <div class="overview-summary-body">${escapeHtml(r.summary)}</div>
     </div>
 
-    <div class="overview-comments-label">${reviewThreads().length} threads across ${Object.keys(grouped).length} files</div>
+    <div class="overview-comments-label">${reviewThreads().length} comments across ${Object.keys(grouped).length} files</div>
     ${groupsHtml}
   `;
 
@@ -1176,7 +1220,7 @@ function renderFileView() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
-        <span style="margin-left:auto">${fileComments.length} ${fileComments.length === 1 ? "thread" : "threads"}</span>
+        <span style="margin-left:auto">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
       </div>
       <div class="code-table-scroll">
         <table class="code-table"><tbody>${rows}</tbody></table>
@@ -1223,7 +1267,7 @@ function renderNewCommentForm() {
         </select>
         <input type="text" id="new-category" placeholder="category (correctness, security, perf, style, …)" />
       </div>
-      <textarea id="new-body" placeholder="Thread body. Markdown — backticks for inline code."></textarea>
+      <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
       <div class="comment-editor-preview" id="new-body-preview"></div>
       <div class="comment-suggestion">
         <div class="comment-suggestion-label">
@@ -1237,7 +1281,7 @@ function renderNewCommentForm() {
       <div class="form-actions">
         <button class="btn btn-primary" data-save-new>
           <i data-lucide="plus"></i>
-          Add thread
+          Add comment
         </button>
       </div>
     </div>
@@ -1256,6 +1300,26 @@ function nextCommentId() {
 
 // --- Comment card ---
 
+function authorKind(author) {
+  return author === "ai" ? "ai" : "user";
+}
+
+function authorLabel(author) {
+  return author === "ai" ? "AI" : "User";
+}
+
+function renderAuthorBadge(author, className = "author-badge") {
+  const kind = authorKind(author);
+  const label = authorLabel(author);
+  const icon = kind === "ai" ? "bot" : "user";
+  return `
+    <span class="${className} ${kind}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">
+      <i data-lucide="${icon}"></i>
+      <span class="visually-hidden">${escapeHtml(label)}</span>
+    </span>
+  `;
+}
+
 function renderCommentCard(c, opts = {}) {
   const [s, e] = commentLineRange(c);
   const lineRef = s === e ? `L${s}` : `L${s}–${e}`;
@@ -1272,7 +1336,6 @@ function renderCommentCard(c, opts = {}) {
   // every interpolation that lands in attributes or text content.
   const sevSafe = escapeHtml(sev);
   const confidenceSafe = escapeHtml(confidence);
-  const authorSafe = escapeHtml(author);
   const anchorSafe = escapeHtml(anchorStatus);
   const statusSafe = escapeHtml(c.status);
   const idSafe = escapeHtml(c.id);
@@ -1333,9 +1396,9 @@ function renderCommentCard(c, opts = {}) {
   return `
     <div class="comment-card" data-comment-card="${idSafe}">
       <div class="comment-header">
-        <span class="author-badge ${authorSafe}">${authorSafe}</span>
-        <span class="severity-badge ${sevSafe}">${sevSafe}</span>
-        <span class="confidence-badge ${confidenceSafe}">${confidenceSafe} confidence</span>
+        ${renderAuthorBadge(author)}
+        <span class="severity-badge ${sevSafe}">Severity: ${sevSafe}</span>
+        <span class="confidence-badge ${confidenceSafe}">Confidence: ${confidenceSafe}</span>
         <span class="category-pill">${escapeHtml(c.category)}</span>
         <button class="status-pill ${statusSafe}" data-cycle-status="${idSafe}" title="Click to cycle: open → acknowledged → resolved → wontfix">${statusSafe}</button>
         ${lineRefHtml}
@@ -1357,7 +1420,7 @@ function renderCommentCard(c, opts = {}) {
         </button>
         <button class="btn btn-primary" data-send-comment="${idSafe}" ${state.review.target?.pr_number && anchorCurrent ? "" : "disabled"}>
           <i data-lucide="send"></i>
-          Send this thread
+          Send this comment
         </button>
       </div>
     </div>
@@ -1369,12 +1432,16 @@ function renderReplies(c) {
   const idSafe = escapeHtml(c.id);
   const repliesHtml = replies.length === 0 ? "" : `
     <div class="thread-replies">
-      ${replies.map((reply) => `
-        <div class="thread-reply ${escapeHtml(reply.author || "user")}">
-          <div class="thread-reply-author">${escapeHtml(reply.author || "user")}</div>
+      ${replies.map((reply) => {
+        const author = reply.author || "user";
+        const kind = authorKind(author);
+        return `
+        <div class="thread-reply ${kind}">
+          <div class="thread-reply-author">${renderAuthorBadge(author, "reply-author-badge")}</div>
           <div class="thread-reply-body">${renderMarkdown(reply.body || "")}</div>
         </div>
-      `).join("")}
+      `;
+      }).join("")}
     </div>
   `;
 
@@ -1426,10 +1493,10 @@ async function saveEditedBody(id, newBody) {
     await persistReview();
     state.editingBody = null;
     renderContent();
-    showToast(`Edited ${id}`);
+    showToast(`Edited ${id}`, { kind: "success" });
   } catch (err) {
     c.body = original;
-    showToast(err.message);
+    showError(err, "Save failed");
   }
 }
 
@@ -1442,14 +1509,14 @@ async function beginSuggestionEdit(id) {
   const c = findThread(id);
   if (!c) return;
   if (c.anchor_status && c.anchor_status !== "current" && c.anchor_status !== "moved") {
-    showToast("Refresh or move the anchor before editing suggestions");
+    showToast("Refresh or move the anchor before editing suggestions", { kind: "warning" });
     return;
   }
   let source = null;
   try {
     source = await ensureSourceForFile(c.file);
   } catch (err) {
-    showToast(err.message || "Could not load source for suggestion");
+    showError(err, "Could not load source for suggestion");
   }
   if (!c.suggestion && !state.suggestionDrafts.has(id)) {
     if (source) {
@@ -1498,11 +1565,11 @@ async function saveEditedSuggestion(id, rawValue) {
     state.editingSuggestion = null;
     state.suggestionDrafts.delete(id);
     renderContent();
-    showToast(finalSuggestion ? `Edited suggestion on ${id}` : `Removed suggestion from ${id}`);
+    showToast(finalSuggestion ? `Edited suggestion on ${id}` : `Removed suggestion from ${id}`, { kind: "success" });
   } catch (err) {
     if (originalSuggestion !== undefined) c.suggestion = originalSuggestion;
     else delete c.suggestion;
-    showToast(err.message);
+    showError(err, "Save failed");
   }
 }
 
@@ -1650,11 +1717,11 @@ function attachContentHandlers() {
       const originalSuggestion = sourceTextForRange(t.file, t.line, endLine);
 
       if (!body) {
-        showToast("Thread body is required");
+        showToast("Comment body is required", { kind: "warning" });
         return;
       }
       if (t.isRange && endLine < t.line) {
-        showToast("End line must be ≥ start line");
+        showToast("End line must be ≥ start line", { kind: "warning" });
         return;
       }
 
@@ -1682,9 +1749,9 @@ function attachContentHandlers() {
         state.expandedComments.add(newComment.id);
         renderTree();
         renderContent();
-        showToast(`Added ${newComment.id}`);
+        showToast(`Added ${newComment.id}`, { kind: "success" });
       } catch (err) {
-        showToast(err.message);
+        showError(err, "Save failed");
         // Roll back optimistic update
         state.review.review.threads = reviewThreads().filter((c) => c.id !== newComment.id);
       }
@@ -1781,15 +1848,15 @@ function attachContentHandlers() {
   content.querySelectorAll("[data-delete-comment]").forEach((el) => {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-delete-comment");
-      if (!confirm(`Delete thread ${id}?`)) return;
+      if (!confirm(`Delete comment ${id}?`)) return;
       state.review.review.threads = reviewThreads().filter((c) => c.id !== id);
       try {
         await persistReview();
         renderTree();
         renderContent();
-        showToast(`Deleted ${id}`);
+        showToast(`Deleted ${id}`, { kind: "success" });
       } catch (err) {
-        showToast(err.message);
+        showError(err, "Delete failed");
       }
     });
   });
@@ -1802,7 +1869,7 @@ function attachContentHandlers() {
       if (!ta || !c) return;
       const body = ta.value.trim();
       if (!body) {
-        showToast("Reply body is required");
+        showToast("Reply body is required", { kind: "warning" });
         return;
       }
       if (!Array.isArray(c.replies)) c.replies = [];
@@ -1810,9 +1877,9 @@ function attachContentHandlers() {
       try {
         await persistReview();
         renderContent();
-        showToast(`Reply added to ${id}`);
+        showToast(`Reply added to ${id}`, { kind: "success" });
       } catch (err) {
-        showToast(err.message);
+        showError(err, "Save failed");
       }
     });
   });
@@ -1821,7 +1888,7 @@ function attachContentHandlers() {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-send-comment");
       if (!state.review.target?.pr_number) {
-        showToast("No PR — set target.pr_number to enable sending");
+        showToast("No PR configured", { kind: "warning", detail: "Set target.pr_number to enable sending." });
         return;
       }
       try {
@@ -1829,9 +1896,9 @@ function attachContentHandlers() {
         // Reload the review (server removed the thread).
         state.review = null;
         await loadRoute(state.route);
-        showToast(`Sent ${id}`);
+        showToast(`Sent ${id}`, { kind: "success" });
       } catch (err) {
-        showToast(err.message);
+        showError(err, "Submission failed");
       }
     });
   });
@@ -1880,7 +1947,7 @@ async function cycleStatus(commentId) {
     await persistReview();
     renderContent();
   } catch (err) {
-    showToast(err.message);
+    showError(err, "Save failed");
   }
 }
 
@@ -1890,17 +1957,9 @@ document.getElementById("btn-home").addEventListener("click", () => {
   navigate({ view: "inbox" });
 });
 
-document.getElementById("btn-prev-comment").addEventListener("click", () => {
-  navigateToComment(-1);
-});
-
-document.getElementById("btn-next-comment").addEventListener("click", () => {
-  navigateToComment(+1);
-});
-
 document.getElementById("btn-refresh-review").addEventListener("click", async () => {
   if (!state.review) {
-    showToast("Open a review to refresh it");
+    showToast("Open a review to refresh it", { kind: "warning" });
     return;
   }
   try {
@@ -1911,24 +1970,27 @@ document.getElementById("btn-refresh-review").addEventListener("click", async ()
     state.sourceCache.clear();
     await loadRoute(state.route);
     const counts = res.counts || {};
-    showToast(`Refreshed · ${counts.moved || 0} moved · ${counts.missing || 0} missing · ${counts.ambiguous || 0} ambiguous`);
+    showToast("Refreshed review", {
+      kind: "success",
+      detail: `${counts.moved || 0} moved · ${counts.missing || 0} missing · ${counts.ambiguous || 0} ambiguous`,
+    });
   } catch (err) {
-    showToast(err.message);
+    showError(err, "Refresh failed");
   }
 });
 
 document.getElementById("btn-send-review").addEventListener("click", async () => {
   if (!state.review?.target?.pr_number) {
-    showToast("No PR — set target.pr_number to enable sending");
+    showToast("No PR configured", { kind: "warning", detail: "Set target.pr_number to enable sending." });
     return;
   }
-  if (!confirm("Send all open + acknowledged threads to GitHub?")) return;
+  if (!confirm("Send all open + acknowledged comments to GitHub?")) return;
   try {
     const res = await submitReview(state.route.slug, state.route.key, { mode: "all" });
-    showToast(`Sent · ${res.url || ""}`);
+    showToast("Sent review", { kind: "success", detail: res.url || "" });
     navigate({ view: "inbox" });
   } catch (err) {
-    showToast(err.message);
+    showError(err, "Submission failed");
   }
 });
 
@@ -2015,7 +2077,7 @@ document.addEventListener("keydown", (e) => {
       renderContent();
     }
   } else if (e.key === "?") {
-    showToast("Keys: Tab/S-Tab or j/k → next/prev thread · Esc → close");
+    showToast("Keys: Tab/S-Tab or j/k → next/prev comment · Esc → close");
   }
 });
 

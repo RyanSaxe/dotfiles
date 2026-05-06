@@ -559,6 +559,11 @@ def refresh_review_file(path: Path) -> dict[str, Any]:
 # === HTTP request handler =========================================
 
 
+def request_path(raw_path: str) -> str:
+    """Return the URL path without query parameters for route matching."""
+    return urllib.parse.urlparse(raw_path).path
+
+
 class ViewerHandler(BaseHTTPRequestHandler):
     server_version = "code-review-viewer/1.0"
 
@@ -668,9 +673,10 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._serve_static(path)
 
     def do_PUT(self) -> None:
-        m = re.match(r"^/api/review/([^/]+)/([^/]+)$", self.path)
+        path = request_path(self.path)
+        m = re.match(r"^/api/review/([^/]+)/([^/]+)$", path)
         if not m:
-            self._json(404, {"error": "no such endpoint"})
+            self._json(404, {"error": f"unknown PUT endpoint: {path}"})
             return
         slug, key = m.group(1), m.group(2)
         rp = review_path(slug, key)
@@ -698,9 +704,10 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._json(200, {"ok": True})
 
     def do_DELETE(self) -> None:
-        m = re.match(r"^/api/review/([^/]+)/([^/]+)$", self.path)
+        path = request_path(self.path)
+        m = re.match(r"^/api/review/([^/]+)/([^/]+)$", path)
         if not m:
-            self._json(404, {"error": "no such endpoint"})
+            self._json(404, {"error": f"unknown DELETE endpoint: {path}"})
             return
         slug, key = m.group(1), m.group(2)
         rp = review_path(slug, key)
@@ -715,7 +722,8 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._json(200, {"ok": True})
 
     def do_POST(self) -> None:
-        m = re.match(r"^/api/refresh/([^/]+)/([^/]+)$", self.path)
+        path = request_path(self.path)
+        m = re.match(r"^/api/refresh/([^/]+)/([^/]+)$", path)
         if m:
             slug, key = m.group(1), m.group(2)
             rp = review_path(slug, key)
@@ -730,9 +738,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
             self._json(200, payload)
             return
 
-        m = re.match(r"^/api/submit/([^/]+)/([^/]+)$", self.path)
+        m = re.match(r"^/api/submit/([^/]+)/([^/]+)$", path)
         if not m:
-            self._json(404, {"error": "no such endpoint"})
+            self._json(404, {"error": f"unknown POST endpoint: {path}"})
             return
         slug, key = m.group(1), m.group(2)
         rp = review_path(slug, key)

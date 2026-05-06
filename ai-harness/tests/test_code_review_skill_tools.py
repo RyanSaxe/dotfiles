@@ -37,6 +37,12 @@ class ReviewToolTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertEqual(validate_mod.validate(path), [])
 
+    def test_request_path_strips_query_string(self) -> None:
+        self.assertEqual(
+            view_mod.request_path("/api/refresh/repo/key?cache_bust=1"),
+            "/api/refresh/repo/key",
+        )
+
     def test_refresh_updates_only_obvious_anchors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
