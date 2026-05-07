@@ -1772,11 +1772,6 @@ function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
           ${bodyAction}
         </button>
         ${suggestionAction}
-        <div class="comment-menu-divider"></div>
-        <button class="comment-menu-item danger" data-delete-comment="${idSafe}" type="button">
-          <i data-lucide="trash-2"></i>
-          Delete comment
-        </button>
       </div>
     </details>
   `;
@@ -1840,6 +1835,8 @@ function renderCommentCard(c, opts = {}) {
 
   const isEditing = state.editingBody === c.id;
   const actionsMenuHtml = isEditing || isEditingSuggestion ? "" : renderCommentActionsMenu(c, idSafe, anchorCurrent);
+  const deleteBtnHtml = isEditing || isEditingSuggestion ? "" :
+    `<button class="comment-delete-trigger" data-delete-comment="${idSafe}" title="Delete comment" aria-label="Delete comment"><i data-lucide="trash-2"></i></button>`;
   const bodyHtml = isEditing
     ? `
       <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(c.body)}</textarea>
@@ -1858,6 +1855,7 @@ function renderCommentCard(c, opts = {}) {
         ${lineRefHtml}
         <span class="comment-header-spacer"></span>
         ${actionsMenuHtml}
+        ${deleteBtnHtml}
         ${closeBtnHtml}
       </div>
       ${anchorHtml}
@@ -2356,7 +2354,8 @@ function attachContentHandlers() {
   });
 
   content.querySelectorAll("[data-delete-comment]").forEach((el) => {
-    el.addEventListener("click", async () => {
+    el.addEventListener("click", async (e) => {
+      e.stopPropagation();
       const id = el.getAttribute("data-delete-comment");
       if (!confirm("Delete this comment?")) return;
       const originalThreads = [...reviewThreads()];

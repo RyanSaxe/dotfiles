@@ -1351,12 +1351,6 @@ body.inbox-mode .main {
   background: #f5f5f5;
 }
 
-.comment-menu-divider {
-  height: 1px;
-  margin: var(--space-1) 0;
-  background: var(--color-border);
-}
-
 .comment-menu-item.danger {
   color: var(--color-negative);
 }
@@ -1387,6 +1381,7 @@ body.inbox-mode .main {
 }
 
 .comment-menu-trigger,
+.comment-delete-trigger,
 .comment-close {
   display: inline-flex;
   align-items: center;
@@ -1409,7 +1404,13 @@ body.inbox-mode .main {
   color: var(--color-emphasis);
 }
 
+.comment-delete-trigger:hover {
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+}
+
 .comment-menu-trigger .lucide,
+.comment-delete-trigger .lucide,
 .comment-close .lucide {
   width: 14px;
   height: 14px;
