@@ -1717,8 +1717,8 @@ body.inbox-mode .main {
   margin-bottom: var(--space-3);
 }
 
-/* "Add suggested change" button when c.suggestion is empty. Inline with the
-   comment body so users discover it without scanning the actions row. */
+/* "Add suggested change" button in the new-comment form. Inline with the
+   body editor so users discover it without scanning the actions row. */
 .btn-suggestion-add {
   margin: var(--space-3) 0;
   font-size: var(--text-xs);
