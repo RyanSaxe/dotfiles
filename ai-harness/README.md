@@ -9,7 +9,7 @@ Shared configuration and utilities for AI coding agents.
 - `scripts/notify.sh`: deterministic notification hook target for Claude, Codex, and Copilot.
 - `scripts/agent-utils.sh`: generic tmux helpers for finding AI agent panes.
 - `scripts/attention-daemon.sh`: tmux metadata watcher for Codex panes whose title enters `Action Required`.
-- `claude/`: Claude-specific configs (CLAUDE.md, settings.json, commands, hooks, references, themes, utility-scripts).
+- `claude/`: Claude-specific configs (CLAUDE.md, settings.json, hooks, references, themes, utility-scripts).
 - `codex/hooks.json`: Codex lifecycle hook configuration.
 - `copilot/settings.json`: Copilot CLI user settings for hooks, status line, and built-in beep behavior.
 - `copilot/utility-scripts/`: Copilot CLI command status line scripts.
