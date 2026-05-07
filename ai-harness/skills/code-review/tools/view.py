@@ -562,6 +562,15 @@ def text_for_range(lines: list[str], start: int, end: int) -> str:
     return "\n".join(lines[start - 1 : end])
 
 
+def anchor_text_variants(anchor_text: str) -> list[str]:
+    variants = [anchor_text]
+    if anchor_text.endswith("\n"):
+        chomped = anchor_text[:-1]
+        if chomped not in variants:
+            variants.append(chomped)
+    return variants
+
+
 def find_anchor_occurrences(
     lines: list[str], anchor_text: str
 ) -> list[tuple[int, int]]:
@@ -595,26 +604,29 @@ def refresh_thread_anchor(repo_root: Path, thread: dict[str, Any]) -> str:
         thread["anchor_status"] = "missing"
         return "missing"
 
-    if current_range is not None:
-        start, end = current_range
-        if end <= len(lines) and text_for_range(lines, start, end) == anchor_text:
-            thread["anchor_status"] = "current"
-            return "current"
+    for search_text in anchor_text_variants(anchor_text):
+        if current_range is not None:
+            start, end = current_range
+            if end <= len(lines) and text_for_range(lines, start, end) == search_text:
+                thread["anchor_status"] = "current"
+                return "current"
 
-    occurrences = find_anchor_occurrences(lines, anchor_text)
-    if len(occurrences) == 1:
-        start, end = occurrences[0]
-        if end == start:
-            thread.pop("start_line", None)
-        else:
-            thread["start_line"] = start
-        thread["line"] = end
-        thread["anchor_status"] = "moved"
-        return "moved"
+        occurrences = find_anchor_occurrences(lines, search_text)
+        if len(occurrences) == 1:
+            start, end = occurrences[0]
+            if end == start:
+                thread.pop("start_line", None)
+            else:
+                thread["start_line"] = start
+            thread["line"] = end
+            thread["anchor_status"] = "moved"
+            return "moved"
+        if len(occurrences) > 1:
+            thread["anchor_status"] = "ambiguous"
+            return "ambiguous"
 
-    status = "missing" if len(occurrences) == 0 else "ambiguous"
-    thread["anchor_status"] = status
-    return status
+    thread["anchor_status"] = "missing"
+    return "missing"
 
 
 def refresh_review_file(path: Path) -> dict[str, Any]:

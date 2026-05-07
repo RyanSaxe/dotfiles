@@ -160,6 +160,46 @@ review:
             self.assertEqual(threads[2]["anchor_status"], "missing")
             self.assertEqual(threads[3]["anchor_status"], "ambiguous")
 
+    def test_refresh_accepts_literal_block_trailing_newline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "src" / "sample.py"
+            source.parent.mkdir()
+            source.write_text("source line\nnext line\n")
+            review_path = root / "review.review.yaml"
+            review_path.write_text(
+                f"""
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: local
+  repo_root: {root}
+review:
+  event: COMMENT
+  summary: test
+  threads:
+    - id: rev-001
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: literal block
+      status: open
+      anchor_text: |
+        source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            result = view_mod.refresh_review_file(review_path)
+            thread = result["review"]["review"]["threads"][0]
+
+            self.assertEqual(thread["line"], 1)
+            self.assertEqual(thread["anchor_status"], "current")
+
     def test_list_repo_files_respects_ignore_with_ignored_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -312,6 +352,107 @@ review:
             self.assertEqual(len(payload["comments"]), 1)
             self.assertEqual(payload["comments"][0]["body"], "thread body")
             self.assertNotIn("local reply only", payload["comments"][0]["body"])
+
+    def test_submit_payload_preserves_empty_suggestion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: pr
+  repo_root: /tmp/repo
+  commit: abc123
+  pr_number: 12
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: delete this line
+      status: open
+      suggestion: ""
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            payload = submit_mod.submit(review_path, None, dry_run=True)["payload"]
+
+            self.assertEqual(
+                payload["comments"][0]["body"],
+                "delete this line\n\n```suggestion\n\n```",
+            )
+
+    def test_submit_refuses_single_skipped_or_stale_thread(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: pr
+  repo_root: /tmp/repo
+  commit: abc123
+  pr_number: 12
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: resolved
+      status: resolved
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+    - id: rev-002
+      author: ai
+      file: src/sample.py
+      line: 2
+      severity: low
+      confidence: high
+      category: test
+      body: stale
+      status: open
+      anchor_text: other source line
+      anchor_status: missing
+      replies: []
+"""
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "not submittable: status"):
+                submit_mod.submit(review_path, "rev-001", dry_run=True)
+            with self.assertRaisesRegex(RuntimeError, "not submittable: anchor_status"):
+                submit_mod.submit(review_path, "rev-002", dry_run=True)
+            with self.assertRaisesRegex(RuntimeError, "stale threads: rev-002"):
+                submit_mod.submit(review_path, None, dry_run=True)
+
+    def test_submit_prefers_explicit_owner_repo(self) -> None:
+        self.assertEqual(
+            submit_mod.target_owner_repo(
+                {
+                    "owner": "example-owner",
+                    "repo": "example-repo",
+                    "repo_root": "/path/that/does/not/exist",
+                }
+            ),
+            ("example-owner", "example-repo"),
+        )
 
 
 if __name__ == "__main__":
