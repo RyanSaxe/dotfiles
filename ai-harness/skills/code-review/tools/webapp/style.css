@@ -285,11 +285,6 @@ body.inbox-mode .topbar-home-sep {
   padding: 6px;
 }
 
-.btn-compact {
-  padding: 4px 8px;
-  font-size: var(--text-xs);
-}
-
 .btn .lucide {
   width: 14px;
   height: 14px;
@@ -1155,7 +1150,7 @@ body.inbox-mode .main {
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
   white-space: nowrap;
@@ -1164,6 +1159,7 @@ body.inbox-mode .main {
 .metadata-chip .lucide {
   width: 13px;
   height: 13px;
+  flex: 0 0 auto;
 }
 
 .severity-chip.critical { background: var(--sev-critical-soft); color: var(--sev-critical); }
@@ -1296,6 +1292,12 @@ body.inbox-mode .main {
   display: inline-flex;
 }
 
+.status-menu[open],
+.comment-menu[open],
+.tree-type-filter[open] {
+  z-index: 100;
+}
+
 .status-menu summary,
 .comment-menu summary {
   list-style: none;
@@ -1310,14 +1312,22 @@ body.inbox-mode .main {
 .comment-menu-popover {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
   z-index: 40;
-  min-width: 164px;
   padding: var(--space-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   box-shadow: var(--shadow-pop);
+}
+
+.status-menu-popover {
+  left: 0;
+  min-width: 220px;
+}
+
+.comment-menu-popover {
+  right: 0;
+  min-width: 180px;
 }
 
 .status-menu-item,
@@ -1371,11 +1381,9 @@ body.inbox-mode .main {
   cursor: not-allowed;
 }
 
-.comment-id {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-faint);
-  margin-left: auto;
+.comment-header-spacer {
+  flex: 1 1 auto;
+  min-width: var(--space-2);
 }
 
 .comment-menu-trigger,

@@ -111,6 +111,24 @@ function humanStatus(status) {
   return STATUS_OPTIONS.find((option) => option.value === status)?.label || status || "Open";
 }
 
+function humanSeverity(severity) {
+  return {
+    critical: "Critical",
+    high: "Major",
+    medium: "Medium",
+    low: "Minor",
+    info: "Info",
+  }[severity] || severity || "Info";
+}
+
+function humanConfidence(confidence) {
+  return {
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  }[confidence] || confidence || "Medium";
+}
+
 function chipIcon(kind, value) {
   const maps = {
     severity: {
@@ -254,6 +272,17 @@ function enhanceRenderedMarkdown(html) {
     }
   });
   return template.innerHTML;
+}
+
+function closeOpenDisclosureMenus(clickedTarget) {
+  const activeMenu = clickedTarget?.closest?.("details.tree-type-filter, details.status-menu, details.comment-menu") || null;
+  document.querySelectorAll("details.tree-type-filter[open], details.status-menu[open], details.comment-menu[open]").forEach((menu) => {
+    if (menu === activeMenu) return;
+    menu.open = false;
+    if (menu.classList.contains("tree-type-filter")) {
+      state.treeFilter.extensionMenuOpen = false;
+    }
+  });
 }
 
 function showToast(message, opts = {}) {
@@ -892,19 +921,9 @@ function renderTopbar() {
 
   const needsRefresh = Boolean(state.refreshStatus?.needs_refresh ?? state.review._stale);
   const refreshKnown = state.refreshStatus?.ok !== false;
-  if (needsRefresh) {
-    staleEl.textContent = "refresh ready";
-    staleEl.className = "topbar-stale";
-    staleEl.hidden = false;
-    staleEl.title = "The current folder differs from this review; refresh to reload files and anchors";
-  } else if (!refreshKnown) {
-    staleEl.textContent = "refresh unavailable";
-    staleEl.className = "topbar-stale unavailable";
-    staleEl.hidden = false;
-    staleEl.title = state.refreshStatus?.reason || "Refresh status unavailable";
-  } else {
-    staleEl.hidden = true;
-  }
+  staleEl.textContent = "";
+  staleEl.hidden = true;
+  staleEl.title = "";
 
   refreshBtn.hidden = false;
   refreshBtn.disabled = !needsRefresh;
@@ -939,14 +958,14 @@ function renderTopbarCommentNav(navEl) {
 
   navEl.hidden = false;
   navEl.innerHTML = `
-    <button class="btn btn-compact" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment" ${disabled}>
+    <button class="btn" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment" ${disabled}>
       <i data-lucide="chevron-up"></i>
-      Prev comment
+      Prev
     </button>
     <span class="topbar-comment-nav-counter">${escapeHtml(counter)}</span>
-    <button class="btn btn-compact" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment" ${disabled}>
+    <button class="btn" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment" ${disabled}>
       <i data-lucide="chevron-down"></i>
-      Next comment
+      Next
     </button>
   `;
 }
@@ -1833,11 +1852,11 @@ function renderCommentCard(c, opts = {}) {
     <div class="comment-card" data-comment-card="${idSafe}">
       <div class="comment-header">
         ${renderAuthorBadge(author)}
-        ${renderMetaChip("severity", sev, sev)}
-        ${renderMetaChip("confidence", confidence, `${confidence} confidence`)}
+        ${renderMetaChip("severity", sev, `Severity: ${humanSeverity(sev)}`)}
+        ${renderMetaChip("confidence", confidence, `Confidence: ${humanConfidence(confidence)}`)}
         ${renderMetaChip("category", c.category || "uncategorized", c.category || "uncategorized")}
         ${lineRefHtml}
-        <span class="comment-id">${idSafe}</span>
+        <span class="comment-header-spacer"></span>
         ${actionsMenuHtml}
         ${closeBtnHtml}
       </div>
@@ -1921,7 +1940,7 @@ async function saveEditedBody(id, newBody) {
     await persistReview();
     state.editingBody = null;
     renderContent();
-    showToast(`Edited ${id}`, { kind: "success" });
+    showToast("Edited comment", { kind: "success" });
   } catch (err) {
     c.body = original;
     showError(err, "Save failed");
@@ -1993,7 +2012,7 @@ async function saveEditedSuggestion(id, rawValue) {
     state.editingSuggestion = null;
     state.suggestionDrafts.delete(id);
     renderContent();
-    showToast(finalSuggestion ? `Edited suggestion on ${id}` : `Removed suggestion from ${id}`, { kind: "success" });
+    showToast(finalSuggestion ? "Edited suggestion" : "Removed suggestion", { kind: "success" });
   } catch (err) {
     if (originalSuggestion !== undefined) c.suggestion = originalSuggestion;
     else delete c.suggestion;
@@ -2004,13 +2023,13 @@ async function saveEditedSuggestion(id, rawValue) {
 async function deleteSuggestion(id) {
   const c = findThread(id);
   if (!c?.suggestion) return;
-  if (!confirm(`Delete suggestion from ${id}?`)) return;
+  if (!confirm("Delete this suggestion?")) return;
   const originalSuggestion = c.suggestion;
   delete c.suggestion;
   try {
     await persistReview();
     renderContent();
-    showToast(`Deleted suggestion from ${id}`, { kind: "success" });
+    showToast("Deleted suggestion", { kind: "success" });
   } catch (err) {
     c.suggestion = originalSuggestion;
     showError(err, "Delete failed");
@@ -2230,7 +2249,7 @@ function attachContentHandlers() {
         state.expandedComments.add(newComment.id);
         renderTree();
         renderContent();
-        showToast(`Added ${newComment.id}`, { kind: "success" });
+        showToast("Added comment", { kind: "success" });
       } catch (err) {
         showError(err, "Save failed");
         // Roll back optimistic update
@@ -2325,6 +2344,7 @@ function attachContentHandlers() {
       e.stopPropagation();
       const id = el.getAttribute("data-set-status");
       const status = el.getAttribute("data-status-value");
+      el.closest("details.status-menu")?.removeAttribute("open");
       await setStatus(id, status);
     });
   });
@@ -2338,14 +2358,14 @@ function attachContentHandlers() {
   content.querySelectorAll("[data-delete-comment]").forEach((el) => {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-delete-comment");
-      if (!confirm(`Delete comment ${id}?`)) return;
+      if (!confirm("Delete this comment?")) return;
       const originalThreads = [...reviewThreads()];
       state.review.review.threads = reviewThreads().filter((c) => c.id !== id);
       try {
         await persistReview();
         renderTree();
         renderContent();
-        showToast(`Deleted ${id}`, { kind: "success" });
+        showToast("Deleted comment", { kind: "success" });
       } catch (err) {
         state.review.review.threads = originalThreads;
         showError(err, "Delete failed");
@@ -2369,7 +2389,7 @@ function attachContentHandlers() {
       try {
         await persistReview();
         renderContent();
-        showToast(`Reply added to ${id}`, { kind: "success" });
+        showToast("Reply added", { kind: "success" });
       } catch (err) {
         showError(err, "Save failed");
       }
@@ -2388,7 +2408,7 @@ function attachContentHandlers() {
         // Reload the review (server removed the thread).
         state.review = null;
         await loadRoute(state.route);
-        showToast(`Sent ${id}`, { kind: "success" });
+        showToast("Sent comment", { kind: "success" });
       } catch (err) {
         showError(err, "Submission failed");
       }
@@ -2462,6 +2482,11 @@ document.getElementById("topbar-comment-nav").addEventListener("click", (e) => {
   } else if (next) {
     navigateToComment(+1);
   }
+});
+
+document.addEventListener("pointerdown", (e) => {
+  const target = e.target instanceof Element ? e.target : null;
+  closeOpenDisclosureMenus(target);
 });
 
 document.getElementById("btn-refresh-review").addEventListener("click", async () => {
