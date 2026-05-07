@@ -129,6 +129,7 @@
       "Write(**/credentials*)"
     ]
   },
+  "model": "opus[1m]",
   "hooks": {
     "SessionStart": [
       {
@@ -226,6 +227,7 @@
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "editorMode": "vim",
   "vimMode": true,
-  "model": "opus[1m]"
+  "skipAutoPermissionPrompt": true
 }
