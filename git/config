@@ -2,7 +2,7 @@
 	name = Ryan Saxe
 	email = ryancsaxe+1@gmail.com
 [core]
-	pager = delta --side-by-side --syntax-theme=tokyonight_night
+	pager = hunk pager
 	editor = nvim
 	autocrlf = input
 [push]
@@ -21,6 +21,9 @@
 	last = log -1 HEAD
 	visual = !gitk
 	lg = log --oneline --graph --decorate --all
+	ddiff = -c core.pager=\"delta --side-by-side --syntax-theme=tokyonight_night\" diff
+	dshow = -c core.pager=\"delta --side-by-side --syntax-theme=tokyonight_night\" show
+	hwatch = !hunk diff --watch
 [init]
 	defaultBranch = main
 [interactive]

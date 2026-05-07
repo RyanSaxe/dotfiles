@@ -43,7 +43,8 @@ gui:
   skipNoStagedFilesWarning: false
   skipDiscardChangeWarning: false
 git:
-  # Use delta with TokyoNight theme for syntax-highlighted diffs
+  # Keep delta as LazyGit's embedded pane renderer. Hunk owns an alternate-screen
+  # review UI, so it is launched through terminal custom commands below.
   pagers:
     - colorArg: always
       pager: delta --paging=never --syntax-theme=tokyonight_night
@@ -71,6 +72,25 @@ keybinding:
     refresh: 'R'
 # Custom commands for workflow enhancement
 customCommands:
+  # Open the current worktree in Hunk's full terminal review UI.
+  - key: '<c-h>'
+    context: 'status'
+    command: 'hunk diff --watch'
+    output: terminal
+    description: 'Review worktree with Hunk'
+  # Open the selected file's working-tree diff in Hunk.
+  - key: '<c-h>'
+    context: 'files'
+    command: >-
+      {{if .SelectedFile.HasUnstagedChanges}}hunk diff -- {{.SelectedFile.Name | quote}}{{else}}hunk diff --staged -- {{.SelectedFile.Name | quote}}{{end}}
+    output: terminal
+    description: 'Review selected file with Hunk'
+  # Open the selected commit in Hunk.
+  - key: '<c-h>'
+    context: 'commits'
+    command: 'hunk show {{.SelectedCommit.Hash}}'
+    output: terminal
+    description: 'Review commit with Hunk'
   # Open commit in browser (GitHub)
   - key: 'b'
     context: 'commits'

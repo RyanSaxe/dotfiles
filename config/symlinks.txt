@@ -2,6 +2,7 @@ nvim:$HOME/.config/nvim
 bat:$HOME/.config/bat
 ghostty:$HOME/.config/ghostty
 git:$HOME/.config/git
+hunk/config.toml:$HOME/.config/hunk/config.toml
 lazygit/config.yml:${LAZYGIT_CONFIG_DIR}/config.yml
 tmux:$HOME/.config/tmux
 zsh/.zshrc:$HOME/.zshrc

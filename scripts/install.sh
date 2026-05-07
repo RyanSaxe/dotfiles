@@ -62,7 +62,8 @@ done < "$DOTFILES_DIR/config/apt-packages.txt"
 #       ipython: enhanced interactive Python shell, useful for development -- for nicer REPLs to integrate with neovim
 #       openjdk-17: Java Development Kit. This version is required for sonarqube LSP support
 #       wget: command-line utility for downloading files from the web
-#       git-delta: a syntax-highlighting pager for git, makes diffs more readable
+#       git-delta: a non-interactive syntax-highlighting diff renderer, still used by LazyGit and git add -p
+#       hunkdiff: review-first terminal diff viewer for Git pager and agent-note workflows
 #       build-essential: a package that includes essential tools for building software from source, only needed for linux servers
 #       curl: command-line tool for transferring data with URLs, used for fetching scripts and packages
 #       zsh: a shell with a superset of features compared to bash, used as the default shell
@@ -339,6 +340,31 @@ fetch_and_exec() {
   fi
 }
 
+npm_global_install() {
+  local package=$1
+  local prefix
+
+  prefix="$(npm prefix -g 2> /dev/null || true)"
+  if [[ -n "$prefix" && -w "$prefix" ]]; then
+    npm install -g "$package"
+  else
+    sudo_if_needed npm install -g "$package"
+  fi
+}
+
+install_hunk() {
+  # hunkdiff publishes the `hunk` CLI and does not currently ship via brew/apt.
+  if ! command -v hunk &> /dev/null; then
+    log "Installing Hunk diff viewer via npm…"
+    npm_global_install hunkdiff || {
+      err "Hunk install failed"
+      exit 1
+    }
+  else
+    log "Hunk already installed—skipping re-install"
+  fi
+}
+
 install_latex_converter() {
   if command -v utftex &> /dev/null; then
     log "utftex already installed - skipping LaTeX converter setup"
@@ -382,6 +408,13 @@ main() {
   # Handle --update-plugins flag for updating zsh plugins only
   if [[ "${1:-}" == "--update-plugins" ]]; then
     update_zsh_plugins
+    return 0
+  fi
+
+  # Install only Hunk. Useful for validating the Hunk path without running the
+  # full machine bootstrap.
+  if [[ "${1:-}" == "--install-hunk" ]]; then
+    install_hunk
     return 0
   fi
 
@@ -436,6 +469,9 @@ main() {
   else
     log "tree-sitter CLI already installed—skipping re-install"
   fi
+
+  # Install Hunk via npm for both macOS and Linux.
+  install_hunk
 
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)
   if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &> /dev/null; then
