@@ -53,7 +53,7 @@ Drive the conversation above. End when you know enough to draft slides the user 
 1. Pick a working directory under `/tmp/<deck-name>/`. Copy `templates/theme.css` and `templates/deck.html.template` (rename to `index.html`) into it.
 2. Set `<body class="deck-<variant>">` on the new deck.
 3. Write the slides. Lean on the catalog in [`references/layouts.md`](references/layouts.md) — pick layout primitives, don't invent. Each slide is `<section>` containing `.slide-head` (kicker + title), `.slide-body` (content), `.slide-foot` (deck name + slide count).
-4. **Self-review with screenshots before showing the user.** Run `node ~/.claude/skills/skill-builder/tools/screenshot.js /tmp/<deck-name>/index.html` and read the resulting PNGs. Catch obvious breakage (overflow, mis-centered headlines, kicker collisions) yourself; iterate until it looks right.
+4. **Self-review with screenshots before showing the user.** Run `uv run --script ~/.claude/skills/skill-builder/tools/screenshot.py /tmp/<deck-name>/index.html` and read the resulting PNGs. Catch obvious breakage (overflow, mis-centered headlines, kicker collisions) yourself; iterate until it looks right.
 5. Show the user. React to feedback. Iterate.
 
 ### Phase 3 — Approve
@@ -79,7 +79,7 @@ If the deck represents a new pattern worth keeping, copy it into `examples/` for
 
 ```sh
 ~/.claude/skills/skill-builder/tools/verify.sh ~/.claude/skills/presentation/
-node ~/.claude/skills/skill-builder/tools/screenshot.js /tmp/<deck-name>/index.html
+uv run --script ~/.claude/skills/skill-builder/tools/screenshot.py /tmp/<deck-name>/index.html
 ```
 
 The verify script confirms the skill folder is structurally sound. The screenshot script confirms the deck actually renders without layout breakage at 16:9, wide, and portrait viewports.

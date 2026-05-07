@@ -24,7 +24,7 @@ skill-builder/
 │   └── README.md                ← short note about the templates
 ├── tools/                       ← helper scripts the skill executes
 │   ├── verify.sh                ← structural check on a new skill folder
-│   └── screenshot.js            ← playwright self-review for visual samples (Phase 2)
+│   └── screenshot.py            ← playwright self-review for visual samples (Phase 2)
 └── design-system/               ← TASTE REFERENCE (scaffold-time only, never imported at runtime)
     ├── README.md                ← role and rules of design-system; artifact-vs-skill-folder distinction
     ├── preferences.md           ← written taste in prose, incl. Content palette + Recommended libraries
@@ -75,7 +75,7 @@ Five phases. The first three are a real working session with the user; the last 
 
 1. Pick 1–3 hypothetical inputs that the future skill might handle, drawn from what the user described in Phase 1. Mock up inputs where needed — the goal is for the user to react to what the skill *would produce*, not to validate any specific real-world input. (The skill may be generic across many environments; don't assume there's a current repo, file, or diff to pull from.)
 2. Produce sample artifact(s) as if the skill were already built and called on those inputs. For visual: scaffold an actual rendered page in `/tmp/<sample-name>/` (read [`design-system/README.md`](design-system/README.md) and [`design-system/preferences.md`](design-system/preferences.md) before drafting). For non-visual: draft inline (a commit message, a sample diff, a log line — whatever the skill would produce).
-3. **For visual samples, self-review with screenshots before showing the user.** Run `node tools/screenshot.js /tmp/<sample-name>/*.html` and read the resulting PNGs at `/tmp/skill-screenshots/`. Catch the obvious layout breakage (overflow, mis-centered headlines, mojibake) yourself; don't make the user be your linter. Iterate until the screenshots look right, *then* show the user.
+3. **For visual samples, self-review with screenshots before showing the user.** Run `uv run --script tools/screenshot.py /tmp/<sample-name>/*.html` and read the resulting PNGs at `/tmp/skill-screenshots/`. Catch the obvious layout breakage (overflow, mis-centered headlines, mojibake) yourself; don't make the user be your linter. Iterate until the screenshots look right, *then* show the user.
 4. Show the samples. React to feedback. Iterate. Each iteration is cheap; the skill folder is the expensive thing we're calibrating toward.
 5. Continue until the user explicitly approves a sample. **No skill files yet.** See [`references/alignment-patterns.md`](references/alignment-patterns.md) § *Calibration loop* for worked iterations.
 
