@@ -48,6 +48,8 @@ const STATUS_OPTIONS = [
   { value: "resolved", label: "Resolved", icon: "check-circle-2" },
   { value: "wontfix", label: "Won't fix", icon: "ban" },
 ];
+const SKIP_SEND_STATUSES = new Set(["resolved", "wontfix"]);
+const SENDABLE_ANCHOR_STATUSES = new Set(["current", "moved"]);
 
 // === Helpers =======================================================
 
@@ -71,6 +73,40 @@ function reviewThreads() {
 
 function findThread(id) {
   return reviewThreads().find((x) => x.id === id);
+}
+
+function hasSuggestion(c) {
+  return Object.prototype.hasOwnProperty.call(c || {}, "suggestion");
+}
+
+function suggestionText(c) {
+  return hasSuggestion(c) ? String(c.suggestion ?? "") : "";
+}
+
+function commentSendBlockReason(c) {
+  if (!state.review?.target?.pr_number) return "Set target.pr_number to enable sending.";
+  if (!c) return "Comment not found.";
+  const status = c.status || "open";
+  if (SKIP_SEND_STATUSES.has(status)) {
+    return `Status is ${humanStatus(status)}. Set it to Open or Acknowledged before sending.`;
+  }
+  const anchorStatus = c.anchor_status || "current";
+  if (!SENDABLE_ANCHOR_STATUSES.has(anchorStatus)) {
+    return "Refresh or move the anchor before sending.";
+  }
+  return "";
+}
+
+function reviewSendBlockReason() {
+  if (!state.review?.target?.pr_number) return "Set target.pr_number to enable submitting.";
+  const activeThreads = reviewThreads().filter((c) => !SKIP_SEND_STATUSES.has(c.status || "open"));
+  if (activeThreads.length === 0) return "No open or acknowledged comments to submit.";
+  const staleThread = activeThreads.find((c) => {
+    const anchorStatus = c.anchor_status || "current";
+    return !SENDABLE_ANCHOR_STATUSES.has(anchorStatus);
+  });
+  if (staleThread) return `Refresh or move ${staleThread.id} before submitting.`;
+  return "";
 }
 
 function severityOrder(sev) {
@@ -902,19 +938,13 @@ function renderTopbar() {
     a.textContent = `Review for PR #${t.pr_number}`;
     a.addEventListener("click", (e) => e.stopPropagation());
     prEl.appendChild(a);
-    sendBtn.disabled = false;
-    sendBtn.title = "";
   } else if (t.pr_number) {
     // Have a PR number but no owner/repo — older YAMLs predate the schema
     // bump. Show the number as text so submit still works (the daemon can
     // resolve owner/repo at submit time), but no clickable link.
     prEl.textContent = `Review for PR #${t.pr_number}`;
-    sendBtn.disabled = false;
-    sendBtn.title = "";
   } else {
     prEl.textContent = "Local Review";
-    sendBtn.disabled = true;
-    sendBtn.title = "Set target.pr_number to enable submitting";
   }
   sep1.hidden = sep2.hidden = sep3.hidden = false;
   renderTopbarCommentNav(commentNavEl);
@@ -934,6 +964,9 @@ function renderTopbar() {
       ? "No filesystem changes detected for this review"
       : state.refreshStatus?.reason || "Refresh status unavailable";
   sendBtn.hidden = false;
+  const sendBlockReason = reviewSendBlockReason();
+  sendBtn.disabled = Boolean(sendBlockReason);
+  sendBtn.title = sendBlockReason || "Submit open and acknowledged comments to GitHub";
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -1743,7 +1776,7 @@ function renderStatusDropdown(c, idSafe) {
 
 function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
   const hasBody = Boolean((c.body || "").trim());
-  const suggestionAction = c.suggestion
+  const suggestionAction = hasSuggestion(c)
     ? `
       <button class="comment-menu-item" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"} type="button">
         <i data-lucide="lightbulb"></i>
@@ -1787,6 +1820,7 @@ function renderCommentCard(c, opts = {}) {
   const anchorCurrent = anchorStatus === "current" || anchorStatus === "moved";
   const language = opts.fileLanguage || detectLanguage(c.file);
   const hasBody = Boolean((c.body || "").trim());
+  const sendBlockReason = commentSendBlockReason(c);
 
   // Severity / status / id are *expected* to be enum / pattern values, but
   // validate.py is only run at generation time — a malicious YAML written
@@ -1798,7 +1832,7 @@ function renderCommentCard(c, opts = {}) {
   const isEditingSuggestion = state.editingSuggestion === c.id;
   let suggestionHtml = "";
   if (isEditingSuggestion) {
-    const draft = c.suggestion || state.suggestionDrafts.get(c.id) || "";
+    const draft = hasSuggestion(c) ? suggestionText(c) : (state.suggestionDrafts.get(c.id) || "");
     const originalText = originalTextForComment(c, opts.sourceLines);
     suggestionHtml = `
       <div class="comment-suggestion">
@@ -1811,10 +1845,10 @@ function renderCommentCard(c, opts = {}) {
         <div class="suggestion-preview" data-suggestion-preview-for="${idSafe}">
           ${renderSuggestionDiffTable(originalText, draft, language, s)}
         </div>
-        <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel · empty to remove</div>
+        <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel · empty deletes selected lines</div>
       </div>
     `;
-  } else if (c.suggestion) {
+  } else if (hasSuggestion(c)) {
     suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines);
   } else {
     suggestionHtml = "";
@@ -1869,7 +1903,7 @@ function renderCommentCard(c, opts = {}) {
           <i data-lucide="message-square-plus"></i>
           Add reply
         </button>
-        <button class="btn btn-primary" data-send-comment="${idSafe}" ${state.review.target?.pr_number && anchorCurrent ? "" : "disabled"}>
+        <button class="btn btn-primary" data-send-comment="${idSafe}" title="${escapeHtml(sendBlockReason || "Send this comment to GitHub")}" ${sendBlockReason ? "disabled" : ""}>
           <i data-lucide="send"></i>
           Send this comment
         </button>
@@ -1912,7 +1946,7 @@ function renderSuggestionDiff(c, language, sourceLinesArg) {
         <i data-lucide="lightbulb"></i>
         Suggested change
       </div>
-      ${renderSuggestionDiffTable(originalText, c.suggestion || "", language, s)}
+      ${renderSuggestionDiffTable(originalText, suggestionText(c), language, s)}
     </div>
   `;
 }
@@ -1963,7 +1997,7 @@ async function beginSuggestionEdit(id) {
   } catch (err) {
     showError(err, "Could not load source for suggestion");
   }
-  if (!c.suggestion && !state.suggestionDrafts.has(id)) {
+  if (!hasSuggestion(c) && !state.suggestionDrafts.has(id)) {
     if (source) {
       const [s, e] = commentLineRange(c);
       state.suggestionDrafts.set(id, source.split("\n").slice(s - 1, e).join("\n"));
@@ -1989,28 +2023,29 @@ async function beginSuggestionEdit(id) {
 async function saveEditedSuggestion(id, rawValue) {
   const c = findThread(id);
   if (!c) return;
-  const hadSuggestion = Boolean(c.suggestion);
-  const originalSuggestion = c.suggestion;
+  const hadSuggestion = hasSuggestion(c);
+  const originalSuggestion = hadSuggestion ? suggestionText(c) : undefined;
   const newSuggestion = normalizeSuggestionText(rawValue);
   const originalSourceText = originalTextForComment(c);
   const isUnchangedDraft = !hadSuggestion && newSuggestion === originalSourceText;
-  const finalSuggestion = isUnchangedDraft ? "" : newSuggestion;
 
-  if ((finalSuggestion || "") === (c.suggestion || "")) {
+  if (isUnchangedDraft || (hadSuggestion && newSuggestion === originalSuggestion)) {
     state.editingSuggestion = null;
     state.suggestionDrafts.delete(id);
     renderContent();
     return;
   }
 
-  if (finalSuggestion) c.suggestion = finalSuggestion;
-  else delete c.suggestion;
+  c.suggestion = newSuggestion;
   try {
     await persistReview();
     state.editingSuggestion = null;
     state.suggestionDrafts.delete(id);
     renderContent();
-    showToast(finalSuggestion ? "Edited suggestion" : "Removed suggestion", { kind: "success" });
+    showToast(
+      newSuggestion ? (hadSuggestion ? "Edited suggestion" : "Added suggestion") : "Saved deletion suggestion",
+      { kind: "success" },
+    );
   } catch (err) {
     if (originalSuggestion !== undefined) c.suggestion = originalSuggestion;
     else delete c.suggestion;
@@ -2020,9 +2055,9 @@ async function saveEditedSuggestion(id, rawValue) {
 
 async function deleteSuggestion(id) {
   const c = findThread(id);
-  if (!c?.suggestion) return;
+  if (!hasSuggestion(c)) return;
   if (!confirm("Delete this suggestion?")) return;
-  const originalSuggestion = c.suggestion;
+  const originalSuggestion = suggestionText(c);
   delete c.suggestion;
   try {
     await persistReview();
@@ -2237,7 +2272,9 @@ function attachContentHandlers() {
         replies: [],
       };
       if (t.isRange && endLine !== t.line) newComment.start_line = t.line;
-      if (suggestion && suggestion !== originalSuggestion) newComment.suggestion = suggestion;
+      if (state.newCommentSuggestionExpanded && suggestion !== originalSuggestion) {
+        newComment.suggestion = suggestion;
+      }
 
       reviewThreads().push(newComment);
       try {
@@ -2301,8 +2338,7 @@ function attachContentHandlers() {
     });
   });
 
-  // Edit-suggestion keyboard handlers (Cmd/Ctrl+Enter saves, Esc cancels,
-  // empty textarea on save removes the suggestion entirely).
+  // Edit-suggestion keyboard handlers (Cmd/Ctrl+Enter saves, Esc cancels).
   content.querySelectorAll("[data-edit-suggestion]").forEach((el) => {
     el.addEventListener("keydown", async (e) => {
       const id = el.getAttribute("data-edit-suggestion");
@@ -2398,10 +2434,12 @@ function attachContentHandlers() {
   content.querySelectorAll("[data-send-comment]").forEach((el) => {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-send-comment");
-      if (!state.review.target?.pr_number) {
-        showToast("No PR configured", { kind: "warning", detail: "Set target.pr_number to enable sending." });
+      const blockReason = commentSendBlockReason(findThread(id));
+      if (blockReason) {
+        showToast("Cannot send comment", { kind: "warning", detail: blockReason });
         return;
       }
+      if (!confirm("Send this comment to GitHub?")) return;
       try {
         await submitReview(state.route.slug, state.route.key, { mode: "comment", commentId: id });
         // Reload the review (server removed the thread).
@@ -2518,8 +2556,9 @@ document.getElementById("btn-refresh-review").addEventListener("click", async ()
 });
 
 document.getElementById("btn-send-review").addEventListener("click", async () => {
-  if (!state.review?.target?.pr_number) {
-    showToast("No PR configured", { kind: "warning", detail: "Set target.pr_number to enable sending." });
+  const blockReason = reviewSendBlockReason();
+  if (blockReason) {
+    showToast("Cannot submit review", { kind: "warning", detail: blockReason });
     return;
   }
   if (!confirm("Send all open + acknowledged comments to GitHub?")) return;
