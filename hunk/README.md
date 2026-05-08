@@ -40,6 +40,11 @@ When a Hunk session is open, agents can inspect and annotate it through
 hunk skill path
 ```
 
+## Feature Specs
+
+- [Hunk follow and comment agent](./follow-comment-agent.md): implementation
+  plan for a `hunk-follow` companion and Codex `hunk_commenter` subagent.
+
 ## Theme Notes
 
 Hunk custom theme support is not part of `hunkdiff` 0.10.0. When a release
