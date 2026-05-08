@@ -12,7 +12,6 @@ codex() {
       ;;
     *)
       command codex \
-        --enable codex_hooks \
         -c "$notify_config" \
         -c "$status_line_config" \
         -c "$status_line_color_config" \
