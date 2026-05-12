@@ -79,7 +79,15 @@ Line numbers reference the current source file for the reviewed local state.
 
 ### `anchor_text` and `anchor_status`
 
-`anchor_text` is the exact source text for the reviewed line or range at generation time. The viewer refresh uses it conservatively:
+`anchor_text` is the exact source text for the reviewed line or range at generation time. For freshly generated reviews, run:
+
+```bash
+uv run --script tools/validate.py --require-current-anchors <path>
+```
+
+That strict mode verifies that every thread's `anchor_text` exactly matches the current source at `start_line..line`. During later review iteration, code may legitimately drift; use schema-only validation (`uv run --script tools/validate.py <path>`) when stale, moved, or missing anchors are expected and should be handled by the viewer refresh flow.
+
+The viewer refresh uses anchor text conservatively:
 
 - `current` — text still matches at the stored line/range.
 - `moved` — text appeared exactly once elsewhere and the viewer moved the line/range.

@@ -57,7 +57,7 @@ One short turn is enough. Iteration mode is detected from existing thread replie
 3. **Check for an existing review for this target.** If an existing review has user replies that the AI has not answered, enter iteration mode. Otherwise ask whether to open it, append more threads, or generate fresh.
 4. **Generate the review.** Walk relevant files for the scope. Produce threads per [`references/schema.md`](references/schema.md). Each thread gets a stable `rev-NNN` id, `author: ai`, severity, confidence, category, body, optional suggestion, `status: open`, `anchor_text`, `anchor_status: current`, and `replies: []`.
 5. **Anchor exactly.** `anchor_text` is the exact current source text for `start_line..line`. For a single-line thread, it is that one line. This lets deterministic refresh move only obvious anchors.
-6. **Validate the YAML.** `uv run --script tools/validate.py <path>` must exit 0. If it fails, fix the YAML and re-validate.
+6. **Validate the YAML.** For a freshly generated review, `uv run --script tools/validate.py --require-current-anchors <path>` must exit 0. This checks both schema shape and exact anchor text against the current source. For an existing review that may have drifted during iteration, use `uv run --script tools/validate.py <path>` for schema-only validation unless you intentionally want strict current-anchor enforcement. If validation fails, fix the YAML and re-validate.
 7. **Open the viewer.** `uv run --script tools/view.py --ensure --open --review-path <path>`.
 8. **Tell the user where it is.** Print the deep-link URL and a one-line summary: `"<ref> · <N> threads (<sev breakdown>) · <url>/r/<slug>/<key>"`.
 
@@ -69,7 +69,8 @@ One short turn is enough. Iteration mode is detected from existing thread replie
 
 **Verification:**
 
-- `uv run --script tools/validate.py <path>` exits 0
+- Fresh review: `uv run --script tools/validate.py --require-current-anchors <path>` exits 0
+- Iterated review with possible code drift: `uv run --script tools/validate.py <path>` exits 0
 - `uv run --script tools/view.py --ensure --open --review-path <path>` returns; the deep-link URL renders the review
 - `uv run --script tools/view.py --stop` cleanly shuts down the daemon
 
