@@ -13,18 +13,18 @@
  *   │  │            │  │            │  │         │  │      chart / etc.)
  *   │  └────────────┘  └────────────┘  └─────────┘  │
  *   │                                               │
- *   │  Deck title                            n / N  │  ← .slide-foot
+ *   │  Deck title · Shared footer label      n / N  │  ← .slide-foot
  *   └───────────────────────────────────────────────┘
  *
- * Slide numbers live ONLY in the foot. The kicker (top-left) is
- * an optional section label — it tells the audience where they
+ * Slide numbers live ONLY in the foot. The footer label is
+ * deck-wide metadata and stays stable across all slides. The
+ * kicker (top-left) is an optional section label — it tells the audience where they
  * are in the talk's structure ("01 · The problem", "PROBLEM",
- * "§ 2 · Mental model"). It is never a slide counter.
+ * "§ 2 · Mental model", "APPENDIX"). It is never a slide counter
+ * or the deck-wide footer label.
  *
- * Each deck opts into a variant via `body.deck-<name>`:
- *   - deck-tech       — engineering-internal, dense, code-forward
- *   - deck-pitch      — persuasive, bolder type, more accent
- *   - deck-explainer  — academic, longform, sectioned with §
+ * Deck-specific body classes are optional. The interview should drive
+ * the register; CSS classes only tune visual treatment.
  *
  * Reveal scales this 1280×800 canvas to fit any viewport.
  * ============================================================ */
@@ -393,10 +393,9 @@ ol.steps > li p  { margin: 4px 0 0; font-size: 15px; color: var(--muted); line-h
 .pill-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* ---------- Title slides ----------
- * Three layout variants (one per deck archetype). They share
- * the same chrome (foot stays bottom) but differ in alignment,
- * type scale, and how meta is displayed. The base rules center
- * everything; variants override below. */
+ * The base rules center everything. Optional body classes below
+ * can tune visual treatment when a deck needs it, but the interview
+ * should determine the deck's actual register and structure. */
 
 section.title-slide .slide-head { visibility: hidden; }  /* keep grid row, hide content */
 
@@ -443,10 +442,10 @@ section.title-slide .meta strong {
 }
 
 /* ============================================================
- * Deck variants
+ * Optional deck body treatments
  * ============================================================ */
 
-/* ---------- deck-tech: dense, engineering, paper-cover title ---------- */
+/* ---------- Optional body class: denser, left-aligned title ---------- */
 
 body.deck-tech section.title-slide .slide-body {
   place-content: center start;
@@ -465,7 +464,7 @@ body.deck-tech section.title-slide .meta {
 }
 body.deck-tech section.title-slide .meta span { align-items: flex-start; }
 
-/* ---------- deck-pitch: bigger type, more accent, dramatic ---------- */
+/* ---------- Optional body class: bigger type, more accent ---------- */
 
 body.deck-pitch .slide-head h2 { font-size: 56px; }
 body.deck-pitch .slide-head .kicker {
@@ -499,7 +498,7 @@ body.deck-pitch section.title-slide .kicker-cover {
   text-transform: uppercase;
 }
 
-/* ---------- deck-explainer: academic, lighter weight, sectioned ---------- */
+/* ---------- Optional body class: lighter weight, sectioned ---------- */
 
 body.deck-explainer .slide-head .kicker {
   text-transform: none;
@@ -645,6 +644,163 @@ body.deck-explainer section.title-slide .byline {
   font-size: 24px;
   font-weight: 300;
   letter-spacing: -0.05em;
+}
+
+/* ---------- Comparison / relationship / movement patterns ---------- */
+
+.compare {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+.compare-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 24px 26px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+.compare-panel.accent {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(250,204,21,0.15), var(--shadow-card);
+}
+.compare-panel h3,
+.relationship-side h3,
+.pipeline-stage h3 {
+  margin: 0;
+  color: var(--emphasis);
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1.08;
+}
+.compare-arrow,
+.pipeline-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 42px;
+  font-weight: 300;
+}
+
+.relationship {
+  display: grid;
+  grid-template-columns: 1fr 300px 1fr;
+  gap: 34px;
+  align-items: center;
+}
+.relationship-side {
+  min-height: 270px;
+  padding: 24px 26px;
+  border-left: 5px solid var(--info);
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(37,99,235,0));
+  display: grid;
+  align-content: center;
+  gap: 14px;
+}
+.relationship-side.positive {
+  border-left-color: var(--positive);
+  background: linear-gradient(90deg, rgba(22,163,74,0.10), rgba(22,163,74,0));
+}
+.relationship-center {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.relationship-node {
+  display: grid;
+  place-items: center;
+  width: 118px;
+  height: 118px;
+  border: 8px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--emphasis);
+  font-size: 42px;
+  font-weight: 750;
+}
+.relationship-tags {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+.relationship-tags .pill {
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: 1fr auto 1.15fr auto 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+.pipeline-stage {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+.pipeline-stage.accent {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(250,204,21,0.15), var(--shadow-card);
+}
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.pipeline-note {
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--fg);
+  display: grid;
+  align-content: center;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.15;
+}
+.pipeline-note.accent { background: #fef3c7; color: var(--warn-deep); }
+
+.section-divider .slide-head { visibility: hidden; }
+.section-divider .slide-body {
+  align-content: center;
+  justify-items: start;
+  gap: 18px;
+}
+.section-divider h2 {
+  margin: 0;
+  color: var(--emphasis);
+  font-size: 96px;
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+.section-divider .divider-rule {
+  width: 170px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.section-divider .divider-topic {
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
 }
 
 /* ---------- Chart wrapper ---------- */

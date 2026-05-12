@@ -7,27 +7,28 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css" id="theme">
-<!-- Optional: enable per deck. Uncomment what you need.
+<!-- Optional: enable per deck.
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-light.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 -->
-<link rel="stylesheet" href="theme.css">
+<style>
+{{INLINE_THEME_CSS}}
+</style>
 </head>
-<!-- Pick a variant: deck-pitch | deck-explainer | deck-tech (or coin a new one) -->
-<body class="deck-{{VARIANT}}">
+<body class="{{BODY_CLASS}}">
 
 <div class="reveal">
   <div class="slides">
 
     <!-- 1 — Title -->
     <section class="title-slide">
-      <header class="slide-head"><span class="kicker">cover</span></header>
+      <header class="slide-head"><span class="kicker">{{COVER_KICKER}}</span></header>
       <div class="slide-body">
         <h1>{{DECK_TITLE}}</h1>
         <p class="lead">{{ONE_LINE_THESIS}}</p>
       </div>
       <footer class="slide-foot">
-        <span>{{DECK_TITLE}} <span class="dot"></span> {{VARIANT}}</span>
+        <span>{{FOOTER_TITLE}} <span class="dot"></span> {{STABLE_FOOTER_LABEL}}</span>
         <span>1 / N</span>
       </footer>
     </section>
@@ -35,14 +36,14 @@
     <!-- 2 — Content slide template -->
     <section>
       <header class="slide-head">
-        <span class="kicker">{{SECTION_LABEL}}</span>
+        <span class="kicker">{{SECTION_KICKER}}</span>
         <h2>{{SLIDE_TITLE}}</h2>
       </header>
       <div class="slide-body">
-        <!-- pick a layout primitive from references/layouts.md -->
+        <!-- pick a visual pattern from references/layouts.md -->
       </div>
       <footer class="slide-foot">
-        <span>{{DECK_TITLE}} <span class="dot"></span> {{VARIANT}}</span>
+        <span>{{FOOTER_TITLE}} <span class="dot"></span> {{STABLE_FOOTER_LABEL}}</span>
         <span>2 / N</span>
       </footer>
     </section>
@@ -60,7 +61,7 @@
 <script>
   Reveal.initialize({
     hash: true,
-    transition: 'fade',
+    transition: "fade",
     controls: true,
     progress: true,
     center: false,
@@ -68,14 +69,14 @@
     height: 800,
     margin: 0,
     minScale: 0.2,
-    maxScale: 2.0,
+    maxScale: 2.0
   });
   // Uncomment if using highlight.js:
   // hljs.highlightAll();
   // Uncomment if using KaTeX:
   // renderMathInElement(document.body, {
-  //   delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }],
-  //   throwOnError: false,
+  //   delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
+  //   throwOnError: false
   // });
 </script>
 </body>

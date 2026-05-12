@@ -14,11 +14,13 @@ Each slide follows the three-row chrome:
     <!-- pick a primitive from below -->
   </div>
   <footer class="slide-foot">
-    <span>Deck title <span class="dot"></span> Variant</span>
+    <span>Deck title <span class="dot"></span> Stable footer label</span>
     <span>N / Total</span>
   </footer>
 </section>
 ```
+
+The footer label is deck-wide metadata and should remain stable across sections. Use the kicker, divider title, or slide body to mark chapters such as `Appendix`.
 
 The body grid has `align-content: center` by default — content clusters vertically center inside the body row. Use `.slide-body.top` to anchor to top instead, or `.slide-body.fill` to stretch (good for chart-only slides).
 
@@ -49,6 +51,21 @@ For laying out 2–4 cards in a row.
 | `.split-l` | 2 columns 1:1 with stretched alignment | Hero metric + supporting cards |
 | `.split-l-2` | 2:1 columns | Chart left, supporting cards right |
 | `.split-r-2` | 1:2 columns | Single card left, content right |
+
+## Before / after comparison
+
+For showing a recommended shift, operating change, product transition, or old/new workflow.
+
+Use a clear left-to-right structure:
+
+- left panel: current state
+- center: arrow or transition marker
+- right panel: recommended/future state
+- accent only the destination or key change
+
+Keep each panel to 2-4 short items. If either side needs paragraphs, split the idea across slides.
+
+Use `.compare`, `.compare-panel`, and `.compare-arrow`.
 
 ## Hero metric
 
@@ -92,6 +109,40 @@ For three-step linear processes.
 
 `.node.accent` highlights the "active" or pivot step. Pair below with a `.grid-2` of detail cards.
 
+## Relationship / tension diagram
+
+For showing a person, team, system, or decision caught between two forces.
+
+Use when the important point is not a process, but a structural tension: split accountability, competing priorities, duplicated ownership, or a mismatch between systems. Put the object under tension in the center, put the forces on the sides, and attach the consequences near the center.
+
+Do not make this an org chart unless the org chart itself is the point.
+
+Use `.relationship`, `.relationship-side`, `.relationship-center`, `.relationship-node`, and `.relationship-tags`.
+
+## Movement / pipeline flow
+
+For showing movement through a development path, operating loop, lifecycle, or talent/product funnel.
+
+Use 3-5 stages with arrows. The middle stage can be accent-highlighted when it is the intervention or bottleneck. Each stage should have a short title and a few labels; avoid turning stages into paragraph cards.
+
+Use `.pipeline`, `.pipeline-stage`, `.pipeline-arrow`, `.pipeline-grid`, and `.pipeline-note`.
+
+## Summary / recommendation slide
+
+For the final main-story landing point.
+
+Use one dominant sentence plus 2-4 supporting items. The sentence should be plain and memorable; the support items should map back to the deck's core argument. Avoid vague titles like "Discussion" or "Next steps" unless they name the actual action.
+
+## Section divider
+
+For a transition into appendix, backup, or a new chapter.
+
+Keep it sparse: big section name, one optional topic line, and minimal decoration. A divider should not introduce new evidence or ask the audience to process a full content slide.
+
+When the divider introduces an appendix, use `Appendix` in the divider content or kicker, not in the shared footer label.
+
+Use `<section class="section-divider">` with `.divider-rule` and `.divider-topic`.
+
 ## Prompt diagram
 
 For annotating a piece of structured text with labeled lines.
@@ -106,9 +157,9 @@ For annotating a piece of structured text with labeled lines.
 
 Variants: `.muted` (gray), `.live` (blue, "active"), `.breakpoint` (yellow accent fill, "the key thing").
 
-## Pull-quote moment (pitch only)
+## Pull-quote moment
 
-For rhetorical beats between content slides. Wrap the whole thing in `<section class="title-slide">`.
+For rhetorical beats between content slides. Use sparingly and only when the user wants a memorable spoken moment. Wrap the whole thing in `<section class="title-slide">`.
 
 ```html
 <section class="title-slide">

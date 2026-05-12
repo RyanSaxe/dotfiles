@@ -1,34 +1,57 @@
-# Deck variants
+# Register, Footer, and Section Markers
 
-Each deck opts into one variant via `<body class="deck-<variant>">`. Variants share all design tokens but differ in *character*: kicker style, type scale, accent application, title-slide composition. The point is distinct decks that still feel like the same family.
+The deck's register and footer language are things to figure out with the user. They are not selected from a fixed menu, and they are not inferred from a filename alone. Use the user's audience, stakes, timing, and intent to decide how the deck should speak and how the artifact should identify itself.
 
-## When to pick which
+## Register
 
-| Variant | Use when… | Character |
-| --- | --- | --- |
-| **`deck-pitch`** | Persuading a decision-maker. Internal pitch, exec readout, ask for headcount/budget, RFC vote. | Yellow accent-pill kickers (`PROBLEM`, `ASK`, `DECISION`). Bigger type. Title slide is a TED-style centered headline. Includes pull-quote "moment" slides between content slides for rhetorical beats. Light on charts; heavy on rhetoric. |
-| **`deck-explainer`** | Teaching a concept. Onboarding doc, technical explainer, "how X works" walkthrough, methodology overview. | Italic blue kickers with section markers (`§ 1 · Motivation`). Lighter heading weights. Title slide is paper-style with an italic abstract block. Heavy on diagrams, math, comparisons. Reads as longform — slides feel like sections of an article. |
+Before drafting, be able to state a working theory in plain language:
 
-A `deck-tech` variant exists in `theme.css` as a starting point but has no validated example yet — treat as experimental. For an engineering-internal tech talk, calibrate via the *Coining a new variant* recipe below before relying on it.
+- who the deck is for
+- what the room is supposed to do with it
+- whether slides are read-ahead, live voiceover, or both
+- how direct, formal, dense, visual, or conversational the deck should feel
+- what material belongs in the main story vs. backup
 
-## How a variant differs in practice
+The point is not to pick a label like "pitch," "explainer," or "executive." The point is to decide, for this specific room, what the audience needs to understand quickly and how much evidence, friction, softness, or directness the slides should carry.
 
-Look at the two example decks side by side: same tokens, same chrome, same primitives — different feel.
+The register should show up in concrete choices: title length, slide density, diagram style, amount of proof, section dividers, appendix separation, and how assertive the recommendation feels.
 
-- `examples/pitch-adopt-skills/` — opens with a yellow accent pill above a 112px headline. Slide 4 is a single pull-quote ("If it's not in a repo, it's not infrastructure"). Kickers are one-word labels (`PROBLEM`, `COST`, `ASK`).
-- `examples/explainer-prompt-caching/` — opens with an italic abstract block top-and-bottom-bordered. Kickers are sectioned (`§ 1 · Motivation`, `§ 2 · Mental model`). Recap slide uses lowercase roman numerals (`i.`, `ii.`, `iii.`) on accent cards.
+## Stable Footer Label
 
-The variant doesn't dictate the slide *count* or the *structure* — those come from the conversation. It dictates the visual register the deck speaks in.
+The footer label is deck-level metadata shared across slides. It should describe the whole artifact in the user's language, not the current section, topic, or slide type.
 
-## Coining a new variant
+Work out the footer label from context:
 
-If the user describes a use case where neither pitch nor explainer fits — say, a *status report* deck, or a *retro* deck, or a *workshop* deck — coin a new variant rather than forcing one of the existing ones.
+- If the user calls it a board readout, use `Board readout`.
+- If the user calls it a weekly product update, use `Product update`.
+- If the room is a leadership discussion, use the phrase they would naturally use for that meeting.
 
-The recipe:
+Do not rotate the footer label by section. In a normal deck, the footer label should stay the same on the title slide, main-story slides, divider slides, and appendix slides.
 
-1. Identify what's structurally different about the use case. (A status report wants more numbers and dates; a retro wants more 2-column "what worked / what didn't" layouts.)
-2. Add a new section to `templates/theme.css` under "Deck variants" — only override the things that differ from base. Keep tokens shared.
-3. Show the user one sample with the new variant. Iterate until they sign off.
-4. If the variant feels stable enough that future invocations should know about it, document it in this file.
+`Appendix` is not a footer label for a deck with an appendix. Use `Appendix` as a section kicker, divider title, or slide marker. Only use `Appendix` in the footer if the entire file is a standalone appendix document.
 
-Failure mode: a variant that overrides so much it amounts to a different design system. If you find yourself overriding tokens (colors, fonts, spacing scale), stop — the requirement isn't a variant, it's a separate skill or a deliberate design-system extension. (The cross-skill version of this rule lives in the design-system preferences doc maintained by `skill-builder`.)
+## Kicker Labels
+
+Kickers orient the audience within the story. Unlike the footer label, they may change slide to slide:
+
+- context-setting labels
+- problem or tension labels
+- recommendation labels
+- example labels
+- risk or guardrail labels
+- appendix labels
+
+Keep kickers short. Avoid making them slide counters or verbose subtitles.
+
+## Visual Register
+
+Keep a consistent visual system inside one deck:
+
+- One accent color should indicate the active recommendation or current focus.
+- Semantic colors should have meaning and be used sparingly.
+- A divider slide should be visibly quieter than content slides.
+- Appendix slides can be more concrete, but must remain visually separate from the main story.
+
+## Body Classes
+
+`theme.css` may include body classes for broad visual treatment, but do not let body classes drive the narrative. Most decks can use the base styles and still feel tailored through wording, slide order, and layout choices.
