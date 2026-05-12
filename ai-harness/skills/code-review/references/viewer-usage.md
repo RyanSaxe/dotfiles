@@ -76,12 +76,20 @@ The web app talks to the daemon via these JSON endpoints:
 - `PUT /api/review/<slug>/<key>` — write review YAML back to disk.
 - `DELETE /api/review/<slug>/<key>` — delete a review file.
 - `GET /api/source?file=<path>&review=<slug/key>` — read source file contents.
+- `GET /api/diff/<slug>/<key>?base=<ref>&file=<path>` — compute live Git diff
+  stats and hunks from `target.repo_root`; `base` and `file` are optional.
+- `GET /api/refs/<slug>/<key>` — list convenient branch/ref suggestions for
+  the diff base selector.
 - `POST /api/refresh/<slug>/<key>` — reload files, refresh obvious anchors,
   and update the review fingerprint.
 - `POST /api/submit/<slug>/<key>` — invoke `submit.py`; body is
   `{"mode": "all" | "comment", "commentId"?: "rev-001"}`.
 
 All filesystem access is restricted to `~/.reviews/` (for review files) and the `target.repo_root` declared in the review (for source files). The server refuses to read paths outside those scopes.
+
+## Diff Context
+
+Diff context is live viewer state, not review content. The review YAML may store `target.base_ref`, but it never stores generated patches, hunk lists, or file stats. The viewer resolves the base ref at render time, compares it to the current repo filesystem state, and exposes the result as file-tree `+x/-y` counts, source-view hunk markers, and unified-diff inspection mode.
 
 ## Staleness
 

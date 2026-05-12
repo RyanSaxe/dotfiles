@@ -16,14 +16,22 @@ const state = {
   source: null,                       // { file, content }
   sourceCache: new Map(),             // file path -> source content for editor previews
   fullTree: null,                     // { files: [...] } — fetched lazily on "show all" toggle
+  diffSummary: null,                  // live git diff summary for current review/base
+  diffFileCache: new Map(),           // `${base}\0${file}` -> per-file diff payload
+  diffError: null,
+  refOptions: null,                   // { refs: [...] } for base selector suggestions
   // ui
   inboxFilter: "needs_triage",        // 'needs_triage' | 'iterating' | 'done' | 'stale'
   showStale: false,
+  viewMode: localStorage.getItem("codeReviewViewMode") || "source", // source | diff
+  navTarget: localStorage.getItem("codeReviewNavTarget") || "comments", // comments | hunks
+  cursorHunk: null,                   // { file, index } for hunk navigation
+  baseDraft: "",
   expandedComments: new Set(),
   cursorCommentId: null,              // last navigated/clicked comment — Tab/S-Tab anchor
   treeFilter: {
     query: "",
-    showAll: false,
+    scope: "comments",                // comments | changed | all
     showIgnored: false,
     extensions: [],
     extensionQuery: "",
@@ -50,6 +58,8 @@ const STATUS_OPTIONS = [
 ];
 const SKIP_SEND_STATUSES = new Set(["resolved", "wontfix"]);
 const SENDABLE_ANCHOR_STATUSES = new Set(["current", "moved"]);
+if (!["source", "diff"].includes(state.viewMode)) state.viewMode = "source";
+if (!["comments", "hunks"].includes(state.navTarget)) state.navTarget = "comments";
 
 // === Helpers =======================================================
 
@@ -141,6 +151,34 @@ function formatExtensionSummary(extensions) {
 
 function unionPaths(...pathLists) {
   return Array.from(new Set(pathLists.flat().filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function diffFiles() {
+  return state.diffSummary?.files || [];
+}
+
+function diffFileMap() {
+  return Object.fromEntries(diffFiles().map((f) => [f.file, f]));
+}
+
+function diffStatForFile(filePath) {
+  return diffFileMap()[filePath] || null;
+}
+
+function diffCacheKey(filePath, baseRef = null) {
+  return `${baseRef || state.diffSummary?.base_ref || ""}\0${filePath}`;
+}
+
+function formatDiffStat(file) {
+  if (!file) return "";
+  if (file.binary) return `<span class="diffstat binary">bin</span>`;
+  const additions = Number(file.additions || 0);
+  const deletions = Number(file.deletions || 0);
+  return `
+    <span class="diffstat" title="${additions} additions, ${deletions} deletions">
+      <span class="diff-add">+${additions}</span><span class="diff-del">-${deletions}</span>
+    </span>
+  `;
 }
 
 function humanStatus(status) {
@@ -463,6 +501,25 @@ async function ensureSourceForFile(filePath) {
   return content;
 }
 
+async function ensureDiffForFile(filePath) {
+  if (!filePath || !state.review) return null;
+  const key = diffCacheKey(filePath);
+  if (state.diffFileCache.has(key)) return state.diffFileCache.get(key);
+  const payload = await fetchDiffFile(state.route.slug, state.route.key, filePath, {
+    base: state.diffSummary?.base_ref || state.review?.target?.base_ref || "",
+  });
+  const fileDiff = (payload.files || []).find((f) => f.file === filePath) || {
+    file: filePath,
+    additions: 0,
+    deletions: 0,
+    hunks: [],
+    hunk_count: 0,
+  };
+  fileDiff.base_ref = payload.base_ref;
+  state.diffFileCache.set(key, fileDiff);
+  return fileDiff;
+}
+
 function sourceTextForRange(filePath, startLine, endLine, sourceLinesArg = null) {
   const sourceLines = sourceLinesForFile(filePath, sourceLinesArg);
   if (!sourceLines || !startLine || !endLine) return "";
@@ -703,6 +760,32 @@ async function fetchRefreshStatus(slug, key) {
   return payload;
 }
 
+async function fetchDiffSummary(slug, key, opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.base) params.set("base", opts.base);
+  const qs = params.toString();
+  const r = await fetch(`/api/diff/${encodeURIComponent(slug)}/${encodeURIComponent(key)}${qs ? `?${qs}` : ""}`);
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(payload, `diff load failed: ${r.status}`);
+  return payload;
+}
+
+async function fetchDiffFile(slug, key, file, opts = {}) {
+  const params = new URLSearchParams({ file });
+  if (opts.base) params.set("base", opts.base);
+  const r = await fetch(`/api/diff/${encodeURIComponent(slug)}/${encodeURIComponent(key)}?${params}`);
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(payload, `file diff load failed: ${r.status}`);
+  return payload;
+}
+
+async function fetchRefs(slug, key) {
+  const r = await fetch(`/api/refs/${encodeURIComponent(slug)}/${encodeURIComponent(key)}`);
+  const payload = await r.json().catch(() => ({}));
+  if (!r.ok) throw apiError(payload, `ref load failed: ${r.status}`);
+  return payload;
+}
+
 async function fetchSource(slug, key, file) {
   const params = new URLSearchParams({ file, review: `${slug}/${key}` });
   const r = await fetch(`/api/source?${params}`);
@@ -850,6 +933,10 @@ async function loadRoute(route) {
       state.review = null;
       state.source = null;
       state.fullTree = null;
+      state.diffSummary = null;
+      state.diffError = null;
+      state.refOptions = null;
+      state.diffFileCache.clear();
       state.collapsedFolders = new Set();
       state.inbox = await fetchInbox();
     } else {
@@ -866,13 +953,54 @@ async function loadRoute(route) {
           mode: "initial",
         };
         state.sourceCache.clear();
+        state.diffFileCache.clear();
+        state.diffSummary = null;
+        state.diffError = null;
+        state.refOptions = null;
+        state.baseDraft = data.target?.base_ref || "";
         state.fullTree = null;          // changed review → invalidate tree cache
         state.collapsedFolders = loadCollapsedFolders(route.slug, route.key);
       }
+      if (!state.diffSummary && !state.diffError) {
+        try {
+          state.diffSummary = await fetchDiffSummary(route.slug, route.key, {
+            base: state.review?.target?.base_ref || "",
+          });
+          state.baseDraft = state.diffSummary.base_ref || state.review?.target?.base_ref || "";
+        } catch (err) {
+          state.diffError = err?.message || String(err);
+        }
+      }
+      if (!state.refOptions) {
+        try {
+          state.refOptions = await fetchRefs(route.slug, route.key);
+          if (!state.baseDraft) state.baseDraft = state.refOptions.base_ref || "";
+        } catch {
+          state.refOptions = { refs: ["HEAD", "HEAD~1", "HEAD~2", "main", "origin/main"] };
+        }
+      }
       if (route.view === "file") {
-        const content = await fetchSource(route.slug, route.key, route.file);
-        state.source = { file: route.file, content };
-        state.sourceCache.set(route.file, content);
+        try {
+          const content = await fetchSource(route.slug, route.key, route.file);
+          state.source = { file: route.file, content };
+          state.sourceCache.set(route.file, content);
+        } catch (err) {
+          state.source = {
+            file: route.file,
+            content: "",
+            unavailable: err?.message || "file content not available",
+          };
+        }
+        try {
+          await ensureDiffForFile(route.file);
+        } catch (err) {
+          state.diffFileCache.set(diffCacheKey(route.file), {
+            file: route.file,
+            error: err?.message || String(err),
+            hunks: [],
+            hunk_count: 0,
+          });
+        }
       } else {
         state.source = null;
       }
@@ -947,7 +1075,8 @@ function renderTopbar() {
     prEl.textContent = "Local Review";
   }
   sep1.hidden = sep2.hidden = sep3.hidden = false;
-  renderTopbarCommentNav(commentNavEl);
+  commentNavEl.hidden = true;
+  commentNavEl.innerHTML = "";
 
   const needsRefresh = Boolean(state.refreshStatus?.needs_refresh ?? state.review._stale);
   const refreshKnown = state.refreshStatus?.ok !== false;
@@ -983,24 +1112,109 @@ function currentCommentIndex(navComments) {
   return 0;
 }
 
-function renderTopbarCommentNav(navEl) {
-  const navComments = navigableComments();
-  const disabled = navComments.length === 0 ? "disabled" : "";
-  const cursorIdx = currentCommentIndex(navComments);
-  const counter = navComments.length === 0 ? "0 / 0" : `${cursorIdx + 1} / ${navComments.length}`;
+function currentNavItems() {
+  return state.navTarget === "hunks" ? navigableHunks() : navigableComments();
+}
 
-  navEl.hidden = false;
-  navEl.innerHTML = `
-    <button class="btn" data-prev-comment title="Previous comment (Shift+Tab / k)" aria-label="Previous comment" ${disabled}>
-      <i data-lucide="chevron-up"></i>
-      Prev
-    </button>
-    <span class="topbar-comment-nav-counter">${escapeHtml(counter)}</span>
-    <button class="btn" data-next-comment title="Next comment (Tab / j)" aria-label="Next comment" ${disabled}>
-      <i data-lucide="chevron-down"></i>
-      Next
-    </button>
+function currentNavIndex(items) {
+  if (items.length === 0) return -1;
+  if (state.navTarget === "hunks") {
+    if (state.cursorHunk) {
+      const idx = items.findIndex((h) => h.file === state.cursorHunk.file && h.index === state.cursorHunk.index);
+      if (idx !== -1) return idx;
+    }
+    if (state.route.view === "file") {
+      const fileIdx = items.findIndex((h) => h.file === state.route.file);
+      if (fileIdx !== -1) return fileIdx;
+    }
+    return 0;
+  }
+  return currentCommentIndex(items);
+}
+
+function renderContextbar() {
+  const bar = document.getElementById("contextbar");
+  if (state.route.view === "inbox" || !state.review) {
+    bar.hidden = true;
+    bar.innerHTML = "";
+    return;
+  }
+
+  const base = state.baseDraft || state.diffSummary?.base_ref || state.review?.target?.base_ref || "HEAD";
+  const refs = state.refOptions?.refs || [];
+  const items = currentNavItems();
+  const idx = currentNavIndex(items);
+  const navLabel = state.navTarget === "hunks" ? "Hunk" : "Comment";
+  const counter = items.length === 0 ? `${navLabel} 0 / 0` : `${navLabel} ${idx + 1} / ${items.length}`;
+  const disabled = items.length === 0 ? "disabled" : "";
+  const diffTotals = state.diffSummary
+    ? formatDiffStat({ additions: state.diffSummary.additions, deletions: state.diffSummary.deletions })
+    : "";
+  const baseTitle = state.diffSummary?.comparison_base
+    ? `Comparing against ${shortSha(state.diffSummary.comparison_base)}`
+    : state.diffError || "Diff base";
+
+  bar.hidden = false;
+  bar.innerHTML = `
+    <div class="contextbar-group contextbar-base" title="${escapeHtml(baseTitle)}">
+      <i data-lucide="git-compare-arrows"></i>
+      <span class="contextbar-label">Base</span>
+      <input id="diff-base-input" list="diff-base-options" value="${escapeHtml(base)}" spellcheck="false" />
+      <datalist id="diff-base-options">
+        ${refs.map((ref) => `<option value="${escapeHtml(ref)}"></option>`).join("")}
+      </datalist>
+      <button class="btn btn-icon" data-apply-base title="Apply base ref" aria-label="Apply base ref">
+        <i data-lucide="check"></i>
+      </button>
+    </div>
+    <div class="segmented" role="group" aria-label="File view mode">
+      <button class="${state.viewMode === "source" ? "active" : ""}" data-view-mode="source" title="Source view (d)">Source</button>
+      <button class="${state.viewMode === "diff" ? "active" : ""}" data-view-mode="diff" title="Unified diff view (d)">Unified</button>
+    </div>
+    <div class="segmented" role="group" aria-label="Navigation target">
+      <button class="${state.navTarget === "comments" ? "active" : ""}" data-nav-target="comments" title="Navigate comments (c)">Comments</button>
+      <button class="${state.navTarget === "hunks" ? "active" : ""}" data-nav-target="hunks" title="Navigate hunks (h)">Hunks</button>
+    </div>
+    <div class="contextbar-spacer"></div>
+    <div class="contextbar-diff-total">${diffTotals}</div>
+    <div class="contextbar-nav">
+      <button class="btn" data-prev-nav title="Previous ${state.navTarget === "hunks" ? "hunk" : "comment"} (Shift+Tab / k)" aria-label="Previous ${state.navTarget}" ${disabled}>
+        <i data-lucide="chevron-up"></i>
+        Prev
+      </button>
+      <span class="topbar-comment-nav-counter">${escapeHtml(counter)}</span>
+      <button class="btn" data-next-nav title="Next ${state.navTarget === "hunks" ? "hunk" : "comment"} (Tab / j)" aria-label="Next ${state.navTarget}" ${disabled}>
+        <i data-lucide="chevron-down"></i>
+        Next
+      </button>
+    </div>
   `;
+  attachContextbarHandlers(bar);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function attachContextbarHandlers(root) {
+  root.querySelectorAll("[data-view-mode]").forEach((el) => {
+    el.addEventListener("click", () => setViewMode(el.getAttribute("data-view-mode")));
+  });
+  root.querySelectorAll("[data-nav-target]").forEach((el) => {
+    el.addEventListener("click", () => setNavTarget(el.getAttribute("data-nav-target")));
+  });
+  root.querySelector("[data-prev-nav]")?.addEventListener("click", () => navigateByTarget(-1));
+  root.querySelector("[data-next-nav]")?.addEventListener("click", () => navigateByTarget(+1));
+  const baseInput = root.querySelector("#diff-base-input");
+  if (baseInput) {
+    baseInput.addEventListener("input", (e) => {
+      state.baseDraft = e.target.value;
+    });
+    baseInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyBaseRef();
+      }
+    });
+  }
+  root.querySelector("[data-apply-base]")?.addEventListener("click", () => applyBaseRef());
 }
 
 // === File tree =====================================================
@@ -1019,11 +1233,13 @@ function renderTree() {
   const counts = filesWithCommentCounts();
   const filterQuery = state.treeFilter.query.toLowerCase().trim();
 
-  // Source set: by default just commented files; with showAll, the full repo
-  // (fetched lazily on toggle and cached on state).
-  const allPaths = state.treeFilter.showAll && state.fullTree
-    ? unionPaths(state.fullTree.files || [], Object.keys(counts))
-    : Object.keys(counts);
+  const changedPaths = diffFiles().map((f) => f.file);
+  const scope = state.treeFilter.scope || "comments";
+  const allPaths = scope === "all" && state.fullTree
+    ? unionPaths(state.fullTree.files || [], Object.keys(counts), changedPaths)
+    : scope === "changed"
+      ? changedPaths
+      : Object.keys(counts);
 
   const extensionOptions = uniqueSortedExtensions(allPaths);
   state.treeFilter.extensions = (state.treeFilter.extensions || []).filter((ext) => extensionOptions.includes(ext));
@@ -1036,7 +1252,7 @@ function renderTree() {
     return matchesQuery && matchesExtension;
   });
 
-  const tree = buildTreeFromFiles(filteredPaths, counts);
+  const tree = buildTreeFromFiles(filteredPaths, counts, diffFileMap());
 
   const filterHtml = `
     <div class="tree-filter">
@@ -1073,21 +1289,24 @@ function renderTree() {
         </div>
       </details>
       <div class="tree-filter-settings">
-        <label class="tree-filter-toggle">
-          <input type="checkbox" id="tree-filter-show-all" ${state.treeFilter.showAll ? "checked" : ""} />
-          Show Git-visible files
-        </label>
-        <label class="tree-filter-toggle ${state.treeFilter.showAll ? "" : "disabled"}">
-          <input type="checkbox" id="tree-filter-show-ignored" ${state.treeFilter.showIgnored ? "checked" : ""} ${state.treeFilter.showAll ? "" : "disabled"} />
+        <div class="tree-scope-control" role="group" aria-label="File scope">
+          <button class="${scope === "comments" ? "active" : ""}" data-tree-scope="comments" type="button">Comments</button>
+          <button class="${scope === "changed" ? "active" : ""}" data-tree-scope="changed" type="button">Changed</button>
+          <button class="${scope === "all" ? "active" : ""}" data-tree-scope="all" type="button">All</button>
+        </div>
+        <label class="tree-filter-toggle ${scope === "all" ? "" : "disabled"}">
+          <input type="checkbox" id="tree-filter-show-ignored" ${state.treeFilter.showIgnored ? "checked" : ""} ${scope === "all" ? "" : "disabled"} />
           Include ignored
         </label>
       </div>
     </div>
   `;
 
-  const loadingFullTree = state.treeFilter.showAll && !state.fullTree;
+  const loadingFullTree = scope === "all" && !state.fullTree;
   const treeHtml = loadingFullTree
     ? `<div class="tree-empty">Loading file tree…</div>`
+    : scope === "changed" && state.diffError
+      ? `<div class="tree-empty">Diff unavailable: ${escapeHtml(state.diffError)}</div>`
     : filteredPaths.length === 0
       ? `<div class="tree-empty">No files match.</div>`
     : `<ul class="tree-node">${tree.map((n) => renderTreeNode(n)).join("")}</ul>`;
@@ -1116,7 +1335,7 @@ function filesWithCommentCounts() {
   return counts;
 }
 
-function buildTreeFromFiles(paths, commentCounts = {}) {
+function buildTreeFromFiles(paths, commentCounts = {}, diffStats = {}) {
   const root = {};
   paths.forEach((path) => {
     const segs = path.split("/");
@@ -1124,7 +1343,12 @@ function buildTreeFromFiles(paths, commentCounts = {}) {
     segs.forEach((seg, i) => {
       const isLeaf = i === segs.length - 1;
       if (isLeaf) {
-        node[seg] = { __leaf: true, path, count: commentCounts[path] || 0 };
+        node[seg] = {
+          __leaf: true,
+          path,
+          count: commentCounts[path] || 0,
+          diff: diffStats[path] || null,
+        };
       } else {
         node[seg] = node[seg] || {};
         node = node[seg];
@@ -1140,17 +1364,16 @@ function treeObjectToList(obj, prefix = "") {
     .map((name) => {
       const v = obj[name];
       if (v.__leaf) {
-        return { type: "file", name, path: v.path, count: v.count };
+        return { type: "file", name, path: v.path, count: v.count, diff: v.diff };
       }
       const dirPath = prefix ? `${prefix}/${name}` : name;
       const children = treeObjectToList(v, dirPath);
       // Aggregate descendant comment counts so a collapsed folder can still
       // show users "5 comments are hiding in here" via its pip.
-      const dirCount = children.reduce(
-        (sum, c) => sum + (c.type === "file" ? c.count : c.dirCount),
-        0,
-      );
-      return { type: "dir", name, path: dirPath, children, dirCount };
+      const dirCount = children.reduce((sum, c) => sum + (c.type === "file" ? c.count : c.dirCount), 0);
+      const additions = children.reduce((sum, c) => sum + (c.type === "file" ? Number(c.diff?.additions || 0) : c.additions), 0);
+      const deletions = children.reduce((sum, c) => sum + (c.type === "file" ? Number(c.diff?.deletions || 0) : c.deletions), 0);
+      return { type: "dir", name, path: dirPath, children, dirCount, additions, deletions };
     });
 }
 
@@ -1165,6 +1388,9 @@ function renderTreeNode(node) {
     const pip = collapsed && node.dirCount > 0
       ? `<span class="comment-pip">${node.dirCount}</span>`
       : "";
+    const dirDiff = node.additions || node.deletions
+      ? formatDiffStat({ additions: node.additions, deletions: node.deletions })
+      : "";
     const childrenHtml = collapsed
       ? ""
       : `<ul class="tree-node tree-children">${node.children.map((c) => renderTreeNode(c)).join("")}</ul>`;
@@ -1174,6 +1400,7 @@ function renderTreeNode(node) {
           <i data-lucide="${chevronIcon}" class="tree-chevron"></i>
           <i data-lucide="${folderIcon}"></i>
           <span class="tree-item-name">${escapeHtml(node.name)}</span>
+          ${dirDiff}
           ${pip}
         </div>
         ${childrenHtml}
@@ -1186,6 +1413,7 @@ function renderTreeNode(node) {
       <div class="tree-item file ${isActive ? "active" : ""}" data-file="${escapeHtml(node.path)}" title="${escapeHtml(node.path)}">
         <i data-lucide="file-text"></i>
         <span class="tree-item-name">${escapeHtml(node.name)}</span>
+        ${formatDiffStat(node.diff)}
         ${node.count > 0 ? `<span class="comment-pip">${node.count}</span>` : ""}
       </div>
     </li>
@@ -1193,13 +1421,6 @@ function renderTreeNode(node) {
 }
 
 function attachTreeHandlers(root) {
-  root.querySelector("[data-prev-comment]")?.addEventListener("click", () => {
-    navigateToComment(-1);
-  });
-  root.querySelector("[data-next-comment]")?.addEventListener("click", () => {
-    navigateToComment(+1);
-  });
-
   root.querySelectorAll("[data-file]").forEach((el) => {
     el.addEventListener("click", () => {
       const file = el.getAttribute("data-file");
@@ -1273,11 +1494,12 @@ function attachTreeHandlers(root) {
     renderTree();
   });
 
-  const showAllToggle = root.querySelector("#tree-filter-show-all");
-  if (showAllToggle) {
-    showAllToggle.addEventListener("change", async (e) => {
-      state.treeFilter.showAll = e.target.checked;
-      if (state.treeFilter.showAll && !state.fullTree) {
+  root.querySelectorAll("[data-tree-scope]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const scope = el.getAttribute("data-tree-scope");
+      if (!["comments", "changed", "all"].includes(scope)) return;
+      state.treeFilter.scope = scope;
+      if (scope === "all" && !state.fullTree) {
         renderTree(); // Render the loading state immediately
         try {
           state.fullTree = await fetchTree(state.route.slug, state.route.key, {
@@ -1285,18 +1507,18 @@ function attachTreeHandlers(root) {
           });
         } catch (err) {
           showError(err, "Could not load file tree");
-          state.treeFilter.showAll = false;
+          state.treeFilter.scope = "comments";
         }
       }
       renderTree();
     });
-  }
+  });
 
   const showIgnoredToggle = root.querySelector("#tree-filter-show-ignored");
   if (showIgnoredToggle) {
     showIgnoredToggle.addEventListener("change", async (e) => {
       state.treeFilter.showIgnored = e.target.checked;
-      if (state.treeFilter.showAll) {
+      if (state.treeFilter.scope === "all") {
         state.fullTree = null;
         renderTree();
         try {
@@ -1319,6 +1541,7 @@ function renderContent() {
   // Chrome reflects the navigation cursor counter — keep it in sync with
   // every content render so Tab / button clicks update the tree rail.
   renderTopbar();
+  renderContextbar();
   renderTree();
   const content = document.getElementById("content");
   if (state.error) {
@@ -1550,47 +1773,54 @@ function renderReviewOverview() {
 function renderFileView() {
   const filePath = state.route.file;
   const language = detectLanguage(filePath, state.source?.content);
-  const source = state.source?.content || "(file content not available)";
-  const lines = source.split("\n");
+  const diffDetail = state.diffFileCache.get(diffCacheKey(filePath)) || diffStatForFile(filePath);
+  if (state.viewMode === "diff") return renderUnifiedDiffView(filePath, language, diffDetail);
+
+  const sourceUnavailable = state.source?.unavailable;
+  const source = state.source?.content || "";
+  const lines = source ? source.split("\n") : [];
   const fileComments = reviewThreads()
     .filter((c) => c.file === filePath)
     .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
 
-  const commentsAtLine = new Map();
-  const rangedSpanLines = new Set();
-  fileComments.forEach((c) => {
-    const [s, e] = commentLineRange(c);
-    if (!commentsAtLine.has(s)) commentsAtLine.set(s, []);
-    commentsAtLine.get(s).push(c);
-    for (let i = s; i <= e; i++) rangedSpanLines.add(i);
-  });
+  const { commentsAtLine, rangedSpanLines } = commentLineMaps(fileComments);
+  const { hunkStarts, hunkSpanLines, changedLines } = hunkLineMaps(diffDetail?.hunks || []);
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
     const anchored = commentsAtLine.get(lineNum) || [];
     const inRange = rangedSpanLines.has(lineNum);
+    const hunkIndex = hunkStarts.get(lineNum);
+    const inHunk = hunkSpanLines.has(lineNum);
+    const changed = changedLines.has(lineNum);
 
     let markerHtml = "";
     if (anchored.length > 0) {
       const c = anchored[0];
       markerHtml = `<span class="dot" style="background:${severityColorVar(c.severity)}"></span>`;
+    } else if (inHunk) {
+      markerHtml = `<span class="hunk-tick"></span>`;
     }
 
     const markerClass = anchored.length > 0 ? `gutter-marker has-marker`
-      : inRange ? `gutter-marker range-mid` : "gutter-marker";
+      : inRange ? `gutter-marker range-mid`
+        : inHunk ? `gutter-marker diff-marker` : "gutter-marker";
     const isUncommented = anchored.length === 0 && !inRange;
     const rowClass = [
       anchored.length > 0 ? "has-comment" : "",
       inRange && anchored.length === 0 ? "range-spanned" : "",
+      inHunk ? "diff-hunk-line" : "",
+      changed ? "diff-changed-line" : "",
       isUncommented ? "uncommented" : "",
     ].filter(Boolean).join(" ");
     const codeHtml = renderHighlightedLine(lineText, language);
     const gutterDataAttr = anchored.length > 0
       ? `data-comment-id="${escapeHtml(anchored[0].id)}"`
       : `data-add-line="${lineNum}"`;
+    const hunkAttr = hunkIndex !== undefined ? `data-hunk-index="${hunkIndex}"` : "";
 
     let html = `
-      <tr class="${rowClass}">
+      <tr class="${rowClass}" ${hunkAttr}>
         <td class="gutter-num">${lineNum}</td>
         <td class="${markerClass}" ${gutterDataAttr}>${markerHtml}</td>
         <td class="code-cell">${codeHtml}</td>
@@ -1619,17 +1849,131 @@ function renderFileView() {
     return html;
   }).join("");
 
+  const emptyHtml = sourceUnavailable
+    ? `<div class="file-unavailable">${escapeHtml(sourceUnavailable)}. Use Unified mode to inspect deleted or unreadable changed files.</div>`
+    : "";
+  const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
+
   document.getElementById("content").innerHTML = `
     <div class="code-pane">
       <div class="code-header">
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
+        ${statHtml}
         <span class="code-comment-count">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
       </div>
       <div class="code-table-scroll">
-        <table class="code-table"><tbody>${rows}</tbody></table>
+        ${emptyHtml || `<table class="code-table"><tbody>${rows}</tbody></table>`}
       </div>
+    </div>
+  `;
+  attachContentHandlers();
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function commentLineMaps(fileComments) {
+  const commentsAtLine = new Map();
+  const rangedSpanLines = new Set();
+  fileComments.forEach((c) => {
+    const [s, e] = commentLineRange(c);
+    if (!commentsAtLine.has(s)) commentsAtLine.set(s, []);
+    commentsAtLine.get(s).push(c);
+    for (let i = s; i <= e; i++) rangedSpanLines.add(i);
+  });
+  return { commentsAtLine, rangedSpanLines };
+}
+
+function hunkLineMaps(hunks) {
+  const hunkStarts = new Map();
+  const hunkSpanLines = new Set();
+  const changedLines = new Set();
+  hunks.forEach((h, index) => {
+    const start = Math.max(1, Number(h.anchor_line || h.new_start || 1));
+    hunkStarts.set(start, index);
+    const spanStart = Math.max(1, Number(h.new_start || start));
+    const spanEnd = Math.max(spanStart, spanStart + Number(h.new_lines || 1) - 1);
+    for (let i = spanStart; i <= spanEnd; i++) hunkSpanLines.add(i);
+    (h.changed_new_lines || []).forEach((line) => changedLines.add(line));
+    if (!(h.changed_new_lines || []).length && h.anchor_line) changedLines.add(h.anchor_line);
+  });
+  return { hunkStarts, hunkSpanLines, changedLines };
+}
+
+function renderUnifiedDiffView(filePath, language, diffDetail) {
+  const fileComments = reviewThreads()
+    .filter((c) => c.file === filePath)
+    .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
+  const { commentsAtLine } = commentLineMaps(fileComments);
+  const sourceLines = sourceLinesForFile(filePath) || [];
+  const hunks = diffDetail?.hunks || [];
+  const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
+  const rows = hunks.flatMap((hunk, hunkIndex) => {
+    const out = [`
+      <tr class="diff-hunk-header" data-hunk-index="${hunkIndex}">
+        <td class="diff-old-num"></td>
+        <td class="diff-new-num"></td>
+        <td class="diff-marker-cell">@@</td>
+        <td class="diff-code-cell">${escapeHtml(hunk.header || "")}</td>
+      </tr>
+    `];
+    (hunk.lines || []).forEach((line) => {
+      const newLine = line.new_line;
+      const oldLine = line.old_line;
+      const anchored = newLine ? commentsAtLine.get(newLine) || [] : [];
+      const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
+      const canComment = Number.isInteger(newLine);
+      const gutterAttr = anchored.length > 0
+        ? `data-comment-id="${escapeHtml(anchored[0].id)}"`
+        : canComment ? `data-add-line="${newLine}"` : "";
+      let markerHtml = escapeHtml(marker);
+      if (anchored.length > 0) {
+        markerHtml = `<span class="dot" style="background:${severityColorVar(anchored[0].severity)}"></span>`;
+      }
+      out.push(`
+        <tr class="unified-line ${escapeHtml(line.kind || "context")}">
+          <td class="diff-old-num">${oldLine || ""}</td>
+          <td class="diff-new-num">${newLine || ""}</td>
+          <td class="diff-marker-cell ${anchored.length ? "has-marker" : ""}" ${gutterAttr}>${markerHtml}</td>
+          <td class="diff-code-cell">${renderHighlightedLine(line.text || "", language)}</td>
+        </tr>
+      `);
+      anchored.forEach((c) => {
+        if (state.expandedComments.has(c.id)) {
+          out.push(`
+            <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
+              <td colspan="4"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines })}</div></td>
+            </tr>
+          `);
+        }
+      });
+      if (state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === newLine) {
+        out.push(`
+          <tr class="comment-row">
+            <td colspan="4"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
+          </tr>
+        `);
+      }
+    });
+    return out;
+  }).join("");
+
+  const body = diffDetail?.error
+    ? `<div class="file-unavailable">${escapeHtml(diffDetail.error)}</div>`
+    : hunks.length === 0
+      ? `<div class="file-unavailable">No changes for this file against ${escapeHtml(state.diffSummary?.base_ref || "base")}.</div>`
+      : `<table class="unified-table"><tbody>${rows}</tbody></table>`;
+
+  document.getElementById("content").innerHTML = `
+    <div class="code-pane">
+      <div class="code-header">
+        <i data-lucide="git-compare-arrows"></i>
+        <strong>${escapeHtml(filePath)}</strong>
+        <span class="lang-badge">unified</span>
+        ${statHtml}
+        <span class="code-comment-count">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
+      </div>
+      <div class="code-table-scroll">${body}</div>
     </div>
   `;
   attachContentHandlers();
@@ -1954,7 +2298,7 @@ function renderSuggestionDiff(c, language, sourceLinesArg) {
 // === Mutation helpers ==============================================
 
 async function persistReview() {
-  const { _slug, _key, ...payload } = state.review;
+  const { _slug, _key, _stale, ...payload } = state.review;
   await putReview(state.route.slug, state.route.key, payload);
 }
 
@@ -2161,13 +2505,6 @@ function initializeEditors(content) {
 function attachContentHandlers() {
   const content = document.getElementById("content");
   initializeEditors(content);
-
-  content.querySelector("[data-prev-comment]")?.addEventListener("click", () => {
-    navigateToComment(-1);
-  });
-  content.querySelector("[data-next-comment]")?.addEventListener("click", () => {
-    navigateToComment(+1);
-  });
 
   content.querySelectorAll("[data-comment-id]").forEach((el) => {
     el.addEventListener("click", () => {
@@ -2487,6 +2824,20 @@ function scrollCommentIntoView(id) {
   });
 }
 
+function scrollHunkIntoView(index) {
+  requestAnimationFrame(() => {
+    const row = document.querySelector(`[data-hunk-index="${index}"]`);
+    const content = document.getElementById("content");
+    if (!row || !content) return;
+    const top =
+      row.getBoundingClientRect().top -
+      content.getBoundingClientRect().top +
+      content.scrollTop -
+      COMMENT_SCROLL_TOP_OFFSET;
+    content.scrollTo({ top, behavior: "smooth" });
+  });
+}
+
 async function setStatus(commentId, status) {
   const c = findThread(commentId);
   if (!c) return;
@@ -2505,20 +2856,58 @@ async function setStatus(commentId, status) {
   }
 }
 
+function setViewMode(mode) {
+  if (!["source", "diff"].includes(mode) || state.viewMode === mode) return;
+  state.viewMode = mode;
+  localStorage.setItem("codeReviewViewMode", mode);
+  renderContent();
+}
+
+function toggleViewMode() {
+  setViewMode(state.viewMode === "source" ? "diff" : "source");
+}
+
+function setNavTarget(target) {
+  if (!["comments", "hunks"].includes(target) || state.navTarget === target) return;
+  state.navTarget = target;
+  localStorage.setItem("codeReviewNavTarget", target);
+  renderContent();
+}
+
+function toggleNavTarget() {
+  setNavTarget(state.navTarget === "comments" ? "hunks" : "comments");
+}
+
+async function applyBaseRef() {
+  if (!state.review) return;
+  const base = String(state.baseDraft || "").trim();
+  if (!base) {
+    showToast("Base ref is required", { kind: "warning" });
+    return;
+  }
+  try {
+    const payload = await fetchDiffSummary(state.route.slug, state.route.key, { base });
+    state.diffSummary = payload;
+    state.diffError = null;
+    state.diffFileCache.clear();
+    state.baseDraft = payload.base_ref || base;
+    state.review.target = state.review.target || {};
+    state.review.target.base_ref = state.baseDraft;
+    await persistReview();
+    if (state.route.view === "file") {
+      await ensureDiffForFile(state.route.file);
+    }
+    renderContent();
+    showToast("Updated diff base", { kind: "success", detail: state.baseDraft });
+  } catch (err) {
+    showError(err, "Base ref failed");
+  }
+}
+
 // === Topbar actions ================================================
 
 document.getElementById("btn-home").addEventListener("click", () => {
   navigate({ view: "inbox" });
-});
-
-document.getElementById("topbar-comment-nav").addEventListener("click", (e) => {
-  const prev = e.target.closest("[data-prev-comment]");
-  const next = e.target.closest("[data-next-comment]");
-  if (prev) {
-    navigateToComment(-1);
-  } else if (next) {
-    navigateToComment(+1);
-  }
 });
 
 document.addEventListener("pointerdown", (e) => {
@@ -2542,7 +2931,10 @@ document.getElementById("btn-refresh-review").addEventListener("click", async ()
     state.refreshStatus = null;
     state.source = null;
     state.fullTree = null;
+    state.diffSummary = null;
+    state.diffError = null;
     state.sourceCache.clear();
+    state.diffFileCache.clear();
     await loadRoute(state.route);
     await updateRefreshStatus();
     const counts = res.counts || {};
@@ -2593,6 +2985,28 @@ function navigableComments() {
     );
 }
 
+function navigableHunks() {
+  if (!state.diffSummary) return [];
+  return diffFiles()
+    .filter((file) => (file.hunks || []).length > 0)
+    .sort((a, b) => a.file.localeCompare(b.file))
+    .flatMap((file) =>
+      (file.hunks || []).map((hunk, index) => ({
+        ...hunk,
+        file: file.file,
+        index,
+      })),
+    );
+}
+
+async function navigateByTarget(direction) {
+  if (state.navTarget === "hunks") {
+    await navigateToHunk(direction);
+  } else {
+    await navigateToComment(direction);
+  }
+}
+
 async function navigateToComment(direction) {
   if (state.route.view === "inbox") return;
   const comments = navigableComments();
@@ -2624,6 +3038,27 @@ async function navigateToComment(direction) {
   scrollCommentIntoView(target.id);
 }
 
+async function navigateToHunk(direction) {
+  if (state.route.view === "inbox") return;
+  const hunks = navigableHunks();
+  if (hunks.length === 0) return;
+
+  const currentIdx = state.cursorHunk
+    ? hunks.findIndex((h) => h.file === state.cursorHunk.file && h.index === state.cursorHunk.index)
+    : -1;
+  const nextIdx = currentIdx === -1
+    ? (direction > 0 ? 0 : hunks.length - 1)
+    : (currentIdx + direction + hunks.length) % hunks.length;
+  const target = hunks[nextIdx];
+  state.cursorHunk = { file: target.file, index: target.index };
+
+  if (state.route.view !== "file" || state.route.file !== target.file) {
+    await navigate({ view: "file", slug: state.route.slug, key: state.route.key, file: target.file });
+  }
+  renderContent();
+  scrollHunkIntoView(target.index);
+}
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && shouldSuppressGlobalEscapeCollapse()) {
     e.preventDefault();
@@ -2642,16 +3077,28 @@ document.addEventListener("keydown", (e) => {
 
   if (e.key === "Tab" && !e.shiftKey) {
     e.preventDefault();
-    navigateToComment(+1);
+    navigateByTarget(+1);
   } else if (e.key === "Tab" && e.shiftKey) {
     e.preventDefault();
-    navigateToComment(-1);
+    navigateByTarget(-1);
   } else if (e.key === "j") {
     e.preventDefault();
-    navigateToComment(+1);
+    navigateByTarget(+1);
   } else if (e.key === "k") {
     e.preventDefault();
-    navigateToComment(-1);
+    navigateByTarget(-1);
+  } else if (e.key === "d") {
+    e.preventDefault();
+    toggleViewMode();
+  } else if (e.key === "c") {
+    e.preventDefault();
+    setNavTarget("comments");
+  } else if (e.key === "h") {
+    e.preventDefault();
+    setNavTarget("hunks");
+  } else if (e.key === "n") {
+    e.preventDefault();
+    toggleNavTarget();
   } else if (e.key === "Escape") {
     if (state.newCommentTarget) {
       state.newCommentTarget = null;
@@ -2662,7 +3109,7 @@ document.addEventListener("keydown", (e) => {
       renderContent();
     }
   } else if (e.key === "?") {
-    showToast("Keys: Tab/S-Tab or j/k → next/prev comment · Esc → close");
+    showToast("Keys: Tab/S-Tab or j/k navigate selected target · d source/unified · c comments · h hunks · n switch target · Esc close");
   }
 });
 

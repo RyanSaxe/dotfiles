@@ -39,6 +39,7 @@ The user may provide a target: a PR number, recent changes, the whole branch, a 
 - **The viewer refresh is deterministic.** It reloads files and moves anchors only when the original `anchor_text` appears exactly once. When uncertain, it marks the thread instead of guessing.
 - **AI may manually move threads during iteration.** If code changed too much for deterministic refresh, use `anchor_text`, the current source, and the thread discussion to move the thread to the right place or mark it obsolete/resolved.
 - **GitHub submission ignores local replies.** Only the thread body and optional suggestion are submitted.
+- **Diff context is live.** Review YAML may persist `target.base_ref`, but never generated diff contents; the viewer computes diff stats and hunks from the current repo state.
 - **Reviews live at `~/.reviews/<repo-slug>/<ref>-<utc-timestamp>.review.yaml`.** `<repo-slug>` is the absolute repo path with `/` replaced by `-`. Reviews are personal scratch state and are never committed.
 
 ## Alignment

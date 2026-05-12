@@ -91,6 +91,7 @@ VIEWER_API_VERSION = 2
 DEFAULT_PORT_START = 51234
 PORT_TRY_LIMIT = 10
 HEAD_CACHE_TTL_SECONDS = 60
+GIT_TIMEOUT_SECONDS = 10
 
 VALID_EVENTS = {"COMMENT", "REQUEST_CHANGES", "APPROVE", "PENDING"}
 SKIP_STATUSES = {"resolved", "wontfix"}
@@ -397,6 +398,583 @@ def list_repo_files(repo_root: str, include_ignored: bool = False) -> list[str]:
         FileNotFoundError,
     ):
         return []
+
+
+# === Live diff access ==============================================
+
+
+def git_text(
+    repo_root: str,
+    args: list[str],
+    *,
+    timeout: int = GIT_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", repo_root, *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout,
+    )
+
+
+def git_bytes(
+    repo_root: str,
+    args: list[str],
+    *,
+    timeout: int = GIT_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["git", "-C", repo_root, *args],
+        capture_output=True,
+        check=False,
+        timeout=timeout,
+    )
+
+
+def resolve_commit(repo_root: str, ref: str) -> str | None:
+    ref = ref.strip()
+    if not ref:
+        return None
+    try:
+        proc = git_text(repo_root, ["rev-parse", "--verify", f"{ref}^{{commit}}"])
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
+def current_branch(repo_root: str) -> str | None:
+    try:
+        proc = git_text(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"], timeout=2)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+    if proc.returncode != 0:
+        return None
+    branch = proc.stdout.strip()
+    return branch if branch and branch != "HEAD" else None
+
+
+def default_base_candidates(repo_root: str, target: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for key in ("base_ref", "base_branch"):
+        value = target.get(key)
+        if isinstance(value, str) and value.strip():
+            candidates.append(value.strip())
+
+    try:
+        proc = git_text(
+            repo_root,
+            ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+            timeout=2,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            candidates.append(proc.stdout.strip())
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    candidates.extend(
+        [
+            "origin/main",
+            "origin/master",
+            "main",
+            "master",
+            "HEAD",
+        ]
+    )
+    branch = current_branch(repo_root)
+    return [c for c in dict.fromkeys(candidates) if c and c != branch]
+
+
+def default_base_ref(repo_root: str, target: dict[str, Any]) -> str:
+    for candidate in default_base_candidates(repo_root, target):
+        if resolve_commit(repo_root, candidate):
+            return candidate
+    return "HEAD"
+
+
+def resolve_diff_base(
+    repo_root: str,
+    target: dict[str, Any],
+    requested_base: str | None = None,
+) -> dict[str, Any]:
+    base_ref = (requested_base or target.get("base_ref") or "").strip()
+    if not base_ref:
+        base_ref = default_base_ref(repo_root, target)
+
+    base_commit = resolve_commit(repo_root, base_ref)
+    if not base_commit:
+        raise RuntimeError(f"could not resolve base ref: {base_ref}")
+
+    head_commit = resolve_commit(repo_root, "HEAD")
+    comparison_base = base_commit
+    if head_commit:
+        try:
+            merge_base = git_text(repo_root, ["merge-base", base_commit, head_commit])
+            if merge_base.returncode == 0 and merge_base.stdout.strip():
+                comparison_base = merge_base.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            comparison_base = base_commit
+
+    return {
+        "base_ref": base_ref,
+        "base_commit": base_commit,
+        "comparison_base": comparison_base,
+        "head_commit": head_commit,
+    }
+
+
+def parse_name_status_z(raw: bytes) -> dict[str, dict[str, Any]]:
+    tokens = [
+        token.decode("utf-8", errors="surrogateescape")
+        for token in raw.split(b"\0")
+        if token
+    ]
+    out: dict[str, dict[str, Any]] = {}
+    i = 0
+    while i < len(tokens):
+        status = tokens[i]
+        code = status[:1]
+        i += 1
+        if code in {"R", "C"} and i + 1 < len(tokens):
+            old_path = tokens[i]
+            new_path = tokens[i + 1]
+            i += 2
+            out[new_path] = {
+                "status": code,
+                "status_raw": status,
+                "old_path": old_path,
+            }
+        elif i < len(tokens):
+            path = tokens[i]
+            i += 1
+            out[path] = {"status": code, "status_raw": status}
+    return out
+
+
+def parse_numstat_z(raw: bytes) -> dict[str, dict[str, int | None]]:
+    tokens = [
+        token.decode("utf-8", errors="surrogateescape")
+        for token in raw.split(b"\0")
+        if token
+    ]
+    out: dict[str, dict[str, int | None]] = {}
+    i = 0
+    while i < len(tokens):
+        parts = tokens[i].split("\t", 2)
+        i += 1
+        if len(parts) != 3:
+            continue
+        added_raw, deleted_raw, path = parts
+        if not path and i + 1 < len(tokens):
+            # Rename/copy records encode the path fields as separate NUL tokens.
+            i += 1
+            path = tokens[i]
+            i += 1
+        additions = None if added_raw == "-" else int(added_raw or "0")
+        deletions = None if deleted_raw == "-" else int(deleted_raw or "0")
+        out[path] = {"additions": additions, "deletions": deletions}
+    return out
+
+
+def unquote_diff_path(path: str) -> str:
+    if path == "/dev/null":
+        return path
+    if path.startswith("a/") or path.startswith("b/"):
+        return path[2:]
+    return path
+
+
+_HUNK_RE = re.compile(
+    r"^@@ -(?P<old_start>\d+)(?:,(?P<old_lines>\d+))? "
+    r"\+(?P<new_start>\d+)(?:,(?P<new_lines>\d+))? @@(?P<section>.*)$"
+)
+
+
+def finalize_hunk(hunk: dict[str, Any] | None) -> None:
+    if not hunk:
+        return
+    changed = sorted(hunk.pop("_changed_new_lines", set()))
+    hunk["changed_new_lines"] = changed
+    if changed:
+        hunk["anchor_line"] = changed[0]
+    elif hunk["new_lines"] > 0:
+        hunk["anchor_line"] = hunk["new_start"]
+    else:
+        hunk["anchor_line"] = None
+
+
+def parse_unified_diff(raw: str) -> dict[str, dict[str, Any]]:
+    files: dict[str, dict[str, Any]] = {}
+    current: dict[str, Any] | None = None
+    current_hunk: dict[str, Any] | None = None
+    old_line = 0
+    new_line = 0
+
+    for line in raw.splitlines():
+        if line.startswith("diff --git "):
+            finalize_hunk(current_hunk)
+            current_hunk = None
+            current = {"file": "", "old_path": None, "hunks": []}
+            old_line = 0
+            new_line = 0
+            continue
+
+        if current is None:
+            continue
+
+        if line.startswith("--- "):
+            path = unquote_diff_path(line[4:].split("\t", 1)[0])
+            if path != "/dev/null":
+                current["old_path"] = path
+                if not current["file"]:
+                    current["file"] = path
+            continue
+
+        if line.startswith("+++ "):
+            path = unquote_diff_path(line[4:].split("\t", 1)[0])
+            if path != "/dev/null":
+                current["file"] = path
+            elif current.get("old_path"):
+                current["file"] = current["old_path"]
+            if current["file"]:
+                files[current["file"]] = current
+            continue
+
+        match = _HUNK_RE.match(line)
+        if match:
+            finalize_hunk(current_hunk)
+            old_start = int(match.group("old_start"))
+            new_start = int(match.group("new_start"))
+            old_lines = int(match.group("old_lines") or "1")
+            new_lines = int(match.group("new_lines") or "1")
+            current_hunk = {
+                "old_start": old_start,
+                "old_lines": old_lines,
+                "new_start": new_start,
+                "new_lines": new_lines,
+                "section": match.group("section").strip(),
+                "header": line,
+                "deletion_count": 0,
+                "lines": [],
+                "_changed_new_lines": set(),
+            }
+            current["hunks"].append(current_hunk)
+            old_line = old_start
+            new_line = new_start
+            continue
+
+        if current_hunk is None:
+            continue
+
+        if line.startswith("\\"):
+            current_hunk["lines"].append(
+                {"kind": "meta", "old_line": None, "new_line": None, "text": line}
+            )
+            continue
+
+        marker = line[:1]
+        text = line[1:] if marker in {" ", "+", "-"} else line
+        if marker == "+":
+            current_hunk["lines"].append(
+                {
+                    "kind": "add",
+                    "old_line": None,
+                    "new_line": new_line,
+                    "text": text,
+                }
+            )
+            current_hunk["_changed_new_lines"].add(new_line)
+            new_line += 1
+        elif marker == "-":
+            current_hunk["lines"].append(
+                {
+                    "kind": "del",
+                    "old_line": old_line,
+                    "new_line": None,
+                    "text": text,
+                }
+            )
+            current_hunk["deletion_count"] += 1
+            old_line += 1
+        else:
+            current_hunk["lines"].append(
+                {
+                    "kind": "context",
+                    "old_line": old_line,
+                    "new_line": new_line,
+                    "text": text,
+                }
+            )
+            old_line += 1
+            new_line += 1
+
+    finalize_hunk(current_hunk)
+    return files
+
+
+def untracked_files(repo_root: str) -> list[str]:
+    try:
+        proc = git_text(
+            repo_root,
+            ["ls-files", "--others", "--exclude-standard"],
+            timeout=5,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return []
+    if proc.returncode != 0:
+        return []
+    return [line for line in proc.stdout.splitlines() if line.strip()]
+
+
+def synthesize_untracked_patch(repo_root: str, rel_file: str) -> dict[str, Any]:
+    path = (Path(repo_root) / rel_file).resolve()
+    try:
+        text = path.read_text()
+    except (OSError, UnicodeDecodeError):
+        return {
+            "file": rel_file,
+            "old_path": None,
+            "hunks": [],
+            "binary": True,
+        }
+
+    lines = text.splitlines()
+    hunk_lines = [
+        {"kind": "add", "old_line": None, "new_line": i, "text": line}
+        for i, line in enumerate(lines, start=1)
+    ]
+    hunks: list[dict[str, Any]] = []
+    if lines:
+        hunks.append(
+            {
+                "old_start": 0,
+                "old_lines": 0,
+                "new_start": 1,
+                "new_lines": len(lines),
+                "section": "",
+                "header": f"@@ -0,0 +1,{len(lines)} @@",
+                "deletion_count": 0,
+                "changed_new_lines": list(range(1, len(lines) + 1)),
+                "anchor_line": 1,
+                "lines": hunk_lines,
+            }
+        )
+    return {
+        "file": rel_file,
+        "old_path": None,
+        "hunks": hunks,
+        "binary": False,
+    }
+
+
+def hunk_summary(hunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "old_start": h["old_start"],
+            "old_lines": h["old_lines"],
+            "new_start": h["new_start"],
+            "new_lines": h["new_lines"],
+            "section": h.get("section", ""),
+            "header": h["header"],
+            "deletion_count": h.get("deletion_count", 0),
+            "changed_new_lines": h.get("changed_new_lines", []),
+            "anchor_line": h.get("anchor_line"),
+        }
+        for h in hunks
+    ]
+
+
+def compute_diff(
+    repo_root: str,
+    target: dict[str, Any],
+    requested_base: str | None = None,
+    rel_file: str | None = None,
+) -> dict[str, Any]:
+    base = resolve_diff_base(repo_root, target, requested_base)
+    diff_args = [
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "--find-renames",
+        base["comparison_base"],
+        "--",
+    ]
+    if rel_file:
+        diff_args.append(rel_file)
+
+    try:
+        raw_diff_proc = git_text(repo_root, diff_args, timeout=20)
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        raise RuntimeError(f"could not compute diff: {e}") from e
+    if raw_diff_proc.returncode not in {0, 1}:
+        raise RuntimeError(raw_diff_proc.stderr.strip() or "git diff failed")
+
+    patches = parse_unified_diff(raw_diff_proc.stdout)
+
+    status_args = [
+        "diff",
+        "--name-status",
+        "-z",
+        "--find-renames",
+        base["comparison_base"],
+        "--",
+    ]
+    numstat_args = [
+        "diff",
+        "--numstat",
+        "-z",
+        "--find-renames",
+        base["comparison_base"],
+        "--",
+    ]
+    if rel_file:
+        status_args.append(rel_file)
+        numstat_args.append(rel_file)
+
+    try:
+        statuses = parse_name_status_z(git_bytes(repo_root, status_args).stdout)
+        stats = parse_numstat_z(git_bytes(repo_root, numstat_args).stdout)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        statuses = {}
+        stats = {}
+
+    files: dict[str, dict[str, Any]] = {}
+    for path, status in statuses.items():
+        files[path] = {
+            "file": path,
+            "status": status.get("status") or "M",
+            "status_raw": status.get("status_raw"),
+            "old_path": status.get("old_path"),
+            "additions": 0,
+            "deletions": 0,
+            "binary": False,
+            "hunks": [],
+        }
+    for path, stat in stats.items():
+        files.setdefault(
+            path,
+            {
+                "file": path,
+                "status": "M",
+                "status_raw": "M",
+                "old_path": None,
+                "additions": 0,
+                "deletions": 0,
+                "binary": False,
+                "hunks": [],
+            },
+        )
+        files[path]["additions"] = stat["additions"]
+        files[path]["deletions"] = stat["deletions"]
+        files[path]["binary"] = stat["additions"] is None or stat["deletions"] is None
+    for path, patch in patches.items():
+        files.setdefault(
+            path,
+            {
+                "file": path,
+                "status": "M",
+                "status_raw": "M",
+                "old_path": patch.get("old_path"),
+                "additions": 0,
+                "deletions": 0,
+                "binary": False,
+                "hunks": [],
+            },
+        )
+        files[path]["hunks"] = patch.get("hunks", [])
+        files[path]["old_path"] = files[path].get("old_path") or patch.get("old_path")
+
+    for path in untracked_files(repo_root):
+        if rel_file and path != rel_file:
+            continue
+        patch = synthesize_untracked_patch(repo_root, path)
+        line_count = sum(1 for h in patch.get("hunks", []) for _ in h.get("lines", []))
+        files[path] = {
+            "file": path,
+            "status": "A",
+            "status_raw": "A",
+            "old_path": None,
+            "additions": line_count,
+            "deletions": 0,
+            "binary": patch.get("binary", False),
+            "hunks": patch.get("hunks", []),
+        }
+
+    payload_files = []
+    for path in sorted(files):
+        item = files[path]
+        hunks = item.get("hunks") or []
+        payload_files.append(
+            {
+                **item,
+                "hunks": hunks if rel_file else hunk_summary(hunks),
+                "hunk_count": len(hunks),
+            }
+        )
+
+    return {
+        **base,
+        "files": payload_files,
+        "file_count": len(payload_files),
+        "additions": sum(f["additions"] or 0 for f in payload_files),
+        "deletions": sum(f["deletions"] or 0 for f in payload_files),
+    }
+
+
+def diff_for_review(
+    path: Path,
+    requested_base: str | None = None,
+    rel_file: str | None = None,
+) -> dict[str, Any]:
+    data = yaml_load(path.read_text())
+    target = data.get("target") or {}
+    if not isinstance(target, dict):
+        raise RuntimeError("review target is not a mapping")
+    repo_root = target.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root:
+        raise RuntimeError("review has no target.repo_root")
+    return compute_diff(repo_root, target, requested_base, rel_file)
+
+
+def refs_for_review(path: Path) -> dict[str, Any]:
+    data = yaml_load(path.read_text())
+    target = data.get("target") or {}
+    if not isinstance(target, dict):
+        raise RuntimeError("review target is not a mapping")
+    repo_root = target.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root:
+        raise RuntimeError("review has no target.repo_root")
+
+    refs = ["HEAD", "HEAD~1", "HEAD~2", "HEAD~3"]
+    try:
+        proc = git_text(
+            repo_root,
+            [
+                "for-each-ref",
+                "--format=%(refname:short)",
+                "refs/heads",
+                "refs/remotes",
+            ],
+            timeout=5,
+        )
+        if proc.returncode == 0:
+            refs.extend(
+                line.strip()
+                for line in proc.stdout.splitlines()
+                if line.strip() and not line.endswith("/HEAD")
+            )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    base_ref = (target.get("base_ref") or "").strip() or default_base_ref(
+        repo_root, target
+    )
+    return {
+        "base_ref": base_ref,
+        "refs": list(dict.fromkeys(refs)),
+    }
 
 
 def refresh_status_for_review(path: Path) -> dict[str, Any]:
@@ -782,6 +1360,39 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 self._json(200, refresh_status_for_review(rp))
             except Exception as e:
                 self._json(500, {"error": f"refresh status failed: {e}"})
+            return
+
+        m = re.match(r"^/api/diff/([^/]+)/([^/]+)$", path)
+        if m:
+            slug, key = m.group(1), m.group(2)
+            rp = review_path(slug, key)
+            if rp is None or not rp.exists():
+                self._json(404, {"error": "not found"})
+                return
+            qs = urllib.parse.parse_qs(parsed.query)
+            base_ref = (qs.get("base") or [""])[0] or None
+            file_arg = (qs.get("file") or [""])[0] or None
+            try:
+                self._json(200, diff_for_review(rp, base_ref, file_arg))
+            except RuntimeError as e:
+                self._json(400, {"error": str(e)})
+            except Exception as e:
+                self._json(500, {"error": f"diff failed: {e}"})
+            return
+
+        m = re.match(r"^/api/refs/([^/]+)/([^/]+)$", path)
+        if m:
+            slug, key = m.group(1), m.group(2)
+            rp = review_path(slug, key)
+            if rp is None or not rp.exists():
+                self._json(404, {"error": "not found"})
+                return
+            try:
+                self._json(200, refs_for_review(rp))
+            except RuntimeError as e:
+                self._json(400, {"error": str(e)})
+            except Exception as e:
+                self._json(500, {"error": f"refs failed: {e}"})
             return
 
         if path == "/api/source":

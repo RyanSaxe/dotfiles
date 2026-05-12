@@ -216,6 +216,114 @@ body.inbox-mode .topbar-home-sep {
   font-variant-numeric: tabular-nums;
 }
 
+/* === Review context bar ========================================== */
+
+.contextbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: 7px var(--space-5);
+  background: #fbfbfb;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.contextbar[hidden] {
+  display: none;
+}
+
+.contextbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.contextbar-group .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--color-muted);
+}
+
+.contextbar-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.contextbar-base input {
+  width: 180px;
+  min-width: 0;
+  padding: 5px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  color: var(--color-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.contextbar-base input:focus {
+  outline: none;
+  border-color: var(--color-emphasis);
+}
+
+.contextbar-spacer {
+  flex: 1;
+}
+
+.contextbar-diff-total {
+  display: inline-flex;
+  min-width: 72px;
+  justify-content: flex-end;
+}
+
+.contextbar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.segmented,
+.tree-scope-control {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.segmented button,
+.tree-scope-control button {
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-muted);
+  padding: 5px 9px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button:last-child,
+.tree-scope-control button:last-child {
+  border-right: none;
+}
+
+.segmented button:hover,
+.tree-scope-control button:hover {
+  background: #f5f5f5;
+  color: var(--color-body);
+}
+
+.segmented button.active,
+.tree-scope-control button.active {
+  background: #f0f7ff;
+  color: var(--color-emphasis);
+}
+
 /* === Buttons ====================================================== */
 
 .btn {
@@ -319,7 +427,7 @@ body.inbox-mode .topbar-home-sep {
 
 .app {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: 100vh;
 }
 
@@ -662,6 +770,39 @@ body.inbox-mode .main {
   font-weight: 600;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.diffstat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.contextbar-diff-total .diffstat,
+.code-header .diffstat {
+  margin-left: 0;
+}
+
+.tree-item .diffstat + .comment-pip {
+  margin-left: 2px;
+}
+
+.diff-add {
+  color: #116329;
+}
+
+.diff-del {
+  color: #a40e26;
+}
+
+.diffstat.binary {
+  color: var(--color-muted);
 }
 
 /* === Content area (right) ========================================= */
@@ -1079,6 +1220,15 @@ body.inbox-mode .main {
   margin-top: 6px;
 }
 
+.gutter-marker .hunk-tick {
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  margin-top: 3px;
+  border-radius: var(--radius-pill);
+  background: #60a5fa;
+}
+
 .gutter-marker .bar {
   position: absolute;
   left: 5px;
@@ -1116,9 +1266,29 @@ body.inbox-mode .main {
   background: rgba(254, 243, 199, 0.4);
 }
 
+.code-table tr.diff-hunk-line {
+  background: rgba(219, 234, 254, 0.26);
+}
+
+.code-table tr.diff-changed-line {
+  background: rgba(219, 234, 254, 0.5);
+}
+
+.code-table tr.diff-hunk-line.has-comment,
+.code-table tr.diff-changed-line.has-comment,
+.code-table tr.diff-hunk-line.range-spanned,
+.code-table tr.diff-changed-line.range-spanned {
+  background: linear-gradient(90deg, rgba(219, 234, 254, 0.58), rgba(254, 243, 199, 0.52));
+}
+
 .code-table tr.has-comment:hover,
 .code-table tr.range-spanned:hover {
   background: rgba(254, 243, 199, 0.55);
+}
+
+.code-table tr.diff-hunk-line:hover,
+.code-table tr.diff-changed-line:hover {
+  background: rgba(191, 219, 254, 0.62);
 }
 
 /* Comment row: rendered as a tr after the code line */
@@ -1140,6 +1310,92 @@ body.inbox-mode .main {
   width: calc(100vw - 280px - var(--space-6) * 2 - var(--space-4));
   padding: var(--space-4);
   box-sizing: border-box;
+}
+
+.file-unavailable {
+  padding: var(--space-6);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.unified-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.unified-table td {
+  vertical-align: top;
+}
+
+.unified-table .diff-old-num,
+.unified-table .diff-new-num {
+  width: 48px;
+  min-width: 48px;
+  padding: 0 var(--space-2);
+  text-align: right;
+  color: var(--color-faint);
+  background: #fafafa;
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.unified-table .diff-marker-cell {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  text-align: center;
+  color: var(--color-muted);
+  background: #fafafa;
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+}
+
+.unified-table .diff-marker-cell[data-add-line] {
+  cursor: pointer;
+}
+
+.unified-table .diff-marker-cell.has-marker {
+  color: inherit;
+}
+
+.unified-table .diff-code-cell {
+  padding: 0 var(--space-3);
+  white-space: pre;
+}
+
+.unified-table tr.diff-hunk-header td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.unified-table tr.add {
+  background: #ecfdf3;
+}
+
+.unified-table tr.del {
+  background: #fff1f2;
+}
+
+.unified-table tr.context {
+  background: var(--color-surface);
+}
+
+.unified-table tr.add .diff-marker-cell {
+  color: #116329;
+  background: #dcfce7;
+}
+
+.unified-table tr.del .diff-marker-cell {
+  color: #a40e26;
+  background: #ffe4e6;
 }
 
 @supports (width: 100cqw) {

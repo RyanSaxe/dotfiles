@@ -22,6 +22,7 @@ target:
   branch: feature/auth-refactor
   commit: a3f2c1d8e9b0c4f5a6d7e8f9 # optional but preferred when available
   fingerprint: 46f3c2... # current reviewed folder state, optional but preferred
+  base_ref: origin/main # optional; viewer diff context compares current state against this Git ref
   pr_number: 142 # required for PR submission
   owner: my-org # required when pr_number is set
   repo: myapp # required when pr_number is set
@@ -95,6 +96,10 @@ The viewer refresh uses anchor text conservatively:
 - `ambiguous` — text appeared multiple times.
 
 If `anchor_status` is `missing` or `ambiguous`, do not submit or edit suggestions until the AI or user moves the thread to the right location.
+
+### `target.base_ref`
+
+Optional Git ref used only by the viewer's live diff context. It may be a branch, remote branch, commit SHA, `HEAD`, or an expression such as `HEAD~2`. The review file stores only this ref string; the viewer computes diff stats and hunks live from `target.repo_root` against the current filesystem state. Do not store generated diff contents in review YAML.
 
 ### `severity`
 
