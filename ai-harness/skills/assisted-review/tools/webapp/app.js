@@ -1281,7 +1281,7 @@ function renderContextbar() {
     <div class="contextbar-group contextbar-base" title="${escapeHtml(baseTitle)}">
       <i data-lucide="git-compare-arrows"></i>
       <span class="contextbar-label">Base</span>
-      <input id="diff-base-input" list="diff-base-options" value="${escapeHtml(base)}" spellcheck="false" />
+      <input id="diff-base-input" list="diff-base-options" value="${escapeHtml(base)}" spellcheck="false" aria-label="Diff base ref" title="${escapeHtml(baseTitle)}" />
       <datalist id="diff-base-options">
         ${refs.map((ref) => `<option value="${escapeHtml(ref)}"></option>`).join("")}
       </datalist>
@@ -1289,9 +1289,10 @@ function renderContextbar() {
         <i data-lucide="check"></i>
       </button>
     </div>
-    <button class="btn diff-toggle ${state.diffVisible ? "active" : ""}" data-toggle-diff aria-pressed="${state.diffVisible ? "true" : "false"}" title="${state.diffVisible ? "Hide inline diff" : "Show inline diff"} (d)">
-      Diff
-    </button>
+    <div class="segmented diff-mode-toggle" role="group" aria-label="Diff display">
+      <button class="${state.diffVisible ? "" : "active"}" data-diff-visible="0" aria-pressed="${state.diffVisible ? "false" : "true"}" title="Show source with subtle change indicators (d)">Source</button>
+      <button class="${state.diffVisible ? "active" : ""}" data-diff-visible="1" aria-pressed="${state.diffVisible ? "true" : "false"}" title="Show inline diff details (d)">Diff</button>
+    </div>
     <div class="segmented" role="group" aria-label="Navigation target">
       <button class="${state.navTarget === "comments" ? "active" : ""}" data-nav-target="comments" title="Navigate threads (c)">Threads</button>
       <button class="${state.navTarget === "hunks" ? "active" : ""}" data-nav-target="hunks" title="Navigate hunks (h)">Hunks</button>
@@ -1320,7 +1321,9 @@ function renderContextbar() {
 }
 
 function attachContextbarHandlers(root) {
-  root.querySelector("[data-toggle-diff]")?.addEventListener("click", () => toggleDiffVisible());
+  root.querySelectorAll("[data-diff-visible]").forEach((el) => {
+    el.addEventListener("click", () => setDiffVisible(el.getAttribute("data-diff-visible") === "1"));
+  });
   root.querySelectorAll("[data-nav-target]").forEach((el) => {
     el.addEventListener("click", () => setNavTarget(el.getAttribute("data-nav-target")));
   });
@@ -2025,8 +2028,12 @@ function renderFileViewHtml(filePath) {
   const lineNumberDigits = diffLineNumberDigits(diffDetail?.hunks || [], lines.length);
   const tableStyle = `style="--line-number-text-width:${lineNumberDigits}ch;--line-number-gutter-width:calc(${lineNumberDigits}ch + 30px)"`;
   const focusedHunkIndex = state.cursorHunk?.file === filePath ? state.cursorHunk.index : null;
-  const renderDeletedRows = (items) => items.map((row) => renderDeletedDiffRow(row, language, focusedHunkIndex)).join("");
-  const renderDeletionSummaries = (items) => items.map((summary) => renderDeletionSummaryRow(summary, focusedHunkIndex)).join("");
+  const renderDeletedRows = (items, virtualMarkerHtml = "") => items
+    .map((row) => renderDeletedDiffRow(row, language, focusedHunkIndex, virtualMarkerHtml))
+    .join("");
+  const renderDeletionSummaries = (items, virtualMarkerHtml = "") => items
+    .map((summary) => renderDeletionSummaryRow(summary, focusedHunkIndex, virtualMarkerHtml))
+    .join("");
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
@@ -2039,6 +2046,7 @@ function renderFileViewHtml(filePath) {
 
     let markerHtml = "";
     const primary = covering[0];
+    const virtualMarkerHtml = virtualRangeMarkerHtml(primary, lineNum);
     if (primary) {
       const [s, e] = commentLineRange(primary);
       const color = threadMarkerColor(primary);
@@ -2071,8 +2079,8 @@ function renderFileViewHtml(filePath) {
     const threadLineAttr = primary ? `data-thread-line-id="${escapeHtml(primary.id)}"` : "";
 
     let html = `
-      ${renderDeletionSummaries(overlay.deletionSummariesBeforeLine.get(lineNum) || [])}
-      ${renderDeletedRows(overlay.beforeLine.get(lineNum) || [])}
+      ${renderDeletionSummaries(overlay.deletionSummariesBeforeLine.get(lineNum) || [], virtualMarkerHtml)}
+      ${renderDeletedRows(overlay.beforeLine.get(lineNum) || [], virtualMarkerHtml)}
       <tr class="${rowClass}" ${hunkAttr} ${hunkMemberAttr} data-source-line="${lineNum}" ${threadLineAttr}>
         <td class="gutter-num ${changed ? "changed" : ""}"><span class="line-number-text">${lineNum}</span></td>
         <td class="${markerClass}" ${gutterDataAttr}>${markerHtml}</td>
@@ -2150,6 +2158,13 @@ function rangeMarkerClass(c, lineNum) {
   if (lineNum === s) return "range-start";
   if (lineNum === e) return "range-end";
   return "range-mid";
+}
+
+function virtualRangeMarkerHtml(c, lineNum) {
+  if (!c) return "";
+  const [s, e] = commentLineRange(c);
+  if (s === e || lineNum <= s || lineNum > e) return "";
+  return `<span class="bar" style="background:${threadMarkerColor(c)}"></span>`;
 }
 
 function diffOverlayForSource(hunks, lineCount) {
@@ -2260,19 +2275,33 @@ function diffOverlayForSource(hunks, lineCount) {
 
 function diffLineNumberDigits(hunks, lineCount) {
   let maxLine = Math.max(1, Number(lineCount) || 1);
+  let maxMarkerChars = String(maxLine).length;
   (hunks || []).forEach((hunk) => {
     const oldEnd = Number(hunk.old_start || 0) + Math.max(0, Number(hunk.old_lines || 0) - 1);
     const newEnd = Number(hunk.new_start || 0) + Math.max(0, Number(hunk.new_lines || 0) - 1);
     maxLine = Math.max(maxLine, oldEnd, newEnd);
+    let deletedRun = 0;
+    const flushDeletedRun = () => {
+      if (deletedRun > 0) {
+        maxMarkerChars = Math.max(maxMarkerChars, String(deletedRun).length + 1);
+        deletedRun = 0;
+      }
+    };
     (hunk.lines || []).forEach((line) => {
+      if (line.kind === "del") {
+        deletedRun += 1;
+      } else {
+        flushDeletedRun();
+      }
       if (Number.isInteger(line.old_line)) maxLine = Math.max(maxLine, line.old_line);
       if (Number.isInteger(line.new_line)) maxLine = Math.max(maxLine, line.new_line);
     });
+    flushDeletedRun();
   });
-  return Math.max(2, String(maxLine).length);
+  return Math.max(2, String(maxLine).length, maxMarkerChars);
 }
 
-function renderDeletionSummaryRow(summary, focusedHunkIndex) {
+function renderDeletionSummaryRow(summary, focusedHunkIndex, virtualMarkerHtml = "") {
   const label = `-${summary.count}`;
   const title = `${summary.count} deleted ${summary.count === 1 ? "line" : "lines"}. Turn diff on to view.`;
   const hunkAttr = summary.hunkStart ? `data-hunk-index="${summary.hunkIndex}"` : "";
@@ -2280,21 +2309,21 @@ function renderDeletionSummaryRow(summary, focusedHunkIndex) {
   return `
     <tr class="source-virtual-line diff-deletion-summary ${focusClass}" ${hunkAttr} data-hunk-member="${summary.hunkIndex}">
       <td class="gutter-num deletion-summary" title="${escapeHtml(title)}">
-        <button class="deletion-count-marker" type="button" data-show-deletion-group="${summary.deletionGroup}" data-show-deletion-hunk="${summary.hunkIndex}" title="${escapeHtml(title)}">${escapeHtml(label)}</button>
+        <button class="deletion-count-marker" type="button" data-show-deletion-group="${summary.deletionGroup}" data-show-deletion-hunk="${summary.hunkIndex}" aria-label="${escapeHtml(title)}" title="${escapeHtml(title)}">${escapeHtml(label)}</button>
       </td>
-      <td class="gutter-marker thread-marker-cell"></td>
+      <td class="gutter-marker diff-virtual-gutter">${virtualMarkerHtml}</td>
       <td class="code-cell deletion-summary-cell" title="${escapeHtml(title)}"></td>
     </tr>
   `;
 }
 
-function renderDeletedDiffRow(row, language, focusedHunkIndex) {
+function renderDeletedDiffRow(row, language, focusedHunkIndex, virtualMarkerHtml = "") {
   const hunkAttr = row.hunkStart ? `data-hunk-index="${row.hunkIndex}"` : "";
   const focusClass = row.hunkIndex === focusedHunkIndex ? "nav-focus nav-focus-hunk" : "";
   return `
     <tr class="source-virtual-line diff-deleted-line ${focusClass}" ${hunkAttr} data-hunk-member="${row.hunkIndex}" data-deletion-group="${row.deletionGroup}" data-deleted-old-line="${row.oldLine || ""}">
       <td class="gutter-num deleted"><span class="line-diff-mark deletion">−</span><span class="line-number-text">${row.oldLine || ""}</span></td>
-      <td class="gutter-marker thread-marker-cell"></td>
+      <td class="gutter-marker diff-virtual-gutter">${virtualMarkerHtml}</td>
       <td class="code-cell">${renderHighlightedLine(row.text || "", language)}</td>
     </tr>
   `;
@@ -3345,11 +3374,12 @@ function applyDiffVisibility(visible) {
     table.classList.toggle("diff-overlay-off", !visible);
   });
 
-  const button = document.querySelector("[data-toggle-diff]");
-  if (!button) return;
-  button.classList.toggle("active", visible);
-  button.setAttribute("aria-pressed", visible ? "true" : "false");
-  button.setAttribute("title", `${visible ? "Hide" : "Show"} inline diff (d)`);
+  document.querySelectorAll("[data-diff-visible]").forEach((button) => {
+    const buttonVisible = button.getAttribute("data-diff-visible") === "1";
+    const active = buttonVisible === visible;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
 }
 
 function setNavTarget(target) {
