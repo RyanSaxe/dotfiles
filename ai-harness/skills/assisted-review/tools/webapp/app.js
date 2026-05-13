@@ -18,6 +18,8 @@ const state = {
   fullTree: null,                     // { files: [...] } — fetched lazily on "show all" toggle
   diffSummary: null,                  // live git diff summary for current review/base
   diffFileCache: new Map(),           // `${base}\0${file}` -> per-file diff payload
+  filePaneCache: new Map(),           // rendered file pane DOM by review/base/filter/file
+  currentFilePaneKey: null,
   diffError: null,
   refOptions: null,                   // { refs: [...] } for base selector suggestions
   // ui
@@ -55,6 +57,7 @@ const state = {
 
 const HIGHLIGHT_CACHE_LIMIT = 20000;
 const highlightLineCache = new Map();
+let focusedHunkElements = new Set();
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", icon: "circle-dot" },
@@ -593,7 +596,7 @@ function sourceLinesForFile(filePath, sourceLinesArg = null) {
 
 async function ensureSourceForFile(filePath) {
   if (!filePath) return null;
-  if (state.source?.file === filePath) return state.source.content;
+  if (state.source?.file === filePath && !state.source.unavailable) return state.source.content;
   if (state.sourceCache.has(filePath)) return state.sourceCache.get(filePath);
   const content = await fetchSource(state.route.slug, state.route.key, filePath);
   state.sourceCache.set(filePath, content);
@@ -988,6 +991,13 @@ function stopRefreshPolling() {
   state.refreshStatus = null;
 }
 
+function clearFilePaneCache() {
+  state.filePaneCache.forEach((entry) => entry.element.remove());
+  state.filePaneCache.clear();
+  state.currentFilePaneKey = null;
+  focusedHunkElements = new Set();
+}
+
 async function updateRefreshStatus() {
   if (!state.review || state.route.view === "inbox") return;
   const { slug, key } = state.route;
@@ -1047,6 +1057,7 @@ async function loadRoute(route) {
       state.diffError = null;
       state.refOptions = null;
       state.diffFileCache.clear();
+      clearFilePaneCache();
       state.collapsedFolders = new Set();
       state.inbox = await fetchInbox();
     } else {
@@ -1064,6 +1075,7 @@ async function loadRoute(route) {
         };
         state.sourceCache.clear();
         state.diffFileCache.clear();
+        clearFilePaneCache();
         state.diffSummary = null;
         state.diffError = null;
         state.refOptions = null;
@@ -1090,23 +1102,24 @@ async function loadRoute(route) {
         }
       }
       if (route.view === "file") {
-        try {
-          const content = await fetchSource(route.slug, route.key, route.file);
-          state.source = { file: route.file, content };
-          state.sourceCache.set(route.file, content);
-        } catch (err) {
+        const [sourceResult, diffResult] = await Promise.allSettled([
+          ensureSourceForFile(route.file),
+          ensureDiffForFile(route.file),
+        ]);
+        if (sourceResult.status === "fulfilled") {
+          state.source = { file: route.file, content: sourceResult.value || "" };
+          state.sourceCache.set(route.file, sourceResult.value || "");
+        } else {
           state.source = {
             file: route.file,
             content: "",
-            unavailable: err?.message || "file content not available",
+            unavailable: sourceResult.reason?.message || "file content not available",
           };
         }
-        try {
-          await ensureDiffForFile(route.file);
-        } catch (err) {
+        if (diffResult.status === "rejected") {
           state.diffFileCache.set(diffCacheKey(route.file), {
             file: route.file,
-            error: err?.message || String(err),
+            error: diffResult.reason?.message || String(diffResult.reason),
             hunks: [],
             hunk_count: 0,
           });
@@ -1120,8 +1133,6 @@ async function loadRoute(route) {
   }
 
   document.body.classList.toggle("inbox-mode", state.route.view === "inbox");
-  renderTopbar();
-  renderTree();
   renderContent();
   if (state.route.view !== "inbox") {
     startRefreshPolling();
@@ -1660,6 +1671,10 @@ function renderContent() {
   renderContextbar();
   renderTree();
   const content = document.getElementById("content");
+  if (state.route.view !== "file") {
+    rememberCurrentFilePaneScroll(content);
+    state.currentFilePaneKey = null;
+  }
   if (state.error) {
     content.innerHTML = `<div class="error-banner">${escapeHtml(state.error)}</div>`;
     return;
@@ -1941,7 +1956,59 @@ function renderReviewOverview() {
 // --- Per-file view ---
 
 function renderFileView() {
+  const content = document.getElementById("content");
   const filePath = state.route.file;
+  if (!canCacheFilePane()) {
+    rememberCurrentFilePaneScroll(content);
+    state.currentFilePaneKey = null;
+    content.innerHTML = renderFileViewHtml(filePath);
+    attachContentHandlers();
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  const cacheKey = filePaneCacheKey(filePath);
+  rememberCurrentFilePaneScroll(content);
+  let entry = state.filePaneCache.get(cacheKey);
+  if (!entry) {
+    const element = document.createElement("div");
+    element.className = "file-pane-cache-entry";
+    element.dataset.filePaneKey = cacheKey;
+    element.innerHTML = renderFileViewHtml(filePath);
+    entry = { key: cacheKey, file: filePath, element, scrollTop: 0 };
+    state.filePaneCache.set(cacheKey, entry);
+    content.replaceChildren(element);
+    state.currentFilePaneKey = cacheKey;
+    attachContentHandlers();
+    if (window.lucide) window.lucide.createIcons();
+  } else {
+    content.replaceChildren(entry.element);
+    state.currentFilePaneKey = cacheKey;
+  }
+  content.scrollTop = entry.scrollTop || 0;
+  syncExpandedCommentRows(entry.element);
+  applyDiffVisibility(state.diffVisible);
+  syncFocusedHunkRows();
+}
+
+function canCacheFilePane() {
+  return !state.newCommentTarget && !state.editingBody && !state.editingSuggestion;
+}
+
+function filePaneCacheKey(filePath) {
+  const slug = state.review?._slug || state.route.slug || "";
+  const key = state.review?._key || state.route.key || "";
+  const base = state.diffSummary?.base_ref || state.review?.target?.base_ref || "";
+  return [slug, key, base, state.threadFilter, filePath].join("\0");
+}
+
+function rememberCurrentFilePaneScroll(content = document.getElementById("content")) {
+  if (!state.currentFilePaneKey || !content) return;
+  const entry = state.filePaneCache.get(state.currentFilePaneKey);
+  if (entry && content.contains(entry.element)) entry.scrollTop = content.scrollTop;
+}
+
+function renderFileViewHtml(filePath) {
   const language = detectLanguage(filePath, state.source?.content);
   const diffDetail = state.diffFileCache.get(diffCacheKey(filePath)) || diffStatForFile(filePath);
 
@@ -2014,13 +2081,12 @@ function renderFileView() {
     `;
 
     ending.forEach((c) => {
-      if (state.expandedComments.has(c.id)) {
-        html += `
-          <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
-            <td colspan="3"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
-          </tr>
-        `;
-      }
+      const hiddenAttr = state.expandedComments.has(c.id) ? "" : "hidden";
+      html += `
+        <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}" ${hiddenAttr}>
+          <td colspan="3"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
+        </tr>
+      `;
     });
 
     // New-comment form rendered inline below the clicked line
@@ -2045,7 +2111,7 @@ function renderFileView() {
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
   const counts = threadCounts(fileComments);
 
-  document.getElementById("content").innerHTML = `
+  return `
     <div class="code-pane">
       <div class="code-header">
         <i data-lucide="file-text"></i>
@@ -2059,8 +2125,6 @@ function renderFileView() {
       </div>
     </div>
   `;
-  attachContentHandlers();
-  if (window.lucide) window.lucide.createIcons();
 }
 
 function commentLineMaps(fileComments) {
@@ -2581,6 +2645,7 @@ async function saveEditedBody(id, newBody) {
   try {
     await persistReview();
     state.editingBody = null;
+    clearFilePaneCache();
     renderContent();
     showToast(overviewKind(id) ? "Edited overview" : "Edited thread", { kind: "success" });
   } catch (err) {
@@ -2652,6 +2717,7 @@ async function saveEditedSuggestion(id, rawValue) {
     await persistReview();
     state.editingSuggestion = null;
     state.suggestionDrafts.delete(id);
+    clearFilePaneCache();
     renderContent();
     showToast(
       newSuggestion ? (hadSuggestion ? "Edited suggestion" : "Added suggestion") : "Saved deletion suggestion",
@@ -2672,6 +2738,7 @@ async function deleteSuggestion(id) {
   delete c.suggestion;
   try {
     await persistReview();
+    clearFilePaneCache();
     renderContent();
     showToast("Deleted suggestion", { kind: "success" });
   } catch (err) {
@@ -2684,6 +2751,65 @@ function cancelSuggestionEdit(id) {
   state.editingSuggestion = null;
   state.suggestionDrafts.delete(id);
   renderContent();
+}
+
+function ensureContentDelegation(content) {
+  if (!content || content._assistedReviewDelegated) return;
+  content._assistedReviewDelegated = true;
+  content.addEventListener("click", handleDelegatedContentClick);
+}
+
+function handleDelegatedContentClick(event) {
+  const content = document.getElementById("content");
+  const target = event.target instanceof Element
+    ? event.target.closest("[data-comment-id], [data-add-line], [data-show-deletion-hunk], .file-group-header[data-file]")
+    : null;
+  if (!target || !content?.contains(target)) return;
+
+  const commentId = target.getAttribute("data-comment-id");
+  if (commentId) {
+    toggleComment(commentId);
+    return;
+  }
+
+  const addLine = target.getAttribute("data-add-line");
+  if (addLine) {
+    const line = parseInt(addLine, 10);
+    state.newCommentTarget = {
+      file: state.route.file,
+      line,
+      isRange: false,
+      endLine: line,
+    };
+    state.newThreadType = state.threadFilter === "note" ? "note" : "comment";
+    resetNewCommentSuggestion();
+    renderContent();
+    requestAnimationFrame(() => {
+      const bodyEl = document.getElementById("new-body");
+      if (bodyEl?._cm) bodyEl._cm.focus();
+      else bodyEl?.focus();
+    });
+    return;
+  }
+
+  const hunkIndex = Number(target.getAttribute("data-show-deletion-hunk"));
+  if (Number.isInteger(hunkIndex)) {
+    event.stopPropagation();
+    const groupIndex = Number(target.getAttribute("data-show-deletion-group"));
+    state.cursorHunk = { file: state.route.file, index: hunkIndex };
+    setDiffVisible(true);
+    if (Number.isInteger(groupIndex)) {
+      scrollDeletionGroupIntoView(groupIndex, hunkIndex);
+    } else {
+      scrollHunkIntoView(hunkIndex);
+    }
+    return;
+  }
+
+  const file = target.getAttribute("data-file");
+  if (file && target.classList.contains("file-group-header")) {
+    navigate({ view: "file", slug: state.route.slug, key: state.route.key, file });
+  }
 }
 
 function initializeEditors(content) {
@@ -2771,50 +2897,8 @@ function initializeEditors(content) {
 
 function attachContentHandlers() {
   const content = document.getElementById("content");
+  ensureContentDelegation(content);
   initializeEditors(content);
-
-  content.querySelectorAll("[data-comment-id]").forEach((el) => {
-    el.addEventListener("click", () => {
-      toggleComment(el.getAttribute("data-comment-id"));
-    });
-  });
-
-  // Click on uncommented gutter → open new-comment form on that line
-  content.querySelectorAll("[data-add-line]").forEach((el) => {
-    el.addEventListener("click", () => {
-      const line = parseInt(el.getAttribute("data-add-line"), 10);
-      state.newCommentTarget = {
-        file: state.route.file,
-        line,
-        isRange: false,
-        endLine: line,
-      };
-      state.newThreadType = state.threadFilter === "note" ? "note" : "comment";
-      resetNewCommentSuggestion();
-      renderContent();
-      requestAnimationFrame(() => {
-        const bodyEl = document.getElementById("new-body");
-        if (bodyEl?._cm) bodyEl._cm.focus();
-        else bodyEl?.focus();
-      });
-    });
-  });
-
-  content.querySelectorAll("[data-show-deletion-hunk]").forEach((el) => {
-    el.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const hunkIndex = Number(el.getAttribute("data-show-deletion-hunk"));
-      const groupIndex = Number(el.getAttribute("data-show-deletion-group"));
-      if (!Number.isInteger(hunkIndex)) return;
-      state.cursorHunk = { file: state.route.file, index: hunkIndex };
-      setDiffVisible(true);
-      if (Number.isInteger(groupIndex)) {
-        scrollDeletionGroupIntoView(groupIndex, hunkIndex);
-      } else {
-        scrollHunkIntoView(hunkIndex);
-      }
-    });
-  });
 
   // New-comment form handlers
   content.querySelectorAll("[data-cancel-new]").forEach((el) => {
@@ -2914,6 +2998,7 @@ function attachContentHandlers() {
         state.newCommentTarget = null;
         resetNewCommentSuggestion();
         state.expandedComments.add(newComment.id);
+        clearFilePaneCache();
         renderTree();
         renderContent();
         showToast(`Added ${isNote ? "note" : "comment"}`, { kind: "success" });
@@ -2994,17 +3079,6 @@ function attachContentHandlers() {
     });
   });
 
-  content.querySelectorAll(".file-group-header[data-file]").forEach((el) => {
-    el.addEventListener("click", () => {
-      navigate({
-        view: "file",
-        slug: state.route.slug,
-        key: state.route.key,
-        file: el.getAttribute("data-file"),
-      });
-    });
-  });
-
   content.querySelectorAll("[data-set-status]").forEach((el) => {
     el.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -3030,6 +3104,7 @@ function attachContentHandlers() {
       state.review.review.threads = reviewThreads().filter((c) => c.id !== id);
       try {
         await persistReview();
+        clearFilePaneCache();
         renderTree();
         renderContent();
         showToast("Deleted thread", { kind: "success" });
@@ -3055,6 +3130,7 @@ function attachContentHandlers() {
       c.replies.push({ author: "user", body });
       try {
         await persistReview();
+        clearFilePaneCache();
         renderContent();
         showToast("Reply added", { kind: "success" });
       } catch (err) {
@@ -3086,6 +3162,7 @@ function attachContentHandlers() {
 }
 
 async function toggleComment(id) {
+  const willExpand = !state.expandedComments.has(id);
   if (state.expandedComments.has(id)) {
     state.expandedComments.delete(id);
   } else {
@@ -3093,8 +3170,10 @@ async function toggleComment(id) {
     state.cursorCommentId = id;
   }
   state.cursorHunk = null;
-  renderContent();
-  scrollCommentIntoView(id);
+  clearHunkFocusRows();
+  syncExpandedCommentRows();
+  renderContextbar();
+  if (willExpand) scrollCommentIntoView(id);
 }
 
 const NAV_SCROLL_TOP_OFFSET = 16;
@@ -3163,17 +3242,36 @@ function firstVisibleElement(selector) {
   }) || null;
 }
 
+function setOnlyExpandedComment(id) {
+  state.expandedComments.clear();
+  if (id) state.expandedComments.add(id);
+  syncExpandedCommentRows();
+}
+
+function syncExpandedCommentRows(root = document) {
+  root.querySelectorAll("[data-comment-row-id]").forEach((row) => {
+    row.hidden = !state.expandedComments.has(row.getAttribute("data-comment-row-id"));
+  });
+}
+
 function focusHunkRows(index) {
   clearHunkFocusRows();
   document.querySelectorAll(`[data-hunk-member="${index}"]`).forEach((el) => {
     el.classList.add("nav-focus", "nav-focus-hunk");
+    focusedHunkElements.add(el);
   });
 }
 
 function clearHunkFocusRows() {
-  document.querySelectorAll(".nav-focus").forEach((el) => {
+  focusedHunkElements.forEach((el) => {
     el.classList.remove("nav-focus", "nav-focus-hunk");
   });
+  focusedHunkElements = new Set();
+}
+
+function syncFocusedHunkRows() {
+  clearHunkFocusRows();
+  if (state.cursorHunk?.file === state.route.file) focusHunkRows(state.cursorHunk.index);
 }
 
 function focusedSourceLine() {
@@ -3219,6 +3317,7 @@ async function setStatus(commentId, status) {
   c.status = status;
   try {
     await persistReview();
+    clearFilePaneCache();
     renderContent();
   } catch (err) {
     c.status = original;
@@ -3256,9 +3355,12 @@ function applyDiffVisibility(visible) {
 function setNavTarget(target) {
   if (!["comments", "hunks"].includes(target) || state.navTarget === target) return;
   state.navTarget = target;
-  if (target === "comments") state.cursorHunk = null;
+  if (target === "comments") {
+    state.cursorHunk = null;
+    clearHunkFocusRows();
+  }
   localStorage.setItem("assistedReviewNavTarget", target);
-  renderContent();
+  renderContextbar();
 }
 
 function toggleNavTarget() {
@@ -3269,6 +3371,7 @@ function setThreadFilter(filter) {
   if (!["all", "comment", "note"].includes(filter) || state.threadFilter === filter) return;
   state.threadFilter = filter;
   localStorage.setItem("assistedReviewThreadFilter", filter);
+  clearFilePaneCache();
   renderContent();
 }
 
@@ -3284,6 +3387,7 @@ async function applyBaseRef() {
     state.diffSummary = payload;
     state.diffError = null;
     state.diffFileCache.clear();
+    clearFilePaneCache();
     state.baseDraft = payload.base_ref || base;
     state.review.target = state.review.target || {};
     state.review.target.base_ref = state.baseDraft;
@@ -3329,6 +3433,7 @@ document.getElementById("btn-refresh-review").addEventListener("click", async ()
     state.diffError = null;
     state.sourceCache.clear();
     state.diffFileCache.clear();
+    clearFilePaneCache();
     await loadRoute(state.route);
     await updateRefreshStatus();
     const counts = res.counts || {};
@@ -3419,6 +3524,7 @@ async function navigateToComment(direction) {
   const target = comments[nextIdx];
   state.cursorCommentId = target.id;
   state.cursorHunk = null;
+  clearHunkFocusRows();
 
   if (state.route.view !== "file" || state.route.file !== target.file) {
     await navigate(
@@ -3427,9 +3533,8 @@ async function navigateToComment(direction) {
       { preserveNavCursor: true },
     );
   }
-  state.expandedComments.clear();
-  state.expandedComments.add(target.id);
-  renderContent();
+  setOnlyExpandedComment(target.id);
+  renderContextbar();
   scrollCommentIntoView(target.id);
 }
 
@@ -3452,7 +3557,7 @@ async function navigateToHunk(direction) {
       { preserveNavCursor: true },
     );
   }
-  renderContent();
+  renderContextbar();
   scrollHunkIntoView(target.index);
 }
 
