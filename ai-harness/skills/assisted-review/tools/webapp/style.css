@@ -279,9 +279,13 @@ body.inbox-mode .topbar-home-sep {
 
 .contextbar-base .btn-icon,
 .contextbar .diff-toggle {
-  min-height: 28px;
+  height: 26px;
+  min-height: 26px;
   border-radius: var(--radius-input);
-  padding: 5px 9px;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  box-shadow: none;
+  color: var(--color-muted);
   font-size: var(--text-xs);
   font-weight: 600;
 }
@@ -290,13 +294,28 @@ body.inbox-mode .topbar-home-sep {
   width: 32px;
   min-width: 32px;
   justify-content: center;
-  padding: 5px;
+  padding: 0;
 }
 
 .contextbar .diff-toggle {
   width: 66px;
   min-width: 66px;
   justify-content: center;
+  padding: 0 9px;
+}
+
+.contextbar-base .btn-icon:hover,
+.contextbar .diff-toggle:hover {
+  border-color: var(--color-border);
+  background: #f5f5f5;
+  color: var(--color-body);
+}
+
+.contextbar .diff-toggle.active,
+.contextbar .diff-toggle.active:hover {
+  border-color: var(--color-border);
+  background: #f0f7ff;
+  color: var(--color-emphasis);
 }
 
 .contextbar .diff-toggle .lucide,
@@ -1221,6 +1240,8 @@ body.inbox-mode .main {
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.6;
+  --line-number-text-width: 3ch;
+  --line-number-gutter-width: calc(3ch + 30px);
 }
 
 .code-table tr {
@@ -1228,8 +1249,10 @@ body.inbox-mode .main {
 }
 
 .code-table td.gutter-num {
-  width: 56px;
-  min-width: 56px;
+  width: var(--line-number-gutter-width);
+  min-width: var(--line-number-gutter-width);
+  max-width: var(--line-number-gutter-width);
+  box-sizing: border-box;
   text-align: right;
   padding: 0 var(--space-2);
   color: var(--color-faint);
@@ -1239,11 +1262,13 @@ body.inbox-mode .main {
   border-right: 1px solid var(--color-border);
   position: relative;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .line-number-text {
   display: inline-block;
-  min-width: 28px;
+  width: var(--line-number-text-width);
+  min-width: var(--line-number-text-width);
 }
 
 .line-diff-mark {
@@ -1365,6 +1390,8 @@ body.inbox-mode .main {
   align-items: center;
   justify-content: center;
   min-width: 30px;
+  max-width: calc(var(--line-number-gutter-width) - 8px);
+  box-sizing: border-box;
   height: 18px;
   padding: 0 6px;
   border: 1px solid #fecdd3;
@@ -1408,14 +1435,6 @@ body.inbox-mode .main {
   width: 3px;
   border-radius: var(--radius-pill);
   background: transparent;
-}
-
-.code-table tr.nav-focus-comment > td.gutter-num::after {
-  background: var(--thread-comment);
-}
-
-.code-table tr.nav-focus-note > td.gutter-num::after {
-  background: var(--thread-note);
 }
 
 .code-table tr.nav-focus-hunk.diff-added-line > td.gutter-num::after,

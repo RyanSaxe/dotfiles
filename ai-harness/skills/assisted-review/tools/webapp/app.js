@@ -23,8 +23,7 @@ const state = {
   // ui
   inboxFilter: "needs_triage",        // 'needs_triage' | 'iterating' | 'done' | 'stale'
   showStale: false,
-  diffVisible: localStorage.getItem("assistedReviewDiffVisible") === "1"
-    || localStorage.getItem("assistedReviewViewMode") === "diff",
+  diffVisible: defaultDiffVisible(),
   navTarget: localStorage.getItem("assistedReviewNavTarget") || "comments", // comments | hunks
   threadFilter: localStorage.getItem("assistedReviewThreadFilter") || "all", // all | comment | note
   cursorHunk: null,                   // { file, index } for hunk navigation
@@ -54,7 +53,8 @@ const state = {
   error: null,
 };
 
-let navFocusTimer = null;
+const HIGHLIGHT_CACHE_LIMIT = 20000;
+const highlightLineCache = new Map();
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", icon: "circle-dot" },
@@ -68,6 +68,12 @@ if (!["comments", "hunks"].includes(state.navTarget)) state.navTarget = "comment
 if (!["all", "comment", "note"].includes(state.threadFilter)) state.threadFilter = "all";
 
 // === Helpers =======================================================
+
+function defaultDiffVisible() {
+  const stored = localStorage.getItem("assistedReviewDiffVisible");
+  if (stored !== null) return stored === "1";
+  return localStorage.getItem("assistedReviewViewMode") !== "source";
+}
 
 function shortSha(sha) {
   return (sha || "").slice(0, 7);
@@ -516,14 +522,25 @@ function detectLanguage(filePath, content) {
 
 function renderHighlightedLine(line, language) {
   const safeLine = line || " ";
-  if (!window.hljs) return escapeHtml(line) || "&nbsp;";
+  const cacheKey = `${window.hljs ? "hljs" : "plain"}\0${language || ""}\0${safeLine}`;
+  if (highlightLineCache.has(cacheKey)) return highlightLineCache.get(cacheKey);
+  if (highlightLineCache.size > HIGHLIGHT_CACHE_LIMIT) highlightLineCache.clear();
+  if (!window.hljs) {
+    const plainHtml = escapeHtml(line) || "&nbsp;";
+    highlightLineCache.set(cacheKey, plainHtml);
+    return plainHtml;
+  }
   try {
     const result = language
       ? window.hljs.highlight(safeLine, { language, ignoreIllegals: true })
       : window.hljs.highlightAuto(safeLine);
-    return result.value || "&nbsp;";
+    const highlightedHtml = result.value || "&nbsp;";
+    highlightLineCache.set(cacheKey, highlightedHtml);
+    return highlightedHtml;
   } catch {
-    return escapeHtml(line) || "&nbsp;";
+    const fallbackHtml = escapeHtml(line) || "&nbsp;";
+    highlightLineCache.set(cacheKey, fallbackHtml);
+    return fallbackHtml;
   }
 }
 
@@ -1939,12 +1956,15 @@ function renderFileView() {
   const { threadsAtLine, threadsEndingAtLine, rangedSpanLines } = commentLineMaps(fileComments);
   const overlay = diffOverlayForSource(diffDetail?.hunks || [], lines.length);
   const diffVisible = state.diffVisible;
+  const lineNumberDigits = diffLineNumberDigits(diffDetail?.hunks || [], lines.length);
+  const tableStyle = `style="--line-number-text-width:${lineNumberDigits}ch;--line-number-gutter-width:calc(${lineNumberDigits}ch + 30px)"`;
+  const focusedHunkIndex = state.cursorHunk?.file === filePath ? state.cursorHunk.index : null;
   const renderDeletedRows = (items) => diffVisible
-    ? items.map((row) => renderDeletedDiffRow(row, language)).join("")
+    ? items.map((row) => renderDeletedDiffRow(row, language, focusedHunkIndex)).join("")
     : "";
   const renderDeletionSummaries = (items) => diffVisible
     ? ""
-    : items.map((summary) => renderDeletionSummaryRow(summary)).join("");
+    : items.map((summary) => renderDeletionSummaryRow(summary, focusedHunkIndex)).join("");
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
@@ -1981,6 +2001,7 @@ function renderFileView() {
       diffVisible ? "diff-visible" : "diff-hidden",
       diffVisible && changed ? "diff-added-line" : "",
       !diffVisible && changed ? "diff-indicator-line" : "",
+      hunkMember === focusedHunkIndex ? "nav-focus nav-focus-hunk" : "",
       isUncommented ? "uncommented" : "",
     ].filter(Boolean).join(" ");
     const codeHtml = renderHighlightedLine(lineText, language);
@@ -2028,7 +2049,7 @@ function renderFileView() {
     ? `<div class="file-unavailable">${escapeHtml(sourceUnavailable)}. Turn diff on to inspect deleted or unreadable changed lines.</div>`
     : "";
   const diffOnlyRows = sourceUnavailable && hasDiffOnlyRows
-    ? `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}"><tbody>${renderDeletedRows(overlay.afterAll)}${renderDeletionSummaries(overlay.deletionSummariesAfterAll)}</tbody></table>`
+    ? `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}" ${tableStyle}><tbody>${renderDeletedRows(overlay.afterAll)}${renderDeletionSummaries(overlay.deletionSummariesAfterAll)}</tbody></table>`
     : "";
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
   const counts = threadCounts(fileComments);
@@ -2043,7 +2064,7 @@ function renderFileView() {
         <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
       </div>
       <div class="code-table-scroll">
-        ${emptyHtml || diffOnlyRows || `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}"><tbody>${rows}</tbody></table>`}
+        ${emptyHtml || diffOnlyRows || `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}" ${tableStyle}><tbody>${rows}</tbody></table>`}
       </div>
     </div>
   `;
@@ -2182,12 +2203,27 @@ function diffOverlayForSource(hunks, lineCount) {
   };
 }
 
-function renderDeletionSummaryRow(summary) {
+function diffLineNumberDigits(hunks, lineCount) {
+  let maxLine = Math.max(1, Number(lineCount) || 1);
+  (hunks || []).forEach((hunk) => {
+    const oldEnd = Number(hunk.old_start || 0) + Math.max(0, Number(hunk.old_lines || 0) - 1);
+    const newEnd = Number(hunk.new_start || 0) + Math.max(0, Number(hunk.new_lines || 0) - 1);
+    maxLine = Math.max(maxLine, oldEnd, newEnd);
+    (hunk.lines || []).forEach((line) => {
+      if (Number.isInteger(line.old_line)) maxLine = Math.max(maxLine, line.old_line);
+      if (Number.isInteger(line.new_line)) maxLine = Math.max(maxLine, line.new_line);
+    });
+  });
+  return Math.max(2, String(maxLine).length);
+}
+
+function renderDeletionSummaryRow(summary, focusedHunkIndex) {
   const label = `-${summary.count}`;
   const title = `${summary.count} deleted ${summary.count === 1 ? "line" : "lines"}. Turn diff on to view.`;
   const hunkAttr = summary.hunkStart ? `data-hunk-index="${summary.hunkIndex}"` : "";
+  const focusClass = summary.hunkIndex === focusedHunkIndex ? "nav-focus nav-focus-hunk" : "";
   return `
-    <tr class="source-virtual-line diff-deletion-summary" ${hunkAttr} data-hunk-member="${summary.hunkIndex}">
+    <tr class="source-virtual-line diff-deletion-summary ${focusClass}" ${hunkAttr} data-hunk-member="${summary.hunkIndex}">
       <td class="gutter-num deletion-summary" title="${escapeHtml(title)}">
         <button class="deletion-count-marker" type="button" data-show-deletion-group="${summary.deletionGroup}" data-show-deletion-hunk="${summary.hunkIndex}" title="${escapeHtml(title)}">${escapeHtml(label)}</button>
       </td>
@@ -2197,10 +2233,11 @@ function renderDeletionSummaryRow(summary) {
   `;
 }
 
-function renderDeletedDiffRow(row, language) {
+function renderDeletedDiffRow(row, language, focusedHunkIndex) {
   const hunkAttr = row.hunkStart ? `data-hunk-index="${row.hunkIndex}"` : "";
+  const focusClass = row.hunkIndex === focusedHunkIndex ? "nav-focus nav-focus-hunk" : "";
   return `
-    <tr class="source-virtual-line diff-deleted-line" ${hunkAttr} data-hunk-member="${row.hunkIndex}" data-deletion-group="${row.deletionGroup}" data-deleted-old-line="${row.oldLine || ""}">
+    <tr class="source-virtual-line diff-deleted-line ${focusClass}" ${hunkAttr} data-hunk-member="${row.hunkIndex}" data-deletion-group="${row.deletionGroup}" data-deleted-old-line="${row.oldLine || ""}">
       <td class="gutter-num deleted"><span class="line-diff-mark deletion">−</span><span class="line-number-text">${row.oldLine || ""}</span></td>
       <td class="gutter-marker thread-marker-cell"></td>
       <td class="code-cell">${renderHighlightedLine(row.text || "", language)}</td>
@@ -2778,6 +2815,7 @@ function attachContentHandlers() {
       const hunkIndex = Number(el.getAttribute("data-show-deletion-hunk"));
       const groupIndex = Number(el.getAttribute("data-show-deletion-group"));
       if (!Number.isInteger(hunkIndex)) return;
+      state.cursorHunk = { file: state.route.file, index: hunkIndex };
       setDiffVisible(true);
       if (Number.isInteger(groupIndex)) {
         scrollDeletionGroupIntoView(groupIndex, hunkIndex);
@@ -3063,6 +3101,7 @@ async function toggleComment(id) {
     state.expandedComments.add(id);
     state.cursorCommentId = id;
   }
+  state.cursorHunk = null;
   renderContent();
   scrollCommentIntoView(id);
 }
@@ -3084,8 +3123,6 @@ function scrollCommentIntoView(id) {
       target = document.querySelector(`[data-source-line="${targetLine}"]`) || card;
     }
     scrollElementToContentTop(target, content, NAV_SCROLL_TOP_OFFSET);
-    const focusRows = Array.from(document.querySelectorAll(`[data-thread-line-id="${CSS.escape(id)}"]`));
-    indicateNavigation(focusRows, thread && isNoteThread(thread) ? "note" : "comment");
   });
 }
 
@@ -3102,7 +3139,7 @@ function scrollHunkIntoView(index) {
     }
     if (!row || !content) return;
     scrollElementToContentTop(row, content, NAV_SCROLL_TOP_OFFSET);
-    indicateNavigation(Array.from(document.querySelectorAll(`[data-hunk-member="${index}"]`)), "hunk");
+    focusHunkRows(index);
   });
 }
 
@@ -3115,7 +3152,7 @@ function scrollDeletionGroupIntoView(groupIndex, fallbackHunkIndex) {
       return;
     }
     scrollElementToContentTop(row, content, NAV_SCROLL_TOP_OFFSET);
-    indicateNavigation(Array.from(document.querySelectorAll(`[data-deletion-group="${groupIndex}"]`)), "hunk");
+    focusHunkRows(fallbackHunkIndex);
   });
 }
 
@@ -3128,20 +3165,17 @@ function scrollElementToContentTop(element, content, offset) {
   content.scrollTo({ top, behavior: "smooth" });
 }
 
-function indicateNavigation(elements, kind) {
+function focusHunkRows(index) {
+  clearHunkFocusRows();
+  document.querySelectorAll(`[data-hunk-member="${index}"]`).forEach((el) => {
+    el.classList.add("nav-focus", "nav-focus-hunk");
+  });
+}
+
+function clearHunkFocusRows() {
   document.querySelectorAll(".nav-focus").forEach((el) => {
-    el.classList.remove("nav-focus", "nav-focus-comment", "nav-focus-note", "nav-focus-hunk");
+    el.classList.remove("nav-focus", "nav-focus-hunk");
   });
-  if (navFocusTimer) window.clearTimeout(navFocusTimer);
-  elements.filter(Boolean).forEach((el) => {
-    el.classList.add("nav-focus", `nav-focus-${kind}`);
-  });
-  navFocusTimer = window.setTimeout(() => {
-    document.querySelectorAll(".nav-focus").forEach((el) => {
-      el.classList.remove("nav-focus", "nav-focus-comment", "nav-focus-note", "nav-focus-hunk");
-    });
-    navFocusTimer = null;
-  }, 1600);
 }
 
 function focusedSourceLine() {
@@ -3211,6 +3245,7 @@ function toggleDiffVisible() {
 function setNavTarget(target) {
   if (!["comments", "hunks"].includes(target) || state.navTarget === target) return;
   state.navTarget = target;
+  if (target === "comments") state.cursorHunk = null;
   localStorage.setItem("assistedReviewNavTarget", target);
   renderContent();
 }
@@ -3372,6 +3407,7 @@ async function navigateToComment(direction) {
   const nextIdx = fileScopedNavIndex(comments, currentIdx, direction);
   const target = comments[nextIdx];
   state.cursorCommentId = target.id;
+  state.cursorHunk = null;
 
   if (state.route.view !== "file" || state.route.file !== target.file) {
     await navigate(
