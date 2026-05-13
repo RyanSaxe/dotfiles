@@ -54,6 +54,8 @@ const state = {
   error: null,
 };
 
+let navFocusTimer = null;
+
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", icon: "circle-dot" },
   { value: "acknowledged", label: "Acknowledged", icon: "eye" },
@@ -1259,9 +1261,9 @@ function renderContextbar() {
         <i data-lucide="check"></i>
       </button>
     </div>
-    <button class="btn diff-toggle ${state.diffVisible ? "active" : ""}" data-toggle-diff title="${state.diffVisible ? "Hide inline diff" : "Show inline diff"} (d)">
+    <button class="btn diff-toggle ${state.diffVisible ? "active" : ""}" data-toggle-diff aria-pressed="${state.diffVisible ? "true" : "false"}" title="${state.diffVisible ? "Hide inline diff" : "Show inline diff"} (d)">
       <i data-lucide="${state.diffVisible ? "git-compare-arrows" : "git-compare"}"></i>
-      Diff ${state.diffVisible ? "on" : "off"}
+      Diff
     </button>
     <div class="segmented" role="group" aria-label="Navigation target">
       <button class="${state.navTarget === "comments" ? "active" : ""}" data-nav-target="comments" title="Navigate threads (c)">Threads</button>
@@ -1940,6 +1942,9 @@ function renderFileView() {
   const renderDeletedRows = (items) => diffVisible
     ? items.map((row) => renderDeletedDiffRow(row, language)).join("")
     : "";
+  const renderDeletionSummaries = (items) => diffVisible
+    ? ""
+    : items.map((summary) => renderDeletionSummaryRow(summary)).join("");
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
@@ -1951,7 +1956,6 @@ function renderFileView() {
       : (overlay.hunkStarts.get(lineNum) ?? overlay.fallbackHunkStarts.get(lineNum));
     const hunkMember = overlay.hunkMembers.get(lineNum);
     const changed = overlay.changedLines.has(lineNum);
-    const nearDeletion = overlay.deletionMarkers.has(lineNum);
 
     let markerHtml = "";
     const primary = covering[0];
@@ -1977,7 +1981,6 @@ function renderFileView() {
       diffVisible ? "diff-visible" : "diff-hidden",
       diffVisible && changed ? "diff-added-line" : "",
       !diffVisible && changed ? "diff-indicator-line" : "",
-      !diffVisible && nearDeletion ? "diff-deletion-near" : "",
       isUncommented ? "uncommented" : "",
     ].filter(Boolean).join(" ");
     const codeHtml = renderHighlightedLine(lineText, language);
@@ -1987,14 +1990,12 @@ function renderFileView() {
     const hunkAttr = hunkIndex !== undefined ? `data-hunk-index="${hunkIndex}"` : "";
     const hunkMemberAttr = hunkMember !== undefined ? `data-hunk-member="${hunkMember}"` : "";
     const threadLineAttr = primary ? `data-thread-line-id="${escapeHtml(primary.id)}"` : "";
-    const lineNumberMark = !diffVisible && nearDeletion
-      ? `<span class="line-diff-mark deletion">−</span>`
-      : "";
 
     let html = `
+      ${renderDeletionSummaries(overlay.deletionSummariesBeforeLine.get(lineNum) || [])}
       ${renderDeletedRows(overlay.beforeLine.get(lineNum) || [])}
       <tr class="${rowClass}" ${hunkAttr} ${hunkMemberAttr} data-source-line="${lineNum}" ${threadLineAttr}>
-        <td class="gutter-num ${changed ? "changed" : ""} ${nearDeletion ? "near-deletion" : ""}">${lineNumberMark}<span class="line-number-text">${lineNum}</span></td>
+        <td class="gutter-num ${changed ? "changed" : ""}"><span class="line-number-text">${lineNum}</span></td>
         <td class="${markerClass}" ${gutterDataAttr}>${markerHtml}</td>
         <td class="code-cell">${codeHtml}</td>
       </tr>
@@ -2020,13 +2021,14 @@ function renderFileView() {
     }
 
     return html;
-  }).join("") + renderDeletedRows(overlay.afterAll);
+  }).join("") + renderDeletedRows(overlay.afterAll) + renderDeletionSummaries(overlay.deletionSummariesAfterAll);
 
-  const emptyHtml = sourceUnavailable && (!diffVisible || !overlay.afterAll.length)
+  const hasDiffOnlyRows = overlay.afterAll.length > 0 || overlay.deletionSummariesAfterAll.length > 0;
+  const emptyHtml = sourceUnavailable && !hasDiffOnlyRows
     ? `<div class="file-unavailable">${escapeHtml(sourceUnavailable)}. Turn diff on to inspect deleted or unreadable changed lines.</div>`
     : "";
-  const diffOnlyRows = sourceUnavailable && diffVisible && overlay.afterAll.length
-    ? `<table class="code-table full-source-table diff-overlay-on"><tbody>${renderDeletedRows(overlay.afterAll)}</tbody></table>`
+  const diffOnlyRows = sourceUnavailable && hasDiffOnlyRows
+    ? `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}"><tbody>${renderDeletedRows(overlay.afterAll)}${renderDeletionSummaries(overlay.deletionSummariesAfterAll)}</tbody></table>`
     : "";
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
   const counts = threadCounts(fileComments);
@@ -2037,7 +2039,6 @@ function renderFileView() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
-        <span class="lang-badge">${diffVisible ? "diff on" : "diff off"}</span>
         ${statHtml}
         <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
       </div>
@@ -2079,14 +2080,21 @@ function diffOverlayForSource(hunks, lineCount) {
   const beforeLine = new Map();
   const afterAll = [];
   const changedLines = new Set();
-  const deletionMarkers = new Set();
+  const deletionSummariesBeforeLine = new Map();
+  const deletionSummariesAfterAll = [];
   const hunkStarts = new Map();
   const fallbackHunkStarts = new Map();
   const hunkMembers = new Map();
+  let deletionGroup = 0;
 
   function addBefore(lineNum, row) {
     if (!beforeLine.has(lineNum)) beforeLine.set(lineNum, []);
     beforeLine.get(lineNum).push(row);
+  }
+
+  function addDeletionSummary(lineNum, summary) {
+    if (!deletionSummariesBeforeLine.has(lineNum)) deletionSummariesBeforeLine.set(lineNum, []);
+    deletionSummariesBeforeLine.get(lineNum).push(summary);
   }
 
   function addMember(lineNum, hunkIndex) {
@@ -2109,22 +2117,29 @@ function diffOverlayForSource(hunks, lineCount) {
         Math.max(1, Number(hunk.new_start || 1) + Number(hunk.new_lines || 0)),
       );
       const insertLine = Number.isInteger(targetLine) ? targetLine : fallbackLine;
-      const markerLine = lineCount
-        ? Math.min(Math.max(1, insertLine), lineCount)
-        : 1;
-      deletionMarkers.add(markerLine);
       const startsHunk = !hunkStarted;
+      const groupId = deletionGroup;
+      deletionGroup += 1;
       pendingDeletes = pendingDeletes.map((row, offset) => ({
         ...row,
+        deletionGroup: groupId,
         hunkStart: startsHunk && offset === 0 ? markHunkStart() : false,
       }));
       if (startsHunk && insertLine <= lineCount) {
         fallbackHunkStarts.set(insertLine, hunkIndex);
       }
+      const summary = {
+        count: pendingDeletes.length,
+        deletionGroup: groupId,
+        hunkIndex,
+        hunkStart: startsHunk,
+      };
       if (insertLine <= lineCount) {
         pendingDeletes.forEach((row) => addBefore(insertLine, row));
+        addDeletionSummary(insertLine, summary);
       } else {
         afterAll.push(...pendingDeletes);
+        deletionSummariesAfterAll.push(summary);
       }
       pendingDeletes = [];
     };
@@ -2159,17 +2174,33 @@ function diffOverlayForSource(hunks, lineCount) {
     beforeLine,
     afterAll,
     changedLines,
-    deletionMarkers,
+    deletionSummariesBeforeLine,
+    deletionSummariesAfterAll,
     hunkStarts,
     fallbackHunkStarts,
     hunkMembers,
   };
 }
 
+function renderDeletionSummaryRow(summary) {
+  const label = `-${summary.count}`;
+  const title = `${summary.count} deleted ${summary.count === 1 ? "line" : "lines"}. Turn diff on to view.`;
+  const hunkAttr = summary.hunkStart ? `data-hunk-index="${summary.hunkIndex}"` : "";
+  return `
+    <tr class="source-virtual-line diff-deletion-summary" ${hunkAttr} data-hunk-member="${summary.hunkIndex}">
+      <td class="gutter-num deletion-summary" title="${escapeHtml(title)}">
+        <button class="deletion-count-marker" type="button" data-show-deletion-group="${summary.deletionGroup}" data-show-deletion-hunk="${summary.hunkIndex}" title="${escapeHtml(title)}">${escapeHtml(label)}</button>
+      </td>
+      <td class="gutter-marker thread-marker-cell"></td>
+      <td class="code-cell deletion-summary-cell" title="${escapeHtml(title)}"></td>
+    </tr>
+  `;
+}
+
 function renderDeletedDiffRow(row, language) {
   const hunkAttr = row.hunkStart ? `data-hunk-index="${row.hunkIndex}"` : "";
   return `
-    <tr class="source-virtual-line diff-deleted-line" ${hunkAttr} data-hunk-member="${row.hunkIndex}" data-deleted-old-line="${row.oldLine || ""}">
+    <tr class="source-virtual-line diff-deleted-line" ${hunkAttr} data-hunk-member="${row.hunkIndex}" data-deletion-group="${row.deletionGroup}" data-deleted-old-line="${row.oldLine || ""}">
       <td class="gutter-num deleted"><span class="line-diff-mark deletion">−</span><span class="line-number-text">${row.oldLine || ""}</span></td>
       <td class="gutter-marker thread-marker-cell"></td>
       <td class="code-cell">${renderHighlightedLine(row.text || "", language)}</td>
@@ -2741,6 +2772,21 @@ function attachContentHandlers() {
     });
   });
 
+  content.querySelectorAll("[data-show-deletion-hunk]").forEach((el) => {
+    el.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const hunkIndex = Number(el.getAttribute("data-show-deletion-hunk"));
+      const groupIndex = Number(el.getAttribute("data-show-deletion-group"));
+      if (!Number.isInteger(hunkIndex)) return;
+      setDiffVisible(true);
+      if (Number.isInteger(groupIndex)) {
+        scrollDeletionGroupIntoView(groupIndex, hunkIndex);
+      } else {
+        scrollHunkIntoView(hunkIndex);
+      }
+    });
+  });
+
   // New-comment form handlers
   content.querySelectorAll("[data-cancel-new]").forEach((el) => {
     el.addEventListener("click", () => {
@@ -3023,22 +3069,23 @@ async function toggleComment(id) {
 
 const NAV_SCROLL_TOP_OFFSET = 16;
 const FOCUS_LINE_OFFSET = 120;
+const COMMENT_CONTEXT_LINE_MAX = 10;
 
 function scrollCommentIntoView(id) {
   requestAnimationFrame(() => {
+    const thread = findThread(id);
     const card = document.querySelector(`[data-comment-card="${id}"]`);
     const content = document.getElementById("content");
     if (!card || !content) return;
-    const top =
-      card.getBoundingClientRect().top -
-      content.getBoundingClientRect().top +
-      content.scrollTop -
-      NAV_SCROLL_TOP_OFFSET;
-    content.scrollTo({ top, behavior: "smooth" });
-    pulseElements([
-      card,
-      document.querySelector(`[data-thread-line-id="${CSS.escape(id)}"]`),
-    ]);
+    let target = card;
+    if (thread) {
+      const [startLine, endLine] = commentLineRange(thread);
+      const targetLine = Math.max(startLine, endLine - COMMENT_CONTEXT_LINE_MAX + 1);
+      target = document.querySelector(`[data-source-line="${targetLine}"]`) || card;
+    }
+    scrollElementToContentTop(target, content, NAV_SCROLL_TOP_OFFSET);
+    const focusRows = Array.from(document.querySelectorAll(`[data-thread-line-id="${CSS.escape(id)}"]`));
+    indicateNavigation(focusRows, thread && isNoteThread(thread) ? "note" : "comment");
   });
 }
 
@@ -3054,23 +3101,47 @@ function scrollHunkIntoView(index) {
       return;
     }
     if (!row || !content) return;
-    const top =
-      row.getBoundingClientRect().top -
-      content.getBoundingClientRect().top +
-      content.scrollTop -
-      NAV_SCROLL_TOP_OFFSET;
-    content.scrollTo({ top, behavior: "smooth" });
-    pulseElements(Array.from(document.querySelectorAll(`[data-hunk-member="${index}"]`)));
+    scrollElementToContentTop(row, content, NAV_SCROLL_TOP_OFFSET);
+    indicateNavigation(Array.from(document.querySelectorAll(`[data-hunk-member="${index}"]`)), "hunk");
   });
 }
 
-function pulseElements(elements) {
-  elements.filter(Boolean).forEach((el) => {
-    el.classList.remove("jump-pulse");
-    void el.offsetWidth;
-    el.classList.add("jump-pulse");
-    window.setTimeout(() => el.classList.remove("jump-pulse"), 1600);
+function scrollDeletionGroupIntoView(groupIndex, fallbackHunkIndex) {
+  requestAnimationFrame(() => {
+    const content = document.getElementById("content");
+    const row = document.querySelector(`[data-deletion-group="${groupIndex}"]`);
+    if (!row || !content) {
+      scrollHunkIntoView(fallbackHunkIndex);
+      return;
+    }
+    scrollElementToContentTop(row, content, NAV_SCROLL_TOP_OFFSET);
+    indicateNavigation(Array.from(document.querySelectorAll(`[data-deletion-group="${groupIndex}"]`)), "hunk");
   });
+}
+
+function scrollElementToContentTop(element, content, offset) {
+  const top =
+    element.getBoundingClientRect().top -
+    content.getBoundingClientRect().top +
+    content.scrollTop -
+    offset;
+  content.scrollTo({ top, behavior: "smooth" });
+}
+
+function indicateNavigation(elements, kind) {
+  document.querySelectorAll(".nav-focus").forEach((el) => {
+    el.classList.remove("nav-focus", "nav-focus-comment", "nav-focus-note", "nav-focus-hunk");
+  });
+  if (navFocusTimer) window.clearTimeout(navFocusTimer);
+  elements.filter(Boolean).forEach((el) => {
+    el.classList.add("nav-focus", `nav-focus-${kind}`);
+  });
+  navFocusTimer = window.setTimeout(() => {
+    document.querySelectorAll(".nav-focus").forEach((el) => {
+      el.classList.remove("nav-focus", "nav-focus-comment", "nav-focus-note", "nav-focus-hunk");
+    });
+    navFocusTimer = null;
+  }, 1600);
 }
 
 function focusedSourceLine() {

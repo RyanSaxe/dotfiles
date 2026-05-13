@@ -92,7 +92,7 @@ All filesystem access is restricted to `~/.reviews/` (for review files) and the 
 
 ## Diff Context
 
-Diff context is live viewer state, not review content. The review YAML may store `target.base_ref`, but it never stores generated patches, hunk lists, or file stats. The viewer resolves the base ref at render time, compares it to the current repo filesystem state, and exposes the result as file-tree `+x/-y` counts plus an inline diff toggle on the full-source file view. With diff off, current lines keep subtle changed/deletion indicators; with diff on, the viewer overlays added/current changed lines and actual deleted base-side code as virtual rows.
+Diff context is live viewer state, not review content. The review YAML may store `target.base_ref`, but it never stores generated patches, hunk lists, or file stats. The viewer resolves the base ref at render time, compares it to the current repo filesystem state, and exposes the result as file-tree `+x/-y` counts plus an inline diff toggle on the full-source file view. With diff off, changed current lines keep subtle line-number tinting and deleted base-side runs appear as compact `-N` gutter markers; clicking a marker turns diff on and jumps to the deleted rows. With diff on, the viewer overlays added/current changed lines and actual deleted base-side code as virtual rows.
 
 ## Staleness
 
