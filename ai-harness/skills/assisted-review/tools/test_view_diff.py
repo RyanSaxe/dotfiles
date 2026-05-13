@@ -105,6 +105,24 @@ class DiffTests(unittest.TestCase):
         self.assertEqual(record["deletions"], 0)
         self.assertNotIn("-0,0", record["hunks"][0]["header"])
 
+    def test_deleted_lines_include_original_text_for_inline_diff_overlay(self) -> None:
+        base_ref = git(self.repo, "rev-parse", "HEAD")
+        (self.repo / "app.py").write_text("one\n")
+
+        payload = view.compute_diff(
+            str(self.repo), {"base_ref": base_ref}, rel_file="app.py"
+        )
+        record = self.file_record(payload, "app.py")
+        deleted_lines = [
+            line
+            for hunk in record["hunks"]
+            for line in hunk["lines"]
+            if line["kind"] == "del"
+        ]
+
+        self.assertEqual(record["deletions"], 1)
+        self.assertEqual(deleted_lines[0]["text"], "two")
+
     def test_invalid_base_ref_raises_clear_error(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "could not resolve base ref"):
             view.compute_diff(str(self.repo), {"base_ref": "missing/ref"})

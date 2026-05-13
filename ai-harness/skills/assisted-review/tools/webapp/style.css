@@ -1202,12 +1202,31 @@ body.inbox-mode .main {
   width: 56px;
   min-width: 56px;
   text-align: right;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-2);
   color: var(--color-faint);
   user-select: none;
   font-variant-numeric: tabular-nums;
   background: #fafafa;
   border-right: 1px solid var(--color-border);
+  position: relative;
+  white-space: nowrap;
+}
+
+.line-number-text {
+  display: inline-block;
+  min-width: 28px;
+}
+
+.line-diff-mark {
+  display: inline-block;
+  width: 10px;
+  margin-right: 4px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.line-diff-mark.deletion {
+  color: #a40e26;
 }
 
 .code-table td.gutter-marker {
@@ -1226,20 +1245,8 @@ body.inbox-mode .main {
   background: #f0f0f0;
 }
 
-.code-table td.source-diff-marker {
-  width: 28px;
-  min-width: 28px;
-  padding: 0;
-  text-align: center;
-  color: var(--color-muted);
-  background: #fafafa;
-  border-right: 1px solid var(--color-border);
-  user-select: none;
-  position: relative;
-}
-
 .gutter-marker .dot,
-.diff-marker-cell .dot {
+.thread-marker-cell .dot {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -1259,7 +1266,7 @@ body.inbox-mode .main {
 }
 
 .gutter-marker .bar,
-.diff-marker-cell .bar {
+.thread-marker-cell .bar {
   position: absolute;
   left: 5px;
   width: 8px;
@@ -1269,19 +1276,19 @@ body.inbox-mode .main {
 }
 
 .gutter-marker.range-start .bar,
-.diff-marker-cell.range-start .bar {
+.thread-marker-cell.range-start .bar {
   top: 6px;
   border-radius: 4px 4px 0 0;
 }
 
 .gutter-marker.range-end .bar,
-.diff-marker-cell.range-end .bar {
+.thread-marker-cell.range-end .bar {
   bottom: 6px;
   border-radius: 0 0 4px 4px;
 }
 
 .gutter-marker.range-only .bar,
-.diff-marker-cell.range-only .bar {
+.thread-marker-cell.range-only .bar {
   top: 6px;
   bottom: 6px;
   border-radius: 4px;
@@ -1292,13 +1299,31 @@ body.inbox-mode .main {
   white-space: pre;
 }
 
-.code-table tr.diff-hunk-line td.source-diff-marker {
-  background: var(--diff-gutter-soft);
+.code-table tr.diff-indicator-line td.gutter-num {
+  color: #116329;
+  background: #f0fdf4;
 }
 
-.code-table tr.diff-changed-line td.source-diff-marker {
-  background: var(--diff-gutter);
+.code-table tr.diff-deletion-near td.gutter-num {
+  color: #a40e26;
+  background: #fff1f2;
+}
+
+.code-table tr.diff-added-line td.gutter-num,
+.code-table tr.diff-added-line td.code-cell {
+  background: #ecfdf3;
   color: #116329;
+}
+
+.code-table tr.diff-deleted-line td.gutter-num,
+.code-table tr.diff-deleted-line td.gutter-marker,
+.code-table tr.diff-deleted-line td.code-cell {
+  background: #fff1f2;
+  color: #a40e26;
+}
+
+.code-table tr.diff-deleted-line td.code-cell {
+  text-decoration: none;
 }
 
 .code-table tr.has-comment:hover td.code-cell,
@@ -1306,9 +1331,34 @@ body.inbox-mode .main {
   background: rgba(250, 204, 21, 0.1);
 }
 
-.code-table tr.diff-hunk-line:hover td.source-diff-marker,
-.code-table tr.diff-changed-line:hover td.source-diff-marker {
-  background: #bfdbfe;
+.code-table tr.diff-added-line:hover td.gutter-num,
+.code-table tr.diff-added-line:hover td.code-cell {
+  background: #dcfce7;
+}
+
+.code-table tr.diff-deleted-line:hover td.gutter-num,
+.code-table tr.diff-deleted-line:hover td.gutter-marker,
+.code-table tr.diff-deleted-line:hover td.code-cell {
+  background: #ffe4e6;
+}
+
+.jump-pulse {
+  animation: jump-pulse 1.5s ease-out;
+}
+
+tr.jump-pulse > td {
+  animation: jump-pulse-row 1.5s ease-out;
+}
+
+@keyframes jump-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.32); }
+  60% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+  100% { box-shadow: none; }
+}
+
+@keyframes jump-pulse-row {
+  0% { background-color: rgba(250, 204, 21, 0.26); }
+  100% { background-color: inherit; }
 }
 
 /* Comment row: rendered as a tr after the code line */
@@ -1336,100 +1386,6 @@ body.inbox-mode .main {
   padding: var(--space-6);
   color: var(--color-muted);
   font-size: var(--text-sm);
-}
-
-.unified-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-.unified-table td {
-  vertical-align: top;
-}
-
-.unified-table .diff-old-num,
-.unified-table .diff-new-num,
-.unified-table .diff-line-num {
-  width: 48px;
-  min-width: 48px;
-  padding: 0 var(--space-2);
-  text-align: right;
-  color: var(--color-faint);
-  background: #fafafa;
-  border-right: 1px solid var(--color-border);
-  user-select: none;
-  font-variant-numeric: tabular-nums;
-}
-
-.unified-table .diff-marker-cell {
-  width: 28px;
-  min-width: 28px;
-  padding: 0;
-  text-align: center;
-  color: var(--color-muted);
-  background: #fafafa;
-  border-right: 1px solid var(--color-border);
-  user-select: none;
-  position: relative;
-}
-
-.unified-table .thread-marker-cell {
-  width: 18px;
-  min-width: 18px;
-  padding: 0;
-  text-align: center;
-  background: #fafafa;
-  border-right: 1px solid var(--color-border);
-  user-select: none;
-  position: relative;
-}
-
-.unified-table .thread-marker-cell[data-add-line],
-.unified-table .thread-marker-cell[data-comment-id] {
-  cursor: pointer;
-}
-
-.unified-table .thread-marker-cell:hover {
-  background: #f0f0f0;
-}
-
-.unified-table .diff-code-cell {
-  padding: 0 var(--space-3);
-  white-space: pre;
-}
-
-.unified-table tr.diff-hunk-header td {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-weight: 600;
-}
-
-.unified-table tr.add {
-  background: #ecfdf3;
-}
-
-.unified-table tr.del {
-  background: #fff1f2;
-}
-
-.unified-table tr.context {
-  background: var(--color-surface);
-}
-
-.unified-table tr.add .diff-marker-cell {
-  color: #116329;
-  background: #dcfce7;
-}
-
-.unified-table tr.del .diff-marker-cell {
-  color: #a40e26;
-  background: #ffe4e6;
 }
 
 @supports (width: 100cqw) {
@@ -2184,31 +2140,6 @@ body.inbox-mode .main {
 
 .comment-actions .spacer {
   flex: 1;
-}
-
-.local-note-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--thread-note);
-  background: var(--thread-note-soft);
-  border: 1px solid var(--thread-note-border);
-  border-radius: var(--radius-pill);
-  padding: 5px 10px;
-  font-size: var(--text-xs);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.local-note-indicator .lucide {
-  width: 14px;
-  height: 14px;
-}
-
-.github-summary-indicator {
-  color: var(--thread-comment);
-  background: var(--thread-comment-soft);
-  border-color: var(--thread-comment-border);
 }
 
 /* === Shared code syntax theme ===================================== */

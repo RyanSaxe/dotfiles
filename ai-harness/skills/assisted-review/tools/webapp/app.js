@@ -23,10 +23,10 @@ const state = {
   // ui
   inboxFilter: "needs_triage",        // 'needs_triage' | 'iterating' | 'done' | 'stale'
   showStale: false,
-  viewMode: localStorage.getItem("assistedReviewViewMode") || "source", // source | diff
+  diffVisible: localStorage.getItem("assistedReviewDiffVisible") === "1"
+    || localStorage.getItem("assistedReviewViewMode") === "diff",
   navTarget: localStorage.getItem("assistedReviewNavTarget") || "comments", // comments | hunks
   threadFilter: localStorage.getItem("assistedReviewThreadFilter") || "all", // all | comment | note
-  hideThreadCards: localStorage.getItem("assistedReviewHideThreadCards") === "1",
   cursorHunk: null,                   // { file, index } for hunk navigation
   baseDraft: "",
   expandedComments: new Set(),
@@ -49,6 +49,7 @@ const state = {
   suggestionDrafts: new Map(),         // commentId -> original source replacement text
   refreshStatus: null,                 // refresh readiness for current review
   refreshPollId: null,
+  preserveNavCursorForLoad: false,
   suppressGlobalEscapeUntil: 0,
   error: null,
 };
@@ -61,7 +62,6 @@ const STATUS_OPTIONS = [
 ];
 const SKIP_SEND_STATUSES = new Set(["resolved", "wontfix"]);
 const SENDABLE_ANCHOR_STATUSES = new Set(["current", "moved"]);
-if (!["source", "diff"].includes(state.viewMode)) state.viewMode = "source";
 if (!["comments", "hunks"].includes(state.navTarget)) state.navTarget = "comments";
 if (!["all", "comment", "note"].includes(state.threadFilter)) state.threadFilter = "all";
 
@@ -147,6 +147,11 @@ function findDiscussionTarget(id) {
   const kind = overviewKind(id);
   if (kind) return ensureOverviewBlock(kind);
   return findThread(id);
+}
+
+function resetNavigationCursors() {
+  state.cursorCommentId = null;
+  state.cursorHunk = null;
 }
 
 function hasSuggestion(c) {
@@ -790,7 +795,8 @@ function buildPath(route) {
   return "/" + segs.join("/");
 }
 
-function navigate(route, replace = false) {
+function navigate(route, replace = false, opts = {}) {
+  state.preserveNavCursorForLoad = Boolean(opts.preserveNavCursor);
   const path = buildPath(route);
   if (replace) {
     window.history.replaceState(route, "", path);
@@ -993,6 +999,9 @@ function startRefreshPolling() {
 }
 
 async function loadRoute(route) {
+  const previousRoute = state.route;
+  const preserveNavCursor = state.preserveNavCursorForLoad;
+  state.preserveNavCursorForLoad = false;
   state.route = route;
   state.error = null;
   state.expandedComments.clear();
@@ -1001,6 +1010,13 @@ async function loadRoute(route) {
   state.editingBody = null;
   state.editingSuggestion = null;
   state.suggestionDrafts.clear();
+  if (
+    route.view === "file"
+    && (!previousRoute || previousRoute.view !== "file" || previousRoute.file !== route.file)
+    && !preserveNavCursor
+  ) {
+    resetNavigationCursors();
+  }
 
   try {
     if (route.view === "inbox") {
@@ -1243,10 +1259,10 @@ function renderContextbar() {
         <i data-lucide="check"></i>
       </button>
     </div>
-    <div class="segmented" role="group" aria-label="File view mode">
-      <button class="${state.viewMode === "source" ? "active" : ""}" data-view-mode="source" title="Source view (d)">Source</button>
-      <button class="${state.viewMode === "diff" ? "active" : ""}" data-view-mode="diff" title="Unified diff view (d)">Unified</button>
-    </div>
+    <button class="btn diff-toggle ${state.diffVisible ? "active" : ""}" data-toggle-diff title="${state.diffVisible ? "Hide inline diff" : "Show inline diff"} (d)">
+      <i data-lucide="${state.diffVisible ? "git-compare-arrows" : "git-compare"}"></i>
+      Diff ${state.diffVisible ? "on" : "off"}
+    </button>
     <div class="segmented" role="group" aria-label="Navigation target">
       <button class="${state.navTarget === "comments" ? "active" : ""}" data-nav-target="comments" title="Navigate threads (c)">Threads</button>
       <button class="${state.navTarget === "hunks" ? "active" : ""}" data-nav-target="hunks" title="Navigate hunks (h)">Hunks</button>
@@ -1256,10 +1272,6 @@ function renderContextbar() {
       <button class="${state.threadFilter === "comment" ? "active" : ""}" data-thread-filter="comment" title="Show GitHub-sendable comments">Comments</button>
       <button class="${state.threadFilter === "note" ? "active" : ""}" data-thread-filter="note" title="Show local notes">Notes</button>
     </div>
-    <button class="btn ${state.hideThreadCards ? "active" : ""}" data-toggle-thread-cards title="${state.hideThreadCards ? "Show thread cards when opened" : "Hide open thread cards"}">
-      <i data-lucide="${state.hideThreadCards ? "panel-bottom-open" : "panel-bottom-close"}"></i>
-      ${state.hideThreadCards ? "Cards hidden" : "Hide cards"}
-    </button>
     <div class="contextbar-spacer"></div>
     <div class="contextbar-diff-total">${diffTotals}</div>
     <div class="contextbar-nav">
@@ -1279,16 +1291,13 @@ function renderContextbar() {
 }
 
 function attachContextbarHandlers(root) {
-  root.querySelectorAll("[data-view-mode]").forEach((el) => {
-    el.addEventListener("click", () => setViewMode(el.getAttribute("data-view-mode")));
-  });
+  root.querySelector("[data-toggle-diff]")?.addEventListener("click", () => toggleDiffVisible());
   root.querySelectorAll("[data-nav-target]").forEach((el) => {
     el.addEventListener("click", () => setNavTarget(el.getAttribute("data-nav-target")));
   });
   root.querySelectorAll("[data-thread-filter]").forEach((el) => {
     el.addEventListener("click", () => setThreadFilter(el.getAttribute("data-thread-filter")));
   });
-  root.querySelector("[data-toggle-thread-cards]")?.addEventListener("click", () => toggleThreadCardsHidden());
   root.querySelector("[data-prev-nav]")?.addEventListener("click", () => navigateByTarget(-1));
   root.querySelector("[data-next-nav]")?.addEventListener("click", () => navigateByTarget(+1));
   const baseInput = root.querySelector("#diff-base-input");
@@ -1825,19 +1834,6 @@ function renderOverviewCard(kind) {
   const isSummary = kind === "summary";
   const type = isSummary ? "comment" : "note";
   const title = isSummary ? "GitHub review summary" : "Reviewer note";
-  const indicator = isSummary
-    ? `
-      <span class="local-note-indicator github-summary-indicator" title="Sent as the PR review body when the full review is submitted">
-        <i data-lucide="git-pull-request"></i>
-        Sends with full review
-      </span>
-    `
-    : `
-      <span class="local-note-indicator" title="This note stays local and is not submitted to GitHub">
-        <i data-lucide="bookmark"></i>
-        Local note
-      </span>
-    `;
   const isEditing = state.editingBody === id;
   const body = block.body || "";
   const bodyHtml = isEditing
@@ -1860,7 +1856,6 @@ function renderOverviewCard(kind) {
       <div class="comment-header">
         ${renderAuthorBadge(block.author || "ai")}
         ${renderMetaChip("type", type, title)}
-        ${indicator}
         <span class="comment-header-spacer"></span>
         ${editButton}
       </div>
@@ -1931,7 +1926,6 @@ function renderFileView() {
   const filePath = state.route.file;
   const language = detectLanguage(filePath, state.source?.content);
   const diffDetail = state.diffFileCache.get(diffCacheKey(filePath)) || diffStatForFile(filePath);
-  if (state.viewMode === "diff") return renderUnifiedDiffView(filePath, language, diffDetail);
 
   const sourceUnavailable = state.source?.unavailable;
   const source = state.source?.content || "";
@@ -1941,16 +1935,23 @@ function renderFileView() {
     .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
 
   const { threadsAtLine, threadsEndingAtLine, rangedSpanLines } = commentLineMaps(fileComments);
-  const { hunkStarts, hunkSpanLines, changedLines } = hunkLineMaps(diffDetail?.hunks || []);
+  const overlay = diffOverlayForSource(diffDetail?.hunks || [], lines.length);
+  const diffVisible = state.diffVisible;
+  const renderDeletedRows = (items) => diffVisible
+    ? items.map((row) => renderDeletedDiffRow(row, language)).join("")
+    : "";
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
     const covering = threadsAtLine.get(lineNum) || [];
     const ending = threadsEndingAtLine.get(lineNum) || [];
     const inRange = rangedSpanLines.has(lineNum);
-    const hunkIndex = hunkStarts.get(lineNum);
-    const inHunk = hunkSpanLines.has(lineNum);
-    const changed = changedLines.has(lineNum);
+    const hunkIndex = diffVisible
+      ? overlay.hunkStarts.get(lineNum)
+      : (overlay.hunkStarts.get(lineNum) ?? overlay.fallbackHunkStarts.get(lineNum));
+    const hunkMember = overlay.hunkMembers.get(lineNum);
+    const changed = overlay.changedLines.has(lineNum);
+    const nearDeletion = overlay.deletionMarkers.has(lineNum);
 
     let markerHtml = "";
     const primary = covering[0];
@@ -1973,8 +1974,10 @@ function renderFileView() {
     const rowClass = [
       primary ? "has-comment" : "",
       inRange && !primary ? "range-spanned" : "",
-      inHunk ? "diff-hunk-line" : "",
-      changed ? "diff-changed-line" : "",
+      diffVisible ? "diff-visible" : "diff-hidden",
+      diffVisible && changed ? "diff-added-line" : "",
+      !diffVisible && changed ? "diff-indicator-line" : "",
+      !diffVisible && nearDeletion ? "diff-deletion-near" : "",
       isUncommented ? "uncommented" : "",
     ].filter(Boolean).join(" ");
     const codeHtml = renderHighlightedLine(lineText, language);
@@ -1982,40 +1985,48 @@ function renderFileView() {
       ? `data-comment-id="${escapeHtml(primary.id)}"`
       : `data-add-line="${lineNum}"`;
     const hunkAttr = hunkIndex !== undefined ? `data-hunk-index="${hunkIndex}"` : "";
+    const hunkMemberAttr = hunkMember !== undefined ? `data-hunk-member="${hunkMember}"` : "";
+    const threadLineAttr = primary ? `data-thread-line-id="${escapeHtml(primary.id)}"` : "";
+    const lineNumberMark = !diffVisible && nearDeletion
+      ? `<span class="line-diff-mark deletion">−</span>`
+      : "";
 
     let html = `
-      <tr class="${rowClass}" ${hunkAttr}>
-        <td class="gutter-num">${lineNum}</td>
-        <td class="source-diff-marker diff-marker-cell ${inHunk ? "in-hunk" : ""} ${changed ? "changed" : ""}">${changed ? "+" : ""}</td>
+      ${renderDeletedRows(overlay.beforeLine.get(lineNum) || [])}
+      <tr class="${rowClass}" ${hunkAttr} ${hunkMemberAttr} data-source-line="${lineNum}" ${threadLineAttr}>
+        <td class="gutter-num ${changed ? "changed" : ""} ${nearDeletion ? "near-deletion" : ""}">${lineNumberMark}<span class="line-number-text">${lineNum}</span></td>
         <td class="${markerClass}" ${gutterDataAttr}>${markerHtml}</td>
         <td class="code-cell">${codeHtml}</td>
       </tr>
     `;
 
     ending.forEach((c) => {
-      if (!state.hideThreadCards && state.expandedComments.has(c.id)) {
+      if (state.expandedComments.has(c.id)) {
         html += `
           <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
-            <td colspan="4"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
+            <td colspan="3"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
           </tr>
         `;
       }
     });
 
     // New-comment form rendered inline below the clicked line
-    if (!state.hideThreadCards && state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === lineNum) {
+    if (state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === lineNum) {
       html += `
         <tr class="comment-row">
-          <td colspan="4"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
+          <td colspan="3"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
         </tr>
       `;
     }
 
     return html;
-  }).join("");
+  }).join("") + renderDeletedRows(overlay.afterAll);
 
-  const emptyHtml = sourceUnavailable
-    ? `<div class="file-unavailable">${escapeHtml(sourceUnavailable)}. Use Unified mode to inspect deleted or unreadable changed files.</div>`
+  const emptyHtml = sourceUnavailable && (!diffVisible || !overlay.afterAll.length)
+    ? `<div class="file-unavailable">${escapeHtml(sourceUnavailable)}. Turn diff on to inspect deleted or unreadable changed lines.</div>`
+    : "";
+  const diffOnlyRows = sourceUnavailable && diffVisible && overlay.afterAll.length
+    ? `<table class="code-table full-source-table diff-overlay-on"><tbody>${renderDeletedRows(overlay.afterAll)}</tbody></table>`
     : "";
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
   const counts = threadCounts(fileComments);
@@ -2026,11 +2037,12 @@ function renderFileView() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
+        <span class="lang-badge">${diffVisible ? "diff on" : "diff off"}</span>
         ${statHtml}
         <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
       </div>
       <div class="code-table-scroll">
-        ${emptyHtml || `<table class="code-table"><tbody>${rows}</tbody></table>`}
+        ${emptyHtml || diffOnlyRows || `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}"><tbody>${rows}</tbody></table>`}
       </div>
     </div>
   `;
@@ -2063,145 +2075,106 @@ function rangeMarkerClass(c, lineNum) {
   return "range-mid";
 }
 
-function hunkLineMaps(hunks) {
-  const hunkStarts = new Map();
-  const hunkSpanLines = new Set();
+function diffOverlayForSource(hunks, lineCount) {
+  const beforeLine = new Map();
+  const afterAll = [];
   const changedLines = new Set();
-  hunks.forEach((h, index) => {
-    const start = Math.max(1, Number(h.anchor_line || h.new_start || 1));
-    hunkStarts.set(start, index);
-    const spanStart = Math.max(1, Number(h.new_start || start));
-    const spanEnd = Math.max(spanStart, spanStart + Number(h.new_lines || 1) - 1);
-    for (let i = spanStart; i <= spanEnd; i++) hunkSpanLines.add(i);
-    (h.changed_new_lines || []).forEach((line) => changedLines.add(line));
-    if (!(h.changed_new_lines || []).length && h.anchor_line) changedLines.add(h.anchor_line);
-  });
-  return { hunkStarts, hunkSpanLines, changedLines };
-}
+  const deletionMarkers = new Set();
+  const hunkStarts = new Map();
+  const fallbackHunkStarts = new Map();
+  const hunkMembers = new Map();
 
-function unifiedNeedsSplitLineNumbers(hunks) {
-  return hunks.some((hunk) => (hunk.lines || []).some((line) => {
-    if (line.kind === "del") return true;
-    return Number.isInteger(line.old_line)
-      && Number.isInteger(line.new_line)
-      && line.old_line !== line.new_line;
-  }));
-}
-
-function unifiedLineNumberHtml(line, splitLineNumbers) {
-  if (splitLineNumbers) {
-    return `
-      <td class="diff-old-num">${line.old_line || ""}</td>
-      <td class="diff-new-num">${line.new_line || ""}</td>
-    `;
+  function addBefore(lineNum, row) {
+    if (!beforeLine.has(lineNum)) beforeLine.set(lineNum, []);
+    beforeLine.get(lineNum).push(row);
   }
-  return `<td class="diff-line-num">${line.new_line || line.old_line || ""}</td>`;
-}
 
-function renderUnifiedDiffView(filePath, language, diffDetail) {
-  const fileComments = visibleReviewThreads()
-    .filter((c) => c.file === filePath)
-    .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
-  const { threadsAtLine } = commentLineMaps(fileComments);
-  const sourceLines = sourceLinesForFile(filePath) || [];
-  const hunks = diffDetail?.hunks || [];
-  const visibleNewLines = new Set(
-    hunks.flatMap((hunk) => (hunk.lines || []).map((line) => line.new_line).filter(Number.isInteger)),
-  );
-  const splitLineNumbers = unifiedNeedsSplitLineNumbers(hunks);
-  const commentColspan = splitLineNumbers ? 5 : 4;
-  const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
-  const counts = threadCounts(fileComments);
-  const rows = hunks.flatMap((hunk, hunkIndex) => {
-    const out = [`
-      <tr class="diff-hunk-header" data-hunk-index="${hunkIndex}">
-        ${splitLineNumbers ? `<td class="diff-old-num"></td><td class="diff-new-num"></td>` : `<td class="diff-line-num"></td>`}
-        <td class="diff-marker-cell hunk-marker">@@</td>
-        <td class="gutter-marker thread-marker-cell"></td>
-        <td class="diff-code-cell">${escapeHtml(hunk.header || "")}</td>
-      </tr>
-    `];
-    (hunk.lines || []).forEach((line) => {
-      const newLine = line.new_line;
-      const oldLine = line.old_line;
-      const covering = newLine ? threadsAtLine.get(newLine) || [] : [];
-      const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
-      const canComment = Number.isInteger(newLine);
-      const primary = covering[0];
-      const threadAttr = primary
-        ? `data-comment-id="${escapeHtml(primary.id)}"`
-        : canComment ? `data-add-line="${newLine}"` : "";
-      let threadMarkerHtml = "";
-      if (primary) {
-        const [s, e] = commentLineRange(primary);
-        const color = threadMarkerColor(primary);
-        const dot = s === e && newLine === s
-          ? `<span class="dot" style="background:${color}"></span>`
-          : "";
-        const rail = s !== e
-          ? `<span class="bar" style="background:${color}"></span>`
-          : "";
-        threadMarkerHtml = `${rail}${dot}`;
+  function addMember(lineNum, hunkIndex) {
+    if (!Number.isInteger(lineNum)) return;
+    if (!hunkMembers.has(lineNum)) hunkMembers.set(lineNum, hunkIndex);
+  }
+
+  hunks.forEach((hunk, hunkIndex) => {
+    let pendingDeletes = [];
+    let hunkStarted = false;
+    const markHunkStart = () => {
+      if (hunkStarted) return false;
+      hunkStarted = true;
+      return true;
+    };
+    const flushDeletes = (targetLine) => {
+      if (!pendingDeletes.length) return;
+      const fallbackLine = Math.min(
+        lineCount + 1,
+        Math.max(1, Number(hunk.new_start || 1) + Number(hunk.new_lines || 0)),
+      );
+      const insertLine = Number.isInteger(targetLine) ? targetLine : fallbackLine;
+      const markerLine = lineCount
+        ? Math.min(Math.max(1, insertLine), lineCount)
+        : 1;
+      deletionMarkers.add(markerLine);
+      const startsHunk = !hunkStarted;
+      pendingDeletes = pendingDeletes.map((row, offset) => ({
+        ...row,
+        hunkStart: startsHunk && offset === 0 ? markHunkStart() : false,
+      }));
+      if (startsHunk && insertLine <= lineCount) {
+        fallbackHunkStarts.set(insertLine, hunkIndex);
       }
-      out.push(`
-        <tr class="unified-line ${escapeHtml(line.kind || "context")}">
-          ${unifiedLineNumberHtml(line, splitLineNumbers)}
-          <td class="diff-marker-cell">${escapeHtml(marker)}</td>
-          <td class="gutter-marker thread-marker-cell ${primary ? `has-marker ${threadType(primary)} ${rangeMarkerClass(primary, newLine)}` : ""}" ${threadAttr}>${threadMarkerHtml}</td>
-          <td class="diff-code-cell">${renderHighlightedLine(line.text || "", language)}</td>
-        </tr>
-      `);
-      covering
-        .filter((c) => isLastVisibleRangeLine(c, newLine, visibleNewLines))
-        .forEach((c) => {
-        if (!state.hideThreadCards && state.expandedComments.has(c.id)) {
-          out.push(`
-            <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
-              <td colspan="${commentColspan}"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines })}</div></td>
-            </tr>
-          `);
+      if (insertLine <= lineCount) {
+        pendingDeletes.forEach((row) => addBefore(insertLine, row));
+      } else {
+        afterAll.push(...pendingDeletes);
+      }
+      pendingDeletes = [];
+    };
+
+    (hunk.lines || []).forEach((line) => {
+      if (line.kind === "del") {
+        pendingDeletes.push({
+          kind: "del",
+          oldLine: line.old_line,
+          text: line.text || "",
+          hunkIndex,
+          hunkStart: false,
+        });
+        return;
+      }
+
+      const newLine = line.new_line;
+      if (Number.isInteger(newLine)) {
+        flushDeletes(newLine);
+        if (!hunkStarted) {
+          hunkStarts.set(newLine, hunkIndex);
+          hunkStarted = true;
         }
-      });
-      if (!state.hideThreadCards && state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === newLine) {
-        out.push(`
-          <tr class="comment-row">
-            <td colspan="${commentColspan}"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
-          </tr>
-        `);
+        addMember(newLine, hunkIndex);
+        if (line.kind === "add") changedLines.add(newLine);
       }
     });
-    return out;
-  }).join("");
+    flushDeletes(null);
+  });
 
-  const body = diffDetail?.error
-    ? `<div class="file-unavailable">${escapeHtml(diffDetail.error)}</div>`
-    : hunks.length === 0
-      ? `<div class="file-unavailable">No changes for this file against ${escapeHtml(state.diffSummary?.base_ref || "base")}.</div>`
-      : `<table class="unified-table"><tbody>${rows}</tbody></table>`;
-
-  document.getElementById("content").innerHTML = `
-    <div class="code-pane">
-      <div class="code-header">
-        <i data-lucide="git-compare-arrows"></i>
-        <strong>${escapeHtml(filePath)}</strong>
-        <span class="lang-badge">unified</span>
-        ${statHtml}
-        <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
-      </div>
-      <div class="code-table-scroll">${body}</div>
-    </div>
-  `;
-  attachContentHandlers();
-  if (window.lucide) window.lucide.createIcons();
+  return {
+    beforeLine,
+    afterAll,
+    changedLines,
+    deletionMarkers,
+    hunkStarts,
+    fallbackHunkStarts,
+    hunkMembers,
+  };
 }
 
-function isLastVisibleRangeLine(c, lineNum, visibleNewLines) {
-  const [s, e] = commentLineRange(c);
-  if (lineNum < s || lineNum > e) return false;
-  for (let i = lineNum + 1; i <= e; i += 1) {
-    if (visibleNewLines.has(i)) return false;
-  }
-  return true;
+function renderDeletedDiffRow(row, language) {
+  const hunkAttr = row.hunkStart ? `data-hunk-index="${row.hunkIndex}"` : "";
+  return `
+    <tr class="source-virtual-line diff-deleted-line" ${hunkAttr} data-hunk-member="${row.hunkIndex}" data-deleted-old-line="${row.oldLine || ""}">
+      <td class="gutter-num deleted"><span class="line-diff-mark deletion">−</span><span class="line-number-text">${row.oldLine || ""}</span></td>
+      <td class="gutter-marker thread-marker-cell"></td>
+      <td class="code-cell">${renderHighlightedLine(row.text || "", language)}</td>
+    </tr>
+  `;
 }
 
 function threadMarkerColor(c) {
@@ -2479,12 +2452,7 @@ function renderCommentCard(c, opts = {}) {
           <i data-lucide="message-square-plus"></i>
           Add reply
         </button>
-        ${isNote ? `
-          <span class="local-note-indicator" title="Notes stay local and are not submitted to GitHub">
-            <i data-lucide="bookmark"></i>
-            Local note
-          </span>
-        ` : `
+        ${isNote ? "" : `
         <button class="btn btn-primary" data-send-comment="${idSafe}" title="${escapeHtml(sendBlockReason || "Send this comment to GitHub")}" ${sendBlockReason ? "disabled" : ""}>
           <i data-lucide="send"></i>
           Send this comment
@@ -2762,8 +2730,6 @@ function attachContentHandlers() {
         isRange: false,
         endLine: line,
       };
-      state.hideThreadCards = false;
-      localStorage.setItem("assistedReviewHideThreadCards", "0");
       state.newThreadType = state.threadFilter === "note" ? "note" : "comment";
       resetNewCommentSuggestion();
       renderContent();
@@ -3048,8 +3014,6 @@ async function toggleComment(id) {
   if (state.expandedComments.has(id)) {
     state.expandedComments.delete(id);
   } else {
-    state.hideThreadCards = false;
-    localStorage.setItem("assistedReviewHideThreadCards", "0");
     state.expandedComments.add(id);
     state.cursorCommentId = id;
   }
@@ -3057,26 +3021,24 @@ async function toggleComment(id) {
   scrollCommentIntoView(id);
 }
 
-// Pixels of breathing room between the topbar and the top of a navigated
-// comment card. Bigger = more code context visible above the comment (useful
-// in code-file view); smaller = comment dominates the viewport.
-const COMMENT_SCROLL_TOP_OFFSET = 120;
+const NAV_SCROLL_TOP_OFFSET = 16;
+const FOCUS_LINE_OFFSET = 120;
 
 function scrollCommentIntoView(id) {
   requestAnimationFrame(() => {
     const card = document.querySelector(`[data-comment-card="${id}"]`);
     const content = document.getElementById("content");
     if (!card || !content) return;
-    // Manual scrollTop math instead of scrollIntoView({block:"center"}):
-    // a tall expanded card centered in the viewport puts its header above
-    // the topbar, hiding the comment's most important line. Anchor the top
-    // edge at a fixed offset from .content's top instead.
     const top =
       card.getBoundingClientRect().top -
       content.getBoundingClientRect().top +
       content.scrollTop -
-      COMMENT_SCROLL_TOP_OFFSET;
+      NAV_SCROLL_TOP_OFFSET;
     content.scrollTo({ top, behavior: "smooth" });
+    pulseElements([
+      card,
+      document.querySelector(`[data-thread-line-id="${CSS.escape(id)}"]`),
+    ]);
   });
 }
 
@@ -3084,13 +3046,62 @@ function scrollHunkIntoView(index) {
   requestAnimationFrame(() => {
     const row = document.querySelector(`[data-hunk-index="${index}"]`);
     const content = document.getElementById("content");
+    if (!row && !state.diffVisible) {
+      state.diffVisible = true;
+      localStorage.setItem("assistedReviewDiffVisible", "1");
+      renderContent();
+      scrollHunkIntoView(index);
+      return;
+    }
     if (!row || !content) return;
     const top =
       row.getBoundingClientRect().top -
       content.getBoundingClientRect().top +
       content.scrollTop -
-      COMMENT_SCROLL_TOP_OFFSET;
+      NAV_SCROLL_TOP_OFFSET;
     content.scrollTo({ top, behavior: "smooth" });
+    pulseElements(Array.from(document.querySelectorAll(`[data-hunk-member="${index}"]`)));
+  });
+}
+
+function pulseElements(elements) {
+  elements.filter(Boolean).forEach((el) => {
+    el.classList.remove("jump-pulse");
+    void el.offsetWidth;
+    el.classList.add("jump-pulse");
+    window.setTimeout(() => el.classList.remove("jump-pulse"), 1600);
+  });
+}
+
+function focusedSourceLine() {
+  const content = document.getElementById("content");
+  if (!content) return null;
+  const focusY = content.getBoundingClientRect().top + FOCUS_LINE_OFFSET;
+  let best = null;
+  let bestDistance = Infinity;
+  document.querySelectorAll("[data-source-line]").forEach((row) => {
+    const rect = row.getBoundingClientRect();
+    const distance = Math.abs(rect.top - focusY);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = Number(row.getAttribute("data-source-line"));
+    }
+  });
+  return Number.isInteger(best) ? best : null;
+}
+
+function restoreFocusedSourceLine(line) {
+  if (!Number.isInteger(line)) return;
+  requestAnimationFrame(() => {
+    const content = document.getElementById("content");
+    const row = document.querySelector(`[data-source-line="${line}"]`);
+    if (!content || !row) return;
+    const top =
+      row.getBoundingClientRect().top -
+      content.getBoundingClientRect().top +
+      content.scrollTop -
+      FOCUS_LINE_OFFSET;
+    content.scrollTo({ top });
   });
 }
 
@@ -3112,15 +3123,18 @@ async function setStatus(commentId, status) {
   }
 }
 
-function setViewMode(mode) {
-  if (!["source", "diff"].includes(mode) || state.viewMode === mode) return;
-  state.viewMode = mode;
-  localStorage.setItem("assistedReviewViewMode", mode);
+function setDiffVisible(visible) {
+  const next = Boolean(visible);
+  if (state.diffVisible === next) return;
+  const focusLine = focusedSourceLine();
+  state.diffVisible = next;
+  localStorage.setItem("assistedReviewDiffVisible", next ? "1" : "0");
   renderContent();
+  restoreFocusedSourceLine(focusLine);
 }
 
-function toggleViewMode() {
-  setViewMode(state.viewMode === "source" ? "diff" : "source");
+function toggleDiffVisible() {
+  setDiffVisible(!state.diffVisible);
 }
 
 function setNavTarget(target) {
@@ -3138,17 +3152,6 @@ function setThreadFilter(filter) {
   if (!["all", "comment", "note"].includes(filter) || state.threadFilter === filter) return;
   state.threadFilter = filter;
   localStorage.setItem("assistedReviewThreadFilter", filter);
-  renderContent();
-}
-
-function toggleThreadCardsHidden() {
-  state.hideThreadCards = !state.hideThreadCards;
-  localStorage.setItem("assistedReviewHideThreadCards", state.hideThreadCards ? "1" : "0");
-  if (state.hideThreadCards) {
-    state.expandedComments.clear();
-    state.newCommentTarget = null;
-    resetNewCommentSuggestion();
-  }
   renderContent();
 }
 
@@ -3292,28 +3295,20 @@ async function navigateToComment(direction) {
   const comments = navigableComments();
   if (comments.length === 0) return;
 
-  // Use the explicit cursor instead of inferring from `expandedComments`. The
-  // Set's iteration order is insertion order, so clicking comments in any
-  // sequence and then tabbing was breaking the cycle (the "first" expanded id
-  // no longer matched the visually-current comment).
   const currentIdx = state.cursorCommentId
     ? comments.findIndex((c) => c.id === state.cursorCommentId)
     : -1;
-
-  const nextIdx = currentIdx === -1
-    ? (direction > 0 ? 0 : comments.length - 1)
-    : (currentIdx + direction + comments.length) % comments.length;
-
+  const nextIdx = fileScopedNavIndex(comments, currentIdx, direction);
   const target = comments[nextIdx];
   state.cursorCommentId = target.id;
 
   if (state.route.view !== "file" || state.route.file !== target.file) {
-    // navigate() → loadRoute() clears expandedComments, so wait for it before
-    // expanding the target — otherwise the target ends up collapsed.
-    await navigate({ view: "file", slug: state.route.slug, key: state.route.key, file: target.file });
+    await navigate(
+      { view: "file", slug: state.route.slug, key: state.route.key, file: target.file },
+      false,
+      { preserveNavCursor: true },
+    );
   }
-  state.hideThreadCards = false;
-  localStorage.setItem("assistedReviewHideThreadCards", "0");
   state.expandedComments.clear();
   state.expandedComments.add(target.id);
   renderContent();
@@ -3328,17 +3323,46 @@ async function navigateToHunk(direction) {
   const currentIdx = state.cursorHunk
     ? hunks.findIndex((h) => h.file === state.cursorHunk.file && h.index === state.cursorHunk.index)
     : -1;
-  const nextIdx = currentIdx === -1
-    ? (direction > 0 ? 0 : hunks.length - 1)
-    : (currentIdx + direction + hunks.length) % hunks.length;
+  const nextIdx = fileScopedNavIndex(hunks, currentIdx, direction);
   const target = hunks[nextIdx];
   state.cursorHunk = { file: target.file, index: target.index };
 
   if (state.route.view !== "file" || state.route.file !== target.file) {
-    await navigate({ view: "file", slug: state.route.slug, key: state.route.key, file: target.file });
+    await navigate(
+      { view: "file", slug: state.route.slug, key: state.route.key, file: target.file },
+      false,
+      { preserveNavCursor: true },
+    );
   }
   renderContent();
   scrollHunkIntoView(target.index);
+}
+
+function fileScopedNavIndex(items, currentIdx, direction) {
+  if (currentIdx !== -1) {
+    return (currentIdx + direction + items.length) % items.length;
+  }
+
+  const currentFile = state.route.view === "file" ? state.route.file : null;
+  if (!currentFile) return direction > 0 ? 0 : items.length - 1;
+
+  const firstInFile = items.findIndex((item) => item.file === currentFile);
+  if (firstInFile !== -1) {
+    if (direction > 0) return firstInFile;
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if (items[i].file === currentFile) return i;
+    }
+  }
+
+  if (direction > 0) {
+    const nextFileIdx = items.findIndex((item) => item.file.localeCompare(currentFile) > 0);
+    return nextFileIdx === -1 ? 0 : nextFileIdx;
+  }
+
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    if (items[i].file.localeCompare(currentFile) < 0) return i;
+  }
+  return items.length - 1;
 }
 
 document.addEventListener("keydown", (e) => {
@@ -3371,7 +3395,7 @@ document.addEventListener("keydown", (e) => {
     navigateByTarget(-1);
   } else if (e.key === "d") {
     e.preventDefault();
-    toggleViewMode();
+    toggleDiffVisible();
   } else if (e.key === "c") {
     e.preventDefault();
     setNavTarget("comments");
@@ -3391,7 +3415,7 @@ document.addEventListener("keydown", (e) => {
       renderContent();
     }
   } else if (e.key === "?") {
-    showToast("Keys: Tab/S-Tab or j/k navigate selected target · d source/unified · c comments · h hunks · n switch target · Esc close");
+    showToast("Keys: Tab/S-Tab or j/k navigate selected target · d diff · c comments · h hunks · n switch target · Esc close");
   }
 });
 
