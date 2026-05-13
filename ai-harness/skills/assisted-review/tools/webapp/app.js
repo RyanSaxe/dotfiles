@@ -23,8 +23,10 @@ const state = {
   // ui
   inboxFilter: "needs_triage",        // 'needs_triage' | 'iterating' | 'done' | 'stale'
   showStale: false,
-  viewMode: localStorage.getItem("codeReviewViewMode") || "source", // source | diff
-  navTarget: localStorage.getItem("codeReviewNavTarget") || "comments", // comments | hunks
+  viewMode: localStorage.getItem("assistedReviewViewMode") || "source", // source | diff
+  navTarget: localStorage.getItem("assistedReviewNavTarget") || "comments", // comments | hunks
+  threadFilter: localStorage.getItem("assistedReviewThreadFilter") || "all", // all | comment | note
+  hideThreadCards: localStorage.getItem("assistedReviewHideThreadCards") === "1",
   cursorHunk: null,                   // { file, index } for hunk navigation
   baseDraft: "",
   expandedComments: new Set(),
@@ -39,6 +41,7 @@ const state = {
   },
   collapsedFolders: new Set(),        // folder paths the user has collapsed in the file tree
   newCommentTarget: null,             // { file, line, isRange, endLine } or null
+  newThreadType: "comment",           // comment | note
   newCommentSuggestionExpanded: false,
   newCommentSuggestionDraft: "",
   editingBody: null,                  // commentId currently being edited inline
@@ -60,6 +63,7 @@ const SKIP_SEND_STATUSES = new Set(["resolved", "wontfix"]);
 const SENDABLE_ANCHOR_STATUSES = new Set(["current", "moved"]);
 if (!["source", "diff"].includes(state.viewMode)) state.viewMode = "source";
 if (!["comments", "hunks"].includes(state.navTarget)) state.navTarget = "comments";
+if (!["all", "comment", "note"].includes(state.threadFilter)) state.threadFilter = "all";
 
 // === Helpers =======================================================
 
@@ -81,6 +85,33 @@ function reviewThreads() {
   return review.threads;
 }
 
+function threadType(c) {
+  return c?.type === "note" ? "note" : "comment";
+}
+
+function isNoteThread(c) {
+  return threadType(c) === "note";
+}
+
+function visibleReviewThreads() {
+  const filter = state.threadFilter;
+  return reviewThreads().filter((c) => filter === "all" || threadType(c) === filter);
+}
+
+function threadCounts(threads = reviewThreads()) {
+  let comments = 0;
+  let notes = 0;
+  threads.forEach((c) => {
+    if (isNoteThread(c)) notes += 1;
+    else comments += 1;
+  });
+  return { comments, notes, total: comments + notes };
+}
+
+function sendableCommentThreads() {
+  return reviewThreads().filter((c) => threadType(c) === "comment" && !SKIP_SEND_STATUSES.has(c.status || "open"));
+}
+
 function findThread(id) {
   return reviewThreads().find((x) => x.id === id);
 }
@@ -96,6 +127,7 @@ function suggestionText(c) {
 function commentSendBlockReason(c) {
   if (!state.review?.target?.pr_number) return "Set target.pr_number to enable sending.";
   if (!c) return "Comment not found.";
+  if (isNoteThread(c)) return "Notes stay local and cannot be sent to GitHub.";
   const status = c.status || "open";
   if (SKIP_SEND_STATUSES.has(status)) {
     return `Status is ${humanStatus(status)}. Set it to Open or Acknowledged before sending.`;
@@ -109,7 +141,7 @@ function commentSendBlockReason(c) {
 
 function reviewSendBlockReason() {
   if (!state.review?.target?.pr_number) return "Set target.pr_number to enable submitting.";
-  const activeThreads = reviewThreads().filter((c) => !SKIP_SEND_STATUSES.has(c.status || "open"));
+  const activeThreads = sendableCommentThreads();
   if (activeThreads.length === 0) return "No open or acknowledged comments to submit.";
   const staleThread = activeThreads.find((c) => {
     const anchorStatus = c.anchor_status || "current";
@@ -117,6 +149,12 @@ function reviewSendBlockReason() {
   });
   if (staleThread) return `Refresh or move ${staleThread.id} before submitting.`;
   return "";
+}
+
+function submissionSummary() {
+  const sendableComments = sendableCommentThreads().length;
+  const notes = threadCounts().notes;
+  return { sendableComments, notes };
 }
 
 function severityOrder(sev) {
@@ -219,6 +257,10 @@ function chipIcon(kind, value) {
     },
     status: {
       ...Object.fromEntries(STATUS_OPTIONS.map((option) => [option.value, option.icon])),
+    },
+    type: {
+      comment: "message-square",
+      note: "bookmark",
     },
     category: {},
   };
@@ -842,7 +884,7 @@ async function refreshReview(slug, key) {
 // so the user's tree shape survives reloads. Key includes slug + key (the
 // same identifiers used in the route) so unrelated reviews don't share state.
 function collapsedFoldersKey(slug, key) {
-  return `code-review:collapsed-folders:${slug}:${key}`;
+  return `assisted-review:collapsed-folders:${slug}:${key}`;
 }
 
 function loadCollapsedFolders(slug, key) {
@@ -1035,7 +1077,7 @@ function renderTopbar() {
   const sendBtn = document.getElementById("btn-send-review");
 
   if (state.route.view === "inbox" || !state.review) {
-    repoEl.textContent = "code-review";
+    repoEl.textContent = "assisted-review";
     branchEl.textContent = "";
     commitEl.textContent = "";
     prEl.textContent = "";
@@ -1095,7 +1137,8 @@ function renderTopbar() {
   sendBtn.hidden = false;
   const sendBlockReason = reviewSendBlockReason();
   sendBtn.disabled = Boolean(sendBlockReason);
-  sendBtn.title = sendBlockReason || "Submit open and acknowledged comments to GitHub";
+  const { sendableComments, notes } = submissionSummary();
+  sendBtn.title = sendBlockReason || `Submit ${sendableComments} comment${sendableComments === 1 ? "" : "s"} to GitHub; ${notes} note${notes === 1 ? "" : "s"} stay local`;
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -1144,7 +1187,7 @@ function renderContextbar() {
   const refs = state.refOptions?.refs || [];
   const items = currentNavItems();
   const idx = currentNavIndex(items);
-  const navLabel = state.navTarget === "hunks" ? "Hunk" : "Comment";
+  const navLabel = state.navTarget === "hunks" ? "Hunk" : "Thread";
   const counter = items.length === 0 ? `${navLabel} 0 / 0` : `${navLabel} ${idx + 1} / ${items.length}`;
   const disabled = items.length === 0 ? "disabled" : "";
   const diffTotals = state.diffSummary
@@ -1172,18 +1215,27 @@ function renderContextbar() {
       <button class="${state.viewMode === "diff" ? "active" : ""}" data-view-mode="diff" title="Unified diff view (d)">Unified</button>
     </div>
     <div class="segmented" role="group" aria-label="Navigation target">
-      <button class="${state.navTarget === "comments" ? "active" : ""}" data-nav-target="comments" title="Navigate comments (c)">Comments</button>
+      <button class="${state.navTarget === "comments" ? "active" : ""}" data-nav-target="comments" title="Navigate threads (c)">Threads</button>
       <button class="${state.navTarget === "hunks" ? "active" : ""}" data-nav-target="hunks" title="Navigate hunks (h)">Hunks</button>
     </div>
+    <div class="segmented" role="group" aria-label="Thread filter">
+      <button class="${state.threadFilter === "all" ? "active" : ""}" data-thread-filter="all" title="Show comments and notes">All</button>
+      <button class="${state.threadFilter === "comment" ? "active" : ""}" data-thread-filter="comment" title="Show GitHub-sendable comments">Comments</button>
+      <button class="${state.threadFilter === "note" ? "active" : ""}" data-thread-filter="note" title="Show local notes">Notes</button>
+    </div>
+    <button class="btn ${state.hideThreadCards ? "active" : ""}" data-toggle-thread-cards title="${state.hideThreadCards ? "Show thread cards when opened" : "Hide open thread cards"}">
+      <i data-lucide="${state.hideThreadCards ? "panel-bottom-open" : "panel-bottom-close"}"></i>
+      ${state.hideThreadCards ? "Cards hidden" : "Hide cards"}
+    </button>
     <div class="contextbar-spacer"></div>
     <div class="contextbar-diff-total">${diffTotals}</div>
     <div class="contextbar-nav">
-      <button class="btn" data-prev-nav title="Previous ${state.navTarget === "hunks" ? "hunk" : "comment"} (Shift+Tab / k)" aria-label="Previous ${state.navTarget}" ${disabled}>
+      <button class="btn" data-prev-nav title="Previous ${state.navTarget === "hunks" ? "hunk" : "thread"} (Shift+Tab / k)" aria-label="Previous ${state.navTarget}" ${disabled}>
         <i data-lucide="chevron-up"></i>
         Prev
       </button>
       <span class="topbar-comment-nav-counter">${escapeHtml(counter)}</span>
-      <button class="btn" data-next-nav title="Next ${state.navTarget === "hunks" ? "hunk" : "comment"} (Tab / j)" aria-label="Next ${state.navTarget}" ${disabled}>
+      <button class="btn" data-next-nav title="Next ${state.navTarget === "hunks" ? "hunk" : "thread"} (Tab / j)" aria-label="Next ${state.navTarget}" ${disabled}>
         <i data-lucide="chevron-down"></i>
         Next
       </button>
@@ -1200,6 +1252,10 @@ function attachContextbarHandlers(root) {
   root.querySelectorAll("[data-nav-target]").forEach((el) => {
     el.addEventListener("click", () => setNavTarget(el.getAttribute("data-nav-target")));
   });
+  root.querySelectorAll("[data-thread-filter]").forEach((el) => {
+    el.addEventListener("click", () => setThreadFilter(el.getAttribute("data-thread-filter")));
+  });
+  root.querySelector("[data-toggle-thread-cards]")?.addEventListener("click", () => toggleThreadCardsHidden());
   root.querySelector("[data-prev-nav]")?.addEventListener("click", () => navigateByTarget(-1));
   root.querySelector("[data-next-nav]")?.addEventListener("click", () => navigateByTarget(+1));
   const baseInput = root.querySelector("#diff-base-input");
@@ -1290,7 +1346,7 @@ function renderTree() {
       </details>
       <div class="tree-filter-settings">
         <div class="tree-scope-control" role="group" aria-label="File scope">
-          <button class="${scope === "comments" ? "active" : ""}" data-tree-scope="comments" type="button">Comments</button>
+          <button class="${scope === "comments" ? "active" : ""}" data-tree-scope="comments" type="button">Threads</button>
           <button class="${scope === "changed" ? "active" : ""}" data-tree-scope="changed" type="button">Changed</button>
           <button class="${scope === "all" ? "active" : ""}" data-tree-scope="all" type="button">All</button>
         </div>
@@ -1317,7 +1373,7 @@ function renderTree() {
       <div class="tree-item overview ${isReviewRoot ? "active" : ""}" data-route="review">
         <i data-lucide="layout-list"></i>
         <span>Overview</span>
-        <span class="comment-pip">${reviewThreads().length}</span>
+        <span class="comment-pip">${visibleReviewThreads().length}</span>
       </div>
     </div>
     <div class="tree-section-label">files</div>
@@ -1329,7 +1385,7 @@ function renderTree() {
 
 function filesWithCommentCounts() {
   const counts = {};
-  reviewThreads().forEach((c) => {
+  visibleReviewThreads().forEach((c) => {
     counts[c.file] = (counts[c.file] || 0) + 1;
   });
   return counts;
@@ -1571,7 +1627,7 @@ function renderInbox() {
         </div>
         <div class="inbox-welcome">
           <h2>No reviews yet</h2>
-          <p>Run <code>/code-review</code> in any repo to generate one. Reviews land in <code>~/.reviews/&lt;repo-slug&gt;/</code> and will appear here as soon as they're written. Background jobs that produce reviews show up the same way.</p>
+          <p>Run <code>/assisted-review</code> in any repo to generate one. Reviews land in <code>~/.reviews/&lt;repo-slug&gt;/</code> and will appear here as soon as they're written. Background jobs that produce reviews show up the same way.</p>
         </div>
       </div>
     `;
@@ -1592,7 +1648,7 @@ function renderInbox() {
     : activeTabReviews.filter((r) => !r.stale || state.inboxFilter === "stale");
 
   const tableHtml = visible.length === 0
-    ? `<div class="inbox-empty">No reviews in this bucket. Run <code>/code-review</code> to make one.</div>`
+    ? `<div class="inbox-empty">No reviews in this bucket. Run <code>/assisted-review</code> to make one.</div>`
     : `
       <table class="inbox-table">
         <thead>
@@ -1707,13 +1763,19 @@ function renderInboxRow(r) {
 
   const replies = r.has_user_reply ? `<span class="reply-flag">reply</span>` : "";
   const stale = r.stale ? `<span class="stale-flag">stale</span>` : "";
+  const threadSummary = `
+    <span class="thread-count-summary">
+      ${Number(r.comment_count || 0)} comments
+      ${Number(r.note_count || 0) ? `· ${Number(r.note_count || 0)} notes` : ""}
+    </span>
+  `;
 
   return `
     <tr class="inbox-row ${r.stale ? "stale" : ""}" data-slug="${r.slug}" data-key="${r.key}">
       <td><span class="repo">${escapeHtml(r.repo_name)}</span> ${stale}</td>
       <td><span class="branch">${escapeHtml(r.branch || "—")}</span></td>
       <td><span class="sha">${escapeHtml(r.short_sha)}</span></td>
-      <td>${pipsHtml} ${replies}</td>
+      <td>${pipsHtml} ${threadSummary} ${replies}</td>
       <td><span class="age">${relativeAge(r.modified)}</span></td>
       <td>${r.pr_number ? `<span class="pr">#${escapeHtml(r.pr_number)}</span>` : `<span class="pr none">—</span>`}</td>
       <td><button class="inbox-delete" title="Delete review" data-slug="${r.slug}" data-key="${r.key}"><i data-lucide="trash-2"></i></button></td>
@@ -1727,10 +1789,12 @@ function renderReviewOverview() {
   const r = state.review.review;
   const t = state.review.target;
   const grouped = {};
-  reviewThreads().forEach((c) => {
+  const threads = visibleReviewThreads();
+  threads.forEach((c) => {
     if (!grouped[c.file]) grouped[c.file] = [];
     grouped[c.file].push(c);
   });
+  const counts = threadCounts(threads);
 
   const groupsHtml = Object.entries(grouped).map(([file, threads]) => `
     <div class="file-group">
@@ -1738,7 +1802,7 @@ function renderReviewOverview() {
         <i data-lucide="file-text"></i>
         <strong>${escapeHtml(file)}</strong>
         <span>·</span>
-        <span>${threads.length} ${threads.length === 1 ? "comment" : "comments"}</span>
+        <span>${threads.length} ${threads.length === 1 ? "thread" : "threads"}</span>
       </div>
       <div class="file-group-cards">
         ${threads
@@ -1760,8 +1824,8 @@ function renderReviewOverview() {
       <div class="overview-summary-body">${escapeHtml(r.summary)}</div>
     </div>
 
-    <div class="overview-comments-label">${reviewThreads().length} comments across ${Object.keys(grouped).length} files</div>
-    ${groupsHtml}
+    <div class="overview-comments-label">${counts.comments} comments · ${counts.notes} notes across ${Object.keys(grouped).length} files</div>
+    ${groupsHtml || `<div class="inbox-empty">No threads match the current filter.</div>`}
   `;
 
   attachContentHandlers();
@@ -1779,43 +1843,50 @@ function renderFileView() {
   const sourceUnavailable = state.source?.unavailable;
   const source = state.source?.content || "";
   const lines = source ? source.split("\n") : [];
-  const fileComments = reviewThreads()
+  const fileComments = visibleReviewThreads()
     .filter((c) => c.file === filePath)
     .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
 
-  const { commentsAtLine, rangedSpanLines } = commentLineMaps(fileComments);
+  const { threadsAtLine, threadsEndingAtLine, rangedSpanLines } = commentLineMaps(fileComments);
   const { hunkStarts, hunkSpanLines, changedLines } = hunkLineMaps(diffDetail?.hunks || []);
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
-    const anchored = commentsAtLine.get(lineNum) || [];
+    const covering = threadsAtLine.get(lineNum) || [];
+    const ending = threadsEndingAtLine.get(lineNum) || [];
     const inRange = rangedSpanLines.has(lineNum);
     const hunkIndex = hunkStarts.get(lineNum);
     const inHunk = hunkSpanLines.has(lineNum);
     const changed = changedLines.has(lineNum);
 
     let markerHtml = "";
-    if (anchored.length > 0) {
-      const c = anchored[0];
-      markerHtml = `<span class="dot" style="background:${severityColorVar(c.severity)}"></span>`;
-    } else if (inHunk) {
-      markerHtml = `<span class="hunk-tick"></span>`;
+    const primary = covering[0];
+    if (primary) {
+      const [s, e] = commentLineRange(primary);
+      const color = threadMarkerColor(primary);
+      const dot = lineNum === s
+        ? `<span class="dot" style="background:${color}"></span>`
+        : "";
+      const rail = s !== e
+        ? `<span class="bar" style="background:${color}"></span>`
+        : "";
+      markerHtml = `${rail}${dot}`;
     }
 
-    const markerClass = anchored.length > 0 ? `gutter-marker has-marker`
+    const markerClass = primary ? `gutter-marker has-marker ${threadType(primary)} ${rangeMarkerClass(primary, lineNum)}`
       : inRange ? `gutter-marker range-mid`
         : inHunk ? `gutter-marker diff-marker` : "gutter-marker";
-    const isUncommented = anchored.length === 0 && !inRange;
+    const isUncommented = !primary && !inRange;
     const rowClass = [
-      anchored.length > 0 ? "has-comment" : "",
-      inRange && anchored.length === 0 ? "range-spanned" : "",
+      primary ? "has-comment" : "",
+      inRange && !primary ? "range-spanned" : "",
       inHunk ? "diff-hunk-line" : "",
       changed ? "diff-changed-line" : "",
       isUncommented ? "uncommented" : "",
     ].filter(Boolean).join(" ");
     const codeHtml = renderHighlightedLine(lineText, language);
-    const gutterDataAttr = anchored.length > 0
-      ? `data-comment-id="${escapeHtml(anchored[0].id)}"`
+    const gutterDataAttr = primary
+      ? `data-comment-id="${escapeHtml(primary.id)}"`
       : `data-add-line="${lineNum}"`;
     const hunkAttr = hunkIndex !== undefined ? `data-hunk-index="${hunkIndex}"` : "";
 
@@ -1827,8 +1898,8 @@ function renderFileView() {
       </tr>
     `;
 
-    anchored.forEach((c) => {
-      if (state.expandedComments.has(c.id)) {
+    ending.forEach((c) => {
+      if (!state.hideThreadCards && state.expandedComments.has(c.id)) {
         html += `
           <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
             <td colspan="3"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
@@ -1838,7 +1909,7 @@ function renderFileView() {
     });
 
     // New-comment form rendered inline below the clicked line
-    if (state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === lineNum) {
+    if (!state.hideThreadCards && state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === lineNum) {
       html += `
         <tr class="comment-row">
           <td colspan="3"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
@@ -1853,6 +1924,7 @@ function renderFileView() {
     ? `<div class="file-unavailable">${escapeHtml(sourceUnavailable)}. Use Unified mode to inspect deleted or unreadable changed files.</div>`
     : "";
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
+  const counts = threadCounts(fileComments);
 
   document.getElementById("content").innerHTML = `
     <div class="code-pane">
@@ -1861,7 +1933,7 @@ function renderFileView() {
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">${language || "auto"}</span>
         ${statHtml}
-        <span class="code-comment-count">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
+        <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
       </div>
       <div class="code-table-scroll">
         ${emptyHtml || `<table class="code-table"><tbody>${rows}</tbody></table>`}
@@ -1873,15 +1945,28 @@ function renderFileView() {
 }
 
 function commentLineMaps(fileComments) {
-  const commentsAtLine = new Map();
+  const threadsAtLine = new Map();
+  const threadsEndingAtLine = new Map();
   const rangedSpanLines = new Set();
   fileComments.forEach((c) => {
     const [s, e] = commentLineRange(c);
-    if (!commentsAtLine.has(s)) commentsAtLine.set(s, []);
-    commentsAtLine.get(s).push(c);
+    if (!threadsEndingAtLine.has(e)) threadsEndingAtLine.set(e, []);
+    threadsEndingAtLine.get(e).push(c);
     for (let i = s; i <= e; i++) rangedSpanLines.add(i);
+    for (let i = s; i <= e; i++) {
+      if (!threadsAtLine.has(i)) threadsAtLine.set(i, []);
+      threadsAtLine.get(i).push(c);
+    }
   });
-  return { commentsAtLine, rangedSpanLines };
+  return { threadsAtLine, threadsEndingAtLine, rangedSpanLines };
+}
+
+function rangeMarkerClass(c, lineNum) {
+  const [s, e] = commentLineRange(c);
+  if (s === e) return "range-only";
+  if (lineNum === s) return "range-start";
+  if (lineNum === e) return "range-end";
+  return "range-mid";
 }
 
 function hunkLineMaps(hunks) {
@@ -1901,13 +1986,17 @@ function hunkLineMaps(hunks) {
 }
 
 function renderUnifiedDiffView(filePath, language, diffDetail) {
-  const fileComments = reviewThreads()
+  const fileComments = visibleReviewThreads()
     .filter((c) => c.file === filePath)
     .sort((a, b) => commentLineRange(a)[0] - commentLineRange(b)[0]);
-  const { commentsAtLine } = commentLineMaps(fileComments);
+  const { threadsAtLine } = commentLineMaps(fileComments);
   const sourceLines = sourceLinesForFile(filePath) || [];
   const hunks = diffDetail?.hunks || [];
+  const visibleNewLines = new Set(
+    hunks.flatMap((hunk) => (hunk.lines || []).map((line) => line.new_line).filter(Number.isInteger)),
+  );
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
+  const counts = threadCounts(fileComments);
   const rows = hunks.flatMap((hunk, hunkIndex) => {
     const out = [`
       <tr class="diff-hunk-header" data-hunk-index="${hunkIndex}">
@@ -1920,26 +2009,37 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
     (hunk.lines || []).forEach((line) => {
       const newLine = line.new_line;
       const oldLine = line.old_line;
-      const anchored = newLine ? commentsAtLine.get(newLine) || [] : [];
+      const covering = newLine ? threadsAtLine.get(newLine) || [] : [];
       const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
       const canComment = Number.isInteger(newLine);
-      const gutterAttr = anchored.length > 0
-        ? `data-comment-id="${escapeHtml(anchored[0].id)}"`
+      const primary = covering[0];
+      const gutterAttr = primary
+        ? `data-comment-id="${escapeHtml(primary.id)}"`
         : canComment ? `data-add-line="${newLine}"` : "";
       let markerHtml = escapeHtml(marker);
-      if (anchored.length > 0) {
-        markerHtml = `<span class="dot" style="background:${severityColorVar(anchored[0].severity)}"></span>`;
+      if (primary) {
+        const [s, e] = commentLineRange(primary);
+        const color = threadMarkerColor(primary);
+        const dot = newLine === s
+          ? `<span class="dot" style="background:${color}"></span>`
+          : "";
+        const rail = s !== e
+          ? `<span class="bar" style="background:${color}"></span>`
+          : "";
+        markerHtml = `${rail}${dot}`;
       }
       out.push(`
         <tr class="unified-line ${escapeHtml(line.kind || "context")}">
           <td class="diff-old-num">${oldLine || ""}</td>
           <td class="diff-new-num">${newLine || ""}</td>
-          <td class="diff-marker-cell ${anchored.length ? "has-marker" : ""}" ${gutterAttr}>${markerHtml}</td>
+          <td class="diff-marker-cell ${primary ? `has-marker ${threadType(primary)} ${rangeMarkerClass(primary, newLine)}` : ""}" ${gutterAttr}>${markerHtml}</td>
           <td class="diff-code-cell">${renderHighlightedLine(line.text || "", language)}</td>
         </tr>
       `);
-      anchored.forEach((c) => {
-        if (state.expandedComments.has(c.id)) {
+      covering
+        .filter((c) => isLastVisibleRangeLine(c, newLine, visibleNewLines))
+        .forEach((c) => {
+        if (!state.hideThreadCards && state.expandedComments.has(c.id)) {
           out.push(`
             <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
               <td colspan="4"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines })}</div></td>
@@ -1947,7 +2047,7 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
           `);
         }
       });
-      if (state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === newLine) {
+      if (!state.hideThreadCards && state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === newLine) {
         out.push(`
           <tr class="comment-row">
             <td colspan="4"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
@@ -1971,7 +2071,7 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
         <strong>${escapeHtml(filePath)}</strong>
         <span class="lang-badge">unified</span>
         ${statHtml}
-        <span class="code-comment-count">${fileComments.length} ${fileComments.length === 1 ? "comment" : "comments"}</span>
+        <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
       </div>
       <div class="code-table-scroll">${body}</div>
     </div>
@@ -1980,8 +2080,21 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
   if (window.lucide) window.lucide.createIcons();
 }
 
+function isLastVisibleRangeLine(c, lineNum, visibleNewLines) {
+  const [s, e] = commentLineRange(c);
+  if (lineNum < s || lineNum > e) return false;
+  for (let i = lineNum + 1; i <= e; i += 1) {
+    if (visibleNewLines.has(i)) return false;
+  }
+  return true;
+}
+
 function severityColorVar(sev) {
   return `var(--sev-${sev})`;
+}
+
+function threadMarkerColor(c) {
+  return isNoteThread(c) ? "var(--thread-note)" : severityColorVar(c.severity);
 }
 
 // --- New comment form ---
@@ -1989,9 +2102,10 @@ function severityColorVar(sev) {
 function renderNewCommentForm() {
   const t = state.newCommentTarget;
   const language = detectLanguage(t.file, state.source?.content);
+  const isNote = state.newThreadType === "note";
   const originalSuggestion = originalTextForNewComment();
   const initialSuggestion = state.newCommentSuggestionDraft || originalSuggestion;
-  const suggestionHtml = state.newCommentSuggestionExpanded
+  const suggestionHtml = !isNote && state.newCommentSuggestionExpanded
     ? `
       <div class="comment-suggestion new-comment-suggestion">
         <div class="comment-suggestion-label">
@@ -2006,7 +2120,7 @@ function renderNewCommentForm() {
         <div class="suggestion-preview" id="new-suggestion-preview"></div>
       </div>
     `
-    : `
+    : isNote ? "" : `
       <button class="btn btn-suggestion-add" data-expand-new-suggestion type="button">
         <i data-lucide="lightbulb"></i>
         Add suggested change
@@ -2016,6 +2130,10 @@ function renderNewCommentForm() {
     <div class="new-comment-form" data-new-comment-form>
       <div class="form-row">
         <span class="comment-line-ref">L${t.line}${t.isRange && t.endLine ? `–${t.endLine}` : ""}</span>
+        <div class="segmented thread-kind-toggle" role="group" aria-label="Thread type">
+          <button class="${state.newThreadType === "comment" ? "active" : ""}" data-new-thread-type="comment" type="button">Comment</button>
+          <button class="${state.newThreadType === "note" ? "active" : ""}" data-new-thread-type="note" type="button">Note</button>
+        </div>
         <label class="range-toggle">
           <input type="checkbox" id="new-range-toggle" ${t.isRange ? "checked" : ""} />
           Range
@@ -2036,15 +2154,15 @@ function renderNewCommentForm() {
           <option value="medium" selected>medium confidence</option>
           <option value="low">low confidence</option>
         </select>
-        <input type="text" id="new-category" placeholder="category (correctness, security, perf, style, …)" />
+        <input type="text" id="new-category" placeholder="${isNote ? "category (context, risk, question, …)" : "category (correctness, security, perf, style, …)"}" />
       </div>
-      <textarea id="new-body" placeholder="Comment body. Markdown — backticks for inline code."></textarea>
+      <textarea id="new-body" placeholder="${isNote ? "Note body. Local-only Markdown for reviewer context." : "Comment body. Markdown — backticks for inline code."}"></textarea>
       <div class="comment-editor-preview markdown-body" id="new-body-preview"></div>
       ${suggestionHtml}
       <div class="form-actions">
         <button class="btn btn-primary" data-save-new>
           <i data-lucide="plus"></i>
-          Add comment
+          Add ${isNote ? "note" : "comment"}
         </button>
       </div>
     </div>
@@ -2120,7 +2238,7 @@ function renderStatusDropdown(c, idSafe) {
 
 function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
   const hasBody = Boolean((c.body || "").trim());
-  const suggestionAction = hasSuggestion(c)
+  const suggestionAction = isNoteThread(c) ? "" : hasSuggestion(c)
     ? `
       <button class="comment-menu-item" data-edit-suggestion-target="${idSafe}" ${anchorCurrent ? "" : "disabled"} type="button">
         <i data-lucide="lightbulb"></i>
@@ -2137,7 +2255,7 @@ function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
         Add suggestion
       </button>
     `;
-  const bodyAction = hasBody ? "Edit comment" : "Add comment";
+  const bodyAction = hasBody ? "Edit thread" : "Add thread";
   return `
     <details class="comment-menu">
       <summary class="comment-menu-trigger" title="Comment actions" aria-label="Comment actions">
@@ -2157,6 +2275,8 @@ function renderCommentActionsMenu(c, idSafe, anchorCurrent) {
 function renderCommentCard(c, opts = {}) {
   const [s, e] = commentLineRange(c);
   const lineRef = s === e ? `L${s}` : `L${s}–${e}`;
+  const type = threadType(c);
+  const isNote = type === "note";
   const sev = c.severity || "info";
   const confidence = c.confidence || "medium";
   const author = c.author || "ai";
@@ -2173,7 +2293,7 @@ function renderCommentCard(c, opts = {}) {
   const anchorSafe = escapeHtml(anchorStatus);
   const idSafe = escapeHtml(c.id);
 
-  const isEditingSuggestion = state.editingSuggestion === c.id;
+  const isEditingSuggestion = !isNote && state.editingSuggestion === c.id;
   let suggestionHtml = "";
   if (isEditingSuggestion) {
     const draft = hasSuggestion(c) ? suggestionText(c) : (state.suggestionDrafts.get(c.id) || "");
@@ -2192,7 +2312,7 @@ function renderCommentCard(c, opts = {}) {
         <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel · empty deletes selected lines</div>
       </div>
     `;
-  } else if (hasSuggestion(c)) {
+  } else if (!isNote && hasSuggestion(c)) {
     suggestionHtml = renderSuggestionDiff(c, language, opts.sourceLines);
   } else {
     suggestionHtml = "";
@@ -2214,7 +2334,7 @@ function renderCommentCard(c, opts = {}) {
   const isEditing = state.editingBody === c.id;
   const actionsMenuHtml = isEditing || isEditingSuggestion ? "" : renderCommentActionsMenu(c, idSafe, anchorCurrent);
   const deleteBtnHtml = isEditing || isEditingSuggestion ? "" :
-    `<button class="comment-delete-trigger" data-delete-comment="${idSafe}" title="Delete comment" aria-label="Delete comment"><i data-lucide="trash-2"></i></button>`;
+    `<button class="comment-delete-trigger" data-delete-comment="${idSafe}" title="Delete thread" aria-label="Delete thread"><i data-lucide="trash-2"></i></button>`;
   const bodyHtml = isEditing
     ? `
       <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(c.body)}</textarea>
@@ -2224,9 +2344,10 @@ function renderCommentCard(c, opts = {}) {
     : hasBody ? `<div class="comment-body markdown-body">${renderMarkdown(c.body)}</div>` : "";
 
   return `
-    <div class="comment-card" data-comment-card="${idSafe}">
+    <div class="comment-card ${type}" data-comment-card="${idSafe}">
       <div class="comment-header">
         ${renderAuthorBadge(author)}
+        ${renderMetaChip("type", type, isNote ? "Note" : "Comment")}
         ${renderMetaChip("severity", sev, `Severity: ${humanSeverity(sev)}`)}
         ${renderMetaChip("confidence", confidence, `Confidence: ${humanConfidence(confidence)}`)}
         ${renderMetaChip("category", c.category || "uncategorized", c.category || "uncategorized")}
@@ -2247,10 +2368,17 @@ function renderCommentCard(c, opts = {}) {
           <i data-lucide="message-square-plus"></i>
           Add reply
         </button>
+        ${isNote ? `
+          <span class="local-note-indicator" title="Notes stay local and are not submitted to GitHub">
+            <i data-lucide="bookmark"></i>
+            Local note
+          </span>
+        ` : `
         <button class="btn btn-primary" data-send-comment="${idSafe}" title="${escapeHtml(sendBlockReason || "Send this comment to GitHub")}" ${sendBlockReason ? "disabled" : ""}>
           <i data-lucide="send"></i>
           Send this comment
         </button>
+        `}
       </div>
     </div>
   `;
@@ -2276,7 +2404,7 @@ function renderReplies(c) {
 
   return `
     ${repliesHtml}
-    <textarea class="thread-reply-input" data-reply-input="${idSafe}" placeholder="Reply locally for the next terminal /code-review iteration…"></textarea>
+    <textarea class="thread-reply-input" data-reply-input="${idSafe}" placeholder="Reply locally for the next terminal /assisted-review iteration..."></textarea>
   `;
 }
 
@@ -2305,6 +2433,10 @@ async function persistReview() {
 async function saveEditedBody(id, newBody) {
   const c = findThread(id);
   if (!c) return;
+  if (isNoteThread(c)) {
+    showToast("Notes cannot include GitHub suggestions", { kind: "warning" });
+    return;
+  }
   if (newBody === c.body) {
     state.editingBody = null;
     renderContent();
@@ -2316,7 +2448,7 @@ async function saveEditedBody(id, newBody) {
     await persistReview();
     state.editingBody = null;
     renderContent();
-    showToast("Edited comment", { kind: "success" });
+    showToast("Edited thread", { kind: "success" });
   } catch (err) {
     c.body = original;
     showError(err, "Save failed");
@@ -2331,6 +2463,7 @@ function cancelBodyEdit() {
 async function beginSuggestionEdit(id) {
   const c = findThread(id);
   if (!c) return;
+  if (isNoteThread(c)) return;
   if (c.anchor_status && c.anchor_status !== "current" && c.anchor_status !== "moved") {
     showToast("Refresh or move the anchor before editing suggestions", { kind: "warning" });
     return;
@@ -2399,7 +2532,7 @@ async function saveEditedSuggestion(id, rawValue) {
 
 async function deleteSuggestion(id) {
   const c = findThread(id);
-  if (!hasSuggestion(c)) return;
+  if (!hasSuggestion(c) || isNoteThread(c)) return;
   if (!confirm("Delete this suggestion?")) return;
   const originalSuggestion = suggestionText(c);
   delete c.suggestion;
@@ -2522,6 +2655,9 @@ function attachContentHandlers() {
         isRange: false,
         endLine: line,
       };
+      state.hideThreadCards = false;
+      localStorage.setItem("assistedReviewHideThreadCards", "0");
+      state.newThreadType = state.threadFilter === "note" ? "note" : "comment";
       resetNewCommentSuggestion();
       renderContent();
       requestAnimationFrame(() => {
@@ -2550,6 +2686,15 @@ function attachContentHandlers() {
       renderContent();
     });
   });
+  content.querySelectorAll("[data-new-thread-type]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const nextType = el.getAttribute("data-new-thread-type");
+      if (!["comment", "note"].includes(nextType) || state.newThreadType === nextType) return;
+      state.newThreadType = nextType;
+      if (nextType === "note") resetNewCommentSuggestion();
+      renderContent();
+    });
+  });
   content.querySelectorAll("[data-expand-new-suggestion]").forEach((el) => {
     el.addEventListener("click", () => {
       state.newCommentSuggestionExpanded = true;
@@ -2575,10 +2720,11 @@ function attachContentHandlers() {
       const bodyEl = document.getElementById("new-body");
       const suggestionEl = document.getElementById("new-suggestion");
       const body = editorValue(bodyEl).trim();
-      const category = document.getElementById("new-category").value.trim() || "correctness";
+      const isNote = state.newThreadType === "note";
+      const category = document.getElementById("new-category").value.trim() || (isNote ? "context" : "correctness");
       const severity = document.getElementById("new-severity").value;
       const confidence = document.getElementById("new-confidence").value;
-      const suggestion = state.newCommentSuggestionExpanded
+      const suggestion = !isNote && state.newCommentSuggestionExpanded
         ? normalizeSuggestionText(editorValue(suggestionEl))
         : "";
       const endLineEl = document.getElementById("new-end-line");
@@ -2586,7 +2732,7 @@ function attachContentHandlers() {
       const originalSuggestion = sourceTextForRange(t.file, t.line, endLine);
 
       if (!body) {
-        showToast("Comment body is required", { kind: "warning" });
+        showToast("Thread body is required", { kind: "warning" });
         return;
       }
       if (t.isRange && endLine < t.line) {
@@ -2596,6 +2742,7 @@ function attachContentHandlers() {
 
       const newComment = {
         id: nextCommentId(),
+        type: state.newThreadType,
         author: "user",
         file: t.file,
         line: endLine,
@@ -2609,7 +2756,7 @@ function attachContentHandlers() {
         replies: [],
       };
       if (t.isRange && endLine !== t.line) newComment.start_line = t.line;
-      if (state.newCommentSuggestionExpanded && suggestion !== originalSuggestion) {
+      if (!isNote && state.newCommentSuggestionExpanded && suggestion !== originalSuggestion) {
         newComment.suggestion = suggestion;
       }
 
@@ -2621,7 +2768,7 @@ function attachContentHandlers() {
         state.expandedComments.add(newComment.id);
         renderTree();
         renderContent();
-        showToast("Added comment", { kind: "success" });
+        showToast(`Added ${isNote ? "note" : "comment"}`, { kind: "success" });
       } catch (err) {
         showError(err, "Save failed");
         // Roll back optimistic update
@@ -2730,14 +2877,14 @@ function attachContentHandlers() {
     el.addEventListener("click", async (e) => {
       e.stopPropagation();
       const id = el.getAttribute("data-delete-comment");
-      if (!confirm("Delete this comment?")) return;
+      if (!confirm("Delete this thread?")) return;
       const originalThreads = [...reviewThreads()];
       state.review.review.threads = reviewThreads().filter((c) => c.id !== id);
       try {
         await persistReview();
         renderTree();
         renderContent();
-        showToast("Deleted comment", { kind: "success" });
+        showToast("Deleted thread", { kind: "success" });
       } catch (err) {
         state.review.review.threads = originalThreads;
         showError(err, "Delete failed");
@@ -2794,6 +2941,8 @@ async function toggleComment(id) {
   if (state.expandedComments.has(id)) {
     state.expandedComments.delete(id);
   } else {
+    state.hideThreadCards = false;
+    localStorage.setItem("assistedReviewHideThreadCards", "0");
     state.expandedComments.add(id);
     state.cursorCommentId = id;
   }
@@ -2859,7 +3008,7 @@ async function setStatus(commentId, status) {
 function setViewMode(mode) {
   if (!["source", "diff"].includes(mode) || state.viewMode === mode) return;
   state.viewMode = mode;
-  localStorage.setItem("codeReviewViewMode", mode);
+  localStorage.setItem("assistedReviewViewMode", mode);
   renderContent();
 }
 
@@ -2870,12 +3019,30 @@ function toggleViewMode() {
 function setNavTarget(target) {
   if (!["comments", "hunks"].includes(target) || state.navTarget === target) return;
   state.navTarget = target;
-  localStorage.setItem("codeReviewNavTarget", target);
+  localStorage.setItem("assistedReviewNavTarget", target);
   renderContent();
 }
 
 function toggleNavTarget() {
   setNavTarget(state.navTarget === "comments" ? "hunks" : "comments");
+}
+
+function setThreadFilter(filter) {
+  if (!["all", "comment", "note"].includes(filter) || state.threadFilter === filter) return;
+  state.threadFilter = filter;
+  localStorage.setItem("assistedReviewThreadFilter", filter);
+  renderContent();
+}
+
+function toggleThreadCardsHidden() {
+  state.hideThreadCards = !state.hideThreadCards;
+  localStorage.setItem("assistedReviewHideThreadCards", state.hideThreadCards ? "1" : "0");
+  if (state.hideThreadCards) {
+    state.expandedComments.clear();
+    state.newCommentTarget = null;
+    resetNewCommentSuggestion();
+  }
+  renderContent();
 }
 
 async function applyBaseRef() {
@@ -2953,11 +3120,17 @@ document.getElementById("btn-send-review").addEventListener("click", async () =>
     showToast("Cannot submit review", { kind: "warning", detail: blockReason });
     return;
   }
-  if (!confirm("Send all open + acknowledged comments to GitHub?")) return;
+  const { sendableComments, notes } = submissionSummary();
+  if (!confirm(`Send ${sendableComments} open or acknowledged comment${sendableComments === 1 ? "" : "s"} to GitHub? ${notes} note${notes === 1 ? "" : "s"} will stay local.`)) return;
   try {
     const res = await submitReview(state.route.slug, state.route.key, { mode: "all" });
     showToast("Sent review", { kind: "success", detail: res.url || "" });
-    navigate({ view: "inbox" });
+    if (res.archived) {
+      navigate({ view: "inbox" });
+    } else {
+      state.review = null;
+      await loadRoute(state.route);
+    }
   } catch (err) {
     showError(err, "Submission failed");
   }
@@ -2974,7 +3147,7 @@ function isTypingInInput() {
 function navigableComments() {
   if (!state.review) return [];
   const grouped = {};
-  reviewThreads().forEach((c) => {
+  visibleReviewThreads().forEach((c) => {
     if (!grouped[c.file]) grouped[c.file] = [];
     grouped[c.file].push(c);
   });
@@ -3032,6 +3205,8 @@ async function navigateToComment(direction) {
     // expanding the target — otherwise the target ends up collapsed.
     await navigate({ view: "file", slug: state.route.slug, key: state.route.key, file: target.file });
   }
+  state.hideThreadCards = false;
+  localStorage.setItem("assistedReviewHideThreadCards", "0");
   state.expandedComments.clear();
   state.expandedComments.add(target.id);
   renderContent();

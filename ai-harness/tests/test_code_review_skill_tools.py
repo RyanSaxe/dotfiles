@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyyaml", "ruamel.yaml"]
 # ///
-"""Regression tests for the code-review skill tools."""
+"""Regression tests for the assisted-review skill tools."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from types import ModuleType
 
-SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "code-review"
+SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "assisted-review"
 TOOLS_DIR = SKILL_DIR / "tools"
 
 
@@ -45,6 +45,93 @@ class ReviewToolTests(unittest.TestCase):
         for path in (SKILL_DIR / "examples").glob("*.review.yaml"):
             with self.subTest(path=path.name):
                 self.assertEqual(validate_mod.validate(path), [])
+
+    def test_validation_requires_thread_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: local
+  repo_root: /tmp/repo
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: missing type
+      status: open
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            self.assertIn(
+                "threads[0].type is required", validate_mod.validate(review_path)
+            )
+
+    def test_validation_rejects_invalid_type_and_note_suggestion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: local
+  repo_root: /tmp/repo
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      type: discussion
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: invalid type
+      status: open
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+    - id: rev-002
+      type: note
+      author: ai
+      file: src/sample.py
+      line: 2
+      severity: info
+      confidence: medium
+      category: context
+      body: note with suggestion
+      suggestion: replacement
+      status: open
+      anchor_text: other source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            errors = validate_mod.validate(review_path)
+
+            self.assertTrue(
+                any("threads[0].type must be one of" in error for error in errors)
+            )
+            self.assertIn(
+                "threads[1].suggestion is not allowed when type is 'note'",
+                errors,
+            )
 
     def test_request_path_strips_query_string(self) -> None:
         self.assertEqual(
@@ -92,6 +179,7 @@ review:
   summary: test
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: src/sample.py
       line: 1
@@ -104,6 +192,7 @@ review:
       anchor_status: current
       replies: []
     - id: rev-002
+      type: comment
       author: ai
       file: src/sample.py
       line: 1
@@ -179,6 +268,7 @@ review:
   summary: test
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: src/sample.py
       line: 1
@@ -302,7 +392,179 @@ review:
             self.assertTrue(status["needs_refresh"])
             self.assertEqual(status["mode"], "commit")
 
+    def test_inbox_metadata_counts_comments_and_notes_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_dir = Path(tmp) / "repo-slug"
+            review_dir.mkdir()
+            review_path = review_dir / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: local
+  repo_root: /tmp/repo
+  commit: abc123
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      type: comment
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: high
+      confidence: high
+      category: correctness
+      body: finding
+      status: open
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+    - id: rev-002
+      type: note
+      author: ai
+      file: src/sample.py
+      line: 2
+      severity: info
+      confidence: medium
+      category: context
+      body: local context
+      status: open
+      anchor_text: other source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            entry = view_mod.review_to_inbox_entry("repo-slug", "review", review_path)
+
+            self.assertEqual(entry["thread_count"], 2)
+            self.assertEqual(entry["comment_count"], 1)
+            self.assertEqual(entry["note_count"], 1)
+            self.assertEqual(entry["severity_counts"]["high"], 1)
+            self.assertEqual(entry["severity_counts"]["info"], 0)
+
+    def test_full_submit_keeps_only_notes_locally(self) -> None:
+        threads = [
+            {"id": "rev-001", "type": "comment", "status": "open"},
+            {"id": "rev-002", "type": "comment", "status": "resolved"},
+            {"id": "rev-003", "type": "note", "status": "open"},
+        ]
+
+        remaining = view_mod.remaining_threads_after_full_submit(threads)
+
+        self.assertEqual(
+            remaining, [{"id": "rev-003", "type": "note", "status": "open"}]
+        )
+
     def test_submit_payload_excludes_replies(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: pr
+  repo_root: /tmp/repo
+  commit: abc123
+  pr_number: 12
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      type: comment
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: thread body
+      status: open
+      anchor_text: source line
+      anchor_status: current
+      replies:
+        - author: user
+          body: local reply only
+    - id: rev-002
+      type: comment
+      author: ai
+      file: src/sample.py
+      line: 2
+      severity: low
+      confidence: high
+      category: test
+      body: skipped
+      status: resolved
+      anchor_text: other source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            payload = submit_mod.submit(review_path, None, dry_run=True)["payload"]
+
+            self.assertEqual(len(payload["comments"]), 1)
+            self.assertEqual(payload["comments"][0]["body"], "thread body")
+            self.assertNotIn("local reply only", payload["comments"][0]["body"])
+
+    def test_submit_payload_excludes_notes_and_refuses_direct_note_send(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: pr
+  repo_root: /tmp/repo
+  commit: abc123
+  pr_number: 12
+review:
+  event: COMMENT
+  summary: test summary
+  threads:
+    - id: rev-001
+      type: comment
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: high
+      confidence: high
+      category: correctness
+      body: sendable comment
+      status: open
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+    - id: rev-002
+      type: note
+      author: ai
+      file: src/sample.py
+      line: 2
+      severity: info
+      confidence: medium
+      category: context
+      body: local note
+      status: open
+      anchor_text: other source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            payload = submit_mod.submit(review_path, None, dry_run=True)["payload"]
+
+            self.assertEqual(len(payload["comments"]), 1)
+            self.assertEqual(payload["comments"][0]["body"], "sendable comment")
+            with self.assertRaisesRegex(RuntimeError, "thread type is not 'comment'"):
+                submit_mod.submit(review_path, "rev-002", dry_run=True)
+
+    def test_submit_treats_legacy_untyped_threads_as_comments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             review_path = Path(tmp) / "review.review.yaml"
             review_path.write_text(
@@ -325,23 +587,9 @@ review:
       severity: low
       confidence: high
       category: test
-      body: thread body
+      body: legacy comment
       status: open
       anchor_text: source line
-      anchor_status: current
-      replies:
-        - author: user
-          body: local reply only
-    - id: rev-002
-      author: ai
-      file: src/sample.py
-      line: 2
-      severity: low
-      confidence: high
-      category: test
-      body: skipped
-      status: resolved
-      anchor_text: other source line
       anchor_status: current
       replies: []
 """
@@ -350,8 +598,7 @@ review:
             payload = submit_mod.submit(review_path, None, dry_run=True)["payload"]
 
             self.assertEqual(len(payload["comments"]), 1)
-            self.assertEqual(payload["comments"][0]["body"], "thread body")
-            self.assertNotIn("local reply only", payload["comments"][0]["body"])
+            self.assertEqual(payload["comments"][0]["body"], "legacy comment")
 
     def test_submit_payload_preserves_empty_suggestion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -370,6 +617,7 @@ review:
   summary: test summary
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: src/sample.py
       line: 1
@@ -409,6 +657,7 @@ review:
   summary: test summary
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: src/sample.py
       line: 1
@@ -421,6 +670,7 @@ review:
       anchor_status: current
       replies: []
     - id: rev-002
+      type: comment
       author: ai
       file: src/sample.py
       line: 2

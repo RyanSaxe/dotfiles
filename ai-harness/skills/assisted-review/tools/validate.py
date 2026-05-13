@@ -23,6 +23,7 @@ VALID_STATUSES = {"open", "acknowledged", "resolved", "wontfix"}
 VALID_EVENTS = {"COMMENT", "REQUEST_CHANGES", "APPROVE", "PENDING"}
 VALID_TARGET_KINDS = {"local", "pr"}
 VALID_AUTHORS = {"ai", "user"}
+VALID_THREAD_TYPES = {"comment", "note"}
 VALID_CONFIDENCES = {"low", "medium", "high"}
 VALID_ANCHOR_STATUSES = {"current", "moved", "missing", "ambiguous"}
 ID_PATTERN = re.compile(r"^rev-\d{3}$")
@@ -119,6 +120,7 @@ def validate_required_thread_fields(thread: dict[str, Any], prefix: str) -> list
     errors: list[str] = []
     for required in (
         "author",
+        "type",
         "file",
         "severity",
         "category",
@@ -137,6 +139,7 @@ def validate_enum_fields(thread: dict[str, Any], prefix: str) -> list[str]:
     errors: list[str] = []
     enum_fields = (
         ("author", VALID_AUTHORS),
+        ("type", VALID_THREAD_TYPES),
         ("severity", VALID_SEVERITIES),
         ("confidence", VALID_CONFIDENCES),
         ("status", VALID_STATUSES),
@@ -209,6 +212,8 @@ def validate_thread(
         errors.append(
             f"{prefix}.anchor_text must be a string, got {type(thread['anchor_text']).__name__}"
         )
+    if thread.get("type") == "note" and "suggestion" in thread:
+        errors.append(f"{prefix}.suggestion is not allowed when type is 'note'")
 
     return errors
 
@@ -330,7 +335,9 @@ def validate(path: Path, *, require_current_anchors: bool = False) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate a code-review YAML file.")
+    parser = argparse.ArgumentParser(
+        description="Validate an assisted-review YAML file."
+    )
     parser.add_argument(
         "--require-current-anchors",
         action="store_true",

@@ -19,6 +19,7 @@ review:
 
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: scripts/attention-daemon.sh
       start_line: 18
@@ -38,6 +39,7 @@ review:
       replies: []
 
     - id: rev-002
+      type: comment
       author: ai
       file: zsh/aliases.zsh
       line: 48
@@ -58,6 +60,7 @@ review:
             Good catch. Please keep this one but make the suggested path use the reusable script convention.
 
     - id: rev-003
+      type: note
       author: user
       file: scripts/notify.sh
       line: 77

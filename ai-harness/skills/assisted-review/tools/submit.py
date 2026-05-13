@@ -30,6 +30,7 @@ import yaml
 
 SKIP_STATUSES = {"resolved", "wontfix"}
 SENDABLE_ANCHOR_STATUSES = {"current", "moved"}
+COMMENT_THREAD_TYPE = "comment"
 
 
 def parse_remote_url(url: str) -> tuple[str, str] | None:
@@ -93,7 +94,17 @@ def has_suggestion(thread: dict[str, Any]) -> bool:
     return "suggestion" in thread
 
 
+def thread_type(thread: dict[str, Any]) -> str:
+    # Older saved review files predate explicit thread types. Keep them
+    # submittable as comments, but newly generated YAML must include `type`.
+    value = thread.get("type")
+    return value if isinstance(value, str) and value else COMMENT_THREAD_TYPE
+
+
 def submission_block_reason(thread: dict[str, Any]) -> str | None:
+    if thread_type(thread) != COMMENT_THREAD_TYPE:
+        return "thread type is not 'comment'"
+
     status = thread.get("status", "open")
     if status in SKIP_STATUSES:
         return f"status is {status!r}"
@@ -143,9 +154,16 @@ def build_review_payload(
                 f"thread id {only_thread_id!r} is not submittable: {reason}"
             )
     else:
-        threads = [c for c in threads if c.get("status") not in SKIP_STATUSES]
+        threads = [
+            c
+            for c in threads
+            if thread_type(c) == COMMENT_THREAD_TYPE
+            and c.get("status") not in SKIP_STATUSES
+        ]
         if not threads:
-            raise RuntimeError("nothing to send — every thread is resolved or wontfix")
+            raise RuntimeError(
+                "nothing to send — no open or acknowledged comment threads"
+            )
         blocked = [
             (c["id"], reason)
             for c in threads

@@ -6,10 +6,10 @@ The iteration loop is local and thread-based:
 
 1. AI generates review threads.
 2. Human reads them in the viewer, starts threads, or adds replies.
-3. Human re-runs `/code-review`.
+3. Human re-runs `/assisted-review`.
 4. AI reads the thread discussion, updates the YAML, and appends AI replies when useful.
 
-The viewer does not call AI. It only edits YAML, refreshes files, and submits selected PR comments.
+The viewer does not call AI. It only edits YAML, refreshes files, and submits selected PR comments. Local notes remain in the review file.
 
 ## When To Iterate
 
@@ -29,6 +29,7 @@ Otherwise ask whether to open the viewer, append a new pass, or regenerate from 
    - Append an `ai` reply when responding to a user reply matters for future context.
    - Delete a thread only when the user clearly asked to drop it.
    - Add new threads if the user asked for another area to be reviewed.
+   - Keep `type: comment` for GitHub-sendable findings and `type: note` for local-only reviewer aids.
 4. Manually move threads when needed. The deterministic refresh only handles exact obvious moves; the AI may use the code context to update `file`, `line`, `start_line`, `anchor_text`, and `anchor_status`.
 5. Validate, then open the viewer.
 
@@ -41,6 +42,7 @@ Existing thread:
 ```yaml
 threads:
   - id: rev-003
+    type: comment
     author: ai
     file: scripts/notify.sh
     line: 44
@@ -71,6 +73,7 @@ Updated:
 ```yaml
 threads:
   - id: rev-003
+    type: comment
     severity: high
     confidence: high
     body: |

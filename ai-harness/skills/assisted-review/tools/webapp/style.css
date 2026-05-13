@@ -23,6 +23,11 @@
   --color-negative-soft: #fee2e2;
   --color-warning: #d97706;
   --color-warning-soft: #fef3c7;
+  --diff-gutter-soft: #eff6ff;
+  --diff-gutter: #dbeafe;
+  --thread-note: #7c3aed;
+  --thread-note-soft: #ede9fe;
+  --thread-note-border: #c4b5fd;
 
   /* Severity rungs (multi-rung content scale, NOT chrome) */
   --sev-critical: #b91c1c;
@@ -344,6 +349,12 @@ body.inbox-mode .topbar-home-sep {
 .btn:hover {
   background: linear-gradient(#fafafa, #eeeeee);
   border-color: #c7c7c7;
+}
+
+.btn.active {
+  border-color: var(--color-action-border);
+  background: var(--color-action);
+  color: var(--color-action-fg);
 }
 
 .btn-primary {
@@ -1212,12 +1223,15 @@ body.inbox-mode .main {
   background: #f0f0f0;
 }
 
-.gutter-marker .dot {
+.gutter-marker .dot,
+.diff-marker-cell .dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   margin-top: 6px;
+  position: relative;
+  z-index: 1;
 }
 
 .gutter-marker .hunk-tick {
@@ -1229,25 +1243,30 @@ body.inbox-mode .main {
   background: #60a5fa;
 }
 
-.gutter-marker .bar {
+.gutter-marker .bar,
+.diff-marker-cell .bar {
   position: absolute;
   left: 5px;
   width: 8px;
   top: 0;
   bottom: 0;
+  border-radius: 0;
 }
 
-.gutter-marker.range-start .bar {
+.gutter-marker.range-start .bar,
+.diff-marker-cell.range-start .bar {
   top: 6px;
   border-radius: 4px 4px 0 0;
 }
 
-.gutter-marker.range-end .bar {
+.gutter-marker.range-end .bar,
+.diff-marker-cell.range-end .bar {
   bottom: 6px;
   border-radius: 0 0 4px 4px;
 }
 
-.gutter-marker.range-only .bar {
+.gutter-marker.range-only .bar,
+.diff-marker-cell.range-only .bar {
   top: 6px;
   bottom: 6px;
   border-radius: 4px;
@@ -1258,37 +1277,26 @@ body.inbox-mode .main {
   white-space: pre;
 }
 
-/* Annotated row wash. With the gutter bar removed, this is the primary signal
-   that lines belong to a comment. Soft amber — close enough to "highlighted"
-   to read as a callout, distinct from any severity color (they're saturated). */
-.code-table tr.has-comment,
-.code-table tr.range-spanned {
-  background: rgba(254, 243, 199, 0.4);
+.code-table tr.diff-hunk-line td.gutter-num,
+.code-table tr.diff-hunk-line td.gutter-marker {
+  background: var(--diff-gutter-soft);
 }
 
-.code-table tr.diff-hunk-line {
-  background: rgba(219, 234, 254, 0.26);
+.code-table tr.diff-changed-line td.gutter-num,
+.code-table tr.diff-changed-line td.gutter-marker {
+  background: var(--diff-gutter);
 }
 
-.code-table tr.diff-changed-line {
-  background: rgba(219, 234, 254, 0.5);
+.code-table tr.has-comment:hover td.code-cell,
+.code-table tr.range-spanned:hover td.code-cell {
+  background: rgba(250, 204, 21, 0.1);
 }
 
-.code-table tr.diff-hunk-line.has-comment,
-.code-table tr.diff-changed-line.has-comment,
-.code-table tr.diff-hunk-line.range-spanned,
-.code-table tr.diff-changed-line.range-spanned {
-  background: linear-gradient(90deg, rgba(219, 234, 254, 0.58), rgba(254, 243, 199, 0.52));
-}
-
-.code-table tr.has-comment:hover,
-.code-table tr.range-spanned:hover {
-  background: rgba(254, 243, 199, 0.55);
-}
-
-.code-table tr.diff-hunk-line:hover,
-.code-table tr.diff-changed-line:hover {
-  background: rgba(191, 219, 254, 0.62);
+.code-table tr.diff-hunk-line:hover td.gutter-num,
+.code-table tr.diff-hunk-line:hover td.gutter-marker,
+.code-table tr.diff-changed-line:hover td.gutter-num,
+.code-table tr.diff-changed-line:hover td.gutter-marker {
+  background: #bfdbfe;
 }
 
 /* Comment row: rendered as a tr after the code line */
@@ -1353,6 +1361,7 @@ body.inbox-mode .main {
   background: #fafafa;
   border-right: 1px solid var(--color-border);
   user-select: none;
+  position: relative;
 }
 
 .unified-table .diff-marker-cell[data-add-line] {
@@ -1415,6 +1424,11 @@ body.inbox-mode .main {
   font-family: var(--font-sans);
 }
 
+.comment-card.note {
+  border-left: 3px solid var(--thread-note);
+  padding-left: calc(var(--space-4) - 2px);
+}
+
 .comment-header {
   display: flex;
   align-items: center;
@@ -1448,6 +1462,18 @@ body.inbox-mode .main {
 .severity-chip.medium { background: var(--sev-medium-soft); color: var(--sev-medium); }
 .severity-chip.low { background: var(--sev-low-soft); color: var(--sev-low); }
 .severity-chip.info { background: var(--sev-info-soft); color: var(--sev-info); }
+
+.type-chip.comment {
+  background: #f5f5f5;
+  border-color: var(--color-border);
+  color: var(--color-body);
+}
+
+.type-chip.note {
+  background: var(--thread-note-soft);
+  border-color: var(--thread-note-border);
+  color: var(--thread-note);
+}
 
 .confidence-chip.high {
   background: var(--color-positive-soft);
@@ -2116,6 +2142,25 @@ body.inbox-mode .main {
   flex: 1;
 }
 
+.local-note-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--thread-note);
+  background: var(--thread-note-soft);
+  border: 1px solid var(--thread-note-border);
+  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.local-note-indicator .lucide {
+  width: 14px;
+  height: 14px;
+}
+
 /* === Shared code syntax theme ===================================== */
 
 .hljs,
@@ -2380,6 +2425,13 @@ body.inbox-mode .main {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.thread-count-summary {
+  display: inline-flex;
+  margin-left: var(--space-2);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
 }
 
 .stale-flag {

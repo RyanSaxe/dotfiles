@@ -15,6 +15,7 @@ review:
 
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: src/utils/parse.py
       line: 47

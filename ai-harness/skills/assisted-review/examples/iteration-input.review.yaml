@@ -15,6 +15,7 @@ review:
 
   threads:
     - id: rev-001
+      type: comment
       author: ai
       file: scripts/notify.sh
       start_line: 18
@@ -37,6 +38,7 @@ review:
             This caused duplicate notifications last month. Please make the impact clearer and raise confidence if you can confirm it.
 
     - id: rev-002
+      type: note
       author: user
       file: scripts/notify.sh
       line: 41

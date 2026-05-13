@@ -4,7 +4,7 @@
 
 ## What it is
 
-`tools/view.py` is a self-daemonizing local HTTP server that serves a vanilla-JS web app at `http://localhost:<port>`. It walks `~/.reviews/` to discover all reviews on the machine and presents them as a **single, persistent inbox** that survives across `/code-review` runs and across coding-agent sessions.
+`tools/view.py` is a self-daemonizing local HTTP server that serves a vanilla-JS web app at `http://localhost:<port>`. It walks `~/.reviews/` to discover all reviews on the machine and presents them as a **single, persistent inbox** that survives across `/assisted-review` runs and across coding-agent sessions.
 
 The viewer is harness-agnostic — it's launched the same way from Claude Code, Codex CLI, Copilot CLI, or any other Agent Skills runtime, via a normal shell `python` invocation.
 
@@ -13,7 +13,7 @@ The viewer is harness-agnostic — it's launched the same way from Claude Code, 
 The viewer is a **cooperative singleton**: only one instance ever runs.
 
 ```text
-~/.cache/code-review/viewer.json      ← state file: pid, port, url, started_at
+~/.cache/assisted-review/viewer.json  ← state file: pid, port, url, started_at
 ```
 
 When the daemon starts cleanly, it writes this file. When it shuts down cleanly (SIGTERM, `--stop`), it deletes the file. A stale state file (process dead) is detected and removed by the next launch.
@@ -30,7 +30,7 @@ The daemon **persists past the launching agent's exit** — it's `os.fork()`+`os
 uv run --script tools/view.py --ensure --open --review-path <path-to-yaml>
 ```
 
-Idempotent. Used by `/code-review` at the end of step 7. Behavior:
+Idempotent. Used by `/assisted-review` at the end of step 7. Behavior:
 
 - If a live daemon is detected (state file exists, pid alive, `/api/ping` responds) → opens the deep-link in the user's default browser, exits 0.
 - Otherwise → daemonizes a fresh server, waits up to 5s for the state file to appear, opens the browser, exits 0.
@@ -83,7 +83,8 @@ The web app talks to the daemon via these JSON endpoints:
 - `POST /api/refresh/<slug>/<key>` — reload files, refresh obvious anchors,
   and update the review fingerprint.
 - `POST /api/submit/<slug>/<key>` — invoke `submit.py`; body is
-  `{"mode": "all" | "comment", "commentId"?: "rev-001"}`.
+  `{"mode": "all" | "comment", "commentId"?: "rev-001"}`. Full review
+  submission sends only comment threads; note threads remain local.
 
 All filesystem access is restricted to `~/.reviews/` (for review files) and the `target.repo_root` declared in the review (for source files). The server refuses to read paths outside those scopes.
 

@@ -35,6 +35,7 @@ review:
 
   threads:
     - id: rev-001
+      type: comment # comment | note
       author: ai # ai | user
       file: src/auth/session.py
       line: 42
@@ -59,6 +60,22 @@ review:
         - author: ai
           body: |
             Agreed. I removed the raw SQL suggestion and downgraded confidence.
+
+    - id: rev-002
+      type: note
+      author: ai
+      file: src/auth/session.py
+      line: 80
+      severity: info
+      confidence: medium
+      category: context
+      body: |
+        This is the main permission boundary for the login flow. Review this before judging the session cache changes below.
+      status: open
+      anchor_text: |
+        def authorize_session(user: User, session: Session) -> bool:
+      anchor_status: current
+      replies: []
 ```
 
 ## Field Rules
@@ -70,6 +87,13 @@ Unique within the file. Use `rev-NNN`, zero-padded. IDs are stable handles for l
 ### `author`
 
 Use `ai` for threads or replies written by the reviewing agent. Use `user` for threads or replies created in the viewer by the human.
+
+### `type`
+
+Required enum: `comment | note`.
+
+- `comment` — a normal code review finding that may be submitted to GitHub. Comments may include a `suggestion`.
+- `note` — a local-only reviewer aid. Use notes to highlight context, uncertainty, important code paths, or areas that need human judgment. Notes are never submitted to GitHub and must not include `suggestion`.
 
 ### Line Targeting
 
@@ -123,7 +147,7 @@ GitHub-flavored Markdown. Lead with what and why; if the fix is non-obvious, end
 
 ### `suggestion`
 
-Optional raw exact replacement code, no fences. The submitter wraps it in a GitHub suggestion block when posting. Include every leading tab or space required.
+Optional raw exact replacement code for `type: comment` threads only, no fences. The submitter wraps it in a GitHub suggestion block when posting. Include every leading tab or space required.
 
 ### `status`
 
@@ -134,7 +158,7 @@ Optional raw exact replacement code, no fences. The submitter wraps it in a GitH
 
 ### `replies`
 
-Local-only thread discussion. The AI reads user replies on the next terminal `/code-review` run. GitHub submission ignores replies and sends only the thread `body` plus optional `suggestion`.
+Local-only thread discussion. The AI reads user replies on the next terminal `/assisted-review` run. GitHub submission ignores replies and sends only `type: comment` thread bodies plus optional suggestions.
 
 ## Examples
 

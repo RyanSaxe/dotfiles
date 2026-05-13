@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 VIEW_PATH = Path(__file__).with_name("view.py")
-SPEC = importlib.util.spec_from_file_location("code_review_view", VIEW_PATH)
+SPEC = importlib.util.spec_from_file_location("assisted_review_view", VIEW_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load view.py")
 view = importlib.util.module_from_spec(SPEC)

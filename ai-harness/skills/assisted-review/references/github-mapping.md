@@ -15,10 +15,10 @@ It calls this via `gh api -X POST --input -`.
 - `review.summary` -> `body`
 - `review.event` -> `event`
 - `target.commit` -> `commit_id`, when available
-- `review.threads[]` -> `comments[]`, after filtering out `resolved` and
-  `wontfix` threads
+- `review.threads[]` with `type: comment` -> `comments[]`, after filtering
+  out `resolved` and `wontfix` threads
 
-Replies are local-only and are not submitted to GitHub.
+Notes and replies are local-only and are not submitted to GitHub.
 
 ### Per-Thread Mapping
 
@@ -33,13 +33,14 @@ Replies are local-only and are not submitted to GitHub.
 
 1. Read the YAML.
 2. Resolve `<owner>/<repo>` from `gh repo view` or `target.remote`.
-3. Build `comments[]` from `review.threads[]`.
+3. Build `comments[]` from sendable `type: comment` threads.
 4. POST via `gh api repos/{owner}/{repo}/pulls/{pr}/reviews -X POST --input -`.
 5. On success, the viewer:
-   - Archives the whole review after "Send full review".
+   - Removes submitted comment threads and preserves local notes.
+   - Archives the whole review only when no threads remain.
    - Removes the sent thread after "Send this thread".
 6. On failure, leave the YAML untouched.
 
 ## Single-Thread Send
 
-`submit.py --thread-id rev-001` sends exactly one thread. `--comment-id` remains as a deprecated alias for older viewer calls.
+`submit.py --thread-id rev-001` sends exactly one comment thread. It refuses note threads. `--comment-id` remains as a deprecated alias for older viewer calls.

@@ -3,11 +3,11 @@
 # requires-python = ">=3.11"
 # dependencies = ["ruamel.yaml", "pyyaml"]
 # ///
-"""Self-daemonizing HTTP server for the code-review viewer.
+"""Self-daemonizing HTTP server for the assisted-review viewer.
 
 Cooperative singleton — only one instance runs at a time per machine.
 Survives the launching agent's exit (Claude Code, Codex CLI, etc.) by
-double-forking + setsid. Persists in `~/.cache/code-review/viewer.json`.
+double-forking + setsid. Persists in `~/.cache/assisted-review/viewer.json`.
 
 CLI:
   python view.py --ensure --open --review-path <path>
@@ -82,19 +82,20 @@ except ImportError:
 # === Constants ====================================================
 
 REVIEWS_DIR = Path.home() / ".reviews"
-CACHE_DIR = Path.home() / ".cache" / "code-review"
+CACHE_DIR = Path.home() / ".cache" / "assisted-review"
 STATE_FILE = CACHE_DIR / "viewer.json"
 ENSURE_LOCK_FILE = CACHE_DIR / ".ensure.lock"
 WEBAPP_DIR = Path(__file__).parent / "webapp"
-SERVICE_SIGNATURE = "code-review-viewer"
-VIEWER_API_VERSION = 2
+SERVICE_SIGNATURE = "assisted-review-viewer"
+VIEWER_API_VERSION = 3
 DEFAULT_PORT_START = 51234
 PORT_TRY_LIMIT = 10
 HEAD_CACHE_TTL_SECONDS = 60
 GIT_TIMEOUT_SECONDS = 10
 
 VALID_EVENTS = {"COMMENT", "REQUEST_CHANGES", "APPROVE", "PENDING"}
-SKIP_STATUSES = {"resolved", "wontfix"}
+COMMENT_THREAD_TYPE = "comment"
+NOTE_THREAD_TYPE = "note"
 
 # === State file helpers ===========================================
 
@@ -1016,6 +1017,17 @@ def refresh_status_for_review(path: Path) -> dict[str, Any]:
     }
 
 
+def thread_type(thread: dict[str, Any]) -> str:
+    value = thread.get("type")
+    return value if isinstance(value, str) and value else COMMENT_THREAD_TYPE
+
+
+def remaining_threads_after_full_submit(
+    threads: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [thread for thread in threads if thread_type(thread) != COMMENT_THREAD_TYPE]
+
+
 # === Inbox metadata ===============================================
 
 
@@ -1050,10 +1062,16 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
     }
     has_user_reply = False
     has_unanswered_user = False
+    comment_count = 0
+    note_count = 0
     for c in threads:
-        sev = c.get("severity")
-        if sev in severity_counts:
-            severity_counts[sev] += 1
+        if thread_type(c) == NOTE_THREAD_TYPE:
+            note_count += 1
+        else:
+            comment_count += 1
+            sev = c.get("severity")
+            if sev in severity_counts:
+                severity_counts[sev] += 1
         st = c.get("status")
         if st in status_counts:
             status_counts[st] += 1
@@ -1080,7 +1098,8 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
         "target_kind": target.get("kind"),
         "pr_number": target.get("pr_number"),
         "thread_count": len(threads),
-        "comment_count": len(threads),
+        "comment_count": comment_count,
+        "note_count": note_count,
         "severity_counts": severity_counts,
         "status_counts": status_counts,
         "has_user_reply": has_user_reply,
@@ -1244,7 +1263,7 @@ def request_path(raw_path: str) -> str:
 
 
 class ViewerHandler(BaseHTTPRequestHandler):
-    server_version = "code-review-viewer/1.0"
+    server_version = "assisted-review-viewer/1.0"
 
     def log_message(self, *_args: Any) -> None:
         # Quiet logs in daemon mode; --foreground users see the request lines.
@@ -1544,18 +1563,29 @@ class ViewerHandler(BaseHTTPRequestHandler):
             return
 
         # On success, mutate the local YAML.
+        archived = False
+        remaining_threads = 0
         try:
             data = yaml_load(rp.read_text())
             if mode == "comment":
                 data["review"]["threads"] = [
                     c for c in data["review"]["threads"] if c.get("id") != comment_id
                 ]
+                remaining_threads = len(data["review"]["threads"])
                 rp.write_text(yaml_dump(data))
             else:
-                # Archive the whole file under ~/.reviews/.archive/<slug>/...
-                archive_dir = REVIEWS_DIR / ".archive" / slug
-                archive_dir.mkdir(parents=True, exist_ok=True)
-                rp.rename(archive_dir / rp.name)
+                data["review"]["threads"] = remaining_threads_after_full_submit(
+                    data["review"]["threads"]
+                )
+                if data["review"]["threads"]:
+                    remaining_threads = len(data["review"]["threads"])
+                    rp.write_text(yaml_dump(data))
+                else:
+                    # Archive the whole file under ~/.reviews/.archive/<slug>/...
+                    archive_dir = REVIEWS_DIR / ".archive" / slug
+                    archive_dir.mkdir(parents=True, exist_ok=True)
+                    rp.rename(archive_dir / rp.name)
+                    archived = True
         except Exception as e:
             self._json(
                 207,
@@ -1566,7 +1596,15 @@ class ViewerHandler(BaseHTTPRequestHandler):
             )
             return
 
-        self._json(200, {"ok": True, "url": stdout.strip()})
+        self._json(
+            200,
+            {
+                "ok": True,
+                "url": stdout.strip(),
+                "archived": archived,
+                "remaining_threads": remaining_threads,
+            },
+        )
 
     # --- static + SPA fallback ---
 
@@ -1802,7 +1840,7 @@ def cmd_ensure(open_browser: bool, review_path_arg: Path | None) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Code-review viewer daemon.")
+    parser = argparse.ArgumentParser(description="Assisted-review viewer daemon.")
     parser.add_argument(
         "--ensure", action="store_true", help="Ensure a daemon is running."
     )
