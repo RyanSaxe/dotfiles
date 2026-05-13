@@ -1279,7 +1279,6 @@ function renderContextbar() {
       </button>
     </div>
     <button class="btn diff-toggle ${state.diffVisible ? "active" : ""}" data-toggle-diff aria-pressed="${state.diffVisible ? "true" : "false"}" title="${state.diffVisible ? "Hide inline diff" : "Show inline diff"} (d)">
-      <i data-lucide="${state.diffVisible ? "git-compare-arrows" : "git-compare"}"></i>
       Diff
     </button>
     <div class="segmented" role="group" aria-label="Navigation target">
@@ -1959,21 +1958,15 @@ function renderFileView() {
   const lineNumberDigits = diffLineNumberDigits(diffDetail?.hunks || [], lines.length);
   const tableStyle = `style="--line-number-text-width:${lineNumberDigits}ch;--line-number-gutter-width:calc(${lineNumberDigits}ch + 30px)"`;
   const focusedHunkIndex = state.cursorHunk?.file === filePath ? state.cursorHunk.index : null;
-  const renderDeletedRows = (items) => diffVisible
-    ? items.map((row) => renderDeletedDiffRow(row, language, focusedHunkIndex)).join("")
-    : "";
-  const renderDeletionSummaries = (items) => diffVisible
-    ? ""
-    : items.map((summary) => renderDeletionSummaryRow(summary, focusedHunkIndex)).join("");
+  const renderDeletedRows = (items) => items.map((row) => renderDeletedDiffRow(row, language, focusedHunkIndex)).join("");
+  const renderDeletionSummaries = (items) => items.map((summary) => renderDeletionSummaryRow(summary, focusedHunkIndex)).join("");
 
   const rows = lines.map((lineText, idx) => {
     const lineNum = idx + 1;
     const covering = threadsAtLine.get(lineNum) || [];
     const ending = threadsEndingAtLine.get(lineNum) || [];
     const inRange = rangedSpanLines.has(lineNum);
-    const hunkIndex = diffVisible
-      ? overlay.hunkStarts.get(lineNum)
-      : (overlay.hunkStarts.get(lineNum) ?? overlay.fallbackHunkStarts.get(lineNum));
+    const hunkIndex = overlay.hunkStarts.get(lineNum) ?? overlay.fallbackHunkStarts.get(lineNum);
     const hunkMember = overlay.hunkMembers.get(lineNum);
     const changed = overlay.changedLines.has(lineNum);
 
@@ -1998,9 +1991,7 @@ function renderFileView() {
     const rowClass = [
       primary ? "has-comment" : "",
       inRange && !primary ? "range-spanned" : "",
-      diffVisible ? "diff-visible" : "diff-hidden",
-      diffVisible && changed ? "diff-added-line" : "",
-      !diffVisible && changed ? "diff-indicator-line" : "",
+      changed ? "diff-added-line diff-indicator-line" : "",
       hunkMember === focusedHunkIndex ? "nav-focus nav-focus-hunk" : "",
       isUncommented ? "uncommented" : "",
     ].filter(Boolean).join(" ");
@@ -3128,12 +3119,12 @@ function scrollCommentIntoView(id) {
 
 function scrollHunkIntoView(index) {
   requestAnimationFrame(() => {
-    const row = document.querySelector(`[data-hunk-index="${index}"]`);
+    const row = firstVisibleElement(`[data-hunk-index="${index}"]`);
     const content = document.getElementById("content");
     if (!row && !state.diffVisible) {
       state.diffVisible = true;
       localStorage.setItem("assistedReviewDiffVisible", "1");
-      renderContent();
+      applyDiffVisibility(true);
       scrollHunkIntoView(index);
       return;
     }
@@ -3146,7 +3137,7 @@ function scrollHunkIntoView(index) {
 function scrollDeletionGroupIntoView(groupIndex, fallbackHunkIndex) {
   requestAnimationFrame(() => {
     const content = document.getElementById("content");
-    const row = document.querySelector(`[data-deletion-group="${groupIndex}"]`);
+    const row = firstVisibleElement(`[data-deletion-group="${groupIndex}"]`);
     if (!row || !content) {
       scrollHunkIntoView(fallbackHunkIndex);
       return;
@@ -3163,6 +3154,13 @@ function scrollElementToContentTop(element, content, offset) {
     content.scrollTop -
     offset;
   content.scrollTo({ top, behavior: "smooth" });
+}
+
+function firstVisibleElement(selector) {
+  return Array.from(document.querySelectorAll(selector)).find((el) => {
+    const style = window.getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden";
+  }) || null;
 }
 
 function focusHunkRows(index) {
@@ -3234,12 +3232,25 @@ function setDiffVisible(visible) {
   const focusLine = focusedSourceLine();
   state.diffVisible = next;
   localStorage.setItem("assistedReviewDiffVisible", next ? "1" : "0");
-  renderContent();
+  applyDiffVisibility(next);
   restoreFocusedSourceLine(focusLine);
 }
 
 function toggleDiffVisible() {
   setDiffVisible(!state.diffVisible);
+}
+
+function applyDiffVisibility(visible) {
+  document.querySelectorAll(".code-table.full-source-table").forEach((table) => {
+    table.classList.toggle("diff-overlay-on", visible);
+    table.classList.toggle("diff-overlay-off", !visible);
+  });
+
+  const button = document.querySelector("[data-toggle-diff]");
+  if (!button) return;
+  button.classList.toggle("active", visible);
+  button.setAttribute("aria-pressed", visible ? "true" : "false");
+  button.setAttribute("title", `${visible ? "Hide" : "Show"} inline diff (d)`);
 }
 
 function setNavTarget(target) {

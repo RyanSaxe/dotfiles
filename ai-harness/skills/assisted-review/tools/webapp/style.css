@@ -298,8 +298,8 @@ body.inbox-mode .topbar-home-sep {
 }
 
 .contextbar .diff-toggle {
-  width: 66px;
-  min-width: 66px;
+  width: 54px;
+  min-width: 54px;
   justify-content: center;
   padding: 0 9px;
 }
@@ -1353,13 +1353,13 @@ body.inbox-mode .main {
   white-space: pre;
 }
 
-.code-table tr.diff-indicator-line td.gutter-num {
+.code-table.diff-overlay-off tr.diff-indicator-line td.gutter-num {
   color: #116329;
   background: #f0fdf4;
 }
 
-.code-table tr.diff-added-line td.gutter-num,
-.code-table tr.diff-added-line td.code-cell {
+.code-table.diff-overlay-on tr.diff-added-line td.gutter-num,
+.code-table.diff-overlay-on tr.diff-added-line td.code-cell {
   background: #ecfdf3;
   color: #116329;
 }
@@ -1373,6 +1373,11 @@ body.inbox-mode .main {
 
 .code-table tr.diff-deleted-line td.code-cell {
   text-decoration: none;
+}
+
+.code-table.diff-overlay-off tr.diff-deleted-line,
+.code-table.diff-overlay-on tr.diff-deletion-summary {
+  display: none;
 }
 
 .code-table tr.diff-deletion-summary td.gutter-num,
@@ -1415,8 +1420,8 @@ body.inbox-mode .main {
   background: rgba(250, 204, 21, 0.1);
 }
 
-.code-table tr.diff-added-line:hover td.gutter-num,
-.code-table tr.diff-added-line:hover td.code-cell {
+.code-table.diff-overlay-on tr.diff-added-line:hover td.gutter-num,
+.code-table.diff-overlay-on tr.diff-added-line:hover td.code-cell {
   background: #dcfce7;
 }
 
