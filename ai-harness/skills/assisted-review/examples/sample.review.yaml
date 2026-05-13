@@ -16,12 +16,12 @@ review:
   event: COMMENT
   summary:
     author: ai
-    body: |
+    body: |-
       I reviewed the notification and shell helper changes. The main issue is a real lock-recovery race that can let two notification daemons run at once; the rest are smaller maintainability and portability notes.
     replies: []
   note:
     author: ai
-    body: |
+    body: |-
       Start with the lock handling thread before judging the portability item. The lock race affects runtime behavior, while the alias finding is a repo hygiene issue.
     replies: []
 
@@ -35,10 +35,10 @@ review:
       severity: high
       confidence: high
       category: correctness
-      body: |
+      body: |-
         The lock recovery path can delete a healthy lock. If `mkdir "$lock_dir"` fails because another daemon owns the lock, this branch removes the directory before proving it is stale, so both processes can continue and emit duplicate notifications.
       status: open
-      anchor_text: |
+      anchor_text: |-
         if ! mkdir "$lock_dir"; then
           rm -rf "$lock_dir"
           mkdir "$lock_dir"
@@ -54,17 +54,17 @@ review:
       severity: medium
       confidence: medium
       category: portability
-      body: |
+      body: |-
         This alias points at a host-specific absolute path. Anyone else sourcing the dotfiles will get a command that exists syntactically but fails at runtime.
-      suggestion: |
+      suggestion: |-
         alias pptx='uv run -q --script ~/generic/dotfiles/scripts/pptx.py'
       status: open
-      anchor_text: |
+      anchor_text: |-
         alias pptx='/Users/me/private/scripts/pptx.py'
       anchor_status: moved
       replies:
         - author: user
-          body: |
+          body: |-
             Good catch. Please keep this one but make the suggested path use the reusable script convention.
 
     - id: rev-003
@@ -75,10 +75,10 @@ review:
       severity: low
       confidence: low
       category: test
-      body: |
+      body: |-
         I am not sure this path is covered. Can the next review pass check whether the retry branch has a test?
       status: open
-      anchor_text: |
+      anchor_text: |-
         retry_send "$payload"
       anchor_status: ambiguous
       replies: []

@@ -12,12 +12,12 @@ review:
   event: COMMENT
   summary:
     author: ai
-    body: |
+    body: |-
       One finding worth flagging.
     replies: []
   note:
     author: ai
-    body: |
+    body: |-
       I focused on parse-failure behavior because it is the main API contract changed by this branch.
     replies: []
 
@@ -30,10 +30,10 @@ review:
       severity: medium
       confidence: high
       category: correctness
-      body: |
+      body: |-
         Returning `None` on parse failure makes callers either ignore the signal or sprinkle `if x is None` checks everywhere. Raise a specific exception (`ParseError`) so the failure path is unambiguous.
       status: open
-      anchor_text: |
+      anchor_text: |-
         return None
       anchor_status: current
       replies: []

@@ -96,7 +96,7 @@ Diff context is live viewer state, not review content. The review YAML may store
 
 ## Staleness
 
-A review is **stale** when `target.fingerprint` no longer matches the current folder state. If a review has no fingerprint, the viewer falls back to comparing `target.commit` with current HEAD. The user can open stale reviews and click Refresh to reload files and update obvious anchors.
+A review is **stale** when `target.fingerprint` no longer matches the current folder state. The fingerprint is computed by `tools/review_state.py` from current `HEAD`, `git diff HEAD --binary`, and untracked non-ignored file contents. If a review has no fingerprint, the viewer falls back to comparing `target.commit` with current HEAD. The user can open stale reviews and click Refresh to reload files and update obvious anchors.
 
 Refresh only moves a thread when its `anchor_text` appears exactly once in the same file. Missing or ambiguous anchors stay at their old line and show an indicator.
 

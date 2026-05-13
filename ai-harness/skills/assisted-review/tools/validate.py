@@ -7,7 +7,7 @@
 references/schema.md.
 
 Exit 0 on success; non-zero with one error message per line on failure.
-Usage: python validate.py [--require-current-anchors] <path-to-review.yaml>
+Usage: python validate.py [--require-current-state] <path-to-review.yaml>
 """
 
 import argparse
@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
+
+from review_state import current_head, current_repo_fingerprint
 
 VALID_SEVERITIES = {"info", "low", "medium", "high", "critical"}
 VALID_STATUSES = {"open", "acknowledged", "resolved", "wontfix"}
@@ -27,6 +30,8 @@ VALID_THREAD_TYPES = {"comment", "note"}
 VALID_CONFIDENCES = {"low", "medium", "high"}
 VALID_ANCHOR_STATUSES = {"current", "moved", "missing", "ambiguous"}
 ID_PATTERN = re.compile(r"^rev-\d{3}$")
+FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+CANONICAL_BLOCK_KEYS = {"body", "anchor_text", "suggestion"}
 
 
 def _load_yaml(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
@@ -34,7 +39,7 @@ def _load_yaml(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
     errors: list[str] = []
 
     try:
-        data = yaml.safe_load(path.read_text())
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
         return None, [f"YAML parse error: {e}"]
     except OSError as e:
@@ -82,6 +87,17 @@ def validate_target(data: dict[str, Any]) -> list[str]:
         for key in ("owner", "repo"):
             if not target.get(key):
                 errors.append(f"target.{key} is required when target.pr_number is set")
+
+    fingerprint = target.get("fingerprint")
+    if fingerprint is not None:
+        if not isinstance(fingerprint, str):
+            errors.append(
+                f"target.fingerprint must be a 64-character lowercase SHA-256 hex string, got {type(fingerprint).__name__}"
+            )
+        elif not FINGERPRINT_PATTERN.match(fingerprint):
+            errors.append(
+                "target.fingerprint must be a 64-character lowercase SHA-256 hex string"
+            )
 
     return errors
 
@@ -331,7 +347,7 @@ def validate_current_anchors(data: dict[str, Any]) -> list[str]:
             continue
 
         try:
-            lines = source_path.read_text().split("\n")
+            lines = source_path.read_text(encoding="utf-8").split("\n")
         except (OSError, UnicodeDecodeError) as e:
             errors.append(f"{prefix}.file cannot be read for anchor check: {e}")
             continue
@@ -352,15 +368,150 @@ def validate_current_anchors(data: dict[str, Any]) -> list[str]:
     return errors
 
 
-def validate(path: Path, *, require_current_anchors: bool = False) -> list[str]:
+def validate_current_fingerprint(data: dict[str, Any]) -> list[str]:
+    """Return errors when target.fingerprint does not match current repo state."""
+    target = data.get("target", {})
+    if not isinstance(target, dict):
+        return ["target must be a mapping before fingerprint can be checked"]
+
+    repo_root = target.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root:
+        return ["target.repo_root must be set before fingerprint can be checked"]
+
+    fingerprint = target.get("fingerprint")
+    if not isinstance(fingerprint, str) or not FINGERPRINT_PATTERN.match(fingerprint):
+        return [
+            "target.fingerprint must be set to a 64-character lowercase SHA-256 hex string when current fingerprint is required"
+        ]
+
+    current = current_repo_fingerprint(repo_root)
+    if current is None:
+        return [
+            "target.fingerprint could not be checked because repo state could not be fingerprinted"
+        ]
+    if current != fingerprint:
+        return [
+            f"target.fingerprint does not match current repo state: expected {current}, got {fingerprint}"
+        ]
+    return []
+
+
+def validate_current_commit(data: dict[str, Any]) -> list[str]:
+    """Return errors when target.commit is present but not current HEAD."""
+    target = data.get("target", {})
+    if not isinstance(target, dict):
+        return ["target must be a mapping before commit can be checked"]
+
+    repo_root = target.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root:
+        return ["target.repo_root must be set before commit can be checked"]
+
+    commit = target.get("commit")
+    if commit is None:
+        return []
+    if not isinstance(commit, str) or not commit:
+        return ["target.commit must be a non-empty string when set"]
+
+    head = current_head(repo_root)
+    if head is None:
+        return [
+            "target.commit could not be checked because current HEAD could not be resolved"
+        ]
+    if commit != head and not head.startswith(commit):
+        return [
+            f"target.commit does not match current HEAD: expected {head}, got {commit}"
+        ]
+    return []
+
+
+def format_node_path(path: tuple[str | int, ...]) -> str:
+    out = ""
+    for part in path:
+        if isinstance(part, int):
+            out += f"[{part}]"
+        elif out:
+            out += f".{part}"
+        else:
+            out = part
+    return out
+
+
+def canonical_block_header(line: str, key: str) -> bool:
+    return re.match(rf"^\s*{re.escape(key)}:\s*\|-\s*(?:#.*)?$", line) is not None
+
+
+def visit_yaml_nodes(
+    node: Node,
+    path: tuple[str | int, ...],
+) -> list[tuple[tuple[str | int, ...], str, Node]]:
+    out: list[tuple[tuple[str | int, ...], str, Node]] = []
+    if isinstance(node, MappingNode):
+        for key_node, value_node in node.value:
+            key = key_node.value if isinstance(key_node, ScalarNode) else ""
+            next_path = (*path, key)
+            if key in CANONICAL_BLOCK_KEYS:
+                out.append((next_path, key, value_node))
+            out.extend(visit_yaml_nodes(value_node, next_path))
+    elif isinstance(node, SequenceNode):
+        for i, item in enumerate(node.value):
+            out.extend(visit_yaml_nodes(item, (*path, i)))
+    return out
+
+
+def validate_canonical_yaml(path: Path) -> list[str]:
+    """Return errors for review text that does not use the canonical YAML subset."""
+    try:
+        text = path.read_text(encoding="utf-8")
+        root = yaml.compose(text)
+    except yaml.YAMLError as e:
+        return [f"YAML parse error: {e}"]
+    except OSError as e:
+        return [f"file read error: {e}"]
+
+    if root is None:
+        return ["root must be a mapping"]
+
+    lines = text.splitlines()
+    errors: list[str] = []
+    for scalar_path, key, value_node in visit_yaml_nodes(root, ()):
+        prefix = format_node_path(scalar_path)
+        if not isinstance(value_node, ScalarNode):
+            errors.append(f"{prefix} must be a literal block scalar using `|-`")
+            continue
+        if value_node.style != "|":
+            errors.append(f"{prefix} must use a literal block scalar using `|-`")
+            continue
+        line = lines[value_node.start_mark.line]
+        if not canonical_block_header(line, key):
+            errors.append(
+                f"{prefix} must use strip chomping style `|-`, not `{line.strip()}`"
+            )
+
+    return errors
+
+
+def validate(
+    path: Path,
+    *,
+    require_current_anchors: bool = False,
+    require_current_fingerprint: bool = False,
+    require_current_state: bool = False,
+    require_canonical_yaml: bool = False,
+) -> list[str]:
     """Return a list of human-readable errors. Empty list = valid."""
     data, errors = _load_yaml(path)
     if data is None:
         return errors
 
     errors.extend(validate_schema(data))
-    if require_current_anchors:
+    if require_canonical_yaml or require_current_state:
+        errors.extend(validate_canonical_yaml(path))
+    if require_current_anchors or require_current_state:
         errors.extend(validate_current_anchors(data))
+    if require_current_fingerprint or require_current_state:
+        errors.extend(validate_current_fingerprint(data))
+    if require_current_state:
+        errors.extend(validate_current_commit(data))
     return errors
 
 
@@ -373,14 +524,38 @@ def main() -> int:
         action="store_true",
         help=(
             "Require every thread's anchor_text to exactly match the current source lines. "
-            "Use this for freshly generated reviews; omit it when validating an active review "
-            "that may legitimately contain moved or stale anchors."
+            "Use --require-current-state for freshly generated reviews; this narrower "
+            "flag is useful when canonical YAML or fingerprint checks are intentionally separate."
+        ),
+    )
+    parser.add_argument(
+        "--require-current-fingerprint",
+        action="store_true",
+        help="Require target.fingerprint to match the current repo state.",
+    )
+    parser.add_argument(
+        "--require-canonical-yaml",
+        action="store_true",
+        help="Require multiline review text fields to use literal block scalars with strip chomping (`|-`).",
+    )
+    parser.add_argument(
+        "--require-current-state",
+        action="store_true",
+        help=(
+            "Fresh-review strict mode: require canonical YAML, current anchors, "
+            "current fingerprint, and target.commit matching current HEAD."
         ),
     )
     parser.add_argument("path", type=Path, help="Path to the review YAML file.")
     args = parser.parse_args()
 
-    errors = validate(args.path, require_current_anchors=args.require_current_anchors)
+    errors = validate(
+        args.path,
+        require_current_anchors=args.require_current_anchors,
+        require_current_fingerprint=args.require_current_fingerprint,
+        require_current_state=args.require_current_state,
+        require_canonical_yaml=args.require_canonical_yaml,
+    )
 
     if errors:
         for err in errors:

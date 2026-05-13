@@ -21,7 +21,7 @@ target:
   repo_root: /Users/me/projects/myapp
   branch: feature/auth-refactor
   commit: a3f2c1d8e9b0c4f5a6d7e8f9 # optional but preferred when available
-  fingerprint: 46f3c2... # current reviewed folder state, optional but preferred
+  fingerprint: 46f3c2... # SHA-256 of current reviewed folder state, optional but preferred
   base_ref: origin/main # optional; viewer diff context compares current state against this Git ref
   pr_number: 142 # required for PR submission
   owner: my-org # required when pr_number is set
@@ -32,12 +32,12 @@ review:
   event: COMMENT # COMMENT | REQUEST_CHANGES | APPROVE | PENDING
   summary:
     author: ai
-    body: |
+    body: |-
       GitHub-ready PR review body. This is submitted as the body when the full review is sent.
     replies: []
   note:
     author: ai
-    body: |
+    body: |-
       Local-only reviewer context. This helps the human understand the review but is never submitted to GitHub.
     replies: []
 
@@ -50,23 +50,23 @@ review:
       severity: high # info | low | medium | high | critical
       confidence: medium # low | medium | high
       category: security
-      body: |
+      body: |-
         Markdown. Renders in the viewer and, if submitted, on GitHub.
-      suggestion: |
+      suggestion: |-
         cursor.execute(
             "SELECT * FROM sessions WHERE user_id = ?",
             (user_id,),
         )
       status: open # open | acknowledged | resolved | wontfix
-      anchor_text: |
+      anchor_text: |-
         cursor.execute(f"SELECT * FROM sessions WHERE user_id = {user_id}")
       anchor_status: current # current | moved | missing | ambiguous
       replies:
         - author: user
-          body: |
+          body: |-
             This path actually uses SQLAlchemy; please re-check.
         - author: ai
-          body: |
+          body: |-
             Agreed. I removed the raw SQL suggestion and downgraded confidence.
 
     - id: rev-002
@@ -77,10 +77,10 @@ review:
       severity: info
       confidence: medium
       category: context
-      body: |
+      body: |-
         This is the main permission boundary for the login flow. Review this before judging the session cache changes below.
       status: open
-      anchor_text: |
+      anchor_text: |-
         def authorize_session(user: User, session: Session) -> bool:
       anchor_status: current
       replies: []
@@ -112,6 +112,23 @@ These are top-level discussion blocks and use the same `author`, `body`, and `re
 
 Do not put local-only process notes in `review.summary`; put them in `review.note`.
 
+### Multiline YAML Style
+
+Use literal block scalars with strip chomping (`|-`) for every multiline text
+field:
+
+- `review.summary.body`
+- `review.note.body`
+- thread `body`
+- thread `anchor_text`
+- thread `suggestion`
+- reply `body`
+
+Do not use plain `|`, folded `>`, quoted multiline strings, or inline strings
+for those fields. Plain `|` adds an implicit trailing newline, which can make
+exact `anchor_text` validation fail. Folded `>` rewrites line breaks, which
+corrupts code anchors and suggestions.
+
 ### Line Targeting
 
 Line numbers reference the current source file for the reviewed local state.
@@ -124,10 +141,10 @@ Line numbers reference the current source file for the reviewed local state.
 `anchor_text` is the exact source text for the reviewed line or range at generation time. For freshly generated reviews, run:
 
 ```bash
-uv run --script tools/validate.py --require-current-anchors <path>
+uv run --script tools/validate.py --require-current-state <path>
 ```
 
-That strict mode verifies that every thread's `anchor_text` exactly matches the current source at `start_line..line`. During later review iteration, code may legitimately drift; use schema-only validation (`uv run --script tools/validate.py <path>`) when stale, moved, or missing anchors are expected and should be handled by the viewer refresh flow.
+That strict mode verifies canonical YAML style, target fingerprint, target commit, and that every thread's `anchor_text` exactly matches the current source at `start_line..line`. During later review iteration, code may legitimately drift; use schema-only validation (`uv run --script tools/validate.py <path>`) when stale, moved, or missing anchors are expected and should be handled by the viewer refresh flow.
 
 The viewer refresh uses anchor text conservatively:
 
@@ -137,6 +154,19 @@ The viewer refresh uses anchor text conservatively:
 - `ambiguous` — text appeared multiple times.
 
 If `anchor_status` is `missing` or `ambiguous`, do not submit or edit suggestions until the AI or user moves the thread to the right location.
+
+### `target.fingerprint`
+
+`target.fingerprint` is deterministic metadata computed from the current repo
+state. It is the SHA-256 used by `tools/review_state.py` over:
+
+- current `HEAD`
+- `git diff HEAD --binary`
+- every untracked, non-ignored file path and file contents
+
+It covers staged changes, unstaged tracked changes, and untracked non-ignored
+files. It does not cover ignored files or empty untracked directories. Agents
+must compute this value; do not invent a hash-shaped placeholder.
 
 ### `target.base_ref`
 

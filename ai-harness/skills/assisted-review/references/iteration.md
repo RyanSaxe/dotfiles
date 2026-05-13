@@ -49,15 +49,15 @@ threads:
     severity: medium
     confidence: low
     category: correctness
-    body: |
+    body: |-
       This may double-send when the lock recovery path races.
     status: open
-    anchor_text: |
+    anchor_text: |-
       recover_lock || send_notification
     anchor_status: current
     replies:
       - author: user
-        body: |
+        body: |-
           This is real, but the impact is higher. It caused a production duplicate last month.
 ```
 
@@ -76,14 +76,14 @@ threads:
     type: comment
     severity: high
     confidence: high
-    body: |
+    body: |-
       Duplicate notification path: if lock recovery races, both processes can send the same notification. Since this already caused a production duplicate, treat this as a real correctness bug rather than a speculative race.
     replies:
       - author: user
-        body: |
+        body: |-
           This is real, but the impact is higher. It caused a production duplicate last month.
       - author: ai
-        body: |
+        body: |-
           Confirmed. I raised the severity and rewrote the finding around the duplicate-send impact.
 ```
 

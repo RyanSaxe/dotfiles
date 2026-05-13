@@ -61,8 +61,8 @@ One short turn is enough. Iteration mode is detected from existing thread replie
 4. **Generate the review.** Walk relevant files for the scope. Produce `review.summary`, `review.note`, and threads per [`references/schema.md`](references/schema.md). Write `review.summary.body` as the exact PR review body that should be submitted to GitHub. Write `review.note.body` as local-only context that makes the human reviewer faster or safer. Each thread gets a stable `rev-NNN` id, `type`, `author: ai`, severity, confidence, category, body, optional suggestion for comments only, `status: open`, `anchor_text`, `anchor_status: current`, and `replies: []`.
    - Use `type: comment` for issues that should be considered for GitHub review submission.
    - Use `type: note` only when the thread makes the human reviewer faster or safer: context worth understanding, areas needing human judgment, uncertainty to discuss, or important code paths that explain the rest of the review.
-5. **Anchor exactly.** `anchor_text` is the exact current source text for `start_line..line`. For a single-line thread, it is that one line. This lets deterministic refresh move only obvious anchors.
-6. **Validate the YAML.** For a freshly generated review, `uv run --script tools/validate.py --require-current-anchors <path>` must exit 0. This checks both schema shape and exact anchor text against the current source. For an existing review that may have drifted during iteration, use `uv run --script tools/validate.py <path>` for schema-only validation unless you intentionally want strict current-anchor enforcement. If validation fails, fix the YAML and re-validate.
+5. **Anchor exactly.** `anchor_text` is the exact current source text for `start_line..line`. For a single-line thread, it is that one line. Use canonical multiline YAML (`|-`) for `body`, `anchor_text`, `suggestion`, and reply bodies. This lets deterministic refresh move only obvious anchors and avoids YAML adding implicit trailing newlines.
+6. **Validate the YAML.** For a freshly generated review, `uv run --script tools/validate.py --require-current-state <path>` must exit 0. This checks schema shape, canonical YAML style, exact anchors, target fingerprint, and target commit against the current repo state. For an existing review that may have drifted during iteration, use `uv run --script tools/validate.py <path>` for schema-only validation unless you intentionally want strict current-state enforcement. If validation fails, fix the YAML and re-validate.
 7. **Open the viewer.** `uv run --script tools/view.py --ensure --open --review-path <path>`.
 8. **Tell the user where it is.** Print the deep-link URL and a one-line summary: `"<ref> · <N> threads (<sev breakdown>) · <url>/r/<slug>/<key>"`.
 
@@ -74,7 +74,7 @@ One short turn is enough. Iteration mode is detected from existing thread replie
 
 **Verification:**
 
-- Fresh review: `uv run --script tools/validate.py --require-current-anchors <path>` exits 0
+- Fresh review: `uv run --script tools/validate.py --require-current-state <path>` exits 0
 - Iterated review with possible code drift: `uv run --script tools/validate.py <path>` exits 0
 - `uv run --script tools/view.py --ensure --open --review-path <path>` returns; the deep-link URL renders the review
 - `uv run --script tools/view.py --stop` cleanly shuts down the daemon

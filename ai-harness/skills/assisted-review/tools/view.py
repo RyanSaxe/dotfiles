@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import hashlib
 import fcntl
 import json
 import os
@@ -47,6 +46,8 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+
+from review_state import current_head, current_repo_fingerprint
 
 # YAML: prefer ruamel.yaml for round-trip formatting preservation, fall
 # back to pyyaml if ruamel isn't available. PEP 723 deps declare both.
@@ -90,7 +91,6 @@ SERVICE_SIGNATURE = "assisted-review-viewer"
 VIEWER_API_VERSION = 3
 DEFAULT_PORT_START = 51234
 PORT_TRY_LIMIT = 10
-HEAD_CACHE_TTL_SECONDS = 60
 GIT_TIMEOUT_SECONDS = 10
 
 VALID_EVENTS = {"COMMENT", "REQUEST_CHANGES", "APPROVE", "PENDING"}
@@ -252,33 +252,7 @@ def walk_reviews() -> list[tuple[str, str, Path]]:
     return out
 
 
-# === Staleness (HEAD SHA cache) ===================================
-
-_head_cache: dict[str, tuple[str, float]] = {}
-
-
-def current_head(repo_root: str) -> str | None:
-    now = time.time()
-    cached = _head_cache.get(repo_root)
-    if cached and now - cached[1] < HEAD_CACHE_TTL_SECONDS:
-        return cached[0]
-    try:
-        result = subprocess.run(
-            ["git", "-C", repo_root, "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=2,
-        )
-        sha = result.stdout.strip()
-        _head_cache[repo_root] = (sha, now)
-        return sha
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-        FileNotFoundError,
-    ):
-        return None
+# === Staleness =====================================================
 
 
 def is_stale(target_commit: str, repo_root: str) -> bool:
@@ -286,60 +260,6 @@ def is_stale(target_commit: str, repo_root: str) -> bool:
     if head is None:
         return False
     return head != target_commit
-
-
-def current_repo_fingerprint(repo_root: str) -> str | None:
-    """Return a lightweight fingerprint for the current checked-out folder state."""
-    h = hashlib.sha256()
-    try:
-        head = subprocess.run(
-            ["git", "-C", repo_root, "rev-parse", "HEAD"],
-            capture_output=True,
-            check=False,
-            timeout=2,
-        )
-        h.update(b"HEAD\0")
-        h.update(head.stdout.strip() if head.returncode == 0 else b"")
-
-        diff = subprocess.run(
-            ["git", "-C", repo_root, "diff", "HEAD", "--binary"],
-            capture_output=True,
-            check=False,
-            timeout=10,
-        )
-        h.update(b"\0DIFF\0")
-        h.update(diff.stdout)
-
-        untracked = subprocess.run(
-            [
-                "git",
-                "-C",
-                repo_root,
-                "ls-files",
-                "--others",
-                "--exclude-standard",
-                "-z",
-            ],
-            capture_output=True,
-            check=False,
-            timeout=5,
-        )
-        h.update(b"\0UNTRACKED\0")
-        if untracked.returncode == 0:
-            repo_root_p = Path(repo_root).resolve()
-            for raw in sorted(p for p in untracked.stdout.split(b"\0") if p):
-                rel = raw.decode("utf-8", errors="surrogateescape")
-                path = (repo_root_p / rel).resolve()
-                try:
-                    path.relative_to(repo_root_p)
-                    h.update(raw)
-                    h.update(b"\0")
-                    h.update(path.read_bytes())
-                except (OSError, ValueError):
-                    h.update(b"<unreadable>")
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return None
-    return h.hexdigest()
 
 
 def review_is_stale(target: dict[str, Any]) -> bool:

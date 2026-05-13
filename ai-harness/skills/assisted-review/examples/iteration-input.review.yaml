@@ -12,12 +12,12 @@ review:
   event: COMMENT
   summary:
     author: ai
-    body: |
+    body: |-
       The review found one lock-recovery race and one lower-priority naming issue.
     replies: []
   note:
     author: ai
-    body: |
+    body: |-
       The user replied on the lock thread with production impact context, so the next pass should re-evaluate severity and confidence before adding more threads.
     replies: []
 
@@ -31,10 +31,10 @@ review:
       severity: high
       confidence: medium
       category: correctness
-      body: |
+      body: |-
         The lock recovery path can remove a live lock if another process creates it between the failed `mkdir` and the cleanup branch.
       status: open
-      anchor_text: |
+      anchor_text: |-
         if ! mkdir "$lock_dir"; then
           rm -rf "$lock_dir"
           mkdir "$lock_dir"
@@ -42,7 +42,7 @@ review:
       anchor_status: current
       replies:
         - author: user
-          body: |
+          body: |-
             This caused duplicate notifications last month. Please make the impact clearer and raise confidence if you can confirm it.
 
     - id: rev-002
@@ -53,10 +53,10 @@ review:
       severity: low
       confidence: medium
       category: naming
-      body: |
+      body: |-
         I think `emit_bell` has the same fall-through shape. Please check it on the next pass.
       status: open
-      anchor_text: |
+      anchor_text: |-
         emit_bell "$message" || true
       anchor_status: current
       replies: []
