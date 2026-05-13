@@ -1269,9 +1269,6 @@ function renderContextbar() {
   const navLabel = state.navTarget === "hunks" ? "Hunk" : "Thread";
   const counter = items.length === 0 ? `${navLabel} 0 / 0` : `${navLabel} ${idx + 1} / ${items.length}`;
   const disabled = items.length === 0 ? "disabled" : "";
-  const diffTotals = state.diffSummary
-    ? formatDiffStat({ additions: state.diffSummary.additions, deletions: state.diffSummary.deletions })
-    : "";
   const baseTitle = state.diffSummary?.comparison_base
     ? `Comparing against ${shortSha(state.diffSummary.comparison_base)}`
     : state.diffError || "Diff base";
@@ -1303,7 +1300,6 @@ function renderContextbar() {
       <button class="${state.threadFilter === "note" ? "active" : ""}" data-thread-filter="note" title="Show local notes">Notes</button>
     </div>
     <div class="contextbar-spacer"></div>
-    <div class="contextbar-diff-total">${diffTotals}</div>
     <div class="contextbar-nav">
       <button class="btn" data-prev-nav title="Previous ${state.navTarget === "hunks" ? "hunk" : "thread"} (Shift+Tab / k)" aria-label="Previous ${state.navTarget}" ${disabled}>
         <i data-lucide="chevron-up"></i>
@@ -1433,6 +1429,9 @@ function renderTree() {
   `;
 
   const loadingFullTree = scope === "all" && !state.fullTree;
+  const overviewDiff = state.diffSummary
+    ? formatDiffStat({ additions: state.diffSummary.additions, deletions: state.diffSummary.deletions })
+    : "";
   const treeHtml = loadingFullTree
     ? `<div class="tree-empty">Loading file tree…</div>`
     : scope === "changed" && state.diffError
@@ -1447,6 +1446,7 @@ function renderTree() {
       <div class="tree-item overview ${isReviewRoot ? "active" : ""}" data-route="review">
         <i data-lucide="layout-list"></i>
         <span>Overview</span>
+        ${overviewDiff}
         <span class="comment-pip">${visibleReviewThreads().length}</span>
       </div>
     </div>
@@ -2122,11 +2122,14 @@ function renderFileViewHtml(filePath) {
   return `
     <div class="code-pane">
       <div class="code-header">
-        <i data-lucide="file-text"></i>
-        <strong>${escapeHtml(filePath)}</strong>
-        <span class="lang-badge">${language || "auto"}</span>
-        ${statHtml}
-        <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
+        <div class="code-header-main">
+          <span class="lang-badge">${language || "auto"}</span>
+          <span class="code-filename">${escapeHtml(filePath)}</span>
+        </div>
+        <div class="code-header-meta">
+          ${statHtml}
+          <span class="code-comment-count">${counts.comments} comments · ${counts.notes} notes</span>
+        </div>
       </div>
       <div class="code-table-scroll">
         ${emptyHtml || diffOnlyRows || `<table class="code-table full-source-table ${diffVisible ? "diff-overlay-on" : "diff-overlay-off"}" ${tableStyle}><tbody>${rows}</tbody></table>`}
