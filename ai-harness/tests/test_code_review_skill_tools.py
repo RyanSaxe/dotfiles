@@ -512,6 +512,55 @@ review:
             self.assertEqual(payload["comments"][0]["body"], "thread body")
             self.assertNotIn("local reply only", payload["comments"][0]["body"])
 
+    def test_single_comment_send_excludes_review_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            review_path = Path(tmp) / "review.review.yaml"
+            review_path.write_text(
+                """
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: pr
+  repo_root: /tmp/repo
+  commit: abc123
+  pr_number: 12
+review:
+  event: COMMENT
+  summary:
+    author: ai
+    body: this is the full review summary
+    replies: []
+  note:
+    author: ai
+    body: local context only
+    replies: []
+  threads:
+    - id: rev-001
+      type: comment
+      author: ai
+      file: src/sample.py
+      line: 1
+      severity: low
+      confidence: high
+      category: test
+      body: thread body
+      status: open
+      anchor_text: source line
+      anchor_status: current
+      replies: []
+"""
+            )
+
+            result = submit_mod.submit(review_path, "rev-001", dry_run=True)
+            payload = result["payload"]
+
+            self.assertEqual(result["endpoint"], "comments")
+            self.assertEqual(payload["body"], "thread body")
+            self.assertEqual(payload["commit_id"], "abc123")
+            self.assertNotIn("this is the full review summary", str(payload))
+            self.assertNotIn("comments", payload)
+            self.assertNotIn("event", payload)
+
     def test_submit_payload_excludes_notes_and_refuses_direct_note_send(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             review_path = Path(tmp) / "review.review.yaml"

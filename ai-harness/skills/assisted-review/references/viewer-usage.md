@@ -84,7 +84,9 @@ The web app talks to the daemon via these JSON endpoints:
   and update the review fingerprint.
 - `POST /api/submit/<slug>/<key>` — invoke `submit.py`; body is
   `{"mode": "all" | "comment", "commentId"?: "rev-001"}`. Full review
-  submission sends only comment threads; note threads remain local.
+  submission sends `review.summary.body` plus comment threads; single-comment
+  submission sends only that one comment. `review.note`, note threads, and
+  replies remain local.
 
 All filesystem access is restricted to `~/.reviews/` (for review files) and the `target.repo_root` declared in the review (for source files). The server refuses to read paths outside those scopes.
 

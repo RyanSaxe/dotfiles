@@ -10,8 +10,16 @@ target:
 
 review:
   event: COMMENT
-  summary: |
-    One finding worth flagging.
+  summary:
+    author: ai
+    body: |
+      One finding worth flagging.
+    replies: []
+  note:
+    author: ai
+    body: |
+      I focused on parse-failure behavior because it is the main API contract changed by this branch.
+    replies: []
 
   threads:
     - id: rev-001

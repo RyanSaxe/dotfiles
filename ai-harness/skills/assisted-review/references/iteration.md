@@ -2,12 +2,12 @@
 
 **When to read this:** when re-entering an existing review with user-authored threads or user replies.
 
-The iteration loop is local and thread-based:
+The iteration loop is local and discussion-based:
 
 1. AI generates review threads.
-2. Human reads them in the viewer, starts threads, or adds replies.
+2. Human reads them in the viewer, starts threads, edits the overview, or adds replies.
 3. Human re-runs `/assisted-review`.
-4. AI reads the thread discussion, updates the YAML, and appends AI replies when useful.
+4. AI reads the overview and thread discussion, updates the YAML, and appends AI replies when useful.
 
 The viewer does not call AI. It only edits YAML, refreshes files, and submits selected PR comments. Local notes remain in the review file.
 
@@ -15,7 +15,7 @@ The viewer does not call AI. It only edits YAML, refreshes files, and submits se
 
 Iterate when either condition is true:
 
-- A thread's latest reply is from `user`.
+- `review.summary`, `review.note`, or a thread has latest reply from `user`.
 - A thread has `author: user` and no later AI reply.
 
 Otherwise ask whether to open the viewer, append a new pass, or regenerate from scratch.
@@ -23,7 +23,7 @@ Otherwise ask whether to open the viewer, append a new pass, or regenerate from 
 ## Iteration Mechanics
 
 1. Read the existing YAML with `ruamel.yaml` when possible so formatting is preserved.
-2. Read each thread's body, replies, `anchor_text`, and current source location.
+2. Read `review.summary`, `review.note`, each thread's body, replies, `anchor_text`, and current source location.
 3. Address user-authored discussion:
    - Edit the thread body, severity, confidence, category, suggestion, or status.
    - Append an `ai` reply when responding to a user reply matters for future context.
@@ -33,7 +33,7 @@ Otherwise ask whether to open the viewer, append a new pass, or regenerate from 
 4. Manually move threads when needed. The deterministic refresh only handles exact obvious moves; the AI may use the code context to update `file`, `line`, `start_line`, `anchor_text`, and `anchor_status`.
 5. Validate, then open the viewer.
 
-Do not add a separate audit log. The thread body plus `replies[]` are the local conversation.
+Do not add a separate audit log. The overview blocks, thread bodies, and `replies[]` are the local conversation.
 
 ## Worked Example
 

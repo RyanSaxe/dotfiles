@@ -94,9 +94,39 @@ def validate_review_header(review: dict[str, Any]) -> list[str]:
             f"review.event must be one of {sorted(VALID_EVENTS)}, got {event!r}"
         )
 
-    for required in ("summary", "threads"):
+    for required in ("summary", "note", "threads"):
         if required not in review:
             errors.append(f"review.{required} is required")
+
+    if "summary" in review:
+        errors.extend(validate_overview_block(review, "summary"))
+    if "note" in review:
+        errors.extend(validate_overview_block(review, "note"))
+
+    return errors
+
+
+def validate_overview_block(review: dict[str, Any], key: str) -> list[str]:
+    errors: list[str] = []
+    block = review.get(key)
+    prefix = f"review.{key}"
+    if not isinstance(block, dict):
+        return [f"{prefix} must be a mapping"]
+
+    author = block.get("author")
+    if author not in VALID_AUTHORS:
+        errors.append(
+            f"{prefix}.author must be one of {sorted(VALID_AUTHORS)}, got {author!r}"
+        )
+
+    if not isinstance(block.get("body"), str):
+        errors.append(f"{prefix}.body must be a string")
+
+    replies = block.get("replies")
+    if not isinstance(replies, list):
+        errors.append(f"{prefix}.replies must be a list")
+    else:
+        errors.extend(validate_replies(block, prefix))
 
     return errors
 

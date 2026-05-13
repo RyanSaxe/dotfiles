@@ -30,8 +30,16 @@ target:
 
 review:
   event: COMMENT # COMMENT | REQUEST_CHANGES | APPROVE | PENDING
-  summary: |
-    Two-to-five-sentence prose summary of what was reviewed and the headline findings.
+  summary:
+    author: ai
+    body: |
+      GitHub-ready PR review body. This is submitted as the body when the full review is sent.
+    replies: []
+  note:
+    author: ai
+    body: |
+      Local-only reviewer context. This helps the human understand the review but is never submitted to GitHub.
+    replies: []
 
   threads:
     - id: rev-001
@@ -94,6 +102,15 @@ Required enum: `comment | note`.
 
 - `comment` — a normal code review finding that may be submitted to GitHub. Comments may include a `suggestion`.
 - `note` — a local-only reviewer aid. Use notes to highlight context, uncertainty, important code paths, or areas that need human judgment. Notes are never submitted to GitHub and must not include `suggestion`.
+
+### `review.summary` and `review.note`
+
+These are top-level discussion blocks and use the same `author`, `body`, and `replies` shape as thread discussions.
+
+- `review.summary` is the GitHub-ready PR review body. Write it exactly as the submitted review summary should read on GitHub: concise, actionable, and focused on the outcome of the review.
+- `review.note` is local-only context for the human reviewer. Use it to explain review strategy, areas that need human attention, important code paths, uncertainty, or context that makes the thread list easier to judge.
+
+Do not put local-only process notes in `review.summary`; put them in `review.note`.
 
 ### Line Targeting
 

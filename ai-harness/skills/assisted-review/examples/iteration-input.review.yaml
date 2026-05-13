@@ -10,8 +10,16 @@ target:
 
 review:
   event: COMMENT
-  summary: |
-    The review found one lock-recovery race and one lower-priority naming issue.
+  summary:
+    author: ai
+    body: |
+      The review found one lock-recovery race and one lower-priority naming issue.
+    replies: []
+  note:
+    author: ai
+    body: |
+      The user replied on the lock thread with production impact context, so the next pass should re-evaluate severity and confidence before adding more threads.
+    replies: []
 
   threads:
     - id: rev-001

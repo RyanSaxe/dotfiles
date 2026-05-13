@@ -88,6 +88,23 @@ class DiffTests(unittest.TestCase):
         self.assertEqual(record["deletions"], 0)
         self.assertEqual(record["hunks"][0]["changed_new_lines"], [1, 2])
 
+    def test_per_file_diff_preserves_rename_hunks(self) -> None:
+        base_ref = git(self.repo, "rev-parse", "HEAD")
+        (self.repo / "src").mkdir()
+        git(self.repo, "mv", "app.py", "src/app.py")
+        (self.repo / "src" / "app.py").write_text("one\ntwo\nthree\n")
+
+        payload = view.compute_diff(
+            str(self.repo), {"base_ref": base_ref}, rel_file="src/app.py"
+        )
+        record = self.file_record(payload, "src/app.py")
+
+        self.assertEqual(record["status"], "R")
+        self.assertEqual(record["old_path"], "app.py")
+        self.assertEqual(record["additions"], 1)
+        self.assertEqual(record["deletions"], 0)
+        self.assertNotIn("-0,0", record["hunks"][0]["header"])
+
     def test_invalid_base_ref_raises_clear_error(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "could not resolve base ref"):
             view.compute_diff(str(self.repo), {"base_ref": "missing/ref"})

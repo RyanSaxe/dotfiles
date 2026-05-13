@@ -14,8 +14,16 @@ target:
 
 review:
   event: COMMENT
-  summary: |
-    I reviewed the notification and shell helper changes. The main issue is a real lock-recovery race that can let two notification daemons run at once; the rest are smaller maintainability and portability notes.
+  summary:
+    author: ai
+    body: |
+      I reviewed the notification and shell helper changes. The main issue is a real lock-recovery race that can let two notification daemons run at once; the rest are smaller maintainability and portability notes.
+    replies: []
+  note:
+    author: ai
+    body: |
+      Start with the lock handling thread before judging the portability item. The lock race affects runtime behavior, while the alias finding is a repo hygiene issue.
+    replies: []
 
   threads:
     - id: rev-001

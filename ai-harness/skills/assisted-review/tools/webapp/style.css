@@ -25,6 +25,9 @@
   --color-warning-soft: #fef3c7;
   --diff-gutter-soft: #eff6ff;
   --diff-gutter: #dbeafe;
+  --thread-comment: #2563eb;
+  --thread-comment-soft: #eff6ff;
+  --thread-comment-border: #bfdbfe;
   --thread-note: #7c3aed;
   --thread-note-soft: #ede9fe;
   --thread-note-border: #c4b5fd;
@@ -1223,6 +1226,18 @@ body.inbox-mode .main {
   background: #f0f0f0;
 }
 
+.code-table td.source-diff-marker {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  text-align: center;
+  color: var(--color-muted);
+  background: #fafafa;
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+  position: relative;
+}
+
 .gutter-marker .dot,
 .diff-marker-cell .dot {
   display: inline-block;
@@ -1277,14 +1292,13 @@ body.inbox-mode .main {
   white-space: pre;
 }
 
-.code-table tr.diff-hunk-line td.gutter-num,
-.code-table tr.diff-hunk-line td.gutter-marker {
+.code-table tr.diff-hunk-line td.source-diff-marker {
   background: var(--diff-gutter-soft);
 }
 
-.code-table tr.diff-changed-line td.gutter-num,
-.code-table tr.diff-changed-line td.gutter-marker {
+.code-table tr.diff-changed-line td.source-diff-marker {
   background: var(--diff-gutter);
+  color: #116329;
 }
 
 .code-table tr.has-comment:hover td.code-cell,
@@ -1292,10 +1306,8 @@ body.inbox-mode .main {
   background: rgba(250, 204, 21, 0.1);
 }
 
-.code-table tr.diff-hunk-line:hover td.gutter-num,
-.code-table tr.diff-hunk-line:hover td.gutter-marker,
-.code-table tr.diff-changed-line:hover td.gutter-num,
-.code-table tr.diff-changed-line:hover td.gutter-marker {
+.code-table tr.diff-hunk-line:hover td.source-diff-marker,
+.code-table tr.diff-changed-line:hover td.source-diff-marker {
   background: #bfdbfe;
 }
 
@@ -1340,7 +1352,8 @@ body.inbox-mode .main {
 }
 
 .unified-table .diff-old-num,
-.unified-table .diff-new-num {
+.unified-table .diff-new-num,
+.unified-table .diff-line-num {
   width: 48px;
   min-width: 48px;
   padding: 0 var(--space-2);
@@ -1364,12 +1377,24 @@ body.inbox-mode .main {
   position: relative;
 }
 
-.unified-table .diff-marker-cell[data-add-line] {
+.unified-table .thread-marker-cell {
+  width: 18px;
+  min-width: 18px;
+  padding: 0;
+  text-align: center;
+  background: #fafafa;
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+  position: relative;
+}
+
+.unified-table .thread-marker-cell[data-add-line],
+.unified-table .thread-marker-cell[data-comment-id] {
   cursor: pointer;
 }
 
-.unified-table .diff-marker-cell.has-marker {
-  color: inherit;
+.unified-table .thread-marker-cell:hover {
+  background: #f0f0f0;
 }
 
 .unified-table .diff-code-cell {
@@ -1422,11 +1447,30 @@ body.inbox-mode .main {
   box-shadow: var(--shadow-card);
   padding: var(--space-4);
   font-family: var(--font-sans);
+  position: relative;
+  z-index: 2;
+}
+
+.comment-card.comment {
+  border-left: 3px solid var(--thread-comment);
+  padding-left: calc(var(--space-4) - 2px);
 }
 
 .comment-card.note {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.035), rgba(255, 255, 255, 0) 140px), var(--color-surface);
   border-left: 3px solid var(--thread-note);
   padding-left: calc(var(--space-4) - 2px);
+}
+
+.overview-cards {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.overview-card .comment-body.empty {
+  color: var(--color-muted);
+  font-style: italic;
 }
 
 .comment-header {
@@ -1464,9 +1508,9 @@ body.inbox-mode .main {
 .severity-chip.info { background: var(--sev-info-soft); color: var(--sev-info); }
 
 .type-chip.comment {
-  background: #f5f5f5;
-  border-color: var(--color-border);
-  color: var(--color-body);
+  background: var(--thread-comment-soft);
+  border-color: var(--thread-comment-border);
+  color: var(--thread-comment);
 }
 
 .type-chip.note {
@@ -1602,7 +1646,7 @@ body.inbox-mode .main {
 .status-menu[open],
 .comment-menu[open],
 .tree-type-filter[open] {
-  z-index: 100;
+  z-index: 1000;
 }
 
 .status-menu summary,
@@ -1619,7 +1663,7 @@ body.inbox-mode .main {
 .comment-menu-popover {
   position: absolute;
   top: calc(100% + 6px);
-  z-index: 40;
+  z-index: 1001;
   padding: var(--space-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
@@ -2159,6 +2203,12 @@ body.inbox-mode .main {
 .local-note-indicator .lucide {
   width: 14px;
   height: 14px;
+}
+
+.github-summary-indicator {
+  color: var(--thread-comment);
+  background: var(--thread-comment-soft);
+  border-color: var(--thread-comment-border);
 }
 
 /* === Shared code syntax theme ===================================== */

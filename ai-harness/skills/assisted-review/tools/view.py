@@ -579,6 +579,38 @@ def parse_numstat_z(raw: bytes) -> dict[str, dict[str, int | None]]:
     return out
 
 
+def diff_pathspecs(
+    repo_root: str, comparison_base: str, rel_file: str | None
+) -> list[str]:
+    if not rel_file:
+        return []
+
+    try:
+        status_proc = git_bytes(
+            repo_root,
+            [
+                "diff",
+                "--name-status",
+                "-z",
+                "--find-renames",
+                comparison_base,
+                "--",
+            ],
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return [rel_file]
+
+    if status_proc.returncode not in {0, 1}:
+        return [rel_file]
+
+    status = parse_name_status_z(status_proc.stdout).get(rel_file)
+    old_path = status.get("old_path") if status else None
+    if isinstance(old_path, str) and old_path and old_path != rel_file:
+        return [old_path, rel_file]
+    return [rel_file]
+
+
 def unquote_diff_path(path: str) -> str:
     if path == "/dev/null":
         return path
@@ -794,6 +826,7 @@ def compute_diff(
     rel_file: str | None = None,
 ) -> dict[str, Any]:
     base = resolve_diff_base(repo_root, target, requested_base)
+    pathspecs = diff_pathspecs(repo_root, base["comparison_base"], rel_file)
     diff_args = [
         "diff",
         "--no-color",
@@ -801,9 +834,8 @@ def compute_diff(
         "--find-renames",
         base["comparison_base"],
         "--",
+        *pathspecs,
     ]
-    if rel_file:
-        diff_args.append(rel_file)
 
     try:
         raw_diff_proc = git_text(repo_root, diff_args, timeout=20)
@@ -821,6 +853,7 @@ def compute_diff(
         "--find-renames",
         base["comparison_base"],
         "--",
+        *pathspecs,
     ]
     numstat_args = [
         "diff",
@@ -829,10 +862,8 @@ def compute_diff(
         "--find-renames",
         base["comparison_base"],
         "--",
+        *pathspecs,
     ]
-    if rel_file:
-        status_args.append(rel_file)
-        numstat_args.append(rel_file)
 
     try:
         statuses = parse_name_status_z(git_bytes(repo_root, status_args).stdout)
@@ -889,6 +920,8 @@ def compute_diff(
 
     for path in untracked_files(repo_root):
         if rel_file and path != rel_file:
+            continue
+        if path in files:
             continue
         patch = synthesize_untracked_patch(repo_root, path)
         line_count = sum(1 for h in patch.get("hunks", []) for _ in h.get("lines", []))
@@ -1022,6 +1055,24 @@ def thread_type(thread: dict[str, Any]) -> str:
     return value if isinstance(value, str) and value else COMMENT_THREAD_TYPE
 
 
+def overview_body(review: dict[str, Any], key: str) -> str:
+    value = review.get(key)
+    if isinstance(value, dict):
+        body = value.get("body")
+        return body if isinstance(body, str) else ""
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def overview_replies(review: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    value = review.get(key)
+    if not isinstance(value, dict):
+        return []
+    replies = value.get("replies")
+    return replies if isinstance(replies, list) else []
+
+
 def remaining_threads_after_full_submit(
     threads: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -1085,6 +1136,16 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
         if last_author == "user" or (c.get("author") == "user" and not replies):
             has_unanswered_user = True
 
+    for key_name in ("summary", "note"):
+        replies = overview_replies(review, key_name)
+        if any(
+            (r.get("author") == "user" and (r.get("body") or "").strip())
+            for r in replies
+        ):
+            has_user_reply = True
+        if replies and replies[-1].get("author") == "user":
+            has_unanswered_user = True
+
     repo_root = target.get("repo_root", "")
     target_commit = target.get("commit", "")
     stale = review_is_stale(target) if isinstance(target, dict) else False
@@ -1107,7 +1168,7 @@ def review_to_inbox_entry(slug: str, key: str, path: Path) -> dict[str, Any]:
         "stale": stale,
         "generated_at": data.get("generated_at"),
         "modified": path.stat().st_mtime,
-        "summary": (review.get("summary") or "").strip(),
+        "summary": overview_body(review, "summary").strip(),
     }
 
 

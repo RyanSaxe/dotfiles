@@ -135,52 +135,76 @@ def build_thread_payload(c: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def build_review_payload(
-    review_data: dict[str, Any],
-    only_thread_id: str | None,
-) -> dict[str, Any]:
-    """Build the full POST body for /pulls/{n}/reviews."""
+def overview_body(review: dict[str, Any], key: str) -> str:
+    value = review.get(key, "")
+    if isinstance(value, dict):
+        body = value.get("body", "")
+        return body if isinstance(body, str) else ""
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def sendable_threads(review: dict[str, Any]) -> list[dict[str, Any]]:
+    threads = review["threads"]
+    selected = [
+        c
+        for c in threads
+        if thread_type(c) == COMMENT_THREAD_TYPE
+        and c.get("status") not in SKIP_STATUSES
+    ]
+    if not selected:
+        raise RuntimeError("nothing to send — no open or acknowledged comment threads")
+
+    blocked = [
+        (c["id"], reason)
+        for c in selected
+        if (reason := submission_block_reason(c)) is not None
+    ]
+    if blocked:
+        details = ", ".join(f"{thread_id} ({reason})" for thread_id, reason in blocked)
+        raise RuntimeError(f"cannot send review with stale threads: {details}")
+
+    return selected
+
+
+def find_single_thread(review: dict[str, Any], thread_id: str) -> dict[str, Any]:
+    matches = [c for c in review["threads"] if c["id"] == thread_id]
+    if not matches:
+        raise RuntimeError(f"thread id {thread_id!r} not found in review")
+
+    thread = matches[0]
+    reason = submission_block_reason(thread)
+    if reason is not None:
+        raise RuntimeError(f"thread id {thread_id!r} is not submittable: {reason}")
+
+    return thread
+
+
+def build_review_payload(review_data: dict[str, Any]) -> dict[str, Any]:
+    """Build the POST body for /pulls/{n}/reviews."""
     target = review_data["target"]
     review = review_data["review"]
-    threads = review["threads"]
-
-    if only_thread_id is not None:
-        threads = [c for c in threads if c["id"] == only_thread_id]
-        if not threads:
-            raise RuntimeError(f"thread id {only_thread_id!r} not found in review")
-        reason = submission_block_reason(threads[0])
-        if reason is not None:
-            raise RuntimeError(
-                f"thread id {only_thread_id!r} is not submittable: {reason}"
-            )
-    else:
-        threads = [
-            c
-            for c in threads
-            if thread_type(c) == COMMENT_THREAD_TYPE
-            and c.get("status") not in SKIP_STATUSES
-        ]
-        if not threads:
-            raise RuntimeError(
-                "nothing to send — no open or acknowledged comment threads"
-            )
-        blocked = [
-            (c["id"], reason)
-            for c in threads
-            if (reason := submission_block_reason(c)) is not None
-        ]
-        if blocked:
-            details = ", ".join(
-                f"{thread_id} ({reason})" for thread_id, reason in blocked
-            )
-            raise RuntimeError(f"cannot send review with stale threads: {details}")
+    threads = sendable_threads(review)
 
     return {
         "commit_id": target["commit"],
         "event": review["event"],
-        "body": review.get("summary", "").rstrip(),
+        "body": overview_body(review, "summary").rstrip(),
         "comments": [build_thread_payload(c) for c in threads],
     }
+
+
+def build_single_comment_payload(
+    review_data: dict[str, Any], thread_id: str
+) -> dict[str, Any]:
+    """Build the POST body for /pulls/{n}/comments."""
+    target = review_data["target"]
+    review = review_data["review"]
+    thread = find_single_thread(review, thread_id)
+    payload = build_thread_payload(thread)
+    payload["commit_id"] = target["commit"]
+    return payload
 
 
 def submit(
@@ -195,18 +219,24 @@ def submit(
             "target.pr_number is not set — review is local-only, nothing to submit"
         )
 
-    payload = build_review_payload(data, only_thread_id)
+    if only_thread_id is None:
+        payload = build_review_payload(data)
+        endpoint = "reviews"
+    else:
+        payload = build_single_comment_payload(data, only_thread_id)
+        endpoint = "comments"
 
     if dry_run:
         # Skip owner/repo lookup (may not be a real repo) — just emit the payload.
         return {
             "_dry_run": True,
+            "endpoint": endpoint,
             "pr_number": pr_number,
             "payload": payload,
         }
 
     owner, repo = target_owner_repo(target)
-    api_path = f"repos/{owner}/{repo}/pulls/{pr_number}/reviews"
+    api_path = f"repos/{owner}/{repo}/pulls/{pr_number}/{endpoint}"
     result = subprocess.run(
         ["gh", "api", api_path, "-X", "POST", "--input", "-"],
         input=json.dumps(payload),

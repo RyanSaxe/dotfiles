@@ -85,6 +85,33 @@ function reviewThreads() {
   return review.threads;
 }
 
+function overviewId(kind) {
+  return `overview:${kind}`;
+}
+
+function overviewKind(id) {
+  const match = /^overview:(summary|note)$/.exec(String(id || ""));
+  return match ? match[1] : null;
+}
+
+function ensureOverviewBlock(kind) {
+  const review = state.review?.review;
+  if (!review) return { author: "ai", body: "", replies: [] };
+
+  const current = review[kind];
+  if (typeof current === "string") {
+    review[kind] = { author: "ai", body: current, replies: [] };
+  } else if (!current || typeof current !== "object" || Array.isArray(current)) {
+    review[kind] = { author: "ai", body: "", replies: [] };
+  } else {
+    if (!["ai", "user"].includes(review[kind].author)) review[kind].author = "ai";
+    if (typeof review[kind].body !== "string") review[kind].body = "";
+    if (!Array.isArray(review[kind].replies)) review[kind].replies = [];
+  }
+
+  return review[kind];
+}
+
 function threadType(c) {
   return c?.type === "note" ? "note" : "comment";
 }
@@ -114,6 +141,12 @@ function sendableCommentThreads() {
 
 function findThread(id) {
   return reviewThreads().find((x) => x.id === id);
+}
+
+function findDiscussionTarget(id) {
+  const kind = overviewKind(id);
+  if (kind) return ensureOverviewBlock(kind);
+  return findThread(id);
 }
 
 function hasSuggestion(c) {
@@ -1444,7 +1477,7 @@ function renderTreeNode(node) {
     const pip = collapsed && node.dirCount > 0
       ? `<span class="comment-pip">${node.dirCount}</span>`
       : "";
-    const dirDiff = node.additions || node.deletions
+    const dirDiff = collapsed && (node.additions || node.deletions)
       ? formatDiffStat({ additions: node.additions, deletions: node.deletions })
       : "";
     const childrenHtml = collapsed
@@ -1785,6 +1818,65 @@ function renderInboxRow(r) {
 
 // --- Per-review overview ---
 
+function renderOverviewCard(kind) {
+  const block = ensureOverviewBlock(kind);
+  const id = overviewId(kind);
+  const idSafe = escapeHtml(id);
+  const isSummary = kind === "summary";
+  const type = isSummary ? "comment" : "note";
+  const title = isSummary ? "GitHub review summary" : "Reviewer note";
+  const indicator = isSummary
+    ? `
+      <span class="local-note-indicator github-summary-indicator" title="Sent as the PR review body when the full review is submitted">
+        <i data-lucide="git-pull-request"></i>
+        Sends with full review
+      </span>
+    `
+    : `
+      <span class="local-note-indicator" title="This note stays local and is not submitted to GitHub">
+        <i data-lucide="bookmark"></i>
+        Local note
+      </span>
+    `;
+  const isEditing = state.editingBody === id;
+  const body = block.body || "";
+  const bodyHtml = isEditing
+    ? `
+      <textarea class="comment-body-edit" data-edit-body="${idSafe}" autofocus>${escapeHtml(body)}</textarea>
+      <div class="comment-editor-preview markdown-body" data-markdown-preview-for="${idSafe}">${renderMarkdown(body)}</div>
+      <div class="comment-body-edit-hint">Cmd/Ctrl+Enter to save · Esc to cancel</div>
+    `
+    : body.trim()
+      ? `<div class="comment-body markdown-body">${renderMarkdown(body)}</div>`
+      : `<div class="comment-body empty">No ${isSummary ? "summary" : "note"} yet.</div>`;
+  const editButton = isEditing ? "" : `
+    <button class="comment-menu-trigger" data-edit-target="${idSafe}" title="Edit ${escapeHtml(title)}" aria-label="Edit ${escapeHtml(title)}" type="button">
+      <i data-lucide="pencil"></i>
+    </button>
+  `;
+
+  return `
+    <div class="comment-card overview-card ${type}" data-comment-card="${idSafe}">
+      <div class="comment-header">
+        ${renderAuthorBadge(block.author || "ai")}
+        ${renderMetaChip("type", type, title)}
+        ${indicator}
+        <span class="comment-header-spacer"></span>
+        ${editButton}
+      </div>
+      ${bodyHtml}
+      ${renderReplies({ id, replies: block.replies })}
+      <div class="comment-actions">
+        <div class="spacer"></div>
+        <button class="btn" data-add-reply="${idSafe}">
+          <i data-lucide="message-square-plus"></i>
+          Add reply
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderReviewOverview() {
   const r = state.review.review;
   const t = state.review.target;
@@ -1819,11 +1911,12 @@ function renderReviewOverview() {
       <div class="meta">${escapeHtml(t.repo_root || "")}</div>
     </div>
 
-    <div class="overview-summary">
-      <div class="overview-summary-label">Summary · ${escapeHtml(r.event)}</div>
-      <div class="overview-summary-body">${escapeHtml(r.summary)}</div>
+    <div class="overview-cards">
+      ${renderOverviewCard("summary")}
+      ${renderOverviewCard("note")}
     </div>
 
+    <div class="overview-comments-label">Review event · ${escapeHtml(r.event)}</div>
     <div class="overview-comments-label">${counts.comments} comments · ${counts.notes} notes across ${Object.keys(grouped).length} files</div>
     ${groupsHtml || `<div class="inbox-empty">No threads match the current filter.</div>`}
   `;
@@ -1864,7 +1957,7 @@ function renderFileView() {
     if (primary) {
       const [s, e] = commentLineRange(primary);
       const color = threadMarkerColor(primary);
-      const dot = lineNum === s
+      const dot = s === e && lineNum === s
         ? `<span class="dot" style="background:${color}"></span>`
         : "";
       const rail = s !== e
@@ -1873,9 +1966,9 @@ function renderFileView() {
       markerHtml = `${rail}${dot}`;
     }
 
-    const markerClass = primary ? `gutter-marker has-marker ${threadType(primary)} ${rangeMarkerClass(primary, lineNum)}`
-      : inRange ? `gutter-marker range-mid`
-        : inHunk ? `gutter-marker diff-marker` : "gutter-marker";
+    const markerClass = primary ? `gutter-marker thread-marker-cell has-marker ${threadType(primary)} ${rangeMarkerClass(primary, lineNum)}`
+      : inRange ? `gutter-marker thread-marker-cell range-mid`
+        : "gutter-marker thread-marker-cell";
     const isUncommented = !primary && !inRange;
     const rowClass = [
       primary ? "has-comment" : "",
@@ -1893,6 +1986,7 @@ function renderFileView() {
     let html = `
       <tr class="${rowClass}" ${hunkAttr}>
         <td class="gutter-num">${lineNum}</td>
+        <td class="source-diff-marker diff-marker-cell ${inHunk ? "in-hunk" : ""} ${changed ? "changed" : ""}">${changed ? "+" : ""}</td>
         <td class="${markerClass}" ${gutterDataAttr}>${markerHtml}</td>
         <td class="code-cell">${codeHtml}</td>
       </tr>
@@ -1902,7 +1996,7 @@ function renderFileView() {
       if (!state.hideThreadCards && state.expandedComments.has(c.id)) {
         html += `
           <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
-            <td colspan="3"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
+            <td colspan="4"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines: lines })}</div></td>
           </tr>
         `;
       }
@@ -1912,7 +2006,7 @@ function renderFileView() {
     if (!state.hideThreadCards && state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === lineNum) {
       html += `
         <tr class="comment-row">
-          <td colspan="3"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
+          <td colspan="4"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
         </tr>
       `;
     }
@@ -1985,6 +2079,25 @@ function hunkLineMaps(hunks) {
   return { hunkStarts, hunkSpanLines, changedLines };
 }
 
+function unifiedNeedsSplitLineNumbers(hunks) {
+  return hunks.some((hunk) => (hunk.lines || []).some((line) => {
+    if (line.kind === "del") return true;
+    return Number.isInteger(line.old_line)
+      && Number.isInteger(line.new_line)
+      && line.old_line !== line.new_line;
+  }));
+}
+
+function unifiedLineNumberHtml(line, splitLineNumbers) {
+  if (splitLineNumbers) {
+    return `
+      <td class="diff-old-num">${line.old_line || ""}</td>
+      <td class="diff-new-num">${line.new_line || ""}</td>
+    `;
+  }
+  return `<td class="diff-line-num">${line.new_line || line.old_line || ""}</td>`;
+}
+
 function renderUnifiedDiffView(filePath, language, diffDetail) {
   const fileComments = visibleReviewThreads()
     .filter((c) => c.file === filePath)
@@ -1995,14 +2108,16 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
   const visibleNewLines = new Set(
     hunks.flatMap((hunk) => (hunk.lines || []).map((line) => line.new_line).filter(Number.isInteger)),
   );
+  const splitLineNumbers = unifiedNeedsSplitLineNumbers(hunks);
+  const commentColspan = splitLineNumbers ? 5 : 4;
   const statHtml = formatDiffStat(diffStatForFile(filePath) || diffDetail);
   const counts = threadCounts(fileComments);
   const rows = hunks.flatMap((hunk, hunkIndex) => {
     const out = [`
       <tr class="diff-hunk-header" data-hunk-index="${hunkIndex}">
-        <td class="diff-old-num"></td>
-        <td class="diff-new-num"></td>
-        <td class="diff-marker-cell">@@</td>
+        ${splitLineNumbers ? `<td class="diff-old-num"></td><td class="diff-new-num"></td>` : `<td class="diff-line-num"></td>`}
+        <td class="diff-marker-cell hunk-marker">@@</td>
+        <td class="gutter-marker thread-marker-cell"></td>
         <td class="diff-code-cell">${escapeHtml(hunk.header || "")}</td>
       </tr>
     `];
@@ -2013,26 +2128,26 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
       const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
       const canComment = Number.isInteger(newLine);
       const primary = covering[0];
-      const gutterAttr = primary
+      const threadAttr = primary
         ? `data-comment-id="${escapeHtml(primary.id)}"`
         : canComment ? `data-add-line="${newLine}"` : "";
-      let markerHtml = escapeHtml(marker);
+      let threadMarkerHtml = "";
       if (primary) {
         const [s, e] = commentLineRange(primary);
         const color = threadMarkerColor(primary);
-        const dot = newLine === s
+        const dot = s === e && newLine === s
           ? `<span class="dot" style="background:${color}"></span>`
           : "";
         const rail = s !== e
           ? `<span class="bar" style="background:${color}"></span>`
           : "";
-        markerHtml = `${rail}${dot}`;
+        threadMarkerHtml = `${rail}${dot}`;
       }
       out.push(`
         <tr class="unified-line ${escapeHtml(line.kind || "context")}">
-          <td class="diff-old-num">${oldLine || ""}</td>
-          <td class="diff-new-num">${newLine || ""}</td>
-          <td class="diff-marker-cell ${primary ? `has-marker ${threadType(primary)} ${rangeMarkerClass(primary, newLine)}` : ""}" ${gutterAttr}>${markerHtml}</td>
+          ${unifiedLineNumberHtml(line, splitLineNumbers)}
+          <td class="diff-marker-cell">${escapeHtml(marker)}</td>
+          <td class="gutter-marker thread-marker-cell ${primary ? `has-marker ${threadType(primary)} ${rangeMarkerClass(primary, newLine)}` : ""}" ${threadAttr}>${threadMarkerHtml}</td>
           <td class="diff-code-cell">${renderHighlightedLine(line.text || "", language)}</td>
         </tr>
       `);
@@ -2042,7 +2157,7 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
         if (!state.hideThreadCards && state.expandedComments.has(c.id)) {
           out.push(`
             <tr class="comment-row" data-comment-row-id="${escapeHtml(c.id)}">
-              <td colspan="4"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines })}</div></td>
+              <td colspan="${commentColspan}"><div class="comment-row-inner">${renderCommentCard(c, { fileLanguage: language, sourceLines })}</div></td>
             </tr>
           `);
         }
@@ -2050,7 +2165,7 @@ function renderUnifiedDiffView(filePath, language, diffDetail) {
       if (!state.hideThreadCards && state.newCommentTarget && state.newCommentTarget.file === filePath && state.newCommentTarget.line === newLine) {
         out.push(`
           <tr class="comment-row">
-            <td colspan="4"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
+            <td colspan="${commentColspan}"><div class="comment-row-inner">${renderNewCommentForm()}</div></td>
           </tr>
         `);
       }
@@ -2089,12 +2204,8 @@ function isLastVisibleRangeLine(c, lineNum, visibleNewLines) {
   return true;
 }
 
-function severityColorVar(sev) {
-  return `var(--sev-${sev})`;
-}
-
 function threadMarkerColor(c) {
-  return isNoteThread(c) ? "var(--thread-note)" : severityColorVar(c.severity);
+  return isNoteThread(c) ? "var(--thread-note)" : "var(--thread-comment)";
 }
 
 // --- New comment form ---
@@ -2431,12 +2542,8 @@ async function persistReview() {
 }
 
 async function saveEditedBody(id, newBody) {
-  const c = findThread(id);
+  const c = findDiscussionTarget(id);
   if (!c) return;
-  if (isNoteThread(c)) {
-    showToast("Notes cannot include GitHub suggestions", { kind: "warning" });
-    return;
-  }
   if (newBody === c.body) {
     state.editingBody = null;
     renderContent();
@@ -2448,7 +2555,7 @@ async function saveEditedBody(id, newBody) {
     await persistReview();
     state.editingBody = null;
     renderContent();
-    showToast("Edited thread", { kind: "success" });
+    showToast(overviewKind(id) ? "Edited overview" : "Edited thread", { kind: "success" });
   } catch (err) {
     c.body = original;
     showError(err, "Save failed");
@@ -2896,7 +3003,7 @@ function attachContentHandlers() {
     el.addEventListener("click", async () => {
       const id = el.getAttribute("data-add-reply");
       const ta = content.querySelector(`[data-reply-input="${id}"]`);
-      const c = findThread(id);
+      const c = findDiscussionTarget(id);
       if (!ta || !c) return;
       const body = ta.value.trim();
       if (!body) {
