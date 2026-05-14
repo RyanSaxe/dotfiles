@@ -6,10 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
-<!-- Optional per deck:
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-light.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
--->
+<!-- Add optional CDN styles here when the deck benefits from them. -->
 <style>
 {{INLINE_THEME_CSS}}
 </style>
@@ -40,12 +37,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
-<!-- Optional per deck:
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
--->
+<!-- Add optional CDN scripts here when the deck benefits from them. -->
 <script>
   Reveal.initialize({
     hash: true,
@@ -59,9 +51,7 @@
     minScale: 0.2,
     maxScale: 2.0
   });
-  // Enable optional libraries here only when the deck uses them.
-  // hljs.highlightAll();
-  // renderMathInElement(document.body, { throwOnError: false });
+  // Initialize optional libraries here only when the deck uses them.
 </script>
 </body>
 </html>

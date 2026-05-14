@@ -21,6 +21,8 @@ presentation/
 │   ├── taste.md
 │   └── workflow.md
 └── examples/
+    ├── full-slide-examples/
+    │   └── .gitkeep
     └── single-slide-examples/
         ├── index.html
         ├── shared.css
@@ -41,8 +43,9 @@ presentation/
 
 - `examples/single-slide-examples/index.html` is for human review and fast visual scanning.
 - The individual HTML files in `examples/single-slide-examples/` are inspiration for slide concepts, visual relationships, spacing, and hierarchy.
+- `examples/full-slide-examples/` is reserved for complete end-to-end example decks as single HTML files.
 - Do not treat the examples as templates, a taxonomy, or a component library. Open a relevant example to study why it works, then design the user's slide from the user's content.
-- Future end-to-end example decks should be single HTML files under `examples/` unless assets are truly required.
+- End-to-end example decks should be single HTML files under `examples/full-slide-examples/` unless assets are truly required.
 
 ## Critical Interview
 
@@ -155,6 +158,7 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 
 - `examples/single-slide-examples/index.html` - human review page for the single-slide example set.
 - `examples/single-slide-examples/*.html` - individual slide examples to inspect for inspiration.
+- `examples/full-slide-examples/*.html` - complete example decks, added only after the skill succeeds in a real end-to-end run.
 - `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
 - `references/rubric.md` - deck-level and slide-level review criteria.
 - `references/taste.md` - visual taste rules and hierarchy guidance.
