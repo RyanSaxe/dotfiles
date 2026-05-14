@@ -21,7 +21,6 @@ presentation/
 `-- examples/
     |-- gallery/
     |   |-- agendas/
-    |   |-- architecture/
     |   |-- metrics/
     |   |-- risks/
     |   |-- roadmaps/
@@ -99,6 +98,7 @@ Every deck should be scan-ready, even if the audience is technical.
 - Make section breaks feel like transitions, not content slides.
 - Use appendix/detail slides for proof that would crowd the main story.
 - If a slide feels crowded, split it or simplify it before shrinking type.
+- Balance the slide body across the artboard. Avoid concentrating all meaningful content at the top, in one corner, or in one dense strip when the message should feel centered and composed.
 - Unless the user provides a brand system, start from muted warm white backgrounds, black primary text, and restrained accent colors for highlights, status, and emphasis.
 - Slides should look like real slides. Do not add explanatory copy about why a layout works.
 
@@ -129,6 +129,7 @@ For every review viewport, verify:
 - slide content centered inside the artboard when the layout calls for it
 - long titles
 - weak visual hierarchy
+- content mass that is visually top-heavy, corner-heavy, or awkwardly uncentered
 - dense blocks that are hard to scan
 - repeated layouts that make the deck feel samey
 - diagrams, charts, or images with unclear emphasis

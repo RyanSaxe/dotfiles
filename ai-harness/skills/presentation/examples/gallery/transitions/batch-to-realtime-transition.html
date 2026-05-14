@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Transition Slide - Batch to Realtime</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.transition-layout {
+  display: grid;
+  grid-template-columns: 1fr 72px 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.state-panel {
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.state-head {
+  border-bottom: 3px solid var(--ink);
+  padding: 22px 26px;
+  display: grid;
+  gap: 8px;
+}
+
+.state-head span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.state-head h2 {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.pipeline {
+  padding: 30px 26px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.pipeline-node {
+  min-height: 82px;
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0 12px;
+  font-size: 19px;
+  line-height: 1.05;
+  font-weight: 850;
+}
+
+.pipeline-arrow {
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.outcome {
+  border-top: 3px solid var(--ink);
+  padding: 22px 26px;
+  display: grid;
+  gap: 8px;
+}
+
+.outcome.bad {
+  background: #f4d7cf;
+}
+
+.outcome.good {
+  background: #d9e5d6;
+}
+
+.outcome span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.outcome strong {
+  font-size: 31px;
+  line-height: 1;
+}
+
+.transition-arrow {
+  display: grid;
+  place-items: center;
+  font-size: 46px;
+  font-weight: 900;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <h1>Batch scoring to real-time inference</h1>
+      </header>
+      <div class="transition-layout" aria-label="Transition from nightly batch scoring to real-time inference">
+        <div class="state-panel">
+          <div class="state-head"><span>current state</span><h2>Nightly batch score</h2></div>
+          <div class="pipeline">
+            <div class="pipeline-node">Export</div>
+            <div class="pipeline-arrow">&rarr;</div>
+            <div class="pipeline-node">Score</div>
+            <div class="pipeline-arrow">&rarr;</div>
+            <div class="pipeline-node">Sync</div>
+          </div>
+          <div class="outcome bad"><span>negative</span><strong>Recommendations are 12h stale</strong></div>
+        </div>
+        <div class="transition-arrow">&rarr;</div>
+        <div class="state-panel">
+          <div class="state-head"><span>target state</span><h2>Online decision service</h2></div>
+          <div class="pipeline">
+            <div class="pipeline-node">Event</div>
+            <div class="pipeline-arrow">&rarr;</div>
+            <div class="pipeline-node">Features</div>
+            <div class="pipeline-arrow">&rarr;</div>
+            <div class="pipeline-node">Rank</div>
+          </div>
+          <div class="outcome good"><span>positive</span><strong>Recommendations update in 5 min</strong></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

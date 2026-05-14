@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spotlight Slide - Travel Agents</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.spotlight-slide {
+  grid-template-rows: auto 1fr;
+  gap: 34px;
+}
+
+.agent-demo {
+  display: grid;
+  grid-template-columns: 0.86fr 1.12fr 0.9fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.demo-panel {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.panel-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.request-card {
+  display: grid;
+  gap: 18px;
+}
+
+.request-card strong {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.request-card p {
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1.28;
+  font-weight: 680;
+}
+
+.constraint-list,
+.itinerary-list {
+  display: grid;
+  gap: 12px;
+}
+
+.constraint,
+.itinerary-item {
+  border-top: 2px solid var(--ink);
+  padding-top: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.constraint strong,
+.itinerary-item strong {
+  font-size: 21px;
+  line-height: 1;
+}
+
+.constraint span,
+.itinerary-item span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.agent-workspace {
+  border: 3px solid var(--ink);
+  background: var(--bg);
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.workspace-head {
+  height: 56px;
+  border-bottom: 3px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.workspace-body {
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.agent-step {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.agent-step b {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--amber);
+}
+
+.agent-step strong {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.agent-step > div {
+  display: grid;
+  gap: 5px;
+}
+
+.agent-step span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.agent-step em {
+  color: var(--green);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.total {
+  align-self: end;
+  border-top: 3px solid var(--ink);
+  padding-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+}
+
+.total strong {
+  font-size: 48px;
+  line-height: 0.9;
+}
+
+.total span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide spotlight-slide content-slide">
+      <header class="slide-title">
+        <h1>AI agents book travel end to end</h1>
+      </header>
+      <div class="agent-demo" aria-label="Travel booking agent moving from request to planned itinerary">
+        <div class="demo-panel">
+          <div class="panel-label">request</div>
+          <div class="request-card">
+            <strong>NYC to Lisbon</strong>
+            <p>Three nights, morning arrival, under policy, near the conference venue.</p>
+          </div>
+          <div class="constraint-list">
+            <div class="constraint"><strong>$2.4k</strong><span>budget cap</span></div>
+            <div class="constraint"><strong>1 stop max</strong><span>flight rule</span></div>
+            <div class="constraint"><strong>4.5+ rating</strong><span>hotel rule</span></div>
+          </div>
+        </div>
+        <div class="agent-workspace">
+          <div class="workspace-head"><span>Travel agent workspace</span><span>live plan</span></div>
+          <div class="workspace-body">
+            <div class="agent-step"><b>1</b><div><strong>Search options</strong><span>flight + hotel inventory</span></div><em>done</em></div>
+            <div class="agent-step"><b>2</b><div><strong>Check policy</strong><span>budget, timing, location</span></div><em>done</em></div>
+            <div class="agent-step"><b>3</b><div><strong>Hold itinerary</strong><span>traveler approval ready</span></div><em>ready</em></div>
+          </div>
+        </div>
+        <div class="demo-panel">
+          <div class="panel-label">itinerary</div>
+          <div class="itinerary-list">
+            <div class="itinerary-item"><strong>07:30 arrival</strong><span>flight held</span></div>
+            <div class="itinerary-item"><strong>0.4 mi walk</strong><span>hotel selected</span></div>
+            <div class="itinerary-item"><strong>$2.18k</strong><span>within policy</span></div>
+          </div>
+          <div class="total"><span>approval</span><strong>1 click</strong></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>
