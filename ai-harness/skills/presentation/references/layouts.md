@@ -2,7 +2,7 @@
 
 This reference is a compass, not a component API. Do not choose a slide from a menu. Start with what the audience must understand, then design the visual relationship that makes that understanding fast.
 
-Open `examples/single-slide-examples/index.html` for a quick scan of the example set. Open individual files when a specific slide raises a useful question about spacing, hierarchy, density, or visual representation.
+Open `examples/single-slide-examples/gallery.html` for a quick scan of the example set. Open individual files when a specific slide raises a useful question about spacing, hierarchy, density, or visual representation.
 
 ## Design From the Relationship
 

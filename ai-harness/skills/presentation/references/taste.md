@@ -36,7 +36,7 @@ These rules describe the default taste for decks made with this skill. They are 
 
 ## Single-Slide Examples
 
-- `examples/single-slide-examples/index.html` is a human review page for quickly scanning the set.
+- `examples/single-slide-examples/gallery.html` is a human review page for quickly scanning the set.
 - The individual HTML files are case studies for range, spacing, hierarchy, and meaningful visuals.
 - Do not copy an example unless the user explicitly asks for that exact shape.
 - When building a new slide, start from the user's content relationship, then design the visual.
