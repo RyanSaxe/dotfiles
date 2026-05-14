@@ -7,86 +7,61 @@
 <link rel="stylesheet" href="../shared.css">
 <style>
 .spotlight-slide {
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 64px;
+  grid-template-rows: auto 1fr;
+  gap: 34px;
+}
+
+.spotlight-head h1 {
+  font-size: 52px;
+}
+
+.feature-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.88fr 1.12fr;
+  gap: 44px;
   align-items: center;
 }
 
-.spotlight-copy {
+.feature-stat {
   display: grid;
-  gap: 22px;
+  gap: 14px;
 }
 
-.spotlight-copy h1 {
-  max-width: 9ch;
-  font-size: 88px;
-  line-height: 0.96;
-  font-weight: 880;
+.feature-stat strong {
+  font-size: 136px;
+  line-height: 0.86;
 }
 
-.spotlight-copy p {
+.feature-stat span {
+  max-width: 15ch;
   color: var(--muted);
-  font-size: 26px;
-  line-height: 1.22;
-  font-weight: 650;
-}
-
-.feature-card {
-  height: 470px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 40px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 28px;
-}
-
-.feature-bar {
-  height: 24px;
-  width: 64%;
-  background: var(--surface-2);
+  font-size: 21px;
+  line-height: 1.18;
+  font-weight: 760;
 }
 
 .approval-path {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
-  gap: 14px;
-  align-items: center;
+  position: relative;
+  height: 430px;
 }
 
-.approval-step {
-  height: 150px;
-  border: 2px solid var(--ink);
-  display: grid;
-  place-items: center;
-  text-align: center;
+.approval-path svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.step-label {
   font-size: 22px;
-  font-weight: 820;
+  font-weight: 850;
+  fill: var(--ink);
 }
 
-.approval-step.current {
-  background: var(--amber);
-}
-
-.feature-metric {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  border-top: 2px solid var(--ink);
-  padding-top: 18px;
-}
-
-.feature-metric strong {
-  font-size: 64px;
-  line-height: 1;
-}
-
-.feature-metric span {
-  max-width: 16ch;
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 750;
-  text-align: right;
+.step-sub {
+  font-size: 12px;
+  font-weight: 850;
+  fill: var(--muted);
   text-transform: uppercase;
 }
 </style>
@@ -95,21 +70,34 @@
 <main class="stage">
   <div class="slide-frame">
     <section class="slide spotlight-slide">
-      <div class="spotlight-copy">
-        <p class="kicker">feature spotlight</p>
-        <h1>Approval flow.</h1>
-        <p>Fewer handoffs. Clearer ownership.</p>
-      </div>
-      <div class="feature-card" aria-label="Approval flow feature diagram">
-        <div class="feature-bar"></div>
-        <div class="approval-path">
-          <div class="approval-step">Request</div>
-          <strong>&rarr;</strong>
-          <div class="approval-step current">Approve</div>
-          <strong>&rarr;</strong>
-          <div class="approval-step">Release</div>
+      <header class="spotlight-head slide-title">
+        <h1>Approval flow cuts handoffs.</h1>
+      </header>
+      <div class="feature-field" aria-label="Approval flow feature spotlight">
+        <div class="feature-stat">
+          <strong>38%</strong>
+          <span>faster review cycle</span>
         </div>
-        <div class="feature-metric"><strong>38%</strong><span>faster review cycle</span></div>
+        <div class="approval-path">
+          <svg viewBox="0 0 650 430" role="img" aria-label="Request, approve, and release path with approval highlighted">
+            <defs>
+              <marker id="spotlight-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#111418"></path>
+              </marker>
+            </defs>
+            <path d="M104 216 C196 96 318 96 406 214 C458 282 516 292 588 246" fill="none" stroke="#d7d2c8" stroke-width="28" stroke-linecap="round"></path>
+            <path d="M104 216 C196 96 318 96 406 214 C458 282 516 292 588 246" fill="none" stroke="#111418" stroke-width="5" marker-end="url(#spotlight-arrow)"></path>
+            <circle cx="104" cy="216" r="66" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+            <circle cx="342" cy="154" r="86" fill="#e9b949" stroke="#111418" stroke-width="3"></circle>
+            <circle cx="588" cy="246" r="66" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+            <text x="104" y="214" text-anchor="middle" class="step-label">Request</text>
+            <text x="104" y="242" text-anchor="middle" class="step-sub">owner set</text>
+            <text x="342" y="152" text-anchor="middle" class="step-label">Approve</text>
+            <text x="342" y="180" text-anchor="middle" class="step-sub">one click</text>
+            <text x="588" y="244" text-anchor="middle" class="step-label">Release</text>
+            <text x="588" y="272" text-anchor="middle" class="step-sub">audit trail</text>
+          </svg>
+        </div>
       </div>
     </section>
   </div>

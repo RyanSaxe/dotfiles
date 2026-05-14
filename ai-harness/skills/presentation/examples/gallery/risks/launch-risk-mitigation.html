@@ -6,59 +6,82 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="../shared.css">
 <style>
-.risk-grid {
-  display: grid;
-  grid-template-columns: 0.92fr 1.08fr;
-  gap: 26px;
+.risk-map {
+  position: relative;
+  height: 510px;
 }
 
-.risk-list,
-.mitigation-list {
+.risk-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.risk-node,
+.mitigation-node {
+  position: absolute;
+  width: 260px;
   display: grid;
+  grid-template-columns: 34px 1fr;
   gap: 14px;
+  align-items: start;
 }
 
-.risk-row,
-.mitigation-row {
-  min-height: 112px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 22px 24px;
-  display: grid;
-  align-content: center;
+.risk-node { left: 0; }
+.mitigation-node { right: 0; }
+
+.risk-node.one,
+.mitigation-node.one { top: 44px; }
+.risk-node.two,
+.mitigation-node.two { top: 214px; }
+.risk-node.three,
+.mitigation-node.three { top: 374px; }
+
+.node-dot {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  margin-top: 6px;
 }
 
-.risk-row {
-  border-left-width: 14px;
-  border-left-color: var(--red);
-}
+.risk-node .node-dot { background: var(--red); }
+.mitigation-node .node-dot { background: var(--green); }
 
-.mitigation-row {
-  border-left-width: 14px;
-  border-left-color: var(--green);
-}
-
-.risk-row h2,
-.mitigation-row h2 {
+.risk-node h2,
+.mitigation-node h2 {
   font-size: 30px;
-  line-height: 1.04;
+  line-height: 1;
 }
 
-.risk-row span,
-.mitigation-row span {
+.risk-node span,
+.mitigation-node span {
   display: block;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 15px;
-  font-weight: 760;
+  font-size: 14px;
+  font-weight: 820;
   text-transform: uppercase;
 }
 
-.column-label {
-  color: var(--muted);
-  font-size: 13px;
+.launch-control {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 180px;
+  height: 180px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--amber);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 26px;
+  line-height: 1;
   font-weight: 850;
-  text-transform: uppercase;
+  transform: translate(-50%, -50%);
 }
 </style>
 </head>
@@ -67,22 +90,24 @@
   <div class="slide-frame">
     <section class="slide content-slide">
       <header class="slide-title">
-        <p class="kicker">launch risk</p>
-        <h1>Three risks have named mitigations.</h1>
+        <h1>Launch risks have mitigations.</h1>
       </header>
-      <div class="risk-grid" aria-label="Risks paired with mitigations">
-        <div class="risk-list">
-          <div class="column-label">risk</div>
-          <div class="risk-row"><h2>Support spike</h2><span>high probability</span></div>
-          <div class="risk-row"><h2>Latency regression</h2><span>medium probability</span></div>
-          <div class="risk-row"><h2>Partner readiness</h2><span>medium probability</span></div>
-        </div>
-        <div class="mitigation-list">
-          <div class="column-label">mitigation</div>
-          <div class="mitigation-row"><h2>Dedicated launch queue</h2><span>owner assigned</span></div>
-          <div class="mitigation-row"><h2>Rollback threshold</h2><span>metric live</span></div>
-          <div class="mitigation-row"><h2>Readiness checklist</h2><span>two gaps open</span></div>
-        </div>
+      <div class="risk-map" aria-label="Three launch risks connected to mitigations through launch control">
+        <svg viewBox="0 0 1152 510" aria-hidden="true">
+          <path d="M276 78 C408 78 430 192 492 248" fill="none" stroke="#d75f46" stroke-width="6" stroke-linecap="round"></path>
+          <path d="M276 248 C380 248 428 248 492 248" fill="none" stroke="#d75f46" stroke-width="6" stroke-linecap="round"></path>
+          <path d="M276 408 C406 408 432 314 492 248" fill="none" stroke="#d75f46" stroke-width="6" stroke-linecap="round"></path>
+          <path d="M660 248 C724 190 764 78 876 78" fill="none" stroke="#4f8061" stroke-width="6" stroke-linecap="round"></path>
+          <path d="M660 248 C742 248 792 248 876 248" fill="none" stroke="#4f8061" stroke-width="6" stroke-linecap="round"></path>
+          <path d="M660 248 C724 314 760 408 876 408" fill="none" stroke="#4f8061" stroke-width="6" stroke-linecap="round"></path>
+        </svg>
+        <div class="risk-node one"><div class="node-dot"></div><div><h2>Support spike</h2><span>high probability</span></div></div>
+        <div class="risk-node two"><div class="node-dot"></div><div><h2>Latency regression</h2><span>medium probability</span></div></div>
+        <div class="risk-node three"><div class="node-dot"></div><div><h2>Partner readiness</h2><span>medium probability</span></div></div>
+        <div class="launch-control">Launch<br>control</div>
+        <div class="mitigation-node one"><div class="node-dot"></div><div><h2>Launch queue</h2><span>owner assigned</span></div></div>
+        <div class="mitigation-node two"><div class="node-dot"></div><div><h2>Rollback threshold</h2><span>metric live</span></div></div>
+        <div class="mitigation-node three"><div class="node-dot"></div><div><h2>Readiness checklist</h2><span>two gaps open</span></div></div>
       </div>
     </section>
   </div>

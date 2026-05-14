@@ -6,53 +6,28 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="../shared.css">
 <style>
-.transition-body {
-  display: grid;
-  grid-template-columns: 1fr 90px 1fr;
-  gap: 28px;
-  align-items: stretch;
+.transition-visual {
+  position: relative;
+  height: 510px;
 }
 
-.state {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 32px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 28px;
+.transition-visual svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.state.target {
-  background: var(--amber);
+.transition-label {
+  font-size: 26px;
+  font-weight: 850;
+  fill: var(--ink);
 }
 
-.state h2 {
-  font-size: 42px;
-  line-height: 1;
-}
-
-.flow-stack {
-  display: grid;
-  gap: 16px;
-  align-content: center;
-}
-
-.flow-item {
-  min-height: 58px;
-  border: 2px solid var(--ink);
-  background: var(--bg);
-  display: grid;
-  align-items: center;
-  padding: 0 18px;
-  font-size: 22px;
-  font-weight: 780;
-}
-
-.transition-arrow {
-  display: grid;
-  place-items: center;
-  font-size: 58px;
-  font-weight: 900;
+.transition-sub {
+  font-size: 13px;
+  font-weight: 850;
+  fill: var(--muted);
+  text-transform: uppercase;
 }
 </style>
 </head>
@@ -61,27 +36,45 @@
   <div class="slide-frame">
     <section class="slide content-slide">
       <header class="slide-title">
-        <p class="kicker">transition</p>
-        <h1>Move support from manual triage to guided recovery.</h1>
+        <h1>Manual triage to guided recovery.</h1>
       </header>
-      <div class="transition-body" aria-label="Current support flow transitioning to guided recovery flow">
-        <div class="state">
-          <h2>Current</h2>
-          <div class="flow-stack">
-            <div class="flow-item">Ticket</div>
-            <div class="flow-item">Search logs</div>
-            <div class="flow-item">Manual replay</div>
-          </div>
-        </div>
-        <div class="transition-arrow">&rarr;</div>
-        <div class="state target">
-          <h2>Target</h2>
-          <div class="flow-stack">
-            <div class="flow-item">Alert</div>
-            <div class="flow-item">Trace</div>
-            <div class="flow-item">Guided retry</div>
-          </div>
-        </div>
+      <div class="transition-visual" aria-label="Current manual support paths converge into guided recovery">
+        <svg viewBox="0 0 1152 510" role="img">
+          <defs>
+            <marker id="transition-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#111418"></path>
+            </marker>
+          </defs>
+          <path d="M118 132 C268 100 312 188 438 232" fill="none" stroke="#d75f46" stroke-width="7" stroke-linecap="round"></path>
+          <path d="M116 252 C250 246 314 246 438 252" fill="none" stroke="#d75f46" stroke-width="7" stroke-linecap="round"></path>
+          <path d="M118 372 C266 402 320 320 438 272" fill="none" stroke="#d75f46" stroke-width="7" stroke-linecap="round"></path>
+          <path d="M548 252 C686 208 786 200 934 158" fill="none" stroke="#111418" stroke-width="6" stroke-linecap="round" marker-end="url(#transition-arrow)"></path>
+          <path d="M548 252 C684 256 796 282 934 286" fill="none" stroke="#111418" stroke-width="6" stroke-linecap="round" marker-end="url(#transition-arrow)"></path>
+          <path d="M548 252 C688 312 790 350 934 390" fill="none" stroke="#111418" stroke-width="6" stroke-linecap="round" marker-end="url(#transition-arrow)"></path>
+
+          <circle cx="118" cy="132" r="58" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+          <circle cx="116" cy="252" r="58" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+          <circle cx="118" cy="372" r="58" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+          <circle cx="492" cy="252" r="82" fill="#e9b949" stroke="#111418" stroke-width="3"></circle>
+          <circle cx="976" cy="158" r="58" fill="#d9e5d6" stroke="#111418" stroke-width="3"></circle>
+          <circle cx="976" cy="286" r="58" fill="#d9e5d6" stroke="#111418" stroke-width="3"></circle>
+          <circle cx="976" cy="390" r="58" fill="#d9e5d6" stroke="#111418" stroke-width="3"></circle>
+
+          <text x="118" y="124" text-anchor="middle" class="transition-label">Ticket</text>
+          <text x="118" y="154" text-anchor="middle" class="transition-sub">manual</text>
+          <text x="116" y="244" text-anchor="middle" class="transition-label">Logs</text>
+          <text x="116" y="274" text-anchor="middle" class="transition-sub">search</text>
+          <text x="118" y="364" text-anchor="middle" class="transition-label">Replay</text>
+          <text x="118" y="394" text-anchor="middle" class="transition-sub">manual</text>
+          <text x="492" y="244" text-anchor="middle" class="transition-label">Guide</text>
+          <text x="492" y="276" text-anchor="middle" class="transition-sub">shared path</text>
+          <text x="976" y="150" text-anchor="middle" class="transition-label">Trace</text>
+          <text x="976" y="180" text-anchor="middle" class="transition-sub">ready</text>
+          <text x="976" y="278" text-anchor="middle" class="transition-label">Retry</text>
+          <text x="976" y="308" text-anchor="middle" class="transition-sub">safe</text>
+          <text x="976" y="382" text-anchor="middle" class="transition-label">Close</text>
+          <text x="976" y="412" text-anchor="middle" class="transition-sub">owned</text>
+        </svg>
       </div>
     </section>
   </div>

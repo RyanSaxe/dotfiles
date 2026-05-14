@@ -7,87 +7,88 @@
 <link rel="stylesheet" href="../shared.css">
 <style>
 .system-map {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 26px;
-  align-items: center;
-}
-
-.system-column {
-  display: grid;
-  gap: 18px;
-}
-
-.system-node {
-  min-height: 92px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  display: grid;
-  align-content: center;
-  padding: 0 24px;
-}
-
-.system-node h2 {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.system-node span {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 760;
-  text-transform: uppercase;
-}
-
-.system-node.focus {
-  background: var(--amber);
-}
-
-.bus {
-  height: 430px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 20px;
+  height: 510px;
   position: relative;
 }
 
-.bus:before,
-.bus:after {
-  content: "";
+.system-map svg {
   position: absolute;
-  top: 50%;
-  width: 52px;
-  height: 4px;
-  background: var(--ink);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.bus:before { left: -52px; }
-.bus:after { right: -52px; }
-
-.bus-ring {
-  width: 180px;
-  height: 180px;
-  border: 12px solid var(--blue);
-  border-radius: 50%;
+.arch-node,
+.stream-node {
+  position: absolute;
+  z-index: 1;
+  border: 3px solid var(--ink);
+  background: var(--bg);
   display: grid;
   place-items: center;
-  color: var(--ink);
-  font-size: 26px;
-  font-weight: 850;
   text-align: center;
 }
 
-.contract {
-  border-top: 3px solid var(--ink);
-  padding-top: 16px;
+.arch-node {
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+}
+
+.arch-node.focus {
+  width: 152px;
+  height: 152px;
+  background: var(--amber);
+}
+
+.stream-node {
+  left: 432px;
+  top: 205px;
+  width: 286px;
+  height: 92px;
+  border-radius: 50%;
+  background: #d6e4e8;
+}
+
+.checkout { left: 50px; top: 72px; }
+.billing { left: 50px; top: 190px; }
+.support { left: 50px; top: 316px; }
+.risk-model { right: 36px; top: 40px; }
+.crm { right: 44px; top: 184px; }
+.warehouse { right: 44px; top: 324px; }
+
+.node-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.node-copy strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.node-copy span {
   color: var(--muted);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.stream-node strong {
+  font-size: 28px;
+}
+
+.focus-callout {
+  position: absolute;
+  z-index: 2;
+  right: 110px;
+  top: 36px;
+  width: 150px;
+  border-top: 3px solid var(--ink);
+  padding-top: 8px;
+  font-size: 14px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 </style>
@@ -97,24 +98,31 @@
   <div class="slide-frame">
     <section class="slide content-slide">
       <header class="slide-title">
-        <p class="kicker">system overview</p>
-        <h1>Customer events move through one governed pipeline.</h1>
+        <h1>Event pipeline overview.</h1>
       </header>
-      <div class="system-map" aria-label="Architecture overview from producers through event bus to consumers">
-        <div class="system-column">
-          <div class="system-node"><h2>Checkout</h2><span>producer</span></div>
-          <div class="system-node"><h2>Billing</h2><span>producer</span></div>
-          <div class="system-node"><h2>Support</h2><span>producer</span></div>
-        </div>
-        <div class="bus">
-          <div class="bus-ring">Event bus</div>
-          <div class="contract">schema contract enforced here</div>
-        </div>
-        <div class="system-column">
-          <div class="system-node focus"><h2>Risk model</h2><span>consumer</span></div>
-          <div class="system-node"><h2>Lifecycle CRM</h2><span>consumer</span></div>
-          <div class="system-node"><h2>Warehouse</h2><span>consumer</span></div>
-        </div>
+      <div class="system-map" aria-label="Architecture overview from producers through event stream to highlighted risk model">
+        <svg viewBox="0 0 1152 510" aria-hidden="true">
+          <defs>
+            <marker id="system-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#111418"></path>
+            </marker>
+          </defs>
+          <path d="M186 140 C302 154 350 210 428 248" fill="none" stroke="#111418" stroke-width="4" marker-end="url(#system-arrow)"></path>
+          <path d="M186 258 C306 258 352 252 428 252" fill="none" stroke="#111418" stroke-width="4" marker-end="url(#system-arrow)"></path>
+          <path d="M186 384 C302 358 352 306 428 256" fill="none" stroke="#111418" stroke-width="4" marker-end="url(#system-arrow)"></path>
+          <path d="M718 252 C812 160 858 122 962 116" fill="none" stroke="#111418" stroke-width="4" marker-end="url(#system-arrow)"></path>
+          <path d="M718 252 C800 252 870 252 960 252" fill="none" stroke="#111418" stroke-width="4" marker-end="url(#system-arrow)"></path>
+          <path d="M718 252 C812 326 858 384 960 392" fill="none" stroke="#111418" stroke-width="4" marker-end="url(#system-arrow)"></path>
+        </svg>
+
+        <div class="arch-node checkout"><div class="node-copy"><strong>Checkout</strong><span>producer</span></div></div>
+        <div class="arch-node billing"><div class="node-copy"><strong>Billing</strong><span>producer</span></div></div>
+        <div class="arch-node support"><div class="node-copy"><strong>Support</strong><span>producer</span></div></div>
+        <div class="stream-node"><div class="node-copy"><strong>Event stream</strong></div></div>
+        <div class="focus-callout">next deep dive</div>
+        <div class="arch-node focus risk-model"><div class="node-copy"><strong>Risk model</strong><span>focus</span></div></div>
+        <div class="arch-node crm"><div class="node-copy"><strong>CRM</strong><span>consumer</span></div></div>
+        <div class="arch-node warehouse"><div class="node-copy"><strong>Warehouse</strong><span>consumer</span></div></div>
       </div>
     </section>
   </div>

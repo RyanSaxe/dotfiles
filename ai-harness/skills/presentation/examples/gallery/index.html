@@ -10,14 +10,13 @@
 <main class="gallery-page">
   <header class="gallery-head">
     <div>
-      <p class="kicker">presentation skill gallery</p>
       <h1>Slide gallery.</h1>
     </div>
   </header>
 
   <section class="gallery-grid" aria-label="Slide examples">
-    <a class="specimen-link" href="titles/operator-console-title.html">
-      <div class="preview"><iframe title="Title slide preview" src="titles/operator-console-title.html"></iframe></div>
+    <a class="specimen-link" href="titles/ml-system-upgrade.html">
+      <div class="preview"><iframe title="Title slide preview" src="titles/ml-system-upgrade.html"></iframe></div>
       <div class="specimen-meta"><span>01</span><span>title</span></div>
     </a>
     <a class="specimen-link" href="agendas/decision-path-agenda.html">
@@ -32,35 +31,42 @@
       <div class="preview"><iframe title="Roadmap slide preview" src="roadmaps/pilot-roadmap.html"></iframe></div>
       <div class="specimen-meta"><span>04</span><span>roadmap</span></div>
     </a>
-    <a class="specimen-link" href="live-demos/payment-retry-live-demo.html">
-      <div class="preview"><iframe title="Live demo slide preview" src="live-demos/payment-retry-live-demo.html"></iframe></div>
-      <div class="specimen-meta"><span>05</span><span>live demo</span></div>
-    </a>
     <a class="specimen-link" href="spotlights/approval-flow-spotlight.html">
       <div class="preview"><iframe title="Spotlight slide preview" src="spotlights/approval-flow-spotlight.html"></iframe></div>
-      <div class="specimen-meta"><span>06</span><span>spotlight</span></div>
+      <div class="specimen-meta"><span>05</span><span>spotlight</span></div>
     </a>
     <a class="specimen-link" href="transitions/manual-to-guided-transition.html">
       <div class="preview"><iframe title="Transition slide preview" src="transitions/manual-to-guided-transition.html"></iframe></div>
-      <div class="specimen-meta"><span>07</span><span>transition</span></div>
+      <div class="specimen-meta"><span>06</span><span>transition</span></div>
     </a>
     <a class="specimen-link" href="statuses/company-targets-status.html">
       <div class="preview"><iframe title="Status slide preview" src="statuses/company-targets-status.html"></iframe></div>
-      <div class="specimen-meta"><span>08</span><span>status</span></div>
+      <div class="specimen-meta"><span>07</span><span>status</span></div>
     </a>
     <a class="specimen-link" href="risks/launch-risk-mitigation.html">
       <div class="preview"><iframe title="Risk slide preview" src="risks/launch-risk-mitigation.html"></iframe></div>
-      <div class="specimen-meta"><span>09</span><span>risk</span></div>
+      <div class="specimen-meta"><span>08</span><span>risk</span></div>
     </a>
-    <a class="specimen-link" href="metrics/conversion-kpi-deep-dive.html">
-      <div class="preview"><iframe title="Metric slide preview" src="metrics/conversion-kpi-deep-dive.html"></iframe></div>
-      <div class="specimen-meta"><span>10</span><span>metric</span></div>
+    <a class="specimen-link" href="metrics/monthly-kpi-summary.html">
+      <div class="preview"><iframe title="Monthly KPI slide preview" src="metrics/monthly-kpi-summary.html"></iframe></div>
+      <div class="specimen-meta"><span>09</span><span>KPI summary</span></div>
     </a>
     <a class="specimen-link" href="architecture/event-pipeline-overview.html">
       <div class="preview"><iframe title="Architecture slide preview" src="architecture/event-pipeline-overview.html"></iframe></div>
-      <div class="specimen-meta"><span>11</span><span>architecture</span></div>
+      <div class="specimen-meta"><span>10</span><span>architecture</span></div>
     </a>
   </section>
 </main>
+<script>
+function fitPreviews() {
+  document.querySelectorAll(".preview").forEach((preview) => {
+    const scale = preview.clientWidth / 1280;
+    preview.style.setProperty("--preview-scale", scale.toString());
+  });
+}
+
+window.addEventListener("resize", fitPreviews);
+fitPreviews();
+</script>
 </body>
 </html>

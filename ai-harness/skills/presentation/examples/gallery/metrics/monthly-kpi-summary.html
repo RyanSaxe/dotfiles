@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Metric Slide - Monthly KPI Summary</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.kpi-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+.kpi-tile {
+  border-top: 4px solid var(--ink);
+  padding-top: 22px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 18px;
+  align-content: start;
+}
+
+.kpi-name {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.kpi-value {
+  display: grid;
+  gap: 8px;
+}
+
+.kpi-value strong {
+  font-size: 54px;
+  line-height: 0.92;
+}
+
+.kpi-value span {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.comparison {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  margin-top: 24px;
+}
+
+.bar-row {
+  display: grid;
+  gap: 6px;
+}
+
+.bar-label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.bar-track {
+  height: 16px;
+  border: 2px solid var(--ink);
+  background: var(--surface-2);
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--amber);
+}
+
+.bar-fill.current {
+  background: var(--green);
+}
+
+.bar-fill.red {
+  background: var(--red);
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <h1>Monthly KPI summary.</h1>
+      </header>
+      <div class="kpi-board" aria-label="Monthly KPI summary comparing current values to last month">
+        <div class="kpi-tile">
+          <div class="kpi-name">Revenue</div>
+          <div class="kpi-value"><strong>$4.8M</strong><span>last month $4.5M</span></div>
+          <div class="comparison">
+            <div class="bar-row"><div class="bar-label"><span>last</span><span>94</span></div><div class="bar-track"><div class="bar-fill" style="width: 94%;"></div></div></div>
+            <div class="bar-row"><div class="bar-label"><span>now</span><span>100</span></div><div class="bar-track"><div class="bar-fill current" style="width: 100%;"></div></div></div>
+          </div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-name">Conversion</div>
+          <div class="kpi-value"><strong>7.4%</strong><span>last month 6.9%</span></div>
+          <div class="comparison">
+            <div class="bar-row"><div class="bar-label"><span>last</span><span>93</span></div><div class="bar-track"><div class="bar-fill" style="width: 93%;"></div></div></div>
+            <div class="bar-row"><div class="bar-label"><span>now</span><span>100</span></div><div class="bar-track"><div class="bar-fill current" style="width: 100%;"></div></div></div>
+          </div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-name">Activation</div>
+          <div class="kpi-value"><strong>62%</strong><span>last month 58%</span></div>
+          <div class="comparison">
+            <div class="bar-row"><div class="bar-label"><span>last</span><span>94</span></div><div class="bar-track"><div class="bar-fill" style="width: 94%;"></div></div></div>
+            <div class="bar-row"><div class="bar-label"><span>now</span><span>100</span></div><div class="bar-track"><div class="bar-fill current" style="width: 100%;"></div></div></div>
+          </div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-name">Retention</div>
+          <div class="kpi-value"><strong>91%</strong><span>last month 93%</span></div>
+          <div class="comparison">
+            <div class="bar-row"><div class="bar-label"><span>last</span><span>100</span></div><div class="bar-track"><div class="bar-fill" style="width: 100%;"></div></div></div>
+            <div class="bar-row"><div class="bar-label"><span>now</span><span>98</span></div><div class="bar-track"><div class="bar-fill red" style="width: 98%;"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

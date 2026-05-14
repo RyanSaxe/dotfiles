@@ -19,6 +19,18 @@ presentation/
 |   |-- variants.md
 |   `-- layouts.md
 `-- examples/
+    |-- gallery/
+    |   |-- agendas/
+    |   |-- architecture/
+    |   |-- metrics/
+    |   |-- risks/
+    |   |-- roadmaps/
+    |   |-- separators/
+    |   |-- spotlights/
+    |   |-- statuses/
+    |   |-- titles/
+    |   |-- transitions/
+    |   `-- index.html
     |-- design-gallery/
     |   `-- index.html
     |-- image-led-narrative/
@@ -29,7 +41,7 @@ presentation/
         `-- cache-boundary-explainer.html
 ```
 
-The examples are visual calibration artifacts, not templates. Open `examples/design-gallery/index.html` before drafting when you need to re-center on variety, hierarchy, and range.
+The examples are visual calibration artifacts, not templates. Open `examples/gallery/index.html` before drafting when you need to re-center on variety, hierarchy, and range.
 
 ## Critical Interview
 
@@ -57,7 +69,22 @@ End discovery only when you can describe the deck's goal, audience, constraints,
 3. Copy `templates/theme.css` into the `<style>` slot in the HTML, then add deck-specific CSS as needed.
 4. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
 5. Draft the deck around slide jobs and visual hierarchy, not around a fixed component list.
-6. Use `references/layouts.md` and `examples/design-gallery/index.html` to broaden possibilities when a slide starts looking like a generic card grid.
+6. Use `references/layouts.md` and `examples/gallery/index.html` to broaden possibilities when a slide starts looking like a generic card grid.
+
+## Deck Structure
+
+Default to this deck arc unless the user's context clearly needs a different shape:
+
+```text
+title -> agenda -> separator for agenda item 1 -> content -> separator for agenda item 2 -> content -> ... -> final slide
+```
+
+- Keep agendas to 5 items or fewer.
+- Use a separator before each major agenda section. Include a short section label and, when helpful, a minimal subtitle.
+- Choose the final slide intentionally: summary, conclusion, decision, Q&A, or next steps.
+- Content slides should generally place the title across the top with the content below. Title, agenda, separator, summary, conclusion, and Q&A slides may use left-weighted or centered layouts.
+- Content-slide titles should aim to fit on one line at a 1200px-wide viewport. Shorten the claim before shrinking type.
+- Omit kickers/eyebrow labels by default. Add one only when it gives necessary orientation that the title cannot carry.
 
 ## Quality Bar
 
@@ -66,29 +93,48 @@ Every deck should be scan-ready, even if the audience is technical.
 - Prefer less slide text and stronger hierarchy.
 - Give each slide one dominant job.
 - Use images, diagrams, charts, tables, code, icons, figures, and spatial composition when they explain faster than paragraphs.
+- Use proven libraries, renderers, syntax highlighters, charting tools, and icon sets when they materially improve the slide. Do not hand-roll complex domain rendering when a stable tool can do it better.
 - Avoid defaulting to three cards, repeated panels, or generic process arrows.
 - Keep a consistent visual system inside one deck, but let different decks look genuinely different.
 - Make section breaks feel like transitions, not content slides.
 - Use appendix/detail slides for proof that would crowd the main story.
 - If a slide feels crowded, split it or simplify it before shrinking type.
+- Unless the user provides a brand system, start from muted warm white backgrounds, black primary text, and restrained accent colors for highlights, status, and emphasis.
+- Slides should look like real slides. Do not add explanatory copy about why a layout works.
 
-## Self-Review
+## Visual QA Playbook
 
-Before showing the user, run screenshots and critique the deck yourself:
+Before showing the user, render the deck in a browser and critique the screenshots yourself. Use Playwright when available; use the screenshot helper only as a fallback:
 
 ```sh
 uv run --script ~/.claude/skills/skill-builder/tools/screenshot.py /tmp/<deck-slug>/<deck-slug>.html
 ```
 
-Review 16:9, wide, and portrait renders. Fix:
+Use a fixed slide artboard and scale it from the center. For Reveal decks, keep `width: 1280`, `height: 800`, `margin: 0`, and `center: false`; for custom galleries or single-slide review pages, wrap the 1280x800 slide in a centered scale-to-fit frame.
+
+Check at least these Playwright viewports before calling a deck ready:
+
+- `1440x900`
+- `1280x800`
+- `1200x800`
+- `1024x768`
+- `900x600`
+- `768x1024`
+
+For every review viewport, verify:
 
 - clipped or overlapping text
+- unwanted page scroll on normal desktop/tablet review sizes
+- slide artboard centered in the viewport
+- slide content centered inside the artboard when the layout calls for it
 - long titles
 - weak visual hierarchy
 - dense blocks that are hard to scan
 - repeated layouts that make the deck feel samey
 - diagrams, charts, or images with unclear emphasis
 - footer, metadata, or slide-count mistakes when the deck uses repeated chrome
+
+When a screenshot fails, fix the layout first: shorten text, simplify the visual, split the slide, or adjust the artboard scaling. Do not solve crowded slides by making all text smaller.
 
 Then show the user the deck and ask for critique. When feedback is broad, first propose a slide-level revision plan; when feedback is specific, implement and re-render.
 
@@ -102,7 +148,8 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 
 ## References
 
-- `examples/design-gallery/index.html` - fast visual scan of slide possibilities.
+- `examples/gallery/index.html` - fast visual scan of slide possibilities.
+- `examples/design-gallery/index.html` - redirect kept for older references.
 - `examples/` - complete fictional decks with different visual systems.
 - `references/layouts.md` - compact guidance for choosing slide jobs without becoming template-bound.
 - `references/variants.md` - register, chrome, and deck-level identity.

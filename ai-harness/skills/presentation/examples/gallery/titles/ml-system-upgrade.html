@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Title Slide - ML System Upgrade</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.title-slide {
+  grid-template-columns: 0.86fr 1.14fr;
+  gap: 68px;
+  align-items: center;
+}
+
+.title-copy {
+  display: grid;
+  gap: 24px;
+}
+
+.title-copy h1 {
+  max-width: 8ch;
+  font-size: 104px;
+  line-height: 0.94;
+  font-weight: 880;
+}
+
+.title-copy p {
+  max-width: 28ch;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1.22;
+  font-weight: 620;
+}
+
+.ml-visual {
+  height: 500px;
+  position: relative;
+}
+
+.ml-visual svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.node-label {
+  font-size: 18px;
+  font-weight: 850;
+  fill: var(--ink);
+}
+
+.node-sub {
+  font-size: 12px;
+  font-weight: 800;
+  fill: var(--muted);
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide title-slide">
+      <div class="title-copy">
+        <h1>ML System Upgrade.</h1>
+        <p>Move the model behind a measurable release gate.</p>
+      </div>
+      <div class="ml-visual" aria-label="ML system upgrade flow">
+        <svg viewBox="0 0 620 500" role="img">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#111418"></path>
+            </marker>
+          </defs>
+          <path d="M72 110 C160 88 230 90 318 138 C402 184 462 184 550 156" fill="none" stroke="#d7d2c8" stroke-width="28" stroke-linecap="round"></path>
+          <path d="M72 344 C164 310 236 314 314 356 C402 404 486 398 550 356" fill="none" stroke="#d7d2c8" stroke-width="28" stroke-linecap="round"></path>
+          <path d="M108 180 C214 178 282 216 348 250 C416 286 480 286 548 264" fill="none" stroke="#111418" stroke-width="5" marker-end="url(#arrow)"></path>
+          <path d="M108 326 C212 310 292 316 366 330 C442 344 496 334 548 306" fill="none" stroke="#2f6f89" stroke-width="5" marker-end="url(#arrow)"></path>
+
+          <circle cx="94" cy="182" r="52" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+          <text x="94" y="178" text-anchor="middle" class="node-label">v1</text>
+          <text x="94" y="202" text-anchor="middle" class="node-sub">current</text>
+
+          <rect x="265" y="190" width="120" height="120" rx="60" fill="#e9b949" stroke="#111418" stroke-width="3"></rect>
+          <text x="325" y="246" text-anchor="middle" class="node-label">Eval</text>
+          <text x="325" y="270" text-anchor="middle" class="node-sub">gate</text>
+
+          <circle cx="540" cy="304" r="64" fill="#fffdf8" stroke="#111418" stroke-width="3"></circle>
+          <text x="540" y="300" text-anchor="middle" class="node-label">v2</text>
+          <text x="540" y="324" text-anchor="middle" class="node-sub">target</text>
+
+          <g transform="translate(230 52)">
+            <rect width="190" height="54" fill="#fffdf8" stroke="#111418" stroke-width="2"></rect>
+            <text x="18" y="34" class="node-label">Feature store</text>
+          </g>
+          <g transform="translate(224 392)">
+            <rect width="206" height="54" fill="#fffdf8" stroke="#111418" stroke-width="2"></rect>
+            <text x="18" y="34" class="node-label">Shadow traffic</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

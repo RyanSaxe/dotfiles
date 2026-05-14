@@ -12,7 +12,7 @@
   --red: #d75f46;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --preview-scale: 0.344;
+  --preview-scale: 0.435;
 }
 
 * { box-sizing: border-box; }
@@ -29,7 +29,9 @@ body {
 a { color: var(--blue); }
 
 .stage {
-  min-height: 100svh;
+  width: 100%;
+  height: 100svh;
+  min-height: 420px;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -37,13 +39,16 @@ a { color: var(--blue); }
 }
 
 .slide-frame {
+  position: relative;
   width: calc(1280px * var(--slide-scale, 1));
   height: calc(800px * var(--slide-scale, 1));
-  display: grid;
-  place-items: center;
+  overflow: visible;
 }
 
 .slide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 1280px;
   height: 800px;
   padding: 64px;
@@ -51,8 +56,7 @@ a { color: var(--blue); }
   background: var(--bg);
   color: var(--ink);
   display: grid;
-  position: relative;
-  transform: scale(var(--slide-scale, 1));
+  transform: translate(-50%, -50%) scale(var(--slide-scale, 1));
   transform-origin: center;
 }
 
@@ -80,7 +84,7 @@ a { color: var(--blue); }
 
 .content-slide {
   grid-template-rows: auto 1fr;
-  gap: 46px;
+  gap: 36px;
 }
 
 .slide-title {
@@ -89,8 +93,8 @@ a { color: var(--blue); }
 }
 
 .slide-title h1 {
-  max-width: 18ch;
-  font-size: 58px;
+  max-width: 100%;
+  font-size: 52px;
   line-height: 1;
   font-weight: 850;
 }
@@ -127,7 +131,7 @@ a { color: var(--blue); }
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 28px;
   padding-top: 34px;
 }
@@ -167,10 +171,6 @@ a { color: var(--blue); }
 }
 
 @media (max-width: 980px) {
-  :root {
-    --preview-scale: 0.64;
-  }
-
   .gallery-grid {
     grid-template-columns: 1fr;
   }
