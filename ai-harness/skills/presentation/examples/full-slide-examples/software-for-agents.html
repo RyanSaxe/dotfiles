@@ -1685,80 +1685,235 @@ body,
 
 .taste-transfer {
   display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  gap: 46px;
-  align-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 1fr);
+  gap: 26px 30px;
+  align-items: stretch;
+  box-sizing: border-box;
+  padding-right: 132px;
+  padding-bottom: 34px;
 }
 
-.reference-signals {
-  height: 420px;
-  display: grid;
-  align-content: center;
-  gap: 30px;
-}
-
-.signal-row {
-  display: grid;
-  grid-template-columns: 134px 1fr;
-  gap: 20px;
-  align-items: center;
-}
-
-.signal-row strong {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.signal-mark {
-  height: 54px;
-  border-left: 7px solid var(--ink);
-  border-bottom: 3px solid var(--ink);
-}
-
-.signal-row:nth-child(2) .signal-mark {
-  border-left-color: var(--blue);
-}
-
-.signal-row:nth-child(3) .signal-mark {
-  border-left-color: var(--amber);
-}
-
-.new-output {
+.taste-example {
   position: relative;
-  height: 430px;
+  min-height: 252px;
   border: 3px solid var(--ink);
   background: var(--surface);
-  padding: 34px;
+  padding: 22px;
+  overflow: hidden;
+  box-shadow: 11px 11px 0 var(--surface-2);
+}
+
+.taste-example .label {
+  position: absolute;
+  left: 22px;
+  top: 18px;
+}
+
+.taste-example h3 {
+  font-size: 29px;
+  line-height: 0.98;
+  font-weight: 880;
+}
+
+.taste-example p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 680;
+}
+
+.taste-claim {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  box-shadow: 16px 16px 0 var(--surface-2);
+  grid-template-rows: 1fr auto;
+  align-content: stretch;
 }
 
-.new-output h3 {
-  font-size: 46px;
-  line-height: 0.95;
-  font-weight: 890;
+.taste-claim h3 {
+  align-self: center;
+  max-width: 9ch;
+  font-size: 48px;
+  line-height: 0.9;
 }
 
-.new-output::before,
-.new-output::after {
+.taste-claim::after {
   content: "";
   position: absolute;
+  right: 22px;
+  top: 24px;
+  width: 94px;
   height: 8px;
+  background: var(--blue);
+}
+
+.taste-claim .mini-rule {
+  width: 72%;
+  height: 10px;
   background: var(--amber);
 }
 
-.new-output::before {
-  left: 34px;
-  right: 42%;
-  bottom: 42px;
+.taste-evidence {
+  display: grid;
+  grid-template-columns: 0.82fr 1.18fr;
+  gap: 20px;
+  align-items: end;
 }
 
-.new-output::after {
-  right: 34px;
-  width: 96px;
-  top: 42px;
-  background: var(--blue);
+.mini-chart {
+  display: grid;
+  align-items: end;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  height: 150px;
+}
+
+.mini-chart span {
+  display: block;
+  border: 3px solid var(--ink);
+  background: var(--surface-2);
+}
+
+.mini-chart span:nth-child(1) {
+  height: 46%;
+}
+
+.mini-chart span:nth-child(2) {
+  height: 72%;
+  background: #d6e4e8;
+}
+
+.mini-chart span:nth-child(3) {
+  height: 54%;
+}
+
+.mini-chart span:nth-child(4) {
+  height: 92%;
+  background: #fff6d9;
+}
+
+.evidence-copy {
+  display: grid;
+  gap: 10px;
+  align-content: end;
+}
+
+.taste-system {
+  display: grid;
+  grid-template-columns: 1fr 0.9fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.mini-network {
+  position: relative;
+  height: 166px;
+}
+
+.mini-node {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.mini-node.a {
+  left: 0;
+  top: 44px;
+  background: #fff6d9;
+}
+
+.mini-node.b {
+  left: 132px;
+  top: 0;
+  background: #d6e4e8;
+}
+
+.mini-node.c {
+  left: 136px;
+  bottom: 0;
+  background: #d9e5d6;
+}
+
+.mini-network::before,
+.mini-network::after {
+  content: "";
+  position: absolute;
+  left: 70px;
+  width: 104px;
+  height: 3px;
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+.mini-network::before {
+  top: 70px;
+  transform: rotate(-22deg);
+}
+
+.mini-network::after {
+  top: 95px;
+  transform: rotate(22deg);
+}
+
+.system-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.taste-critique {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.mini-review {
+  position: relative;
+  height: 158px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+  align-content: center;
+}
+
+.mini-review span {
+  display: block;
+  height: 14px;
+  border: 2px solid var(--ink);
+}
+
+.mini-review span:nth-child(1) {
+  width: 66%;
+  background: var(--amber);
+}
+
+.mini-review span:nth-child(2) {
+  width: 88%;
+}
+
+.mini-review span:nth-child(3) {
+  width: 44%;
+}
+
+.mini-review::after {
+  content: "QA";
+  position: absolute;
+  right: -18px;
+  top: -18px;
+  border: 3px solid var(--ink);
+  background: #d9e5d6;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 880;
+}
+
+.critique-copy {
+  display: grid;
+  gap: 10px;
 }
 
 .local-output {
@@ -2179,20 +2334,39 @@ body,
       <header class="slide-title">
         <h2>Examples calibrate taste without freezing it</h2>
       </header>
-      <div class="taste-transfer" aria-label="Reference examples influencing a new output">
-        <div class="reference-signals">
-          <div class="signal-row"><strong>Hierarchy</strong><div class="signal-mark"></div></div>
-          <div class="signal-row"><strong>Spacing</strong><div class="signal-mark"></div></div>
-          <div class="signal-row"><strong>Judgment</strong><div class="signal-mark"></div></div>
+      <div class="taste-transfer" aria-label="Four orthogonal example slides calibrating taste">
+        <div class="taste-example taste-claim">
+          <span class="label">claim example</span>
+          <h3>One idea first.</h3>
+          <div class="mini-rule"></div>
         </div>
-        <div class="new-output">
-          <h3>A new deck, not a copied slide.</h3>
-          <div class="deck-lines">
-            <div class="deck-line accent"></div>
-            <div class="deck-line"></div>
-            <div class="deck-line"></div>
+        <div class="taste-example taste-evidence">
+          <div class="mini-chart" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <div class="evidence-copy">
+            <span class="label">evidence example</span>
+            <h3>Proof gets shaped.</h3>
+            <p>The example teaches hierarchy, not the exact chart.</p>
           </div>
-          <span class="label">calibrated by examples</span>
+        </div>
+        <div class="taste-example taste-system">
+          <div class="mini-network" aria-hidden="true">
+            <div class="mini-node a"></div>
+            <div class="mini-node b"></div>
+            <div class="mini-node c"></div>
+          </div>
+          <div class="system-copy">
+            <span class="label">system example</span>
+            <h3>Relationships matter.</h3>
+            <p>Same visual language, different structure.</p>
+          </div>
+        </div>
+        <div class="taste-example taste-critique">
+          <div class="mini-review" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="critique-copy">
+            <span class="label">review example</span>
+            <h3>Quality is visible.</h3>
+            <p>The pattern calibrates judgment without freezing output.</p>
+          </div>
         </div>
       </div>
     </section>
