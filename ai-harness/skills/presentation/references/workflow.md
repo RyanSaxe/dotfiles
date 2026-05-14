@@ -48,7 +48,9 @@ Default arc:
 title -> agenda -> separator for agenda item 1 -> content -> separator for agenda item 2 -> content -> final slide
 ```
 
-When a deck includes an agenda, each agenda item should usually become a visible section with its own separator slide. Adapt the arc when the user's context demands it, but do not let the agenda promise structure that the slide flow does not deliver.
+When a deck includes an agenda, keep the agenda slide subtitle-free by default. Each agenda item should usually become a visible section with its own separator slide, followed by at least two content slides. Adapt the arc when the user's context demands it, but do not let the agenda promise structure that the slide flow does not deliver.
+
+If a section has only one content slide, treat that as a sign the agenda is probably too granular. Merge thin sections before drafting unless the user explicitly wants a very short or unusual deck.
 
 Content-slide subtitles are optional. Use them when they supply necessary frame or evidence context; otherwise remove them and let the title, visual hierarchy, and section separator carry orientation.
 

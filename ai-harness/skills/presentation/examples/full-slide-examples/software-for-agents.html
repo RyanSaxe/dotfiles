@@ -1308,6 +1308,623 @@ body,
   font-weight: 650;
 }
 
+.agenda-clean {
+  grid-template-columns: 0.84fr 1.16fr;
+}
+
+.agenda-clean .agenda-path {
+  grid-template-rows: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.agenda-clean .agenda-path::before {
+  bottom: 78px;
+}
+
+.agenda-clean .agenda-item {
+  min-height: 132px;
+  align-items: center;
+}
+
+.agenda-clean .agenda-item h2 {
+  font-size: 40px;
+}
+
+.agent-contrast {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.contrast-side {
+  min-height: 420px;
+  display: grid;
+  align-content: center;
+  gap: 22px;
+}
+
+.contrast-side h3 {
+  font-size: 58px;
+  line-height: 0.92;
+  font-weight: 890;
+}
+
+.contrast-side p {
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.context-ribbon {
+  height: 12px;
+  background: var(--ink);
+}
+
+.capability-ribbon {
+  height: 12px;
+  width: 72%;
+  background: var(--amber);
+}
+
+.contrast-divider {
+  height: 2px;
+  background: var(--line);
+}
+
+.exploded-package {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 54px;
+  align-items: center;
+}
+
+.package-assembly {
+  height: 430px;
+  position: relative;
+}
+
+.assembly-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 230px;
+  height: 150px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 33px;
+  line-height: 0.95;
+  font-weight: 890;
+  box-shadow: 14px 14px 0 var(--surface-2);
+}
+
+.assembly-part {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  font-weight: 850;
+}
+
+.assembly-part span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.assembly-part strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.assembly-part.instructions {
+  left: 18px;
+  top: 40px;
+}
+
+.assembly-part.tools {
+  right: 26px;
+  top: 62px;
+}
+
+.assembly-part.examples {
+  left: 34px;
+  bottom: 62px;
+}
+
+.assembly-part.contracts {
+  right: 10px;
+  bottom: 46px;
+}
+
+.assembly-line {
+  position: absolute;
+  height: 3px;
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+.assembly-line.a {
+  left: 152px;
+  top: 112px;
+  width: 170px;
+  transform: rotate(23deg);
+}
+
+.assembly-line.b {
+  right: 148px;
+  top: 130px;
+  width: 160px;
+  transform: rotate(152deg);
+}
+
+.assembly-line.c {
+  left: 154px;
+  bottom: 122px;
+  width: 166px;
+  transform: rotate(-22deg);
+}
+
+.assembly-line.d {
+  right: 134px;
+  bottom: 108px;
+  width: 156px;
+  transform: rotate(-154deg);
+}
+
+.tools-content {
+  display: grid;
+  grid-template-columns: 1.02fr 0.98fr;
+  gap: 46px;
+  align-items: center;
+}
+
+.tools-content .terminal-large {
+  width: 100%;
+}
+
+.tool-points {
+  display: grid;
+  gap: 26px;
+}
+
+.tool-point {
+  border-left: 8px solid var(--ink);
+  padding-left: 22px;
+}
+
+.tool-point:nth-child(2) {
+  border-left-color: var(--blue);
+}
+
+.tool-point:nth-child(3) {
+  border-left-color: var(--green);
+}
+
+.tool-point strong {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.tool-point span {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.interface-wrapper {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.interface-core {
+  border: 3px solid var(--ink);
+  background: #111820;
+  color: #d7f3ed;
+  padding: 30px;
+  font-family: var(--mono);
+  font-size: 22px;
+  line-height: 1.45;
+  font-weight: 700;
+  box-shadow: 16px 16px 0 var(--surface-2);
+}
+
+.interface-core .dim {
+  color: #91aaa6;
+}
+
+.capability-shell {
+  position: relative;
+  min-height: 440px;
+}
+
+.shell-ring {
+  position: absolute;
+  inset: 22px 16px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+}
+
+.shell-ring.two {
+  inset: 94px 96px;
+  border-color: var(--line);
+}
+
+.shell-label {
+  position: absolute;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 870;
+}
+
+.shell-label.a {
+  left: 18px;
+  top: 40px;
+}
+
+.shell-label.b {
+  right: 18px;
+  top: 84px;
+}
+
+.shell-label.c {
+  left: 56px;
+  bottom: 70px;
+}
+
+.shell-label.d {
+  right: 54px;
+  bottom: 48px;
+}
+
+.context-funnel {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.input-streams {
+  height: 430px;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+}
+
+.stream-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.stream-row strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.stream-line {
+  height: 6px;
+  background: var(--ink);
+  transform-origin: right center;
+}
+
+.stream-row:nth-child(1) .stream-line {
+  width: 96%;
+  transform: rotate(7deg);
+}
+
+.stream-row:nth-child(2) .stream-line {
+  width: 86%;
+  background: var(--blue);
+  transform: rotate(3deg);
+}
+
+.stream-row:nth-child(3) .stream-line {
+  width: 100%;
+}
+
+.stream-row:nth-child(4) .stream-line {
+  width: 76%;
+  background: var(--green);
+  transform: rotate(-3deg);
+}
+
+.stream-row:nth-child(5) .stream-line {
+  width: 90%;
+  background: var(--amber);
+  transform: rotate(-7deg);
+}
+
+.compressed-output {
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  height: 430px;
+  padding: 34px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  box-shadow: 16px 16px 0 var(--surface-2);
+}
+
+.compressed-output h3 {
+  font-size: 50px;
+  line-height: 0.94;
+  font-weight: 890;
+}
+
+.deck-lines {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+}
+
+.deck-line {
+  height: 18px;
+  border: 2px solid var(--ink);
+  background: var(--surface-2);
+}
+
+.deck-line.accent {
+  width: 68%;
+  background: var(--amber);
+}
+
+.taste-transfer {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 46px;
+  align-items: center;
+}
+
+.reference-signals {
+  height: 420px;
+  display: grid;
+  align-content: center;
+  gap: 30px;
+}
+
+.signal-row {
+  display: grid;
+  grid-template-columns: 134px 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.signal-row strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.signal-mark {
+  height: 54px;
+  border-left: 7px solid var(--ink);
+  border-bottom: 3px solid var(--ink);
+}
+
+.signal-row:nth-child(2) .signal-mark {
+  border-left-color: var(--blue);
+}
+
+.signal-row:nth-child(3) .signal-mark {
+  border-left-color: var(--amber);
+}
+
+.new-output {
+  position: relative;
+  height: 430px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 34px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  box-shadow: 16px 16px 0 var(--surface-2);
+}
+
+.new-output h3 {
+  font-size: 46px;
+  line-height: 0.95;
+  font-weight: 890;
+}
+
+.new-output::before,
+.new-output::after {
+  content: "";
+  position: absolute;
+  height: 8px;
+  background: var(--amber);
+}
+
+.new-output::before {
+  left: 34px;
+  right: 42%;
+  bottom: 42px;
+}
+
+.new-output::after {
+  right: 34px;
+  width: 96px;
+  top: 42px;
+  background: var(--blue);
+}
+
+.local-output {
+  display: grid;
+  grid-template-columns: 0.86fr 1.14fr;
+  gap: 46px;
+  align-items: center;
+}
+
+.shared-signal {
+  border-left: 8px solid var(--ink);
+  padding-left: 30px;
+  display: grid;
+  gap: 18px;
+}
+
+.shared-signal h3 {
+  font-size: 62px;
+  line-height: 0.92;
+  font-weight: 890;
+}
+
+.shared-signal p {
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.output-spectrum {
+  height: 430px;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  gap: 22px;
+  align-content: center;
+}
+
+.spectrum-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 24px;
+  align-items: center;
+}
+
+.spectrum-row span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.spectrum-row strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.spectrum-line {
+  height: 8px;
+  background: var(--ink);
+}
+
+.spectrum-row:nth-child(2) .spectrum-line {
+  width: 78%;
+  background: var(--blue);
+}
+
+.spectrum-row:nth-child(3) .spectrum-line {
+  width: 66%;
+  background: var(--amber);
+}
+
+.spectrum-row:nth-child(4) .spectrum-line {
+  width: 86%;
+  background: var(--green);
+}
+
+.release-path {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 28px;
+  align-content: center;
+}
+
+.gate-track {
+  position: relative;
+  height: 308px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 54px;
+  align-items: center;
+}
+
+.gate-track::before {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 50%;
+  height: 7px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--ink) 0 32%,
+      var(--amber) 32% 66%,
+      var(--green) 66% 100%
+    );
+}
+
+.release-gate {
+  z-index: 1;
+  width: 220px;
+  height: 220px;
+  justify-self: center;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 34px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.release-gate:nth-child(2) {
+  background: #fff6d9;
+}
+
+.release-gate:nth-child(3) {
+  background: #d9e5d6;
+}
+
+.release-gate strong {
+  font-size: 31px;
+  line-height: 0.95;
+}
+
+.release-gate span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.release-caption {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 54px;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.release-caption span {
+  border-top: 3px solid var(--ink);
+  padding-top: 16px;
+}
+
+.release-caption span:nth-child(2) {
+  border-color: var(--amber);
+  text-align: center;
+}
+
+.release-caption span:nth-child(3) {
+  border-color: var(--green);
+  text-align: right;
+}
+
 .reveal .progress {
   height: 3px;
   color: var(--amber);
@@ -1345,17 +1962,14 @@ body,
       </div>
     </section>
 
-    <section class="agenda-slide">
+    <section class="agenda-slide agenda-clean">
       <div class="agenda-title">
         <h1>Agenda</h1>
-        <p>Five sections. Five transitions. One argument.</p>
       </div>
-      <div class="agenda-path" aria-label="Five part agenda">
-        <div class="agenda-item active"><b>1</b><div><h2>Prompt ceiling</h2><p>Where instruction-only approaches stop compounding.</p></div></div>
-        <div class="agenda-item"><b>2</b><div><h2>Skill anatomy</h2><p>What a capability package can carry.</p></div></div>
-        <div class="agenda-item"><b>3</b><div><h2>Tools</h2><p>How scripts, CLIs, and services become agent-native.</p></div></div>
-        <div class="agenda-item"><b>4</b><div><h2>Presentation skill</h2><p>A self-referential case study in context and QA.</p></div></div>
-        <div class="agenda-item"><b>5</b><div><h2>Operating model</h2><p>How teams share capability without flattening taste.</p></div></div>
+      <div class="agenda-path" aria-label="Three part agenda">
+        <div class="agenda-item active"><b>1</b><div><h2>Prompt Ceiling</h2></div></div>
+        <div class="agenda-item"><b>2</b><div><h2>Capability Package</h2></div></div>
+        <div class="agenda-item"><b>3</b><div><h2>Proof in Practice</h2></div></div>
       </div>
     </section>
 
@@ -1395,11 +2009,29 @@ body,
       </div>
     </section>
 
+    <section class="content-slide">
+      <header class="slide-title">
+        <h2>Agents are not skills</h2>
+      </header>
+      <div class="agent-contrast" aria-label="Agents and skills solve different problems">
+        <div class="contrast-side">
+          <div class="context-ribbon"></div>
+          <h3>Agents manage execution context.</h3>
+          <p>Use an agent when isolation, delegation, or parallel work is the problem.</p>
+        </div>
+        <div class="contrast-side">
+          <div class="capability-ribbon"></div>
+          <h3>Skills equip reusable capability.</h3>
+          <p>Use a skill when the main agent needs workflow, tools, examples, and checks.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="section-slide">
       <div class="section-copy">
         <span class="number">02</span>
-        <h2>Skill anatomy</h2>
-        <p>Not one folder shape. A capability package can carry whatever the agent needs.</p>
+        <h2>Capability Package</h2>
+        <p>Skills can carry instructions, assets, software, examples, and contracts together.</p>
         <div class="accent-line"></div>
       </div>
       <div class="anatomy-art" aria-label="Exploded skill artifacts">
@@ -1412,11 +2044,19 @@ body,
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>A skill can be any package shape</h2>
+        <h2>A skill can carry any package shape</h2>
       </header>
-      <div class="package-shape">
-        <div class="central-capability">
-          <h3>Capability, packaged</h3>
+      <div class="exploded-package">
+        <div class="package-assembly" aria-label="Exploded package assembling into capability">
+          <div class="assembly-line a"></div>
+          <div class="assembly-line b"></div>
+          <div class="assembly-line c"></div>
+          <div class="assembly-line d"></div>
+          <div class="assembly-core">Capability,<br>packaged</div>
+          <div class="assembly-part instructions"><span>rules</span><strong>Instructions</strong></div>
+          <div class="assembly-part tools"><span>execution</span><strong>Software</strong></div>
+          <div class="assembly-part examples"><span>taste</span><strong>Examples</strong></div>
+          <div class="assembly-part contracts"><span>trust</span><strong>Contracts</strong></div>
         </div>
         <div class="package-list">
           <div class="package-row"><strong>Instructions</strong><span>When the skill applies, how to collaborate, and what threshold must be met before acting.</span></div>
@@ -1427,27 +2067,26 @@ body,
       </div>
     </section>
 
-    <section class="section-slide">
-      <div class="section-copy">
-        <span class="number">03</span>
-        <h2>Tools</h2>
-        <p>The agent needs an interface it can discover, inspect, and execute.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="tools-art" aria-label="CLI tool interface">
-        <div class="tool-tag a">local</div>
-        <div class="tool-tag b">versioned</div>
-        <div class="tool-tag c">inspectable</div>
+    <section class="content-slide">
+      <header class="slide-title">
+        <h2>Tools make skills feel like software</h2>
+      </header>
+      <div class="tools-content" aria-label="CLI tool interface packaged with skill guidance">
         <div class="terminal-large"><span class="dim">$</span> deck-qa --help<br>Usage: deck-qa [html]<br><br>  --viewport 1280x800<br>  --fail-on-scroll<br>  --write-screenshots</div>
+        <div class="tool-points">
+          <div class="tool-point"><strong>Local</strong><span>The agent can run the tool inside the task context.</span></div>
+          <div class="tool-point"><strong>Inspectable</strong><span>Help text gives the same kind of affordance discovery agents need from tool surfaces.</span></div>
+          <div class="tool-point"><strong>Versioned</strong><span>The tool ships with the skill, examples, and validation expectations.</span></div>
+        </div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Ship the interface the agent can inspect</h2>
+        <h2>Interfaces are not the whole capability</h2>
       </header>
-      <div class="tool-slide">
-        <div class="cli-panel" aria-label="CLI help output">
+      <div class="interface-wrapper">
+        <div class="interface-core" aria-label="CLI help output">
           <span class="dim">$</span> skill-tool --help<br>
           Usage: skill-tool [input] [flags]<br><br>
           Commands:<br>
@@ -1458,22 +2097,22 @@ body,
           &nbsp;&nbsp;--format&nbsp;&nbsp;html|json|yaml<br>
           &nbsp;&nbsp;--strict&nbsp;&nbsp;fail on drift
         </div>
-        <div class="tool-thesis">
-          <h3>MCP is a tool surface. A skill is the package around the work.</h3>
-          <div class="mcp-note">
-            <strong>No false choice</strong>
-            <span>MCP can expose services. A skill can carry the workflow, examples, validation, and tool usage together.</span>
-          </div>
-          <p>For many agent tasks, a CLI with help text and deterministic exits is already a natural interface.</p>
+        <div class="capability-shell" aria-label="Capability shell around interface">
+          <div class="shell-ring"></div>
+          <div class="shell-ring two"></div>
+          <div class="shell-label a">usage rules</div>
+          <div class="shell-label b">examples</div>
+          <div class="shell-label c">expected output</div>
+          <div class="shell-label d">checks</div>
         </div>
       </div>
     </section>
 
     <section class="section-slide case-separator">
       <div class="section-copy">
-        <span class="number">04</span>
-        <h2>Presentation skill</h2>
-        <p>A deck-making capability that has to preserve human judgment.</p>
+        <span class="number">03</span>
+        <h2>Proof in Practice</h2>
+        <p>The presentation skill is the case study.</p>
         <div class="accent-line"></div>
       </div>
       <div class="deck-art" aria-label="Stacked presentation slides">
@@ -1487,22 +2126,21 @@ body,
       <header class="slide-title">
         <h2>Context transfer makes compression possible</h2>
       </header>
-      <div class="context-compression">
-        <div class="messy-context" aria-label="User context before compression">
-          <div class="context-chip a">beliefs</div>
-          <div class="context-chip b">stories</div>
-          <div class="context-chip c">data</div>
-          <div class="context-chip d">objections</div>
-          <div class="context-chip e">taste</div>
-          <div class="context-chip f">constraints</div>
+      <div class="context-funnel">
+        <div class="input-streams" aria-label="User context streams">
+          <div class="stream-row"><strong>Beliefs</strong><div class="stream-line"></div></div>
+          <div class="stream-row"><strong>Stories</strong><div class="stream-line"></div></div>
+          <div class="stream-row"><strong>Data</strong><div class="stream-line"></div></div>
+          <div class="stream-row"><strong>Objections</strong><div class="stream-line"></div></div>
+          <div class="stream-row"><strong>Taste</strong><div class="stream-line"></div></div>
         </div>
-        <div class="compression-arrow"></div>
-        <div class="compressed-slide">
+        <div class="compressed-output">
           <h3>The deck keeps what matters.</h3>
-          <div class="compressed-bars">
-            <div class="compressed-bar"></div>
-            <div class="compressed-bar short"></div>
-            <div class="compressed-bar"></div>
+          <div class="deck-lines">
+            <div class="deck-line accent"></div>
+            <div class="deck-line"></div>
+            <div class="deck-line"></div>
+            <div class="deck-line"></div>
           </div>
           <span class="label">thesis / sequence / visuals / voiceover</span>
         </div>
@@ -1536,61 +2174,40 @@ body,
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Examples make taste portable</h2>
+        <h2>Examples calibrate taste without freezing it</h2>
       </header>
-      <div class="example-gallery" aria-label="Example slides showing variety">
-        <div class="mini-slide">
-          <h3>Decision</h3>
-          <div class="mini-visual"></div>
-          <div class="mini-caption">A path through a tradeoff.</div>
+      <div class="taste-transfer" aria-label="Reference examples influencing a new output">
+        <div class="reference-signals">
+          <div class="signal-row"><strong>Hierarchy</strong><div class="signal-mark"></div></div>
+          <div class="signal-row"><strong>Spacing</strong><div class="signal-mark"></div></div>
+          <div class="signal-row"><strong>Judgment</strong><div class="signal-mark"></div></div>
         </div>
-        <div class="mini-slide">
-          <h3>System</h3>
-          <div class="mini-visual"></div>
-          <div class="mini-caption">A relationship made visible.</div>
+        <div class="new-output">
+          <h3>A new deck, not a copied slide.</h3>
+          <div class="deck-lines">
+            <div class="deck-line accent"></div>
+            <div class="deck-line"></div>
+            <div class="deck-line"></div>
+          </div>
+          <span class="label">calibrated by examples</span>
         </div>
-        <div class="mini-slide">
-          <h3>Evidence</h3>
-          <div class="mini-visual"></div>
-          <div class="mini-caption">A signal with hierarchy.</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section-slide">
-      <div class="section-copy">
-        <span class="number">05</span>
-        <h2>Operating model</h2>
-        <p>Skills let teams share capability without forcing the same artifact.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="operating-art" aria-label="Shared skill reaching multiple teams">
-        <div class="connection a"></div>
-        <div class="connection b"></div>
-        <div class="connection c"></div>
-        <div class="connection d"></div>
-        <div class="shared-core">Shared<br>skill</div>
-        <div class="team-node product"><strong>Product</strong><span>launch logic</span></div>
-        <div class="team-node research"><strong>Research</strong><span>proof depth</span></div>
-        <div class="team-node design"><strong>Design</strong><span>taste bar</span></div>
-        <div class="team-node ops"><strong>Ops</strong><span>checks</span></div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Shared capability does not mean same output</h2>
+        <h2>Shared capability, local output</h2>
       </header>
-      <div class="shared-local">
-        <div class="capability-source">
+      <div class="local-output">
+        <div class="shared-signal">
           <h3>One skill, many rooms.</h3>
           <p>The package carries the workflow and checks. The agent adapts the artifact to the local context.</p>
         </div>
-        <div class="outputs" aria-label="Different local outputs from one skill">
-          <div class="output-card"><span>exec</span><h3>Decision memo</h3></div>
-          <div class="output-card"><span>technical</span><h3>System explainer</h3></div>
-          <div class="output-card"><span>design</span><h3>Critique deck</h3></div>
-          <div class="output-card"><span>ops</span><h3>Runbook view</h3></div>
+        <div class="output-spectrum" aria-label="Different local outputs from one shared skill">
+          <div class="spectrum-row"><span>exec</span><div><strong>Decision memo</strong><div class="spectrum-line"></div></div></div>
+          <div class="spectrum-row"><span>technical</span><div><strong>System explainer</strong><div class="spectrum-line"></div></div></div>
+          <div class="spectrum-row"><span>design</span><div><strong>Critique deck</strong><div class="spectrum-line"></div></div></div>
+          <div class="spectrum-row"><span>ops</span><div><strong>Runbook view</strong><div class="spectrum-line"></div></div></div>
         </div>
       </div>
     </section>
@@ -1599,22 +2216,13 @@ body,
       <header class="slide-title">
         <h2>Serious skills have a release shape</h2>
       </header>
-      <div class="standards-slide">
-        <div class="standard-column">
-          <b>1</b>
-          <h3>Context gate</h3>
-          <p>The skill says what must be understood before the agent starts producing.</p>
+      <div class="release-path" aria-label="Skill release quality gates">
+        <div class="gate-track">
+          <div class="release-gate"><span>gate 1</span><strong>Context</strong></div>
+          <div class="release-gate"><span>gate 2</span><strong>Contract</strong></div>
+          <div class="release-gate"><span>gate 3</span><strong>Validation</strong></div>
         </div>
-        <div class="standard-column">
-          <b>2</b>
-          <h3>Output contract</h3>
-          <p>The artifact has a shape, a destination, and a way to know whether it worked.</p>
-        </div>
-        <div class="standard-column">
-          <b>3</b>
-          <h3>Validation loop</h3>
-          <p>The skill bakes in checks, screenshots, tests, or review steps before delivery.</p>
-        </div>
+        <div class="release-caption"><span>understand before producing</span><span>define the artifact</span><span>check before delivery</span></div>
       </div>
     </section>
 

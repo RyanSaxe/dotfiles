@@ -19,6 +19,7 @@ presentation/
 │   ├── layouts.md
 │   ├── rubric.md
 │   ├── taste.md
+│   ├── visuals.md
 │   └── workflow.md
 └── examples/
     ├── single-slide-examples/
@@ -63,7 +64,7 @@ Settle these before drafting:
 5. Delete placeholder slide content before delivery.
 6. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
 7. Link optional libraries by CDN when they improve the result, such as Reveal.js, syntax highlighting, charts, math rendering, icon sets, or diagram tools.
-8. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, and relevant single-slide examples to review quality before showing the user.
+8. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, `references/visuals.md`, and relevant single-slide examples to review quality before showing the user.
 
 ## Deck Structure
 
@@ -74,7 +75,9 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 ```
 
 - Keep agendas to 5 items or fewer.
+- Agenda slides should not have subtitles by default. Let the agenda be a stable, low-friction orientation slide: title plus section names.
 - By default, each agenda item starts a section and gets its own separator slide before that section's content. If the deck uses an agenda, the audience should feel the same chunking in the slide flow.
+- Agenda items should be real chunks, not labels for one-slide sections. During alignment, choose agenda items that can each support at least two content slides; if a section is too thin, merge it before drafting.
 - Use separators as transitions, not content slides. Include a short section label and, when helpful, a minimal subtitle there rather than repeating explanatory subtitles on content slides.
 - Choose the final slide intentionally: summary, conclusion, decision, Q&A, or next steps.
 - Content slides should generally place the title across the top with the content below.
@@ -153,5 +156,6 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 - `references/rubric.md` - deck-level and slide-level review criteria.
 - `references/taste.md` - visual taste rules and hierarchy guidance.
 - `references/layouts.md` - guidance for designing visual relationships without becoming template-bound.
+- `references/visuals.md` - meaning-first visual guidance and anti-patterns.
 - `templates/theme.css` - sparse foundation CSS to inline and adapt.
 - `templates/deck.html.template` - single-file HTML skeleton.
