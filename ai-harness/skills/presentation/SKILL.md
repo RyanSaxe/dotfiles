@@ -83,6 +83,7 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 - Choose the final slide intentionally: summary, conclusion, decision, Q&A, or next steps.
 - Content slides should generally place the title across the top with the content below. Title, agenda, separator, summary, conclusion, and Q&A slides may use left-weighted or centered layouts.
 - Content-slide titles should aim to fit on one line at a 1200px-wide viewport. Shorten the claim before shrinking type.
+- Write high-emphasis text to render on one line inside its container: titles, section labels, KPI values, outcome statements, callout headers, and other bold scan targets should be concise enough to grok without a line break. Reserve multi-line wrapping for smaller supporting copy.
 - Omit kickers/eyebrow labels by default. Add one only when it gives necessary orientation that the title cannot carry.
 
 ## Quality Bar
@@ -128,6 +129,7 @@ For every review viewport, verify:
 - slide artboard centered in the viewport
 - slide content centered inside the artboard when the layout calls for it
 - long titles
+- high-emphasis text wrapping onto multiple lines where the audience should skim it instantly
 - weak visual hierarchy
 - content mass that is visually top-heavy, corner-heavy, or awkwardly uncentered
 - dense blocks that are hard to scan
