@@ -38,9 +38,9 @@ presentation/
 
 ## Critical Interview
 
-Do not jump straight to slides. Ask concise questions first; use multiple-choice wording when the user is choosing between real tradeoffs, and use free-form questions when context is needed.
+Do not jump straight to slides. Ask concise questions first; use multiple-choice wording when the user is choosing between real tradeoffs, and use free-form questions when context is needed. If you have a tool you can use to interact with users where you ask them questions, use it as much as possible for this interview.
 
-Resolve these before drafting:
+Resolve these before drafting, but do not follow it like a checklist. Let the conversation be fluid between you and the user where you aim to understand and know answers to these concepts:
 
 - **Audience and room:** who is present, how senior, read-ahead vs. live voiceover, and what they already believe.
 - **Purpose:** what the deck must accomplish, stated in the user's language.
@@ -111,7 +111,6 @@ Check at least these viewports before calling a deck ready:
 
 - `1440x900`
 - `1280x800`
-- `1200x800`
 - `1024x768`
 - `900x600`
 - `768x1024`
