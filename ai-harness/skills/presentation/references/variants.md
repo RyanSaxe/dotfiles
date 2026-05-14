@@ -1,57 +1,25 @@
-# Register, Footer, and Section Markers
+# Register, Chrome, and Deck Identity
 
-The deck's register and footer language are things to figure out with the user. They are not selected from a fixed menu, and they are not inferred from a filename alone. Use the user's audience, stakes, timing, and intent to decide how the deck should speak and how the artifact should identify itself.
+The deck's register comes from the room, not from a fixed taxonomy.
 
-## Register
-
-Before drafting, be able to state a working theory in plain language:
+Before drafting, be able to state:
 
 - who the deck is for
-- what the room is supposed to do with it
-- whether slides are read-ahead, live voiceover, or both
-- how direct, formal, dense, visual, or conversational the deck should feel
-- what material belongs in the main story vs. backup
-
-The point is not to pick a label like "pitch," "explainer," or "executive." The point is to decide, for this specific room, what the audience needs to understand quickly and how much evidence, friction, softness, or directness the slides should carry.
-
-The register should show up in concrete choices: title length, slide density, diagram style, amount of proof, section dividers, appendix separation, and how assertive the recommendation feels.
-
-## Stable Footer Label
-
-The footer label is deck-level metadata shared across slides. It should describe the whole artifact in the user's language, not the current section, topic, or slide type.
-
-Work out the footer label from context:
-
-- If the user calls it a board readout, use `Board readout`.
-- If the user calls it a weekly product update, use `Product update`.
-- If the room is a leadership discussion, use the phrase they would naturally use for that meeting.
-
-Do not rotate the footer label by section. In a normal deck, the footer label should stay the same on the title slide, main-story slides, divider slides, and appendix slides.
-
-`Appendix` is not a footer label for a deck with an appendix. Use `Appendix` as a section kicker, divider title, or slide marker. Only use `Appendix` in the footer if the entire file is a standalone appendix document.
-
-## Kicker Labels
-
-Kickers orient the audience within the story. Unlike the footer label, they may change slide to slide:
-
-- context-setting labels
-- problem or tension labels
-- recommendation labels
-- example labels
-- risk or guardrail labels
-- appendix labels
-
-Keep kickers short. Avoid making them slide counters or verbose subtitles.
+- what the room should do with it
+- whether it is read-ahead, live voiceover, or both
+- how direct, formal, dense, visual, or conversational it should feel
+- what belongs in the main story vs. backup
 
 ## Visual Register
 
-Keep a consistent visual system inside one deck:
+Make register visible through concrete choices: title size, density, proof depth, image use, chart treatment, section breaks, and how assertive the recommendation feels.
 
-- One accent color should indicate the active recommendation or current focus.
-- Semantic colors should have meaning and be used sparingly.
-- A divider slide should be visibly quieter than content slides.
-- Appendix slides can be more concrete, but must remain visually separate from the main story.
+A leadership decision deck may need a sparse thesis and a sharp option set. A technical explainer may need a diagram, short code, and precise labels. A team update may need artifacts, progress signals, and next actions. These are not templates; they are visual consequences of the room.
 
-## Body Classes
+## Chrome and Metadata
 
-`theme.css` may include body classes for broad visual treatment, but do not let body classes drive the narrative. Most decks can use the base styles and still feel tailored through wording, slide order, and layout choices.
+Repeated chrome is optional. Use it when it helps the deck feel like a formal artifact or when the audience needs stable context. Reduce it when a full-bleed, editorial, or workshop slide benefits from more visual space.
+
+If a footer or deck label is used, keep it stable across the deck. Use kickers, divider slides, or body content for section markers such as `Appendix`.
+
+Do not rotate the footer label by section. Do not make `Appendix` the footer label unless the entire file is a standalone appendix.

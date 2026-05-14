@@ -20,7 +20,7 @@
 <div class="reveal">
   <div class="slides">
 
-    <!-- 1 — Title -->
+    <!-- 1 - Title -->
     <section class="title-slide">
       <header class="slide-head"><span class="kicker">{{COVER_KICKER}}</span></header>
       <div class="slide-body">
@@ -33,14 +33,14 @@
       </footer>
     </section>
 
-    <!-- 2 — Content slide template -->
+    <!-- 2 - Content slide starting point -->
     <section>
       <header class="slide-head">
         <span class="kicker">{{SECTION_KICKER}}</span>
         <h2>{{SLIDE_TITLE}}</h2>
       </header>
       <div class="slide-body">
-        <!-- pick a visual pattern from references/layouts.md -->
+        <!-- Compose the slide around one job: orient, prove, compare, explain, decide, transition, or close. -->
       </div>
       <footer class="slide-foot">
         <span>{{FOOTER_TITLE}} <span class="dot"></span> {{STABLE_FOOTER_LABEL}}</span>
