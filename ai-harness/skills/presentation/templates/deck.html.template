@@ -6,8 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css" id="theme">
-<!-- Optional: enable per deck.
+<!-- Optional per deck:
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-light.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 -->
@@ -15,44 +14,33 @@
 {{INLINE_THEME_CSS}}
 </style>
 </head>
-<body class="{{BODY_CLASS}}">
+<body>
 
 <div class="reveal">
   <div class="slides">
 
-    <!-- 1 - Title -->
+    <!-- Replace these starter slides with the deck designed for the user's room. -->
     <section class="title-slide">
-      <header class="slide-head"><span class="kicker">{{COVER_KICKER}}</span></header>
-      <div class="slide-body">
+      <div class="title-copy">
         <h1>{{DECK_TITLE}}</h1>
-        <p class="lead">{{ONE_LINE_THESIS}}</p>
+        <p>{{ONE_LINE_THESIS}}</p>
       </div>
-      <footer class="slide-foot">
-        <span>{{FOOTER_TITLE}} <span class="dot"></span> {{STABLE_FOOTER_LABEL}}</span>
-        <span>1 / N</span>
-      </footer>
     </section>
 
-    <!-- 2 - Content slide starting point -->
-    <section>
-      <header class="slide-head">
-        <span class="kicker">{{SECTION_KICKER}}</span>
+    <section class="content-slide">
+      <header class="slide-title">
         <h2>{{SLIDE_TITLE}}</h2>
       </header>
       <div class="slide-body">
-        <!-- Compose the slide around one job: orient, prove, compare, explain, decide, transition, or close. -->
+        <!-- Compose this slide around the user's claim and the visual relationship that explains it fastest. -->
       </div>
-      <footer class="slide-foot">
-        <span>{{FOOTER_TITLE}} <span class="dot"></span> {{STABLE_FOOTER_LABEL}}</span>
-        <span>2 / N</span>
-      </footer>
     </section>
 
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
-<!-- Optional: enable per deck.
+<!-- Optional per deck:
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -71,13 +59,9 @@
     minScale: 0.2,
     maxScale: 2.0
   });
-  // Uncomment if using highlight.js:
+  // Enable optional libraries here only when the deck uses them.
   // hljs.highlightAll();
-  // Uncomment if using KaTeX:
-  // renderMathInElement(document.body, {
-  //   delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
-  //   throwOnError: false
-  // });
+  // renderMathInElement(document.body, { throwOnError: false });
 </script>
 </body>
 </html>

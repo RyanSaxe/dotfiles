@@ -4,7 +4,7 @@ This is a collaborative working-session workflow. Do not draft slides before the
 
 ## 1. Discover
 
-Interview for decisions, not trivia. Use multiple choice questions when the tool is available and a real tradeoff exists.
+Interview for decisions, not trivia. Use concise multiple-choice questions when the user is choosing between real tradeoffs; use free-form questions when context or examples matter more.
 
 Resolve:
 
@@ -62,7 +62,7 @@ Fix issues before asking the user to review.
 
 Ask for targeted critique after V1. When feedback is broad, propose a slide-level revision plan. When feedback is specific, implement it and re-render.
 
-Treat examples and gallery slides as calibration. They should influence quality, hierarchy, and range, not become components to copy.
+Treat the single-slide examples as calibration. They should influence quality, hierarchy, and range, not become components to copy.
 
 ## 6. Finalize
 

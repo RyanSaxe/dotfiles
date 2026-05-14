@@ -5,50 +5,48 @@ description: Build a shareable HTML slide deck when the user says "make a presen
 
 # presentation
 
-Builds a shareable HTML slide deck. This is a working-session skill: interview critically, draft visually, review screenshots, and iterate.
+Build one polished, browser-openable HTML slide deck. Treat this as a collaborative design session: align on intent, draft a complete V1, review screenshots, and iterate.
 
 ## Layout
 
 ```text
 presentation/
-|-- SKILL.md
-|-- templates/
-|   |-- theme.css
-|   `-- deck.html.template
-|-- references/
-|   |-- layouts.md
-|   |-- rubric.md
-|   |-- taste.md
-|   |-- variants.md
-|   `-- workflow.md
-`-- examples/
-    |-- gallery/
-    |   |-- agendas/
-    |   |-- metrics/
-    |   |-- risks/
-    |   |-- roadmaps/
-    |   |-- separators/
-    |   |-- spotlights/
-    |   |-- statuses/
-    |   |-- systems/
-    |   |-- titles/
-    |   |-- transitions/
-    |   `-- index.html
-    |-- design-gallery/
-    |   `-- index.html
-    |-- image-led-narrative/
-    |   `-- coastal-launch-field-notes.html
-    |-- operating-review/
-    |   `-- reliability-operating-review.html
-    `-- technical-explainer/
-        `-- cache-boundary-explainer.html
+├── SKILL.md
+├── templates/
+│   ├── deck.html.template
+│   └── theme.css
+├── references/
+│   ├── layouts.md
+│   ├── rubric.md
+│   ├── taste.md
+│   └── workflow.md
+└── examples/
+    └── single-slide-examples/
+        ├── index.html
+        ├── shared.css
+        ├── shared.js
+        ├── title-ml-system-upgrade.html
+        ├── agenda-decision-path.html
+        ├── separator-evidence.html
+        ├── roadmap-pilot.html
+        ├── spotlight-travel-agent.html
+        ├── transition-batch-to-realtime.html
+        ├── status-company-targets.html
+        ├── risk-launch-mitigation.html
+        ├── metric-monthly-kpi-summary.html
+        └── system-ml-observability-layers.html
 ```
 
-The examples are visual calibration artifacts, not templates. Open `examples/gallery/index.html` before drafting when you need to re-center on variety, hierarchy, and range.
+## How to Use the Examples
+
+- `examples/single-slide-examples/index.html` is for human review and fast visual scanning.
+- The individual HTML files in `examples/single-slide-examples/` are inspiration for slide concepts, visual relationships, spacing, and hierarchy.
+- Do not treat the examples as templates, a taxonomy, or a component library. Open a relevant example to study why it works, then design the user's slide from the user's content.
+- Future end-to-end example decks should be single HTML files under `examples/` unless assets are truly required.
 
 ## Critical Interview
 
-Do not jump straight to slides. Use `request_user_input` when available for real tradeoffs; ask direct questions only when multiple choice would be awkward.
+Do not jump straight to slides. Ask concise questions first; use multiple-choice wording when the user is choosing between real tradeoffs, and use free-form questions when context is needed.
 
 Resolve these before drafting:
 
@@ -56,24 +54,25 @@ Resolve these before drafting:
 - **Purpose:** what the deck must accomplish, stated in the user's language.
 - **Thesis:** the one sentence the audience should retain.
 - **Content inventory:** facts, examples, tensions, decisions, constraints, anecdotes, data points, and half-formed arguments.
-- **Narrative shape:** how the audience should move from current belief to the intended action or understanding.
+- **Narrative shape:** how the audience should move from current belief to intended action or understanding.
 - **Length and timing:** target slide count, appendix needs, and what will be spoken instead of written.
 - **Inputs:** notes, docs, existing decks, screenshots, data, brand requirements, and required examples.
 - **Constraints:** banned wording, sensitive topics, required terms, shareability needs, and style preferences.
-- **Visual stance:** image-led, editorial, data-heavy, technical, workshop, executive, or another concrete direction derived from the room.
+- **Visual stance:** the deck's density, proof depth, image use, chart use, technicality, and formality.
 - **Slide/speaker split:** what must be legible on the slide vs. what the presenter will say.
 
 End discovery only when you can describe the deck's goal, audience, constraints, rough order, visual stance, and what "good" means for this user. Before drafting, reflect that plan back and ask: "Is there anything else I need to know, or should I build a V1 for us to critique?"
 
-## How to Run
+## Build Workflow
 
 1. Follow `references/workflow.md`: discover, reflect back, get permission for a V1, draft, self-review, and iterate.
 2. Pick a working directory under `/tmp/<deck-slug>/`.
-3. Copy `templates/deck.html.template` to `<deck-slug>.html`.
-4. Copy `templates/theme.css` into the `<style>` slot in the HTML, then add deck-specific CSS as needed.
-5. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
-6. Draft the deck around slide jobs and visual hierarchy, not around a fixed component list.
-7. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, and `examples/gallery/index.html` to broaden possibilities and review quality before showing the user.
+3. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
+4. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.
+5. Delete placeholder slide content before delivery.
+6. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
+7. Link optional libraries by CDN when they improve the result, such as Reveal.js, syntax highlighting, charts, math rendering, icon sets, or diagram tools.
+8. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, and relevant single-slide examples to review quality before showing the user.
 
 ## Deck Structure
 
@@ -86,9 +85,11 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 - Keep agendas to 5 items or fewer.
 - Use a separator before each major agenda section. Include a short section label and, when helpful, a minimal subtitle.
 - Choose the final slide intentionally: summary, conclusion, decision, Q&A, or next steps.
-- Content slides should generally place the title across the top with the content below. Title, agenda, separator, summary, conclusion, and Q&A slides may use left-weighted or centered layouts.
+- Content slides should generally place the title across the top with the content below.
+- Title, agenda, separator, summary, conclusion, and Q&A slides may use centered or left-weighted layouts because they carry less body information.
 - Content-slide titles should aim to fit on one line at a 1200px-wide viewport. Shorten the claim before shrinking type.
-- Write high-emphasis text to render on one line inside its container: titles, section labels, KPI values, outcome statements, callout headers, and other bold scan targets should be concise enough to grok without a line break. Reserve multi-line wrapping for smaller supporting copy.
+- Write high-emphasis text to render on one line inside its container: titles, section labels, KPI values, outcome statements, callout headers, and other bold scan targets should be concise enough to understand without a line break.
+- Reserve multi-line wrapping for smaller supporting copy.
 - Omit kickers/eyebrow labels by default. Add one only when it gives necessary orientation that the title cannot carry.
 
 ## Quality Bar
@@ -96,29 +97,25 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 Every deck should be scan-ready, even if the audience is technical.
 
 - Prefer less slide text and stronger hierarchy.
-- Give each slide one dominant job.
+- Give each slide one dominant communicative purpose, written in the user's context rather than selected from a fixed list.
 - Use images, diagrams, charts, tables, code, icons, figures, and spatial composition when they explain faster than paragraphs.
-- Use proven libraries, renderers, syntax highlighters, charting tools, and icon sets when they materially improve the slide. Do not hand-roll complex domain rendering when a stable tool can do it better.
+- Use proven libraries, renderers, syntax highlighters, charting tools, and icon sets when they materially improve the slide.
 - Avoid defaulting to three cards, repeated panels, or generic process arrows.
 - Keep a consistent visual system inside one deck, but let different decks look genuinely different.
 - Make section breaks feel like transitions, not content slides.
 - Use appendix/detail slides for proof that would crowd the main story.
 - If a slide feels crowded, split it or simplify it before shrinking type.
-- Balance the slide body across the artboard. Avoid concentrating all meaningful content at the top, in one corner, or in one dense strip when the message should feel centered and composed.
+- Balance the slide body across the artboard. Avoid concentrating all meaningful content at the top, in one corner, or in one dense strip.
 - Unless the user provides a brand system, start from muted warm white backgrounds, black primary text, and restrained accent colors for highlights, status, and emphasis.
 - Slides should look like real slides. Do not add explanatory copy about why a layout works.
 
 ## Visual QA Playbook
 
-Before showing the user, render the deck in a browser and critique the screenshots yourself. Use Playwright when available; use the screenshot helper only as a fallback:
+Before showing the user, render the deck in a browser and critique screenshots yourself. Prefer Playwright or another browser automation tool when available; otherwise use whatever screenshot workflow the environment provides. Save QA screenshots and traces under `/tmp/<deck-slug>/qa/` or another temporary location, not in the repository or current working directory.
 
-```sh
-uv run --script ~/.claude/skills/skill-builder/tools/screenshot.py /tmp/<deck-slug>/<deck-slug>.html
-```
+Use a fixed slide artboard and scale it from the center. For Reveal decks, keep `width: 1280`, `height: 800`, `margin: 0`, and `center: false`; for custom single-slide review pages, wrap the 1280x800 slide in a centered scale-to-fit frame.
 
-Use a fixed slide artboard and scale it from the center. For Reveal decks, keep `width: 1280`, `height: 800`, `margin: 0`, and `center: false`; for custom galleries or single-slide review pages, wrap the 1280x800 slide in a centered scale-to-fit frame.
-
-Check at least these Playwright viewports before calling a deck ready:
+Check at least these viewports before calling a deck ready:
 
 - `1440x900`
 - `1280x800`
@@ -150,19 +147,17 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 
 - Deliver one file named `<presentation-name>.html` unless the user asks for an asset folder.
 - The file may link Reveal.js and optional libraries by CDN, but deck CSS should be inline.
-- Default Reveal initialization: `width: 1280`, `height: 800`, `margin: 0`, `center: false`.
+- Default Reveal initialization: `width: 1280`, `height: 800`, `margin: 0`, and `center: false`.
 - The deck must be usable by opening the HTML directly in a browser.
 - Repeated footers or metadata are optional. If used, keep deck-level labels stable and use slide content for section markers.
 
 ## References
 
-- `examples/gallery/index.html` - fast visual scan of slide possibilities.
-- `examples/design-gallery/index.html` - redirect kept for older references.
-- `examples/` - complete fictional decks with different visual systems.
-- `references/layouts.md` - compact guidance for choosing slide jobs without becoming template-bound.
+- `examples/single-slide-examples/index.html` - human review page for the single-slide example set.
+- `examples/single-slide-examples/*.html` - individual slide examples to inspect for inspiration.
+- `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
 - `references/rubric.md` - deck-level and slide-level review criteria.
 - `references/taste.md` - visual taste rules and hierarchy guidance.
-- `references/variants.md` - register, chrome, and deck-level identity.
-- `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
-- `templates/theme.css` - foundation CSS to inline and adapt.
+- `references/layouts.md` - guidance for designing visual relationships without becoming template-bound.
+- `templates/theme.css` - sparse foundation CSS to inline and adapt.
 - `templates/deck.html.template` - single-file HTML skeleton.

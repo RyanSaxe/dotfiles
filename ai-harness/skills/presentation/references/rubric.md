@@ -1,10 +1,10 @@
 # Presentation Rubric
 
-Use this rubric as a review lens, not a form to fill out. A good deck is judged by whether the intended audience can skim it, understand the argument, and know what the presentation will make real in the room.
+Use this rubric as a review lens, not a form to fill out. Do not score slides against it mechanically. A good deck is judged by whether the intended audience can skim it, understand the argument, and know what the presentation will make real in the room.
 
 ## Deck-Level Rubric
 
-- **Purpose:** the deck has one clear reason to exist: decide, align, teach, persuade, update, or explore.
+- **Purpose:** the deck has one clear reason to exist, stated in the user's language.
 - **Audience fit:** density, tone, proof depth, and terminology match the room.
 - **Thesis:** the main idea can be stated in one sentence before the slides are built.
 - **Argument path:** the sequence moves the audience from current belief to intended belief or action.
@@ -16,11 +16,11 @@ Use this rubric as a review lens, not a form to fill out. A good deck is judged 
 
 ## Slide-Level Rubric
 
-- **One job:** each slide has a specific communicative job such as orient, prove, compare, explain, transition, decide, or close.
+- **One job:** each slide has a specific communicative job, stated in context rather than selected from a fixed list.
 - **Scan target:** the eye knows where to land first, second, and third.
 - **One-line emphasis:** titles, KPI values, outcome statements, section labels, and callout headers are concise enough to render on one line in their available space.
 - **Text roles:** large text carries the message; smaller text supplies context; speaker notes or voiceover carry nuance.
-- **Relationship-first visual:** the visual shows the relationship in the content: sequence, contrast, hierarchy, dependency, magnitude, risk, tradeoff, or flow.
+- **Relationship-first visual:** the visual shows the relationship that matters in the content rather than decorating around it.
 - **Meaningful containers:** cards, panels, tables, and boxes group real peers or states; they are not generic buckets for excess text.
 - **Balanced content mass:** the body feels composed on the artboard, not top-heavy, corner-heavy, or pinned to one dense strip.
 - **Color discipline:** black text stays primary; accent color marks status, focus, comparison, or emphasis.
