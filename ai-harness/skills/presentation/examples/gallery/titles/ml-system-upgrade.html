@@ -7,9 +7,9 @@
 <link rel="stylesheet" href="../shared.css">
 <style>
 .title-slide {
-  grid-template-columns: 0.82fr 1.18fr;
-  gap: 62px;
-  align-items: center;
+  grid-template-rows: auto 1fr;
+  gap: 30px;
+  align-items: stretch;
 }
 
 .title-copy {
@@ -18,14 +18,15 @@
 }
 
 .title-copy h1 {
-  max-width: 8ch;
-  font-size: 104px;
-  line-height: 0.94;
+  max-width: 100%;
+  font-size: 80px;
+  line-height: 0.96;
   font-weight: 880;
+  white-space: nowrap;
 }
 
 .title-copy p {
-  max-width: 28ch;
+  max-width: 36ch;
   color: var(--muted);
   font-size: 26px;
   line-height: 1.22;
@@ -33,7 +34,9 @@
 }
 
 .ml-visual {
-  height: 520px;
+  width: 900px;
+  height: 500px;
+  justify-self: center;
   position: relative;
 }
 

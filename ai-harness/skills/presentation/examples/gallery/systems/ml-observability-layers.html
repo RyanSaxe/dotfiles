@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>System Slide - ML Observability Layers</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.observability-map {
+  align-self: center;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr auto;
+  gap: 22px 34px;
+}
+
+.layer-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.layer {
+  min-height: 92px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: 150px 1fr auto;
+  gap: 22px;
+  align-items: center;
+}
+
+.layer.highlight {
+  border-width: 3px;
+  background: #fff6d9;
+  box-shadow: inset 8px 0 0 var(--amber);
+}
+
+.layer-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.layer-main {
+  display: grid;
+  gap: 6px;
+}
+
+.layer-main strong {
+  font-size: 27px;
+  line-height: 1;
+}
+
+.layer-main span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.layer-badge {
+  min-width: 94px;
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  padding: 9px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.layer.highlight .layer-badge {
+  background: var(--amber);
+}
+
+.monitor-panel {
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 24px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 18px;
+}
+
+.monitor-head {
+  display: grid;
+  gap: 6px;
+}
+
+.monitor-head span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.monitor-head strong {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.signal-list {
+  display: grid;
+  align-content: center;
+  gap: 18px;
+}
+
+.signal {
+  border-top: 2px solid var(--ink);
+  padding-top: 14px;
+  display: grid;
+  gap: 5px;
+}
+
+.signal strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.signal span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.system-outcome {
+  grid-column: 1 / -1;
+  border: 2px solid var(--ink);
+  background: #d9e5d6;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 24px;
+}
+
+.outcome-step {
+  display: grid;
+  gap: 5px;
+}
+
+.outcome-step strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.outcome-step span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.outcome-arrow {
+  font-size: 27px;
+  font-weight: 900;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <h1>Observability closes the model loop</h1>
+      </header>
+      <div class="observability-map" aria-label="ML system layers with model runtime observability loop">
+        <div class="layer-stack">
+          <div class="layer">
+            <div class="layer-label">product</div>
+            <div class="layer-main"><strong>Search surface</strong><span>captures user actions and outcomes</span></div>
+            <div class="layer-badge">events</div>
+          </div>
+          <div class="layer">
+            <div class="layer-label">service</div>
+            <div class="layer-main"><strong>Decision API</strong><span>routes requests and applies policy</span></div>
+            <div class="layer-badge">42ms</div>
+          </div>
+          <div class="layer highlight">
+            <div class="layer-label">model</div>
+            <div class="layer-main"><strong>Model runtime</strong><span>scores, ranks, and emits quality signals</span></div>
+            <div class="layer-badge">watch</div>
+          </div>
+          <div class="layer">
+            <div class="layer-label">data</div>
+            <div class="layer-main"><strong>Feature layer</strong><span>refreshes behavioral and catalog inputs</span></div>
+            <div class="layer-badge">12 feeds</div>
+          </div>
+        </div>
+        <div class="monitor-panel">
+          <div class="monitor-head"><span>feedback loop</span><strong>Release monitor</strong></div>
+          <div class="signal-list">
+            <div class="signal"><strong>Drift alert</strong><span>distribution shift</span></div>
+            <div class="signal"><strong>Quality eval</strong><span>holdout check</span></div>
+            <div class="signal"><strong>Rollback gate</strong><span>canary guard</span></div>
+          </div>
+        </div>
+        <div class="system-outcome">
+          <div class="outcome-step"><strong>Detect</strong><span>runtime signal</span></div>
+          <div class="outcome-arrow">&rarr;</div>
+          <div class="outcome-step"><strong>Decide</strong><span>eval threshold</span></div>
+          <div class="outcome-arrow">&rarr;</div>
+          <div class="outcome-step"><strong>Fix before impact</strong><span>rollback or retrain</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 This reference is a compass, not a component API. The examples should carry most of the visual teaching.
 
-Open `examples/design-gallery/index.html` when you need range. It shows covers, big-number slides, charts, tables, maps, code, system diagrams, timelines, decision slides, workshop prompts, appendix evidence, and closing moments.
+Open `examples/gallery/index.html` when you need a quick visual reset. It shows slide jobs, hierarchy, content balance, and meaningful visuals. Use it to widen your thinking, not to pick a template.
 
 ## Working Principles
 
@@ -13,7 +13,9 @@ Open `examples/design-gallery/index.html` when you need range. It shows covers, 
 - Keep one deck visually coherent through type scale, color meaning, spacing, and chrome.
 - Let different decks have different visual systems. The examples are deliberately varied.
 
-## Useful Families
+## Possible Starting Points
+
+These are prompts for invention, not a taxonomy. A slide may combine several of them or use none of them.
 
 - **Image-led:** full-bleed cover, artifact close-up, annotated screenshot, field-photo evidence.
 - **Data-led:** one-number slide, focused chart, matrix, dense table, operating ledger.

@@ -16,8 +16,11 @@ presentation/
 |   |-- theme.css
 |   `-- deck.html.template
 |-- references/
+|   |-- layouts.md
+|   |-- rubric.md
+|   |-- taste.md
 |   |-- variants.md
-|   `-- layouts.md
+|   `-- workflow.md
 `-- examples/
     |-- gallery/
     |   |-- agendas/
@@ -27,6 +30,7 @@ presentation/
     |   |-- separators/
     |   |-- spotlights/
     |   |-- statuses/
+    |   |-- systems/
     |   |-- titles/
     |   |-- transitions/
     |   `-- index.html
@@ -59,16 +63,17 @@ Resolve these before drafting:
 - **Visual stance:** image-led, editorial, data-heavy, technical, workshop, executive, or another concrete direction derived from the room.
 - **Slide/speaker split:** what must be legible on the slide vs. what the presenter will say.
 
-End discovery only when you can describe the deck's goal, audience, constraints, rough order, visual stance, and what "good" means for this user.
+End discovery only when you can describe the deck's goal, audience, constraints, rough order, visual stance, and what "good" means for this user. Before drafting, reflect that plan back and ask: "Is there anything else I need to know, or should I build a V1 for us to critique?"
 
 ## How to Run
 
-1. Pick a working directory under `/tmp/<deck-slug>/`.
-2. Copy `templates/deck.html.template` to `<deck-slug>.html`.
-3. Copy `templates/theme.css` into the `<style>` slot in the HTML, then add deck-specific CSS as needed.
-4. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
-5. Draft the deck around slide jobs and visual hierarchy, not around a fixed component list.
-6. Use `references/layouts.md` and `examples/gallery/index.html` to broaden possibilities when a slide starts looking like a generic card grid.
+1. Follow `references/workflow.md`: discover, reflect back, get permission for a V1, draft, self-review, and iterate.
+2. Pick a working directory under `/tmp/<deck-slug>/`.
+3. Copy `templates/deck.html.template` to `<deck-slug>.html`.
+4. Copy `templates/theme.css` into the `<style>` slot in the HTML, then add deck-specific CSS as needed.
+5. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
+6. Draft the deck around slide jobs and visual hierarchy, not around a fixed component list.
+7. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, and `examples/gallery/index.html` to broaden possibilities and review quality before showing the user.
 
 ## Deck Structure
 
@@ -155,6 +160,9 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 - `examples/design-gallery/index.html` - redirect kept for older references.
 - `examples/` - complete fictional decks with different visual systems.
 - `references/layouts.md` - compact guidance for choosing slide jobs without becoming template-bound.
+- `references/rubric.md` - deck-level and slide-level review criteria.
+- `references/taste.md` - visual taste rules and hierarchy guidance.
 - `references/variants.md` - register, chrome, and deck-level identity.
+- `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
 - `templates/theme.css` - foundation CSS to inline and adapt.
 - `templates/deck.html.template` - single-file HTML skeleton.
