@@ -36,28 +36,27 @@ presentation/
 - Do not treat the examples as templates, a taxonomy, or a component library. Open a relevant example to study why it works, then design the user's slide from the user's content.
 - End-to-end example decks should be single HTML files under `examples/full-slide-examples/` unless assets are truly required.
 
-## Critical Interview
+## Alignment
 
-Do not jump straight to slides. Ask concise questions first; use multiple-choice wording when the user is choosing between real tradeoffs, and use free-form questions when context is needed. If you have a tool you can use to interact with users where you ask them questions, use it as much as possible for this interview.
+A presentation is a compression of deep user context, not a formatting pass over a topic. Before drafting any outline or HTML, transfer enough context that the deck can reflect the user's real knowledge, judgment, and taste.
 
-Resolve these before drafting, but do not follow it like a checklist. Let the conversation be fluid between you and the user where you aim to understand and know answers to these concepts:
+Ask concise questions first; use multiple-choice wording for real tradeoffs and free-form questions when the user needs to brain-dump. Use the question tool when available. Pull context from docs, notes, screenshots, data, existing decks, examples, and web research when the deck depends on facts outside the conversation.
 
+Settle these before drafting:
+
+- **Deep material:** facts, tensions, anecdotes, data points, examples, objections, decisions, constraints, and half-formed arguments.
 - **Audience and room:** who is present, how senior, read-ahead vs. live voiceover, and what they already believe.
-- **Purpose:** what the deck must accomplish, stated in the user's language.
-- **Thesis:** the one sentence the audience should retain.
-- **Content inventory:** facts, examples, tensions, decisions, constraints, anecdotes, data points, and half-formed arguments.
+- **Purpose and thesis:** what the deck must accomplish, stated in the user's language, and the one sentence the audience should retain.
 - **Narrative shape:** how the audience should move from current belief to intended action or understanding.
-- **Length and timing:** target slide count, appendix needs, and what will be spoken instead of written.
-- **Inputs:** notes, docs, existing decks, screenshots, data, brand requirements, and required examples.
-- **Constraints:** banned wording, sensitive topics, required terms, shareability needs, and style preferences.
-- **Visual stance:** the deck's density, proof depth, image use, chart use, technicality, and formality.
-- **Slide/speaker split:** what must be legible on the slide vs. what the presenter will say.
+- **Length and slide/speaker split:** target slide count, appendix needs, what must be legible, and what the presenter will say.
+- **Inputs and constraints:** required artifacts, brand requirements, banned wording, sensitive topics, shareability needs, and style preferences.
+- **Visual stance:** density, proof depth, image use, chart use, technicality, formality, and what "good" means for this user.
 
-End discovery only when you can describe the deck's goal, audience, constraints, rough order, visual stance, and what "good" means for this user. Before drafting, reflect that plan back and ask: "Is there anything else I need to know, or should I build a V1 for us to critique?"
+**Threshold (high push):** Do not propose a slide-by-slide outline, produce HTML, or present a formal implementation plan as a substitute for alignment until you can state what deep material you have, what is still missing, and why the deck can now be responsibly compressed. Reflect that understanding back and ask: "Is there anything else I need to know, or should I build a V1 for us to critique?" Wait for explicit approval.
 
 ## Build Workflow
 
-1. Follow `references/workflow.md`: discover, reflect back, get permission for a V1, draft, self-review, and iterate.
+1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission for a V1, draft, self-review, and iterate.
 2. Pick a working directory under `/tmp/<deck-slug>/`.
 3. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
 4. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.

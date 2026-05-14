@@ -4,38 +4,43 @@ This is a collaborative working-session workflow. Do not draft slides before the
 
 ## 1. Discover
 
-Interview for decisions, not trivia. Use concise multiple-choice questions when the user is choosing between real tradeoffs; use free-form questions when context or examples matter more.
+Treat discovery as context transfer. A deck compresses the user's knowledge, so shallow metadata is not enough. Audience, length, and tone guide the work; they do not replace the raw material the deck must compress.
 
-Resolve:
+Gather enough substance to understand:
 
-- audience and room
-- purpose and desired action
-- thesis or working claim
-- content inventory
-- narrative order
-- slide count and timing
-- visual stance
-- required inputs, examples, constraints, and banned moves
-- pre-read vs. live voiceover balance
+- the user's actual goal and why the presentation needs to exist
+- facts, examples, anecdotes, data points, tensions, objections, and decisions
+- docs, notes, screenshots, existing decks, datasets, or links the agent should inspect
+- what the audience already believes and what must change
+- the working thesis and likely narrative order
+- what belongs on slides vs. what the presenter will say
+- visual stance, constraints, banned moves, and what "good" means for this user
 
-When uncertain, ask the fewest questions that remove the biggest risk. Do not ask the user to design the deck for you.
+Use concise multiple-choice questions for real tradeoffs. Use free-form questions when the user needs to brain-dump context. Research or inspect artifacts when needed; do not make the user answer questions the environment can answer. Do not ask the user to design the deck for you.
+
+Never treat a few routing answers as sufficient context. If the substantive material is thin, keep interviewing or ask for artifacts before outlining.
 
 ## 2. Reflect Back
 
-Before drafting, restate the working plan in plain language:
+Before outlining or drafting, restate the understanding in plain language:
 
 - who the deck is for
 - what it must accomplish
-- the likely arc
+- the deep material the agent has absorbed
+- the important gaps or assumptions that remain
+- why the material is now sufficient to compress into a deck
+- the likely narrative arc
 - what belongs on slides vs. in voiceover
 - the visual direction
-- known risks or open assumptions
+- known risks, constraints, or banned moves
 
 End this stage with: "Is there anything else I need to know, or should I build a V1 for us to critique?"
 
+Do not substitute a slide outline, implementation plan, or confident thesis statement for this checkpoint. Wait for explicit approval before drafting HTML.
+
 ## 3. Build V1
 
-After the user confirms, build a complete reviewable V1. A V1 should be concrete enough to critique visually and narratively.
+After the user explicitly approves the reflected understanding, build a complete reviewable V1. A V1 should be concrete enough to critique visually and narratively.
 
 Default arc:
 
