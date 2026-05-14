@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reliability Operating Review</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<style>
+:root {
+  --bg: #fbfaf6;
+  --ink: #1d252c;
+  --muted: #66717a;
+  --line: #d7d2c9;
+  --surface: #ffffff;
+  --blue: #3f7cac;
+  --teal: #54a894;
+  --green: #6c9b4e;
+  --amber: #e6a93d;
+  --red: #d95b43;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+html,
+body,
+.reveal { background: var(--bg); }
+
+.reveal {
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+.reveal .slides { text-align: left; }
+
+.reveal .slides > section {
+  width: 100% !important;
+  height: 800px !important;
+  padding: 46px 60px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto 1fr auto !important;
+  gap: 24px !important;
+  background: var(--bg);
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal p {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.slide-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: start;
+}
+
+.kicker {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.slide-head h2 {
+  max-width: 820px;
+  margin-top: 7px;
+  font-size: 44px;
+  line-height: 1.02;
+  letter-spacing: 0;
+  font-weight: 820;
+}
+
+.date-chip {
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.slide-foot {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.slide-body {
+  min-height: 0;
+  display: grid;
+}
+
+.cover {
+  grid-template-rows: 1fr auto !important;
+  padding: 60px !important;
+}
+
+.cover .slide-body {
+  grid-template-columns: 0.9fr 1.1fr;
+  align-items: end;
+  gap: 54px;
+}
+
+.cover h1 {
+  max-width: 8ch;
+  font-size: 98px;
+  line-height: 0.9;
+  letter-spacing: 0;
+  font-weight: 920;
+}
+
+.status-board {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  gap: 2px;
+}
+
+.status-cell {
+  min-height: 172px;
+  padding: 24px;
+  display: grid;
+  align-content: space-between;
+  background: var(--surface);
+}
+
+.status-cell.hot {
+  background: var(--amber);
+}
+
+.status-cell strong {
+  font-size: 54px;
+  line-height: 0.92;
+  letter-spacing: 0;
+}
+
+.status-cell span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.trend-layout {
+  grid-template-columns: 0.76fr 1.24fr;
+  gap: 52px;
+  align-items: center;
+}
+
+.callout-number strong {
+  display: block;
+  font-size: 132px;
+  line-height: 0.86;
+  letter-spacing: 0;
+}
+
+.callout-number span {
+  color: var(--muted);
+  font-size: 23px;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.chart-frame {
+  height: 452px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+svg { width: 100%; height: 100%; overflow: visible; }
+
+.incident-layout {
+  grid-template-columns: 1fr 1fr;
+  gap: 34px;
+  align-items: stretch;
+}
+
+.incident-stack {
+  display: grid;
+  align-content: end;
+  gap: 14px;
+  padding: 26px;
+  background: var(--ink);
+}
+
+.incident-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 14px;
+  align-items: center;
+  color: #fffaf0;
+}
+
+.incident-row b {
+  color: rgba(255, 250, 240, 0.58);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.incident-row span {
+  height: 34px;
+  background: var(--blue);
+}
+
+.incident-row:nth-child(2) span { width: 82%; background: var(--teal); }
+.incident-row:nth-child(3) span { width: 58%; background: var(--amber); }
+.incident-row:nth-child(4) span { width: 38%; background: var(--red); }
+.incident-row:nth-child(5) span { width: 24%; background: #ffffff; }
+
+.note-panel {
+  padding: 34px;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+  border-left: 6px solid var(--red);
+  background: #fff;
+}
+
+.note-panel strong {
+  max-width: 13ch;
+  font-size: 56px;
+  line-height: 0.94;
+  letter-spacing: 0;
+}
+
+.note-panel p {
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1.28;
+  font-weight: 650;
+}
+
+.matrix {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr 1fr 1fr;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  gap: 2px;
+}
+
+.matrix div {
+  min-height: 96px;
+  padding: 18px;
+  display: grid;
+  align-content: center;
+  background: #fff;
+  font-size: 16px;
+  font-weight: 820;
+}
+
+.matrix .head {
+  background: var(--ink);
+  color: #fffaf0;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.matrix .green { background: rgba(108, 155, 78, 0.22); }
+.matrix .amber { background: rgba(230, 169, 61, 0.32); }
+.matrix .red { background: rgba(217, 91, 67, 0.28); }
+
+.flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.flow-node {
+  min-height: 330px;
+  padding: 28px;
+  display: grid;
+  align-content: space-between;
+  border: 2px solid var(--ink);
+  background: #fff;
+}
+
+.flow-node.hot {
+  background: var(--amber);
+}
+
+.flow-node strong {
+  font-size: 38px;
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.flow-node span {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.arrow {
+  color: var(--muted);
+  font-size: 46px;
+  font-weight: 900;
+}
+
+.ledger {
+  display: grid;
+  grid-template-rows: repeat(5, 1fr);
+  border-top: 2px solid var(--ink);
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 1fr;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  font-size: 20px;
+  font-weight: 780;
+}
+
+.ledger-row.head {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pill {
+  display: inline-flex;
+  width: max-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(63, 124, 172, 0.14);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pill.red { background: rgba(217, 91, 67, 0.18); color: var(--red); }
+.pill.green { background: rgba(108, 155, 78, 0.18); color: var(--green); }
+.pill.amber { background: rgba(230, 169, 61, 0.24); color: #875d12; }
+
+.close-grid {
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 52px;
+  align-items: center;
+}
+
+.close-grid h2 {
+  font-size: 86px;
+  line-height: 0.9;
+  letter-spacing: 0;
+  font-weight: 920;
+}
+
+.actions {
+  display: grid;
+  gap: 18px;
+}
+
+.action {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 20px 0;
+  border-top: 2px solid var(--ink);
+}
+
+.action b {
+  color: var(--red);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.action strong {
+  display: block;
+  font-size: 26px;
+  line-height: 1.04;
+  letter-spacing: 0;
+}
+
+.action span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.reveal .controls { color: var(--ink); opacity: 0.4; }
+.reveal .progress { height: 3px; color: var(--blue); background: rgba(29, 37, 44, 0.08); }
+</style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+    <section class="cover">
+      <div class="slide-body">
+        <div>
+          <span class="kicker">operating review</span>
+          <h1>Reliability Operating Review.</h1>
+        </div>
+        <div class="status-board">
+          <div class="status-cell"><span>availability</span><strong>99.94%</strong></div>
+          <div class="status-cell hot"><span>watch item</span><strong>queue age</strong></div>
+          <div class="status-cell"><span>incidents</span><strong>3</strong></div>
+          <div class="status-cell"><span>decision</span><strong>hold gate</strong></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>1 / 7</span></footer>
+    </section>
+
+    <section>
+      <header class="slide-head"><div><span class="kicker">weekly trend</span><h2>The reliability story improved, but the tail got worse.</h2></div><span class="date-chip">week 21</span></header>
+      <div class="slide-body trend-layout">
+        <div class="callout-number"><strong>14m</strong><span>p95 recovery time in the worst cohort, up from 6m last week.</span></div>
+        <div class="chart-frame">
+          <svg viewBox="0 0 560 330" aria-hidden="true">
+            <path d="M36 286 H528 M36 218 H528 M36 150 H528 M36 82 H528" stroke="#e6e0d7" stroke-width="2"/>
+            <path d="M42 248 C96 238 124 212 166 198 C225 178 256 190 304 156 C364 114 420 118 512 92" fill="none" stroke="#3f7cac" stroke-width="8"/>
+            <path d="M42 270 C116 264 176 260 236 252 C314 242 378 232 512 210" fill="none" stroke="#54a894" stroke-width="8"/>
+            <circle cx="512" cy="92" r="13" fill="#d95b43"/>
+          </svg>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>2 / 7</span></footer>
+    </section>
+
+    <section>
+      <header class="slide-head"><div><span class="kicker">incidents</span><h2>The incident count is low. The concentration is the issue.</h2></div><span class="date-chip">last 30d</span></header>
+      <div class="slide-body incident-layout">
+        <div class="incident-stack">
+          <div class="incident-row"><b>auth</b><span></span></div>
+          <div class="incident-row"><b>billing</b><span></span></div>
+          <div class="incident-row"><b>search</b><span></span></div>
+          <div class="incident-row"><b>queue</b><span></span></div>
+          <div class="incident-row"><b>cdn</b><span></span></div>
+        </div>
+        <div class="note-panel">
+          <strong>Queue failures create the longest visible customer pain.</strong>
+          <p>Most systems recovered quickly. The queue path recovered slowly because retry ownership is split.</p>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>3 / 7</span></footer>
+    </section>
+
+    <section>
+      <header class="slide-head"><div><span class="kicker">service grid</span><h2>The health picture is uneven across dimensions.</h2></div><span class="date-chip">snapshot</span></header>
+      <div class="slide-body">
+        <div class="matrix">
+          <div class="head"></div><div class="head">availability</div><div class="head">latency</div><div class="head">recovery</div>
+          <div class="head">auth</div><div class="green">green</div><div class="green">green</div><div class="amber">watch</div>
+          <div class="head">billing</div><div class="green">green</div><div class="amber">watch</div><div class="amber">watch</div>
+          <div class="head">search</div><div class="green">green</div><div class="green">green</div><div class="green">green</div>
+          <div class="head">queue</div><div class="amber">watch</div><div class="red">red</div><div class="red">red</div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>4 / 7</span></footer>
+    </section>
+
+    <section>
+      <header class="slide-head"><div><span class="kicker">bottleneck</span><h2>The next fix is not another alert. It is one owner for retry policy.</h2></div><span class="date-chip">control point</span></header>
+      <div class="slide-body">
+        <div class="flow">
+          <div class="flow-node"><span>detect</span><strong>Queue age crosses threshold.</strong></div>
+          <div class="arrow">&rarr;</div>
+          <div class="flow-node hot"><span>decide</span><strong>Retry policy has no single owner.</strong></div>
+          <div class="arrow">&rarr;</div>
+          <div class="flow-node"><span>recover</span><strong>Manual replay becomes the path.</strong></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>5 / 7</span></footer>
+    </section>
+
+    <section>
+      <header class="slide-head"><div><span class="kicker">decision ledger</span><h2>Keep the gate closed until two controls are real.</h2></div><span class="date-chip">this week</span></header>
+      <div class="slide-body">
+        <div class="ledger">
+          <div class="ledger-row head"><span>control</span><span>owner</span><span>state</span><span>gate effect</span></div>
+          <div class="ledger-row"><span>Queue retry policy</span><span>Platform</span><span><b class="pill red">missing</b></span><span>blocks expansion</span></div>
+          <div class="ledger-row"><span>Replay audit trail</span><span>SRE</span><span><b class="pill amber">partial</b></span><span>blocks expansion</span></div>
+          <div class="ledger-row"><span>Customer comms trigger</span><span>Support</span><span><b class="pill green">ready</b></span><span>no blocker</span></div>
+          <div class="ledger-row"><span>Error budget alert</span><span>Infra</span><span><b class="pill green">ready</b></span><span>no blocker</span></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>6 / 7</span></footer>
+    </section>
+
+    <section>
+      <header class="slide-head"><div><span class="kicker">close</span></div><span class="date-chip">ask</span></header>
+      <div class="slide-body close-grid">
+        <h2>Hold the rollout one week.</h2>
+        <div class="actions">
+          <div class="action"><b>1</b><div><strong>Name the retry-policy owner.</strong><span>One team owns the rules, exceptions, and release path.</span></div></div>
+          <div class="action"><b>2</b><div><strong>Prove replay auditability.</strong><span>Every recovery action has an operator, reason, and customer impact.</span></div></div>
+          <div class="action"><b>3</b><div><strong>Reopen the gate with evidence.</strong><span>Expansion resumes when both controls show up in production.</span></div></div>
+        </div>
+      </div>
+      <footer class="slide-foot"><span>Reliability Operating Review</span><span>7 / 7</span></footer>
+    </section>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  transition: "fade",
+  controls: true,
+  progress: true,
+  center: false,
+  width: 1280,
+  height: 800,
+  margin: 0
+});
+</script>
+</body>
+</html>
