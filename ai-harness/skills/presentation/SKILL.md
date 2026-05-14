@@ -74,11 +74,13 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 ```
 
 - Keep agendas to 5 items or fewer.
-- Use a separator before each major agenda section. Include a short section label and, when helpful, a minimal subtitle.
+- By default, each agenda item starts a section and gets its own separator slide before that section's content. If the deck uses an agenda, the audience should feel the same chunking in the slide flow.
+- Use separators as transitions, not content slides. Include a short section label and, when helpful, a minimal subtitle there rather than repeating explanatory subtitles on content slides.
 - Choose the final slide intentionally: summary, conclusion, decision, Q&A, or next steps.
 - Content slides should generally place the title across the top with the content below.
 - Title, agenda, separator, summary, conclusion, and Q&A slides may use centered or left-weighted layouts because they carry less body information.
 - Content-slide titles should aim to fit on one line at a 1200px-wide viewport. Shorten the claim before shrinking type.
+- Do not add a subtitle to a content slide by default. Add one only when the audience needs it to understand the slide's frame; otherwise let the title and visual do the work.
 - Write high-emphasis text to render on one line inside its container: titles, section labels, KPI values, outcome statements, callout headers, and other bold scan targets should be concise enough to understand without a line break.
 - Reserve multi-line wrapping for smaller supporting copy.
 - Omit kickers/eyebrow labels by default. Add one only when it gives necessary orientation that the title cannot carry.
@@ -92,6 +94,7 @@ Every deck should be scan-ready, even if the audience is technical.
 - Use images, diagrams, charts, tables, code, icons, figures, and spatial composition when they explain faster than paragraphs.
 - Use proven libraries, renderers, syntax highlighters, charting tools, and icon sets when they materially improve the slide.
 - Avoid defaulting to three cards, repeated panels, or generic process arrows.
+- Do not over-copy structures from examples. Examples calibrate taste, spacing, hierarchy, and craft; they are not components to reuse until every deck looks the same.
 - Keep a consistent visual system inside one deck, but let different decks look genuinely different.
 - Make section breaks feel like transitions, not content slides.
 - Use appendix/detail slides for proof that would crowd the main story.

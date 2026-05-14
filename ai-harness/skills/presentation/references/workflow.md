@@ -45,10 +45,12 @@ After the user explicitly approves the reflected understanding, build a complete
 Default arc:
 
 ```text
-title -> agenda -> separator -> content -> separator -> content -> final slide
+title -> agenda -> separator for agenda item 1 -> content -> separator for agenda item 2 -> content -> final slide
 ```
 
-Adapt the arc when the user's context demands it. Do not force every deck into the same shape.
+When a deck includes an agenda, each agenda item should usually become a visible section with its own separator slide. Adapt the arc when the user's context demands it, but do not let the agenda promise structure that the slide flow does not deliver.
+
+Content-slide subtitles are optional. Use them when they supply necessary frame or evidence context; otherwise remove them and let the title, visual hierarchy, and section separator carry orientation.
 
 ## 4. Self-Review
 

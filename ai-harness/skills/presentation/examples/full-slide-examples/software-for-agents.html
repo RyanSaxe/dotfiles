@@ -73,39 +73,18 @@ body,
   font-weight: 870;
 }
 
-.content-slide {
-  display: grid !important;
-  grid-template-rows: auto 1fr;
-  gap: 34px;
-}
-
-.slide-title {
-  display: grid;
-  gap: 10px;
-}
-
-.slide-title h2,
-.slide-title h1 {
+.slide-title h2 {
   max-width: 100%;
   color: var(--ink);
   font-size: 52px;
   line-height: 1;
-  font-weight: 860;
+  font-weight: 870;
 }
 
-.slide-title p {
-  max-width: 48ch;
-  color: var(--muted);
-  font-size: 20px;
-  line-height: 1.25;
-  font-weight: 640;
-}
-
-.kicker {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
+.content-slide {
+  display: grid !important;
+  grid-template-rows: auto 1fr;
+  gap: 36px;
 }
 
 .accent-line {
@@ -114,12 +93,11 @@ body,
   background: var(--amber);
 }
 
-.muted {
+.label {
   color: var(--muted);
-}
-
-.mono {
-  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .pill {
@@ -145,10 +123,14 @@ body,
   background: #d6e4e8;
 }
 
+.muted {
+  color: var(--muted);
+}
+
 .title-slide {
   display: grid !important;
-  grid-template-columns: 0.84fr 1.16fr;
-  gap: 46px;
+  grid-template-columns: 0.88fr 1.12fr;
+  gap: 54px;
   align-items: center;
 }
 
@@ -159,78 +141,123 @@ body,
 
 .title-copy h1 {
   max-width: 8ch;
-  font-size: 94px;
-  line-height: 0.92;
-  font-weight: 890;
+  font-size: 98px;
+  line-height: 0.91;
+  font-weight: 900;
 }
 
 .title-copy p {
-  max-width: 33ch;
+  max-width: 32ch;
   color: var(--muted);
   font-size: 25px;
   line-height: 1.22;
   font-weight: 650;
 }
 
-.package-blueprint {
+.capability-orbit {
   position: relative;
   height: 560px;
+}
+
+.orbit-ring {
+  position: absolute;
+  inset: 58px 40px 48px;
   border: 3px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 18px 18px 0 var(--surface-2);
-  display: grid;
-  grid-template-rows: 62px 1fr;
-}
-
-.blueprint-head {
-  border-bottom: 3px solid var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 24px;
-}
-
-.window-dot {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--ink);
   border-radius: 50%;
 }
 
-.blueprint-body {
-  padding: 28px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 132px 116px 116px;
-  gap: 18px;
-  align-content: center;
+.orbit-ring.two {
+  inset: 112px 118px 102px;
+  border-color: var(--line);
 }
 
-.blueprint-card {
-  min-height: 0;
+.agent-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  height: 190px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 30px;
+  line-height: 0.95;
+  font-weight: 880;
+}
+
+.orbit-node {
+  position: absolute;
   border: 2px solid var(--ink);
-  background: var(--bg);
-  padding: 18px;
+  background: var(--surface);
+  padding: 16px 18px;
+  min-width: 146px;
   display: grid;
-  align-content: center;
-  gap: 8px;
+  gap: 5px;
 }
 
-.blueprint-card.big {
-  grid-column: 1 / -1;
-  background: #fff6d9;
-}
-
-.blueprint-card strong {
-  font-size: 23px;
+.orbit-node strong {
+  font-size: 22px;
   line-height: 1;
 }
 
-.blueprint-card span {
+.orbit-node span {
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 830;
   text-transform: uppercase;
+}
+
+.orbit-node.tools {
+  right: 32px;
+  top: 84px;
+  background: #d6e4e8;
+}
+
+.orbit-node.examples {
+  right: 64px;
+  bottom: 86px;
+  background: #fff6d9;
+}
+
+.orbit-node.contracts {
+  left: 42px;
+  bottom: 116px;
+  background: #d9e5d6;
+}
+
+.orbit-node.instructions {
+  left: 78px;
+  top: 76px;
+}
+
+.orbit-spoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  height: 3px;
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+.orbit-spoke.a {
+  transform: rotate(-34deg);
+}
+
+.orbit-spoke.b {
+  transform: rotate(38deg);
+}
+
+.orbit-spoke.c {
+  transform: rotate(146deg);
+}
+
+.orbit-spoke.d {
+  transform: rotate(215deg);
 }
 
 .agenda-slide {
@@ -240,24 +267,20 @@ body,
   align-items: center;
 }
 
-.agenda-title {
-  display: grid;
-  gap: 20px;
-}
-
 .agenda-title h1 {
   max-width: 9ch;
   font-size: 94px;
   line-height: 0.95;
-  font-weight: 880;
+  font-weight: 890;
 }
 
 .agenda-title p {
-  max-width: 27ch;
+  max-width: 26ch;
+  margin-top: 22px;
   color: var(--muted);
   font-size: 23px;
   line-height: 1.25;
-  font-weight: 640;
+  font-weight: 650;
 }
 
 .agenda-path {
@@ -315,470 +338,16 @@ body,
   font-weight: 650;
 }
 
-.ceiling-body {
-  display: grid;
-  grid-template-columns: 1fr 92px 1fr;
-  gap: 26px;
-  align-items: stretch;
-}
-
-.ceiling-panel {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-}
-
-.ceiling-head {
-  border-bottom: 3px solid var(--ink);
-  padding: 22px 24px;
-  display: grid;
-  gap: 7px;
-}
-
-.ceiling-head span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.ceiling-head h3 {
-  font-size: 36px;
-  line-height: 1;
-  font-weight: 860;
-}
-
-.prompt-card {
-  margin: 28px;
-  border: 2px solid var(--ink);
-  background: var(--bg);
-  padding: 24px;
-  display: grid;
-  align-content: center;
-  gap: 16px;
-}
-
-.prompt-line {
-  height: 16px;
-  border: 2px solid var(--ink);
-  background: var(--surface-2);
-}
-
-.prompt-line.short {
-  width: 68%;
-}
-
-.package-stack {
-  padding: 24px;
-  display: grid;
-  gap: 12px;
-  align-content: center;
-}
-
-.stack-row {
-  border: 2px solid var(--ink);
-  background: var(--bg);
-  padding: 14px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 18px;
-  font-weight: 850;
-}
-
-.stack-row.focus {
-  background: var(--amber);
-}
-
-.outcome-band {
-  border-top: 3px solid var(--ink);
-  padding: 20px 24px;
-  display: grid;
-  gap: 6px;
-}
-
-.outcome-band.bad {
-  background: #f4d7cf;
-}
-
-.outcome-band.good {
-  background: #d9e5d6;
-}
-
-.outcome-band span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.outcome-band strong {
-  font-size: 27px;
-  line-height: 1;
-}
-
-.bridge-arrow {
-  display: grid;
-  place-items: center;
-  font-size: 44px;
-  font-weight: 900;
-}
-
-.agent-skill-map {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 32px;
-  align-items: stretch;
-}
-
-.agent-column,
-.skill-column {
-  display: grid;
-  gap: 18px;
-}
-
-.big-node {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  min-height: 184px;
-  padding: 26px;
-  display: grid;
-  align-content: center;
-  gap: 12px;
-}
-
-.big-node h3 {
-  font-size: 44px;
-  line-height: 0.95;
-  font-weight: 860;
-}
-
-.big-node p {
-  max-width: 32ch;
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.capability-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.capability {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  min-height: 112px;
-  padding: 18px;
-  display: grid;
-  align-content: center;
-  gap: 7px;
-}
-
-.capability strong {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.capability span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 820;
-  text-transform: uppercase;
-}
-
-.callout-strip {
-  border: 2px solid var(--ink);
-  background: #fff6d9;
-  padding: 18px 22px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 18px;
-  align-items: center;
-  font-size: 22px;
-  font-weight: 850;
-}
-
-.callout-strip b {
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--amber);
-}
-
-.anatomy {
-  display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  gap: 34px;
-  align-items: center;
-}
-
-.folder {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  display: grid;
-  grid-template-rows: 58px 1fr;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.folder-tab {
-  border-bottom: 3px solid var(--ink);
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 18px;
-  font-weight: 860;
-}
-
-.folder-tree {
-  padding: 24px 28px;
-  display: grid;
-  gap: 15px;
-  font-family: var(--mono);
-  font-size: 22px;
-  line-height: 1;
-  font-weight: 700;
-}
-
-.folder-tree span {
-  color: var(--muted);
-  font-size: 15px;
-}
-
-.anatomy-notes {
-  display: grid;
-  gap: 18px;
-}
-
-.note-row {
-  border-top: 2px solid var(--ink);
-  padding-top: 16px;
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-.note-row strong {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.note-row p {
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1.28;
-  font-weight: 650;
-}
-
-.tools-layout {
-  display: grid;
-  grid-template-columns: 0.92fr 1.08fr;
-  gap: 34px;
-  align-items: stretch;
-}
-
-.tool-question {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 30px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 24px;
-}
-
-.tool-question h3 {
-  max-width: 9ch;
-  font-size: 56px;
-  line-height: 0.96;
-  font-weight: 880;
-}
-
-.tool-question p {
-  max-width: 28ch;
-  color: var(--muted);
-  font-size: 20px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.tool-answer {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 18px;
-}
-
-.tool-compare {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.tool-card {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 22px;
-  display: grid;
-  gap: 14px;
-  align-content: start;
-}
-
-.tool-card.highlight {
-  background: #fff6d9;
-}
-
-.tool-card h3 {
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 860;
-}
-
-.tool-card p {
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.terminal {
-  border: 2px solid var(--ink);
-  background: #111820;
-  color: #d7f3ed;
-  padding: 18px;
-  font-family: var(--mono);
-  font-size: 17px;
-  line-height: 1.45;
-  font-weight: 650;
-}
-
-.terminal .dim {
-  color: #91aaa6;
-}
-
-.tool-principle {
-  border: 2px solid var(--ink);
-  background: #d9e5d6;
-  padding: 18px 22px;
-  display: grid;
-  grid-template-columns: 168px 1fr;
-  gap: 22px;
-  align-items: center;
-}
-
-.tool-principle strong {
-  font-size: 26px;
-  line-height: 1;
-}
-
-.tool-principle span {
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.25;
-  font-weight: 700;
-}
-
-.sharing-map {
-  display: grid;
-  grid-template-columns: 0.92fr 84px 1.08fr;
-  gap: 24px;
-  align-items: center;
-}
-
-.source-package {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  min-height: 360px;
-  padding: 28px;
-  display: grid;
-  align-content: center;
-  gap: 18px;
-}
-
-.source-package h3 {
-  font-size: 44px;
-  line-height: 0.98;
-  font-weight: 860;
-}
-
-.source-package p {
-  max-width: 28ch;
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.team-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.team-card {
-  min-height: 168px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 20px;
-  display: grid;
-  align-content: space-between;
-}
-
-.team-card h3 {
-  font-size: 27px;
-  line-height: 1;
-}
-
-.team-card p {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.team-card .swatch {
-  width: 64px;
-  height: 12px;
-  border: 2px solid var(--ink);
-}
-
-.swatch.green {
-  background: var(--green);
-}
-
-.swatch.blue {
-  background: var(--blue);
-}
-
-.swatch.amber {
-  background: var(--amber);
-}
-
-.swatch.red {
-  background: var(--red);
-}
-
 .section-slide {
   display: grid !important;
-  align-content: center;
-}
-
-.section-grid {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 72px;
+  grid-template-columns: 0.88fr 1.12fr;
+  gap: 70px;
   align-items: center;
 }
 
 .section-copy {
   display: grid;
-  gap: 24px;
+  gap: 22px;
 }
 
 .section-copy .number {
@@ -788,10 +357,20 @@ body,
 }
 
 .section-copy h2 {
-  max-width: 10ch;
+  max-width: 9ch;
   font-size: 104px;
   line-height: 0.92;
-  font-weight: 890;
+  font-weight: 900;
+}
+
+.case-separator .section-copy h2 {
+  max-width: 9ch;
+  font-size: 88px;
+}
+
+.case-separator .deck-art {
+  transform: scale(0.76);
+  transform-origin: center;
 }
 
 .section-copy p {
@@ -802,166 +381,550 @@ body,
   font-weight: 650;
 }
 
-.case-meter {
-  height: 390px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
-  align-items: end;
-  border-bottom: 3px solid var(--ink);
-  padding: 0 18px;
-}
-
-.meter-col {
+.prompt-ceiling-art {
+  height: 430px;
+  position: relative;
   display: grid;
   align-content: end;
-  gap: 12px;
 }
 
-.meter-bar {
-  border: 2px solid var(--ink);
-  background: var(--surface);
+.ceiling-line {
+  position: absolute;
+  top: 54px;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: var(--ink);
 }
 
-.meter-bar.context {
-  height: 300px;
-  background: var(--amber);
-}
-
-.meter-bar.template {
-  height: 214px;
-}
-
-.meter-bar.examples {
-  height: 252px;
-  background: #d6e4e8;
-}
-
-.meter-bar.qa {
-  height: 188px;
-  background: #d9e5d6;
-}
-
-.meter-col span {
+.ceiling-line span {
+  position: absolute;
+  right: 0;
+  top: -30px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 850;
   text-transform: uppercase;
 }
 
-.context-flow {
-  display: grid;
-  grid-template-columns: 0.85fr 82px 1.15fr;
-  gap: 22px;
-  align-items: stretch;
-}
-
-.brain-dump,
-.deck-compression {
+.prompt-sheet {
+  width: 520px;
+  height: 250px;
   border: 3px solid var(--ink);
   background: var(--surface);
-  padding: 24px;
+  transform: rotate(-4deg);
+  box-shadow: 16px 18px 0 var(--surface-2);
+  padding: 34px;
   display: grid;
   gap: 16px;
+  align-content: center;
 }
 
-.brain-dump h3,
-.deck-compression h3 {
-  font-size: 34px;
-  line-height: 1;
-  font-weight: 860;
-}
-
-.context-chip-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.context-chip {
+.prompt-mark {
+  height: 18px;
   border: 2px solid var(--ink);
-  background: var(--bg);
-  padding: 14px 15px;
-  min-height: 66px;
+  background: var(--surface-2);
+}
+
+.prompt-mark.short {
+  width: 58%;
+}
+
+.prompt-vs-skill {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.thin-prompt {
+  position: relative;
+  min-height: 392px;
+  border-left: 4px solid var(--ink);
+  padding-left: 34px;
   display: grid;
   align-content: center;
-  gap: 4px;
+  gap: 26px;
 }
 
-.context-chip strong {
-  font-size: 19px;
-  line-height: 1;
+.thin-prompt h3 {
+  font-size: 58px;
+  line-height: 0.94;
+  font-weight: 890;
 }
 
-.context-chip span {
+.thin-prompt p {
+  max-width: 28ch;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 820;
-  text-transform: uppercase;
-}
-
-.compression-list {
-  display: grid;
-  gap: 13px;
-  align-content: center;
-}
-
-.compression-item {
-  border-top: 2px solid var(--ink);
-  padding-top: 13px;
-  display: grid;
-  grid-template-columns: 126px 1fr;
-  gap: 18px;
-  align-items: start;
-}
-
-.compression-item strong {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.compression-item span {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.24;
+  font-size: 21px;
+  line-height: 1.25;
   font-weight: 650;
 }
 
-.arrow-cell {
+.operating-surface {
   display: grid;
-  place-items: center;
-  font-size: 40px;
-  font-weight: 900;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 150px 150px 86px;
+  gap: 18px;
 }
 
-.template-board {
+.surface-piece {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 20px;
   display: grid;
-  grid-template-columns: 1.02fr 0.98fr;
-  gap: 28px;
-  align-items: stretch;
+  align-content: center;
+  gap: 8px;
 }
 
-.skeleton {
+.surface-piece.wide {
+  grid-column: 1 / -1;
+  grid-template-columns: 170px 1fr;
+  align-items: center;
+  background: #d9e5d6;
+}
+
+.surface-piece strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.surface-piece span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 830;
+  text-transform: uppercase;
+}
+
+.anatomy-art {
+  height: 460px;
+  position: relative;
+}
+
+.artifact-sheet {
+  position: absolute;
   border: 3px solid var(--ink);
   background: var(--surface);
+  padding: 22px;
   display: grid;
-  grid-template-rows: 58px 1fr;
+  align-content: end;
+  gap: 8px;
+  box-shadow: 12px 12px 0 var(--surface-2);
 }
 
-.skeleton-head {
-  border-bottom: 3px solid var(--ink);
-  padding: 0 22px;
-  display: flex;
+.artifact-sheet strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.artifact-sheet span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 830;
+  text-transform: uppercase;
+}
+
+.artifact-sheet.one {
+  width: 300px;
+  height: 210px;
+  left: 24px;
+  top: 42px;
+  transform: rotate(-6deg);
+  background: #fff6d9;
+}
+
+.artifact-sheet.two {
+  width: 260px;
+  height: 178px;
+  right: 72px;
+  top: 26px;
+  transform: rotate(4deg);
+}
+
+.artifact-sheet.three {
+  width: 286px;
+  height: 184px;
+  left: 168px;
+  bottom: 34px;
+  transform: rotate(2deg);
+  background: #d6e4e8;
+}
+
+.artifact-sheet.four {
+  width: 236px;
+  height: 150px;
+  right: 12px;
+  bottom: 76px;
+  transform: rotate(-5deg);
+  background: #d9e5d6;
+}
+
+.package-shape {
+  display: grid;
+  grid-template-columns: 0.88fr 1.12fr;
+  gap: 42px;
   align-items: center;
-  justify-content: space-between;
+}
+
+.central-capability {
+  width: 380px;
+  height: 380px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 40px;
+  box-shadow: 18px 18px 0 var(--surface-2);
+}
+
+.central-capability h3 {
+  font-size: 54px;
+  line-height: 0.92;
+  font-weight: 890;
+}
+
+.package-list {
+  display: grid;
+  gap: 18px;
+}
+
+.package-row {
+  border-top: 2px solid var(--ink);
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 26px;
+  align-items: start;
+}
+
+.package-row strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.package-row span {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.28;
+  font-weight: 650;
+}
+
+.tools-art {
+  height: 460px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.terminal-large {
+  width: 560px;
+  border: 3px solid var(--ink);
+  background: #111820;
+  color: #d7f3ed;
+  padding: 28px 30px;
+  font-family: var(--mono);
+  font-size: 23px;
+  line-height: 1.45;
+  font-weight: 700;
+  box-shadow: 18px 18px 0 var(--surface-2);
+}
+
+.terminal-large .dim {
+  color: #91aaa6;
+}
+
+.tool-tag {
+  position: absolute;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 12px 16px;
   font-size: 18px;
-  font-weight: 860;
+  font-weight: 850;
+}
+
+.tool-tag.a {
+  left: 10px;
+  top: 36px;
+  background: #d6e4e8;
+}
+
+.tool-tag.b {
+  right: 10px;
+  top: 74px;
+}
+
+.tool-tag.c {
+  left: 52px;
+  bottom: 46px;
+  background: #d9e5d6;
+}
+
+.tool-slide {
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.cli-panel {
+  border: 3px solid var(--ink);
+  background: #111820;
+  color: #d7f3ed;
+  padding: 34px;
+  font-family: var(--mono);
+  font-size: 21px;
+  line-height: 1.52;
+  font-weight: 700;
+  box-shadow: 16px 16px 0 var(--surface-2);
+}
+
+.cli-panel .dim {
+  color: #91aaa6;
+}
+
+.tool-thesis {
+  display: grid;
+  gap: 24px;
+}
+
+.tool-thesis h3 {
+  font-size: 56px;
+  line-height: 0.95;
+  font-weight: 890;
+}
+
+.tool-thesis p {
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.mcp-note {
+  border-left: 8px solid var(--blue);
+  padding-left: 20px;
+  display: grid;
+  gap: 7px;
+}
+
+.mcp-note strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mcp-note span {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.deck-art {
+  position: relative;
+  height: 460px;
+}
+
+.slide-stack-card {
+  position: absolute;
+  width: 430px;
+  height: 270px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  box-shadow: 12px 12px 0 var(--surface-2);
+  padding: 26px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 22px;
+}
+
+.slide-stack-card::before {
+  content: "";
+  width: 110px;
+  height: 8px;
+  background: var(--amber);
+}
+
+.slide-stack-card.a {
+  left: 70px;
+  top: 32px;
+  transform: rotate(-7deg);
+}
+
+.slide-stack-card.b {
+  right: 58px;
+  top: 106px;
+  transform: rotate(5deg);
+  background: #fff6d9;
+}
+
+.slide-stack-card.c {
+  left: 168px;
+  bottom: 20px;
+  transform: rotate(-1deg);
+  background: #d6e4e8;
+}
+
+.thumb-title {
+  width: 78%;
+  height: 30px;
+  border: 2px solid var(--ink);
+  background: var(--bg);
+}
+
+.thumb-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.thumb-box {
+  border: 2px solid var(--ink);
+  background: var(--bg);
+}
+
+.context-compression {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 0.82fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.messy-context {
+  min-height: 420px;
+  position: relative;
+}
+
+.context-chip {
+  position: absolute;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 14px 16px;
+  font-size: 20px;
+  font-weight: 850;
+  box-shadow: 8px 8px 0 var(--surface-2);
+}
+
+.context-chip.a {
+  left: 10px;
+  top: 18px;
+  transform: rotate(-5deg);
+}
+
+.context-chip.b {
+  right: 36px;
+  top: 64px;
+  background: #fff6d9;
+  transform: rotate(4deg);
+}
+
+.context-chip.c {
+  left: 86px;
+  top: 150px;
+  background: #d6e4e8;
+}
+
+.context-chip.d {
+  right: 86px;
+  top: 210px;
+  transform: rotate(-4deg);
+}
+
+.context-chip.e {
+  left: 38px;
+  bottom: 56px;
+  background: #d9e5d6;
+  transform: rotate(3deg);
+}
+
+.context-chip.f {
+  right: 14px;
+  bottom: 24px;
+}
+
+.compression-arrow {
+  position: absolute;
+  left: 52%;
+  top: 50%;
+  width: 104px;
+  height: 5px;
+  background: var(--ink);
+  transform: translate(-50%, -50%);
+}
+
+.compression-arrow::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-right: 5px solid var(--ink);
+  border-top: 5px solid var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.compressed-slide {
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 28px;
+  height: 390px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  box-shadow: 16px 16px 0 var(--surface-2);
+}
+
+.compressed-slide h3 {
+  font-size: 42px;
+  line-height: 0.95;
+  font-weight: 880;
+}
+
+.compressed-bars {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+}
+
+.compressed-bar {
+  height: 18px;
+  border: 2px solid var(--ink);
+  background: var(--surface-2);
+}
+
+.compressed-bar.short {
+  width: 62%;
+}
+
+.template-spread {
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.starter-sheet {
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  height: 420px;
+  padding: 28px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 28px;
+  box-shadow: 16px 16px 0 var(--surface-2);
+}
+
+.starter-sheet h3 {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 870;
 }
 
 .code-lines {
-  padding: 24px;
   display: grid;
-  gap: 13px;
+  gap: 14px;
   align-content: center;
 }
 
@@ -987,135 +950,316 @@ body,
   background: var(--amber);
 }
 
-.downstream {
+.completion-lanes {
   display: grid;
-  gap: 18px;
+  gap: 26px;
 }
 
-.downstream-card {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  min-height: 126px;
-  padding: 20px;
+.completion-lane {
   display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 18px;
+  grid-template-columns: 118px 1fr;
+  gap: 22px;
   align-items: center;
 }
 
-.downstream-card .icon-box {
-  height: 82px;
-  border: 2px solid var(--ink);
-  background: var(--bg);
+.completion-lane b {
+  width: 86px;
+  height: 86px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 30px;
-  font-weight: 900;
+  background: var(--amber);
+  font-size: 34px;
 }
 
-.downstream-card strong {
-  font-size: 24px;
+.completion-lane strong {
+  font-size: 31px;
   line-height: 1;
 }
 
-.downstream-card p {
-  margin-top: 7px;
+.completion-lane span {
+  display: block;
+  margin-top: 6px;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.25;
   font-weight: 650;
 }
 
-.qa-board {
+.example-gallery {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 30px;
-  align-items: stretch;
-}
-
-.viewport-grid {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 24px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.viewport {
-  border: 2px solid var(--ink);
-  background: var(--bg);
-  padding: 14px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 12px;
-  min-height: 142px;
-}
-
-.viewport strong {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.viewport-screen {
-  border: 2px solid var(--ink);
-  background: var(--surface-2);
-  display: grid;
-  place-items: center;
-}
-
-.viewport-screen::before {
-  content: "";
-  width: 70%;
-  height: 44%;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 8px 8px 0 #d9e5d6;
-}
-
-.qa-loop {
-  display: grid;
-  gap: 16px;
-  align-content: center;
-}
-
-.qa-step {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 18px 20px;
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 15px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
   align-items: center;
 }
 
-.qa-step b {
-  width: 38px;
-  height: 38px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  background: var(--amber);
+.mini-slide {
+  height: 390px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 22px;
   display: grid;
-  place-items: center;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
 }
 
-.qa-step strong {
-  font-size: 23px;
+.mini-slide:nth-child(2) {
+  background: #fff6d9;
+  transform: translateY(-26px);
+}
+
+.mini-slide:nth-child(3) {
+  background: #d6e4e8;
+}
+
+.mini-slide h3 {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 870;
+}
+
+.mini-visual {
+  border: 2px solid var(--ink);
+  background: var(--bg);
+}
+
+.mini-slide:nth-child(1) .mini-visual {
+  background:
+    linear-gradient(90deg, transparent 48%, var(--ink) 48%, var(--ink) 52%, transparent 52%),
+    linear-gradient(180deg, transparent 48%, var(--ink) 48%, var(--ink) 52%, transparent 52%),
+    var(--bg);
+}
+
+.mini-slide:nth-child(2) .mini-visual {
+  background:
+    linear-gradient(180deg, transparent 14%, var(--ink) 14%, var(--ink) 17%, transparent 17%),
+    linear-gradient(180deg, transparent 44%, var(--ink) 44%, var(--ink) 47%, transparent 47%),
+    linear-gradient(180deg, transparent 74%, var(--ink) 74%, var(--ink) 77%, transparent 77%),
+    var(--bg);
+}
+
+.mini-slide:nth-child(3) .mini-visual {
+  background:
+    linear-gradient(90deg, transparent 12%, var(--amber) 12%, var(--amber) 28%, transparent 28%),
+    linear-gradient(90deg, transparent 38%, var(--blue) 38%, var(--blue) 58%, transparent 58%),
+    linear-gradient(90deg, transparent 68%, var(--green) 68%, var(--green) 86%, transparent 86%),
+    var(--bg);
+}
+
+.mini-caption {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.22;
+  font-weight: 700;
+}
+
+.operating-art {
+  height: 460px;
+  position: relative;
+}
+
+.shared-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  height: 190px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--amber);
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 880;
+}
+
+.team-node {
+  position: absolute;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  width: 170px;
+  height: 108px;
+  padding: 16px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.team-node strong {
+  font-size: 24px;
   line-height: 1;
 }
 
-.qa-step span {
-  display: block;
-  margin-top: 5px;
+.team-node span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 820;
   text-transform: uppercase;
 }
 
+.team-node.product {
+  left: 24px;
+  top: 40px;
+}
+
+.team-node.research {
+  right: 30px;
+  top: 58px;
+  background: #d6e4e8;
+}
+
+.team-node.design {
+  left: 72px;
+  bottom: 42px;
+  background: #fff6d9;
+}
+
+.team-node.ops {
+  right: 82px;
+  bottom: 34px;
+  background: #d9e5d6;
+}
+
+.connection {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 230px;
+  height: 3px;
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+.connection.a {
+  transform: rotate(-143deg);
+}
+
+.connection.b {
+  transform: rotate(-35deg);
+}
+
+.connection.c {
+  transform: rotate(145deg);
+}
+
+.connection.d {
+  transform: rotate(36deg);
+}
+
+.shared-local {
+  display: grid;
+  grid-template-columns: 0.86fr 1.14fr;
+  gap: 42px;
+  align-items: center;
+}
+
+.capability-source {
+  border-left: 8px solid var(--ink);
+  padding-left: 30px;
+  display: grid;
+  gap: 18px;
+}
+
+.capability-source h3 {
+  font-size: 62px;
+  line-height: 0.92;
+  font-weight: 890;
+}
+
+.capability-source p {
+  max-width: 29ch;
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.outputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.output-card {
+  height: 178px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 20px;
+  display: grid;
+  align-content: space-between;
+}
+
+.output-card:nth-child(2) {
+  background: #d6e4e8;
+}
+
+.output-card:nth-child(3) {
+  background: #fff6d9;
+}
+
+.output-card:nth-child(4) {
+  background: #d9e5d6;
+}
+
+.output-card h3 {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.output-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 830;
+  text-transform: uppercase;
+}
+
+.standards-slide {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 34px;
+  align-items: center;
+}
+
+.standard-column {
+  min-height: 430px;
+  border-top: 4px solid var(--ink);
+  padding-top: 24px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.standard-column b {
+  width: 54px;
+  height: 54px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--amber);
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.standard-column h3 {
+  font-size: 40px;
+  line-height: 0.96;
+  font-weight: 880;
+}
+
+.standard-column p {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.28;
+  font-weight: 650;
+}
+
 .final-slide {
   display: grid !important;
-  grid-template-columns: 0.92fr 1.08fr;
+  grid-template-columns: 0.9fr 1.1fr;
   gap: 64px;
   align-items: center;
 }
@@ -1140,41 +1284,26 @@ body,
   font-weight: 650;
 }
 
-.thesis-board {
+.thesis-mark {
   border: 3px solid var(--ink);
   background: var(--surface);
-  padding: 30px;
+  min-height: 380px;
+  padding: 34px;
   display: grid;
-  gap: 22px;
+  align-content: center;
+  gap: 28px;
+  box-shadow: 16px 16px 0 var(--surface-2);
 }
 
-.thesis-board h3 {
-  font-size: 42px;
-  line-height: 0.98;
-  font-weight: 870;
+.thesis-mark h3 {
+  font-size: 52px;
+  line-height: 0.95;
+  font-weight: 890;
 }
 
-.thesis-list {
-  display: grid;
-  gap: 16px;
-}
-
-.thesis-item {
-  border-top: 2px solid var(--ink);
-  padding-top: 14px;
-  display: grid;
-  grid-template-columns: 142px 1fr;
-  gap: 22px;
-}
-
-.thesis-item strong {
-  font-size: 23px;
-  line-height: 1;
-}
-
-.thesis-item span {
+.thesis-mark p {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 22px;
   line-height: 1.25;
   font-weight: 650;
 }
@@ -1201,217 +1330,181 @@ body,
         <p>Skills raise the ceiling because they package capability, not just wording.</p>
         <div class="accent-line"></div>
       </div>
-      <div class="package-blueprint" aria-label="Capability package blueprint">
-        <div class="blueprint-head">
-          <div class="window-dot"></div>
-          <div class="window-dot"></div>
-          <div class="window-dot"></div>
-        </div>
-        <div class="blueprint-body">
-          <div class="blueprint-card big"><span>capability package</span><strong>Instructions + software + examples</strong></div>
-          <div class="blueprint-card"><span>tools</span><strong>Scripts, CLIs, helpers</strong></div>
-          <div class="blueprint-card"><span>standards</span><strong>Contracts and validation</strong></div>
-          <div class="blueprint-card"><span>taste</span><strong>Reference artifacts</strong></div>
-          <div class="blueprint-card"><span>context</span><strong>Filled in at runtime</strong></div>
-        </div>
+      <div class="capability-orbit" aria-label="Agent equipped by skill capabilities">
+        <div class="orbit-ring"></div>
+        <div class="orbit-ring two"></div>
+        <div class="orbit-spoke a"></div>
+        <div class="orbit-spoke b"></div>
+        <div class="orbit-spoke c"></div>
+        <div class="orbit-spoke d"></div>
+        <div class="agent-core">Main<br>agent</div>
+        <div class="orbit-node instructions"><strong>Instructions</strong><span>when and how</span></div>
+        <div class="orbit-node tools"><strong>Tools</strong><span>scripts and CLIs</span></div>
+        <div class="orbit-node examples"><strong>Examples</strong><span>taste and behavior</span></div>
+        <div class="orbit-node contracts"><strong>Contracts</strong><span>what good means</span></div>
       </div>
     </section>
 
     <section class="agenda-slide">
       <div class="agenda-title">
         <h1>Agenda</h1>
-        <p>From prompt-shaped guidance to software-shaped capability.</p>
+        <p>Five sections. Five transitions. One argument.</p>
       </div>
       <div class="agenda-path" aria-label="Five part agenda">
         <div class="agenda-item active"><b>1</b><div><h2>Prompt ceiling</h2><p>Where instruction-only approaches stop compounding.</p></div></div>
         <div class="agenda-item"><b>2</b><div><h2>Skill anatomy</h2><p>What a capability package can carry.</p></div></div>
         <div class="agenda-item"><b>3</b><div><h2>Tools</h2><p>How scripts, CLIs, and services become agent-native.</p></div></div>
-        <div class="agenda-item"><b>4</b><div><h2>Case study</h2><p>Why the presentation skill depends on context transfer.</p></div></div>
+        <div class="agenda-item"><b>4</b><div><h2>Presentation skill</h2><p>A self-referential case study in context and QA.</p></div></div>
         <div class="agenda-item"><b>5</b><div><h2>Operating model</h2><p>How teams share capability without flattening taste.</p></div></div>
       </div>
     </section>
 
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Prompts hit a ceiling</h2>
-        <p>Instruction text can steer behavior, but it cannot carry the full operating surface of a serious workflow.</p>
-      </header>
-      <div class="ceiling-body">
-        <div class="ceiling-panel">
-          <div class="ceiling-head"><span>prompt only</span><h3>Guidance</h3></div>
-          <div class="prompt-card" aria-label="Prompt text block">
-            <div class="prompt-line"></div>
-            <div class="prompt-line"></div>
-            <div class="prompt-line short"></div>
-          </div>
-          <div class="outcome-band bad"><span>ceiling</span><strong>Behavior depends on memory</strong></div>
-        </div>
-        <div class="bridge-arrow">&rarr;</div>
-        <div class="ceiling-panel">
-          <div class="ceiling-head"><span>skill package</span><h3>Capability</h3></div>
-          <div class="package-stack" aria-label="Capability package stack">
-            <div class="stack-row focus"><span>Instructions</span><span>intent</span></div>
-            <div class="stack-row"><span>Tools</span><span>execution</span></div>
-            <div class="stack-row"><span>Examples</span><span>taste</span></div>
-            <div class="stack-row"><span>Validation</span><span>trust</span></div>
-          </div>
-          <div class="outcome-band good"><span>leverage</span><strong>Behavior ships with assets</strong></div>
+    <section class="section-slide">
+      <div class="section-copy">
+        <span class="number">01</span>
+        <h2>Prompt ceiling</h2>
+        <p>Text can steer behavior. It cannot carry the full operating surface.</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="prompt-ceiling-art" aria-label="Prompt page hitting a ceiling">
+        <div class="ceiling-line"><span>ceiling</span></div>
+        <div class="prompt-sheet">
+          <div class="prompt-mark"></div>
+          <div class="prompt-mark"></div>
+          <div class="prompt-mark short"></div>
         </div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Agents and skills solve different problems</h2>
-        <p>An agent is an execution context. A skill equips that context with a capability.</p>
+        <h2>Text alone cannot carry the work</h2>
       </header>
-      <div class="agent-skill-map">
-        <div class="agent-column">
-          <div class="big-node">
-            <span class="pill">agent</span>
-            <h3>Manages work</h3>
-            <p>Chooses what to inspect, what to preserve in context, what to delegate, and when to act.</p>
-          </div>
-          <div class="callout-strip"><b>1</b><span>Use another agent when isolation or parallel execution is the need.</span></div>
+      <div class="prompt-vs-skill">
+        <div class="thin-prompt">
+          <h3>A prompt can say what to do.</h3>
+          <p>That helps. But the next run still has to reconstruct tools, examples, checks, and taste from language.</p>
         </div>
-        <div class="skill-column">
-          <div class="big-node">
-            <span class="pill amber">skill</span>
-            <h3>Provides capability</h3>
-            <p>Adds workflow knowledge, tools, examples, templates, and verification to the main agent.</p>
-          </div>
-          <div class="capability-grid">
-            <div class="capability"><strong>Review code</strong><span>workflow + schema</span></div>
-            <div class="capability"><strong>Make slides</strong><span>taste + QA</span></div>
-            <div class="capability"><strong>Run tools</strong><span>CLI + help</span></div>
-            <div class="capability"><strong>Ship output</strong><span>contract + checks</span></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>A skill can carry more than instructions</h2>
-        <p>This anatomy is only one example. The point is that the capability can ship as files, tools, and standards.</p>
-      </header>
-      <div class="anatomy">
-        <div class="folder" aria-label="Example skill folder anatomy">
-          <div class="folder-tab"><span>example-skill/</span><span class="muted">one possible shape</span></div>
-          <div class="folder-tree">
-            <div>SKILL.md <span>entrypoint</span></div>
-            <div>references/ <span>depth</span></div>
-            <div>templates/ <span>starting points</span></div>
-            <div>tools/ <span>software</span></div>
-            <div>examples/ <span>calibration</span></div>
-          </div>
-        </div>
-        <div class="anatomy-notes">
-          <div class="note-row"><strong>Instructions</strong><p>Tell the agent when the capability applies and how hard to push for alignment.</p></div>
-          <div class="note-row"><strong>Assets</strong><p>Give the agent concrete material to inspect, adapt, run, or validate against.</p></div>
-          <div class="note-row"><strong>Contracts</strong><p>Define what exists after the skill runs and how success can be checked.</p></div>
-          <div class="note-row"><strong>Examples</strong><p>Transmit taste and judgment without forcing every future output to look the same.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Tools make skills feel like software</h2>
-        <p>MCP can expose tools. Skills can package tools with the workflow, examples, and validation that make them useful.</p>
-      </header>
-      <div class="tools-layout">
-        <div class="tool-question">
-          <span class="pill blue">common question</span>
-          <h3>Why not just MCP?</h3>
-          <p>MCP is a useful tool surface. It is not the whole capability surface.</p>
-          <div class="terminal" aria-label="CLI help example"><span class="dim">$</span> deck-qa --help<br>Usage: deck-qa [html]<br>  --viewport 1280x800<br>  --fail-on-scroll</div>
-        </div>
-        <div class="tool-answer">
-          <div class="tool-compare">
-            <div class="tool-card">
-              <span class="kicker">MCP</span>
-              <h3>Expose a tool</h3>
-              <p>Good for connecting agents to services, APIs, and shared operational surfaces.</p>
-            </div>
-            <div class="tool-card highlight">
-              <span class="kicker">skill</span>
-              <h3>Package the work</h3>
-              <p>Ship the tool with instructions, examples, expected outputs, and validation loops.</p>
-            </div>
-          </div>
-          <div class="tool-principle">
-            <strong>CLIs are native</strong>
-            <span>A script with --help, deterministic exits, and local files gives an agent a discoverable interface it can inspect and run.</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Shared capability, local taste</h2>
-        <p>The same skill can equip multiple teams without forcing identical artifacts downstream.</p>
-      </header>
-      <div class="sharing-map">
-        <div class="source-package">
-          <span class="pill green">shared skill</span>
-          <h3>One capability package</h3>
-          <p>Workflow, tools, examples, and validation move together across teams.</p>
-        </div>
-        <div class="bridge-arrow">&rarr;</div>
-        <div class="team-grid" aria-label="Teams adapting a shared skill locally">
-          <div class="team-card"><div class="swatch green"></div><div><h3>Product</h3><p>Uses the same workflow for launch decisions.</p></div></div>
-          <div class="team-card"><div class="swatch blue"></div><div><h3>Research</h3><p>Adapts proof depth and evidence style.</p></div></div>
-          <div class="team-card"><div class="swatch amber"></div><div><h3>Design</h3><p>Preserves taste through approved examples.</p></div></div>
-          <div class="team-card"><div class="swatch red"></div><div><h3>Ops</h3><p>Keeps the checks and output contract stable.</p></div></div>
+        <div class="operating-surface" aria-label="Operating surface pieces">
+          <div class="surface-piece"><strong>Tools</strong><span>how work executes</span></div>
+          <div class="surface-piece"><strong>Examples</strong><span>what good feels like</span></div>
+          <div class="surface-piece"><strong>Contracts</strong><span>what must exist</span></div>
+          <div class="surface-piece"><strong>Validation</strong><span>how trust is checked</span></div>
+          <div class="surface-piece wide"><strong>Skill</strong><span>Packages the operating surface so capability compounds.</span></div>
         </div>
       </div>
     </section>
 
     <section class="section-slide">
-      <div class="section-grid">
-        <div class="section-copy">
-          <span class="number">04</span>
-          <h2>The Presentation Skill</h2>
-          <p>A self-referential case study: the deck demonstrates the capability it is describing.</p>
-          <div class="accent-line"></div>
+      <div class="section-copy">
+        <span class="number">02</span>
+        <h2>Skill anatomy</h2>
+        <p>Not one folder shape. A capability package can carry whatever the agent needs.</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="anatomy-art" aria-label="Exploded skill artifacts">
+        <div class="artifact-sheet one"><span>entrypoint</span><strong>SKILL.md</strong></div>
+        <div class="artifact-sheet two"><span>depth</span><strong>References</strong></div>
+        <div class="artifact-sheet three"><span>software</span><strong>Tools</strong></div>
+        <div class="artifact-sheet four"><span>calibration</span><strong>Examples</strong></div>
+      </div>
+    </section>
+
+    <section class="content-slide">
+      <header class="slide-title">
+        <h2>A skill can be any package shape</h2>
+      </header>
+      <div class="package-shape">
+        <div class="central-capability">
+          <h3>Capability, packaged</h3>
         </div>
-        <div class="case-meter" aria-label="Presentation skill capabilities">
-          <div class="meter-col"><div class="meter-bar context"></div><span>context</span></div>
-          <div class="meter-col"><div class="meter-bar template"></div><span>template</span></div>
-          <div class="meter-col"><div class="meter-bar examples"></div><span>examples</span></div>
-          <div class="meter-col"><div class="meter-bar qa"></div><span>QA</span></div>
+        <div class="package-list">
+          <div class="package-row"><strong>Instructions</strong><span>When the skill applies, how to collaborate, and what threshold must be met before acting.</span></div>
+          <div class="package-row"><strong>Assets</strong><span>Templates, references, examples, fixtures, or any file the agent can inspect and adapt.</span></div>
+          <div class="package-row"><strong>Software</strong><span>Scripts, CLIs, apps, renderers, validators, or services the agent can run.</span></div>
+          <div class="package-row"><strong>Contracts</strong><span>The output shape and checks that make success visible.</span></div>
         </div>
+      </div>
+    </section>
+
+    <section class="section-slide">
+      <div class="section-copy">
+        <span class="number">03</span>
+        <h2>Tools</h2>
+        <p>The agent needs an interface it can discover, inspect, and execute.</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="tools-art" aria-label="CLI tool interface">
+        <div class="tool-tag a">local</div>
+        <div class="tool-tag b">versioned</div>
+        <div class="tool-tag c">inspectable</div>
+        <div class="terminal-large"><span class="dim">$</span> deck-qa --help<br>Usage: deck-qa [html]<br><br>  --viewport 1280x800<br>  --fail-on-scroll<br>  --write-screenshots</div>
+      </div>
+    </section>
+
+    <section class="content-slide">
+      <header class="slide-title">
+        <h2>Ship the interface the agent can inspect</h2>
+      </header>
+      <div class="tool-slide">
+        <div class="cli-panel" aria-label="CLI help output">
+          <span class="dim">$</span> skill-tool --help<br>
+          Usage: skill-tool [input] [flags]<br><br>
+          Commands:<br>
+          &nbsp;&nbsp;plan&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prepare work<br>
+          &nbsp;&nbsp;render&nbsp;&nbsp;&nbsp;create artifact<br>
+          &nbsp;&nbsp;verify&nbsp;&nbsp;&nbsp;check output<br><br>
+          Flags:<br>
+          &nbsp;&nbsp;--format&nbsp;&nbsp;html|json|yaml<br>
+          &nbsp;&nbsp;--strict&nbsp;&nbsp;fail on drift
+        </div>
+        <div class="tool-thesis">
+          <h3>MCP is a tool surface. A skill is the package around the work.</h3>
+          <div class="mcp-note">
+            <strong>No false choice</strong>
+            <span>MCP can expose services. A skill can carry the workflow, examples, validation, and tool usage together.</span>
+          </div>
+          <p>For many agent tasks, a CLI with help text and deterministic exits is already a natural interface.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-slide case-separator">
+      <div class="section-copy">
+        <span class="number">04</span>
+        <h2>Presentation skill</h2>
+        <p>A deck-making capability that has to preserve human judgment.</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="deck-art" aria-label="Stacked presentation slides">
+        <div class="slide-stack-card a"><div class="thumb-title"></div><div class="thumb-body"><div class="thumb-box"></div><div class="thumb-box"></div></div></div>
+        <div class="slide-stack-card b"><div class="thumb-title"></div><div class="thumb-body"><div class="thumb-box"></div><div class="thumb-box"></div></div></div>
+        <div class="slide-stack-card c"><div class="thumb-title"></div><div class="thumb-body"><div class="thumb-box"></div><div class="thumb-box"></div></div></div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
         <h2>Context transfer makes compression possible</h2>
-        <p>The skill is built for a user who can give the talk, but wants a colleague to make the deck.</p>
       </header>
-      <div class="context-flow">
-        <div class="brain-dump">
-          <h3>What the user knows</h3>
-          <div class="context-chip-grid">
-            <div class="context-chip"><strong>Beliefs</strong><span>what matters</span></div>
-            <div class="context-chip"><strong>Stories</strong><span>what happened</span></div>
-            <div class="context-chip"><strong>Data</strong><span>what proves it</span></div>
-            <div class="context-chip"><strong>Taste</strong><span>what good feels like</span></div>
-            <div class="context-chip"><strong>Objections</strong><span>what the room asks</span></div>
-            <div class="context-chip"><strong>Constraints</strong><span>what not to do</span></div>
-          </div>
+      <div class="context-compression">
+        <div class="messy-context" aria-label="User context before compression">
+          <div class="context-chip a">beliefs</div>
+          <div class="context-chip b">stories</div>
+          <div class="context-chip c">data</div>
+          <div class="context-chip d">objections</div>
+          <div class="context-chip e">taste</div>
+          <div class="context-chip f">constraints</div>
         </div>
-        <div class="arrow-cell">&rarr;</div>
-        <div class="deck-compression">
-          <h3>What the deck keeps</h3>
-          <div class="compression-list">
-            <div class="compression-item"><strong>Thesis</strong><span>The one idea the room should retain.</span></div>
-            <div class="compression-item"><strong>Sequence</strong><span>The path from current belief to intended belief.</span></div>
-            <div class="compression-item"><strong>Visuals</strong><span>The relationships that explain faster than prose.</span></div>
-            <div class="compression-item"><strong>Voiceover</strong><span>The nuance the presenter carries live.</span></div>
+        <div class="compression-arrow"></div>
+        <div class="compressed-slide">
+          <h3>The deck keeps what matters.</h3>
+          <div class="compressed-bars">
+            <div class="compressed-bar"></div>
+            <div class="compressed-bar short"></div>
+            <div class="compressed-bar"></div>
           </div>
+          <span class="label">thesis / sequence / visuals / voiceover</span>
         </div>
       </div>
     </section>
@@ -1419,11 +1512,10 @@ body,
     <section class="content-slide">
       <header class="slide-title">
         <h2>Templates are starting points, not destiny</h2>
-        <p>The skill ships a skeleton so the agent can build faster, then complete the software in the user's context.</p>
       </header>
-      <div class="template-board">
-        <div class="skeleton" aria-label="Deck skeleton">
-          <div class="skeleton-head"><span>deck.html.template</span><span class="muted">starter</span></div>
+      <div class="template-spread">
+        <div class="starter-sheet" aria-label="Deck starter template">
+          <h3>deck.html.template</h3>
           <div class="code-lines">
             <div class="code-line wide"></div>
             <div class="code-line mid accent"></div>
@@ -1434,31 +1526,94 @@ body,
             <div class="code-line short accent"></div>
           </div>
         </div>
-        <div class="downstream">
-          <div class="downstream-card"><div class="icon-box">1</div><div><strong>Inline the foundation</strong><p>Start from artboard, typography, and Reveal defaults.</p></div></div>
-          <div class="downstream-card"><div class="icon-box">2</div><div><strong>Design for the room</strong><p>Replace placeholders with the user's argument and visual relationships.</p></div></div>
-          <div class="downstream-card"><div class="icon-box">3</div><div><strong>Finish downstream</strong><p>The agent writes the final HTML, CSS, and checks for this deck.</p></div></div>
+        <div class="completion-lanes">
+          <div class="completion-lane"><b>1</b><div><strong>Start from structure</strong><span>Artboard, Reveal defaults, and a sparse foundation.</span></div></div>
+          <div class="completion-lane"><b>2</b><div><strong>Design from content</strong><span>The user's argument decides the visual relationship.</span></div></div>
+          <div class="completion-lane"><b>3</b><div><strong>Finish downstream</strong><span>The agent writes the final deck for this room.</span></div></div>
         </div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Validation can be built into the capability</h2>
-        <p>The skill does not stop at generation. It makes visual critique part of the workflow.</p>
+        <h2>Examples make taste portable</h2>
       </header>
-      <div class="qa-board">
-        <div class="viewport-grid" aria-label="Viewport screenshot checks">
-          <div class="viewport"><strong>1440 x 900</strong><div class="viewport-screen"></div></div>
-          <div class="viewport"><strong>1280 x 800</strong><div class="viewport-screen"></div></div>
-          <div class="viewport"><strong>1024 x 768</strong><div class="viewport-screen"></div></div>
-          <div class="viewport"><strong>768 x 1024</strong><div class="viewport-screen"></div></div>
+      <div class="example-gallery" aria-label="Example slides showing variety">
+        <div class="mini-slide">
+          <h3>Decision</h3>
+          <div class="mini-visual"></div>
+          <div class="mini-caption">A path through a tradeoff.</div>
         </div>
-        <div class="qa-loop">
-          <div class="qa-step"><b>1</b><div><strong>Render</strong><span>browser screenshots</span></div></div>
-          <div class="qa-step"><b>2</b><div><strong>Critique</strong><span>clipping, hierarchy, balance</span></div></div>
-          <div class="qa-step"><b>3</b><div><strong>Repair</strong><span>rewrite, split, recompose</span></div></div>
-          <div class="qa-step"><b>4</b><div><strong>Review</strong><span>human critique loop</span></div></div>
+        <div class="mini-slide">
+          <h3>System</h3>
+          <div class="mini-visual"></div>
+          <div class="mini-caption">A relationship made visible.</div>
+        </div>
+        <div class="mini-slide">
+          <h3>Evidence</h3>
+          <div class="mini-visual"></div>
+          <div class="mini-caption">A signal with hierarchy.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-slide">
+      <div class="section-copy">
+        <span class="number">05</span>
+        <h2>Operating model</h2>
+        <p>Skills let teams share capability without forcing the same artifact.</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="operating-art" aria-label="Shared skill reaching multiple teams">
+        <div class="connection a"></div>
+        <div class="connection b"></div>
+        <div class="connection c"></div>
+        <div class="connection d"></div>
+        <div class="shared-core">Shared<br>skill</div>
+        <div class="team-node product"><strong>Product</strong><span>launch logic</span></div>
+        <div class="team-node research"><strong>Research</strong><span>proof depth</span></div>
+        <div class="team-node design"><strong>Design</strong><span>taste bar</span></div>
+        <div class="team-node ops"><strong>Ops</strong><span>checks</span></div>
+      </div>
+    </section>
+
+    <section class="content-slide">
+      <header class="slide-title">
+        <h2>Shared capability does not mean same output</h2>
+      </header>
+      <div class="shared-local">
+        <div class="capability-source">
+          <h3>One skill, many rooms.</h3>
+          <p>The package carries the workflow and checks. The agent adapts the artifact to the local context.</p>
+        </div>
+        <div class="outputs" aria-label="Different local outputs from one skill">
+          <div class="output-card"><span>exec</span><h3>Decision memo</h3></div>
+          <div class="output-card"><span>technical</span><h3>System explainer</h3></div>
+          <div class="output-card"><span>design</span><h3>Critique deck</h3></div>
+          <div class="output-card"><span>ops</span><h3>Runbook view</h3></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-slide">
+      <header class="slide-title">
+        <h2>Serious skills have a release shape</h2>
+      </header>
+      <div class="standards-slide">
+        <div class="standard-column">
+          <b>1</b>
+          <h3>Context gate</h3>
+          <p>The skill says what must be understood before the agent starts producing.</p>
+        </div>
+        <div class="standard-column">
+          <b>2</b>
+          <h3>Output contract</h3>
+          <p>The artifact has a shape, a destination, and a way to know whether it worked.</p>
+        </div>
+        <div class="standard-column">
+          <b>3</b>
+          <h3>Validation loop</h3>
+          <p>The skill bakes in checks, screenshots, tests, or review steps before delivery.</p>
         </div>
       </div>
     </section>
@@ -1469,14 +1624,10 @@ body,
         <p>Skills are how teams package capability for agents without flattening the work.</p>
         <div class="accent-line"></div>
       </div>
-      <div class="thesis-board">
+      <div class="thesis-mark">
         <span class="pill amber">core thesis</span>
         <h3>Software for agents is not one shape.</h3>
-        <div class="thesis-list">
-          <div class="thesis-item"><strong>It can instruct</strong><span>Workflow, thresholds, and collaboration behavior.</span></div>
-          <div class="thesis-item"><strong>It can execute</strong><span>Scripts, CLIs, services, and custom helpers.</span></div>
-          <div class="thesis-item"><strong>It can calibrate</strong><span>Examples, taste, output contracts, and validation loops.</span></div>
-        </div>
+        <p>It can instruct, execute, calibrate, validate, or provide a skeleton the agent completes in context.</p>
       </div>
     </section>
 
