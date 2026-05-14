@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Live Demo Slide - Payment Retry</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.demo-slide {
+  grid-template-columns: 0.82fr 1.18fr;
+  gap: 76px;
+  align-items: center;
+}
+
+.demo-copy {
+  display: grid;
+  gap: 24px;
+}
+
+.demo-copy h1 {
+  max-width: 8ch;
+  font-size: 108px;
+  line-height: 0.92;
+  font-weight: 880;
+}
+
+.watch-list {
+  display: grid;
+  gap: 18px;
+}
+
+.watch-list div {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 14px;
+  align-items: center;
+  font-size: 24px;
+  font-weight: 760;
+}
+
+.watch-list b {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--amber);
+  font-size: 16px;
+}
+
+.demo-window {
+  height: 430px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  display: grid;
+  grid-template-rows: 54px 1fr;
+}
+
+.window-top {
+  border-bottom: 2px solid var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.window-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.demo-flow {
+  padding: 42px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.demo-node {
+  height: 172px;
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 820;
+}
+
+.demo-node.active {
+  background: var(--amber);
+}
+
+.arrow {
+  font-size: 44px;
+  font-weight: 850;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide demo-slide">
+      <div class="demo-copy">
+        <p class="kicker">live demo</p>
+        <h1>Retry recovery.</h1>
+        <div class="watch-list">
+          <div><b>1</b><span>Failed payment</span></div>
+          <div><b>2</b><span>Guided retry</span></div>
+          <div><b>3</b><span>Support trace</span></div>
+        </div>
+      </div>
+      <div class="demo-window" aria-label="Demo path from failed payment to support trace">
+        <div class="window-top"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+        <div class="demo-flow">
+          <div class="demo-node">Decline</div>
+          <div class="arrow">&rarr;</div>
+          <div class="demo-node active">Retry</div>
+          <div class="arrow">&rarr;</div>
+          <div class="demo-node">Trace</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

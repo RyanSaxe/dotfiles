@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Transition Slide - Manual to Guided</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.transition-body {
+  display: grid;
+  grid-template-columns: 1fr 90px 1fr;
+  gap: 28px;
+  align-items: stretch;
+}
+
+.state {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 32px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 28px;
+}
+
+.state.target {
+  background: var(--amber);
+}
+
+.state h2 {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.flow-stack {
+  display: grid;
+  gap: 16px;
+  align-content: center;
+}
+
+.flow-item {
+  min-height: 58px;
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  display: grid;
+  align-items: center;
+  padding: 0 18px;
+  font-size: 22px;
+  font-weight: 780;
+}
+
+.transition-arrow {
+  display: grid;
+  place-items: center;
+  font-size: 58px;
+  font-weight: 900;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <p class="kicker">transition</p>
+        <h1>Move support from manual triage to guided recovery.</h1>
+      </header>
+      <div class="transition-body" aria-label="Current support flow transitioning to guided recovery flow">
+        <div class="state">
+          <h2>Current</h2>
+          <div class="flow-stack">
+            <div class="flow-item">Ticket</div>
+            <div class="flow-item">Search logs</div>
+            <div class="flow-item">Manual replay</div>
+          </div>
+        </div>
+        <div class="transition-arrow">&rarr;</div>
+        <div class="state target">
+          <h2>Target</h2>
+          <div class="flow-stack">
+            <div class="flow-item">Alert</div>
+            <div class="flow-item">Trace</div>
+            <div class="flow-item">Guided retry</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

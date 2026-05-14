@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status Slide - Company Targets</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.status-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+.status-card {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 30px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 26px;
+}
+
+.status-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+}
+
+.status-dot.green { background: var(--green); }
+.status-dot.amber { background: var(--amber); }
+.status-dot.red { background: var(--red); }
+
+.status-card h2 {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.status-card strong {
+  font-size: 74px;
+  line-height: 0.94;
+}
+
+.status-card span {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <p class="kicker">company targets</p>
+        <h1>Revenue is on track. Retention needs intervention.</h1>
+      </header>
+      <div class="status-board" aria-label="Three company target status cards">
+        <div class="status-card"><div class="status-dot green"></div><h2>Revenue</h2><strong>102%</strong><span>of plan</span></div>
+        <div class="status-card"><div class="status-dot amber"></div><h2>Activation</h2><strong>91%</strong><span>of plan</span></div>
+        <div class="status-card"><div class="status-dot red"></div><h2>Retention</h2><strong>84%</strong><span>of plan</span></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

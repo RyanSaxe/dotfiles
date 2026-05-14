@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Architecture Slide - Event Pipeline</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.system-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 26px;
+  align-items: center;
+}
+
+.system-column {
+  display: grid;
+  gap: 18px;
+}
+
+.system-node {
+  min-height: 92px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  display: grid;
+  align-content: center;
+  padding: 0 24px;
+}
+
+.system-node h2 {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.system-node span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.system-node.focus {
+  background: var(--amber);
+}
+
+.bus {
+  height: 430px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 20px;
+  position: relative;
+}
+
+.bus:before,
+.bus:after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 52px;
+  height: 4px;
+  background: var(--ink);
+}
+
+.bus:before { left: -52px; }
+.bus:after { right: -52px; }
+
+.bus-ring {
+  width: 180px;
+  height: 180px;
+  border: 12px solid var(--blue);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.contract {
+  border-top: 3px solid var(--ink);
+  padding-top: 16px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <p class="kicker">system overview</p>
+        <h1>Customer events move through one governed pipeline.</h1>
+      </header>
+      <div class="system-map" aria-label="Architecture overview from producers through event bus to consumers">
+        <div class="system-column">
+          <div class="system-node"><h2>Checkout</h2><span>producer</span></div>
+          <div class="system-node"><h2>Billing</h2><span>producer</span></div>
+          <div class="system-node"><h2>Support</h2><span>producer</span></div>
+        </div>
+        <div class="bus">
+          <div class="bus-ring">Event bus</div>
+          <div class="contract">schema contract enforced here</div>
+        </div>
+        <div class="system-column">
+          <div class="system-node focus"><h2>Risk model</h2><span>consumer</span></div>
+          <div class="system-node"><h2>Lifecycle CRM</h2><span>consumer</span></div>
+          <div class="system-node"><h2>Warehouse</h2><span>consumer</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

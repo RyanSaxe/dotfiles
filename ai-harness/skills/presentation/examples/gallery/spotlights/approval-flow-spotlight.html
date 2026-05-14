@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spotlight Slide - Approval Flow</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.spotlight-slide {
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.spotlight-copy {
+  display: grid;
+  gap: 22px;
+}
+
+.spotlight-copy h1 {
+  max-width: 9ch;
+  font-size: 88px;
+  line-height: 0.96;
+  font-weight: 880;
+}
+
+.spotlight-copy p {
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1.22;
+  font-weight: 650;
+}
+
+.feature-card {
+  height: 470px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 40px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 28px;
+}
+
+.feature-bar {
+  height: 24px;
+  width: 64%;
+  background: var(--surface-2);
+}
+
+.approval-path {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.approval-step {
+  height: 150px;
+  border: 2px solid var(--ink);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 820;
+}
+
+.approval-step.current {
+  background: var(--amber);
+}
+
+.feature-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  border-top: 2px solid var(--ink);
+  padding-top: 18px;
+}
+
+.feature-metric strong {
+  font-size: 64px;
+  line-height: 1;
+}
+
+.feature-metric span {
+  max-width: 16ch;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 750;
+  text-align: right;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide spotlight-slide">
+      <div class="spotlight-copy">
+        <p class="kicker">feature spotlight</p>
+        <h1>Approval flow.</h1>
+        <p>Fewer handoffs. Clearer ownership.</p>
+      </div>
+      <div class="feature-card" aria-label="Approval flow feature diagram">
+        <div class="feature-bar"></div>
+        <div class="approval-path">
+          <div class="approval-step">Request</div>
+          <strong>&rarr;</strong>
+          <div class="approval-step current">Approve</div>
+          <strong>&rarr;</strong>
+          <div class="approval-step">Release</div>
+        </div>
+        <div class="feature-metric"><strong>38%</strong><span>faster review cycle</span></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>

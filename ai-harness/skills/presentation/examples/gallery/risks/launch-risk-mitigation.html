@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Risk Slide - Launch Mitigation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.risk-grid {
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 26px;
+}
+
+.risk-list,
+.mitigation-list {
+  display: grid;
+  gap: 14px;
+}
+
+.risk-row,
+.mitigation-row {
+  min-height: 112px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 22px 24px;
+  display: grid;
+  align-content: center;
+}
+
+.risk-row {
+  border-left-width: 14px;
+  border-left-color: var(--red);
+}
+
+.mitigation-row {
+  border-left-width: 14px;
+  border-left-color: var(--green);
+}
+
+.risk-row h2,
+.mitigation-row h2 {
+  font-size: 30px;
+  line-height: 1.04;
+}
+
+.risk-row span,
+.mitigation-row span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.column-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <p class="kicker">launch risk</p>
+        <h1>Three risks have named mitigations.</h1>
+      </header>
+      <div class="risk-grid" aria-label="Risks paired with mitigations">
+        <div class="risk-list">
+          <div class="column-label">risk</div>
+          <div class="risk-row"><h2>Support spike</h2><span>high probability</span></div>
+          <div class="risk-row"><h2>Latency regression</h2><span>medium probability</span></div>
+          <div class="risk-row"><h2>Partner readiness</h2><span>medium probability</span></div>
+        </div>
+        <div class="mitigation-list">
+          <div class="column-label">mitigation</div>
+          <div class="mitigation-row"><h2>Dedicated launch queue</h2><span>owner assigned</span></div>
+          <div class="mitigation-row"><h2>Rollback threshold</h2><span>metric live</span></div>
+          <div class="mitigation-row"><h2>Readiness checklist</h2><span>two gaps open</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="../shared.js"></script>
+</body>
+</html>
