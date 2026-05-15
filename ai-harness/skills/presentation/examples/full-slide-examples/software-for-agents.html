@@ -1,2645 +1,2991 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Software for Agents</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
-<style>
-:root {
-  color-scheme: light;
-  --r-heading-text-transform: none;
-  --r-heading-letter-spacing: 0;
-  --r-heading-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
-  --r-main-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
-  --r-background-color: #f7f5ef;
-  --bg: #f7f5ef;
-  --surface: #fffdf8;
-  --surface-2: #eeebe3;
-  --ink: #111418;
-  --muted: #60666b;
-  --line: #d7d2c8;
-  --blue: #2f6f89;
-  --green: #4f8061;
-  --amber: #e9b949;
-  --red: #d75f46;
-  --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
-  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --pad-x: 64px;
-  --pad-y: 56px;
-}
-
-html,
-body,
-.reveal {
-  background: var(--bg);
-}
-
-.reveal {
-  color: var(--ink);
-  font-family: var(--font);
-  font-weight: 400;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.reveal .slides {
-  text-align: left;
-}
-
-.reveal .slides > section,
-.reveal .slides > section.present {
-  width: 100% !important;
-  height: 800px !important;
-  padding: var(--pad-y) var(--pad-x) !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
-  background: var(--bg);
-  text-align: left !important;
-}
-
-.reveal h1,
-.reveal h2,
-.reveal h3,
-.reveal p {
-  margin: 0;
-  color: inherit;
-  font-family: var(--font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.reveal strong {
-  font-weight: 870;
-}
-
-.slide-title h2 {
-  max-width: 100%;
-  color: var(--ink);
-  font-size: 52px;
-  line-height: 1;
-  font-weight: 870;
-}
-
-.slide-title .slide-subtitle {
-  margin-top: 12px;
-  max-width: 56ch;
-  color: var(--muted);
-  font-size: 21px;
-  line-height: 1.18;
-  font-weight: 680;
-}
-
-.content-slide {
-  display: grid !important;
-  grid-template-rows: auto 1fr;
-  gap: 36px;
-}
-
-.accent-line {
-  width: 74px;
-  height: 8px;
-  background: var(--amber);
-}
-
-.label {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.pill {
-  width: max-content;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 8px 13px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 860;
-  text-transform: uppercase;
-}
-
-.pill.amber {
-  background: var(--amber);
-}
-
-.pill.green {
-  background: #d9e5d6;
-}
-
-.pill.blue {
-  background: #d6e4e8;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.title-slide {
-  display: grid !important;
-  grid-template-columns: 0.88fr 1.12fr;
-  gap: 54px;
-  align-items: center;
-}
-
-.title-copy {
-  display: grid;
-  gap: 24px;
-}
-
-.title-copy h1 {
-  max-width: 8ch;
-  font-size: 98px;
-  line-height: 0.91;
-  font-weight: 900;
-}
-
-.title-copy p {
-  max-width: 32ch;
-  color: var(--muted);
-  font-size: 25px;
-  line-height: 1.22;
-  font-weight: 650;
-}
-
-.skill-equip-scene {
-  position: relative;
-  height: 560px;
-}
-
-.skill-folder {
-  position: absolute;
-  z-index: 1;
-  left: 90px;
-  top: 120px;
-  width: 370px;
-  height: 250px;
-  border: 3px solid var(--ink);
-  background: #cfe3ea;
-  box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.06);
-}
-
-.skill-folder::before {
-  content: "";
-  position: absolute;
-  left: -3px;
-  top: -32px;
-  width: 176px;
-  height: 32px;
-  border: 3px solid var(--ink);
-  border-bottom: 0;
-  background: #cfe3ea;
-}
-
-.skill-folder::after {
-  content: "";
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  bottom: -3px;
-  height: 154px;
-  border: 3px solid var(--ink);
-  background: #dcecf1;
-}
-
-.folder-label {
-  position: absolute;
-  z-index: 2;
-  left: 28px;
-  top: 24px;
-  display: grid;
-  gap: 6px;
-}
-
-.folder-label strong {
-  color: var(--ink);
-  font-size: 30px;
-  line-height: 0.92;
-}
-
-.folder-label span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 840;
-  text-transform: uppercase;
-}
-
-.terminal-agent {
-  position: absolute;
-  z-index: 4;
-  left: 246px;
-  top: 274px;
-  width: 336px;
-  height: 174px;
-  border: 3px solid var(--ink);
-  background: var(--ink);
-  color: var(--surface);
-  box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
-}
-
-.terminal-bar {
-  height: 34px;
-  border-bottom: 3px solid var(--ink);
-  background: var(--surface);
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 13px;
-  font-size: 11px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.terminal-dot {
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  background: var(--amber);
-}
-
-.terminal-screen {
-  padding: 19px 23px;
-  font-family: var(--mono);
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-.terminal-screen span {
-  display: block;
-}
-
-.terminal-screen .prompt {
-  color: #b8d3da;
-}
-
-.terminal-screen .ready {
-  color: #d9e5d6;
-}
-
-.agenda-slide {
-  display: grid !important;
-  grid-template-columns: 0.78fr 1.22fr;
-  gap: 64px;
-  align-items: center;
-}
-
-.agenda-title h1 {
-  max-width: 9ch;
-  font-size: 94px;
-  line-height: 0.95;
-  font-weight: 890;
-}
-
-.agenda-title p {
-  max-width: 26ch;
-  margin-top: 22px;
-  color: var(--muted);
-  font-size: 23px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.agenda-path {
-  position: relative;
-  display: grid;
-  grid-template-rows: repeat(5, 1fr);
-}
-
-.agenda-path::before {
-  content: "";
-  position: absolute;
-  left: 18px;
-  top: 19px;
-  bottom: 80px;
-  width: 3px;
-  background: var(--ink);
-}
-
-.agenda-item {
-  display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 22px;
-  min-height: 96px;
-}
-
-.agenda-item b {
-  z-index: 1;
-  width: 40px;
-  height: 40px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  background: var(--bg);
-  display: grid;
-  place-items: center;
-  font-size: 16px;
-  font-weight: 850;
-}
-
-.agenda-item.active b {
-  background: var(--amber);
-}
-
-.agenda-item h2 {
-  font-size: 32px;
-  line-height: 1.02;
-  font-weight: 850;
-}
-
-.agenda-item p {
-  margin-top: 7px;
-  max-width: 42ch;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.28;
-  font-weight: 650;
-}
-
-.section-slide {
-  display: grid !important;
-  grid-template-columns: 0.88fr 1.12fr;
-  gap: 70px;
-  align-items: center;
-}
-
-.section-copy {
-  display: grid;
-  gap: 22px;
-}
-
-.section-copy .number {
-  color: var(--muted);
-  font-size: 18px;
-  font-weight: 850;
-}
-
-.section-copy h2 {
-  max-width: 9ch;
-  font-size: 104px;
-  line-height: 0.92;
-  font-weight: 900;
-}
-
-.case-separator .section-copy h2 {
-  max-width: 9ch;
-  font-size: 88px;
-}
-
-.case-separator .deck-art {
-  transform: scale(0.76);
-  transform-origin: center;
-}
-
-.section-copy p {
-  max-width: 34ch;
-  color: var(--muted);
-  font-size: 24px;
-  line-height: 1.24;
-  font-weight: 650;
-}
-
-.prompt-ceiling-art {
-  height: 430px;
-  position: relative;
-  display: grid;
-  align-content: end;
-}
-
-.ceiling-line {
-  position: absolute;
-  top: 54px;
-  left: 0;
-  right: 0;
-  height: 5px;
-  background: var(--ink);
-}
-
-.ceiling-line span {
-  position: absolute;
-  right: 0;
-  top: -30px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.prompt-sheet {
-  width: 520px;
-  height: 250px;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  transform: rotate(-4deg);
-  box-shadow: 16px 18px 0 var(--surface-2);
-  padding: 34px;
-  display: grid;
-  gap: 16px;
-  align-content: center;
-}
-
-.prompt-mark {
-  height: 18px;
-  border: 2px solid var(--ink);
-  background: var(--surface-2);
-}
-
-.prompt-mark.short {
-  width: 58%;
-}
-
-.prompt-vs-skill {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 40px;
-  align-items: center;
-}
-
-.thin-prompt {
-  position: relative;
-  min-height: 392px;
-  border-left: 4px solid var(--ink);
-  padding-left: 34px;
-  display: grid;
-  align-content: center;
-  gap: 26px;
-}
-
-.thin-prompt h3 {
-  font-size: 58px;
-  line-height: 0.94;
-  font-weight: 890;
-}
-
-.thin-prompt p {
-  max-width: 28ch;
-  color: var(--muted);
-  font-size: 21px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.operating-surface {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 150px 150px 86px;
-  gap: 18px;
-}
-
-.surface-piece {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 20px;
-  display: grid;
-  align-content: center;
-  gap: 8px;
-}
-
-.surface-piece.wide {
-  grid-column: 1 / -1;
-  grid-template-columns: 170px 1fr;
-  align-items: center;
-  background: #d9e5d6;
-}
-
-.surface-piece strong {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.surface-piece span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 830;
-  text-transform: uppercase;
-}
-
-.anatomy-art {
-  height: 460px;
-  position: relative;
-}
-
-.artifact-sheet {
-  position: absolute;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 22px;
-  display: grid;
-  align-content: end;
-  gap: 8px;
-  box-shadow: 12px 12px 0 var(--surface-2);
-}
-
-.artifact-sheet strong {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.artifact-sheet span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 830;
-  text-transform: uppercase;
-}
-
-.artifact-sheet.one {
-  width: 300px;
-  height: 210px;
-  left: 24px;
-  top: 42px;
-  transform: rotate(-6deg);
-  background: #fff6d9;
-}
-
-.artifact-sheet.two {
-  width: 260px;
-  height: 178px;
-  right: 72px;
-  top: 26px;
-  transform: rotate(4deg);
-}
-
-.artifact-sheet.three {
-  width: 286px;
-  height: 184px;
-  left: 168px;
-  bottom: 34px;
-  transform: rotate(2deg);
-  background: #d6e4e8;
-}
-
-.artifact-sheet.four {
-  width: 236px;
-  height: 150px;
-  right: 12px;
-  bottom: 76px;
-  transform: rotate(-5deg);
-  background: #d9e5d6;
-}
-
-.capability-package {
-  display: grid;
-  grid-template-columns: 0.96fr 1.04fr;
-  gap: 56px;
-  align-items: center;
-}
-
-.skill-manifest {
-  position: relative;
-  height: 430px;
-}
-
-.manifest-folder {
-  position: absolute;
-  left: 26px;
-  top: 64px;
-  width: 466px;
-  height: 326px;
-  border: 3px solid var(--ink);
-  background: #dcecf1;
-  box-shadow: 12px 12px 0 var(--surface-2);
-}
-
-.manifest-folder::before {
-  content: "";
-  position: absolute;
-  left: -3px;
-  top: -34px;
-  width: 170px;
-  height: 34px;
-  border: 3px solid var(--ink);
-  border-bottom: 0;
-  background: #cfe3ea;
-}
-
-.manifest-title {
-  position: absolute;
-  left: 28px;
-  top: 22px;
-  display: grid;
-  gap: 4px;
-}
-
-.manifest-title strong {
-  font-size: 32px;
-  line-height: 0.95;
-}
-
-.manifest-title span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 840;
-  text-transform: uppercase;
-}
-
-.manifest-tree {
-  position: absolute;
-  left: 28px;
-  right: 28px;
-  bottom: 24px;
-  display: grid;
-  gap: 10px;
-}
-
-.manifest-row {
-  display: grid;
-  grid-template-columns: 124px 1fr;
-  gap: 18px;
-  align-items: baseline;
-  border-top: 2px solid rgba(17, 20, 24, 0.18);
-  padding-top: 10px;
-}
-
-.manifest-row:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.manifest-row code {
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.manifest-row span {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.2;
-  font-weight: 670;
-}
-
-.package-meaning {
-  display: grid;
-  gap: 20px;
-}
-
-.meaning-row {
-  display: grid;
-  grid-template-columns: 148px 1fr;
-  gap: 24px;
-  align-items: center;
-  border-top: 3px solid var(--ink);
-  padding-top: 17px;
-}
-
-.meaning-row:nth-child(2) {
-  border-color: var(--blue);
-}
-
-.meaning-row:nth-child(3) {
-  border-color: var(--amber);
-}
-
-.meaning-row:nth-child(4) {
-  border-color: var(--green);
-}
-
-.meaning-row strong {
-  font-size: 27px;
-  line-height: 0.96;
-}
-
-.meaning-row span {
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1.22;
-  font-weight: 660;
-}
-
-.tool-shipping {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 48px;
-  align-items: center;
-}
-
-.cli-help-window {
-  border: 3px solid var(--ink);
-  background: #111820;
-  color: #d7f3ed;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.cli-titlebar {
-  height: 42px;
-  border-bottom: 3px solid var(--ink);
-  background: var(--surface);
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  font-size: 13px;
-  font-weight: 860;
-  text-transform: uppercase;
-}
-
-.cli-dot {
-  width: 11px;
-  height: 11px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  background: var(--amber);
-}
-
-.cli-body {
-  padding: 30px 34px 34px;
-  font-family: var(--mono);
-  font-size: 22px;
-  line-height: 1.48;
-  font-weight: 720;
-}
-
-.cli-body .dim {
-  color: #91aaa6;
-}
-
-.cli-body .flag {
-  color: #f4c84e;
-}
-
-.tool-discovery {
-  display: grid;
-  gap: 22px;
-}
-
-.discovery-row {
-  border-left: 8px solid var(--ink);
-  padding-left: 20px;
-}
-
-.discovery-row:nth-child(2) {
-  border-color: var(--blue);
-}
-
-.discovery-row:nth-child(3) {
-  border-color: var(--green);
-}
-
-.discovery-row strong {
-  display: block;
-  font-size: 28px;
-  line-height: 1;
-}
-
-.discovery-row span {
-  display: block;
-  margin-top: 7px;
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1.22;
-  font-weight: 660;
-}
-
-.mcp-contrast {
-  border: 3px solid var(--ink);
-  background: #d6e4e8;
-  padding: 19px 21px;
-  box-shadow: 8px 8px 0 var(--surface-2);
-}
-
-.mcp-contrast strong {
-  display: block;
-  font-size: 24px;
-  line-height: 1;
-}
-
-.mcp-contrast span {
-  display: block;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.22;
-  font-weight: 680;
-}
-
-.deck-art {
-  position: relative;
-  height: 460px;
-}
-
-.slide-stack-card {
-  position: absolute;
-  width: 430px;
-  height: 270px;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 12px 12px 0 var(--surface-2);
-  padding: 26px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 22px;
-}
-
-.slide-stack-card::before {
-  content: "";
-  width: 110px;
-  height: 8px;
-  background: var(--amber);
-}
-
-.slide-stack-card.a {
-  left: 70px;
-  top: 32px;
-  transform: rotate(-7deg);
-}
-
-.slide-stack-card.b {
-  right: 58px;
-  top: 106px;
-  transform: rotate(5deg);
-  background: #fff6d9;
-}
-
-.slide-stack-card.c {
-  left: 168px;
-  bottom: 20px;
-  transform: rotate(-1deg);
-  background: #d6e4e8;
-}
-
-.thumb-title {
-  width: 78%;
-  height: 30px;
-  border: 2px solid var(--ink);
-  background: var(--bg);
-}
-
-.thumb-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.thumb-box {
-  border: 2px solid var(--ink);
-  background: var(--bg);
-}
-
-.context-compression {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 0.82fr;
-  gap: 48px;
-  align-items: center;
-}
-
-.messy-context {
-  min-height: 420px;
-  position: relative;
-}
-
-.context-chip {
-  position: absolute;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 14px 16px;
-  font-size: 20px;
-  font-weight: 850;
-  box-shadow: 8px 8px 0 var(--surface-2);
-}
-
-.context-chip.a {
-  left: 10px;
-  top: 18px;
-  transform: rotate(-5deg);
-}
-
-.context-chip.b {
-  right: 36px;
-  top: 64px;
-  background: #fff6d9;
-  transform: rotate(4deg);
-}
-
-.context-chip.c {
-  left: 86px;
-  top: 150px;
-  background: #d6e4e8;
-}
-
-.context-chip.d {
-  right: 86px;
-  top: 210px;
-  transform: rotate(-4deg);
-}
-
-.context-chip.e {
-  left: 38px;
-  bottom: 56px;
-  background: #d9e5d6;
-  transform: rotate(3deg);
-}
-
-.context-chip.f {
-  right: 14px;
-  bottom: 24px;
-}
-
-.compression-arrow {
-  position: absolute;
-  left: 52%;
-  top: 50%;
-  width: 104px;
-  height: 5px;
-  background: var(--ink);
-  transform: translate(-50%, -50%);
-}
-
-.compression-arrow::after {
-  content: "";
-  position: absolute;
-  right: -2px;
-  top: 50%;
-  width: 22px;
-  height: 22px;
-  border-right: 5px solid var(--ink);
-  border-top: 5px solid var(--ink);
-  transform: translateY(-50%) rotate(45deg);
-}
-
-.compressed-slide {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 28px;
-  height: 390px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.compressed-slide h3 {
-  font-size: 42px;
-  line-height: 0.95;
-  font-weight: 880;
-}
-
-.compressed-bars {
-  display: grid;
-  gap: 14px;
-  align-content: center;
-}
-
-.compressed-bar {
-  height: 18px;
-  border: 2px solid var(--ink);
-  background: var(--surface-2);
-}
-
-.compressed-bar.short {
-  width: 62%;
-}
-
-.template-spread {
-  display: grid;
-  grid-template-columns: 0.92fr 1.08fr;
-  gap: 40px;
-  align-items: center;
-}
-
-.starter-sheet {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  height: 420px;
-  padding: 28px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 28px;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.starter-sheet h3 {
-  font-size: 34px;
-  line-height: 1;
-  font-weight: 870;
-}
-
-.code-lines {
-  display: grid;
-  gap: 14px;
-  align-content: center;
-}
-
-.code-line {
-  height: 18px;
-  border: 2px solid var(--ink);
-  background: var(--surface-2);
-}
-
-.code-line.wide {
-  width: 100%;
-}
-
-.code-line.mid {
-  width: 78%;
-}
-
-.code-line.short {
-  width: 46%;
-}
-
-.code-line.accent {
-  background: var(--amber);
-}
-
-.completion-lanes {
-  display: grid;
-  gap: 26px;
-}
-
-.completion-lane {
-  display: grid;
-  grid-template-columns: 118px 1fr;
-  gap: 22px;
-  align-items: center;
-}
-
-.completion-lane b {
-  width: 86px;
-  height: 86px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--amber);
-  font-size: 34px;
-}
-
-.completion-lane strong {
-  font-size: 31px;
-  line-height: 1;
-}
-
-.completion-lane span {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.example-gallery {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 24px;
-  align-items: center;
-}
-
-.mini-slide {
-  height: 390px;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 22px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 20px;
-}
-
-.mini-slide:nth-child(2) {
-  background: #fff6d9;
-  transform: translateY(-26px);
-}
-
-.mini-slide:nth-child(3) {
-  background: #d6e4e8;
-}
-
-.mini-slide h3 {
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 870;
-}
-
-.mini-visual {
-  border: 2px solid var(--ink);
-  background: var(--bg);
-}
-
-.mini-slide:nth-child(1) .mini-visual {
-  background:
-    linear-gradient(90deg, transparent 48%, var(--ink) 48%, var(--ink) 52%, transparent 52%),
-    linear-gradient(180deg, transparent 48%, var(--ink) 48%, var(--ink) 52%, transparent 52%),
-    var(--bg);
-}
-
-.mini-slide:nth-child(2) .mini-visual {
-  background:
-    linear-gradient(180deg, transparent 14%, var(--ink) 14%, var(--ink) 17%, transparent 17%),
-    linear-gradient(180deg, transparent 44%, var(--ink) 44%, var(--ink) 47%, transparent 47%),
-    linear-gradient(180deg, transparent 74%, var(--ink) 74%, var(--ink) 77%, transparent 77%),
-    var(--bg);
-}
-
-.mini-slide:nth-child(3) .mini-visual {
-  background:
-    linear-gradient(90deg, transparent 12%, var(--amber) 12%, var(--amber) 28%, transparent 28%),
-    linear-gradient(90deg, transparent 38%, var(--blue) 38%, var(--blue) 58%, transparent 58%),
-    linear-gradient(90deg, transparent 68%, var(--green) 68%, var(--green) 86%, transparent 86%),
-    var(--bg);
-}
-
-.mini-caption {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.22;
-  font-weight: 700;
-}
-
-.operating-art {
-  height: 460px;
-  position: relative;
-}
-
-.shared-core {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 190px;
-  height: 190px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--amber);
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  font-size: 26px;
-  line-height: 1;
-  font-weight: 880;
-}
-
-.team-node {
-  position: absolute;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  width: 170px;
-  height: 108px;
-  padding: 16px;
-  display: grid;
-  align-content: center;
-  gap: 5px;
-}
-
-.team-node strong {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.team-node span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 820;
-  text-transform: uppercase;
-}
-
-.team-node.product {
-  left: 24px;
-  top: 40px;
-}
-
-.team-node.research {
-  right: 30px;
-  top: 58px;
-  background: #d6e4e8;
-}
-
-.team-node.design {
-  left: 72px;
-  bottom: 42px;
-  background: #fff6d9;
-}
-
-.team-node.ops {
-  right: 82px;
-  bottom: 34px;
-  background: #d9e5d6;
-}
-
-.connection {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 230px;
-  height: 3px;
-  background: var(--ink);
-  transform-origin: left center;
-}
-
-.connection.a {
-  transform: rotate(-143deg);
-}
-
-.connection.b {
-  transform: rotate(-35deg);
-}
-
-.connection.c {
-  transform: rotate(145deg);
-}
-
-.connection.d {
-  transform: rotate(36deg);
-}
-
-.shared-local {
-  display: grid;
-  grid-template-columns: 0.86fr 1.14fr;
-  gap: 42px;
-  align-items: center;
-}
-
-.capability-source {
-  border-left: 8px solid var(--ink);
-  padding-left: 30px;
-  display: grid;
-  gap: 18px;
-}
-
-.capability-source h3 {
-  font-size: 62px;
-  line-height: 0.92;
-  font-weight: 890;
-}
-
-.capability-source p {
-  max-width: 29ch;
-  color: var(--muted);
-  font-size: 21px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.outputs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.output-card {
-  height: 178px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 20px;
-  display: grid;
-  align-content: space-between;
-}
-
-.output-card:nth-child(2) {
-  background: #d6e4e8;
-}
-
-.output-card:nth-child(3) {
-  background: #fff6d9;
-}
-
-.output-card:nth-child(4) {
-  background: #d9e5d6;
-}
-
-.output-card h3 {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.output-card span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 830;
-  text-transform: uppercase;
-}
-
-.standards-slide {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 34px;
-  align-items: center;
-}
-
-.standard-column {
-  min-height: 430px;
-  border-top: 4px solid var(--ink);
-  padding-top: 24px;
-  display: grid;
-  align-content: start;
-  gap: 18px;
-}
-
-.standard-column b {
-  width: 54px;
-  height: 54px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--amber);
-  display: grid;
-  place-items: center;
-  font-size: 24px;
-}
-
-.standard-column h3 {
-  font-size: 40px;
-  line-height: 0.96;
-  font-weight: 880;
-}
-
-.standard-column p {
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1.28;
-  font-weight: 650;
-}
-
-.final-slide {
-  display: grid !important;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 64px;
-  align-items: center;
-}
-
-.final-copy {
-  display: grid;
-  gap: 24px;
-}
-
-.final-copy h2 {
-  max-width: 8ch;
-  font-size: 118px;
-  line-height: 0.88;
-  font-weight: 900;
-}
-
-.final-copy p {
-  max-width: 32ch;
-  color: var(--muted);
-  font-size: 25px;
-  line-height: 1.22;
-  font-weight: 650;
-}
-
-.thesis-mark {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  min-height: 380px;
-  padding: 34px;
-  display: grid;
-  align-content: center;
-  gap: 28px;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.thesis-mark h3 {
-  font-size: 52px;
-  line-height: 0.95;
-  font-weight: 890;
-}
-
-.thesis-mark p {
-  color: var(--muted);
-  font-size: 22px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.agenda-clean {
-  grid-template-columns: 0.84fr 1.16fr;
-}
-
-.agenda-clean .agenda-path {
-  grid-template-rows: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.agenda-clean .agenda-path::before {
-  left: 20px;
-  top: 66px;
-  bottom: 66px;
-  transform: translateX(-50%);
-}
-
-.agenda-clean .agenda-item {
-  min-height: 132px;
-  align-items: center;
-}
-
-.agenda-clean .agenda-item h2 {
-  font-size: 40px;
-}
-
-.agent-contrast {
-  position: relative;
-  justify-self: center;
-  align-self: center;
-  width: min(1040px, 100%);
-  height: 500px;
-}
-
-.axis-frame {
-  position: absolute;
-  left: 140px;
-  right: 92px;
-  top: 48px;
-  bottom: 86px;
-}
-
-.axis-x,
-.axis-y {
-  position: absolute;
-  z-index: 2;
-  background: var(--ink);
-}
-
-.axis-x {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-}
-
-.axis-y {
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-}
-
-.axis-x::after,
-.axis-y::after {
-  content: "";
-  position: absolute;
-  width: 0;
-  height: 0;
-}
-
-.axis-x::after {
-  right: -2px;
-  top: -10px;
-  border-top: 12px solid transparent;
-  border-bottom: 12px solid transparent;
-  border-left: 18px solid var(--ink);
-}
-
-.axis-y::after {
-  left: -10px;
-  top: -2px;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-bottom: 18px solid var(--ink);
-}
-
-.axis-title {
-  position: absolute;
-  z-index: 3;
-  color: var(--ink);
-  font-size: 22px;
-  font-weight: 880;
-}
-
-.axis-title.capability {
-  left: calc(52% + 1px);
-  bottom: -54px;
-  transform: translateX(-50%);
-}
-
-.axis-title.execution {
-  left: -42px;
-  top: 44.3%;
-  transform: rotate(-90deg) translateX(-50%);
-  transform-origin: left center;
-}
-
-.axis-gridline {
-  position: absolute;
-  z-index: 1;
-  background: var(--line);
-}
-
-.axis-gridline.horizontal {
-  left: 0;
-  right: 0;
-  top: 47%;
-  height: 2px;
-}
-
-.axis-gridline.vertical {
-  top: 0;
-  bottom: 0;
-  left: 52%;
-  width: 2px;
-}
-
-.axis-wash {
-  position: absolute;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.axis-wash.execution {
-  left: 28px;
-  top: 16px;
-  bottom: 20px;
-  width: 238px;
-  background: linear-gradient(90deg, rgba(47, 111, 137, 0.14), rgba(47, 111, 137, 0));
-}
-
-.axis-wash.capability {
-  left: 20px;
-  right: 132px;
-  bottom: 24px;
-  height: 132px;
-  background: linear-gradient(0deg, rgba(233, 185, 73, 0.18), rgba(233, 185, 73, 0));
-}
-
-.dimension-card {
-  position: absolute;
-  z-index: 4;
-  box-sizing: border-box;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 13px 16px 15px;
-  box-shadow: 7px 7px 0 var(--surface-2);
-}
-
-.dimension-card span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.dimension-card strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--ink);
-  font-size: 32px;
-  line-height: 0.92;
-  font-weight: 890;
-}
-
-.dimension-card.agent {
-  left: 116px;
-  top: 82px;
-  width: 188px;
-}
-
-.dimension-card.skill {
-  right: 210px;
-  bottom: 102px;
-  width: 170px;
-  background: #fff6d9;
-}
-
-.screenshot-qa {
-  display: grid;
-  grid-template-columns: 1.08fr 0.92fr;
-  gap: 46px;
-  align-items: center;
-}
-
-.viewport-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.viewport-card {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 14px;
-  box-shadow: 9px 9px 0 var(--surface-2);
-}
-
-.viewport-card strong {
-  display: block;
-  margin-bottom: 10px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 14px;
-  line-height: 1;
-  font-weight: 820;
-}
-
-.viewport-slide {
-  height: 128px;
-  border: 2px solid var(--ink);
-  background: #fffdf8;
-  padding: 16px;
-  display: grid;
-  grid-template-rows: 15px 1fr;
-  gap: 14px;
-}
-
-.viewport-slide::before {
-  content: "";
-  width: 66px;
-  height: 7px;
-  background: var(--amber);
-}
-
-.viewport-body {
-  display: grid;
-  grid-template-columns: 1fr 0.82fr;
-  gap: 12px;
-  align-items: end;
-}
-
-.viewport-text {
-  display: grid;
-  gap: 7px;
-}
-
-.viewport-text span {
-  height: 8px;
-  background: var(--ink);
-}
-
-.viewport-text span:nth-child(2) {
-  width: 72%;
-  background: var(--line);
-}
-
-.viewport-text span:nth-child(3) {
-  width: 52%;
-  background: var(--line);
-}
-
-.viewport-block {
-  height: 58px;
-  border: 2px solid var(--ink);
-  background: #d6e4e8;
-}
-
-.viewport-slide.compact {
-  height: 116px;
-  padding: 13px;
-  gap: 11px;
-}
-
-.viewport-slide.portrait {
-  height: 148px;
-  padding: 14px;
-}
-
-.viewport-slide.portrait .viewport-body {
-  grid-template-columns: 1fr;
-  align-items: stretch;
-}
-
-.viewport-slide.portrait .viewport-block {
-  height: 34px;
-  background: #d9e5d6;
-}
-
-.qa-loop {
-  display: grid;
-  gap: 18px;
-}
-
-.qa-step {
-  display: grid;
-  grid-template-columns: 46px 1fr;
-  gap: 17px;
-  align-items: center;
-}
-
-.qa-step b {
-  width: 42px;
-  height: 42px;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  line-height: 1;
-  font-weight: 890;
-}
-
-.qa-step:nth-child(2) b {
-  background: #d6e4e8;
-}
-
-.qa-step:nth-child(3) b {
-  background: #fff6d9;
-}
-
-.qa-step:nth-child(4) b {
-  background: #d9e5d6;
-}
-
-.qa-step strong {
-  display: block;
-  font-size: 28px;
-  line-height: 0.95;
-}
-
-.qa-step span {
-  display: block;
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.2;
-  font-weight: 660;
-}
-
-.qa-proof {
-  margin-top: 10px;
-  border-top: 3px solid var(--ink);
-  padding-top: 18px;
-}
-
-.qa-proof strong {
-  display: block;
-  font-size: 30px;
-  line-height: 1;
-}
-
-.qa-proof span {
-  display: block;
-  margin-top: 7px;
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1.22;
-  font-weight: 660;
-}
-
-.context-funnel {
-  display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  gap: 48px;
-  align-items: center;
-}
-
-.input-streams {
-  height: 430px;
-  display: grid;
-  align-content: center;
-  gap: 24px;
-}
-
-.stream-row {
-  display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 18px;
-  align-items: center;
-}
-
-.stream-row strong {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.stream-line {
-  height: 6px;
-  background: var(--ink);
-  transform-origin: right center;
-}
-
-.stream-row:nth-child(1) .stream-line {
-  width: 96%;
-  transform: rotate(7deg);
-}
-
-.stream-row:nth-child(2) .stream-line {
-  width: 86%;
-  background: var(--blue);
-  transform: rotate(3deg);
-}
-
-.stream-row:nth-child(3) .stream-line {
-  width: 100%;
-}
-
-.stream-row:nth-child(4) .stream-line {
-  width: 76%;
-  background: var(--green);
-  transform: rotate(-3deg);
-}
-
-.stream-row:nth-child(5) .stream-line {
-  width: 90%;
-  background: var(--amber);
-  transform: rotate(-7deg);
-}
-
-.compressed-output {
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  height: 430px;
-  padding: 34px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.compressed-output h3 {
-  font-size: 50px;
-  line-height: 0.94;
-  font-weight: 890;
-}
-
-.deck-lines {
-  display: grid;
-  gap: 14px;
-  align-content: center;
-}
-
-.deck-line {
-  height: 18px;
-  border: 2px solid var(--ink);
-  background: var(--surface-2);
-}
-
-.deck-line.accent {
-  width: 68%;
-  background: var(--amber);
-}
-
-.taste-transfer {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, 206px);
-  gap: 34px 44px;
-  align-items: stretch;
-  box-sizing: border-box;
-  justify-self: center;
-  width: 100%;
-  max-width: 1100px;
-  padding: 64px 82px 20px 38px;
-}
-
-.taste-example {
-  position: relative;
-  min-height: 0;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 20px;
-  overflow: hidden;
-  box-shadow: 9px 9px 0 var(--surface-2);
-}
-
-.taste-example .label {
-  position: absolute;
-  left: 20px;
-  top: 17px;
-}
-
-.taste-example h3 {
-  font-size: 29px;
-  line-height: 0.98;
-  font-weight: 880;
-}
-
-.taste-example p {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.2;
-  font-weight: 680;
-}
-
-.taste-claim {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  align-content: stretch;
-}
-
-.taste-claim h3 {
-  align-self: center;
-  max-width: 9ch;
-  font-size: 45px;
-  line-height: 0.9;
-}
-
-.taste-claim::after {
-  content: "";
-  position: absolute;
-  right: 20px;
-  top: 22px;
-  width: 94px;
-  height: 8px;
-  background: var(--blue);
-}
-
-.taste-claim .mini-rule {
-  width: 72%;
-  height: 10px;
-  background: var(--amber);
-}
-
-.taste-evidence {
-  display: grid;
-  grid-template-columns: 0.82fr 1.18fr;
-  gap: 20px;
-  align-items: end;
-}
-
-.mini-chart {
-  display: grid;
-  align-items: end;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  height: 134px;
-}
-
-.mini-chart span {
-  display: block;
-  border: 3px solid var(--ink);
-  background: var(--surface-2);
-}
-
-.mini-chart span:nth-child(1) {
-  height: 46%;
-}
-
-.mini-chart span:nth-child(2) {
-  height: 72%;
-  background: #d6e4e8;
-}
-
-.mini-chart span:nth-child(3) {
-  height: 54%;
-}
-
-.mini-chart span:nth-child(4) {
-  height: 92%;
-  background: #fff6d9;
-}
-
-.evidence-copy {
-  display: grid;
-  gap: 10px;
-  align-content: end;
-}
-
-.taste-system {
-  display: grid;
-  grid-template-columns: 1fr 0.9fr;
-  gap: 24px;
-  align-items: center;
-}
-
-.mini-network {
-  position: relative;
-  height: 150px;
-}
-
-.mini-node {
-  position: absolute;
-  z-index: 2;
-  width: 66px;
-  height: 66px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--surface);
-}
-
-.mini-node.a {
-  left: 0;
-  top: 42px;
-  background: #fff6d9;
-}
-
-.mini-node.b {
-  left: 126px;
-  top: 0;
-  background: #d6e4e8;
-}
-
-.mini-node.c {
-  left: 126px;
-  bottom: 0;
-  background: #d9e5d6;
-}
-
-.mini-network::before,
-.mini-network::after {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  left: 57px;
-  width: 104px;
-  height: 3px;
-  background: var(--ink);
-  transform-origin: left center;
-}
-
-.mini-network::before {
-  top: 61px;
-  transform: rotate(-20deg);
-}
-
-.mini-network::after {
-  top: 89px;
-  transform: rotate(20deg);
-}
-
-.system-copy {
-  display: grid;
-  gap: 10px;
-}
-
-.taste-critique {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 22px;
-  align-items: center;
-}
-
-.mini-review {
-  position: relative;
-  margin-top: 20px;
-  height: 138px;
-  box-sizing: border-box;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 17px;
-  display: grid;
-  gap: 10px;
-  align-content: center;
-}
-
-.mini-review span {
-  display: block;
-  height: 14px;
-  border: 2px solid var(--ink);
-}
-
-.mini-review span:nth-child(1) {
-  width: 66%;
-  background: var(--amber);
-}
-
-.mini-review span:nth-child(2) {
-  width: 88%;
-}
-
-.mini-review span:nth-child(3) {
-  width: 44%;
-}
-
-.mini-review::after {
-  content: "QA";
-  position: absolute;
-  right: -18px;
-  top: -18px;
-  border: 3px solid var(--ink);
-  background: #d9e5d6;
-  padding: 10px 12px;
-  font-size: 14px;
-  font-weight: 880;
-}
-
-.critique-copy {
-  display: grid;
-  gap: 10px;
-}
-
-.local-output {
-  display: grid;
-  grid-template-columns: 0.86fr 1.14fr;
-  gap: 46px;
-  align-items: center;
-}
-
-.shared-signal {
-  border-left: 8px solid var(--ink);
-  padding-left: 30px;
-  display: grid;
-  gap: 18px;
-}
-
-.shared-signal h3 {
-  font-size: 62px;
-  line-height: 0.92;
-  font-weight: 890;
-}
-
-.shared-signal p {
-  color: var(--muted);
-  font-size: 21px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.output-spectrum {
-  height: 430px;
-  display: grid;
-  grid-template-rows: repeat(4, 1fr);
-  gap: 22px;
-  align-content: center;
-}
-
-.spectrum-row {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 24px;
-  align-items: center;
-}
-
-.spectrum-row span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 840;
-  text-transform: uppercase;
-}
-
-.spectrum-row strong {
-  font-size: 34px;
-  line-height: 1;
-}
-
-.spectrum-line {
-  height: 8px;
-  background: var(--ink);
-}
-
-.spectrum-row:nth-child(2) .spectrum-line {
-  width: 78%;
-  background: var(--blue);
-}
-
-.spectrum-row:nth-child(3) .spectrum-line {
-  width: 66%;
-  background: var(--amber);
-}
-
-.spectrum-row:nth-child(4) .spectrum-line {
-  width: 86%;
-  background: var(--green);
-}
-
-.release-path {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 28px;
-  align-content: center;
-}
-
-.gate-track {
-  position: relative;
-  align-self: center;
-  height: 308px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 54px;
-  align-items: center;
-}
-
-.gate-track::before {
-  content: "";
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  top: 50%;
-  height: 7px;
-  background:
-    linear-gradient(
-      90deg,
-      var(--ink) 0 32%,
-      var(--amber) 32% 66%,
-      var(--green) 66% 100%
-    );
-}
-
-.release-gate {
-  z-index: 1;
-  width: 220px;
-  height: 220px;
-  justify-self: center;
-  border-radius: 999px;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  padding: 34px;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 12px;
-  text-align: center;
-}
-
-.release-gate:nth-child(2) {
-  background: #fff6d9;
-}
-
-.release-gate:nth-child(3) {
-  background: #d9e5d6;
-}
-
-.release-gate strong {
-  font-size: 31px;
-  line-height: 0.95;
-}
-
-.release-gate span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 840;
-  text-transform: uppercase;
-}
-
-.release-caption {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 54px;
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.release-caption span {
-  border-top: 3px solid var(--ink);
-  padding-top: 16px;
-  text-align: center;
-}
-
-.release-caption span:nth-child(2) {
-  border-color: var(--amber);
-}
-
-.release-caption span:nth-child(3) {
-  border-color: var(--green);
-}
-
-.reveal .progress {
-  height: 3px;
-  color: var(--amber);
-  background: rgba(17, 20, 24, 0.08);
-}
-
-.reveal .controls {
-  color: var(--ink);
-  opacity: 0.42;
-}
-</style>
-</head>
-<body>
-<div class="reveal">
-  <div class="slides">
-
-    <section class="title-slide">
-      <div class="title-copy">
-        <h1>Software for Agents</h1>
-        <p>Skills raise the ceiling because they package capability, not just wording.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="skill-equip-scene" aria-label="Skill package equipping an agent terminal">
-        <div class="skill-folder">
-          <div class="folder-label"><strong>Skill package</strong><span>capability as software</span></div>
-        </div>
-        <div class="terminal-agent">
-          <div class="terminal-bar"><span class="terminal-dot"></span>Agent terminal</div>
-          <div class="terminal-screen">
-            <span class="prompt">$ load skill</span>
-            <span>skill package/</span>
-            <span class="ready">capability ready</span>
+  <head>
+    <meta charset="utf-8" />
+    <title>Software for Agents</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --r-heading-text-transform: none;
+        --r-heading-letter-spacing: 0;
+        --r-heading-font:
+          Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          system-ui, sans-serif;
+        --r-main-font:
+          Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          system-ui, sans-serif;
+        --r-background-color: #f7f5ef;
+        --bg: #f7f5ef;
+        --surface: #fffdf8;
+        --surface-2: #eeebe3;
+        --ink: #111418;
+        --muted: #60666b;
+        --line: #d7d2c8;
+        --blue: #2f6f89;
+        --green: #4f8061;
+        --amber: #e9b949;
+        --red: #d75f46;
+        --font:
+          Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          system-ui, sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --pad-x: 64px;
+        --pad-y: 56px;
+      }
+
+      html,
+      body,
+      .reveal {
+        background: var(--bg);
+      }
+
+      .reveal {
+        color: var(--ink);
+        font-family: var(--font);
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .reveal .slides {
+        text-align: left;
+      }
+
+      .reveal .slides > section,
+      .reveal .slides > section.present {
+        width: 100% !important;
+        height: 800px !important;
+        padding: var(--pad-y) var(--pad-x) !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        background: var(--bg);
+        text-align: left !important;
+      }
+
+      .reveal h1,
+      .reveal h2,
+      .reveal h3,
+      .reveal p {
+        margin: 0;
+        color: inherit;
+        font-family: var(--font);
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .reveal strong {
+        font-weight: 870;
+      }
+
+      .slide-title h2 {
+        max-width: 100%;
+        color: var(--ink);
+        font-size: 52px;
+        line-height: 1;
+        font-weight: 870;
+      }
+
+      .slide-title .slide-subtitle {
+        margin-top: 12px;
+        max-width: 56ch;
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.18;
+        font-weight: 680;
+      }
+
+      .content-slide {
+        display: grid !important;
+        grid-template-rows: auto 1fr;
+        gap: 36px;
+      }
+
+      .accent-line {
+        width: 74px;
+        height: 8px;
+        background: var(--amber);
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .pill {
+        width: max-content;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 8px 13px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .pill.amber {
+        background: var(--amber);
+      }
+
+      .pill.green {
+        background: #d9e5d6;
+      }
+
+      .pill.blue {
+        background: #d6e4e8;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .title-slide {
+        display: grid !important;
+        grid-template-columns: 0.88fr 1.12fr;
+        gap: 54px;
+        align-items: center;
+      }
+
+      .title-copy {
+        display: grid;
+        gap: 24px;
+      }
+
+      .title-copy h1 {
+        max-width: 8ch;
+        font-size: 98px;
+        line-height: 0.91;
+        font-weight: 900;
+      }
+
+      .title-copy p {
+        max-width: 32ch;
+        color: var(--muted);
+        font-size: 25px;
+        line-height: 1.22;
+        font-weight: 650;
+      }
+
+      .skill-equip-scene {
+        position: relative;
+        height: 560px;
+      }
+
+      .skill-folder {
+        position: absolute;
+        z-index: 1;
+        left: 90px;
+        top: 120px;
+        width: 370px;
+        height: 250px;
+        border: 3px solid var(--ink);
+        background: #cfe3ea;
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.06);
+      }
+
+      .skill-folder::before {
+        content: "";
+        position: absolute;
+        left: -3px;
+        top: -32px;
+        width: 176px;
+        height: 32px;
+        border: 3px solid var(--ink);
+        border-bottom: 0;
+        background: #cfe3ea;
+      }
+
+      .skill-folder::after {
+        content: "";
+        position: absolute;
+        left: -3px;
+        right: -3px;
+        bottom: -3px;
+        height: 154px;
+        border: 3px solid var(--ink);
+        background: #dcecf1;
+      }
+
+      .folder-label {
+        position: absolute;
+        z-index: 2;
+        left: 28px;
+        top: 24px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .folder-label strong {
+        color: var(--ink);
+        font-size: 30px;
+        line-height: 0.92;
+      }
+
+      .folder-label span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .terminal-agent {
+        position: absolute;
+        z-index: 4;
+        left: 246px;
+        top: 274px;
+        width: 336px;
+        height: 174px;
+        border: 3px solid var(--ink);
+        background: var(--ink);
+        color: var(--surface);
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
+      }
+
+      .terminal-bar {
+        height: 34px;
+        border-bottom: 3px solid var(--ink);
+        background: var(--surface);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 13px;
+        font-size: 11px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .terminal-dot {
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      .terminal-screen {
+        padding: 19px 23px;
+        font-family: var(--mono);
+        font-size: 16px;
+        line-height: 1.45;
+      }
+
+      .terminal-screen span {
+        display: block;
+      }
+
+      .terminal-screen .prompt {
+        color: #b8d3da;
+      }
+
+      .terminal-screen .ready {
+        color: #d9e5d6;
+      }
+
+      .agenda-slide {
+        display: grid !important;
+        grid-template-columns: 0.78fr 1.22fr;
+        gap: 64px;
+        align-items: center;
+      }
+
+      .agenda-title h1 {
+        max-width: 9ch;
+        font-size: 94px;
+        line-height: 0.95;
+        font-weight: 890;
+      }
+
+      .agenda-title p {
+        max-width: 26ch;
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 23px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .agenda-path {
+        position: relative;
+        display: grid;
+        grid-template-rows: repeat(5, 1fr);
+      }
+
+      .agenda-path::before {
+        content: "";
+        position: absolute;
+        left: 18px;
+        top: 19px;
+        bottom: 80px;
+        width: 3px;
+        background: var(--ink);
+      }
+
+      .agenda-item {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 22px;
+        min-height: 96px;
+      }
+
+      .agenda-item b {
+        z-index: 1;
+        width: 40px;
+        height: 40px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        font-weight: 850;
+      }
+
+      .agenda-item.active b {
+        background: var(--amber);
+      }
+
+      .agenda-item h2 {
+        font-size: 32px;
+        line-height: 1.02;
+        font-weight: 850;
+      }
+
+      .agenda-item p {
+        margin-top: 7px;
+        max-width: 42ch;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.28;
+        font-weight: 650;
+      }
+
+      .section-slide {
+        display: grid !important;
+        grid-template-columns: 0.88fr 1.12fr;
+        gap: 70px;
+        align-items: center;
+      }
+
+      .section-copy {
+        display: grid;
+        gap: 22px;
+      }
+
+      .section-copy .number {
+        color: var(--muted);
+        font-size: 18px;
+        font-weight: 850;
+      }
+
+      .section-copy h2 {
+        max-width: 9ch;
+        font-size: 104px;
+        line-height: 0.92;
+        font-weight: 900;
+      }
+
+      .case-separator .section-copy h2 {
+        max-width: 9ch;
+        font-size: 88px;
+      }
+
+      .case-separator .deck-art {
+        transform: scale(0.76);
+        transform-origin: center;
+      }
+
+      .section-copy p {
+        max-width: 34ch;
+        color: var(--muted);
+        font-size: 24px;
+        line-height: 1.24;
+        font-weight: 650;
+      }
+
+      .prompt-ceiling-art {
+        height: 430px;
+        position: relative;
+        display: grid;
+        align-content: end;
+      }
+
+      .ceiling-line {
+        position: absolute;
+        top: 54px;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: var(--ink);
+      }
+
+      .ceiling-line span {
+        position: absolute;
+        right: 0;
+        top: -30px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .prompt-sheet {
+        width: 520px;
+        height: 250px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        transform: rotate(-4deg);
+        box-shadow: 16px 18px 0 var(--surface-2);
+        padding: 34px;
+        display: grid;
+        gap: 16px;
+        align-content: center;
+      }
+
+      .prompt-mark {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .prompt-mark.short {
+        width: 58%;
+      }
+
+      .prompt-vs-skill {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 40px;
+        align-items: center;
+      }
+
+      .thin-prompt {
+        position: relative;
+        min-height: 392px;
+        border-left: 4px solid var(--ink);
+        padding-left: 34px;
+        display: grid;
+        align-content: center;
+        gap: 26px;
+      }
+
+      .thin-prompt h3 {
+        font-size: 58px;
+        line-height: 0.94;
+        font-weight: 890;
+      }
+
+      .thin-prompt p {
+        max-width: 28ch;
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .operating-surface {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 150px 150px 86px;
+        gap: 18px;
+      }
+
+      .surface-piece {
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 20px;
+        display: grid;
+        align-content: center;
+        gap: 8px;
+      }
+
+      .surface-piece.wide {
+        grid-column: 1 / -1;
+        grid-template-columns: 170px 1fr;
+        align-items: center;
+        background: #d9e5d6;
+      }
+
+      .surface-piece strong {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .surface-piece span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 830;
+        text-transform: uppercase;
+      }
+
+      .anatomy-art {
+        height: 460px;
+        position: relative;
+      }
+
+      .artifact-sheet {
+        position: absolute;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 22px;
+        display: grid;
+        align-content: end;
+        gap: 8px;
+        box-shadow: 12px 12px 0 var(--surface-2);
+      }
+
+      .artifact-sheet strong {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .artifact-sheet span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 830;
+        text-transform: uppercase;
+      }
+
+      .artifact-sheet.one {
+        width: 300px;
+        height: 210px;
+        left: 24px;
+        top: 42px;
+        transform: rotate(-6deg);
+        background: #fff6d9;
+      }
+
+      .artifact-sheet.two {
+        width: 260px;
+        height: 178px;
+        right: 72px;
+        top: 26px;
+        transform: rotate(4deg);
+      }
+
+      .artifact-sheet.three {
+        width: 286px;
+        height: 184px;
+        left: 168px;
+        bottom: 34px;
+        transform: rotate(2deg);
+        background: #d6e4e8;
+      }
+
+      .artifact-sheet.four {
+        width: 236px;
+        height: 150px;
+        right: 12px;
+        bottom: 76px;
+        transform: rotate(-5deg);
+        background: #d9e5d6;
+      }
+
+      .capability-package {
+        display: grid;
+        grid-template-columns: 0.96fr 1.04fr;
+        gap: 56px;
+        align-items: center;
+      }
+
+      .skill-manifest {
+        position: relative;
+        height: 430px;
+      }
+
+      .manifest-folder {
+        position: absolute;
+        left: 26px;
+        top: 64px;
+        width: 466px;
+        height: 326px;
+        border: 3px solid var(--ink);
+        background: #dcecf1;
+        box-shadow: 12px 12px 0 var(--surface-2);
+      }
+
+      .manifest-folder::before {
+        content: "";
+        position: absolute;
+        left: -3px;
+        top: -34px;
+        width: 170px;
+        height: 34px;
+        border: 3px solid var(--ink);
+        border-bottom: 0;
+        background: #cfe3ea;
+      }
+
+      .manifest-title {
+        position: absolute;
+        left: 28px;
+        top: 22px;
+        display: grid;
+        gap: 4px;
+      }
+
+      .manifest-title strong {
+        font-size: 32px;
+        line-height: 0.95;
+      }
+
+      .manifest-title span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .manifest-tree {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        bottom: 24px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .manifest-row {
+        display: grid;
+        grid-template-columns: 124px 1fr;
+        gap: 18px;
+        align-items: baseline;
+        border-top: 2px solid rgba(17, 20, 24, 0.18);
+        padding-top: 10px;
+      }
+
+      .manifest-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .manifest-row code {
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .manifest-row span {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.2;
+        font-weight: 670;
+      }
+
+      .package-meaning {
+        display: grid;
+        gap: 20px;
+      }
+
+      .meaning-row {
+        display: grid;
+        grid-template-columns: 148px 1fr;
+        gap: 24px;
+        align-items: center;
+        border-top: 3px solid var(--ink);
+        padding-top: 17px;
+      }
+
+      .meaning-row:nth-child(2) {
+        border-color: var(--blue);
+      }
+
+      .meaning-row:nth-child(3) {
+        border-color: var(--amber);
+      }
+
+      .meaning-row:nth-child(4) {
+        border-color: var(--green);
+      }
+
+      .meaning-row strong {
+        font-size: 27px;
+        line-height: 0.96;
+      }
+
+      .meaning-row span {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
+      .tool-shipping {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .cli-help-window {
+        border: 3px solid var(--ink);
+        background: #111820;
+        color: #d7f3ed;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .cli-titlebar {
+        height: 42px;
+        border-bottom: 3px solid var(--ink);
+        background: var(--surface);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px;
+        font-size: 13px;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .cli-dot {
+        width: 11px;
+        height: 11px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      .cli-body {
+        padding: 30px 34px 34px;
+        font-family: var(--mono);
+        font-size: 22px;
+        line-height: 1.48;
+        font-weight: 720;
+      }
+
+      .cli-body .dim {
+        color: #91aaa6;
+      }
+
+      .cli-body .flag {
+        color: #f4c84e;
+      }
+
+      .tool-discovery {
+        display: grid;
+        gap: 22px;
+      }
+
+      .discovery-row {
+        border-left: 8px solid var(--ink);
+        padding-left: 20px;
+      }
+
+      .discovery-row:nth-child(2) {
+        border-color: var(--blue);
+      }
+
+      .discovery-row:nth-child(3) {
+        border-color: var(--green);
+      }
+
+      .discovery-row strong {
+        display: block;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .discovery-row span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
+      .mcp-contrast {
+        border: 3px solid var(--ink);
+        background: #d6e4e8;
+        padding: 19px 21px;
+        box-shadow: 8px 8px 0 var(--surface-2);
+      }
+
+      .mcp-contrast strong {
+        display: block;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .mcp-contrast span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.22;
+        font-weight: 680;
+      }
+
+      .deck-art {
+        position: relative;
+        height: 460px;
+      }
+
+      .slide-stack-card {
+        position: absolute;
+        width: 430px;
+        height: 270px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        box-shadow: 12px 12px 0 var(--surface-2);
+        padding: 26px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 22px;
+      }
+
+      .slide-stack-card::before {
+        content: "";
+        width: 110px;
+        height: 8px;
+        background: var(--amber);
+      }
+
+      .slide-stack-card.a {
+        left: 70px;
+        top: 32px;
+        transform: rotate(-7deg);
+      }
+
+      .slide-stack-card.b {
+        right: 58px;
+        top: 106px;
+        transform: rotate(5deg);
+        background: #fff6d9;
+      }
+
+      .slide-stack-card.c {
+        left: 168px;
+        bottom: 20px;
+        transform: rotate(-1deg);
+        background: #d6e4e8;
+      }
+
+      .thumb-title {
+        width: 78%;
+        height: 30px;
+        border: 2px solid var(--ink);
+        background: var(--bg);
+      }
+
+      .thumb-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .thumb-box {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+      }
+
+      .context-compression {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 0.82fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .messy-context {
+        min-height: 420px;
+        position: relative;
+      }
+
+      .context-chip {
+        position: absolute;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 14px 16px;
+        font-size: 20px;
+        font-weight: 850;
+        box-shadow: 8px 8px 0 var(--surface-2);
+      }
+
+      .context-chip.a {
+        left: 10px;
+        top: 18px;
+        transform: rotate(-5deg);
+      }
+
+      .context-chip.b {
+        right: 36px;
+        top: 64px;
+        background: #fff6d9;
+        transform: rotate(4deg);
+      }
+
+      .context-chip.c {
+        left: 86px;
+        top: 150px;
+        background: #d6e4e8;
+      }
+
+      .context-chip.d {
+        right: 86px;
+        top: 210px;
+        transform: rotate(-4deg);
+      }
+
+      .context-chip.e {
+        left: 38px;
+        bottom: 56px;
+        background: #d9e5d6;
+        transform: rotate(3deg);
+      }
+
+      .context-chip.f {
+        right: 14px;
+        bottom: 24px;
+      }
+
+      .compression-arrow {
+        position: absolute;
+        left: 52%;
+        top: 50%;
+        width: 104px;
+        height: 5px;
+        background: var(--ink);
+        transform: translate(-50%, -50%);
+      }
+
+      .compression-arrow::after {
+        content: "";
+        position: absolute;
+        right: -2px;
+        top: 50%;
+        width: 22px;
+        height: 22px;
+        border-right: 5px solid var(--ink);
+        border-top: 5px solid var(--ink);
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .compressed-slide {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 28px;
+        height: 390px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .compressed-slide h3 {
+        font-size: 42px;
+        line-height: 0.95;
+        font-weight: 880;
+      }
+
+      .compressed-bars {
+        display: grid;
+        gap: 14px;
+        align-content: center;
+      }
+
+      .compressed-bar {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .compressed-bar.short {
+        width: 62%;
+      }
+
+      .template-spread {
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: 40px;
+        align-items: center;
+      }
+
+      .starter-sheet {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        height: 420px;
+        padding: 28px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 28px;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .starter-sheet h3 {
+        font-size: 34px;
+        line-height: 1;
+        font-weight: 870;
+      }
+
+      .code-lines {
+        display: grid;
+        gap: 14px;
+        align-content: center;
+      }
+
+      .code-line {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .code-line.wide {
+        width: 100%;
+      }
+
+      .code-line.mid {
+        width: 78%;
+      }
+
+      .code-line.short {
+        width: 46%;
+      }
+
+      .code-line.accent {
+        background: var(--amber);
+      }
+
+      .completion-lanes {
+        display: grid;
+        gap: 26px;
+      }
+
+      .completion-lane {
+        display: grid;
+        grid-template-columns: 118px 1fr;
+        gap: 22px;
+        align-items: center;
+      }
+
+      .completion-lane b {
+        width: 86px;
+        height: 86px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--amber);
+        font-size: 34px;
+      }
+
+      .completion-lane strong {
+        font-size: 31px;
+        line-height: 1;
+      }
+
+      .completion-lane span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .example-gallery {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 24px;
+        align-items: center;
+      }
+
+      .mini-slide {
+        height: 390px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 22px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 20px;
+      }
+
+      .mini-slide:nth-child(2) {
+        background: #fff6d9;
+        transform: translateY(-26px);
+      }
+
+      .mini-slide:nth-child(3) {
+        background: #d6e4e8;
+      }
+
+      .mini-slide h3 {
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 870;
+      }
+
+      .mini-visual {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+      }
+
+      .mini-slide:nth-child(1) .mini-visual {
+        background:
+          linear-gradient(
+            90deg,
+            transparent 48%,
+            var(--ink) 48%,
+            var(--ink) 52%,
+            transparent 52%
+          ),
+          linear-gradient(
+            180deg,
+            transparent 48%,
+            var(--ink) 48%,
+            var(--ink) 52%,
+            transparent 52%
+          ),
+          var(--bg);
+      }
+
+      .mini-slide:nth-child(2) .mini-visual {
+        background:
+          linear-gradient(
+            180deg,
+            transparent 14%,
+            var(--ink) 14%,
+            var(--ink) 17%,
+            transparent 17%
+          ),
+          linear-gradient(
+            180deg,
+            transparent 44%,
+            var(--ink) 44%,
+            var(--ink) 47%,
+            transparent 47%
+          ),
+          linear-gradient(
+            180deg,
+            transparent 74%,
+            var(--ink) 74%,
+            var(--ink) 77%,
+            transparent 77%
+          ),
+          var(--bg);
+      }
+
+      .mini-slide:nth-child(3) .mini-visual {
+        background:
+          linear-gradient(
+            90deg,
+            transparent 12%,
+            var(--amber) 12%,
+            var(--amber) 28%,
+            transparent 28%
+          ),
+          linear-gradient(
+            90deg,
+            transparent 38%,
+            var(--blue) 38%,
+            var(--blue) 58%,
+            transparent 58%
+          ),
+          linear-gradient(
+            90deg,
+            transparent 68%,
+            var(--green) 68%,
+            var(--green) 86%,
+            transparent 86%
+          ),
+          var(--bg);
+      }
+
+      .mini-caption {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.22;
+        font-weight: 700;
+      }
+
+      .operating-art {
+        height: 460px;
+        position: relative;
+      }
+
+      .shared-core {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 190px;
+        height: 190px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+        transform: translate(-50%, -50%);
+        display: grid;
+        place-items: center;
+        text-align: center;
+        font-size: 26px;
+        line-height: 1;
+        font-weight: 880;
+      }
+
+      .team-node {
+        position: absolute;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        width: 170px;
+        height: 108px;
+        padding: 16px;
+        display: grid;
+        align-content: center;
+        gap: 5px;
+      }
+
+      .team-node strong {
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .team-node span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 820;
+        text-transform: uppercase;
+      }
+
+      .team-node.product {
+        left: 24px;
+        top: 40px;
+      }
+
+      .team-node.research {
+        right: 30px;
+        top: 58px;
+        background: #d6e4e8;
+      }
+
+      .team-node.design {
+        left: 72px;
+        bottom: 42px;
+        background: #fff6d9;
+      }
+
+      .team-node.ops {
+        right: 82px;
+        bottom: 34px;
+        background: #d9e5d6;
+      }
+
+      .connection {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 230px;
+        height: 3px;
+        background: var(--ink);
+        transform-origin: left center;
+      }
+
+      .connection.a {
+        transform: rotate(-143deg);
+      }
+
+      .connection.b {
+        transform: rotate(-35deg);
+      }
+
+      .connection.c {
+        transform: rotate(145deg);
+      }
+
+      .connection.d {
+        transform: rotate(36deg);
+      }
+
+      .shared-local {
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 42px;
+        align-items: center;
+      }
+
+      .capability-source {
+        border-left: 8px solid var(--ink);
+        padding-left: 30px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .capability-source h3 {
+        font-size: 62px;
+        line-height: 0.92;
+        font-weight: 890;
+      }
+
+      .capability-source p {
+        max-width: 29ch;
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .outputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .output-card {
+        height: 178px;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 20px;
+        display: grid;
+        align-content: space-between;
+      }
+
+      .output-card:nth-child(2) {
+        background: #d6e4e8;
+      }
+
+      .output-card:nth-child(3) {
+        background: #fff6d9;
+      }
+
+      .output-card:nth-child(4) {
+        background: #d9e5d6;
+      }
+
+      .output-card h3 {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .output-card span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 830;
+        text-transform: uppercase;
+      }
+
+      .standards-slide {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 34px;
+        align-items: center;
+      }
+
+      .standard-column {
+        min-height: 430px;
+        border-top: 4px solid var(--ink);
+        padding-top: 24px;
+        display: grid;
+        align-content: start;
+        gap: 18px;
+      }
+
+      .standard-column b {
+        width: 54px;
+        height: 54px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+      }
+
+      .standard-column h3 {
+        font-size: 40px;
+        line-height: 0.96;
+        font-weight: 880;
+      }
+
+      .standard-column p {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.28;
+        font-weight: 650;
+      }
+
+      .final-slide {
+        display: grid !important;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 64px;
+        align-items: center;
+      }
+
+      .final-copy {
+        display: grid;
+        gap: 24px;
+      }
+
+      .final-copy h2 {
+        max-width: 8ch;
+        font-size: 118px;
+        line-height: 0.88;
+        font-weight: 900;
+      }
+
+      .final-copy p {
+        max-width: 32ch;
+        color: var(--muted);
+        font-size: 25px;
+        line-height: 1.22;
+        font-weight: 650;
+      }
+
+      .thesis-mark {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        min-height: 380px;
+        padding: 34px;
+        display: grid;
+        align-content: center;
+        gap: 28px;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .thesis-mark h3 {
+        font-size: 52px;
+        line-height: 0.95;
+        font-weight: 890;
+      }
+
+      .thesis-mark p {
+        color: var(--muted);
+        font-size: 22px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .agenda-clean {
+        grid-template-columns: 0.84fr 1.16fr;
+      }
+
+      .agenda-clean .agenda-path {
+        grid-template-rows: repeat(3, 1fr);
+        gap: 20px;
+      }
+
+      .agenda-clean .agenda-path::before {
+        left: 20px;
+        top: 66px;
+        bottom: 66px;
+        transform: translateX(-50%);
+      }
+
+      .agenda-clean .agenda-item {
+        min-height: 132px;
+        align-items: center;
+      }
+
+      .agenda-clean .agenda-item h2 {
+        font-size: 40px;
+      }
+
+      .agent-contrast {
+        position: relative;
+        justify-self: center;
+        align-self: center;
+        width: min(1040px, 100%);
+        height: 500px;
+      }
+
+      .axis-frame {
+        position: absolute;
+        left: 140px;
+        right: 92px;
+        top: 48px;
+        bottom: 86px;
+      }
+
+      .axis-x,
+      .axis-y {
+        position: absolute;
+        z-index: 2;
+        background: var(--ink);
+      }
+
+      .axis-x {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 4px;
+      }
+
+      .axis-y {
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+      }
+
+      .axis-x::after,
+      .axis-y::after {
+        content: "";
+        position: absolute;
+        width: 0;
+        height: 0;
+      }
+
+      .axis-x::after {
+        right: -2px;
+        top: -10px;
+        border-top: 12px solid transparent;
+        border-bottom: 12px solid transparent;
+        border-left: 18px solid var(--ink);
+      }
+
+      .axis-y::after {
+        left: -10px;
+        top: -2px;
+        border-left: 12px solid transparent;
+        border-right: 12px solid transparent;
+        border-bottom: 18px solid var(--ink);
+      }
+
+      .axis-title {
+        position: absolute;
+        z-index: 3;
+        color: var(--ink);
+        font-size: 22px;
+        font-weight: 880;
+      }
+
+      .axis-title.capability {
+        left: calc(52% + 1px);
+        bottom: -54px;
+        transform: translateX(-50%);
+      }
+
+      .axis-title.execution {
+        left: -42px;
+        top: 44.3%;
+        transform: rotate(-90deg) translateX(-50%);
+        transform-origin: left center;
+      }
+
+      .axis-gridline {
+        position: absolute;
+        z-index: 1;
+        background: var(--line);
+      }
+
+      .axis-gridline.horizontal {
+        left: 0;
+        right: 0;
+        top: 47%;
+        height: 2px;
+      }
+
+      .axis-gridline.vertical {
+        top: 0;
+        bottom: 0;
+        left: 52%;
+        width: 2px;
+      }
+
+      .axis-wash {
+        position: absolute;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      .axis-wash.execution {
+        left: 28px;
+        top: 16px;
+        bottom: 20px;
+        width: 238px;
+        background: linear-gradient(
+          90deg,
+          rgba(47, 111, 137, 0.14),
+          rgba(47, 111, 137, 0)
+        );
+      }
+
+      .axis-wash.capability {
+        left: 20px;
+        right: 132px;
+        bottom: 24px;
+        height: 132px;
+        background: linear-gradient(
+          0deg,
+          rgba(233, 185, 73, 0.18),
+          rgba(233, 185, 73, 0)
+        );
+      }
+
+      .dimension-card {
+        position: absolute;
+        z-index: 4;
+        box-sizing: border-box;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 13px 16px 15px;
+        box-shadow: 7px 7px 0 var(--surface-2);
+      }
+
+      .dimension-card span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .dimension-card strong {
+        display: block;
+        margin-top: 4px;
+        color: var(--ink);
+        font-size: 32px;
+        line-height: 0.92;
+        font-weight: 890;
+      }
+
+      .dimension-card.agent {
+        left: 116px;
+        top: 82px;
+        width: 188px;
+      }
+
+      .dimension-card.skill {
+        right: 210px;
+        bottom: 102px;
+        width: 170px;
+        background: #fff6d9;
+      }
+
+      .screenshot-qa {
+        display: grid;
+        grid-template-columns: 1.08fr 0.92fr;
+        gap: 46px;
+        align-items: center;
+      }
+
+      .viewport-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+      }
+
+      .viewport-card {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 14px;
+        box-shadow: 9px 9px 0 var(--surface-2);
+      }
+
+      .viewport-card strong {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 14px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .viewport-slide {
+        height: 128px;
+        border: 2px solid var(--ink);
+        background: #fffdf8;
+        padding: 16px;
+        display: grid;
+        grid-template-rows: 15px 1fr;
+        gap: 14px;
+      }
+
+      .viewport-slide::before {
+        content: "";
+        width: 66px;
+        height: 7px;
+        background: var(--amber);
+      }
+
+      .viewport-body {
+        display: grid;
+        grid-template-columns: 1fr 0.82fr;
+        gap: 12px;
+        align-items: end;
+      }
+
+      .viewport-text {
+        display: grid;
+        gap: 7px;
+      }
+
+      .viewport-text span {
+        height: 8px;
+        background: var(--ink);
+      }
+
+      .viewport-text span:nth-child(2) {
+        width: 72%;
+        background: var(--line);
+      }
+
+      .viewport-text span:nth-child(3) {
+        width: 52%;
+        background: var(--line);
+      }
+
+      .viewport-block {
+        height: 58px;
+        border: 2px solid var(--ink);
+        background: #d6e4e8;
+      }
+
+      .viewport-slide.compact {
+        height: 116px;
+        padding: 13px;
+        gap: 11px;
+      }
+
+      .viewport-slide.portrait {
+        height: 148px;
+        padding: 14px;
+      }
+
+      .viewport-slide.portrait .viewport-body {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+
+      .viewport-slide.portrait .viewport-block {
+        height: 34px;
+        background: #d9e5d6;
+      }
+
+      .qa-loop {
+        display: grid;
+        gap: 18px;
+      }
+
+      .qa-step {
+        display: grid;
+        grid-template-columns: 46px 1fr;
+        gap: 17px;
+        align-items: center;
+      }
+
+      .qa-step b {
+        width: 42px;
+        height: 42px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 890;
+      }
+
+      .qa-step:nth-child(2) b {
+        background: #d6e4e8;
+      }
+
+      .qa-step:nth-child(3) b {
+        background: #fff6d9;
+      }
+
+      .qa-step:nth-child(4) b {
+        background: #d9e5d6;
+      }
+
+      .qa-step strong {
+        display: block;
+        font-size: 28px;
+        line-height: 0.95;
+      }
+
+      .qa-step span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.2;
+        font-weight: 660;
+      }
+
+      .qa-proof {
+        margin-top: 10px;
+        border-top: 3px solid var(--ink);
+        padding-top: 18px;
+      }
+
+      .qa-proof strong {
+        display: block;
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .qa-proof span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
+      .context-funnel {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .input-streams {
+        height: 430px;
+        display: grid;
+        align-content: center;
+        gap: 24px;
+      }
+
+      .stream-row {
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        gap: 18px;
+        align-items: center;
+      }
+
+      .stream-row strong {
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      .stream-line {
+        height: 6px;
+        background: var(--ink);
+        transform-origin: right center;
+      }
+
+      .stream-row:nth-child(1) .stream-line {
+        width: 96%;
+        transform: rotate(7deg);
+      }
+
+      .stream-row:nth-child(2) .stream-line {
+        width: 86%;
+        background: var(--blue);
+        transform: rotate(3deg);
+      }
+
+      .stream-row:nth-child(3) .stream-line {
+        width: 100%;
+      }
+
+      .stream-row:nth-child(4) .stream-line {
+        width: 76%;
+        background: var(--green);
+        transform: rotate(-3deg);
+      }
+
+      .stream-row:nth-child(5) .stream-line {
+        width: 90%;
+        background: var(--amber);
+        transform: rotate(-7deg);
+      }
+
+      .compressed-output {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        height: 430px;
+        padding: 34px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .compressed-output h3 {
+        font-size: 50px;
+        line-height: 0.94;
+        font-weight: 890;
+      }
+
+      .deck-lines {
+        display: grid;
+        gap: 14px;
+        align-content: center;
+      }
+
+      .deck-line {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .deck-line.accent {
+        width: 68%;
+        background: var(--amber);
+      }
+
+      .taste-transfer {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, 206px);
+        gap: 34px 44px;
+        align-items: stretch;
+        box-sizing: border-box;
+        justify-self: center;
+        width: 100%;
+        max-width: 1100px;
+        padding: 64px 82px 20px 38px;
+      }
+
+      .taste-example {
+        position: relative;
+        min-height: 0;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 20px;
+        overflow: hidden;
+        box-shadow: 9px 9px 0 var(--surface-2);
+      }
+
+      .taste-example .label {
+        position: absolute;
+        left: 20px;
+        top: 17px;
+      }
+
+      .taste-example h3 {
+        font-size: 29px;
+        line-height: 0.98;
+        font-weight: 880;
+      }
+
+      .taste-example p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.2;
+        font-weight: 680;
+      }
+
+      .taste-claim {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        align-content: stretch;
+      }
+
+      .taste-claim h3 {
+        align-self: center;
+        max-width: 9ch;
+        font-size: 45px;
+        line-height: 0.9;
+      }
+
+      .taste-claim::after {
+        content: "";
+        position: absolute;
+        right: 20px;
+        top: 22px;
+        width: 94px;
+        height: 8px;
+        background: var(--blue);
+      }
+
+      .taste-claim .mini-rule {
+        width: 72%;
+        height: 10px;
+        background: var(--amber);
+      }
+
+      .taste-evidence {
+        display: grid;
+        grid-template-columns: 0.82fr 1.18fr;
+        gap: 20px;
+        align-items: end;
+      }
+
+      .mini-chart {
+        display: grid;
+        align-items: end;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        height: 134px;
+      }
+
+      .mini-chart span {
+        display: block;
+        border: 3px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .mini-chart span:nth-child(1) {
+        height: 46%;
+      }
+
+      .mini-chart span:nth-child(2) {
+        height: 72%;
+        background: #d6e4e8;
+      }
+
+      .mini-chart span:nth-child(3) {
+        height: 54%;
+      }
+
+      .mini-chart span:nth-child(4) {
+        height: 92%;
+        background: #fff6d9;
+      }
+
+      .evidence-copy {
+        display: grid;
+        gap: 10px;
+        align-content: end;
+      }
+
+      .taste-system {
+        display: grid;
+        grid-template-columns: 1fr 0.9fr;
+        gap: 24px;
+        align-items: center;
+      }
+
+      .mini-network {
+        position: relative;
+        height: 150px;
+      }
+
+      .mini-node {
+        position: absolute;
+        z-index: 2;
+        width: 66px;
+        height: 66px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--surface);
+      }
+
+      .mini-node.a {
+        left: 0;
+        top: 42px;
+        background: #fff6d9;
+      }
+
+      .mini-node.b {
+        left: 126px;
+        top: 0;
+        background: #d6e4e8;
+      }
+
+      .mini-node.c {
+        left: 126px;
+        bottom: 0;
+        background: #d9e5d6;
+      }
+
+      .mini-network::before,
+      .mini-network::after {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        left: 57px;
+        width: 104px;
+        height: 3px;
+        background: var(--ink);
+        transform-origin: left center;
+      }
+
+      .mini-network::before {
+        top: 61px;
+        transform: rotate(-20deg);
+      }
+
+      .mini-network::after {
+        top: 89px;
+        transform: rotate(20deg);
+      }
+
+      .system-copy {
+        display: grid;
+        gap: 10px;
+      }
+
+      .taste-critique {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 22px;
+        align-items: center;
+      }
+
+      .mini-review {
+        position: relative;
+        margin-top: 20px;
+        height: 138px;
+        box-sizing: border-box;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 17px;
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .mini-review span {
+        display: block;
+        height: 14px;
+        border: 2px solid var(--ink);
+      }
+
+      .mini-review span:nth-child(1) {
+        width: 66%;
+        background: var(--amber);
+      }
+
+      .mini-review span:nth-child(2) {
+        width: 88%;
+      }
+
+      .mini-review span:nth-child(3) {
+        width: 44%;
+      }
+
+      .mini-review::after {
+        content: "QA";
+        position: absolute;
+        right: -18px;
+        top: -18px;
+        border: 3px solid var(--ink);
+        background: #d9e5d6;
+        padding: 10px 12px;
+        font-size: 14px;
+        font-weight: 880;
+      }
+
+      .critique-copy {
+        display: grid;
+        gap: 10px;
+      }
+
+      .local-output {
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 46px;
+        align-items: center;
+      }
+
+      .shared-signal {
+        border-left: 8px solid var(--ink);
+        padding-left: 30px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .shared-signal h3 {
+        font-size: 62px;
+        line-height: 0.92;
+        font-weight: 890;
+      }
+
+      .shared-signal p {
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .output-spectrum {
+        height: 430px;
+        display: grid;
+        grid-template-rows: repeat(4, 1fr);
+        gap: 22px;
+        align-content: center;
+      }
+
+      .spectrum-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 24px;
+        align-items: center;
+      }
+
+      .spectrum-row span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .spectrum-row strong {
+        font-size: 34px;
+        line-height: 1;
+      }
+
+      .spectrum-line {
+        height: 8px;
+        background: var(--ink);
+      }
+
+      .spectrum-row:nth-child(2) .spectrum-line {
+        width: 78%;
+        background: var(--blue);
+      }
+
+      .spectrum-row:nth-child(3) .spectrum-line {
+        width: 66%;
+        background: var(--amber);
+      }
+
+      .spectrum-row:nth-child(4) .spectrum-line {
+        width: 86%;
+        background: var(--green);
+      }
+
+      .release-path {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 28px;
+        align-content: center;
+      }
+
+      .gate-track {
+        position: relative;
+        align-self: center;
+        height: 308px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 54px;
+        align-items: center;
+      }
+
+      .gate-track::before {
+        content: "";
+        position: absolute;
+        left: 10%;
+        right: 10%;
+        top: 50%;
+        height: 7px;
+        background: linear-gradient(
+          90deg,
+          var(--ink) 0 32%,
+          var(--amber) 32% 66%,
+          var(--green) 66% 100%
+        );
+      }
+
+      .release-gate {
+        z-index: 1;
+        width: 220px;
+        height: 220px;
+        justify-self: center;
+        border-radius: 999px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 34px;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .release-gate:nth-child(2) {
+        background: #fff6d9;
+      }
+
+      .release-gate:nth-child(3) {
+        background: #d9e5d6;
+      }
+
+      .release-gate strong {
+        font-size: 31px;
+        line-height: 0.95;
+      }
+
+      .release-gate span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .release-caption {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 54px;
+        color: var(--muted);
+        font-size: 16px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .release-caption span {
+        border-top: 3px solid var(--ink);
+        padding-top: 16px;
+        text-align: center;
+      }
+
+      .release-caption span:nth-child(2) {
+        border-color: var(--amber);
+      }
+
+      .release-caption span:nth-child(3) {
+        border-color: var(--green);
+      }
+
+      .reveal .progress {
+        height: 3px;
+        color: var(--amber);
+        background: rgba(17, 20, 24, 0.08);
+      }
+
+      .reveal .controls {
+        color: var(--ink);
+        opacity: 0.42;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="title-slide">
+          <div class="title-copy">
+            <h1>Software for Agents</h1>
+            <p>
+              Skills raise the ceiling because they package capability, not just
+              prompts.
+            </p>
+            <div class="accent-line"></div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="agenda-slide agenda-clean">
-      <div class="agenda-title">
-        <h1>Agenda</h1>
-      </div>
-      <div class="agenda-path" aria-label="Three part agenda">
-        <div class="agenda-item active"><b>1</b><div><h2>Prompt Ceiling</h2></div></div>
-        <div class="agenda-item"><b>2</b><div><h2>Capability Package</h2></div></div>
-        <div class="agenda-item"><b>3</b><div><h2>Proof in Practice</h2></div></div>
-      </div>
-    </section>
-
-    <section class="section-slide">
-      <div class="section-copy">
-        <span class="number">01</span>
-        <h2>Prompt ceiling</h2>
-        <p>Text can steer behavior. It cannot carry the full operating surface.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="prompt-ceiling-art" aria-label="Prompt page hitting a ceiling">
-        <div class="ceiling-line"><span>ceiling</span></div>
-        <div class="prompt-sheet">
-          <div class="prompt-mark"></div>
-          <div class="prompt-mark"></div>
-          <div class="prompt-mark short"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Text alone cannot carry the work</h2>
-      </header>
-      <div class="prompt-vs-skill">
-        <div class="thin-prompt">
-          <h3>A prompt can say what to do.</h3>
-          <p>That helps. But the next run still has to reconstruct tools, examples, checks, and taste from language.</p>
-        </div>
-        <div class="operating-surface" aria-label="Operating surface pieces">
-          <div class="surface-piece"><strong>Tools</strong><span>how work executes</span></div>
-          <div class="surface-piece"><strong>Examples</strong><span>what good feels like</span></div>
-          <div class="surface-piece"><strong>Contracts</strong><span>what must exist</span></div>
-          <div class="surface-piece"><strong>Validation</strong><span>how trust is checked</span></div>
-          <div class="surface-piece wide"><strong>Skill</strong><span>Packages the operating surface so capability compounds.</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>The difference between agents and skills</h2>
-        <p class="slide-subtitle">Different context boundary, different capability model.</p>
-      </header>
-      <div class="agent-contrast" aria-label="Agents and skills solve different problems">
-        <div class="axis-frame">
-          <div class="axis-wash execution"></div>
-          <div class="axis-wash capability"></div>
-          <div class="axis-gridline horizontal"></div>
-          <div class="axis-gridline vertical"></div>
-          <div class="axis-x"></div>
-          <div class="axis-y"></div>
-          <span class="axis-title capability">Capability</span>
-          <span class="axis-title execution">Execution</span>
-          <div class="dimension-card agent">
-            <span>agent</span>
-            <strong>isolates</strong>
-          </div>
-          <div class="dimension-card skill">
-            <span>skill</span>
-            <strong>equips</strong>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section-slide">
-      <div class="section-copy">
-        <span class="number">02</span>
-        <h2>Capability Package</h2>
-        <p>Skills can carry instructions, assets, software, examples, and contracts together.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="anatomy-art" aria-label="Exploded skill artifacts">
-        <div class="artifact-sheet one"><span>entrypoint</span><strong>SKILL.md</strong></div>
-        <div class="artifact-sheet two"><span>depth</span><strong>References</strong></div>
-        <div class="artifact-sheet three"><span>software</span><strong>Tools</strong></div>
-        <div class="artifact-sheet four"><span>calibration</span><strong>Examples</strong></div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>A skill is a capability package</h2>
-      </header>
-      <div class="capability-package" aria-label="Skill package manifest and carried capability">
-        <div class="skill-manifest">
-          <div class="manifest-folder">
-            <div class="manifest-title"><strong>skill/</strong><span>shippable capability</span></div>
-            <div class="manifest-tree">
-              <div class="manifest-row"><code>SKILL.md</code><span>activation and collaboration rules</span></div>
-              <div class="manifest-row"><code>references/</code><span>deep context the agent can inspect</span></div>
-              <div class="manifest-row"><code>templates/</code><span>starting points to populate downstream</span></div>
-              <div class="manifest-row"><code>examples/</code><span>taste and behavior calibration</span></div>
-              <div class="manifest-row"><code>tools/</code><span>optional software, CLIs, validators</span></div>
-              <div class="manifest-row"><code>checks/</code><span>quality gates and output contracts</span></div>
+          <div
+            class="skill-equip-scene"
+            aria-label="Skill package equipping an agent terminal"
+          >
+            <div class="skill-folder">
+              <div class="folder-label">
+                <strong>Skill package</strong
+                ><span>capability as software</span>
+              </div>
+            </div>
+            <div class="terminal-agent">
+              <div class="terminal-bar">
+                <span class="terminal-dot"></span>Agent terminal
+              </div>
+              <div class="terminal-screen">
+                <span class="prompt">>>> Create a deck on AI skills</span>
+                <span>$presentation skill loaded</span>
+                <br />
+                <span class="ready">Researching AI skills . . . </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="package-meaning">
-          <div class="meaning-row"><strong>Behavior</strong><span>When to act and how to collaborate.</span></div>
-          <div class="meaning-row"><strong>Materials</strong><span>Examples, templates, and references the agent can reuse.</span></div>
-          <div class="meaning-row"><strong>Software</strong><span>Optional tools when execution belongs with the skill.</span></div>
-          <div class="meaning-row"><strong>Assurance</strong><span>Contracts and checks make success visible.</span></div>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Tools can ship with the skill</h2>
-      </header>
-      <div class="tool-shipping" aria-label="CLI tool packaged with skill guidance">
-        <div class="cli-help-window">
-          <div class="cli-titlebar"><span class="cli-dot"></span>deck-qa --help</div>
-          <div class="cli-body"><span class="dim">$</span> deck-qa --help<br>Usage: deck-qa [html]<br><br><span class="flag">--viewport</span> 1280x800<br><span class="flag">--fail-on-scroll</span><br><span class="flag">--write-screenshots</span></div>
-        </div>
-        <div class="tool-discovery">
-          <div class="discovery-row"><strong>Discoverable</strong><span><code>--help</code> gives agents the operating surface.</span></div>
-          <div class="discovery-row"><strong>Local</strong><span>The tool runs inside the task context, next to the files.</span></div>
-          <div class="discovery-row"><strong>Versioned</strong><span>The executable ships with examples and checks.</span></div>
-          <div class="mcp-contrast"><strong>MCP for services.</strong><span>Ship a CLI when the tool belongs with the capability.</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Serious skills have a release shape</h2>
-      </header>
-      <div class="release-path" aria-label="Skill release quality gates">
-        <div class="gate-track">
-          <div class="release-gate"><span>gate 1</span><strong>Context</strong></div>
-          <div class="release-gate"><span>gate 2</span><strong>Contract</strong></div>
-          <div class="release-gate"><span>gate 3</span><strong>Validation</strong></div>
-        </div>
-        <div class="release-caption"><span>understand before acting</span><span>align on output</span><span>check before delivery</span></div>
-      </div>
-    </section>
-
-    <section class="section-slide case-separator">
-      <div class="section-copy">
-        <span class="number">03</span>
-        <h2>Proof in Practice</h2>
-        <p>The presentation skill is the case study.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="deck-art" aria-label="Stacked presentation slides">
-        <div class="slide-stack-card a"><div class="thumb-title"></div><div class="thumb-body"><div class="thumb-box"></div><div class="thumb-box"></div></div></div>
-        <div class="slide-stack-card b"><div class="thumb-title"></div><div class="thumb-body"><div class="thumb-box"></div><div class="thumb-box"></div></div></div>
-        <div class="slide-stack-card c"><div class="thumb-title"></div><div class="thumb-body"><div class="thumb-box"></div><div class="thumb-box"></div></div></div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Context transfer makes compression possible</h2>
-      </header>
-      <div class="context-funnel">
-        <div class="input-streams" aria-label="User context streams">
-          <div class="stream-row"><strong>Beliefs</strong><div class="stream-line"></div></div>
-          <div class="stream-row"><strong>Stories</strong><div class="stream-line"></div></div>
-          <div class="stream-row"><strong>Data</strong><div class="stream-line"></div></div>
-          <div class="stream-row"><strong>Objections</strong><div class="stream-line"></div></div>
-          <div class="stream-row"><strong>Taste</strong><div class="stream-line"></div></div>
-        </div>
-        <div class="compressed-output">
-          <h3>The deck keeps what matters.</h3>
-          <div class="deck-lines">
-            <div class="deck-line accent"></div>
-            <div class="deck-line"></div>
-            <div class="deck-line"></div>
-            <div class="deck-line"></div>
+        <section class="agenda-slide agenda-clean">
+          <div class="agenda-title">
+            <h1>Agenda</h1>
           </div>
-          <span class="label">thesis / sequence / visuals / voiceover</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Templates are starting points, not destiny</h2>
-      </header>
-      <div class="template-spread">
-        <div class="starter-sheet" aria-label="Deck starter template">
-          <h3>deck.html.template</h3>
-          <div class="code-lines">
-            <div class="code-line wide"></div>
-            <div class="code-line mid accent"></div>
-            <div class="code-line wide"></div>
-            <div class="code-line short"></div>
-            <div class="code-line wide"></div>
-            <div class="code-line mid"></div>
-            <div class="code-line short accent"></div>
-          </div>
-        </div>
-        <div class="completion-lanes">
-          <div class="completion-lane"><b>1</b><div><strong>Start from structure</strong><span>Artboard, Reveal defaults, and a sparse foundation.</span></div></div>
-          <div class="completion-lane"><b>2</b><div><strong>Design from content</strong><span>The user's argument decides the visual relationship.</span></div></div>
-          <div class="completion-lane"><b>3</b><div><strong>Finish downstream</strong><span>The agent writes the final deck for this room.</span></div></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Examples calibrate taste without freezing it</h2>
-      </header>
-      <div class="taste-transfer" aria-label="Four orthogonal example slides calibrating taste">
-        <div class="taste-example taste-claim">
-          <span class="label">claim example</span>
-          <h3>One idea first.</h3>
-          <div class="mini-rule"></div>
-        </div>
-        <div class="taste-example taste-evidence">
-          <div class="mini-chart" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-          <div class="evidence-copy">
-            <span class="label">evidence example</span>
-            <h3>Proof gets shaped.</h3>
-            <p>The example teaches hierarchy, not the exact chart.</p>
-          </div>
-        </div>
-        <div class="taste-example taste-system">
-          <div class="mini-network" aria-hidden="true">
-            <div class="mini-node a"></div>
-            <div class="mini-node b"></div>
-            <div class="mini-node c"></div>
-          </div>
-          <div class="system-copy">
-            <span class="label">system example</span>
-            <h3>Relationships matter.</h3>
-            <p>Same visual language, different structure.</p>
-          </div>
-        </div>
-        <div class="taste-example taste-critique">
-          <div class="mini-review" aria-hidden="true"><span></span><span></span><span></span></div>
-          <div class="critique-copy">
-            <span class="label">review example</span>
-            <h3>Quality is visible.</h3>
-            <p>The pattern calibrates judgment without freezing output.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Shared capability, local output</h2>
-      </header>
-      <div class="local-output">
-        <div class="shared-signal">
-          <h3>One skill, many rooms.</h3>
-          <p>The package carries the workflow and checks. The agent adapts the artifact to the local context.</p>
-        </div>
-        <div class="output-spectrum" aria-label="Different local outputs from one shared skill">
-          <div class="spectrum-row"><span>exec</span><div><strong>Decision memo</strong><div class="spectrum-line"></div></div></div>
-          <div class="spectrum-row"><span>technical</span><div><strong>System explainer</strong><div class="spectrum-line"></div></div></div>
-          <div class="spectrum-row"><span>design</span><div><strong>Critique deck</strong><div class="spectrum-line"></div></div></div>
-          <div class="spectrum-row"><span>ops</span><div><strong>Runbook view</strong><div class="spectrum-line"></div></div></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="content-slide">
-      <header class="slide-title">
-        <h2>Screenshots to iterate for quality</h2>
-      </header>
-      <div class="screenshot-qa" aria-label="Screenshot QA loop for presentation quality">
-        <div class="viewport-grid">
-          <div class="viewport-card">
-            <strong>1440x900</strong>
-            <div class="viewport-slide">
-              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+          <div class="agenda-path" aria-label="Three part agenda">
+            <div class="agenda-item active">
+              <b>1</b>
+              <div><h2>Prompt Ceiling</h2></div>
+            </div>
+            <div class="agenda-item">
+              <b>2</b>
+              <div><h2>Capability Package</h2></div>
+            </div>
+            <div class="agenda-item">
+              <b>3</b>
+              <div><h2>Proof in Practice</h2></div>
             </div>
           </div>
-          <div class="viewport-card">
-            <strong>1280x800</strong>
-            <div class="viewport-slide">
-              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+        </section>
+
+        <section class="section-slide">
+          <div class="section-copy">
+            <span class="number">01</span>
+            <h2>Prompt ceiling</h2>
+            <p>Text can only steer behavior.</p>
+            <div class="accent-line"></div>
+          </div>
+          <div
+            class="prompt-ceiling-art"
+            aria-label="Prompt page hitting a ceiling"
+          >
+            <div class="ceiling-line"><span>ceiling</span></div>
+            <div class="prompt-sheet">
+              <div class="prompt-mark"></div>
+              <div class="prompt-mark"></div>
+              <div class="prompt-mark short"></div>
             </div>
           </div>
-          <div class="viewport-card">
-            <strong>900x600</strong>
-            <div class="viewport-slide compact">
-              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Text alone cannot carry the work</h2>
+          </header>
+          <div class="prompt-vs-skill">
+            <div class="thin-prompt">
+              <h3>A prompt only says what to do.</h3>
+              <p>
+                But the next run still has to reconstruct tools, examples,
+                checks, and taste from language.
+              </p>
+            </div>
+            <div
+              class="operating-surface"
+              aria-label="Operating surface pieces"
+            >
+              <div class="surface-piece">
+                <strong>Tools</strong><span>how work executes</span>
+              </div>
+              <div class="surface-piece">
+                <strong>Examples</strong><span>what good feels like</span>
+              </div>
+              <div class="surface-piece">
+                <strong>Contracts</strong><span>what must exist</span>
+              </div>
+              <div class="surface-piece">
+                <strong>Validation</strong><span>how trust is checked</span>
+              </div>
+              <div class="surface-piece wide">
+                <strong>Skill</strong><span>Packages a full capability.</span>
+              </div>
             </div>
           </div>
-          <div class="viewport-card">
-            <strong>768x1024</strong>
-            <div class="viewport-slide portrait">
-              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>The difference between agents and skills</h2>
+            <p class="slide-subtitle">
+              Different context boundary, different capability model.
+            </p>
+          </header>
+          <div
+            class="agent-contrast"
+            aria-label="Agents and skills solve different problems"
+          >
+            <div class="axis-frame">
+              <div class="axis-wash execution"></div>
+              <div class="axis-wash capability"></div>
+              <div class="axis-gridline horizontal"></div>
+              <div class="axis-gridline vertical"></div>
+              <div class="axis-x"></div>
+              <div class="axis-y"></div>
+              <span class="axis-title capability">Capability</span>
+              <span class="axis-title execution">Execution</span>
+              <div class="dimension-card agent">
+                <span>agent</span>
+                <strong>isolates</strong>
+              </div>
+              <div class="dimension-card skill">
+                <span>skill</span>
+                <strong>equips</strong>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="qa-loop">
-          <div class="qa-step"><b>1</b><div><strong>Render</strong><span>Capture the deck at real review sizes.</span></div></div>
-          <div class="qa-step"><b>2</b><div><strong>Inspect</strong><span>Find clipping, scroll, overlap, and weak hierarchy.</span></div></div>
-          <div class="qa-step"><b>3</b><div><strong>Revise</strong><span>Fix layout before shrinking text.</span></div></div>
-          <div class="qa-step"><b>4</b><div><strong>Verify</strong><span>Rerender until the screenshots hold.</span></div></div>
-          <div class="qa-proof"><strong>Quality becomes inspectable.</strong><span>The skill gives the agent a visual feedback loop.</span></div>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <section class="final-slide">
-      <div class="final-copy">
-        <h2>Q&amp;A</h2>
-        <p>Skills are how teams package capability for agents without flattening the work.</p>
-        <div class="accent-line"></div>
-      </div>
-      <div class="thesis-mark">
-        <span class="pill amber">core thesis</span>
-        <h3>Software for agents is not one shape.</h3>
-        <p>It can instruct, execute, calibrate, validate, or provide a skeleton the agent completes in context.</p>
-      </div>
-    </section>
+        <section class="section-slide">
+          <div class="section-copy">
+            <span class="number">02</span>
+            <h2>Capability Package</h2>
+            <p>
+              Skills can carry instructions, assets, software, examples, and
+              contracts together.
+            </p>
+            <div class="accent-line"></div>
+          </div>
+          <div class="anatomy-art" aria-label="Exploded skill artifacts">
+            <div class="artifact-sheet one">
+              <span>entrypoint</span><strong>SKILL.md</strong>
+            </div>
+            <div class="artifact-sheet two">
+              <span>depth</span><strong>References</strong>
+            </div>
+            <div class="artifact-sheet three">
+              <span>software</span><strong>Tools</strong>
+            </div>
+            <div class="artifact-sheet four">
+              <span>calibration</span><strong>Examples</strong>
+            </div>
+          </div>
+        </section>
 
-  </div>
-</div>
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>A skill is a capability package</h2>
+          </header>
+          <div
+            class="capability-package"
+            aria-label="Skill package manifest and carried capability"
+          >
+            <div class="skill-manifest">
+              <div class="manifest-folder">
+                <div class="manifest-title">
+                  <strong>skill/</strong><span>shippable capability</span>
+                </div>
+                <div class="manifest-tree">
+                  <div class="manifest-row">
+                    <code>SKILL.md</code
+                    ><span>activation and collaboration rules</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>references/</code
+                    ><span>deep context the agent can inspect</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>templates/</code
+                    ><span>starting points to populate downstream</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>examples/</code
+                    ><span>taste and behavior calibration</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>tools/</code
+                    ><span>optional software, CLIs, validators</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>checks/</code
+                    ><span>quality gates and output contracts</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="package-meaning">
+              <div class="meaning-row">
+                <strong>Behavior</strong
+                ><span>When to act and how to collaborate.</span>
+              </div>
+              <div class="meaning-row">
+                <strong>Materials</strong
+                ><span
+                  >Examples, templates, and references the agent can
+                  reuse.</span
+                >
+              </div>
+              <div class="meaning-row">
+                <strong>Software</strong
+                ><span
+                  >Optional tools when execution belongs with the skill.</span
+                >
+              </div>
+              <div class="meaning-row">
+                <strong>Assurance</strong
+                ><span>Contracts and checks make success visible.</span>
+              </div>
+            </div>
+          </div>
+        </section>
 
-<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
-<script>
-  Reveal.initialize({
-    hash: true,
-    transition: "fade",
-    controls: true,
-    progress: true,
-    center: false,
-    width: 1280,
-    height: 800,
-    margin: 0,
-    minScale: 0.2,
-    maxScale: 2.0
-  });
-</script>
-</body>
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Tools can ship with the skill</h2>
+          </header>
+          <div
+            class="tool-shipping"
+            aria-label="CLI tool packaged with skill guidance"
+          >
+            <div class="cli-help-window">
+              <div class="cli-titlebar">
+                <span class="cli-dot"></span>deck-qa --help
+              </div>
+              <div class="cli-body">
+                <span class="dim">$</span> deck-qa --help<br />Usage: deck-qa
+                [html]<br /><br /><span class="flag">--viewport</span>
+                1280x800<br /><span class="flag">--fail-on-scroll</span
+                ><br /><span class="flag">--write-screenshots</span>
+              </div>
+            </div>
+            <div class="tool-discovery">
+              <div class="discovery-row">
+                <strong>Discoverable</strong
+                ><span
+                  ><code>--help</code> gives agents the operating surface.</span
+                >
+              </div>
+              <div class="discovery-row">
+                <strong>Local</strong
+                ><span
+                  >The tool runs inside the task context, next to the
+                  files.</span
+                >
+              </div>
+              <div class="discovery-row">
+                <strong>Versioned</strong
+                ><span>The executable ships with examples and checks.</span>
+              </div>
+              <div class="mcp-contrast">
+                <strong>MCP for isolated services.</strong
+                ><span
+                  >Ship a CLI when the tool belongs with the capability.</span
+                >
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Serious skills have a release shape</h2>
+          </header>
+          <div class="release-path" aria-label="Skill release quality gates">
+            <div class="gate-track">
+              <div class="release-gate">
+                <span>gate 1</span><strong>Context</strong>
+              </div>
+              <div class="release-gate">
+                <span>gate 2</span><strong>Contract</strong>
+              </div>
+              <div class="release-gate">
+                <span>gate 3</span><strong>Validation</strong>
+              </div>
+            </div>
+            <div class="release-caption">
+              <span>understand before acting</span><span>align on output</span
+              ><span>check before delivery</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-slide case-separator">
+          <div class="section-copy">
+            <span class="number">03</span>
+            <h2>Proof in Practice</h2>
+            <p>The presentation skill is the case study.</p>
+            <div class="accent-line"></div>
+          </div>
+          <div class="deck-art" aria-label="Stacked presentation slides">
+            <div class="slide-stack-card a">
+              <div class="thumb-title"></div>
+              <div class="thumb-body">
+                <div class="thumb-box"></div>
+                <div class="thumb-box"></div>
+              </div>
+            </div>
+            <div class="slide-stack-card b">
+              <div class="thumb-title"></div>
+              <div class="thumb-body">
+                <div class="thumb-box"></div>
+                <div class="thumb-box"></div>
+              </div>
+            </div>
+            <div class="slide-stack-card c">
+              <div class="thumb-title"></div>
+              <div class="thumb-body">
+                <div class="thumb-box"></div>
+                <div class="thumb-box"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Context transfer makes compression possible</h2>
+          </header>
+          <div class="context-funnel">
+            <div class="input-streams" aria-label="User context streams">
+              <div class="stream-row">
+                <strong>Beliefs</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Stories</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Data</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Objections</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Taste</strong>
+                <div class="stream-line"></div>
+              </div>
+            </div>
+            <div class="compressed-output">
+              <h3>The deck keeps what matters.</h3>
+              <div class="deck-lines">
+                <div class="deck-line accent"></div>
+                <div class="deck-line"></div>
+                <div class="deck-line"></div>
+                <div class="deck-line"></div>
+              </div>
+              <span class="label">thesis / sequence / visuals / voiceover</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Templates are starting points, not destiny</h2>
+          </header>
+          <div class="template-spread">
+            <div class="starter-sheet" aria-label="Deck starter template">
+              <h3>deck.html.template</h3>
+              <div class="code-lines">
+                <div class="code-line wide"></div>
+                <div class="code-line mid accent"></div>
+                <div class="code-line wide"></div>
+                <div class="code-line short"></div>
+                <div class="code-line wide"></div>
+                <div class="code-line mid"></div>
+                <div class="code-line short accent"></div>
+              </div>
+            </div>
+            <div class="completion-lanes">
+              <div class="completion-lane">
+                <b>1</b>
+                <div>
+                  <strong>Start from structure</strong
+                  ><span
+                    >Artboard, Reveal defaults, and a sparse foundation.</span
+                  >
+                </div>
+              </div>
+              <div class="completion-lane">
+                <b>2</b>
+                <div>
+                  <strong>Design from content</strong
+                  ><span
+                    >The user's argument decides the visual relationship.</span
+                  >
+                </div>
+              </div>
+              <div class="completion-lane">
+                <b>3</b>
+                <div>
+                  <strong>Finish downstream</strong
+                  ><span>The agent writes the final deck for this room.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Examples calibrate taste without freezing it</h2>
+          </header>
+          <div
+            class="taste-transfer"
+            aria-label="Four orthogonal example slides calibrating taste"
+          >
+            <div class="taste-example taste-claim">
+              <span class="label">claim example</span>
+              <h3>One idea first.</h3>
+              <div class="mini-rule"></div>
+            </div>
+            <div class="taste-example taste-evidence">
+              <div class="mini-chart" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+              </div>
+              <div class="evidence-copy">
+                <span class="label">evidence example</span>
+                <h3>Proof gets shaped.</h3>
+                <p>The example teaches hierarchy, not the exact chart.</p>
+              </div>
+            </div>
+            <div class="taste-example taste-system">
+              <div class="mini-network" aria-hidden="true">
+                <div class="mini-node a"></div>
+                <div class="mini-node b"></div>
+                <div class="mini-node c"></div>
+              </div>
+              <div class="system-copy">
+                <span class="label">system example</span>
+                <h3>Relationships matter.</h3>
+                <p>Same visual language, different structure.</p>
+              </div>
+            </div>
+            <div class="taste-example taste-critique">
+              <div class="mini-review" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="critique-copy">
+                <span class="label">review example</span>
+                <h3>Quality is visible.</h3>
+                <p>The pattern calibrates judgment without freezing output.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Shared capability, local output</h2>
+          </header>
+          <div class="local-output">
+            <div class="shared-signal">
+              <h3>One skill, many rooms.</h3>
+              <p>
+                The package carries the workflow and checks. The agent adapts
+                the artifact to the local context.
+              </p>
+            </div>
+            <div
+              class="output-spectrum"
+              aria-label="Different local outputs from one shared skill"
+            >
+              <div class="spectrum-row">
+                <span>exec</span>
+                <div>
+                  <strong>Decision memo</strong>
+                  <div class="spectrum-line"></div>
+                </div>
+              </div>
+              <div class="spectrum-row">
+                <span>technical</span>
+                <div>
+                  <strong>System explainer</strong>
+                  <div class="spectrum-line"></div>
+                </div>
+              </div>
+              <div class="spectrum-row">
+                <span>design</span>
+                <div>
+                  <strong>Critique deck</strong>
+                  <div class="spectrum-line"></div>
+                </div>
+              </div>
+              <div class="spectrum-row">
+                <span>ops</span>
+                <div>
+                  <strong>Runbook view</strong>
+                  <div class="spectrum-line"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Screenshots to iterate for quality</h2>
+          </header>
+          <div
+            class="screenshot-qa"
+            aria-label="Screenshot QA loop for presentation quality"
+          >
+            <div class="viewport-grid">
+              <div class="viewport-card">
+                <strong>1440x900</strong>
+                <div class="viewport-slide">
+                  <div class="viewport-body">
+                    <div class="viewport-text">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <div class="viewport-block"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="viewport-card">
+                <strong>1280x800</strong>
+                <div class="viewport-slide">
+                  <div class="viewport-body">
+                    <div class="viewport-text">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <div class="viewport-block"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="viewport-card">
+                <strong>900x600</strong>
+                <div class="viewport-slide compact">
+                  <div class="viewport-body">
+                    <div class="viewport-text">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <div class="viewport-block"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="viewport-card">
+                <strong>768x1024</strong>
+                <div class="viewport-slide portrait">
+                  <div class="viewport-body">
+                    <div class="viewport-text">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <div class="viewport-block"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="qa-loop">
+              <div class="qa-step">
+                <b>1</b>
+                <div>
+                  <strong>Render</strong
+                  ><span>Capture the deck at real review sizes.</span>
+                </div>
+              </div>
+              <div class="qa-step">
+                <b>2</b>
+                <div>
+                  <strong>Inspect</strong
+                  ><span
+                    >Find clipping, scroll, overlap, and weak hierarchy.</span
+                  >
+                </div>
+              </div>
+              <div class="qa-step">
+                <b>3</b>
+                <div>
+                  <strong>Revise</strong
+                  ><span>Fix layout before shrinking text.</span>
+                </div>
+              </div>
+              <div class="qa-step">
+                <b>4</b>
+                <div>
+                  <strong>Verify</strong
+                  ><span>Rerender until the screenshots hold.</span>
+                </div>
+              </div>
+              <div class="qa-proof">
+                <strong>Quality becomes inspectable.</strong
+                ><span>The skill gives the agent a visual feedback loop.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="final-slide">
+          <div class="final-copy">
+            <h2>Q&amp;A</h2>
+            <p>
+              Skills are how teams package capability for agents without
+              flattening the work.
+            </p>
+            <div class="accent-line"></div>
+          </div>
+          <div class="thesis-mark">
+            <span class="pill amber">core thesis</span>
+            <h3>Software for agents is not one shape.</h3>
+            <p>
+              It can instruct, execute, calibrate, validate, or provide a
+              skeleton the agent completes in context.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+    <script>
+      Reveal.initialize({
+        hash: true,
+        transition: "fade",
+        controls: true,
+        progress: true,
+        center: false,
+        width: 1280,
+        height: 800,
+        margin: 0,
+        minScale: 0.2,
+        maxScale: 2.0,
+      });
+    </script>
+  </body>
 </html>
