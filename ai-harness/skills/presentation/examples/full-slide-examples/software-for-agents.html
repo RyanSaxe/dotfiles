@@ -460,134 +460,146 @@
 
       .reuse-gap {
         display: grid;
-        grid-template-columns: 1fr 0.76fr;
-        gap: 56px;
+        grid-template-columns: 0.78fr 1.22fr;
+        gap: 48px;
         align-items: center;
       }
 
-      .reuse-patterns {
-        display: grid;
-        gap: 20px;
-      }
-
-      .reuse-pattern {
-        min-height: 116px;
-        border-top: 3px solid var(--ink);
-        padding-top: 20px;
-        display: grid;
-        grid-template-columns: 54px 1fr 164px;
-        gap: 22px;
-        align-items: center;
-      }
-
-      .reuse-pattern:nth-child(2) {
-        border-color: var(--amber);
-      }
-
-      .reuse-pattern:nth-child(3) {
-        border-color: var(--blue);
-      }
-
-      .reuse-pattern b {
-        color: var(--muted);
-        font-family: var(--mono);
-        font-size: 15px;
-        line-height: 1;
-        font-weight: 820;
-      }
-
-      .reuse-pattern h3 {
-        font-size: 35px;
-        line-height: 0.96;
-        font-weight: 880;
-      }
-
-      .reuse-pattern p {
-        margin-top: 7px;
-        color: var(--muted);
-        font-size: 17px;
-        line-height: 1.2;
-        font-weight: 650;
-      }
-
-      .reuse-gap-label {
-        border: 2px solid var(--red);
-        background: #f8ded8;
-        padding: 12px 14px;
-        font-size: 13px;
-        line-height: 1.08;
-        font-weight: 850;
-        text-transform: uppercase;
-      }
-
-      .reuse-gap-label span {
-        display: block;
-        margin-bottom: 5px;
-        color: var(--red);
-        font-size: 11px;
-      }
-
-      .reuse-gap-note {
-        display: grid;
-        align-items: center;
-        min-height: 392px;
-      }
-
-      .package-gap-art {
+      .reuse-base {
         position: relative;
-        min-height: 286px;
+        min-height: 344px;
         border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 36px;
+        padding: 34px;
         display: grid;
         align-content: center;
-        gap: 28px;
-        box-shadow: 14px 14px 0 var(--surface-2);
+        gap: 20px;
+        box-shadow: 12px 12px 0 var(--surface-2);
       }
 
-      .package-gap-tab {
+      .reuse-base::after {
+        content: "";
         position: absolute;
-        left: -3px;
-        top: -34px;
-        width: 138px;
-        height: 34px;
-        border: 3px solid var(--ink);
-        border-bottom: 0;
-        background: var(--surface);
-        display: flex;
-        align-items: center;
-        padding: 0 17px;
-        color: var(--red);
-        font-size: 13px;
-        font-weight: 860;
-        text-transform: uppercase;
+        right: -50px;
+        top: 50%;
+        width: 50px;
+        height: 3px;
+        background: var(--ink);
       }
 
-      .package-gap-art strong {
-        max-width: 9ch;
-        font-size: 50px;
+      .reuse-base h3 {
+        max-width: 8ch;
+        font-size: 56px;
         line-height: 0.94;
         font-weight: 890;
       }
 
-      .package-gap-lines {
+      .reuse-base p {
+        max-width: 22ch;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.24;
+        font-weight: 650;
+      }
+
+      .reuse-tag,
+      .move-tag {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .reuse-branches {
+        position: relative;
         display: grid;
-        gap: 10px;
+        gap: 26px;
       }
 
-      .package-gap-lines span {
-        height: 8px;
-        background: rgba(215, 95, 70, 0.24);
+      .reuse-branches::before {
+        content: "";
+        position: absolute;
+        left: -26px;
+        top: 78px;
+        bottom: 78px;
+        width: 3px;
+        background: var(--ink);
       }
 
-      .package-gap-lines span:nth-child(2) {
-        width: 74%;
+      .reuse-move {
+        position: relative;
+        min-height: 194px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 24px 26px;
+        display: grid;
+        gap: 14px;
+        box-shadow: 10px 10px 0 var(--surface-2);
       }
 
-      .package-gap-lines span:nth-child(3) {
-        width: 52%;
+      .reuse-move::before {
+        content: "";
+        position: absolute;
+        left: -26px;
+        top: 50%;
+        width: 26px;
+        height: 3px;
+        background: var(--ink);
       }
 
+      .reuse-move.few-shot {
+        background: #fff6d9;
+      }
+
+      .reuse-move.sub-agent {
+        background: #d6e4e8;
+      }
+
+      .reuse-move h3 {
+        font-size: 36px;
+        line-height: 1;
+        font-weight: 880;
+      }
+
+      .move-copy {
+        display: grid;
+        gap: 9px;
+      }
+
+      .move-detail {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 16px;
+        align-items: baseline;
+        border-top: 2px solid rgba(17, 20, 24, 0.22);
+        padding-top: 10px;
+      }
+
+      .move-detail b {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .move-detail span {
+        color: var(--ink);
+        font-size: 20px;
+        line-height: 1.14;
+        font-weight: 760;
+      }
+
+      .move-detail.gap {
+        border-color: var(--red);
+      }
+
+      .move-detail.gap b {
+        color: var(--red);
+      }
+
+      .move-detail.gap span {
+        color: var(--red);
+      }
 
       .anatomy-art {
         height: 460px;
@@ -1704,8 +1716,8 @@
       }
 
       .quadrant-point.skills {
-        left: calc(50% + 92px);
-        top: 64px;
+        left: calc(100% - 78px);
+        top: 28px;
         border-width: 3px;
         background: var(--amber);
         box-shadow: 11px 11px 0 var(--surface-2);
@@ -2546,40 +2558,30 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Reusable prompts leave a gap</h2>
+            <h2>Reusable prompts are not enough</h2>
           </header>
           <div class="reuse-gap" aria-label="Reusable prompt patterns and gaps">
-            <div class="reuse-patterns">
-              <div class="reuse-pattern">
-                <b>01</b>
-                <div>
-                  <h3>Prompt templates</h3>
-                  <p>Repeat a known action without retyping.</p>
-                </div>
-                <div class="reuse-gap-label"><span>gap</span>wording only</div>
-              </div>
-              <div class="reuse-pattern">
-                <b>02</b>
-                <div>
-                  <h3>Few-shot prompts</h3>
-                  <p>Show examples of the desired behavior.</p>
-                </div>
-                <div class="reuse-gap-label"><span>gap</span>no execution</div>
-              </div>
-              <div class="reuse-pattern">
-                <b>03</b>
-                <div>
-                  <h3>Sub-agents</h3>
-                  <p>Parallelize work in a separate context.</p>
-                </div>
-                <div class="reuse-gap-label"><span>gap</span>no packaged software</div>
-              </div>
+            <div class="reuse-base">
+              <span class="reuse-tag">base</span>
+              <h3>Prompt templates</h3>
+              <p>Reusable wording for a repeatable ask.</p>
             </div>
-            <div class="reuse-gap-note">
-              <div class="package-gap-art" aria-label="Reusable prompts are not capability packages">
-                <div class="package-gap-tab">missing</div>
-                <strong>not packaged</strong>
-                <div class="package-gap-lines"><span></span><span></span><span></span></div>
+            <div class="reuse-branches" aria-label="Reusable prompt improvements and remaining gaps">
+              <div class="reuse-move few-shot">
+                <span class="move-tag">adds calibration</span>
+                <h3>Few-shot prompts</h3>
+                <div class="move-copy">
+                  <div class="move-detail"><b>adds</b><span>more reliable output</span></div>
+                  <div class="move-detail gap"><b>gap</b><span>needs workflow, tools, and checks</span></div>
+                </div>
+              </div>
+              <div class="reuse-move sub-agent">
+                <span class="move-tag">adds execution</span>
+                <h3>Sub-agents</h3>
+                <div class="move-copy">
+                  <div class="move-detail"><b>adds</b><span>isolated context for parallel work</span></div>
+                  <div class="move-detail gap"><b>gap</b><span>can miss main context; no custom tools</span></div>
+                </div>
               </div>
             </div>
           </div>
@@ -2591,7 +2593,7 @@
           </header>
           <div
             class="agent-contrast"
-            aria-label="Reusable options mapped by execution and capability"
+            aria-label="Reusable options mapped by context and execution"
           >
             <div class="axis-frame">
               <div class="axis-wash execution"></div>
@@ -2600,7 +2602,7 @@
               <div class="axis-gridline vertical"></div>
               <div class="axis-x"></div>
               <div class="axis-y"></div>
-              <span class="axis-title capability">Capability</span>
+              <span class="axis-title capability">Context</span>
               <span class="axis-title execution">Execution</span>
               <div class="quadrant-point templates">Templates</div>
               <div class="quadrant-point few-shot">Few-shot</div>
