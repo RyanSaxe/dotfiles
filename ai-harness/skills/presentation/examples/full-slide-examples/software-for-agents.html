@@ -603,9 +603,10 @@
       }
 
       .reuse-gap {
+        position: relative;
         display: grid;
-        grid-template-columns: 0.74fr 1.26fr;
-        gap: 42px;
+        grid-template-columns: 0.7fr 86px 1.12fr;
+        gap: 0;
         align-items: center;
       }
 
@@ -618,16 +619,6 @@
         display: grid;
         align-content: center;
         gap: 17px;
-      }
-
-      .reuse-base::after {
-        content: "";
-        position: absolute;
-        right: -43px;
-        top: 50%;
-        width: 43px;
-        height: 3px;
-        background: var(--ink);
       }
 
       .reuse-base h3 {
@@ -653,20 +644,24 @@
         text-transform: uppercase;
       }
 
+      .reuse-fork {
+        width: 86px;
+        height: 334px;
+        align-self: center;
+        overflow: visible;
+      }
+
+      .reuse-fork path {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 3;
+        stroke-linecap: round;
+      }
+
       .reuse-branches {
         position: relative;
         display: grid;
         gap: 18px;
-      }
-
-      .reuse-branches::before {
-        content: "";
-        position: absolute;
-        left: -22px;
-        top: 79px;
-        bottom: 79px;
-        width: 3px;
-        background: var(--ink);
       }
 
       .reuse-move {
@@ -677,16 +672,6 @@
         padding: 20px 22px;
         display: grid;
         gap: 11px;
-      }
-
-      .reuse-move::before {
-        content: "";
-        position: absolute;
-        left: -22px;
-        top: 50%;
-        width: 22px;
-        height: 3px;
-        background: var(--ink);
       }
 
       .reuse-move.few-shot {
@@ -945,6 +930,9 @@
         box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
         transform: scale(1.04);
         transform-origin: left center;
+        min-height: 314px;
+        display: grid;
+        grid-template-rows: auto 1fr;
       }
 
       .cli-titlebar {
@@ -962,10 +950,10 @@
       }
 
       .cli-body {
-        padding: 28px 32px 32px;
+        padding: 32px 34px;
         font-family: var(--mono);
         font-size: 21px;
-        line-height: 1.5;
+        line-height: 1.44;
         font-weight: 720;
       }
 
@@ -3015,6 +3003,15 @@
               <h3>Prompt templates</h3>
               <p>Reusable wording for a repeatable ask.</p>
             </div>
+            <svg
+              class="reuse-fork"
+              viewBox="0 0 86 334"
+              role="img"
+              aria-label="Prompt template branches into few-shot prompts and sub-agents"
+            >
+              <path d="M 0 167 C 34 167 39 79 86 79" />
+              <path d="M 0 167 C 34 167 39 255 86 255" />
+            </svg>
             <div
               class="reuse-branches"
               aria-label="Reusable prompt improvements and remaining gaps"
@@ -3187,7 +3184,8 @@
               </div>
               <div class="cli-body">
                 <span class="dim">$</span> deck-qa --help<br />usage: deck-qa
-                [file]<br />checks: layout, overflow, visual fit<br /><span
+                &lt;deck.html&gt;<br />checks: layout, overflow, visual
+                story<br />exports:<br /><span
                   class="flag"
                   >--write-screenshots</span
                 >
