@@ -19,7 +19,7 @@ Use this rubric as a review lens, not a form to fill out. Do not score slides ag
 - **One job:** each slide has a specific communicative job, stated in context rather than selected from a fixed list.
 - **Scan target:** the eye knows where to land first, second, and third.
 - **One-line emphasis:** titles, KPI values, outcome statements, section labels, and callout headers are concise enough to render on one line in their available space.
-- **Text roles:** large text carries the message; smaller text supplies context; speaker notes or voiceover carry nuance.
+- **Text roles:** large text carries the message; smaller text supplies context; nuance stays off the slide unless the room requires it.
 - **Relationship-first visual:** the visual shows the relationship that matters in the content rather than decorating around it.
 - **Message-visual fit:** the slide title and dominant visual tell the same story; if they point in different directions, redesign the visual or rename the claim.
 - **Meaningful containers:** cards, panels, tables, and boxes group real peers or states; they are not generic buckets for excess text.

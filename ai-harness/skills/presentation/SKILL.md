@@ -37,7 +37,7 @@ presentation/
 - `examples/full-slide-examples/` is reserved for complete end-to-end example decks as single HTML files.
 - Do not treat the examples as templates, a taxonomy, or a component library. Open a relevant example to study why it works, then design the user's slide from the user's content.
 - End-to-end example decks should be single HTML files under `examples/full-slide-examples/` unless assets are truly required.
-- Before coding a V1, inspect at least one full example deck when available and either the single-slide gallery or 3-5 relevant single-slide examples. Use them to calibrate density, hierarchy, visual range, copy length, and slide/speaker split. Do not copy their structures unless the user's content relationship calls for it.
+- Before coding a V1, inspect at least one full example deck when available and either the single-slide gallery or 3-5 relevant single-slide examples. Use them to calibrate density, hierarchy, visual range, slide text density, and pre-read balance. Do not copy their structures unless the user's content relationship calls for it.
 
 ## Alignment
 
@@ -48,10 +48,10 @@ Ask concise questions first; use multiple-choice wording for real tradeoffs and 
 Settle these before drafting:
 
 - **Deep material:** facts, tensions, anecdotes, data points, examples, objections, decisions, constraints, and half-formed arguments.
-- **Audience and room:** who is present, how senior, read-ahead vs. live voiceover, and what they already believe.
+- **Audience and room:** who is present, how senior, read-ahead vs. live presentation, and what they already believe.
 - **Purpose and thesis:** what the deck must accomplish, stated in the user's language, and the one sentence the audience should retain.
 - **Narrative shape:** how the audience should move from current belief to intended action or understanding.
-- **Length and slide/speaker split:** target slide count, appendix needs, what must be legible, and what the presenter will say.
+- **Length and presenter context:** target slide count, appendix needs, what must be legible, and what the presenter can explain instead of putting on slides.
 - **Inputs and constraints:** required artifacts, brand requirements, banned wording, sensitive topics, shareability needs, and style preferences.
 - **Visual stance:** density, proof depth, image use, chart use, technicality, formality, and what "good" means for this user.
 
@@ -69,22 +69,22 @@ Start the outline with a count and structure contract:
 - planned separator slide for each agenda section, including the separator's visual concept
 - pacing notes for sections with fewer than two or more than three content slides
 
-Include every planned slide in order. For each slide, include:
+Include every planned slide in order. For each slide, use this human-readable structure:
 
 - draft title
-- context or job of the slide
-- desired audience takeaway
-- visual, chart, diagram, image, table, code, or spatial composition that will communicate it
-- visible copy budget: what must appear on the slide vs. what belongs in voiceover
+- **Role:** why this slide exists in the story
+- **Message:** what the audience should understand
+- **Visual:** the planned visual relationship, chart, diagram, image, table, code, or spatial composition
+- **Notes:** optional constraints, density guidance, or important context that should not become slide prose
 
-Keep the outline readable in a terminal: use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid decorative blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Keep each slide entry to the minimum needed for the user to critique the sequence, claims, visuals, and slide/speaker split. Do not write full speaker notes or long slide copy at this stage.
+Keep the outline readable in a terminal: use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid decorative blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Keep each slide entry to the minimum needed for the user to critique the sequence, message, visuals, and pacing. Do not write long narration or detailed slide wording at this stage.
 
 End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
 
 ## Build Workflow
 
 1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission to outline, outline the deck, get permission for a V1, draft, self-review, and iterate.
-2. Before coding V1, run the example calibration pass described above. For full decks, read `references/planning-example.md` if the count, agenda, separator, or slide/speaker split is not already crisp.
+2. Before coding V1, run the example calibration pass described above. For full decks, read `references/planning-example.md` if the count, agenda, separator, or slide plan shape is not already crisp.
 3. Pick a working directory under `/tmp/<deck-slug>/`.
 4. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
 5. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.
@@ -119,7 +119,7 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 
 Every deck should be scan-ready, even if the audience is technical.
 
-- Prefer purposeful slide text and stronger hierarchy: visible copy should carry claims, labels, evidence anchors, and necessary context, while voiceover carries nuance and connective tissue.
+- Prefer purposeful slide text and stronger hierarchy: slides should be skimmable as pre-read material without becoming self-narrating. Use short claims, labels, evidence anchors, and necessary context; keep nuance and caveats out of slide prose unless the room requires them.
 - Give each slide one dominant communicative purpose, written in the user's context rather than selected from a fixed list.
 - Use images, diagrams, charts, tables, code, icons, figures, and spatial composition when they explain faster than paragraphs.
 - For standard quantitative charts in HTML decks, prefer Chart.js by CDN over hand-rolled SVG/CSS/canvas chart geometry. Use D3, Observable Plot, or custom code only when the chart needs a relationship Chart.js cannot express cleanly.

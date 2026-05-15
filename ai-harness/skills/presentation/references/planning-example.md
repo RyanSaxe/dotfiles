@@ -1,20 +1,19 @@
 # Planning Example: Software for Agents
 
 This is a reverse plan for `examples/full-slide-examples/software-for-agents.html`.
-Use it as a model for outline shape before building a full deck. It shows how to
-make slide count, agenda, separators, visible copy, voiceover, and visuals line
-up before coding starts.
+Use it as a model for a human-readable deck outline before building a full deck.
 
 Do not copy this deck's layout system by default. Copy the planning discipline:
 count every visible slide, map agenda sections to separator slides, name the
-visual job of each separator, and keep visible copy distinct from voiceover.
+visual job of each separator, and keep each slide block focused on story,
+message, and visual direction.
 
 ## Example Calibration
 
 - Density: most slides use one claim, one dominant visual relationship, and a few labels or short lines.
-- Hierarchy: titles and visuals carry the argument; supporting copy is brief and role-specific.
+- Hierarchy: titles and visuals carry the argument; supporting text is brief and role-specific.
 - Variety: the deck uses folders, quadrants, terminals, gates, template sheets, example cards, screenshot windows, and deck stacks.
-- Slide/speaker split: visible copy makes the deck skimmable, while nuance and caveats belong in the presenter voiceover.
+- Pre-read balance: the deck is skimmable, but it does not try to narrate every caveat on the slide.
 - Constraint: examples calibrate taste and judgment; they are not a component library.
 
 ## Count Contract
@@ -68,120 +67,104 @@ Visible count:
 ```text
 OPENING
 01 Title: Software for Agents
-   Job: establish the thesis and make the deck feel CEO-ready
-   Takeaway: skills package capability, not just instructions
-   Visible copy: title, one thesis sentence, folder label, terminal lines
-   Voiceover: why the phrase "software for agents" changes expectations
+   Role: establish the thesis and make the deck feel CEO-ready
+   Message: skills package capability, not just instructions
    Visual: light-blue folder equipping an agent terminal
+   Notes: one thesis sentence is enough; keep terminal and folder labels short
 
 02 Agenda
-   Job: orient the room without adding explanatory copy
-   Takeaway: the story has three chunks
-   Visible copy: Agenda plus three section names
-   Voiceover: brief setup for why the sequence starts with prompt limits
+   Role: orient the room without adding explanation
+   Message: the story has three chunks
    Visual: centered agenda line with exact dot alignment
+   Notes: no subtitle; this slide is the stable structure people can copy
 
 SECTION 1: PROMPT CEILING
 03 Separator: Prompt Ceiling
-   Job: mark the first section and set up the limitation
-   Takeaway: text-only steering has a ceiling
-   Visible copy: section number, section title, one short subtitle
-   Voiceover: prompts help, but they do not package capability
+   Role: mark the first section and set up the limitation
+   Message: text-only steering has a ceiling
    Visual: prompt page pressing into a ceiling line
+   Notes: section title plus one short subtitle; separator visuals should feel distinct
 
 04 Reusable prompts are not enough
-   Job: show the main reusable prompt options and their gaps
-   Takeaway: templates, few-shot prompts, and sub-agents each help but remain incomplete
-   Visible copy: card labels, adds/gap labels, short fragments
-   Voiceover: explain why these are useful but not sufficient
+   Role: show the main reusable prompt options and their gaps
+   Message: templates, few-shot prompts, and sub-agents help, but remain incomplete
    Visual: prompt template card branching into few-shot and sub-agent cards
+   Notes: label-led slide; do not turn the gap explanations into paragraphs
 
 05 The missing layer is packaged capability
-   Job: locate skills relative to reusable prompting patterns
-   Takeaway: skills occupy the missing space of context-rich packaged capability
-   Visible copy: title, axis labels, five plotted labels
-   Voiceover: clarify sub-agents, custom agents, and skills without overloading the plot
-   Visual: context vs. automation quadrant with skill point emphasized
+   Role: locate skills relative to reusable prompting patterns
+   Message: skills occupy the missing space of context-rich packaged capability
+   Visual: context vs. automation quadrant with the skill point emphasized
+   Notes: keep terms short; explain sub-agents, custom agents, and skills only as needed
 
 SECTION 2: CAPABILITY PACKAGE
 06 Separator: Capability Package
-   Job: transition from missing layer to anatomy
-   Takeaway: skills carry multiple capability surfaces together
-   Visible copy: section number, section title, one concise subtitle, artifact labels
-   Voiceover: a skill is incomplete software intended to be populated downstream
+   Role: transition from missing layer to anatomy
+   Message: skills carry multiple capability surfaces together
    Visual: layered artifact cards for SKILL.md, references, tools, and examples
+   Notes: artifact labels do the work; avoid explaining the whole folder structure here
 
 07 A skill is a capability package
-   Job: make the package shape concrete
-   Takeaway: the folder can ship behavior, materials, optional software, and assurance
-   Visible copy: manifest rows and four short meaning rows
-   Voiceover: not every skill has every folder, but the package can carry more than prompts
+   Role: make the package shape concrete
+   Message: the folder can ship behavior, materials, optional software, and assurance
    Visual: folder manifest next to meaning lanes
+   Notes: clarify that not every skill needs every folder
 
 08 Tools can ship with the skill
-   Job: answer the "why not MCP" question without making the slide anti-MCP
-   Takeaway: when a tool belongs with the capability, a local CLI is a natural packaged interface
-   Visible copy: terminal help lines, three benefit labels, one MCP contrast note
-   Voiceover: MCP is good for isolated services; bundled CLIs fit capability-local tools
+   Role: answer the "why not MCP" question without making the slide anti-MCP
+   Message: a local CLI is natural when the tool belongs with the capability
    Visual: standardized terminal window plus discoverable/local/versioned callouts
+   Notes: MCP nuance matters, but keep it as one contrast note instead of a debate slide
 
 09 Serious skills have a release shape
-   Job: make quality gates feel like part of the package
-   Takeaway: useful skills align context, contract, and validation
-   Visible copy: three gate labels and three short captions
-   Voiceover: serious skills encode both behavior and checks
+   Role: make quality gates feel like part of the package
+   Message: useful skills align context, contract, and validation
    Visual: circular gate path with amber-to-green progression
+   Notes: the visual should imply maturity and release readiness, not a generic process
 
 SECTION 3: PROOF IN PRACTICE
 10 Separator: Proof in Practice
-   Job: move from concept into the presentation skill case study
-   Takeaway: the presentation skill is the proof
-   Visible copy: section number, section title, one short subtitle
-   Voiceover: the rest of the deck shows the workflow as a concrete case
+   Role: move from concept into the presentation skill case study
+   Message: the presentation skill is the proof
    Visual: single clean deck stack with its own identity
+   Notes: do not reuse the final artifact-stack visual; the separator needs its own look
 
 11 Alignment comes before creation
-   Job: show that the skill forces deep context before slides
-   Takeaway: the first deliverable is a grounded plan
-   Visible copy: title, subtitle, context labels, compressed plan label
-   Voiceover: this is where the agent collects enough human judgment to avoid generic decks
+   Role: show that the skill forces deep context before slides
+   Message: the first deliverable is a grounded plan
    Visual: context streams funneling into a plan output
+   Notes: make the plan feel earned by context, not like ordinary chat
 
 12 Templates provide the starting structure
-   Job: show templates as incomplete software skeletons
-   Takeaway: the skill provides a starting point, not a finished deck generator
-   Visible copy: template label and three short process rows
-   Voiceover: the agent completes the skeleton for the user's room
+   Role: show templates as incomplete software skeletons
+   Message: the skill provides a starting point, not a finished deck generator
    Visual: template sheet plus downstream completion lanes
+   Notes: emphasize completion downstream without overexplaining implementation
 
 13 Examples calibrate taste
-   Job: show examples as taste transfer without freezing output
-   Takeaway: examples teach judgment across orthogonal slide types
-   Visible copy: four example labels, short headings, one short support line where needed
-   Voiceover: examples calibrate density, hierarchy, and craft rather than dictating exact layouts
+   Role: show examples as taste transfer without freezing output
+   Message: examples teach judgment across orthogonal slide types
    Visual: 2x2 grid of miniature slides from one design system
+   Notes: each miniature should look meaningfully different, not like repeated cards
 
 14 Screenshots to iterate for quality
-   Job: make validation loop visible
-   Takeaway: screenshots let the agent inspect fit, hierarchy, balance, and visual story
-   Visible copy: title, three loop steps, one proof note
-   Voiceover: render, judge, revise, then repeat until the deck is production-ready
+   Role: make the validation loop visible
+   Message: screenshots reveal fit, hierarchy, balance, and visual story
    Visual: screenshot window with production-like slide and review loop
+   Notes: the screenshot target should look like a real slide, not a placeholder box
 
 15 One workflow creates very different decks
-   Job: land that standardizing workflow does not standardize artifacts
-   Takeaway: a shared capability can still produce highly local outputs
-   Visible copy: title and two artifact labels
-   Voiceover: local context and user intent determine the final deck
+   Role: land that standardizing workflow does not standardize artifacts
+   Message: a shared capability can still produce highly local outputs
    Visual: two different final deck stacks with visibly different content
+   Notes: the artifacts must be clearly different; avoid generic empty deck stacks
 
 CLOSE
 16 Q&A
-   Job: close cleanly and restate the thesis
-   Takeaway: skills equip agents with standardized capabilities
-   Visible copy: Q&A title, thesis sentence, terminal ready state
-   Voiceover: invite questions around where this model fits in the audience's workflow
+   Role: close cleanly and restate the thesis
+   Message: skills equip agents with standardized capabilities
    Visual: standardized terminal ready for questions
+   Notes: terminal should match the title and tools terminals
 ```
 
 ## Planning Notes
@@ -189,5 +172,5 @@ CLOSE
 - The agenda names sections, not individual slides.
 - Each agenda section has a separator slide with a visual concept planned before coding.
 - Section separators are counted as visible slides.
-- Slide copy is planned as visible copy plus voiceover, so planning fields do not become slide paragraphs by accident.
+- Slide blocks are for human review of story and design direction, not final wording.
 - If the requested count changes, adjust the count contract first, then remap agenda sections and separators before editing slide details.

@@ -13,7 +13,7 @@ Gather enough substance to understand:
 - docs, notes, screenshots, existing decks, datasets, or links the agent should inspect
 - what the audience already believes and what must change
 - the working thesis and likely narrative order
-- what belongs on slides vs. what the presenter will say
+- what must be legible on slides vs. what the presenter can explain live
 - visual stance, constraints, banned moves, and what "good" means for this user
 
 Use concise multiple-choice questions for real tradeoffs. Use free-form questions when the user needs to brain-dump context. Research or inspect artifacts when needed; do not make the user answer questions the environment can answer. Do not ask the user to design the deck for you.
@@ -30,7 +30,7 @@ Before outlining or drafting, restate the understanding in plain language:
 - the important gaps or assumptions that remain
 - why the material is now sufficient to compress into a deck
 - the likely narrative arc
-- what belongs on slides vs. in voiceover
+- what should be legible on slides vs. what should remain presenter context
 - the visual direction
 - known risks, constraints, or banned moves
 
@@ -45,10 +45,10 @@ After the user explicitly approves the reflected understanding, present the comp
 Include every slide in order. For each slide, state:
 
 - draft title
-- context or job of the slide
-- desired audience takeaway
-- planned visual, chart, diagram, image, table, code, or spatial composition
-- visible copy budget: what appears on the slide vs. what belongs in voiceover
+- **Role:** why this slide exists in the story
+- **Message:** what the audience should understand
+- **Visual:** the planned visual relationship, chart, diagram, image, table, code, or spatial composition
+- **Notes:** optional constraints, density guidance, or important context that should not become slide prose
 
 Start with a count and structure contract before listing slides:
 
@@ -58,7 +58,7 @@ Start with a count and structure contract before listing slides:
 - separator slides, including the planned visual for each separator
 - intentional exceptions, such as a one-slide section or a longer case-study section
 
-Keep it readable in a terminal. Use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Do not write full speaker notes or long slide copy unless the user specifically asks for that detail.
+Keep it readable in a terminal. Use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Do not write long narration or detailed slide wording unless the user specifically asks for that detail.
 
 End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
 
@@ -70,7 +70,7 @@ Before coding, inspect the examples for calibration:
 
 - read at least one full example deck when available
 - inspect the single-slide gallery or 3-5 relevant single-slide examples
-- use the examples to calibrate density, hierarchy, visual range, copy length, and slide/speaker split
+- use the examples to calibrate density, hierarchy, visual range, slide text density, and pre-read balance
 - do not copy example layouts unless the user's content relationship calls for that structure
 
 Default arc:
@@ -85,7 +85,7 @@ If a section has only one content slide, treat that as a sign the agenda is prob
 
 Content-slide subtitles are optional. Use them when they supply necessary frame or evidence context; otherwise remove them and let the title, visual hierarchy, and section separator carry orientation.
 
-Slides should be skimmable as a pre-read, but not self-narrating. Visible copy should carry claims, labels, evidence anchors, and necessary context. Voiceover should carry nuance, caveats, examples, and connective tissue.
+Slides should be skimmable as a pre-read, but not self-narrating. Use short claims, labels, evidence anchors, and necessary context. Keep nuance, caveats, examples, and connective tissue out of slide prose unless the room requires them.
 
 ## 5. Self-Review
 
