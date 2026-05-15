@@ -30,6 +30,9 @@
         --green: #4f8061;
         --amber: #e9b949;
         --red: #d75f46;
+        --traffic-red: #c88478;
+        --traffic-yellow: #d9b766;
+        --traffic-green: #8da989;
         --font:
           Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
           system-ui, sans-serif;
@@ -109,6 +112,32 @@
         width: 74px;
         height: 8px;
         background: var(--amber);
+      }
+
+      .traffic-dots {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .traffic-dots span {
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        box-sizing: border-box;
+      }
+
+      .traffic-dots span:nth-child(1) {
+        background: var(--traffic-red);
+      }
+
+      .traffic-dots span:nth-child(2) {
+        background: var(--traffic-yellow);
+      }
+
+      .traffic-dots span:nth-child(3) {
+        background: var(--traffic-green);
       }
 
       .label {
@@ -254,19 +283,11 @@
         color: var(--ink);
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: space-between;
         padding: 0 13px;
         font-size: 11px;
         font-weight: 850;
         text-transform: uppercase;
-      }
-
-      .terminal-dot {
-        width: 10px;
-        height: 10px;
-        border: 2px solid var(--ink);
-        border-radius: 50%;
-        background: var(--amber);
       }
 
       .terminal-screen {
@@ -281,11 +302,11 @@
       }
 
       .terminal-screen .prompt {
-        color: #b8d3da;
+        color: #d7f3ed;
       }
 
       .terminal-screen .ready {
-        color: #d9e5d6;
+        color: #91aaa6;
       }
 
       .agenda-slide {
@@ -735,7 +756,6 @@
         display: grid;
         align-content: end;
         gap: 8px;
-        box-shadow: 12px 12px 0 var(--surface-2);
       }
 
       .artifact-sheet strong {
@@ -751,37 +771,42 @@
       }
 
       .artifact-sheet.one {
-        width: 300px;
-        height: 210px;
-        left: 24px;
-        top: 42px;
-        transform: rotate(-6deg);
+        z-index: 1;
+        width: 320px;
+        height: 218px;
+        left: 62px;
+        top: 68px;
+        transform: rotate(-4deg);
         background: #fff6d9;
       }
 
       .artifact-sheet.two {
-        width: 260px;
-        height: 178px;
-        right: 72px;
-        top: 26px;
-        transform: rotate(4deg);
+        z-index: 2;
+        width: 326px;
+        height: 198px;
+        right: 8px;
+        top: 38px;
+        align-content: start;
+        transform: rotate(2deg);
       }
 
       .artifact-sheet.three {
-        width: 286px;
-        height: 184px;
-        left: 168px;
-        bottom: 34px;
-        transform: rotate(2deg);
+        z-index: 3;
+        width: 336px;
+        height: 214px;
+        left: 158px;
+        bottom: 42px;
+        transform: rotate(1deg);
         background: #d6e4e8;
       }
 
       .artifact-sheet.four {
-        width: 236px;
-        height: 150px;
-        right: 12px;
-        bottom: 76px;
-        transform: rotate(-5deg);
+        z-index: 4;
+        width: 292px;
+        height: 162px;
+        right: 4px;
+        bottom: 126px;
+        transform: rotate(-2deg);
         background: #d9e5d6;
       }
 
@@ -917,36 +942,28 @@
         border: 3px solid var(--ink);
         background: #111820;
         color: #d7f3ed;
-        box-shadow: 16px 16px 0 var(--surface-2);
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
       }
 
       .cli-titlebar {
-        height: 42px;
+        height: 34px;
         border-bottom: 3px solid var(--ink);
         background: var(--surface);
         color: var(--ink);
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 0 16px;
-        font-size: 13px;
+        justify-content: space-between;
+        padding: 0 13px;
+        font-size: 11px;
         font-weight: 860;
         text-transform: uppercase;
       }
 
-      .cli-dot {
-        width: 11px;
-        height: 11px;
-        border: 2px solid var(--ink);
-        border-radius: 50%;
-        background: var(--amber);
-      }
-
       .cli-body {
-        padding: 30px 34px 34px;
+        padding: 28px 32px 32px;
         font-family: var(--mono);
-        font-size: 22px;
-        line-height: 1.48;
+        font-size: 21px;
+        line-height: 1.5;
         font-weight: 720;
       }
 
@@ -1584,27 +1601,6 @@
         text-transform: uppercase;
       }
 
-      .qna-dots {
-        display: flex;
-        gap: 7px;
-      }
-
-      .qna-dots span {
-        width: 10px;
-        height: 10px;
-        border: 2px solid var(--ink);
-        border-radius: 50%;
-        background: var(--amber);
-      }
-
-      .qna-dots span:nth-child(2) {
-        background: #d6e4e8;
-      }
-
-      .qna-dots span:nth-child(3) {
-        background: #d9e5d6;
-      }
-
       .qna-body {
         min-height: 190px;
         padding: 28px 30px;
@@ -1852,19 +1848,6 @@
         font-size: 12px;
         line-height: 1;
         font-weight: 820;
-      }
-
-      .capture-dots {
-        display: flex;
-        gap: 6px;
-      }
-
-      .capture-dots span {
-        width: 9px;
-        height: 9px;
-        border: 2px solid var(--ink);
-        border-radius: 50%;
-        background: var(--surface);
       }
 
       .annotated-window {
@@ -2965,13 +2948,16 @@
             </div>
             <div class="terminal-agent">
               <div class="terminal-bar">
-                <span class="terminal-dot"></span>Agent terminal
+                <div class="traffic-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <span>Agent terminal</span>
               </div>
               <div class="terminal-screen">
-                <span class="prompt">$ Create a deck on AI skills</span>
-                <span>presentation skill loaded</span>
+                <span class="prompt">$ deck create agent-skills</span>
+                <span>loaded: presentation skill</span>
                 <br />
-                <span class="ready">Researching AI skills . . . </span>
+                <span class="ready">drafting from context ...</span>
               </div>
             </div>
           </div>
@@ -3192,13 +3178,17 @@
           >
             <div class="cli-help-window">
               <div class="cli-titlebar">
-                <span class="cli-dot"></span>deck-qa --help
+                <div class="traffic-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <span>deck-qa --help</span>
               </div>
               <div class="cli-body">
-                <span class="dim">$</span> deck-qa --help<br />Usage: deck-qa
-                [html]<br /><br /><span class="flag">--viewport</span>
-                1280x800<br /><span class="flag">--fail-on-scroll</span
-                ><br /><span class="flag">--write-screenshots</span>
+                <span class="dim">$</span> deck-qa --help<br />usage: deck-qa
+                [file]<br />checks: layout, overflow, visual fit<br /><span
+                  class="flag"
+                  >--write-screenshots</span
+                >
               </div>
             </div>
             <div class="tool-discovery">
@@ -3462,7 +3452,7 @@
           >
             <div class="annotated-shot">
               <div class="capture-toolbar">
-                <div class="capture-dots" aria-hidden="true">
+                <div class="traffic-dots capture-dots" aria-hidden="true">
                   <span></span><span></span><span></span>
                 </div>
                 <span>slide-qa / 1280x800</span>
@@ -3616,7 +3606,7 @@
             aria-label="Terminal answering the deck thesis"
           >
             <div class="qna-titlebar">
-              <div class="qna-dots" aria-hidden="true">
+              <div class="traffic-dots qna-dots" aria-hidden="true">
                 <span></span><span></span><span></span>
               </div>
               <span>Agent Terminal</span>
