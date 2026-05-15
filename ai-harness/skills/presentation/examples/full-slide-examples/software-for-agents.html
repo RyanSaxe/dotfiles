@@ -430,6 +430,7 @@
         display: grid;
         grid-template-rows: 9px 1fr;
         gap: 18px;
+        overflow: hidden;
       }
 
       .proof-card::before {
@@ -457,87 +458,78 @@
         background: #d6e4e8;
       }
 
-      .proof-lines {
+      .proof-plot {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 16px 18px 15px;
         display: grid;
-        gap: 12px;
-        align-content: center;
+        grid-template-rows: 1fr auto;
+        gap: 13px;
       }
 
-      .proof-lines span {
-        height: 11px;
+      .proof-plot svg {
+        width: 100%;
+        height: 126px;
+        overflow: visible;
+      }
+
+      .proof-axis {
+        stroke: var(--ink);
+        stroke-width: 4;
+      }
+
+      .proof-grid-line {
+        stroke: rgba(17, 20, 24, 0.16);
+        stroke-width: 1.5;
+      }
+
+      .proof-trend-main {
+        fill: none;
+        stroke: var(--amber);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 8;
+      }
+
+      .proof-trend-alt {
+        fill: none;
+        stroke: var(--green);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 5;
+      }
+
+      .proof-dot {
+        fill: var(--surface);
+        stroke: var(--ink);
+        stroke-width: 3;
+      }
+
+      .proof-plot-caption {
+        display: grid;
+        grid-template-columns: 1fr 0.66fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .proof-plot-caption b {
+        font-size: 23px;
+        line-height: 0.9;
+      }
+
+      .proof-plot-lines {
+        display: grid;
+        gap: 6px;
+      }
+
+      .proof-plot-lines span {
+        height: 7px;
         background: var(--ink);
       }
 
-      .proof-lines span:nth-child(2) {
-        width: 76%;
+      .proof-plot-lines span:nth-child(2) {
+        width: 64%;
         background: var(--line);
-      }
-
-      .proof-lines span:nth-child(3) {
-        width: 54%;
-        background: var(--line);
-      }
-
-      .proof-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        align-items: end;
-      }
-
-      .proof-grid span {
-        border: 2px solid var(--ink);
-        background: var(--surface);
-      }
-
-      .proof-grid span:nth-child(1) {
-        height: 54%;
-      }
-
-      .proof-grid span:nth-child(2) {
-        height: 86%;
-        background: #d9e5d6;
-      }
-
-      .proof-grid span:nth-child(3) {
-        height: 66%;
-        background: var(--surface-2);
-      }
-
-      .proof-review {
-        display: grid;
-        grid-template-columns: 1fr 0.85fr;
-        gap: 16px;
-        align-items: stretch;
-      }
-
-      .proof-review-shot {
-        border: 2px solid var(--ink);
-        background:
-          linear-gradient(var(--ink) 0 0) 16px 18px / 86px 8px no-repeat,
-          linear-gradient(var(--line) 0 0) 16px 44px / 112px 7px no-repeat,
-          linear-gradient(var(--line) 0 0) 16px 62px / 74px 7px no-repeat,
-          var(--bg);
-      }
-
-      .proof-review-checks {
-        display: grid;
-        gap: 10px;
-        align-content: center;
-      }
-
-      .proof-review-checks span {
-        height: 18px;
-        border: 2px solid var(--ink);
-        background: var(--surface);
-      }
-
-      .proof-review-checks span:nth-child(1) {
-        background: var(--amber);
-      }
-
-      .proof-review-checks span:nth-child(3) {
-        background: #d9e5d6;
       }
 
       .prompt-ceiling-art {
@@ -1921,47 +1913,31 @@
       }
 
       .capture-corner.tl {
-        left: 9px;
-        top: 43px;
+        left: 12px;
+        top: 12px;
         border-left: 4px solid var(--amber);
         border-top: 4px solid var(--amber);
       }
 
       .capture-corner.tr {
-        right: 9px;
-        top: 43px;
+        right: 12px;
+        top: 12px;
         border-right: 4px solid var(--amber);
         border-top: 4px solid var(--amber);
       }
 
       .capture-corner.bl {
-        left: 9px;
-        bottom: 9px;
+        left: 12px;
+        bottom: 12px;
         border-left: 4px solid var(--amber);
         border-bottom: 4px solid var(--amber);
       }
 
       .capture-corner.br {
-        right: 9px;
-        bottom: 9px;
+        right: 12px;
+        bottom: 12px;
         border-right: 4px solid var(--amber);
         border-bottom: 4px solid var(--amber);
-      }
-
-      .capture-badge {
-        position: absolute;
-        z-index: 5;
-        right: 26px;
-        top: 26px;
-        border: 2px solid var(--ink);
-        background: #fff6d9;
-        padding: 8px 10px;
-        color: var(--ink);
-        font-family: var(--mono);
-        font-size: 11px;
-        line-height: 1;
-        font-weight: 840;
-        text-transform: uppercase;
       }
 
       .production-copy {
@@ -2003,85 +1979,83 @@
         background: #d6e4e8;
         padding: 16px;
         display: grid;
-        grid-template-rows: 1fr auto;
-        gap: 14px;
+        grid-template-columns: 1fr 0.62fr;
+        gap: 16px;
+        align-items: center;
       }
 
-      .production-chart {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 11px;
-        align-items: end;
-      }
-
-      .production-chart span {
-        display: block;
+      .production-donut {
+        position: relative;
+        aspect-ratio: 1;
+        width: 136px;
+        justify-self: center;
         border: 2px solid var(--ink);
-        background: var(--surface-2);
+        border-radius: 50%;
+        background: conic-gradient(
+          var(--amber) 0 44%,
+          #d9e5d6 44% 73%,
+          var(--surface) 73% 100%
+        );
       }
 
-      .production-chart span:nth-child(1) {
-        height: 42%;
+      .production-donut::after {
+        content: "";
+        position: absolute;
+        inset: 31px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: #d6e4e8;
       }
 
-      .production-chart span:nth-child(2) {
-        height: 70%;
-        background: #fff6d9;
+      .production-donut b {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        font-size: 26px;
+        line-height: 1;
       }
 
-      .production-chart span:nth-child(3) {
-        height: 58%;
+      .production-legend {
+        display: grid;
+        gap: 9px;
+      }
+
+      .legend-row {
+        display: grid;
+        grid-template-columns: 14px 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .legend-row i {
+        height: 14px;
+        border: 2px solid var(--ink);
+        background: var(--amber);
+      }
+
+      .legend-row:nth-child(2) i {
+        background: #d9e5d6;
+      }
+
+      .legend-row:nth-child(3) i {
         background: var(--surface);
       }
 
-      .production-chart span:nth-child(4) {
-        height: 88%;
-        background: #d9e5d6;
-      }
-
-      .production-caption {
-        display: grid;
-        gap: 7px;
-      }
-
-      .production-caption span {
-        height: 7px;
+      .legend-row span {
+        height: 8px;
         background: var(--ink);
       }
 
-      .production-caption span:nth-child(2) {
-        width: 62%;
-        background: rgba(17, 20, 24, 0.28);
+      .legend-row:nth-child(2) span {
+        width: 76%;
+        background: var(--line);
       }
 
-      .qa-callout {
-        position: absolute;
-        z-index: 6;
-        border: 3px solid var(--ink);
-        background: #fff6d9;
-        padding: 10px 12px;
-        font-size: 13px;
-        line-height: 1;
-        font-weight: 860;
-        box-shadow: 6px 6px 0 var(--surface-2);
-        text-transform: uppercase;
-      }
-
-      .qa-callout.fit {
-        right: -20px;
-        top: 82px;
-      }
-
-      .qa-callout.hierarchy {
-        left: -18px;
-        bottom: 64px;
-        background: #d9e5d6;
-      }
-
-      .qa-callout.fix {
-        right: 72px;
-        bottom: -20px;
-        background: #d6e4e8;
+      .legend-row:nth-child(3) span {
+        width: 56%;
+        background: var(--line);
       }
 
       .visual-loop {
@@ -3314,21 +3288,32 @@
           </div>
           <div class="proof-separator-art" aria-label="Single proof deck stack">
             <div class="proof-stack">
-              <div class="proof-card back">
-                <div class="proof-lines">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-              <div class="proof-card mid">
-                <div class="proof-grid" aria-hidden="true">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
+              <div class="proof-card back"></div>
+              <div class="proof-card mid"></div>
               <div class="proof-card front">
-                <div class="proof-review">
-                  <div class="proof-review-shot"></div>
-                  <div class="proof-review-checks">
-                    <span></span><span></span><span></span>
+                <div class="proof-plot">
+                  <svg viewBox="0 0 300 150" aria-hidden="true">
+                    <line class="proof-grid-line" x1="24" y1="36" x2="286" y2="36" />
+                    <line class="proof-grid-line" x1="24" y1="76" x2="286" y2="76" />
+                    <line class="proof-axis" x1="24" y1="18" x2="24" y2="124" />
+                    <line class="proof-axis" x1="24" y1="124" x2="288" y2="124" />
+                    <path
+                      class="proof-trend-alt"
+                      d="M 36 106 C 80 98, 104 86, 138 82 S 206 70, 268 54"
+                    />
+                    <path
+                      class="proof-trend-main"
+                      d="M 36 114 C 84 112, 102 78, 136 74 S 206 38, 268 26"
+                    />
+                    <circle class="proof-dot" cx="36" cy="114" r="7" />
+                    <circle class="proof-dot" cx="136" cy="74" r="7" />
+                    <circle class="proof-dot" cx="268" cy="26" r="7" />
+                  </svg>
+                  <div class="proof-plot-caption">
+                    <b>Quality holds.</b>
+                    <div class="proof-plot-lines">
+                      <span></span><span></span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3482,7 +3467,7 @@
           </header>
           <div
             class="visual-qa"
-            aria-label="Annotated screenshot quality review loop"
+            aria-label="Screenshot capture quality review loop"
           >
             <div class="annotated-shot">
               <div class="capture-toolbar">
@@ -3496,7 +3481,6 @@
                 <div class="capture-corner tr"></div>
                 <div class="capture-corner bl"></div>
                 <div class="capture-corner br"></div>
-                <div class="capture-badge">captured</div>
                 <div class="annotated-slide">
                   <div class="production-copy">
                     <b>One claim, one visual.</b>
@@ -3505,17 +3489,16 @@
                     </div>
                   </div>
                   <div class="production-visual" aria-hidden="true">
-                    <div class="production-chart">
-                      <span></span><span></span><span></span><span></span>
+                    <div class="production-donut">
+                      <b>92%</b>
                     </div>
-                    <div class="production-caption">
-                      <span></span><span></span>
+                    <div class="production-legend">
+                      <div class="legend-row"><i></i><span></span></div>
+                      <div class="legend-row"><i></i><span></span></div>
+                      <div class="legend-row"><i></i><span></span></div>
                     </div>
                   </div>
                 </div>
-                <div class="qa-callout fit">visual story matches</div>
-                <div class="qa-callout hierarchy">hierarchy holds</div>
-                <div class="qa-callout fix">revise spacing</div>
               </div>
             </div>
             <div class="visual-loop">
