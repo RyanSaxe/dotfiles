@@ -920,20 +920,17 @@
       .slide-stack-card.a {
         left: 70px;
         top: 32px;
-        transform: rotate(-7deg);
       }
 
       .slide-stack-card.b {
         right: 58px;
         top: 106px;
-        transform: rotate(5deg);
         background: #fff6d9;
       }
 
       .slide-stack-card.c {
         left: 168px;
         bottom: 20px;
-        transform: rotate(-1deg);
         background: #d6e4e8;
       }
 
@@ -1721,21 +1718,21 @@
 
       .screenshot-qa {
         display: grid;
-        grid-template-columns: 1.08fr 0.92fr;
-        gap: 46px;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 44px;
         align-items: center;
       }
 
       .viewport-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
+        gap: 18px;
       }
 
       .viewport-card {
         border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 14px;
+        padding: 13px;
         box-shadow: 9px 9px 0 var(--surface-2);
       }
 
@@ -1750,36 +1747,39 @@
       }
 
       .viewport-slide {
-        height: 128px;
+        aspect-ratio: 16 / 10;
+        width: 100%;
         border: 2px solid var(--ink);
         background: #fffdf8;
-        padding: 16px;
+        box-sizing: border-box;
+        padding: 14px;
         display: grid;
-        grid-template-rows: 15px 1fr;
-        gap: 14px;
+        grid-template-rows: 12px 1fr;
+        gap: 12px;
       }
 
       .viewport-slide::before {
         content: "";
-        width: 66px;
-        height: 7px;
+        width: 58px;
+        height: 6px;
         background: var(--amber);
       }
 
       .viewport-body {
         display: grid;
-        grid-template-columns: 1fr 0.82fr;
-        gap: 12px;
-        align-items: end;
+        grid-template-columns: 1fr 0.86fr;
+        gap: 10px;
+        align-items: stretch;
       }
 
       .viewport-text {
         display: grid;
-        gap: 7px;
+        gap: 6px;
+        align-content: end;
       }
 
       .viewport-text span {
-        height: 8px;
+        height: 7px;
         background: var(--ink);
       }
 
@@ -1794,47 +1794,42 @@
       }
 
       .viewport-block {
-        height: 58px;
         border: 2px solid var(--ink);
         background: #d6e4e8;
       }
 
       .viewport-slide.compact {
-        height: 116px;
-        padding: 13px;
-        gap: 11px;
+        padding: 12px;
+        gap: 10px;
       }
 
       .viewport-slide.portrait {
-        height: 148px;
-        padding: 14px;
+        padding: 12px;
       }
 
       .viewport-slide.portrait .viewport-body {
-        grid-template-columns: 1fr;
-        align-items: stretch;
+        grid-template-columns: 0.9fr 1.1fr;
       }
 
       .viewport-slide.portrait .viewport-block {
-        height: 34px;
         background: #d9e5d6;
       }
 
       .qa-loop {
         display: grid;
-        gap: 18px;
+        gap: 14px;
       }
 
       .qa-step {
         display: grid;
-        grid-template-columns: 46px 1fr;
-        gap: 17px;
+        grid-template-columns: 42px 1fr;
+        gap: 16px;
         align-items: center;
       }
 
       .qa-step b {
-        width: 42px;
-        height: 42px;
+        width: 38px;
+        height: 38px;
         border: 3px solid var(--ink);
         background: var(--surface);
         display: grid;
@@ -1856,9 +1851,13 @@
         background: #d9e5d6;
       }
 
+      .qa-step:nth-child(5) b {
+        background: var(--surface);
+      }
+
       .qa-step strong {
         display: block;
-        font-size: 28px;
+        font-size: 25px;
         line-height: 0.95;
       }
 
@@ -1872,9 +1871,9 @@
       }
 
       .qa-proof {
-        margin-top: 10px;
+        margin-top: 8px;
         border-top: 3px solid var(--ink);
-        padding-top: 18px;
+        padding-top: 16px;
       }
 
       .qa-proof strong {
@@ -2223,153 +2222,275 @@
         gap: 10px;
       }
 
-      .capability-local {
+      .different-decks {
         display: grid;
-        grid-template-columns: 0.94fr 1.06fr;
-        gap: 52px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 66px;
         align-items: center;
+        justify-self: center;
+        width: 100%;
+        max-width: 1080px;
+        padding-top: 14px;
       }
 
-      .capability-layers {
+      .deck-outcome {
         display: grid;
-        gap: 22px;
+        gap: 16px;
       }
 
-      .capability-layer {
-        border: 3px solid var(--ink);
-        background: var(--surface);
-        min-height: 158px;
-        padding: 24px 26px;
-        display: grid;
-        align-content: center;
+      .deck-outcome-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 18px;
-        box-shadow: 10px 10px 0 var(--surface-2);
-      }
-
-      .capability-layer.local {
-        background: #dcecf1;
-      }
-
-      .layer-label {
+        min-height: 38px;
         color: var(--muted);
         font-size: 13px;
+        line-height: 1;
         font-weight: 850;
         text-transform: uppercase;
       }
 
-      .layer-items {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
+      .workflow-mark {
+        display: inline-grid;
+        grid-template-columns: repeat(3, 14px);
+        gap: 4px;
+        align-items: center;
       }
 
-      .layer-items span {
-        border-top: 3px solid var(--ink);
-        padding-top: 8px;
-        min-width: 116px;
-        font-size: 24px;
-        line-height: 1;
-        font-weight: 860;
+      .workflow-mark span {
+        height: 6px;
+        border: 2px solid var(--ink);
       }
 
-      .capability-layer.local .layer-items span:nth-child(2),
-      .capability-layer.shared .layer-items span:nth-child(2) {
-        border-color: var(--blue);
+      .workflow-mark span:nth-child(1) {
+        background: var(--amber);
       }
 
-      .capability-layer.local .layer-items span:nth-child(3),
-      .capability-layer.shared .layer-items span:nth-child(3) {
-        border-color: var(--amber);
+      .workflow-mark span:nth-child(2) {
+        background: var(--blue);
       }
 
-      .capability-layer.local .layer-items span:nth-child(4),
-      .capability-layer.shared .layer-items span:nth-child(4) {
-        border-color: var(--green);
+      .workflow-mark span:nth-child(3) {
+        background: var(--green);
       }
 
-      .layer-note {
-        margin-top: -4px;
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 800;
+      .outcome-stack {
+        position: relative;
+        height: 430px;
       }
 
-      .work-products {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
-      }
-
-      .work-product {
-        min-height: 194px;
+      .outcome-slide {
+        position: absolute;
+        box-sizing: border-box;
+        width: 426px;
+        height: 266px;
         border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 18px;
+        box-shadow: 12px 12px 0 var(--surface-2);
+        padding: 22px;
         display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 16px;
-        box-shadow: 8px 8px 0 var(--surface-2);
+        grid-template-rows: 10px 1fr;
+        gap: 18px;
       }
 
-      .work-product:nth-child(2) {
-        background: #d6e4e8;
+      .outcome-slide::before {
+        content: "";
+        width: 104px;
+        height: 8px;
+        background: var(--amber);
       }
 
-      .work-product:nth-child(3) {
+      .outcome-slide.back {
+        left: 6px;
+        top: 0;
+      }
+
+      .outcome-slide.mid {
+        left: 30px;
+        top: 44px;
+      }
+
+      .outcome-slide.front {
+        left: 54px;
+        top: 88px;
+      }
+
+      .executive-deck .outcome-slide.mid {
         background: #fff6d9;
       }
 
-      .work-product:nth-child(4) {
+      .design-deck .outcome-slide.mid {
+        background: #d6e4e8;
+      }
+
+      .design-deck .outcome-slide.front {
         background: #d9e5d6;
       }
 
-      .work-product strong {
-        font-size: 28px;
-        line-height: 1;
-        font-weight: 880;
-      }
-
-      .product-lines {
+      .strategy-visual {
         display: grid;
-        align-content: end;
-        gap: 9px;
+        grid-template-columns: 0.76fr 1.24fr;
+        gap: 22px;
+        align-items: end;
       }
 
-      .product-lines span {
+      .metric-stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .metric-card {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 13px;
+      }
+
+      .metric-card b {
+        display: block;
+        font-size: 35px;
+        line-height: 0.92;
+      }
+
+      .metric-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .strategy-chart {
+        height: 142px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        align-items: end;
+      }
+
+      .strategy-chart span {
+        display: block;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .strategy-chart span:nth-child(1) {
+        height: 42%;
+      }
+
+      .strategy-chart span:nth-child(2) {
+        height: 70%;
+        background: #d6e4e8;
+      }
+
+      .strategy-chart span:nth-child(3) {
+        height: 54%;
+      }
+
+      .strategy-chart span:nth-child(4) {
+        height: 94%;
+        background: var(--amber);
+      }
+
+      .strategy-lines,
+      .design-lines {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .strategy-lines span,
+      .design-lines span {
+        height: 10px;
+        background: var(--ink);
+      }
+
+      .strategy-lines span:nth-child(2),
+      .design-lines span:nth-child(2) {
+        width: 74%;
+        background: var(--line);
+      }
+
+      .strategy-lines span:nth-child(3),
+      .design-lines span:nth-child(3) {
+        width: 52%;
+        background: var(--line);
+      }
+
+      .design-visual {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .design-frame {
+        border: 2px solid var(--ink);
+        background:
+          linear-gradient(
+            90deg,
+            transparent 0 56%,
+            rgba(17, 20, 24, 0.12) 56% 58%,
+            transparent 58% 100%
+          ),
+          #fffdf8;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr 0.7fr;
+        gap: 10px;
+      }
+
+      .design-image {
+        background: var(--ink);
+      }
+
+      .design-swatches {
+        display: grid;
+        gap: 8px;
+      }
+
+      .design-swatches span {
+        border: 2px solid var(--ink);
+      }
+
+      .design-swatches span:nth-child(1) {
+        background: #d6e4e8;
+      }
+
+      .design-swatches span:nth-child(2) {
+        background: #fff6d9;
+      }
+
+      .design-swatches span:nth-child(3) {
+        background: #d9e5d6;
+      }
+
+      .design-notes {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .design-note {
+        border-left: 5px solid var(--amber);
+        padding-left: 10px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .design-note:nth-child(2) {
+        border-color: var(--green);
+      }
+
+      .design-note span {
         height: 8px;
         background: var(--ink);
       }
 
-      .product-lines span:nth-child(2) {
-        width: 76%;
-        background: rgba(17, 20, 24, 0.22);
-      }
-
-      .product-lines span:nth-child(3) {
-        width: 54%;
-        background: rgba(17, 20, 24, 0.22);
-      }
-
-      .work-product.pr .product-lines {
-        grid-template-columns: 1fr 1fr;
-        align-content: stretch;
-      }
-
-      .work-product.pr .product-lines span {
-        height: auto;
-        min-height: 44px;
-      }
-
-      .work-product.deck .product-lines span:first-child {
-        background: var(--blue);
-      }
-
-      .work-product.email .product-lines span:first-child {
-        background: var(--amber);
-      }
-
-      .work-product.report .product-lines span:first-child {
-        background: var(--green);
+      .design-note span:nth-child(2) {
+        width: 66%;
+        background: var(--line);
       }
 
       .release-path {
@@ -2820,24 +2941,27 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Extensive context gathering via questions</h2>
+            <h2>Alignment comes before creation</h2>
+            <p class="slide-subtitle">
+              The first deliverable is a plan grounded in deep context.
+            </p>
           </header>
           <div class="context-funnel">
-            <div class="input-streams" aria-label="User context streams">
+            <div class="input-streams" aria-label="Discovery context streams">
               <div class="stream-row">
-                <strong>Beliefs</strong>
+                <strong>Goal</strong>
                 <div class="stream-line"></div>
               </div>
               <div class="stream-row">
-                <strong>Stories</strong>
+                <strong>Audience</strong>
                 <div class="stream-line"></div>
               </div>
               <div class="stream-row">
-                <strong>Data</strong>
+                <strong>Material</strong>
                 <div class="stream-line"></div>
               </div>
               <div class="stream-row">
-                <strong>Objections</strong>
+                <strong>Constraints</strong>
                 <div class="stream-line"></div>
               </div>
               <div class="stream-row">
@@ -2846,21 +2970,23 @@
               </div>
             </div>
             <div class="compressed-output">
-              <h3>The deck keeps what matters.</h3>
+              <h3>Plan before slides.</h3>
               <div class="deck-lines">
                 <div class="deck-line accent"></div>
                 <div class="deck-line"></div>
                 <div class="deck-line"></div>
                 <div class="deck-line"></div>
               </div>
-              <span class="label">thesis / sequence / visuals / voiceover</span>
+              <span class="label"
+                >thesis / sequence / gaps / visual stance / approval</span
+              >
             </div>
           </div>
         </section>
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Templates standardize starting points</h2>
+            <h2>Templates provide the starting structure</h2>
           </header>
           <div class="template-spread">
             <div class="starter-sheet" aria-label="Deck starter template">
@@ -2907,7 +3033,7 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Examples calibrate taste without freezing it</h2>
+            <h2>Examples calibrate taste</h2>
           </header>
           <div
             class="taste-transfer"
@@ -2947,7 +3073,7 @@
               <div class="critique-copy">
                 <span class="label">review example</span>
                 <h3>Quality is visible.</h3>
-                <p>The pattern calibrates judgment without freezing output.</p>
+                <p>The pattern calibrates judgment across outputs.</p>
               </div>
             </div>
           </div>
@@ -2955,67 +3081,7 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Standardize capability, localize the work</h2>
-          </header>
-          <div
-            class="capability-local"
-            aria-label="Shared capability shaped by local context into different work"
-          >
-            <div class="capability-layers">
-              <div class="capability-layer shared">
-                <span class="layer-label">shared capability</span>
-                <div class="layer-items">
-                  <span>workflow</span>
-                  <span>examples</span>
-                  <span>checks</span>
-                  <span>contract</span>
-                  <span>tools*</span>
-                </div>
-                <div class="layer-note">* when useful</div>
-              </div>
-              <div class="capability-layer local">
-                <span class="layer-label">local context</span>
-                <div class="layer-items">
-                  <span>intent</span>
-                  <span>audience</span>
-                  <span>inputs</span>
-                  <span>constraints</span>
-                  <span>taste</span>
-                </div>
-              </div>
-            </div>
-            <div class="work-products">
-              <div class="work-product deck">
-                <strong>Deck</strong>
-                <div class="product-lines">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-              <div class="work-product pr">
-                <strong>PR</strong>
-                <div class="product-lines">
-                  <span></span><span></span><span></span><span></span>
-                </div>
-              </div>
-              <div class="work-product email">
-                <strong>Email</strong>
-                <div class="product-lines">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-              <div class="work-product report">
-                <strong>Report</strong>
-                <div class="product-lines">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="content-slide">
-          <header class="slide-title">
-            <h2>Screenshots to iterate for quality</h2>
+            <h2>Screenshots make quality iterative</h2>
           </header>
           <div
             class="screenshot-qa"
@@ -3079,20 +3145,25 @@
                 <b>2</b>
                 <div>
                   <strong>Inspect</strong
-                  ><span
-                    >Find clipping, scroll, overlap, and weak hierarchy.</span
-                  >
+                  ><span>Find clipping, scroll, overlap, and hierarchy.</span>
                 </div>
               </div>
               <div class="qa-step">
                 <b>3</b>
+                <div>
+                  <strong>Visual story</strong
+                  ><span>Check that the visual matches the message.</span>
+                </div>
+              </div>
+              <div class="qa-step">
+                <b>4</b>
                 <div>
                   <strong>Revise</strong
                   ><span>Fix layout before shrinking text.</span>
                 </div>
               </div>
               <div class="qa-step">
-                <b>4</b>
+                <b>5</b>
                 <div>
                   <strong>Verify</strong
                   ><span>Rerender until the screenshots hold.</span>
@@ -3101,6 +3172,85 @@
               <div class="qa-proof">
                 <strong>Quality becomes inspectable.</strong
                 ><span>The skill gives the agent a visual feedback loop.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>One workflow creates very different decks</h2>
+          </header>
+          <div
+            class="different-decks"
+            aria-label="Two different final deck stacks from the same workflow"
+          >
+            <div class="deck-outcome executive-deck">
+              <div class="deck-outcome-label">
+                <span>executive strategy deck</span>
+                <div class="workflow-mark" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+              <div class="outcome-stack">
+                <div class="outcome-slide back">
+                  <div class="strategy-lines">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+                <div class="outcome-slide mid">
+                  <div class="strategy-chart" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
+                </div>
+                <div class="outcome-slide front">
+                  <div class="strategy-visual">
+                    <div class="metric-stack">
+                      <div class="metric-card"><b>42%</b><span>shift</span></div>
+                      <div class="metric-card"><b>3x</b><span>focus</span></div>
+                    </div>
+                    <div class="strategy-chart" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="deck-outcome design-deck">
+              <div class="deck-outcome-label">
+                <span>product critique deck</span>
+                <div class="workflow-mark" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+              <div class="outcome-stack">
+                <div class="outcome-slide back">
+                  <div class="design-lines">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+                <div class="outcome-slide mid">
+                  <div class="design-frame" aria-hidden="true">
+                    <div class="design-image"></div>
+                    <div class="design-swatches">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="outcome-slide front">
+                  <div class="design-visual">
+                    <div class="design-frame" aria-hidden="true">
+                      <div class="design-image"></div>
+                      <div class="design-swatches">
+                        <span></span><span></span><span></span>
+                      </div>
+                    </div>
+                    <div class="design-notes">
+                      <div class="design-note"><span></span><span></span></div>
+                      <div class="design-note"><span></span><span></span></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
