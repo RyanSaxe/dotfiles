@@ -401,6 +401,18 @@
         transform-origin: center;
       }
 
+      .case-separator .different-decks {
+        max-width: none;
+        padding-top: 0;
+        gap: 44px;
+        transform: scale(0.72);
+        transform-origin: center;
+      }
+
+      .case-separator .deck-outcome-label {
+        display: none;
+      }
+
       .section-copy p {
         max-width: 34ch;
         color: var(--muted);
@@ -1815,6 +1827,282 @@
         background: #d9e5d6;
       }
 
+      .viewport-frame {
+        position: relative;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        box-shadow: 9px 9px 0 var(--surface-2);
+        display: grid;
+        place-items: center;
+        box-sizing: border-box;
+      }
+
+      .viewport-frame strong {
+        position: absolute;
+        left: 12px;
+        top: 10px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .viewport-frame.wide {
+        height: 140px;
+      }
+
+      .viewport-frame.base {
+        height: 128px;
+      }
+
+      .viewport-frame.compact {
+        height: 112px;
+      }
+
+      .viewport-frame.portrait {
+        height: 196px;
+      }
+
+      .viewport-artboard {
+        aspect-ratio: 16 / 10;
+        width: 78%;
+        max-height: 72%;
+        border: 2px solid var(--ink);
+        background: #fffdf8;
+        box-sizing: border-box;
+        padding: 8px;
+        display: grid;
+        grid-template-rows: 6px 1fr;
+        gap: 7px;
+      }
+
+      .viewport-frame.portrait .viewport-artboard {
+        width: 82%;
+      }
+
+      .viewport-artboard::before {
+        content: "";
+        width: 34px;
+        height: 5px;
+        background: var(--amber);
+      }
+
+      .viewport-artboard-body {
+        display: grid;
+        grid-template-columns: 1fr 0.84fr;
+        gap: 8px;
+        align-items: stretch;
+      }
+
+      .viewport-artboard-lines {
+        display: grid;
+        gap: 4px;
+        align-content: end;
+      }
+
+      .viewport-artboard-lines span {
+        height: 5px;
+        background: var(--ink);
+      }
+
+      .viewport-artboard-lines span:nth-child(2) {
+        width: 72%;
+        background: var(--line);
+      }
+
+      .viewport-artboard-lines span:nth-child(3) {
+        width: 52%;
+        background: var(--line);
+      }
+
+      .viewport-artboard-block {
+        border: 2px solid var(--ink);
+        background: #d6e4e8;
+      }
+
+      .visual-qa {
+        display: grid;
+        grid-template-columns: 1.03fr 0.97fr;
+        gap: 54px;
+        align-items: center;
+      }
+
+      .annotated-shot {
+        position: relative;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 18px;
+        box-shadow: 14px 14px 0 var(--surface-2);
+      }
+
+      .annotated-window {
+        border: 2px solid var(--ink);
+        background: #fffdf8;
+        padding: 16px;
+      }
+
+      .annotated-slide {
+        position: relative;
+        aspect-ratio: 16 / 10;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 20px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: 22px;
+        align-items: end;
+      }
+
+      .annotated-copy {
+        display: grid;
+        gap: 10px;
+        align-content: end;
+      }
+
+      .annotated-copy span {
+        height: 10px;
+        background: var(--ink);
+      }
+
+      .annotated-copy span:nth-child(2) {
+        width: 76%;
+        background: var(--line);
+      }
+
+      .annotated-copy span:nth-child(3) {
+        width: 52%;
+        background: var(--line);
+      }
+
+      .annotated-visual {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        align-items: end;
+        height: 158px;
+      }
+
+      .annotated-visual span {
+        display: block;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .annotated-visual span:nth-child(1) {
+        height: 42%;
+      }
+
+      .annotated-visual span:nth-child(2) {
+        height: 78%;
+        background: #d6e4e8;
+      }
+
+      .annotated-visual span:nth-child(3) {
+        height: 58%;
+        background: #fff6d9;
+      }
+
+      .qa-callout {
+        position: absolute;
+        border: 3px solid var(--ink);
+        background: #fff6d9;
+        padding: 9px 12px;
+        font-size: 14px;
+        line-height: 1;
+        font-weight: 860;
+        box-shadow: 6px 6px 0 var(--surface-2);
+        text-transform: uppercase;
+      }
+
+      .qa-callout.fit {
+        right: 28px;
+        top: 32px;
+      }
+
+      .qa-callout.hierarchy {
+        left: 34px;
+        bottom: 32px;
+        background: #d9e5d6;
+      }
+
+      .qa-callout.fix {
+        right: 78px;
+        bottom: -18px;
+        background: #d6e4e8;
+      }
+
+      .visual-loop {
+        display: grid;
+        gap: 20px;
+      }
+
+      .visual-loop-step {
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        gap: 17px;
+        align-items: center;
+      }
+
+      .visual-loop-step b {
+        width: 44px;
+        height: 44px;
+        border: 3px solid var(--ink);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 890;
+      }
+
+      .visual-loop-step:nth-child(1) b {
+        background: var(--surface);
+      }
+
+      .visual-loop-step:nth-child(2) b {
+        background: #fff6d9;
+      }
+
+      .visual-loop-step:nth-child(3) b {
+        background: #d9e5d6;
+      }
+
+      .visual-loop-step strong {
+        display: block;
+        font-size: 29px;
+        line-height: 0.96;
+      }
+
+      .visual-loop-step span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.2;
+        font-weight: 660;
+      }
+
+      .visual-loop-proof {
+        border-top: 3px solid var(--ink);
+        padding-top: 20px;
+      }
+
+      .visual-loop-proof strong {
+        display: block;
+        font-size: 33px;
+        line-height: 1;
+      }
+
+      .visual-loop-proof span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
       .qa-loop {
         display: grid;
         gap: 14px;
@@ -2239,40 +2527,12 @@
       }
 
       .deck-outcome-label {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 18px;
         min-height: 38px;
         color: var(--muted);
         font-size: 13px;
         line-height: 1;
         font-weight: 850;
         text-transform: uppercase;
-      }
-
-      .workflow-mark {
-        display: inline-grid;
-        grid-template-columns: repeat(3, 14px);
-        gap: 4px;
-        align-items: center;
-      }
-
-      .workflow-mark span {
-        height: 6px;
-        border: 2px solid var(--ink);
-      }
-
-      .workflow-mark span:nth-child(1) {
-        background: var(--amber);
-      }
-
-      .workflow-mark span:nth-child(2) {
-        background: var(--blue);
-      }
-
-      .workflow-mark span:nth-child(3) {
-        background: var(--green);
       }
 
       .outcome-stack {
@@ -2491,6 +2751,150 @@
       .design-note span:nth-child(2) {
         width: 66%;
         background: var(--line);
+      }
+
+      .strategy-map {
+        position: relative;
+        border: 2px solid var(--ink);
+        background:
+          linear-gradient(var(--line) 2px, transparent 2px) 0 50% / 100% 50%
+            no-repeat,
+          linear-gradient(90deg, var(--line) 2px, transparent 2px) 50% 0 / 50%
+            100% no-repeat,
+          var(--surface);
+        min-height: 150px;
+      }
+
+      .map-dot {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      .map-dot:nth-child(1) {
+        left: 18%;
+        top: 58%;
+      }
+
+      .map-dot:nth-child(2) {
+        left: 52%;
+        top: 24%;
+        background: #d6e4e8;
+      }
+
+      .map-dot:nth-child(3) {
+        right: 16%;
+        bottom: 18%;
+        background: #d9e5d6;
+      }
+
+      .strategy-roadmap {
+        display: grid;
+        gap: 16px;
+        align-content: center;
+      }
+
+      .roadmap-row {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .roadmap-row b {
+        height: 34px;
+        border: 2px solid var(--ink);
+        background: var(--amber);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .roadmap-row:nth-child(2) b {
+        background: #d6e4e8;
+      }
+
+      .roadmap-row:nth-child(3) b {
+        background: #d9e5d6;
+      }
+
+      .roadmap-row span {
+        height: 9px;
+        background: var(--ink);
+      }
+
+      .roadmap-row:nth-child(2) span {
+        width: 78%;
+      }
+
+      .roadmap-row:nth-child(3) span {
+        width: 58%;
+      }
+
+      .design-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .design-tile {
+        border: 2px solid var(--ink);
+        background: var(--surface);
+      }
+
+      .design-tile.dark {
+        background: var(--ink);
+      }
+
+      .design-tile.blue {
+        background: #d6e4e8;
+      }
+
+      .design-tile.amber {
+        background: #fff6d9;
+      }
+
+      .design-tile.green {
+        background: #d9e5d6;
+      }
+
+      .critique-board {
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 16px;
+        align-items: stretch;
+      }
+
+      .critique-shot {
+        border: 2px solid var(--ink);
+        background:
+          linear-gradient(90deg, var(--ink) 0 56%, transparent 56%),
+          #fffdf8;
+      }
+
+      .critique-notes {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .critique-notes span {
+        height: 9px;
+        background: var(--ink);
+      }
+
+      .critique-notes span:nth-child(1) {
+        width: 92%;
+        background: var(--amber);
+      }
+
+      .critique-notes span:nth-child(3) {
+        width: 62%;
+        background: var(--green);
       }
 
       .release-path {
@@ -2914,26 +3318,76 @@
             <p>The presentation skill is the case study.</p>
             <div class="accent-line"></div>
           </div>
-          <div class="deck-art" aria-label="Stacked presentation slides">
-            <div class="slide-stack-card a">
-              <div class="thumb-title"></div>
-              <div class="thumb-body">
-                <div class="thumb-box"></div>
-                <div class="thumb-box"></div>
+          <div
+            class="different-decks"
+            aria-label="Two straight deck stacks previewing the proof section"
+          >
+            <div class="deck-outcome executive-deck">
+              <div class="deck-outcome-label">
+                <span>executive strategy deck</span>
+              </div>
+              <div class="outcome-stack">
+                <div class="outcome-slide back">
+                  <div class="strategy-map" aria-hidden="true">
+                    <span class="map-dot"></span><span class="map-dot"></span
+                    ><span class="map-dot"></span>
+                  </div>
+                </div>
+                <div class="outcome-slide mid">
+                  <div class="strategy-roadmap">
+                    <div class="roadmap-row"><b>1</b><span></span></div>
+                    <div class="roadmap-row"><b>2</b><span></span></div>
+                    <div class="roadmap-row"><b>3</b><span></span></div>
+                  </div>
+                </div>
+                <div class="outcome-slide front">
+                  <div class="strategy-visual">
+                    <div class="metric-stack">
+                      <div class="metric-card"><b>42%</b><span>shift</span></div>
+                      <div class="metric-card"><b>3x</b><span>focus</span></div>
+                    </div>
+                    <div class="strategy-chart" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="slide-stack-card b">
-              <div class="thumb-title"></div>
-              <div class="thumb-body">
-                <div class="thumb-box"></div>
-                <div class="thumb-box"></div>
+            <div class="deck-outcome design-deck">
+              <div class="deck-outcome-label">
+                <span>product critique deck</span>
               </div>
-            </div>
-            <div class="slide-stack-card c">
-              <div class="thumb-title"></div>
-              <div class="thumb-body">
-                <div class="thumb-box"></div>
-                <div class="thumb-box"></div>
+              <div class="outcome-stack">
+                <div class="outcome-slide back">
+                  <div class="design-grid">
+                    <div class="design-tile dark"></div>
+                    <div class="design-tile blue"></div>
+                    <div class="design-tile amber"></div>
+                    <div class="design-tile green"></div>
+                  </div>
+                </div>
+                <div class="outcome-slide mid">
+                  <div class="critique-board">
+                    <div class="critique-shot"></div>
+                    <div class="critique-notes">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="outcome-slide front">
+                  <div class="design-visual">
+                    <div class="design-frame" aria-hidden="true">
+                      <div class="design-image"></div>
+                      <div class="design-swatches">
+                        <span></span><span></span><span></span>
+                      </div>
+                    </div>
+                    <div class="design-notes">
+                      <div class="design-note"><span></span><span></span></div>
+                      <div class="design-note"><span></span><span></span></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -3081,54 +3535,54 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Screenshots make quality iterative</h2>
+            <h2>Option A: screenshots test real review sizes</h2>
           </header>
           <div
             class="screenshot-qa"
-            aria-label="Screenshot QA loop for presentation quality"
+            aria-label="Screenshot QA across real review viewport sizes"
           >
             <div class="viewport-grid">
-              <div class="viewport-card">
+              <div class="viewport-frame wide">
                 <strong>1440x900</strong>
-                <div class="viewport-slide">
-                  <div class="viewport-body">
-                    <div class="viewport-text">
+                <div class="viewport-artboard">
+                  <div class="viewport-artboard-body">
+                    <div class="viewport-artboard-lines">
                       <span></span><span></span><span></span>
                     </div>
-                    <div class="viewport-block"></div>
+                    <div class="viewport-artboard-block"></div>
                   </div>
                 </div>
               </div>
-              <div class="viewport-card">
+              <div class="viewport-frame base">
                 <strong>1280x800</strong>
-                <div class="viewport-slide">
-                  <div class="viewport-body">
-                    <div class="viewport-text">
+                <div class="viewport-artboard">
+                  <div class="viewport-artboard-body">
+                    <div class="viewport-artboard-lines">
                       <span></span><span></span><span></span>
                     </div>
-                    <div class="viewport-block"></div>
+                    <div class="viewport-artboard-block"></div>
                   </div>
                 </div>
               </div>
-              <div class="viewport-card">
+              <div class="viewport-frame compact">
                 <strong>900x600</strong>
-                <div class="viewport-slide compact">
-                  <div class="viewport-body">
-                    <div class="viewport-text">
+                <div class="viewport-artboard">
+                  <div class="viewport-artboard-body">
+                    <div class="viewport-artboard-lines">
                       <span></span><span></span><span></span>
                     </div>
-                    <div class="viewport-block"></div>
+                    <div class="viewport-artboard-block"></div>
                   </div>
                 </div>
               </div>
-              <div class="viewport-card">
+              <div class="viewport-frame portrait">
                 <strong>768x1024</strong>
-                <div class="viewport-slide portrait">
-                  <div class="viewport-body">
-                    <div class="viewport-text">
+                <div class="viewport-artboard">
+                  <div class="viewport-artboard-body">
+                    <div class="viewport-artboard-lines">
                       <span></span><span></span><span></span>
                     </div>
-                    <div class="viewport-block"></div>
+                    <div class="viewport-artboard-block"></div>
                   </div>
                 </div>
               </div>
@@ -3145,13 +3599,13 @@
                 <b>2</b>
                 <div>
                   <strong>Inspect</strong
-                  ><span>Find clipping, scroll, overlap, and hierarchy.</span>
+                  ><span>Find scroll, clipping, overlap, and hierarchy.</span>
                 </div>
               </div>
               <div class="qa-step">
                 <b>3</b>
                 <div>
-                  <strong>Visual story</strong
+                  <strong>Match</strong
                   ><span>Check that the visual matches the message.</span>
                 </div>
               </div>
@@ -3159,19 +3613,65 @@
                 <b>4</b>
                 <div>
                   <strong>Revise</strong
-                  ><span>Fix layout before shrinking text.</span>
-                </div>
-              </div>
-              <div class="qa-step">
-                <b>5</b>
-                <div>
-                  <strong>Verify</strong
                   ><span>Rerender until the screenshots hold.</span>
                 </div>
               </div>
               <div class="qa-proof">
                 <strong>Quality becomes inspectable.</strong
                 ><span>The skill gives the agent a visual feedback loop.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Option B: screenshots focus the critique</h2>
+          </header>
+          <div
+            class="visual-qa"
+            aria-label="Annotated screenshot quality review loop"
+          >
+            <div class="annotated-shot">
+              <div class="annotated-window">
+                <div class="annotated-slide">
+                  <div class="annotated-copy">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <div class="annotated-visual" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <div class="qa-callout fit">message fits visual</div>
+                  <div class="qa-callout hierarchy">hierarchy holds</div>
+                  <div class="qa-callout fix">revise</div>
+                </div>
+              </div>
+            </div>
+            <div class="visual-loop">
+              <div class="visual-loop-step">
+                <b>1</b>
+                <div>
+                  <strong>Render</strong
+                  ><span>Turn the deck into inspectable screenshots.</span>
+                </div>
+              </div>
+              <div class="visual-loop-step">
+                <b>2</b>
+                <div>
+                  <strong>Judge</strong
+                  ><span>Check fit, hierarchy, balance, and visual story.</span>
+                </div>
+              </div>
+              <div class="visual-loop-step">
+                <b>3</b>
+                <div>
+                  <strong>Revise</strong
+                  ><span>Change the slide, render again, and compare.</span>
+                </div>
+              </div>
+              <div class="visual-loop-proof">
+                <strong>Quality becomes visible.</strong
+                ><span>The skill gives the agent a feedback loop.</span>
               </div>
             </div>
           </div>
@@ -3188,19 +3688,19 @@
             <div class="deck-outcome executive-deck">
               <div class="deck-outcome-label">
                 <span>executive strategy deck</span>
-                <div class="workflow-mark" aria-hidden="true">
-                  <span></span><span></span><span></span>
-                </div>
               </div>
               <div class="outcome-stack">
                 <div class="outcome-slide back">
-                  <div class="strategy-lines">
-                    <span></span><span></span><span></span>
+                  <div class="strategy-map" aria-hidden="true">
+                    <span class="map-dot"></span><span class="map-dot"></span
+                    ><span class="map-dot"></span>
                   </div>
                 </div>
                 <div class="outcome-slide mid">
-                  <div class="strategy-chart" aria-hidden="true">
-                    <span></span><span></span><span></span><span></span>
+                  <div class="strategy-roadmap">
+                    <div class="roadmap-row"><b>1</b><span></span></div>
+                    <div class="roadmap-row"><b>2</b><span></span></div>
+                    <div class="roadmap-row"><b>3</b><span></span></div>
                   </div>
                 </div>
                 <div class="outcome-slide front">
@@ -3219,20 +3719,20 @@
             <div class="deck-outcome design-deck">
               <div class="deck-outcome-label">
                 <span>product critique deck</span>
-                <div class="workflow-mark" aria-hidden="true">
-                  <span></span><span></span><span></span>
-                </div>
               </div>
               <div class="outcome-stack">
                 <div class="outcome-slide back">
-                  <div class="design-lines">
-                    <span></span><span></span><span></span>
+                  <div class="design-grid">
+                    <div class="design-tile dark"></div>
+                    <div class="design-tile blue"></div>
+                    <div class="design-tile amber"></div>
+                    <div class="design-tile green"></div>
                   </div>
                 </div>
                 <div class="outcome-slide mid">
-                  <div class="design-frame" aria-hidden="true">
-                    <div class="design-image"></div>
-                    <div class="design-swatches">
+                  <div class="critique-board">
+                    <div class="critique-shot"></div>
+                    <div class="critique-notes">
                       <span></span><span></span><span></span>
                     </div>
                   </div>
