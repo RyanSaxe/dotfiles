@@ -81,6 +81,15 @@ body,
   font-weight: 870;
 }
 
+.slide-title .slide-subtitle {
+  margin-top: 12px;
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1.18;
+  font-weight: 680;
+}
+
 .content-slide {
   display: grid !important;
   grid-template-rows: auto 1fr;
@@ -1408,7 +1417,7 @@ body,
 }
 
 .axis-title.execution {
-  left: -132px;
+  left: -60px;
   top: 50%;
   transform: rotate(-90deg) translateX(-50%);
   transform-origin: left center;
@@ -1493,16 +1502,6 @@ body,
   bottom: 102px;
   width: 170px;
   background: #fff6d9;
-}
-
-.axis-note {
-  position: absolute;
-  left: 156px;
-  bottom: 10px;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.18;
-  font-weight: 760;
 }
 
 .exploded-package {
@@ -2305,6 +2304,7 @@ body,
     <section class="content-slide">
       <header class="slide-title">
         <h2>Agents are not skills</h2>
+        <p class="slide-subtitle">Different context boundary, different capability model.</p>
       </header>
       <div class="agent-contrast" aria-label="Agents and skills solve different problems">
         <div class="axis-frame">
@@ -2325,7 +2325,6 @@ body,
             <strong>equips</strong>
           </div>
         </div>
-        <p class="axis-note">Different context boundary, different capability model.</p>
       </div>
     </section>
 
