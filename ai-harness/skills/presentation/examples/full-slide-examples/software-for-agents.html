@@ -1686,28 +1686,28 @@ body,
 .taste-transfer {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, 1fr);
-  gap: 26px 30px;
+  grid-template-rows: repeat(2, 220px);
+  gap: 22px 28px;
   align-items: stretch;
   box-sizing: border-box;
   padding-right: 132px;
-  padding-bottom: 34px;
+  padding-bottom: 74px;
 }
 
 .taste-example {
   position: relative;
-  min-height: 252px;
+  min-height: 0;
   border: 3px solid var(--ink);
   background: var(--surface);
-  padding: 22px;
+  padding: 20px;
   overflow: hidden;
-  box-shadow: 11px 11px 0 var(--surface-2);
+  box-shadow: 9px 9px 0 var(--surface-2);
 }
 
 .taste-example .label {
   position: absolute;
-  left: 22px;
-  top: 18px;
+  left: 20px;
+  top: 17px;
 }
 
 .taste-example h3 {
@@ -1732,15 +1732,15 @@ body,
 .taste-claim h3 {
   align-self: center;
   max-width: 9ch;
-  font-size: 48px;
+  font-size: 45px;
   line-height: 0.9;
 }
 
 .taste-claim::after {
   content: "";
   position: absolute;
-  right: 22px;
-  top: 24px;
+  right: 20px;
+  top: 22px;
   width: 94px;
   height: 8px;
   background: var(--blue);
@@ -1764,7 +1764,7 @@ body,
   align-items: end;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  height: 150px;
+  height: 134px;
 }
 
 .mini-chart span {
@@ -1800,19 +1800,20 @@ body,
 .taste-system {
   display: grid;
   grid-template-columns: 1fr 0.9fr;
-  gap: 22px;
+  gap: 24px;
   align-items: center;
 }
 
 .mini-network {
   position: relative;
-  height: 166px;
+  height: 150px;
 }
 
 .mini-node {
   position: absolute;
-  width: 78px;
-  height: 78px;
+  z-index: 2;
+  width: 66px;
+  height: 66px;
   border: 3px solid var(--ink);
   border-radius: 50%;
   background: var(--surface);
@@ -1820,18 +1821,18 @@ body,
 
 .mini-node.a {
   left: 0;
-  top: 44px;
+  top: 42px;
   background: #fff6d9;
 }
 
 .mini-node.b {
-  left: 132px;
+  left: 126px;
   top: 0;
   background: #d6e4e8;
 }
 
 .mini-node.c {
-  left: 136px;
+  left: 126px;
   bottom: 0;
   background: #d9e5d6;
 }
@@ -1840,7 +1841,8 @@ body,
 .mini-network::after {
   content: "";
   position: absolute;
-  left: 70px;
+  z-index: 1;
+  left: 57px;
   width: 104px;
   height: 3px;
   background: var(--ink);
@@ -1848,13 +1850,13 @@ body,
 }
 
 .mini-network::before {
-  top: 70px;
-  transform: rotate(-22deg);
+  top: 61px;
+  transform: rotate(-20deg);
 }
 
 .mini-network::after {
-  top: 95px;
-  transform: rotate(22deg);
+  top: 89px;
+  transform: rotate(20deg);
 }
 
 .system-copy {
@@ -1871,10 +1873,12 @@ body,
 
 .mini-review {
   position: relative;
-  height: 158px;
+  margin-top: 20px;
+  height: 138px;
+  box-sizing: border-box;
   border: 3px solid var(--ink);
   background: var(--surface);
-  padding: 18px;
+  padding: 17px;
   display: grid;
   gap: 10px;
   align-content: center;
