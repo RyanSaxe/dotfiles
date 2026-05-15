@@ -1334,46 +1334,187 @@ body,
 }
 
 .agent-contrast {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 56px;
-  align-items: center;
+  position: relative;
+  justify-self: center;
+  align-self: center;
+  width: min(1040px, 100%);
+  height: 520px;
 }
 
-.contrast-side {
-  min-height: 420px;
-  display: grid;
-  align-content: center;
-  gap: 22px;
+.axis-frame {
+  position: absolute;
+  left: 168px;
+  right: 62px;
+  top: 32px;
+  bottom: 92px;
 }
 
-.contrast-side h3 {
-  font-size: 58px;
-  line-height: 0.92;
-  font-weight: 890;
-}
-
-.contrast-side p {
-  color: var(--muted);
-  font-size: 21px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.context-ribbon {
-  height: 12px;
+.axis-x,
+.axis-y {
+  position: absolute;
   background: var(--ink);
 }
 
-.capability-ribbon {
-  height: 12px;
-  width: 72%;
-  background: var(--amber);
+.axis-x {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
 }
 
-.contrast-divider {
-  height: 2px;
+.axis-y {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.axis-x::after,
+.axis-y::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.axis-x::after {
+  right: -2px;
+  top: -10px;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-left: 18px solid var(--ink);
+}
+
+.axis-y::after {
+  left: -10px;
+  top: -2px;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 18px solid var(--ink);
+}
+
+.axis-label {
+  position: absolute;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.axis-label.x-start {
+  left: -8px;
+  bottom: -42px;
+}
+
+.axis-label.x-end {
+  right: -6px;
+  bottom: -42px;
+  text-align: right;
+}
+
+.axis-label.y-start {
+  left: -142px;
+  bottom: -6px;
+  text-align: right;
+}
+
+.axis-label.y-end {
+  left: -162px;
+  top: -6px;
+  max-width: 13ch;
+  text-align: right;
+}
+
+.axis-title {
+  position: absolute;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 880;
+}
+
+.axis-title.capability {
+  right: 4px;
+  bottom: -72px;
+}
+
+.axis-title.execution {
+  left: -170px;
+  top: 50%;
+  transform: rotate(-90deg) translateX(-50%);
+  transform-origin: left center;
+}
+
+.axis-gridline {
+  position: absolute;
   background: var(--line);
+}
+
+.axis-gridline.horizontal {
+  left: 0;
+  right: 0;
+  top: 47%;
+  height: 2px;
+}
+
+.axis-gridline.vertical {
+  top: 0;
+  bottom: 0;
+  left: 52%;
+  width: 2px;
+}
+
+.dimension-card {
+  position: absolute;
+  z-index: 2;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 20px 22px;
+  box-shadow: 10px 10px 0 var(--surface-2);
+}
+
+.dimension-card h3 {
+  font-size: 30px;
+  line-height: 0.98;
+  font-weight: 880;
+}
+
+.dimension-card p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.22;
+  font-weight: 650;
+}
+
+.dimension-card.agent {
+  left: 88px;
+  top: 46px;
+  width: 286px;
+}
+
+.dimension-card.skill {
+  right: 74px;
+  bottom: 48px;
+  width: 306px;
+  background: #fff6d9;
+}
+
+.dimension-card.both {
+  right: 92px;
+  top: 62px;
+  width: 246px;
+  background: #d9e5d6;
+}
+
+.axis-note {
+  position: absolute;
+  left: 168px;
+  bottom: 8px;
+  max-width: 39ch;
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1.22;
+  font-weight: 680;
 }
 
 .exploded-package {
@@ -2178,16 +2319,33 @@ body,
         <h2>Agents are not skills</h2>
       </header>
       <div class="agent-contrast" aria-label="Agents and skills solve different problems">
-        <div class="contrast-side">
-          <div class="context-ribbon"></div>
-          <h3>Agents manage execution context.</h3>
-          <p>Use an agent when isolation, delegation, or parallel work is the problem.</p>
+        <div class="axis-frame">
+          <div class="axis-gridline horizontal"></div>
+          <div class="axis-gridline vertical"></div>
+          <div class="axis-x"></div>
+          <div class="axis-y"></div>
+          <span class="axis-title capability">Reusable capability</span>
+          <span class="axis-title execution">Execution context</span>
+          <span class="axis-label x-start">base</span>
+          <span class="axis-label x-end">equipped</span>
+          <span class="axis-label y-start">same thread</span>
+          <span class="axis-label y-end">isolated / delegated</span>
+          <div class="dimension-card agent">
+            <span class="label">agent</span>
+            <h3>Separate the work.</h3>
+            <p>Isolation, delegation, parallelism.</p>
+          </div>
+          <div class="dimension-card skill">
+            <span class="label">skill</span>
+            <h3>Equip the agent.</h3>
+            <p>Workflow, tools, examples, checks.</p>
+          </div>
+          <div class="dimension-card both">
+            <span class="label">both</span>
+            <h3>Use both when needed.</h3>
+          </div>
         </div>
-        <div class="contrast-side">
-          <div class="capability-ribbon"></div>
-          <h3>Skills equip reusable capability.</h3>
-          <p>Use a skill when the main agent needs workflow, tools, examples, and checks.</p>
-        </div>
+        <p class="axis-note">Agents and skills can work together, but they solve different problems.</p>
       </div>
     </section>
 
