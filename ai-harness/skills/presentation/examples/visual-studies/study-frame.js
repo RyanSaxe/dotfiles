@@ -1,3 +1,5 @@
+// Visual study harness only. Generated decks should use Reveal.js from
+// templates/deck.html.template, not this standalone preview scaler.
 const SLIDE_WIDTH = 1280;
 const SLIDE_HEIGHT = 800;
 const PAGE_MARGIN = 72;

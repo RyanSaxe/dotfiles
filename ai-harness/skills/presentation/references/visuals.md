@@ -34,9 +34,9 @@ Common failures:
 
 ## Use Examples For Taste, Not Structure
 
-Open examples to study spacing, confidence, hierarchy, and craft. Do not treat them as components. If two decks reuse the same structural trick, it should be because the underlying relationship is the same, not because the example was nearby.
+Open full example decks to study spacing, confidence, hierarchy, craft, and content-slide visuals in context. Open visual studies when a content-slide visual question needs a quick focused reference. Do not treat either as components. If two decks reuse the same structural trick, it should be because the underlying relationship is the same, not because the example was nearby.
 
-The single-slide examples are calibration. The user's content decides the slide.
+The visual studies are calibration for content-slide bodies. The user's content decides the slide, and the deck template decides the chrome and skeleton.
 
 ## Chart Guidance
 

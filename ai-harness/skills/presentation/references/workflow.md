@@ -69,8 +69,9 @@ After the user explicitly approves the deck outline, build a complete reviewable
 Before coding, inspect the examples for calibration:
 
 - read at least one full example deck when available
-- inspect the single-slide gallery or 3-5 relevant single-slide examples
-- use the examples to calibrate density, hierarchy, visual range, slide text density, and pre-read balance
+- inspect 2-4 relevant files in `examples/visual-studies/` when a content-slide visual needs a quick one-shot reference
+- use full example decks to calibrate narrative, deck-system use, density, hierarchy, visual range, slide text density, pre-read balance, and content-slide visual craft
+- use visual studies only as focused content-slide visual calibration
 - do not copy example layouts unless the user's content relationship calls for that structure
 
 Default arc:
@@ -104,7 +105,7 @@ Fix issues before asking the user to review.
 
 Ask for targeted critique after V1. When feedback is broad, propose a slide-level revision plan. When feedback is specific, implement it and re-render.
 
-Treat the single-slide examples as calibration. They should influence quality, hierarchy, and range, not become components to copy.
+Treat full examples and visual studies as calibration. They should influence quality, hierarchy, and range, not become components to copy or alternate deck skeletons.
 
 ## 7. Finalize
 

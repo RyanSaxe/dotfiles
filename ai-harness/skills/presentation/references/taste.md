@@ -21,7 +21,7 @@ These rules describe the default taste for decks made with this skill. They are 
 ## Layout
 
 - Content slides should generally use a full-width title at the top and place content below.
-- Title, agenda, separator, summary, conclusion, and Q&A slides may use centered or left-weighted composition because they carry less body information.
+- Title, agenda, separator, summary, conclusion, and Q&A slides should follow the default deck system unless the user has approved a different system.
 - Keep content mass visually centered in the artboard and within the region it occupies. Horizontal centering is not enough; the body group should also feel vertically centered unless the slide is deliberately using asymmetry.
 - Avoid leaving the top, bottom, or either side noticeably underused unless negative space is doing real work.
 - Do not put cards inside cards. Use cards, panels, and boxes only when they express grouping, comparison, state, or hierarchy.
@@ -35,9 +35,10 @@ These rules describe the default taste for decks made with this skill. They are 
 - Do not hand-roll a complex visual when a stable tool can produce a more legible one.
 - Do not add random visuals. Every visual should carry meaning or create useful orientation.
 
-## Single-Slide Examples
+## Visual Studies
 
-- `examples/single-slide-examples/gallery.html` is a human review page for quickly scanning the set.
-- The individual HTML files are case studies for range, spacing, hierarchy, and meaningful visuals.
-- Do not copy an example unless the user explicitly asks for that exact shape.
-- When building a new slide, start from the user's content relationship, then design the visual.
+- Full example decks are case studies for narrative flow, deck-system use, spacing, hierarchy, and meaningful content visuals.
+- `examples/visual-studies/*.html` are one-shot content-slide studies for range, spacing, hierarchy, and meaningful visuals.
+- `study-frame.css` and `study-frame.js` are preview harness files only. They are not deck chrome and should not be copied into generated decks.
+- Do not copy an example or study unless the user explicitly asks for that exact shape.
+- When building a new content slide, start from the user's content relationship, then design the visual inside the canonical deck template.

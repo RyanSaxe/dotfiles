@@ -24,8 +24,9 @@ presentation/
 │   ├── visuals.md
 │   └── workflow.md
 └── examples/
-    ├── single-slide-examples/
-    │   ├── gallery.html
+    ├── visual-studies/
+    │   ├── study-frame.css
+    │   ├── study-frame.js
     │   └── *.html
     └── full-slide-examples/
         └── *.html
@@ -33,12 +34,13 @@ presentation/
 
 ## How to Use the Examples
 
-- `examples/single-slide-examples/gallery.html` is for human review and fast visual scanning.
-- The individual HTML files in `examples/single-slide-examples/` are inspiration for slide concepts, visual relationships, spacing, and hierarchy.
-- `examples/full-slide-examples/` is reserved for complete end-to-end example decks as single HTML files.
+- `examples/full-slide-examples/` contains complete end-to-end decks as single HTML files. Use them to study narrative flow, the default deck system in context, density, hierarchy, and content-slide visual craft.
+- `examples/visual-studies/*.html` contains standalone content-slide visual studies. Use them as quick one-shot references when reading a full deck would be overkill for the visual question at hand.
+- `examples/visual-studies/study-frame.css` and `study-frame.js` are only a local preview harness so the studies open directly in a browser. Do not copy this harness into generated decks.
 - Do not treat example content, diagrams, or visual subjects as templates, a taxonomy, or a component library. Open relevant examples to study why they work, then design the user's slide from the user's content.
+- Do not use visual studies for deck chrome, title slides, agenda slides, section separators, final slides, or the default deck skeleton. Those come from `templates/deck.html.template` and full example decks.
 - End-to-end example decks should be single HTML files under `examples/full-slide-examples/` unless assets are truly required.
-- Before coding a V1, inspect at least one full example deck when available and either the single-slide gallery or 3-5 relevant single-slide examples. Use them to calibrate density, hierarchy, visual range, slide text density, and pre-read balance. The example content and one-off diagrams are inspiration only.
+- Before coding a V1, inspect at least one full example deck when available. Also inspect 2-4 relevant visual studies when content-slide visuals need fast calibration. If no visual study is relevant, skip them rather than forcing the deck into a nearby category.
 
 ## Default Deck System
 
@@ -98,7 +100,7 @@ End by asking what should change, or whether to build the V1 from the outline. W
 ## Build Workflow
 
 1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission to outline, outline the deck, get permission for a V1, draft, self-review, and iterate.
-2. Before coding V1, run the example calibration pass described above. Use examples to calibrate craft, not to select slide types or reuse example content.
+2. Before coding V1, run the example calibration pass described above. Use full example decks for end-to-end calibration and visual studies for fast content-slide visual calibration; do not select slide types or reuse example content.
 3. Pick a working directory under `/tmp/<deck-slug>/`.
 4. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
 5. Start from the inline CSS and script already in the HTML template. Preserve the default deck system unless the user has approved a different system.
@@ -212,10 +214,10 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 
 ## References
 
-- `examples/single-slide-examples/gallery.html` - human review page for the single-slide example set.
-- `examples/single-slide-examples/*.html` - individual slide examples to inspect for inspiration.
+- `examples/visual-studies/*.html` - standalone content-slide visual studies to inspect for quick visual inspiration.
+- `examples/visual-studies/study-frame.css` and `study-frame.js` - local preview harness for visual studies only; generated decks should use the main template.
 - `examples/full-slide-examples/*.html` - complete example decks, added only after the skill succeeds in a real end-to-end run.
-- `tools/deck_qa.py` - presentation-specific screenshot QA for full decks, selected slides, and single-slide HTML examples.
+- `tools/deck_qa.py` - presentation-specific screenshot QA for full decks, selected slides, and standalone visual-study HTML files.
 - `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
 - `references/planning-example.md` - reverse plan for the full `software-for-agents.html` example deck.
 - `references/rubric.md` - deck-level and slide-level review criteria.
