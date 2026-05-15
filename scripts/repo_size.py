@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run -q --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["tiktoken"]
 # ///
 from __future__ import annotations
 
@@ -10,9 +10,21 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from typing import Protocol
+
+TOKEN_ENCODING = "o200k_base"
+
+
+class TokenEncoding(Protocol):
+    def encode(
+        self, text: str, *, disallowed_special: tuple[str, ...] = ()
+    ) -> list[int]: ...
+
+
+_token_encoding: TokenEncoding | None = None
 
 
 @dataclass
@@ -20,6 +32,7 @@ class Node:
     name: str
     is_dir: bool = True
     loc: int = 0
+    tokens: int = 0
     added: int = 0
     deleted: int = 0
     binary: bool = False
@@ -61,7 +74,7 @@ class Colors:
     def directory(self, text: str) -> str:
         return self.paint(text, "36")
 
-    def loc(self, text: str) -> str:
+    def size(self, text: str) -> str:
         return self.paint(text, "33")
 
     def add(self, text: str) -> str:
@@ -74,22 +87,11 @@ class Colors:
         return self.paint(text, "35")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Show Git-visible text line counts or git diff line deltas as a tree."
-    )
+def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "path", nargs="?", default=".", help="file or directory to summarize"
     )
     parser.add_argument("--depth", type=int, default=1, help="tree depth to display")
-    parser.add_argument(
-        "--diff",
-        nargs="?",
-        const="HEAD",
-        default=None,
-        metavar="TARGET",
-        help="show git diff +added/-deleted lines against TARGET; with no TARGET, defaults to HEAD",
-    )
     parser.add_argument(
         "--color",
         choices=("auto", "always", "never"),
@@ -97,7 +99,36 @@ def parse_args() -> argparse.Namespace:
         help="when to emit ANSI colors",
     )
     parser.add_argument("--no-color", action="store_true", help="disable ANSI colors")
-    args = parser.parse_args()
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Show Git-visible repository size metrics as a tree."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    loc_parser = subparsers.add_parser(
+        "loc", help="show text line counts or git diff line deltas"
+    )
+    add_common_arguments(loc_parser)
+    loc_parser.add_argument(
+        "--diff",
+        nargs="?",
+        const="HEAD",
+        default=None,
+        metavar="TARGET",
+        help=(
+            "show git diff +added/-deleted lines against TARGET; with no TARGET, "
+            "defaults to HEAD"
+        ),
+    )
+
+    tokens_parser = subparsers.add_parser(
+        "tokens", help=f"show token counts using {TOKEN_ENCODING}"
+    )
+    add_common_arguments(tokens_parser)
+
+    args = parser.parse_args(argv)
     if args.depth < 0:
         parser.error("--depth must be 0 or greater")
     if args.no_color:
@@ -135,7 +166,7 @@ def git_root_for(path: Path) -> Path:
     start = nearest_existing_parent(path)
     result = run(["git", "-C", str(start), "rev-parse", "--show-toplevel"])
     if result.returncode != 0:
-        raise SystemExit("loc must be run inside a git repository")
+        raise SystemExit("repo_size must be run inside a git repository")
     return Path(result.stdout.strip()).resolve()
 
 
@@ -163,15 +194,37 @@ def is_binary(path: Path) -> bool:
         return True
 
 
-def count_lines(path: Path) -> int:
+def read_text_bytes(path: Path) -> bytes:
     try:
-        data = path.read_bytes()
+        return path.read_bytes()
     except OSError:
-        return 0
+        return b""
+
+
+def count_lines(path: Path) -> int:
+    data = read_text_bytes(path)
     if not data:
         return 0
     lines = data.count(b"\n")
     return lines if data.endswith(b"\n") else lines + 1
+
+
+def get_token_encoding() -> TokenEncoding:
+    global _token_encoding
+    if _token_encoding is None:
+        import tiktoken
+
+        _token_encoding = tiktoken.get_encoding(TOKEN_ENCODING)
+    return _token_encoding
+
+
+def count_tokens(path: Path) -> int:
+    data = read_text_bytes(path)
+    if not data:
+        return 0
+    encoding = get_token_encoding()
+    text = data.decode("utf-8", errors="replace")
+    return len(encoding.encode(text, disallowed_special=()))
 
 
 def git_visible_files(git_root: Path, pathspec: str) -> list[Path]:
@@ -201,6 +254,15 @@ def git_visible_files(git_root: Path, pathspec: str) -> list[Path]:
     return files
 
 
+def path_context(path_arg: str) -> tuple[Path, str, str, Path]:
+    target = Path(path_arg).expanduser()
+    git_root = git_root_for(target)
+    pathspec = rel_to_git_root(target, git_root)
+    root_name = display_root_name(path_arg)
+    base = (git_root / pathspec).resolve(strict=False) if pathspec != "." else git_root
+    return git_root, pathspec, root_name, base
+
+
 def add_loc(root: Node, parts: Iterable[str], loc: int) -> None:
     root.loc += loc
     node = root
@@ -210,19 +272,40 @@ def add_loc(root: Node, parts: Iterable[str], loc: int) -> None:
         node.loc += loc
 
 
-def build_loc_tree(path_arg: str) -> Node:
-    target = Path(path_arg).expanduser()
-    git_root = git_root_for(target)
-    pathspec = rel_to_git_root(target, git_root)
-    root = Node(name=display_root_name(path_arg), is_dir=not target.is_file())
+def add_tokens(root: Node, parts: Iterable[str], tokens: int) -> None:
+    root.tokens += tokens
+    node = root
+    parts_list = list(parts)
+    for index, part in enumerate(parts_list):
+        node = node.child(part, is_dir=index < len(parts_list) - 1)
+        node.tokens += tokens
 
-    base = (git_root / pathspec).resolve(strict=False) if pathspec != "." else git_root
+
+def build_loc_tree(path_arg: str) -> Node:
+    git_root, pathspec, root_name, base = path_context(path_arg)
+    target = Path(path_arg).expanduser()
+    root = Node(name=root_name, is_dir=not target.is_file())
+
     for file in git_visible_files(git_root, pathspec):
         try:
             rel_parts = file.resolve().relative_to(base).parts
         except ValueError:
             continue
         add_loc(root, rel_parts, count_lines(file))
+    return root
+
+
+def build_token_tree(path_arg: str) -> Node:
+    git_root, pathspec, root_name, base = path_context(path_arg)
+    target = Path(path_arg).expanduser()
+    root = Node(name=root_name, is_dir=not target.is_file())
+
+    for file in git_visible_files(git_root, pathspec):
+        try:
+            rel_parts = file.resolve().relative_to(base).parts
+        except ValueError:
+            continue
+        add_tokens(root, rel_parts, count_tokens(file))
     return root
 
 
@@ -325,7 +408,11 @@ def humanize(value: int) -> str:
 
 
 def format_loc(node: Node, colors: Colors) -> str:
-    return colors.loc(humanize(node.loc))
+    return colors.size(humanize(node.loc))
+
+
+def format_tokens(node: Node, colors: Colors) -> str:
+    return colors.size(humanize(node.tokens))
 
 
 def binary_marker(colors: Colors) -> str:
@@ -336,7 +423,9 @@ def format_diff(node: Node, colors: Colors) -> str:
     if node.added == 0 and node.deleted == 0 and node.binary_count:
         return binary_marker(colors)
 
-    metric = f"{colors.add(f'+{humanize(node.added)}')}/{colors.delete(f'-{humanize(node.deleted)}')}"
+    added = colors.add(f"+{humanize(node.added)}")
+    deleted = colors.delete(f"-{humanize(node.deleted)}")
+    metric = f"{added}/{deleted}"
     if node.binary_count:
         return f"{metric} {binary_marker(colors)}"
     return metric
@@ -365,9 +454,16 @@ def visible_rows(root: Node, depth: int) -> list[RenderRow]:
     return rows
 
 
+MetricFormatter = Callable[[Node, Colors], str]
+
+
 def render_tree(root: Node, *, depth: int, mode: str, colors: Colors) -> str:
-    metric = format_diff if mode == "diff" else format_loc
-    metric_header = "DIFF" if mode == "diff" else "TOTAL"
+    metrics: dict[str, tuple[MetricFormatter, str]] = {
+        "diff": (format_diff, "DIFF"),
+        "loc": (format_loc, "TOTAL"),
+        "tokens": (format_tokens, "TOKENS"),
+    }
+    metric, metric_header = metrics[mode]
     rows = visible_rows(root, depth)
     path_width = max(len("PATH"), *(len(row.plain_path) for row in rows))
     gap = "  "
@@ -384,10 +480,13 @@ def render_tree(root: Node, *, depth: int, mode: str, colors: Colors) -> str:
     return "\n".join(lines)
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
     colors = Colors(color_enabled(args.color))
-    if args.diff is None:
+    if args.command == "tokens":
+        root = build_token_tree(args.path)
+        mode = "tokens"
+    elif args.diff is None:
         root = build_loc_tree(args.path)
         mode = "loc"
     else:

@@ -34,7 +34,8 @@ alias claude='env -u TMUX claude'
 
 # Development tools
 alias lsp-check='~/generic/dotfiles/scripts/lsp-check'
-alias loc='uv run -q --script ~/generic/dotfiles/scripts/loc.py'
+alias loc='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py loc'
+alias tokens='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py tokens'
 alias nvim-clean='~/generic/dotfiles/scripts/nvim-clean.sh'
 alias diagnose='uvx ty check --output-format concise --no-progress --color never --exit-zero | rg -o "(error|warning)\[[^]]+\]" | sort | uniq -c | sort -nr | awk "{print \$2 \": \" \$1}"'
 
