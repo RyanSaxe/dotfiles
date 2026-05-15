@@ -578,166 +578,241 @@ body,
   background: #d9e5d6;
 }
 
-.package-shape {
+.capability-package {
   display: grid;
-  grid-template-columns: 0.88fr 1.12fr;
-  gap: 42px;
+  grid-template-columns: 0.96fr 1.04fr;
+  gap: 56px;
   align-items: center;
 }
 
-.central-capability {
-  width: 380px;
-  height: 380px;
+.skill-manifest {
+  position: relative;
+  height: 430px;
+}
+
+.manifest-folder {
+  position: absolute;
+  left: 26px;
+  top: 64px;
+  width: 466px;
+  height: 326px;
   border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--surface);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 40px;
-  box-shadow: 18px 18px 0 var(--surface-2);
+  background: #dcecf1;
+  box-shadow: 12px 12px 0 var(--surface-2);
 }
 
-.central-capability h3 {
-  font-size: 54px;
-  line-height: 0.92;
-  font-weight: 890;
+.manifest-folder::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -34px;
+  width: 170px;
+  height: 34px;
+  border: 3px solid var(--ink);
+  border-bottom: 0;
+  background: #cfe3ea;
 }
 
-.package-list {
+.manifest-title {
+  position: absolute;
+  left: 28px;
+  top: 22px;
   display: grid;
+  gap: 4px;
+}
+
+.manifest-title strong {
+  font-size: 32px;
+  line-height: 0.95;
+}
+
+.manifest-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.manifest-tree {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 24px;
+  display: grid;
+  gap: 10px;
+}
+
+.manifest-row {
+  display: grid;
+  grid-template-columns: 124px 1fr;
   gap: 18px;
+  align-items: baseline;
+  border-top: 2px solid rgba(17, 20, 24, 0.18);
+  padding-top: 10px;
 }
 
-.package-row {
-  border-top: 2px solid var(--ink);
-  padding-top: 16px;
+.manifest-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.manifest-row code {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.manifest-row span {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 670;
+}
+
+.package-meaning {
+  display: grid;
+  gap: 20px;
+}
+
+.meaning-row {
   display: grid;
   grid-template-columns: 148px 1fr;
-  gap: 26px;
-  align-items: start;
+  gap: 24px;
+  align-items: center;
+  border-top: 3px solid var(--ink);
+  padding-top: 17px;
 }
 
-.package-row strong {
-  font-size: 26px;
-  line-height: 1;
+.meaning-row:nth-child(2) {
+  border-color: var(--blue);
 }
 
-.package-row span {
+.meaning-row:nth-child(3) {
+  border-color: var(--amber);
+}
+
+.meaning-row:nth-child(4) {
+  border-color: var(--green);
+}
+
+.meaning-row strong {
+  font-size: 27px;
+  line-height: 0.96;
+}
+
+.meaning-row span {
   color: var(--muted);
-  font-size: 17px;
-  line-height: 1.28;
-  font-weight: 650;
-}
-
-.tools-art {
-  height: 460px;
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-
-.terminal-large {
-  width: 560px;
-  border: 3px solid var(--ink);
-  background: #111820;
-  color: #d7f3ed;
-  padding: 28px 30px;
-  font-family: var(--mono);
-  font-size: 23px;
-  line-height: 1.45;
-  font-weight: 700;
-  box-shadow: 18px 18px 0 var(--surface-2);
-}
-
-.terminal-large .dim {
-  color: #91aaa6;
-}
-
-.tool-tag {
-  position: absolute;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 12px 16px;
   font-size: 18px;
-  font-weight: 850;
+  line-height: 1.22;
+  font-weight: 660;
 }
 
-.tool-tag.a {
-  left: 10px;
-  top: 36px;
-  background: #d6e4e8;
-}
-
-.tool-tag.b {
-  right: 10px;
-  top: 74px;
-}
-
-.tool-tag.c {
-  left: 52px;
-  bottom: 46px;
-  background: #d9e5d6;
-}
-
-.tool-slide {
+.tool-shipping {
   display: grid;
-  grid-template-columns: 1.12fr 0.88fr;
-  gap: 40px;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 48px;
   align-items: center;
 }
 
-.cli-panel {
+.cli-help-window {
   border: 3px solid var(--ink);
   background: #111820;
   color: #d7f3ed;
-  padding: 34px;
-  font-family: var(--mono);
-  font-size: 21px;
-  line-height: 1.52;
-  font-weight: 700;
   box-shadow: 16px 16px 0 var(--surface-2);
 }
 
-.cli-panel .dim {
+.cli-titlebar {
+  height: 42px;
+  border-bottom: 3px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 860;
+  text-transform: uppercase;
+}
+
+.cli-dot {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.cli-body {
+  padding: 30px 34px 34px;
+  font-family: var(--mono);
+  font-size: 22px;
+  line-height: 1.48;
+  font-weight: 720;
+}
+
+.cli-body .dim {
   color: #91aaa6;
 }
 
-.tool-thesis {
+.cli-body .flag {
+  color: #f4c84e;
+}
+
+.tool-discovery {
   display: grid;
-  gap: 24px;
+  gap: 22px;
 }
 
-.tool-thesis h3 {
-  font-size: 56px;
-  line-height: 0.95;
-  font-weight: 890;
-}
-
-.tool-thesis p {
-  color: var(--muted);
-  font-size: 22px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.mcp-note {
-  border-left: 8px solid var(--blue);
+.discovery-row {
+  border-left: 8px solid var(--ink);
   padding-left: 20px;
-  display: grid;
-  gap: 7px;
 }
 
-.mcp-note strong {
+.discovery-row:nth-child(2) {
+  border-color: var(--blue);
+}
+
+.discovery-row:nth-child(3) {
+  border-color: var(--green);
+}
+
+.discovery-row strong {
+  display: block;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.discovery-row span {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.22;
+  font-weight: 660;
+}
+
+.mcp-contrast {
+  border: 3px solid var(--ink);
+  background: #d6e4e8;
+  padding: 19px 21px;
+  box-shadow: 8px 8px 0 var(--surface-2);
+}
+
+.mcp-contrast strong {
+  display: block;
   font-size: 24px;
   line-height: 1;
 }
 
-.mcp-note span {
+.mcp-contrast span {
+  display: block;
+  margin-top: 8px;
   color: var(--muted);
   font-size: 16px;
-  line-height: 1.25;
-  font-weight: 650;
+  line-height: 1.22;
+  font-weight: 680;
 }
 
 .deck-art {
@@ -1515,219 +1590,177 @@ body,
   background: #fff6d9;
 }
 
-.exploded-package {
+.screenshot-qa {
   display: grid;
-  grid-template-columns: 1fr 1.1fr;
-  gap: 54px;
-  align-items: center;
-}
-
-.package-assembly {
-  height: 430px;
-  position: relative;
-}
-
-.assembly-core {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 230px;
-  height: 150px;
-  border: 3px solid var(--ink);
-  background: var(--surface);
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  font-size: 33px;
-  line-height: 0.95;
-  font-weight: 890;
-  box-shadow: 14px 14px 0 var(--surface-2);
-}
-
-.assembly-part {
-  position: absolute;
-  display: grid;
-  gap: 4px;
-  font-weight: 850;
-}
-
-.assembly-part span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 840;
-  text-transform: uppercase;
-}
-
-.assembly-part strong {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.assembly-part.instructions {
-  left: 18px;
-  top: 40px;
-}
-
-.assembly-part.tools {
-  right: 26px;
-  top: 62px;
-}
-
-.assembly-part.examples {
-  left: 34px;
-  bottom: 62px;
-}
-
-.assembly-part.contracts {
-  right: 10px;
-  bottom: 46px;
-}
-
-.assembly-line {
-  position: absolute;
-  height: 3px;
-  background: var(--ink);
-  transform-origin: left center;
-}
-
-.assembly-line.a {
-  left: 152px;
-  top: 112px;
-  width: 170px;
-  transform: rotate(23deg);
-}
-
-.assembly-line.b {
-  right: 148px;
-  top: 130px;
-  width: 160px;
-  transform: rotate(152deg);
-}
-
-.assembly-line.c {
-  left: 154px;
-  bottom: 122px;
-  width: 166px;
-  transform: rotate(-22deg);
-}
-
-.assembly-line.d {
-  right: 134px;
-  bottom: 108px;
-  width: 156px;
-  transform: rotate(-154deg);
-}
-
-.tools-content {
-  display: grid;
-  grid-template-columns: 1.02fr 0.98fr;
+  grid-template-columns: 1.08fr 0.92fr;
   gap: 46px;
   align-items: center;
 }
 
-.tools-content .terminal-large {
-  width: 100%;
-}
-
-.tool-points {
+.viewport-grid {
   display: grid;
-  gap: 26px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
 }
 
-.tool-point {
-  border-left: 8px solid var(--ink);
-  padding-left: 22px;
+.viewport-card {
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 14px;
+  box-shadow: 9px 9px 0 var(--surface-2);
 }
 
-.tool-point:nth-child(2) {
-  border-left-color: var(--blue);
+.viewport-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 820;
 }
 
-.tool-point:nth-child(3) {
-  border-left-color: var(--green);
+.viewport-slide {
+  height: 128px;
+  border: 2px solid var(--ink);
+  background: #fffdf8;
+  padding: 16px;
+  display: grid;
+  grid-template-rows: 15px 1fr;
+  gap: 14px;
 }
 
-.tool-point strong {
+.viewport-slide::before {
+  content: "";
+  width: 66px;
+  height: 7px;
+  background: var(--amber);
+}
+
+.viewport-body {
+  display: grid;
+  grid-template-columns: 1fr 0.82fr;
+  gap: 12px;
+  align-items: end;
+}
+
+.viewport-text {
+  display: grid;
+  gap: 7px;
+}
+
+.viewport-text span {
+  height: 8px;
+  background: var(--ink);
+}
+
+.viewport-text span:nth-child(2) {
+  width: 72%;
+  background: var(--line);
+}
+
+.viewport-text span:nth-child(3) {
+  width: 52%;
+  background: var(--line);
+}
+
+.viewport-block {
+  height: 58px;
+  border: 2px solid var(--ink);
+  background: #d6e4e8;
+}
+
+.viewport-slide.compact {
+  height: 116px;
+  padding: 13px;
+  gap: 11px;
+}
+
+.viewport-slide.portrait {
+  height: 148px;
+  padding: 14px;
+}
+
+.viewport-slide.portrait .viewport-body {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.viewport-slide.portrait .viewport-block {
+  height: 34px;
+  background: #d9e5d6;
+}
+
+.qa-loop {
+  display: grid;
+  gap: 18px;
+}
+
+.qa-step {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 17px;
+  align-items: center;
+}
+
+.qa-step b {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 890;
+}
+
+.qa-step:nth-child(2) b {
+  background: #d6e4e8;
+}
+
+.qa-step:nth-child(3) b {
+  background: #fff6d9;
+}
+
+.qa-step:nth-child(4) b {
+  background: #d9e5d6;
+}
+
+.qa-step strong {
+  display: block;
+  font-size: 28px;
+  line-height: 0.95;
+}
+
+.qa-step span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 660;
+}
+
+.qa-proof {
+  margin-top: 10px;
+  border-top: 3px solid var(--ink);
+  padding-top: 18px;
+}
+
+.qa-proof strong {
   display: block;
   font-size: 30px;
   line-height: 1;
 }
 
-.tool-point span {
+.qa-proof span {
   display: block;
   margin-top: 7px;
   color: var(--muted);
   font-size: 17px;
-  line-height: 1.25;
-  font-weight: 650;
-}
-
-.interface-wrapper {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 48px;
-  align-items: center;
-}
-
-.interface-core {
-  border: 3px solid var(--ink);
-  background: #111820;
-  color: #d7f3ed;
-  padding: 30px;
-  font-family: var(--mono);
-  font-size: 22px;
-  line-height: 1.45;
-  font-weight: 700;
-  box-shadow: 16px 16px 0 var(--surface-2);
-}
-
-.interface-core .dim {
-  color: #91aaa6;
-}
-
-.capability-shell {
-  position: relative;
-  min-height: 440px;
-}
-
-.shell-ring {
-  position: absolute;
-  inset: 22px 16px;
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-}
-
-.shell-ring.two {
-  inset: 94px 96px;
-  border-color: var(--line);
-}
-
-.shell-label {
-  position: absolute;
-  font-size: 24px;
-  line-height: 1;
-  font-weight: 870;
-}
-
-.shell-label.a {
-  left: 18px;
-  top: 40px;
-}
-
-.shell-label.b {
-  right: 18px;
-  top: 84px;
-}
-
-.shell-label.c {
-  left: 56px;
-  bottom: 70px;
-}
-
-.shell-label.d {
-  right: 54px;
-  bottom: 48px;
+  line-height: 1.22;
+  font-weight: 660;
 }
 
 .context-funnel {
@@ -2217,16 +2250,15 @@ body,
 .release-caption span {
   border-top: 3px solid var(--ink);
   padding-top: 16px;
+  text-align: center;
 }
 
 .release-caption span:nth-child(2) {
   border-color: var(--amber);
-  text-align: center;
 }
 
 .release-caption span:nth-child(3) {
   border-color: var(--green);
-  text-align: right;
 }
 
 .reveal .progress {
@@ -2357,67 +2389,60 @@ body,
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>A skill can carry any package shape</h2>
+        <h2>A skill is a capability package</h2>
       </header>
-      <div class="exploded-package">
-        <div class="package-assembly" aria-label="Exploded package assembling into capability">
-          <div class="assembly-line a"></div>
-          <div class="assembly-line b"></div>
-          <div class="assembly-line c"></div>
-          <div class="assembly-line d"></div>
-          <div class="assembly-core">Capability,<br>packaged</div>
-          <div class="assembly-part instructions"><span>rules</span><strong>Instructions</strong></div>
-          <div class="assembly-part tools"><span>execution</span><strong>Software</strong></div>
-          <div class="assembly-part examples"><span>taste</span><strong>Examples</strong></div>
-          <div class="assembly-part contracts"><span>trust</span><strong>Contracts</strong></div>
+      <div class="capability-package" aria-label="Skill package manifest and carried capability">
+        <div class="skill-manifest">
+          <div class="manifest-folder">
+            <div class="manifest-title"><strong>skill/</strong><span>shippable capability</span></div>
+            <div class="manifest-tree">
+              <div class="manifest-row"><code>SKILL.md</code><span>activation and collaboration rules</span></div>
+              <div class="manifest-row"><code>references/</code><span>deep context the agent can inspect</span></div>
+              <div class="manifest-row"><code>templates/</code><span>starting points to populate downstream</span></div>
+              <div class="manifest-row"><code>examples/</code><span>taste and behavior calibration</span></div>
+              <div class="manifest-row"><code>tools/</code><span>optional software, CLIs, validators</span></div>
+              <div class="manifest-row"><code>checks/</code><span>quality gates and output contracts</span></div>
+            </div>
+          </div>
         </div>
-        <div class="package-list">
-          <div class="package-row"><strong>Instructions</strong><span>When the skill applies, how to collaborate, and what threshold must be met before acting.</span></div>
-          <div class="package-row"><strong>Assets</strong><span>Templates, references, examples, fixtures, or any file the agent can inspect and adapt.</span></div>
-          <div class="package-row"><strong>Software</strong><span>Scripts, CLIs, apps, renderers, validators, or services the agent can run.</span></div>
-          <div class="package-row"><strong>Contracts</strong><span>The output shape and checks that make success visible.</span></div>
+        <div class="package-meaning">
+          <div class="meaning-row"><strong>Behavior</strong><span>When to act and how to collaborate.</span></div>
+          <div class="meaning-row"><strong>Materials</strong><span>Examples, templates, and references the agent can reuse.</span></div>
+          <div class="meaning-row"><strong>Software</strong><span>Optional tools when execution belongs with the skill.</span></div>
+          <div class="meaning-row"><strong>Assurance</strong><span>Contracts and checks make success visible.</span></div>
         </div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Tools make skills feel like software</h2>
+        <h2>Tools can ship with the skill</h2>
       </header>
-      <div class="tools-content" aria-label="CLI tool interface packaged with skill guidance">
-        <div class="terminal-large"><span class="dim">$</span> deck-qa --help<br>Usage: deck-qa [html]<br><br>  --viewport 1280x800<br>  --fail-on-scroll<br>  --write-screenshots</div>
-        <div class="tool-points">
-          <div class="tool-point"><strong>Local</strong><span>The agent can run the tool inside the task context.</span></div>
-          <div class="tool-point"><strong>Inspectable</strong><span>Help text gives the same kind of affordance discovery agents need from tool surfaces.</span></div>
-          <div class="tool-point"><strong>Versioned</strong><span>The tool ships with the skill, examples, and validation expectations.</span></div>
+      <div class="tool-shipping" aria-label="CLI tool packaged with skill guidance">
+        <div class="cli-help-window">
+          <div class="cli-titlebar"><span class="cli-dot"></span>deck-qa --help</div>
+          <div class="cli-body"><span class="dim">$</span> deck-qa --help<br>Usage: deck-qa [html]<br><br><span class="flag">--viewport</span> 1280x800<br><span class="flag">--fail-on-scroll</span><br><span class="flag">--write-screenshots</span></div>
+        </div>
+        <div class="tool-discovery">
+          <div class="discovery-row"><strong>Discoverable</strong><span><code>--help</code> gives agents the operating surface.</span></div>
+          <div class="discovery-row"><strong>Local</strong><span>The tool runs inside the task context, next to the files.</span></div>
+          <div class="discovery-row"><strong>Versioned</strong><span>The executable ships with examples and checks.</span></div>
+          <div class="mcp-contrast"><strong>MCP for services.</strong><span>Ship a CLI when the tool belongs with the capability.</span></div>
         </div>
       </div>
     </section>
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Interfaces are not the whole capability</h2>
+        <h2>Serious skills have a release shape</h2>
       </header>
-      <div class="interface-wrapper">
-        <div class="interface-core" aria-label="CLI help output">
-          <span class="dim">$</span> skill-tool --help<br>
-          Usage: skill-tool [input] [flags]<br><br>
-          Commands:<br>
-          &nbsp;&nbsp;plan&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prepare work<br>
-          &nbsp;&nbsp;render&nbsp;&nbsp;&nbsp;create artifact<br>
-          &nbsp;&nbsp;verify&nbsp;&nbsp;&nbsp;check output<br><br>
-          Flags:<br>
-          &nbsp;&nbsp;--format&nbsp;&nbsp;html|json|yaml<br>
-          &nbsp;&nbsp;--strict&nbsp;&nbsp;fail on drift
+      <div class="release-path" aria-label="Skill release quality gates">
+        <div class="gate-track">
+          <div class="release-gate"><span>gate 1</span><strong>Context</strong></div>
+          <div class="release-gate"><span>gate 2</span><strong>Contract</strong></div>
+          <div class="release-gate"><span>gate 3</span><strong>Validation</strong></div>
         </div>
-        <div class="capability-shell" aria-label="Capability shell around interface">
-          <div class="shell-ring"></div>
-          <div class="shell-ring two"></div>
-          <div class="shell-label a">usage rules</div>
-          <div class="shell-label b">examples</div>
-          <div class="shell-label c">expected output</div>
-          <div class="shell-label d">checks</div>
-        </div>
+        <div class="release-caption"><span>understand before acting</span><span>align on output</span><span>check before delivery</span></div>
       </div>
     </section>
 
@@ -2546,15 +2571,42 @@ body,
 
     <section class="content-slide">
       <header class="slide-title">
-        <h2>Serious skills have a release shape</h2>
+        <h2>Screenshots to iterate for quality</h2>
       </header>
-      <div class="release-path" aria-label="Skill release quality gates">
-        <div class="gate-track">
-          <div class="release-gate"><span>gate 1</span><strong>Context</strong></div>
-          <div class="release-gate"><span>gate 2</span><strong>Contract</strong></div>
-          <div class="release-gate"><span>gate 3</span><strong>Validation</strong></div>
+      <div class="screenshot-qa" aria-label="Screenshot QA loop for presentation quality">
+        <div class="viewport-grid">
+          <div class="viewport-card">
+            <strong>1440x900</strong>
+            <div class="viewport-slide">
+              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+            </div>
+          </div>
+          <div class="viewport-card">
+            <strong>1280x800</strong>
+            <div class="viewport-slide">
+              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+            </div>
+          </div>
+          <div class="viewport-card">
+            <strong>900x600</strong>
+            <div class="viewport-slide compact">
+              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+            </div>
+          </div>
+          <div class="viewport-card">
+            <strong>768x1024</strong>
+            <div class="viewport-slide portrait">
+              <div class="viewport-body"><div class="viewport-text"><span></span><span></span><span></span></div><div class="viewport-block"></div></div>
+            </div>
+          </div>
         </div>
-        <div class="release-caption"><span>understand before producing</span><span>define the artifact</span><span>check before delivery</span></div>
+        <div class="qa-loop">
+          <div class="qa-step"><b>1</b><div><strong>Render</strong><span>Capture the deck at real review sizes.</span></div></div>
+          <div class="qa-step"><b>2</b><div><strong>Inspect</strong><span>Find clipping, scroll, overlap, and weak hierarchy.</span></div></div>
+          <div class="qa-step"><b>3</b><div><strong>Revise</strong><span>Fix layout before shrinking text.</span></div></div>
+          <div class="qa-step"><b>4</b><div><strong>Verify</strong><span>Rerender until the screenshots hold.</span></div></div>
+          <div class="qa-proof"><strong>Quality becomes inspectable.</strong><span>The skill gives the agent a visual feedback loop.</span></div>
+        </div>
       </div>
     </section>
 
