@@ -1337,16 +1337,16 @@ body,
   position: relative;
   justify-self: center;
   align-self: center;
-  width: min(1040px, 100%);
-  height: 520px;
+  width: min(990px, 100%);
+  height: 500px;
 }
 
 .axis-frame {
   position: absolute;
-  left: 168px;
-  right: 62px;
-  top: 32px;
-  bottom: 92px;
+  left: 150px;
+  right: 68px;
+  top: 30px;
+  bottom: 74px;
 }
 
 .axis-x,
@@ -1402,26 +1402,26 @@ body,
 }
 
 .axis-label.x-start {
-  left: -8px;
-  bottom: -42px;
+  left: -6px;
+  bottom: -38px;
 }
 
 .axis-label.x-end {
   right: -6px;
-  bottom: -42px;
+  bottom: -38px;
   text-align: right;
 }
 
 .axis-label.y-start {
-  left: -142px;
+  left: -118px;
   bottom: -6px;
   text-align: right;
 }
 
 .axis-label.y-end {
-  left: -162px;
+  left: -128px;
   top: -6px;
-  max-width: 13ch;
+  max-width: 12ch;
   text-align: right;
 }
 
@@ -1434,87 +1434,143 @@ body,
 
 .axis-title.capability {
   right: 4px;
-  bottom: -72px;
+  bottom: -68px;
 }
 
 .axis-title.execution {
-  left: -170px;
+  left: -154px;
   top: 50%;
   transform: rotate(-90deg) translateX(-50%);
   transform-origin: left center;
 }
 
-.axis-gridline {
+.dimension-route {
   position: absolute;
-  background: var(--line);
+  z-index: 1;
 }
 
-.axis-gridline.horizontal {
-  left: 0;
-  right: 0;
-  top: 47%;
-  height: 2px;
+.dimension-route.skill {
+  left: 18px;
+  right: 188px;
+  bottom: 50px;
+  height: 8px;
+  background: var(--amber);
 }
 
-.axis-gridline.vertical {
-  top: 0;
-  bottom: 0;
-  left: 52%;
-  width: 2px;
+.dimension-route.agent {
+  left: 52px;
+  top: 64px;
+  bottom: 18px;
+  width: 8px;
+  background: var(--blue);
 }
 
-.dimension-card {
+.dimension-route.skill::after,
+.dimension-route.agent::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.dimension-route.skill::after {
+  right: -2px;
+  top: -9px;
+  border-top: 13px solid transparent;
+  border-bottom: 13px solid transparent;
+  border-left: 19px solid var(--amber);
+}
+
+.dimension-route.agent::after {
+  left: -9px;
+  top: -2px;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-bottom: 19px solid var(--blue);
+}
+
+.origin-dot {
   position: absolute;
   z-index: 2;
+  left: -17px;
+  bottom: -17px;
+  width: 34px;
+  height: 34px;
   border: 3px solid var(--ink);
+  border-radius: 50%;
   background: var(--surface);
-  padding: 20px 22px;
-  box-shadow: 10px 10px 0 var(--surface-2);
 }
 
-.dimension-card h3 {
-  font-size: 30px;
-  line-height: 0.98;
+.dimension-label {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 16px 18px;
+  box-shadow: 8px 8px 0 var(--surface-2);
+}
+
+.dimension-label span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.dimension-label strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 0.95;
   font-weight: 880;
 }
 
-.dimension-card p {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.22;
-  font-weight: 650;
+.dimension-label.agent {
+  left: 86px;
+  top: 68px;
+  width: 220px;
 }
 
-.dimension-card.agent {
-  left: 88px;
-  top: 46px;
-  width: 286px;
-}
-
-.dimension-card.skill {
-  right: 74px;
-  bottom: 48px;
-  width: 306px;
+.dimension-label.skill {
+  left: 310px;
+  bottom: 88px;
+  width: 190px;
   background: #fff6d9;
 }
 
-.dimension-card.both {
-  right: 92px;
-  top: 62px;
-  width: 246px;
+.both-target {
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  right: 40px;
+  top: 58px;
+  width: 220px;
+  height: 142px;
+  border: 3px solid var(--ink);
   background: #d9e5d6;
+  box-shadow: 8px 8px 0 var(--surface-2);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 20px;
 }
 
-.axis-note {
-  position: absolute;
-  left: 168px;
-  bottom: 8px;
-  max-width: 39ch;
+.both-target span {
   color: var(--muted);
-  font-size: 19px;
-  line-height: 1.22;
-  font-weight: 680;
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.both-target strong {
+  display: block;
+  margin-top: 7px;
+  max-width: 8ch;
+  font-size: 32px;
+  line-height: 0.9;
+  font-weight: 890;
 }
 
 .exploded-package {
@@ -2320,8 +2376,6 @@ body,
       </header>
       <div class="agent-contrast" aria-label="Agents and skills solve different problems">
         <div class="axis-frame">
-          <div class="axis-gridline horizontal"></div>
-          <div class="axis-gridline vertical"></div>
           <div class="axis-x"></div>
           <div class="axis-y"></div>
           <span class="axis-title capability">Reusable capability</span>
@@ -2329,23 +2383,22 @@ body,
           <span class="axis-label x-start">base</span>
           <span class="axis-label x-end">equipped</span>
           <span class="axis-label y-start">same thread</span>
-          <span class="axis-label y-end">isolated / delegated</span>
-          <div class="dimension-card agent">
-            <span class="label">agent</span>
-            <h3>Separate the work.</h3>
-            <p>Isolation, delegation, parallelism.</p>
+          <span class="axis-label y-end">separate context</span>
+          <div class="dimension-route skill"></div>
+          <div class="dimension-route agent"></div>
+          <div class="origin-dot" aria-hidden="true"></div>
+          <div class="dimension-label agent">
+            <span>agent</span>
+            <strong>Separate context</strong>
           </div>
-          <div class="dimension-card skill">
-            <span class="label">skill</span>
-            <h3>Equip the agent.</h3>
-            <p>Workflow, tools, examples, checks.</p>
+          <div class="dimension-label skill">
+            <span>skill</span>
+            <strong>Equip capability</strong>
           </div>
-          <div class="dimension-card both">
-            <span class="label">both</span>
-            <h3>Use both when needed.</h3>
+          <div class="both-target">
+            <div><span>both</span><strong>Use both</strong></div>
           </div>
         </div>
-        <p class="axis-note">Agents and skills can work together, but they solve different problems.</p>
       </div>
     </section>
 
