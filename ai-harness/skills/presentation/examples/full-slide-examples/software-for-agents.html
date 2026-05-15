@@ -166,37 +166,43 @@ body,
 .skill-equip-scene {
   position: relative;
   height: 560px;
+  display: grid;
+  place-items: center;
 }
 
 .skill-folder {
-  position: absolute;
-  z-index: 1;
-  left: 18px;
-  top: 58px;
-  width: 386px;
-  height: 292px;
-  border: 3px solid var(--ink);
-  background: #fff6d9;
-  box-shadow: 16px 16px 0 var(--surface-2);
-  transform: rotate(-2deg);
+  position: relative;
+  width: 548px;
+  height: 390px;
+  filter: drop-shadow(16px 16px 0 var(--surface-2));
 }
 
 .skill-folder::before {
   content: "";
   position: absolute;
-  left: -3px;
-  top: -45px;
-  width: 172px;
-  height: 45px;
+  inset: 0;
   border: 3px solid var(--ink);
-  border-bottom: 0;
-  background: #fff6d9;
+  background: #cfe3ea;
+  clip-path: polygon(0 20%, 14% 20%, 22% 0, 44% 0, 52% 20%, 100% 20%, 100% 100%, 0 100%);
+}
+
+.skill-folder::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 238px;
+  border: 3px solid var(--ink);
+  background: #dcecf1;
+  clip-path: polygon(0 11%, 100% 0, 100% 100%, 0 100%);
 }
 
 .folder-label {
   position: absolute;
-  left: 28px;
-  top: 26px;
+  z-index: 2;
+  left: 54px;
+  top: 94px;
   display: grid;
   gap: 6px;
 }
@@ -214,55 +220,17 @@ body,
   text-transform: uppercase;
 }
 
-.folder-file {
-  position: absolute;
-  width: 168px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 13px 15px;
-  color: var(--ink);
-  font-size: 17px;
-  font-weight: 850;
-  box-shadow: 6px 6px 0 rgba(17, 20, 24, 0.08);
-}
-
-.folder-file small {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.folder-file.instructions {
-  left: 30px;
-  bottom: 82px;
-}
-
-.folder-file.tools {
-  right: 30px;
-  bottom: 98px;
-  background: #d6e4e8;
-}
-
-.folder-file.examples {
-  left: 82px;
-  bottom: 28px;
-  background: #d9e5d6;
-}
-
 .terminal-agent {
   position: absolute;
   z-index: 3;
-  right: 6px;
-  bottom: 50px;
-  width: 330px;
-  height: 222px;
+  left: 74px;
+  top: 188px;
+  width: 398px;
+  height: 168px;
   border: 3px solid var(--ink);
   background: var(--ink);
   color: var(--surface);
-  box-shadow: 14px 14px 0 var(--surface-2);
+  box-shadow: 9px 9px 0 rgba(17, 20, 24, 0.13);
 }
 
 .terminal-bar {
@@ -288,9 +256,9 @@ body,
 }
 
 .terminal-screen {
-  padding: 23px 24px;
+  padding: 20px 24px;
   font-family: var(--mono);
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.45;
 }
 
@@ -304,45 +272,6 @@ body,
 
 .terminal-screen .ready {
   color: #d9e5d6;
-}
-
-.equip-cable {
-  position: absolute;
-  z-index: 4;
-  left: 382px;
-  top: 336px;
-  width: 124px;
-  height: 7px;
-  background: var(--amber);
-  transform: rotate(13deg);
-  transform-origin: left center;
-}
-
-.equip-cable::after {
-  content: "";
-  position: absolute;
-  right: -15px;
-  top: -8px;
-  width: 0;
-  height: 0;
-  border-top: 12px solid transparent;
-  border-bottom: 12px solid transparent;
-  border-left: 18px solid var(--amber);
-}
-
-.equip-label {
-  position: absolute;
-  z-index: 5;
-  left: 420px;
-  top: 258px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 7px 11px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 860;
-  text-transform: uppercase;
-  transform: rotate(5deg);
 }
 
 .agenda-slide {
@@ -2320,18 +2249,13 @@ body,
       <div class="skill-equip-scene" aria-label="Skill package equipping an agent terminal">
         <div class="skill-folder">
           <div class="folder-label"><strong>Skill package</strong><span>capability as software</span></div>
-          <div class="folder-file instructions">SKILL.md<small>instructions</small></div>
-          <div class="folder-file tools">tools/cli<small>execution</small></div>
-          <div class="folder-file examples">examples<small>taste</small></div>
-        </div>
-        <div class="equip-cable"></div>
-        <div class="equip-label">equips</div>
-        <div class="terminal-agent">
-          <div class="terminal-bar"><span class="terminal-dot"></span>Agent terminal</div>
-          <div class="terminal-screen">
-            <span class="prompt">$ load skill</span>
-            <span>skill package/</span>
-            <span class="ready">capability ready</span>
+          <div class="terminal-agent">
+            <div class="terminal-bar"><span class="terminal-dot"></span>Agent terminal</div>
+            <div class="terminal-screen">
+              <span class="prompt">$ load skill</span>
+              <span>skill package/</span>
+              <span class="ready">capability ready</span>
+            </div>
           </div>
         </div>
       </div>
