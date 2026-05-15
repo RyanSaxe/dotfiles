@@ -15,8 +15,7 @@ presentation/
 ├── tools/
 │   └── deck_qa.py
 ├── templates/
-│   ├── deck.html.template
-│   └── theme.css
+│   └── deck.html.template
 ├── references/
 │   ├── layouts.md
 │   ├── planning-example.md
@@ -37,9 +36,22 @@ presentation/
 - `examples/single-slide-examples/gallery.html` is for human review and fast visual scanning.
 - The individual HTML files in `examples/single-slide-examples/` are inspiration for slide concepts, visual relationships, spacing, and hierarchy.
 - `examples/full-slide-examples/` is reserved for complete end-to-end example decks as single HTML files.
-- Do not treat the examples as templates, a taxonomy, or a component library. Open a relevant example to study why it works, then design the user's slide from the user's content.
+- Do not treat example content, diagrams, or visual subjects as templates, a taxonomy, or a component library. Open relevant examples to study why they work, then design the user's slide from the user's content.
 - End-to-end example decks should be single HTML files under `examples/full-slide-examples/` unless assets are truly required.
-- Before coding a V1, inspect at least one full example deck when available and either the single-slide gallery or 3-5 relevant single-slide examples. Use them to calibrate density, hierarchy, visual range, slide text density, and pre-read balance. Do not copy their structures unless the user's content relationship calls for it.
+- Before coding a V1, inspect at least one full example deck when available and either the single-slide gallery or 3-5 relevant single-slide examples. Use them to calibrate density, hierarchy, visual range, slide text density, and pre-read balance. The example content and one-off diagrams are inspiration only.
+
+## Default Deck System
+
+The default deck system is not example inspiration. It is the starting structure and look-and-feel for decks made with this skill unless the user asks for a different system or there is a strong reason to ask for approval to deviate.
+
+- Use the self-contained `templates/deck.html.template` as the canonical starter. It includes the base CSS, Reveal.js setup, required chrome, and commented optional chart CDN.
+- Keep the deck full-screen in Reveal.js with native navigation arrows, progress bar, bottom-left slide numbers, fixed 1280x800 artboard, `margin: 0`, and `center: false`.
+- Keep title, agenda, section separator, and final slides in the established left/right composition by default.
+- Keep content slides in the established top-title composition by default, with the slide body below.
+- Keep the agenda slide as the specific stable orientation slide: left title, right numbered agenda path, no subtitle by default.
+- Preserve the default voice: concise executive claims, low slide-text density, direct labels, and nuance left for speaker notes unless the room needs it on-slide.
+- Content-slide visuals have broad freedom. Design charts, diagrams, screenshots, tables, code, images, or spatial compositions around the user's actual message rather than choosing from example slides.
+- Change the deck system only when the user explicitly asks, a supplied brand or prior deck requires it, or the content cannot be explained well inside the system. If the reason is not obvious from the user's request, ask before changing it.
 
 ## Alignment
 
@@ -86,13 +98,13 @@ End by asking what should change, or whether to build the V1 from the outline. W
 ## Build Workflow
 
 1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission to outline, outline the deck, get permission for a V1, draft, self-review, and iterate.
-2. Before coding V1, run the example calibration pass described above. For full decks, read `references/planning-example.md` if the count, agenda, separator, or slide plan shape is not already crisp.
+2. Before coding V1, run the example calibration pass described above. Use examples to calibrate craft, not to select slide types or reuse example content.
 3. Pick a working directory under `/tmp/<deck-slug>/`.
 4. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
-5. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.
+5. Start from the inline CSS and script already in the HTML template. Preserve the default deck system unless the user has approved a different system.
 6. Delete placeholder slide content before delivery.
 7. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
-8. Link optional libraries by CDN when they improve the result, such as Reveal.js, syntax highlighting, charts, math rendering, icon sets, or diagram tools.
+8. Link optional libraries by CDN when they improve the result, such as syntax highlighting, charts, math rendering, icon sets, or diagram tools. Reveal.js is already in the template.
 9. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, `references/visuals.md`, and relevant examples to review quality before showing the user.
 
 ## Deck Structure
@@ -109,8 +121,8 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 - Agenda items should be real chunks, not labels for one-slide sections. During alignment, choose agenda items that can each support at least two content slides; if a section is too thin, merge it before drafting.
 - Use separators as transitions, not content slides. Include a short section label and, when helpful, a minimal subtitle there rather than repeating explanatory subtitles on content slides.
 - Choose the final slide intentionally: summary, conclusion, decision, Q&A, or next steps.
-- Content slides should generally place the title across the top with the content below.
-- Title, agenda, separator, summary, conclusion, and Q&A slides may use centered or left-weighted layouts because they carry less body information.
+- Content slides should place the title across the top with the content below unless the user has approved a different deck system.
+- Title, agenda, separator, and final slides should use the default left/right compositions in the HTML template unless the user has approved a different deck system.
 - Content-slide titles should aim to fit on one line at a 1200px-wide viewport. Shorten the claim before shrinking type.
 - Do not add a subtitle to a content slide by default. Add one only when the audience needs it to understand the slide's frame; otherwise let the title and visual do the work.
 - Write high-emphasis text to render on one line inside its container: titles, section labels, KPI values, outcome statements, callout headers, and other bold scan targets should be concise enough to understand without a line break.
@@ -127,7 +139,7 @@ Every deck should be scan-ready, even if the audience is technical.
 - For standard quantitative charts in HTML decks, prefer Chart.js by CDN over hand-rolled SVG/CSS/canvas chart geometry. Use D3, Observable Plot, or custom code only when the chart needs a relationship Chart.js cannot express cleanly.
 - Use proven libraries, renderers, syntax highlighters, charting tools, and icon sets when they materially improve the slide.
 - Avoid defaulting to three cards, repeated panels, or generic process arrows.
-- Do not over-copy structures from examples. Examples calibrate taste, spacing, hierarchy, and craft; they are not components to reuse until every deck looks the same.
+- Do not over-copy example content or one-off diagrams. Examples calibrate taste, spacing, hierarchy, and craft; the default deck system supplies the shared skeleton.
 - Keep a consistent visual system inside one deck, but let different decks look genuinely different.
 - Make section breaks feel like transitions, not content slides.
 - Use appendix/detail slides for proof that would crowd the main story.
@@ -178,6 +190,7 @@ For every review viewport, verify:
 - content mass that is visually top-heavy, corner-heavy, or awkwardly uncentered
 - dense blocks that are hard to scan
 - repeated layouts that make the deck feel samey
+- default deck system fit: title, agenda, separator, final, content-frame, Reveal controls, progress bar, bottom-left slide numbers, and full-screen behavior
 - visual story/message fit: whether the visual relationship actually expresses the slide's claim
 - diagrams, charts, or images with unclear emphasis
 - footer, metadata, or slide-count mistakes when the deck uses repeated chrome
@@ -191,8 +204,9 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 ## Output Contract
 
 - Deliver one file named `<presentation-name>.html` unless the user asks for an asset folder.
+- Use real Reveal.js by default. Do not replace it with a custom slide framework unless the user explicitly requests no external dependencies or a non-Reveal runtime.
 - The file may link Reveal.js and optional libraries by CDN, but deck CSS should be inline.
-- Default Reveal initialization: `width: 1280`, `height: 800`, `margin: 0`, and `center: false`.
+- Default Reveal initialization: `width: 1280`, `height: 800`, `margin: 0`, `center: false`, `slideNumber: "c/t"`, and `showSlideNumber: "all"`.
 - The deck must be usable by opening the HTML directly in a browser.
 - Repeated footers or metadata are optional. If used, keep deck-level labels stable and use slide content for section markers.
 
@@ -208,5 +222,4 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 - `references/taste.md` - visual taste rules and hierarchy guidance.
 - `references/layouts.md` - guidance for designing visual relationships without becoming template-bound.
 - `references/visuals.md` - meaning-first visual guidance and anti-patterns.
-- `templates/theme.css` - sparse foundation CSS to inline and adapt.
-- `templates/deck.html.template` - single-file HTML skeleton.
+- `templates/deck.html.template` - canonical single-file HTML starter with inline CSS, Reveal.js setup, and default deck system.

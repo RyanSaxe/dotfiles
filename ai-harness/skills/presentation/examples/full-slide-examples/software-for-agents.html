@@ -2930,6 +2930,24 @@
         color: var(--ink);
         opacity: 0.42;
       }
+
+      .reveal .slide-number {
+        left: 26px;
+        right: auto;
+        bottom: 18px;
+        padding: 0;
+        background: transparent;
+        color: rgba(17, 20, 24, 0.48);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      .reveal .slide-number a {
+        color: inherit;
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
@@ -3680,6 +3698,8 @@
         transition: "fade",
         controls: true,
         progress: true,
+        slideNumber: "c/t",
+        showSlideNumber: "all",
         center: false,
         width: 1280,
         height: 800,

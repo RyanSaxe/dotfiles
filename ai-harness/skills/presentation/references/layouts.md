@@ -30,4 +30,4 @@ This list is not a taxonomy. It is a way to avoid designing from generic contain
 
 ## Template CSS
 
-`templates/theme.css` is deliberately sparse. It establishes the fixed artboard, typography, background, and a few layout primitives. It is not a component library and should not decide the deck's visual system.
+`templates/deck.html.template` contains the canonical inline CSS for the default deck system. Keep the base CSS in that single copied HTML starter so it cannot drift from a separate source file.

@@ -6,9 +6,514 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
-<!-- Add optional CDN styles here when the deck benefits from them. -->
 <style>
-{{INLINE_THEME_CSS}}
+/* Presentation skill default deck system.
+ * Keep this CSS inline so the copied starter is a single browser-openable file.
+ * Change the deck system only when the user asks or the content clearly requires it.
+ */
+
+:root {
+  color-scheme: light;
+  --r-background-color: #f7f5ef;
+  --r-heading-text-transform: none;
+  --r-heading-letter-spacing: 0;
+  --r-heading-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
+  --r-main-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
+
+  --bg: #f7f5ef;
+  --surface: #fffdf8;
+  --surface-2: #eeebe3;
+  --ink: #111418;
+  --muted: #60666b;
+  --line: #d7d2c8;
+  --blue: #2f6f89;
+  --green: #4f8061;
+  --amber: #e9b949;
+  --red: #d75f46;
+  --terminal-bg: #111820;
+  --terminal-fg: #d7f3ed;
+  --terminal-muted: #91aaa6;
+  --terminal-accent: #f4c84e;
+  --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --pad-x: 64px;
+  --pad-y: 56px;
+}
+
+html,
+body,
+.reveal {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+}
+
+.reveal {
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.reveal .slides {
+  text-align: left;
+}
+
+.reveal .slides > section,
+.reveal .slides > section > section,
+.reveal .slides > section.present,
+.reveal .slides > section > section.present {
+  width: 100% !important;
+  height: 800px !important;
+  padding: var(--pad-y) var(--pad-x) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  background: var(--bg);
+  text-align: left !important;
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal p {
+  margin: 0;
+  color: inherit;
+  font-family: var(--font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.reveal strong {
+  font-weight: 870;
+}
+
+.accent-line {
+  width: 74px;
+  height: 8px;
+  background: var(--amber);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.pill {
+  width: max-content;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 760;
+}
+
+.traffic-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.traffic-dots span {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.traffic-dots span:nth-child(1) {
+  background: #c88478;
+}
+
+.traffic-dots span:nth-child(2) {
+  background: #d9b766;
+}
+
+.traffic-dots span:nth-child(3) {
+  background: #8da989;
+}
+
+.panel,
+.figure {
+  min-height: 0;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.panel {
+  padding: 26px;
+}
+
+.figure {
+  display: grid;
+  place-items: center;
+}
+
+.title-slide {
+  display: grid !important;
+  grid-template-columns: 0.88fr 1.12fr;
+  gap: 54px;
+  align-items: center;
+}
+
+.title-copy {
+  display: grid;
+  gap: 24px;
+}
+
+.title-copy h1 {
+  max-width: 8.5ch;
+  font-size: 96px;
+  line-height: 0.91;
+  font-weight: 900;
+}
+
+.title-copy p {
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 25px;
+  line-height: 1.24;
+  font-weight: 620;
+}
+
+.title-visual-slot {
+  min-height: 548px;
+  display: grid;
+  align-content: stretch;
+}
+
+.title-visual-frame,
+.section-art-slot,
+.final-art-slot {
+  min-height: 100%;
+  border: 2px solid var(--ink);
+  background:
+    linear-gradient(135deg, rgba(47, 111, 137, 0.13), transparent 48%),
+    linear-gradient(315deg, rgba(233, 185, 73, 0.22), transparent 46%),
+    var(--surface);
+}
+
+.agenda-slide {
+  display: grid !important;
+  grid-template-columns: 0.84fr 1.16fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.agenda-title h1 {
+  max-width: 9ch;
+  font-size: 94px;
+  line-height: 0.92;
+  font-weight: 900;
+}
+
+.agenda-path {
+  position: relative;
+  display: grid;
+  gap: 20px;
+}
+
+.agenda-path::before {
+  content: "";
+  position: absolute;
+  top: 66px;
+  bottom: 66px;
+  left: 19px;
+  width: 2px;
+  background: var(--line);
+}
+
+.agenda-count-2 {
+  grid-template-rows: repeat(2, 1fr);
+}
+
+.agenda-count-3 {
+  grid-template-rows: repeat(3, 1fr);
+}
+
+.agenda-count-4 {
+  grid-template-rows: repeat(4, 1fr);
+}
+
+.agenda-count-5 {
+  grid-template-rows: repeat(5, 1fr);
+}
+
+.agenda-item {
+  position: relative;
+  z-index: 1;
+  min-height: 132px;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.agenda-num {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 860;
+}
+
+.agenda-item.is-active .agenda-num {
+  background: var(--amber);
+}
+
+.agenda-item h2 {
+  max-width: 18ch;
+  font-size: 40px;
+  line-height: 1.02;
+  font-weight: 870;
+}
+
+.section-slide {
+  display: grid !important;
+  grid-template-columns: 0.88fr 1.12fr;
+  gap: 70px;
+  align-items: center;
+}
+
+.section-copy {
+  display: grid;
+  gap: 22px;
+}
+
+.section-number {
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 820;
+}
+
+.section-copy h2 {
+  max-width: 9ch;
+  font-size: 104px;
+  line-height: 0.92;
+  font-weight: 900;
+}
+
+.section-copy p {
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1.24;
+  font-weight: 620;
+}
+
+.section-art {
+  min-height: 548px;
+  display: grid;
+  align-content: stretch;
+}
+
+.content-slide {
+  display: grid !important;
+  grid-template-rows: auto 1fr;
+  gap: 36px;
+}
+
+.slide-title {
+  display: grid;
+  gap: 10px;
+}
+
+.slide-title h2 {
+  max-width: 100%;
+  font-size: 52px;
+  line-height: 1;
+  font-weight: 870;
+}
+
+.slide-title p {
+  max-width: 44ch;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 620;
+}
+
+.slide-body {
+  min-height: 0;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+}
+
+.slide-body.top {
+  align-content: start;
+}
+
+.slide-body.fill {
+  align-content: stretch;
+}
+
+.chart-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 18px;
+  padding: 24px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.chart-panel h3 {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 840;
+}
+
+.chart-wrap {
+  position: relative;
+  min-height: 0;
+}
+
+.code-surface,
+.terminal {
+  padding: 24px;
+  border: 2px solid var(--ink);
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+  font-family: var(--mono);
+}
+
+.reveal pre {
+  width: 100%;
+  margin: 0;
+  box-shadow: none;
+}
+
+.reveal pre code,
+.code-surface code,
+.code-surface pre,
+.terminal code,
+.terminal pre {
+  display: block;
+  max-height: none;
+  overflow: auto;
+  background: transparent;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.final-slide {
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.final-copy {
+  display: grid;
+  gap: 22px;
+}
+
+.final-copy h2 {
+  max-width: 8ch;
+  font-size: 118px;
+  line-height: 0.88;
+  font-weight: 900;
+}
+
+.final-copy p {
+  max-width: 32ch;
+  color: var(--muted);
+  font-size: 25px;
+  line-height: 1.24;
+  font-weight: 620;
+}
+
+.qna-terminal {
+  min-height: 530px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border: 2px solid var(--ink);
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+}
+
+.qna-titlebar {
+  height: 42px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.qna-titlebar span:last-child {
+  color: var(--terminal-muted);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.qna-body {
+  padding: 34px;
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  font-family: var(--mono);
+}
+
+.qna-line {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 12px;
+  align-items: start;
+  color: var(--terminal-fg);
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.qna-line .prompt {
+  color: var(--terminal-accent);
+  font-weight: 900;
+}
+
+.qna-line.muted-line {
+  color: var(--terminal-muted);
+  font-size: 16px;
+}
+
+.reveal .progress {
+  height: 3px;
+  color: var(--amber);
+  background: rgba(17, 20, 24, 0.08);
+}
+
+.reveal .controls {
+  color: var(--ink);
+  opacity: 0.42;
+}
+
+.reveal .slide-number {
+  left: 26px;
+  right: auto;
+  bottom: 18px;
+  padding: 0;
+  background: transparent;
+  color: rgba(17, 20, 24, 0.48);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.reveal .slide-number a {
+  color: inherit;
+  text-decoration: none;
+}
 </style>
 </head>
 <body>
@@ -16,20 +521,78 @@
 <div class="reveal">
   <div class="slides">
 
-    <!-- Replace these starter slides with the deck designed for the user's room. -->
+    <!-- Keep this left/right title frame unless the user approves a different deck system. -->
     <section class="title-slide">
       <div class="title-copy">
         <h1>{{DECK_TITLE}}</h1>
         <p>{{ONE_LINE_THESIS}}</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="title-visual-slot" aria-label="{{TITLE_VISUAL_ARIA}}">
+        <div class="title-visual-frame"></div>
       </div>
     </section>
 
+    <!-- Stable agenda slide: left title, right numbered path, no subtitle by default. -->
+    <section class="agenda-slide">
+      <div class="agenda-title">
+        <h1>Agenda</h1>
+      </div>
+      <div class="agenda-path agenda-count-3">
+        <div class="agenda-item is-active">
+          <div class="agenda-num">1</div>
+          <h2>{{AGENDA_ITEM_1}}</h2>
+        </div>
+        <div class="agenda-item">
+          <div class="agenda-num">2</div>
+          <h2>{{AGENDA_ITEM_2}}</h2>
+        </div>
+        <div class="agenda-item">
+          <div class="agenda-num">3</div>
+          <h2>{{AGENDA_ITEM_3}}</h2>
+        </div>
+      </div>
+    </section>
+
+    <!-- Use one separator at the start of each agenda section. -->
+    <section class="section-slide">
+      <div class="section-copy">
+        <div class="section-number">01</div>
+        <h2>{{SECTION_TITLE}}</h2>
+        <p>{{SECTION_PROMISE}}</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="section-art" aria-label="{{SECTION_VISUAL_ARIA}}">
+        <div class="section-art-slot"></div>
+      </div>
+    </section>
+
+    <!-- Content slides keep title on top and custom visual/content below. -->
     <section class="content-slide">
       <header class="slide-title">
         <h2>{{SLIDE_TITLE}}</h2>
       </header>
       <div class="slide-body">
-        <!-- Compose this slide around the user's claim and the visual relationship that explains it fastest. -->
+        <!-- Compose the slide around the user's claim and the visual relationship that explains it fastest. -->
+      </div>
+    </section>
+
+    <!-- Keep this left/right closing frame unless the user's requested ending needs a different system. -->
+    <section class="final-slide">
+      <div class="final-copy">
+        <h2>{{FINAL_TITLE}}</h2>
+        <p>{{FINAL_MESSAGE}}</p>
+        <div class="accent-line"></div>
+      </div>
+      <div class="qna-terminal" aria-label="{{FINAL_VISUAL_ARIA}}">
+        <div class="qna-titlebar">
+          <div class="traffic-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span>{{FINAL_TERMINAL_LABEL}}</span>
+        </div>
+        <div class="qna-body">
+          <div class="qna-line muted-line"><span class="prompt">$</span><span>{{FINAL_CONTEXT_LINE}}</span></div>
+          <div class="qna-line"><span class="prompt">&gt;</span><span>{{FINAL_PROMPT}}</span></div>
+        </div>
       </div>
     </section>
 
@@ -37,6 +600,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<!-- Standard charts: uncomment when using Chart.js.
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+-->
 <!-- Add optional CDN scripts here when the deck benefits from them. -->
 <script>
   Reveal.initialize({
@@ -44,6 +610,8 @@
     transition: "fade",
     controls: true,
     progress: true,
+    slideNumber: "c/t",
+    showSlideNumber: "all",
     center: false,
     width: 1280,
     height: 800,
@@ -51,7 +619,15 @@
     minScale: 0.2,
     maxScale: 2.0
   });
-  // Initialize optional libraries here only when the deck uses them.
+
+  if (window.Chart) {
+    const rootStyle = getComputedStyle(document.documentElement);
+    Chart.defaults.animation = false;
+    Chart.defaults.color = rootStyle.getPropertyValue("--ink").trim();
+    Chart.defaults.font.family = rootStyle.getPropertyValue("--font").trim();
+    Chart.defaults.plugins.legend.labels.boxWidth = 10;
+    Chart.defaults.plugins.legend.labels.boxHeight = 10;
+  }
 </script>
 </body>
 </html>
