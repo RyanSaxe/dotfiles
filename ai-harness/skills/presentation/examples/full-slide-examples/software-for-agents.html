@@ -458,71 +458,100 @@
         width: 58%;
       }
 
-      .prompt-vs-skill {
+      .reuse-gap {
         display: grid;
-        grid-template-columns: 0.9fr 1.1fr;
-        gap: 40px;
+        grid-template-columns: 1fr 0.76fr;
+        gap: 56px;
         align-items: center;
       }
 
-      .thin-prompt {
-        position: relative;
-        min-height: 392px;
-        border-left: 4px solid var(--ink);
-        padding-left: 34px;
+      .reuse-patterns {
         display: grid;
-        align-content: center;
-        gap: 26px;
+        gap: 20px;
       }
 
-      .thin-prompt h3 {
-        font-size: 58px;
+      .reuse-pattern {
+        min-height: 116px;
+        border-top: 3px solid var(--ink);
+        padding-top: 20px;
+        display: grid;
+        grid-template-columns: 54px 1fr 164px;
+        gap: 22px;
+        align-items: center;
+      }
+
+      .reuse-pattern:nth-child(2) {
+        border-color: var(--amber);
+      }
+
+      .reuse-pattern:nth-child(3) {
+        border-color: var(--blue);
+      }
+
+      .reuse-pattern b {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 15px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .reuse-pattern h3 {
+        font-size: 35px;
+        line-height: 0.96;
+        font-weight: 880;
+      }
+
+      .reuse-pattern p {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.2;
+        font-weight: 650;
+      }
+
+      .reuse-gap-label {
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 12px 14px;
+        font-size: 13px;
+        line-height: 1.08;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .reuse-gap-label span {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .reuse-gap-note {
+        border-left: 8px solid var(--ink);
+        padding-left: 30px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .reuse-gap-note h3 {
+        font-size: 56px;
         line-height: 0.94;
         font-weight: 890;
       }
 
-      .thin-prompt p {
-        max-width: 28ch;
+      .reuse-gap-note p {
+        max-width: 25ch;
         color: var(--muted);
-        font-size: 21px;
-        line-height: 1.25;
+        font-size: 20px;
+        line-height: 1.24;
         font-weight: 650;
       }
 
-      .operating-surface {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 150px 150px 86px;
-        gap: 18px;
+      .reuse-gap-note .accent-line {
+        margin-top: 4px;
       }
 
-      .surface-piece {
-        border: 2px solid var(--ink);
-        background: var(--surface);
-        padding: 20px;
-        display: grid;
-        align-content: center;
-        gap: 8px;
-      }
-
-      .surface-piece.wide {
-        grid-column: 1 / -1;
-        grid-template-columns: 170px 1fr;
-        align-items: center;
-        background: #d9e5d6;
-      }
-
-      .surface-piece strong {
-        font-size: 28px;
-        line-height: 1;
-      }
-
-      .surface-piece span {
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 830;
-        text-transform: uppercase;
-      }
 
       .anatomy-art {
         height: 460px;
@@ -1480,15 +1509,15 @@
         justify-self: center;
         align-self: center;
         width: min(1040px, 100%);
-        height: 500px;
+        height: 488px;
       }
 
       .axis-frame {
         position: absolute;
-        left: 140px;
-        right: 92px;
-        top: 48px;
-        bottom: 86px;
+        left: 122px;
+        right: 88px;
+        top: 38px;
+        bottom: 82px;
       }
 
       .axis-x,
@@ -1545,14 +1574,14 @@
       }
 
       .axis-title.capability {
-        left: calc(52% + 1px);
+        left: 50%;
         bottom: -54px;
         transform: translateX(-50%);
       }
 
       .axis-title.execution {
         left: -42px;
-        top: 44.3%;
+        top: 50%;
         transform: rotate(-90deg) translateX(-50%);
         transform-origin: left center;
       }
@@ -1566,14 +1595,14 @@
       .axis-gridline.horizontal {
         left: 0;
         right: 0;
-        top: 47%;
+        top: 50%;
         height: 2px;
       }
 
       .axis-gridline.vertical {
         top: 0;
         bottom: 0;
-        left: 52%;
+        left: 50%;
         width: 2px;
       }
 
@@ -1587,7 +1616,7 @@
         left: 28px;
         top: 16px;
         bottom: 20px;
-        width: 238px;
+        width: 246px;
         background: linear-gradient(
           90deg,
           rgba(47, 111, 137, 0.14),
@@ -1597,7 +1626,7 @@
 
       .axis-wash.capability {
         left: 20px;
-        right: 132px;
+        right: 96px;
         bottom: 24px;
         height: 132px;
         background: linear-gradient(
@@ -1607,43 +1636,43 @@
         );
       }
 
-      .dimension-card {
+      .quadrant-point {
         position: absolute;
         z-index: 4;
         box-sizing: border-box;
-        border: 3px solid var(--ink);
+        border: 2px solid var(--ink);
         background: var(--surface);
-        padding: 13px 16px 15px;
+        padding: 12px 16px;
+        color: var(--ink);
+        font-size: 27px;
+        line-height: 1;
+        font-weight: 880;
         box-shadow: 7px 7px 0 var(--surface-2);
       }
 
-      .dimension-card span {
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 850;
-        text-transform: uppercase;
+      .quadrant-point.templates {
+        left: 68px;
+        bottom: 56px;
       }
 
-      .dimension-card strong {
-        display: block;
-        margin-top: 4px;
-        color: var(--ink);
-        font-size: 32px;
-        line-height: 0.92;
-        font-weight: 890;
-      }
-
-      .dimension-card.agent {
-        left: 116px;
-        top: 82px;
-        width: 188px;
-      }
-
-      .dimension-card.skill {
-        right: 210px;
-        bottom: 102px;
-        width: 170px;
+      .quadrant-point.few-shot {
+        left: calc(50% + 74px);
+        bottom: 56px;
         background: #fff6d9;
+      }
+
+      .quadrant-point.agents {
+        left: 80px;
+        top: 72px;
+        background: #d6e4e8;
+      }
+
+      .quadrant-point.skills {
+        left: calc(50% + 92px);
+        top: 64px;
+        border-width: 3px;
+        background: #fff6d9;
+        box-shadow: 11px 11px 0 var(--surface-2);
       }
 
       .screenshot-qa {
@@ -2150,77 +2179,152 @@
         gap: 10px;
       }
 
-      .local-output {
+      .capability-local {
         display: grid;
-        grid-template-columns: 0.86fr 1.14fr;
-        gap: 46px;
+        grid-template-columns: 0.94fr 1.06fr;
+        gap: 52px;
         align-items: center;
       }
 
-      .shared-signal {
-        border-left: 8px solid var(--ink);
-        padding-left: 30px;
+      .capability-layers {
         display: grid;
-        gap: 18px;
-      }
-
-      .shared-signal h3 {
-        font-size: 62px;
-        line-height: 0.92;
-        font-weight: 890;
-      }
-
-      .shared-signal p {
-        color: var(--muted);
-        font-size: 21px;
-        line-height: 1.25;
-        font-weight: 650;
-      }
-
-      .output-spectrum {
-        height: 430px;
-        display: grid;
-        grid-template-rows: repeat(4, 1fr);
         gap: 22px;
-        align-content: center;
       }
 
-      .spectrum-row {
+      .capability-layer {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        min-height: 158px;
+        padding: 24px 26px;
         display: grid;
-        grid-template-columns: 120px 1fr;
-        gap: 24px;
-        align-items: center;
+        align-content: center;
+        gap: 18px;
+        box-shadow: 10px 10px 0 var(--surface-2);
       }
 
-      .spectrum-row span {
+      .capability-layer.local {
+        background: #dcecf1;
+      }
+
+      .layer-label {
         color: var(--muted);
         font-size: 13px;
-        font-weight: 840;
+        font-weight: 850;
         text-transform: uppercase;
       }
 
-      .spectrum-row strong {
-        font-size: 34px;
-        line-height: 1;
+      .layer-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
       }
 
-      .spectrum-line {
+      .layer-items span {
+        border-top: 3px solid var(--ink);
+        padding-top: 8px;
+        min-width: 116px;
+        font-size: 24px;
+        line-height: 1;
+        font-weight: 860;
+      }
+
+      .capability-layer.local .layer-items span:nth-child(2),
+      .capability-layer.shared .layer-items span:nth-child(2) {
+        border-color: var(--blue);
+      }
+
+      .capability-layer.local .layer-items span:nth-child(3),
+      .capability-layer.shared .layer-items span:nth-child(3) {
+        border-color: var(--amber);
+      }
+
+      .capability-layer.local .layer-items span:nth-child(4),
+      .capability-layer.shared .layer-items span:nth-child(4) {
+        border-color: var(--green);
+      }
+
+      .layer-note {
+        margin-top: -4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .work-products {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+      }
+
+      .work-product {
+        min-height: 194px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 18px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 16px;
+        box-shadow: 8px 8px 0 var(--surface-2);
+      }
+
+      .work-product:nth-child(2) {
+        background: #d6e4e8;
+      }
+
+      .work-product:nth-child(3) {
+        background: #fff6d9;
+      }
+
+      .work-product:nth-child(4) {
+        background: #d9e5d6;
+      }
+
+      .work-product strong {
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 880;
+      }
+
+      .product-lines {
+        display: grid;
+        align-content: end;
+        gap: 9px;
+      }
+
+      .product-lines span {
         height: 8px;
         background: var(--ink);
       }
 
-      .spectrum-row:nth-child(2) .spectrum-line {
-        width: 78%;
+      .product-lines span:nth-child(2) {
+        width: 76%;
+        background: rgba(17, 20, 24, 0.22);
+      }
+
+      .product-lines span:nth-child(3) {
+        width: 54%;
+        background: rgba(17, 20, 24, 0.22);
+      }
+
+      .work-product.pr .product-lines {
+        grid-template-columns: 1fr 1fr;
+        align-content: stretch;
+      }
+
+      .work-product.pr .product-lines span {
+        height: auto;
+        min-height: 44px;
+      }
+
+      .work-product.deck .product-lines span:first-child {
         background: var(--blue);
       }
 
-      .spectrum-row:nth-child(3) .spectrum-line {
-        width: 66%;
+      .work-product.email .product-lines span:first-child {
         background: var(--amber);
       }
 
-      .spectrum-row:nth-child(4) .spectrum-line {
-        width: 86%;
+      .work-product.report .product-lines span:first-child {
         background: var(--green);
       }
 
@@ -2406,49 +2510,57 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Text alone cannot carry the work</h2>
+            <h2>Reusable prompts leave a gap</h2>
           </header>
-          <div class="prompt-vs-skill">
-            <div class="thin-prompt">
-              <h3>A prompt only says what to do.</h3>
-              <p>
-                But the next run still has to reconstruct tools, examples,
-                checks, and taste from language.
-              </p>
+          <div class="reuse-gap" aria-label="Reusable prompt patterns and gaps">
+            <div class="reuse-patterns">
+              <div class="reuse-pattern">
+                <b>01</b>
+                <div>
+                  <h3>Prompt templates</h3>
+                  <p>Repeat a known action without retyping.</p>
+                </div>
+                <div class="reuse-gap-label"><span>gap</span>wording only</div>
+              </div>
+              <div class="reuse-pattern">
+                <b>02</b>
+                <div>
+                  <h3>Few-shot prompts</h3>
+                  <p>Show examples of the desired behavior.</p>
+                </div>
+                <div class="reuse-gap-label"><span>gap</span>no execution</div>
+              </div>
+              <div class="reuse-pattern">
+                <b>03</b>
+                <div>
+                  <h3>Agents</h3>
+                  <p>Delegate work into a separate context.</p>
+                </div>
+                <div class="reuse-gap-label"><span>gap</span>separate boundary</div>
+              </div>
             </div>
-            <div
-              class="operating-surface"
-              aria-label="Operating surface pieces"
-            >
-              <div class="surface-piece">
-                <strong>Tools</strong><span>how work executes</span>
-              </div>
-              <div class="surface-piece">
-                <strong>Examples</strong><span>what good feels like</span>
-              </div>
-              <div class="surface-piece">
-                <strong>Contracts</strong><span>what must exist</span>
-              </div>
-              <div class="surface-piece">
-                <strong>Validation</strong><span>how trust is checked</span>
-              </div>
-              <div class="surface-piece wide">
-                <strong>Skill</strong><span>Packages a full capability.</span>
-              </div>
+            <div class="reuse-gap-note">
+              <h3>Useful reuse. Incomplete package.</h3>
+              <p>
+                Each pattern preserves part of the work. None carries the full
+                capability.
+              </p>
+              <div class="accent-line"></div>
             </div>
           </div>
         </section>
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>The difference between agents and skills</h2>
+            <h2>Skills fill the missing quadrant</h2>
             <p class="slide-subtitle">
-              Different context boundary, different capability model.
+              Agents isolate execution. Skills package capability for the main
+              agent.
             </p>
           </header>
           <div
             class="agent-contrast"
-            aria-label="Agents and skills solve different problems"
+            aria-label="Reusable options mapped by execution and capability"
           >
             <div class="axis-frame">
               <div class="axis-wash execution"></div>
@@ -2459,14 +2571,10 @@
               <div class="axis-y"></div>
               <span class="axis-title capability">Capability</span>
               <span class="axis-title execution">Execution</span>
-              <div class="dimension-card agent">
-                <span>agent</span>
-                <strong>isolates</strong>
-              </div>
-              <div class="dimension-card skill">
-                <span>skill</span>
-                <strong>equips</strong>
-              </div>
+              <div class="quadrant-point templates">Templates</div>
+              <div class="quadrant-point few-shot">Few-shot</div>
+              <div class="quadrant-point agents">Agents</div>
+              <div class="quadrant-point skills">Skills</div>
             </div>
           </div>
         </section>
@@ -2801,47 +2909,51 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Shared capability, local output</h2>
+            <h2>Standardize capability, localize the work</h2>
           </header>
-          <div class="local-output">
-            <div class="shared-signal">
-              <h3>One skill, many rooms.</h3>
-              <p>
-                The package carries the workflow and checks. The agent adapts
-                the artifact to the local context.
-              </p>
+          <div
+            class="capability-local"
+            aria-label="Shared capability shaped by local context into different work"
+          >
+            <div class="capability-layers">
+              <div class="capability-layer shared">
+                <span class="layer-label">shared capability</span>
+                <div class="layer-items">
+                  <span>workflow</span>
+                  <span>examples</span>
+                  <span>checks</span>
+                  <span>contract</span>
+                  <span>tools*</span>
+                </div>
+                <div class="layer-note">* when useful</div>
+              </div>
+              <div class="capability-layer local">
+                <span class="layer-label">local context</span>
+                <div class="layer-items">
+                  <span>intent</span>
+                  <span>audience</span>
+                  <span>inputs</span>
+                  <span>constraints</span>
+                  <span>taste</span>
+                </div>
+              </div>
             </div>
-            <div
-              class="output-spectrum"
-              aria-label="Different local outputs from one shared skill"
-            >
-              <div class="spectrum-row">
-                <span>exec</span>
-                <div>
-                  <strong>Decision memo</strong>
-                  <div class="spectrum-line"></div>
-                </div>
+            <div class="work-products">
+              <div class="work-product deck">
+                <strong>Deck</strong>
+                <div class="product-lines"><span></span><span></span><span></span></div>
               </div>
-              <div class="spectrum-row">
-                <span>technical</span>
-                <div>
-                  <strong>System explainer</strong>
-                  <div class="spectrum-line"></div>
-                </div>
+              <div class="work-product pr">
+                <strong>PR</strong>
+                <div class="product-lines"><span></span><span></span><span></span><span></span></div>
               </div>
-              <div class="spectrum-row">
-                <span>design</span>
-                <div>
-                  <strong>Critique deck</strong>
-                  <div class="spectrum-line"></div>
-                </div>
+              <div class="work-product email">
+                <strong>Email</strong>
+                <div class="product-lines"><span></span><span></span><span></span></div>
               </div>
-              <div class="spectrum-row">
-                <span>ops</span>
-                <div>
-                  <strong>Runbook view</strong>
-                  <div class="spectrum-line"></div>
-                </div>
+              <div class="work-product report">
+                <strong>Report</strong>
+                <div class="product-lines"><span></span><span></span><span></span></div>
               </div>
             </div>
           </div>
