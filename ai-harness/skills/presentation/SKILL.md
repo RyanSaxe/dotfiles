@@ -17,6 +17,7 @@ presentation/
 │   └── theme.css
 ├── references/
 │   ├── layouts.md
+│   ├── planning-example.md
 │   ├── rubric.md
 │   ├── taste.md
 │   ├── visuals.md
@@ -36,6 +37,7 @@ presentation/
 - `examples/full-slide-examples/` is reserved for complete end-to-end example decks as single HTML files.
 - Do not treat the examples as templates, a taxonomy, or a component library. Open a relevant example to study why it works, then design the user's slide from the user's content.
 - End-to-end example decks should be single HTML files under `examples/full-slide-examples/` unless assets are truly required.
+- Before coding a V1, inspect at least one full example deck when available and either the single-slide gallery or 3-5 relevant single-slide examples. Use them to calibrate density, hierarchy, visual range, copy length, and slide/speaker split. Do not copy their structures unless the user's content relationship calls for it.
 
 ## Alignment
 
@@ -59,27 +61,37 @@ Settle these before drafting:
 
 After the user approves the reflected understanding, outline the whole deck before building the V1. Make the outline concrete enough for clean feedback without becoming a dense script.
 
+Start the outline with a count and structure contract:
+
+- target number of visible slides
+- whether the count includes title, agenda, separators, content slides, appendix, and final slide; default to including every visible slide unless the user says otherwise
+- agenda sections and the content-slide range under each section
+- planned separator slide for each agenda section, including the separator's visual concept
+- pacing notes for sections with fewer than two or more than three content slides
+
 Include every planned slide in order. For each slide, include:
 
 - draft title
 - context or job of the slide
 - desired audience takeaway
 - visual, chart, diagram, image, table, code, or spatial composition that will communicate it
+- visible copy budget: what must appear on the slide vs. what belongs in voiceover
 
-Keep the outline readable in a terminal: group slides by section, use clear separators, and use compact labeled lines for each slide. Do not use Markdown tables. Avoid decorative blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Keep each slide entry to the minimum needed for the user to critique the sequence, claims, and visuals. Do not write full speaker notes or long slide copy at this stage.
+Keep the outline readable in a terminal: use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid decorative blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Keep each slide entry to the minimum needed for the user to critique the sequence, claims, visuals, and slide/speaker split. Do not write full speaker notes or long slide copy at this stage.
 
 End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
 
 ## Build Workflow
 
 1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission to outline, outline the deck, get permission for a V1, draft, self-review, and iterate.
-2. Pick a working directory under `/tmp/<deck-slug>/`.
-3. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
-4. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.
-5. Delete placeholder slide content before delivery.
-6. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
-7. Link optional libraries by CDN when they improve the result, such as Reveal.js, syntax highlighting, charts, math rendering, icon sets, or diagram tools.
-8. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, `references/visuals.md`, and relevant single-slide examples to review quality before showing the user.
+2. Before coding V1, run the example calibration pass described above. For full decks, read `references/planning-example.md` if the count, agenda, separator, or slide/speaker split is not already crisp.
+3. Pick a working directory under `/tmp/<deck-slug>/`.
+4. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
+5. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.
+6. Delete placeholder slide content before delivery.
+7. Keep the final deliverable as one named HTML file unless the user explicitly wants a folder of assets.
+8. Link optional libraries by CDN when they improve the result, such as Reveal.js, syntax highlighting, charts, math rendering, icon sets, or diagram tools.
+9. Use `references/rubric.md`, `references/taste.md`, `references/layouts.md`, `references/visuals.md`, and relevant examples to review quality before showing the user.
 
 ## Deck Structure
 
@@ -107,9 +119,10 @@ title -> agenda -> separator for agenda item 1 -> content -> separator for agend
 
 Every deck should be scan-ready, even if the audience is technical.
 
-- Prefer less slide text and stronger hierarchy.
+- Prefer purposeful slide text and stronger hierarchy: visible copy should carry claims, labels, evidence anchors, and necessary context, while voiceover carries nuance and connective tissue.
 - Give each slide one dominant communicative purpose, written in the user's context rather than selected from a fixed list.
 - Use images, diagrams, charts, tables, code, icons, figures, and spatial composition when they explain faster than paragraphs.
+- For standard quantitative charts in HTML decks, prefer Chart.js by CDN over hand-rolled SVG/CSS/canvas chart geometry. Use D3, Observable Plot, or custom code only when the chart needs a relationship Chart.js cannot express cleanly.
 - Use proven libraries, renderers, syntax highlighters, charting tools, and icon sets when they materially improve the slide.
 - Avoid defaulting to three cards, repeated panels, or generic process arrows.
 - Do not over-copy structures from examples. Examples calibrate taste, spacing, hierarchy, and craft; they are not components to reuse until every deck looks the same.
@@ -170,6 +183,7 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 - `examples/single-slide-examples/*.html` - individual slide examples to inspect for inspiration.
 - `examples/full-slide-examples/*.html` - complete example decks, added only after the skill succeeds in a real end-to-end run.
 - `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
+- `references/planning-example.md` - reverse plan for the full `software-for-agents.html` example deck.
 - `references/rubric.md` - deck-level and slide-level review criteria.
 - `references/taste.md` - visual taste rules and hierarchy guidance.
 - `references/layouts.md` - guidance for designing visual relationships without becoming template-bound.

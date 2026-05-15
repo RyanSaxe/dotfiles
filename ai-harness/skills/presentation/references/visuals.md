@@ -38,6 +38,21 @@ Open examples to study spacing, confidence, hierarchy, and craft. Do not treat t
 
 The single-slide examples are calibration. The user's content decides the slide.
 
+## Chart Guidance
+
+Use a chart when the audience needs to compare, rank, trend, distribute, or see part-to-whole structure faster than prose can explain it.
+
+For standard quantitative charts in HTML decks, default to Chart.js loaded by CDN. It is the first choice for bar, line, area, scatter, pie, doughnut, and radar charts when a polished static or lightly interactive chart is enough.
+
+Do not hand-roll complex charts with ad hoc divs, SVG paths, or canvas code unless the chart is extremely simple or the custom geometry is the point of the slide. Use D3, Observable Plot, or custom rendering only when Chart.js cannot cleanly express the needed relationship.
+
+Before coding a chart, name:
+
+- the comparison or relationship the chart must reveal
+- the chart type and why it fits
+- the first read the audience should notice
+- which labels, annotations, or highlights are necessary on-slide
+
 ## Review Questions
 
 Before calling a visual done, ask:

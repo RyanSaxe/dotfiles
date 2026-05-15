@@ -48,14 +48,30 @@ Include every slide in order. For each slide, state:
 - context or job of the slide
 - desired audience takeaway
 - planned visual, chart, diagram, image, table, code, or spatial composition
+- visible copy budget: what appears on the slide vs. what belongs in voiceover
 
-Keep it readable. Group slides by section, use compact bullets or a table, and keep each slide entry short enough to scan. Do not write full speaker notes or long slide copy unless the user specifically asks for that detail.
+Start with a count and structure contract before listing slides:
+
+- target number of visible slides
+- whether the count includes title, agenda, section separators, content slides, appendix, and final slide; default to every visible slide
+- agenda sections, content-slide ranges, and section pacing
+- separator slides, including the planned visual for each separator
+- intentional exceptions, such as a one-slide section or a longer case-study section
+
+Keep it readable in a terminal. Use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Do not write full speaker notes or long slide copy unless the user specifically asks for that detail.
 
 End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
 
 ## 4. Build V1
 
 After the user explicitly approves the deck outline, build a complete reviewable V1. A V1 should be concrete enough to critique visually and narratively.
+
+Before coding, inspect the examples for calibration:
+
+- read at least one full example deck when available
+- inspect the single-slide gallery or 3-5 relevant single-slide examples
+- use the examples to calibrate density, hierarchy, visual range, copy length, and slide/speaker split
+- do not copy example layouts unless the user's content relationship calls for that structure
 
 Default arc:
 
@@ -68,6 +84,8 @@ When a deck includes an agenda, keep the agenda slide subtitle-free by default. 
 If a section has only one content slide, treat that as a sign the agenda is probably too granular. Merge thin sections before drafting unless the user explicitly wants a very short or unusual deck.
 
 Content-slide subtitles are optional. Use them when they supply necessary frame or evidence context; otherwise remove them and let the title, visual hierarchy, and section separator carry orientation.
+
+Slides should be skimmable as a pre-read, but not self-narrating. Visible copy should carry claims, labels, evidence anchors, and necessary context. Voiceover should carry nuance, caveats, examples, and connective tissue.
 
 ## 5. Self-Review
 
