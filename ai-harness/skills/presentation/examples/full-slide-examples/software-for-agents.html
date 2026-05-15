@@ -327,6 +327,11 @@
         color: var(--terminal-muted);
       }
 
+      .terminal-accent {
+        color: var(--terminal-accent);
+        font-weight: 850;
+      }
+
       .agenda-slide {
         display: grid !important;
         grid-template-columns: 0.78fr 1.22fr;
@@ -946,9 +951,7 @@
         background: var(--terminal-bg);
         color: var(--terminal-fg);
         box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
-        transform: scale(1.04);
-        transform-origin: left center;
-        min-height: 314px;
+        min-height: 327px;
         display: grid;
         grid-template-rows: auto 1fr;
       }
@@ -974,14 +977,9 @@
         font-size: var(--terminal-body-size);
         line-height: var(--terminal-body-line);
         font-weight: var(--terminal-body-weight);
-      }
-
-      .cli-body .dim {
-        color: var(--terminal-muted);
-      }
-
-      .cli-body .flag {
-        color: var(--terminal-accent);
+        display: grid;
+        align-content: center;
+        gap: 14px;
       }
 
       .tool-discovery {
@@ -3210,12 +3208,28 @@
                 <span>deck-qa --help</span>
               </div>
               <div class="cli-body">
-                <span class="dim">$</span> deck-qa --help<br />usage: deck-qa
-                &lt;deck.html&gt;<br />checks: layout, overflow, visual
-                story<br />exports:<br /><span
-                  class="flag"
-                  >--write-screenshots</span
-                >
+                <div class="terminal-line">
+                  <span class="terminal-prompt">$</span>
+                  <span>deck-qa --help</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted"
+                    >usage: deck-qa &lt;deck.html&gt;</span
+                  >
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span>checks: layout, overflow, visual story</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted">exports:</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-accent">--write-screenshots</span>
+                </div>
               </div>
             </div>
             <div class="tool-discovery">
