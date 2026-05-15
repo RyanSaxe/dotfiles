@@ -597,7 +597,6 @@
         display: grid;
         align-content: center;
         gap: 20px;
-        box-shadow: 12px 12px 0 var(--surface-2);
       }
 
       .reuse-base::after {
@@ -657,7 +656,6 @@
         padding: 24px 26px;
         display: grid;
         gap: 14px;
-        box-shadow: 10px 10px 0 var(--surface-2);
       }
 
       .reuse-move::before {
@@ -997,7 +995,6 @@
         border: 3px solid var(--ink);
         background: #d6e4e8;
         padding: 19px 21px;
-        box-shadow: 8px 8px 0 var(--surface-2);
       }
 
       .mcp-contrast strong {
@@ -1013,66 +1010,6 @@
         font-size: 16px;
         line-height: 1.22;
         font-weight: 680;
-      }
-
-      .deck-art {
-        position: relative;
-        height: 460px;
-      }
-
-      .slide-stack-card {
-        position: absolute;
-        width: 430px;
-        height: 270px;
-        border: 3px solid var(--ink);
-        background: var(--surface);
-        box-shadow: 12px 12px 0 var(--surface-2);
-        padding: 26px;
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 22px;
-      }
-
-      .slide-stack-card::before {
-        content: "";
-        width: 110px;
-        height: 8px;
-        background: var(--amber);
-      }
-
-      .slide-stack-card.a {
-        left: 70px;
-        top: 32px;
-      }
-
-      .slide-stack-card.b {
-        right: 58px;
-        top: 106px;
-        background: #fff6d9;
-      }
-
-      .slide-stack-card.c {
-        left: 168px;
-        bottom: 20px;
-        background: #d6e4e8;
-      }
-
-      .thumb-title {
-        width: 78%;
-        height: 30px;
-        border: 2px solid var(--ink);
-        background: var(--bg);
-      }
-
-      .thumb-body {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-      }
-
-      .thumb-box {
-        border: 2px solid var(--ink);
-        background: var(--bg);
       }
 
       .context-compression {
@@ -1623,28 +1560,113 @@
         font-weight: 650;
       }
 
-      .thesis-mark {
+      .qna-terminal {
         border: 3px solid var(--ink);
-        background: var(--surface);
-        min-height: 380px;
-        padding: 34px;
-        display: grid;
-        align-content: center;
-        gap: 28px;
+        background: #111820;
+        color: #d7f3ed;
         box-shadow: 16px 16px 0 var(--surface-2);
       }
 
-      .thesis-mark h3 {
-        font-size: 52px;
-        line-height: 0.95;
+      .qna-titlebar {
+        height: 44px;
+        border-bottom: 3px solid var(--ink);
+        background: var(--surface);
+        color: var(--ink);
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        line-height: 1;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .qna-dots {
+        display: flex;
+        gap: 8px;
+      }
+
+      .qna-dots span {
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      .qna-dots span:nth-child(2) {
+        background: #d6e4e8;
+      }
+
+      .qna-dots span:nth-child(3) {
+        background: #d9e5d6;
+      }
+
+      .qna-body {
+        min-height: 356px;
+        padding: 34px 38px;
+        display: grid;
+        align-content: center;
+        gap: 22px;
+        font-family: var(--mono);
+      }
+
+      .qna-line {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px;
+        align-items: baseline;
+        color: #d7f3ed;
+        font-size: 20px;
+        line-height: 1.34;
+        font-weight: 720;
+      }
+
+      .qna-prompt {
+        color: #f4c84e;
+        font-weight: 850;
+      }
+
+      .qna-status {
+        width: max-content;
+        border: 2px solid #91aaa6;
+        padding: 4px 7px;
+        color: #f4c84e;
+        font-size: 13px;
+        line-height: 1;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .qna-answer {
+        border-left: 5px solid #f4c84e;
+        padding-left: 18px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .qna-answer span {
+        color: #91aaa6;
+        font-size: 17px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .qna-answer strong {
+        max-width: 19ch;
+        color: var(--surface);
+        font-family: var(--sans);
+        font-size: 42px;
+        line-height: 0.98;
         font-weight: 890;
       }
 
-      .thesis-mark p {
-        color: var(--muted);
-        font-size: 22px;
-        line-height: 1.25;
-        font-weight: 650;
+      .qna-cursor {
+        display: inline-block;
+        width: 16px;
+        height: 24px;
+        background: #d7f3ed;
       }
 
       .agenda-clean {
@@ -1786,7 +1808,6 @@
         font-size: 23px;
         line-height: 0.98;
         font-weight: 880;
-        box-shadow: 6px 6px 0 var(--surface-2);
         transform: translate(-50%, -50%);
         white-space: nowrap;
       }
@@ -1831,7 +1852,6 @@
         background: var(--amber);
         padding: 15px 18px;
         font-size: 31px;
-        box-shadow: 11px 11px 0 var(--surface-2);
       }
 
       .quadrant-point.skills small {
@@ -2157,7 +2177,6 @@
         font-size: 18px;
         line-height: 1;
         font-weight: 860;
-        box-shadow: 4px 4px 0 var(--surface-2);
         transform: translateY(-50%) rotate(var(--angle));
         transform-origin: left center;
       }
@@ -3629,13 +3648,33 @@
             </p>
             <div class="accent-line"></div>
           </div>
-          <div class="thesis-mark">
-            <span class="pill amber">core thesis</span>
-            <h3>Software for agents is not one shape.</h3>
-            <p>
-              It can instruct, execute, calibrate, validate, or provide a
-              skeleton the agent completes in context.
-            </p>
+          <div class="qna-terminal" aria-label="Terminal answering the deck thesis">
+            <div class="qna-titlebar">
+              <div class="qna-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <span>qna.skill</span>
+            </div>
+            <div class="qna-body">
+              <div class="qna-line">
+                <span class="qna-prompt">$</span>
+                <span>Question: what is the deck's thesis?</span>
+              </div>
+              <div class="qna-line">
+                <span class="qna-status">loaded</span>
+                <span>Q&amp;A skill</span>
+              </div>
+              <div class="qna-answer">
+                <span>Answer:</span>
+                <strong
+                  >Skills package capability without flattening the work.</strong
+                >
+              </div>
+              <div class="qna-line">
+                <span class="qna-prompt">$</span>
+                <span class="qna-cursor"></span>
+              </div>
+            </div>
           </div>
         </section>
       </div>
