@@ -1848,9 +1848,7 @@
 
       .annotated-shot {
         position: relative;
-        border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 16px;
         box-shadow: 14px 14px 0 var(--surface-2);
       }
 
@@ -2655,14 +2653,7 @@
 
       .design-frame {
         border: 2px solid var(--ink);
-        background:
-          linear-gradient(
-            90deg,
-            transparent 0 56%,
-            rgba(17, 20, 24, 0.12) 56% 58%,
-            transparent 58% 100%
-          ),
-          #fffdf8;
+        background: #fffdf8;
         padding: 12px;
         display: grid;
         grid-template-columns: 1fr 0.7fr;
@@ -2840,8 +2831,7 @@
       .critique-shot {
         border: 2px solid var(--ink);
         background:
-          linear-gradient(90deg, var(--ink) 0 56%, transparent 56%),
-          #fffdf8;
+          linear-gradient(90deg, var(--ink) 0 56%, transparent 56%), #fffdf8;
       }
 
       .critique-notes {
@@ -3293,10 +3283,28 @@
               <div class="proof-card front">
                 <div class="proof-plot">
                   <svg viewBox="0 0 300 150" aria-hidden="true">
-                    <line class="proof-grid-line" x1="24" y1="36" x2="286" y2="36" />
-                    <line class="proof-grid-line" x1="24" y1="76" x2="286" y2="76" />
+                    <line
+                      class="proof-grid-line"
+                      x1="24"
+                      y1="36"
+                      x2="286"
+                      y2="36"
+                    />
+                    <line
+                      class="proof-grid-line"
+                      x1="24"
+                      y1="76"
+                      x2="286"
+                      y2="76"
+                    />
                     <line class="proof-axis" x1="24" y1="18" x2="24" y2="124" />
-                    <line class="proof-axis" x1="24" y1="124" x2="288" y2="124" />
+                    <line
+                      class="proof-axis"
+                      x1="24"
+                      y1="124"
+                      x2="288"
+                      y2="124"
+                    />
                     <path
                       class="proof-trend-alt"
                       d="M 36 106 C 80 98, 104 86, 138 82 S 206 70, 268 54"
@@ -3560,7 +3568,9 @@
                 <div class="outcome-slide front">
                   <div class="strategy-visual">
                     <div class="metric-stack">
-                      <div class="metric-card"><b>42%</b><span>shift</span></div>
+                      <div class="metric-card">
+                        <b>42%</b><span>shift</span>
+                      </div>
                       <div class="metric-card"><b>3x</b><span>focus</span></div>
                     </div>
                     <div class="strategy-chart" aria-hidden="true">
