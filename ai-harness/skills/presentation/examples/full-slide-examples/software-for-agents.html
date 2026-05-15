@@ -396,29 +396,148 @@
         font-size: 88px;
       }
 
-      .case-separator .deck-art {
-        transform: scale(0.76);
-        transform-origin: center;
-      }
-
-      .case-separator .different-decks {
-        max-width: none;
-        padding-top: 0;
-        gap: 44px;
-        transform: scale(0.72);
-        transform-origin: center;
-      }
-
-      .case-separator .deck-outcome-label {
-        display: none;
-      }
-
       .section-copy p {
         max-width: 34ch;
         color: var(--muted);
         font-size: 24px;
         line-height: 1.24;
         font-weight: 650;
+      }
+
+      .proof-separator-art {
+        justify-self: center;
+        width: 540px;
+        height: 430px;
+        display: grid;
+        place-items: center;
+      }
+
+      .proof-stack {
+        position: relative;
+        width: 500px;
+        height: 360px;
+      }
+
+      .proof-card {
+        position: absolute;
+        box-sizing: border-box;
+        width: 420px;
+        height: 262px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        box-shadow: 12px 12px 0 var(--surface-2);
+        padding: 22px;
+        display: grid;
+        grid-template-rows: 9px 1fr;
+        gap: 18px;
+      }
+
+      .proof-card::before {
+        content: "";
+        width: 96px;
+        height: 8px;
+        background: var(--amber);
+      }
+
+      .proof-card.back {
+        left: 14px;
+        top: 8px;
+        background: #fffdf8;
+      }
+
+      .proof-card.mid {
+        left: 42px;
+        top: 52px;
+        background: #fff6d9;
+      }
+
+      .proof-card.front {
+        left: 70px;
+        top: 96px;
+        background: #d6e4e8;
+      }
+
+      .proof-lines {
+        display: grid;
+        gap: 12px;
+        align-content: center;
+      }
+
+      .proof-lines span {
+        height: 11px;
+        background: var(--ink);
+      }
+
+      .proof-lines span:nth-child(2) {
+        width: 76%;
+        background: var(--line);
+      }
+
+      .proof-lines span:nth-child(3) {
+        width: 54%;
+        background: var(--line);
+      }
+
+      .proof-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        align-items: end;
+      }
+
+      .proof-grid span {
+        border: 2px solid var(--ink);
+        background: var(--surface);
+      }
+
+      .proof-grid span:nth-child(1) {
+        height: 54%;
+      }
+
+      .proof-grid span:nth-child(2) {
+        height: 86%;
+        background: #d9e5d6;
+      }
+
+      .proof-grid span:nth-child(3) {
+        height: 66%;
+        background: var(--surface-2);
+      }
+
+      .proof-review {
+        display: grid;
+        grid-template-columns: 1fr 0.85fr;
+        gap: 16px;
+        align-items: stretch;
+      }
+
+      .proof-review-shot {
+        border: 2px solid var(--ink);
+        background:
+          linear-gradient(var(--ink) 0 0) 16px 18px / 86px 8px no-repeat,
+          linear-gradient(var(--line) 0 0) 16px 44px / 112px 7px no-repeat,
+          linear-gradient(var(--line) 0 0) 16px 62px / 74px 7px no-repeat,
+          var(--bg);
+      }
+
+      .proof-review-checks {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .proof-review-checks span {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+      }
+
+      .proof-review-checks span:nth-child(1) {
+        background: var(--amber);
+      }
+
+      .proof-review-checks span:nth-child(3) {
+        background: #d9e5d6;
       }
 
       .prompt-ceiling-art {
@@ -1728,203 +1847,10 @@
         font-size: 13px;
       }
 
-      .screenshot-qa {
-        display: grid;
-        grid-template-columns: 1.05fr 0.95fr;
-        gap: 44px;
-        align-items: center;
-      }
-
-      .viewport-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 18px;
-      }
-
-      .viewport-card {
-        border: 3px solid var(--ink);
-        background: var(--surface);
-        padding: 13px;
-        box-shadow: 9px 9px 0 var(--surface-2);
-      }
-
-      .viewport-card strong {
-        display: block;
-        margin-bottom: 10px;
-        color: var(--muted);
-        font-family: var(--mono);
-        font-size: 14px;
-        line-height: 1;
-        font-weight: 820;
-      }
-
-      .viewport-slide {
-        aspect-ratio: 16 / 10;
-        width: 100%;
-        border: 2px solid var(--ink);
-        background: #fffdf8;
-        box-sizing: border-box;
-        padding: 14px;
-        display: grid;
-        grid-template-rows: 12px 1fr;
-        gap: 12px;
-      }
-
-      .viewport-slide::before {
-        content: "";
-        width: 58px;
-        height: 6px;
-        background: var(--amber);
-      }
-
-      .viewport-body {
-        display: grid;
-        grid-template-columns: 1fr 0.86fr;
-        gap: 10px;
-        align-items: stretch;
-      }
-
-      .viewport-text {
-        display: grid;
-        gap: 6px;
-        align-content: end;
-      }
-
-      .viewport-text span {
-        height: 7px;
-        background: var(--ink);
-      }
-
-      .viewport-text span:nth-child(2) {
-        width: 72%;
-        background: var(--line);
-      }
-
-      .viewport-text span:nth-child(3) {
-        width: 52%;
-        background: var(--line);
-      }
-
-      .viewport-block {
-        border: 2px solid var(--ink);
-        background: #d6e4e8;
-      }
-
-      .viewport-slide.compact {
-        padding: 12px;
-        gap: 10px;
-      }
-
-      .viewport-slide.portrait {
-        padding: 12px;
-      }
-
-      .viewport-slide.portrait .viewport-body {
-        grid-template-columns: 0.9fr 1.1fr;
-      }
-
-      .viewport-slide.portrait .viewport-block {
-        background: #d9e5d6;
-      }
-
-      .viewport-frame {
-        position: relative;
-        border: 3px solid var(--ink);
-        background: var(--surface);
-        box-shadow: 9px 9px 0 var(--surface-2);
-        display: grid;
-        place-items: center;
-        box-sizing: border-box;
-      }
-
-      .viewport-frame strong {
-        position: absolute;
-        left: 12px;
-        top: 10px;
-        color: var(--muted);
-        font-family: var(--mono);
-        font-size: 12px;
-        line-height: 1;
-        font-weight: 820;
-      }
-
-      .viewport-frame.wide {
-        height: 140px;
-      }
-
-      .viewport-frame.base {
-        height: 128px;
-      }
-
-      .viewport-frame.compact {
-        height: 112px;
-      }
-
-      .viewport-frame.portrait {
-        height: 196px;
-      }
-
-      .viewport-artboard {
-        aspect-ratio: 16 / 10;
-        width: 78%;
-        max-height: 72%;
-        border: 2px solid var(--ink);
-        background: #fffdf8;
-        box-sizing: border-box;
-        padding: 8px;
-        display: grid;
-        grid-template-rows: 6px 1fr;
-        gap: 7px;
-      }
-
-      .viewport-frame.portrait .viewport-artboard {
-        width: 82%;
-      }
-
-      .viewport-artboard::before {
-        content: "";
-        width: 34px;
-        height: 5px;
-        background: var(--amber);
-      }
-
-      .viewport-artboard-body {
-        display: grid;
-        grid-template-columns: 1fr 0.84fr;
-        gap: 8px;
-        align-items: stretch;
-      }
-
-      .viewport-artboard-lines {
-        display: grid;
-        gap: 4px;
-        align-content: end;
-      }
-
-      .viewport-artboard-lines span {
-        height: 5px;
-        background: var(--ink);
-      }
-
-      .viewport-artboard-lines span:nth-child(2) {
-        width: 72%;
-        background: var(--line);
-      }
-
-      .viewport-artboard-lines span:nth-child(3) {
-        width: 52%;
-        background: var(--line);
-      }
-
-      .viewport-artboard-block {
-        border: 2px solid var(--ink);
-        background: #d6e4e8;
-      }
-
       .visual-qa {
         display: grid;
-        grid-template-columns: 1.03fr 0.97fr;
-        gap: 54px;
+        grid-template-columns: 1.08fr 0.92fr;
+        gap: 58px;
         align-items: center;
       }
 
@@ -1932,84 +1858,209 @@
         position: relative;
         border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 18px;
+        padding: 16px;
         box-shadow: 14px 14px 0 var(--surface-2);
       }
 
+      .capture-toolbar {
+        height: 34px;
+        border: 2px solid var(--ink);
+        border-bottom: 0;
+        background: #fffdf8;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .capture-dots {
+        display: flex;
+        gap: 6px;
+      }
+
+      .capture-dots span {
+        width: 9px;
+        height: 9px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--surface);
+      }
+
       .annotated-window {
+        position: relative;
         border: 2px solid var(--ink);
         background: #fffdf8;
-        padding: 16px;
+        padding: 18px;
       }
 
       .annotated-slide {
         position: relative;
         aspect-ratio: 16 / 10;
         border: 2px solid var(--ink);
-        background: var(--surface);
-        padding: 20px;
+        background: var(--bg);
+        padding: 24px;
         box-sizing: border-box;
         display: grid;
-        grid-template-columns: 0.92fr 1.08fr;
-        gap: 22px;
-        align-items: end;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 26px;
+        align-items: stretch;
       }
 
-      .annotated-copy {
+      .capture-corner {
+        position: absolute;
+        z-index: 4;
+        width: 24px;
+        height: 24px;
+        pointer-events: none;
+      }
+
+      .capture-corner.tl {
+        left: 9px;
+        top: 43px;
+        border-left: 4px solid var(--amber);
+        border-top: 4px solid var(--amber);
+      }
+
+      .capture-corner.tr {
+        right: 9px;
+        top: 43px;
+        border-right: 4px solid var(--amber);
+        border-top: 4px solid var(--amber);
+      }
+
+      .capture-corner.bl {
+        left: 9px;
+        bottom: 9px;
+        border-left: 4px solid var(--amber);
+        border-bottom: 4px solid var(--amber);
+      }
+
+      .capture-corner.br {
+        right: 9px;
+        bottom: 9px;
+        border-right: 4px solid var(--amber);
+        border-bottom: 4px solid var(--amber);
+      }
+
+      .capture-badge {
+        position: absolute;
+        z-index: 5;
+        right: 26px;
+        top: 26px;
+        border: 2px solid var(--ink);
+        background: #fff6d9;
+        padding: 8px 10px;
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 11px;
+        line-height: 1;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .production-copy {
         display: grid;
-        gap: 10px;
-        align-content: end;
+        align-content: space-between;
+        min-width: 0;
       }
 
-      .annotated-copy span {
-        height: 10px;
+      .production-copy b {
+        display: block;
+        max-width: 9ch;
+        font-size: 33px;
+        line-height: 0.94;
+        font-weight: 890;
+      }
+
+      .production-lines {
+        display: grid;
+        gap: 8px;
+      }
+
+      .production-lines span {
+        height: 8px;
         background: var(--ink);
       }
 
-      .annotated-copy span:nth-child(2) {
-        width: 76%;
+      .production-lines span:nth-child(2) {
+        width: 74%;
         background: var(--line);
       }
 
-      .annotated-copy span:nth-child(3) {
-        width: 52%;
+      .production-lines span:nth-child(3) {
+        width: 50%;
         background: var(--line);
       }
 
-      .annotated-visual {
+      .production-visual {
+        border: 2px solid var(--ink);
+        background: #d6e4e8;
+        padding: 16px;
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        align-items: end;
-        height: 158px;
+        grid-template-rows: 1fr auto;
+        gap: 14px;
       }
 
-      .annotated-visual span {
+      .production-chart {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 11px;
+        align-items: end;
+      }
+
+      .production-chart span {
         display: block;
         border: 2px solid var(--ink);
         background: var(--surface-2);
       }
 
-      .annotated-visual span:nth-child(1) {
+      .production-chart span:nth-child(1) {
         height: 42%;
       }
 
-      .annotated-visual span:nth-child(2) {
-        height: 78%;
-        background: #d6e4e8;
+      .production-chart span:nth-child(2) {
+        height: 70%;
+        background: #fff6d9;
       }
 
-      .annotated-visual span:nth-child(3) {
+      .production-chart span:nth-child(3) {
         height: 58%;
-        background: #fff6d9;
+        background: var(--surface);
+      }
+
+      .production-chart span:nth-child(4) {
+        height: 88%;
+        background: #d9e5d6;
+      }
+
+      .production-caption {
+        display: grid;
+        gap: 7px;
+      }
+
+      .production-caption span {
+        height: 7px;
+        background: var(--ink);
+      }
+
+      .production-caption span:nth-child(2) {
+        width: 62%;
+        background: rgba(17, 20, 24, 0.28);
       }
 
       .qa-callout {
         position: absolute;
+        z-index: 6;
         border: 3px solid var(--ink);
         background: #fff6d9;
-        padding: 9px 12px;
-        font-size: 14px;
+        padding: 10px 12px;
+        font-size: 13px;
         line-height: 1;
         font-weight: 860;
         box-shadow: 6px 6px 0 var(--surface-2);
@@ -2017,19 +2068,19 @@
       }
 
       .qa-callout.fit {
-        right: 28px;
-        top: 32px;
+        right: -20px;
+        top: 82px;
       }
 
       .qa-callout.hierarchy {
-        left: 34px;
-        bottom: 32px;
+        left: -18px;
+        bottom: 64px;
         background: #d9e5d6;
       }
 
       .qa-callout.fix {
-        right: 78px;
-        bottom: -18px;
+        right: 72px;
+        bottom: -20px;
         background: #d6e4e8;
       }
 
@@ -2103,82 +2154,6 @@
         font-weight: 660;
       }
 
-      .qa-loop {
-        display: grid;
-        gap: 14px;
-      }
-
-      .qa-step {
-        display: grid;
-        grid-template-columns: 42px 1fr;
-        gap: 16px;
-        align-items: center;
-      }
-
-      .qa-step b {
-        width: 38px;
-        height: 38px;
-        border: 3px solid var(--ink);
-        background: var(--surface);
-        display: grid;
-        place-items: center;
-        font-size: 18px;
-        line-height: 1;
-        font-weight: 890;
-      }
-
-      .qa-step:nth-child(2) b {
-        background: #d6e4e8;
-      }
-
-      .qa-step:nth-child(3) b {
-        background: #fff6d9;
-      }
-
-      .qa-step:nth-child(4) b {
-        background: #d9e5d6;
-      }
-
-      .qa-step:nth-child(5) b {
-        background: var(--surface);
-      }
-
-      .qa-step strong {
-        display: block;
-        font-size: 25px;
-        line-height: 0.95;
-      }
-
-      .qa-step span {
-        display: block;
-        margin-top: 5px;
-        color: var(--muted);
-        font-size: 16px;
-        line-height: 1.2;
-        font-weight: 660;
-      }
-
-      .qa-proof {
-        margin-top: 8px;
-        border-top: 3px solid var(--ink);
-        padding-top: 16px;
-      }
-
-      .qa-proof strong {
-        display: block;
-        font-size: 30px;
-        line-height: 1;
-      }
-
-      .qa-proof span {
-        display: block;
-        margin-top: 7px;
-        color: var(--muted);
-        font-size: 17px;
-        line-height: 1.22;
-        font-weight: 660;
-      }
-
       .context-funnel {
         display: grid;
         grid-template-columns: 0.95fr 1.05fr;
@@ -2187,55 +2162,74 @@
       }
 
       .input-streams {
+        position: relative;
         height: 430px;
         display: grid;
         align-content: center;
-        gap: 24px;
+        gap: 22px;
       }
 
       .stream-row {
-        display: grid;
-        grid-template-columns: 130px 1fr;
-        gap: 18px;
-        align-items: center;
+        position: relative;
+        height: 52px;
       }
 
       .stream-row strong {
-        font-size: 22px;
+        position: absolute;
+        left: 0;
+        top: 50%;
+        z-index: 3;
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 7px 10px 6px;
+        font-size: 18px;
         line-height: 1;
+        font-weight: 860;
+        box-shadow: 4px 4px 0 var(--surface-2);
+        transform: translateY(-50%) rotate(var(--angle));
+        transform-origin: left center;
       }
 
       .stream-line {
+        position: absolute;
+        left: 42px;
+        top: 50%;
+        z-index: 1;
+        width: var(--line-width);
         height: 6px;
-        background: var(--ink);
-        transform-origin: right center;
+        background: var(--line-color);
+        transform: translateY(-50%) rotate(var(--angle));
+        transform-origin: left center;
       }
 
-      .stream-row:nth-child(1) .stream-line {
-        width: 96%;
-        transform: rotate(7deg);
+      .stream-row:nth-child(1) {
+        --angle: 7deg;
+        --line-width: 460px;
+        --line-color: var(--ink);
       }
 
-      .stream-row:nth-child(2) .stream-line {
-        width: 86%;
-        background: var(--blue);
-        transform: rotate(3deg);
+      .stream-row:nth-child(2) {
+        --angle: 3deg;
+        --line-width: 420px;
+        --line-color: var(--blue);
       }
 
-      .stream-row:nth-child(3) .stream-line {
-        width: 100%;
+      .stream-row:nth-child(3) {
+        --angle: 0deg;
+        --line-width: 480px;
+        --line-color: var(--ink);
       }
 
-      .stream-row:nth-child(4) .stream-line {
-        width: 76%;
-        background: var(--green);
-        transform: rotate(-3deg);
+      .stream-row:nth-child(4) {
+        --angle: -3deg;
+        --line-width: 370px;
+        --line-color: var(--green);
       }
 
-      .stream-row:nth-child(5) .stream-line {
-        width: 90%;
-        background: var(--amber);
-        transform: rotate(-7deg);
+      .stream-row:nth-child(5) {
+        --angle: -7deg;
+        --line-width: 430px;
+        --line-color: var(--amber);
       }
 
       .compressed-output {
@@ -3318,74 +3312,23 @@
             <p>The presentation skill is the case study.</p>
             <div class="accent-line"></div>
           </div>
-          <div
-            class="different-decks"
-            aria-label="Two straight deck stacks previewing the proof section"
-          >
-            <div class="deck-outcome executive-deck">
-              <div class="deck-outcome-label">
-                <span>executive strategy deck</span>
-              </div>
-              <div class="outcome-stack">
-                <div class="outcome-slide back">
-                  <div class="strategy-map" aria-hidden="true">
-                    <span class="map-dot"></span><span class="map-dot"></span
-                    ><span class="map-dot"></span>
-                  </div>
-                </div>
-                <div class="outcome-slide mid">
-                  <div class="strategy-roadmap">
-                    <div class="roadmap-row"><b>1</b><span></span></div>
-                    <div class="roadmap-row"><b>2</b><span></span></div>
-                    <div class="roadmap-row"><b>3</b><span></span></div>
-                  </div>
-                </div>
-                <div class="outcome-slide front">
-                  <div class="strategy-visual">
-                    <div class="metric-stack">
-                      <div class="metric-card"><b>42%</b><span>shift</span></div>
-                      <div class="metric-card"><b>3x</b><span>focus</span></div>
-                    </div>
-                    <div class="strategy-chart" aria-hidden="true">
-                      <span></span><span></span><span></span><span></span>
-                    </div>
-                  </div>
+          <div class="proof-separator-art" aria-label="Single proof deck stack">
+            <div class="proof-stack">
+              <div class="proof-card back">
+                <div class="proof-lines">
+                  <span></span><span></span><span></span>
                 </div>
               </div>
-            </div>
-            <div class="deck-outcome design-deck">
-              <div class="deck-outcome-label">
-                <span>product critique deck</span>
+              <div class="proof-card mid">
+                <div class="proof-grid" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
               </div>
-              <div class="outcome-stack">
-                <div class="outcome-slide back">
-                  <div class="design-grid">
-                    <div class="design-tile dark"></div>
-                    <div class="design-tile blue"></div>
-                    <div class="design-tile amber"></div>
-                    <div class="design-tile green"></div>
-                  </div>
-                </div>
-                <div class="outcome-slide mid">
-                  <div class="critique-board">
-                    <div class="critique-shot"></div>
-                    <div class="critique-notes">
-                      <span></span><span></span><span></span>
-                    </div>
-                  </div>
-                </div>
-                <div class="outcome-slide front">
-                  <div class="design-visual">
-                    <div class="design-frame" aria-hidden="true">
-                      <div class="design-image"></div>
-                      <div class="design-swatches">
-                        <span></span><span></span><span></span>
-                      </div>
-                    </div>
-                    <div class="design-notes">
-                      <div class="design-note"><span></span><span></span></div>
-                      <div class="design-note"><span></span><span></span></div>
-                    </div>
+              <div class="proof-card front">
+                <div class="proof-review">
+                  <div class="proof-review-shot"></div>
+                  <div class="proof-review-checks">
+                    <span></span><span></span><span></span>
                   </div>
                 </div>
               </div>
@@ -3535,116 +3478,44 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Option A: screenshots test real review sizes</h2>
-          </header>
-          <div
-            class="screenshot-qa"
-            aria-label="Screenshot QA across real review viewport sizes"
-          >
-            <div class="viewport-grid">
-              <div class="viewport-frame wide">
-                <strong>1440x900</strong>
-                <div class="viewport-artboard">
-                  <div class="viewport-artboard-body">
-                    <div class="viewport-artboard-lines">
-                      <span></span><span></span><span></span>
-                    </div>
-                    <div class="viewport-artboard-block"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="viewport-frame base">
-                <strong>1280x800</strong>
-                <div class="viewport-artboard">
-                  <div class="viewport-artboard-body">
-                    <div class="viewport-artboard-lines">
-                      <span></span><span></span><span></span>
-                    </div>
-                    <div class="viewport-artboard-block"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="viewport-frame compact">
-                <strong>900x600</strong>
-                <div class="viewport-artboard">
-                  <div class="viewport-artboard-body">
-                    <div class="viewport-artboard-lines">
-                      <span></span><span></span><span></span>
-                    </div>
-                    <div class="viewport-artboard-block"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="viewport-frame portrait">
-                <strong>768x1024</strong>
-                <div class="viewport-artboard">
-                  <div class="viewport-artboard-body">
-                    <div class="viewport-artboard-lines">
-                      <span></span><span></span><span></span>
-                    </div>
-                    <div class="viewport-artboard-block"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="qa-loop">
-              <div class="qa-step">
-                <b>1</b>
-                <div>
-                  <strong>Render</strong
-                  ><span>Capture the deck at real review sizes.</span>
-                </div>
-              </div>
-              <div class="qa-step">
-                <b>2</b>
-                <div>
-                  <strong>Inspect</strong
-                  ><span>Find scroll, clipping, overlap, and hierarchy.</span>
-                </div>
-              </div>
-              <div class="qa-step">
-                <b>3</b>
-                <div>
-                  <strong>Match</strong
-                  ><span>Check that the visual matches the message.</span>
-                </div>
-              </div>
-              <div class="qa-step">
-                <b>4</b>
-                <div>
-                  <strong>Revise</strong
-                  ><span>Rerender until the screenshots hold.</span>
-                </div>
-              </div>
-              <div class="qa-proof">
-                <strong>Quality becomes inspectable.</strong
-                ><span>The skill gives the agent a visual feedback loop.</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="content-slide">
-          <header class="slide-title">
-            <h2>Option B: screenshots focus the critique</h2>
+            <h2>Screenshots to iterate for quality</h2>
           </header>
           <div
             class="visual-qa"
             aria-label="Annotated screenshot quality review loop"
           >
             <div class="annotated-shot">
-              <div class="annotated-window">
-                <div class="annotated-slide">
-                  <div class="annotated-copy">
-                    <span></span><span></span><span></span>
-                  </div>
-                  <div class="annotated-visual" aria-hidden="true">
-                    <span></span><span></span><span></span>
-                  </div>
-                  <div class="qa-callout fit">message fits visual</div>
-                  <div class="qa-callout hierarchy">hierarchy holds</div>
-                  <div class="qa-callout fix">revise</div>
+              <div class="capture-toolbar">
+                <div class="capture-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
                 </div>
+                <span>slide-qa / 1280x800</span>
+              </div>
+              <div class="annotated-window">
+                <div class="capture-corner tl"></div>
+                <div class="capture-corner tr"></div>
+                <div class="capture-corner bl"></div>
+                <div class="capture-corner br"></div>
+                <div class="capture-badge">captured</div>
+                <div class="annotated-slide">
+                  <div class="production-copy">
+                    <b>One claim, one visual.</b>
+                    <div class="production-lines">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                  <div class="production-visual" aria-hidden="true">
+                    <div class="production-chart">
+                      <span></span><span></span><span></span><span></span>
+                    </div>
+                    <div class="production-caption">
+                      <span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="qa-callout fit">visual story matches</div>
+                <div class="qa-callout hierarchy">hierarchy holds</div>
+                <div class="qa-callout fix">revise spacing</div>
               </div>
             </div>
             <div class="visual-loop">
