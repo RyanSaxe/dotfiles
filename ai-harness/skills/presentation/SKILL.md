@@ -66,7 +66,7 @@ Include every planned slide in order. For each slide, include:
 - desired audience takeaway
 - visual, chart, diagram, image, table, code, or spatial composition that will communicate it
 
-Keep the outline readable: group slides by section, use compact bullets or a table, and keep each slide entry to the minimum needed for the user to critique the sequence, claims, and visuals. Do not write full speaker notes or long slide copy at this stage.
+Keep the outline readable in a terminal: group slides by section, use clear separators, and use compact labeled lines for each slide. Do not use Markdown tables. Avoid decorative blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Keep each slide entry to the minimum needed for the user to critique the sequence, claims, and visuals. Do not write full speaker notes or long slide copy at this stage.
 
 End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
 
