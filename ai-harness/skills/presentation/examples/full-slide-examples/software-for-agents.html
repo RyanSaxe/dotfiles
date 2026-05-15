@@ -511,8 +511,8 @@
       }
 
       .reuse-gap-label {
-        border: 2px solid var(--ink);
-        background: var(--surface);
+        border: 2px solid var(--red);
+        background: #f8ded8;
         padding: 12px 14px;
         font-size: 13px;
         line-height: 1.08;
@@ -523,33 +523,69 @@
       .reuse-gap-label span {
         display: block;
         margin-bottom: 5px;
-        color: var(--muted);
+        color: var(--red);
         font-size: 11px;
       }
 
       .reuse-gap-note {
-        border-left: 8px solid var(--ink);
-        padding-left: 30px;
         display: grid;
-        gap: 20px;
+        align-items: center;
+        min-height: 392px;
       }
 
-      .reuse-gap-note h3 {
-        font-size: 56px;
+      .package-gap-art {
+        position: relative;
+        min-height: 286px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 36px;
+        display: grid;
+        align-content: center;
+        gap: 28px;
+        box-shadow: 14px 14px 0 var(--surface-2);
+      }
+
+      .package-gap-tab {
+        position: absolute;
+        left: -3px;
+        top: -34px;
+        width: 138px;
+        height: 34px;
+        border: 3px solid var(--ink);
+        border-bottom: 0;
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        padding: 0 17px;
+        color: var(--red);
+        font-size: 13px;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .package-gap-art strong {
+        max-width: 9ch;
+        font-size: 50px;
         line-height: 0.94;
         font-weight: 890;
       }
 
-      .reuse-gap-note p {
-        max-width: 25ch;
-        color: var(--muted);
-        font-size: 20px;
-        line-height: 1.24;
-        font-weight: 650;
+      .package-gap-lines {
+        display: grid;
+        gap: 10px;
       }
 
-      .reuse-gap-note .accent-line {
-        margin-top: 4px;
+      .package-gap-lines span {
+        height: 8px;
+        background: rgba(215, 95, 70, 0.24);
+      }
+
+      .package-gap-lines span:nth-child(2) {
+        width: 74%;
+      }
+
+      .package-gap-lines span:nth-child(3) {
+        width: 52%;
       }
 
 
@@ -1662,7 +1698,7 @@
       }
 
       .quadrant-point.agents {
-        left: 80px;
+        left: 66px;
         top: 72px;
         background: #d6e4e8;
       }
@@ -1671,7 +1707,7 @@
         left: calc(50% + 92px);
         top: 64px;
         border-width: 3px;
-        background: #fff6d9;
+        background: var(--amber);
         box-shadow: 11px 11px 0 var(--surface-2);
       }
 
@@ -2533,19 +2569,18 @@
               <div class="reuse-pattern">
                 <b>03</b>
                 <div>
-                  <h3>Agents</h3>
-                  <p>Delegate work into a separate context.</p>
+                  <h3>Sub-agents</h3>
+                  <p>Parallelize work in a separate context.</p>
                 </div>
-                <div class="reuse-gap-label"><span>gap</span>separate boundary</div>
+                <div class="reuse-gap-label"><span>gap</span>no packaged software</div>
               </div>
             </div>
             <div class="reuse-gap-note">
-              <h3>Useful reuse. Incomplete package.</h3>
-              <p>
-                Each pattern preserves part of the work. None carries the full
-                capability.
-              </p>
-              <div class="accent-line"></div>
+              <div class="package-gap-art" aria-label="Reusable prompts are not capability packages">
+                <div class="package-gap-tab">missing</div>
+                <strong>not packaged</strong>
+                <div class="package-gap-lines"><span></span><span></span><span></span></div>
+              </div>
             </div>
           </div>
         </section>
@@ -2553,10 +2588,6 @@
         <section class="content-slide">
           <header class="slide-title">
             <h2>Skills fill the missing quadrant</h2>
-            <p class="slide-subtitle">
-              Agents isolate execution. Skills package capability for the main
-              agent.
-            </p>
           </header>
           <div
             class="agent-contrast"
@@ -2573,7 +2604,7 @@
               <span class="axis-title execution">Execution</span>
               <div class="quadrant-point templates">Templates</div>
               <div class="quadrant-point few-shot">Few-shot</div>
-              <div class="quadrant-point agents">Agents</div>
+              <div class="quadrant-point agents">Sub-agents</div>
               <div class="quadrant-point skills">Skills</div>
             </div>
           </div>
