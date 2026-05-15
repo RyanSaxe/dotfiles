@@ -9,45 +9,22 @@
 .chart-story {
   align-self: center;
   display: grid;
-  grid-template-columns: 1fr 324px;
-  gap: 34px;
-  align-items: stretch;
+  align-items: center;
 }
 
 .chart-panel {
-  min-height: 548px;
+  min-height: 584px;
   border: 3px solid var(--ink);
   background: var(--surface);
-  padding: 28px 30px 24px;
+  padding: 30px 34px 28px;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 18px;
-}
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
+  grid-template-rows: 1fr auto;
   gap: 24px;
-  align-items: start;
-  padding-bottom: 18px;
-  border-bottom: 2px solid var(--ink);
-}
-
-.chart-header h2 {
-  font-size: 27px;
-  line-height: 1;
-}
-
-.chart-header span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
 }
 
 .chart-wrap {
   position: relative;
-  min-height: 384px;
+  min-height: 430px;
 }
 
 .chart-wrap canvas {
@@ -74,112 +51,41 @@
 }
 
 .chart-legend {
-  display: flex;
-  gap: 22px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 850;
-  text-transform: uppercase;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
 }
 
 .legend-item {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.legend-swatch {
-  width: 18px;
-  height: 18px;
   border: 2px solid var(--ink);
-}
-
-.legend-swatch.total {
-  background: var(--blue);
-}
-
-.legend-swatch.gain {
-  background: var(--green);
-}
-
-.legend-swatch.loss {
-  background: var(--red);
-}
-
-.insight-rail {
+  background: var(--bg);
+  padding: 15px 16px;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 20px;
+  gap: 5px;
 }
 
-.headline-stat {
-  border-top: 4px solid var(--ink);
-  padding-top: 22px;
-  display: grid;
-  gap: 10px;
+.legend-item.total {
+  box-shadow: inset 0 9px 0 var(--blue);
 }
 
-.headline-stat strong {
-  font-size: 78px;
-  line-height: 0.88;
+.legend-item.gain {
+  box-shadow: inset 0 9px 0 var(--green);
 }
 
-.headline-stat span {
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 800;
-  text-transform: uppercase;
+.legend-item.loss {
+  box-shadow: inset 0 9px 0 var(--red);
 }
 
-.bridge-notes {
-  display: grid;
-  align-content: center;
-  gap: 18px;
-}
-
-.bridge-note {
-  border-left: 12px solid var(--green);
-  background: #d9e5d6;
-  padding: 18px 20px;
-  display: grid;
-  gap: 7px;
-}
-
-.bridge-note.loss {
-  border-left-color: var(--red);
-  background: #f4d7cf;
-}
-
-.bridge-note h3 {
-  font-size: 26px;
-  line-height: 1;
-}
-
-.bridge-note p {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.22;
-  font-weight: 700;
-}
-
-.decision-note {
-  border: 2px solid var(--ink);
-  background: #fff6d9;
-  padding: 18px 20px;
-  display: grid;
-  gap: 6px;
-}
-
-.decision-note strong {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.decision-note span {
+.legend-item span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.legend-item strong {
+  font-size: 31px;
+  line-height: 1;
 }
 
 .sr-only {
@@ -200,38 +106,21 @@
   <div class="slide-frame">
     <section class="slide content-slide">
       <header class="slide-title">
-        <h1>Expansion offsets most churn drag</h1>
+        <h1>ARR bridge: +$0.7M net</h1>
       </header>
       <div class="chart-story">
         <div class="chart-panel">
-          <div class="chart-header">
-            <h2>Quarterly ARR bridge</h2>
-            <span>Opening ARR to closing ARR</span>
-          </div>
           <div class="chart-wrap">
             <canvas id="arr-waterfall-chart" role="img" aria-label="Waterfall chart moving from 4.2 million dollars in opening ARR to 4.9 million dollars in closing ARR. Expansion adds 0.7 million. New business adds 0.4 million. Churn subtracts 0.25 million. Contraction subtracts 0.15 million."></canvas>
             <p class="chart-fallback" hidden>ARR moves from $4.2M to $4.9M after $1.1M of gains and $0.4M of churn and contraction.</p>
           </div>
           <div class="chart-legend" aria-hidden="true">
-            <span class="legend-item"><span class="legend-swatch total"></span>Total</span>
-            <span class="legend-item"><span class="legend-swatch gain"></span>Gain</span>
-            <span class="legend-item"><span class="legend-swatch loss"></span>Loss</span>
+            <div class="legend-item total"><span>Open</span><strong>$4.2M</strong></div>
+            <div class="legend-item gain"><span>Gain</span><strong>+$1.1M</strong></div>
+            <div class="legend-item loss"><span>Drag</span><strong>-$0.4M</strong></div>
+            <div class="legend-item total"><span>Close</span><strong>$4.9M</strong></div>
           </div>
         </div>
-        <aside class="insight-rail" aria-label="ARR bridge takeaways">
-          <div class="headline-stat"><strong>$4.9M</strong><span>closing ARR</span></div>
-          <div class="bridge-notes">
-            <div class="bridge-note">
-              <h3>Growth engine</h3>
-              <p>Expansion and new business added $1.1M, led by existing account upgrades.</p>
-            </div>
-            <div class="bridge-note loss">
-              <h3>Drag to solve</h3>
-              <p>Churn and contraction removed $0.4M, enough to erase more than a third of gross growth.</p>
-            </div>
-          </div>
-          <div class="decision-note"><strong>Next readout</strong><span>separate preventable churn from planned downsell</span></div>
-        </aside>
       </div>
       <table class="sr-only">
         <caption>Quarterly ARR bridge in millions of dollars</caption>
@@ -268,12 +157,12 @@ if (chartCanvas instanceof HTMLCanvasElement && window.Chart) {
   Chart.defaults.color = ink;
 
   const bridgeData = [
-    { label: "Opening", range: [0, 4.2], kind: "total", end: 4.2 },
-    { label: "Expansion", range: [4.2, 4.9], kind: "gain", end: 4.9 },
-    { label: "New biz", range: [4.9, 5.3], kind: "gain", end: 5.3 },
-    { label: "Churn", range: [5.05, 5.3], kind: "loss", end: 5.05 },
-    { label: "Contraction", range: [4.9, 5.05], kind: "loss", end: 4.9 },
-    { label: "Closing", range: [0, 4.9], kind: "total", end: 4.9 },
+    { label: "Open", range: [0, 4.2], kind: "total", end: 4.2, value: "$4.2" },
+    { label: "Expand", range: [4.2, 4.9], kind: "gain", end: 4.9, value: "+$0.7" },
+    { label: "New", range: [4.9, 5.3], kind: "gain", end: 5.3, value: "+$0.4" },
+    { label: "Churn", range: [5.05, 5.3], kind: "loss", end: 5.05, value: "-$0.25" },
+    { label: "Downsell", range: [4.9, 5.05], kind: "loss", end: 4.9, value: "-$0.15" },
+    { label: "Close", range: [0, 4.9], kind: "total", end: 4.9, value: "$4.9" },
   ];
 
   const fills = bridgeData.map((item) => {
@@ -283,7 +172,7 @@ if (chartCanvas instanceof HTMLCanvasElement && window.Chart) {
   });
 
   const connectorPlugin = {
-    id: "waterfallConnectors",
+    id: "waterfallGuides",
     afterDatasetsDraw(chart) {
       const meta = chart.getDatasetMeta(0);
       const yScale = chart.scales.y;
@@ -307,6 +196,17 @@ if (chartCanvas instanceof HTMLCanvasElement && window.Chart) {
         context.lineTo(x2, y);
         context.stroke();
       }
+
+      context.setLineDash([]);
+      context.fillStyle = ink;
+      context.textAlign = "center";
+      context.textBaseline = "bottom";
+      context.font = `800 18px ${fontFamily}`;
+
+      meta.data.forEach((bar, index) => {
+        const y = Math.min(bar.y, bar.base) - 10;
+        context.fillText(bridgeData[index].value, bar.x, y);
+      });
 
       context.restore();
     },
