@@ -34,13 +34,28 @@ Before outlining or drafting, restate the understanding in plain language:
 - the visual direction
 - known risks, constraints, or banned moves
 
-End this stage with: "Is there anything else I need to know, or should I build a V1 for us to critique?"
+End this stage with: "Is there anything else I need to know, or should I outline the deck for review?"
 
-Do not substitute a slide outline, implementation plan, or confident thesis statement for this checkpoint. Wait for explicit approval before drafting HTML.
+Do not substitute a slide outline, implementation plan, or confident thesis statement for this checkpoint. Wait for explicit approval before outlining the deck.
 
-## 3. Build V1
+## 3. Outline the Deck
 
-After the user explicitly approves the reflected understanding, build a complete reviewable V1. A V1 should be concrete enough to critique visually and narratively.
+After the user explicitly approves the reflected understanding, present the complete planned deck before building HTML. The outline is the user's chance to reshape the narrative while changes are still cheap.
+
+Include every slide in order. For each slide, state:
+
+- draft title
+- context or job of the slide
+- desired audience takeaway
+- planned visual, chart, diagram, image, table, code, or spatial composition
+
+Keep it readable. Group slides by section, use compact bullets or a table, and keep each slide entry short enough to scan. Do not write full speaker notes or long slide copy unless the user specifically asks for that detail.
+
+End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
+
+## 4. Build V1
+
+After the user explicitly approves the deck outline, build a complete reviewable V1. A V1 should be concrete enough to critique visually and narratively.
 
 Default arc:
 
@@ -54,7 +69,7 @@ If a section has only one content slide, treat that as a sign the agenda is prob
 
 Content-slide subtitles are optional. Use them when they supply necessary frame or evidence context; otherwise remove them and let the title, visual hierarchy, and section separator carry orientation.
 
-## 4. Self-Review
+## 5. Self-Review
 
 Before showing the user, run the rubric and visual QA passes:
 
@@ -67,13 +82,13 @@ Before showing the user, run the rubric and visual QA passes:
 
 Fix issues before asking the user to review.
 
-## 5. Critique and Iterate
+## 6. Critique and Iterate
 
 Ask for targeted critique after V1. When feedback is broad, propose a slide-level revision plan. When feedback is specific, implement it and re-render.
 
 Treat the single-slide examples as calibration. They should influence quality, hierarchy, and range, not become components to copy.
 
-## 6. Finalize
+## 7. Finalize
 
 Before final delivery:
 

@@ -39,7 +39,7 @@ presentation/
 
 ## Alignment
 
-A presentation is a compression of deep user context, not a formatting pass over a topic. Before drafting any outline or HTML, transfer enough context that the deck can reflect the user's real knowledge, judgment, and taste.
+A presentation is a compression of deep user context, not a formatting pass over a topic. Before drafting any deck outline or HTML, transfer enough context that the deck can reflect the user's real knowledge, judgment, and taste.
 
 Ask concise questions first; use multiple-choice wording for real tradeoffs and free-form questions when the user needs to brain-dump. Use the question tool when available. Pull context from docs, notes, screenshots, data, existing decks, examples, and web research when the deck depends on facts outside the conversation.
 
@@ -53,11 +53,26 @@ Settle these before drafting:
 - **Inputs and constraints:** required artifacts, brand requirements, banned wording, sensitive topics, shareability needs, and style preferences.
 - **Visual stance:** density, proof depth, image use, chart use, technicality, formality, and what "good" means for this user.
 
-**Threshold (high push):** Do not propose a slide-by-slide outline, produce HTML, or present a formal implementation plan as a substitute for alignment until you can state what deep material you have, what is still missing, and why the deck can now be responsibly compressed. Reflect that understanding back and ask: "Is there anything else I need to know, or should I build a V1 for us to critique?" Wait for explicit approval.
+**Threshold (high push):** Do not propose a slide-by-slide outline, produce HTML, or present a formal implementation plan as a substitute for alignment until you can state what deep material you have, what is still missing, and why the deck can now be responsibly compressed. Reflect that understanding back and ask: "Is there anything else I need to know, or should I outline the deck for review?" Wait for explicit approval before outlining.
+
+## Outline Checkpoint
+
+After the user approves the reflected understanding, outline the whole deck before building the V1. Make the outline concrete enough for clean feedback without becoming a dense script.
+
+Include every planned slide in order. For each slide, include:
+
+- draft title
+- context or job of the slide
+- desired audience takeaway
+- visual, chart, diagram, image, table, code, or spatial composition that will communicate it
+
+Keep the outline readable: group slides by section, use compact bullets or a table, and keep each slide entry to the minimum needed for the user to critique the sequence, claims, and visuals. Do not write full speaker notes or long slide copy at this stage.
+
+End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
 
 ## Build Workflow
 
-1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission for a V1, draft, self-review, and iterate.
+1. Follow `references/workflow.md`: transfer context, reflect sufficiency, get permission to outline, outline the deck, get permission for a V1, draft, self-review, and iterate.
 2. Pick a working directory under `/tmp/<deck-slug>/`.
 3. Copy `templates/deck.html.template` to `/tmp/<deck-slug>/<deck-slug>.html`.
 4. Inline `templates/theme.css` into the `<style>` slot, then adapt or replace it for the user's room.
