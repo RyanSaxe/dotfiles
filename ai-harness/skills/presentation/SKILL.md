@@ -1,6 +1,6 @@
 ---
 name: presentation
-description: Build a shareable HTML slide deck when the user says "make a presentation", "build a deck", "make a pitch deck", "make slides", "explainer deck", "discussion deck", "townhall deck", or wants a self-contained HTML file they can present or send. Produces one polished browser-openable HTML file, usually with Reveal.js.
+description: Build, polish, edit, or visually improve a shareable HTML slide deck when the user says "make a presentation", "build a deck", "make a pitch deck", "make slides", "edit this deck", "polish these slides", "improve this presentation", "explainer deck", "discussion deck", "townhall deck", or wants a self-contained HTML file they can present or send. Produces one polished browser-openable HTML file, usually with Reveal.js.
 ---
 
 # presentation
@@ -12,6 +12,8 @@ Build one polished, browser-openable HTML slide deck. Treat this as a collaborat
 ```text
 presentation/
 ├── SKILL.md
+├── tools/
+│   └── deck_qa.py
 ├── templates/
 │   ├── deck.html.template
 │   └── theme.css
@@ -136,7 +138,22 @@ Every deck should be scan-ready, even if the audience is technical.
 
 ## Visual QA Playbook
 
-Before showing the user, render the deck in a browser and critique screenshots yourself. Prefer Playwright or another browser automation tool when available; otherwise use whatever screenshot workflow the environment provides. Save QA screenshots and traces under `/tmp/<deck-slug>/qa/` or another temporary location, not in the repository or current working directory.
+Before showing the user, render the deck with the presentation QA tool and critique screenshots yourself. Save QA screenshots and traces under `/tmp`, not in the repository or current working directory.
+
+Use `tools/deck_qa.py` from this skill:
+
+```zsh
+uv run --script ai-harness/skills/presentation/tools/deck_qa.py /tmp/<deck-slug>/<deck-slug>.html --all
+```
+
+During iteration, capture only the slide or range being edited:
+
+```zsh
+uv run --script ai-harness/skills/presentation/tools/deck_qa.py /tmp/<deck-slug>/<deck-slug>.html --slide 7
+uv run --script ai-harness/skills/presentation/tools/deck_qa.py /tmp/<deck-slug>/<deck-slug>.html --slides 3,4,8-10
+```
+
+The tool writes each run to a unique `/tmp/presentation-qa/...` directory by default, so concurrent QA runs do not overwrite each other. Use `--out /tmp/<deck-slug>/qa/<run-name>` only when a stable path is useful. Use `--fail-on-scroll` and `--fail-on-console-error` when checking a deck before delivery.
 
 Use a fixed slide artboard and scale it from the center. For Reveal decks, keep `width: 1280`, `height: 800`, `margin: 0`, and `center: false`; for custom single-slide review pages, wrap the 1280x800 slide in a centered scale-to-fit frame.
 
@@ -167,6 +184,8 @@ For every review viewport, verify:
 
 When a screenshot fails, fix the layout first: shorten text, simplify the visual, split the slide, or adjust the artboard scaling. Do not solve crowded slides by making all text smaller.
 
+If browser preview tools or page annotations point at screenshots or temporary review HTML, treat that feedback as feedback on the real deck source. Apply the edit to the HTML file being authored, then rerun `deck_qa.py`; do not hand-edit generated temporary QA artifacts.
+
 Then show the user the deck and ask for critique. When feedback is broad, first propose a slide-level revision plan; when feedback is specific, implement and re-render.
 
 ## Output Contract
@@ -182,6 +201,7 @@ Then show the user the deck and ask for critique. When feedback is broad, first 
 - `examples/single-slide-examples/gallery.html` - human review page for the single-slide example set.
 - `examples/single-slide-examples/*.html` - individual slide examples to inspect for inspiration.
 - `examples/full-slide-examples/*.html` - complete example decks, added only after the skill succeeds in a real end-to-end run.
+- `tools/deck_qa.py` - presentation-specific screenshot QA for full decks, selected slides, and single-slide HTML examples.
 - `references/workflow.md` - collaborative staged workflow from discovery to final delivery.
 - `references/planning-example.md` - reverse plan for the full `software-for-agents.html` example deck.
 - `references/rubric.md` - deck-level and slide-level review criteria.
