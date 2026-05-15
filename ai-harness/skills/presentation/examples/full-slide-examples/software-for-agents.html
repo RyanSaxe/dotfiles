@@ -163,110 +163,186 @@ body,
   font-weight: 650;
 }
 
-.capability-orbit {
+.skill-equip-scene {
   position: relative;
   height: 560px;
 }
 
-.orbit-ring {
+.skill-folder {
   position: absolute;
-  inset: 58px 40px 48px;
+  z-index: 1;
+  left: 18px;
+  top: 58px;
+  width: 386px;
+  height: 292px;
   border: 3px solid var(--ink);
-  border-radius: 50%;
+  background: #fff6d9;
+  box-shadow: 16px 16px 0 var(--surface-2);
+  transform: rotate(-2deg);
 }
 
-.orbit-ring.two {
-  inset: 112px 118px 102px;
-  border-color: var(--line);
-}
-
-.agent-core {
+.skill-folder::before {
+  content: "";
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 190px;
-  height: 190px;
+  left: -3px;
+  top: -45px;
+  width: 172px;
+  height: 45px;
   border: 3px solid var(--ink);
-  border-radius: 50%;
-  background: var(--surface);
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  font-size: 30px;
-  line-height: 0.95;
-  font-weight: 880;
-}
-
-.orbit-node {
-  position: absolute;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 16px 18px;
-  min-width: 146px;
-  display: grid;
-  gap: 5px;
-}
-
-.orbit-node strong {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.orbit-node span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 830;
-  text-transform: uppercase;
-}
-
-.orbit-node.tools {
-  right: 32px;
-  top: 84px;
-  background: #d6e4e8;
-}
-
-.orbit-node.examples {
-  right: 64px;
-  bottom: 86px;
+  border-bottom: 0;
   background: #fff6d9;
 }
 
-.orbit-node.contracts {
-  left: 42px;
-  bottom: 116px;
+.folder-label {
+  position: absolute;
+  left: 28px;
+  top: 26px;
+  display: grid;
+  gap: 6px;
+}
+
+.folder-label strong {
+  color: var(--ink);
+  font-size: 34px;
+  line-height: 0.92;
+}
+
+.folder-label span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.folder-file {
+  position: absolute;
+  width: 168px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 13px 15px;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 850;
+  box-shadow: 6px 6px 0 rgba(17, 20, 24, 0.08);
+}
+
+.folder-file small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.folder-file.instructions {
+  left: 30px;
+  bottom: 82px;
+}
+
+.folder-file.tools {
+  right: 30px;
+  bottom: 98px;
+  background: #d6e4e8;
+}
+
+.folder-file.examples {
+  left: 82px;
+  bottom: 28px;
   background: #d9e5d6;
 }
 
-.orbit-node.instructions {
-  left: 78px;
-  top: 76px;
+.terminal-agent {
+  position: absolute;
+  z-index: 3;
+  right: 6px;
+  bottom: 50px;
+  width: 330px;
+  height: 222px;
+  border: 3px solid var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  box-shadow: 14px 14px 0 var(--surface-2);
 }
 
-.orbit-spoke {
+.terminal-bar {
+  height: 39px;
+  border-bottom: 3px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 15px;
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.terminal-screen {
+  padding: 23px 24px;
+  font-family: var(--mono);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.terminal-screen span {
+  display: block;
+}
+
+.terminal-screen .prompt {
+  color: #b8d3da;
+}
+
+.terminal-screen .ready {
+  color: #d9e5d6;
+}
+
+.equip-cable {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 190px;
-  height: 3px;
-  background: var(--ink);
+  z-index: 4;
+  left: 382px;
+  top: 336px;
+  width: 124px;
+  height: 7px;
+  background: var(--amber);
+  transform: rotate(13deg);
   transform-origin: left center;
 }
 
-.orbit-spoke.a {
-  transform: rotate(-34deg);
+.equip-cable::after {
+  content: "";
+  position: absolute;
+  right: -15px;
+  top: -8px;
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-left: 18px solid var(--amber);
 }
 
-.orbit-spoke.b {
-  transform: rotate(38deg);
-}
-
-.orbit-spoke.c {
-  transform: rotate(146deg);
-}
-
-.orbit-spoke.d {
-  transform: rotate(215deg);
+.equip-label {
+  position: absolute;
+  z-index: 5;
+  left: 420px;
+  top: 258px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 7px 11px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 860;
+  text-transform: uppercase;
+  transform: rotate(5deg);
 }
 
 .agenda-slide {
@@ -2241,18 +2317,23 @@ body,
         <p>Skills raise the ceiling because they package capability, not just wording.</p>
         <div class="accent-line"></div>
       </div>
-      <div class="capability-orbit" aria-label="Agent equipped by skill capabilities">
-        <div class="orbit-ring"></div>
-        <div class="orbit-ring two"></div>
-        <div class="orbit-spoke a"></div>
-        <div class="orbit-spoke b"></div>
-        <div class="orbit-spoke c"></div>
-        <div class="orbit-spoke d"></div>
-        <div class="agent-core">Main<br>agent</div>
-        <div class="orbit-node instructions"><strong>Instructions</strong><span>when and how</span></div>
-        <div class="orbit-node tools"><strong>Tools</strong><span>scripts and CLIs</span></div>
-        <div class="orbit-node examples"><strong>Examples</strong><span>taste and behavior</span></div>
-        <div class="orbit-node contracts"><strong>Contracts</strong><span>what good means</span></div>
+      <div class="skill-equip-scene" aria-label="Skill package equipping an agent terminal">
+        <div class="skill-folder">
+          <div class="folder-label"><strong>Skill package</strong><span>capability as software</span></div>
+          <div class="folder-file instructions">SKILL.md<small>instructions</small></div>
+          <div class="folder-file tools">tools/cli<small>execution</small></div>
+          <div class="folder-file examples">examples<small>taste</small></div>
+        </div>
+        <div class="equip-cable"></div>
+        <div class="equip-label">equips</div>
+        <div class="terminal-agent">
+          <div class="terminal-bar"><span class="terminal-dot"></span>Agent terminal</div>
+          <div class="terminal-screen">
+            <span class="prompt">$ load skill</span>
+            <span>skill package/</span>
+            <span class="ready">capability ready</span>
+          </div>
+        </div>
       </div>
     </section>
 
