@@ -133,6 +133,7 @@ For every review viewport, verify:
 - content mass that is visually top-heavy, corner-heavy, or awkwardly uncentered
 - dense blocks that are hard to scan
 - repeated layouts that make the deck feel samey
+- visual story/message fit: whether the visual relationship actually expresses the slide's claim
 - diagrams, charts, or images with unclear emphasis
 - footer, metadata, or slide-count mistakes when the deck uses repeated chrome
 
