@@ -1654,79 +1654,6 @@
         width: 2px;
       }
 
-      .axis-wash {
-        position: absolute;
-        z-index: 0;
-        pointer-events: none;
-      }
-
-      .axis-wash.execution {
-        left: 28px;
-        top: 16px;
-        bottom: 22px;
-        width: 320px;
-        background: linear-gradient(
-          90deg,
-          rgba(47, 111, 137, 0.14),
-          rgba(47, 111, 137, 0)
-        );
-      }
-
-      .axis-wash.capability {
-        left: 20px;
-        right: 54px;
-        bottom: 24px;
-        height: 124px;
-        background: linear-gradient(
-          0deg,
-          rgba(233, 185, 73, 0.18),
-          rgba(233, 185, 73, 0)
-        );
-      }
-
-      .lineage-arrow {
-        position: absolute;
-        z-index: 3;
-        height: 3px;
-        border-radius: 999px;
-        background: rgba(17, 20, 24, 0.24);
-        transform-origin: left center;
-      }
-
-      .lineage-arrow::after {
-        content: "";
-        position: absolute;
-        right: -1px;
-        top: 50%;
-        width: 0;
-        height: 0;
-        border-top: 7px solid transparent;
-        border-bottom: 7px solid transparent;
-        border-left: 11px solid rgba(17, 20, 24, 0.34);
-        transform: translateY(-50%);
-      }
-
-      .lineage-arrow.to-few-shot {
-        left: 188px;
-        top: 298px;
-        width: 178px;
-        transform: rotate(-10deg);
-      }
-
-      .lineage-arrow.to-sub-agents {
-        left: 182px;
-        top: 274px;
-        width: 242px;
-        transform: rotate(-48deg);
-      }
-
-      .lineage-arrow.to-custom-agents {
-        left: 338px;
-        top: 136px;
-        width: 190px;
-        transform: rotate(-10deg);
-      }
-
       .quadrant-point {
         position: absolute;
         z-index: 5;
@@ -2676,15 +2603,10 @@
             aria-label="Reusable options mapped by context and automation"
           >
             <div class="axis-frame">
-              <div class="axis-wash execution"></div>
-              <div class="axis-wash capability"></div>
               <div class="axis-gridline horizontal"></div>
               <div class="axis-gridline vertical"></div>
               <div class="axis-x"></div>
               <div class="axis-y"></div>
-              <div class="lineage-arrow to-few-shot"></div>
-              <div class="lineage-arrow to-sub-agents"></div>
-              <div class="lineage-arrow to-custom-agents"></div>
               <span class="axis-title capability">Context</span>
               <span class="axis-title execution">Automation</span>
               <div class="quadrant-point templates">Templates</div>
