@@ -1556,16 +1556,16 @@
         position: relative;
         justify-self: center;
         align-self: center;
-        width: min(1040px, 100%);
-        height: 488px;
+        width: min(1050px, 100%);
+        height: 500px;
       }
 
       .axis-frame {
         position: absolute;
-        left: 122px;
-        right: 88px;
-        top: 38px;
-        bottom: 82px;
+        left: 112px;
+        right: 84px;
+        top: 36px;
+        bottom: 84px;
       }
 
       .axis-x,
@@ -1663,8 +1663,8 @@
       .axis-wash.execution {
         left: 28px;
         top: 16px;
-        bottom: 20px;
-        width: 246px;
+        bottom: 22px;
+        width: 320px;
         background: linear-gradient(
           90deg,
           rgba(47, 111, 137, 0.14),
@@ -1674,9 +1674,9 @@
 
       .axis-wash.capability {
         left: 20px;
-        right: 96px;
+        right: 54px;
         bottom: 24px;
-        height: 132px;
+        height: 124px;
         background: linear-gradient(
           0deg,
           rgba(233, 185, 73, 0.18),
@@ -1684,43 +1684,112 @@
         );
       }
 
+      .lineage-arrow {
+        position: absolute;
+        z-index: 3;
+        height: 3px;
+        border-radius: 999px;
+        background: rgba(17, 20, 24, 0.24);
+        transform-origin: left center;
+      }
+
+      .lineage-arrow::after {
+        content: "";
+        position: absolute;
+        right: -1px;
+        top: 50%;
+        width: 0;
+        height: 0;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        border-left: 11px solid rgba(17, 20, 24, 0.34);
+        transform: translateY(-50%);
+      }
+
+      .lineage-arrow.to-few-shot {
+        left: 188px;
+        top: 298px;
+        width: 178px;
+        transform: rotate(-10deg);
+      }
+
+      .lineage-arrow.to-sub-agents {
+        left: 182px;
+        top: 274px;
+        width: 242px;
+        transform: rotate(-48deg);
+      }
+
+      .lineage-arrow.to-custom-agents {
+        left: 338px;
+        top: 136px;
+        width: 190px;
+        transform: rotate(-10deg);
+      }
+
       .quadrant-point {
         position: absolute;
-        z-index: 4;
+        z-index: 5;
         box-sizing: border-box;
         border: 2px solid var(--ink);
+        border-radius: 7px;
         background: var(--surface);
-        padding: 12px 16px;
+        padding: 11px 14px;
         color: var(--ink);
-        font-size: 27px;
-        line-height: 1;
+        font-size: 23px;
+        line-height: 0.98;
         font-weight: 880;
-        box-shadow: 7px 7px 0 var(--surface-2);
+        box-shadow: 6px 6px 0 var(--surface-2);
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+      }
+
+      .quadrant-point small {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 820;
+        text-transform: uppercase;
       }
 
       .quadrant-point.templates {
-        left: 68px;
-        bottom: 56px;
+        left: 17%;
+        top: 78%;
       }
 
       .quadrant-point.few-shot {
-        left: calc(50% + 74px);
-        bottom: 56px;
+        left: 42%;
+        top: 70%;
         background: #fff6d9;
       }
 
       .quadrant-point.agents {
-        left: 66px;
-        top: 72px;
+        left: 32%;
+        top: 28%;
+        background: #d6e4e8;
+      }
+
+      .quadrant-point.custom-agents {
+        left: 60%;
+        top: 20%;
         background: #d6e4e8;
       }
 
       .quadrant-point.skills {
-        left: calc(100% - 78px);
-        top: 28px;
+        left: 86%;
+        top: 34%;
         border-width: 3px;
         background: var(--amber);
+        padding: 15px 18px;
+        font-size: 31px;
         box-shadow: 11px 11px 0 var(--surface-2);
+      }
+
+      .quadrant-point.skills small {
+        color: rgba(17, 20, 24, 0.72);
+        font-size: 13px;
       }
 
       .screenshot-qa {
@@ -2600,11 +2669,11 @@
 
         <section class="content-slide">
           <header class="slide-title">
-            <h2>Skills fill the missing quadrant</h2>
+            <h2>The missing layer is packaged capability</h2>
           </header>
           <div
             class="agent-contrast"
-            aria-label="Reusable options mapped by context and execution"
+            aria-label="Reusable options mapped by context and automation"
           >
             <div class="axis-frame">
               <div class="axis-wash execution"></div>
@@ -2613,12 +2682,20 @@
               <div class="axis-gridline vertical"></div>
               <div class="axis-x"></div>
               <div class="axis-y"></div>
+              <div class="lineage-arrow to-few-shot"></div>
+              <div class="lineage-arrow to-sub-agents"></div>
+              <div class="lineage-arrow to-custom-agents"></div>
               <span class="axis-title capability">Context</span>
-              <span class="axis-title execution">Execution</span>
+              <span class="axis-title execution">Automation</span>
               <div class="quadrant-point templates">Templates</div>
               <div class="quadrant-point few-shot">Few-shot</div>
               <div class="quadrant-point agents">Sub-agents</div>
-              <div class="quadrant-point skills">Skills</div>
+              <div class="quadrant-point custom-agents">
+                Custom agents<small>configured worker</small>
+              </div>
+              <div class="quadrant-point skills">
+                Skills<small>packaged capability</small>
+              </div>
             </div>
           </div>
         </section>
