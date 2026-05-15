@@ -33,6 +33,15 @@
         --traffic-red: #c88478;
         --traffic-yellow: #d9b766;
         --traffic-green: #8da989;
+        --terminal-bg: #111820;
+        --terminal-fg: #d7f3ed;
+        --terminal-muted: #91aaa6;
+        --terminal-accent: #f4c84e;
+        --terminal-title-size: 11px;
+        --terminal-title-weight: 860;
+        --terminal-body-size: 19px;
+        --terminal-body-line: 1.32;
+        --terminal-body-weight: 720;
         --font:
           Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
           system-ui, sans-serif;
@@ -271,8 +280,8 @@
         width: 374px;
         height: 190px;
         border: 3px solid var(--ink);
-        background: var(--ink);
-        color: var(--surface);
+        background: var(--terminal-bg);
+        color: var(--terminal-fg);
         box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
       }
 
@@ -285,28 +294,37 @@
         align-items: center;
         justify-content: space-between;
         padding: 0 13px;
-        font-size: 11px;
-        font-weight: 850;
+        font-size: var(--terminal-title-size);
+        line-height: 1;
+        font-weight: var(--terminal-title-weight);
         text-transform: uppercase;
       }
 
       .terminal-screen {
-        padding: 22px 25px;
+        padding: 26px 28px;
         font-family: var(--mono);
-        font-size: 17px;
-        line-height: 1.45;
+        font-size: var(--terminal-body-size);
+        line-height: var(--terminal-body-line);
+        font-weight: var(--terminal-body-weight);
+        display: grid;
+        align-content: center;
+        gap: 11px;
       }
 
-      .terminal-screen span {
-        display: block;
+      .terminal-line {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        gap: 12px;
+        align-items: baseline;
       }
 
-      .terminal-screen .prompt {
-        color: #d7f3ed;
+      .terminal-prompt {
+        color: var(--terminal-accent);
+        font-weight: 850;
       }
 
-      .terminal-screen .ready {
-        color: #91aaa6;
+      .terminal-muted {
+        color: var(--terminal-muted);
       }
 
       .agenda-slide {
@@ -925,8 +943,8 @@
 
       .cli-help-window {
         border: 3px solid var(--ink);
-        background: #111820;
-        color: #d7f3ed;
+        background: var(--terminal-bg);
+        color: var(--terminal-fg);
         box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
         transform: scale(1.04);
         transform-origin: left center;
@@ -944,25 +962,26 @@
         align-items: center;
         justify-content: space-between;
         padding: 0 13px;
-        font-size: 11px;
-        font-weight: 860;
+        font-size: var(--terminal-title-size);
+        line-height: 1;
+        font-weight: var(--terminal-title-weight);
         text-transform: uppercase;
       }
 
       .cli-body {
         padding: 32px 34px;
         font-family: var(--mono);
-        font-size: 21px;
-        line-height: 1.44;
-        font-weight: 720;
+        font-size: var(--terminal-body-size);
+        line-height: var(--terminal-body-line);
+        font-weight: var(--terminal-body-weight);
       }
 
       .cli-body .dim {
-        color: #91aaa6;
+        color: var(--terminal-muted);
       }
 
       .cli-body .flag {
-        color: #f4c84e;
+        color: var(--terminal-accent);
       }
 
       .tool-discovery {
@@ -1571,8 +1590,8 @@
         justify-self: center;
         width: 440px;
         border: 3px solid var(--ink);
-        background: #111820;
-        color: #d7f3ed;
+        background: var(--terminal-bg);
+        color: var(--terminal-fg);
         box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
       }
 
@@ -1585,9 +1604,9 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        font-size: 11px;
+        font-size: var(--terminal-title-size);
         line-height: 1;
-        font-weight: 860;
+        font-weight: var(--terminal-title-weight);
         text-transform: uppercase;
       }
 
@@ -1605,19 +1624,19 @@
         grid-template-columns: 16px 1fr;
         gap: 12px;
         align-items: baseline;
-        color: #d7f3ed;
-        font-size: 19px;
-        line-height: 1.32;
-        font-weight: 720;
+        color: var(--terminal-fg);
+        font-size: var(--terminal-body-size);
+        line-height: var(--terminal-body-line);
+        font-weight: var(--terminal-body-weight);
       }
 
       .qna-prompt {
-        color: #f4c84e;
+        color: var(--terminal-accent);
         font-weight: 850;
       }
 
       .qna-muted {
-        color: #91aaa6;
+        color: var(--terminal-muted);
       }
 
       .agenda-clean {
@@ -2944,10 +2963,18 @@
                 <span>Agent terminal</span>
               </div>
               <div class="terminal-screen">
-                <span class="prompt">$ deck create agent-skills</span>
-                <span>loaded: presentation skill</span>
-                <br />
-                <span class="ready">drafting from context ...</span>
+                <div class="terminal-line">
+                  <span class="terminal-prompt">$</span>
+                  <span>deck create agent-skills</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted">loaded: presentation</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span>drafting from context _</span>
+                </div>
               </div>
             </div>
           </div>
