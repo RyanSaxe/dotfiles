@@ -266,10 +266,10 @@
       .terminal-agent {
         position: absolute;
         z-index: 4;
-        left: 246px;
-        top: 274px;
-        width: 336px;
-        height: 174px;
+        left: 232px;
+        top: 258px;
+        width: 374px;
+        height: 190px;
         border: 3px solid var(--ink);
         background: var(--ink);
         color: var(--surface);
@@ -291,9 +291,9 @@
       }
 
       .terminal-screen {
-        padding: 19px 23px;
+        padding: 22px 25px;
         font-family: var(--mono);
-        font-size: 16px;
+        font-size: 17px;
         line-height: 1.45;
       }
 
@@ -604,35 +604,35 @@
 
       .reuse-gap {
         display: grid;
-        grid-template-columns: 0.78fr 1.22fr;
-        gap: 48px;
+        grid-template-columns: 0.74fr 1.26fr;
+        gap: 42px;
         align-items: center;
       }
 
       .reuse-base {
         position: relative;
-        min-height: 344px;
+        min-height: 292px;
         border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 34px;
+        padding: 28px;
         display: grid;
         align-content: center;
-        gap: 20px;
+        gap: 17px;
       }
 
       .reuse-base::after {
         content: "";
         position: absolute;
-        right: -50px;
+        right: -43px;
         top: 50%;
-        width: 50px;
+        width: 43px;
         height: 3px;
         background: var(--ink);
       }
 
       .reuse-base h3 {
         max-width: 8ch;
-        font-size: 56px;
+        font-size: 47px;
         line-height: 0.94;
         font-weight: 890;
       }
@@ -640,7 +640,7 @@
       .reuse-base p {
         max-width: 22ch;
         color: var(--muted);
-        font-size: 20px;
+        font-size: 17px;
         line-height: 1.24;
         font-weight: 650;
       }
@@ -656,35 +656,35 @@
       .reuse-branches {
         position: relative;
         display: grid;
-        gap: 26px;
+        gap: 18px;
       }
 
       .reuse-branches::before {
         content: "";
         position: absolute;
-        left: -26px;
-        top: 78px;
-        bottom: 78px;
+        left: -22px;
+        top: 79px;
+        bottom: 79px;
         width: 3px;
         background: var(--ink);
       }
 
       .reuse-move {
         position: relative;
-        min-height: 194px;
+        min-height: 158px;
         border: 3px solid var(--ink);
         background: var(--surface);
-        padding: 24px 26px;
+        padding: 20px 22px;
         display: grid;
-        gap: 14px;
+        gap: 11px;
       }
 
       .reuse-move::before {
         content: "";
         position: absolute;
-        left: -26px;
+        left: -22px;
         top: 50%;
-        width: 26px;
+        width: 22px;
         height: 3px;
         background: var(--ink);
       }
@@ -698,7 +698,7 @@
       }
 
       .reuse-move h3 {
-        font-size: 36px;
+        font-size: 30px;
         line-height: 1;
         font-weight: 880;
       }
@@ -726,7 +726,7 @@
 
       .move-detail span {
         color: var(--ink);
-        font-size: 20px;
+        font-size: 17px;
         line-height: 1.14;
         font-weight: 760;
       }
@@ -774,7 +774,7 @@
         z-index: 1;
         width: 320px;
         height: 218px;
-        left: 62px;
+        left: 0;
         top: 68px;
         transform: rotate(-4deg);
         background: #fff6d9;
@@ -943,6 +943,8 @@
         background: #111820;
         color: #d7f3ed;
         box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
+        transform: scale(1.04);
+        transform-origin: left center;
       }
 
       .cli-titlebar {
