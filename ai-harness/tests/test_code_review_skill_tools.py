@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import importlib.util
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +18,7 @@ from types import ModuleType
 
 SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "assisted-review"
 TOOLS_DIR = SKILL_DIR / "tools"
+sys.path.insert(0, str(TOOLS_DIR))
 
 
 def load_module(name: str, path: Path) -> ModuleType:
@@ -159,6 +162,55 @@ review:
                 }
             )
         )
+
+    def test_yaml_load_is_safe_for_concurrent_viewer_requests(self) -> None:
+        threads_yaml = "\n".join(
+            f"""    - id: rev-{i:03d}
+      type: comment
+      author: ai
+      file: src/sample_{i}.py
+      line: {i}
+      severity: low
+      confidence: high
+      category: test
+      body: |-
+        Thread body {i} with mapping-looking text: value
+        class Layer[
+      status: open
+      anchor_text: |-
+        class Layer[
+            field: value
+        def call(self):
+            return {i}
+      anchor_status: current
+      replies: []
+"""
+            for i in range(1, 80)
+        )
+        review_yaml = f"""
+generated_at: 2026-05-05T09:30:00Z
+generated_by: test
+target:
+  kind: local
+  repo_root: /tmp/repo
+review:
+  event: COMMENT
+  summary:
+    author: ai
+    body: test
+    replies: []
+  threads:
+{threads_yaml}
+"""
+
+        def load_thread_count() -> int:
+            data = view_mod.yaml_load(review_yaml)
+            return len(data["review"]["threads"])
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+            counts = list(executor.map(lambda _i: load_thread_count(), range(300)))
+
+        self.assertEqual(counts, [79] * 300)
 
     def test_refresh_updates_only_obvious_anchors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -54,18 +54,20 @@ from review_state import current_head, current_repo_fingerprint
 try:
     from ruamel.yaml import YAML  # type: ignore[import-not-found]
 
-    _ruamel = YAML()
-    _ruamel.preserve_quotes = True
-    _ruamel.indent(mapping=2, sequence=4, offset=2)
+    def _new_ruamel_yaml() -> YAML:
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        yaml.indent(mapping=2, sequence=4, offset=2)
+        return yaml
 
     def yaml_load(text: str) -> Any:
-        return _ruamel.load(text)
+        return _new_ruamel_yaml().load(text)
 
     def yaml_dump(data: Any) -> str:
         from io import StringIO
 
         buf = StringIO()
-        _ruamel.dump(data, buf)
+        _new_ruamel_yaml().dump(data, buf)
         return buf.getvalue()
 
     YAML_BACKEND = "ruamel"
@@ -88,7 +90,7 @@ STATE_FILE = CACHE_DIR / "viewer.json"
 ENSURE_LOCK_FILE = CACHE_DIR / ".ensure.lock"
 WEBAPP_DIR = Path(__file__).parent / "webapp"
 SERVICE_SIGNATURE = "assisted-review-viewer"
-VIEWER_API_VERSION = 3
+VIEWER_API_VERSION = 4
 DEFAULT_PORT_START = 51234
 PORT_TRY_LIMIT = 10
 GIT_TIMEOUT_SECONDS = 10
