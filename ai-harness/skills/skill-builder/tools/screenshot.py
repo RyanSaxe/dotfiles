@@ -9,7 +9,7 @@ Usage:
   uv run --script tools/screenshot.py <html-file> [<html-file> ...]
 
 Each HTML file is opened in headless Chromium at three viewports. Screenshots
-land in /tmp/skill-screenshots/<viewport>/<basename>/.
+land in /tmp/skill-screenshots/<timestamp>-<pid>/<viewport>/<basename>/.
 
 If the page exposes window.Reveal, every slide is screenshotted with fragments
 shown. Otherwise the tool captures one full-page screenshot.
@@ -17,10 +17,11 @@ shown. Otherwise the tool captures one full-page screenshot.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from os import getpid
 from pathlib import Path
 from typing import Sequence
 
@@ -90,6 +91,11 @@ def output_base_name(file: Path) -> str:
     return file.parent.name if stem == "index" else stem
 
 
+def make_run_root() -> Path:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return SHOTS_DIR / f"{timestamp}-{getpid()}"
+
+
 def shoot_deck(page: Page, directory: Path) -> int:
     page.wait_for_function(
         "() => window.Reveal && window.Reveal.isReady && window.Reveal.isReady()"
@@ -121,7 +127,12 @@ def shoot_page(page: Page, directory: Path) -> int:
     return 1
 
 
-def shoot(playwright: Playwright, file: Path, viewport: Viewport) -> ShotResult:
+def shoot(
+    playwright: Playwright,
+    file: Path,
+    viewport: Viewport,
+    run_root: Path,
+) -> ShotResult:
     browser = launch_chromium(playwright.chromium)
     try:
         context = browser.new_context(
@@ -132,7 +143,7 @@ def shoot(playwright: Playwright, file: Path, viewport: Viewport) -> ShotResult:
         page.goto(file.resolve().as_uri(), wait_until="networkidle")
 
         is_deck = bool(page.evaluate("() => typeof window.Reveal !== 'undefined'"))
-        directory = SHOTS_DIR / viewport.name / output_base_name(file.resolve())
+        directory = run_root / viewport.name / output_base_name(file.resolve())
         directory.mkdir(parents=True, exist_ok=True)
 
         count = shoot_deck(page, directory) if is_deck else shoot_page(page, directory)
@@ -151,8 +162,7 @@ def main(argv: Sequence[str]) -> int:
         )
         return 2
 
-    if SHOTS_DIR.exists():
-        shutil.rmtree(SHOTS_DIR)
+    run_root = make_run_root()
 
     with sync_playwright() as playwright:
         for file in files:
@@ -160,7 +170,7 @@ def main(argv: Sequence[str]) -> int:
                 print(f"skip: {file} not found", file=sys.stderr)
                 continue
             for viewport in VIEWPORTS:
-                result = shoot(playwright, file, viewport)
+                result = shoot(playwright, file, viewport, run_root)
                 kind = f"{result.count} slides" if result.is_deck else "full page"
                 print(f"{file.name} {viewport.name}: {kind} -> {result.directory}/")
 

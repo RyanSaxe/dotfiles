@@ -1,8 +1,3 @@
-#!/usr/bin/env -S uv run -q --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["pyyaml", "ruamel.yaml"]
-# ///
 """Regression tests for the assisted-review skill tools."""
 
 from __future__ import annotations
@@ -16,7 +11,8 @@ import unittest
 from pathlib import Path
 from types import ModuleType
 
-SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "assisted-review"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SKILL_DIR = REPO_ROOT / "ai-harness" / "skills" / "assisted-review"
 TOOLS_DIR = SKILL_DIR / "tools"
 sys.path.insert(0, str(TOOLS_DIR))
 

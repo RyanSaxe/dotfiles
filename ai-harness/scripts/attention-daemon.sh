@@ -1,36 +1,43 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -Eeuo pipefail
-shopt -s nocasematch
 
-script_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="${0:A:h}"
 notify_script="$script_dir/notify.sh"
 
 # shellcheck source=agent-utils.sh
 source "$script_dir/agent-utils.sh"
 
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/ai-harness"
-lock_dir="$cache_dir/tmux-attention-daemon.lock"
-pid_file="$lock_dir/pid"
+legacy_lock_dir="$cache_dir/tmux-attention-daemon.lock"
+legacy_pid_file="$legacy_lock_dir/pid"
+lock_file="$cache_dir/tmux-attention-daemon.flock"
+pid_file="$cache_dir/tmux-attention-daemon.pid"
 state_file="$cache_dir/tmux-action-required-panes"
 
 mkdir -p "$cache_dir" 2> /dev/null || true
 
-if ! mkdir "$lock_dir" 2> /dev/null; then
-  if [[ -f "$pid_file" ]]; then
-    existing_pid="$(cat "$pid_file" 2> /dev/null || true)"
-    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2> /dev/null; then
-      exit 0
-    fi
+if [[ -f "$legacy_pid_file" ]]; then
+  existing_pid="$(cat "$legacy_pid_file" 2> /dev/null || true)"
+  if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2> /dev/null; then
+    exit 0
   fi
+fi
 
-  rm -rf "$lock_dir" 2> /dev/null || true
-  mkdir "$lock_dir" 2> /dev/null || exit 0
+zmodload zsh/system || exit 0
+: >| "$lock_file" || exit 0
+if ! zsystem flock -t 0 -f lock_fd "$lock_file" 2> /dev/null; then
+  exit 0
 fi
 
 printf '%s\n' "$$" > "$pid_file"
 
 cleanup() {
-  rm -rf "$lock_dir" 2> /dev/null || true
+  local current_pid=""
+  [[ -f "$pid_file" ]] && current_pid="$(cat "$pid_file" 2> /dev/null || true)"
+  if [[ "$current_pid" == "$$" ]]; then
+    rm -f "$pid_file" 2> /dev/null || true
+  fi
+  zsystem flock -u "$lock_fd" 2> /dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -79,7 +86,7 @@ poll_once() {
       [[ -n "$pane_id" && -n "$tty" ]] || continue
       detect_ai_agent_for_tty "$tty" | grep -Fxq "Codex CLI" || continue
 
-      if [[ "$title" == *"Action Required"* ]]; then
+      if [[ "${title:l}" == *"action required"* ]]; then
         printf '%s\n' "$pane_id" >> "$next_state"
 
         if ! was_waiting "$pane_id"; then

@@ -1375,6 +1375,9 @@ body.inbox-mode .main {
 .code-table.diff-overlay-on tr.diff-added-line td.gutter-num,
 .code-table.diff-overlay-on tr.diff-added-line td.code-cell {
   background: #ecfdf3;
+}
+
+.code-table.diff-overlay-on tr.diff-added-line td.gutter-num {
   color: #15803d;
 }
 
@@ -1382,11 +1385,20 @@ body.inbox-mode .main {
 .code-table tr.diff-deleted-line td.gutter-marker,
 .code-table tr.diff-deleted-line td.code-cell {
   background: #fff1f2;
+}
+
+.code-table tr.diff-deleted-line td.gutter-num,
+.code-table tr.diff-deleted-line td.gutter-marker {
   color: #e11d48;
 }
 
 .code-table tr.diff-deleted-line td.code-cell {
+  color: var(--code-text);
   text-decoration: none;
+}
+
+.code-table.diff-overlay-on tr.diff-added-line td.code-cell {
+  color: var(--code-text);
 }
 
 .code-table.diff-overlay-off tr.diff-deleted-line,

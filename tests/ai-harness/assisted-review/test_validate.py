@@ -1,18 +1,31 @@
-#!/usr/bin/env -S uv run -q --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["pyyaml"]
-# ///
-
 from __future__ import annotations
 
+import importlib.util
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import ModuleType
 
-import validate
-from review_state import current_repo_fingerprint
+REPO_ROOT = Path(__file__).resolve().parents[3]
+TOOLS_DIR = REPO_ROOT / "ai-harness" / "skills" / "assisted-review" / "tools"
+sys.path.insert(0, str(TOOLS_DIR))
+
+
+def load_module(name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+review_state = load_module("review_state", TOOLS_DIR / "review_state.py")
+validate = load_module("validate", TOOLS_DIR / "validate.py")
+current_repo_fingerprint = review_state.current_repo_fingerprint
 
 
 def git(repo: Path, *args: str) -> str:

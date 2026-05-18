@@ -1,8 +1,3 @@
-#!/usr/bin/env -S uv run -q --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["tiktoken"]
-# ///
 """Regression tests for the repo_size utility."""
 
 from __future__ import annotations
@@ -15,7 +10,7 @@ import unittest
 from pathlib import Path
 from types import ModuleType
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 

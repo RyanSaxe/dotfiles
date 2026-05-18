@@ -45,6 +45,7 @@ import webbrowser
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 from review_state import current_head, current_repo_fingerprint
@@ -1745,7 +1746,7 @@ def cmd_foreground(open_browser: bool, review_path_arg: Path | None) -> int:
 
 
 @contextlib.contextmanager
-def ensure_lock():
+def ensure_lock() -> Iterator[int]:
     """Serialize the detect→fork→write_state critical section in cmd_ensure.
 
     Without this, two parallel `view.py --ensure` invocations both find
@@ -1757,7 +1758,7 @@ def ensure_lock():
     fd = os.open(ENSURE_LOCK_FILE, os.O_CREAT | os.O_RDWR, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
+        yield fd
     finally:
         # flock is released on close — explicit unlock keeps the order
         # obvious when reading the code.
@@ -1773,7 +1774,7 @@ def cmd_ensure(open_browser: bool, review_path_arg: Path | None) -> int:
     # invocation's daemon has either written its state file or timed
     # out, at which point the second invocation's detect_running_daemon
     # finds the first daemon and returns without spawning a duplicate.
-    with ensure_lock():
+    with ensure_lock() as lock_fd:
         existing = detect_running_daemon()
         if existing is not None:
             if open_browser:
@@ -1801,6 +1802,7 @@ def cmd_ensure(open_browser: bool, review_path_arg: Path | None) -> int:
         # runs in this process; otherwise the daemon's flock release
         # would race the parent's release on the shared OFD.
         try:
+            os.close(lock_fd)
             daemonize()
             port = find_free_port()
             state = {

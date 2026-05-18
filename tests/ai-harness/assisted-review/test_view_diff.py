@@ -1,19 +1,17 @@
-#!/usr/bin/env -S uv run -q --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["ruamel.yaml", "pyyaml"]
-# ///
-
 from __future__ import annotations
 
 import importlib.util
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
-VIEW_PATH = Path(__file__).with_name("view.py")
+REPO_ROOT = Path(__file__).resolve().parents[3]
+TOOLS_DIR = REPO_ROOT / "ai-harness" / "skills" / "assisted-review" / "tools"
+VIEW_PATH = TOOLS_DIR / "view.py"
+sys.path.insert(0, str(TOOLS_DIR))
 SPEC = importlib.util.spec_from_file_location("assisted_review_view", VIEW_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load view.py")
