@@ -1,0 +1,103 @@
+/* Visual study harness only.
+ * Deck chrome, Reveal setup, title/agenda/separator/final structures, and
+ * production deck CSS come from templates/deck.html.template.
+ * Do not copy this file into generated decks.
+ */
+
+:root {
+  color-scheme: light;
+  --bg: #f7f5ef;
+  --ink: #111418;
+  --muted: #60666b;
+  --line: #d7d2c8;
+  --surface: #fffdf8;
+  --surface-2: #eeebe3;
+  --blue: #2f6f89;
+  --green: #4f8061;
+  --amber: #e9b949;
+  --red: #d75f46;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+.stage {
+  width: 100%;
+  height: 100svh;
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.slide-frame {
+  position: relative;
+  width: calc(1280px * var(--slide-scale, 1));
+  height: calc(800px * var(--slide-scale, 1));
+  overflow: visible;
+}
+
+.slide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1280px;
+  height: 800px;
+  padding: 64px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  display: grid;
+  transform: translate(-50%, -50%) scale(var(--slide-scale, 1));
+  transform-origin: center;
+}
+
+.slide h1,
+.slide h2,
+.slide h3,
+.slide p {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.accent-line {
+  width: 72px;
+  height: 8px;
+  background: var(--amber);
+}
+
+.content-slide {
+  grid-template-rows: auto 1fr;
+  gap: 36px;
+}
+
+.slide-title {
+  display: grid;
+  gap: 10px;
+}
+
+.slide-title h1 {
+  max-width: 100%;
+  font-size: 52px;
+  line-height: 1;
+  font-weight: 850;
+}
+
+.slide-title p {
+  max-width: 44ch;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 620;
+}

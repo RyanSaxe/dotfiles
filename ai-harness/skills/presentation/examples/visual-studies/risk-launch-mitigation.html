@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Risk Slide - Launch Mitigation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="study-frame.css">
+<style>
+.risk-table {
+  display: grid;
+  grid-template-columns: 1fr 84px 1fr;
+  grid-template-rows: auto repeat(3, 1fr);
+  column-gap: 24px;
+  row-gap: 16px;
+  align-items: stretch;
+}
+
+.risk-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.pair-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.risk-card,
+.mitigation-card {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 20px 22px;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.risk-card {
+  border-left: 12px solid var(--red);
+}
+
+.mitigation-card {
+  border-left: 12px solid var(--green);
+}
+
+.severity-dot {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.risk-card .severity-dot { background: var(--red); }
+.mitigation-card .severity-dot { background: var(--green); }
+
+.risk-card h2,
+.mitigation-card h2 {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.risk-card p,
+.mitigation-card p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.22;
+  font-weight: 680;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <h1>Launch risks and mitigations</h1>
+      </header>
+      <div class="risk-table" aria-label="Each launch risk paired with its mitigation">
+        <div class="risk-label">risk</div>
+        <div></div>
+        <div class="risk-label">mitigation</div>
+
+        <div class="risk-card"><div class="severity-dot"></div><div><h2>Support spike</h2><p>New flow may generate setup questions in week one.</p></div></div>
+        <div class="pair-arrow">&rarr;</div>
+        <div class="mitigation-card"><div class="severity-dot"></div><div><h2>Launch queue</h2><p>Dedicated owners triage issues within 30 minutes.</p></div></div>
+
+        <div class="risk-card"><div class="severity-dot"></div><div><h2>Latency regression</h2><p>Extra validation can slow checkout during peak traffic.</p></div></div>
+        <div class="pair-arrow">&rarr;</div>
+        <div class="mitigation-card"><div class="severity-dot"></div><div><h2>Rollback threshold</h2><p>Automatic hold if p95 exceeds 220ms for 10 minutes.</p></div></div>
+
+        <div class="risk-card"><div class="severity-dot"></div><div><h2>Partner readiness</h2><p>Two partners still need production credentials.</p></div></div>
+        <div class="pair-arrow">&rarr;</div>
+        <div class="mitigation-card"><div class="severity-dot"></div><div><h2>Readiness checklist</h2><p>Launch blocked until both credentials are verified.</p></div></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="study-frame.js"></script>
+</body>
+</html>

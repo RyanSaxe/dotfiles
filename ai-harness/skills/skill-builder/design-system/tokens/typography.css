@@ -1,0 +1,56 @@
+/*
+ * Typography tokens.
+ *
+ * Geometric sans-serif via system stack — Inter first if installed locally,
+ * then a system-ui chain so the cascade always resolves to a clean modern
+ * sans on every platform. No @font-face or webfont fetch needed.
+ *
+ * Type scale is intentionally short (xs → display). Resist adding intermediate
+ * sizes — `--text-md-plus` is a smell that the hierarchy is being
+ * over-articulated rather than designed.
+ */
+
+:root {
+  /* Families */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+               "Liberation Mono", monospace;
+
+  /* Scale (rem-based, 16px root) */
+  --text-xs:   0.75rem;   /* 12px — small-caps labels, fine print */
+  --text-sm:   0.875rem;  /* 14px — captions, secondary body */
+  --text-base: 1rem;      /* 16px — body */
+  --text-lg:   1.125rem;  /* 18px — emphasized body, card titles */
+  --text-xl:   1.5rem;    /* 24px — section headings */
+  --text-2xl:  2rem;      /* 32px — page titles */
+  --text-display: 3rem;   /* 48px — hero metric values, opener numerals */
+
+  /* Line heights */
+  --leading-tight:   1.2;   /* headings, big metric values */
+  --leading-normal:  1.5;   /* body text */
+  --leading-relaxed: 1.7;   /* long-form reading */
+
+  /* Letter-spacing for uppercase small-caps section labels */
+  --tracking-label: 0.06em;
+
+  /* Weights */
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+}
+
+/*
+ * Utility class for the recurring "section label" style:
+ * uppercase, tracked-out, muted, smaller than body.
+ *
+ * <span class="label">TIME UNIT</span>
+ */
+.label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}

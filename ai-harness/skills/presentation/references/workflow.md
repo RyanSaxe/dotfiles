@@ -1,0 +1,118 @@
+# Presentation Workflow
+
+This is a collaborative working-session workflow. Do not draft slides before the deck is scoped well enough for critique.
+
+## 1. Discover
+
+Treat discovery as context transfer. A deck compresses the user's knowledge, so shallow metadata is not enough. Audience, length, and tone guide the work; they do not replace the raw material the deck must compress.
+
+Gather enough substance to understand:
+
+- the user's actual goal and why the presentation needs to exist
+- facts, examples, anecdotes, data points, tensions, objections, and decisions
+- docs, notes, screenshots, existing decks, datasets, or links the agent should inspect
+- what the audience already believes and what must change
+- the working thesis and likely narrative order
+- what must be legible on slides vs. what the presenter can explain live
+- visual stance, constraints, banned moves, and what "good" means for this user
+
+Use concise multiple-choice questions for real tradeoffs. Use free-form questions when the user needs to brain-dump context. Research or inspect artifacts when needed; do not make the user answer questions the environment can answer. Do not ask the user to design the deck for you.
+
+Never treat a few routing answers as sufficient context. If the substantive material is thin, keep interviewing or ask for artifacts before outlining.
+
+## 2. Reflect Back
+
+Before outlining or drafting, restate the understanding in plain language:
+
+- who the deck is for
+- what it must accomplish
+- the deep material the agent has absorbed
+- the important gaps or assumptions that remain
+- why the material is now sufficient to compress into a deck
+- the likely narrative arc
+- what should be legible on slides vs. what should remain presenter context
+- the visual direction
+- known risks, constraints, or banned moves
+
+End this stage with: "Is there anything else I need to know, or should I outline the deck for review?"
+
+Do not substitute a slide outline, implementation plan, or confident thesis statement for this checkpoint. Wait for explicit approval before outlining the deck.
+
+## 3. Outline the Deck
+
+After the user explicitly approves the reflected understanding, present the complete planned deck before building HTML. The outline is the user's chance to reshape the narrative while changes are still cheap.
+
+Include every slide in order. For each slide, state:
+
+- draft title
+- **Role:** why this slide exists in the story
+- **Message:** what the audience should understand
+- **Visual:** the planned visual relationship, chart, diagram, image, table, code, or spatial composition
+- **Notes:** optional constraints, density guidance, or important context that should not become slide prose
+
+Start with a count and structure contract before listing slides:
+
+- target number of visible slides
+- whether the count includes title, agenda, section separators, content slides, appendix, and final slide; default to every visible slide
+- agenda sections, content-slide ranges, and section pacing
+- separator slides, including the planned visual for each separator
+- intentional exceptions, such as a one-slide section or a longer case-study section
+
+Keep it readable in a terminal. Use clear section separators, then one compact slide block at a time with indented labeled lines. Do not use Markdown tables. Avoid blank spacer lines inside repeated slide entries; blank lines should separate major sections or slide blocks, not every field. Do not write long narration or detailed slide wording unless the user specifically asks for that detail.
+
+End by asking what should change, or whether to build the V1 from the outline. Wait for explicit approval before drafting HTML.
+
+## 4. Build V1
+
+After the user explicitly approves the deck outline, build a complete reviewable V1. A V1 should be concrete enough to critique visually and narratively.
+
+Before coding, inspect the examples for calibration:
+
+- read at least one full example deck when available
+- inspect 2-4 relevant files in `examples/visual-studies/` when a content-slide visual needs a quick one-shot reference
+- use full example decks to calibrate narrative, deck-system use, density, hierarchy, visual range, slide text density, pre-read balance, and content-slide visual craft
+- use visual studies only as focused content-slide visual calibration
+- do not copy example layouts unless the user's content relationship calls for that structure
+
+Default arc:
+
+```text
+title -> agenda -> separator for agenda item 1 -> content -> separator for agenda item 2 -> content -> final slide
+```
+
+When a deck includes an agenda, keep the agenda slide subtitle-free by default. Each agenda item should usually become a visible section with its own separator slide, followed by at least two content slides. Adapt the arc when the user's context demands it, but do not let the agenda promise structure that the slide flow does not deliver.
+
+If a section has only one content slide, treat that as a sign the agenda is probably too granular. Merge thin sections before drafting unless the user explicitly wants a very short or unusual deck.
+
+Content-slide subtitles are optional. Use them when they supply necessary frame or evidence context; otherwise remove them and let the title, visual hierarchy, and section separator carry orientation.
+
+Slides should be skimmable as a pre-read, but not self-narrating. Use short claims, labels, evidence anchors, and necessary context. Keep nuance, caveats, examples, and connective tissue out of slide prose unless the room requires them.
+
+## 5. Self-Review
+
+Before showing the user, run the rubric and visual QA passes:
+
+- deck-level argument pass
+- slide-level job and scan pass
+- text density pass
+- high-emphasis one-line pass
+- content mass and balance pass
+- viewport and screenshot pass
+
+Fix issues before asking the user to review.
+
+## 6. Critique and Iterate
+
+Ask for targeted critique after V1. When feedback is broad, propose a slide-level revision plan. When feedback is specific, implement it and re-render.
+
+Treat full examples and visual studies as calibration. They should influence quality, hierarchy, and range, not become components to copy or alternate deck skeletons.
+
+## 7. Finalize
+
+Before final delivery:
+
+- remove placeholder language and process commentary
+- verify links, assets, fonts, and optional CDNs
+- render screenshots at required viewports
+- confirm no unwanted scrolling or clipping
+- ensure the final HTML opens directly in a browser

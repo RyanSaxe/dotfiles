@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chart Slide - ARR Waterfall</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="study-frame.css">
+<style>
+.chart-story {
+  align-self: center;
+  display: grid;
+  align-items: center;
+}
+
+.chart-panel {
+  min-height: 584px;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  padding: 30px 34px 28px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 24px;
+}
+
+.chart-wrap {
+  position: relative;
+  min-height: 430px;
+}
+
+.chart-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.chart-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+  text-align: center;
+}
+
+.chart-fallback[hidden] {
+  display: none;
+}
+
+.chart-legend {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.legend-item {
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  padding: 15px 16px;
+  display: grid;
+  gap: 5px;
+}
+
+.legend-item.total {
+  box-shadow: inset 0 9px 0 var(--blue);
+}
+
+.legend-item.gain {
+  box-shadow: inset 0 9px 0 var(--green);
+}
+
+.legend-item.loss {
+  box-shadow: inset 0 9px 0 var(--red);
+}
+
+.legend-item span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.legend-item strong {
+  font-size: 31px;
+  line-height: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <h1>ARR bridge: +$0.7M net</h1>
+      </header>
+      <div class="chart-story">
+        <div class="chart-panel">
+          <div class="chart-wrap">
+            <canvas id="arr-waterfall-chart" role="img" aria-label="Waterfall chart moving from 4.2 million dollars in opening ARR to 4.9 million dollars in closing ARR. Expansion adds 0.7 million. New business adds 0.4 million. Churn subtracts 0.25 million. Contraction subtracts 0.15 million."></canvas>
+            <p class="chart-fallback" hidden>ARR moves from $4.2M to $4.9M after $1.1M of gains and $0.4M of churn and contraction.</p>
+          </div>
+          <div class="chart-legend" aria-hidden="true">
+            <div class="legend-item total"><span>Open</span><strong>$4.2M</strong></div>
+            <div class="legend-item gain"><span>Gain</span><strong>+$1.1M</strong></div>
+            <div class="legend-item loss"><span>Drag</span><strong>-$0.4M</strong></div>
+            <div class="legend-item total"><span>Close</span><strong>$4.9M</strong></div>
+          </div>
+        </div>
+      </div>
+      <table class="sr-only">
+        <caption>Quarterly ARR bridge in millions of dollars</caption>
+        <thead><tr><th>Step</th><th>Change</th><th>Ending ARR</th></tr></thead>
+        <tbody>
+          <tr><th>Opening ARR</th><td>$4.20M</td><td>$4.20M</td></tr>
+          <tr><th>Expansion</th><td>+$0.70M</td><td>$4.90M</td></tr>
+          <tr><th>New business</th><td>+$0.40M</td><td>$5.30M</td></tr>
+          <tr><th>Churn</th><td>-$0.25M</td><td>$5.05M</td></tr>
+          <tr><th>Contraction</th><td>-$0.15M</td><td>$4.90M</td></tr>
+          <tr><th>Closing ARR</th><td>$4.90M</td><td>$4.90M</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="study-frame.js"></script>
+<script>
+const chartCanvas = document.getElementById("arr-waterfall-chart");
+const fallback = document.querySelector(".chart-fallback");
+
+if (chartCanvas instanceof HTMLCanvasElement && window.Chart) {
+  const styles = getComputedStyle(document.documentElement);
+  const fontFamily = styles.getPropertyValue("--font").trim();
+  const ink = styles.getPropertyValue("--ink").trim();
+  const muted = styles.getPropertyValue("--muted").trim();
+  const line = styles.getPropertyValue("--line").trim();
+  const blue = styles.getPropertyValue("--blue").trim();
+  const green = styles.getPropertyValue("--green").trim();
+  const red = styles.getPropertyValue("--red").trim();
+
+  Chart.defaults.font.family = fontFamily;
+  Chart.defaults.color = ink;
+
+  const bridgeData = [
+    { label: "Open", range: [0, 4.2], kind: "total", end: 4.2, value: "$4.2" },
+    { label: "Expand", range: [4.2, 4.9], kind: "gain", end: 4.9, value: "+$0.7" },
+    { label: "New", range: [4.9, 5.3], kind: "gain", end: 5.3, value: "+$0.4" },
+    { label: "Churn", range: [5.05, 5.3], kind: "loss", end: 5.05, value: "-$0.25" },
+    { label: "Downsell", range: [4.9, 5.05], kind: "loss", end: 4.9, value: "-$0.15" },
+    { label: "Close", range: [0, 4.9], kind: "total", end: 4.9, value: "$4.9" },
+  ];
+
+  const fills = bridgeData.map((item) => {
+    if (item.kind === "total") return blue;
+    if (item.kind === "loss") return red;
+    return green;
+  });
+
+  const connectorPlugin = {
+    id: "waterfallGuides",
+    afterDatasetsDraw(chart) {
+      const meta = chart.getDatasetMeta(0);
+      const yScale = chart.scales.y;
+      const context = chart.ctx;
+
+      context.save();
+      context.strokeStyle = ink;
+      context.lineWidth = 2;
+      context.setLineDash([7, 6]);
+
+      for (let index = 0; index < meta.data.length - 1; index += 1) {
+        const current = meta.data[index];
+        const next = meta.data[index + 1];
+        const currentEnd = bridgeData[index].end;
+        const y = yScale.getPixelForValue(currentEnd);
+        const x1 = current.x + current.width / 2;
+        const x2 = next.x - next.width / 2;
+
+        context.beginPath();
+        context.moveTo(x1, y);
+        context.lineTo(x2, y);
+        context.stroke();
+      }
+
+      context.setLineDash([]);
+      context.fillStyle = ink;
+      context.textAlign = "center";
+      context.textBaseline = "bottom";
+      context.font = `800 18px ${fontFamily}`;
+
+      meta.data.forEach((bar, index) => {
+        const y = Math.min(bar.y, bar.base) - 10;
+        context.fillText(bridgeData[index].value, bar.x, y);
+      });
+
+      context.restore();
+    },
+  };
+
+  new Chart(chartCanvas, {
+    type: "bar",
+    data: {
+      labels: bridgeData.map((item) => item.label),
+      datasets: [
+        {
+          label: "ARR",
+          data: bridgeData.map((item) => item.range),
+          backgroundColor: fills,
+          borderColor: ink,
+          borderWidth: 2,
+          borderSkipped: false,
+          barPercentage: 0.82,
+          categoryPercentage: 0.76,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      layout: {
+        padding: {
+          top: 8,
+          right: 8,
+          bottom: 0,
+          left: 4,
+        },
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          enabled: false,
+        },
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false,
+          },
+          border: {
+            color: ink,
+            width: 2,
+          },
+          ticks: {
+            color: muted,
+            maxRotation: 0,
+            minRotation: 0,
+            font: {
+              size: 14,
+              weight: 850,
+            },
+          },
+        },
+        y: {
+          min: 0,
+          max: 6,
+          border: {
+            color: ink,
+            width: 2,
+          },
+          grid: {
+            color: line,
+            lineWidth: 1.4,
+          },
+          ticks: {
+            stepSize: 1,
+            color: muted,
+            callback: (value) => `$${value}M`,
+            font: {
+              size: 14,
+              weight: 800,
+            },
+          },
+        },
+      },
+    },
+    plugins: [connectorPlugin],
+  });
+} else if (fallback instanceof HTMLElement) {
+  fallback.hidden = false;
+}
+</script>
+</body>
+</html>

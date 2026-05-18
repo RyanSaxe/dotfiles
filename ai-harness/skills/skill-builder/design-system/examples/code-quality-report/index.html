@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quality audit · feature/payment-rewrite</title>
+
+<!-- CDN libraries: highlight.js (cdn-release build includes common languages,
+     so no separate python pack is needed); Lucide for icons. -->
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-light.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="brand">
+    <i data-lucide="shield-check" class="brand-icon"></i>
+    <div>
+      <div class="brand-name">Quality audit</div>
+      <div class="brand-sub">Branch review</div>
+    </div>
+  </div>
+
+  <div class="branch-pill" id="branchPill">
+    <i data-lucide="git-branch" class="inline-icon"></i>
+    <span>feature/payment-rewrite</span>
+    <span class="muted">·</span>
+    <code id="commitShort">8f3a2c1</code>
+  </div>
+
+  <button class="btn btn-primary" type="button" title="Re-run audit">
+    <i data-lucide="rotate-cw" class="inline-icon"></i>
+    Re-run
+  </button>
+</header>
+
+<main class="page">
+
+  <header class="page-head">
+    <span class="label">Branch review</span>
+    <h1 class="page-title">Quality audit</h1>
+    <p class="page-sub">
+      <code>feature/payment-rewrite</code> compared to <code>main</code>.
+      Two issues block merge — a hardcoded Stripe key and a SQL-injection
+      in the refunds endpoint. The rest are tightening recommendations.
+    </p>
+  </header>
+
+  <!-- Filter bar -->
+  <section class="filter-bar card">
+    <div class="filter-group">
+      <span class="label">Severity</span>
+      <div class="chips" id="severityChips" role="tablist">
+        <button class="chip is-active" data-filter="severity" data-value="all" role="tab">All <span class="chip-count">12</span></button>
+        <button class="chip" data-filter="severity" data-value="critical" role="tab"><span class="dot dot-critical"></span>Critical <span class="chip-count">2</span></button>
+        <button class="chip" data-filter="severity" data-value="high" role="tab"><span class="dot dot-high"></span>High <span class="chip-count">2</span></button>
+        <button class="chip" data-filter="severity" data-value="medium" role="tab"><span class="dot dot-medium"></span>Medium <span class="chip-count">3</span></button>
+        <button class="chip" data-filter="severity" data-value="low" role="tab"><span class="dot dot-low"></span>Low <span class="chip-count">3</span></button>
+        <button class="chip" data-filter="severity" data-value="info" role="tab"><span class="dot dot-info"></span>Info <span class="chip-count">2</span></button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="label">Status</span>
+      <div class="chips" id="statusChips" role="tablist">
+        <button class="chip is-active" data-filter="status" data-value="all" role="tab">All</button>
+        <button class="chip" data-filter="status" data-value="open" role="tab">Open <span class="chip-count">8</span></button>
+        <button class="chip" data-filter="status" data-value="resolved" role="tab">Resolved <span class="chip-count">3</span></button>
+        <button class="chip" data-filter="status" data-value="wontfix" role="tab">Won't fix <span class="chip-count">1</span></button>
+      </div>
+    </div>
+
+    <div class="filter-summary" id="filterSummary">Showing all 12 findings</div>
+  </section>
+
+  <!-- Findings list (rendered by JS) -->
+  <section class="findings" id="findings"></section>
+
+  <footer class="page-foot">
+    <span class="muted small">Generated 2026-05-04 14:22 UTC by <code>/quality-audit --branch=feature/payment-rewrite</code> · 47 files scanned · Status pills toggle on click.</span>
+  </footer>
+
+</main>
+
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

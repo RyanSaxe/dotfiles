@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bayesian vs gradient · Two ways to learn from data</title>
+
+<!-- KaTeX for math typesetting (with auto-render extension) -->
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$',  right: '$',  display: false }
+          ],
+          throwOnError: false
+        });"></script>
+
+<!-- highlight.js for the small Python snippets (atom-one-light baseline) -->
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-light.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
+
+<!-- Lucide icons -->
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="print.css" media="print" />
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="brand">
+    <i data-lucide="book-open" class="brand-icon"></i>
+    <div>
+      <div class="brand-name">Methodology</div>
+      <div class="brand-sub">ML foundations</div>
+    </div>
+  </div>
+  <div class="reading-meta">
+    <span class="muted small"><i data-lucide="clock" class="inline-icon"></i> 8 min read</span>
+    <button class="btn btn-ghost" type="button" onclick="window.print()" title="Print">
+      <i data-lucide="printer" class="inline-icon"></i> Print
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sticky TOC sidebar -->
+  <aside class="toc">
+    <div class="toc-inner">
+      <span class="label">In this piece</span>
+      <ol id="tocList">
+        <li><a href="#setup" class="is-active">The shared setup</a></li>
+        <li><a href="#gradient">Gradient: find the best $\theta$</a></li>
+        <li><a href="#bayesian">Bayesian: find the distribution</a></li>
+        <li><a href="#compare">Side by side</a></li>
+        <li><a href="#when">When to use which</a></li>
+        <li><a href="#hybrid">The hybrid landscape</a></li>
+      </ol>
+
+      <span class="label" style="margin-top: var(--space-6); display:block;">Math notation</span>
+      <ul class="glossary">
+        <li><dfn>$\theta$</dfn> — model parameters (weights)</li>
+        <li><dfn>$\mathcal{D}$</dfn> — observed data</li>
+        <li><dfn>$p(\cdot)$</dfn> — probability density</li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Main article -->
+  <main class="article">
+
+    <header class="article-head">
+      <span class="label">Methodology explainer</span>
+      <h1>Bayesian vs gradient: two ways to learn from data</h1>
+      <p class="lede">
+        When you fit a model, you choose between an answer and a distribution.
+        Gradient-based methods give you a single best-guess set of parameters.
+        Bayesian inference gives you a probability distribution over them. The
+        difference sounds philosophical until you have to ship something — at
+        which point it becomes one of the most consequential decisions in the
+        whole pipeline.
+      </p>
+      <div class="byline">
+        <span class="muted small">
+          Generated 2026-05-04 by <code>/explain-methodology --topic="bayesian vs gradient ML"</code>
+        </span>
+      </div>
+    </header>
+
+    <section id="setup">
+      <h2>The shared setup</h2>
+      <p>
+        Both frames start from the same place: data
+        $\mathcal{D} = \{(x_i, y_i)\}_{i=1}^n$, a model with parameters
+        $\theta$, and a likelihood $p(\mathcal{D} \mid \theta)$ that says
+        how plausibly the model would have produced the data we observed.
+      </p>
+      <p>
+        From there, the two camps diverge on what they want from $\theta$.
+        The gradient camp turns the problem into <em>optimization</em> —
+        what's the single best $\theta$? The Bayesian camp turns it into
+        <em>inference</em> — what does the data tell us about the
+        distribution over $\theta$?
+      </p>
+    </section>
+
+    <section id="gradient">
+      <h2>Gradient: find the best $\theta$</h2>
+      <p>
+        Maximum-likelihood estimation picks the $\theta$ that maximizes the
+        log-likelihood of the data:
+      </p>
+
+      <div class="math-display">
+        $$ \theta^* = \arg\max_\theta \sum_{i=1}^n \log p(y_i \mid x_i, \theta) $$
+      </div>
+
+      <p>
+        Stochastic gradient descent is the workhorse: take a small step
+        against the gradient of the loss, repeat until convergence. The
+        output is one parameter vector — a single point in parameter space.
+      </p>
+
+      <pre><code class="language-python">def sgd_step(theta, x, y, lr):
+    grad = -log_likelihood_grad(theta, x, y)
+    return theta - lr * grad</code></pre>
+
+      <aside class="callout callout-info">
+        <span class="callout-icon"><i data-lucide="info" class="inline-icon"></i></span>
+        <div>
+          <strong>What you ship:</strong> a single set of weights, a forward
+          pass at inference time, and $O(\text{model size})$ memory. This
+          is why every frontier model, every production classifier, and
+          every recsys ranker uses some flavor of this.
+        </div>
+      </aside>
+
+      <h3>Interactive: gradient descent on a 2D loss</h3>
+      <p class="caption">
+        Click <em>Step</em> to take one gradient step from the current point
+        toward the minimum. The learning rate slider controls step size —
+        push it too high and you'll see the path overshoot and oscillate
+        through the elongated valley before settling.
+      </p>
+
+      <figure class="figure" id="figGD">
+        <svg viewBox="0 0 480 300" class="fig-svg" id="gdSvg" aria-label="Gradient descent on an elongated quadratic loss"></svg>
+        <div class="fig-controls">
+          <button class="btn btn-primary" type="button" id="gdStep">
+            <i data-lucide="play" class="inline-icon"></i> Step
+          </button>
+          <button class="btn btn-ghost" type="button" id="gdReset">
+            <i data-lucide="rotate-ccw" class="inline-icon"></i> Reset
+          </button>
+          <label class="slider">
+            <span>Learning rate</span>
+            <input type="range" id="gdLr" min="0.05" max="0.95" step="0.05" value="0.35" />
+            <output id="gdLrOut">0.35</output>
+          </label>
+          <span class="fig-stat muted small">
+            steps: <span id="gdSteps">0</span> · loss: <span id="gdLoss">—</span>
+          </span>
+        </div>
+      </figure>
+    </section>
+
+    <section id="bayesian">
+      <h2>Bayesian: find the distribution over $\theta$</h2>
+      <p>
+        Bayes' rule turns the problem inside out. Given a prior $p(\theta)$
+        that encodes what you believed about the parameters before seeing
+        data, the posterior is:
+      </p>
+
+      <div class="math-display">
+        $$ p(\theta \mid \mathcal{D}) \;=\; \frac{\,p(\mathcal{D} \mid \theta)\, p(\theta)\,}{p(\mathcal{D})} $$
+      </div>
+
+      <p>
+        You don't get a single $\theta$ — you get a probability distribution
+        that captures everything the data has told you about the parameters.
+        To make a prediction, you sample $\theta$ from the posterior and
+        average predictions across samples.
+      </p>
+
+      <p>
+        The catch: $p(\theta \mid \mathcal{D})$ is rarely tractable in
+        closed form for anything beyond toy cases. So you approximate. MCMC
+        draws samples from the posterior over many iterations; variational
+        inference fits a simpler distribution that's close to it.
+      </p>
+
+      <aside class="callout callout-warning">
+        <span class="callout-icon"><i data-lucide="alert-triangle" class="inline-icon"></i></span>
+        <div>
+          <strong>What you ship:</strong> a sampler (or a fitted variational
+          approximation), and an inference cost that scales with how many
+          posterior samples you average over. An ensemble of 10 samples
+          means every prediction is 10× the compute.
+        </div>
+      </aside>
+
+      <h3>Interactive: how the posterior moves with data</h3>
+      <p class="caption">
+        A coin-flip example with a Beta(2, 2) prior — a mild belief that
+        the coin is roughly fair. Slide <em>trials</em> and <em>successes</em>
+        to add data; the posterior pulls toward the data and away from the
+        prior as evidence accumulates.
+      </p>
+
+      <figure class="figure" id="figPosterior">
+        <svg viewBox="0 0 480 280" class="fig-svg" id="postSvg" aria-label="Prior, likelihood, and posterior for a Beta-binomial model"></svg>
+        <div class="fig-controls">
+          <label class="slider">
+            <span>Trials</span>
+            <input type="range" id="postN" min="0" max="60" step="1" value="0" />
+            <output id="postNOut">0</output>
+          </label>
+          <label class="slider">
+            <span>Successes</span>
+            <input type="range" id="postS" min="0" max="60" step="1" value="0" />
+            <output id="postSOut">0</output>
+          </label>
+        </div>
+        <ul class="figure-legend" id="postLegend"></ul>
+      </figure>
+    </section>
+
+    <section id="compare">
+      <h2>Side by side</h2>
+      <p>
+        The two methods aren't competing on the same axes. Each is good at
+        what it's optimizing for, and weak on the things it isn't. The grid
+        below summarizes the trade where it most matters in practice.
+      </p>
+
+      <div class="compare-grid" role="table" aria-label="Comparison across four practical axes">
+        <div class="cmp-row cmp-head" role="row">
+          <div role="columnheader">Axis</div>
+          <div role="columnheader">Gradient</div>
+          <div role="columnheader">Bayesian</div>
+        </div>
+
+        <div class="cmp-row" role="row">
+          <div class="cmp-axis" role="rowheader">Compute cost</div>
+          <div class="cmp-cell cell-good" role="cell">
+            <span class="cmp-mark"><i data-lucide="check" class="inline-icon"></i></span>
+            <strong>Low.</strong> One model fit; one forward pass at inference.
+          </div>
+          <div class="cmp-cell cell-bad" role="cell">
+            <span class="cmp-mark"><i data-lucide="x" class="inline-icon"></i></span>
+            <strong>High.</strong> Sampling or variational fits; multi-sample inference.
+          </div>
+        </div>
+
+        <div class="cmp-row" role="row">
+          <div class="cmp-axis" role="rowheader">Uncertainty</div>
+          <div class="cmp-cell cell-bad" role="cell">
+            <span class="cmp-mark"><i data-lucide="x" class="inline-icon"></i></span>
+            <strong>None built in.</strong> A point estimate has no native error bars.
+          </div>
+          <div class="cmp-cell cell-good" role="cell">
+            <span class="cmp-mark"><i data-lucide="check" class="inline-icon"></i></span>
+            <strong>Native.</strong> Posterior is a full distribution; calibration falls out.
+          </div>
+        </div>
+
+        <div class="cmp-row" role="row">
+          <div class="cmp-axis" role="rowheader">Sample efficiency</div>
+          <div class="cmp-cell cell-mid" role="cell">
+            <span class="cmp-mark"><i data-lucide="minus" class="inline-icon"></i></span>
+            <strong>Data-hungry.</strong> No mechanism to encode prior knowledge.
+          </div>
+          <div class="cmp-cell cell-good" role="cell">
+            <span class="cmp-mark"><i data-lucide="check" class="inline-icon"></i></span>
+            <strong>Strong.</strong> A well-chosen prior substitutes for missing data.
+          </div>
+        </div>
+
+        <div class="cmp-row" role="row">
+          <div class="cmp-axis" role="rowheader">Interpretability</div>
+          <div class="cmp-cell cell-mid" role="cell">
+            <span class="cmp-mark"><i data-lucide="minus" class="inline-icon"></i></span>
+            <strong>Opaque.</strong> A trained weight vector resists introspection.
+          </div>
+          <div class="cmp-cell cell-good" role="cell">
+            <span class="cmp-mark"><i data-lucide="check" class="inline-icon"></i></span>
+            <strong>Transparent.</strong> Posterior shape says what's known.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="when">
+      <h2>When to use which</h2>
+      <p>
+        Three quick heuristics that hold up most of the time:
+      </p>
+
+      <div class="when-grid">
+        <article class="card when-card">
+          <span class="label"><i data-lucide="zap" class="inline-icon"></i> Reach for gradient</span>
+          <ul>
+            <li>Model is large (millions+ of parameters)</li>
+            <li>Data is abundant relative to parameters</li>
+            <li>A point estimate is acceptable downstream</li>
+            <li>Inference budget is tight</li>
+          </ul>
+        </article>
+
+        <article class="card when-card">
+          <span class="label"><i data-lucide="compass" class="inline-icon"></i> Reach for Bayesian</span>
+          <ul>
+            <li>Calibrated uncertainty is the deliverable</li>
+            <li>Data is scarce; sensible priors exist</li>
+            <li>Model is small enough that posterior sampling is tractable</li>
+            <li>Decisions downstream reason about distributions</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="hybrid">
+      <h2>The hybrid landscape</h2>
+      <p>
+        Most production systems that "do Bayesian deep learning" don't run
+        full posterior inference. They live in a hybrid space: MAP
+        estimation gives a Bayesian-flavored point estimate. Deep ensembles
+        train several models from different initializations and average
+        them — sample-free uncertainty for the price of N forward passes.
+        Laplace approximations fit a Gaussian around a trained model's
+        weights. MC dropout reinterprets a regularizer as variational
+        inference.<sup class="fn-ref"><a href="#fn1" id="fnref1">1</a></sup>
+      </p>
+      <p>
+        The honest takeaway: gradient methods win on engineering
+        practicality almost everywhere; Bayesian methods win when
+        uncertainty itself is the deliverable; and the hybrid space is
+        where most useful ML quietly lives.
+      </p>
+    </section>
+
+    <hr />
+
+    <footer class="footnotes">
+      <h2 class="label">Notes</h2>
+      <ol>
+        <li id="fn1">
+          Gal &amp; Ghahramani (2016), <em>Dropout as a Bayesian
+          Approximation</em>, showed that a network with dropout at inference
+          time can be interpreted as approximate variational inference over
+          the weights. <a href="#fnref1" class="fn-back">↩</a>
+        </li>
+      </ol>
+    </footer>
+
+    <footer class="article-foot">
+      <span class="muted small">Data, code samples, and figures are pedagogical, not production. Hybrid approaches are an active research area; the description above is a snapshot.</span>
+    </footer>
+
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

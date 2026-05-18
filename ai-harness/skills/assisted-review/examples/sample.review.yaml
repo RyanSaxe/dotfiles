@@ -1,0 +1,84 @@
+generated_at: 2026-05-05T09:12:00Z
+generated_by: codex
+
+target:
+  kind: pr
+  repo_root: /Users/me/projects/dotfiles
+  branch: feature/agent-notifications
+  commit: d598ced2047cd78b72d69b092ebb842bb85772d6
+  fingerprint: c23ec50a7b7b75f012a9985da42698515c87a7e29501cb89f0b17a81ddf9f0aa
+  pr_number: 142
+  owner: me
+  repo: dotfiles
+  remote: origin
+
+review:
+  event: COMMENT
+  summary:
+    author: ai
+    body: |-
+      I reviewed the notification and shell helper changes. The main issue is a real lock-recovery race that can let two notification daemons run at once; the rest are smaller maintainability and portability notes.
+    replies: []
+  note:
+    author: ai
+    body: |-
+      Start with the lock handling thread before judging the portability item. The lock race affects runtime behavior, while the alias finding is a repo hygiene issue.
+    replies: []
+
+  threads:
+    - id: rev-001
+      type: comment
+      author: ai
+      file: scripts/attention-daemon.sh
+      start_line: 18
+      line: 26
+      severity: high
+      confidence: high
+      category: correctness
+      body: |-
+        The lock recovery path can delete a healthy lock. If `mkdir "$lock_dir"` fails because another daemon owns the lock, this branch removes the directory before proving it is stale, so both processes can continue and emit duplicate notifications.
+      status: open
+      anchor_text: |-
+        if ! mkdir "$lock_dir"; then
+          rm -rf "$lock_dir"
+          mkdir "$lock_dir"
+        fi
+      anchor_status: current
+      replies: []
+
+    - id: rev-002
+      type: comment
+      author: ai
+      file: zsh/aliases.zsh
+      line: 48
+      severity: medium
+      confidence: medium
+      category: portability
+      body: |-
+        This alias points at a host-specific absolute path. Anyone else sourcing the dotfiles will get a command that exists syntactically but fails at runtime.
+      suggestion: |-
+        alias pptx='uv run -q --script ~/generic/dotfiles/scripts/pptx.py'
+      status: open
+      anchor_text: |-
+        alias pptx='/Users/me/private/scripts/pptx.py'
+      anchor_status: moved
+      replies:
+        - author: user
+          body: |-
+            Good catch. Please keep this one but make the suggested path use the reusable script convention.
+
+    - id: rev-003
+      type: note
+      author: user
+      file: scripts/notify.sh
+      line: 77
+      severity: low
+      confidence: low
+      category: test
+      body: |-
+        I am not sure this path is covered. Can the next review pass check whether the retry branch has a test?
+      status: open
+      anchor_text: |-
+        retry_send "$payload"
+      anchor_status: ambiguous
+      replies: []

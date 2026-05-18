@@ -1,11 +1,16 @@
 # Git Configuration
 
-Git configuration with delta for syntax-highlighted diffs, TokyoNight theme integration, and useful aliases.
+Git configuration with Hunk as the primary interactive diff pager, delta as a
+stable fallback, TokyoNight theme integration, and useful aliases.
 
 ## Features
 
-- **Delta integration** - Syntax-highlighted side-by-side diffs with TokyoNight Night theme
-- **zdiff3 merge style** - Enhanced conflict markers showing original, ours, and theirs
+- **Hunk pager** - Review-first terminal diff UI for `git diff`, `git show`,
+  and agent-note workflows
+- **Delta fallback** - Syntax-highlighted side-by-side diffs for fallback
+  aliases and `git add -p`
+- **zdiff3 merge style** - Enhanced conflict markers showing original, ours,
+  and theirs
 - **Auto-setup remote** - Automatically sets up remote tracking for new branches
 - **Rebase by default** - Pull with rebase instead of merge
 - **Useful aliases** - Common git shortcuts
@@ -16,7 +21,7 @@ Git configuration with delta for syntax-highlighted diffs, TokyoNight theme inte
 
 ```gitconfig
 [core]
-    pager = delta --side-by-side --syntax-theme=tokyonight_night
+    pager = hunk pager
 [interactive]
     diffFilter = delta --color-only
 [merge]
@@ -43,17 +48,21 @@ Git configuration with delta for syntax-highlighted diffs, TokyoNight theme inte
 - `git unstage` → `reset HEAD --`
 - `git last` → `log -1 HEAD`
 - `git lg` → `log --oneline --graph --decorate --all`
+- `git ddiff` → run `git diff` through delta
+- `git dshow` → run `git show` through delta
+- `git hwatch` → open `hunk diff --watch`
 
 ## Global Ignore
 
-The `ignore` file defines patterns to exclude globally across all repositories (e.g., `.DS_Store`, editor files, etc.).
+The `ignore` file defines patterns to exclude globally across all repositories
+(e.g., `.DS_Store`, editor files, etc.).
 
 ## Customization
 
 Edit `config` to:
 
 - Add new aliases
-- Modify delta display options (remove `--side-by-side` for unified diffs)
+- Modify Hunk or delta fallback pager options
 - Change merge conflict style
 - Update user name/email
 

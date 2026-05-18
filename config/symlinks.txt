@@ -2,6 +2,7 @@ nvim:$HOME/.config/nvim
 bat:$HOME/.config/bat
 ghostty:$HOME/.config/ghostty
 git:$HOME/.config/git
+hunk/config.toml:$HOME/.config/hunk/config.toml
 lazygit/config.yml:${LAZYGIT_CONFIG_DIR}/config.yml
 tmux:$HOME/.config/tmux
 zsh/.zshrc:$HOME/.zshrc
@@ -14,16 +15,17 @@ ai-harness/AGENTS.md:$HOME/.codex/AGENTS.md
 ai-harness/AGENTS.md:$HOME/.copilot/copilot-instructions.md
 ai-harness/skills:$HOME/.agents/skills
 ai-harness/skills:$HOME/.claude/skills
-ai-harness/notify.sh:$HOME/.codex/hooks/notify.sh
-ai-harness/notify.sh:$HOME/.copilot/hooks/notify.sh
+ai-harness/scripts/notify.sh:$HOME/.codex/hooks/notify.sh
+ai-harness/scripts/notify.sh:$HOME/.copilot/hooks/notify.sh
 ai-harness/codex/hooks.json:$HOME/.codex/hooks.json
 ai-harness/copilot/settings.json:$HOME/.copilot/settings.json
-claude/CLAUDE.md:$HOME/.claude/CLAUDE.md
-claude/settings.json:$HOME/.claude/settings.json
-claude/utility-scripts:$HOME/.claude/utility-scripts
-claude/references:$HOME/.claude/references
-claude/hooks:$HOME/.claude/hooks
-claude/commands:$HOME/.claude/commands
+ai-harness/copilot/utility-scripts:$HOME/.copilot/utility-scripts
+ai-harness/claude/CLAUDE.md:$HOME/.claude/CLAUDE.md
+ai-harness/claude/settings.json:$HOME/.claude/settings.json
+ai-harness/claude/utility-scripts:$HOME/.claude/utility-scripts
+ai-harness/claude/references:$HOME/.claude/references
+ai-harness/claude/hooks:$HOME/.claude/hooks
+ai-harness/claude/themes:$HOME/.claude/themes
 karabiner:$HOME/.config/karabiner
 leader-key/config.json:$HOME/Library/Application Support/Leader Key/config.json
 harper/dictionary.txt:$HOME/.config/harper-ls/dictionary.txt

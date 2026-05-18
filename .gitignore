@@ -20,3 +20,5 @@ ipython/profile_default/*
 !ipython/profile_default/startup/
 test-projects/
 tmux/plugins/
+__pycache__/
+*.py[cod]

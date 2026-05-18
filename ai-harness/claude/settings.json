@@ -1,0 +1,233 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash list:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run python -m pytest:*)",
+      "Bash(pytest:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(make test:*)",
+      "Bash(make check:*)",
+      "Bash(man:*)",
+      "Bash(tldr:*)",
+      "Bash(ls:*)",
+      "Bash(pwd:*)",
+      "Bash(which:*)",
+      "Bash(whereis:*)",
+      "Bash(type:*)",
+      "Bash(file:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(date:*)",
+      "Bash(uname:*)",
+      "Bash(whoami:*)",
+      "Bash(hostname:*)",
+      "Bash(id:*)",
+      "Bash(df:*)",
+      "Bash(du:*)",
+      "Bash(diff:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(cut:*)",
+      "Bash(tr:*)",
+      "Bash(basename:*)",
+      "Bash(dirname:*)",
+      "Bash(realpath:*)",
+      "Bash(readlink:*)",
+      "Bash(echo:*)",
+      "Bash(printf:*)",
+      "Bash(true:*)",
+      "Bash(false:*)",
+      "Bash(sleep:*)",
+      "Bash(jq:*)",
+      "Bash(yq:*)",
+      "Bash(bat:*)",
+      "Bash(column:*)",
+      "Bash(nl:*)",
+      "Bash(seq:*)",
+      "Bash(expr:*)",
+      "Bash(bc:*)",
+      "Bash(md5sum:*)",
+      "Bash(sha256sum:*)",
+      "Bash(sha1sum:*)",
+      "Bash(stat:*)",
+      "Bash(rg:*)",
+      "Bash(sg:*)",
+      "Bash(ag:*)",
+      "SlashCommand:/python",
+      "SlashCommand:/neovim",
+      "SlashCommand:/shell",
+      "SlashCommand:/clean",
+      "SlashCommand:/tdd"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(**/*secret*)",
+      "Read(**/secrets/**)",
+      "Read(**/.secrets/**)",
+      "Read(**/credentials*)",
+      "Read(**/*credential*)",
+      "Read(**/api-key*)",
+      "Read(**/*apikey*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.gem/credentials)",
+      "Read(./**/.netrc)",
+      "Read(./**/.htpasswd)",
+      "Read(**/auth.json)",
+      "Read(**/token.json)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.csv)",
+      "Read(**/*.parquet)",
+      "Read(**/*.arrow)",
+      "Read(**/*.sql)",
+      "Read(**/*.db)",
+      "Read(**/*.sqlite)",
+      "Read(**/*.sqlite3)",
+      "Read(**/package-lock.json)",
+      "Read(**/yarn.lock)",
+      "Read(**/uv.lock)",
+      "Read(**/Cargo.lock)",
+      "Read(**/poetry.lock)",
+      "Read(**/pnpm-lock.yaml)",
+      "Read(**/composer.lock)",
+      "Read(**/Gemfile.lock)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Edit(./**/.env)",
+      "Edit(./**/.env.*)",
+      "Edit(**/*secret*)",
+      "Edit(**/credentials*)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Write(./**/.env)",
+      "Write(./**/.env.*)",
+      "Write(**/*secret*)",
+      "Write(**/credentials*)"
+    ]
+  },
+  "model": "opus[1m]",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/post-todowrite.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AI_AGENT_SOURCE=claude bash $HOME/.claude/hooks/send-notification.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash $HOME/.claude/utility-scripts/statusline.sh",
+    "padding": 0
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "editorMode": "vim",
+  "vimMode": true,
+  "skipAutoPermissionPrompt": true
+}

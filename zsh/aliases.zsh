@@ -26,9 +26,16 @@ alias du='du -h'
 alias free='free -h'
 # alias grep='grep --color=auto' -- commenting due to claude using grep a lot
 
+# Claude Code: unset TMUX env so the binary's hardcoded chalk-level cap
+# (`if (process.env.TMUX && level > 2) level = 2`) doesn't fire. This restores
+# truecolor bg rendering inside tmux. Tracking issue:
+# https://github.com/anthropics/claude-code/issues/36785
+alias claude='env -u TMUX claude'
+
 # Development tools
 alias lsp-check='~/generic/dotfiles/scripts/lsp-check'
-alias loc='uv run --script ~/generic/dotfiles/scripts/loc.py'
+alias loc='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py loc'
+alias tokens='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py tokens'
 alias nvim-clean='~/generic/dotfiles/scripts/nvim-clean.sh'
 alias diagnose='uvx ty check --output-format concise --no-progress --color never --exit-zero | rg -o "(error|warning)\[[^]]+\]" | sort | uniq -c | sort -nr | awk "{print \$2 \": \" \$1}"'
 

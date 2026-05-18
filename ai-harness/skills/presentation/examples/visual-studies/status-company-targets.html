@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status Slide - Company Targets</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="study-frame.css">
+<style>
+.status-board {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 30px;
+  align-content: center;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 210px 1fr 150px;
+  gap: 28px;
+  align-items: center;
+  min-height: 114px;
+  border-top: 2px solid var(--ink);
+}
+
+.status-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+}
+
+.status-dot.green { background: var(--green); }
+.status-dot.amber { background: var(--amber); }
+.status-dot.red { background: var(--red); }
+
+.status-name {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.status-name h2 {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.status-track {
+  position: relative;
+  height: 18px;
+  background: var(--surface-2);
+  border: 2px solid var(--ink);
+}
+
+.status-fill {
+  height: 100%;
+  background: var(--green);
+}
+
+.status-fill.amber { background: var(--amber); }
+.status-fill.red { background: var(--red); }
+
+.target-marker {
+  position: absolute;
+  left: 91%;
+  top: -14px;
+  width: 3px;
+  height: 46px;
+  background: var(--ink);
+}
+
+.target-marker span {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
+.status-value {
+  text-align: right;
+}
+
+.status-value strong {
+  font-size: 58px;
+  line-height: 0.9;
+}
+
+.status-value span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="slide-frame">
+    <section class="slide content-slide">
+      <header class="slide-title">
+        <h1>Targets by exception</h1>
+      </header>
+      <div class="status-board" aria-label="Company target status rows">
+        <div class="status-row">
+          <div class="status-name"><div class="status-dot green"></div><h2>Revenue</h2></div>
+          <div class="status-track"><div class="status-fill" style="width: 93%;"></div><div class="target-marker"><span>plan</span></div></div>
+          <div class="status-value"><strong>102%</strong><span>of plan</span></div>
+        </div>
+        <div class="status-row">
+          <div class="status-name"><div class="status-dot amber"></div><h2>Activation</h2></div>
+          <div class="status-track"><div class="status-fill amber" style="width: 83%;"></div><div class="target-marker"><span>plan</span></div></div>
+          <div class="status-value"><strong>91%</strong><span>of plan</span></div>
+        </div>
+        <div class="status-row">
+          <div class="status-name"><div class="status-dot red"></div><h2>Retention</h2></div>
+          <div class="status-track"><div class="status-fill red" style="width: 76%;"></div><div class="target-marker"><span>plan</span></div></div>
+          <div class="status-value"><strong>84%</strong><span>of plan</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="study-frame.js"></script>
+</body>
+</html>

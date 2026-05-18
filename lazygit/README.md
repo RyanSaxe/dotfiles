@@ -1,11 +1,14 @@
 # LazyGit Configuration
 
-LazyGit TUI configuration with TokyoNight Night theme and delta integration for syntax-highlighted diffs.
+LazyGit TUI configuration with TokyoNight Night theme, delta-backed embedded
+diffs, and Hunk terminal review commands.
 
 ## Features
 
 - **TokyoNight theme** - Custom colors matching Neovim/Tmux color scheme
-- **Delta integration** - Syntax-highlighted diffs via delta with TokyoNight theme
+- **Delta integration** - Syntax-highlighted embedded diffs via delta with
+  TokyoNight theme
+- **Hunk commands** - Full-screen Hunk review sessions launched from LazyGit
 - **Nerd Fonts** - File icons using Nerd Fonts v3
 - **Borders & UI** - Enhanced visual layout with borders and bottom status line
 
@@ -22,16 +25,24 @@ Carefully matched to TokyoNight Night palette:
 - **Unstaged changes** - Teal (`#73daca`)
 - **Cherry-picked commits** - Purple (`#bb9af7`)
 
-### Delta Integration
+### Diff Integration
 
 ```yaml
 git:
-  paging:
-    colorArg: always
-    pager: delta --paging=never --syntax-theme=tokyonight_night
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never --syntax-theme=tokyonight_night
 ```
 
-Provides syntax-highlighted diffs within LazyGit, consistent with command-line git.
+Delta stays as the embedded LazyGit pane renderer because it is non-interactive
+and works with LazyGit's pager contract. Hunk owns an alternate-screen terminal
+UI, so it is launched through custom commands instead.
+
+### Hunk Commands
+
+- `<c-h>` in the status panel opens `hunk diff --watch`
+- `<c-h>` on a file opens that file's unstaged or staged diff in Hunk
+- `<c-h>` on a commit opens `hunk show <commit>`
 
 ## Usage
 
@@ -49,7 +60,8 @@ Edit `config.yml` to:
 
 - Modify theme colors (all colors defined in `gui.theme` section)
 - Change UI preferences (`showCommandLog`, `splitDiff`, etc.)
-- Adjust git behavior (paging, commit graph, etc.)
+- Adjust git behavior (delta pager, commit graph, etc.)
 - Add custom keybindings
 
-See [LazyGit docs](https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md) for all available options.
+See [LazyGit docs](https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md)
+for all available options.

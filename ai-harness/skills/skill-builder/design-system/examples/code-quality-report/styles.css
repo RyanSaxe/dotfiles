@@ -1,0 +1,630 @@
+/* ----------------------------------------------------------------
+ * code-quality-report / styles.css
+ *
+ * Internalized design-system tokens — light only, yellow as
+ * active-state-only, near-black emphasis, semantic green/red.
+ *
+ * The file demonstrates two design-system patterns that the
+ * fitness dashboard didn't:
+ *   1. Diff blocks using --color-positive-soft / --color-negative-soft
+ *      backgrounds — the canonical "real green/red use" demo.
+ *   2. A 5-rung severity scale that uses red (semantic) for the
+ *      worst, amber from the data-viz palette for medium (yellow
+ *      is still reserved for active state), and neutral muted for
+ *      info-level.
+ *   3. A highlight.js theme override at the bottom that remaps the
+ *      .hljs-* classes to design-system tokens, so syntax highlighting
+ *      matches the system rather than GitHub's defaults.
+ * ---------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* Palette — internalized from design-system/tokens/colors.css */
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --border: #e5e5e5;
+  --border-strong: #d4d4d4;
+
+  --fg: #262626;
+  --muted: #737373;
+  --emphasis: #0a0a0a;
+
+  --accent: #facc15;
+  --accent-fg: #0a0a0a;
+
+  --positive: #16a34a;
+  --positive-soft: #dcfce7;
+  --positive-deep: #14532d;
+
+  --negative: #dc2626;
+  --negative-soft: #fee2e2;
+  --negative-deep: #7f1d1d;
+
+  /* Severity scale (5 rungs).
+   * Critical / High = semantic red, two intensities.
+   * Medium = amber (data-viz palette, NOT the active-state yellow).
+   * Low = muted gray, no fill.
+   * Info = blue (focus hue, calm/neutral signal).
+   */
+  --sev-critical:      #b91c1c;          /* deep red */
+  --sev-critical-soft: #fee2e2;
+  --sev-high:          #dc2626;
+  --sev-high-soft:     #fef2f2;
+  --sev-medium:        #d97706;          /* amber-3 from viz palette */
+  --sev-medium-soft:   #fef3c7;
+  --sev-low:           #737373;
+  --sev-low-soft:      #f5f5f5;
+  --sev-info:          #2563eb;
+  --sev-info-soft:     #dbeafe;
+
+  /* Typography */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+               "Liberation Mono", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-display: 3rem;
+  --tracking-label: 0.06em;
+
+  /* Spacing (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 3rem;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04),
+                 0 1px 1px rgba(0, 0, 0, 0.03);
+}
+
+/* ---------- Reset / base ---------- */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: inherit; }
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.label .inline-icon { width: 14px; height: 14px; stroke-width: 2; }
+.muted { color: var(--muted); }
+.small { font-size: var(--text-sm); }
+
+/* Inline code (e.g. `feature/payment-rewrite` in prose). The `:not(.hljs)`
+ * scope keeps this off the per-line code wrappers inside the diff block —
+ * those are display-only containers for highlight.js output, not inline code. */
+code:not(.hljs) {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--emphasis);
+}
+
+button { font: inherit; }
+
+/* ---------- App bar ---------- */
+
+.app-bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-7);
+  background: rgba(250, 250, 250, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: var(--space-3); }
+.brand-icon {
+  width: 28px; height: 28px;
+  color: var(--emphasis); stroke-width: 2;
+}
+.brand-name {
+  font-weight: 700; color: var(--emphasis);
+  line-height: 1.15;
+}
+.brand-sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.branch-pill {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+.branch-pill .inline-icon { color: var(--muted); }
+.branch-pill code { background: transparent; border: 0; padding: 0; color: var(--muted); }
+
+/* Buttons — black-fill primary (a "do this" commitment), per preferences.md */
+.btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.btn-primary {
+  background: var(--emphasis);
+  color: white;
+}
+.btn-primary:hover { background: #1a1a1a; }
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--fg);
+}
+.btn-ghost:hover { background: var(--bg); border-color: var(--border-strong); }
+
+/* ---------- Page layout ---------- */
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--space-7);
+  display: grid; gap: var(--space-7);
+}
+
+.page-head { display: grid; gap: var(--space-2); }
+.page-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--emphasis);
+  margin: 0; line-height: 1.15;
+}
+.page-sub {
+  color: var(--muted);
+  margin: 0;
+  max-width: 70ch;
+}
+.page-sub code {
+  background: var(--surface);
+  font-size: 0.9em;
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- Filter bar ---------- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.filter-summary {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.chip:hover { color: var(--emphasis); border-color: var(--border-strong); }
+.chip.is-active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.chip.is-active .dot { display: none; } /* yellow fill makes the dot redundant */
+.chip-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.chip.is-active .chip-count {
+  background: rgba(0,0,0,0.12);
+  border-color: transparent;
+  color: var(--accent-fg);
+}
+
+/* Severity dots — small color cues inside each chip */
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.dot-critical { background: var(--sev-critical); }
+.dot-high     { background: var(--sev-high); }
+.dot-medium   { background: var(--sev-medium); }
+.dot-low      { background: var(--sev-low); }
+.dot-info     { background: var(--sev-info); }
+
+/* ---------- Findings list ---------- */
+
+.findings {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.finding {
+  padding: 0;
+  overflow: hidden;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--border);
+}
+.finding[data-severity="critical"] { border-left-color: var(--sev-critical); }
+.finding[data-severity="high"]     { border-left-color: var(--sev-high); }
+.finding[data-severity="medium"]   { border-left-color: var(--sev-medium); }
+.finding[data-severity="low"]      { border-left-color: var(--sev-low); }
+.finding[data-severity="info"]     { border-left-color: var(--sev-info); }
+
+.finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+.finding-head-main {
+  flex: 1; min-width: 0;
+  display: grid; gap: var(--space-2);
+}
+.finding-title-row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--space-3);
+}
+.finding-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.finding-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--emphasis);
+  margin: 0;
+  line-height: 1.3;
+  flex: 1; min-width: 200px;
+}
+.finding-rule {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.finding-meta {
+  display: flex; flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  align-items: center;
+}
+.finding-file {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+.finding-file .inline-icon { color: var(--muted); }
+.finding-line { color: var(--muted); }
+
+.finding-actions {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Severity badge (in the title row) */
+.sev-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-md);
+}
+.sev-badge .dot { width: 6px; height: 6px; }
+.sev-badge[data-severity="critical"] { background: var(--sev-critical-soft); color: var(--sev-critical); }
+.sev-badge[data-severity="high"]     { background: var(--sev-high-soft);     color: var(--sev-high); }
+.sev-badge[data-severity="medium"]   { background: var(--sev-medium-soft);   color: var(--sev-medium); }
+.sev-badge[data-severity="low"]      { background: var(--sev-low-soft);      color: var(--sev-low); }
+.sev-badge[data-severity="info"]     { background: var(--sev-info-soft);     color: var(--sev-info); }
+
+/* Status pill — clickable, cycles open → resolved → wontfix → open */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: filter 120ms ease;
+}
+.status-pill:hover { filter: brightness(0.97); }
+.status-pill::before {
+  content: ""; display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.status-pill[data-status="open"] {
+  background: var(--bg); color: var(--muted); border-color: var(--border);
+}
+.status-pill[data-status="open"]::before { background: var(--muted); }
+.status-pill[data-status="resolved"] {
+  background: var(--positive-soft); color: var(--positive-deep);
+}
+.status-pill[data-status="resolved"]::before { background: var(--positive); }
+.status-pill[data-status="wontfix"] {
+  background: var(--surface); color: var(--muted); border-color: var(--border);
+  text-decoration: line-through;
+  text-decoration-color: rgba(0,0,0,0.25);
+}
+.status-pill[data-status="wontfix"]::before {
+  background: var(--muted);
+  text-decoration: none;
+}
+
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.copy-btn:hover { color: var(--emphasis); border-color: var(--border-strong); }
+.copy-btn .inline-icon { width: 12px; height: 12px; }
+.copy-btn.is-copied { color: var(--positive); border-color: var(--positive); }
+
+/* Finding body — description + diff blocks */
+.finding-body {
+  padding: var(--space-5) var(--space-6);
+  display: grid; gap: var(--space-4);
+}
+.finding-desc {
+  margin: 0;
+  color: var(--fg);
+  max-width: 75ch;
+}
+
+/* ---------- Unified diff block ----------
+ *
+ * Single block (not two stacked blocks) showing a git-style unified diff.
+ * Each line is one row in a 4-column grid:
+ *
+ *   [old line #] [new line #] [+/- marker] [code content]
+ *
+ * Removed lines have a red-soft bg with a deeper-red gutter; added lines
+ * have a green-soft bg with a deeper-green gutter. Context lines have
+ * neither. Within changed lines, the words that actually differ get a
+ * second, deeper highlight (--word-rm-bg / --word-add-bg) so the eye
+ * jumps straight to "what changed" rather than "what's red".
+ */
+
+.diff-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  font-size: var(--text-sm);
+  background: var(--surface);
+}
+
+.diff-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+}
+.diff-block-head .file {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-mono);
+  color: var(--fg);
+}
+.diff-block-head .file .inline-icon {
+  width: 13px; height: 13px; color: var(--muted);
+}
+.diff-block-head .stats {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.diff-block-head .stat-add { color: var(--positive); font-weight: 600; }
+.diff-block-head .stat-rm  { color: var(--negative); font-weight: 600; }
+
+.diff-lines {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: 44px 44px 22px minmax(0, 1fr);
+  align-items: stretch;
+  white-space: pre;
+}
+.dl .dl-num {
+  text-align: right;
+  padding: 0 var(--space-2);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+.dl .dl-marker {
+  text-align: center;
+  color: var(--muted);
+  user-select: none;
+  font-weight: 700;
+}
+.dl .dl-content {
+  padding: 0 var(--space-3);
+  white-space: pre;
+  overflow: visible;
+}
+/* Removed line — red wash, deeper gutter */
+.dl-rm {
+  background: var(--negative-soft);
+}
+.dl-rm .dl-num {
+  background: #fecaca;       /* red-200, slightly deeper than soft */
+  color: var(--negative-deep);
+  border-right-color: #fca5a5;
+}
+.dl-rm .dl-marker { color: var(--negative); }
+/* Added line — green wash, deeper gutter */
+.dl-add {
+  background: var(--positive-soft);
+}
+.dl-add .dl-num {
+  background: #bbf7d0;       /* green-200 */
+  color: var(--positive-deep);
+  border-right-color: #86efac;
+}
+.dl-add .dl-marker { color: var(--positive); }
+/* Context line — plain */
+.dl-ctx {
+  background: var(--surface);
+}
+
+/* Word-level highlights inside changed lines. Translucent overlay on top
+ * of the line wash, not a solid block — the eye should glance and notice
+ * "this part changed", not feel like it's reading two colors at once. */
+.word-rm { background: rgba(220, 38, 38, 0.20); }
+.word-add { background: rgba(22, 163, 74, 0.22); }
+
+/* Hunk separator (when context is collapsed) */
+.dl-hunk {
+  display: block;
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Page footer ---------- */
+
+.page-foot {
+  text-align: center;
+  padding: var(--space-3) 0 var(--space-7);
+  color: var(--muted);
+}
+
+/* ----------------------------------------------------------------
+ * highlight.js theme — atom-one-light baseline, minimal overrides
+ *
+ * The CDN-loaded atom-one-light stylesheet does the heavy lifting (it's
+ * a well-known, well-tuned theme used by many editors). We override only:
+ *
+ *   1. Background — transparent, so the diff-line wash shows through.
+ *   2. String / attribute color — atom-one-light's green (#50a14f) is
+ *      indistinguishable from --color-positive-soft (the +add line wash).
+ *      We move strings to a deep blue that contrasts on white,
+ *      red-soft, AND green-soft backgrounds.
+ *
+ * Comments, keywords, numbers, functions, types, etc. all keep their
+ * atom-one-light colors. Don't add more overrides without a reason.
+ * ---------------------------------------------------------------- */
+
+.hljs {
+  background: transparent;
+  font-family: var(--font-mono);
+}
+.hljs-string,
+.hljs-attribute,
+.hljs-meta-string {
+  color: #1e3a8a;             /* deep blue (--viz-blue-4) */
+}

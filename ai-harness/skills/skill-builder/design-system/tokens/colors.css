@@ -1,0 +1,101 @@
+/*
+ * Semantic color tokens.
+ *
+ * Names describe ROLE, not literal hue (`--color-accent`, not `--color-yellow-500`).
+ * That way, swapping a palette doesn't require renaming every reference.
+ *
+ * Light mode only. A page using these tokens renders the same on every machine,
+ * regardless of the user's OS appearance — important for shared artifacts (reports,
+ * decks, dashboards) so author and reader see the same thing.
+ *
+ * If a specific skill genuinely needs dark mode (an in-IDE viewer, a terminal-adjacent
+ * tool), the skill author writes a dark variant deliberately rather than relying on
+ * `prefers-color-scheme`. See ../preferences.md § Mode.
+ */
+
+:root {
+  /* Tell the browser this is a light page so UA styles for form controls,
+   * scrollbars, etc. don't get auto-themed dark on a dark-mode OS. */
+  color-scheme: light;
+
+  /* Surfaces */
+  --color-bg: #fafafa;             /* page background */
+  --color-surface: #ffffff;        /* card / elevated surface */
+  --color-border: #e5e5e5;         /* hairline borders, separators */
+
+  /* Text */
+  --color-fg: #262626;             /* body text */
+  --color-muted: #737373;          /* secondary text, captions, axis labels */
+  --color-emphasis: #0a0a0a;       /* primary emphasis: titles, totals, default-emphasis pills */
+
+  /* Active state — single-job, never decorative */
+  --color-accent: #facc15;         /* "you are here" yellow */
+  --color-accent-fg: #0a0a0a;      /* text on accent fills */
+
+  /* Semantic — never decorative */
+  --color-positive: #16a34a;       /* up / success / accept */
+  --color-negative: #dc2626;       /* down / failure / decline */
+
+  /* Soft tints of the semantic colors — use as backgrounds only,
+   * e.g. diff-add / diff-remove blocks, success/error banners. */
+  --color-positive-soft: #dcfce7;  /* translucent-feeling green wash */
+  --color-negative-soft: #fee2e2;  /* translucent-feeling red wash */
+
+  /* Focus ring (accessibility) */
+  --color-focus: #2563eb;
+
+  /* ----------------------------------------------------------------
+   * Content palette
+   *
+   * Despite the `--viz-` prefix (kept short for brevity), these tokens
+   * are for ALL content-rich areas where N things must be visually
+   * separable — not just charts:
+   *
+   *   - Chart series and density ramps
+   *   - Code syntax highlighting overrides
+   *   - Multi-rung scales (severity, priority, risk)
+   *
+   * The chrome rules above (yellow=active, green/red=semantic) are
+   * right for UI elements (toggles, badges, deltas, status pills).
+   * They are wrong for content areas — a monochrome chart, a single-
+   * color code block, or an all-gray severity scale all read as
+   * broken, not restrained. See ../preferences.md § Content palette
+   * for the full rationale and worked examples.
+   *
+   * Sequential ramps: 5 stops, light → saturated. The "0/empty" stop
+   * is always the cool pale gray below — not a tinted version of the
+   * hue — so empty cells read as *absent* rather than *minimum*.
+   * ---------------------------------------------------------------- */
+
+  --viz-empty: #f1f5f9;            /* universal "no data" — same for all ramps */
+
+  /* Activity / "more is positively healthy" — green ramp */
+  --viz-green-1: #bbf7d0;
+  --viz-green-2: #4ade80;
+  --viz-green-3: #16a34a;
+  --viz-green-4: #14532d;
+
+  /* Generic intensity / depth / volume — blue ramp */
+  --viz-blue-1: #bfdbfe;
+  --viz-blue-2: #60a5fa;
+  --viz-blue-3: #2563eb;
+  --viz-blue-4: #1e3a8a;
+
+  /* Warmth / risk-tinted intensity — amber ramp */
+  --viz-amber-1: #fde68a;
+  --viz-amber-2: #fbbf24;
+  --viz-amber-3: #d97706;
+  --viz-amber-4: #78350f;
+
+  /* Categorical palette for multi-series charts (donuts, multi-line, etc.).
+   * Pick in order. Excludes yellow (active) and red (semantic negative).
+   * If a chart needs more than 8 categories, group small ones into "Other". */
+  --viz-cat-1: #2563eb;  /* blue */
+  --viz-cat-2: #06b6d4;  /* cyan */
+  --viz-cat-3: #10b981;  /* emerald */
+  --viz-cat-4: #8b5cf6;  /* violet */
+  --viz-cat-5: #f97316;  /* orange */
+  --viz-cat-6: #0ea5e9;  /* sky */
+  --viz-cat-7: #14b8a6;  /* teal */
+  --viz-cat-8: #a855f7;  /* purple */
+}

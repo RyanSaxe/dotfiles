@@ -1,0 +1,3712 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Software for Agents</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --r-heading-text-transform: none;
+        --r-heading-letter-spacing: 0;
+        --r-heading-font:
+          Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          system-ui, sans-serif;
+        --r-main-font:
+          Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          system-ui, sans-serif;
+        --r-background-color: #f7f5ef;
+        --bg: #f7f5ef;
+        --surface: #fffdf8;
+        --surface-2: #eeebe3;
+        --ink: #111418;
+        --muted: #60666b;
+        --line: #d7d2c8;
+        --blue: #2f6f89;
+        --green: #4f8061;
+        --amber: #e9b949;
+        --red: #d75f46;
+        --traffic-red: #c88478;
+        --traffic-yellow: #d9b766;
+        --traffic-green: #8da989;
+        --terminal-bg: #111820;
+        --terminal-fg: #d7f3ed;
+        --terminal-muted: #91aaa6;
+        --terminal-accent: #f4c84e;
+        --terminal-title-size: 11px;
+        --terminal-title-weight: 860;
+        --terminal-body-size: 19px;
+        --terminal-body-line: 1.32;
+        --terminal-body-weight: 720;
+        --font:
+          Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+          system-ui, sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --pad-x: 64px;
+        --pad-y: 56px;
+      }
+
+      html,
+      body,
+      .reveal {
+        background: var(--bg);
+      }
+
+      .reveal {
+        color: var(--ink);
+        font-family: var(--font);
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .reveal .slides {
+        text-align: left;
+      }
+
+      .reveal .slides > section,
+      .reveal .slides > section.present {
+        width: 100% !important;
+        height: 800px !important;
+        padding: var(--pad-y) var(--pad-x) !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        background: var(--bg);
+        text-align: left !important;
+      }
+
+      .reveal h1,
+      .reveal h2,
+      .reveal h3,
+      .reveal p {
+        margin: 0;
+        color: inherit;
+        font-family: var(--font);
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .reveal strong {
+        font-weight: 870;
+      }
+
+      .slide-title h2 {
+        max-width: 100%;
+        color: var(--ink);
+        font-size: 52px;
+        line-height: 1;
+        font-weight: 870;
+      }
+
+      .slide-title .slide-subtitle {
+        margin-top: 12px;
+        max-width: 56ch;
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.18;
+        font-weight: 680;
+      }
+
+      .content-slide {
+        display: grid !important;
+        grid-template-rows: auto 1fr;
+        gap: 36px;
+      }
+
+      .accent-line {
+        width: 74px;
+        height: 8px;
+        background: var(--amber);
+      }
+
+      .traffic-dots {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .traffic-dots span {
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        box-sizing: border-box;
+      }
+
+      .traffic-dots span:nth-child(1) {
+        background: var(--traffic-red);
+      }
+
+      .traffic-dots span:nth-child(2) {
+        background: var(--traffic-yellow);
+      }
+
+      .traffic-dots span:nth-child(3) {
+        background: var(--traffic-green);
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .pill {
+        width: max-content;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 8px 13px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .pill.amber {
+        background: var(--amber);
+      }
+
+      .pill.green {
+        background: #d9e5d6;
+      }
+
+      .pill.blue {
+        background: #d6e4e8;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .title-slide {
+        display: grid !important;
+        grid-template-columns: 0.88fr 1.12fr;
+        gap: 54px;
+        align-items: center;
+      }
+
+      .title-copy {
+        display: grid;
+        gap: 24px;
+      }
+
+      .title-copy h1 {
+        max-width: 8ch;
+        font-size: 98px;
+        line-height: 0.91;
+        font-weight: 900;
+      }
+
+      .title-copy p {
+        max-width: 32ch;
+        color: var(--muted);
+        font-size: 25px;
+        line-height: 1.22;
+        font-weight: 650;
+      }
+
+      .skill-equip-scene {
+        position: relative;
+        height: 560px;
+      }
+
+      .skill-folder {
+        position: absolute;
+        z-index: 1;
+        left: 90px;
+        top: 120px;
+        width: 370px;
+        height: 250px;
+        border: 3px solid var(--ink);
+        background: #cfe3ea;
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.06);
+      }
+
+      .skill-folder::before {
+        content: "";
+        position: absolute;
+        left: -3px;
+        top: -32px;
+        width: 176px;
+        height: 32px;
+        border: 3px solid var(--ink);
+        border-bottom: 0;
+        background: #cfe3ea;
+      }
+
+      .skill-folder::after {
+        content: "";
+        position: absolute;
+        left: -3px;
+        right: -3px;
+        bottom: -3px;
+        height: 154px;
+        border: 3px solid var(--ink);
+        background: #dcecf1;
+      }
+
+      .folder-label {
+        position: absolute;
+        z-index: 2;
+        left: 28px;
+        top: 24px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .folder-label strong {
+        color: var(--ink);
+        font-size: 30px;
+        line-height: 0.92;
+      }
+
+      .folder-label span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .terminal-agent {
+        position: absolute;
+        z-index: 4;
+        left: 232px;
+        top: 258px;
+        width: 374px;
+        height: 190px;
+        border: 3px solid var(--ink);
+        background: var(--terminal-bg);
+        color: var(--terminal-fg);
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
+      }
+
+      .terminal-bar {
+        height: 34px;
+        border-bottom: 3px solid var(--ink);
+        background: var(--surface);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 13px;
+        font-size: var(--terminal-title-size);
+        line-height: 1;
+        font-weight: var(--terminal-title-weight);
+        text-transform: uppercase;
+      }
+
+      .terminal-screen {
+        padding: 26px 28px;
+        font-family: var(--mono);
+        font-size: var(--terminal-body-size);
+        line-height: var(--terminal-body-line);
+        font-weight: var(--terminal-body-weight);
+        display: grid;
+        align-content: center;
+        gap: 11px;
+      }
+
+      .terminal-line {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        gap: 12px;
+        align-items: baseline;
+      }
+
+      .terminal-prompt {
+        color: var(--terminal-accent);
+        font-weight: 850;
+      }
+
+      .terminal-muted {
+        color: var(--terminal-muted);
+      }
+
+      .terminal-accent {
+        color: var(--terminal-accent);
+        font-weight: 850;
+      }
+
+      .agenda-slide {
+        display: grid !important;
+        grid-template-columns: 0.78fr 1.22fr;
+        gap: 64px;
+        align-items: center;
+      }
+
+      .agenda-title h1 {
+        max-width: 9ch;
+        font-size: 94px;
+        line-height: 0.95;
+        font-weight: 890;
+      }
+
+      .agenda-title p {
+        max-width: 26ch;
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 23px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .agenda-path {
+        position: relative;
+        display: grid;
+        grid-template-rows: repeat(5, 1fr);
+      }
+
+      .agenda-path::before {
+        content: "";
+        position: absolute;
+        left: 18px;
+        top: 19px;
+        bottom: 80px;
+        width: 3px;
+        background: var(--ink);
+      }
+
+      .agenda-item {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 22px;
+        min-height: 96px;
+      }
+
+      .agenda-item b {
+        z-index: 1;
+        width: 40px;
+        height: 40px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        font-weight: 850;
+      }
+
+      .agenda-item.active b {
+        background: var(--amber);
+      }
+
+      .agenda-item h2 {
+        font-size: 32px;
+        line-height: 1.02;
+        font-weight: 850;
+      }
+
+      .agenda-item p {
+        margin-top: 7px;
+        max-width: 42ch;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.28;
+        font-weight: 650;
+      }
+
+      .section-slide {
+        display: grid !important;
+        grid-template-columns: 0.88fr 1.12fr;
+        gap: 70px;
+        align-items: center;
+      }
+
+      .section-copy {
+        display: grid;
+        gap: 22px;
+      }
+
+      .section-copy .number {
+        color: var(--muted);
+        font-size: 18px;
+        font-weight: 850;
+      }
+
+      .section-copy h2 {
+        max-width: 9ch;
+        font-size: 104px;
+        line-height: 0.92;
+        font-weight: 900;
+      }
+
+      .case-separator .section-copy h2 {
+        max-width: 9ch;
+        font-size: 88px;
+      }
+
+      .section-copy p {
+        max-width: 34ch;
+        color: var(--muted);
+        font-size: 24px;
+        line-height: 1.24;
+        font-weight: 650;
+      }
+
+      .proof-separator-art {
+        justify-self: center;
+        width: 540px;
+        height: 430px;
+        display: grid;
+        place-items: center;
+      }
+
+      .proof-stack {
+        position: relative;
+        width: 500px;
+        height: 360px;
+      }
+
+      .proof-card {
+        position: absolute;
+        box-sizing: border-box;
+        width: 420px;
+        height: 262px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        box-shadow: 12px 12px 0 var(--surface-2);
+        padding: 22px;
+        display: grid;
+        grid-template-rows: 9px 1fr;
+        gap: 18px;
+        overflow: hidden;
+      }
+
+      .proof-card::before {
+        content: "";
+        width: 96px;
+        height: 8px;
+        background: var(--amber);
+      }
+
+      .proof-card.back {
+        left: 14px;
+        top: 8px;
+        background: #fffdf8;
+      }
+
+      .proof-card.mid {
+        left: 42px;
+        top: 52px;
+        background: #fff6d9;
+      }
+
+      .proof-card.front {
+        left: 70px;
+        top: 96px;
+        background: #d6e4e8;
+      }
+
+      .proof-plot {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 16px 18px 15px;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 13px;
+      }
+
+      .proof-plot svg {
+        width: 100%;
+        height: 126px;
+        overflow: visible;
+      }
+
+      .proof-axis {
+        stroke: var(--ink);
+        stroke-width: 4;
+      }
+
+      .proof-grid-line {
+        stroke: rgba(17, 20, 24, 0.16);
+        stroke-width: 1.5;
+      }
+
+      .proof-trend-main {
+        fill: none;
+        stroke: var(--amber);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 8;
+      }
+
+      .proof-trend-alt {
+        fill: none;
+        stroke: var(--green);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 5;
+      }
+
+      .proof-dot {
+        fill: var(--surface);
+        stroke: var(--ink);
+        stroke-width: 3;
+      }
+
+      .proof-plot-caption {
+        display: grid;
+        grid-template-columns: 1fr 0.66fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .proof-plot-caption b {
+        font-size: 23px;
+        line-height: 0.9;
+      }
+
+      .proof-plot-lines {
+        display: grid;
+        gap: 6px;
+      }
+
+      .proof-plot-lines span {
+        height: 7px;
+        background: var(--ink);
+      }
+
+      .proof-plot-lines span:nth-child(2) {
+        width: 64%;
+        background: var(--line);
+      }
+
+      .prompt-ceiling-art {
+        height: 430px;
+        position: relative;
+        display: grid;
+        align-content: end;
+      }
+
+      .ceiling-line {
+        position: absolute;
+        top: 54px;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: var(--ink);
+      }
+
+      .ceiling-line span {
+        position: absolute;
+        right: 0;
+        top: -30px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .prompt-sheet {
+        width: 520px;
+        height: 250px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        transform: rotate(-4deg);
+        box-shadow: 16px 18px 0 var(--surface-2);
+        padding: 34px;
+        display: grid;
+        gap: 16px;
+        align-content: center;
+      }
+
+      .prompt-mark {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .prompt-mark.short {
+        width: 58%;
+      }
+
+      .reuse-gap {
+        position: relative;
+        display: grid;
+        grid-template-columns: 0.7fr 86px 1.12fr;
+        gap: 0;
+        align-items: center;
+      }
+
+      .reuse-base {
+        position: relative;
+        min-height: 292px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 28px;
+        display: grid;
+        align-content: center;
+        gap: 17px;
+      }
+
+      .reuse-base h3 {
+        max-width: 8ch;
+        font-size: 47px;
+        line-height: 0.94;
+        font-weight: 890;
+      }
+
+      .reuse-base p {
+        max-width: 22ch;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.24;
+        font-weight: 650;
+      }
+
+      .reuse-tag,
+      .move-tag {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .reuse-fork {
+        width: 86px;
+        height: 334px;
+        align-self: center;
+        overflow: visible;
+      }
+
+      .reuse-fork path {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 3;
+        stroke-linecap: round;
+      }
+
+      .reuse-branches {
+        position: relative;
+        display: grid;
+        gap: 18px;
+      }
+
+      .reuse-move {
+        position: relative;
+        min-height: 158px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 20px 22px;
+        display: grid;
+        gap: 11px;
+      }
+
+      .reuse-move.few-shot {
+        background: #fff6d9;
+      }
+
+      .reuse-move.sub-agent {
+        background: #d6e4e8;
+      }
+
+      .reuse-move h3 {
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 880;
+      }
+
+      .move-copy {
+        display: grid;
+        gap: 9px;
+      }
+
+      .move-detail {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 16px;
+        align-items: baseline;
+        border-top: 2px solid rgba(17, 20, 24, 0.22);
+        padding-top: 10px;
+      }
+
+      .move-detail b {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 860;
+        text-transform: uppercase;
+      }
+
+      .move-detail span {
+        color: var(--ink);
+        font-size: 17px;
+        line-height: 1.14;
+        font-weight: 760;
+      }
+
+      .move-detail.gap {
+        border-color: var(--red);
+      }
+
+      .move-detail.gap b {
+        color: var(--red);
+      }
+
+      .move-detail.gap span {
+        color: var(--red);
+      }
+
+      .anatomy-art {
+        height: 460px;
+        position: relative;
+      }
+
+      .artifact-sheet {
+        position: absolute;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 22px;
+        display: grid;
+        align-content: end;
+        gap: 8px;
+      }
+
+      .artifact-sheet strong {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .artifact-sheet span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 830;
+        text-transform: uppercase;
+      }
+
+      .artifact-sheet.one {
+        z-index: 1;
+        width: 320px;
+        height: 218px;
+        left: 0;
+        top: 68px;
+        transform: rotate(-4deg);
+        background: #fff6d9;
+      }
+
+      .artifact-sheet.two {
+        z-index: 2;
+        width: 326px;
+        height: 198px;
+        right: 8px;
+        top: 38px;
+        align-content: start;
+        transform: rotate(2deg);
+      }
+
+      .artifact-sheet.three {
+        z-index: 3;
+        width: 336px;
+        height: 214px;
+        left: 158px;
+        bottom: 42px;
+        transform: rotate(1deg);
+        background: #d6e4e8;
+      }
+
+      .artifact-sheet.four {
+        z-index: 4;
+        width: 292px;
+        height: 162px;
+        right: 4px;
+        bottom: 126px;
+        transform: rotate(-2deg);
+        background: #d9e5d6;
+      }
+
+      .capability-package {
+        display: grid;
+        grid-template-columns: 0.96fr 1.04fr;
+        gap: 56px;
+        align-items: center;
+      }
+
+      .skill-manifest {
+        position: relative;
+        height: 430px;
+      }
+
+      .manifest-folder {
+        position: absolute;
+        left: 26px;
+        top: 64px;
+        width: 466px;
+        height: 326px;
+        border: 3px solid var(--ink);
+        background: #dcecf1;
+        box-shadow: 12px 12px 0 var(--surface-2);
+      }
+
+      .manifest-folder::before {
+        content: none;
+      }
+
+      .manifest-tab {
+        position: absolute;
+        left: -3px;
+        top: -34px;
+        width: 170px;
+        height: 34px;
+        border: 3px solid var(--ink);
+        border-bottom: 0;
+        background: #dcecf1;
+        display: flex;
+        align-items: center;
+        padding: 0 26px;
+        font-size: 24px;
+        line-height: 1;
+        font-weight: 890;
+      }
+
+      .manifest-tree {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        top: 48px;
+        bottom: 24px;
+        display: grid;
+        align-content: center;
+        gap: 10px;
+      }
+
+      .manifest-row {
+        display: grid;
+        grid-template-columns: 124px 1fr;
+        gap: 18px;
+        align-items: baseline;
+        border-top: 2px solid rgba(17, 20, 24, 0.18);
+        padding-top: 10px;
+      }
+
+      .manifest-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .manifest-row code {
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .manifest-row span {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.2;
+        font-weight: 670;
+      }
+
+      .package-meaning {
+        display: grid;
+        gap: 20px;
+      }
+
+      .meaning-row {
+        display: grid;
+        grid-template-columns: 148px 1fr;
+        gap: 24px;
+        align-items: center;
+        border-top: 3px solid var(--ink);
+        padding-top: 17px;
+      }
+
+      .meaning-row:nth-child(2) {
+        border-color: var(--blue);
+      }
+
+      .meaning-row:nth-child(3) {
+        border-color: var(--amber);
+      }
+
+      .meaning-row:nth-child(4) {
+        border-color: var(--green);
+      }
+
+      .meaning-row strong {
+        font-size: 27px;
+        line-height: 0.96;
+      }
+
+      .meaning-row span {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
+      .tool-shipping {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .cli-help-window {
+        border: 3px solid var(--ink);
+        background: var(--terminal-bg);
+        color: var(--terminal-fg);
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
+        min-height: 327px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .cli-titlebar {
+        height: 34px;
+        border-bottom: 3px solid var(--ink);
+        background: var(--surface);
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 13px;
+        font-size: var(--terminal-title-size);
+        line-height: 1;
+        font-weight: var(--terminal-title-weight);
+        text-transform: uppercase;
+      }
+
+      .cli-body {
+        padding: 32px 34px;
+        font-family: var(--mono);
+        font-size: var(--terminal-body-size);
+        line-height: var(--terminal-body-line);
+        font-weight: var(--terminal-body-weight);
+        display: grid;
+        align-content: center;
+        gap: 14px;
+      }
+
+      .tool-discovery {
+        display: grid;
+        gap: 22px;
+      }
+
+      .discovery-row {
+        border-left: 8px solid var(--ink);
+        padding-left: 20px;
+      }
+
+      .discovery-row:nth-child(2) {
+        border-color: var(--blue);
+      }
+
+      .discovery-row:nth-child(3) {
+        border-color: var(--green);
+      }
+
+      .discovery-row strong {
+        display: block;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .discovery-row span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
+      .mcp-contrast {
+        border: 3px solid var(--ink);
+        background: #d6e4e8;
+        padding: 19px 21px;
+      }
+
+      .mcp-contrast strong {
+        display: block;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .mcp-contrast span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.22;
+        font-weight: 680;
+      }
+
+      .context-compression {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 0.82fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .messy-context {
+        min-height: 420px;
+        position: relative;
+      }
+
+      .context-chip {
+        position: absolute;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 14px 16px;
+        font-size: 20px;
+        font-weight: 850;
+        box-shadow: 8px 8px 0 var(--surface-2);
+      }
+
+      .context-chip.a {
+        left: 10px;
+        top: 18px;
+        transform: rotate(-5deg);
+      }
+
+      .context-chip.b {
+        right: 36px;
+        top: 64px;
+        background: #fff6d9;
+        transform: rotate(4deg);
+      }
+
+      .context-chip.c {
+        left: 86px;
+        top: 150px;
+        background: #d6e4e8;
+      }
+
+      .context-chip.d {
+        right: 86px;
+        top: 210px;
+        transform: rotate(-4deg);
+      }
+
+      .context-chip.e {
+        left: 38px;
+        bottom: 56px;
+        background: #d9e5d6;
+        transform: rotate(3deg);
+      }
+
+      .context-chip.f {
+        right: 14px;
+        bottom: 24px;
+      }
+
+      .compression-arrow {
+        position: absolute;
+        left: 52%;
+        top: 50%;
+        width: 104px;
+        height: 5px;
+        background: var(--ink);
+        transform: translate(-50%, -50%);
+      }
+
+      .compression-arrow::after {
+        content: "";
+        position: absolute;
+        right: -2px;
+        top: 50%;
+        width: 22px;
+        height: 22px;
+        border-right: 5px solid var(--ink);
+        border-top: 5px solid var(--ink);
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .compressed-slide {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 28px;
+        height: 390px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .compressed-slide h3 {
+        font-size: 42px;
+        line-height: 0.95;
+        font-weight: 880;
+      }
+
+      .compressed-bars {
+        display: grid;
+        gap: 14px;
+        align-content: center;
+      }
+
+      .compressed-bar {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .compressed-bar.short {
+        width: 62%;
+      }
+
+      .template-spread {
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: 40px;
+        align-items: center;
+      }
+
+      .starter-sheet {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        height: 420px;
+        padding: 28px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 28px;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .starter-sheet h3 {
+        font-size: 34px;
+        line-height: 1;
+        font-weight: 870;
+      }
+
+      .code-lines {
+        display: grid;
+        gap: 14px;
+        align-content: center;
+      }
+
+      .code-line {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .code-line.wide {
+        width: 100%;
+      }
+
+      .code-line.mid {
+        width: 78%;
+      }
+
+      .code-line.short {
+        width: 46%;
+      }
+
+      .code-line.accent {
+        background: var(--amber);
+      }
+
+      .completion-lanes {
+        display: grid;
+        gap: 26px;
+      }
+
+      .completion-lane {
+        display: grid;
+        grid-template-columns: 118px 1fr;
+        gap: 22px;
+        align-items: center;
+      }
+
+      .completion-lane b {
+        width: 86px;
+        height: 86px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--amber);
+        font-size: 34px;
+      }
+
+      .completion-lane strong {
+        font-size: 31px;
+        line-height: 1;
+      }
+
+      .completion-lane span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .example-gallery {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 24px;
+        align-items: center;
+      }
+
+      .mini-slide {
+        height: 390px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 22px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 20px;
+      }
+
+      .mini-slide:nth-child(2) {
+        background: #fff6d9;
+        transform: translateY(-26px);
+      }
+
+      .mini-slide:nth-child(3) {
+        background: #d6e4e8;
+      }
+
+      .mini-slide h3 {
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 870;
+      }
+
+      .mini-visual {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+      }
+
+      .mini-slide:nth-child(1) .mini-visual {
+        background:
+          linear-gradient(
+            90deg,
+            transparent 48%,
+            var(--ink) 48%,
+            var(--ink) 52%,
+            transparent 52%
+          ),
+          linear-gradient(
+            180deg,
+            transparent 48%,
+            var(--ink) 48%,
+            var(--ink) 52%,
+            transparent 52%
+          ),
+          var(--bg);
+      }
+
+      .mini-slide:nth-child(2) .mini-visual {
+        background:
+          linear-gradient(
+            180deg,
+            transparent 14%,
+            var(--ink) 14%,
+            var(--ink) 17%,
+            transparent 17%
+          ),
+          linear-gradient(
+            180deg,
+            transparent 44%,
+            var(--ink) 44%,
+            var(--ink) 47%,
+            transparent 47%
+          ),
+          linear-gradient(
+            180deg,
+            transparent 74%,
+            var(--ink) 74%,
+            var(--ink) 77%,
+            transparent 77%
+          ),
+          var(--bg);
+      }
+
+      .mini-slide:nth-child(3) .mini-visual {
+        background:
+          linear-gradient(
+            90deg,
+            transparent 12%,
+            var(--amber) 12%,
+            var(--amber) 28%,
+            transparent 28%
+          ),
+          linear-gradient(
+            90deg,
+            transparent 38%,
+            var(--blue) 38%,
+            var(--blue) 58%,
+            transparent 58%
+          ),
+          linear-gradient(
+            90deg,
+            transparent 68%,
+            var(--green) 68%,
+            var(--green) 86%,
+            transparent 86%
+          ),
+          var(--bg);
+      }
+
+      .mini-caption {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.22;
+        font-weight: 700;
+      }
+
+      .operating-art {
+        height: 460px;
+        position: relative;
+      }
+
+      .shared-core {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 190px;
+        height: 190px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+        transform: translate(-50%, -50%);
+        display: grid;
+        place-items: center;
+        text-align: center;
+        font-size: 26px;
+        line-height: 1;
+        font-weight: 880;
+      }
+
+      .team-node {
+        position: absolute;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        width: 170px;
+        height: 108px;
+        padding: 16px;
+        display: grid;
+        align-content: center;
+        gap: 5px;
+      }
+
+      .team-node strong {
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .team-node span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 820;
+        text-transform: uppercase;
+      }
+
+      .team-node.product {
+        left: 24px;
+        top: 40px;
+      }
+
+      .team-node.research {
+        right: 30px;
+        top: 58px;
+        background: #d6e4e8;
+      }
+
+      .team-node.design {
+        left: 72px;
+        bottom: 42px;
+        background: #fff6d9;
+      }
+
+      .team-node.ops {
+        right: 82px;
+        bottom: 34px;
+        background: #d9e5d6;
+      }
+
+      .connection {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 230px;
+        height: 3px;
+        background: var(--ink);
+        transform-origin: left center;
+      }
+
+      .connection.a {
+        transform: rotate(-143deg);
+      }
+
+      .connection.b {
+        transform: rotate(-35deg);
+      }
+
+      .connection.c {
+        transform: rotate(145deg);
+      }
+
+      .connection.d {
+        transform: rotate(36deg);
+      }
+
+      .shared-local {
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 42px;
+        align-items: center;
+      }
+
+      .capability-source {
+        border-left: 8px solid var(--ink);
+        padding-left: 30px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .capability-source h3 {
+        font-size: 62px;
+        line-height: 0.92;
+        font-weight: 890;
+      }
+
+      .capability-source p {
+        max-width: 29ch;
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .outputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .output-card {
+        height: 178px;
+        border: 2px solid var(--ink);
+        background: var(--surface);
+        padding: 20px;
+        display: grid;
+        align-content: space-between;
+      }
+
+      .output-card:nth-child(2) {
+        background: #d6e4e8;
+      }
+
+      .output-card:nth-child(3) {
+        background: #fff6d9;
+      }
+
+      .output-card:nth-child(4) {
+        background: #d9e5d6;
+      }
+
+      .output-card h3 {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .output-card span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 830;
+        text-transform: uppercase;
+      }
+
+      .standards-slide {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 34px;
+        align-items: center;
+      }
+
+      .standard-column {
+        min-height: 430px;
+        border-top: 4px solid var(--ink);
+        padding-top: 24px;
+        display: grid;
+        align-content: start;
+        gap: 18px;
+      }
+
+      .standard-column b {
+        width: 54px;
+        height: 54px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+      }
+
+      .standard-column h3 {
+        font-size: 40px;
+        line-height: 0.96;
+        font-weight: 880;
+      }
+
+      .standard-column p {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.28;
+        font-weight: 650;
+      }
+
+      .final-slide {
+        display: grid !important;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 64px;
+        align-items: center;
+      }
+
+      .final-copy {
+        display: grid;
+        gap: 24px;
+      }
+
+      .final-copy h2 {
+        max-width: 8ch;
+        font-size: 118px;
+        line-height: 0.88;
+        font-weight: 900;
+      }
+
+      .final-copy p {
+        max-width: 32ch;
+        color: var(--muted);
+        font-size: 25px;
+        line-height: 1.22;
+        font-weight: 650;
+      }
+
+      .qna-terminal {
+        justify-self: center;
+        width: 440px;
+        border: 3px solid var(--ink);
+        background: var(--terminal-bg);
+        color: var(--terminal-fg);
+        box-shadow: 8px 8px 0 rgba(17, 20, 24, 0.12);
+      }
+
+      .qna-titlebar {
+        height: 34px;
+        border-bottom: 3px solid var(--ink);
+        background: var(--surface);
+        color: var(--ink);
+        padding: 0 13px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: var(--terminal-title-size);
+        line-height: 1;
+        font-weight: var(--terminal-title-weight);
+        text-transform: uppercase;
+      }
+
+      .qna-body {
+        min-height: 190px;
+        padding: 28px 30px;
+        display: grid;
+        align-content: center;
+        gap: 14px;
+        font-family: var(--mono);
+      }
+
+      .qna-line {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        gap: 12px;
+        align-items: baseline;
+        color: var(--terminal-fg);
+        font-size: var(--terminal-body-size);
+        line-height: var(--terminal-body-line);
+        font-weight: var(--terminal-body-weight);
+      }
+
+      .qna-prompt {
+        color: var(--terminal-accent);
+        font-weight: 850;
+      }
+
+      .qna-muted {
+        color: var(--terminal-muted);
+      }
+
+      .agenda-clean {
+        grid-template-columns: 0.84fr 1.16fr;
+      }
+
+      .agenda-clean .agenda-path {
+        grid-template-rows: repeat(3, 1fr);
+        gap: 20px;
+      }
+
+      .agenda-clean .agenda-path::before {
+        left: 20px;
+        top: 66px;
+        bottom: 66px;
+        transform: translateX(-50%);
+      }
+
+      .agenda-clean .agenda-item {
+        min-height: 132px;
+        align-items: center;
+      }
+
+      .agenda-clean .agenda-item h2 {
+        font-size: 40px;
+      }
+
+      .agent-contrast {
+        position: relative;
+        justify-self: center;
+        align-self: center;
+        width: min(1050px, 100%);
+        height: 500px;
+      }
+
+      .axis-frame {
+        position: absolute;
+        left: 112px;
+        right: 84px;
+        top: 36px;
+        bottom: 84px;
+      }
+
+      .axis-x,
+      .axis-y {
+        position: absolute;
+        z-index: 2;
+        background: var(--ink);
+      }
+
+      .axis-x {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 4px;
+      }
+
+      .axis-y {
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+      }
+
+      .axis-x::after,
+      .axis-y::after {
+        content: "";
+        position: absolute;
+        width: 0;
+        height: 0;
+      }
+
+      .axis-x::after {
+        right: -2px;
+        top: -10px;
+        border-top: 12px solid transparent;
+        border-bottom: 12px solid transparent;
+        border-left: 18px solid var(--ink);
+      }
+
+      .axis-y::after {
+        left: -10px;
+        top: -2px;
+        border-left: 12px solid transparent;
+        border-right: 12px solid transparent;
+        border-bottom: 18px solid var(--ink);
+      }
+
+      .axis-title {
+        position: absolute;
+        z-index: 3;
+        color: var(--ink);
+        font-size: 22px;
+        font-weight: 880;
+      }
+
+      .axis-title.capability {
+        left: 50%;
+        bottom: -54px;
+        transform: translateX(-50%);
+      }
+
+      .axis-title.execution {
+        left: -42px;
+        top: 50%;
+        transform: rotate(-90deg) translateX(-50%);
+        transform-origin: left center;
+      }
+
+      .axis-gridline {
+        position: absolute;
+        z-index: 1;
+        background: var(--line);
+      }
+
+      .axis-gridline.horizontal {
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 2px;
+      }
+
+      .axis-gridline.vertical {
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+      }
+
+      .quadrant-point {
+        position: absolute;
+        z-index: 5;
+        box-sizing: border-box;
+        border: 2px solid var(--ink);
+        border-radius: 7px;
+        background: var(--surface);
+        padding: 11px 14px;
+        color: var(--ink);
+        font-size: 23px;
+        line-height: 0.98;
+        font-weight: 880;
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+      }
+
+      .quadrant-point small {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 820;
+        text-transform: uppercase;
+      }
+
+      .quadrant-point.templates {
+        left: 17%;
+        top: 78%;
+      }
+
+      .quadrant-point.few-shot {
+        left: 42%;
+        top: 70%;
+        background: #fff6d9;
+      }
+
+      .quadrant-point.agents {
+        left: 32%;
+        top: 28%;
+        background: #d6e4e8;
+      }
+
+      .quadrant-point.custom-agents {
+        left: 60%;
+        top: 20%;
+        background: #d6e4e8;
+      }
+
+      .quadrant-point.skills {
+        left: 86%;
+        top: 34%;
+        border-width: 3px;
+        background: var(--amber);
+        padding: 15px 18px;
+        font-size: 31px;
+      }
+
+      .quadrant-point.skills small {
+        color: rgba(17, 20, 24, 0.72);
+        font-size: 13px;
+      }
+
+      .visual-qa {
+        display: grid;
+        grid-template-columns: 1.08fr 0.92fr;
+        gap: 58px;
+        align-items: center;
+      }
+
+      .annotated-shot {
+        position: relative;
+        background: var(--surface);
+        box-shadow: 14px 14px 0 var(--surface-2);
+      }
+
+      .capture-toolbar {
+        height: 34px;
+        border: 2px solid var(--ink);
+        border-bottom: 0;
+        background: #fffdf8;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .annotated-window {
+        position: relative;
+        border: 2px solid var(--ink);
+        background: #fffdf8;
+        padding: 18px;
+      }
+
+      .annotated-slide {
+        position: relative;
+        aspect-ratio: 16 / 10;
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 24px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 26px;
+        align-items: stretch;
+      }
+
+      .capture-corner {
+        position: absolute;
+        z-index: 4;
+        width: 24px;
+        height: 24px;
+        pointer-events: none;
+      }
+
+      .capture-corner.tl {
+        left: 12px;
+        top: 12px;
+        border-left: 4px solid var(--amber);
+        border-top: 4px solid var(--amber);
+      }
+
+      .capture-corner.tr {
+        right: 12px;
+        top: 12px;
+        border-right: 4px solid var(--amber);
+        border-top: 4px solid var(--amber);
+      }
+
+      .capture-corner.bl {
+        left: 12px;
+        bottom: 12px;
+        border-left: 4px solid var(--amber);
+        border-bottom: 4px solid var(--amber);
+      }
+
+      .capture-corner.br {
+        right: 12px;
+        bottom: 12px;
+        border-right: 4px solid var(--amber);
+        border-bottom: 4px solid var(--amber);
+      }
+
+      .production-copy {
+        display: grid;
+        align-content: space-between;
+        min-width: 0;
+      }
+
+      .production-copy b {
+        display: block;
+        max-width: 9ch;
+        font-size: 33px;
+        line-height: 0.94;
+        font-weight: 890;
+      }
+
+      .production-lines {
+        display: grid;
+        gap: 8px;
+      }
+
+      .production-lines span {
+        height: 8px;
+        background: var(--ink);
+      }
+
+      .production-lines span:nth-child(2) {
+        width: 74%;
+        background: var(--line);
+      }
+
+      .production-lines span:nth-child(3) {
+        width: 50%;
+        background: var(--line);
+      }
+
+      .production-visual {
+        border: 2px solid var(--ink);
+        background: #d6e4e8;
+        padding: 16px;
+        display: grid;
+        grid-template-columns: 1fr 0.62fr;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .production-donut {
+        position: relative;
+        aspect-ratio: 1;
+        width: 136px;
+        justify-self: center;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: conic-gradient(
+          var(--amber) 0 44%,
+          #d9e5d6 44% 73%,
+          var(--surface) 73% 100%
+        );
+      }
+
+      .production-donut::after {
+        content: "";
+        position: absolute;
+        inset: 31px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: #d6e4e8;
+      }
+
+      .production-donut b {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        font-size: 26px;
+        line-height: 1;
+      }
+
+      .production-legend {
+        display: grid;
+        gap: 9px;
+      }
+
+      .legend-row {
+        display: grid;
+        grid-template-columns: 14px 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .legend-row i {
+        height: 14px;
+        border: 2px solid var(--ink);
+        background: var(--amber);
+      }
+
+      .legend-row:nth-child(2) i {
+        background: #d9e5d6;
+      }
+
+      .legend-row:nth-child(3) i {
+        background: var(--surface);
+      }
+
+      .legend-row span {
+        height: 8px;
+        background: var(--ink);
+      }
+
+      .legend-row:nth-child(2) span {
+        width: 76%;
+        background: var(--line);
+      }
+
+      .legend-row:nth-child(3) span {
+        width: 56%;
+        background: var(--line);
+      }
+
+      .visual-loop {
+        display: grid;
+        gap: 20px;
+      }
+
+      .visual-loop-step {
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        gap: 17px;
+        align-items: center;
+      }
+
+      .visual-loop-step b {
+        width: 44px;
+        height: 44px;
+        border: 3px solid var(--ink);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 890;
+      }
+
+      .visual-loop-step:nth-child(1) b {
+        background: var(--surface);
+      }
+
+      .visual-loop-step:nth-child(2) b {
+        background: #fff6d9;
+      }
+
+      .visual-loop-step:nth-child(3) b {
+        background: #d9e5d6;
+      }
+
+      .visual-loop-step strong {
+        display: block;
+        font-size: 29px;
+        line-height: 0.96;
+      }
+
+      .visual-loop-step span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.2;
+        font-weight: 660;
+      }
+
+      .visual-loop-proof {
+        border-top: 3px solid var(--ink);
+        padding-top: 20px;
+      }
+
+      .visual-loop-proof strong {
+        display: block;
+        font-size: 33px;
+        line-height: 1;
+      }
+
+      .visual-loop-proof span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.22;
+        font-weight: 660;
+      }
+
+      .context-funnel {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .input-streams {
+        position: relative;
+        height: 430px;
+        display: grid;
+        align-content: center;
+        gap: 22px;
+      }
+
+      .stream-row {
+        position: relative;
+        height: 52px;
+      }
+
+      .stream-row strong {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        z-index: 3;
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 7px 10px 6px;
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 860;
+        transform: translateY(-50%) rotate(var(--angle));
+        transform-origin: left center;
+      }
+
+      .stream-line {
+        position: absolute;
+        left: 42px;
+        top: 50%;
+        z-index: 1;
+        width: var(--line-width);
+        height: 6px;
+        background: var(--line-color);
+        transform: translateY(-50%) rotate(var(--angle));
+        transform-origin: left center;
+      }
+
+      .stream-row:nth-child(1) {
+        --angle: 7deg;
+        --line-width: 460px;
+        --line-color: var(--ink);
+      }
+
+      .stream-row:nth-child(2) {
+        --angle: 3deg;
+        --line-width: 420px;
+        --line-color: var(--blue);
+      }
+
+      .stream-row:nth-child(3) {
+        --angle: 0deg;
+        --line-width: 480px;
+        --line-color: var(--ink);
+      }
+
+      .stream-row:nth-child(4) {
+        --angle: -3deg;
+        --line-width: 370px;
+        --line-color: var(--green);
+      }
+
+      .stream-row:nth-child(5) {
+        --angle: -7deg;
+        --line-width: 430px;
+        --line-color: var(--amber);
+      }
+
+      .compressed-output {
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        height: 430px;
+        padding: 34px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        box-shadow: 16px 16px 0 var(--surface-2);
+      }
+
+      .compressed-output h3 {
+        font-size: 50px;
+        line-height: 0.94;
+        font-weight: 890;
+      }
+
+      .deck-lines {
+        display: grid;
+        gap: 14px;
+        align-content: center;
+      }
+
+      .deck-line {
+        height: 18px;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .deck-line.accent {
+        width: 68%;
+        background: var(--amber);
+      }
+
+      .taste-transfer {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, 206px);
+        gap: 34px 44px;
+        align-items: stretch;
+        box-sizing: border-box;
+        justify-self: center;
+        width: 100%;
+        max-width: 1100px;
+        padding: 64px 82px 20px 38px;
+      }
+
+      .taste-example {
+        position: relative;
+        min-height: 0;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 20px;
+        overflow: hidden;
+        box-shadow: 9px 9px 0 var(--surface-2);
+      }
+
+      .taste-example .label {
+        position: absolute;
+        left: 20px;
+        top: 17px;
+      }
+
+      .taste-example h3 {
+        font-size: 29px;
+        line-height: 0.98;
+        font-weight: 880;
+      }
+
+      .taste-example p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.2;
+        font-weight: 680;
+      }
+
+      .taste-claim {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        align-content: stretch;
+      }
+
+      .taste-claim h3 {
+        align-self: center;
+        max-width: 9ch;
+        font-size: 45px;
+        line-height: 0.9;
+      }
+
+      .taste-claim::after {
+        content: "";
+        position: absolute;
+        right: 20px;
+        top: 22px;
+        width: 94px;
+        height: 8px;
+        background: var(--blue);
+      }
+
+      .taste-claim .mini-rule {
+        width: 72%;
+        height: 10px;
+        background: var(--amber);
+      }
+
+      .taste-evidence {
+        display: grid;
+        grid-template-columns: 0.82fr 1.18fr;
+        gap: 20px;
+        align-items: end;
+      }
+
+      .mini-chart {
+        display: grid;
+        align-items: end;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        height: 134px;
+      }
+
+      .mini-chart span {
+        display: block;
+        border: 3px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .mini-chart span:nth-child(1) {
+        height: 46%;
+      }
+
+      .mini-chart span:nth-child(2) {
+        height: 72%;
+        background: #d6e4e8;
+      }
+
+      .mini-chart span:nth-child(3) {
+        height: 54%;
+      }
+
+      .mini-chart span:nth-child(4) {
+        height: 92%;
+        background: #fff6d9;
+      }
+
+      .evidence-copy {
+        display: grid;
+        gap: 10px;
+        align-content: end;
+      }
+
+      .taste-system {
+        display: grid;
+        grid-template-columns: 1fr 0.9fr;
+        gap: 24px;
+        align-items: center;
+      }
+
+      .mini-network {
+        position: relative;
+        height: 150px;
+      }
+
+      .mini-node {
+        position: absolute;
+        z-index: 2;
+        width: 66px;
+        height: 66px;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--surface);
+      }
+
+      .mini-node.a {
+        left: 0;
+        top: 42px;
+        background: #fff6d9;
+      }
+
+      .mini-node.b {
+        left: 126px;
+        top: 0;
+        background: #d6e4e8;
+      }
+
+      .mini-node.c {
+        left: 126px;
+        bottom: 0;
+        background: #d9e5d6;
+      }
+
+      .mini-network::before,
+      .mini-network::after {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        left: 57px;
+        width: 104px;
+        height: 3px;
+        background: var(--ink);
+        transform-origin: left center;
+      }
+
+      .mini-network::before {
+        top: 61px;
+        transform: rotate(-20deg);
+      }
+
+      .mini-network::after {
+        top: 89px;
+        transform: rotate(20deg);
+      }
+
+      .system-copy {
+        display: grid;
+        gap: 10px;
+      }
+
+      .taste-critique {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 22px;
+        align-items: center;
+      }
+
+      .mini-review {
+        position: relative;
+        margin-top: 20px;
+        height: 138px;
+        box-sizing: border-box;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 17px;
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .mini-review span {
+        display: block;
+        height: 14px;
+        border: 2px solid var(--ink);
+      }
+
+      .mini-review span:nth-child(1) {
+        width: 66%;
+        background: var(--amber);
+      }
+
+      .mini-review span:nth-child(2) {
+        width: 88%;
+      }
+
+      .mini-review span:nth-child(3) {
+        width: 44%;
+      }
+
+      .mini-review::after {
+        content: "QA";
+        position: absolute;
+        right: -18px;
+        top: -18px;
+        border: 3px solid var(--ink);
+        background: #d9e5d6;
+        padding: 10px 12px;
+        font-size: 14px;
+        font-weight: 880;
+      }
+
+      .critique-copy {
+        display: grid;
+        gap: 10px;
+      }
+
+      .different-decks {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 66px;
+        align-items: center;
+        justify-self: center;
+        width: 100%;
+        max-width: 1080px;
+        padding-top: 14px;
+      }
+
+      .deck-outcome {
+        display: grid;
+        gap: 16px;
+      }
+
+      .deck-outcome-label {
+        min-height: 38px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .outcome-stack {
+        position: relative;
+        height: 430px;
+      }
+
+      .outcome-slide {
+        position: absolute;
+        box-sizing: border-box;
+        width: 426px;
+        height: 266px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        box-shadow: 12px 12px 0 var(--surface-2);
+        padding: 22px;
+        display: grid;
+        grid-template-rows: 10px 1fr;
+        gap: 18px;
+      }
+
+      .outcome-slide::before {
+        content: "";
+        width: 104px;
+        height: 8px;
+        background: var(--amber);
+      }
+
+      .outcome-slide.back {
+        left: 6px;
+        top: 0;
+      }
+
+      .outcome-slide.mid {
+        left: 30px;
+        top: 44px;
+      }
+
+      .outcome-slide.front {
+        left: 54px;
+        top: 88px;
+      }
+
+      .executive-deck .outcome-slide.mid {
+        background: #fff6d9;
+      }
+
+      .design-deck .outcome-slide.mid {
+        background: #d6e4e8;
+      }
+
+      .design-deck .outcome-slide.front {
+        background: #d9e5d6;
+      }
+
+      .strategy-visual {
+        display: grid;
+        grid-template-columns: 0.76fr 1.24fr;
+        gap: 22px;
+        align-items: end;
+      }
+
+      .metric-stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .metric-card {
+        border: 2px solid var(--ink);
+        background: var(--bg);
+        padding: 13px;
+      }
+
+      .metric-card b {
+        display: block;
+        font-size: 35px;
+        line-height: 0.92;
+      }
+
+      .metric-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .strategy-chart {
+        height: 142px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        align-items: end;
+      }
+
+      .strategy-chart span {
+        display: block;
+        border: 2px solid var(--ink);
+        background: var(--surface-2);
+      }
+
+      .strategy-chart span:nth-child(1) {
+        height: 42%;
+      }
+
+      .strategy-chart span:nth-child(2) {
+        height: 70%;
+        background: #d6e4e8;
+      }
+
+      .strategy-chart span:nth-child(3) {
+        height: 54%;
+      }
+
+      .strategy-chart span:nth-child(4) {
+        height: 94%;
+        background: var(--amber);
+      }
+
+      .strategy-lines,
+      .design-lines {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .strategy-lines span,
+      .design-lines span {
+        height: 10px;
+        background: var(--ink);
+      }
+
+      .strategy-lines span:nth-child(2),
+      .design-lines span:nth-child(2) {
+        width: 74%;
+        background: var(--line);
+      }
+
+      .strategy-lines span:nth-child(3),
+      .design-lines span:nth-child(3) {
+        width: 52%;
+        background: var(--line);
+      }
+
+      .design-visual {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .design-frame {
+        border: 2px solid var(--ink);
+        background: #fffdf8;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr 0.7fr;
+        gap: 10px;
+      }
+
+      .design-image {
+        background: var(--ink);
+      }
+
+      .design-swatches {
+        display: grid;
+        gap: 8px;
+      }
+
+      .design-swatches span {
+        border: 2px solid var(--ink);
+      }
+
+      .design-swatches span:nth-child(1) {
+        background: #d6e4e8;
+      }
+
+      .design-swatches span:nth-child(2) {
+        background: #fff6d9;
+      }
+
+      .design-swatches span:nth-child(3) {
+        background: #d9e5d6;
+      }
+
+      .design-notes {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .design-note {
+        border-left: 5px solid var(--amber);
+        padding-left: 10px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .design-note:nth-child(2) {
+        border-color: var(--green);
+      }
+
+      .design-note span {
+        height: 8px;
+        background: var(--ink);
+      }
+
+      .design-note span:nth-child(2) {
+        width: 66%;
+        background: var(--line);
+      }
+
+      .strategy-map {
+        position: relative;
+        border: 2px solid var(--ink);
+        background:
+          linear-gradient(var(--line) 2px, transparent 2px) 0 50% / 100% 50%
+            no-repeat,
+          linear-gradient(90deg, var(--line) 2px, transparent 2px) 50% 0 / 50%
+            100% no-repeat,
+          var(--surface);
+        min-height: 150px;
+      }
+
+      .map-dot {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      .map-dot:nth-child(1) {
+        left: 18%;
+        top: 58%;
+      }
+
+      .map-dot:nth-child(2) {
+        left: 52%;
+        top: 24%;
+        background: #d6e4e8;
+      }
+
+      .map-dot:nth-child(3) {
+        right: 16%;
+        bottom: 18%;
+        background: #d9e5d6;
+      }
+
+      .strategy-roadmap {
+        display: grid;
+        gap: 16px;
+        align-content: center;
+      }
+
+      .roadmap-row {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .roadmap-row b {
+        height: 34px;
+        border: 2px solid var(--ink);
+        background: var(--amber);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .roadmap-row:nth-child(2) b {
+        background: #d6e4e8;
+      }
+
+      .roadmap-row:nth-child(3) b {
+        background: #d9e5d6;
+      }
+
+      .roadmap-row span {
+        height: 9px;
+        background: var(--ink);
+      }
+
+      .roadmap-row:nth-child(2) span {
+        width: 78%;
+      }
+
+      .roadmap-row:nth-child(3) span {
+        width: 58%;
+      }
+
+      .design-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .design-tile {
+        border: 2px solid var(--ink);
+        background: var(--surface);
+      }
+
+      .design-tile.dark {
+        background: var(--ink);
+      }
+
+      .design-tile.blue {
+        background: #d6e4e8;
+      }
+
+      .design-tile.amber {
+        background: #fff6d9;
+      }
+
+      .design-tile.green {
+        background: #d9e5d6;
+      }
+
+      .critique-board {
+        display: grid;
+        grid-template-columns: 0.86fr 1.14fr;
+        gap: 16px;
+        align-items: stretch;
+      }
+
+      .critique-shot {
+        border: 2px solid var(--ink);
+        background:
+          linear-gradient(90deg, var(--ink) 0 56%, transparent 56%), #fffdf8;
+      }
+
+      .critique-notes {
+        display: grid;
+        gap: 10px;
+        align-content: center;
+      }
+
+      .critique-notes span {
+        height: 9px;
+        background: var(--ink);
+      }
+
+      .critique-notes span:nth-child(1) {
+        width: 92%;
+        background: var(--amber);
+      }
+
+      .critique-notes span:nth-child(3) {
+        width: 62%;
+        background: var(--green);
+      }
+
+      .release-path {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 28px;
+        align-content: center;
+      }
+
+      .gate-track {
+        position: relative;
+        align-self: center;
+        height: 308px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 54px;
+        align-items: center;
+      }
+
+      .gate-track::before {
+        content: "";
+        position: absolute;
+        left: 10%;
+        right: 10%;
+        top: 50%;
+        height: 7px;
+        background: linear-gradient(
+          90deg,
+          var(--amber) 0 50%,
+          var(--green) 50% 100%
+        );
+      }
+
+      .release-gate {
+        z-index: 1;
+        width: 220px;
+        height: 220px;
+        justify-self: center;
+        border-radius: 999px;
+        border: 3px solid var(--ink);
+        background: var(--surface);
+        padding: 34px;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .release-gate:nth-child(2) {
+        background: #fff6d9;
+      }
+
+      .release-gate:nth-child(3) {
+        background: #d9e5d6;
+      }
+
+      .release-gate strong {
+        font-size: 31px;
+        line-height: 0.95;
+      }
+
+      .release-gate span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 840;
+        text-transform: uppercase;
+      }
+
+      .release-caption {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 54px;
+        color: var(--muted);
+        font-size: 16px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .release-caption span {
+        border-top: 3px solid var(--ink);
+        padding-top: 16px;
+        text-align: center;
+      }
+
+      .release-caption span:nth-child(2) {
+        border-color: var(--amber);
+      }
+
+      .release-caption span:nth-child(3) {
+        border-color: var(--green);
+      }
+
+      .reveal .progress {
+        height: 3px;
+        color: var(--amber);
+        background: rgba(17, 20, 24, 0.08);
+      }
+
+      .reveal .controls {
+        color: var(--ink);
+        opacity: 0.42;
+      }
+
+      .reveal .slide-number {
+        left: 26px;
+        right: auto;
+        bottom: 18px;
+        padding: 0;
+        background: transparent;
+        color: rgba(17, 20, 24, 0.48);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      .reveal .slide-number a {
+        color: inherit;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="title-slide">
+          <div class="title-copy">
+            <h1>Software for Agents</h1>
+            <p>
+              Skills raise the ceiling because they package capability, not just
+              prompts.
+            </p>
+            <div class="accent-line"></div>
+          </div>
+          <div
+            class="skill-equip-scene"
+            aria-label="Skill package equipping an agent terminal"
+          >
+            <div class="skill-folder">
+              <div class="folder-label">
+                <strong>Agent Skills</strong><span>capability as software</span>
+              </div>
+            </div>
+            <div class="terminal-agent">
+              <div class="terminal-bar">
+                <div class="traffic-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <span>Agent terminal</span>
+              </div>
+              <div class="terminal-screen">
+                <div class="terminal-line">
+                  <span class="terminal-prompt">$</span>
+                  <span>deck create agent-skills</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted">loaded: presentation</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span>drafting from context _</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="agenda-slide agenda-clean">
+          <div class="agenda-title">
+            <h1>Agenda</h1>
+          </div>
+          <div class="agenda-path" aria-label="Three part agenda">
+            <div class="agenda-item active">
+              <b>1</b>
+              <div><h2>Prompt Ceiling</h2></div>
+            </div>
+            <div class="agenda-item">
+              <b>2</b>
+              <div><h2>Capability Package</h2></div>
+            </div>
+            <div class="agenda-item">
+              <b>3</b>
+              <div><h2>Proof in Practice</h2></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-slide">
+          <div class="section-copy">
+            <span class="number">01</span>
+            <h2>Prompt ceiling</h2>
+            <p>Text can only steer behavior.</p>
+            <div class="accent-line"></div>
+          </div>
+          <div
+            class="prompt-ceiling-art"
+            aria-label="Prompt page hitting a ceiling"
+          >
+            <div class="ceiling-line"><span>ceiling</span></div>
+            <div class="prompt-sheet">
+              <div class="prompt-mark"></div>
+              <div class="prompt-mark"></div>
+              <div class="prompt-mark short"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Reusable prompts are not enough</h2>
+          </header>
+          <div class="reuse-gap" aria-label="Reusable prompt patterns and gaps">
+            <div class="reuse-base">
+              <span class="reuse-tag">base</span>
+              <h3>Prompt templates</h3>
+              <p>Reusable wording for a repeatable ask.</p>
+            </div>
+            <svg
+              class="reuse-fork"
+              viewBox="0 0 86 334"
+              role="img"
+              aria-label="Prompt template branches into few-shot prompts and sub-agents"
+            >
+              <path d="M 0 167 C 34 167 39 79 86 79" />
+              <path d="M 0 167 C 34 167 39 255 86 255" />
+            </svg>
+            <div
+              class="reuse-branches"
+              aria-label="Reusable prompt improvements and remaining gaps"
+            >
+              <div class="reuse-move few-shot">
+                <span class="move-tag">better calibration</span>
+                <h3>Few-shot prompts</h3>
+                <div class="move-copy">
+                  <div class="move-detail">
+                    <b>adds</b><span>examples for more reliable output</span>
+                  </div>
+                  <div class="move-detail gap">
+                    <b>gap</b><span>lacks automation and structured data</span>
+                  </div>
+                </div>
+              </div>
+              <div class="reuse-move sub-agent">
+                <span class="move-tag">better execution</span>
+                <h3>Sub-agents</h3>
+                <div class="move-copy">
+                  <div class="move-detail">
+                    <b>adds</b
+                    ><span
+                      >isolated context and permissions for parallel work</span
+                    >
+                  </div>
+                  <div class="move-detail gap">
+                    <b>gap</b
+                    ><span>lacks custom tools and context history</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>The missing layer is packaged capability</h2>
+          </header>
+          <div
+            class="agent-contrast"
+            aria-label="Reusable options mapped by context and automation"
+          >
+            <div class="axis-frame">
+              <div class="axis-gridline horizontal"></div>
+              <div class="axis-gridline vertical"></div>
+              <div class="axis-x"></div>
+              <div class="axis-y"></div>
+              <span class="axis-title capability">Context</span>
+              <span class="axis-title execution">Automation</span>
+              <div class="quadrant-point templates">Templates</div>
+              <div class="quadrant-point few-shot">Few-shot</div>
+              <div class="quadrant-point agents">Sub-agents</div>
+              <div class="quadrant-point custom-agents">
+                Custom agents<small>configured worker</small>
+              </div>
+              <div class="quadrant-point skills">
+                Skills<small>packaged capability</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-slide">
+          <div class="section-copy">
+            <span class="number">02</span>
+            <h2>Capability Package</h2>
+            <p>
+              Skills can carry instructions, assets, software, examples, and
+              contracts together.
+            </p>
+            <div class="accent-line"></div>
+          </div>
+          <div class="anatomy-art" aria-label="Exploded skill artifacts">
+            <div class="artifact-sheet one">
+              <span>entrypoint</span><strong>SKILL.md</strong>
+            </div>
+            <div class="artifact-sheet two">
+              <span>depth</span><strong>References</strong>
+            </div>
+            <div class="artifact-sheet three">
+              <span>software</span><strong>Tools</strong>
+            </div>
+            <div class="artifact-sheet four">
+              <span>calibration</span><strong>Examples</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>A skill is a capability package</h2>
+          </header>
+          <div
+            class="capability-package"
+            aria-label="Skill package manifest and carried capability"
+          >
+            <div class="skill-manifest">
+              <div class="manifest-folder">
+                <div class="manifest-tab">skill-name/</div>
+                <div class="manifest-tree">
+                  <div class="manifest-row">
+                    <code>SKILL.md</code
+                    ><span>activation and collaboration rules</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>references/</code
+                    ><span>deep context the agent can inspect</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>templates/</code
+                    ><span>starting points to build off</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>examples/</code
+                    ><span>taste and behavior calibration</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>tools/</code
+                    ><span>optional software, CLIs, validators</span>
+                  </div>
+                  <div class="manifest-row">
+                    <code>checks/</code
+                    ><span>quality gates and output contracts</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="package-meaning">
+              <div class="meaning-row">
+                <strong>Behavior</strong
+                ><span>When to act and how to collaborate.</span>
+              </div>
+              <div class="meaning-row">
+                <strong>Materials</strong
+                ><span
+                  >Examples, templates, and references the agent can
+                  reuse.</span
+                >
+              </div>
+              <div class="meaning-row">
+                <strong>Software</strong
+                ><span
+                  >Optional tools when execution belongs with the skill.</span
+                >
+              </div>
+              <div class="meaning-row">
+                <strong>Assurance</strong
+                ><span>Contracts and checks make success visible.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Tools can ship with the skill</h2>
+          </header>
+          <div
+            class="tool-shipping"
+            aria-label="CLI tool packaged with skill guidance"
+          >
+            <div class="cli-help-window">
+              <div class="cli-titlebar">
+                <div class="traffic-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <span>deck-qa --help</span>
+              </div>
+              <div class="cli-body">
+                <div class="terminal-line">
+                  <span class="terminal-prompt">$</span>
+                  <span>deck-qa --help</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted"
+                    >usage: deck-qa &lt;deck.html&gt;</span
+                  >
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted"
+                    >checks: layout, overflow, visual story</span
+                  >
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-muted">exports:</span>
+                </div>
+                <div class="terminal-line">
+                  <span></span>
+                  <span class="terminal-accent">--write-screenshots</span>
+                </div>
+              </div>
+            </div>
+            <div class="tool-discovery">
+              <div class="discovery-row">
+                <strong>Discoverable</strong
+                ><span
+                  ><code>--help</code> gives agents the operating surface.</span
+                >
+              </div>
+              <div class="discovery-row">
+                <strong>Local</strong
+                ><span
+                  >The tool runs inside the task context, next to the
+                  files.</span
+                >
+              </div>
+              <div class="discovery-row">
+                <strong>Versioned</strong
+                ><span>The executable ships with examples and checks.</span>
+              </div>
+              <div class="mcp-contrast">
+                <strong>MCP for isolated services.</strong
+                ><span
+                  >Ship a CLI when the tool belongs with the capability.</span
+                >
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Serious skills have a release shape</h2>
+          </header>
+          <div class="release-path" aria-label="Skill release quality gates">
+            <div class="gate-track">
+              <div class="release-gate">
+                <span>gate 1</span><strong>Context</strong>
+              </div>
+              <div class="release-gate">
+                <span>gate 2</span><strong>Contract</strong>
+              </div>
+              <div class="release-gate">
+                <span>gate 3</span><strong>Validation</strong>
+              </div>
+            </div>
+            <div class="release-caption">
+              <span>understand before acting</span><span>align on output</span
+              ><span>check before delivery</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-slide case-separator">
+          <div class="section-copy">
+            <span class="number">03</span>
+            <h2>Proof in Practice</h2>
+            <p>The presentation skill is the case study.</p>
+            <div class="accent-line"></div>
+          </div>
+          <div class="proof-separator-art" aria-label="Single proof deck stack">
+            <div class="proof-stack">
+              <div class="proof-card back"></div>
+              <div class="proof-card mid"></div>
+              <div class="proof-card front">
+                <div class="proof-plot">
+                  <svg viewBox="0 0 300 150" aria-hidden="true">
+                    <line
+                      class="proof-grid-line"
+                      x1="24"
+                      y1="36"
+                      x2="286"
+                      y2="36"
+                    />
+                    <line
+                      class="proof-grid-line"
+                      x1="24"
+                      y1="76"
+                      x2="286"
+                      y2="76"
+                    />
+                    <line class="proof-axis" x1="24" y1="18" x2="24" y2="124" />
+                    <line
+                      class="proof-axis"
+                      x1="24"
+                      y1="124"
+                      x2="288"
+                      y2="124"
+                    />
+                    <path
+                      class="proof-trend-alt"
+                      d="M 36 106 C 80 98, 104 86, 138 82 S 206 70, 268 54"
+                    />
+                    <path
+                      class="proof-trend-main"
+                      d="M 36 114 C 84 112, 102 78, 136 74 S 206 38, 268 26"
+                    />
+                    <circle class="proof-dot" cx="36" cy="114" r="7" />
+                    <circle class="proof-dot" cx="136" cy="74" r="7" />
+                    <circle class="proof-dot" cx="268" cy="26" r="7" />
+                  </svg>
+                  <div class="proof-plot-caption">
+                    <b>Quality holds.</b>
+                    <div class="proof-plot-lines">
+                      <span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Alignment comes before creation</h2>
+            <p class="slide-subtitle">
+              The first deliverable is a plan grounded in deep context.
+            </p>
+          </header>
+          <div class="context-funnel">
+            <div class="input-streams" aria-label="Discovery context streams">
+              <div class="stream-row">
+                <strong>Goal</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Audience</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Material</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Constraints</strong>
+                <div class="stream-line"></div>
+              </div>
+              <div class="stream-row">
+                <strong>Taste</strong>
+                <div class="stream-line"></div>
+              </div>
+            </div>
+            <div class="compressed-output">
+              <h3>Plan before slides.</h3>
+              <div class="deck-lines">
+                <div class="deck-line accent"></div>
+                <div class="deck-line"></div>
+                <div class="deck-line"></div>
+                <div class="deck-line"></div>
+              </div>
+              <span class="label"
+                >thesis / sequence / gaps / visual stance / approval</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Templates provide the starting structure</h2>
+          </header>
+          <div class="template-spread">
+            <div class="starter-sheet" aria-label="Deck starter template">
+              <h3>deck.html.template</h3>
+              <div class="code-lines">
+                <div class="code-line wide"></div>
+                <div class="code-line mid accent"></div>
+                <div class="code-line wide"></div>
+                <div class="code-line short"></div>
+                <div class="code-line wide"></div>
+                <div class="code-line mid"></div>
+                <div class="code-line short accent"></div>
+              </div>
+            </div>
+            <div class="completion-lanes">
+              <div class="completion-lane">
+                <b>1</b>
+                <div>
+                  <strong>Start from structure</strong
+                  ><span
+                    >Artboard, Reveal defaults, and a sparse foundation.</span
+                  >
+                </div>
+              </div>
+              <div class="completion-lane">
+                <b>2</b>
+                <div>
+                  <strong>Design from content</strong
+                  ><span
+                    >The user's argument decides the visual relationship.</span
+                  >
+                </div>
+              </div>
+              <div class="completion-lane">
+                <b>3</b>
+                <div>
+                  <strong>Finish downstream</strong
+                  ><span>The agent writes the final deck for this room.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Examples calibrate taste</h2>
+          </header>
+          <div
+            class="taste-transfer"
+            aria-label="Four orthogonal example slides calibrating taste"
+          >
+            <div class="taste-example taste-claim">
+              <span class="label">claim example</span>
+              <h3>One idea first.</h3>
+              <div class="mini-rule"></div>
+            </div>
+            <div class="taste-example taste-evidence">
+              <div class="mini-chart" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+              </div>
+              <div class="evidence-copy">
+                <span class="label">evidence example</span>
+                <h3>Proof gets shaped.</h3>
+                <p>The example teaches hierarchy, not the exact chart.</p>
+              </div>
+            </div>
+            <div class="taste-example taste-system">
+              <div class="mini-network" aria-hidden="true">
+                <div class="mini-node a"></div>
+                <div class="mini-node b"></div>
+                <div class="mini-node c"></div>
+              </div>
+              <div class="system-copy">
+                <span class="label">system example</span>
+                <h3>Relationships matter.</h3>
+                <p>Same visual language, different structure.</p>
+              </div>
+            </div>
+            <div class="taste-example taste-critique">
+              <div class="mini-review" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="critique-copy">
+                <span class="label">review example</span>
+                <h3>Quality is visible.</h3>
+                <p>The pattern calibrates judgment across outputs.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>Screenshots to iterate for quality</h2>
+          </header>
+          <div
+            class="visual-qa"
+            aria-label="Screenshot capture quality review loop"
+          >
+            <div class="annotated-shot">
+              <div class="capture-toolbar">
+                <div class="traffic-dots capture-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <span>slide-qa / 1280x800</span>
+              </div>
+              <div class="annotated-window">
+                <div class="capture-corner tl"></div>
+                <div class="capture-corner tr"></div>
+                <div class="capture-corner bl"></div>
+                <div class="capture-corner br"></div>
+                <div class="annotated-slide">
+                  <div class="production-copy">
+                    <b>One claim, one visual.</b>
+                    <div class="production-lines">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                  <div class="production-visual" aria-hidden="true">
+                    <div class="production-donut">
+                      <b>72%</b>
+                    </div>
+                    <div class="production-legend">
+                      <div class="legend-row"><i></i><span></span></div>
+                      <div class="legend-row"><i></i><span></span></div>
+                      <div class="legend-row"><i></i><span></span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="visual-loop">
+              <div class="visual-loop-step">
+                <b>1</b>
+                <div>
+                  <strong>Render</strong
+                  ><span>Turn the deck into inspectable screenshots.</span>
+                </div>
+              </div>
+              <div class="visual-loop-step">
+                <b>2</b>
+                <div>
+                  <strong>Judge</strong
+                  ><span>Check fit, hierarchy, balance, and visual story.</span>
+                </div>
+              </div>
+              <div class="visual-loop-step">
+                <b>3</b>
+                <div>
+                  <strong>Revise</strong
+                  ><span>Change the slide, render again, and compare.</span>
+                </div>
+              </div>
+              <div class="visual-loop-proof">
+                <strong>Quality becomes visible.</strong
+                ><span>The skill gives the agent a feedback loop.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-slide">
+          <header class="slide-title">
+            <h2>One workflow creates very different decks</h2>
+          </header>
+          <div
+            class="different-decks"
+            aria-label="Two different final deck stacks from the same workflow"
+          >
+            <div class="deck-outcome executive-deck">
+              <div class="deck-outcome-label">
+                <span>executive strategy deck</span>
+              </div>
+              <div class="outcome-stack">
+                <div class="outcome-slide back">
+                  <div class="strategy-map" aria-hidden="true">
+                    <span class="map-dot"></span><span class="map-dot"></span
+                    ><span class="map-dot"></span>
+                  </div>
+                </div>
+                <div class="outcome-slide mid">
+                  <div class="strategy-roadmap">
+                    <div class="roadmap-row"><b>1</b><span></span></div>
+                    <div class="roadmap-row"><b>2</b><span></span></div>
+                    <div class="roadmap-row"><b>3</b><span></span></div>
+                  </div>
+                </div>
+                <div class="outcome-slide front">
+                  <div class="strategy-visual">
+                    <div class="metric-stack">
+                      <div class="metric-card">
+                        <b>42%</b><span>shift</span>
+                      </div>
+                      <div class="metric-card"><b>3x</b><span>focus</span></div>
+                    </div>
+                    <div class="strategy-chart" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="deck-outcome design-deck">
+              <div class="deck-outcome-label">
+                <span>product critique deck</span>
+              </div>
+              <div class="outcome-stack">
+                <div class="outcome-slide back">
+                  <div class="design-grid">
+                    <div class="design-tile dark"></div>
+                    <div class="design-tile blue"></div>
+                    <div class="design-tile amber"></div>
+                    <div class="design-tile green"></div>
+                  </div>
+                </div>
+                <div class="outcome-slide mid">
+                  <div class="critique-board">
+                    <div class="critique-shot"></div>
+                    <div class="critique-notes">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="outcome-slide front">
+                  <div class="design-visual">
+                    <div class="design-frame" aria-hidden="true">
+                      <div class="design-image"></div>
+                      <div class="design-swatches">
+                        <span></span><span></span><span></span>
+                      </div>
+                    </div>
+                    <div class="design-notes">
+                      <div class="design-note"><span></span><span></span></div>
+                      <div class="design-note"><span></span><span></span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="final-slide">
+          <div class="final-copy">
+            <h2>Q&amp;A</h2>
+            <p>
+              Skills allow teams to equip agents with standardized capabilities.
+            </p>
+            <div class="accent-line"></div>
+          </div>
+          <div
+            class="qna-terminal"
+            aria-label="Terminal answering the deck thesis"
+          >
+            <div class="qna-titlebar">
+              <div class="traffic-dots qna-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <span>Agent Terminal</span>
+            </div>
+            <div class="qna-body">
+              <div class="qna-line">
+                <span class="qna-prompt">$</span>
+                <span>ask</span>
+              </div>
+              <div class="qna-line">
+                <span></span>
+                <span class="qna-muted">context: software-for-agents.deck</span>
+              </div>
+              <div class="qna-line">
+                <span></span>
+                <span>ready for questions _</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+    <script>
+      Reveal.initialize({
+        hash: true,
+        transition: "fade",
+        controls: true,
+        progress: true,
+        slideNumber: "c/t",
+        showSlideNumber: "all",
+        center: false,
+        width: 1280,
+        height: 800,
+        margin: 0,
+        minScale: 0.2,
+        maxScale: 2.0,
+      });
+    </script>
+  </body>
+</html>

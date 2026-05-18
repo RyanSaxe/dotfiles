@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>assisted-review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <button class="topbar-identity" id="btn-home" title="Back to inbox">
+        <i data-lucide="chevron-left" class="topbar-home-chevron"></i>
+        <span class="topbar-home-label">Inbox</span>
+        <span class="topbar-home-sep">·</span>
+        <strong id="topbar-repo">assisted-review</strong>
+        <span class="sep" id="topbar-sep-1" hidden>·</span>
+        <span id="topbar-branch"></span>
+        <span class="sep" id="topbar-sep-2" hidden>·</span>
+        <span class="commit" id="topbar-commit"></span>
+        <span class="sep" id="topbar-sep-3" hidden>·</span>
+        <span id="topbar-pr-link"></span>
+        <span id="topbar-stale" hidden></span>
+      </button>
+      <div class="topbar-actions">
+        <div class="topbar-comment-nav" id="topbar-comment-nav" hidden></div>
+        <button class="btn" id="btn-refresh-review" hidden>
+          <i data-lucide="refresh-cw"></i>
+          Refresh
+        </button>
+        <button class="btn btn-primary" id="btn-send-review" hidden>
+          <i data-lucide="send"></i>
+          Submit
+        </button>
+      </div>
+    </header>
+
+    <div class="contextbar" id="contextbar" hidden></div>
+
+    <div class="main">
+      <aside class="tree" id="file-tree" hidden></aside>
+      <main class="content" id="content"></main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- highlight.js common bundle: 32+ languages built-in. Long-tail languages
+       fall back to highlightAuto in app.js. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- marked: GitHub-flavored markdown renderer for comment bodies. Schema
+       claims comment bodies are Markdown; we honor the full GFM contract
+       (lists, links, code blocks, tables) instead of a homemade subset. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <!-- CodeMirror 5 keeps this no-build static app simple while giving review
+       body/suggestion editors real code and Markdown editing behavior. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/meta.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/loadmode.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -110,7 +110,7 @@ materialize_runtime_dir_if_needed() {
 }
 
 prepare_runtime_parent_dirs() {
-  materialize_runtime_dir_if_needed "$DOTFILES_DIR/claude" "$HOME/.claude"
+  materialize_runtime_dir_if_needed "$DOTFILES_DIR/ai-harness/claude" "$HOME/.claude"
 }
 
 create_symlink() {
@@ -270,8 +270,8 @@ dry_run() {
   log "DRY RUN - showing what would be done:"
   echo
 
-  if is_symlink_to_path "$HOME/.claude" "$DOTFILES_DIR/claude"; then
-    warn "MATERIALIZE: $HOME/.claude is a broad symlink; it would be replaced with a real runtime directory copied from $DOTFILES_DIR/claude"
+  if is_symlink_to_path "$HOME/.claude" "$DOTFILES_DIR/ai-harness/claude"; then
+    warn "MATERIALIZE: $HOME/.claude is a broad symlink; it would be replaced with a real runtime directory copied from $DOTFILES_DIR/ai-harness/claude"
   fi
 
   for mapping in "${DOTFILE_MAPPINGS[@]}"; do

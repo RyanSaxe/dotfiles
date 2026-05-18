@@ -62,7 +62,8 @@ done < "$DOTFILES_DIR/config/apt-packages.txt"
 #       ipython: enhanced interactive Python shell, useful for development -- for nicer REPLs to integrate with neovim
 #       openjdk-17: Java Development Kit. This version is required for sonarqube LSP support
 #       wget: command-line utility for downloading files from the web
-#       git-delta: a syntax-highlighting pager for git, makes diffs more readable
+#       git-delta: a non-interactive syntax-highlighting diff renderer, still used by LazyGit and git add -p
+#       hunkdiff: review-first terminal diff viewer for Git pager and agent-note workflows
 #       build-essential: a package that includes essential tools for building software from source, only needed for linux servers
 #       curl: command-line tool for transferring data with URLs, used for fetching scripts and packages
 #       zsh: a shell with a superset of features compared to bash, used as the default shell
@@ -339,6 +340,35 @@ fetch_and_exec() {
   fi
 }
 
+npm_global_install() {
+  local package=$1
+  local prefix cache_dir
+
+  prefix="$(npm prefix -g 2> /dev/null || true)"
+  if [[ -n "$prefix" && -w "$prefix" ]]; then
+    cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/npm"
+    mkdir -p "$cache_dir"
+    npm --cache "$cache_dir" install -g "$package"
+  else
+    cache_dir="${TMPDIR:-/tmp}/dotfiles-npm-cache-${UID:-0}"
+    mkdir -p "$cache_dir"
+    sudo_if_needed npm --cache "$cache_dir" install -g "$package"
+  fi
+}
+
+install_hunk() {
+  # hunkdiff publishes the `hunk` CLI and does not currently ship via brew/apt.
+  if ! command -v hunk &> /dev/null; then
+    log "Installing Hunk diff viewer via npm…"
+    npm_global_install hunkdiff || {
+      err "Hunk install failed"
+      exit 1
+    }
+  else
+    log "Hunk already installed—skipping re-install"
+  fi
+}
+
 install_latex_converter() {
   if command -v utftex &> /dev/null; then
     log "utftex already installed - skipping LaTeX converter setup"
@@ -385,6 +415,13 @@ main() {
     return 0
   fi
 
+  # Install only Hunk. Useful for validating the Hunk path without running the
+  # full machine bootstrap.
+  if [[ "${1:-}" == "--install-hunk" ]]; then
+    install_hunk
+    return 0
+  fi
+
   # ── Make sure TERM is valid for tput ─────────────────────
   if [[ -z "${TERM:-}" || "${TERM}" == "unknown" ]]; then
     log "TERM is unset/unknown; defaulting to xterm-256color for this run"
@@ -404,7 +441,7 @@ main() {
 
   if ! command -v mmdc &> /dev/null; then
     log "Installing Mermaid CLI via npm…"
-    sudo_if_needed npm install -g @mermaid-js/mermaid-cli || {
+    npm_global_install @mermaid-js/mermaid-cli || {
       err "Mermaid CLI install failed"
       exit 1
     }
@@ -415,7 +452,7 @@ main() {
   # Install ast-grep via npm on Linux only (on macOS it's installed via brew)
   if [[ "$PM" == "apt" ]] && ! command -v ast-grep &> /dev/null && ! command -v sg &> /dev/null; then
     log "Installing ast-grep via npm…"
-    sudo_if_needed npm install -g @ast-grep/cli || {
+    npm_global_install @ast-grep/cli || {
       err "ast-grep install failed"
       exit 1
     }
@@ -429,7 +466,7 @@ main() {
   # tree-sitter-cli provides the tree-sitter binary needed by Neovim plugins
   if ! command -v tree-sitter &> /dev/null; then
     log "Installing tree-sitter CLI via npm…"
-    sudo_if_needed npm install -g tree-sitter-cli || {
+    npm_global_install tree-sitter-cli || {
       err "tree-sitter CLI install failed"
       exit 1
     }
@@ -437,10 +474,13 @@ main() {
     log "tree-sitter CLI already installed—skipping re-install"
   fi
 
+  # Install Hunk via npm for both macOS and Linux.
+  install_hunk
+
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)
   if [[ "$PM" == "apt" ]] && ! command -v git-split-diffs &> /dev/null; then
     log "Installing git-split-diffs via npm…"
-    sudo_if_needed npm install -g git-split-diffs || {
+    npm_global_install git-split-diffs || {
       err "git-split-diffs install failed"
       exit 1
     }
@@ -455,7 +495,7 @@ main() {
     # prettier - multi-language formatter for JSON, Markdown, etc.
     if ! command -v prettier &> /dev/null; then
       log "Installing prettier via npm…"
-      sudo_if_needed npm install -g prettier || {
+      npm_global_install prettier || {
         err "prettier install failed"
         exit 1
       }
@@ -466,7 +506,7 @@ main() {
     # markdownlint-cli - Markdown linter with auto-fix
     if ! command -v markdownlint &> /dev/null; then
       log "Installing markdownlint-cli via npm…"
-      sudo_if_needed npm install -g markdownlint-cli || {
+      npm_global_install markdownlint-cli || {
         err "markdownlint-cli install failed"
         exit 1
       }
@@ -477,7 +517,7 @@ main() {
     # stylua - Lua formatter (not available in apt, use npm package)
     if ! command -v stylua &> /dev/null; then
       log "Installing stylua via npm…"
-      sudo_if_needed npm install -g @johnnymorganz/stylua-bin || {
+      npm_global_install @johnnymorganz/stylua-bin || {
         err "stylua install failed"
         exit 1
       }
@@ -488,7 +528,7 @@ main() {
     # AI CLIs - on macOS these are casks (codex, copilot-cli); on Linux use npm
     if ! command -v codex &> /dev/null; then
       log "Installing OpenAI Codex CLI via npm…"
-      sudo_if_needed npm install -g @openai/codex || {
+      npm_global_install @openai/codex || {
         err "Codex CLI install failed"
         exit 1
       }
@@ -498,7 +538,7 @@ main() {
 
     if ! command -v copilot &> /dev/null; then
       log "Installing GitHub Copilot CLI via npm…"
-      sudo_if_needed npm install -g @github/copilot || {
+      npm_global_install @github/copilot || {
         err "Copilot CLI install failed"
         exit 1
       }

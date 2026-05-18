@@ -1,0 +1,11 @@
+# <Reference title — what this file covers>
+
+**When to read this:** <one line — the trigger that should make the skill load this file. e.g. "when the output contract is YAML", "when scaffolding a visual artifact", "when the user asks about portability across CLIs".>
+
+## <Section 1>
+
+<Content the skill needs at depth.>
+
+## <Section 2>
+
+<Add or remove sections as needed. Keep each one self-contained so the skill can read just the relevant part.>
