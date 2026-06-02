@@ -378,13 +378,19 @@ local function collapse_diff_side(side)
     local hidden_width = 1
     local visible_width = math.max(1, available_width - hidden_width)
 
-    if vim.api.nvim_get_current_win() == hide_win then
-      vim.api.nvim_set_current_win(show_win)
-    end
+    vim.api.nvim_set_current_win(show_win)
+
+    local previous_winminwidth = vim.o.winminwidth
+    local previous_winwidth = vim.o.winwidth
+    vim.o.winminwidth = 1
+    vim.o.winwidth = 1
 
     pcall(vim.api.nvim_win_set_width, show_win, visible_width)
     pcall(vim.api.nvim_win_set_width, hide_win, hidden_width)
     pcall(vim.api.nvim_win_set_width, show_win, visible_width)
+
+    vim.o.winwidth = previous_winwidth
+    vim.o.winminwidth = previous_winminwidth
   end
 end
 
