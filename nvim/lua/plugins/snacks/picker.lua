@@ -1,6 +1,27 @@
 -- snacks-picker.lua  ── Snacks picker configuration
 -- Custom picker configurations including enhanced buffer picker
 
+local function force_integral_select_height(opts)
+  if opts.source ~= "select" or type(opts.layout) ~= "table" or type(opts.layout.config) ~= "function" then
+    return opts
+  end
+
+  local original_config = opts.layout.config
+  opts.layout.config = function(layout)
+    local configured_layout = original_config(layout) or layout
+
+    for _, box in ipairs(configured_layout.layout or {}) do
+      if box.win == "list" and type(box.height) == "number" then
+        box.height = math.max(math.floor(box.height), 1)
+      end
+    end
+
+    return configured_layout
+  end
+
+  return opts
+end
+
 return {
   "folke/snacks.nvim",
   keys = {
@@ -19,6 +40,7 @@ return {
   },
   opts = {
     picker = {
+      config = force_integral_select_height,
       layout = {
         preset = "custom_vertical",
       },
