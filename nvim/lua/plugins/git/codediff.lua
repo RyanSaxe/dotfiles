@@ -40,7 +40,7 @@ local help_lines = {
   "│    <leader>b   Toggle explorer visibility   │",
   "│    \\t          Toggle inline / side-by-side │",
   "│    \\=          Equalize layout              │",
-  "│    \\h / \\l     Shrink / grow width          │",
+  "│    \\h / \\l     Hide left / right pane       │",
   "│    \\j / \\k     Shrink / grow height         │",
   "│    ?           Show this help               │",
   "╰─────────────────────────────────────────────╯",
@@ -94,6 +94,300 @@ local function equalize_layout()
   end
 end
 
+local review_nav_wait_ms = 2500
+local review_nav_poll_ms = 25
+local pending_review_nav = {}
+local next_review_step
+local prev_review_step
+
+local function now_ms()
+  local uv = vim.uv or vim.loop
+  return uv.now()
+end
+
+local function valid_win(winid)
+  return type(winid) == "number" and vim.api.nvim_win_is_valid(winid)
+end
+
+local function get_lifecycle_session(tabpage)
+  local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+  if not ok then
+    return nil, nil
+  end
+  return lifecycle, lifecycle.get_session(tabpage)
+end
+
+local function diff_result_ready(session)
+  return type(session) == "table"
+    and type(session.stored_diff_result) == "table"
+    and type(session.stored_diff_result.changes) == "table"
+end
+
+local function add_path_candidate(candidates, git_root, path)
+  if not path or path == "" then
+    return
+  end
+
+  candidates[path] = true
+  if git_root and not path:match("^/") then
+    candidates[git_root .. "/" .. path] = true
+  end
+end
+
+local function session_matches_selection(session, selection, git_root)
+  if not selection or not selection.path then
+    return true
+  end
+
+  local candidates = {}
+  add_path_candidate(candidates, git_root, selection.path)
+  add_path_candidate(candidates, git_root, selection.old_path)
+
+  return candidates[session.original_path] == true or candidates[session.modified_path] == true
+end
+
+local function session_file_key(session)
+  if not session then
+    return ""
+  end
+
+  return table.concat({
+    session.original_path or "",
+    session.modified_path or "",
+    session.original_revision or "",
+    session.modified_revision or "",
+  }, "\0")
+end
+
+local function explorer_selection_key(explorer)
+  if not explorer then
+    return ""
+  end
+
+  local selection = explorer.current_selection
+  if selection then
+    return table.concat({
+      selection.group or "",
+      selection.path or "",
+      selection.old_path or "",
+      selection.status or "",
+      selection.commit_hash or "",
+    }, "\0")
+  end
+
+  return table.concat({
+    explorer.current_file_group or "",
+    explorer.current_file_path or "",
+    explorer.current_commit or "",
+    explorer.current_file or "",
+  }, "\0")
+end
+
+local function current_diff_side(session)
+  local current_buf = vim.api.nvim_get_current_buf()
+  if current_buf == session.original_bufnr then
+    return "original"
+  end
+  if current_buf == session.modified_bufnr then
+    return "modified"
+  end
+  if valid_win(session.modified_win) then
+    return "modified"
+  end
+  return "original"
+end
+
+local function preferred_diff_window(session, side)
+  local primary = side == "original" and session.original_win or session.modified_win
+  local fallback = side == "original" and session.modified_win or session.original_win
+
+  if valid_win(primary) then
+    return primary
+  end
+  if valid_win(fallback) then
+    return fallback
+  end
+  return nil
+end
+
+local function clamp_line(winid, line)
+  local bufnr = vim.api.nvim_win_get_buf(winid)
+  local line_count = vim.api.nvim_buf_line_count(bufnr)
+  return math.max(1, math.min(line_count, line))
+end
+
+local function focus_line(winid, line)
+  if not valid_win(winid) then
+    return false
+  end
+
+  vim.api.nvim_set_current_win(winid)
+  pcall(vim.api.nvim_win_set_cursor, winid, { clamp_line(winid, line), 0 })
+  vim.cmd("normal! zz")
+  return true
+end
+
+local function focus_single_file_boundary(session, direction)
+  local winid = preferred_diff_window(session, "modified")
+  if not winid then
+    return false
+  end
+
+  local line = 1
+  if direction == "prev" then
+    line = vim.api.nvim_buf_line_count(vim.api.nvim_win_get_buf(winid))
+  end
+  return focus_line(winid, line)
+end
+
+local function focus_review_boundary(tabpage, direction)
+  local _, session = get_lifecycle_session(tabpage)
+  if not diff_result_ready(session) then
+    return false
+  end
+
+  local changes = session.stored_diff_result.changes
+  if #changes == 0 then
+    return focus_single_file_boundary(session, direction)
+  end
+
+  local side = current_diff_side(session)
+  local change_index = direction == "prev" and #changes or 1
+  local change = changes[change_index]
+  local range = side == "original" and change.original or change.modified
+  local winid = preferred_diff_window(session, side)
+  if not winid or not range then
+    return false
+  end
+
+  local target_line = math.max(1, range.start_line or 1)
+  if focus_line(winid, target_line) then
+    vim.api.nvim_echo({ { string.format("Hunk %d of %d", change_index, #changes), "None" } }, false, {})
+    return true
+  end
+  return false
+end
+
+local function wait_for_review_ready(tabpage, selection, previous_file_key, on_ready)
+  local token = {}
+  local deadline = now_ms() + review_nav_wait_ms
+  pending_review_nav[tabpage] = token
+
+  local function poll()
+    if pending_review_nav[tabpage] ~= token then
+      return
+    end
+    if not vim.api.nvim_tabpage_is_valid(tabpage) then
+      pending_review_nav[tabpage] = nil
+      return
+    end
+
+    local lifecycle, session = get_lifecycle_session(tabpage)
+    local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+    local git_root = explorer and explorer.git_root or (session and session.git_root or nil)
+    local file_changed = not previous_file_key or session_file_key(session) ~= previous_file_key
+
+    if diff_result_ready(session) and file_changed and session_matches_selection(session, selection, git_root) then
+      pending_review_nav[tabpage] = nil
+      if vim.api.nvim_get_current_tabpage() == tabpage then
+        on_ready()
+      end
+      return
+    end
+
+    if now_ms() >= deadline then
+      pending_review_nav[tabpage] = nil
+      vim.notify("CodeDiff navigation timed out waiting for the diff to update", vim.log.levels.WARN)
+      return
+    end
+
+    vim.defer_fn(poll, review_nav_poll_ms)
+  end
+
+  vim.defer_fn(poll, review_nav_poll_ms)
+end
+
+local function navigate_file_and_focus(direction)
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  local lifecycle, session = get_lifecycle_session(tabpage)
+  if not lifecycle or not session then
+    return false
+  end
+
+  local navigation = require("codediff.ui.view.navigation")
+  local explorer = lifecycle.get_explorer(tabpage)
+  local before_selection_key = explorer_selection_key(explorer)
+  local before_file_key = session_file_key(session)
+
+  if direction == "prev" then
+    navigation.prev_file()
+  else
+    navigation.next_file()
+  end
+
+  local after_selection_key = explorer_selection_key(explorer)
+  local tracks_explorer_selection = explorer
+    and (explorer.status_result ~= nil or explorer.current_selection ~= nil or explorer.current_file_path ~= nil)
+  if tracks_explorer_selection and after_selection_key == before_selection_key then
+    return false
+  end
+
+  local selection = explorer and explorer.current_selection and vim.deepcopy(explorer.current_selection) or nil
+  wait_for_review_ready(tabpage, selection, before_file_key, function()
+    focus_review_boundary(tabpage, direction)
+  end)
+
+  return true
+end
+
+local function review_step_when_ready(direction)
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  wait_for_review_ready(tabpage, nil, nil, function()
+    if direction == "prev" then
+      prev_review_step()
+    else
+      next_review_step()
+    end
+  end)
+end
+
+local function collapse_diff_side(side)
+  return function()
+    local tabpage = vim.api.nvim_get_current_tabpage()
+    local _, session = get_lifecycle_session(tabpage)
+    if not session then
+      return
+    end
+
+    if session.layout == "inline" or session.original_win == session.modified_win then
+      vim.notify("CodeDiff has only one visible diff pane", vim.log.levels.WARN)
+      return
+    end
+    if not valid_win(session.original_win) or not valid_win(session.modified_win) then
+      vim.notify("CodeDiff side-by-side panes are not both available", vim.log.levels.WARN)
+      return
+    end
+
+    local original_col = vim.api.nvim_win_get_position(session.original_win)[2]
+    local modified_col = vim.api.nvim_win_get_position(session.modified_win)[2]
+    local left_win = original_col <= modified_col and session.original_win or session.modified_win
+    local right_win = left_win == session.original_win and session.modified_win or session.original_win
+    local hide_win = side == "left" and left_win or right_win
+    local show_win = side == "left" and right_win or left_win
+    local available_width = vim.api.nvim_win_get_width(left_win) + vim.api.nvim_win_get_width(right_win)
+    local hidden_width = 1
+    local visible_width = math.max(1, available_width - hidden_width)
+
+    if vim.api.nvim_get_current_win() == hide_win then
+      vim.api.nvim_set_current_win(show_win)
+    end
+
+    pcall(vim.api.nvim_win_set_width, show_win, visible_width)
+    pcall(vim.api.nvim_win_set_width, hide_win, hidden_width)
+    pcall(vim.api.nvim_win_set_width, show_win, visible_width)
+  end
+end
+
 local function resize_window(width_delta, height_delta)
   return function()
     local win = vim.api.nvim_get_current_win()
@@ -113,37 +407,52 @@ local function resize_window(width_delta, height_delta)
   end
 end
 
-local function next_review_step()
+next_review_step = function()
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  local _, session = get_lifecycle_session(tabpage)
+  if not session then
+    return
+  end
+  if not diff_result_ready(session) then
+    review_step_when_ready("next")
+    return
+  end
+
+  local changes = session.stored_diff_result.changes
+  if #changes == 0 then
+    navigate_file_and_focus("next")
+    return
+  end
+
   local navigation = require("codediff.ui.view.navigation")
   if not navigation.next_hunk() then
-    navigation.next_file()
+    navigate_file_and_focus("next")
   end
 end
 
-local function prev_review_step()
-  local lifecycle = require("codediff.ui.lifecycle")
-  local navigation = require("codediff.ui.view.navigation")
+prev_review_step = function()
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  local _, session = get_lifecycle_session(tabpage)
+  if not session then
+    return
+  end
+  if not diff_result_ready(session) then
+    review_step_when_ready("prev")
+    return
+  end
 
+  local changes = session.stored_diff_result.changes
+  if #changes == 0 then
+    navigate_file_and_focus("prev")
+    return
+  end
+
+  local navigation = require("codediff.ui.view.navigation")
   if navigation.prev_hunk() then
     return
   end
 
-  if not navigation.prev_file() then
-    return
-  end
-
-  local session = lifecycle.get_session(vim.api.nvim_get_current_tabpage())
-  if not session or not session.modified_bufnr or not session.modified_win then
-    return
-  end
-  if not vim.api.nvim_buf_is_valid(session.modified_bufnr) or not vim.api.nvim_win_is_valid(session.modified_win) then
-    return
-  end
-
-  vim.api.nvim_set_current_win(session.modified_win)
-  local last_line = vim.api.nvim_buf_line_count(session.modified_bufnr)
-  pcall(vim.api.nvim_win_set_cursor, session.modified_win, { last_line, 0 })
-  navigation.prev_hunk()
+  navigate_file_and_focus("prev")
 end
 
 local function setup_custom_keymaps(tabpage, keymaps)
@@ -177,14 +486,14 @@ local function setup_custom_keymaps(tabpage, keymaps)
   end
 
   if keymaps.shrink_width then
-    lifecycle.set_tab_keymap(tabpage, "n", keymaps.shrink_width, resize_window(-10, nil), {
-      desc = "Shrink current CodeDiff window width",
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.shrink_width, collapse_diff_side("left"), {
+      desc = "Hide left CodeDiff pane",
     })
   end
 
   if keymaps.grow_width then
-    lifecycle.set_tab_keymap(tabpage, "n", keymaps.grow_width, resize_window(10, nil), {
-      desc = "Grow current CodeDiff window width",
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.grow_width, collapse_diff_side("right"), {
+      desc = "Hide right CodeDiff pane",
     })
   end
 
