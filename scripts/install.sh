@@ -63,7 +63,7 @@ done < "$DOTFILES_DIR/config/apt-packages.txt"
 #       openjdk-17: Java Development Kit. This version is required for sonarqube LSP support
 #       wget: command-line utility for downloading files from the web
 #       git-delta: a non-interactive syntax-highlighting diff renderer, still used by LazyGit and git add -p
-#       hunkdiff: review-first terminal diff viewer for Git pager and agent-note workflows
+#       hunk: review-first terminal diff viewer for Git pager and agent-note workflows
 #       build-essential: a package that includes essential tools for building software from source, only needed for linux servers
 #       curl: command-line tool for transferring data with URLs, used for fetching scripts and packages
 #       zsh: a shell with a superset of features compared to bash, used as the default shell
@@ -357,7 +357,23 @@ npm_global_install() {
 }
 
 install_hunk() {
-  # hunkdiff publishes the `hunk` CLI and does not currently ship via brew/apt.
+  local pm
+  pm="${PM:-$(detect_pm)}"
+
+  if [[ "$pm" == "brew" ]]; then
+    if brew list --formula hunk &> /dev/null; then
+      log "Hunk already installed via Homebrew—skipping re-install"
+    else
+      log "Installing Hunk diff viewer via Homebrew…"
+      brew install modem-dev/tap/hunk || {
+        err "Hunk Homebrew install failed"
+        exit 1
+      }
+    fi
+    return 0
+  fi
+
+  # hunkdiff publishes the `hunk` CLI on npm for platforms without a package.
   if ! command -v hunk &> /dev/null; then
     log "Installing Hunk diff viewer via npm…"
     npm_global_install hunkdiff || {
@@ -474,7 +490,7 @@ main() {
     log "tree-sitter CLI already installed—skipping re-install"
   fi
 
-  # Install Hunk via npm for both macOS and Linux.
+  # Install Hunk via Homebrew on macOS, npm elsewhere.
   install_hunk
 
   # Install git-split-diffs via npm on Linux (on macOS it's installed via brew)

@@ -1,12 +1,20 @@
 # Hunk Configuration
 
-Hunk is the primary interactive Git diff/review viewer. It is installed from the
-`hunkdiff` npm package, which provides the `hunk` CLI.
+Hunk is the primary interactive Git diff/review viewer. On macOS, it is
+installed from the `modem-dev/tap/hunk` Homebrew formula. On Linux, the
+dotfiles installer falls back to the `hunkdiff` npm package, which provides the
+`hunk` CLI.
 
 Install or validate just this tool through the dotfiles installer:
 
 ```bash
 ./scripts/install.sh --install-hunk
+```
+
+The macOS install path is equivalent to:
+
+```bash
+brew install modem-dev/tap/hunk
 ```
 
 ## Defaults
