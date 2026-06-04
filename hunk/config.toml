@@ -1,8 +1,52 @@
-# Hunk 0.10.0 supports built-in themes only. Use "midnight" until custom
-# TokyoNight theme support lands in a published hunkdiff release.
-theme = "midnight"
+theme = "custom"
 mode = "auto"
 exclude_untracked = true
 line_numbers = true
 wrap_lines = false
 agent_notes = true
+
+[custom_theme]
+base = "midnight"
+label = "TokyoNight Neovim"
+background = "#16161e"
+panel = "#1a1b26"
+panelAlt = "#1f2335"
+border = "#3b4261"
+accent = "#bb9af7"
+accentMuted = "#3f385b"
+text = "#c0caf5"
+muted = "#565f89"
+addedBg = "#1b3028"
+removedBg = "#39242f"
+contextBg = "#1a1b26"
+addedContentBg = "#223d2f"
+removedContentBg = "#4a2733"
+contextContentBg = "#1a1b26"
+addedSignColor = "#73daca"
+removedSignColor = "#f7768e"
+lineNumberBg = "#16161e"
+lineNumberFg = "#3b4261"
+selectedHunk = "#292e42"
+badgeAdded = "#9ece6a"
+badgeRemoved = "#f7768e"
+badgeNeutral = "#565f89"
+fileNew = "#9ece6a"
+fileDeleted = "#f7768e"
+fileRenamed = "#e0af68"
+fileModified = "#bb9af7"
+fileUntracked = "#7dcfff"
+noteBorder = "#fca7ea"
+noteBackground = "#231d35"
+noteTitleBackground = "#332648"
+noteTitleText = "#fca7ea"
+
+[custom_theme.syntax]
+default = "#c0caf5"
+keyword = "#bb9af7"
+string = "#8e95b7"
+comment = "#565f89"
+number = "#8e95b7"
+function = "#ff9e64"
+property = "#73daca"
+type = "#73daca"
+punctuation = "#bb9af7"

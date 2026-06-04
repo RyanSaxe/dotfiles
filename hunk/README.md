@@ -19,7 +19,8 @@ brew install modem-dev/tap/hunk
 
 ## Defaults
 
-- `theme = "midnight"` - closest released built-in theme to the TokyoNight setup
+- `theme = "custom"` - TokyoNight Night palette tuned to match the local
+  Neovim theme
 - `mode = "auto"` - split on wide terminals, stack on narrow terminals
 - `exclude_untracked = true` - avoids large-untracked-file crashes in current
   Hunk releases
@@ -55,7 +56,14 @@ hunk skill path
 
 ## Theme Notes
 
-Hunk custom theme support is not part of `hunkdiff` 0.10.0. When a release
-includes `theme = "custom"`, this config should be updated to map the local
-TokyoNight/Neovim palette into Hunk's `[custom_theme]` and
-`[custom_theme.syntax]` sections.
+The custom theme maps Hunk's semantic theme slots to the local TokyoNight-based
+Neovim palette:
+
+- `#16161e` and `#1a1b26` for dark chrome and review backgrounds
+- `#bb9af7`, `#fca7ea`, and `#f7768e` for purple, pink, and red accents
+- `#73daca`, `#9ece6a`, and `#ff9e64` for teal, green, and orange code/diff
+  emphasis
+- `#565f89` and `#3b4261` for muted comments, gutters, and borders
+
+Hunk cannot load Neovim highlight groups or dynamic dashboard colors directly,
+so the config uses a static approximation of the local Neovim theme.
