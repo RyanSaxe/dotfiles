@@ -88,9 +88,22 @@ local function show_help()
 end
 
 local function equalize_layout()
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  local ok_lifecycle, lifecycle = pcall(require, "codediff.ui.lifecycle")
+  local session = ok_lifecycle and lifecycle.get_session(tabpage) or nil
+  if type(session) == "table" then
+    session.custom_collapsed_side = nil
+    if type(session.original_win) == "number" and vim.api.nvim_win_is_valid(session.original_win) then
+      vim.wo[session.original_win].winfixwidth = false
+    end
+    if type(session.modified_win) == "number" and vim.api.nvim_win_is_valid(session.modified_win) then
+      vim.wo[session.modified_win].winfixwidth = false
+    end
+  end
+
   local ok, layout = pcall(require, "codediff.ui.layout")
   if ok then
-    layout.arrange(vim.api.nvim_get_current_tabpage())
+    layout.arrange(tabpage)
   end
 end
 
@@ -208,6 +221,100 @@ local function preferred_diff_window(session, side)
     return fallback
   end
   return nil
+end
+
+local function physical_diff_windows(session)
+  if
+    not session
+    or session.layout == "inline"
+    or session.single_pane
+    or session.original_win == session.modified_win
+    or not valid_win(session.original_win)
+    or not valid_win(session.modified_win)
+  then
+    return nil, nil
+  end
+
+  local original_col = vim.api.nvim_win_get_position(session.original_win)[2]
+  local modified_col = vim.api.nvim_win_get_position(session.modified_win)[2]
+  if original_col <= modified_col then
+    return session.original_win, session.modified_win
+  end
+  return session.modified_win, session.original_win
+end
+
+local function clear_diff_winfixwidth(session)
+  if not session then
+    return
+  end
+  if valid_win(session.original_win) then
+    vim.wo[session.original_win].winfixwidth = false
+  end
+  if valid_win(session.modified_win) then
+    vim.wo[session.modified_win].winfixwidth = false
+  end
+end
+
+local function apply_collapsed_side(tabpage, opts)
+  opts = opts or {}
+
+  local _, session = get_lifecycle_session(tabpage)
+  if not session or not session.custom_collapsed_side then
+    return false
+  end
+
+  if session.layout == "inline" then
+    session.custom_collapsed_side = nil
+    clear_diff_winfixwidth(session)
+    return false
+  end
+
+  local left_win, right_win = physical_diff_windows(session)
+  if not left_win or not right_win then
+    clear_diff_winfixwidth(session)
+    return false
+  end
+
+  local hide_win
+  local show_win
+  if session.custom_collapsed_side == "left" then
+    hide_win = left_win
+    show_win = right_win
+  elseif session.custom_collapsed_side == "right" then
+    hide_win = right_win
+    show_win = left_win
+  else
+    session.custom_collapsed_side = nil
+    clear_diff_winfixwidth(session)
+    return false
+  end
+
+  local current_win = vim.api.nvim_get_current_win()
+  local should_focus_visible = opts.focus_visible == true or current_win == hide_win
+  if should_focus_visible then
+    vim.api.nvim_set_current_win(show_win)
+  end
+
+  local available_width = vim.api.nvim_win_get_width(left_win) + vim.api.nvim_win_get_width(right_win)
+  local hidden_width = 1
+  local visible_width = math.max(1, available_width - hidden_width)
+
+  local previous_winminwidth = vim.o.winminwidth
+  local previous_winwidth = vim.o.winwidth
+  vim.o.winminwidth = 1
+  vim.o.winwidth = 1
+
+  vim.wo[left_win].winfixwidth = left_win == hide_win
+  vim.wo[right_win].winfixwidth = right_win == hide_win
+
+  pcall(vim.api.nvim_win_set_width, show_win, visible_width)
+  pcall(vim.api.nvim_win_set_width, hide_win, hidden_width)
+  pcall(vim.api.nvim_win_set_width, show_win, visible_width)
+
+  vim.o.winwidth = previous_winwidth
+  vim.o.winminwidth = previous_winminwidth
+
+  return true
 end
 
 local function clamp_line(winid, line)
@@ -335,6 +442,7 @@ local function navigate_file_and_focus(direction)
   local selection = explorer and explorer.current_selection and vim.deepcopy(explorer.current_selection) or nil
   wait_for_review_ready(tabpage, selection, before_file_key, function()
     focus_review_boundary(tabpage, direction)
+    apply_collapsed_side(tabpage, { focus_visible = true })
   end)
 
   return true
@@ -368,29 +476,8 @@ local function collapse_diff_side(side)
       return
     end
 
-    local original_col = vim.api.nvim_win_get_position(session.original_win)[2]
-    local modified_col = vim.api.nvim_win_get_position(session.modified_win)[2]
-    local left_win = original_col <= modified_col and session.original_win or session.modified_win
-    local right_win = left_win == session.original_win and session.modified_win or session.original_win
-    local hide_win = side == "left" and left_win or right_win
-    local show_win = side == "left" and right_win or left_win
-    local available_width = vim.api.nvim_win_get_width(left_win) + vim.api.nvim_win_get_width(right_win)
-    local hidden_width = 1
-    local visible_width = math.max(1, available_width - hidden_width)
-
-    vim.api.nvim_set_current_win(show_win)
-
-    local previous_winminwidth = vim.o.winminwidth
-    local previous_winwidth = vim.o.winwidth
-    vim.o.winminwidth = 1
-    vim.o.winwidth = 1
-
-    pcall(vim.api.nvim_win_set_width, show_win, visible_width)
-    pcall(vim.api.nvim_win_set_width, hide_win, hidden_width)
-    pcall(vim.api.nvim_win_set_width, show_win, visible_width)
-
-    vim.o.winwidth = previous_winwidth
-    vim.o.winminwidth = previous_winminwidth
+    session.custom_collapsed_side = side
+    apply_collapsed_side(tabpage, { focus_visible = true })
   end
 end
 
@@ -533,6 +620,7 @@ local function ensure_custom_reapply(tabpage, keymaps)
       original_reapply()
     end
     setup_custom_keymaps(tabpage, keymaps)
+    apply_collapsed_side(tabpage)
   end
   session.custom_keymaps_wrapped = true
 end
@@ -620,13 +708,14 @@ return {
     require("codediff").setup(opts)
     local augroup = vim.api.nvim_create_augroup("custom-codediff", { clear = true })
 
-    vim.api.nvim_create_autocmd("BufEnter", {
+    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
       group = augroup,
       callback = function()
         local tabpage = vim.api.nvim_get_current_tabpage()
         vim.schedule(function()
           ensure_custom_reapply(tabpage, opts.keymaps.view)
           setup_custom_keymaps(tabpage, opts.keymaps.view)
+          apply_collapsed_side(tabpage)
         end)
       end,
     })
