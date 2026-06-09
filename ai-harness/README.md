@@ -11,14 +11,18 @@ Shared configuration and utilities for AI coding agents.
 - `scripts/attention-daemon.sh`: tmux metadata watcher for Codex panes whose title enters `Action Required`.
 - `claude/`: Claude-specific configs (CLAUDE.md, settings.json, hooks, references, themes, utility-scripts).
 - `codex/hooks.json`: Codex lifecycle hook configuration.
+- `codex/dotfiles.config.toml`: Shared Codex profile selected by the zsh
+  wrapper with `--profile dotfiles`.
 - `copilot/settings.json`: Copilot CLI user settings for hooks, status line, and built-in beep behavior.
 - `copilot/utility-scripts/`: Copilot CLI command status line scripts.
 
 Codex also gets a launch-time `notify=[...]` override from the repo-owned zsh
 `codex()` wrapper, so Codex can pass notification JSON to `scripts/notify.sh`
 without editing `~/.codex/config.toml`.
-The same wrapper passes native Codex status line settings at launch, keeping
-trusted folder paths and other local state out of the dotfiles repo.
+The same wrapper passes native Codex status line settings and machine-expanded
+environment paths at launch. `~/.codex/config.toml` remains local mutable state
+for trusted project paths, hook trust hashes, UI flags, and connector-specific
+settings.
 
 ## Notification Environment
 

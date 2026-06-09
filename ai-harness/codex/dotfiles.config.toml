@@ -1,0 +1,56 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+approval_policy = "on-request"
+default_permissions = "dev-workspace"
+
+[permissions.dev-workspace]
+description = "Workspace access with uv cache and tool directories writable."
+extends = ":workspace"
+
+[permissions.dev-workspace.filesystem]
+"~/.cache/uv" = "write"
+"~/.local/bin" = "write"
+"~/.local/share/uv" = "write"
+
+[permissions.dev-workspace.network]
+enabled = true
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+
+[mcp_servers.playwright.tools.browser_navigate]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_click]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_evaluate]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_press_key]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_run_code_unsafe]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_resize]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_close]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_type]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_fill_form]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_tabs]
+approval_mode = "approve"
+
+[features]
+goals = true

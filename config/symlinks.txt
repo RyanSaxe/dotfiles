@@ -18,6 +18,7 @@ ai-harness/skills:$HOME/.claude/skills
 ai-harness/scripts/notify.sh:$HOME/.codex/hooks/notify.sh
 ai-harness/scripts/notify.sh:$HOME/.copilot/hooks/notify.sh
 ai-harness/codex/hooks.json:$HOME/.codex/hooks.json
+ai-harness/codex/dotfiles.config.toml:$HOME/.codex/dotfiles.config.toml
 ai-harness/copilot/settings.json:$HOME/.copilot/settings.json
 ai-harness/copilot/utility-scripts:$HOME/.copilot/utility-scripts
 ai-harness/claude/CLAUDE.md:$HOME/.claude/CLAUDE.md
