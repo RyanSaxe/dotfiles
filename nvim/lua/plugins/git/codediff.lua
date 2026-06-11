@@ -625,6 +625,25 @@ local function ensure_custom_reapply(tabpage, keymaps)
   session.custom_keymaps_wrapped = true
 end
 
+local function ensure_custom_file_switch_reapply(keymaps)
+  local ok, view_keymaps = pcall(require, "codediff.ui.view.keymaps")
+  if not ok or view_keymaps.custom_file_switch_keymaps_wrapped then
+    return
+  end
+
+  local original_setup_all_keymaps = view_keymaps.setup_all_keymaps
+  if type(original_setup_all_keymaps) ~= "function" then
+    return
+  end
+
+  view_keymaps.setup_all_keymaps = function(tabpage, original_bufnr, modified_bufnr, is_explorer_mode)
+    original_setup_all_keymaps(tabpage, original_bufnr, modified_bufnr, is_explorer_mode)
+    setup_custom_keymaps(tabpage, keymaps)
+    apply_collapsed_side(tabpage)
+  end
+  view_keymaps.custom_file_switch_keymaps_wrapped = true
+end
+
 return {
   "esmuellert/codediff.nvim",
   dependencies = { "MunifTanjim/nui.nvim", "folke/snacks.nvim" },
@@ -706,6 +725,7 @@ return {
   },
   config = function(_, opts)
     require("codediff").setup(opts)
+    ensure_custom_file_switch_reapply(opts.keymaps.view)
     local augroup = vim.api.nvim_create_augroup("custom-codediff", { clear = true })
 
     vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
