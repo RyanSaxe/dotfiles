@@ -54,3 +54,9 @@ approval_mode = "approve"
 
 [features]
 goals = true
+
+[projects."/Users/a10889158/work/current/codex-tune"]
+trust_level = "trusted"
+
+[projects."/Users/a10889158/work/current/watchtower-v2"]
+trust_level = "trusted"

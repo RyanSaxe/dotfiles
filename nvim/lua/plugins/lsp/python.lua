@@ -6,7 +6,7 @@ return {
       zuban = false,
       pyright = false,
       basedpyright = {
-        enabled = true,
+        enabled = false,
         settings = {
           basedpyright = {
             disableOrganizeImports = true, -- Defer to Ruff
@@ -28,7 +28,7 @@ return {
       pyrefly = false,
       pylsp = false,
       ty = {
-        enabled = false,
+        enabled = true,
         settings = {
           ty = {
             diagnosticMode = "workspace",

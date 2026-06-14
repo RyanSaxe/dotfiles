@@ -33,7 +33,7 @@ Only entries that override agent defaults. AIs already write good code in these 
 ### Python
 
 - Manage deps with `uv`; execute via `uv run`. Use `uvx` for one-off package commands.
-- Type check with `basedpyright` (`uvx ty check` is faster but `ty` isn't stable enough yet — revisit when it is). Lint and format with `ruff`.
+- Type check with `uvx ty check`. Lint and format with `ruff`.
 - Avoid `Any` and `object` types, and avoid type casting. They're code smells — use only when actually required.
 
 ### TypeScript
