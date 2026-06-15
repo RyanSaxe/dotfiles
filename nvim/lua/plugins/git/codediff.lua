@@ -18,6 +18,7 @@ local help_lines = {
   "│    <S-Tab>     Prev hunk, else prev file    │",
   "│    ]h / [h     Next / previous hunk         │",
   "│    ]f / [f     Next / previous file         │",
+  "│    ]c / [c     Next / previous stack commit │",
   "│    <CR>        Open file (in explorer)      │",
   "│                                             │",
   "│  Actions                                    │",
@@ -42,6 +43,7 @@ local help_lines = {
   "│    \\=          Equalize layout              │",
   "│    \\h / \\l     Hide left / right pane       │",
   "│    \\j / \\k     Shrink / grow height         │",
+  "│    \\s          Stack commit picker          │",
   "│    ?           Show this help               │",
   "╰─────────────────────────────────────────────╯",
 }
@@ -459,6 +461,162 @@ local function review_step_when_ready(direction)
   end)
 end
 
+local function active_stack(session)
+  if type(session) ~= "table" or type(session.custom_stack_review) ~= "table" then
+    return nil
+  end
+
+  local stack = session.custom_stack_review
+  if type(stack.pairs) ~= "table" or #stack.pairs == 0 then
+    return nil
+  end
+
+  stack.index = tonumber(stack.index) or 1
+  return stack
+end
+
+local function no_active_stack()
+  vim.notify("No active CodeDiff stack review", vim.log.levels.WARN)
+end
+
+local function stack_boundary(direction)
+  local message = direction == "prev" and "Start of CodeDiff stack review" or "End of CodeDiff stack review"
+  vim.api.nvim_echo({ { message, "WarningMsg" } }, false, {})
+end
+
+local function explorer_file_line(explorer, file_data)
+  if not explorer or not file_data or not explorer.tree or not vim.api.nvim_buf_is_valid(explorer.bufnr) then
+    return nil
+  end
+
+  local line_count = vim.api.nvim_buf_line_count(explorer.bufnr)
+  for line = 1, line_count do
+    local node = explorer.tree:get_node(line)
+    if node and node.data and node.data.path == file_data.path and node.data.group == file_data.group then
+      return line
+    end
+  end
+  return nil
+end
+
+local function select_stack_boundary_file(tabpage, direction)
+  local lifecycle, session = get_lifecycle_session(tabpage)
+  local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+  if not explorer or type(explorer.on_file_select) ~= "function" then
+    return focus_review_boundary(tabpage, direction)
+  end
+
+  local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
+  if not ok_refresh then
+    return focus_review_boundary(tabpage, direction)
+  end
+
+  local files = refresh.get_all_files(explorer.tree)
+  if #files == 0 then
+    return focus_review_boundary(tabpage, direction)
+  end
+
+  local target = direction == "prev" and files[#files] or files[1]
+  if not target or not target.data then
+    return focus_review_boundary(tabpage, direction)
+  end
+
+  local selection = vim.deepcopy(target.data)
+  local before_file_key = session_file_key(session)
+  local current_win = vim.api.nvim_get_current_win()
+  local line = explorer_file_line(explorer, selection)
+  if line and valid_win(explorer.winid) then
+    vim.api.nvim_set_current_win(explorer.winid)
+    pcall(vim.api.nvim_win_set_cursor, explorer.winid, { line, 0 })
+    if valid_win(current_win) then
+      vim.api.nvim_set_current_win(current_win)
+    end
+  end
+
+  explorer.on_file_select(selection)
+  wait_for_review_ready(tabpage, selection, before_file_key, function()
+    focus_review_boundary(tabpage, direction)
+    apply_collapsed_side(tabpage, { focus_visible = true })
+  end)
+
+  return true
+end
+
+local function focus_pending_stack_pair(tabpage)
+  local _, session = get_lifecycle_session(tabpage)
+  if not session or not session.custom_stack_focus_direction then
+    return
+  end
+
+  local direction = session.custom_stack_focus_direction
+  session.custom_stack_focus_direction = nil
+
+  vim.schedule(function()
+    if not vim.api.nvim_tabpage_is_valid(tabpage) then
+      return
+    end
+    if vim.api.nvim_get_current_tabpage() ~= tabpage then
+      return
+    end
+    select_stack_boundary_file(tabpage, direction)
+  end)
+end
+
+local function jump_stack_pair(target_index, direction)
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  local _, session = get_lifecycle_session(tabpage)
+  local stack = active_stack(session)
+  if not stack then
+    no_active_stack()
+    return false
+  end
+
+  if target_index < 1 or target_index > #stack.pairs then
+    stack_boundary(direction)
+    return false
+  end
+
+  require("custom.git.diff").open_stack_pair(stack, target_index, {
+    close_tabpage = tabpage,
+    focus_direction = direction,
+  })
+  return true
+end
+
+local function next_stack_pair()
+  local _, session = get_lifecycle_session(vim.api.nvim_get_current_tabpage())
+  local stack = active_stack(session)
+  if not stack then
+    no_active_stack()
+    return false
+  end
+  return jump_stack_pair(stack.index + 1, "next")
+end
+
+local function prev_stack_pair()
+  local _, session = get_lifecycle_session(vim.api.nvim_get_current_tabpage())
+  local stack = active_stack(session)
+  if not stack then
+    no_active_stack()
+    return false
+  end
+  return jump_stack_pair(stack.index - 1, "prev")
+end
+
+local function open_stack_picker()
+  local _, session = get_lifecycle_session(vim.api.nvim_get_current_tabpage())
+  local stack = active_stack(session)
+  if not stack then
+    no_active_stack()
+    return
+  end
+
+  require("custom.git.diff").open_stack_picker(stack, function(index)
+    local direction = index < stack.index and "prev" or "next"
+    jump_stack_pair(index, direction)
+  end)
+end
+
 local function collapse_diff_side(side)
   return function()
     local tabpage = vim.api.nvim_get_current_tabpage()
@@ -513,13 +671,17 @@ next_review_step = function()
 
   local changes = session.stored_diff_result.changes
   if #changes == 0 then
-    navigate_file_and_focus("next")
+    if not navigate_file_and_focus("next") then
+      next_stack_pair()
+    end
     return
   end
 
   local navigation = require("codediff.ui.view.navigation")
   if not navigation.next_hunk() then
-    navigate_file_and_focus("next")
+    if not navigate_file_and_focus("next") then
+      next_stack_pair()
+    end
   end
 end
 
@@ -536,7 +698,9 @@ prev_review_step = function()
 
   local changes = session.stored_diff_result.changes
   if #changes == 0 then
-    navigate_file_and_focus("prev")
+    if not navigate_file_and_focus("prev") then
+      prev_stack_pair()
+    end
     return
   end
 
@@ -545,7 +709,9 @@ prev_review_step = function()
     return
   end
 
-  navigate_file_and_focus("prev")
+  if not navigate_file_and_focus("prev") then
+    prev_stack_pair()
+  end
 end
 
 local function setup_custom_keymaps(tabpage, keymaps)
@@ -569,6 +735,24 @@ local function setup_custom_keymaps(tabpage, keymaps)
   if keymaps.prev_review_step then
     lifecycle.set_tab_keymap(tabpage, "n", keymaps.prev_review_step, prev_review_step, {
       desc = "Previous hunk, else previous file",
+    })
+  end
+
+  if keymaps.next_stack_pair then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.next_stack_pair, next_stack_pair, {
+      desc = "Next stack commit",
+    })
+  end
+
+  if keymaps.prev_stack_pair then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.prev_stack_pair, prev_stack_pair, {
+      desc = "Previous stack commit",
+    })
+  end
+
+  if keymaps.stack_picker then
+    lifecycle.set_tab_keymap(tabpage, "n", keymaps.stack_picker, open_stack_picker, {
+      desc = "CodeDiff stack commit picker",
     })
   end
 
@@ -679,6 +863,20 @@ return {
       end,
       desc = "All Files Diff (pick commit)",
     },
+    {
+      "<leader>gds",
+      function()
+        require("custom.git.diff").pick_stack_review_branch()
+      end,
+      desc = "Stack Review (pick branch)",
+    },
+    {
+      "<leader>gdS",
+      function()
+        require("custom.git.diff").pick_stack_review_commit()
+      end,
+      desc = "Stack Review (pick commit)",
+    },
   },
   opts = {
     explorer = {
@@ -709,6 +907,9 @@ return {
         grow_height = "<localleader>k",
         next_review_step = "<Tab>",
         prev_review_step = "<S-Tab>",
+        next_stack_pair = "]c",
+        prev_stack_pair = "[c",
+        stack_picker = "<localleader>s",
         help_popup = "?",
       },
       explorer = {
@@ -736,6 +937,21 @@ return {
           ensure_custom_reapply(tabpage, opts.keymaps.view)
           setup_custom_keymaps(tabpage, opts.keymaps.view)
           apply_collapsed_side(tabpage)
+          focus_pending_stack_pair(tabpage)
+        end)
+      end,
+    })
+
+    vim.api.nvim_create_autocmd("User", {
+      group = augroup,
+      pattern = "CodeDiffStackPairOpen",
+      callback = function(ev)
+        local tabpage = ev.data and ev.data.tabpage or vim.api.nvim_get_current_tabpage()
+        vim.schedule(function()
+          ensure_custom_reapply(tabpage, opts.keymaps.view)
+          setup_custom_keymaps(tabpage, opts.keymaps.view)
+          apply_collapsed_side(tabpage)
+          focus_pending_stack_pair(tabpage)
         end)
       end,
     })
