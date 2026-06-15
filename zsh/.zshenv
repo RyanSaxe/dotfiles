@@ -6,6 +6,10 @@
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 
+# ----- Preferred editor (used by git, $EDITOR-aware CLIs, etc.) -----
+export EDITOR="nvim"
+export VISUAL="nvim"
+
 # ----- OS-specific PATH / Homebrew setup -----
 case "$OSTYPE" in
   darwin*) # macOS

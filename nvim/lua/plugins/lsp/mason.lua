@@ -16,6 +16,9 @@ return {
 
       -- HTML
       "html-lsp",
+
+      -- Structural lint (byor / ast-grep rules)
+      "ast-grep",
     },
   },
 }
