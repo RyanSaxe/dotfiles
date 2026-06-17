@@ -22,3 +22,4 @@ test-projects/
 tmux/plugins/
 __pycache__/
 *.py[cod]
+ai-harness/skills/byor/
