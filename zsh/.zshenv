@@ -11,6 +11,10 @@ export EDITOR="nvim"
 export VISUAL="nvim"
 
 # ----- OS-specific PATH / Homebrew setup -----
+path_add() {
+  [[ ":$PATH:" == *":$1:"* ]] || PATH="$1:$PATH"
+}
+
 case "$OSTYPE" in
   darwin*) # macOS
     # Apple Silicon Homebrew
@@ -24,15 +28,11 @@ case "$OSTYPE" in
 
   linux-gnu* | linux*)
     # Ubuntu-style defaults (no Homebrew / Linuxbrew nonsense)
-    # Prepend common user/local paths; avoid duplicates by checking first.
-    path_add() {
-      [[ ":$PATH:" == *":$1:"* ]] || PATH="$1:$PATH"
-    }
-
-    path_add "$HOME/.local/bin"
     path_add "/usr/local/sbin"
     path_add "/usr/local/bin"
-    export PATH
     ;;
 esac
+
+path_add "$HOME/.local/bin"
+export PATH
 . "$HOME/.cargo/env"
