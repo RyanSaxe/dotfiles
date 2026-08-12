@@ -1,0 +1,12 @@
+# Rendered by `theme` — do not edit; change the template or tokens instead.
+# Sourced by .zshrc when present.
+
+# Ghost text (zsh-autosuggestions). v1 hardcoded this hex; now it is a token.
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg={{ghost}}'
+
+# fzf and the fzf-tab popup.
+export FZF_DEFAULT_OPTS="\
+--color=bg+:{{bg_highlight}},bg:{{bg}},border:{{border}} \
+--color=fg:{{fg}},fg+:{{fg}},hl:{{accent}},hl+:{{accent_bright}} \
+--color=info:{{info}},prompt:{{accent}},pointer:{{accent_bright}} \
+--color=marker:{{success}},spinner:{{accent_bright}},header:{{fg_muted}}"

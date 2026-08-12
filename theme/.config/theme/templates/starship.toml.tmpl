@@ -1,0 +1,30 @@
+# Rendered by `theme` — do not edit; change the template or tokens instead.
+add_newline = true
+format = "$directory$git_branch$git_status$python$cmd_duration$line_break$character"
+
+[directory]
+style = "bold {{accent}}"
+truncation_length = 3
+
+[git_branch]
+symbol = " "
+style = "{{fg_muted}}"
+
+[git_status]
+style = "{{warn}}"
+
+[python]
+symbol = " "
+style = "{{success}}"
+format = '[${symbol}(${virtualenv})]($style) '
+detect_extensions = []
+detect_files = []
+
+[cmd_duration]
+min_time = 2000
+style = "{{fg_faint}}"
+
+[character]
+success_symbol = "[❯]({{accent_bright}})"
+error_symbol = "[❯]({{error}})"
+vimcmd_symbol = "[❮]({{success}})"
