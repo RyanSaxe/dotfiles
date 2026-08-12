@@ -100,17 +100,46 @@ install_tier_packages() {
   esac
 }
 
+# Stow one package, cleaning up links left behind by files that were renamed
+# or deleted since the last run. Stow itself cannot do this: it unstows by
+# walking the CURRENT package tree, so links to files no longer in the tree
+# are never visited and dangle forever. We keep a manifest of what each
+# package stowed last time; anything in the old manifest but not the new tree
+# that is now a broken symlink gets removed.
+stow_package() {
+  target="${DOTFILES_TARGET:-$HOME}"
+  manifest_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/manifest"
+  manifest="$manifest_dir/$1.txt"
+  mkdir -p "$manifest_dir"
+
+  current="$(cd "$1" && find . -type f | sort)"
+
+  if [ -f "$manifest" ]; then
+    printf '%s\n' "$current" | comm -23 "$manifest" - | while IFS= read -r gone; do
+      link="$target/${gone#./}"
+      # Only touch broken symlinks; a real file there is not ours to delete.
+      if [ -L "$link" ] && [ ! -e "$link" ]; then
+        rm "$link"
+        echo "cleaned dangling link: $link"
+      fi
+    done
+  fi
+
+  stow -R -t "$target" "$1"
+  printf '%s\n' "$current" >"$manifest"
+}
+
 install_tier() {
   if [ "$1" = mac ] && [ "$OS" != Darwin ]; then
     echo "skipping mac tier: not macOS"
     return 0
   fi
   install_tier_packages "$1"
-  # Restow so re-runs reconcile renames and removals. DOTFILES_TARGET exists
-  # so tests can point this at a throwaway directory instead of $HOME.
   # Tiers with no stow packages yet have no tiers/<name>.txt.
   if [ -s "tiers/$1.txt" ]; then
-    xargs stow -R -t "${DOTFILES_TARGET:-$HOME}" <"tiers/$1.txt"
+    while IFS= read -r pkg; do
+      stow_package "$pkg"
+    done <"tiers/$1.txt"
   fi
 }
 
