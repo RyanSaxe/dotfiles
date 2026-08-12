@@ -43,13 +43,13 @@ repos:
         alias: ruff-format-uv-scripts
         name: ruff format (uv scripts)
         types_or: [file]
-        files: '^theme/\.local/bin/pokemon-accents$'
+        files: '^theme/\.local/bin/(pokemon-accents|herdr-mascot)$'
       - id: ruff-check
         alias: ruff-check-uv-scripts
         name: ruff check (uv scripts)
         args: [--fix]
         types_or: [file]
-        files: '^theme/\.local/bin/pokemon-accents$'
+        files: '^theme/\.local/bin/(pokemon-accents|herdr-mascot)$'
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.70

@@ -146,6 +146,7 @@ pokemon)
   name="${2:?usage: theme pokemon <name>|none}"
   if [ "$name" = none ]; then
     rm -f "$STATE/accents.conf"
+    command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot clear
   else
     # Atomic write: a failed extraction must not clobber working accents.
     if ! pokemon-accents "$name" >"$STATE/.accents.tmp"; then
@@ -153,6 +154,7 @@ pokemon)
       exit 1
     fi
     mv "$STATE/.accents.tmp" "$STATE/accents.conf"
+    command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot set "$name"
   fi
   render "$(current_mode)"
   reload_consumers

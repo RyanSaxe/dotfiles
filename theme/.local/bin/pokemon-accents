@@ -38,29 +38,41 @@ SECOND_CLUSTER_MIN_WEIGHT = 0.02
 Hsv = tuple[float, float, float]
 
 
-def fetch_artwork(name: str) -> Path:
+def _get(url: str) -> bytes:
+    # PokeAPI rejects urllib's default User-Agent with a 403.
+    request = urllib.request.Request(url, headers={"User-Agent": "dotfiles-theme/1.0"})
+    with urllib.request.urlopen(request) as response:
+        return response.read()
+
+
+def fetch_images(name: str) -> Path:
+    """Cache both renderings and return the artwork path for extraction.
+
+    One fetch, two roles: the official ARTWORK is the palette source — it
+    carries identity details the 96px game sprite drops (gengar's sprite has
+    literally zero red pixels, losing the eyes) — while the game SPRITE is
+    what herdr-mascot displays. Same character, same color family, so the
+    mascot matches its accents.
+    """
     cache_dir = (
         Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/pokemon"
     )
     cache_dir.mkdir(parents=True, exist_ok=True)
-    image_path = cache_dir / f"{name}.png"
-    if image_path.exists():
-        return image_path
+    artwork = cache_dir / f"{name}.png"
+    sprite = cache_dir / f"{name}-sprite.png"
+    if artwork.exists() and sprite.exists():
+        return artwork
 
-    # PokeAPI rejects urllib's default User-Agent with a 403.
-    def get(url: str) -> bytes:
-        request = urllib.request.Request(
-            url, headers={"User-Agent": "dotfiles-theme/1.0"}
-        )
-        with urllib.request.urlopen(request) as response:
-            return response.read()
-
-    data = json.loads(get(f"{API}{name}"))
-    url = data["sprites"]["other"]["official-artwork"]["front_default"]
-    if not url:
-        raise SystemExit(f"error: no artwork for '{name}'")
-    image_path.write_bytes(get(url))
-    return image_path
+    data = json.loads(_get(f"{API}{name}"))
+    artwork_url = data["sprites"]["other"]["official-artwork"]["front_default"]
+    sprite_url = data["sprites"]["front_default"]
+    if not artwork_url or not sprite_url:
+        raise SystemExit(f"error: missing images for '{name}'")
+    if not artwork.exists():
+        artwork.write_bytes(_get(artwork_url))
+    if not sprite.exists():
+        sprite.write_bytes(_get(sprite_url))
+    return artwork
 
 
 def vivid_pixels(image_path: Path) -> list[Hsv]:
@@ -147,7 +159,7 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: pokemon-accents <name>")
     name = sys.argv[1].lower()
-    accent, accent_bright = pick_pair(vivid_pixels(fetch_artwork(name)))
+    accent, accent_bright = pick_pair(vivid_pixels(fetch_images(name)))
     print(f"pokemon={name}")
     print(f"accent_dark={styled(accent, dark_background=True, bright=False)}")
     print(
