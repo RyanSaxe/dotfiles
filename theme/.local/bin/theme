@@ -50,7 +50,8 @@ conf_put() {
   fi
 }
 
-# Extract accents for a pokemon and show its mascot.
+# Extract accents for a pokemon into state. Display is not this command's
+# job: the pokemon-mascot herdr plugin owns pixels and is notified below.
 set_pokemon() {
   # Atomic write: a failed extraction must not clobber working accents.
   if ! pokemon-accents "$1" >"$STATE/.accents.tmp"; then
@@ -58,7 +59,6 @@ set_pokemon() {
     exit 1
   fi
   mv "$STATE/.accents.tmp" "$STATE/accents.conf"
-  command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot set "$1"
 }
 
 render() {
@@ -113,6 +113,9 @@ reload_consumers() {
   # is running.
   if command -v herdr >/dev/null 2>&1; then
     herdr server reload-config >/dev/null 2>&1 || true
+    # The pokemon-mascot plugin owns the sprite overlay; ask it to reconcile
+    # with the state written above. One-shot and silent when not installed.
+    herdr-pokemon place >/dev/null 2>&1 || true
   fi
   # ghostty / nvim reloads arrive with their packages.
 }
@@ -129,20 +132,7 @@ show_accents() {
   accents="$STATE/accents.conf"
   [ -f "$accents" ] || return 0
   mode="$(current_mode)"
-  name="$(conf_get "$accents" pokemon)"
-  # Display and extraction are different jobs: hues come from the official
-  # artwork PNG, but the sprite shown is pokemon-colorscripts' hand-tuned
-  # pixel art, which reads far better in terminal cells than any downscale
-  # of the artwork. chafa on the PNG is only a fallback.
-  if command -v pokemon-colorscripts >/dev/null 2>&1; then
-    pokemon-colorscripts -n "$name" --no-title 2>/dev/null || true
-  else
-    sprite="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon/$name.png"
-    if command -v chafa >/dev/null 2>&1 && [ -f "$sprite" ]; then
-      chafa -f symbols -s 26x13 "$sprite"
-    fi
-  fi
-  echo "pokemon: $name ($mode)"
+  echo "pokemon: $(conf_get "$accents" pokemon) ($mode)"
   swatch "$(conf_get "$accents" "accent_$mode")" accent
   swatch "$(conf_get "$accents" "accent_bright_$mode")" accent_bright
 }
@@ -168,7 +158,6 @@ pokemon)
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
-    command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot clear
     ;;
   default)
     conf_put "$CONFIG/pokemon.conf" default "${3:?usage: theme pokemon default <name>}"
