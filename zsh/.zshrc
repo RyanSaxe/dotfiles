@@ -32,9 +32,6 @@ if [[ -r "$ZSH_PLUGINS/fzf-tab/fzf-tab.plugin.zsh" ]]; then
   source "$ZSH_PLUGINS/fzf-tab/fzf-tab.plugin.zsh"
   # Convention: Tab is menu completion. (Bind after vi_mode_init, which resets keymaps.)
   bindkey -M viins '^I' fzf-tab-complete
-  # fzf-tab ignores FZF_DEFAULT_OPTS unless told otherwise; without this the
-  # popup would stay default-colored while plain fzf follows the theme.
-  zstyle ':fzf-tab:*' use-fzf-default-opts yes
 fi
 
 if [[ -r "$ZSH_PLUGINS/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
