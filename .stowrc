@@ -1,0 +1,5 @@
+# Create real directories and per-file symlinks instead of folding whole
+# directories into one link. Folding would make ~/.config itself a link into
+# this repo on a fresh machine, so every app writing ~/.config/<anything>
+# would write into the repo. Per-file links keep repo contents explicit.
+--no-folding
