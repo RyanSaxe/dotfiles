@@ -1,0 +1,3 @@
+#!/bin/sh
+# Managed by prek — see .pre-commit-config.yaml
+exec prek run --hook-stage pre-commit

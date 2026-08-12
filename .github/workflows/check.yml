@@ -1,0 +1,19 @@
+name: check
+
+on:
+  push:
+    branches: [v2, main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      # prek downloads the exact hook versions pinned in .pre-commit-config.yaml —
+      # the same ones the local pre-commit hook runs. No other tool installation:
+      # if CI needs a binary the config doesn't pin, that's a config bug.
+      - name: Run all hooks
+        run: uvx prek run --all-files --show-diff-on-failure

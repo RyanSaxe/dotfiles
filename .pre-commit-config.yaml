@@ -1,0 +1,89 @@
+# The single source of truth for code quality gates.
+#
+# Run by prek locally on commit and by CI via `prek run --all-files` — the same
+# pinned versions in both places, downloaded by prek itself, so hook and CI can
+# never disagree. Formatters FIX files rather than reject them: a version skew
+# against the editor's on-save formatter shows up as a silent reformat, never a
+# blocked commit.
+#
+# Editor parity: nvim resolves project-local tools first (.venv/bin via
+# venv.zsh, node_modules/.bin via conform), then globals. See
+# docs/v2-plan.md#toolchain.
+
+fail_fast: false
+
+repos:
+  # Basic hygiene, mirrors .editorconfig.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  # ------------------------------------------------------------------ Lua
+  # Diagnostics/typecheck for Lua come from lua-language-server: live in the
+  # editor, and `lua-language-server --check` in CI once nvim/ exists (step 6).
+  - repo: https://github.com/JohnnyMorganz/StyLua
+    rev: v2.5.2
+    hooks:
+      - id: stylua-github
+
+  # --------------------------------------------------------------- Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.2
+    hooks:
+      - id: ruff-format
+      - id: ruff-check
+        args: [--fix]
+
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.70
+    hooks:
+      - id: ty
+
+  # ---------------------------------------------------------------- Shell
+  # POSIX sh only — zsh interactive config is deliberately unlinted
+  # (shellcheck has no zsh dialect; see docs/v2-plan.md#shell-language-split).
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        exclude: '\.zsh$|^zsh/'
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        args: [--write, --indent, "2"]
+        exclude: '\.zsh$|^zsh/'
+
+  # ------------------------------------------- Web / Markdown / JSON / YAML
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.9.6
+    hooks:
+      - id: prettier
+        types_or: [html, css, javascript, ts, json, yaml, markdown]
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.49.1
+    hooks:
+      - id: markdownlint
+
+  # ----------------------------------------------------------------- TOML
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: v0.9.3
+    hooks:
+      - id: taplo-format
+
+  # oxlint has no hook repo; pin via npm instead. prek installs this exact
+  # version into an isolated env — same everywhere, including CI.
+  - repo: local
+    hooks:
+      - id: oxlint
+        name: oxlint
+        language: node
+        additional_dependencies: ["oxlint@1.12.0"]
+        entry: oxlint
+        types_or: [javascript, ts]
