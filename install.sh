@@ -162,6 +162,11 @@ for tier in "$@"; do
   install_tier "$tier"
 done
 
+# Render the theme so every consumer has colors from the first shell.
+if [ -x "$HOME/.local/bin/theme" ]; then
+  "$HOME/.local/bin/theme" apply
+fi
+
 # The commit gate for working on this repo (see README: Development).
 uv tool install --quiet prek
 git config core.hooksPath .githooks
