@@ -67,36 +67,55 @@ def normalize(sprite: Image.Image, margin_fraction: float = 0.05) -> Image.Image
     )
 
 
-def fetch_images(name: str) -> Path:
+def cache_dir() -> Path:
+    path = (
+        Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/pokemon"
+    )
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def fetch_images(name: str, *, shiny: bool) -> Path:
     """Cache all renderings and return the artwork path for extraction.
 
     One fetch, distinct roles: the official ARTWORK is the palette source —
     it carries identity details the 96px game sprite drops (gengar's sprite
     has literally zero red pixels, losing the eyes) — while the game SPRITE,
-    normalized into <name>-mascot.png, is what the mascot displays. Same
-    character, same color family, so the mascot matches its accents.
+    normalized into <base>-mascot.png, is what the mascot displays. Same
+    character, same color family, so the mascot matches its accents. Shiny
+    variants have their own artwork and sprite, cached under <name>-shiny.
     """
-    cache_dir = (
-        Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/pokemon"
-    )
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    artwork = cache_dir / f"{name}.png"
-    sprite = cache_dir / f"{name}-sprite.png"
-    mascot = cache_dir / f"{name}-mascot.png"
+    base = f"{name}-shiny" if shiny else name
+    artwork = cache_dir() / f"{base}.png"
+    sprite = cache_dir() / f"{base}-sprite.png"
+    mascot = cache_dir() / f"{base}-mascot.png"
     if artwork.exists() and sprite.exists() and mascot.exists():
         return artwork
 
     data = json.loads(_get(f"{API}{name}"))
-    artwork_url = data["sprites"]["other"]["official-artwork"]["front_default"]
-    sprite_url = data["sprites"]["front_default"]
+    variant = "front_shiny" if shiny else "front_default"
+    artwork_url = data["sprites"]["other"]["official-artwork"][variant]
+    sprite_url = data["sprites"][variant]
     if not artwork_url or not sprite_url:
-        raise SystemExit(f"error: missing images for '{name}'")
+        raise SystemExit(
+            f"error: missing {'shiny ' if shiny else ''}images for '{name}'"
+        )
     if not artwork.exists():
         artwork.write_bytes(_get(artwork_url))
     if not sprite.exists():
         sprite.write_bytes(_get(sprite_url))
     normalize(Image.open(sprite)).save(mascot)
     return artwork
+
+
+def all_names() -> list[str]:
+    """Every pokemon name, fetched once and cached for picker completion."""
+    names_file = cache_dir() / "names.txt"
+    if not names_file.exists():
+        data = json.loads(_get(f"{API}?limit=100000"))
+        names = [entry["name"] for entry in data["results"]]
+        names_file.write_text("\n".join(names) + "\n")
+    return names_file.read_text().splitlines()
 
 
 def vivid_pixels(image_path: Path) -> list[Hsv]:
@@ -180,11 +199,19 @@ def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: pokemon-accents <name>")
-    name = sys.argv[1].lower()
-    accent, accent_bright = pick_pair(vivid_pixels(fetch_images(name)))
+    args = sys.argv[1:]
+    if args == ["--names"]:
+        print("\n".join(all_names()))
+        return
+    shiny = "--shiny" in args
+    names = [a for a in args if a != "--shiny"]
+    if len(names) != 1:
+        raise SystemExit("usage: pokemon-accents <name> [--shiny] | --names")
+    name = names[0].lower()
+    accent, accent_bright = pick_pair(vivid_pixels(fetch_images(name, shiny=shiny)))
     print(f"pokemon={name}")
+    if shiny:
+        print("shiny=1")
     print(f"accent_dark={styled(accent, dark_background=True, bright=False)}")
     print(
         f"accent_bright_dark={styled(accent_bright, dark_background=True, bright=True)}"

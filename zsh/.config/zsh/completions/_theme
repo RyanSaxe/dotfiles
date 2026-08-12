@@ -12,15 +12,17 @@ if (( CURRENT == 2 )); then
   )
   _describe 'theme command' subcommands
 elif [[ $words[2] == pokemon ]]; then
-  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon"
-  local -a cached=()
-  [[ -d $cache ]] && cached=(${${${(f)"$(ls "$cache" 2> /dev/null)"}%.png}%-sprite})
-  cached=(${(u)cached})
+  # Full pokedex once pokemon-accents has cached it; cheap and offline.
+  local names_file="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon/names.txt"
+  local -a names=()
+  [[ -r $names_file ]] && names=(${(f)"$(< "$names_file")"})
   if (( CURRENT == 3 )); then
     _alternative \
       "actions:action:(none default project)" \
-      "pokemon:cached pokemon:($cached)"
+      "pokemon:pokemon:($names)"
   elif [[ $words[3] == (default|project) ]]; then
-    _describe 'cached pokemon' cached
+    _describe 'pokemon' names
+  elif (( CURRENT == 4 || CURRENT == 5 )); then
+    _describe 'flag' '(--shiny)'
   fi
 fi

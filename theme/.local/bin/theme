@@ -57,15 +57,23 @@ conf_del() {
   fi
 }
 
-# Extract accents for a pokemon into state. Display is not this command's
-# job: the pokemon-mascot herdr plugin owns pixels and is notified below.
+# Extract accents into state. $1 is the name, $2 non-empty means shiny.
+# Display is not this command's job: the hammerspoon mascot watches state.
 set_pokemon() {
   # Atomic write: a failed extraction must not clobber working accents.
-  if ! pokemon-accents "$1" >"$STATE/.accents.tmp"; then
+  if ! pokemon-accents "$1" ${2:+--shiny} >"$STATE/.accents.tmp"; then
     rm -f "$STATE/.accents.tmp"
     exit 1
   fi
   mv "$STATE/.accents.tmp" "$STATE/accents.conf"
+}
+
+# Mapped values encode shininess as "<name>:shiny"; apply one.
+set_pokemon_value() {
+  case "$1" in
+  *:shiny) set_pokemon "${1%:shiny}" 1 ;;
+  *) set_pokemon "$1" "" ;;
+  esac
 }
 
 render() {
@@ -137,7 +145,9 @@ show_accents() {
   accents="$STATE/accents.conf"
   [ -f "$accents" ] || return 0
   mode="$(current_mode)"
-  echo "pokemon: $(conf_get "$accents" pokemon) ($mode)"
+  sparkle=""
+  [ "$(conf_get "$accents" shiny)" = "1" ] && sparkle=" ✨shiny"
+  echo "pokemon: $(conf_get "$accents" pokemon)$sparkle ($mode)"
   swatch "$(conf_get "$accents" "accent_$mode")" accent
   swatch "$(conf_get "$accents" "accent_bright_$mode")" accent_bright
 }
@@ -159,32 +169,39 @@ apply)
   reload_consumers
   ;;
 pokemon)
-  sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name>}"
+  sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name> [--shiny]}"
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
     ;;
   default)
-    conf_put "$CONFIG/pokemon.conf" default "${3:?usage: theme pokemon default <name>}"
-    set_pokemon "$3"
+    name="${3:?usage: theme pokemon default <name> [--shiny]}"
+    value="$name"
+    [ "${4:-}" = "--shiny" ] && value="$name:shiny"
+    conf_put "$CONFIG/pokemon.conf" default "$value"
+    set_pokemon_value "$value"
     ;;
   project)
     project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-    name="${3:?usage: theme pokemon project <name>|none}"
+    name="${3:?usage: theme pokemon project <name>|none [--shiny]}"
     if [ "$name" = none ]; then
       # Unmap this project and fall back to the global default, if one is set.
       conf_del "$CONFIG/pokemon.conf" "$project"
       echo "unmapped: $project"
       fallback="$(conf_get "$CONFIG/pokemon.conf" default)"
-      [ -n "$fallback" ] && set_pokemon "$fallback"
+      [ -n "$fallback" ] && set_pokemon_value "$fallback"
     else
-      conf_put "$CONFIG/pokemon.conf" "$project" "$name"
-      echo "mapped: $project -> $name"
-      set_pokemon "$name"
+      value="$name"
+      [ "${4:-}" = "--shiny" ] && value="$name:shiny"
+      conf_put "$CONFIG/pokemon.conf" "$project" "$value"
+      echo "mapped: $project -> $value"
+      set_pokemon_value "$value"
     fi
     ;;
   *)
-    set_pokemon "$sub"
+    shinyflag=""
+    [ "${3:-}" = "--shiny" ] && shinyflag=1
+    set_pokemon "$sub" "$shinyflag"
     ;;
   esac
   render "$(current_mode)"

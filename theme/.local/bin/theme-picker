@@ -1,0 +1,40 @@
+#!/bin/sh
+# Interactive theme switching with fzf. Bound to alt+c as a herdr popup;
+# equally usable from any plain shell, including over SSH.
+#
+#   stage 1: toggle / light / dark / pokemon / shiny pokemon / none
+#   stage 2: (pokemon) fuzzy-pick from the full pokedex
+#   stage 3: (pokemon) scope — just now, this project, or global default
+set -eu
+
+pick() {
+  fzf --reverse --prompt="$1 > " --height=100%
+}
+
+action="$(printf 'pokemon\nshiny pokemon\ntoggle\nlight\ndark\nnone\n' | pick theme)" || exit 0
+
+case "$action" in
+toggle | light | dark)
+  theme "$action"
+  ;;
+none)
+  theme pokemon none
+  ;;
+"pokemon" | "shiny pokemon")
+  name="$(pokemon-accents --names | pick pokemon)" || exit 0
+  scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
+
+  set -- pokemon
+  case "$scope" in
+  "this project") set -- pokemon project ;;
+  "global default") set -- pokemon default ;;
+  esac
+  set -- "$@" "$name"
+  [ "$action" = "shiny pokemon" ] && set -- "$@" --shiny
+
+  theme "$@"
+  ;;
+esac
+
+# Popups close on exit; give the eye a beat to confirm what happened.
+sleep 1

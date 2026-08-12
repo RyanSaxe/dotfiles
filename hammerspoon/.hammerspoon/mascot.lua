@@ -24,23 +24,25 @@ M.config = {
 local state_dir = os.getenv("HOME") .. "/.local/state/dotfiles"
 local cache_dir = os.getenv("HOME") .. "/.cache/dotfiles/pokemon"
 
---- Read the active pokemon name from theme state, or nil when unset.
+--- Read the active pokemon from theme state: name plus shininess, or nil.
 local function current_pokemon()
   local file = io.open(state_dir .. "/accents.conf", "r")
   if not file then
     return nil
   end
-  local name
+  local name, shiny
   for line in file:lines() do
     name = line:match("^pokemon=(.+)$") or name
+    shiny = line:match("^shiny=1$") and true or shiny
   end
   file:close()
-  return name
+  return name, shiny
 end
 
 --- Load the normalized mascot image for a pokemon, or nil if not cached.
-local function mascot_image(name)
-  return hs.image.imageFromPath(cache_dir .. "/" .. name .. "-mascot.png")
+local function mascot_image(name, shiny)
+  local base = shiny and (name .. "-shiny") or name
+  return hs.image.imageFromPath(cache_dir .. "/" .. base .. "-mascot.png")
 end
 
 --- Move the canvas to the bottom-right corner of the given window.
@@ -54,8 +56,8 @@ end
 
 --- Show the mascot over a window, or hide it when there is nothing to show.
 local function refresh(window)
-  local name = current_pokemon()
-  local image = name and mascot_image(name)
+  local name, shiny = current_pokemon()
+  local image = name and mascot_image(name, shiny)
   if not (window and image) then
     M.canvas:hide()
     return
