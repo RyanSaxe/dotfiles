@@ -49,15 +49,22 @@ fi
 THEME_GENERATED="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated"
 
 if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
-  source "$THEME_GENERATED/shell-colors.zsh"
-  # Re-source when `theme` regenerates, so running shells follow a switch.
+  _theme_shell_colors() {
+    source "$THEME_GENERATED/shell-colors.zsh"
+    # The fzf-tab popup takes colors as appended flags, never FZF_DEFAULT_OPTS.
+    if (( ${+functions[fzf-tab-complete]} && ${+FZF_THEME_COLORS} )); then
+      zstyle ':fzf-tab:*' fzf-flags $FZF_THEME_COLORS
+    fi
+  }
+  _theme_shell_colors
+  # Re-apply when `theme` regenerates, so running shells follow a switch.
   zmodload -F zsh/stat b:zstat
   typeset -g _THEME_COLORS_MTIME="$(zstat +mtime "$THEME_GENERATED/shell-colors.zsh" 2> /dev/null)"
   _theme_refresh() {
     local mtime="$(zstat +mtime "$THEME_GENERATED/shell-colors.zsh" 2> /dev/null)"
     if [[ "$mtime" != "$_THEME_COLORS_MTIME" ]]; then
       typeset -g _THEME_COLORS_MTIME="$mtime"
-      source "$THEME_GENERATED/shell-colors.zsh"
+      _theme_shell_colors
     fi
   }
   autoload -U add-zsh-hook
