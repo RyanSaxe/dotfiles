@@ -1,0 +1,48 @@
+[user]
+	name = Ryan Saxe
+	email = ryancsaxe+1@gmail.com
+[core]
+	pager = delta
+	editor = nvim
+	autocrlf = input
+[push]
+	default = simple
+	autoSetupRemote = true
+[pull]
+	rebase = true
+[branch]
+	autosetuprebase = always
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+	unstage = reset HEAD --
+	last = log -1 HEAD
+	lg = log --oneline --graph --decorate --all
+	ddiff = -c delta.side-by-side=true diff
+	dshow = -c delta.side-by-side=true show
+[init]
+	defaultBranch = main
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+[diff]
+	tool = codediff
+[difftool "codediff"]
+	cmd = nvim -c \"CodeDiff file $LOCAL $REMOTE\"
+[merge]
+	tool = codediff
+	conflictStyle = zdiff3
+[mergetool "codediff"]
+	cmd = nvim -c \"CodeDiff merge $MERGED\"
+	trustExitCode = true
+[status]
+	showUntrackedFiles = all
+[credential "https://github.com"]
+	helper =
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential
