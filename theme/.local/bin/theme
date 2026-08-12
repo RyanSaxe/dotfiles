@@ -1,0 +1,155 @@
+#!/bin/sh
+# One theme for every tool. Renders templates with the current palette and
+# semantic tokens, then reloads consumers.
+#
+#   theme dark      switch to catppuccin mocha
+#   theme light     switch to catppuccin latte
+#   theme toggle    flip between them
+#   theme apply     re-render the current mode (default: dark)
+#   theme status    print the current mode
+#
+# Layers (see README: Theming):
+#   palettes/*.conf   raw color values        (layer 1)
+#   tokens.conf       role -> palette key     (layer 2)
+#   templates/*.tmpl  {{role}} placeholders   (layer 3)
+# Rendered output lands in state, never in the repo.
+set -eu
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/theme"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+GENERATED="$STATE/generated"
+MODE_FILE="$STATE/theme-mode"
+
+current_mode() {
+  if [ -f "$MODE_FILE" ]; then cat "$MODE_FILE"; else echo dark; fi
+}
+
+palette_for_mode() {
+  case "$1" in
+  dark) echo "$CONFIG/palettes/mocha.conf" ;;
+  light) echo "$CONFIG/palettes/latte.conf" ;;
+  esac
+}
+
+# Look up one key in a key=value conf file.
+conf_get() {
+  sed -n "s/^$2=//p" "$1"
+}
+
+render() {
+  mode="$1"
+  palette="$(palette_for_mode "$mode")"
+  mkdir -p "$GENERATED"
+
+  # Build a sed script resolving each {{role}} to its hex via the palette.
+  # A pokemon (theme pokemon <name>) overrides accent/accent_bright only,
+  # with the pair extracted for the current background mode.
+  accents="$STATE/accents.conf"
+  sed_script="$STATE/.render.sed"
+  : >"$sed_script"
+  while IFS='=' read -r role key; do
+    case "$role" in ''#*) continue ;; esac
+    hex="$(conf_get "$palette" "$key")"
+    if [ -f "$accents" ]; then
+      case "$role" in
+      accent | accent_bright)
+        override="$(conf_get "$accents" "${role}_${mode}")"
+        [ -n "$override" ] && hex="$override"
+        ;;
+      esac
+    fi
+    if [ -z "$hex" ]; then
+      echo "error: token '$role' maps to '$key', not in $(basename "$palette")" >&2
+      exit 1
+    fi
+    printf 's/{{%s}}/%s/g\n' "$role" "$hex" >>"$sed_script"
+  done <"$CONFIG/tokens.conf"
+
+  for tmpl in "$CONFIG/templates/"*.tmpl; do
+    out="$GENERATED/$(basename "$tmpl" .tmpl)"
+    sed -f "$sed_script" "$tmpl" >"$out"
+    # A surviving {{...}} means a template used an unknown role. Fail loudly.
+    if grep -q '{{' "$out"; then
+      echo "error: unresolved tokens in $(basename "$tmpl"):" >&2
+      grep -o '{{[a-z_]*}}' "$out" | sort -u >&2
+      exit 1
+    fi
+  done
+  rm -f "$sed_script"
+
+  echo "$mode" >"$MODE_FILE"
+  echo "theme: $mode"
+}
+
+reload_consumers() {
+  # starship re-reads its config every prompt: nothing to do.
+  # Running zsh sessions pick up shell colors on their next precmd (see .zshrc).
+  # ghostty / herdr / nvim reloads arrive with their packages.
+  :
+}
+
+# Print a color as a filled block so switches are visible at a glance.
+swatch() {
+  r="$(printf '%d' "0x$(printf '%s' "$1" | cut -c2-3)")"
+  g="$(printf '%d' "0x$(printf '%s' "$1" | cut -c4-5)")"
+  b="$(printf '%d' "0x$(printf '%s' "$1" | cut -c6-7)")"
+  printf '%-16s %s \033[48;2;%d;%d;%dm      \033[0m\n' "$2" "$1" "$r" "$g" "$b"
+}
+
+show_accents() {
+  accents="$STATE/accents.conf"
+  [ -f "$accents" ] || return 0
+  mode="$(current_mode)"
+  name="$(conf_get "$accents" pokemon)"
+  # Render the actual sprite when chafa is around (kitty protocol in ghostty,
+  # ANSI blocks over SSH).
+  sprite="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon/$name.png"
+  if command -v chafa >/dev/null 2>&1 && [ -f "$sprite" ]; then
+    chafa -s 26x13 "$sprite"
+  fi
+  echo "pokemon: $name ($mode)"
+  swatch "$(conf_get "$accents" "accent_$mode")" accent
+  swatch "$(conf_get "$accents" "accent_bright_$mode")" accent_bright
+}
+
+case "${1:-status}" in
+dark | light)
+  render "$1"
+  reload_consumers
+  ;;
+toggle)
+  case "$(current_mode)" in
+  dark) render light ;;
+  *) render dark ;;
+  esac
+  reload_consumers
+  ;;
+apply)
+  render "$(current_mode)"
+  reload_consumers
+  ;;
+pokemon)
+  name="${2:?usage: theme pokemon <name>|none}"
+  if [ "$name" = none ]; then
+    rm -f "$STATE/accents.conf"
+  else
+    # Atomic write: a failed extraction must not clobber working accents.
+    if ! pokemon-accents "$name" >"$STATE/.accents.tmp"; then
+      rm -f "$STATE/.accents.tmp"
+      exit 1
+    fi
+    mv "$STATE/.accents.tmp" "$STATE/accents.conf"
+  fi
+  render "$(current_mode)"
+  reload_consumers
+  show_accents
+  ;;
+status)
+  current_mode
+  show_accents
+  ;;
+*)
+  echo "usage: theme dark|light|toggle|apply|status|pokemon <name>|none" >&2
+  exit 1
+  ;;
+esac

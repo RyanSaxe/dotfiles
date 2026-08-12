@@ -6,8 +6,10 @@ notes/
 **/generated/
 
 # Tool-writeback state. Design rule 1: these files are written by the tools
-# themselves, so tracking them produces permanent churn.
-*.local
+# themselves, so tracking them produces permanent churn. (Deliberately
+# *.local.* and not *.local — the latter also matches stow packages'
+# .local/ directories and silently untracked the theme command once.)
+*.local.*
 .env
 
 # OS + editor noise

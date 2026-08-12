@@ -1,0 +1,163 @@
+#!/usr/bin/env -S uv run -q --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pillow"]
+# ///
+"""Extract a two-hue accent pair from a pokemon's official artwork.
+
+Prints key=value lines consumed by the `theme` command:
+
+    pokemon=<name>
+    accent_dark=#...          accent_bright_dark=#...
+    accent_light=#...         accent_bright_light=#...
+
+The pair must be two DIFFERENT hues (gengar: purple body + red eyes), never
+two shades of one hue. Wallpaper-palette tools fail this: a small vivid area
+like eyes disappears under frequency-based extraction. Instead, saturated
+pixels are clustered by hue; the accent is the dominant vivid cluster and the
+bright accent is the strongest cluster at least 45 degrees of hue away.
+"""
+
+from __future__ import annotations
+
+import colorsys
+import json
+import sys
+import urllib.request
+from os import environ
+from pathlib import Path
+
+from PIL import Image
+
+API = "https://pokeapi.co/api/v2/pokemon/"
+HUE_BUCKETS = 24  # 15 degrees each
+MIN_HUE_SEPARATION = 3  # buckets: 45 degrees
+# A second cluster this much weaker than the primary is noise, not a hue.
+SECOND_CLUSTER_MIN_WEIGHT = 0.02
+
+Hsv = tuple[float, float, float]
+
+
+def fetch_artwork(name: str) -> Path:
+    cache_dir = (
+        Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/pokemon"
+    )
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    image_path = cache_dir / f"{name}.png"
+    if image_path.exists():
+        return image_path
+
+    # PokeAPI rejects urllib's default User-Agent with a 403.
+    def get(url: str) -> bytes:
+        request = urllib.request.Request(
+            url, headers={"User-Agent": "dotfiles-theme/1.0"}
+        )
+        with urllib.request.urlopen(request) as response:
+            return response.read()
+
+    data = json.loads(get(f"{API}{name}"))
+    url = data["sprites"]["other"]["official-artwork"]["front_default"]
+    if not url:
+        raise SystemExit(f"error: no artwork for '{name}'")
+    image_path.write_bytes(get(url))
+    return image_path
+
+
+def vivid_pixels(image_path: Path) -> list[Hsv]:
+    img = Image.open(image_path).convert("RGBA")
+    img.thumbnail((96, 96))
+    pixels = []
+    raw = img.tobytes()
+    for i in range(0, len(raw), 4):
+        r, g, b, a = raw[i : i + 4]
+        if a < 128:
+            continue
+        h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        # Grays, blacks, and whites carry no hue information.
+        if s < 0.25 or v < 0.2 or v > 0.98:
+            continue
+        pixels.append((h, s, v))
+    if not pixels:
+        raise SystemExit("error: image has no vivid pixels to extract from")
+    return pixels
+
+
+def cluster_weights(pixels: list[Hsv]) -> list[float]:
+    weights = [0.0] * HUE_BUCKETS
+    for h, s, v in pixels:
+        weights[int(h * HUE_BUCKETS) % HUE_BUCKETS] += s * v
+    return weights
+
+
+def bucket_distance(a: int, b: int) -> int:
+    d = abs(a - b)
+    return min(d, HUE_BUCKETS - d)
+
+
+def representative(pixels: list[Hsv], bucket: int) -> Hsv:
+    """The vivid heart of a cluster: mean of its most saturated quartile."""
+    members = [
+        p
+        for p in pixels
+        if bucket_distance(int(p[0] * HUE_BUCKETS) % HUE_BUCKETS, bucket) <= 1
+    ]
+    members.sort(key=lambda p: p[1] * p[2], reverse=True)
+    top = members[: max(1, len(members) // 4)]
+    # Hues within one bucket of each other never wrap far; recenter around the
+    # bucket midpoint so the mean is safe at the 0/1 boundary.
+    center = (bucket + 0.5) / HUE_BUCKETS
+    hue = sum(((p[0] - center + 0.5) % 1.0) - 0.5 for p in top) / len(top) + center
+    sat = sum(p[1] for p in top) / len(top)
+    val = sum(p[2] for p in top) / len(top)
+    return (hue % 1.0, sat, val)
+
+
+def pick_pair(pixels: list[Hsv]) -> tuple[Hsv, Hsv]:
+    weights = cluster_weights(pixels)
+    primary = max(range(HUE_BUCKETS), key=lambda i: weights[i])
+    candidates = [
+        i
+        for i in range(HUE_BUCKETS)
+        if bucket_distance(i, primary) >= MIN_HUE_SEPARATION
+        and weights[i] > weights[primary] * SECOND_CLUSTER_MIN_WEIGHT
+    ]
+    accent = representative(pixels, primary)
+    if candidates:
+        secondary = max(candidates, key=lambda i: weights[i])
+        return accent, representative(pixels, secondary)
+    # Single-hue pokemon: complement the dominant hue rather than shade it.
+    h, s, v = accent
+    return accent, ((h + 0.5) % 1.0, s, v)
+
+
+def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
+    """Pastel-but-vibrant, tuned per background mode."""
+    h, s, _ = color
+    if dark_background:
+        s = min(max(s, 0.55), 0.85)
+        v = 0.92 if bright else 0.85
+    else:
+        s = min(max(s, 0.65), 1.0)
+        v = 0.70 if bright else 0.60
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: pokemon-accents <name>")
+    name = sys.argv[1].lower()
+    accent, accent_bright = pick_pair(vivid_pixels(fetch_artwork(name)))
+    print(f"pokemon={name}")
+    print(f"accent_dark={styled(accent, dark_background=True, bright=False)}")
+    print(
+        f"accent_bright_dark={styled(accent_bright, dark_background=True, bright=True)}"
+    )
+    print(f"accent_light={styled(accent, dark_background=False, bright=False)}")
+    print(
+        f"accent_bright_light={styled(accent_bright, dark_background=False, bright=True)}"
+    )
+
+
+if __name__ == "__main__":
+    main()

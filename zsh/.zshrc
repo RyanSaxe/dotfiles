@@ -11,6 +11,7 @@ SAVEHIST=50000
 setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS HIST_VERIFY
 
 # ----- completion ------------------------------------------------------
+fpath=("$HOME/.config/zsh/completions" $fpath)
 autoload -Uz compinit && compinit
 # Case-insensitive matching.
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'

@@ -37,6 +37,19 @@ repos:
       - id: ruff-format
       - id: ruff-check
         args: [--fix]
+      # Extensionless uv scripts (PEP 723 shebangs) are invisible to the
+      # `types: python` filter; list them explicitly so they stay gated.
+      - id: ruff-format
+        alias: ruff-format-uv-scripts
+        name: ruff format (uv scripts)
+        types_or: [file]
+        files: '^theme/\.local/bin/pokemon-accents$'
+      - id: ruff-check
+        alias: ruff-check-uv-scripts
+        name: ruff check (uv scripts)
+        args: [--fix]
+        types_or: [file]
+        files: '^theme/\.local/bin/pokemon-accents$'
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.70

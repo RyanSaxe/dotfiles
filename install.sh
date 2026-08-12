@@ -78,11 +78,11 @@ install_zsh_plugins() {
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv starship fzf
+    brew_install stow git gh git-delta uv starship fzf chafa
     install_zsh_plugins
     ;;
   core:Linux)
-    apt_install stow git gh git-delta curl zsh fzf
+    apt_install stow git gh git-delta curl zsh fzf chafa
     # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y

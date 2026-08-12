@@ -1,0 +1,19 @@
+#compdef theme
+# Completion for the theme command; cached pokemon complete by name.
+
+if (( CURRENT == 2 )); then
+  local -a subcommands=(
+    'dark:switch to catppuccin mocha'
+    'light:switch to catppuccin latte'
+    'toggle:flip between dark and light'
+    'apply:re-render the current mode'
+    'status:print mode and pokemon accents'
+    'pokemon:accent colors from a pokemon'
+  )
+  _describe 'theme command' subcommands
+elif [[ $words[2] == pokemon ]]; then
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon"
+  local -a names=(none)
+  [[ -d $cache ]] && names+=(${${(f)"$(ls "$cache" 2> /dev/null)"}%.png})
+  _describe 'pokemon' names
+fi
