@@ -56,15 +56,37 @@ ensure_package_manager() {
 # ------------------------------------------------------------------- tiers
 # System packages per tier and OS, named per package manager. Stow packages
 # live in tiers/*.txt.
+
+# zsh plugins are shallow git clones into one fixed path, sourced by .zshrc.
+# One mechanism on every OS — brew and apt disagree on names and paths.
+clone_plugin() {
+  dir="$HOME/.local/share/zsh/plugins/${1##*/}"
+  if [ -d "$dir/.git" ]; then
+    git -C "$dir" pull --quiet --ff-only
+  else
+    mkdir -p "${dir%/*}"
+    git clone --quiet --depth 1 "https://github.com/$1" "$dir"
+  fi
+}
+
+install_zsh_plugins() {
+  clone_plugin zsh-users/zsh-autosuggestions
+  clone_plugin zdharma-continuum/fast-syntax-highlighting
+  clone_plugin Aloxaf/fzf-tab
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv
+    brew_install stow git gh git-delta uv starship fzf
+    install_zsh_plugins
     ;;
   core:Linux)
-    apt_install stow git gh git-delta curl
-    # uv is not packaged in apt; use the official installer.
+    apt_install stow git gh git-delta curl zsh fzf
+    # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
+    command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
+    install_zsh_plugins
     ;;
   mac:Darwin)
     brew_install
