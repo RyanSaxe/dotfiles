@@ -15,7 +15,11 @@
 # Rendered output lands in state, never in the repo.
 set -eu
 
-CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/theme"
+# Palettes, tokens, and templates live next to this script in its stow
+# package; resolving our own symlink finds them wherever the repo lives.
+SCRIPT_PATH="$(readlink -f "$0")"
+PACKAGE_ROOT="${SCRIPT_PATH%/.local/bin/theme}"
+CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT/.config}/theme"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 GENERATED="$STATE/generated"
 MODE_FILE="$STATE/theme-mode"
