@@ -9,11 +9,12 @@ agents work inside the same environment and pass the same commit gates I do.
 ## Install
 
 ```sh
-git clone https://github.com/RyanSaxe/dotfiles ~/dotfiles && cd ~/dotfiles
+git clone https://github.com/RyanSaxe/dotfiles && cd dotfiles
 ./install.sh
 ```
 
-Works on a fresh machine: installs homebrew itself on macOS, system packages,
+Clone it anywhere; nothing depends on where the repo lives. Works on a fresh
+machine: installs homebrew itself on macOS, system packages,
 and the symlinks for the tiers you pick — `core` everywhere, `mac` for GUI
 apps, `agents` for the AI harness. Pass tiers as arguments to skip the
 prompts (`./install.sh core` on a remote box), and re-run any time to update
