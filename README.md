@@ -1,41 +1,64 @@
 # dotfiles
 
-My development environment, rebuilt for a workflow where AI coding agents are
-first-class users of the machine: shared quality gates, one theming system
-across every tool, and nothing configured that isn't earned by daily use.
+Dotfiles for working from a Mac and SSHing into Linux boxes: Neovim, Ghostty,
+herdr, zsh, and git, themed as one system and installed with GNU Stow. Coding
+agents work inside the same environment and pass the same commit gates I do.
 
-Managed with [GNU Stow](https://www.gnu.org/software/stow/). Each top-level
-directory is a stow package whose layout mirrors the filesystem, so the repo is
-its own documentation:
+![screenshot](docs/screenshot.png)
+
+## Install
+
+```sh
+git clone https://github.com/RyanSaxe/dotfiles ~/dotfiles && cd ~/dotfiles
+./bootstrap.sh                     # packages: brew on macOS, apt on Linux
+stow -t ~ $(cat tiers/core.txt)    # every machine
+stow -t ~ $(cat tiers/mac.txt)     # macOS only
+stow -t ~ $(cat tiers/agents.txt)  # AI agent harness (optional)
+```
+
+Each top-level directory is a stow package whose layout mirrors where its
+files land:
 
 ```text
 nvim/.config/nvim/init.lua  ->  ~/.config/nvim/init.lua
 zsh/.zshrc                  ->  ~/.zshrc
 ```
 
-## Principles
+Every tracked file is identical on every machine. Anything machine-specific
+resolves at runtime via `PATH` and `$HOME`; there is no templating.
 
-- **Symlinks, never copies.** Configs are edited live. Every tracked file is
-  byte-identical on every machine; anything machine-specific resolves at
-  runtime through `PATH` and `$HOME`, never through templating.
-- **Tokens, not colors.** One palette and one semantic token layer generate
-  per-app themes. Light and dark are two bindings of the same tokens, and no
-  config hardcodes a hex value.
-- **One gate for humans, agents, and CI.** Every commit passes the same pinned
-  formatters, linters, and type checkers, locally and in CI, from a single
-  config. Agents working in this repo hit the same wall a human does.
-- **State never lands in git.** Files that tools write back to are generated
-  and ignored, not tracked.
+## Tools
+
+| Package      | Contents                                                                                |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `nvim`       | LazyVim-based Neovim. Personal plugins live in `nvim/dev/` as real, extractable plugins |
+| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                             |
+| `ghostty`    | terminal emulator (macOS)                                                               |
+| `herdr`      | agent-aware terminal multiplexer; runs on remote boxes, attached with `herdr --remote`  |
+| `git`        | git + gh, delta as pager                                                                |
+| `theme`      | the theming pipeline (below)                                                            |
+| `ai-harness` | shared instructions, skills, and hooks for coding agents                                |
+| `tiers`      | which packages install on which machines                                                |
+
+## Theming
+
+Catppuccin — Mocha in dark, Latte in light — rendered from one token file into
+every tool. No config hardcodes a color; apps consume generated palettes and
+reload in place:
+
+```sh
+theme dark
+theme light
+theme pokemon gengar   # accent colors extracted from a pokemon image
+```
 
 ## Development
 
-Every commit is gated by [prek](https://github.com/j178/prek) through the
-hooks in `.githooks/`:
+Every commit is gated by [prek](https://github.com/j178/prek): pinned
+formatters, linters, and type checkers, defined once in
+`.pre-commit-config.yaml` and run identically in CI.
 
 ```sh
 git config core.hooksPath .githooks   # enable the gate
 prek run --all-files                  # run every check manually
 ```
-
-Checks are pinned in `.pre-commit-config.yaml`. CI runs the identical config,
-so a passing local commit cannot fail remotely.
