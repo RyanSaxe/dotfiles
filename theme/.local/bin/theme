@@ -40,6 +40,27 @@ conf_get() {
   sed -n "s/^$2=//p" "$1"
 }
 
+# Set key=value in a conf file, replacing an existing entry (portable
+# in-place: sed -i differs between BSD and GNU).
+conf_put() {
+  if grep -q "^$2=" "$1" 2>/dev/null; then
+    sed "s|^$2=.*|$2=$3|" "$1" >"$1.tmp" && mv "$1.tmp" "$1"
+  else
+    printf '%s=%s\n' "$2" "$3" >>"$1"
+  fi
+}
+
+# Extract accents for a pokemon and show its mascot.
+set_pokemon() {
+  # Atomic write: a failed extraction must not clobber working accents.
+  if ! pokemon-accents "$1" >"$STATE/.accents.tmp"; then
+    rm -f "$STATE/.accents.tmp"
+    exit 1
+  fi
+  mv "$STATE/.accents.tmp" "$STATE/accents.conf"
+  command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot set "$1"
+}
+
 render() {
   mode="$1"
   palette="$(palette_for_mode "$mode")"
@@ -143,19 +164,26 @@ apply)
   reload_consumers
   ;;
 pokemon)
-  name="${2:?usage: theme pokemon <name>|none}"
-  if [ "$name" = none ]; then
+  sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name>}"
+  case "$sub" in
+  none)
     rm -f "$STATE/accents.conf"
     command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot clear
-  else
-    # Atomic write: a failed extraction must not clobber working accents.
-    if ! pokemon-accents "$name" >"$STATE/.accents.tmp"; then
-      rm -f "$STATE/.accents.tmp"
-      exit 1
-    fi
-    mv "$STATE/.accents.tmp" "$STATE/accents.conf"
-    command -v herdr-mascot >/dev/null 2>&1 && herdr-mascot set "$name"
-  fi
+    ;;
+  default)
+    conf_put "$CONFIG/pokemon.conf" default "${3:?usage: theme pokemon default <name>}"
+    set_pokemon "$3"
+    ;;
+  project)
+    project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+    conf_put "$CONFIG/pokemon.conf" "$project" "${3:?usage: theme pokemon project <name>}"
+    echo "mapped: $project -> $3"
+    set_pokemon "$3"
+    ;;
+  *)
+    set_pokemon "$sub"
+    ;;
+  esac
   render "$(current_mode)"
   reload_consumers
   show_accents

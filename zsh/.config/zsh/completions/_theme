@@ -13,7 +13,14 @@ if (( CURRENT == 2 )); then
   _describe 'theme command' subcommands
 elif [[ $words[2] == pokemon ]]; then
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon"
-  local -a names=(none)
-  [[ -d $cache ]] && names+=(${${(f)"$(ls "$cache" 2> /dev/null)"}%.png})
-  _describe 'pokemon' names
+  local -a cached=()
+  [[ -d $cache ]] && cached=(${${${(f)"$(ls "$cache" 2> /dev/null)"}%.png}%-sprite})
+  cached=(${(u)cached})
+  if (( CURRENT == 3 )); then
+    _alternative \
+      "actions:action:(none default project)" \
+      "pokemon:cached pokemon:($cached)"
+  elif [[ $words[3] == (default|project) ]]; then
+    _describe 'cached pokemon' cached
+  fi
 fi
