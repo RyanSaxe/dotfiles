@@ -1,0 +1,35 @@
+# Rendered by `theme` — do not edit; change the template or tokens instead.
+# Installed as ~/.config/herdr/config.toml via symlink (install.sh).
+# Apply changes with: theme apply   (runs herdr server reload-config)
+
+onboarding = false
+
+[theme]
+name = "catppuccin"
+# Follow the host terminal's light/dark appearance.
+auto_switch = true
+dark_name = "catppuccin"
+light_name = "catppuccin-latte"
+
+# Accent roles come from the token layer, so a pokemon switch recolors the
+# herdr UI along with everything else.
+[theme.custom]
+accent = "{{accent}}"
+red = "{{error}}"
+green = "{{success}}"
+yellow = "{{warn}}"
+blue = "{{info}}"
+
+[ui]
+show_agent_labels_on_pane_borders = true
+
+[keys]
+# Fast layer: alt for tab jumps (needs macos-option-as-alt in ghostty; works
+# natively over SSH). Prefix layer stays on the defaults: c new tab, w picker,
+# o notification target, h/j/k/l panes, v/minus splits, b sidebar, q detach.
+switch_tab = "alt+1..9"
+last_pane = "prefix+tab"
+
+[experimental]
+# Kitty graphics inside herdr panes — required for the pokemon mascot overlay.
+kitty_graphics = true

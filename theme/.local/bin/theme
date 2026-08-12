@@ -84,8 +84,12 @@ render() {
 reload_consumers() {
   # starship re-reads its config every prompt: nothing to do.
   # Running zsh sessions pick up shell colors on their next precmd (see .zshrc).
-  # ghostty / herdr / nvim reloads arrive with their packages.
-  :
+  # herdr applies UI settings live on reload; ignore failures when no server
+  # is running.
+  if command -v herdr >/dev/null 2>&1; then
+    herdr server reload-config >/dev/null 2>&1 || true
+  fi
+  # ghostty / nvim reloads arrive with their packages.
 }
 
 # Print a color as a filled block so switches are visible at a glance.
