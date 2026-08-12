@@ -12,8 +12,10 @@ dark_name = "catppuccin"
 light_name = "catppuccin-latte"
 
 # Accent roles come from the token layer, so a pokemon switch recolors the
-# herdr UI along with everything else.
+# herdr UI along with everything else. panel_bg matches the terminal
+# background so the sidebar blends in and the active row is not a stripe.
 [theme.custom]
+panel_bg = "{{bg}}"
 accent = "{{accent}}"
 red = "{{error}}"
 green = "{{success}}"
@@ -21,7 +23,34 @@ yellow = "{{warn}}"
 blue = "{{info}}"
 
 [ui]
+accent = "{{accent}}"
 show_agent_labels_on_pane_borders = true
+# The tab row only exists once a workspace actually has multiple tabs.
+hide_tab_bar_when_single_tab = true
+# The agent panel is an attention queue, most urgent first.
+agent_panel_sort = "priority"
+
+# Two quiet rows per entry: bold workspace as the anchor, muted detail under
+# it. Secondary tokens need explicit fg — the defaults are unreadable on a
+# dark panel.
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", { token = "workspace", bold = true }],
+  [{ token = "agent", fg = "{{fg_muted}}" }],
+]
+
+# Claude panes show what they are DOING, not a static label.
+[ui.sidebar.agents.rows_by_agent]
+claude = [
+  ["state_icon", { token = "workspace", bold = true }],
+  [{ token = "terminal_title_stripped", fg = "{{fg}}" }],
+]
+
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", { token = "workspace", bold = true }],
+  [{ token = "branch", fg = "{{fg_faint}}" }, { token = "git_status", fg = "{{warn}}" }],
+]
 
 [keys]
 # Fast layer: alt for tab jumps (needs macos-option-as-alt in ghostty; works
