@@ -1,0 +1,8 @@
+# Normalize line endings on checkin; the repo is LF everywhere.
+* text=auto eol=lf
+
+# Shell scripts without extensions still need shell highlighting and diffing.
+scripts/*     text eol=lf
+
+# Keep generated-looking assets out of language statistics.
+**/generated/** linguist-generated=true

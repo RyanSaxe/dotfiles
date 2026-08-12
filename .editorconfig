@@ -1,0 +1,33 @@
+# Values here mirror the formatters pinned in .pre-commit-config.yaml so that
+# editors and the pre-commit hook never disagree. Changing one means changing both.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# ruff: 4-space indent, 88-column lines
+[*.py]
+indent_size = 4
+max_line_length = 88
+
+# stylua
+[*.lua]
+max_line_length = 120
+
+# shfmt -i 2
+[*.{sh,zsh}]
+indent_size = 2
+
+# prettier
+[*.{html,css,js,ts,json,yaml,yml,md}]
+max_line_length = 80
+
+# Makefile syntax requires literal tabs
+[Makefile]
+indent_style = tab

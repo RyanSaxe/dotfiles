@@ -1,0 +1,25 @@
+# Working notes for AI agents and planning discussions. Never published;
+# committed docs are for humans.
+notes/
+
+# Generated theme output (layer 3) — emitted at runtime, never authored
+**/generated/
+
+# Tool-writeback state. Design rule 1: these files are written by the tools
+# themselves, so tracking them produces permanent churn.
+*.local
+.env
+
+# OS + editor noise
+.DS_Store
+*.swp
+*~
+
+# Language caches
+__pycache__/
+*.py[cod]
+.ruff_cache/
+node_modules/
+
+# Logs
+*.log
