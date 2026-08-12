@@ -44,6 +44,18 @@ resolves at runtime via `PATH` and `$HOME`; there is no templating.
 | `ai-harness` | shared instructions, skills, and hooks for coding agents                                |
 | `tiers`      | which packages install on which machines                                                |
 
+## Conventions
+
+The same keybinding model everywhere, so the shell and the editor feel like
+one tool:
+
+- **Tab** — menu completion: open or cycle the menu (fzf-tab in zsh, blink.cmp
+  in Neovim)
+- **Shift-Tab** — accept ghost text (history suggestions in zsh, AI
+  completions in Neovim)
+- **vi-mode** in every input: beam cursor in insert, block in normal. No
+  bindings on arrow keys, Ctrl, or Alt.
+
 ## Theming
 
 Catppuccin — Mocha in dark, Latte in light — rendered from one token file into
