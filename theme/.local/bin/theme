@@ -101,16 +101,16 @@ show_accents() {
   [ -f "$accents" ] || return 0
   mode="$(current_mode)"
   name="$(conf_get "$accents" pokemon)"
-  # Render the actual sprite when chafa is around. Inside tmux the kitty
-  # graphics protocol gets swallowed unless allow-passthrough is on, so force
-  # ANSI symbols there; everywhere else chafa auto-picks the best protocol
-  # (real images in ghostty, blocks over SSH).
-  sprite="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon/$name.png"
-  if command -v chafa >/dev/null 2>&1 && [ -f "$sprite" ]; then
-    if [ -n "${TMUX:-}" ]; then
+  # Display and extraction are different jobs: hues come from the official
+  # artwork PNG, but the sprite shown is pokemon-colorscripts' hand-tuned
+  # pixel art, which reads far better in terminal cells than any downscale
+  # of the artwork. chafa on the PNG is only a fallback.
+  if command -v pokemon-colorscripts >/dev/null 2>&1; then
+    pokemon-colorscripts -n "$name" --no-title 2>/dev/null || true
+  else
+    sprite="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon/$name.png"
+    if command -v chafa >/dev/null 2>&1 && [ -f "$sprite" ]; then
       chafa -f symbols -s 26x13 "$sprite"
-    else
-      chafa -s 26x13 "$sprite"
     fi
   fi
   echo "pokemon: $name ($mode)"

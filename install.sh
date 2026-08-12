@@ -75,11 +75,26 @@ install_zsh_plugins() {
   clone_plugin Aloxaf/fzf-tab
 }
 
+# Hand-tuned pixel-art sprites; the theme command shows these on pokemon
+# switches (far better in terminal cells than downscaled artwork). No sudo:
+# cloned to ~/.local/share and linked into ~/.local/bin.
+install_pokemon_colorscripts() {
+  dir="$HOME/.local/share/pokemon-colorscripts"
+  if [ -d "$dir/.git" ]; then
+    git -C "$dir" pull --quiet --ff-only
+  else
+    git clone --quiet --depth 1 https://gitlab.com/phoneybadger/pokemon-colorscripts.git "$dir"
+  fi
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$dir/pokemon-colorscripts.py" "$HOME/.local/bin/pokemon-colorscripts"
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
     brew_install stow git gh git-delta uv starship fzf chafa
     install_zsh_plugins
+    install_pokemon_colorscripts
     ;;
   core:Linux)
     apt_install stow git gh git-delta curl zsh fzf chafa
@@ -87,6 +102,7 @@ install_tier_packages() {
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
     install_zsh_plugins
+    install_pokemon_colorscripts
     ;;
   mac:Darwin)
     brew_install
