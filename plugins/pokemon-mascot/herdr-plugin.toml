@@ -1,0 +1,33 @@
+id = "dev.ryansaxe.pokemon-mascot"
+name = "pokemon-mascot"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "A little pokemon in the corner of your terminal, themed with your accents"
+platforms = ["macos", "linux"]
+
+# Restore the mascot after session restore. One-shot, per the plugin contract.
+[[startup]]
+command = ["bin/herdr-pokemon", "place"]
+
+# Re-place on every hookable event that changes where the mascot belongs.
+# (herdr 0.8.0 exposes no resize/layout event to plugins; see README.) Each
+# invocation is stateless: fresh snapshot, deterministic anchor, exit.
+[[events]]
+on = "tab.focused"
+command = ["bin/herdr-pokemon", "place"]
+
+[[events]]
+on = "workspace.focused"
+command = ["bin/herdr-pokemon", "place"]
+
+[[events]]
+on = "pane.closed"
+command = ["bin/herdr-pokemon", "place"]
+
+[[events]]
+on = "pane.created"
+command = ["bin/herdr-pokemon", "place"]
+
+[[events]]
+on = "pane.moved"
+command = ["bin/herdr-pokemon", "place"]
