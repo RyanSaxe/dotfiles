@@ -43,13 +43,13 @@ repos:
         alias: ruff-format-uv-scripts
         name: ruff format (uv scripts)
         types_or: [file]
-        files: '^(theme/\.local/bin/pokemon-accents|plugins/pokemon-mascot/bin/herdr-pokemon)$'
+        files: '^theme/\.local/bin/pokemon-accents$'
       - id: ruff-check
         alias: ruff-check-uv-scripts
         name: ruff check (uv scripts)
         args: [--fix]
         types_or: [file]
-        files: '^(theme/\.local/bin/pokemon-accents|plugins/pokemon-mascot/bin/herdr-pokemon)$'
+        files: '^theme/\.local/bin/pokemon-accents$'
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.70
@@ -101,11 +101,11 @@ repos:
         entry: oxlint
         types_or: [javascript, ts]
 
-      # Plugin unit tests. uv resolves the environment, so this runs
+      # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.
-      - id: pokemon-mascot-tests
-        name: pytest (pokemon-mascot)
+      - id: theme-tests
+        name: pytest (theme)
         language: system
-        entry: uv run --no-project --with pytest --with pillow pytest -q plugins/pokemon-mascot/tests
+        entry: uv run --no-project --with pytest --with pillow pytest -q theme/tests
         pass_filenames: false
-        files: "^plugins/pokemon-mascot/"
+        files: "^theme/"

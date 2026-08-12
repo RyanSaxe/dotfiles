@@ -45,14 +45,36 @@ def _get(url: str) -> bytes:
         return response.read()
 
 
-def fetch_images(name: str) -> Path:
-    """Cache both renderings and return the artwork path for extraction.
+MASCOT_SCALE = 2  # crisp on retina: image pixels = 2x the canvas points
 
-    One fetch, two roles: the official ARTWORK is the palette source — it
-    carries identity details the 96px game sprite drops (gengar's sprite has
-    literally zero red pixels, losing the eyes) — while the game SPRITE is
-    what herdr-mascot displays. Same character, same color family, so the
-    mascot matches its accents.
+
+def normalize(sprite: Image.Image, margin_fraction: float = 0.05) -> Image.Image:
+    """Crop to visible content and pad to a square with a small margin.
+
+    PokeAPI sprites are a 96x96 canvas with the creature at arbitrary size
+    and offset; without this, each pokemon displays at a different size.
+    Scaled up with NEAREST so the pixel art stays crisp.
+    """
+    rgba = sprite.convert("RGBA")
+    content_box = rgba.getchannel("A").getbbox()
+    if content_box:
+        rgba = rgba.crop(content_box)
+    side = max(round(max(rgba.size) * (1 + 2 * margin_fraction)), 1)
+    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    canvas.paste(rgba, ((side - rgba.width) // 2, (side - rgba.height) // 2))
+    return canvas.resize(
+        (side * MASCOT_SCALE, side * MASCOT_SCALE), Image.Resampling.NEAREST
+    )
+
+
+def fetch_images(name: str) -> Path:
+    """Cache all renderings and return the artwork path for extraction.
+
+    One fetch, distinct roles: the official ARTWORK is the palette source —
+    it carries identity details the 96px game sprite drops (gengar's sprite
+    has literally zero red pixels, losing the eyes) — while the game SPRITE,
+    normalized into <name>-mascot.png, is what the mascot displays. Same
+    character, same color family, so the mascot matches its accents.
     """
     cache_dir = (
         Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/pokemon"
@@ -60,7 +82,8 @@ def fetch_images(name: str) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
     artwork = cache_dir / f"{name}.png"
     sprite = cache_dir / f"{name}-sprite.png"
-    if artwork.exists() and sprite.exists():
+    mascot = cache_dir / f"{name}-mascot.png"
+    if artwork.exists() and sprite.exists() and mascot.exists():
         return artwork
 
     data = json.loads(_get(f"{API}{name}"))
@@ -72,6 +95,7 @@ def fetch_images(name: str) -> Path:
         artwork.write_bytes(_get(artwork_url))
     if not sprite.exists():
         sprite.write_bytes(_get(sprite_url))
+    normalize(Image.open(sprite)).save(mascot)
     return artwork
 
 

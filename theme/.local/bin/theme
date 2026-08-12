@@ -50,6 +50,13 @@ conf_put() {
   fi
 }
 
+# Remove a key from a conf file.
+conf_del() {
+  if grep -q "^$2=" "$1" 2>/dev/null; then
+    grep -v "^$2=" "$1" >"$1.tmp" && mv "$1.tmp" "$1"
+  fi
+}
+
 # Extract accents for a pokemon into state. Display is not this command's
 # job: the pokemon-mascot herdr plugin owns pixels and is notified below.
 set_pokemon() {
@@ -113,10 +120,8 @@ reload_consumers() {
   # is running.
   if command -v herdr >/dev/null 2>&1; then
     herdr server reload-config >/dev/null 2>&1 || true
-    # The pokemon-mascot plugin owns the sprite overlay; ask it to reconcile
-    # with the state written above. One-shot and silent when not installed.
-    herdr-pokemon place >/dev/null 2>&1 || true
   fi
+  # The hammerspoon mascot watches the state directory and updates itself.
   # ghostty / nvim reloads arrive with their packages.
 }
 
@@ -165,9 +170,18 @@ pokemon)
     ;;
   project)
     project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-    conf_put "$CONFIG/pokemon.conf" "$project" "${3:?usage: theme pokemon project <name>}"
-    echo "mapped: $project -> $3"
-    set_pokemon "$3"
+    name="${3:?usage: theme pokemon project <name>|none}"
+    if [ "$name" = none ]; then
+      # Unmap this project and fall back to the global default, if one is set.
+      conf_del "$CONFIG/pokemon.conf" "$project"
+      echo "unmapped: $project"
+      fallback="$(conf_get "$CONFIG/pokemon.conf" default)"
+      [ -n "$fallback" ] && set_pokemon "$fallback"
+    else
+      conf_put "$CONFIG/pokemon.conf" "$project" "$name"
+      echo "mapped: $project -> $name"
+      set_pokemon "$name"
+    fi
     ;;
   *)
     set_pokemon "$sub"
