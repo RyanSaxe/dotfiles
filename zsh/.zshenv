@@ -1,0 +1,30 @@
+# Sourced by every zsh, interactive or not. Keep minimal and fast.
+
+export LANG="en_US.UTF-8"
+export LC_ALL="en_US.UTF-8"
+export EDITOR="nvim"
+export VISUAL="nvim"
+
+# Prepend a directory to PATH, once.
+path_add() {
+  [[ ":$PATH:" == *":$1:"* ]] || PATH="$1:$PATH"
+}
+
+case "$OSTYPE" in
+darwin*)
+  # Homebrew: Apple Silicon, then Intel.
+  if [[ -x /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [[ -x /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+  fi
+  ;;
+esac
+
+path_add "/usr/local/bin"
+# uv-managed tools (prek, ...) and user binaries.
+path_add "$HOME/.local/bin"
+export PATH
+
+# Rust, when present on this machine.
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
