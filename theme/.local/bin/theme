@@ -24,6 +24,8 @@ STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 # Pokemon mappings are machine-personal state (project names must never
 # reach the public repo), not tracked config.
 POKEMON_CONF="$STATE/pokemon.conf"
+# The global default is shareable and tracked; see pokemon.conf in config.
+DEFAULT_CONF="$CONFIG/pokemon.conf"
 GENERATED="$STATE/generated"
 MODE_FILE="$STATE/theme-mode"
 
@@ -181,7 +183,7 @@ pokemon)
     name="${3:?usage: theme pokemon default <name> [--shiny]}"
     value="$name"
     [ "${4:-}" = "--shiny" ] && value="$name:shiny"
-    conf_put "$POKEMON_CONF" default "$value"
+    conf_put "$DEFAULT_CONF" default "$value"
     set_pokemon_value "$value"
     ;;
   project)
@@ -191,7 +193,7 @@ pokemon)
       # Unmap this project and fall back to the global default, if one is set.
       conf_del "$POKEMON_CONF" "$project"
       echo "unmapped: $project"
-      fallback="$(conf_get "$POKEMON_CONF" default)"
+      fallback="$(conf_get "$DEFAULT_CONF" default)"
       [ -n "$fallback" ] && set_pokemon_value "$fallback"
     else
       value="$name"
