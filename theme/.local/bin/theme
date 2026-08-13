@@ -111,6 +111,8 @@ render() {
   done <"$CONFIG/tokens.conf"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
+    # An unmatched glob stays literal; never render a file named "*".
+    [ -e "$tmpl" ] || continue
     out="$GENERATED/$(basename "$tmpl" .tmpl)"
     sed -f "$sed_script" "$tmpl" >"$out"
     # A surviving {{...}} means a template used an unknown role. Fail loudly.
