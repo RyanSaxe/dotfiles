@@ -23,7 +23,8 @@ toggle | light | dark)
   # The job runs on the tmux server (run-shell -b): popup teardown kills the
   # popup's whole process group, so a backgrounded child would die with it.
   if [ -n "${TMUX:-}" ]; then
-    tmux run-shell -b "sleep 0.3; \"$HOME/.local/bin/theme\" $action"
+    # Silenced: tmux displays run-shell output in a dismiss-with-enter view.
+    tmux run-shell -b "sleep 0.3; \"$HOME/.local/bin/theme\" $action >/dev/null 2>&1"
   else
     theme "$action"
   fi
