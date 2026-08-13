@@ -52,31 +52,57 @@ def test_normalize_of_blank_image_does_not_crash() -> None:
     assert accents.normalize(blank).width >= 1
 
 
+def _pixels_of(image: accents.Image.Image) -> tuple[list, list]:
+    vivid, pale = [], []
+    for x in range(image.width):
+        for y in range(image.height):
+            r, g, b, a = image.getpixel((x, y))
+            if a <= 128:
+                continue
+            h, s, v = accents.colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if not (0.2 < v <= 0.98):
+                continue
+            (vivid if s >= 0.25 else pale if s >= 0.10 else []).append((h, s, v))
+    return vivid, pale
+
+
 def test_pick_pair_finds_two_distinct_hues() -> None:
     # A synthetic gengar: a large purple body with small red eyes. The pair
     # must be the two hues, never two shades of purple.
+    # Eyes sized to clear the 2%-of-primary noise threshold honestly — the
+    # old 8x4 version only "passed" via the now-dead complement fallback.
     image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
-    body = Image.new("RGBA", (60, 60), (140, 100, 220, 255))  # purple
-    eyes = Image.new("RGBA", (8, 4), (220, 40, 40, 255))  # red
-    image.paste(body, (18, 18))
-    image.paste(eyes, (40, 30))
+    image.paste(Image.new("RGBA", (60, 60), (140, 100, 220, 255)), (18, 18))  # purple
+    image.paste(Image.new("RGBA", (16, 8), (220, 40, 40, 255)), (40, 30))  # red eyes
 
-    pixels = [
-        (h, s, v)
-        for h, s, v in (
-            accents.colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            for r, g, b, a in (
-                image.getpixel((x, y)) for x in range(96) for y in range(96)
-            )
-            if a > 128
-        )
-        if s >= 0.25
-    ]
-    accent, accent_bright = accents.pick_pair(pixels)
+    accent, accent_bright = accents.pick_pair(*_pixels_of(image))
 
     hue_distance = abs(accent[0] - accent_bright[0])
     hue_distance = min(hue_distance, 1 - hue_distance)
     assert hue_distance >= 45 / 360  # genuinely different hues
+
+
+def test_pick_pair_relaxes_to_nearby_hue_over_inventing_one() -> None:
+    # A synthetic shiny gyarados: red body, gold fins ~35 degrees away —
+    # closer than the strict 45-degree tier, but REAL. The pair must be
+    # red + gold, never red + a synthesized complement (teal).
+    image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+    image.paste(Image.new("RGBA", (60, 60), (216, 60, 50, 255)), (18, 18))  # red
+    image.paste(Image.new("RGBA", (20, 10), (230, 180, 60, 255)), (30, 80))  # gold
+
+    _accent, accent_bright = accents.pick_pair(*_pixels_of(image))
+
+    gold_hue = accents.colorsys.rgb_to_hsv(230 / 255, 180 / 255, 60 / 255)[0]
+    assert abs(accent_bright[0] - gold_hue) < 0.06  # the gold, not teal
+
+
+def test_pick_pair_single_hue_never_invents_a_color() -> None:
+    image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+    image.paste(Image.new("RGBA", (60, 60), (216, 60, 50, 255)), (18, 18))  # red only
+
+    accent, accent_bright = accents.pick_pair(*_pixels_of(image))
+
+    assert accent_bright[0] == accent[0]  # same hue, not a complement
 
 
 def test_styled_output_is_valid_hex() -> None:

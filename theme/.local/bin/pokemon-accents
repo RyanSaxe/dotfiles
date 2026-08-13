@@ -11,11 +11,12 @@ Prints key=value lines consumed by the `theme` command:
     accent_dark=#...          accent_bright_dark=#...
     accent_light=#...         accent_bright_light=#...
 
-The pair must be two DIFFERENT hues (gengar: purple body + red eyes), never
-two shades of one hue. Wallpaper-palette tools fail this: a small vivid area
-like eyes disappears under frequency-based extraction. Instead, saturated
-pixels are clustered by hue; the accent is the dominant vivid cluster and the
-bright accent is the strongest cluster at least 45 degrees of hue away.
+Every color must actually exist on the pokemon. The accent is the dominant
+vivid hue cluster; the bright accent is the most distinct OTHER hue present,
+searched in relaxing tiers (vivid at 45°+, vivid at 30°+, pale clusters like
+cream fins). A truly single-hue pokemon gets two brightnesses of its one hue
+— never a synthesized complement. Wallpaper-palette tools fail here: small
+identity areas (gengar's red eyes) vanish under frequency-based extraction.
 """
 
 from __future__ import annotations
@@ -154,23 +155,34 @@ def prefetch_sprites() -> None:
     print(f"sprites: {sum(results)} fetched, {len(results) - sum(results)} unavailable")
 
 
-def vivid_pixels(image_path: Path) -> list[Hsv]:
+def gather_pixels(image_path: Path) -> tuple[list[Hsv], list[Hsv]]:
+    """Split usable pixels into vivid and pale-but-tinted.
+
+    Pale pixels (cream fins, pastel markings) are too washed to lead, but
+    when a pokemon has no second vivid hue they are the honest source of an
+    accent — shiny gyarados is red plus cream-gold, not red plus anything
+    invented.
+    """
     img = Image.open(image_path).convert("RGBA")
     img.thumbnail((96, 96))
-    pixels = []
+    vivid: list[Hsv] = []
+    pale: list[Hsv] = []
     raw = img.tobytes()
     for i in range(0, len(raw), 4):
         r, g, b, a = raw[i : i + 4]
         if a < 128:
             continue
         h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-        # Grays, blacks, and whites carry no hue information.
-        if s < 0.25 or v < 0.2 or v > 0.98:
+        # Blacks and whites carry no hue information.
+        if v < 0.2 or v > 0.98:
             continue
-        pixels.append((h, s, v))
-    if not pixels:
+        if s >= 0.25:
+            vivid.append((h, s, v))
+        elif s >= 0.10:
+            pale.append((h, s, v))
+    if not vivid:
         raise SystemExit("error: image has no vivid pixels to extract from")
-    return pixels
+    return vivid, pale
 
 
 def cluster_weights(pixels: list[Hsv]) -> list[float]:
@@ -203,22 +215,39 @@ def representative(pixels: list[Hsv], bucket: int) -> Hsv:
     return (hue % 1.0, sat, val)
 
 
-def pick_pair(pixels: list[Hsv]) -> tuple[Hsv, Hsv]:
-    weights = cluster_weights(pixels)
-    primary = max(range(HUE_BUCKETS), key=lambda i: weights[i])
+def _best_secondary(
+    weights: list[float], threshold: float, primary: int, min_separation: int
+) -> int | None:
     candidates = [
         i
         for i in range(HUE_BUCKETS)
-        if bucket_distance(i, primary) >= MIN_HUE_SEPARATION
-        and weights[i] > weights[primary] * SECOND_CLUSTER_MIN_WEIGHT
+        if bucket_distance(i, primary) >= min_separation and weights[i] > threshold
     ]
-    accent = representative(pixels, primary)
-    if candidates:
-        secondary = max(candidates, key=lambda i: weights[i])
-        return accent, representative(pixels, secondary)
-    # Single-hue pokemon: complement the dominant hue rather than shade it.
-    h, s, v = accent
-    return accent, ((h + 0.5) % 1.0, s, v)
+    return max(candidates, key=lambda i: weights[i]) if candidates else None
+
+
+def pick_pair(vivid: list[Hsv], pale: list[Hsv]) -> tuple[Hsv, Hsv]:
+    """Accent = dominant vivid hue; accent_bright = the most distinct OTHER
+    hue actually present, searched in relaxing tiers: vivid at 45°+, vivid at
+    30°+ (red-vs-gold pokemon), then pale clusters. Every color must exist on
+    the pokemon — with a single-hue pokemon the pair is two brightnesses of
+    its one hue, never an invented complement.
+    """
+    vivid_weights = cluster_weights(vivid)
+    primary = max(range(HUE_BUCKETS), key=lambda i: vivid_weights[i])
+    threshold = vivid_weights[primary] * SECOND_CLUSTER_MIN_WEIGHT
+    accent = representative(vivid, primary)
+
+    tiers: list[tuple[list[Hsv], list[float], int]] = [
+        (vivid, vivid_weights, MIN_HUE_SEPARATION),
+        (vivid, vivid_weights, MIN_HUE_SEPARATION - 1),
+        (pale, cluster_weights(pale), MIN_HUE_SEPARATION - 1),
+    ]
+    for pixels, weights, separation in tiers:
+        secondary = _best_secondary(weights, threshold, primary, separation)
+        if secondary is not None:
+            return accent, representative(pixels, secondary)
+    return accent, accent
 
 
 def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
@@ -247,7 +276,7 @@ def main() -> None:
     if len(names) != 1:
         raise SystemExit("usage: pokemon-accents <name> [--shiny] | --names")
     name = names[0].lower()
-    accent, accent_bright = pick_pair(vivid_pixels(fetch_images(name, shiny=shiny)))
+    accent, accent_bright = pick_pair(*gather_pixels(fetch_images(name, shiny=shiny)))
     print(f"pokemon={name}")
     if shiny:
         print("shiny=1")
