@@ -116,10 +116,15 @@ render() {
   # Templates may also reference palette keys directly ({{mauve}}, {{sky}},
   # {{green}}...) for SEMANTIC hue choices — meaning lives in the template,
   # identity-sync lives in the accent/notify tokens. Names never collide.
+  # The palette's mode key renders too ({{mode}} -> dark|light), for
+  # consumers that take the scheme by name. The _hex variant is only
+  # emitted for color values.
   while IFS='=' read -r key hex; do
-    case "$key" in ''#* | mode) continue ;; esac
+    case "$key" in ''#*) continue ;; esac
     printf 's/{{%s}}/%s/g\n' "$key" "$hex" >>"$sed_script"
-    printf 's/{{%s_hex}}/%s/g\n' "$key" "${hex#\#}" >>"$sed_script"
+    case "$hex" in
+    \#*) printf 's/{{%s_hex}}/%s/g\n' "$key" "${hex#\#}" >>"$sed_script" ;;
+    esac
   done <"$palette"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do

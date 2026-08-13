@@ -15,7 +15,13 @@ action="$(printf 'pokemon\nshiny pokemon\ntoggle\nlight\ndark\nnone\n' | pick th
 
 case "$action" in
 toggle | light | dark)
-  theme "$action"
+  # Mode changes are applied AFTER this script (and its popup) exits.
+  # Flipping macOS appearance makes the terminal emit theme-change reports,
+  # and tmux mangles those inside an open popup — they land in whatever is
+  # focused as literal "?997;2n" keystrokes. With the popup already closed,
+  # the reports arrive at panes that ignore them.
+  nohup sh -c "sleep 0.3; theme '$action'" >/dev/null 2>&1 &
+  exit 0
   ;;
 none)
   theme pokemon none
