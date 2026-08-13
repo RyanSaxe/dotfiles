@@ -15,6 +15,10 @@
 # Rendered output lands in state, never in the repo.
 set -eu
 
+# This script is invoked from contexts with a bare PATH (hammerspoon's
+# appearance watcher, launchd) — make sure tmux and friends resolve.
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 # Palettes, tokens, and templates live next to this script in its stow
 # package; resolving our own symlink finds them wherever the repo lives.
 SCRIPT_PATH="$(readlink -f "$0")"
@@ -90,7 +94,9 @@ render() {
   # A pokemon (theme pokemon <name>) overrides accent/notify only,
   # with the pair extracted for the current background mode.
   accents="$STATE/accents.conf"
-  sed_script="$STATE/.render.sed"
+  # Per-process temp name: the appearance watcher and a manual `theme` can
+  # render concurrently, and a shared file would corrupt both.
+  sed_script="$STATE/.render.$$.sed"
   : >"$sed_script"
   while IFS='=' read -r role key; do
     case "$role" in ''#*) continue ;; esac
