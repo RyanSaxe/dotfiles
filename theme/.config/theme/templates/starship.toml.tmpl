@@ -1,54 +1,80 @@
 # Rendered by `theme` — do not edit; change the template or tokens instead.
 #
-# Shape:
-#   in nvim/lua/plugins on main from 3 hours ago ✓     <- subdir only when deep
-#   dotfiles ❯                                          <- name color = venv state
+# Grammar (Ryan's spec):
+#   [user] [in path] [on branch] [at version] [from time ago] [status]
+#   [project] [language version] ❯
 #
-# Line 1 says WHERE INSIDE (repo-relative subdir, or the plain path outside
-# repos; nothing at the repo root). Line 2 says WHAT: the project name whose
-# color is the venv state — faint none, green matching, red shows the name
-# of a MISMATCHED venv. The caret never moves. Username appears only when
-# it is information (root/SSH). Connectors are faint; values bold semantic.
+# Line 1 is the repo's story: where inside it, which branch (ORANGE when
+# upstream has commits you haven't pulled — a local check against the last
+# fetch, never the network), the package's own declared version, how stale,
+# clean/dirty. Line 2 is the venv verdict: project name colored by state —
+# faint none, green matching, red shows the name of a MISMATCHED venv —
+# plus the venv interpreter's version, faint. The caret never moves.
+# The prompt shows identity, declared facts, and chosen state — never
+# inventory (installed toolchains, incidental file types).
 add_newline = true
-format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}$package${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.pyversion}$all$character"
-
-# Only shown when root or over SSH — locally it never changes, so it says
-# nothing; remotely or elevated it is exactly the thing to notice.
-[username]
-format = '[$user]({{fg_faint}}) '
+format = "${custom.subdir}${custom.repo_parent}${custom.dir_plain}${custom.branch}${custom.branch_behind}${custom.pkgversion}${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.dir_name}${custom.pyversion}$character"
 
 # WHERE, inside a repo: path relative to the repo root; hidden at the root
 # itself. Long paths collapse to first/…/last/two.
 [custom.subdir]
 command = '''p="$(git rev-parse --show-prefix)"; p="${p%/}"; n=$(printf %s "$p" | awk -F/ "{print NF}"); if [ "$n" -gt 3 ]; then printf %s "${p%%/*}/…/$(printf %s "$p" | awk -F/ "{print \$(NF-1)\"/\"\$NF}")"; else printf %s "$p"; fi'''
 when = '[ -n "$(git rev-parse --show-prefix 2>/dev/null)" ]'
-format = '[in ]({{fg_faint}})[$output](bold {{sky}}) '
+format = '[in ]({{fg_faint}})[$output]({{sky}}) '
 
-# WHERE, outside any repo: ~-relative path with the same collapsing.
+# WHERE, at a repo's root: the directory the repo lives in. Deeper inside,
+# custom.subdir takes over with the repo-relative position instead.
+[custom.repo_parent]
+command = '''top="$(git rev-parse --show-toplevel)"; p="${top%/*}"; [ -n "$p" ] || p=/; case "$p" in "$HOME") p="~" ;; "$HOME"/*) p="~${p#"$HOME"}" ;; esac; printf %s "$p"'''
+when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git rev-parse --show-prefix 2>/dev/null)" ]'
+format = '[in ]({{fg_faint}})[$output]({{sky}}) '
+
+# WHERE, outside any repo: the parent of the current folder — the folder's
+# own name sits on line 2 before the caret (see custom.dir_name). Hidden at
+# ~ itself, where line 2 shows just "~".
 [custom.dir_plain]
-command = '''case "$PWD" in "$HOME") p="~" ;; "$HOME"/*) p="~${PWD#"$HOME"}" ;; *) p="$PWD" ;; esac; n=$(printf %s "$p" | awk -F/ "{print NF}"); if [ "$n" -gt 4 ]; then printf %s "${p%%/*}/…/$(printf %s "$p" | awk -F/ "{print \$(NF-1)\"/\"\$NF}")"; else printf %s "$p"; fi'''
-when = '! git rev-parse --is-inside-work-tree >/dev/null 2>&1'
-format = '[in ]({{fg_faint}})[$output](bold {{sky}}) '
+command = '''p="${PWD%/*}"; [ -n "$p" ] || p=/; case "$p" in "$HOME") p="~" ;; "$HOME"/*) p="~${p#"$HOME"}" ;; esac; n=$(printf %s "$p" | awk -F/ "{print NF}"); if [ "$n" -gt 4 ]; then printf %s "${p%%/*}/…/$(printf %s "$p" | awk -F/ "{print \$(NF-1)\"/\"\$NF}")"; else printf %s "$p"; fi'''
+when = '! git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$PWD" != "$HOME" ]'
+format = '[in ]({{fg_faint}})[$output]({{sky}}) '
 
-[git_branch]
-format = '[on ]({{fg_faint}})[$branch](bold {{mauve}}) '
+# Branch, colored as a pull-reminder: mauve normally, orange when the last
+# fetch recorded upstream commits this branch doesn't have. Purely local
+# (~2ms, offline-safe) — it can only know what the last fetch/pull learned.
+[custom.branch]
+command = 'git branch --show-current | grep . || git rev-parse --short HEAD'
+when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$(git rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)" -eq 0 ]'
+format = '[on ]({{fg_faint}})[$output]({{mauve}}) '
+
+[custom.branch_behind]
+command = 'git branch --show-current | grep . || git rev-parse --short HEAD'
+when = '[ "$(git rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)" -gt 0 ]'
+format = '[on ]({{fg_faint}})[$output]({{peach}}) '
+
+# The project's own declared version, found by walking UP from here to the
+# repo root and asking starship's package module at each level — so a
+# monorepo half shows its own version, and the display never changes with
+# cd inside one package. All ~15 manifest formats are starship's, not ours.
+[custom.pkgversion]
+command = '''d="$PWD"; top="$(git rev-parse --show-toplevel)"; while :; do v="$(cd "$d" && starship module package)"; if [ -n "$v" ]; then printf %s "$v"; break; fi; [ "$d" = "$top" ] && break; d="${d%/*}"; done'''
+when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1'
+format = '([at ]({{fg_faint}})[$output]({{pink}}) )'
 
 # Time since last commit — connectors fold in so they vanish outside repos.
 [custom.git_age]
 command = "git log -1 --format=%cr 2>/dev/null | sed 's/ ago//'"
-when = "git rev-parse --is-inside-work-tree >/dev/null 2>&1"
-format = '[from ]({{fg_faint}})[$output](bold {{info}})[ ago]({{fg_faint}}) '
+when = "git rev-parse HEAD >/dev/null 2>&1"
+format = '[from ]({{fg_faint}})[$output]({{info}})[ ago]({{fg_faint}}) '
 
 # Clean/dirty as a single glanceable mark.
 [custom.git_clean]
 command = "echo ✓"
 when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git status --porcelain 2>/dev/null)" ]'
-format = '[$output](bold {{green}}) '
+format = '[$output]({{green}}) '
 
 [custom.git_dirty]
 command = "echo ✗"
 when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -n "$(git status --porcelain 2>/dev/null)" ]'
-format = '[$output](bold {{red}}) '
+format = '[$output]({{red}}) '
 
 # Only ahead/behind arrows; state marks come from the customs above.
 [git_status]
@@ -59,48 +85,38 @@ format = '([$ahead_behind]({{fg_faint}}) )'
 # OTHER project: red, showing the impostor's name.
 [custom.proj_plain]
 command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
-when = '[ -z "$VIRTUAL_ENV" ]'
-format = '[$output](bold {{lavender}}) '
+when = '[ -z "$VIRTUAL_ENV" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1'
+format = '[$output]({{lavender}}) '
+
+# Outside any repo the caret keeps its anchor word, but faint: this is a
+# location, not a project — no verdict light to carry.
+[custom.dir_name]
+command = '[ "$PWD" = "$HOME" ] && printf "~" || basename "$PWD"'
+when = '! git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$VIRTUAL_ENV" ]'
+format = '[$output]({{fg_faint}}) '
 
 [custom.proj_ok]
 command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
 when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
-format = '[$output](bold {{green}}) '
+format = '[$output]({{green}}) '
 
 [custom.proj_bad]
 command = 'basename "$(dirname "$VIRTUAL_ENV")"'
 when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
-format = '[$output](bold {{red}}) '
+format = '[$output]({{red}}) '
 
 # The venv's interpreter version, read from pyvenv.cfg — instant, whereas
 # the standard python module launches the interpreter on every prompt.
-# Dressed with the language sigil to match the standard modules.
 [custom.pyversion]
 command = 'sed -n -E "s/^version(_info)? *= *//p" "$VIRTUAL_ENV/pyvenv.cfg" | head -1 | cut -d. -f1,2'
 when = '[ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/pyvenv.cfg" ]'
-format = '[ $output]({{fg_faint}}) '
+format = '[$output]({{fg_faint}}) '
 
-# The package's own version, in the repo sentence: a committed fact, in the
-# module color (pink). One module covers ~15 manifest formats.
+# Not in the prompt's format — this is the render backend for the pkgversion
+# walk above (`starship module package`). Plain output; the custom styles it.
 [package]
 version_format = '${raw}'
-format = '[at ]({{fg_faint}})[v${version}](bold {{pink}}) '
-
-# Every other language/context module arrives via $all with starship's
-# defaults — sigil + version, ANSI colors that resolve to the terminal's
-# catppuccin palette. All languages free, forever. Prune individual modules
-# here with disabled = true only on lived annoyance.
-[python]
-disabled = true # replaced by custom.pyversion (speed)
-
-[directory]
-disabled = true # replaced by custom.subdir / custom.dir_plain
-
-[cmd_duration]
-disabled = true # deliberately absent from this prompt
-
-[hostname]
-disabled = true # username already covers remote identity; the 🌐 was noise
+format = 'v${version}'
 
 [character]
 success_symbol = "[❯]({{accent}})"
