@@ -1,6 +1,6 @@
 #!/bin/sh
 # One theme for every tool. Renders templates with the current palette and
-# semantic tokens, then reloads consumers.
+# semantic tokens; consumers watch the rendered files and converge.
 #
 #   theme dark      switch to catppuccin mocha
 #   theme light     switch to catppuccin latte
@@ -151,28 +151,23 @@ render() {
   echo "theme: $mode"
 }
 
-reload_consumers() {
-  # starship re-reads its config every prompt: nothing to do.
-  # Running zsh sessions pick up shell colors on their next precmd (see .zshrc).
-  # The hammerspoon mascot watches the state directory and updates itself.
-  # ghostty follows macOS appearance natively (see set_os_appearance).
-  # nvim reload arrives with its package.
-
-  # A running tmux server re-reads the color variables; every style
-  # references them, so this recolors all sessions live.
-  if command -v tmux >/dev/null 2>&1 && tmux ls >/dev/null 2>&1; then
-    tmux source-file -q "$GENERATED/tmux-colors.conf" || true
-  fi
-
-  # ghostty resolves custom-shader relative to its config dir, so the
-  # rendered cursor-trail shader is copied there. SIGUSR2 makes ghostty
-  # (1.2+) reload its config, which recompiles shaders from disk — the
-  # trail follows a pokemon/theme switch with no keypress. Only SIGUSR2 is
-  # handled; any other signal would crash ghostty.
+# This script only WRITES state; it never pokes processes. It runs from
+# many contexts (shells, ssh, hammerspoon, the tmux server) whose
+# environments differ, and a push that works in one silently fails in
+# another. Consumers converge on the generated files themselves:
+#   starship   re-reads its config every prompt
+#   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
+#   tmux       status-interval sync re-sources tmux-colors.conf on mtime
+#              change (tmux scripts/theme-sync.sh) — any OS, any context
+#   mascot     hammerspoon watches the state directory
+#   ghostty    palette follows macOS appearance natively; hammerspoon's
+#              watcher sends the reload signal for the trail shader
+publish_files() {
+  # File copies are context-independent writes, so they belong here:
+  # ghostty resolves custom-shader relative to its config dir.
   if [ -f "$GENERATED/cursor_trail.glsl" ]; then
     mkdir -p "$HOME/.config/ghostty/shaders"
     cp "$GENERATED/cursor_trail.glsl" "$HOME/.config/ghostty/shaders/cursor_trail.glsl"
-    pkill -USR2 -x ghostty 2>/dev/null || true
   fi
 }
 
@@ -214,14 +209,14 @@ case "${1:-status}" in
 dark | light)
   set_os_appearance "$1"
   render "$1"
-  reload_consumers
+  publish_files
   ;;
 toggle)
   case "$(current_mode)" in
   dark) set_os_appearance light && render light ;;
   *) set_os_appearance dark && render dark ;;
   esac
-  reload_consumers
+  publish_files
   ;;
 apply)
   # `theme apply [dark|light]` renders WITHOUT touching OS appearance —
@@ -236,7 +231,7 @@ apply)
     ;;
   esac
   render "$mode"
-  reload_consumers
+  publish_files
   ;;
 pokemon)
   sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name> [--shiny]}"
@@ -275,7 +270,7 @@ pokemon)
     ;;
   esac
   render "$(current_mode)"
-  reload_consumers
+  publish_files
   show_accents
   ;;
 status)

@@ -25,6 +25,23 @@ config_watcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", funct
 end)
 config_watcher:start()
 
+-- 2b. Ghostty shader reload: ghostty cannot watch files, so this is the one
+-- consumer that needs a push — and it lives HERE, in the single watcher
+-- with a controlled environment, never in the theme script (which runs
+-- from arbitrary contexts). SIGUSR2 = ghostty's config-reload signal
+-- (1.2+; other signals would crash it). Debounced: one render touches
+-- several files and one reload covers them all.
+local ghostty_reload_timer = nil
+generated_watcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.local/state/dotfiles/generated/", function()
+  if ghostty_reload_timer then
+    ghostty_reload_timer:stop()
+  end
+  ghostty_reload_timer = hs.timer.doAfter(0.3, function()
+    hs.task.new("/usr/bin/pkill", nil, { "-USR2", "-x", "ghostty" }):start()
+  end)
+end)
+generated_watcher:start()
+
 -- 3. Appearance sync: macOS appearance is the master light/dark switch.
 -- When it flips by ANY path (System Settings, sunset schedule, or the
 -- `theme` command itself once Phase 3 wires toggle -> osascript), re-render
