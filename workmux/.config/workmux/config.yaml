@@ -1,0 +1,19 @@
+# Global workmux configuration. Per-repo .workmux.yaml files override this
+# only where a project needs it (env-file copies, a different agent).
+
+agent: claude
+
+# All worktrees under one root, out of the project directories.
+worktree_dir: ~/worktrees/{project}
+
+# tmux window formats belong to tmux.conf (the pill design): workmux only
+# sets @workmux_status per window, and the pills render it themselves.
+status_format: false
+
+# Status glyphs, colored through the theme's tmux variables so they follow
+# light/dark. Status semantics never take pokemon colors: working=mauve
+# (operational), waiting=peach (act now), done=green (glance).
+status_icons:
+  working: "#[fg=#{@status_working}]●#[fg=default]"
+  waiting: "#[fg=#{@status_waiting}]●#[fg=default]"
+  done: "#[fg=#{@status_done}]✓#[fg=default]"
