@@ -1,6 +1,6 @@
 # Auto-activate and auto-deactivate Python virtualenvs.
 # Walks up from $PWD to the nearest .venv, stopping at the repo boundary.
-# No caching: the walk is a few stat calls and a stale cache was the v1 bug.
+# No caching: the walk is a few stat calls, and a cache can serve stale state.
 
 _venv_find() {
   local dir="$PWD"

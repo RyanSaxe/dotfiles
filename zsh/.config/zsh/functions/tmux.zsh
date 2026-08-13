@@ -153,7 +153,8 @@ ts() {
 }
 
 _ai_harness_source_tmux_utils() {
-  # Explicit v1 path: ai-harness stays on v1 until its own cutover (step 8).
+  # TODO: ai-harness still lives in the legacy dotfiles repo; when it moves
+  # into this repo, replace this absolute path.
   local utils_path="$HOME/generic/dotfiles/ai-harness/scripts/agent-utils.sh"
   if [[ -f "$utils_path" ]]; then
     source "$utils_path"
