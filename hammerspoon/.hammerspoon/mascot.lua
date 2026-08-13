@@ -85,20 +85,25 @@ function M.start()
   M.canvas:clickActivating(false)
 
   -- Follow the focused Ghostty window; hide when Ghostty loses focus so the
-  -- mascot never floats over unrelated apps.
+  -- mascot never floats over unrelated apps. Every event re-queries focus
+  -- AND re-checks shortly after: macOS delivers same-app window-switch
+  -- events late or out of order, so a single immediate refresh can act on
+  -- stale focus. The delayed pass self-heals those races.
+  local function refresh_soon()
+    refresh(focused_app_window())
+    M.refresh_timer = hs.timer.doAfter(0.25, function()
+      refresh(focused_app_window())
+    end)
+  end
+
   M.window_filter = hs.window.filter.new(M.config.app_name)
   M.window_filter:subscribe({
     hs.window.filter.windowFocused,
     hs.window.filter.windowMoved, -- fires on both move and resize
-  }, function(window)
-    refresh(window)
-  end)
-  M.window_filter:subscribe({
     hs.window.filter.windowUnfocused,
+    hs.window.filter.windowCreated,
     hs.window.filter.windowDestroyed,
-  }, function()
-    refresh(focused_app_window())
-  end)
+  }, refresh_soon)
 
   -- Swap the sprite the moment the theme writes new state.
   M.path_watcher = hs.pathwatcher.new(state_dir, function()

@@ -21,14 +21,19 @@ none)
   theme pokemon none
   ;;
 "pokemon" | "shiny pokemon")
-  # Live sprite preview: chafa renders the real image over the kitty
-  # protocol in capable terminals and degrades gracefully elsewhere.
+  # Live sprite preview. chafa auto-detection sees a pipe inside fzf's
+  # preview and would degrade to symbols, so force the kitty protocol in
+  # ghostty (fzf renders it natively); elsewhere let it degrade for SSH.
   # Sprites come from the local cache only; prefetch fills it.
   cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon"
   suffix="-sprite.png"
   [ "$action" = "shiny pokemon" ] && suffix="-shiny-sprite.png"
+  format=""
+  if [ -n "${GHOSTTY_RESOURCES_DIR:-}" ] || [ "${TERM_PROGRAM:-}" = "ghostty" ]; then
+    format="-f kitty"
+  fi
   name="$(pokemon-accents --names | fzf --reverse --prompt="pokemon > " --height=100% \
-    --preview "chafa --size 26x13 $cache/{}$suffix 2>/dev/null ||
+    --preview "chafa $format --size 26x13 $cache/{}$suffix 2>/dev/null ||
       echo 'no sprite cached - run: pokemon-accents --prefetch-sprites'" \
     --preview-window=right,45%)" || exit 0
   scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
