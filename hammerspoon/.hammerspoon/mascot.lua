@@ -3,13 +3,15 @@
 ---
 --- Why Hammerspoon: the mascot must sit ABOVE terminal content (visible
 --- inside neovim or any TUI), stay put through pane/tab/layout changes, and
---- never flicker. A canvas floating over the window is the only layer that
---- has all three properties; in-terminal approaches are either behind the
---- cells (ghostty background-image) or anchored to panes (herdr overlays).
+--- never flicker. A canvas floating over the window is the only layer with
+--- all three properties.
 ---
---- Auto-update: a pathwatcher on the theme state directory swaps the sprite
---- the moment `theme pokemon <name>` writes new state. No polling, no
---- reloads. The state file is the entire interface to the theme system.
+--- Why a reconcile tick instead of window events: macOS delivers same-app
+--- window-switch events to the accessibility API late, out of order, or not
+--- at all, so event-driven tracking visibly loses the window. A 0.4s tick
+--- that diffs desired state against drawn state and acts only on change is
+--- simpler and never wrong for more than a beat. The sprite itself swaps
+--- instantly via a pathwatcher on the theme state directory.
 
 local M = {}
 
@@ -19,6 +21,8 @@ M.config = {
   -- Distance from the window's bottom-right corner, in points.
   padding = 14,
   app_name = "Ghostty",
+  -- Reconcile cadence. Movement is corrected within this interval.
+  tick_seconds = 0.4,
 }
 
 local state_dir = os.getenv("HOME") .. "/.local/state/dotfiles"
@@ -39,34 +43,6 @@ local function current_pokemon()
   return name, shiny
 end
 
---- Load the normalized mascot image for a pokemon, or nil if not cached.
-local function mascot_image(name, shiny)
-  local base = shiny and (name .. "-shiny") or name
-  return hs.image.imageFromPath(cache_dir .. "/" .. base .. "-mascot.png")
-end
-
---- Move the canvas to the bottom-right corner of the given window.
-local function reposition(window)
-  local frame = window:frame()
-  M.canvas:topLeft({
-    x = frame.x + frame.w - M.config.size - M.config.padding,
-    y = frame.y + frame.h - M.config.size - M.config.padding,
-  })
-end
-
---- Show the mascot over a window, or hide it when there is nothing to show.
-local function refresh(window)
-  local name, shiny = current_pokemon()
-  local image = name and mascot_image(name, shiny)
-  if not (window and image) then
-    M.canvas:hide()
-    return
-  end
-  M.canvas[1].image = image
-  reposition(window)
-  M.canvas:show()
-end
-
 --- The focused window of the configured app, or nil.
 local function focused_app_window()
   local window = hs.window.focusedWindow()
@@ -74,6 +50,42 @@ local function focused_app_window()
     return window
   end
   return nil
+end
+
+--- Reconcile the canvas with reality; cheap no-op when nothing changed.
+local function reconcile()
+  local window = focused_app_window()
+  local name, shiny = current_pokemon()
+
+  if not (window and name) then
+    if M.drawn then
+      M.canvas:hide()
+      M.drawn = nil
+    end
+    return
+  end
+
+  local frame = window:frame()
+  local sprite = (shiny and (name .. "-shiny") or name) .. "-mascot.png"
+  local signature = string.format("%s|%d|%.0f|%.0f|%.0f|%.0f", sprite, window:id(), frame.x, frame.y, frame.w, frame.h)
+  if signature == M.drawn then
+    return
+  end
+
+  if M.drawn_sprite ~= sprite then
+    local image = hs.image.imageFromPath(cache_dir .. "/" .. sprite)
+    if not image then
+      return
+    end
+    M.canvas[1].image = image
+    M.drawn_sprite = sprite
+  end
+  M.canvas:topLeft({
+    x = frame.x + frame.w - M.config.size - M.config.padding,
+    y = frame.y + frame.h - M.config.size - M.config.padding,
+  })
+  M.canvas:show()
+  M.drawn = signature
 end
 
 function M.start()
@@ -84,46 +96,25 @@ function M.start()
   M.canvas:behavior({ "canJoinAllSpaces", "transient" })
   M.canvas:clickActivating(false)
 
-  -- Follow the focused Ghostty window; hide when Ghostty loses focus so the
-  -- mascot never floats over unrelated apps. Every event re-queries focus
-  -- AND re-checks shortly after: macOS delivers same-app window-switch
-  -- events late or out of order, so a single immediate refresh can act on
-  -- stale focus. The delayed pass self-heals those races.
-  local function refresh_soon()
-    refresh(focused_app_window())
-    M.refresh_timer = hs.timer.doAfter(0.25, function()
-      refresh(focused_app_window())
-    end)
-  end
-
-  M.window_filter = hs.window.filter.new(M.config.app_name)
-  M.window_filter:subscribe({
-    hs.window.filter.windowFocused,
-    hs.window.filter.windowMoved, -- fires on both move and resize
-    hs.window.filter.windowUnfocused,
-    hs.window.filter.windowCreated,
-    hs.window.filter.windowDestroyed,
-  }, refresh_soon)
-
-  -- Swap the sprite the moment the theme writes new state.
-  M.path_watcher = hs.pathwatcher.new(state_dir, function()
-    refresh(focused_app_window())
-  end)
+  M.ticker = hs.timer.doEvery(M.config.tick_seconds, reconcile)
+  -- Theme switches should not wait for the next tick.
+  M.path_watcher = hs.pathwatcher.new(state_dir, reconcile)
   M.path_watcher:start()
-
-  refresh(focused_app_window())
+  reconcile()
 end
 
 function M.stop()
+  if M.ticker then
+    M.ticker:stop()
+  end
   if M.path_watcher then
     M.path_watcher:stop()
-  end
-  if M.window_filter then
-    M.window_filter:unsubscribeAll()
   end
   if M.canvas then
     M.canvas:delete()
   end
+  M.drawn = nil
+  M.drawn_sprite = nil
 end
 
 return M
