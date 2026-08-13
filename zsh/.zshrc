@@ -4,6 +4,24 @@
 # lives, with no hardcoded path. %x is the file currently being sourced.
 typeset -g DOTFILES_DIR="${${(%):-%x}:A:h:h}"
 
+# ----- stale $TMUX scrubber --------------------------------------------
+# A shell can inherit $TMUX from three broken situations: tmux crashed, a
+# new terminal inherited the parent's env, or the socket died. Detect by
+# checking whether THIS tty is actually one of tmux's pane ttys.
+if [[ -n "$TMUX" ]]; then
+  _tmux_socket="${TMUX%%,*}"
+  if ! tmux -S "$_tmux_socket" list-clients &> /dev/null; then
+    unset TMUX TMUX_PANE
+  else
+    _current_tty="$(tty 2> /dev/null)"
+    if [[ -n "$_current_tty" ]] &&
+      ! tmux -S "$_tmux_socket" list-panes -a -F "#{pane_tty}" 2> /dev/null | grep -Fxq "$_current_tty"; then
+      unset TMUX TMUX_PANE
+    fi
+  fi
+  unset _tmux_socket _current_tty
+fi
+
 # ----- history ---------------------------------------------------------
 HISTFILE="$HOME/.zsh_history"
 HISTSIZE=50000
@@ -16,9 +34,13 @@ autoload -Uz compinit && compinit
 # Case-insensitive matching.
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 
-# ----- functions -------------------------------------------------------
-source "$HOME/.config/zsh/functions/vi-mode.zsh"
-source "$HOME/.config/zsh/functions/venv.zsh"
+# ----- functions and aliases -------------------------------------------
+for _fn in "$HOME/.config/zsh/functions/"*.zsh; do
+  source "$_fn"
+done
+unset _fn
+source "$HOME/.config/zsh/aliases.zsh"
+env_init
 vi_mode_init
 venv_init
 
