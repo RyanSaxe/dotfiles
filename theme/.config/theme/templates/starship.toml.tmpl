@@ -15,7 +15,7 @@ format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_ag
 # Only shown when root or over SSH — locally it never changes, so it says
 # nothing; remotely or elevated it is exactly the thing to notice.
 [username]
-format = '[$user](bold {{lavender}}) '
+format = '[$user]({{fg_faint}}) '
 
 # WHERE, inside a repo: path relative to the repo root; hidden at the root
 # itself. Long paths collapse to first/…/last/two.
@@ -60,17 +60,17 @@ format = '([$ahead_behind]({{fg_faint}}) )'
 [custom.proj_plain]
 command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
 when = '[ -z "$VIRTUAL_ENV" ]'
-format = '[$output]({{fg_faint}}) '
+format = '[$output](bold {{lavender}}) '
 
 [custom.proj_ok]
 command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
 when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
-format = '[$output]({{green}}) '
+format = '[$output](bold {{green}}) '
 
 [custom.proj_bad]
 command = 'basename "$(dirname "$VIRTUAL_ENV")"'
 when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
-format = '[$output]({{red}}) '
+format = '[$output](bold {{red}}) '
 
 [python]
 disabled = true
