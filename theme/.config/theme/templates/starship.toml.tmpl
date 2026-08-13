@@ -10,7 +10,7 @@
 # of a MISMATCHED venv. The caret never moves. Username appears only when
 # it is information (root/SSH). Connectors are faint; values bold semantic.
 add_newline = true
-format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.pyversion}$nodejs$character"
+format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}$package${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.pyversion}$all$character"
 
 # Only shown when root or over SSH — locally it never changes, so it says
 # nothing; remotely or elevated it is exactly the thing to notice.
@@ -72,22 +72,35 @@ command = 'basename "$(dirname "$VIRTUAL_ENV")"'
 when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
 format = '[$output](bold {{red}}) '
 
-# The venv's interpreter version, read from pyvenv.cfg — no subprocess,
-# and wrong-python is the sneakier cousin of wrong-venv.
+# The venv's interpreter version, read from pyvenv.cfg — instant, whereas
+# the standard python module launches the interpreter on every prompt.
+# Dressed with the language sigil to match the standard modules.
 [custom.pyversion]
 command = 'sed -n -E "s/^version(_info)? *= *//p" "$VIRTUAL_ENV/pyvenv.cfg" | head -1 | cut -d. -f1,2'
 when = '[ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/pyvenv.cfg" ]'
-format = '[$output]({{fg_faint}}) '
+format = '[ $output]({{fg_faint}}) '
 
+# The package's own version, in the repo sentence: a committed fact, in the
+# module color (pink). One module covers ~15 manifest formats.
+[package]
+version_format = '${raw}'
+format = '[at ]({{fg_faint}})[v${version}](bold {{pink}}) '
+
+# Every other language/context module arrives via $all with starship's
+# defaults — sigil + version, ANSI colors that resolve to the terminal's
+# catppuccin palette. All languages free, forever. Prune individual modules
+# here with disabled = true only on lived annoyance.
 [python]
-disabled = true
+disabled = true # replaced by custom.pyversion (speed)
 
-# Node version in JS/TS projects (package.json etc.) — the active runtime,
-# which respects per-project version managers. Same faint-version slot as
-# python on the identity row.
-[nodejs]
-format = '[$version ]({{fg_faint}})'
-version_format = '${major}.${minor}'
+[directory]
+disabled = true # replaced by custom.subdir / custom.dir_plain
+
+[cmd_duration]
+disabled = true # deliberately absent from this prompt
+
+[hostname]
+disabled = true # username already covers remote identity; the 🌐 was noise
 
 [character]
 success_symbol = "[❯]({{accent}})"
