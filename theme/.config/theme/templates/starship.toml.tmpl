@@ -10,7 +10,7 @@
 # of a MISMATCHED venv. The caret never moves. Username appears only when
 # it is information (root/SSH). Connectors are faint; values bold semantic.
 add_newline = true
-format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}$character"
+format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.pyversion}$character"
 
 # Only shown when root or over SSH — locally it never changes, so it says
 # nothing; remotely or elevated it is exactly the thing to notice.
@@ -71,6 +71,13 @@ format = '[$output](bold {{green}}) '
 command = 'basename "$(dirname "$VIRTUAL_ENV")"'
 when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
 format = '[$output](bold {{red}}) '
+
+# The venv's interpreter version, read from pyvenv.cfg — no subprocess,
+# and wrong-python is the sneakier cousin of wrong-venv.
+[custom.pyversion]
+command = 'sed -n "s/^version *= *//p" "$VIRTUAL_ENV/pyvenv.cfg" | cut -d. -f1,2'
+when = '[ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/pyvenv.cfg" ]'
+format = '[$output]({{fg_faint}}) '
 
 [python]
 disabled = true
