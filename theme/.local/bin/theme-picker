@@ -21,18 +21,10 @@ none)
   theme pokemon none
   ;;
 "pokemon" | "shiny pokemon")
-  # Live sprite preview. chafa auto-detection sees a pipe inside fzf's
-  # preview and would degrade to symbols, so force the kitty protocol in
-  # ghostty (fzf renders it natively); elsewhere let it degrade for SSH.
-  # Sprites come from the local cache only; prefetch fills it.
-  cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon"
-  suffix="-sprite.png"
-  [ "$action" = "shiny pokemon" ] && suffix="-shiny-sprite.png"
-  # All context handling (ghostty vs tmux vs SSH, stale-placement cleanup)
-  # lives in pokemon-sprite-preview — never inline it here again.
-  name="$(pokemon-accents --names | fzf --reverse --prompt="pokemon > " --height=100% \
-    --preview "pokemon-sprite-preview $cache/{}$suffix" \
-    --preview-window=right,45%)" || exit 0
+  # Deliberately NO sprite preview: images through the fzf/tmux/terminal
+  # pipeline proved fragile and slow, three regressions deep. The mascot
+  # is the preview — it appears the moment you pick.
+  name="$(pokemon-accents --names | pick pokemon)" || exit 0
   scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
 
   set -- pokemon

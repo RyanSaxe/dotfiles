@@ -22,10 +22,8 @@ identity areas (gengar's red eyes) vanish under frequency-based extraction.
 from __future__ import annotations
 
 import colorsys
-import concurrent.futures
 import json
 import sys
-import urllib.error
 import urllib.request
 from os import environ
 from pathlib import Path
@@ -33,7 +31,6 @@ from pathlib import Path
 from PIL import Image
 
 API = "https://pokeapi.co/api/v2/pokemon/"
-SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
 HUE_BUCKETS = 24  # 15 degrees each
 MIN_HUE_SEPARATION = 3  # buckets: 45 degrees
 # A second cluster this much weaker than the primary is noise, not a hue.
@@ -120,39 +117,6 @@ def all_names() -> list[str]:
         names = [entry["name"] for entry in data["results"]]
         names_file.write_text("\n".join(names) + "\n")
     return names_file.read_text().splitlines()
-
-
-def prefetch_sprites() -> None:
-    """Download every game sprite (normal and shiny) for instant, offline
-    picker previews. One-time; existing files are skipped. Sprite files are
-    fetched by id straight from the PokeAPI sprites repo — one request each,
-    no per-pokemon API call."""
-    data = json.loads(_get(f"{API}?limit=100000"))
-    jobs: list[tuple[str, Path]] = []
-    for entry in data["results"]:
-        name = entry["name"]
-        poke_id = entry["url"].rstrip("/").rsplit("/", 1)[-1]
-        for url, path in (
-            (f"{SPRITES}/{poke_id}.png", cache_dir() / f"{name}-sprite.png"),
-            (
-                f"{SPRITES}/shiny/{poke_id}.png",
-                cache_dir() / f"{name}-shiny-sprite.png",
-            ),
-        ):
-            if not path.exists():
-                jobs.append((url, path))
-
-    def fetch(job: tuple[str, Path]) -> bool:
-        url, path = job
-        try:
-            path.write_bytes(_get(url))
-        except urllib.error.URLError:
-            return False  # some alternate forms have no sprite
-        return True
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(fetch, jobs))
-    print(f"sprites: {sum(results)} fetched, {len(results) - sum(results)} unavailable")
 
 
 def gather_pixels(image_path: Path) -> tuple[list[Hsv], list[Hsv]]:
@@ -267,9 +231,6 @@ def main() -> None:
     args = sys.argv[1:]
     if args == ["--names"]:
         print("\n".join(all_names()))
-        return
-    if args == ["--prefetch-sprites"]:
-        prefetch_sprites()
         return
     shiny = "--shiny" in args
     names = [a for a in args if a != "--shiny"]
