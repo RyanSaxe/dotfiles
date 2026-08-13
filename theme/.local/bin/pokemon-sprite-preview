@@ -6,9 +6,11 @@
 #
 # Contexts:
 #   SSH            -> character blocks (remote terminals lack kitty graphics)
-#   ghostty + tmux -> kitty protocol wrapped in tmux passthrough
-#                     (requires `allow-passthrough on`; set by our tmux.conf)
-#   ghostty        -> kitty protocol directly
+#   ghostty        -> raw classic kitty protocol, tmux or not: our only
+#                     consumer is fzf's preview, whose passthrough machinery
+#                     (extractPassThroughs) wraps for tmux itself — feeding it
+#                     pre-wrapped or placeholder-mode output blanks the pane.
+#                     Requires tmux `allow-passthrough on` (v2 tmux.conf).
 #   anything else  -> chafa's own auto-detection
 set -eu
 
@@ -30,13 +32,9 @@ if [ -n "${GHOSTTY_RESOURCES_DIR:-}" ] || [ "${LC_TERMINAL:-}" = "ghostty" ] ||
   in_ghostty=true
 fi
 
-if [ "$in_ghostty" = true ] && [ -n "${TMUX:-}" ]; then
-  # Delete stale placements, wrapped so tmux forwards it to ghostty.
-  # Backslash is octal \134 so shellcheck knows nothing escapes a quote.
-  printf '\033Ptmux;\033\033_Ga=d,d=A\033\033\134\033\134'
-  exec chafa -f kitty --passthrough tmux --animate off --size "$size" "$path"
-fi
 if [ "$in_ghostty" = true ]; then
+  # Delete stale placements first: protocol images are not text and stack
+  # otherwise. Backslash is octal \134 so shellcheck sees no quote escape.
   printf '\033_Ga=d,d=A\033\134'
   exec chafa -f kitty --animate off --size "$size" "$path"
 fi
