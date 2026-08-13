@@ -32,8 +32,10 @@ none)
   if [ -n "${GHOSTTY_RESOURCES_DIR:-}" ] || [ "${TERM_PROGRAM:-}" = "ghostty" ]; then
     format="-f kitty"
   fi
+  # --clear deletes the previous placement first: protocol images are not
+  # text, so without it sprites from earlier previews stack up on screen.
   name="$(pokemon-accents --names | fzf --reverse --prompt="pokemon > " --height=100% \
-    --preview "chafa $format --size 26x13 $cache/{}$suffix 2>/dev/null ||
+    --preview "chafa --clear --animate off $format --size 26x13 $cache/{}$suffix 2>/dev/null ||
       echo 'no sprite cached - run: pokemon-accents --prefetch-sprites'" \
     --preview-window=right,45%)" || exit 0
   scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
