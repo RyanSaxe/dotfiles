@@ -145,10 +145,19 @@ reload_consumers() {
   # Running zsh sessions pick up shell colors on their next precmd (see .zshrc).
   # The hammerspoon mascot watches the state directory and updates itself.
   # ghostty follows macOS appearance natively (see set_os_appearance).
-  # tmux / nvim reloads arrive with their packages.
+  # nvim reload arrives with its package.
+
+  # A running tmux server re-reads the color variables; every style
+  # references them, so this recolors all sessions live.
+  if command -v tmux >/dev/null 2>&1 && tmux ls >/dev/null 2>&1; then
+    tmux source-file -q "$GENERATED/tmux-colors.conf" || true
+  fi
 
   # ghostty resolves custom-shader relative to its config dir, so the
-  # rendered cursor-trail shader is copied there (cmd+r in ghostty reloads).
+  # rendered cursor-trail shader is copied there. SIGUSR2 makes ghostty
+  # (1.2+) reload its config, which recompiles shaders from disk — the
+  # trail follows a pokemon/theme switch with no keypress. Only SIGUSR2 is
+  # handled; any other signal would crash ghostty.
   if [ -f "$GENERATED/cursor_trail.glsl" ]; then
     mkdir -p "$HOME/.config/ghostty/shaders"
     cp "$GENERATED/cursor_trail.glsl" "$HOME/.config/ghostty/shaders/cursor_trail.glsl"
