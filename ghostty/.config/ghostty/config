@@ -1,0 +1,49 @@
+# Ghostty configuration.
+#
+# Theme: ghostty follows macOS appearance NATIVELY via the light:/dark: pair
+# below — when the OS flips (System Settings, schedule, or the `theme`
+# command), ghostty recolors itself with no reload machinery. Catppuccin is
+# built into ghostty, so the palette needs no template; pokemon accents live
+# in the prompt/fzf layer, not the terminal palette.
+theme = light:Catppuccin Latte,dark:Catppuccin Mocha
+
+# Option is Alt: makes the alt layer real for terminal-world keybinds
+# (alt+c theme picker, alt+o sessions, workmux binds in Phase 4).
+# Cost: option no longer types accented characters (ç, ¡, …).
+macos-option-as-alt = true
+
+# ----- misc keybinds ---------------------------------------------------
+# tmux owns panes and windows; ghostty-native splits are deliberately
+# not configured.
+
+keybind = cmd+r=reload_config
+keybind = cmd+o=open_config
+
+# Multiline input for claude code (shift+enter sends ESC+CR).
+keybind = shift+enter=text:\x1b\r
+
+# ----- styling ---------------------------------------------------------
+
+font-size = 16
+
+# Generous padding; the padding area matches the background color.
+window-padding-x = 20
+window-padding-y = 20
+window-padding-color = background
+window-padding-balance = true
+
+# Copying highlighted text needs no shortcut.
+copy-on-select = clipboard
+
+# When a TUI (Claude Code fullscreen, etc.) captures the mouse, holding
+# SHIFT while dragging forces terminal-native selection — and copy-on-select
+# fires. `never` guarantees apps can't claim shift away from the terminal.
+mouse-shift-capture = never
+
+# Cursor trail shader in the theme's accent colors. The file is rendered by
+# the `theme` command (from theme/templates/cursor_trail.glsl.tmpl) and
+# copied here — it follows the active palette and pokemon; cmd+r reloads it.
+custom-shader = shaders/cursor_trail.glsl
+
+# Title bar hidden — window moving is keyboard territory.
+macos-titlebar-style = hidden
