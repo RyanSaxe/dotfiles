@@ -24,7 +24,10 @@ toggle | light | dark)
   # popup's whole process group, so a backgrounded child would die with it.
   if [ -n "${TMUX:-}" ]; then
     # Silenced: tmux displays run-shell output in a dismiss-with-enter view.
-    tmux run-shell -b "sleep 0.3; \"$HOME/.local/bin/theme\" $action >/dev/null 2>&1"
+    # theme-sync runs right after so tmux recolors instantly — this job is
+    # already inside the tmux server, the same context the periodic pull
+    # uses, so it shares none of the fragility of external pushes.
+    tmux run-shell -b "sleep 0.3; \"$HOME/.local/bin/theme\" $action >/dev/null 2>&1; \"$HOME/.config/tmux/scripts/theme-sync.sh\" >/dev/null 2>&1 || true"
   else
     theme "$action"
   fi
