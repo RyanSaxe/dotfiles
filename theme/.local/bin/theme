@@ -161,6 +161,7 @@ reload_consumers() {
   if [ -f "$GENERATED/cursor_trail.glsl" ]; then
     mkdir -p "$HOME/.config/ghostty/shaders"
     cp "$GENERATED/cursor_trail.glsl" "$HOME/.config/ghostty/shaders/cursor_trail.glsl"
+    pkill -USR2 -x ghostty 2>/dev/null || true
   fi
 }
 
