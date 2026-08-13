@@ -221,11 +221,6 @@ tai() {
   switch_to_pane "$target_location"
 }
 
-# Backward-compatible name for older muscle memory.
-tc() {
-  tai "$@"
-}
-
 # Switch to any tmux pane with bell notifications
 tb() {
   _ai_harness_source_tmux_utils || return 1
