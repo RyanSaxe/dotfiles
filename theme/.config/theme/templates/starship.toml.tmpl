@@ -10,7 +10,7 @@ format = "$username$directory$git_branch${custom.git_age}${custom.git_clean}${cu
 
 [username]
 show_always = true
-format = '[$user](bold {{pink}}) '
+format = '[$user](bold {{info}}) '
 
 # (venv-name) on the prompt row: catches being in the wrong venv at a
 # glance. uv venvs are all literally named ".venv", so show the project
@@ -32,7 +32,7 @@ format = '[on ]({{fg_faint}})[$branch](bold {{mauve}}) '
 [custom.git_age]
 command = "git log -1 --format=%cr 2>/dev/null | sed 's/ ago//'"
 when = "git rev-parse --is-inside-work-tree >/dev/null 2>&1"
-format = '[from ]({{fg_faint}})[$output](bold {{info}})[ ago]({{fg_faint}}) '
+format = '[from ]({{fg_faint}})[$output](bold {{pink}})[ ago]({{fg_faint}}) '
 
 # Clean/dirty as a single glanceable mark.
 [custom.git_clean]
