@@ -6,11 +6,17 @@
 # info, green/red = glance/look-now. Nothing is right-aligned — the mascot
 # owns the bottom-right. The prompt character is the pokemon accent.
 add_newline = true
-format = "${custom.venv}$directory$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break$character"
+format = "$username$directory$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.venv}$character"
 
-# Leading (venv-name): catches being in the wrong venv at a glance.
+[username]
+show_always = true
+format = '[$user](bold {{fg}}) '
+
+# (venv-name) on the prompt row: catches being in the wrong venv at a
+# glance. uv venvs are all literally named ".venv", so show the project
+# directory the venv belongs to instead.
 [custom.venv]
-command = 'basename "$VIRTUAL_ENV"'
+command = 'name="$(basename "$VIRTUAL_ENV")"; case "$name" in .venv | venv) basename "$(dirname "$VIRTUAL_ENV")" ;; *) printf %s "$name" ;; esac'
 when = '[ -n "$VIRTUAL_ENV" ]'
 format = '[\($output\) ]({{fg_faint}})'
 
@@ -22,11 +28,11 @@ truncation_length = 3
 [git_branch]
 format = '[on ]({{fg_faint}})[$branch](bold {{mauve}}) '
 
-# Time since last commit — connector folds in so it vanishes outside repos.
+# Time since last commit — connectors fold in so they vanish outside repos.
 [custom.git_age]
 command = "git log -1 --format=%cr 2>/dev/null | sed 's/ ago//'"
 when = "git rev-parse --is-inside-work-tree >/dev/null 2>&1"
-format = '[from ]({{fg_faint}})[$output](bold {{info}}) '
+format = '[from ]({{fg_faint}})[$output](bold {{info}})[ ago]({{fg_faint}}) '
 
 # Clean/dirty as a single glanceable mark.
 [custom.git_clean]
