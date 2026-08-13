@@ -28,18 +28,10 @@ none)
   cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pokemon"
   suffix="-sprite.png"
   [ "$action" = "shiny pokemon" ] && suffix="-shiny-sprite.png"
-  # Protocol images are not text: fzf redraws the pane but placements live
-  # in the terminal's image layer and stack up. Emit the kitty delete-all
-  # instruction before each draw so every sprite replaces the last.
-  format=""
-  wipe=""
-  if [ -n "${GHOSTTY_RESOURCES_DIR:-}" ] || [ "${TERM_PROGRAM:-}" = "ghostty" ]; then
-    format="-f kitty"
-    wipe="printf '\\033_Ga=d,d=A\\033\\\\'; "
-  fi
+  # All context handling (ghostty vs tmux vs SSH, stale-placement cleanup)
+  # lives in pokemon-sprite-preview — never inline it here again.
   name="$(pokemon-accents --names | fzf --reverse --prompt="pokemon > " --height=100% \
-    --preview "${wipe}chafa --animate off $format --size 26x13 $cache/{}$suffix 2>/dev/null ||
-      echo 'no sprite cached - run: pokemon-accents --prefetch-sprites'" \
+    --preview "pokemon-sprite-preview $cache/{}$suffix" \
     --preview-window=right,45%)" || exit 0
   scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
 
