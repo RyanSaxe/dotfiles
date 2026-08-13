@@ -2,8 +2,8 @@
 --   1. the pokemon mascot (mascot.lua)
 --   2. reload this config whenever its files change
 --   3. keep the terminal theme in step with macOS appearance
--- All automation/launcher ambitions are deliberately deferred until after
--- the core cutover — this file should stay boring.
+-- Anything beyond those three jobs is deliberately out of scope —
+-- this file should stay boring.
 
 -- Enable the `hs` CLI (used for manual poking and by scripts).
 hs.ipc.cliInstall()
@@ -33,7 +33,9 @@ config_watcher:start()
 local function sync_theme_to_appearance()
   hs.timer.doAfter(0.2, function()
     local mode = (hs.host.interfaceStyle() == "Dark") and "dark" or "light"
-    hs.task.new(os.getenv("HOME") .. "/.local/bin/theme", nil, { mode }):start()
+    -- `apply <mode>` renders WITHOUT setting OS appearance: a follower
+    -- must never set the thing it reacts to (feedback race with toggle).
+    hs.task.new(os.getenv("HOME") .. "/.local/bin/theme", nil, { "apply", mode }):start()
   end)
 end
 

@@ -140,8 +140,24 @@ reload_consumers() {
   # starship re-reads its config every prompt: nothing to do.
   # Running zsh sessions pick up shell colors on their next precmd (see .zshrc).
   # The hammerspoon mascot watches the state directory and updates itself.
-  # ghostty / tmux / nvim reloads arrive with their packages.
+  # ghostty follows macOS appearance natively (see set_os_appearance).
+  # tmux / nvim reloads arrive with their packages.
   :
+}
+
+# macOS appearance is the master light/dark switch: setting it flips ghostty
+# (native light:/dark: theme pair) and anything else that follows the OS.
+# The hammerspoon appearance watcher then re-runs this script for the same
+# mode — idempotent, and setting an unchanged value fires no notification,
+# so there is no loop. Silently a no-op off macOS or without permissions.
+set_os_appearance() {
+  case "$1" in
+  dark) darkmode=true ;;
+  light) darkmode=false ;;
+  esac
+  command -v osascript >/dev/null 2>&1 &&
+    osascript -e "tell app \"System Events\" to tell appearance preferences to set dark mode to $darkmode" >/dev/null 2>&1 ||
+    true
 }
 
 # Print a color as a filled block so switches are visible at a glance.
@@ -165,18 +181,30 @@ show_accents() {
 
 case "${1:-status}" in
 dark | light)
+  set_os_appearance "$1"
   render "$1"
   reload_consumers
   ;;
 toggle)
   case "$(current_mode)" in
-  dark) render light ;;
-  *) render dark ;;
+  dark) set_os_appearance light && render light ;;
+  *) set_os_appearance dark && render dark ;;
   esac
   reload_consumers
   ;;
 apply)
-  render "$(current_mode)"
+  # `theme apply [dark|light]` renders WITHOUT touching OS appearance —
+  # the entry point for followers (hammerspoon's appearance watcher), which
+  # must never set the thing they react to, or toggles race themselves.
+  mode="${2:-$(current_mode)}"
+  case "$mode" in
+  dark | light) ;;
+  *)
+    echo "usage: theme apply [dark|light]" >&2
+    exit 1
+    ;;
+  esac
+  render "$mode"
   reload_consumers
   ;;
 pokemon)
