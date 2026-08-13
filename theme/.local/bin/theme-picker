@@ -20,7 +20,13 @@ toggle | light | dark)
   # and tmux mangles those inside an open popup — they land in whatever is
   # focused as literal "?997;2n" keystrokes. With the popup already closed,
   # the reports arrive at panes that ignore them.
-  nohup sh -c "sleep 0.3; theme '$action'" >/dev/null 2>&1 &
+  # The job runs on the tmux server (run-shell -b): popup teardown kills the
+  # popup's whole process group, so a backgrounded child would die with it.
+  if [ -n "${TMUX:-}" ]; then
+    tmux run-shell -b "sleep 0.3; \"$HOME/.local/bin/theme\" $action"
+  else
+    theme "$action"
+  fi
   exit 0
   ;;
 none)
