@@ -1,7 +1,7 @@
 # dotfiles
 
 Dotfiles for working from a Mac and SSHing into Linux boxes: Neovim, Ghostty,
-herdr, zsh, and git, themed as one system and installed with GNU Stow. Coding
+tmux, zsh, and git, themed as one system and installed with GNU Stow. Coding
 agents work inside the same environment and pass the same commit gates I do.
 
 ![screenshot](docs/screenshot.png)
@@ -33,16 +33,16 @@ resolves at runtime via `PATH` and `$HOME`; there is no templating.
 
 ## Tools
 
-| Package      | Contents                                                                                |
-| ------------ | --------------------------------------------------------------------------------------- |
-| `nvim`       | LazyVim-based Neovim. Personal plugins live in `nvim/dev/` as real, extractable plugins |
-| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                             |
-| `ghostty`    | terminal emulator (macOS)                                                               |
-| `herdr`      | agent-aware terminal multiplexer; runs on remote boxes, attached with `herdr --remote`  |
-| `git`        | git + gh, delta as pager                                                                |
-| `theme`      | the theming pipeline (below)                                                            |
-| `ai-harness` | shared instructions, skills, and hooks for coding agents                                |
-| `tiers`      | which packages install on which machines                                                |
+| Package      | Contents                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| `nvim`       | LazyVim-based Neovim. Personal plugins live in `nvim/dev/` as real, extractable plugins               |
+| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                           |
+| `ghostty`    | terminal emulator (macOS)                                                                             |
+| `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status |
+| `git`        | git + gh, delta as pager                                                                              |
+| `theme`      | the theming pipeline (below)                                                                          |
+| `ai-harness` | shared instructions, skills, and hooks for coding agents                                              |
+| `tiers`      | which packages install on which machines                                                              |
 
 ## Conventions
 

@@ -78,7 +78,7 @@ install_zsh_plugins() {
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv starship fzf chafa herdr
+    brew_install stow git gh git-delta uv starship fzf chafa tmux
     install_zsh_plugins
     ;;
   core:Linux)
@@ -163,15 +163,6 @@ for tier in "$@"; do
   echo "==> $tier"
   install_tier "$tier"
 done
-
-# herdr reads exactly one config file, and ours is rendered by the theme
-# system so pokemon accents recolor its UI. Link it in place, preserving any
-# pre-existing hand-written config once.
-if [ -f "$HOME/.config/herdr/config.toml" ] && [ ! -L "$HOME/.config/herdr/config.toml" ]; then
-  mv "$HOME/.config/herdr/config.toml" "$HOME/.config/herdr/config.toml.bak"
-fi
-mkdir -p "$HOME/.config/herdr"
-ln -sf "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated/herdr.toml" "$HOME/.config/herdr/config.toml"
 
 # Render the theme so every consumer has colors from the first shell.
 if [ -x "$HOME/.local/bin/theme" ]; then
