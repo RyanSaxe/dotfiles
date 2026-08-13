@@ -108,6 +108,9 @@ render() {
       exit 1
     fi
     printf 's/{{%s}}/%s/g\n' "$role" "$hex" >>"$sed_script"
+    # {{role_hex}} is the same color without '#', for formats that take raw
+    # hex digits (e.g. GLSL int literals: 0x{{accent_hex}}).
+    printf 's/{{%s_hex}}/%s/g\n' "$role" "${hex#\#}" >>"$sed_script"
   done <"$CONFIG/tokens.conf"
 
   # Templates may also reference palette keys directly ({{mauve}}, {{sky}},
@@ -116,6 +119,7 @@ render() {
   while IFS='=' read -r key hex; do
     case "$key" in ''#* | mode) continue ;; esac
     printf 's/{{%s}}/%s/g\n' "$key" "$hex" >>"$sed_script"
+    printf 's/{{%s_hex}}/%s/g\n' "$key" "${hex#\#}" >>"$sed_script"
   done <"$palette"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
@@ -142,7 +146,13 @@ reload_consumers() {
   # The hammerspoon mascot watches the state directory and updates itself.
   # ghostty follows macOS appearance natively (see set_os_appearance).
   # tmux / nvim reloads arrive with their packages.
-  :
+
+  # ghostty resolves custom-shader relative to its config dir, so the
+  # rendered cursor-trail shader is copied there (cmd+r in ghostty reloads).
+  if [ -f "$GENERATED/cursor_trail.glsl" ]; then
+    mkdir -p "$HOME/.config/ghostty/shaders"
+    cp "$GENERATED/cursor_trail.glsl" "$HOME/.config/ghostty/shaders/cursor_trail.glsl"
+  fi
 }
 
 # macOS appearance is the master light/dark switch: setting it flips ghostty
