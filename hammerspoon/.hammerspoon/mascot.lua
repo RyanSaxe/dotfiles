@@ -43,10 +43,13 @@ local function current_pokemon()
   return name, shiny
 end
 
---- The focused window of the configured app, or nil.
+--- The focused window of the configured app, or nil. Guarded: macOS can
+--- briefly return windows with no application during switches, and an error
+--- here would kill the reconcile timer permanently.
 local function focused_app_window()
   local window = hs.window.focusedWindow()
-  if window and window:application():name() == M.config.app_name then
+  local app = window and window:application()
+  if app and app:name() == M.config.app_name then
     return window
   end
   return nil
@@ -96,7 +99,10 @@ function M.start()
   M.canvas:behavior({ "canJoinAllSpaces", "transient" })
   M.canvas:clickActivating(false)
 
-  M.ticker = hs.timer.doEvery(M.config.tick_seconds, reconcile)
+  -- pcall so no transient OS hiccup can ever kill the timer.
+  M.ticker = hs.timer.doEvery(M.config.tick_seconds, function()
+    pcall(reconcile)
+  end)
   -- Theme switches should not wait for the next tick.
   M.path_watcher = hs.pathwatcher.new(state_dir, reconcile)
   M.path_watcher:start()
