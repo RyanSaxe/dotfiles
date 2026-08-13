@@ -75,7 +75,7 @@ format = '[$output](bold {{red}}) '
 # The venv's interpreter version, read from pyvenv.cfg — no subprocess,
 # and wrong-python is the sneakier cousin of wrong-venv.
 [custom.pyversion]
-command = 'sed -n "s/^version *= *//p" "$VIRTUAL_ENV/pyvenv.cfg" | cut -d. -f1,2'
+command = 'sed -n -E "s/^version(_info)? *= *//p" "$VIRTUAL_ENV/pyvenv.cfg" | head -1 | cut -d. -f1,2'
 when = '[ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/pyvenv.cfg" ]'
 format = '[$output]({{fg_faint}}) '
 
