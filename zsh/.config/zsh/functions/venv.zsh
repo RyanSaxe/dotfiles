@@ -34,6 +34,14 @@ _auto_venv() {
 }
 
 venv_init() {
+  # Venv state is derived from location, never inherited. A new shell can
+  # be born with another project's .venv/bin on PATH — tmux captures the
+  # spawning shell's env at window creation, even with VIRTUAL_ENV unset —
+  # and there is no deactivate to undo it. Scrub every trace, then let the
+  # walk re-activate whatever actually belongs to this directory.
+  path=("${(@)path:#*/.venv/bin}")
+  [[ -n "$VIRTUAL_ENV" ]] && path=("${(@)path:#$VIRTUAL_ENV/bin}")
+  unset VIRTUAL_ENV VIRTUAL_ENV_PROMPT
   autoload -U add-zsh-hook
   add-zsh-hook chpwd _auto_venv
   _auto_venv
