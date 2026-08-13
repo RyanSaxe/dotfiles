@@ -10,8 +10,8 @@ ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg={{ghost}}'
 # (use-fzf-default-opts) disturbs the popup's own flag set — flags only.
 typeset -ga FZF_THEME_COLORS=(
   "--color=bg+:{{bg_highlight}},bg:{{bg}},border:{{border}}"
-  "--color=fg:{{fg}},fg+:{{fg}},hl:{{accent}},hl+:{{accent_bright}}"
-  "--color=info:{{info}},prompt:{{accent}},pointer:{{accent_bright}}"
-  "--color=marker:{{success}},spinner:{{accent_bright}},header:{{fg_muted}}"
+  "--color=fg:{{fg}},fg+:{{fg}},hl:{{accent}},hl+:{{notify}}"
+  "--color=info:{{info}},prompt:{{accent}},pointer:{{notify}}"
+  "--color=marker:{{success}},spinner:{{notify}},header:{{fg_muted}}"
 )
 export FZF_DEFAULT_OPTS="${FZF_THEME_COLORS[*]}"

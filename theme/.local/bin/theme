@@ -87,7 +87,7 @@ render() {
   mkdir -p "$GENERATED"
 
   # Build a sed script resolving each {{role}} to its hex via the palette.
-  # A pokemon (theme pokemon <name>) overrides accent/accent_bright only,
+  # A pokemon (theme pokemon <name>) overrides accent/notify only,
   # with the pair extracted for the current background mode.
   accents="$STATE/accents.conf"
   sed_script="$STATE/.render.sed"
@@ -97,7 +97,7 @@ render() {
     hex="$(conf_get "$palette" "$key")"
     if [ -f "$accents" ]; then
       case "$role" in
-      accent | accent_bright)
+      accent | notify)
         override="$(conf_get "$accents" "${role}_${mode}")"
         [ -n "$override" ] && hex="$override"
         ;;
@@ -109,6 +109,14 @@ render() {
     fi
     printf 's/{{%s}}/%s/g\n' "$role" "$hex" >>"$sed_script"
   done <"$CONFIG/tokens.conf"
+
+  # Templates may also reference palette keys directly ({{mauve}}, {{sky}},
+  # {{green}}...) for SEMANTIC hue choices — meaning lives in the template,
+  # identity-sync lives in the accent/notify tokens. Names never collide.
+  while IFS='=' read -r key hex; do
+    case "$key" in ''#* | mode) continue ;; esac
+    printf 's/{{%s}}/%s/g\n' "$key" "$hex" >>"$sed_script"
+  done <"$palette"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
@@ -152,7 +160,7 @@ show_accents() {
   [ "$(conf_get "$accents" shiny)" = "1" ] && sparkle=" ✨shiny"
   echo "pokemon: $(conf_get "$accents" pokemon)$sparkle ($mode)"
   swatch "$(conf_get "$accents" "accent_$mode")" accent
-  swatch "$(conf_get "$accents" "accent_bright_$mode")" accent_bright
+  swatch "$(conf_get "$accents" "notify_$mode")" notify
 }
 
 case "${1:-status}" in

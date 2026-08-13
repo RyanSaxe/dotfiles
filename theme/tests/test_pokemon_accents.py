@@ -75,9 +75,9 @@ def test_pick_pair_finds_two_distinct_hues() -> None:
     image.paste(Image.new("RGBA", (60, 60), (140, 100, 220, 255)), (18, 18))  # purple
     image.paste(Image.new("RGBA", (16, 8), (220, 40, 40, 255)), (40, 30))  # red eyes
 
-    accent, accent_bright = accents.pick_pair(*_pixels_of(image))
+    accent, notify = accents.pick_pair(*_pixels_of(image))
 
-    hue_distance = abs(accent[0] - accent_bright[0])
+    hue_distance = abs(accent[0] - notify[0])
     hue_distance = min(hue_distance, 1 - hue_distance)
     assert hue_distance >= 45 / 360  # genuinely different hues
 
@@ -90,19 +90,19 @@ def test_pick_pair_relaxes_to_nearby_hue_over_inventing_one() -> None:
     image.paste(Image.new("RGBA", (60, 60), (216, 60, 50, 255)), (18, 18))  # red
     image.paste(Image.new("RGBA", (20, 10), (230, 180, 60, 255)), (30, 80))  # gold
 
-    _accent, accent_bright = accents.pick_pair(*_pixels_of(image))
+    _accent, notify = accents.pick_pair(*_pixels_of(image))
 
     gold_hue = accents.colorsys.rgb_to_hsv(230 / 255, 180 / 255, 60 / 255)[0]
-    assert abs(accent_bright[0] - gold_hue) < 0.06  # the gold, not teal
+    assert abs(notify[0] - gold_hue) < 0.06  # the gold, not teal
 
 
 def test_pick_pair_single_hue_never_invents_a_color() -> None:
     image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
     image.paste(Image.new("RGBA", (60, 60), (216, 60, 50, 255)), (18, 18))  # red only
 
-    accent, accent_bright = accents.pick_pair(*_pixels_of(image))
+    accent, notify = accents.pick_pair(*_pixels_of(image))
 
-    assert accent_bright[0] == accent[0]  # same hue, not a complement
+    assert notify[0] == accent[0]  # same hue, not a complement
 
 
 def test_styled_output_is_valid_hex() -> None:

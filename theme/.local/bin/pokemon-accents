@@ -8,8 +8,8 @@
 Prints key=value lines consumed by the `theme` command:
 
     pokemon=<name>
-    accent_dark=#...          accent_bright_dark=#...
-    accent_light=#...         accent_bright_light=#...
+    accent_dark=#...          notify_dark=#...
+    accent_light=#...         notify_light=#...
 
 Every color must actually exist on the pokemon. The accent is the dominant
 vivid hue cluster; the bright accent is the most distinct OTHER hue present,
@@ -191,7 +191,7 @@ def _best_secondary(
 
 
 def pick_pair(vivid: list[Hsv], pale: list[Hsv]) -> tuple[Hsv, Hsv]:
-    """Accent = dominant vivid hue; accent_bright = the most distinct OTHER
+    """Accent = dominant vivid hue; notify = the most distinct OTHER
     hue actually present, searched in relaxing tiers: vivid at 45°+, vivid at
     30°+ (red-vs-gold pokemon), then pale clusters. Every color must exist on
     the pokemon — with a single-hue pokemon the pair is two brightnesses of
@@ -237,18 +237,14 @@ def main() -> None:
     if len(names) != 1:
         raise SystemExit("usage: pokemon-accents <name> [--shiny] | --names")
     name = names[0].lower()
-    accent, accent_bright = pick_pair(*gather_pixels(fetch_images(name, shiny=shiny)))
+    accent, notify = pick_pair(*gather_pixels(fetch_images(name, shiny=shiny)))
     print(f"pokemon={name}")
     if shiny:
         print("shiny=1")
     print(f"accent_dark={styled(accent, dark_background=True, bright=False)}")
-    print(
-        f"accent_bright_dark={styled(accent_bright, dark_background=True, bright=True)}"
-    )
+    print(f"notify_dark={styled(notify, dark_background=True, bright=True)}")
     print(f"accent_light={styled(accent, dark_background=False, bright=False)}")
-    print(
-        f"accent_bright_light={styled(accent_bright, dark_background=False, bright=True)}"
-    )
+    print(f"notify_light={styled(notify, dark_background=False, bright=True)}")
 
 
 if __name__ == "__main__":
