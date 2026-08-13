@@ -21,6 +21,9 @@ SCRIPT_PATH="$(readlink -f "$0")"
 PACKAGE_ROOT="${SCRIPT_PATH%/.local/bin/theme}"
 CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT/.config}/theme"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+# Pokemon mappings are machine-personal state (project names must never
+# reach the public repo), not tracked config.
+POKEMON_CONF="$STATE/pokemon.conf"
 GENERATED="$STATE/generated"
 MODE_FILE="$STATE/theme-mode"
 
@@ -178,7 +181,7 @@ pokemon)
     name="${3:?usage: theme pokemon default <name> [--shiny]}"
     value="$name"
     [ "${4:-}" = "--shiny" ] && value="$name:shiny"
-    conf_put "$CONFIG/pokemon.conf" default "$value"
+    conf_put "$POKEMON_CONF" default "$value"
     set_pokemon_value "$value"
     ;;
   project)
@@ -186,14 +189,14 @@ pokemon)
     name="${3:?usage: theme pokemon project <name>|none [--shiny]}"
     if [ "$name" = none ]; then
       # Unmap this project and fall back to the global default, if one is set.
-      conf_del "$CONFIG/pokemon.conf" "$project"
+      conf_del "$POKEMON_CONF" "$project"
       echo "unmapped: $project"
-      fallback="$(conf_get "$CONFIG/pokemon.conf" default)"
+      fallback="$(conf_get "$POKEMON_CONF" default)"
       [ -n "$fallback" ] && set_pokemon_value "$fallback"
     else
       value="$name"
       [ "${4:-}" = "--shiny" ] && value="$name:shiny"
-      conf_put "$CONFIG/pokemon.conf" "$project" "$value"
+      conf_put "$POKEMON_CONF" "$project" "$value"
       echo "mapped: $project -> $value"
       set_pokemon_value "$value"
     fi
