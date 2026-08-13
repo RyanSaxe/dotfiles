@@ -1,12 +1,12 @@
 # Rendered by `theme` — do not edit; change the template or tokens instead.
 #
-# Colors follow Ryan's semantic system: cyan = project identity, purple =
-# operational (branch, vi normal mode), green/red = glance/look-now, faint =
-# ambient info. The prompt character is the pokemon accent — sync, not
-# semantics.
+# Shape: (venv) in dotfiles on main from 3 hours ✓ ⇡2
+# Connectors (in/on/from) are faint and unbolded; values are bold in Ryan's
+# semantic hues: cyan = project identity, purple = operational, blue = calm
+# info, green/red = glance/look-now. Nothing is right-aligned — the mascot
+# owns the bottom-right. The prompt character is the pokemon accent.
 add_newline = true
-format = "${custom.venv}$directory$git_branch${custom.git_clean}${custom.git_dirty}$git_status$line_break$character"
-right_format = "$cmd_duration${custom.git_age}"
+format = "${custom.venv}$directory$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break$character"
 
 # Leading (venv-name): catches being in the wrong venv at a glance.
 [custom.venv]
@@ -15,37 +15,33 @@ when = '[ -n "$VIRTUAL_ENV" ]'
 format = '[\($output\) ]({{fg_faint}})'
 
 [directory]
+format = '[in ]({{fg_faint}})[$path]($style) '
 style = "bold {{sky}}"
 truncation_length = 3
 
 [git_branch]
-format = '[$branch]({{mauve}}) '
+format = '[on ]({{fg_faint}})[$branch](bold {{mauve}}) '
 
-# Clean/dirty as a single glanceable mark, per the claude-statusline habit.
+# Time since last commit — connector folds in so it vanishes outside repos.
+[custom.git_age]
+command = "git log -1 --format=%cr 2>/dev/null | sed 's/ ago//'"
+when = "git rev-parse --is-inside-work-tree >/dev/null 2>&1"
+format = '[from ]({{fg_faint}})[$output](bold {{info}}) '
+
+# Clean/dirty as a single glanceable mark.
 [custom.git_clean]
 command = "echo ✓"
 when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git status --porcelain 2>/dev/null)" ]'
-format = '[$output]({{green}}) '
+format = '[$output](bold {{green}}) '
 
 [custom.git_dirty]
 command = "echo ✗"
 when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -n "$(git status --porcelain 2>/dev/null)" ]'
-format = '[$output]({{red}}) '
+format = '[$output](bold {{red}}) '
 
 # Only ahead/behind arrows; state marks come from the customs above.
 [git_status]
 format = '([$ahead_behind]({{fg_faint}}) )'
-
-# Right side: quiet ambient info. Bare duration, no "took".
-[cmd_duration]
-min_time = 2000
-format = '[$duration · ]({{fg_faint}})'
-
-# Time since last commit — ported from the v1 prompt.
-[custom.git_age]
-command = "git log -1 --format=%cr 2>/dev/null | sed 's/ ago//'"
-when = "git rev-parse --is-inside-work-tree >/dev/null 2>&1"
-format = '[$output]({{fg_faint}})'
 
 [python]
 disabled = true

@@ -8,7 +8,10 @@ typeset -g DOTFILES_DIR="${${(%):-%x}:A:h:h}"
 # A shell can inherit $TMUX from three broken situations: tmux crashed, a
 # new terminal inherited the parent's env, or the socket died. Detect by
 # checking whether THIS tty is actually one of tmux's pane ttys.
-if [[ -n "$TMUX" ]]; then
+# NEVER scrub inside a tmux popup: popups are not panes, so the tty check
+# fails by design there — scrubbing would make `to`/`ts` nest a tmux
+# session inside the popup. Popup bindings pass TMUX_POPUP=1.
+if [[ -n "$TMUX" && -z "$TMUX_POPUP" ]]; then
   _tmux_socket="${TMUX%%,*}"
   if ! tmux -S "$_tmux_socket" list-clients &> /dev/null; then
     unset TMUX TMUX_PANE
