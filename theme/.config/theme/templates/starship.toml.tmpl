@@ -10,7 +10,7 @@
 # of a MISMATCHED venv. The caret never moves. Username appears only when
 # it is information (root/SSH). Connectors are faint; values bold semantic.
 add_newline = true
-format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.pyversion}$character"
+format = "$username${custom.subdir}${custom.dir_plain}$git_branch${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.pyversion}$nodejs$character"
 
 # Only shown when root or over SSH — locally it never changes, so it says
 # nothing; remotely or elevated it is exactly the thing to notice.
@@ -81,6 +81,13 @@ format = '[$output]({{fg_faint}}) '
 
 [python]
 disabled = true
+
+# Node version in JS/TS projects (package.json etc.) — the active runtime,
+# which respects per-project version managers. Same faint-version slot as
+# python on the identity row.
+[nodejs]
+format = '[$version ]({{fg_faint}})'
+version_format = '${major}.${minor}'
 
 [character]
 success_symbol = "[❯]({{accent}})"
