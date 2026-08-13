@@ -60,9 +60,17 @@ switch_tab = "alt+1..9"
 last_pane = "prefix+tab"
 
 # Colorscheme picker: light/dark toggle and pokemon (incl. shiny) with
-# project/global scope, from anywhere in herdr.
+# project/global scope, from anywhere in herdr. alt+c is the intended key
+# (needs ghostty macos-option-as-alt); prefix+t works today.
 [[keys.command]]
 key = "alt+c"
+type = "popup"
+command = "theme-picker"
+width = "50%"
+height = "70%"
+
+[[keys.command]]
+key = "prefix+t"
 type = "popup"
 command = "theme-picker"
 width = "50%"
