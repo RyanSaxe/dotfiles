@@ -1,7 +1,13 @@
 import { blank, line } from "../cells.js";
 import type { Agent, Window } from "../data.js";
 import { railBg, type Palette } from "../theme.js";
-import { elapsedSpan, pill, stateColor, type RailRow } from "./rows.js";
+import {
+  agentRank,
+  elapsedSpan,
+  pill,
+  stateColor,
+  type RailRow,
+} from "./rows.js";
 
 // Two orthogonal channels, never mixed: the accent-filled pill means only
 // "you are here"; a colored title always means agent state. Every row is
@@ -17,9 +23,12 @@ export function windowRows(
   const bg = railBg(palette);
   const rows: RailRow[] = [];
   for (const win of windows) {
+    // A window hosting several agents surfaces its most urgent pane — a
+    // waiting agent must never hide behind a working sibling.
     const agent = win.paneIds
       .map((paneId) => agentsByPane.get(paneId))
-      .find((candidate) => candidate !== undefined);
+      .filter((candidate): candidate is Agent => candidate !== undefined)
+      .sort((a, b) => agentRank(a, acked) - agentRank(b, acked))[0];
     const marker = win.active
       ? pill(String(win.index), palette.base, palette.accent, bg)
       : pill(String(win.index), palette.dim2, palette.surface0, bg);
