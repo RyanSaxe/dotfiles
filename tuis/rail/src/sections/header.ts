@@ -6,7 +6,7 @@ import type { Palette } from "../theme.js";
 export const railBg = (palette: Palette): string => palette.crust;
 
 // Session identity: the name is the rail's first cell — the window's
-// symmetric padding places it exactly at (32, 32) — over a full-width
+// symmetric padding places it exactly at (19, 19) — over a full-width
 // accent rule.
 export function header(
   session: string,

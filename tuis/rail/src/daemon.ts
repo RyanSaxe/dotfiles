@@ -41,8 +41,9 @@ const tmux = (...args: string[]) => run("tmux", args);
 
 const TICK_MS = 250;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
-// ~216pt at font-size 16 — the verdicted rail width.
-const RAIL_WIDTH = 22;
+// 22 slab cells (~211pt at font-size 16, the verdicted rail width) plus
+// the one-cell content-background gutter renderRail appends.
+const RAIL_WIDTH = 23;
 // Hysteresis: rails die below 100 but only spawn above 110, so a window
 // hovering at the boundary can't flap between the two.
 const KILL_BELOW_WIDTH = 100;
