@@ -8,7 +8,9 @@
 # menu bar and the window chrome read as one continuous surface.
 export BAR_COLOR="0xff{{crust_hex}}"
 export ITEM_BG="0x00000000"
-export BORDER_COLOR="0xff{{border_hex}}"
+# The measured macOS window-stroke color (see palettes), so the bar's
+# border matches the hairline the OS draws around every window.
+export BORDER_COLOR="0xff{{os_window_stroke_hex}}"
 
 # fg_faint (the dim tier the rail and tmux share), not fg_muted: bar text
 # should be present but quiet.
