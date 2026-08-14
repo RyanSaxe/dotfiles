@@ -41,7 +41,8 @@ const tmux = (...args: string[]) => run("tmux", args);
 
 const TICK_MS = 250;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
-const RAIL_WIDTH = 34;
+// ~216pt at font-size 16 — the verdicted rail width.
+const RAIL_WIDTH = 22;
 // Hysteresis: rails die below 100 but only spawn above 110, so a window
 // hovering at the boundary can't flap between the two.
 const KILL_BELOW_WIDTH = 100;
@@ -121,11 +122,20 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
   const enabled = existsSync(ENABLED_FLAG);
   const railByWindow = new Map<string, Pane>();
   for (const pane of panes) {
-    if (pane.isRail) railByWindow.set(pane.windowId, pane);
+    if (!pane.isRail) continue;
+    const first = railByWindow.get(pane.windowId);
+    if (first === undefined) {
+      railByWindow.set(pane.windowId, pane);
+    } else {
+      // One rail per window, no exceptions — a duplicate (however it was
+      // born) dies on sight.
+      await tmux("kill-pane", "-t", pane.paneId).catch(() => {});
+      touched.add(pane.paneId);
+    }
   }
 
   for (const pane of panes) {
-    if (!pane.isRail) continue;
+    if (!pane.isRail || touched.has(pane.paneId)) continue;
 
     // A rail alone in a window is a zombie: every content pane is gone.
     if (pane.windowPanes === 1) {

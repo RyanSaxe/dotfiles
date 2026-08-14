@@ -10,33 +10,45 @@
 import { readFileSync } from "node:fs";
 import { closeSync, openSync, writeSync } from "node:fs";
 
-// Footer block the sprite is scaled over. Terminal cells are ~1:2, so
-// 14x7 cells is roughly square — right for the 96x96 sprites.
-export const SPRITE_COLS = 14;
-export const SPRITE_ROWS = 7;
+// Footer block the sprite is scaled over. Terminal cells are roughly 1:2
+// (9.6pt x 20.8pt at font-size 16), so 17x8 cells is ~163x166pt — square,
+// so the 96x96 sprites keep their proportions.
+export const SPRITE_COLS = 17;
+export const SPRITE_ROWS = 8;
 
-// Row/column diacritics, indices 0..15, from kitty's
-// rowcolumn-diacritics.txt (the spec's canonical table).
+// Row/column diacritics, indices 0..31, from kitty's
+// rowcolumn-diacritics.txt (the spec's canonical table, in order).
 const DIACRITICS = [
   0x0305, 0x030d, 0x030e, 0x0310, 0x0312, 0x033d, 0x033e, 0x033f, 0x0346,
-  0x034a, 0x034b, 0x034c, 0x0350, 0x0351, 0x0352, 0x0357,
+  0x034a, 0x034b, 0x034c, 0x0350, 0x0351, 0x0352, 0x0357, 0x035b, 0x0363,
+  0x0364, 0x0365, 0x0366, 0x0367, 0x0368, 0x0369, 0x036a, 0x036b, 0x036c,
+  0x036d, 0x036e, 0x036f, 0x0483, 0x0484,
 ];
 
 const PLACEHOLDER = 0x10eeee;
 
-// Image ids double as the placeholder foreground color (24-bit). The base
-// keeps the rail clear of the small ids other tools (nvim image plugins)
-// typically allocate from zero.
-const ID_BASE = 0x72a100;
-let nextId = ID_BASE;
-const idBySprite = new Map<string, number>();
+// A sprite larger than the diacritic table would index undefined and
+// throw NaN code points deep inside the render loop — fail at load time
+// with a legible error instead.
+if (SPRITE_COLS > DIACRITICS.length || SPRITE_ROWS > DIACRITICS.length) {
+  throw new Error(
+    `sprite grid ${SPRITE_COLS}x${SPRITE_ROWS} exceeds the ${DIACRITICS.length}-entry diacritic table`,
+  );
+}
 
+// Image ids double as the placeholder foreground color (24-bit). Derived
+// from a hash of the sprite path so an id is STABLE across daemon
+// restarts — a restart-reset counter would hand one pokemon's id to
+// another, and stale placeholders would show slices of the wrong sprite
+// until retransmission. The offset keeps ids clear of the small ones
+// other tools (nvim image plugins) allocate from zero.
 export function spriteId(spritePath: string): number {
-  const existing = idBySprite.get(spritePath);
-  if (existing !== undefined) return existing;
-  const id = nextId++;
-  idBySprite.set(spritePath, id);
-  return id;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < spritePath.length; i++) {
+    hash ^= spritePath.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return 0x100000 + (hash % 0xefffff);
 }
 
 export function idToHex(id: number): string {

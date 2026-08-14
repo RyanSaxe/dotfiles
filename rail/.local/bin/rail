@@ -1,14 +1,14 @@
 #!/bin/sh
 # Rail control: the in-terminal sidebar (tuis/rail).
 #
-#   rail on|off|toggle   enable/disable + spawn/kill rail panes everywhere
-#   rail attach <win>    give one window a rail pane (tmux hooks call this)
+#   rail on|off|toggle   enable/disable the rail everywhere
+#   rail jump <letter>   jump to the agent behind a hint letter
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
-# Rail panes hold only `tail -f /dev/null`; the daemon paints them by
-# writing frames to their ttys. Killing a pane costs nothing; a spawned
-# pane is painted within a tick.
+# The daemon is the ONLY thing that creates rail panes: while the enabled
+# flag is set it reconciles every window within a tick. A second spawner
+# (hooks, this script) would race it and duplicate panes, so none exists.
 set -eu
 
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -23,11 +23,6 @@ ENABLED_FLAG="$STATE/enabled"
 PID_FILE="$STATE/daemon.pid"
 LOG_FILE="$STATE/daemon.log"
 
-RAIL_WIDTH=34
-# Windows narrower than this don't get a rail: the content pane must stay
-# usable. (Phone attaches land here too.)
-MIN_WINDOW_WIDTH=100
-
 mkdir -p "$STATE"
 
 daemon_running() {
@@ -37,28 +32,6 @@ daemon_running() {
 ensure_daemon() {
   daemon_running && return 0
   (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
-}
-
-# Spawn a rail pane in one window unless it already has one or is too
-# narrow. Input is disabled: the rail is display-only, all interaction
-# stays on tmux binds.
-attach_window() {
-  window="$1"
-  [ -f "$ENABLED_FLAG" ] || return 0
-  existing="$(tmux list-panes -t "$window" -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
-  [ "$existing" -gt 0 ] && return 0
-  width="$(tmux display-message -p -t "$window" '#{window_width}')"
-  [ "$width" -lt "$MIN_WINDOW_WIDTH" ] && return 0
-  pane="$(tmux split-window -hbf -d -l "$RAIL_WIDTH" -t "$window" -P -F '#{pane_id}' 'tail -f /dev/null')"
-  tmux set-option -p -t "$pane" @rail 1
-  tmux select-pane -d -t "$pane"
-  ensure_daemon
-}
-
-attach_everywhere() {
-  for window in $(tmux list-windows -a -F '#{window_id}'); do
-    attach_window "$window"
-  done
 }
 
 kill_rail_panes() {
@@ -74,7 +47,6 @@ on)
   # lived in the status line's interval slot) is carried by the daemon.
   tmux set -g status off 2>/dev/null || true
   ensure_daemon
-  attach_everywhere
   ;;
 off)
   rm -f "$ENABLED_FLAG"
@@ -87,12 +59,6 @@ toggle)
   else
     "$0" on
   fi
-  ;;
-attach)
-  attach_window "${2:?usage: rail attach <window_id>}"
-  ;;
-ensure-daemon)
-  ensure_daemon
   ;;
 jump)
   # Jump to the agent behind a hint letter (alt+; <letter> in tmux). The
@@ -109,6 +75,9 @@ jump)
   # projects); background — jumps must stay instant.
   ("$HOME/.local/bin/theme" pokemon sync "$session" >/dev/null 2>&1 &)
   ;;
+ensure-daemon)
+  ensure_daemon
+  ;;
 status)
   if daemon_running; then
     echo "daemon: running (pid $(cat "$PID_FILE"))"
@@ -119,9 +88,7 @@ status)
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
   ;;
 *)
-  echo "usage: rail on|off|toggle|attach <window>|jump <letter>|ensure-daemon|status" >&2
-  # (No image-deletion commands live here: the rail draws sprites only via
-  # cell-anchored placeholders, which need no cleanup by construction.)
+  echo "usage: rail on|off|toggle|jump <letter>|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

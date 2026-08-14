@@ -26,16 +26,17 @@ keybind = shift+enter=text:\x1b\r
 
 font-size = 16
 
-# The frame: 24pt of padding that the frame shader (below) paints in the
-# theme's darkest background tier — a dark chrome around every surface
-# that the terminal sidebar leans into. This value must stay in sync with
-# FRAME_PX in theme/templates/frame.glsl.tmpl (points here, device pixels
-# there). `extend-always` keeps the sub-cell remainder in edge colors
-# beneath the shader's ring; balance splits it evenly.
-window-padding-x = 24
-window-padding-y = 24
+# The frame: padding that the frame shader (below) paints in the theme's
+# darkest background tier — a dark chrome around every surface. The LEFT
+# edge is zero: the sidebar's slab is the frame's left side, flush with
+# the window. These values must stay in sync with the FRAME_*_PX defines
+# in theme/templates/frame.glsl.tmpl (points here, device pixels there).
+# `extend-always` keeps the sub-cell remainder in edge colors beneath the
+# shader's ring; balance is off so the remainder never pads the left.
+window-padding-x = 0,32
+window-padding-y = 32
 window-padding-color = extend-always
-window-padding-balance = true
+window-padding-balance = false
 
 # Copying highlighted text needs no shortcut.
 copy-on-select = clipboard

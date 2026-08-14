@@ -6,17 +6,22 @@
  * chrome that the terminal sidebar leans into. Ghostty has no
  * "padding in a custom color" option; this shader is that option.
  *
- * FRAME_PX is in DEVICE pixels and must never exceed the ghostty padding
- * (configured in points) on the LOWEST-density display in use: shaders
- * cannot see the pixel ratio, and a ring wider than the padding would
- * paint over content. Calibrated for 1x external monitors (24pt padding =
- * 24px); retina displays show a thinner ring, and the padding remainder
- * stays invisible because ghostty extends edge colors into it. To thicken
- * the frame, raise this AND window-padding-x/y together.
+ * The FRAME_*_PX defines are in DEVICE pixels and must never exceed the
+ * matching ghostty padding (configured in points) on the LOWEST-density
+ * display in use: shaders cannot see the pixel ratio, and a ring wider
+ * than the padding would paint over content. Calibrated for 1x external
+ * monitors (32pt padding = 32px); retina displays show a thinner ring,
+ * and the padding remainder stays invisible because ghostty extends edge
+ * colors into it. LEFT is zero: the sidebar's slab is the frame's left
+ * side. To resize the frame, change these AND window-padding-x/y
+ * together.
  */
 
 #define FRAME_HEX 0x{{crust_hex}}
-#define FRAME_PX 24.0
+#define FRAME_LEFT_PX 0.0
+#define FRAME_RIGHT_PX 32.0
+#define FRAME_TOP_PX 32.0
+#define FRAME_BOTTOM_PX 32.0
 
 vec3 frameColor() {
     int c = FRAME_HEX;
@@ -27,12 +32,25 @@ vec3 frameColor() {
     );
 }
 
+// 1 inside the ring for this edge (soft one-pixel inner transition),
+// 0 outside; edges with zero width contribute nothing.
+float edgeRing(float dist, float px) {
+    if (px <= 0.0) return 0.0;
+    return 1.0 - smoothstep(px - 1.0, px, dist);
+}
+
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec4 color = texture(iChannel0, fragCoord.xy / iResolution.xy);
-    vec2 fromEdge = min(fragCoord.xy, iResolution.xy - fragCoord.xy);
-    float edge = min(fromEdge.x, fromEdge.y);
-    // One-pixel soft transition keeps the inner edge of the ring crisp
-    // without a hard aliased line.
-    float ring = 1.0 - smoothstep(FRAME_PX - 1.0, FRAME_PX, edge);
+    // fragCoord origin is bottom-left.
+    float ring = max(
+        max(
+            edgeRing(fragCoord.x, FRAME_LEFT_PX),
+            edgeRing(iResolution.x - fragCoord.x, FRAME_RIGHT_PX)
+        ),
+        max(
+            edgeRing(fragCoord.y, FRAME_BOTTOM_PX),
+            edgeRing(iResolution.y - fragCoord.y, FRAME_TOP_PX)
+        )
+    );
     fragColor = vec4(mix(color.rgb, frameColor(), ring), color.a);
 }

@@ -12,8 +12,9 @@ export function header(
   width: number,
 ): string[] {
   const bg = railBg(palette);
+  // No blank above the name: the slab is flush with the window frame, so
+  // the session name sits at the very top of the rail.
   return [
-    blank(width, bg),
     line(width, bg, [
       { text: " ", fg: palette.text },
       { text: session, fg: palette.lavender },

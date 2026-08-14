@@ -28,16 +28,33 @@ export function renderRail(
 
   // Section rows each start with their own blank spacer, so the gap under
   // a rule always equals the gap above the next one.
-  const body: string[] = [
-    ...windowRows(data.windows, agentsByPane, data.acked, palette, width),
-  ];
-  if (elsewhere.length > 0) {
-    body.push(blank(width, bg));
-    body.push(hairline(palette, width, blend(palette.notify, bg, 0.5)));
-    body.push(
-      ...elsewhereRows(elsewhere, data.acked, data.hints, palette, width),
-    );
-  }
+  const build = (spacious: boolean): string[] => {
+    const body: string[] = [
+      ...windowRows(
+        data.windows,
+        agentsByPane,
+        data.acked,
+        palette,
+        width,
+        spacious,
+      ),
+    ];
+    if (elsewhere.length > 0) {
+      if (spacious) body.push(blank(width, bg));
+      body.push(hairline(palette, width, blend(palette.notify, bg, 0.5)));
+      body.push(
+        ...elsewhereRows(
+          elsewhere,
+          data.acked,
+          data.hints,
+          palette,
+          width,
+          spacious,
+        ),
+      );
+    }
+    return body;
+  };
 
   const top = header(data.session, palette, width);
   const footer =
@@ -47,10 +64,17 @@ export function renderRail(
   // Bottom padding row mirrors the top one.
   const budget = height - top.length - footer.length - 1;
 
-  let content = body;
-  if (body.length > budget) {
-    content = body.slice(0, Math.max(0, budget - 1));
-    content.push(line(width, bg, [{ text: "  ⋯", fg: palette.dim }]));
+  // Adaptive density: breathe while there is room, tighten when the list
+  // grows, and only then truncate — with a count, so nothing hides
+  // silently.
+  let content = build(true);
+  if (content.length > budget) content = build(false);
+  if (content.length > budget) {
+    const hidden = content.length - Math.max(0, budget - 1);
+    content = content.slice(0, Math.max(0, budget - 1));
+    content.push(
+      line(width, bg, [{ text: `  +${hidden} more`, fg: palette.dim }]),
+    );
   }
   while (content.length < budget) content.push(blank(width, bg));
 

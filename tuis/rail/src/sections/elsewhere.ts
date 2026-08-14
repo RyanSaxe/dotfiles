@@ -40,6 +40,7 @@ export function elsewhereRows(
   hints: Map<string, string>,
   palette: Palette,
   width: number,
+  spacious: boolean,
 ): string[] {
   const bg = railBg(palette);
   const dim = blend(palette.dim, bg, ELSEWHERE_KEEP);
@@ -52,7 +53,7 @@ export function elsewhereRows(
       ? dim2
       : blend(stateColor(agent.status, palette), bg, ELSEWHERE_KEEP);
     const hint = hints.get(agent.paneId);
-    rows.push(blank(width, bg));
+    if (spacious) rows.push(blank(width, bg));
     rows.push(
       line(
         width,

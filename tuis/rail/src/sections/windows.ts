@@ -40,6 +40,7 @@ export function windowRows(
   acked: Set<string>,
   palette: Palette,
   width: number,
+  spacious: boolean,
 ): string[] {
   const bg = railBg(palette);
   const rows: string[] = [];
@@ -58,7 +59,7 @@ export function windowRows(
         : win.active
           ? palette.text
           : palette.dim2;
-    rows.push(blank(width, bg));
+    if (spacious) rows.push(blank(width, bg));
     rows.push(
       line(
         width,
