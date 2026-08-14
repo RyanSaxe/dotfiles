@@ -96,8 +96,8 @@ install_tier_packages() {
     install_rail
     ;;
   mac:Darwin)
-    # Hammerspoon is a cask; it hosts the pokemon mascot (see hammerspoon/).
-    brew list --cask hammerspoon >/dev/null 2>&1 || brew install --cask hammerspoon
+    # No casks: the mac tier is stow-only (ghostty).
+    :
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
