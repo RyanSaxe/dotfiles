@@ -15,7 +15,9 @@ export interface RailRow {
 
 // A three-cell pill: powerline caps around a single character. The SAME
 // shape everywhere in the rail — window numbers and elsewhere hints differ
-// only in color, never geometry.
+// only in color, never geometry. The caps are Private Use Area glyphs
+// (nerd-font rounded halves), written as escapes because editors and
+// review tools render them invisibly.
 export function pill(
   text: string,
   fg: string,
@@ -23,9 +25,9 @@ export function pill(
   lineBackground: string,
 ): Span[] {
   return [
-    { text: "", fg: bg, bg: lineBackground },
+    { text: "\ue0b6", fg: bg, bg: lineBackground },
     { text, fg, bg },
-    { text: "", fg: bg, bg: lineBackground },
+    { text: "\ue0b4", fg: bg, bg: lineBackground },
   ];
 }
 
