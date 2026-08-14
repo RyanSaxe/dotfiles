@@ -33,6 +33,9 @@ _tmux_attach_or_switch() {
     tmux attach-session -t "${target%%:*}"
     [[ "$target" == *:* ]] && tmux switch-client -t "$target"
   fi
+  # The global accent (prompt, cursor trail, ghostty) follows the project
+  # you just landed in; sessions are named after projects.
+  (theme pokemon sync "${target%%:*}" >/dev/null 2>&1 &)
 }
 
 # Create a new tmux session with predefined windows and programs

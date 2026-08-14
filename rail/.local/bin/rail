@@ -101,6 +101,9 @@ jump)
   tmux switch-client -t "$session"
   tmux select-window -t "$pane"
   tmux select-pane -t "$pane"
+  # The global accent follows the project (sessions are named after
+  # projects); background — jumps must stay instant.
+  ("$HOME/.local/bin/theme" pokemon sync "$session" >/dev/null 2>&1 &)
   ;;
 status)
   if daemon_running; then

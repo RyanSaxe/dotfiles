@@ -25,6 +25,8 @@ import {
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
+import { forgetPane, releaseAllMascots, syncMascot } from "./mascot.js";
+import { pokemonFor } from "./pokemon.js";
 import { renderRail } from "./render.js";
 import { loadPalette } from "./theme.js";
 
@@ -103,6 +105,13 @@ async function tick(counter: number): Promise<void> {
   const frames = new Map<string, string>();
   for (const pane of panes) {
     if (!pane.isRail || pane.windowPanes === 1) continue;
+    // Each session's rail wears its own pokemon: accent and sprite follow
+    // the project mapping, not the globally active theme accent.
+    const pokemon = pokemonFor(pane.session);
+    const accent =
+      (palette.mode === "dark" ? pokemon?.accentDark : pokemon?.accentLight) ??
+      palette.accent;
+    const sessionPalette = { ...palette, accent };
     const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}`;
     let frame = frames.get(bucket);
     if (frame === undefined) {
@@ -113,16 +122,26 @@ async function tick(counter: number): Promise<void> {
         acked,
         hints,
       };
-      frame = toFrame(renderRail(data, palette, pane.width, pane.height));
+      frame = toFrame(
+        renderRail(data, sessionPalette, pane.width, pane.height),
+      );
       frames.set(bucket, frame);
     }
     paintPane(pane, frame);
+    syncMascot(
+      pane,
+      pokemon?.spritePath ?? null,
+      pane.sessionAttached && pane.windowActive,
+    );
   }
 
   // Forget panes that no longer exist so their ids can't shadow reused ones.
   const alive = new Set(panes.map((pane) => pane.paneId));
   for (const paneId of pushed.keys()) {
-    if (!alive.has(paneId)) pushed.delete(paneId);
+    if (!alive.has(paneId)) {
+      pushed.delete(paneId);
+      forgetPane(paneId);
+    }
   }
 }
 
@@ -146,6 +165,12 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   await writeFile(PID_FILE, String(process.pid));
+  const shutdown = () => {
+    releaseAllMascots();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 
   // Instant agent updates: workmux hooks write a state file the moment an
   // agent changes status. Debounced a hair so bursts coalesce.

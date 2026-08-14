@@ -234,10 +234,28 @@ apply)
   publish_files
   ;;
 pokemon)
-  sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name> [--shiny]}"
+  sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name>|sync [project] [--shiny]}"
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
+    ;;
+  sync)
+    # Make the global accent follow a project: apply its mapped pokemon
+    # (or the default), skipping the extraction when it is already active.
+    # Session switchers (to/ts, rail jump) call this in the background.
+    project="${3:-}"
+    [ -n "$project" ] || project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+    value=""
+    [ -f "$POKEMON_CONF" ] && value="$(conf_get "$POKEMON_CONF" "$project")"
+    [ -n "$value" ] || value="$(conf_get "$DEFAULT_CONF" default)"
+    [ -n "$value" ] || exit 0
+    current=""
+    if [ -f "$STATE/accents.conf" ]; then
+      current="$(conf_get "$STATE/accents.conf" pokemon)"
+      [ "$(conf_get "$STATE/accents.conf" shiny)" = "1" ] && current="$current:shiny"
+    fi
+    [ "$value" = "$current" ] && exit 0
+    set_pokemon_value "$value"
     ;;
   default)
     name="${3:?usage: theme pokemon default <name> [--shiny]}"
