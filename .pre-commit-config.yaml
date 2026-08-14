@@ -101,14 +101,19 @@ repos:
         entry: oxlint
         types_or: [javascript, ts]
 
-      # The rail is plain TS with no runtime deps, so prek's isolated env
-      # can carry the compiler — no repo node_modules needed, identical
-      # locally and in CI.
+      # Typecheck with the rail's OWN pinned toolchain (package-lock is
+      # the version pin; tsc resolves @types project-relative, so a
+      # hook-env compiler can't see them). Skips cleanly where node isn't
+      # installed — node tooling is not core.
       - id: rail-typecheck
         name: tsc (rail)
-        language: node
-        additional_dependencies: ["typescript@5.9.3", "@types/node@24.3.0"]
-        entry: tsc -p tuis/rail
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "command -v npm >/dev/null 2>&1 || exit 0; cd tuis/rail && { [ -d node_modules ] || npm ci --silent --no-audit --no-fund; } && npx tsc --noEmit",
+          ]
         pass_filenames: false
         files: "^tuis/rail/"
 
