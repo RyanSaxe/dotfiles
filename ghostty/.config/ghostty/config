@@ -27,12 +27,14 @@ keybind = shift+enter=text:\x1b\r
 font-size = 16
 
 # No padding: the terminal grid owns the window edge-to-edge, so the rail
-# sits truly flush and nothing needs recoloring. `extend` still covers the
-# sub-cell remainder from grid rounding; balance splits that remainder
-# evenly instead of piling it on one side.
+# sits truly flush. Cell sizes rarely divide the window exactly; the
+# remainder ring is painted by continuing the edge cells' background —
+# `extend-always` because plain `extend` has heuristics that sometimes
+# refuse, leaving off-color strips at the edges. Balance splits the
+# remainder evenly instead of piling it on one side.
 window-padding-x = 0
 window-padding-y = 0
-window-padding-color = extend
+window-padding-color = extend-always
 window-padding-balance = true
 
 # Copying highlighted text needs no shortcut.
