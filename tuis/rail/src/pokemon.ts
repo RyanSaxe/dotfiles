@@ -2,7 +2,7 @@
 // mapped to its project (sessions are named after projects), falling back
 // to the tracked default — accent color and sprite both.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -38,9 +38,22 @@ function parseConfText(raw: string): Map<string, string> {
   return entries;
 }
 
+// Conf reads are mtime-gated (the loadPalette pattern): identical
+// freshness, zero re-parsing while nothing changed — this runs per rail
+// pane per tick.
+const confCache = new Map<
+  string,
+  { mtimeMs: number; conf: Map<string, string> }
+>();
+
 function parseConf(path: string): Map<string, string> {
   try {
-    return parseConfText(readFileSync(path, "utf8"));
+    const mtimeMs = statSync(path).mtimeMs;
+    const cached = confCache.get(path);
+    if (cached && cached.mtimeMs === mtimeMs) return cached.conf;
+    const conf = parseConfText(readFileSync(path, "utf8"));
+    confCache.set(path, { mtimeMs, conf });
+    return conf;
   } catch {
     return new Map();
   }
@@ -104,8 +117,8 @@ function activeIdentity(): PokemonIdentity | null {
 
 // Session -> identity: the project's mapped pokemon wins; unmapped
 // sessions follow the globally active one (which `theme pokemon sync`
-// keeps aligned with the project you're in). Files are tiny and re-read
-// each call, so picker changes land within a tick.
+// keeps aligned with the project you're in). Conf reads are mtime-gated
+// above, so picker changes still land within a tick.
 export function pokemonFor(session: string): PokemonIdentity | null {
   const mapped = parseConf(STATE_MAPPING).get(session);
   if (mapped) return identityFor(mapped);

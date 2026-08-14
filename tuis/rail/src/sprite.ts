@@ -69,8 +69,8 @@ export function idToHex(id: number): string {
 
 // One frame row of the placeholder block: every cell is U+10EEEE + row
 // diacritic + column diacritic. Rendered as a single span colored with the
-// image id.
-export function placeholderRow(row: number): string {
+// image id. The rows depend only on constants, so they're built once.
+const PLACEHOLDER_ROWS = Array.from({ length: SPRITE_ROWS }, (_, row) => {
   let cells = "";
   for (let col = 0; col < SPRITE_COLS; col++) {
     cells += String.fromCodePoint(
@@ -80,6 +80,10 @@ export function placeholderRow(row: number): string {
     );
   }
   return cells;
+});
+
+export function placeholderRow(row: number): string {
+  return PLACEHOLDER_ROWS[row] ?? "";
 }
 
 // ----- transmission ------------------------------------------------------

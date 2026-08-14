@@ -63,14 +63,23 @@ export function blend(fg: string, bg: string, keep: number): string {
   return `#${to2(mix(fr, br))}${to2(mix(fg_, bg_))}${to2(mix(fb, bb))}`;
 }
 
-export const fg = (hex: string): string => {
-  const [r, g, b] = hexToRgb(hex);
-  return `\x1b[38;2;${r};${g};${b}m`;
-};
+// Escapes are memoized: a frame recolors the same ~16 palette hexes
+// hundreds of times, and the cache never outgrows the palette.
+const sgrCache = new Map<string, string>();
 
-export const bg = (hex: string): string => {
-  const [r, g, b] = hexToRgb(hex);
-  return `\x1b[48;2;${r};${g};${b}m`;
-};
+function sgr(prefix: 38 | 48, hex: string): string {
+  const key = `${prefix}${hex}`;
+  let esc = sgrCache.get(key);
+  if (esc === undefined) {
+    const [r, g, b] = hexToRgb(hex);
+    esc = `\x1b[${prefix};2;${r};${g};${b}m`;
+    sgrCache.set(key, esc);
+  }
+  return esc;
+}
+
+export const fg = (hex: string): string => sgr(38, hex);
+
+export const bg = (hex: string): string => sgr(48, hex);
 
 export const RESET = "\x1b[0m";

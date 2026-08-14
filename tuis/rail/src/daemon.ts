@@ -238,14 +238,20 @@ function maybeTransmit(pane: Pane, spritePath: string): void {
 }
 
 async function tick(counter: number): Promise<void> {
-  if (counter % AGENT_RECONCILE_TICKS === 0 || !agentsFresh) {
-    await refreshAgents();
-    agentsFresh = true;
-  }
-  const panes = await collectPanes();
+  const refresh =
+    counter % AGENT_RECONCILE_TICKS === 0 || !agentsFresh
+      ? refreshAgents().then(() => {
+          agentsFresh = true;
+        })
+      : Promise.resolve();
+  // The polls are independent — one round-trip of latency, not three.
+  const [panes, spriteCapable] = await Promise.all([
+    collectPanes(),
+    capableSessions(),
+    refresh,
+  ]);
   const palette = loadPalette();
   const skip = await selfHeal(panes);
-  const spriteCapable = await capableSessions();
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
   const acked = updateAcks(acks, settled, panes);
@@ -342,10 +348,18 @@ async function main(): Promise<void> {
   // Theme/pokemon switches rewrite the generated files: drop frame caches
   // so every pane repaints, and re-source tmux's own colors (this replaces
   // the statusline's theme-sync slot — the statusline is off while the
-  // rail carries the chrome).
+  // rail carries the chrome). A render touches every template output in a
+  // burst; debounce so the burst costs one pass, not one per file event.
+  let themePending: NodeJS.Timeout | null = null;
+  let tuisColorsTouched = false;
   watch(GENERATED_DIR, (_event, filename) => {
-    if (filename === "tuis-colors.json") pushed.clear();
-    run(THEME_SYNC, []).catch(() => {});
+    if (filename === "tuis-colors.json") tuisColorsTouched = true;
+    if (themePending) clearTimeout(themePending);
+    themePending = setTimeout(() => {
+      if (tuisColorsTouched) pushed.clear();
+      tuisColorsTouched = false;
+      run(THEME_SYNC, []).catch(() => {});
+    }, 30);
   });
 
   let counter = 0;
