@@ -29,11 +29,15 @@ const pane = (windowActive: boolean, sessionAttached: boolean): Pane[] => [
     windowName: "w",
     windowActive,
     windowPanes: 2,
+    windowWidth: 200,
     paneId: "%1",
+    paneActive: false,
     tty: "/dev/null",
     width: 34,
     height: 40,
     isRail: false,
+    historySize: 0,
+    inMode: false,
   },
 ];
 

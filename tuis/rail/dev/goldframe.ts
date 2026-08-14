@@ -72,7 +72,8 @@ const scene: RailData = {
 
 scene.hints = assignHints(scene.agents);
 
-const width = Number(process.env.RAIL_WIDTH ?? 34);
+// Defaults mirror the shipped pane geometry (daemon.ts RAIL_WIDTH).
+const width = Number(process.env.RAIL_WIDTH ?? 24);
 const height = Number(process.env.RAIL_HEIGHT ?? 41);
 process.stdout.write(
   renderRail(scene, loadPalette(), width, height).join("\n") + "\n",
