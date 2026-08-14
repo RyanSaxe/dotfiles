@@ -52,15 +52,24 @@ export function agentRank(agent: Agent, acked: Set<string>): number {
   return acked.has(agent.paneId) ? 3 : URGENCY[agent.status];
 }
 
-// Timers whisper by default — blended well into the slab so their minute
-// ticks never pull the eye. Past eight hours the timer turns red: an agent
-// left alone that long IS the thing to look at.
+// Timers whisper — blended well into the slab so their minute ticks never
+// pull the eye — but in the agent's STATE hue, so a truncated title still
+// shows its color through the timer. Acked rows drop to the neutral dim.
+// Past eight hours the timer turns full red: an agent left alone that
+// long IS the thing to look at.
 const ELAPSED_ATTENTION_SECS = 8 * 60 * 60;
 
-export function elapsedSpan(secs: number, palette: Palette): Span {
-  const fg =
-    secs >= ELAPSED_ATTENTION_SECS
-      ? palette.red
-      : blend(palette.dim, railBg(palette), DIM_KEEP);
-  return { text: fmtElapsed(secs), fg };
+export function elapsedSpan(
+  agent: Agent,
+  acked: Set<string>,
+  palette: Palette,
+): Span {
+  const secs = agent.elapsedSecs;
+  if (secs >= ELAPSED_ATTENTION_SECS) {
+    return { text: fmtElapsed(secs), fg: palette.red };
+  }
+  const hue = acked.has(agent.paneId)
+    ? palette.dim
+    : stateColor(agent.status, palette);
+  return { text: fmtElapsed(secs), fg: blend(hue, railBg(palette), DIM_KEEP) };
 }

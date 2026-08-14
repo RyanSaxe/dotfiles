@@ -60,7 +60,7 @@ export function elsewhereRows(
           { text: project, fg: dim },
           { text: name, fg: nameFg },
         ],
-        elapsedSpan(agent.elapsedSecs, palette),
+        elapsedSpan(agent, acked, palette),
       ),
       item: true,
     });

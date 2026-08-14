@@ -50,7 +50,7 @@ export function windowRows(
           { text: " ", fg: palette.text },
           { text: win.name, fg: titleFg },
         ],
-        agent ? elapsedSpan(agent.elapsedSecs, palette) : undefined,
+        agent ? elapsedSpan(agent, acked, palette) : undefined,
       ),
       item: true,
     });
