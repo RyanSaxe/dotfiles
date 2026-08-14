@@ -29,6 +29,10 @@ export interface RailData {
   session: string;
   windows: Window[];
   agents: Agent[];
+  // Pane ids whose done/waiting status has been seen (visit-clears).
+  acked: Set<string>;
+  // Jump-hint letter per agent pane id (alt+; <letter>).
+  hints: Map<string, string>;
 }
 
 // tmux formats can't contain our field separator; \x1f never appears in
@@ -116,7 +120,7 @@ export async function collect(session: string): Promise<RailData> {
     collectWindows(session),
     collectAgents(),
   ]);
-  return { session, windows, agents };
+  return { session, windows, agents, acked: new Set(), hints: new Map() };
 }
 
 export async function currentSession(): Promise<string> {
@@ -128,6 +132,7 @@ export async function currentSession(): Promise<string> {
 
 export interface Pane {
   session: string;
+  sessionAttached: boolean;
   windowId: string;
   windowIndex: number;
   windowName: string;
@@ -142,6 +147,7 @@ export interface Pane {
 
 const GLOBAL_FORMAT = [
   "#{session_name}",
+  "#{session_attached}",
   "#{window_id}",
   "#{window_index}",
   "#{window_name}",
@@ -167,19 +173,20 @@ export async function collectPanes(): Promise<Pane[]> {
   for (const rawLine of stdout.split("\n")) {
     if (!rawLine) continue;
     const f = rawLine.split(SEP);
-    if (f.length < 11) continue;
+    if (f.length < 12) continue;
     panes.push({
       session: f[0]!,
-      windowId: f[1]!,
-      windowIndex: Number(f[2]!),
-      windowName: f[3]!,
-      windowActive: f[4] === "1",
-      windowPanes: Number(f[5]!),
-      paneId: f[6]!,
-      tty: f[7]!,
-      width: Number(f[8]!),
-      height: Number(f[9]!),
-      isRail: f[10] === "1",
+      sessionAttached: Number(f[1]!) > 0,
+      windowId: f[2]!,
+      windowIndex: Number(f[3]!),
+      windowName: f[4]!,
+      windowActive: f[5] === "1",
+      windowPanes: Number(f[6]!),
+      paneId: f[7]!,
+      tty: f[8]!,
+      width: Number(f[9]!),
+      height: Number(f[10]!),
+      isRail: f[11] === "1",
     });
   }
   return panes;

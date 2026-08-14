@@ -14,10 +14,12 @@ const URGENCY: Record<Agent["status"], number> = {
   done: 2,
 };
 
-export function sortElsewhere(agents: Agent[]): Agent[] {
+// Acked rows sort after everything: their news has been seen.
+export function sortElsewhere(agents: Agent[], acked: Set<string>): Agent[] {
+  const rank = (agent: Agent) =>
+    acked.has(agent.paneId) ? 3 : URGENCY[agent.status];
   return [...agents].sort(
-    (a, b) =>
-      URGENCY[a.status] - URGENCY[b.status] || b.updatedTs - a.updatedTs,
+    (a, b) => rank(a) - rank(b) || b.updatedTs - a.updatedTs,
   );
 }
 
@@ -33,27 +35,34 @@ function label(agent: Agent): { project: string; name: string } {
 
 export function elsewhereRows(
   agents: Agent[],
+  acked: Set<string>,
+  hints: Map<string, string>,
   palette: Palette,
   width: number,
 ): string[] {
   const railBg = palette.mantle;
   const dim = blend(palette.dim, railBg, ELSEWHERE_KEEP);
+  const dim2 = blend(palette.dim2, railBg, ELSEWHERE_KEEP);
+  const chipBg = blend(palette.surface0, railBg, ELSEWHERE_KEEP);
   const rows: string[] = [];
-  for (const agent of sortElsewhere(agents)) {
+  for (const agent of sortElsewhere(agents, acked)) {
     const { project, name } = label(agent);
-    const state = blend(
-      stateColor(agent.status, palette),
-      railBg,
-      ELSEWHERE_KEEP,
-    );
+    const nameFg = acked.has(agent.paneId)
+      ? dim2
+      : blend(stateColor(agent.status, palette), railBg, ELSEWHERE_KEEP);
+    const hint = hints.get(agent.paneId);
     rows.push(
       line(
         width,
         railBg,
         [
           { text: " ", fg: dim },
+          // The jump chip mirrors the window number chips: alt+; then this
+          // letter lands on the agent's pane.
+          hint ? { text: hint, fg: dim2, bg: chipBg } : { text: " ", fg: dim },
+          { text: " ", fg: dim },
           { text: project, fg: dim },
-          { text: name, fg: state },
+          { text: name, fg: nameFg },
         ],
         { text: fmtElapsed(agent.elapsedSecs), fg: dim },
       ),
@@ -61,7 +70,7 @@ export function elsewhereRows(
     if (agent.title) {
       rows.push(
         line(width, railBg, [
-          { text: " ", fg: dim },
+          { text: "   ", fg: dim },
           { text: agent.title, fg: dim },
         ]),
       );

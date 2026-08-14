@@ -6,11 +6,14 @@
 //   npx tsx dev/goldframe.ts | uv run -q --script dev/ansi2png.py gold.png
 
 import type { RailData } from "../src/data.js";
+import { assignHints } from "../src/hints.js";
 import { renderRail } from "../src/render.js";
 import { loadPalette } from "../src/theme.js";
 
 const scene: RailData = {
   session: "dotfiles",
+  acked: new Set(process.env.RAIL_ACK ? [process.env.RAIL_ACK] : []),
+  hints: new Map(),
   windows: [
     { index: 1, name: "nvim", active: false, paneIds: ["%1"] },
     { index: 2, name: "zsh", active: true, paneIds: ["%2"] },
@@ -64,6 +67,8 @@ const scene: RailData = {
     },
   ],
 };
+
+scene.hints = assignHints(scene.agents);
 
 const width = Number(process.env.RAIL_WIDTH ?? 34);
 const height = Number(process.env.RAIL_HEIGHT ?? 41);

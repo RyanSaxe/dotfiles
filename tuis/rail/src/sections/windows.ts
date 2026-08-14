@@ -19,6 +19,7 @@ export function stateColor(status: Agent["status"], palette: Palette): string {
 export function windowRows(
   windows: Window[],
   agentsByPane: Map<string, Agent>,
+  acked: Set<string>,
   palette: Palette,
   width: number,
 ): string[] {
@@ -33,11 +34,14 @@ export function windowRows(
     const chip = win.active
       ? { text: chipText, fg: palette.base, bg: palette.accent }
       : { text: chipText, fg: palette.dim2, bg: palette.surface0 };
-    const titleFg = agent
-      ? stateColor(agent.status, palette)
-      : win.active
-        ? palette.text
-        : palette.dim2;
+    // An acknowledged agent reads like a plain window: the state was seen,
+    // the color returns only on a new status event.
+    const titleFg =
+      agent && !acked.has(agent.paneId)
+        ? stateColor(agent.status, palette)
+        : win.active
+          ? palette.text
+          : palette.dim2;
     rows.push(
       line(
         width,

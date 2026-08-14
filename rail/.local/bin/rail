@@ -90,6 +90,18 @@ attach)
 ensure-daemon)
   ensure_daemon
   ;;
+jump)
+  # Jump to the agent behind a hint letter (alt+; <letter> in tmux). The
+  # daemon keeps hints.tsv current: letter <tab> session <tab> pane_id.
+  letter="${2:?usage: rail jump <letter>}"
+  hint_line="$(grep "^$letter	" "$STATE/hints.tsv" 2>/dev/null | head -1 || true)"
+  [ -n "$hint_line" ] || exit 0
+  session="$(printf '%s' "$hint_line" | cut -f2)"
+  pane="$(printf '%s' "$hint_line" | cut -f3)"
+  tmux switch-client -t "$session"
+  tmux select-window -t "$pane"
+  tmux select-pane -t "$pane"
+  ;;
 status)
   if daemon_running; then
     echo "daemon: running (pid $(cat "$PID_FILE"))"
@@ -100,7 +112,7 @@ status)
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
   ;;
 *)
-  echo "usage: rail on|off|toggle|attach <window>|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|attach <window>|jump <letter>|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

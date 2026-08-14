@@ -31,11 +31,13 @@ export function renderRail(
   }
 
   const body: string[] = [
-    ...windowRows(data.windows, agentsByPane, palette, width),
+    ...windowRows(data.windows, agentsByPane, data.acked, palette, width),
   ];
   if (elsewhere.length > 0) {
     body.push(hairline(palette, width));
-    body.push(...elsewhereRows(elsewhere, palette, width));
+    body.push(
+      ...elsewhereRows(elsewhere, data.acked, data.hints, palette, width),
+    );
   }
 
   const top = header(data.session, palette, width);

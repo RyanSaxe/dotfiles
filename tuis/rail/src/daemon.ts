@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { loadAcks, updateAcks } from "./acks.js";
 import {
   collectAgents,
   collectPanes,
@@ -23,6 +24,7 @@ import {
   type Agent,
   type Pane,
 } from "./data.js";
+import { assignHints, writeHints } from "./hints.js";
 import { renderRail } from "./render.js";
 import { loadPalette } from "./theme.js";
 
@@ -47,6 +49,7 @@ const SYNC_OFF = "\x1b[?2026l";
 
 let agents: Agent[] = [];
 let agentsFresh = false;
+const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
 
@@ -92,6 +95,10 @@ async function tick(counter: number): Promise<void> {
   const panes = await collectPanes();
   await killZombieWindows(panes);
 
+  const acked = updateAcks(acks, agents, panes);
+  const hints = assignHints(agents);
+  writeHints(agents, hints);
+
   const palette = loadPalette();
   const frames = new Map<string, string>();
   for (const pane of panes) {
@@ -103,6 +110,8 @@ async function tick(counter: number): Promise<void> {
         session: pane.session,
         windows: windowsOf(panes, pane.session),
         agents,
+        acked,
+        hints,
       };
       frame = toFrame(renderRail(data, palette, pane.width, pane.height));
       frames.set(bucket, frame);

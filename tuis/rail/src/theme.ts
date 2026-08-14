@@ -20,10 +20,14 @@ export interface Palette {
   red: string;
 }
 
-const PALETTE_PATH = join(
-  process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-  "dotfiles/generated/tuis-colors.json",
-);
+// TUIS_COLORS_PATH pins an alternate palette file (fixtures, light-mode
+// checks) without touching the live theme state.
+const PALETTE_PATH =
+  process.env.TUIS_COLORS_PATH ??
+  join(
+    process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
+    "dotfiles/generated/tuis-colors.json",
+  );
 
 let cached: { palette: Palette; mtimeMs: number } | null = null;
 
