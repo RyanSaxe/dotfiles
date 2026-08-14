@@ -1,21 +1,16 @@
--- Hammerspoon: the theme system's macOS limb. Exactly three jobs:
---   1. the pokemon mascot (mascot.lua)
---   2. reload this config whenever its files change
---   3. keep the terminal theme in step with macOS appearance
--- Anything beyond those three jobs is deliberately out of scope —
--- this file should stay boring.
+-- Hammerspoon: the theme system's macOS limb. Exactly two jobs:
+--   1. reload this config whenever its files change
+--   2. keep the terminal theme in step with macOS appearance
+--      (including the ghostty reload push, which only a watcher with a
+--      controlled environment can deliver)
+-- Anything beyond those jobs is deliberately out of scope — this file
+-- should stay boring. The pokemon mascot lives in the terminal rail
+-- (tuis/rail), not here.
 
 -- Enable the `hs` CLI (used for manual poking and by scripts).
 hs.ipc.cliInstall()
 
-local rail = require("rail")
-local mascot = require("mascot")
--- The rail's reserved footer is the mascot's home when the rail is up.
-mascot.rail = rail
-rail.start()
-mascot.start()
-
--- 2. Auto-reload: editing any .lua file applies itself. ~/.hammerspoon
+-- 1. Auto-reload: editing any .lua file applies itself. ~/.hammerspoon
 -- holds stow SYMLINKS — file events fire at the TARGET (the repo), never
 -- on the symlink — so the watcher must watch the resolved directory.
 -- Only reload for .lua so stray temp files can't cause reload loops.
@@ -38,7 +33,7 @@ if real_init then
   target_watcher:start()
 end
 
--- 2b. Ghostty shader reload: ghostty cannot watch files, so this is the one
+-- 1b. Ghostty shader reload: ghostty cannot watch files, so this is the one
 -- consumer that needs a push — and it lives HERE, in the single watcher
 -- with a controlled environment, never in the theme script (which runs
 -- from arbitrary contexts). SIGUSR2 = ghostty's config-reload signal
@@ -55,11 +50,10 @@ generated_watcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.local/state/dotfi
 end)
 generated_watcher:start()
 
--- 3. Appearance sync: macOS appearance is the master light/dark switch.
+-- 2. Appearance sync: macOS appearance is the master light/dark switch.
 -- When it flips by ANY path (System Settings, sunset schedule, or the
--- `theme` command itself once Phase 3 wires toggle -> osascript), re-render
--- the terminal theme to match. The tiny delay lets the OS finish writing
--- the new appearance before we read it.
+-- `theme` command itself), re-render the terminal theme to match. The tiny
+-- delay lets the OS finish writing the new appearance before we read it.
 local function sync_theme_to_appearance()
   hs.timer.doAfter(0.2, function()
     local mode = (hs.host.interfaceStyle() == "Dark") and "dark" or "light"
