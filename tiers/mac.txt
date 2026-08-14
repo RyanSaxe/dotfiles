@@ -1,3 +1,2 @@
-hammerspoon
 ghostty
 sketchybar

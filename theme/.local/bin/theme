@@ -15,8 +15,8 @@
 # Rendered output lands in state, never in the repo.
 set -eu
 
-# This script is invoked from contexts with a bare PATH (hammerspoon's
-# appearance watcher, launchd) — make sure tmux and friends resolve.
+# This script is invoked from contexts with a bare PATH (launchd) —
+# make sure tmux and friends resolve.
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 # Palettes, tokens, and templates live next to this script in its stow
@@ -67,7 +67,7 @@ conf_del() {
 }
 
 # Extract accents into state. $1 is the name, $2 non-empty means shiny.
-# Display is not this command's job: the hammerspoon mascot watches state.
+# Display is not this command's job: the rail mascot watches state.
 set_pokemon() {
   # Atomic write: a failed extraction must not clobber working accents.
   if ! pokemon-accents "$1" ${2:+--shiny} >"$STATE/.accents.tmp"; then
@@ -153,16 +153,16 @@ render() {
 }
 
 # This script only WRITES state; it never pokes processes. It runs from
-# many contexts (shells, ssh, hammerspoon, the tmux server) whose
-# environments differ, and a push that works in one silently fails in
-# another. Consumers converge on the generated files themselves:
+# many contexts (shells, ssh, the tmux server) whose environments differ,
+# and a push that works in one silently fails in another. Consumers
+# converge on the generated files themselves:
 #   starship   re-reads its config every prompt
 #   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
 #   tmux       status-interval sync re-sources tmux-colors.conf on mtime
 #              change (tmux scripts/theme-sync.sh) — any OS, any context
-#   mascot     hammerspoon watches the state directory
-#   ghostty    palette follows macOS appearance natively; hammerspoon's
-#              watcher sends the reload signal for the trail shader
+#   mascot     rail watches the state directory
+#   ghostty    palette follows macOS appearance natively; custom shaders
+#              pick up new content on the next config reload
 publish_files() {
   # File copies are context-independent writes: ghostty resolves
   # custom-shader paths relative to its config dir. Every rendered .glsl
@@ -176,9 +176,9 @@ publish_files() {
 
 # macOS appearance is the master light/dark switch: setting it flips ghostty
 # (native light:/dark: theme pair) and anything else that follows the OS.
-# The hammerspoon appearance watcher then re-runs this script for the same
-# mode — idempotent, and setting an unchanged value fires no notification,
-# so there is no loop. Silently a no-op off macOS or without permissions.
+# No watcher reacts to this — `theme dark/light/toggle` renders and sets
+# the OS flag in the same call, so nothing needs to loop back. Silently a
+# no-op off macOS or without permissions.
 set_os_appearance() {
   case "$1" in
   dark) darkmode=true ;;
@@ -221,8 +221,8 @@ toggle)
   ;;
 apply)
   # `theme apply [dark|light]` renders WITHOUT touching OS appearance —
-  # the entry point for followers (hammerspoon's appearance watcher), which
-  # must never set the thing they react to, or toggles race themselves.
+  # for catching the terminal up after the OS already changed (System
+  # Settings, schedule) without re-triggering that flip.
   mode="${2:-$(current_mode)}"
   case "$mode" in
   dark | light) ;;
