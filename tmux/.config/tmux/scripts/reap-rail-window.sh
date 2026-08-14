@@ -17,10 +17,15 @@
 
 reap_if_rail_only() {
   window="$1"
-  panes="$(tmux list-panes -t "$window" -F '#{@rail}' 2>/dev/null)" || return 0
+  # The ?: sentinel guarantees every pane prints a non-empty line. A bare
+  # '#{@rail}' expands EMPTY for content panes, and command substitution
+  # strips trailing empty lines — so a window listing [rail, content]
+  # collapsed to "1" and got killed with its content alive (this bug once
+  # took out the window running the reviewer's own session).
+  panes="$(tmux list-panes -t "$window" -F '#{?#{@rail},rail,content}' 2>/dev/null)" || return 0
   [ -n "$panes" ] || return 0
-  # Any pane without @rail=1 means real content survives; leave it alone.
-  echo "$panes" | grep -qv '^1$' && return 0
+  # Any content pane means the window lives.
+  echo "$panes" | grep -q 'content' && return 0
   tmux kill-window -t "$window" 2>/dev/null
 }
 
