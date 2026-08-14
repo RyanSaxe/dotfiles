@@ -32,14 +32,19 @@ never flicker.
   color everywhere until a new status event (`src/acks.ts`).
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
-- The footer is the mascot's home: the project's pokemon sprite via kitty
-  graphics, placed only while the window is visible on an attached client
-  (`src/mascot.ts`).
+- The footer is the mascot's home: the project's pokemon sprite rendered
+  through kitty-graphics Unicode placeholders (`src/sprite.ts`) — the PNG
+  is transmitted once as a virtual placement and the footer cells anchor
+  it, so tmux redraws, switches, and the toggle carry it like text and
+  ghosting is structurally impossible. Sprites render only when every
+  client attached to the session is a kitty-capable terminal (tmux's
+  client table decides); otherwise the footer stays blank.
 
 ## Commands
 
 ```sh
 rail on|off|toggle    # enable/disable + spawn/kill rail panes everywhere
+                      # (on also turns the tmux status bar off; off restores)
 rail attach <window>  # tmux hooks call this for new windows/sessions
 rail jump <letter>    # hint jump (bound to alt+; <letter>)
 rail status           # daemon, flag, pane count

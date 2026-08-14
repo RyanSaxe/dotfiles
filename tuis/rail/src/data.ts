@@ -33,6 +33,8 @@ export interface RailData {
   acked: Set<string>;
   // Jump-hint letter per agent pane id (alt+; <letter>).
   hints: Map<string, string>;
+  // Kitty image id for the footer sprite; null renders a blank footer.
+  sprite: number | null;
 }
 
 // tmux formats can't contain our field separator; \x1f never appears in
@@ -120,7 +122,14 @@ export async function collect(session: string): Promise<RailData> {
     collectWindows(session),
     collectAgents(),
   ]);
-  return { session, windows, agents, acked: new Set(), hints: new Map() };
+  return {
+    session,
+    windows,
+    agents,
+    acked: new Set(),
+    hints: new Map(),
+    sprite: null,
+  };
 }
 
 export async function currentSession(): Promise<string> {
@@ -138,11 +147,15 @@ export interface Pane {
   windowName: string;
   windowActive: boolean;
   windowPanes: number;
+  windowWidth: number;
   paneId: string;
+  paneActive: boolean;
   tty: string;
   width: number;
   height: number;
   isRail: boolean;
+  historySize: number;
+  inMode: boolean;
 }
 
 const GLOBAL_FORMAT = [
@@ -153,11 +166,15 @@ const GLOBAL_FORMAT = [
   "#{window_name}",
   "#{window_active}",
   "#{window_panes}",
+  "#{window_width}",
   "#{pane_id}",
+  "#{pane_active}",
   "#{pane_tty}",
   "#{pane_width}",
   "#{pane_height}",
   "#{@rail}",
+  "#{history_size}",
+  "#{pane_in_mode}",
 ].join(SEP);
 
 // One tmux call per tick covers every session: rail panes to paint,
@@ -173,7 +190,7 @@ export async function collectPanes(): Promise<Pane[]> {
   for (const rawLine of stdout.split("\n")) {
     if (!rawLine) continue;
     const f = rawLine.split(SEP);
-    if (f.length < 12) continue;
+    if (f.length < 16) continue;
     panes.push({
       session: f[0]!,
       sessionAttached: Number(f[1]!) > 0,
@@ -182,11 +199,15 @@ export async function collectPanes(): Promise<Pane[]> {
       windowName: f[4]!,
       windowActive: f[5] === "1",
       windowPanes: Number(f[6]!),
-      paneId: f[7]!,
-      tty: f[8]!,
-      width: Number(f[9]!),
-      height: Number(f[10]!),
-      isRail: f[11] === "1",
+      windowWidth: Number(f[7]!),
+      paneId: f[8]!,
+      paneActive: f[9] === "1",
+      tty: f[10]!,
+      width: Number(f[11]!),
+      height: Number(f[12]!),
+      isRail: f[13] === "1",
+      historySize: Number(f[14]!),
+      inMode: f[15] === "1",
     });
   }
   return panes;

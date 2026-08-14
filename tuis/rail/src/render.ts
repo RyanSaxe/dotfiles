@@ -2,11 +2,7 @@ import { blank, line } from "./cells.js";
 import type { Agent, RailData } from "./data.js";
 import { elsewhereRows } from "./sections/elsewhere.js";
 import { hairline, header } from "./sections/header.js";
-import {
-  MASCOT_ROWS,
-  MIN_HEIGHT_FOR_MASCOT,
-  mascotFooter,
-} from "./sections/mascot.js";
+import { MIN_HEIGHT_FOR_MASCOT, mascotFooter } from "./sections/mascot.js";
 import { windowRows } from "./sections/windows.js";
 import type { Palette } from "./theme.js";
 
@@ -42,7 +38,9 @@ export function renderRail(
 
   const top = header(data.session, palette, width);
   const footer =
-    height >= MIN_HEIGHT_FOR_MASCOT ? mascotFooter(palette, width) : [];
+    height >= MIN_HEIGHT_FOR_MASCOT
+      ? mascotFooter(palette, width, data.sprite)
+      : [];
   // Bottom padding row mirrors the top one.
   const budget = height - top.length - footer.length - 1;
 

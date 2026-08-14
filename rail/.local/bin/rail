@@ -70,11 +70,15 @@ kill_rail_panes() {
 case "${1:-toggle}" in
 on)
   touch "$ENABLED_FLAG"
+  # The rail replaces the status bar's chrome; theme re-sourcing (which
+  # lived in the status line's interval slot) is carried by the daemon.
+  tmux set -g status off 2>/dev/null || true
   ensure_daemon
   attach_everywhere
   ;;
 off)
   rm -f "$ENABLED_FLAG"
+  tmux set -g status 2 2>/dev/null || true
   kill_rail_panes
   ;;
 toggle)
@@ -116,6 +120,8 @@ status)
   ;;
 *)
   echo "usage: rail on|off|toggle|attach <window>|jump <letter>|ensure-daemon|status" >&2
+  # (No image-deletion commands live here: the rail draws sprites only via
+  # cell-anchored placeholders, which need no cleanup by construction.)
   exit 1
   ;;
 esac
