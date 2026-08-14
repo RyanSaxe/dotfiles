@@ -6,17 +6,17 @@
  * chrome that the terminal sidebar leans into. Ghostty has no
  * "padding in a custom color" option; this shader is that option.
  *
- * FRAME_PX is in DEVICE pixels and must never exceed the ghostty padding
- * (configured in points) on the LOWEST-density display in use: shaders
- * cannot see the pixel ratio, and a ring wider than the padding would
- * paint over content. Calibrated for 1x external monitors (32pt padding =
- * 32px); retina displays show a thinner ring, and the padding remainder
- * stays invisible because ghostty extends edge colors into it. To resize
- * the frame, change this AND window-padding-x/y together.
+ * FRAME_PT is in POINTS and must equal window-padding-x/y in the ghostty
+ * config, so the ring exactly covers the padding on every display. Shaders
+ * only see device pixels, so the scale factor is inferred from the cursor:
+ * iCurrentCursor.w is the cursor height in device pixels, the cursor is
+ * one cell tall, and a cell at font-size 16 is ~20pt — so ~20px means a
+ * 1x display and ~40px means retina (macOS backing scale is only ever
+ * 1x or 2x; fractional "looks like" modes still render at 2x).
  */
 
 #define FRAME_HEX 0x{{crust_hex}}
-#define FRAME_PX 32.0
+#define FRAME_PT 19.0
 
 vec3 frameColor() {
     int c = FRAME_HEX;
@@ -29,10 +29,15 @@ vec3 frameColor() {
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec4 color = texture(iChannel0, fragCoord.xy / iResolution.xy);
+    // Display scale from the cursor-height probe (see header comment).
+    // A zero cursor (uniform not yet populated) falls back to 1x, which
+    // can only under-paint, never cover content.
+    float scale = iCurrentCursor.w >= 30.0 ? 2.0 : 1.0;
+    float framePx = FRAME_PT * scale;
     vec2 fromEdge = min(fragCoord.xy, iResolution.xy - fragCoord.xy);
     float edge = min(fromEdge.x, fromEdge.y);
     // One-pixel soft transition keeps the inner edge of the ring crisp
     // without a hard aliased line.
-    float ring = 1.0 - smoothstep(FRAME_PX - 1.0, FRAME_PX, edge);
+    float ring = 1.0 - smoothstep(framePx - 1.0, framePx, edge);
     fragColor = vec4(mix(color.rgb, frameColor(), ring), color.a);
 }

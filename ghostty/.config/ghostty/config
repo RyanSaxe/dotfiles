@@ -26,16 +26,18 @@ keybind = shift+enter=text:\x1b\r
 
 font-size = 16
 
-# The frame: 32pt of symmetric padding that the frame shader (below)
+# The frame: 19pt of symmetric padding that the frame shader (below)
 # paints in the theme's darkest background tier — a dark chrome around
-# every surface. The grid starts at (32,32), so the sidebar's first cell
-# (the session name) sits exactly there; the sidebar's slab fuses with the
-# frame and reads as touching the edges. Must stay in sync with FRAME_PX
-# in theme/templates/frame.glsl.tmpl (points here, device pixels there).
-# `extend-always` keeps the sub-cell remainder in edge colors beneath the
-# shader's ring; balance splits it evenly.
-window-padding-x = 32
-window-padding-y = 32
+# every surface. 19pt is the design's spacing unit: two terminal cells at
+# font-size 16 (2 × 9.6pt), so the frame, the rail's text inset, and the
+# rail→content seam all read as the same gap. The grid starts at (19,19),
+# so the sidebar's first cell (the session name) sits exactly there. Must
+# stay in sync with FRAME_PT in theme/templates/frame.glsl.tmpl (the
+# shader detects the display scale itself). `extend-always` keeps the
+# sub-cell remainder in edge colors beneath the shader's ring; balance
+# splits it evenly.
+window-padding-x = 19
+window-padding-y = 19
 window-padding-color = extend-always
 window-padding-balance = true
 
