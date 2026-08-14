@@ -103,7 +103,7 @@ function M.start()
   M.canvas = hs.canvas.new({ x = 0, y = 0, w = M.config.size, h = M.config.size })
   M.canvas[1] = { type = "image", imageScaling = "scaleToFit" }
   -- Float above normal windows; never steal clicks or focus.
-  M.canvas:level(hs.canvas.windowLevels.floating)
+  M.canvas:level(hs.canvas.windowLevels.floating + 1)
   M.canvas:behavior({ "canJoinAllSpaces", "transient" })
   M.canvas:clickActivating(false)
 

@@ -8,15 +8,17 @@ set -eu
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 FLAG="$STATE/rail-on"
 PAD_FILE="$HOME/.config/ghostty/padding.conf"
-# rail width (218) + panel margins (2*8) + gap to the text grid
-RAIL_PAD=244
+# rail column width (256) + gap to the text grid
+RAIL_PAD=276
 
 reload_ghostty() {
   pkill -USR2 -x ghostty 2>/dev/null || true
 }
 
 on() {
-  printf 'window-padding-x = %s,20\n' "$RAIL_PAD" >"$PAD_FILE"
+  # balance=false is required: the main config balances padding, which would
+  # redistribute the asymmetric reservation evenly across both sides.
+  printf 'window-padding-x = %s,20\nwindow-padding-balance = false\n' "$RAIL_PAD" >"$PAD_FILE"
   mkdir -p "$STATE" && touch "$FLAG"
   reload_ghostty
 }
