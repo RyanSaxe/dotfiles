@@ -23,6 +23,7 @@ import { promisify } from "node:util";
 
 import { loadAcks, updateAcks } from "./acks.js";
 import {
+  applyDoneHysteresis,
   collectAgents,
   collectPanes,
   windowsOf,
@@ -247,9 +248,10 @@ async function tick(counter: number): Promise<void> {
   const skip = await selfHeal(panes);
   const spriteCapable = await capableSessions();
 
-  const acked = updateAcks(acks, agents, panes);
-  const hints = assignHints(agents);
-  writeHints(agents, hints);
+  const settled = applyDoneHysteresis(agents, Date.now() / 1000);
+  const acked = updateAcks(acks, settled, panes);
+  const hints = assignHints(settled);
+  writeHints(settled, hints);
 
   const frames = new Map<string, string>();
   for (const pane of panes) {
@@ -272,7 +274,7 @@ async function tick(counter: number): Promise<void> {
       const data = {
         session: pane.session,
         windows: windowsOf(panes, pane.session),
-        agents,
+        agents: settled,
         acked,
         hints,
         sprite,

@@ -117,6 +117,19 @@ async function collectAgents(): Promise<Agent[]> {
     }));
 }
 
+// Claude's Stop hook fires per TURN, so "done" flaps on while subagents
+// still run. Until status carries subagent awareness upstream, done must
+// hold for a quiet interval before the rail believes it.
+const DONE_STABLE_SECS = 10;
+
+export function applyDoneHysteresis(agents: Agent[], nowSecs: number): Agent[] {
+  return agents.map((agent) =>
+    agent.status === "done" && nowSecs - agent.updatedTs < DONE_STABLE_SECS
+      ? { ...agent, status: "working" as const }
+      : agent,
+  );
+}
+
 export async function collect(session: string): Promise<RailData> {
   const [windows, agents] = await Promise.all([
     collectWindows(session),

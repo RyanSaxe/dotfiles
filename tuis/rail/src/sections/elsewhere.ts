@@ -67,14 +67,7 @@ export function elsewhereRows(
         { text: fmtElapsed(agent.elapsedSecs), fg: dim },
       ),
     );
-    if (agent.title) {
-      rows.push(
-        line(width, railBg, [
-          { text: "   ", fg: dim },
-          { text: agent.title, fg: dim },
-        ]),
-      );
-    }
+    // No doing-line here either — see sections/windows.ts.
   }
   return rows;
 }

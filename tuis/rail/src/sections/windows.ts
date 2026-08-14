@@ -57,15 +57,9 @@ export function windowRows(
           : undefined,
       ),
     );
-    if (agent && agent.title) {
-      rows.push(
-        // Indented to start exactly under the title column.
-        line(width, railBg, [
-          { text: "     ", fg: palette.dim },
-          { text: agent.title, fg: palette.dim },
-        ]),
-      );
-    }
+    // Deliberately no per-agent "doing" line: agent CLIs rarely update
+    // their pane titles, so the line reads as frozen noise. Status color
+    // and elapsed carry the story.
   }
   return rows;
 }
