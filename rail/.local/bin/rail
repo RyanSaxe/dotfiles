@@ -44,14 +44,12 @@ kill_rail_panes() {
 case "${1:-toggle}" in
 on)
   touch "$ENABLED_FLAG"
-  # The rail replaces the status bar's chrome; theme re-sourcing (which
-  # lived in the status line's interval slot) is carried by the daemon.
-  tmux set -g status off 2>/dev/null || true
   ensure_daemon
   ;;
 off)
+  # Focus mode: no status bar comes back — no chrome at all. Navigation
+  # stays on the alt binds; alt+g re-shows the rail.
   rm -f "$ENABLED_FLAG"
-  tmux set -g status 2 2>/dev/null || true
   kill_rail_panes
   ;;
 toggle)
