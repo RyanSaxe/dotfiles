@@ -76,15 +76,17 @@ export function renderRail(
   } else {
     // Paginate: indicator rows sit at fixed slots — directly under the
     // header rule and directly above the footer hairline — so the layout
-    // stays symmetric on every page.
+    // stays symmetric on every page. The top slot itself is the gap under
+    // the rule, so the body's leading spacer would double it — drop it.
+    const paged = body.slice(1);
     const visible = Math.max(1, budget - 2);
-    const maxPage = Math.floor((body.length - 1) / visible);
+    const maxPage = Math.floor((paged.length - 1) / visible);
     const page = Math.min(Math.max(0, data.page), maxPage);
-    const slice = body.slice(page * visible, page * visible + visible);
-    const hiddenAbove = body
+    const slice = paged.slice(page * visible, page * visible + visible);
+    const hiddenAbove = paged
       .slice(0, page * visible)
       .filter((row) => row.item).length;
-    const hiddenBelow = body
+    const hiddenBelow = paged
       .slice(page * visible + visible)
       .filter((row) => row.item).length;
     content = [
