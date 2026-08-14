@@ -144,9 +144,20 @@ local function parse_collected(out)
   M.data = { session = session, windows = windows, agents = agents }
 end
 
+local inflight_at
 local function collect()
+  -- In-tick watchdog: a wedged child is terminated on a later tick. Never
+  -- a detached timer (unretained hs timers are garbage-collected and a
+  -- stuck inflight would block collection forever).
   if inflight then
-    return
+    if os.time() - (inflight_at or 0) > 5 then
+      pcall(function()
+        inflight:terminate()
+      end)
+      inflight = nil
+    else
+      return
+    end
   end
   local task = hs.task.new("/bin/sh", function(_, stdout)
     if inflight == task then
@@ -155,13 +166,8 @@ local function collect()
     pcall(parse_collected, stdout or "")
   end, { "-c", COLLECT_SCRIPT })
   inflight = task
+  inflight_at = os.time()
   task:start()
-  hs.timer.doAfter(5, function()
-    if inflight == task then
-      task:terminate()
-      inflight = nil
-    end
-  end)
 end
 
 -- ----------------------------------------------------------- dossier cache
@@ -217,14 +223,22 @@ end
 local function build_elements(session, windows, agents, height)
   local W = M.config.width
   local e = {}
-  -- Full-bleed mantle slab. Radius matches the macOS window corner so the
-  -- left corners follow the window's curve; the right edge meets terminal
-  -- background mid-window where the tiny corner inset is invisible.
+  -- Full-bleed slab: a rounded strip under a square body so only the far
+  -- left corners follow the macOS window curve — the right edge is square.
+  -- Fill uses rail_bg (canvas rendering shifts hex lighter than terminals
+  -- render the same value; rail_bg is compensated to READ as mantle).
   e[#e + 1] = {
     type = "rectangle",
     action = "fill",
-    fillColor = col("mantle"),
+    fillColor = col("rail_bg"),
     roundedRectRadii = { xRadius = 11, yRadius = 11 },
+    frame = { x = 0, y = 0, w = 30, h = height },
+  }
+  e[#e + 1] = {
+    type = "rectangle",
+    action = "fill",
+    fillColor = col("rail_bg"),
+    frame = { x = 11, y = 0, w = W - 11, h = height },
   }
 
   local y = 14

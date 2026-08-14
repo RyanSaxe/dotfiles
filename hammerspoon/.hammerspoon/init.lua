@@ -15,20 +15,28 @@ mascot.rail = rail
 rail.start()
 mascot.start()
 
--- 2. Auto-reload: editing any .lua file in ~/.hammerspoon applies itself.
--- The watcher hands us the list of changed paths; only reload for .lua so
--- stray editor swap/temp files can't cause reload loops.
+-- 2. Auto-reload: editing any .lua file applies itself. ~/.hammerspoon
+-- holds stow SYMLINKS — file events fire at the TARGET (the repo), never
+-- on the symlink — so the watcher must watch the resolved directory.
+-- Only reload for .lua so stray temp files can't cause reload loops.
 -- NOTE: watchers must be GLOBAL — top-level locals in init.lua get garbage
 -- collected after the chunk runs, silently killing the watcher.
-config_watcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", function(paths)
+local function reload_on_lua(paths)
   for _, path in ipairs(paths) do
     if path:sub(-4) == ".lua" then
       hs.reload()
       return
     end
   end
-end)
+end
+local config_dir = os.getenv("HOME") .. "/.hammerspoon/"
+config_watcher = hs.pathwatcher.new(config_dir, reload_on_lua)
 config_watcher:start()
+local real_init = hs.fs.pathToAbsolute(config_dir .. "init.lua")
+if real_init then
+  target_watcher = hs.pathwatcher.new(real_init:match("(.*/)"), reload_on_lua)
+  target_watcher:start()
+end
 
 -- 2b. Ghostty shader reload: ghostty cannot watch files, so this is the one
 -- consumer that needs a push — and it lives HERE, in the single watcher

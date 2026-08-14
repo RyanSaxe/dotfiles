@@ -7,6 +7,9 @@ return {
   accent = "{{accent}}",
   base = "{{base}}",
   mantle = "{{mantle}}",
+  -- The rail's slab color: hs.canvas renders hex lighter than terminals do
+  -- (colorspace handling), so this is crust — compensated to read as mantle.
+  rail_bg = "{{crust}}",
   surface0 = "{{surface0}}",
   surface1 = "{{surface1}}",
   text = "{{text}}",
