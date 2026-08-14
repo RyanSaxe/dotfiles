@@ -123,3 +123,87 @@ export async function currentSession(): Promise<string> {
   const { stdout } = await run("tmux", ["display-message", "-p", "#S"]);
   return stdout.trim();
 }
+
+// ----- global snapshot (daemon) -----------------------------------------
+
+export interface Pane {
+  session: string;
+  windowId: string;
+  windowIndex: number;
+  windowName: string;
+  windowActive: boolean;
+  windowPanes: number;
+  paneId: string;
+  tty: string;
+  width: number;
+  height: number;
+  isRail: boolean;
+}
+
+const GLOBAL_FORMAT = [
+  "#{session_name}",
+  "#{window_id}",
+  "#{window_index}",
+  "#{window_name}",
+  "#{window_active}",
+  "#{window_panes}",
+  "#{pane_id}",
+  "#{pane_tty}",
+  "#{pane_width}",
+  "#{pane_height}",
+  "#{@rail}",
+].join(SEP);
+
+// One tmux call per tick covers every session: rail panes to paint,
+// content windows to list, and geometry for frame buckets.
+export async function collectPanes(): Promise<Pane[]> {
+  const { stdout } = await run("tmux", [
+    "list-panes",
+    "-a",
+    "-F",
+    GLOBAL_FORMAT,
+  ]);
+  const panes: Pane[] = [];
+  for (const rawLine of stdout.split("\n")) {
+    if (!rawLine) continue;
+    const f = rawLine.split(SEP);
+    if (f.length < 11) continue;
+    panes.push({
+      session: f[0]!,
+      windowId: f[1]!,
+      windowIndex: Number(f[2]!),
+      windowName: f[3]!,
+      windowActive: f[4] === "1",
+      windowPanes: Number(f[5]!),
+      paneId: f[6]!,
+      tty: f[7]!,
+      width: Number(f[8]!),
+      height: Number(f[9]!),
+      isRail: f[10] === "1",
+    });
+  }
+  return panes;
+}
+
+// Content windows of one session, rail panes excluded — the rail never
+// lists itself.
+export function windowsOf(panes: Pane[], session: string): Window[] {
+  const windows = new Map<number, Window>();
+  for (const pane of panes) {
+    if (pane.session !== session || pane.isRail) continue;
+    const existing = windows.get(pane.windowIndex);
+    if (existing) {
+      existing.paneIds.push(pane.paneId);
+    } else {
+      windows.set(pane.windowIndex, {
+        index: pane.windowIndex,
+        name: pane.windowName,
+        active: pane.windowActive,
+        paneIds: [pane.paneId],
+      });
+    }
+  }
+  return [...windows.values()].sort((a, b) => a.index - b.index);
+}
+
+export { collectAgents };

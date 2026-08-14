@@ -3,3 +3,4 @@ zsh
 theme
 tmux
 workmux
+rail

@@ -75,18 +75,25 @@ install_zsh_plugins() {
   clone_plugin Aloxaf/fzf-tab
 }
 
+# The rail TUI (tuis/rail) runs via tsx from its own node_modules.
+install_rail() {
+  (cd tuis/rail && npm install --no-fund --no-audit --silent)
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv starship fzf tmux
+    brew_install stow git gh git-delta uv starship fzf tmux node
     install_zsh_plugins
+    install_rail
     ;;
   core:Linux)
-    apt_install stow git gh git-delta curl zsh fzf
+    apt_install stow git gh git-delta curl zsh fzf nodejs npm
     # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
     install_zsh_plugins
+    install_rail
     ;;
   mac:Darwin)
     brew_install

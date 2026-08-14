@@ -1,0 +1,106 @@
+#!/bin/sh
+# Rail control: the in-terminal sidebar (tuis/rail).
+#
+#   rail on|off|toggle   enable/disable + spawn/kill rail panes everywhere
+#   rail attach <win>    give one window a rail pane (tmux hooks call this)
+#   rail ensure-daemon   start the render daemon if it isn't running
+#   rail status          daemon + pane count + enabled flag
+#
+# Rail panes hold only `tail -f /dev/null`; the daemon paints them by
+# writing frames to their ttys. Killing a pane costs nothing; a spawned
+# pane is painted within a tick.
+set -eu
+
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+# Resolve the repo through this script's own symlink (stow pattern).
+SCRIPT_PATH="$(readlink -f "$0")"
+REPO_ROOT="${SCRIPT_PATH%/rail/.local/bin/rail}"
+RAIL_DIR="$REPO_ROOT/tuis/rail"
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"
+ENABLED_FLAG="$STATE/enabled"
+PID_FILE="$STATE/daemon.pid"
+LOG_FILE="$STATE/daemon.log"
+
+RAIL_WIDTH=34
+# Windows narrower than this don't get a rail: the content pane must stay
+# usable. (Phone attaches land here too.)
+MIN_WINDOW_WIDTH=100
+
+mkdir -p "$STATE"
+
+daemon_running() {
+  [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+}
+
+ensure_daemon() {
+  daemon_running && return 0
+  (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
+}
+
+# Spawn a rail pane in one window unless it already has one or is too
+# narrow. Input is disabled: the rail is display-only, all interaction
+# stays on tmux binds.
+attach_window() {
+  window="$1"
+  [ -f "$ENABLED_FLAG" ] || return 0
+  existing="$(tmux list-panes -t "$window" -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
+  [ "$existing" -gt 0 ] && return 0
+  width="$(tmux display-message -p -t "$window" '#{window_width}')"
+  [ "$width" -lt "$MIN_WINDOW_WIDTH" ] && return 0
+  pane="$(tmux split-window -hbf -d -l "$RAIL_WIDTH" -t "$window" -P -F '#{pane_id}' 'tail -f /dev/null')"
+  tmux set-option -p -t "$pane" @rail 1
+  tmux select-pane -d -t "$pane"
+  ensure_daemon
+}
+
+attach_everywhere() {
+  for window in $(tmux list-windows -a -F '#{window_id}'); do
+    attach_window "$window"
+  done
+}
+
+kill_rail_panes() {
+  for pane in $(tmux list-panes -a -F '#{pane_id} #{@rail}' | awk '$2==1 {print $1}'); do
+    tmux kill-pane -t "$pane"
+  done
+}
+
+case "${1:-toggle}" in
+on)
+  touch "$ENABLED_FLAG"
+  ensure_daemon
+  attach_everywhere
+  ;;
+off)
+  rm -f "$ENABLED_FLAG"
+  kill_rail_panes
+  ;;
+toggle)
+  if [ -f "$ENABLED_FLAG" ]; then
+    "$0" off
+  else
+    "$0" on
+  fi
+  ;;
+attach)
+  attach_window "${2:?usage: rail attach <window_id>}"
+  ;;
+ensure-daemon)
+  ensure_daemon
+  ;;
+status)
+  if daemon_running; then
+    echo "daemon: running (pid $(cat "$PID_FILE"))"
+  else
+    echo "daemon: not running"
+  fi
+  if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
+  echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
+  ;;
+*)
+  echo "usage: rail on|off|toggle|attach <window>|ensure-daemon|status" >&2
+  exit 1
+  ;;
+esac
