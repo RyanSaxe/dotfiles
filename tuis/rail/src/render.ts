@@ -65,8 +65,10 @@ export function renderRail(
     height >= MIN_HEIGHT_FOR_MASCOT
       ? mascotFooter(palette, inner, data.sprite)
       : [];
-  // Bottom padding row mirrors the top of the footer.
-  const budget = height - top.length - footer.length - 1;
+  // No blank row below the sprite: the 19pt bottom frame is the sprite's
+  // lower margin (~one cell), matching the blank row above it — so the
+  // mascot reads centered between the footer hairline and the window edge.
+  const budget = height - top.length - footer.length;
 
   let content: string[];
   if (body.length <= budget) {
@@ -98,7 +100,5 @@ export function renderRail(
   while (content.length < budget) content.push(blank(inner, bg));
 
   const gutter = bgEsc(bg) + "  " + RESET;
-  return [...top, ...content, ...footer, blank(inner, bg)].map(
-    (row) => row + gutter,
-  );
+  return [...top, ...content, ...footer].map((row) => row + gutter);
 }
