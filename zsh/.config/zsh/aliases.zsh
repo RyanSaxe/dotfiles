@@ -22,6 +22,8 @@ alias ~='cd ~'
 # System utilities
 alias df='df -h'
 alias du='du -h'
+# apt installs bat's binary as batcat to avoid clashing with bacula-console.
+command -v batcat >/dev/null 2>&1 && alias bat='batcat'
 # alias grep='grep --color=auto' -- commenting due to claude using grep a lot
 
 # Claude Code: unset TMUX env so the binary's hardcoded chalk-level cap

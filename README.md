@@ -40,6 +40,7 @@ resolves at runtime via `PATH` and `$HOME`; there is no templating.
 | `ghostty`    | terminal emulator (macOS)                                                                             |
 | `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status |
 | `git`        | git + gh, delta as pager                                                                              |
+| `bat`        | `cat` with syntax highlighting, themed with Catppuccin                                                |
 | `theme`      | the theming pipeline (below)                                                                          |
 | `ai-harness` | shared instructions, skills, and hooks for coding agents                                              |
 | `tiers`      | which packages install on which machines                                                              |

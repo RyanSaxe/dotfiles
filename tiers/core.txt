@@ -4,3 +4,4 @@ theme
 tmux
 workmux
 rail
+bat

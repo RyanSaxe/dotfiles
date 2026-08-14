@@ -83,12 +83,12 @@ install_rail() {
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv starship fzf tmux node
+    brew_install stow git gh git-delta uv starship fzf tmux node bat
     install_zsh_plugins
     install_rail
     ;;
   core:Linux)
-    apt_install stow git gh git-delta curl zsh fzf nodejs npm
+    apt_install stow git gh git-delta curl zsh fzf nodejs npm bat
     # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
@@ -169,6 +169,14 @@ done
 # Render the theme so every consumer has colors from the first shell.
 if [ -x "$HOME/.local/bin/theme" ]; then
   "$HOME/.local/bin/theme" apply
+fi
+
+# Rebuild bat's theme cache now that the vendored Catppuccin tmThemes are
+# stowed in; apt names the binary batcat (see zsh/aliases.zsh for the alias).
+if command -v bat >/dev/null 2>&1; then
+  bat cache --build
+elif command -v batcat >/dev/null 2>&1; then
+  batcat cache --build
 fi
 
 # The commit gate for working on this repo (see README: Development).
