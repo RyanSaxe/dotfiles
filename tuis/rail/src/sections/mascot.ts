@@ -12,7 +12,8 @@ import { hairline, railBg } from "./header.js";
 // footer rows carry kitty Unicode-placeholder cells and the terminal draws
 // the real pixel art over them; without one (no capable client attached,
 // no sprite cached) the footer stays blank — never boxes, never escapes.
-export const MASCOT_ROWS = SPRITE_ROWS + 1;
+// Rows: hairline + hint/blank row + the sprite block.
+export const FOOTER_ROWS = SPRITE_ROWS + 2;
 
 // Only reserve the footer when the pane is tall enough that content
 // doesn't starve for it.
@@ -22,11 +23,18 @@ export function mascotFooter(
   palette: Palette,
   width: number,
   spriteIdValue: number | null,
+  pageHint = "",
 ): string[] {
   const bg = railBg(palette);
+  // The row between the hairline and the sprite doubles as the pagination
+  // hint's home — out of the list, always with air on both sides.
+  const pad = Math.max(0, Math.floor((width - pageHint.length) / 2));
+  const hintRow = pageHint
+    ? line(width, bg, [{ text: " ".repeat(pad) + pageHint, fg: palette.dim }])
+    : blank(width, bg);
   const rows: string[] = [
     hairline(palette, width, blend(palette.notify, bg, 0.5)),
-    blank(width, bg),
+    hintRow,
   ];
   if (spriteIdValue === null || width < SPRITE_COLS + 2) {
     for (let i = 0; i < SPRITE_ROWS; i++) rows.push(blank(width, bg));
