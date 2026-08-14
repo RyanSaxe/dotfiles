@@ -1,26 +1,25 @@
-import { blank, line } from "./cells.js";
+import { blank, hintRow } from "./cells.js";
 import type { Agent, RailData } from "./data.js";
 import { elsewhereRows } from "./sections/elsewhere.js";
-import { hairline, header, railBg } from "./sections/header.js";
+import { header, sectionHairline } from "./sections/header.js";
 import {
   FOOTER_ROWS,
   MIN_HEIGHT_FOR_MASCOT,
   mascotFooter,
 } from "./sections/mascot.js";
-import { windowRows, type RailRow } from "./sections/windows.js";
-import { bg as bgEsc, blend, RESET, type Palette } from "./theme.js";
+import type { RailRow } from "./sections/rows.js";
+import { windowRows } from "./sections/windows.js";
+import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 
 // Keys that page the rail (tmux binds run `rail page up|down`); shown in
-// the pagination indicators.
+// the footer pagination hint.
 const PAGE_UP_KEY = "⌥,";
 const PAGE_DOWN_KEY = "⌥.";
 
-function indicator(palette: Palette, width: number, text: string): string {
-  const pad = Math.max(0, Math.floor((width - text.length) / 2));
-  return line(width, railBg(palette), [
-    { text: " ".repeat(pad) + text, fg: palette.dim },
-  ]);
-}
+// The slab is 22 content cells; these two crust columns after them are
+// the visible right margin (the tmux border beside them completes the
+// seam). daemon.ts derives the pane width from this.
+export const GUTTER_COLS = 2;
 
 // Pure frame renderer: RailData -> exactly `height` ANSI lines of `width`
 // cells. The daemon and the look-spike share this path verbatim.
@@ -31,11 +30,11 @@ export function renderRail(
   height: number,
 ): string[] {
   const bg = railBg(palette);
-  // The last two columns are a crust gutter (appended at the end): the
-  // hairlines and text stop two cells (~19pt at font-size 16, the frame's
-  // spacing unit) before the slab meets the content surface — mirroring
-  // the 19pt of frame crust on the rail's left edge.
-  const inner = width - 2;
+  // The gutter (appended at the end) makes hairlines and text stop two
+  // cells (~19pt at font-size 16, the frame's spacing unit) before the
+  // slab meets the content surface — mirroring the 19pt of frame crust on
+  // the rail's left edge.
+  const inner = width - GUTTER_COLS;
 
   const agentsByPane = new Map<string, Agent>();
   const elsewhere: Agent[] = [];
@@ -55,10 +54,7 @@ export function renderRail(
   ];
   if (elsewhere.length > 0) {
     body.push({ text: blank(inner, bg), item: false });
-    body.push({
-      text: hairline(palette, inner, blend(palette.notify, bg, 0.5)),
-      item: false,
-    });
+    body.push({ text: sectionHairline(palette, inner), item: false });
     body.push(
       ...elsewhereRows(elsewhere, data.acked, data.hints, palette, inner),
     );
@@ -112,7 +108,7 @@ export function renderRail(
   while (content.length < budget) content.push(blank(inner, bg));
   // Short panes have no footer to carry the hint; borrow the bottom row.
   if (!hasFooter && pageHint) {
-    content[budget - 1] = indicator(palette, inner, pageHint);
+    content[budget - 1] = hintRow(palette, inner, pageHint);
   }
 
   const footer = hasFooter

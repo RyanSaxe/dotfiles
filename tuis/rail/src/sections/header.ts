@@ -1,9 +1,5 @@
 import { line } from "../cells.js";
-import type { Palette } from "../theme.js";
-
-// The rail's slab color: the darkest palette tier, so the sidebar fuses
-// with the window frame it leans against.
-export const railBg = (palette: Palette): string => palette.crust;
+import { blend, railBg, type Palette } from "../theme.js";
 
 // Session identity: the name is the rail's first cell — the window's
 // symmetric padding places it exactly at (19, 19) — over a full-width
@@ -22,7 +18,11 @@ export function header(
   ];
 }
 
-// Thin rule, full width — every line in the rail shares one span.
-export function hairline(palette: Palette, width: number, fg: string): string {
-  return line(width, railBg(palette), [{ text: "─".repeat(width), fg }]);
+// Thin rule, full width, in the sections' one hairline color — every
+// divider below the header shares this look.
+export function sectionHairline(palette: Palette, width: number): string {
+  const bg = railBg(palette);
+  return line(width, bg, [
+    { text: "─".repeat(width), fg: blend(palette.notify, bg, 0.5) },
+  ]);
 }

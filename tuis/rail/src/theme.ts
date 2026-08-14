@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { XDG_STATE } from "./paths.js";
 
 export interface Palette {
   mode: "dark" | "light";
@@ -21,14 +22,19 @@ export interface Palette {
   red: string;
 }
 
+// The rail's slab color: the darkest palette tier, so the sidebar fuses
+// with the window frame it leans against.
+export const railBg = (palette: Palette): string => palette.crust;
+
+// The spec's single dim level: how much of a foreground survives when a
+// row is de-emphasized (the elsewhere section, the timers).
+export const DIM_KEEP = 0.55;
+
 // TUIS_COLORS_PATH pins an alternate palette file (fixtures, light-mode
 // checks) without touching the live theme state.
 const PALETTE_PATH =
   process.env.TUIS_COLORS_PATH ??
-  join(
-    process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-    "dotfiles/generated/tuis-colors.json",
-  );
+  join(XDG_STATE, "dotfiles/generated/tuis-colors.json");
 
 let cached: { palette: Palette; mtimeMs: number } | null = null;
 

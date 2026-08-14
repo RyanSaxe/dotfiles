@@ -1,52 +1,7 @@
-import { blank, fmtElapsed, line, type Span } from "../cells.js";
+import { blank, line } from "../cells.js";
 import type { Agent, Window } from "../data.js";
-import { blend, type Palette } from "../theme.js";
-import { railBg } from "./header.js";
-
-// Timers whisper by default — blended well into the slab so their minute
-// ticks never pull the eye. Past eight hours the timer turns red: an agent
-// left alone that long IS the thing to look at.
-const ELAPSED_ATTENTION_SECS = 8 * 60 * 60;
-const ELAPSED_KEEP = 0.55;
-
-export function elapsedFg(secs: number, palette: Palette): string {
-  if (secs >= ELAPSED_ATTENTION_SECS) return palette.red;
-  return blend(palette.dim, railBg(palette), ELAPSED_KEEP);
-}
-
-export function stateColor(status: Agent["status"], palette: Palette): string {
-  switch (status) {
-    case "working":
-      return palette.mauve;
-    case "waiting":
-      return palette.peach;
-    case "done":
-      return palette.green;
-  }
-}
-
-// A three-cell pill: powerline caps around a single character. The SAME
-// shape everywhere in the rail — window numbers and elsewhere hints differ
-// only in color, never geometry.
-export function pill(
-  text: string,
-  fg: string,
-  bg: string,
-  lineBackground: string,
-): Span[] {
-  return [
-    { text: "", fg: bg, bg: lineBackground },
-    { text, fg, bg },
-    { text: "", fg: bg, bg: lineBackground },
-  ];
-}
-
-// A rail row paired with whether it is an item (a window/agent) or
-// furniture (spacers, hairlines) — pagination counts items, not rows.
-export interface RailRow {
-  text: string;
-  item: boolean;
-}
+import { railBg, type Palette } from "../theme.js";
+import { elapsedSpan, pill, stateColor, type RailRow } from "./rows.js";
 
 // Two orthogonal channels, never mixed: the accent-filled pill means only
 // "you are here"; a colored title always means agent state. Every row is
@@ -64,7 +19,7 @@ export function windowRows(
   for (const win of windows) {
     const agent = win.paneIds
       .map((paneId) => agentsByPane.get(paneId))
-      .find((a) => a !== undefined);
+      .find((candidate) => candidate !== undefined);
     const marker = win.active
       ? pill(String(win.index), palette.base, palette.accent, bg)
       : pill(String(win.index), palette.dim2, palette.surface0, bg);
@@ -86,12 +41,7 @@ export function windowRows(
           { text: " ", fg: palette.text },
           { text: win.name, fg: titleFg },
         ],
-        agent
-          ? {
-              text: fmtElapsed(agent.elapsedSecs),
-              fg: elapsedFg(agent.elapsedSecs, palette),
-            }
-          : undefined,
+        agent ? elapsedSpan(agent.elapsedSecs, palette) : undefined,
       ),
       item: true,
     });

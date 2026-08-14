@@ -4,15 +4,12 @@
 // acknowledged status timestamp; "new" means updatedTs > acked ts.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { XDG_STATE } from "./paths.js";
 import type { Agent, Pane } from "./data.js";
 
-const ACKS_PATH = join(
-  process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-  "dotfiles/rail/acks.json",
-);
+const ACKS_PATH = join(XDG_STATE, "dotfiles/rail/acks.json");
 
 export type AckStore = Record<string, number>;
 

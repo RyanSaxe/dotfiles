@@ -15,52 +15,44 @@
 
 import { existsSync, readFileSync, watch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { closeSync, openSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
 import { loadAcks, updateAcks } from "./acks.js";
 import {
   applyDoneHysteresis,
   collectAgents,
   collectPanes,
+  run,
+  tmux,
   windowsOf,
   type Agent,
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
+import { XDG_STATE } from "./paths.js";
 import { pokemonFor } from "./pokemon.js";
-import { renderRail } from "./render.js";
-import { spriteId, transmitSprite } from "./sprite.js";
+import { GUTTER_COLS, renderRail } from "./render.js";
+import { spriteId, transmitSprite, writeTty } from "./sprite.js";
 import { loadPalette } from "./theme.js";
-
-const run = promisify(execFile);
-const tmux = (...args: string[]) => run("tmux", args);
 
 const TICK_MS = 250;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
-// plus the two-cell crust gutter renderRail appends.
-const RAIL_WIDTH = 24;
+// plus the crust gutter renderRail appends.
+const RAIL_WIDTH = 22 + GUTTER_COLS;
 // Hysteresis: rails die below 100 but only spawn above 110, so a window
 // hovering at the boundary can't flap between the two.
 const KILL_BELOW_WIDTH = 100;
 const SPAWN_ABOVE_WIDTH = 110;
 
-const STATE_DIR = join(
-  process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-  "dotfiles/rail",
-);
+const STATE_DIR = join(XDG_STATE, "dotfiles/rail");
 const PID_FILE = join(STATE_DIR, "daemon.pid");
 const ENABLED_FLAG = join(STATE_DIR, "enabled");
 const PAGE_FILE = join(STATE_DIR, "page");
+// workmux manages its own state home; not ours to redirect via XDG.
 const WORKMUX_STATE = join(homedir(), ".local/state/workmux");
-const GENERATED_DIR = join(
-  process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-  "dotfiles/generated",
-);
+const GENERATED_DIR = join(XDG_STATE, "dotfiles/generated");
 const THEME_SYNC = join(homedir(), ".config/tmux/scripts/theme-sync.sh");
 
 const HIDE_CURSOR = "\x1b[?25l";
@@ -83,13 +75,8 @@ async function refreshAgents(): Promise<void> {
 
 function paintPane(pane: Pane, frame: string): void {
   if (pushed.get(pane.paneId) === frame) return;
-  try {
-    const fd = openSync(pane.tty, "w");
-    writeSync(fd, SYNC_ON + HIDE_CURSOR + frame + SYNC_OFF);
-    closeSync(fd);
+  if (writeTty(pane.tty, SYNC_ON + HIDE_CURSOR + frame + SYNC_OFF)) {
     pushed.set(pane.paneId, frame);
-  } catch {
-    // The pane died between the poll and the write; the next tick forgets it.
   }
 }
 

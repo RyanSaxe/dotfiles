@@ -4,15 +4,12 @@
 // and writes the mapping file `rail jump` reads.
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { XDG_STATE } from "./paths.js";
 import type { Agent } from "./data.js";
 
-const HINTS_PATH = join(
-  process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
-  "dotfiles/rail/hints.tsv",
-);
+const HINTS_PATH = join(XDG_STATE, "dotfiles/rail/hints.tsv");
 
 // Home row first, then the rest of the alphabet.
 const POOL = "asdfghjklqwertyuiopzxcvbnm";

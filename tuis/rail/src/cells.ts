@@ -2,7 +2,7 @@
 // truncated by display width, and padded to the full rail width so the
 // background paints edge to edge.
 
-import { RESET, bg, fg } from "./theme.js";
+import { RESET, bg, fg, railBg, type Palette } from "./theme.js";
 
 export interface Span {
   text: string;
@@ -38,13 +38,13 @@ function charWidth(cp: number): number {
   return 1;
 }
 
-export function displayWidth(text: string): number {
+function displayWidth(text: string): number {
   let width = 0;
   for (const ch of text) width += charWidth(ch.codePointAt(0)!);
   return width;
 }
 
-export function truncate(text: string, max: number): string {
+function truncate(text: string, max: number): string {
   if (displayWidth(text) <= max) return text;
   let width = 0;
   let out = "";
@@ -92,6 +92,15 @@ export function line(
 
 export function blank(width: number, lineBg: string): string {
   return bg(lineBg) + " ".repeat(width) + RESET;
+}
+
+// Centered dim text on the slab — the pagination hint's one look, wherever
+// it renders (footer row or a short pane's bottom row).
+export function hintRow(palette: Palette, width: number, text: string): string {
+  const pad = Math.max(0, Math.floor((width - displayWidth(text)) / 2));
+  return line(width, railBg(palette), [
+    { text: " ".repeat(pad) + text, fg: palette.dim },
+  ]);
 }
 
 export function fmtElapsed(secs: number): string {

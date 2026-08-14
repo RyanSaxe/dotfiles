@@ -1,12 +1,12 @@
-import { blank, line } from "../cells.js";
+import { blank, hintRow, line } from "../cells.js";
 import {
   idToHex,
   placeholderRow,
   SPRITE_COLS,
   SPRITE_ROWS,
 } from "../sprite.js";
-import { blend, type Palette } from "../theme.js";
-import { hairline, railBg } from "./header.js";
+import { railBg, type Palette } from "../theme.js";
+import { sectionHairline } from "./header.js";
 
 // Reserved footer: the mascot's home. When a sprite id is present the
 // footer rows carry kitty Unicode-placeholder cells and the terminal draws
@@ -26,15 +26,11 @@ export function mascotFooter(
   pageHint = "",
 ): string[] {
   const bg = railBg(palette);
-  // The row between the hairline and the sprite doubles as the pagination
-  // hint's home — out of the list, always with air on both sides.
-  const pad = Math.max(0, Math.floor((width - pageHint.length) / 2));
-  const hintRow = pageHint
-    ? line(width, bg, [{ text: " ".repeat(pad) + pageHint, fg: palette.dim }])
-    : blank(width, bg);
   const rows: string[] = [
-    hairline(palette, width, blend(palette.notify, bg, 0.5)),
-    hintRow,
+    sectionHairline(palette, width),
+    // The row between the hairline and the sprite doubles as the
+    // pagination hint's home — out of the list, air on both sides.
+    pageHint ? hintRow(palette, width, pageHint) : blank(width, bg),
   ];
   if (spriteIdValue === null || width < SPRITE_COLS + 2) {
     for (let i = 0; i < SPRITE_ROWS; i++) rows.push(blank(width, bg));

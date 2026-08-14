@@ -2,7 +2,9 @@ import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 
-const run = promisify(execFile);
+// The one exec plumbing every module shares.
+export const run = promisify(execFile);
+export const tmux = (...args: string[]) => run("tmux", args);
 
 export type AgentStatus = "working" | "waiting" | "done";
 

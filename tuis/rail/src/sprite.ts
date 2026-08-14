@@ -7,8 +7,20 @@
 // toggle all carry the sprite exactly like text. Nothing ever needs
 // deleting: no cells, no image.
 
-import { readFileSync } from "node:fs";
-import { closeSync, openSync, writeSync } from "node:fs";
+import { closeSync, openSync, readFileSync, writeSync } from "node:fs";
+
+// Write raw bytes straight to a pane's tty, tolerating its death between
+// the poll and the write. The daemon paints frames through this too.
+export function writeTty(tty: string, payload: string): boolean {
+  try {
+    const fd = openSync(tty, "w");
+    writeSync(fd, payload);
+    closeSync(fd);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Footer block the sprite is scaled over. Terminal cells are roughly 1:2
 // (9.6pt x 20.8pt at font-size 16), so 18x8 cells is ~173x166pt — near
@@ -109,12 +121,5 @@ export function transmitSprite(tty: string, spritePath: string): boolean {
         : `m=${last ? 0 : 1}`;
     payload += wrapTmux(`\x1b_G${control};${chunk}\x1b\\`);
   }
-  try {
-    const fd = openSync(tty, "w");
-    writeSync(fd, payload);
-    closeSync(fd);
-    return true;
-  } catch {
-    return false;
-  }
+  return writeTty(tty, payload);
 }

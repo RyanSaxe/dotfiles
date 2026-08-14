@@ -1,26 +1,19 @@
-import { blank, fmtElapsed, line } from "../cells.js";
+import { blank, line } from "../cells.js";
 import type { Agent } from "../data.js";
-import { blend, type Palette } from "../theme.js";
-import { railBg } from "./header.js";
-import { elapsedFg, pill, stateColor, type RailRow } from "./windows.js";
+import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
+import {
+  agentRank,
+  elapsedSpan,
+  pill,
+  stateColor,
+  type RailRow,
+} from "./rows.js";
 
-// How much of a foreground color survives in the elsewhere section: the
-// whole section sits at one uniform dim level — urgency order and hue carry
-// attention, never extra brightness tiers.
-const ELSEWHERE_KEEP = 0.55;
-
-const URGENCY: Record<Agent["status"], number> = {
-  waiting: 0,
-  working: 1,
-  done: 2,
-};
-
-// Acked rows sort after everything: their news has been seen.
-export function sortElsewhere(agents: Agent[], acked: Set<string>): Agent[] {
-  const rank = (agent: Agent) =>
-    acked.has(agent.paneId) ? 3 : URGENCY[agent.status];
+// Urgency first, acked last, newest activity breaking ties.
+function sortElsewhere(agents: Agent[], acked: Set<string>): Agent[] {
   return [...agents].sort(
-    (a, b) => rank(a) - rank(b) || b.updatedTs - a.updatedTs,
+    (a, b) =>
+      agentRank(a, acked) - agentRank(b, acked) || b.updatedTs - a.updatedTs,
   );
 }
 
@@ -34,6 +27,8 @@ function label(agent: Agent): { project: string; name: string } {
   return { project: `${agent.session}/`, name };
 }
 
+// The whole section sits at one uniform dim level (DIM_KEEP) — urgency
+// order and hue carry attention, never extra brightness tiers.
 export function elsewhereRows(
   agents: Agent[],
   acked: Set<string>,
@@ -42,15 +37,15 @@ export function elsewhereRows(
   width: number,
 ): RailRow[] {
   const bg = railBg(palette);
-  const dim = blend(palette.dim, bg, ELSEWHERE_KEEP);
-  const dim2 = blend(palette.dim2, bg, ELSEWHERE_KEEP);
-  const chipBg = blend(palette.surface0, bg, ELSEWHERE_KEEP);
+  const dim = blend(palette.dim, bg, DIM_KEEP);
+  const dim2 = blend(palette.dim2, bg, DIM_KEEP);
+  const chipBg = blend(palette.surface0, bg, DIM_KEEP);
   const rows: RailRow[] = [];
   for (const agent of sortElsewhere(agents, acked)) {
     const { project, name } = label(agent);
     const nameFg = acked.has(agent.paneId)
       ? dim2
-      : blend(stateColor(agent.status, palette), bg, ELSEWHERE_KEEP);
+      : blend(stateColor(agent.status, palette), bg, DIM_KEEP);
     const hint = hints.get(agent.paneId);
     rows.push({ text: blank(width, bg), item: false });
     rows.push({
@@ -65,10 +60,7 @@ export function elsewhereRows(
           { text: project, fg: dim },
           { text: name, fg: nameFg },
         ],
-        {
-          text: fmtElapsed(agent.elapsedSecs),
-          fg: elapsedFg(agent.elapsedSecs, palette),
-        },
+        elapsedSpan(agent.elapsedSecs, palette),
       ),
       item: true,
     });
