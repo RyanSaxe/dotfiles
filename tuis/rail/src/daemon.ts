@@ -100,6 +100,17 @@ async function spawnRail(windowId: string): Promise<void> {
   );
   const paneId = stdout.trim();
   await tmux("set-option", "-p", "-t", paneId, "@rail", "1");
+  // The rail's own border hides (per-pane style wins the shared border):
+  // the seam stays a pure color boundary while content-content splits
+  // keep the global separator line.
+  await tmux(
+    "set-option",
+    "-p",
+    "-t",
+    paneId,
+    "pane-border-style",
+    "fg=#{@bg}",
+  );
   await tmux("select-pane", "-d", "-t", paneId);
 }
 
