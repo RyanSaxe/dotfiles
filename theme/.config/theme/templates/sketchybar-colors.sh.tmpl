@@ -4,7 +4,9 @@
 # colors.sh). ARGB strings for sketchybar's own color format, built from the
 # bare-hex-digit variant `theme` emits alongside every color token.
 
-export BAR_COLOR="0xff{{bg_hex}}"
+# Crust, not base: the bar shares the terminal frame's darkest tier so the
+# menu bar and the window chrome read as one continuous surface.
+export BAR_COLOR="0xff{{crust_hex}}"
 export ITEM_BG="0x00000000"
 export BORDER_COLOR="0xff{{border_hex}}"
 
