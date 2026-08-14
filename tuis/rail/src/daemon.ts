@@ -13,7 +13,7 @@
 // copy-mode, are never the selected pane, don't exist in narrow windows,
 // exist in wide ones while enabled, and never survive alone in a window.
 
-import { existsSync, watch } from "node:fs";
+import { existsSync, readFileSync, watch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { closeSync, openSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
@@ -54,6 +54,7 @@ const STATE_DIR = join(
 );
 const PID_FILE = join(STATE_DIR, "daemon.pid");
 const ENABLED_FLAG = join(STATE_DIR, "enabled");
+const PAGE_FILE = join(STATE_DIR, "page");
 const WORKMUX_STATE = join(homedir(), ".local/state/workmux");
 const GENERATED_DIR = join(
   process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
@@ -263,6 +264,14 @@ async function tick(counter: number): Promise<void> {
   const hints = assignHints(settled);
   writeHints(settled, hints);
 
+  // Pagination state, written by `rail page up|down`; the renderer clamps.
+  let page = 0;
+  try {
+    page = Math.max(0, Number(readFileSync(PAGE_FILE, "utf8")) || 0);
+  } catch {
+    // No page file: top of the list.
+  }
+
   const frames = new Map<string, string>();
   for (const pane of panes) {
     if (!pane.isRail || skip.has(pane.paneId)) continue;
@@ -278,7 +287,7 @@ async function tick(counter: number): Promise<void> {
         ? pokemon.spritePath
         : null;
     const sprite = spritePath ? spriteId(spritePath) : null;
-    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}`;
+    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}`;
     let frame = frames.get(bucket);
     if (frame === undefined) {
       const data = {
@@ -288,6 +297,7 @@ async function tick(counter: number): Promise<void> {
         acked,
         hints,
         sprite,
+        page,
       };
       frame = toFrame(
         renderRail(data, sessionPalette, pane.width, pane.height),

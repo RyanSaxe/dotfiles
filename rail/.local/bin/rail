@@ -78,6 +78,22 @@ jump)
 ensure-daemon)
   ensure_daemon
   ;;
+page)
+  # Page the rail's body when it overflows (bound to alt+, / alt+. in
+  # tmux). The daemon reads this file; the renderer clamps out-of-range.
+  direction="${2:?usage: rail page up|down}"
+  current="$(cat "$STATE/page" 2>/dev/null || echo 0)"
+  case "$direction" in
+  up) next=$((current - 1)) ;;
+  down) next=$((current + 1)) ;;
+  *)
+    echo "usage: rail page up|down" >&2
+    exit 1
+    ;;
+  esac
+  [ "$next" -lt 0 ] && next=0
+  printf '%s' "$next" >"$STATE/page"
+  ;;
 status)
   if daemon_running; then
     echo "daemon: running (pid $(cat "$PID_FILE"))"

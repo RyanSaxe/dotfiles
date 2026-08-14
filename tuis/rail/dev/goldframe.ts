@@ -15,6 +15,7 @@ const scene: RailData = {
   acked: new Set(process.env.RAIL_ACK ? [process.env.RAIL_ACK] : []),
   hints: new Map(),
   sprite: null,
+  page: Number(process.env.RAIL_PAGE ?? 0),
   windows: [
     { index: 1, name: "nvim", active: false, paneIds: ["%1"] },
     { index: 2, name: "zsh", active: true, paneIds: ["%2"] },

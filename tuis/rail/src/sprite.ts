@@ -11,9 +11,9 @@ import { readFileSync } from "node:fs";
 import { closeSync, openSync, writeSync } from "node:fs";
 
 // Footer block the sprite is scaled over. Terminal cells are roughly 1:2
-// (9.6pt x 20.8pt at font-size 16), so 17x8 cells is ~163x166pt — square,
-// so the 96x96 sprites keep their proportions.
-export const SPRITE_COLS = 17;
+// (9.6pt x 20.8pt at font-size 16), so 18x8 cells is ~173x166pt — near
+// square, and 18 centers exactly in the 22-column rail (2 cols each side).
+export const SPRITE_COLS = 18;
 export const SPRITE_ROWS = 8;
 
 // Row/column diacritics, indices 0..31, from kitty's

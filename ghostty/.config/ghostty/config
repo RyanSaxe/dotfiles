@@ -26,17 +26,18 @@ keybind = shift+enter=text:\x1b\r
 
 font-size = 16
 
-# The frame: padding that the frame shader (below) paints in the theme's
-# darkest background tier — a dark chrome around every surface. The LEFT
-# edge is zero: the sidebar's slab is the frame's left side, flush with
-# the window. These values must stay in sync with the FRAME_*_PX defines
+# The frame: 32pt of symmetric padding that the frame shader (below)
+# paints in the theme's darkest background tier — a dark chrome around
+# every surface. The grid starts at (32,32), so the sidebar's first cell
+# (the session name) sits exactly there; the sidebar's slab fuses with the
+# frame and reads as touching the edges. Must stay in sync with FRAME_PX
 # in theme/templates/frame.glsl.tmpl (points here, device pixels there).
 # `extend-always` keeps the sub-cell remainder in edge colors beneath the
-# shader's ring; balance is off so the remainder never pads the left.
-window-padding-x = 0,32
+# shader's ring; balance splits it evenly.
+window-padding-x = 32
 window-padding-y = 32
 window-padding-color = extend-always
-window-padding-balance = false
+window-padding-balance = true
 
 # Copying highlighted text needs no shortcut.
 copy-on-select = clipboard

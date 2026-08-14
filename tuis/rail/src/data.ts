@@ -35,6 +35,8 @@ export interface RailData {
   hints: Map<string, string>;
   // Kitty image id for the footer sprite; null renders a blank footer.
   sprite: number | null;
+  // Pagination page for the body (0 = top); clamped by the renderer.
+  page: number;
 }
 
 // tmux formats can't contain our field separator; \x1f never appears in
@@ -142,6 +144,7 @@ export async function collect(session: string): Promise<RailData> {
     acked: new Set(),
     hints: new Map(),
     sprite: null,
+    page: 0,
   };
 }
 

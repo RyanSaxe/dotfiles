@@ -30,6 +30,13 @@ export function pill(
   ];
 }
 
+// A rail row paired with whether it is an item (a window/agent) or
+// furniture (spacers, hairlines) — pagination counts items, not rows.
+export interface RailRow {
+  text: string;
+  item: boolean;
+}
+
 // Two orthogonal channels, never mixed: the accent-filled pill means only
 // "you are here"; a colored title always means agent state. Every row is
 // preceded by a blank spacer, so rows breathe and the gap below the header
@@ -40,10 +47,9 @@ export function windowRows(
   acked: Set<string>,
   palette: Palette,
   width: number,
-  spacious: boolean,
-): string[] {
+): RailRow[] {
   const bg = railBg(palette);
-  const rows: string[] = [];
+  const rows: RailRow[] = [];
   for (const win of windows) {
     const agent = win.paneIds
       .map((paneId) => agentsByPane.get(paneId))
@@ -59,13 +65,12 @@ export function windowRows(
         : win.active
           ? palette.text
           : palette.dim2;
-    if (spacious) rows.push(blank(width, bg));
-    rows.push(
-      line(
+    rows.push({ text: blank(width, bg), item: false });
+    rows.push({
+      text: line(
         width,
         bg,
         [
-          { text: " ", fg: palette.text },
           ...marker,
           { text: " ", fg: palette.text },
           { text: win.name, fg: titleFg },
@@ -74,7 +79,8 @@ export function windowRows(
           ? { text: fmtElapsed(agent.elapsedSecs), fg: palette.dim }
           : undefined,
       ),
-    );
+      item: true,
+    });
   }
   return rows;
 }

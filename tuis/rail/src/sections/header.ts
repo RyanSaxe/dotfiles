@@ -1,36 +1,28 @@
-import { blank, line } from "../cells.js";
+import { line } from "../cells.js";
 import type { Palette } from "../theme.js";
 
 // The rail's slab color: the darkest palette tier, so the sidebar fuses
 // with the window frame it leans against.
 export const railBg = (palette: Palette): string => palette.crust;
 
-// Session identity: name in lavender over a full-width accent rule.
+// Session identity: the name is the rail's first cell — the window's
+// symmetric padding places it exactly at (32, 32) — over a full-width
+// accent rule.
 export function header(
   session: string,
   palette: Palette,
   width: number,
 ): string[] {
   const bg = railBg(palette);
-  // No blank above the name: the slab is flush with the window frame, so
-  // the session name sits at the very top of the rail.
   return [
-    line(width, bg, [
-      { text: " ", fg: palette.text },
-      { text: session, fg: palette.lavender },
-    ]),
+    line(width, bg, [{ text: session, fg: palette.lavender }]),
     // Heavy rule: the header's accent line carries more weight than the
     // section hairlines below it.
-    line(width, bg, [
-      { text: " " + "━".repeat(width - 2), fg: palette.accent },
-    ]),
+    line(width, bg, [{ text: "━".repeat(width), fg: palette.accent }]),
   ];
 }
 
-// Thin rule, same span as the header rule — every line in the rail shares
-// one width.
+// Thin rule, full width — every line in the rail shares one span.
 export function hairline(palette: Palette, width: number, fg: string): string {
-  return line(width, railBg(palette), [
-    { text: " " + "─".repeat(width - 2), fg },
-  ]);
+  return line(width, railBg(palette), [{ text: "─".repeat(width), fg }]);
 }

@@ -66,11 +66,12 @@ export function line(
   spans: Span[],
   right?: Span,
 ): string {
-  const rightWidth = right ? displayWidth(right.text) + 1 : 0;
+  // Right-aligned spans end flush at the final column; left content keeps
+  // at least one cell of air before them.
+  const rightWidth = right ? displayWidth(right.text) : 0;
   let used = 0;
   let out = bg(lineBg);
   const parts: Span[] = [];
-  // Left content keeps at least one cell of air before a right-aligned span.
   const budget = width - rightWidth - (right ? 1 : 0);
   for (const span of spans) {
     const available = budget - used;
@@ -85,7 +86,7 @@ export function line(
   }
   const fill = width - used - rightWidth;
   out += " ".repeat(Math.max(0, fill));
-  if (right) out += fg(right.fg) + right.text + " ";
+  if (right) out += fg(right.fg) + right.text;
   return out + RESET;
 }
 
