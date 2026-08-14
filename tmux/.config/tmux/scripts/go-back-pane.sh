@@ -14,8 +14,6 @@ if [[ -n "$prev" ]]; then
   window="${window_pane%.*}"
   pane="${window_pane#*.}"
 
-  # Switch to session, then window, then pane
-  tmux switch-client -t "$session"
-  tmux select-window -t ":$window"
-  tmux select-pane -t ".$pane"
+  # The shared jump primitive switches AND syncs the pokemon accent.
+  "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" ":$window" ".$pane"
 fi

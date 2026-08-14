@@ -67,12 +67,8 @@ jump)
   [ -n "$hint_line" ] || exit 0
   session="$(printf '%s' "$hint_line" | cut -f2)"
   pane="$(printf '%s' "$hint_line" | cut -f3)"
-  tmux switch-client -t "$session"
-  tmux select-window -t "$pane"
-  tmux select-pane -t "$pane"
-  # The global accent follows the project (sessions are named after
-  # projects); background — jumps must stay instant.
-  ("$HOME/.local/bin/theme" pokemon sync "$session" >/dev/null 2>&1 &)
+  # The shared jump primitive switches AND syncs the pokemon accent.
+  "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
   ;;
 ensure-daemon)
   ensure_daemon
