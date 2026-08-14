@@ -32,11 +32,11 @@ export function pill(
 export function stateColor(status: Agent["status"], palette: Palette): string {
   switch (status) {
     case "working":
-      return palette.mauve;
+      return palette.statusWorking;
     case "waiting":
-      return palette.peach;
+      return palette.statusWaiting;
     case "done":
-      return palette.green;
+      return palette.statusDone;
   }
 }
 

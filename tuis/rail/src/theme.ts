@@ -8,10 +8,8 @@ export interface Palette {
   accent: string;
   notify: string;
   base: string;
-  mantle: string;
   crust: string;
   surface0: string;
-  surface1: string;
   text: string;
   dim: string;
   dim2: string;
@@ -20,6 +18,11 @@ export interface Palette {
   peach: string;
   green: string;
   red: string;
+  // Agent status semantics, from the status_* tokens (tokens.conf) — the
+  // same source tmux's @status_* variables render from.
+  statusWorking: string;
+  statusWaiting: string;
+  statusDone: string;
 }
 
 // The rail's slab color: the darkest palette tier, so the sidebar fuses

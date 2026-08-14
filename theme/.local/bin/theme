@@ -148,6 +148,7 @@ render() {
   rm -f "$sed_script"
 
   echo "$mode" >"$MODE_FILE"
+  publish_files
   echo "theme: $mode"
 }
 
@@ -163,13 +164,13 @@ render() {
 #   ghostty    palette follows macOS appearance natively; hammerspoon's
 #              watcher sends the reload signal for the trail shader
 publish_files() {
-  # File copies are context-independent writes, so they belong here:
-  # ghostty resolves custom-shader paths relative to its config dir.
+  # File copies are context-independent writes: ghostty resolves
+  # custom-shader paths relative to its config dir. Every rendered .glsl
+  # is a shader by convention — no name list to maintain.
   mkdir -p "$HOME/.config/ghostty/shaders"
-  for shader in cursor_trail.glsl frame.glsl; do
-    if [ -f "$GENERATED/$shader" ]; then
-      cp "$GENERATED/$shader" "$HOME/.config/ghostty/shaders/$shader"
-    fi
+  for shader in "$GENERATED"/*.glsl; do
+    [ -f "$shader" ] || continue
+    cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
   done
 }
 
@@ -211,14 +212,12 @@ case "${1:-status}" in
 dark | light)
   set_os_appearance "$1"
   render "$1"
-  publish_files
   ;;
 toggle)
   case "$(current_mode)" in
   dark) set_os_appearance light && render light ;;
   *) set_os_appearance dark && render dark ;;
   esac
-  publish_files
   ;;
 apply)
   # `theme apply [dark|light]` renders WITHOUT touching OS appearance —
@@ -233,7 +232,6 @@ apply)
     ;;
   esac
   render "$mode"
-  publish_files
   ;;
 pokemon)
   sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name>|sync [project] [--shiny]}"
@@ -290,7 +288,6 @@ pokemon)
     ;;
   esac
   render "$(current_mode)"
-  publish_files
   show_accents
   ;;
 status)

@@ -13,9 +13,8 @@ set -g @notify "{{notify}}"
 set -g @warn "{{warn}}"
 set -g @info "{{info}}"
 
-# Agent status glyph colors (see workmux config.yaml status_icons). These
-# are semantic — deliberately palette keys, never the pokemon accents.
-set -g @status_working "{{mauve}}"
-set -g @status_waiting "{{peach}}"
-set -g @status_done "{{green}}"
-set -g @status_interrupted "{{red}}"
+# Agent status glyph colors (see workmux config.yaml status_icons), from
+# the status_* tokens shared with the rail.
+set -g @status_working "{{status_working}}"
+set -g @status_waiting "{{status_waiting}}"
+set -g @status_done "{{status_done}}"
