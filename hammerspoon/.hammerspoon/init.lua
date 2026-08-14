@@ -8,7 +8,12 @@
 -- Enable the `hs` CLI (used for manual poking and by scripts).
 hs.ipc.cliInstall()
 
-require("mascot").start()
+local rail = require("rail")
+local mascot = require("mascot")
+-- The rail's reserved footer is the mascot's home when the rail is up.
+mascot.rail = rail
+rail.start()
+mascot.start()
 
 -- 2. Auto-reload: editing any .lua file in ~/.hammerspoon applies itself.
 -- The watcher hands us the list of changed paths; only reload for .lua so

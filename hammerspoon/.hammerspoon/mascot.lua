@@ -69,8 +69,19 @@ local function reconcile()
   end
 
   local frame = window:frame()
+  -- When the rail is up it reserves a footer as the mascot's home;
+  -- otherwise the mascot floats at the window's bottom-right as before.
+  local anchor
+  if M.rail then
+    anchor = M.rail.mascot_anchor(frame, M.config.size)
+  end
+  anchor = anchor
+    or {
+      x = frame.x + frame.w - M.config.size - M.config.padding,
+      y = frame.y + frame.h - M.config.size - M.config.padding,
+    }
   local sprite = (shiny and (name .. "-shiny") or name) .. "-mascot.png"
-  local signature = string.format("%s|%d|%.0f|%.0f|%.0f|%.0f", sprite, window:id(), frame.x, frame.y, frame.w, frame.h)
+  local signature = string.format("%s|%d|%.0f|%.0f", sprite, window:id(), anchor.x, anchor.y)
   if signature == M.drawn then
     return
   end
@@ -83,10 +94,7 @@ local function reconcile()
     M.canvas[1].image = image
     M.drawn_sprite = sprite
   end
-  M.canvas:topLeft({
-    x = frame.x + frame.w - M.config.size - M.config.padding,
-    y = frame.y + frame.h - M.config.size - M.config.padding,
-  })
+  M.canvas:topLeft(anchor)
   M.canvas:show()
   M.drawn = signature
 end

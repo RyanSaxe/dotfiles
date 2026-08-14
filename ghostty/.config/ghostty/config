@@ -32,6 +32,10 @@ window-padding-y = 20
 window-padding-color = background
 window-padding-balance = true
 
+# The agent rail reserves left padding by rewriting this optional include
+# (the `rail` command); hammerspoon draws the rail in the reserved band.
+config-file = ?padding.conf
+
 # Copying highlighted text needs no shortcut.
 copy-on-select = clipboard
 
