@@ -27,11 +27,11 @@ export function renderRail(
   height: number,
 ): string[] {
   const bg = railBg(palette);
-  // The last column is a content-background gutter (appended at the end):
-  // together with the one-cell tmux border beside it, the slab and its
-  // hairlines end exactly two cells (~19pt at font-size 16, the frame's
-  // spacing unit) before the content pane's first character.
-  const inner = width - 1;
+  // The last two columns are a crust gutter (appended at the end): the
+  // hairlines and text stop two cells (~19pt at font-size 16, the frame's
+  // spacing unit) before the slab meets the content surface — mirroring
+  // the 19pt of frame crust on the rail's left edge.
+  const inner = width - 2;
 
   const agentsByPane = new Map<string, Agent>();
   const elsewhere: Agent[] = [];
@@ -97,7 +97,7 @@ export function renderRail(
   }
   while (content.length < budget) content.push(blank(inner, bg));
 
-  const gutter = bgEsc(palette.base) + " " + RESET;
+  const gutter = bgEsc(bg) + "  " + RESET;
   return [...top, ...content, ...footer, blank(inner, bg)].map(
     (row) => row + gutter,
   );
