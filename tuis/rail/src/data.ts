@@ -42,42 +42,6 @@ export interface RailData {
 // tmux formats can't contain our field separator; \x1f never appears in
 // window names or pane ids.
 const SEP = "\x1f";
-const PANE_FORMAT = [
-  "#{window_index}",
-  "#{window_name}",
-  "#{window_active}",
-  "#{pane_id}",
-].join(SEP);
-
-async function collectWindows(session: string): Promise<Window[]> {
-  const { stdout } = await run("tmux", [
-    "list-panes",
-    "-s",
-    "-t",
-    session,
-    "-F",
-    PANE_FORMAT,
-  ]);
-  const windows = new Map<number, Window>();
-  for (const line of stdout.split("\n")) {
-    if (!line) continue;
-    const [index, name, active, paneId] = line.split(SEP);
-    if (!index || !name || !paneId) continue;
-    const idx = Number(index);
-    const existing = windows.get(idx);
-    if (existing) {
-      existing.paneIds.push(paneId);
-    } else {
-      windows.set(idx, {
-        index: idx,
-        name,
-        active: active === "1",
-        paneIds: [paneId],
-      });
-    }
-  }
-  return [...windows.values()].sort((a, b) => a.index - b.index);
-}
 
 interface WorkmuxAgent {
   session: string;
@@ -130,27 +94,6 @@ export function applyDoneHysteresis(agents: Agent[], nowSecs: number): Agent[] {
       ? { ...agent, status: "working" as const }
       : agent,
   );
-}
-
-export async function collect(session: string): Promise<RailData> {
-  const [windows, agents] = await Promise.all([
-    collectWindows(session),
-    collectAgents(),
-  ]);
-  return {
-    session,
-    windows,
-    agents,
-    acked: new Set(),
-    hints: new Map(),
-    sprite: null,
-    page: 0,
-  };
-}
-
-export async function currentSession(): Promise<string> {
-  const { stdout } = await run("tmux", ["display-message", "-p", "#S"]);
-  return stdout.trim();
 }
 
 // ----- global snapshot (daemon) -----------------------------------------

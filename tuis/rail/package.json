@@ -4,7 +4,6 @@
   "type": "module",
   "description": "In-terminal sidebar: tmux windows + agent status, themed by the dotfiles theme system",
   "scripts": {
-    "start": "tsx src/app.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
