@@ -1,0 +1,66 @@
+name: health
+
+# "Does a fresh box come up?" — the installer's symlink shape, shell
+# syntax, and the theme render, verified on both OSes without real
+# package installs.
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+jobs:
+  health:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stow and zsh
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install stow
+          else
+            sudo apt-get update -q
+            sudo apt-get install -y stow zsh
+          fi
+
+      - name: Stow every tier into a scratch home
+        run: |
+          scratch="$(mktemp -d)"
+          echo "SCRATCH=$scratch" >> "$GITHUB_ENV"
+          tiers="tiers/core.txt"
+          if [ "$RUNNER_OS" = macOS ]; then tiers="$tiers tiers/mac.txt"; fi
+          # shellcheck disable=SC2086
+          cat $tiers | while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            echo "stow: $pkg"
+            stow -t "$scratch" "$pkg"
+          done
+
+      - name: Key targets resolve
+        run: |
+          paths=".zshrc .config/tmux/tmux.conf .local/bin/theme .local/bin/rail"
+          if [ "$RUNNER_OS" = macOS ]; then
+            paths="$paths .config/ghostty/config"
+          fi
+          for path in $paths; do
+            if [ ! -e "$SCRATCH/$path" ]; then
+              echo "::error::missing $path after stow"
+              exit 1
+            fi
+          done
+
+      - name: zsh syntax
+        run: |
+          find zsh -type f \( -name '.zsh*' -o -name '*.zsh' \) \
+            -exec zsh -n {} +
+
+      - name: Theme renders with no unresolved tokens
+        run: |
+          HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
+            "$SCRATCH/.local/bin/theme" apply
+          test -s "$SCRATCH/.local/state/dotfiles/generated/tuis-colors.json"

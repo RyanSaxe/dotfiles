@@ -1,0 +1,58 @@
+name: release
+
+# develop -> main merges cut a release automatically. The semver bump is
+# derived from conventional commit prefixes since the last tag: feat ->
+# minor, breaking (! or BREAKING CHANGE) -> major, anything else ->
+# patch. The first release is v1.0.0.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute the next version
+        id: version
+        run: |
+          last="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+          if [ -z "$last" ]; then
+            echo "next=v1.0.0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$(git log --format=%s "$last..HEAD")" ]; then
+            echo "next=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          bump=patch
+          git log --format=%s "$last..HEAD" | grep -qE '^feat(\(.*\))?:' && bump=minor
+          if git log --format='%s%n%b' "$last..HEAD" | grep -qE '^[a-z]+(\(.*\))?!:|^BREAKING CHANGE'; then
+            bump=major
+          fi
+          v="${last#v}"
+          major="${v%%.*}"
+          rest="${v#*.}"
+          minor="${rest%%.*}"
+          patch="${rest#*.}"
+          case "$bump" in
+            major) major=$((major + 1)) minor=0 patch=0 ;;
+            minor) minor=$((minor + 1)) patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          echo "next=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+
+      - name: Create the release
+        if: steps.version.outputs.next != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.next }}" \
+            --target "$GITHUB_SHA" --generate-notes

@@ -112,6 +112,18 @@ repos:
         pass_filenames: false
         files: "^tuis/rail/"
 
+      # The rail's behavioral test: the visit-clears ack lifecycle,
+      # against a throwaway state dir.
+      - id: rail-ackcheck
+        name: ackcheck (rail)
+        language: node
+        additional_dependencies: ["tsx@4.19.2"]
+        entry: sh
+        args:
+          ["-c", "XDG_STATE_HOME=$(mktemp -d) tsx tuis/rail/dev/ackcheck.ts"]
+        pass_filenames: false
+        files: "^tuis/rail/"
+
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.
       - id: theme-tests
