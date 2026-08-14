@@ -10,8 +10,10 @@ export BAR_COLOR="0xff{{crust_hex}}"
 export ITEM_BG="0x00000000"
 export BORDER_COLOR="0xff{{border_hex}}"
 
-export ICON_COLOR="0xff{{fg_muted_hex}}"
-export LABEL_COLOR="0xff{{fg_muted_hex}}"
+# fg_faint (the dim tier the rail and tmux share), not fg_muted: bar text
+# should be present but quiet.
+export ICON_COLOR="0xff{{fg_faint_hex}}"
+export LABEL_COLOR="0xff{{fg_faint_hex}}"
 
 # Pokemon-linked: theme pokemon <name> overrides these two only.
 export ACCENT_COLOR="0xff{{accent_hex}}"
