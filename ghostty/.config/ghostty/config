@@ -26,14 +26,14 @@ keybind = shift+enter=text:\x1b\r
 
 font-size = 16
 
-# No padding: the terminal grid owns the window edge-to-edge, so the rail
-# sits truly flush. Cell sizes rarely divide the window exactly; the
-# remainder ring is painted by continuing the edge cells' background —
-# `extend-always` because plain `extend` has heuristics that sometimes
-# refuse, leaving off-color strips at the edges. Balance splits the
-# remainder evenly instead of piling it on one side.
-window-padding-x = 0
-window-padding-y = 0
+# The frame: 8pt of padding that the frame shader (below) paints in the
+# theme's darkest background tier — a dark chrome around every surface
+# that the terminal sidebar leans into. This value must stay in sync with
+# FRAME_PX in theme/templates/frame.glsl.tmpl (points here, device pixels
+# there). `extend-always` keeps the sub-cell remainder in edge colors
+# beneath the shader's ring; balance splits it evenly.
+window-padding-x = 8
+window-padding-y = 8
 window-padding-color = extend-always
 window-padding-balance = true
 
@@ -45,11 +45,12 @@ copy-on-select = clipboard
 # fires. `never` guarantees apps can't claim shift away from the terminal.
 mouse-shift-capture = never
 
-# Cursor trail shader in the theme's accent colors. The file is rendered by
-# the `theme` command (from theme/templates/cursor_trail.glsl.tmpl) and
-# copied here; `theme` then signals ghostty (SIGUSR2 = reload config) so
-# the trail follows a palette or pokemon switch with no keypress.
+# Theme-rendered shaders (from theme/templates/*.glsl.tmpl), copied here
+# by the `theme` command, which then signals ghostty (SIGUSR2 = reload) so
+# both follow palette/pokemon/mode switches with no keypress. The frame
+# shader runs last so its ring paints over everything at the edges.
 custom-shader = shaders/cursor_trail.glsl
+custom-shader = shaders/frame.glsl
 
 # Title bar hidden — window moving is keyboard territory.
 macos-titlebar-style = hidden

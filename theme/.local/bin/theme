@@ -164,11 +164,13 @@ render() {
 #              watcher sends the reload signal for the trail shader
 publish_files() {
   # File copies are context-independent writes, so they belong here:
-  # ghostty resolves custom-shader relative to its config dir.
-  if [ -f "$GENERATED/cursor_trail.glsl" ]; then
-    mkdir -p "$HOME/.config/ghostty/shaders"
-    cp "$GENERATED/cursor_trail.glsl" "$HOME/.config/ghostty/shaders/cursor_trail.glsl"
-  fi
+  # ghostty resolves custom-shader paths relative to its config dir.
+  mkdir -p "$HOME/.config/ghostty/shaders"
+  for shader in cursor_trail.glsl frame.glsl; do
+    if [ -f "$GENERATED/$shader" ]; then
+      cp "$GENERATED/$shader" "$HOME/.config/ghostty/shaders/$shader"
+    fi
+  done
 }
 
 # macOS appearance is the master light/dark switch: setting it flips ghostty

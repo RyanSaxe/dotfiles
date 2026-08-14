@@ -5,8 +5,8 @@ import {
   SPRITE_COLS,
   SPRITE_ROWS,
 } from "../sprite.js";
-import type { Palette } from "../theme.js";
-import { hairline } from "./header.js";
+import { blend, type Palette } from "../theme.js";
+import { hairline, railBg } from "./header.js";
 
 // Reserved footer: the mascot's home. When a sprite id is present the
 // footer rows carry kitty Unicode-placeholder cells and the terminal draws
@@ -23,17 +23,20 @@ export function mascotFooter(
   width: number,
   spriteIdValue: number | null,
 ): string[] {
-  const railBg = palette.mantle;
-  const rows: string[] = [hairline(palette, width), blank(width, railBg)];
+  const bg = railBg(palette);
+  const rows: string[] = [
+    hairline(palette, width, blend(palette.notify, bg, 0.5)),
+    blank(width, bg),
+  ];
   if (spriteIdValue === null || width < SPRITE_COLS + 2) {
-    for (let i = 0; i < SPRITE_ROWS; i++) rows.push(blank(width, railBg));
+    for (let i = 0; i < SPRITE_ROWS; i++) rows.push(blank(width, bg));
     return rows;
   }
   const leftPad = Math.floor((width - SPRITE_COLS) / 2);
   const fg = idToHex(spriteIdValue);
   for (let row = 0; row < SPRITE_ROWS; row++) {
     rows.push(
-      line(width, railBg, [
+      line(width, bg, [
         { text: " ".repeat(leftPad), fg: palette.dim },
         { text: placeholderRow(row), fg },
       ]),

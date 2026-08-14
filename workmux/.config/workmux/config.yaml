@@ -17,3 +17,4 @@ status_icons:
   working: "#[fg=#{@status_working}]●#[fg=default]"
   waiting: "#[fg=#{@status_waiting}]●#[fg=default]"
   done: "#[fg=#{@status_done}]✓#[fg=default]"
+nerdfont: true

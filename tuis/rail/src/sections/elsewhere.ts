@@ -1,7 +1,8 @@
-import { fmtElapsed, line } from "../cells.js";
+import { blank, fmtElapsed, line } from "../cells.js";
 import type { Agent } from "../data.js";
 import { blend, type Palette } from "../theme.js";
-import { stateColor } from "./windows.js";
+import { railBg } from "./header.js";
+import { pill, stateColor } from "./windows.js";
 
 // How much of a foreground color survives in the elsewhere section: the
 // whole section sits at one uniform dim level — urgency order and hue carry
@@ -40,26 +41,27 @@ export function elsewhereRows(
   palette: Palette,
   width: number,
 ): string[] {
-  const railBg = palette.mantle;
-  const dim = blend(palette.dim, railBg, ELSEWHERE_KEEP);
-  const dim2 = blend(palette.dim2, railBg, ELSEWHERE_KEEP);
-  const chipBg = blend(palette.surface0, railBg, ELSEWHERE_KEEP);
+  const bg = railBg(palette);
+  const dim = blend(palette.dim, bg, ELSEWHERE_KEEP);
+  const dim2 = blend(palette.dim2, bg, ELSEWHERE_KEEP);
+  const chipBg = blend(palette.surface0, bg, ELSEWHERE_KEEP);
   const rows: string[] = [];
   for (const agent of sortElsewhere(agents, acked)) {
     const { project, name } = label(agent);
     const nameFg = acked.has(agent.paneId)
       ? dim2
-      : blend(stateColor(agent.status, palette), railBg, ELSEWHERE_KEEP);
+      : blend(stateColor(agent.status, palette), bg, ELSEWHERE_KEEP);
     const hint = hints.get(agent.paneId);
+    rows.push(blank(width, bg));
     rows.push(
       line(
         width,
-        railBg,
+        bg,
         [
           { text: " ", fg: dim },
-          // The jump chip mirrors the window number chips: alt+; then this
-          // letter lands on the agent's pane.
-          hint ? { text: hint, fg: dim2, bg: chipBg } : { text: " ", fg: dim },
+          // The jump pill mirrors the window pills exactly — same shape,
+          // blended colors; alt+; then this letter lands on the pane.
+          ...(hint ? pill(hint, dim2, chipBg, bg) : [{ text: "   ", fg: dim }]),
           { text: " ", fg: dim },
           { text: project, fg: dim },
           { text: name, fg: nameFg },
@@ -67,7 +69,6 @@ export function elsewhereRows(
         { text: fmtElapsed(agent.elapsedSecs), fg: dim },
       ),
     );
-    // No doing-line here either — see sections/windows.ts.
   }
   return rows;
 }

@@ -5,6 +5,7 @@ import { join } from "node:path";
 export interface Palette {
   mode: "dark" | "light";
   accent: string;
+  notify: string;
   base: string;
   mantle: string;
   crust: string;

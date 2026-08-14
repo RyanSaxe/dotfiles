@@ -1,0 +1,38 @@
+/*
+ * Window frame shader for Ghostty.
+ *
+ * Paints a ring around the window edge in the theme's darkest background
+ * tier, so every surface — bare shell, nvim, any TUI — sits inside a dark
+ * chrome that the terminal sidebar leans into. Ghostty has no
+ * "padding in a custom color" option; this shader is that option.
+ *
+ * FRAME_PX is in DEVICE pixels and must never exceed the ghostty padding
+ * (configured in points) on the LOWEST-density display in use: shaders
+ * cannot see the pixel ratio, and a ring wider than the padding would
+ * paint over content. Calibrated for 1x external monitors (8pt padding =
+ * 8px); retina displays show a thinner ring, and the padding remainder
+ * stays invisible because ghostty extends edge colors into it. To thicken
+ * the frame, raise this AND window-padding-x/y together.
+ */
+
+#define FRAME_HEX 0x{{crust_hex}}
+#define FRAME_PX 8.0
+
+vec3 frameColor() {
+    int c = FRAME_HEX;
+    return vec3(
+        float((c >> 16) & 0xFF) / 255.0,
+        float((c >> 8) & 0xFF) / 255.0,
+        float(c & 0xFF) / 255.0
+    );
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec4 color = texture(iChannel0, fragCoord.xy / iResolution.xy);
+    vec2 fromEdge = min(fragCoord.xy, iResolution.xy - fragCoord.xy);
+    float edge = min(fromEdge.x, fromEdge.y);
+    // One-pixel soft transition keeps the inner edge of the ring crisp
+    // without a hard aliased line.
+    float ring = 1.0 - smoothstep(FRAME_PX - 1.0, FRAME_PX, edge);
+    fragColor = vec4(mix(color.rgb, frameColor(), ring), color.a);
+}
