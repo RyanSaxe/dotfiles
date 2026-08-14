@@ -172,11 +172,16 @@ publish_files() {
     [ -f "$shader" ] || continue
     cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
   done
-  # The one exception to "never poke processes": ghostty re-reads shader
-  # FILES only on a config reload, and its native light/dark flip doesn't
-  # trigger one — without this signal the frame keeps the old mode's
-  # crust. SIGUSR2 is ghostty's reload; idempotent, no-op when absent.
+  # Exceptions to "never poke processes", for consumers with no
+  # file-watching path of their own. Both are idempotent no-ops when the
+  # target isn't running:
+  #   ghostty re-reads shader FILES only on a config reload (SIGUSR2) —
+  #   its native light/dark flip doesn't trigger one.
+  #   sketchybar converges instantly on this event; its 30s mtime timer
+  #   (plugins/theme-sync.sh) is only the backstop.
   pkill -USR2 -x ghostty 2>/dev/null || true
+  command -v sketchybar >/dev/null 2>&1 &&
+    sketchybar --trigger theme_changed 2>/dev/null || true
 }
 
 # macOS appearance is the master light/dark switch: setting it flips ghostty

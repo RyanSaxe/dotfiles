@@ -64,19 +64,20 @@ sketchybar --default "${default[@]}"
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event pokemon_colors_changed
 sketchybar --add event tmux_bell_change
+sketchybar --add event theme_changed
 
 # -----------------------------------------------------------------------------
 # Theme convergence (Left, invisible) - see plugins/theme-sync.sh
 # -----------------------------------------------------------------------------
-# `theme` only ever writes the rendered colors file; it never pokes running
-# processes (see theme/.local/bin/theme). This item polls that file's mtime
-# every 5s and fans out a recolor when it changes - the sketchybar analogue
-# of tmux's status-interval theme-sync.sh.
+# `theme` fires the theme_changed event when it publishes (its one
+# sketchybar poke), so recolors land instantly; the 30s mtime poll is only
+# the backstop for renders from contexts where sketchybar wasn't reachable.
 sketchybar --add item theme_sync left \
   --set theme_sync \
   drawing=off \
-  update_freq=5 \
-  script="$PLUGIN_DIR/theme-sync.sh"
+  update_freq=30 \
+  script="$PLUGIN_DIR/theme-sync.sh" \
+  --subscribe theme_sync theme_changed
 
 # -----------------------------------------------------------------------------
 # Date (Left - far left, before workspaces)
