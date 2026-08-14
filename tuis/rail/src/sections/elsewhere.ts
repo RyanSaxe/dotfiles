@@ -2,7 +2,7 @@ import { blank, fmtElapsed, line } from "../cells.js";
 import type { Agent } from "../data.js";
 import { blend, type Palette } from "../theme.js";
 import { railBg } from "./header.js";
-import { pill, stateColor, type RailRow } from "./windows.js";
+import { elapsedFg, pill, stateColor, type RailRow } from "./windows.js";
 
 // How much of a foreground color survives in the elsewhere section: the
 // whole section sits at one uniform dim level — urgency order and hue carry
@@ -65,7 +65,10 @@ export function elsewhereRows(
           { text: project, fg: dim },
           { text: name, fg: nameFg },
         ],
-        { text: fmtElapsed(agent.elapsedSecs), fg: dim },
+        {
+          text: fmtElapsed(agent.elapsedSecs),
+          fg: elapsedFg(agent.elapsedSecs, palette),
+        },
       ),
       item: true,
     });

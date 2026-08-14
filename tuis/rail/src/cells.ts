@@ -95,7 +95,9 @@ export function blank(width: number, lineBg: string): string {
 }
 
 export function fmtElapsed(secs: number): string {
-  if (secs < 60) return `${Math.max(0, Math.floor(secs))}s`;
+  // Minute floor: a seconds readout would tick every second and keep the
+  // rail in constant motion; nothing under a minute is worth reading.
+  if (secs < 60) return "<1m";
   if (secs < 3600) return `${Math.floor(secs / 60)}m`;
   if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
   return `${Math.floor(secs / 86400)}d`;

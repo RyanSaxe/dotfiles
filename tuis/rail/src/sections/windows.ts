@@ -1,7 +1,18 @@
 import { blank, fmtElapsed, line, type Span } from "../cells.js";
 import type { Agent, Window } from "../data.js";
-import type { Palette } from "../theme.js";
+import { blend, type Palette } from "../theme.js";
 import { railBg } from "./header.js";
+
+// Timers whisper by default — blended well into the slab so their minute
+// ticks never pull the eye. Past eight hours the timer turns red: an agent
+// left alone that long IS the thing to look at.
+const ELAPSED_ATTENTION_SECS = 8 * 60 * 60;
+const ELAPSED_KEEP = 0.55;
+
+export function elapsedFg(secs: number, palette: Palette): string {
+  if (secs >= ELAPSED_ATTENTION_SECS) return palette.red;
+  return blend(palette.dim, railBg(palette), ELAPSED_KEEP);
+}
 
 export function stateColor(status: Agent["status"], palette: Palette): string {
   switch (status) {
@@ -76,7 +87,10 @@ export function windowRows(
           { text: win.name, fg: titleFg },
         ],
         agent
-          ? { text: fmtElapsed(agent.elapsedSecs), fg: palette.dim }
+          ? {
+              text: fmtElapsed(agent.elapsedSecs),
+              fg: elapsedFg(agent.elapsedSecs, palette),
+            }
           : undefined,
       ),
       item: true,
