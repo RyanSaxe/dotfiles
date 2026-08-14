@@ -100,4 +100,14 @@ fi
 [[ -f "$THEME_GENERATED/starship.toml" ]] && export STARSHIP_CONFIG="$THEME_GENERATED/starship.toml"
 
 # ----- prompt ----------------------------------------------------------
+# Blank line between prompts, but never above the first one: starship's
+# add_newline (deliberately off in the template) would also pad the very
+# first prompt, breaking the flush top edge under the window frame.
+_prompt_spacer() {
+  [[ -n "${_PROMPT_SEEN:-}" ]] && print ""
+  typeset -g _PROMPT_SEEN=1
+}
+autoload -U add-zsh-hook
+add-zsh-hook precmd _prompt_spacer
+
 command -v starship > /dev/null && eval "$(starship init zsh)"

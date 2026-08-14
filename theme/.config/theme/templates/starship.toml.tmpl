@@ -12,7 +12,11 @@
 # plus the venv interpreter's version, faint. The caret never moves.
 # The prompt shows identity, declared facts, and chosen state — never
 # inventory (installed toolchains, incidental file types).
-add_newline = true
+# Starship's add_newline pads EVERY prompt, including the first one in a
+# fresh pane — which reads as broken top padding under the window frame.
+# The blank line between commands comes from a zsh precmd instead (.zshrc),
+# which skips the first prompt.
+add_newline = false
 format = "${custom.subdir}${custom.repo_parent}${custom.dir_plain}${custom.branch}${custom.branch_behind}${custom.pkgversion}${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.dir_name}${custom.pyversion}$character"
 
 # WHERE, inside a repo: path relative to the repo root; hidden at the root
