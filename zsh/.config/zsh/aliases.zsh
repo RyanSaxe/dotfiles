@@ -1,5 +1,4 @@
-# Shared aliases for both minimal and full zsh configurations
-# Basic aliases that are lightweight and commonly used
+# Lightweight, commonly used aliases.
 
 # Essential directory navigation
 alias ll='ls -alF'
@@ -32,6 +31,9 @@ alias du='du -h'
 alias claude='env -u TMUX claude'
 
 # Development tools
+# TODO(legacy): these point at the v1 repo until scripts/ gets its own
+# port-on-demand pass — like the tmux legacy-daemon block, they go away
+# with it.
 alias lsp-check='~/generic/dotfiles/scripts/lsp-check'
 alias loc='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py loc'
 alias tokens='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py tokens'
@@ -43,5 +45,3 @@ alias zshrc='$EDITOR ~/.zshrc'
 
 # Network and system info
 alias myip='curl -s ipinfo.io/ip'
-
-# special local tools

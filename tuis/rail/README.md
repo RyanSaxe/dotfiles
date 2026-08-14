@@ -32,6 +32,12 @@ never flicker.
   color everywhere until a new status event (`src/acks.ts`).
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
+- Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint
+  renders in the footer row between the hairline and the sprite, so the
+  list's spacing never changes.
+- A two-cell crust gutter ends every row: text and hairlines stop ~19pt
+  (the frame's spacing unit) before the content surface, mirroring the
+  frame crust left of the session name.
 - The footer is the mascot's home: the project's pokemon sprite rendered
   through kitty-graphics Unicode placeholders (`src/sprite.ts`) — the PNG
   is transmitted once as a virtual placement and the footer cells anchor
@@ -45,8 +51,9 @@ never flicker.
 ```sh
 rail on|off|toggle    # enable/disable + spawn/kill rail panes everywhere
                       # (on also turns the tmux status bar off; off restores)
-rail attach <window>  # tmux hooks call this for new windows/sessions
 rail jump <letter>    # hint jump (bound to alt+; <letter>)
+rail page up|down     # page an overflowing rail (bound to alt+, / alt+.)
+rail ensure-daemon    # start the render daemon if it isn't running
 rail status           # daemon, flag, pane count
 ```
 
@@ -60,16 +67,13 @@ The CLI lives in the `rail` stow package (`rail/.local/bin/rail`);
 ```sh
 npx tsx dev/goldframe.ts | uv run -q --script dev/ansi2png.py frame.png
 XDG_STATE_HOME=$(mktemp -d) npx tsx dev/ackcheck.ts   # ack lifecycle
-npx tsx dev/mascotcheck.ts <sprite.png>               # kitty sequences
 ```
 
 `TUIS_COLORS_PATH` pins an alternate palette (light-mode checks);
-`RAIL_WIDTH`/`RAIL_HEIGHT`/`RAIL_ACK` shape the fixture scene.
+`RAIL_WIDTH`/`RAIL_HEIGHT`/`RAIL_ACK`/`RAIL_PAGE` shape the fixture scene.
 
 ## TODO
 
-- Multi-agent windows render only the first agent; stacked-row design
-  awaits a verdict (see the rail design artifacts).
 - `workmux status --json` does not export interrupted/stale states; if
   they land upstream, consume them instead of local detection.
 - Future tabs (todos, review queue, PR checks) join as sibling sections

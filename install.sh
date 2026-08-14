@@ -96,11 +96,8 @@ install_tier_packages() {
     install_rail
     ;;
   mac:Darwin)
-    brew_install
     # Hammerspoon is a cask; it hosts the pokemon mascot (see hammerspoon/).
     brew list --cask hammerspoon >/dev/null 2>&1 || brew install --cask hammerspoon
-    ;;
-  agents:*)
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -155,14 +152,12 @@ install_tier() {
 # -------------------------------------------------------------------- main
 ensure_package_manager
 
-# No tiers on the command line: choose interactively.
+# No tiers on the command line: choose interactively. (An agents tier —
+# interactive AI-harness wiring — arrives with the ai-harness rebuild.)
 if [ "$#" -eq 0 ]; then
   set -- core
   if [ "$OS" = Darwin ] && ask "install the mac tier (GUI apps)?"; then
     set -- "$@" mac
-  fi
-  if ask "install the agents tier (AI harness)?"; then
-    set -- "$@" agents
   fi
 fi
 

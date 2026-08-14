@@ -3,6 +3,7 @@
 #
 #   rail on|off|toggle   enable/disable the rail everywhere
 #   rail jump <letter>   jump to the agent behind a hint letter
+#   rail page up|down    page the rail body when it overflows
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
@@ -104,7 +105,7 @@ status)
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump <letter>|page up|down|ensure-daemon|status" >&2
   exit 1
   ;;
 esac
