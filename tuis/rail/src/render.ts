@@ -17,8 +17,8 @@ const PAGE_UP_KEY = "⌥,";
 const PAGE_DOWN_KEY = "⌥.";
 
 // The slab is 22 content cells; these two crust columns after them are
-// the visible right margin (the tmux border beside them completes the
-// seam). daemon.ts derives the pane width from this.
+// the visible right margin (the colorless tmux border beside them reads
+// as part of the gap). daemon.ts derives the pane width from this.
 export const GUTTER_COLS = 2;
 
 // Pure frame renderer: RailData -> exactly `height` ANSI lines of `width`

@@ -100,17 +100,10 @@ async function spawnRail(windowId: string): Promise<void> {
   );
   const paneId = stdout.trim();
   await tmux("set-option", "-p", "-t", paneId, "@rail", "1");
-  // The rail's own border hides (per-pane style wins the shared border):
-  // the seam stays a pure color boundary while content-content splits
-  // keep the global separator line.
-  await tmux(
-    "set-option",
-    "-p",
-    "-t",
-    paneId,
-    "pane-border-style",
-    "fg=#{@bg}",
-  );
+  // No per-pane border styling: borders are crust-filled globally
+  // (tmux.conf), which is attribution-proof — per-pane styles only ever
+  // controlled half a shared border and the active pane's style took
+  // the rest.
   await tmux("select-pane", "-d", "-t", paneId);
 }
 
@@ -150,7 +143,10 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
       continue;
     }
     // tmux resizes panes proportionally on window resize; the rail's width
-    // is not negotiable.
+    // is not negotiable. A resize REFLOWS whatever was on screen (old
+    // frames wrap line by line), and that can corrupt the display without
+    // raising history — so a resize always drops the pushed cache and the
+    // scrollback, forcing a clean repaint next tick.
     if (pane.width !== RAIL_WIDTH) {
       await tmux(
         "resize-pane",
@@ -159,6 +155,8 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
         "-x",
         String(RAIL_WIDTH),
       ).catch(() => {});
+      await tmux("clear-history", "-t", pane.paneId).catch(() => {});
+      pushed.delete(pane.paneId);
       touched.add(pane.paneId);
     }
     // NO SCROLLING, ever: any scrollback means a write raced a resize —
