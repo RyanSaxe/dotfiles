@@ -1,0 +1,15 @@
+{
+  "name": "rail",
+  "private": true,
+  "type": "module",
+  "description": "In-terminal sidebar: tmux windows + agent status, themed by the dotfiles theme system",
+  "scripts": {
+    "start": "tsx src/app.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
