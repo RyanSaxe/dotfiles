@@ -26,11 +26,12 @@ keybind = shift+enter=text:\x1b\r
 
 font-size = 16
 
-# Generous padding. `extend` continues the edge cells' background into the
-# padding, so a full-height sidebar's color bleeds to the window edge
-# instead of sitting in a background-colored gutter.
-window-padding-x = 20
-window-padding-y = 20
+# No padding: the terminal grid owns the window edge-to-edge, so the rail
+# sits truly flush and nothing needs recoloring. `extend` still covers the
+# sub-cell remainder from grid rounding; balance splits that remainder
+# evenly instead of piling it on one side.
+window-padding-x = 0
+window-padding-y = 0
 window-padding-color = extend
 window-padding-balance = true
 

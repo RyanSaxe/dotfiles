@@ -93,28 +93,6 @@ function toFrame(lines: string[]): string {
   return lines.map((text, row) => `\x1b[${row + 1};1H${text}`).join("");
 }
 
-// The rail must not read as a tmux pane: its border carries no color (the
-// border column becomes the design's gap) even while adjacent panes are
-// active.
-async function dressRailPane(paneId: string, baseHex: string): Promise<void> {
-  await tmux(
-    "set-option",
-    "-p",
-    "-t",
-    paneId,
-    "pane-border-style",
-    `fg=${baseHex}`,
-  ).catch(() => {});
-  await tmux(
-    "set-option",
-    "-p",
-    "-t",
-    paneId,
-    "pane-active-border-style",
-    `fg=${baseHex}`,
-  ).catch(() => {});
-}
-
 async function spawnRail(windowId: string): Promise<void> {
   const { stdout } = await tmux(
     "split-window",
@@ -134,14 +112,10 @@ async function spawnRail(windowId: string): Promise<void> {
   await tmux("select-pane", "-d", "-t", paneId);
 }
 
-// Panes whose border styling is already applied (spawned by us, by the
-// hooks, or found at startup — the set makes the origin irrelevant).
-const dressed = new Set<string>();
-
 // Enforce every rail invariant against one snapshot. Any pane this touched
 // is skipped for painting this tick — it repaints next tick at its
 // corrected geometry.
-async function selfHeal(panes: Pane[], baseHex: string): Promise<Set<string>> {
+async function selfHeal(panes: Pane[]): Promise<Set<string>> {
   const touched = new Set<string>();
   const enabled = existsSync(ENABLED_FLAG);
   const railByWindow = new Map<string, Pane>();
@@ -157,10 +131,6 @@ async function selfHeal(panes: Pane[], baseHex: string): Promise<Set<string>> {
       await tmux("kill-window", "-t", pane.windowId).catch(() => {});
       touched.add(pane.paneId);
       continue;
-    }
-    if (!dressed.has(pane.paneId)) {
-      await dressRailPane(pane.paneId, baseHex);
-      dressed.add(pane.paneId);
     }
     // Narrow windows carry no rail; the content pane wins.
     if (pane.windowWidth < KILL_BELOW_WIDTH) {
@@ -274,7 +244,7 @@ async function tick(counter: number): Promise<void> {
   }
   const panes = await collectPanes();
   const palette = loadPalette();
-  const skip = await selfHeal(panes, palette.base);
+  const skip = await selfHeal(panes);
   const spriteCapable = await capableSessions();
 
   const acked = updateAcks(acks, agents, panes);
@@ -322,9 +292,6 @@ async function tick(counter: number): Promise<void> {
   const alive = new Set(panes.map((pane) => pane.paneId));
   for (const paneId of pushed.keys()) {
     if (!alive.has(paneId)) pushed.delete(paneId);
-  }
-  for (const paneId of dressed) {
-    if (!alive.has(paneId)) dressed.delete(paneId);
   }
 }
 
