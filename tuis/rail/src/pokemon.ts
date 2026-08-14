@@ -14,7 +14,9 @@ const STATE_MAPPING = join(
   process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
   "dotfiles/pokemon.conf",
 );
-const DEFAULT_MAPPING = join(homedir(), ".config/theme/pokemon.conf");
+// (The tracked default in ~/.config/theme/pokemon.conf is consumed by
+// `theme pokemon sync`, whose result lands in accents.conf — the rail
+// reads that, never the default directly.)
 const SPRITE_CACHE = join(homedir(), ".cache/dotfiles/pokemon");
 const POKEMON_ACCENTS = join(homedir(), ".local/bin/pokemon-accents");
 
@@ -93,11 +95,37 @@ async function extractAccents(
   }
 }
 
-// Session -> identity, re-reading the mapping files each call (they are
-// tiny; the daemon calls this a few times per tick).
+const ACCENTS_CONF = join(
+  process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"),
+  "dotfiles/accents.conf",
+);
+
+// The globally ACTIVE pokemon (whatever `theme pokemon`/the picker last
+// applied). Its accents are already extracted, so no extractor run.
+function activeIdentity(): PokemonIdentity | null {
+  const conf = parseConf(ACCENTS_CONF);
+  const name = conf.get("pokemon");
+  if (!name) return null;
+  const shiny = conf.get("shiny") === "1";
+  const spritePath = join(
+    SPRITE_CACHE,
+    `${name}${shiny ? "-shiny" : ""}-sprite.png`,
+  );
+  return {
+    name,
+    shiny,
+    spritePath: existsSync(spritePath) ? spritePath : null,
+    accentDark: conf.get("accent_dark") ?? null,
+    accentLight: conf.get("accent_light") ?? null,
+  };
+}
+
+// Session -> identity: the project's mapped pokemon wins; unmapped
+// sessions follow the globally active one (which `theme pokemon sync`
+// keeps aligned with the project you're in). Files are tiny and re-read
+// each call, so picker changes land within a tick.
 export function pokemonFor(session: string): PokemonIdentity | null {
-  const mapped =
-    parseConf(STATE_MAPPING).get(session) ??
-    parseConf(DEFAULT_MAPPING).get("default");
-  return mapped ? identityFor(mapped) : null;
+  const mapped = parseConf(STATE_MAPPING).get(session);
+  if (mapped) return identityFor(mapped);
+  return activeIdentity();
 }
