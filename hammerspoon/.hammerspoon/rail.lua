@@ -69,16 +69,39 @@ end
 -- M.data. An in-flight guard plus a watchdog means a hung child skips
 -- ticks instead of stacking, and is killed after 5s.
 M.data = { session = nil, windows = {}, agents = {} }
-local inflight
 
-local COLLECT_SCRIPT = [[
+--- ONE persistent streaming child instead of a task per poll: rapid
+--- per-event spawns lose hs.task callbacks under bursts (observed), and a
+--- single loop has no spawn latency at all. It emits window snapshots
+--- every 250ms (~3ms of tmux work) and folds the agent snapshot in every
+--- 20th cycle; instant agent changes arrive via the workmux state-file
+--- watcher triggering a one-shot refresh.
+local STREAM_SCRIPT = [[
 export LANG=en_US.UTF-8 PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
-S=$(tmux list-clients -F '#{client_activity} #{client_session}' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
-[ -n "$S" ] || exit 0
-echo "SESSION $S"
-tmux list-windows -t "$S" -F 'WINDOW #{window_index} #{window_active} #{window_name}' 2>/dev/null
-echo "AGENTS"
-workmux status --json 2>/dev/null
+i=0
+while :; do
+  S=$(tmux list-clients -F '#{client_activity} #{client_session}' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+  if [ -n "$S" ]; then
+    echo "SESSION $S"
+    tmux list-windows -t "$S" -F 'WINDOW #{window_index} #{window_active} #{window_name}' 2>/dev/null
+    if [ $((i % 20)) -eq 0 ]; then
+      printf 'AGENTS '
+      workmux status --json 2>/dev/null | tr -d '\n'
+      echo ""
+    fi
+    echo "END"
+  fi
+  i=$((i + 1))
+  sleep 0.25
+done
+]]
+
+local AGENTS_SCRIPT = [[
+export LANG=en_US.UTF-8 PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+printf 'AGENTS '
+workmux status --json 2>/dev/null | tr -d '\n'
+echo ""
+echo "END"
 ]]
 
 --- Strip characters that churn without meaning (spinner glyph frames in
@@ -91,83 +114,111 @@ local function normalize_title(t)
   return t ~= "" and t or nil
 end
 
-local function parse_collected(out)
-  local session
-  local windows = {}
-  local json_lines = {}
-  local in_json = false
-  for line in out:gmatch("[^\n]+") do
-    if in_json then
-      json_lines[#json_lines + 1] = line
-    elseif line == "AGENTS" then
-      in_json = true
-    else
-      local s = line:match("^SESSION (.+)$")
-      if s then
-        session = s
-      end
-      local idx, active, name = line:match("^WINDOW (%d+) (%d) (.*)$")
-      if idx then
-        windows[#windows + 1] = { index = idx, active = active == "1", name = name }
-      end
-    end
-  end
+local draw -- forward declaration: parsers draw the moment data lands
 
-  local agents = {}
-  local ok, data = pcall(hs.json.decode, table.concat(json_lines, "\n"))
-  if ok and type(data) == "table" and type(data.agents) == "table" then
-    local now = os.time()
-    for _, a in ipairs(data.agents) do
-      local status = a.status ~= "-" and a.status or nil
-      if a.updated_ts and (now - a.updated_ts) > M.config.stale_after then
-        status = "stale"
-      end
-      agents[#agents + 1] = {
-        session = a.session,
-        window = a.window_name,
-        name = a.worktree or a.window_name or "agent",
-        status = status,
-        elapsed = a.elapsed_secs,
-        title = normalize_title(a.title),
-        workdir = a.workdir,
-        updated = a.updated_ts or 0,
-        pane = a.pane_id,
-      }
-    end
-  end
-
-  -- Keep last-known-good on a transient empty read: a blank tmux answer
-  -- for one tick must never blank the rail (visible as a flicker).
-  if not session then
+local function apply_agents_json(json)
+  local ok, data = pcall(hs.json.decode, json)
+  if not (ok and type(data) == "table" and type(data.agents) == "table") then
     return
   end
-  M.data = { session = session, windows = windows, agents = agents }
+  local now = os.time()
+  local agents = {}
+  for _, a in ipairs(data.agents) do
+    local status = a.status ~= "-" and a.status or nil
+    if a.updated_ts and (now - a.updated_ts) > M.config.stale_after then
+      status = "stale"
+    end
+    agents[#agents + 1] = {
+      session = a.session,
+      window = a.window_name,
+      name = a.worktree or a.window_name or "agent",
+      status = status,
+      elapsed = a.elapsed_secs,
+      title = normalize_title(a.title),
+      workdir = a.workdir,
+      updated = a.updated_ts or 0,
+      pane = a.pane_id,
+    }
+  end
+  M.data.agents = agents
 end
 
-local inflight_at
-local function collect()
-  -- In-tick watchdog: a wedged child is terminated on a later tick. Never
-  -- a detached timer (unretained hs timers are garbage-collected and a
-  -- stuck inflight would block collection forever).
-  if inflight then
-    if os.time() - (inflight_at or 0) > 5 then
-      pcall(function()
-        inflight:terminate()
-      end)
-      inflight = nil
-    else
-      return
+--- Parse one complete snapshot block (everything up to an END line).
+local function apply_snapshot(block)
+  local session
+  local windows = {}
+  for line in block:gmatch("[^\n]+") do
+    local sess = line:match("^SESSION (.+)$")
+    if sess then
+      session = sess
+    end
+    local idx, active, name = line:match("^WINDOW (%d+) (%d) (.*)$")
+    if idx then
+      windows[#windows + 1] = { index = idx, active = active == "1", name = name }
+    end
+    local json = line:match("^AGENTS (.+)$")
+    if json then
+      apply_agents_json(json)
     end
   end
-  local task = hs.task.new("/bin/sh", function(_, stdout)
-    if inflight == task then
-      inflight = nil
+  if session then
+    M.data.session = session
+    M.data.windows = windows
+  end
+end
+
+-- Stream plumbing: buffer chunks, act on each END-terminated block.
+local stream_task
+local stream_buffer = ""
+
+local function on_stream(_, stdout)
+  stream_buffer = stream_buffer .. (stdout or "")
+  local acted = false
+  while true do
+    local head, rest = stream_buffer:match("^(.-)\nEND\n(.*)$")
+    if not head then
+      break
     end
-    pcall(parse_collected, stdout or "")
-  end, { "-c", COLLECT_SCRIPT })
-  inflight = task
-  inflight_at = os.time()
-  task:start()
+    stream_buffer = rest
+    pcall(apply_snapshot, head .. "\n")
+    acted = true
+  end
+  if acted then
+    pcall(draw)
+  end
+  return true -- keep streaming
+end
+
+local function ensure_stream()
+  if stream_task and stream_task:isRunning() then
+    return
+  end
+  stream_buffer = ""
+  stream_task = hs.task.new("/bin/sh", function() end, on_stream, { "-c", STREAM_SCRIPT })
+  stream_task:start()
+end
+
+local function stop_stream()
+  if stream_task then
+    pcall(function()
+      stream_task:terminate()
+    end)
+    stream_task = nil
+  end
+end
+
+--- One-shot agent refresh for instant status changes (workmux state-file
+--- events); losses are harmless — the stream re-syncs agents within 5s.
+local function refresh_agents()
+  hs.task
+    .new("/bin/sh", function(_, stdout)
+      local json = (stdout or ""):match("AGENTS (.-)\nEND") or (stdout or ""):match("AGENTS (.+)")
+      if json then
+        pcall(apply_agents_json, json)
+        pcall(draw)
+      end
+    end, { "-c", AGENTS_SCRIPT })
+    :start()
 end
 
 -- ----------------------------------------------------------- dossier cache
@@ -415,7 +466,7 @@ local function signature(frame)
   return table.concat(parts, "|")
 end
 
-local function reconcile()
+draw = function()
   load_colors()
   local window = focused_app_window()
 
@@ -424,13 +475,9 @@ local function reconcile()
       M.canvas:hide()
       M.drawn = nil
     end
-    if enabled() then
-      collect()
-    end
     return
   end
 
-  collect()
   local frame = window:frame()
   local sig = signature(frame)
   if sig == M.drawn then
@@ -441,6 +488,17 @@ local function reconcile()
   M.canvas:replaceElements(build_elements(M.data.session, M.data.windows, M.data.agents, frame.h))
   M.canvas:show()
   M.drawn = sig
+end
+
+--- The tick is a safety net: keep the stream alive, redraw for frame
+--- moves and elapsed-time updates the stream's change detection misses.
+local function tick()
+  if enabled() then
+    ensure_stream()
+  else
+    stop_stream()
+  end
+  pcall(draw)
 end
 
 --- The mascot's home while the rail is up: centered in the reserved footer.
@@ -461,13 +519,26 @@ function M.start()
   M.canvas:clickActivating(false)
 
   M.ticker = hs.timer.doEvery(M.config.tick_seconds, function()
-    pcall(reconcile)
+    pcall(tick)
   end)
+  -- Theme renders and the rail-on flag land here; redraw promptly.
   M.path_watcher = hs.pathwatcher.new(state_dir, function()
-    pcall(reconcile)
+    pcall(tick)
   end)
   M.path_watcher:start()
-  pcall(reconcile)
+  -- workmux's agent hooks write a state file the moment an agent starts,
+  -- waits, or finishes — the event triggers an instant one-shot refresh
+  -- (data still comes from `workmux status --json`).
+  local workmux_state = os.getenv("HOME") .. "/.local/state/workmux"
+  if hs.fs.attributes(workmux_state) then
+    M.agents_watcher = hs.pathwatcher.new(workmux_state, function()
+      if enabled() then
+        refresh_agents()
+      end
+    end)
+    M.agents_watcher:start()
+  end
+  pcall(tick)
 end
 
 function M.stop()
@@ -477,6 +548,10 @@ function M.stop()
   if M.path_watcher then
     M.path_watcher:stop()
   end
+  if M.agents_watcher then
+    M.agents_watcher:stop()
+  end
+  stop_stream()
   if M.canvas then
     M.canvas:delete()
   end
