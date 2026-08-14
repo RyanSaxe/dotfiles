@@ -101,6 +101,17 @@ repos:
         entry: oxlint
         types_or: [javascript, ts]
 
+      # The rail is plain TS with no runtime deps, so prek's isolated env
+      # can carry the compiler — no repo node_modules needed, identical
+      # locally and in CI.
+      - id: rail-typecheck
+        name: tsc (rail)
+        language: node
+        additional_dependencies: ["typescript@5.9.3", "@types/node@24.3.0"]
+        entry: tsc -p tuis/rail
+        pass_filenames: false
+        files: "^tuis/rail/"
+
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.
       - id: theme-tests
