@@ -1,0 +1,194 @@
+#!/usr/bin/env zsh
+# Sketchybar configuration
+# Floating rounded bar, themed with the v2 token pipeline (colors.sh) and
+# pokemon color accents
+#
+# Layout:
+# - Left: Date, Aerospace workspace indicators (V B N M 1 2 3)
+# - Right: CPU, Memory, WiFi, Battery, Clock
+
+setopt ERR_EXIT NO_UNSET PIPE_FAIL
+
+# -----------------------------------------------------------------------------
+# Configuration Paths
+# -----------------------------------------------------------------------------
+CONFIG_DIR="$HOME/.config/sketchybar"
+PLUGIN_DIR="$CONFIG_DIR/plugins"
+
+# Load color definitions (sources the rendered theme colors)
+source "$CONFIG_DIR/colors.sh"
+
+# -----------------------------------------------------------------------------
+# Bar Configuration
+# -----------------------------------------------------------------------------
+# Floating rounded bar
+bar=(
+  position=top
+  height=32
+  margin=10
+  corner_radius=10
+  color="$BAR_COLOR"
+  border_color="$BORDER_COLOR"
+  border_width=1
+  blur_radius=30
+  shadow=on
+  sticky=on
+  topmost=off
+  y_offset=10
+  notch_width=0
+)
+sketchybar --bar "${bar[@]}"
+
+# -----------------------------------------------------------------------------
+# Default Item Configuration
+# -----------------------------------------------------------------------------
+default=(
+  padding_left=4
+  padding_right=4
+  background.height=26
+  background.corner_radius=6
+  icon.font="JetBrainsMono Nerd Font:Bold:12.0"
+  icon.color="$ICON_COLOR"
+  icon.padding_left=0
+  icon.padding_right=6
+  label.font="JetBrainsMono Nerd Font:Regular:12.0"
+  label.color="$LABEL_COLOR"
+  label.padding_left=0
+  label.padding_right=12
+)
+sketchybar --default "${default[@]}"
+
+# -----------------------------------------------------------------------------
+# Custom Events (must be defined before items subscribe to them)
+# -----------------------------------------------------------------------------
+sketchybar --add event aerospace_workspace_change
+sketchybar --add event pokemon_colors_changed
+sketchybar --add event tmux_bell_change
+
+# -----------------------------------------------------------------------------
+# Theme convergence (Left, invisible) - see plugins/theme-sync.sh
+# -----------------------------------------------------------------------------
+# `theme` only ever writes the rendered colors file; it never pokes running
+# processes (see theme/.local/bin/theme). This item polls that file's mtime
+# every 5s and fans out a recolor when it changes - the sketchybar analogue
+# of tmux's status-interval theme-sync.sh.
+sketchybar --add item theme_sync left \
+  --set theme_sync \
+  drawing=off \
+  update_freq=5 \
+  script="$PLUGIN_DIR/theme-sync.sh"
+
+# -----------------------------------------------------------------------------
+# Date (Left - far left, before workspaces)
+# -----------------------------------------------------------------------------
+sketchybar --add item date left \
+  --set date \
+  update_freq=60 \
+  icon="󰃭 " \
+  icon.color="$ACCENT_COLOR" \
+  label.color="$ACCENT_COLOR" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/date.sh" \
+  --subscribe date system_woke pokemon_colors_changed
+
+# -----------------------------------------------------------------------------
+# Aerospace Workspace Indicators (Left)
+# -----------------------------------------------------------------------------
+# Display keybinding letters matching aerospace.toml keybindings
+# Using zsh associative array (works in zsh 5.9)
+# Keys align with bottom row (V B N M) and match monitor layout left-to-right
+typeset -A WORKSPACE_KEYS
+WORKSPACE_KEYS=(
+  message "V" # mail/messages (left monitor)
+  browser "B" # center monitor
+  code "N"    # center monitor
+  meeting "M" # Teams meetings (right monitor)
+  monitor-1 "1"
+  monitor-2 "2"
+  monitor-3 "3"
+)
+
+# Workspace order (left to right in bar, matches monitor layout)
+WORKSPACES=("monitor-1" "monitor-2" "monitor-3" "message" "browser" "code" "meeting")
+
+for workspace in "${WORKSPACES[@]}"; do
+  key="${WORKSPACE_KEYS[$workspace]}"
+  sketchybar --add item "space.$workspace" left \
+    --set "space.$workspace" \
+    icon="$key" \
+    icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+    icon.padding_left=8 \
+    icon.padding_right=8 \
+    label.drawing=off \
+    background.color="$WORKSPACE_INACTIVE_BG" \
+    background.corner_radius=6 \
+    background.height=22 \
+    click_script="aerospace workspace $workspace" \
+    script="$PLUGIN_DIR/aerospace.sh"
+
+  # Subscribe to events - code workspace also listens for tmux bell changes
+  if [[ "$workspace" == "code" ]]; then
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed tmux_bell_change
+  else
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
+  fi
+done
+
+# -----------------------------------------------------------------------------
+# Right Side Items (ordered right-to-left)
+# -----------------------------------------------------------------------------
+
+# Clock (rightmost) - time with clock icon
+# Highlights in the notify color at meeting reminder times (00, 29, 30, 59
+# minutes) - see plugins/clock.sh
+sketchybar --add item clock right \
+  --set clock \
+  update_freq=15 \
+  icon="󰥔" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
+  label.font="JetBrainsMono Nerd Font:Bold:12.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/clock.sh" \
+  label.padding_right=0 \
+  --subscribe clock system_woke pokemon_colors_changed
+
+# Battery
+sketchybar --add item battery right \
+  --set battery \
+  update_freq=60 \
+  label.padding_right=8 \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/battery.sh" \
+  --subscribe battery power_source_change system_woke
+
+# WiFi - clickable, opens the Network settings pane
+sketchybar --add item wifi right \
+  --set wifi \
+  update_freq=30 \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/wifi.sh" \
+  click_script='open "x-apple.systempreferences:com.apple.Network-Settings.extension"' \
+  --subscribe wifi wifi_change
+
+# Memory (with icon)
+sketchybar --add item memory right \
+  --set memory \
+  update_freq=10 \
+  icon="󰍛" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/memory.sh"
+
+# CPU (with icon)
+sketchybar --add item cpu right \
+  --set cpu \
+  update_freq=5 \
+  icon="󰌢" \
+  icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
+  background.color="$ITEM_BG" \
+  script="$PLUGIN_DIR/cpu.sh"
+
+# -----------------------------------------------------------------------------
+# Force Initial Update
+# -----------------------------------------------------------------------------
+sketchybar --update

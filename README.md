@@ -38,6 +38,7 @@ resolves at runtime via `PATH` and `$HOME`; there is no templating.
 | `nvim`       | LazyVim-based Neovim. Personal plugins live in `nvim/dev/` as real, extractable plugins               |
 | `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                           |
 | `ghostty`    | terminal emulator (macOS)                                                                             |
+| `sketchybar` | macOS menu bar replacement, aerospace/battery/cpu/memory/wifi widgets                                 |
 | `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status |
 | `git`        | git + gh, delta as pager                                                                              |
 | `bat`        | `cat` with syntax highlighting, themed with Catppuccin                                                |

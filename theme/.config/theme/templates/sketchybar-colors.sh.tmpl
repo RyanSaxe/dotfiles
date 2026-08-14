@@ -1,0 +1,34 @@
+#!/usr/bin/env zsh
+# Rendered by `theme` — do not edit; change this template or tokens instead.
+# Sourced by sketchybarrc and every plugin (see sketchybar/.config/sketchybar/
+# colors.sh). ARGB strings for sketchybar's own color format, built from the
+# bare-hex-digit variant `theme` emits alongside every color token.
+
+export BAR_COLOR="0xff{{bg_hex}}"
+export ITEM_BG="0x00000000"
+export BORDER_COLOR="0xff{{border_hex}}"
+
+export ICON_COLOR="0xff{{fg_muted_hex}}"
+export LABEL_COLOR="0xff{{fg_muted_hex}}"
+
+# Pokemon-linked: theme pokemon <name> overrides these two only.
+export ACCENT_COLOR="0xff{{accent_hex}}"
+export NOTIFY_COLOR="0xff{{notify_hex}}"
+
+export WORKSPACE_ACTIVE_FG="0xff{{accent_hex}}"
+export WORKSPACE_ACTIVE_BG="0x33{{accent_hex}}"
+export WORKSPACE_INACTIVE_FG="0xff{{fg_muted_hex}}"
+export WORKSPACE_INACTIVE_BG="0x00000000"
+
+# The clock's meeting-warning state (see plugins/clock.sh).
+export TIME_NORMAL="0xff{{accent_hex}}"
+export TIME_HIGHLIGHT="0xff{{notify_hex}}"
+
+export BELL_FG="0xff{{notify_hex}}"
+export BELL_BG="0x33{{notify_hex}}"
+
+# Threshold colors for battery/cpu/memory. warn is a semantic token; danger
+# has no role of its own, so it names the red palette hue directly (see
+# starship.toml.tmpl's use of raw palette keys for the same pattern).
+export WARN_COLOR="0xff{{warn_hex}}"
+export DANGER_COLOR="0xff{{red_hex}}"

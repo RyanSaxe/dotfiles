@@ -59,11 +59,12 @@ repos:
   # ---------------------------------------------------------------- Shell
   # POSIX sh only — zsh interactive config is deliberately unlinted
   # (shellcheck has no zsh dialect; see docs/v2-plan.md#shell-language-split).
+  # sketchybar's plugins are zsh too (shebang, not extension), same reason.
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        exclude: '\.zsh$|^zsh/'
+        exclude: '\.zsh$|^zsh/|^sketchybar/'
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1

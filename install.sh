@@ -98,6 +98,9 @@ install_tier_packages() {
   mac:Darwin)
     # Hammerspoon is a cask; it hosts the pokemon mascot (see hammerspoon/).
     brew list --cask hammerspoon >/dev/null 2>&1 || brew install --cask hammerspoon
+    # sketchybar itself is mac-only; the plugins under sketchybar/ shell out
+    # to macOS-only tools (pmset, ipconfig) regardless.
+    brew_install sketchybar
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
