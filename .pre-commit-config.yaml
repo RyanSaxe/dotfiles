@@ -137,7 +137,7 @@ repos:
         language: system
         entry: uv run -q --script dev/keycheck.py
         pass_filenames: false
-        files: '^(tmux/\.config/tmux/(tmux\.conf|keys\.tsv)|aerospace/\.config/aerospace/aerospace\.toml|dev/keycheck\.py)$'
+        files: '^(tmux/\.config/tmux/(tmux\.conf|keys\.tsv)|aerospace/\.config/aerospace/aerospace\.toml|ghostty/\.config/ghostty/config|zsh/\.zshrc|dev/keycheck\.py)$'
 
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.

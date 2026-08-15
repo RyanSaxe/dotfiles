@@ -5,9 +5,10 @@
 """Drift check for the keybind cheatsheet (alt+/).
 
 Every chord bound in tmux.conf (root alt layer, agent table, prefix
-popups) and aerospace.toml must have a row in keys.tsv, so the popup can
-never silently fall behind the configs. The TSV may hold extra rows
-(ghostty, zsh, esc) — the check is config -> TSV only.
+popups), aerospace.toml, ghostty's config, and zsh's bindkey calls must
+have a row in keys.tsv, so the popup can never silently fall behind the
+configs. The TSV may hold extra rows (esc, prefix aliases) — the check
+is config -> TSV only.
 """
 
 import re
@@ -17,6 +18,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 TMUX_CONF = REPO / "tmux/.config/tmux/tmux.conf"
 AEROSPACE_TOML = REPO / "aerospace/.config/aerospace/aerospace.toml"
+GHOSTTY_CONFIG = REPO / "ghostty/.config/ghostty/config"
+ZSHRC = REPO / "zsh/.zshrc"
 KEYS_TSV = REPO / "tmux/.config/tmux/keys.tsv"
 
 KEY_WORDS = {"slash": "/", "comma": ",", "period": ".", "semicolon": ";"}
@@ -77,13 +80,35 @@ def aerospace_chords(toml: str) -> set[str]:
     return chords
 
 
+def ghostty_chords(config: str) -> set[str]:
+    return {
+        m.group(1).strip()
+        for m in re.finditer(r"^keybind = ([^=]+)=", config, re.MULTILINE)
+    }
+
+
+# Raw zle sequences -> readable chords. An unmapped sequence surfaces as
+# a loud "zsh-seq" miss so the human extends this table.
+ZSH_SEQUENCES = {"'^I'": "tab", "'^[[Z'": "shift+tab"}
+
+
+def zsh_chords(zshrc: str) -> set[str]:
+    return {
+        ZSH_SEQUENCES.get(m.group(1), f"zsh-seq {m.group(1)}")
+        for m in re.finditer(r"^\s*bindkey (?:-M \S+ )?('[^']+')", zshrc, re.MULTILINE)
+    }
+
+
 def main() -> int:
     covered: set[str] = set()
     for line in KEYS_TSV.read_text().splitlines()[1:]:
         _, chord, _ = line.split("\t", 2)
         covered |= expand_tsv_chord(chord)
-    bound = tmux_chords(TMUX_CONF.read_text()) | aerospace_chords(
-        AEROSPACE_TOML.read_text()
+    bound = (
+        tmux_chords(TMUX_CONF.read_text())
+        | aerospace_chords(AEROSPACE_TOML.read_text())
+        | ghostty_chords(GHOSTTY_CONFIG.read_text())
+        | zsh_chords(ZSHRC.read_text())
     )
     missing = sorted(bound - covered)
     for chord in missing:
