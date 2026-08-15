@@ -20,6 +20,12 @@ apps, `agents` for the AI harness. Pass tiers as arguments to skip the
 prompts (`./install.sh core` on a remote box), and re-run any time to update
 packages and symlinks.
 
+`./install.sh upgrade` brings every package manager current — brew or apt,
+zsh plugins, the rail's npm deps, uv tools, prek hook revs — and prints one
+before/after summary. Version pins (the rail lockfile, prek revs) are bumped
+in the working tree but never committed: review the diff and commit
+deliberately.
+
 Each top-level directory is a stow package whose layout mirrors where its
 files land:
 
