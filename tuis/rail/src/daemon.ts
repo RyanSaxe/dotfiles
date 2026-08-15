@@ -203,6 +203,35 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
   return touched;
 }
 
+// Auto separators: a window's crust hairlines show only with 2+ content
+// panes (@wborders read by the border styles at draw time). Hooks flip
+// the flag instantly; this reconcile makes it inevitable (break-pane,
+// join-pane — anything hookless). Only mismatches cost a tmux call.
+const windowBorders = new Map<string, boolean>();
+
+async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
+  const counts = new Map<string, number>();
+  for (const pane of panes) {
+    if (pane.isRail) continue;
+    counts.set(pane.windowId, (counts.get(pane.windowId) ?? 0) + 1);
+  }
+  const seen = new Set<string>();
+  for (const pane of panes) {
+    if (seen.has(pane.windowId)) continue;
+    seen.add(pane.windowId);
+    const want = (counts.get(pane.windowId) ?? 0) >= 2;
+    if (windowBorders.get(pane.windowId) === want) continue;
+    windowBorders.set(pane.windowId, want);
+    const args = want
+      ? ["set-option", "-w", "-t", pane.windowId, "@wborders", "1"]
+      : ["set-option", "-w", "-t", pane.windowId, "-u", "@wborders"];
+    await tmux(...args).catch(() => {});
+  }
+  for (const windowId of windowBorders.keys()) {
+    if (!seen.has(windowId)) windowBorders.delete(windowId);
+  }
+}
+
 // Sprites render only for sessions where EVERY attached client identifies
 // as a kitty-graphics terminal — the daemon can't see through tmux to the
 // outer terminal any other way, and emitting graphics at an incapable
@@ -261,6 +290,7 @@ async function tick(counter: number): Promise<void> {
   ]);
   const palette = loadPalette();
   const skip = await selfHeal(panes);
+  await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
   const acked = updateAcks(acks, settled, panes);
