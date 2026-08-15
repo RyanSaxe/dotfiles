@@ -3,18 +3,24 @@
 # requires-python = ">=3.11"
 # dependencies = ["pillow"]
 # ///
-"""Extract a two-hue accent pair from a pokemon's official artwork.
+"""Extract a two-hue accent pair from a mascot's image.
+
+A mascot identity is provider-qualified ("pokemon:raikou"). Each registered
+provider supplies two things: an identity list for the picker, and the
+images for one identity — the sprite the rail displays plus the image
+accent extraction reads. Extraction itself is core and identical for every
+provider.
 
 Prints key=value lines consumed by the `theme` command:
 
-    pokemon=<name>
+    mascot=<provider:id>      sprite=<png path the rail paints>
     accent_dark=#...          notify_dark=#...
     accent_light=#...         notify_light=#...
 
-Every color must actually exist on the pokemon. The accent is the dominant
+Every color must actually exist on the mascot. The accent is the dominant
 vivid hue cluster; the bright accent is the most distinct OTHER hue present,
 searched in relaxing tiers (vivid at 45°+, vivid at 30°+, pale clusters like
-cream fins). A truly single-hue pokemon gets two brightnesses of its one hue
+cream fins). A truly single-hue mascot gets two brightnesses of its one hue
 — never a synthesized complement. Wallpaper-palette tools fail here: small
 identity areas (gengar's red eyes) vanish under frequency-based extraction.
 """
@@ -25,12 +31,13 @@ import colorsys
 import json
 import sys
 import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass
 from os import environ
 from pathlib import Path
 
 from PIL import Image
 
-API = "https://pokeapi.co/api/v2/pokemon/"
 HUE_BUCKETS = 24  # 15 degrees each
 MIN_HUE_SEPARATION = 3  # buckets: 45 degrees
 # A second cluster this much weaker than the primary is noise, not a hue.
@@ -52,9 +59,9 @@ MASCOT_SCALE = 2  # crisp on retina: image pixels = 2x the canvas points
 def normalize(sprite: Image.Image, margin_fraction: float = 0.05) -> Image.Image:
     """Crop to visible content and pad to a square with a small margin.
 
-    PokeAPI sprites are a 96x96 canvas with the creature at arbitrary size
-    and offset; without this, each pokemon displays at a different size.
-    Scaled up with NEAREST so the pixel art stays crisp.
+    Sources put the subject at arbitrary size and offset on their canvas;
+    without this, each mascot displays at a different size. Scaled up with
+    NEAREST so the pixel art stays crisp.
     """
     rgba = sprite.convert("RGBA")
     content_box = rgba.getchannel("A").getbbox()
@@ -68,32 +75,84 @@ def normalize(sprite: Image.Image, margin_fraction: float = 0.05) -> Image.Image
     )
 
 
-def cache_dir() -> Path:
-    path = (
-        Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/pokemon"
+def mascot_cache(provider: str) -> Path:
+    root = (
+        Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/mascots"
     )
+    # One-time migration from the pre-provider layout, where the pokemon
+    # cache WAS the whole cache.
+    legacy = root.parent / "pokemon"
+    migrated = root / "pokemon"
+    if legacy.is_dir() and not migrated.exists():
+        root.mkdir(parents=True, exist_ok=True)
+        legacy.rename(migrated)
+    path = root / provider
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def fetch_images(name: str, *, shiny: bool) -> Path:
-    """Cache all renderings and return the artwork path for extraction.
+# ----- provider registry --------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MascotImages:
+    sprite: Path  # what the rail paints (the accents.conf pointer)
+    palette: Path  # what extraction reads (may be a richer rendering of
+    # the same character than the displayed sprite)
+
+
+@dataclass(frozen=True)
+class Provider:
+    identities: Callable[[], list[str]]
+    fetch: Callable[[str], MascotImages]
+
+
+PROVIDERS: dict[str, Provider] = {}
+
+
+def register(name: str, provider: Provider) -> None:
+    PROVIDERS[name] = provider
+
+
+def resolve(value: str) -> tuple[Provider, str]:
+    provider_name, sep, identity = value.partition(":")
+    if not sep or not identity:
+        raise SystemExit(
+            f"error: '{value}' is not provider-qualified (e.g. pokemon:raikou)"
+        )
+    provider = PROVIDERS.get(provider_name)
+    if provider is None:
+        known = ", ".join(PROVIDERS)
+        raise SystemExit(f"error: unknown provider '{provider_name}' (have: {known})")
+    return provider, identity
+
+
+# ----- pokemon provider ---------------------------------------------------
+
+POKEAPI = "https://pokeapi.co/api/v2/pokemon/"
+
+
+def _pokemon_fetch(name: str, *, shiny: bool) -> MascotImages:
+    """Cache all renderings of one pokemon.
 
     One fetch, distinct roles: the official ARTWORK is the palette source —
     it carries identity details the 96px game sprite drops (gengar's sprite
-    has literally zero red pixels, losing the eyes) — while the game SPRITE,
-    normalized into <base>-mascot.png, is what the mascot displays. Same
-    character, same color family, so the mascot matches its accents. Shiny
-    variants have their own artwork and sprite, cached under <name>-shiny.
+    has literally zero red pixels, losing the eyes) — while the game SPRITE
+    is what the mascot displays, with a normalized square variant cached
+    alongside as <base>-mascot.png. Same character, same color family, so
+    the mascot matches its accents. Shiny variants have their own artwork
+    and sprite, cached under <name>-shiny.
     """
+    name = name.lower()
+    cache = mascot_cache("pokemon")
     base = f"{name}-shiny" if shiny else name
-    artwork = cache_dir() / f"{base}.png"
-    sprite = cache_dir() / f"{base}-sprite.png"
-    mascot = cache_dir() / f"{base}-mascot.png"
+    artwork = cache / f"{base}.png"
+    sprite = cache / f"{base}-sprite.png"
+    mascot = cache / f"{base}-mascot.png"
     if artwork.exists() and sprite.exists() and mascot.exists():
-        return artwork
+        return MascotImages(sprite=sprite, palette=artwork)
 
-    data = json.loads(_get(f"{API}{name}"))
+    data = json.loads(_get(f"{POKEAPI}{name}"))
     variant = "front_shiny" if shiny else "front_default"
     artwork_url = data["sprites"]["other"]["official-artwork"][variant]
     sprite_url = data["sprites"][variant]
@@ -106,24 +165,39 @@ def fetch_images(name: str, *, shiny: bool) -> Path:
     if not sprite.exists():
         sprite.write_bytes(_get(sprite_url))
     normalize(Image.open(sprite)).save(mascot)
-    return artwork
+    return MascotImages(sprite=sprite, palette=artwork)
 
 
-def all_names() -> list[str]:
+def _pokemon_identities() -> list[str]:
     """Every pokemon name, fetched once and cached for picker completion."""
-    names_file = cache_dir() / "names.txt"
+    names_file = mascot_cache("pokemon") / "names.txt"
     if not names_file.exists():
-        data = json.loads(_get(f"{API}?limit=100000"))
+        data = json.loads(_get(f"{POKEAPI}?limit=100000"))
         names = [entry["name"] for entry in data["results"]]
         names_file.write_text("\n".join(names) + "\n")
     return names_file.read_text().splitlines()
+
+
+register(
+    "pokemon",
+    Provider(_pokemon_identities, lambda name: _pokemon_fetch(name, shiny=False)),
+)
+# Shiny is its own picker entry — a cheap wrapper over the pokemon source,
+# sharing its cache under the -shiny suffix.
+register(
+    "shiny-pokemon",
+    Provider(_pokemon_identities, lambda name: _pokemon_fetch(name, shiny=True)),
+)
+
+
+# ----- extraction (core, provider-blind) ----------------------------------
 
 
 def gather_pixels(image_path: Path) -> tuple[list[Hsv], list[Hsv]]:
     """Split usable pixels into vivid and pale-but-tinted.
 
     Pale pixels (cream fins, pastel markings) are too washed to lead, but
-    when a pokemon has no second vivid hue they are the honest source of an
+    when a mascot has no second vivid hue they are the honest source of an
     accent — shiny gyarados is red plus cream-gold, not red plus anything
     invented.
     """
@@ -194,7 +268,7 @@ def pick_pair(vivid: list[Hsv], pale: list[Hsv]) -> tuple[Hsv, Hsv]:
     """Accent = dominant vivid hue; notify = the most distinct OTHER
     hue actually present, searched in relaxing tiers: vivid at 45°+, vivid at
     30°+ (red-vs-gold pokemon), then pale clusters. Every color must exist on
-    the pokemon — with a single-hue pokemon the pair is two brightnesses of
+    the mascot — with a single-hue mascot the pair is two brightnesses of
     its one hue, never an invented complement.
     """
     vivid_weights = cluster_weights(vivid)
@@ -227,20 +301,29 @@ def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
     return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
+USAGE = "usage: mascot-accents <provider:id> | --providers | --identities <provider>"
+
+
 def main() -> None:
     args = sys.argv[1:]
-    if args == ["--names"]:
-        print("\n".join(all_names()))
+    if args == ["--providers"]:
+        print("\n".join(PROVIDERS))
         return
-    shiny = "--shiny" in args
-    names = [a for a in args if a != "--shiny"]
-    if len(names) != 1:
-        raise SystemExit("usage: pokemon-accents <name> [--shiny] | --names")
-    name = names[0].lower()
-    accent, notify = pick_pair(*gather_pixels(fetch_images(name, shiny=shiny)))
-    print(f"pokemon={name}")
-    if shiny:
-        print("shiny=1")
+    if len(args) == 2 and args[0] == "--identities":
+        provider = PROVIDERS.get(args[1])
+        if provider is None:
+            known = ", ".join(PROVIDERS)
+            raise SystemExit(f"error: unknown provider '{args[1]}' (have: {known})")
+        print("\n".join(provider.identities()))
+        return
+    if len(args) != 1:
+        raise SystemExit(USAGE)
+    value = args[0]
+    provider, identity = resolve(value)
+    images = provider.fetch(identity)
+    accent, notify = pick_pair(*gather_pixels(images.palette))
+    print(f"mascot={value}")
+    print(f"sprite={images.sprite}")
     print(f"accent_dark={styled(accent, dark_background=True, bright=False)}")
     print(f"notify_dark={styled(notify, dark_background=True, bright=True)}")
     print(f"accent_light={styled(accent, dark_background=False, bright=False)}")

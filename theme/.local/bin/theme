@@ -25,11 +25,11 @@ SCRIPT_PATH="$(readlink -f "$0")"
 PACKAGE_ROOT="${SCRIPT_PATH%/.local/bin/theme}"
 CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT/.config}/theme"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
-# Pokemon mappings are machine-personal state (project names must never
+# Mascot mappings are machine-personal state (project names must never
 # reach the public repo), not tracked config.
-POKEMON_CONF="$STATE/pokemon.conf"
-# The global default is shareable and tracked; see pokemon.conf in config.
-DEFAULT_CONF="$CONFIG/pokemon.conf"
+MASCOT_CONF="$STATE/mascot.conf"
+# The global default is shareable and tracked; see mascot.conf in config.
+DEFAULT_CONF="$CONFIG/mascot.conf"
 GENERATED="$STATE/generated"
 MODE_FILE="$STATE/theme-mode"
 
@@ -66,23 +66,40 @@ conf_del() {
   fi
 }
 
-# Extract accents into state. $1 is the name, $2 non-empty means shiny.
-# Display is not this command's job: the rail mascot watches state.
-set_pokemon() {
+# Extract accents into state. $1 is a provider-qualified identity
+# (e.g. pokemon:raikou). Display is not this command's job: the rail
+# mascot watches state.
+set_mascot() {
   # Atomic write: a failed extraction must not clobber working accents.
-  if ! pokemon-accents "$1" ${2:+--shiny} >"$STATE/.accents.tmp"; then
+  if ! mascot-accents "$1" >"$STATE/.accents.tmp"; then
     rm -f "$STATE/.accents.tmp"
     exit 1
   fi
   mv "$STATE/.accents.tmp" "$STATE/accents.conf"
 }
 
-# Mapped values encode shininess as "<name>:shiny"; apply one.
-set_pokemon_value() {
-  case "$1" in
-  *:shiny) set_pokemon "${1%:shiny}" 1 ;;
-  *) set_pokemon "$1" "" ;;
-  esac
+# One-time migration from the pre-provider layout: mapped values gain
+# their provider prefix (X -> pokemon:X, X:shiny -> shiny-pokemon:X) and
+# accents.conf regenerates in the provider-qualified format (identity +
+# sprite pointer). Every image involved is already cached, so this is
+# offline; on failure the legacy file stays and the next run retries.
+migrate_legacy_state() {
+  if [ -f "$STATE/pokemon.conf" ] && [ ! -f "$MASCOT_CONF" ]; then
+    sed -e 's/=\(.*\):shiny$/=shiny-pokemon:\1/' -e 't' -e 's/=/=pokemon:/' \
+      "$STATE/pokemon.conf" >"$MASCOT_CONF"
+    rm "$STATE/pokemon.conf"
+  fi
+  legacy=""
+  [ -f "$STATE/accents.conf" ] && legacy="$(conf_get "$STATE/accents.conf" pokemon)"
+  if [ -n "$legacy" ]; then
+    value="pokemon:$legacy"
+    [ "$(conf_get "$STATE/accents.conf" shiny)" = "1" ] && value="shiny-pokemon:$legacy"
+    if mascot-accents "$value" >"$STATE/.accents.tmp" 2>/dev/null; then
+      mv "$STATE/.accents.tmp" "$STATE/accents.conf"
+    else
+      rm -f "$STATE/.accents.tmp"
+    fi
+  fi
 }
 
 render() {
@@ -91,7 +108,7 @@ render() {
   mkdir -p "$GENERATED"
 
   # Build a sed script resolving each {{role}} to its hex via the palette.
-  # A pokemon (theme pokemon <name>) overrides accent/notify only,
+  # A mascot (theme mascot <provider:id>) overrides accent/notify only,
   # with the pair extracted for the current background mode.
   accents="$STATE/accents.conf"
   # Per-process temp name: the appearance watcher and a manual `theme` can
@@ -211,12 +228,12 @@ show_accents() {
   accents="$STATE/accents.conf"
   [ -f "$accents" ] || return 0
   mode="$(current_mode)"
-  sparkle=""
-  [ "$(conf_get "$accents" shiny)" = "1" ] && sparkle=" ✨shiny"
-  echo "pokemon: $(conf_get "$accents" pokemon)$sparkle ($mode)"
+  echo "mascot: $(conf_get "$accents" mascot) ($mode)"
   swatch "$(conf_get "$accents" "accent_$mode")" accent
   swatch "$(conf_get "$accents" "notify_$mode")" notify
 }
+
+migrate_legacy_state
 
 case "${1:-status}" in
 dark | light)
@@ -243,58 +260,49 @@ apply)
   esac
   render "$mode"
   ;;
-pokemon)
-  sub="${2:?usage: theme pokemon <name>|none|default <name>|project <name>|sync [project] [--shiny]}"
+mascot)
+  sub="${2:?usage: theme mascot <provider:id>|none|default <provider:id>|project <provider:id>|none|sync [project]}"
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
     ;;
   sync)
-    # Make the global accent follow a project: apply its mapped pokemon
+    # Make the global accent follow a project: apply its mapped mascot
     # (or the default), skipping the extraction when it is already active.
     # Session switchers (to/ts, rail jump) call this in the background.
     project="${3:-}"
     [ -n "$project" ] || project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
     value=""
-    [ -f "$POKEMON_CONF" ] && value="$(conf_get "$POKEMON_CONF" "$project")"
+    [ -f "$MASCOT_CONF" ] && value="$(conf_get "$MASCOT_CONF" "$project")"
     [ -n "$value" ] || value="$(conf_get "$DEFAULT_CONF" default)"
     [ -n "$value" ] || exit 0
     current=""
-    if [ -f "$STATE/accents.conf" ]; then
-      current="$(conf_get "$STATE/accents.conf" pokemon)"
-      [ "$(conf_get "$STATE/accents.conf" shiny)" = "1" ] && current="$current:shiny"
-    fi
+    [ -f "$STATE/accents.conf" ] && current="$(conf_get "$STATE/accents.conf" mascot)"
     [ "$value" = "$current" ] && exit 0
-    set_pokemon_value "$value"
+    set_mascot "$value"
     ;;
   default)
-    name="${3:?usage: theme pokemon default <name> [--shiny]}"
-    value="$name"
-    [ "${4:-}" = "--shiny" ] && value="$name:shiny"
+    value="${3:?usage: theme mascot default <provider:id>}"
     conf_put "$DEFAULT_CONF" default "$value"
-    set_pokemon_value "$value"
+    set_mascot "$value"
     ;;
   project)
     project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
-    name="${3:?usage: theme pokemon project <name>|none [--shiny]}"
-    if [ "$name" = none ]; then
+    value="${3:?usage: theme mascot project <provider:id>|none}"
+    if [ "$value" = none ]; then
       # Unmap this project and fall back to the global default, if one is set.
-      conf_del "$POKEMON_CONF" "$project"
+      conf_del "$MASCOT_CONF" "$project"
       echo "unmapped: $project"
       fallback="$(conf_get "$DEFAULT_CONF" default)"
-      [ -n "$fallback" ] && set_pokemon_value "$fallback"
+      [ -n "$fallback" ] && set_mascot "$fallback"
     else
-      value="$name"
-      [ "${4:-}" = "--shiny" ] && value="$name:shiny"
-      conf_put "$POKEMON_CONF" "$project" "$value"
+      conf_put "$MASCOT_CONF" "$project" "$value"
       echo "mapped: $project -> $value"
-      set_pokemon_value "$value"
+      set_mascot "$value"
     fi
     ;;
   *)
-    shinyflag=""
-    [ "${3:-}" = "--shiny" ] && shinyflag=1
-    set_pokemon "$sub" "$shinyflag"
+    set_mascot "$sub"
     ;;
   esac
   render "$(current_mode)"
@@ -305,7 +313,7 @@ status)
   show_accents
   ;;
 *)
-  echo "usage: theme dark|light|toggle|apply|status|pokemon <name>|none" >&2
+  echo "usage: theme dark|light|toggle|apply|status|mascot <provider:id>|none" >&2
   exit 1
   ;;
 esac
