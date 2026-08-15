@@ -187,6 +187,14 @@ cmd-alt-tab = 'workspace-back-and-forth'
 cmd-alt-r = 'reload-config'
 cmd-alt-f = 'fullscreen'
 
+# Jump to the newest agent needing attention from anywhere: land on the
+# code workspace, focus the terminal, and let workmux switch tmux to the
+# agent's pane (the same jump alt+j does inside tmux).
+alt-shift-a = [
+  'workspace code',
+  'exec-and-forget open -a Ghostty && /opt/homebrew/bin/workmux last-done',
+]
+
 # modes
 cmd-alt-shift-semicolon = 'mode service'
 cmd-alt-shift-r = 'mode resize'
