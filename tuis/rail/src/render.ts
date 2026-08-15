@@ -60,7 +60,7 @@ export function renderRail(
     );
   }
 
-  const top = header(data.session, palette, inner);
+  const top = header(data.session, palette, inner, data.prefixHeld);
   const hasFooter = height >= MIN_HEIGHT_FOR_MASCOT;
   // No blank row below the sprite: the 19pt bottom frame is the sprite's
   // lower margin (~one cell), matching the blank row above it — so the

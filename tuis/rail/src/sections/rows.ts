@@ -54,6 +54,16 @@ export function agentRank(agent: Agent, acked: Set<string>): number {
   return acked.has(agent.paneId) ? 3 : URGENCY[agent.status];
 }
 
+// The one display order for agent lists: urgency first, acked last,
+// newest activity breaking ties. Jump hints number this exact order, so
+// anything that renders agents MUST sort through here.
+export function sortByUrgency(agents: Agent[], acked: Set<string>): Agent[] {
+  return [...agents].sort(
+    (a, b) =>
+      agentRank(a, acked) - agentRank(b, acked) || b.updatedTs - a.updatedTs,
+  );
+}
+
 // Timers whisper — blended well into the slab so their minute ticks never
 // pull the eye — but in the agent's STATE hue, so a truncated title still
 // shows its color through the timer. Acked rows drop to the neutral dim.

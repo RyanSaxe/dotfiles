@@ -130,6 +130,15 @@ repos:
         pass_filenames: false
         files: "^tuis/rail/"
 
+      # The keybind cheatsheet (alt+/) can never drift: every chord bound
+      # in tmux.conf and aerospace.toml must have a keys.tsv row.
+      - id: keycheck
+        name: keycheck (cheatsheet drift)
+        language: system
+        entry: uv run -q --script dev/keycheck.py
+        pass_filenames: false
+        files: '^(tmux/\.config/tmux/(tmux\.conf|keys\.tsv)|aerospace/\.config/aerospace/aerospace\.toml|dev/keycheck\.py)$'
+
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.
       - id: theme-tests

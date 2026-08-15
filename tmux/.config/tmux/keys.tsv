@@ -1,0 +1,42 @@
+app	chord	action
+tmux	alt+1-9	switch to window N
+tmux	alt+n	new window
+tmux	alt+q	detach client
+tmux	alt+l	jump back to last pane
+tmux	ctrl+h/j/k/l	move between panes (vim-aware; skips the rail)
+tmux	ctrl+b/f	scroll full page up/down (vim-aware copy-mode)
+tmux	ctrl+u/d	scroll half page up/down (vim-aware copy-mode)
+tmux	alt+s	session switcher popup
+tmux	alt+o	repo picker popup (opens session)
+tmux	alt+c	theme picker popup
+tmux	alt+d	agent dashboard popup
+tmux	alt+g	toggle rail / focus mode
+tmux	alt+,	rail page up
+tmux	alt+.	rail page down
+tmux	alt+a	enter agent jump table
+tmux	alt+a 1-9	jump to elsewhere agent N (rail chip)
+tmux	alt+a a	jump to top agent (what needs me)
+tmux	alt+a enter	jump to top agent
+tmux	alt+a esc	cancel agent table
+tmux	alt+/	this cheatsheet
+tmux	prefix r	reload tmux config
+tmux	prefix s	session switcher popup
+tmux	prefix o	repo picker popup
+aerospace	cmd+alt+h/j/k/l	focus window left/down/up/right
+aerospace	cmd+alt+shift+h/j/k/l	move window left/down/up/right
+aerospace	cmd+alt+v/b/n/m	workspace: message/browser/code/meeting
+aerospace	cmd+alt+shift+v/b/n/m	send window to workspace
+aerospace	cmd+alt+s	summon the stack (on-demand accordion)
+aerospace	cmd+alt+shift+s	throw window onto the stack
+aerospace	cmd+alt+a	jump to agent needing attention (from anywhere)
+aerospace	cmd+alt+tab	previous workspace
+aerospace	cmd+alt+f	fullscreen
+aerospace	cmd+alt+/	toggle split orientation
+aerospace	cmd+alt+minus	flatten layout (reset)
+aerospace	cmd+alt+equal	balance window sizes
+aerospace	cmd+alt+r	reload aerospace config
+ghostty	cmd+r	reload ghostty config
+ghostty	cmd+o	open ghostty config
+ghostty	shift+enter	newline without submitting
+zsh	tab	completion menu (fzf)
+zsh	shift+tab	accept ghost suggestion

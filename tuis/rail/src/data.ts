@@ -33,12 +33,15 @@ export interface RailData {
   agents: Agent[];
   // Pane ids whose done/waiting status has been seen (visit-clears).
   acked: Set<string>;
-  // Jump-hint letter per agent pane id (alt+; <letter>).
+  // Jump-hint digit per agent pane id (alt+a <digit>), viewer-relative.
   hints: Map<string, string>;
   // Kitty image id for the footer sprite; null renders a blank footer.
   sprite: number | null;
   // Pagination page for the body (0 = top); clamped by the renderer.
   page: number;
+  // A client on this session is holding the tmux prefix or sitting in
+  // the agent key table — the header recolors as the mode signal.
+  prefixHeld: boolean;
 }
 
 // tmux formats can't contain our field separator; \x1f never appears in
@@ -172,6 +175,26 @@ export async function collectPanes(): Promise<Pane[]> {
     });
   }
   return panes;
+}
+
+// Sessions whose attached client is mid-chord: tmux prefix held, or the
+// agent jump table active. Polled per tick; the ~250ms lag is the accepted
+// cost of riding the daemon cadence.
+export async function collectModeSessions(): Promise<Set<string>> {
+  const { stdout } = await run("tmux", [
+    "list-clients",
+    "-F",
+    `#{client_session}${SEP}#{client_prefix}${SEP}#{client_key_table}`,
+  ]);
+  const sessions = new Set<string>();
+  for (const rawLine of stdout.split("\n")) {
+    if (!rawLine) continue;
+    const [session, prefix, keyTable] = rawLine.split(SEP);
+    if (session && (prefix === "1" || keyTable === "agent")) {
+      sessions.add(session);
+    }
+  }
+  return sessions;
 }
 
 // Content windows of one session, rail panes excluded — the rail never

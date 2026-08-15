@@ -1,52 +1,64 @@
-// Jump hints: every agent gets a letter; alt+; enters a one-key tmux table
-// where that letter jumps straight to the agent's pane. The daemon assigns
-// letters (preferring the session's first letter so they stay guessable)
-// and writes the mapping file `rail jump` reads.
+// Jump hints: the elsewhere section's rows are numbered by display
+// position — 1 is always the top row of the rail you are looking at.
+// alt+a enters a one-key tmux table where the digit jumps to that row
+// (a / Enter jump to row 1, "what needs me most"). Because "elsewhere"
+// is relative to the viewing session, assignments are per session; the
+// daemon writes one mapping line per (viewing session, digit).
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { XDG_STATE } from "./paths.js";
+import { sortByUrgency } from "./sections/rows.js";
 import type { Agent } from "./data.js";
 
 const HINTS_PATH = join(XDG_STATE, "dotfiles/rail/hints.tsv");
 
-// Home row first, then the rest of the alphabet.
-const POOL = "asdfghjklqwertyuiopzxcvbnm";
+// Digits only: past nine agents the dashboard is the overflow surface.
+const MAX_HINTS = 9;
 
-export function assignHints(agents: Agent[]): Map<string, string> {
-  const hints = new Map<string, string>();
-  const taken = new Set<string>();
-  // Deterministic order: assignments only reshuffle when agents come or go.
-  const ordered = [...agents].sort((a, b) => a.paneId.localeCompare(b.paneId));
-  for (const agent of ordered) {
-    const preferred = (agent.session[0] ?? "").toLowerCase();
-    let letter = "";
-    if (preferred && POOL.includes(preferred) && !taken.has(preferred)) {
-      letter = preferred;
-    } else {
-      letter = [...POOL].find((candidate) => !taken.has(candidate)) ?? "";
+// One digit map per viewing session, numbering that session's elsewhere
+// rows in their exact display order.
+export function assignHints(
+  agents: Agent[],
+  sessions: Iterable<string>,
+  acked: Set<string>,
+): Map<string, Map<string, string>> {
+  const bySession = new Map<string, Map<string, string>>();
+  for (const session of sessions) {
+    const elsewhere = sortByUrgency(
+      agents.filter((agent) => agent.session !== session),
+      acked,
+    );
+    const hints = new Map<string, string>();
+    for (const [index, agent] of elsewhere.slice(0, MAX_HINTS).entries()) {
+      hints.set(agent.paneId, String(index + 1));
     }
-    if (!letter) break;
-    taken.add(letter);
-    hints.set(agent.paneId, letter);
+    bySession.set(session, hints);
   }
-  return hints;
+  return bySession;
 }
 
 let lastWritten = "";
 
-export function writeHints(agents: Agent[], hints: Map<string, string>): void {
-  const lines = agents
-    .filter((agent) => hints.has(agent.paneId))
-    .map(
-      (agent) =>
-        `${hints.get(agent.paneId)}\t${agent.session}\t${agent.paneId}`,
-    )
-    .sort()
-    .join("\n");
-  if (lines === lastWritten) return;
-  lastWritten = lines;
+// Line format: viewing session \t digit \t target session \t pane id.
+// `rail jump` greps the caller's session to resolve a digit.
+export function writeHints(
+  agents: Agent[],
+  bySession: Map<string, Map<string, string>>,
+): void {
+  const sessionOf = new Map(agents.map((agent) => [agent.paneId, agent]));
+  const lines: string[] = [];
+  for (const [session, hints] of bySession) {
+    for (const [paneId, digit] of hints) {
+      const target = sessionOf.get(paneId);
+      if (target)
+        lines.push(`${session}\t${digit}\t${target.session}\t${paneId}`);
+    }
+  }
+  const joined = lines.sort().join("\n");
+  if (joined === lastWritten) return;
+  lastWritten = joined;
   mkdirSync(dirname(HINTS_PATH), { recursive: true });
-  writeFileSync(HINTS_PATH, lines + (lines ? "\n" : ""));
+  writeFileSync(HINTS_PATH, joined + (joined ? "\n" : ""));
 }

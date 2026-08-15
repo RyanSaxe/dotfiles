@@ -22,6 +22,7 @@ import { loadAcks, updateAcks } from "./acks.js";
 import {
   applyDoneHysteresis,
   collectAgents,
+  collectModeSessions,
   collectPanes,
   run,
   tmux,
@@ -283,10 +284,11 @@ async function tick(counter: number): Promise<void> {
           agentsFresh = true;
         })
       : Promise.resolve();
-  // The polls are independent — one round-trip of latency, not three.
-  const [panes, spriteCapable] = await Promise.all([
+  // The polls are independent — one round-trip of latency, not four.
+  const [panes, spriteCapable, modeSessions] = await Promise.all([
     collectPanes(),
     capableSessions(),
+    collectModeSessions(),
     refresh,
   ]);
   const palette = loadPalette();
@@ -295,8 +297,9 @@ async function tick(counter: number): Promise<void> {
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
   const acked = updateAcks(acks, settled, panes);
-  const hints = assignHints(settled);
-  writeHints(settled, hints);
+  const sessions = new Set(panes.map((pane) => pane.session));
+  const hintsBySession = assignHints(settled, sessions, acked);
+  writeHints(settled, hintsBySession);
   publishAttention(settled, acked);
   pushPhone(settled, panes);
 
@@ -323,7 +326,8 @@ async function tick(counter: number): Promise<void> {
         ? pokemon.spritePath
         : null;
     const sprite = spritePath ? spriteId(spritePath) : null;
-    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}`;
+    const prefixHeld = modeSessions.has(pane.session);
+    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
     let frame = frames.get(bucket);
     if (frame === undefined) {
       const data = {
@@ -331,9 +335,10 @@ async function tick(counter: number): Promise<void> {
         windows: windowsOf(panes, pane.session),
         agents: settled,
         acked,
-        hints,
+        hints: hintsBySession.get(pane.session) ?? new Map<string, string>(),
         sprite,
         page,
+        prefixHeld,
       };
       frame = toFrame(
         renderRail(data, sessionPalette, pane.width, pane.height),

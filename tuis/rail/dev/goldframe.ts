@@ -16,6 +16,7 @@ const scene: RailData = {
   hints: new Map(),
   sprite: null,
   page: Number(process.env.RAIL_PAGE ?? 0),
+  prefixHeld: Boolean(process.env.RAIL_PREFIX),
   windows: [
     { index: 1, name: "nvim", active: false, paneIds: ["%1"] },
     { index: 2, name: "zsh", active: true, paneIds: ["%2"] },
@@ -70,7 +71,9 @@ const scene: RailData = {
   ],
 };
 
-scene.hints = assignHints(scene.agents);
+scene.hints =
+  assignHints(scene.agents, [scene.session], scene.acked).get(scene.session) ??
+  new Map();
 
 // Defaults mirror the shipped pane geometry (daemon.ts RAIL_WIDTH).
 const width = Number(process.env.RAIL_WIDTH ?? 24);

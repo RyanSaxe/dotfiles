@@ -60,13 +60,17 @@ toggle)
   fi
   ;;
 jump)
-  # Jump to the agent behind a hint letter (alt+; <letter> in tmux). The
-  # daemon keeps hints.tsv current: letter <tab> session <tab> pane_id.
-  letter="${2:?usage: rail jump <letter>}"
-  hint_line="$(grep "^$letter	" "$STATE/hints.tsv" 2>/dev/null | head -1 || true)"
+  # Jump to the agent behind a hint digit (alt+a <digit> in tmux). Digits
+  # are viewer-relative — 1 is the top elsewhere row of the CALLING
+  # session's rail — so the lookup is keyed by the current session. The
+  # daemon keeps hints.tsv current:
+  # viewing_session <tab> digit <tab> target_session <tab> pane_id.
+  digit="${2:?usage: rail jump <digit>}"
+  viewing="$(tmux display-message -p '#{session_name}')"
+  hint_line="$(grep "^$viewing	$digit	" "$STATE/hints.tsv" 2>/dev/null | head -1 || true)"
   [ -n "$hint_line" ] || exit 0
-  session="$(printf '%s' "$hint_line" | cut -f2)"
-  pane="$(printf '%s' "$hint_line" | cut -f3)"
+  session="$(printf '%s' "$hint_line" | cut -f3)"
+  pane="$(printf '%s' "$hint_line" | cut -f4)"
   # The shared jump primitive switches AND syncs the pokemon accent.
   "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
   ;;

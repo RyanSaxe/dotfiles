@@ -3,15 +3,19 @@ import { blend, railBg, type Palette } from "../theme.js";
 
 // Session identity: the name is the rail's first cell — the window's
 // symmetric padding places it exactly at (19, 19) — over a full-width
-// accent rule.
+// accent rule. While a prefix chord is mid-flight the name flips to the
+// accent: the mode signal the old status pill used to carry.
 export function header(
   session: string,
   palette: Palette,
   width: number,
+  prefixHeld: boolean,
 ): string[] {
   const bg = railBg(palette);
   return [
-    line(width, bg, [{ text: session, fg: palette.lavender }]),
+    line(width, bg, [
+      { text: session, fg: prefixHeld ? palette.accent : palette.lavender },
+    ]),
     // Heavy rule: the header's accent line carries more weight than the
     // section hairlines below it.
     line(width, bg, [{ text: "━".repeat(width), fg: palette.accent }]),
