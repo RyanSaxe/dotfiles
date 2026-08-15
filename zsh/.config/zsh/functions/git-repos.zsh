@@ -153,7 +153,9 @@ to() {
   repo_real="$(cd "$repo" && pwd -P)"
   if tmux has-session -t "=$session_name" 2>/dev/null; then
     local existing_path
-    existing_path="$(tmux display-message -p -t "=$session_name" '#{session_path}')"
+    # The trailing colon targets the session itself; bare `=name` resolves
+    # as a client target here and comes back empty.
+    existing_path="$(tmux display-message -p -t "=${session_name}:" '#{session_path}')"
     if [[ "$(cd "$existing_path" 2>/dev/null && pwd -P)" != "$repo_real" ]]; then
       session_name="$(_sanitize_tmux_session_name "$(basename "$repo")-$(basename "$(dirname "$repo")")")"
     fi
