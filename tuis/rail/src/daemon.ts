@@ -37,7 +37,7 @@ import { XDG_STATE } from "./paths.js";
 import { pokemonFor } from "./pokemon.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
-import { loadPalette } from "./theme.js";
+import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
@@ -63,6 +63,7 @@ const SYNC_OFF = "\x1b[?2026l";
 
 let agents: Agent[] = [];
 let agentsFresh = false;
+let appliedBg = "";
 const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
@@ -102,6 +103,12 @@ async function spawnRail(windowId: string): Promise<void> {
   );
   const paneId = stdout.trim();
   await tmux("set-option", "-p", "-t", paneId, "@rail", "1");
+  // The pane's DEFAULT background must match the frames: tmux clears a
+  // pane region to its default bg before redrawing on window/session
+  // switches, and a default that differs from the rail's crust flashes
+  // visibly on every switch. (Content panes don't need this — their bg
+  // already equals the terminal default.)
+  await tmux("select-pane", "-P", `bg=${railBg(loadPalette())}`, "-t", paneId);
   // No per-pane border styling: borders are crust-filled globally
   // (tmux.conf), which is attribution-proof — per-pane styles only ever
   // controlled half a shared border and the active pane's style took
@@ -235,15 +242,17 @@ async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
 // rail and a mid-flip window switch shows the stale variant.
 
 // Terminals drop image data on restart and the daemon can't observe that;
-// a slow re-send through each visible rail pane keeps sprites alive.
+// a slow re-send through each visible rail pane keeps sprites alive. The
+// key includes the id so an id change (camouflage follows the theme
+// background) retransmits immediately instead of waiting out the timer.
 const TRANSMIT_INTERVAL_MS = 60_000;
 const lastTransmit = new Map<string, number>();
 
-function maybeTransmit(pane: Pane, spritePath: string): void {
-  const key = `${pane.paneId}\x1f${spritePath}`;
+function maybeTransmit(pane: Pane, spritePath: string, id: number): void {
+  const key = `${pane.paneId}\x1f${spritePath}\x1f${id}`;
   const last = lastTransmit.get(key) ?? 0;
   if (Date.now() - last < TRANSMIT_INTERVAL_MS) return;
-  if (transmitSprite(pane.tty, spritePath)) {
+  if (transmitSprite(pane.tty, spritePath, id)) {
     lastTransmit.set(key, Date.now());
     // Repaint after the data lands so the placeholder cells composite.
     pushed.delete(pane.paneId);
@@ -264,6 +273,18 @@ async function tick(counter: number): Promise<void> {
     refresh,
   ]);
   const palette = loadPalette();
+  // Keep every rail pane's default bg in step with the theme (spawn sets
+  // it once; a mode flip changes crust under all existing panes).
+  const bg = railBg(palette);
+  if (bg !== appliedBg) {
+    for (const pane of panes) {
+      if (!pane.isRail) continue;
+      await tmux("select-pane", "-P", `bg=${bg}`, "-t", pane.paneId).catch(
+        () => {},
+      );
+    }
+    appliedBg = bg;
+  }
   const skip = await selfHeal(panes);
   await reconcileWindowBorders(panes);
 
@@ -294,7 +315,7 @@ async function tick(counter: number): Promise<void> {
       palette.accent;
     const sessionPalette = { ...palette, accent };
     const spritePath = pokemon?.spritePath ?? null;
-    const sprite = spritePath ? spriteId(spritePath) : null;
+    const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
     const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
     let frame = frames.get(bucket);
@@ -314,8 +335,13 @@ async function tick(counter: number): Promise<void> {
       );
       frames.set(bucket, frame);
     }
-    if (spritePath && pane.sessionAttached && pane.windowActive) {
-      maybeTransmit(pane, spritePath);
+    if (
+      spritePath &&
+      sprite !== null &&
+      pane.sessionAttached &&
+      pane.windowActive
+    ) {
+      maybeTransmit(pane, spritePath, sprite);
     }
     paintPane(pane, frame);
   }
