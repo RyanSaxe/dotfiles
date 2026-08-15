@@ -10,8 +10,9 @@
 //
 // The daemon also enforces the rail's invariants every tick (self-heal):
 // rails are exactly RAIL_WIDTH wide, hold no scrollback, are never in
-// copy-mode, are never the selected pane, don't exist in narrow windows,
-// exist in wide ones while enabled, and never survive alone in a window.
+// copy-mode, are never the selected pane, exist in every window while
+// enabled (alt+g is the ONLY gate — no width policy), and never survive
+// alone in a window.
 
 import { existsSync, readFileSync, watch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -43,10 +44,9 @@ const AGENT_RECONCILE_TICKS = 20; // every 5s
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
 // plus the crust gutter renderRail appends.
 const RAIL_WIDTH = 22 + GUTTER_COLS;
-// Hysteresis: rails die below 100 but only spawn above 110, so a window
-// hovering at the boundary can't flap between the two.
-const KILL_BELOW_WIDTH = 100;
-const SPAWN_ABOVE_WIDTH = 110;
+// Split feasibility, not policy: below this tmux can't fit rail + border
+// + any content. Visibility is Ryan's call via alt+g, never width magic.
+const MIN_SPLIT_WIDTH = RAIL_WIDTH + 2;
 
 const STATE_DIR = join(XDG_STATE, "dotfiles/rail");
 const PID_FILE = join(STATE_DIR, "daemon.pid");
@@ -138,12 +138,6 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
       touched.add(pane.paneId);
       continue;
     }
-    // Narrow windows carry no rail; the content pane wins.
-    if (pane.windowWidth < KILL_BELOW_WIDTH) {
-      await tmux("kill-pane", "-t", pane.paneId).catch(() => {});
-      touched.add(pane.paneId);
-      continue;
-    }
     // tmux resizes panes proportionally on window resize; the rail's width
     // is not negotiable. A resize REFLOWS whatever was on screen (old
     // frames wrap line by line), and that can corrupt the display without
@@ -187,15 +181,15 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
     }
   }
 
-  // While enabled, every wide-enough window grows a rail — hooks make this
-  // instant, this reconcile makes it inevitable.
+  // While enabled, EVERY window grows a rail — no width policy, alt+g is
+  // the only gate. This reconcile makes it inevitable.
   if (enabled) {
     const seen = new Set<string>();
     for (const pane of panes) {
       if (seen.has(pane.windowId) || pane.isRail) continue;
       seen.add(pane.windowId);
       if (
-        pane.windowWidth >= SPAWN_ABOVE_WIDTH &&
+        pane.windowWidth >= MIN_SPLIT_WIDTH &&
         !railByWindow.has(pane.windowId)
       ) {
         await spawnRail(pane.windowId).catch(() => {});
