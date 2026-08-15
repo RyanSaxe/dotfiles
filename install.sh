@@ -103,6 +103,13 @@ install_tier_packages() {
     brew tap felixkratz/formulae
     brew trust felixkratz/formulae 2>/dev/null || true
     brew_install sketchybar
+    # aerospace is a cask in nikitabobko's tap; install skips when present
+    # (casks error on reinstall, unlike formulas).
+    brew tap nikitabobko/tap
+    brew trust nikitabobko/tap 2>/dev/null || true
+    brew list --cask aerospace >/dev/null 2>&1 || brew install --cask aerospace
+    # Per-machine notch compensation for aerospace's top gap.
+    ./aerospace/.config/aerospace/configure.sh
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2

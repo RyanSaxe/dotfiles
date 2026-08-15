@@ -1,0 +1,154 @@
+# AeroSpace: tiling window management.
+#
+# Chord grammar: plain alt is terminal control (tmux), alt-cmd is window
+# management, and shift turns a verb into its move variant.
+
+config-version = 2
+
+start-at-login = true
+
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+accordion-padding = 300
+
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+
+# Recolor the sketchybar workspace indicators the moment focus moves.
+exec-on-workspace-change = [
+  '/bin/bash',
+  '-c',
+  'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE PREV_WORKSPACE=$AEROSPACE_PREV_WORKSPACE',
+]
+
+# Bottom-row keys in spatial order: V on the left monitor through M on the
+# right. The workspaces themselves are monitor-independent — undocked they
+# all collapse onto the laptop screen and the same keys switch app groups.
+persistent-workspaces = [
+  "message", # mail/messages - key V
+  "browser", # key B
+  "code",    # key N
+  "meeting", # Teams meetings/calls - key M
+]
+
+after-startup-command = ['exec-and-forget sketchybar']
+
+# ----------------------------
+# WORKSPACES -> MONITORS
+# ----------------------------
+# 1 = left-to-right sequence number, 'main' = macOS main display. Missing
+# monitors degrade gracefully: everything lands on what exists.
+[workspace-to-monitor-force-assignment]
+message = 1      # tall left monitor - reading threads
+browser = "main" # wide center monitor
+code = "main"    # wide center monitor
+meeting = 3      # tall right monitor - Teams
+
+# Floating windows for system apps
+[[on-window-detected]]
+if.app-id = 'com.apple.finder'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.ActivityMonitor'
+run = 'layout floating'
+
+# -----------------------------------------------------------------------------
+# Gaps
+# -----------------------------------------------------------------------------
+# Balance rule: the bar->window distance equals the window->window distance.
+# sketchybar bottom sits at y_offset 10 + height 32 = 42, so outer.top 52
+# leaves the same 10 the inner gaps use. Changing the bar geometry means
+# re-deriving outer.top from this rule.
+#
+# outer.top is rewritten per machine by the aerospace-notch git filter
+# (notch-filter.sh, registered by configure.sh): the built-in display
+# reserves the camera-housing rows, so its gap shrinks by the measured
+# inset to keep the absolute window top identical to external monitors.
+[gaps]
+inner.horizontal = 10
+inner.vertical = 10
+outer.left = 10
+outer.bottom = 10
+outer.top = 52
+outer.right = 10
+
+# ----------------------------
+# KEYBINDINGS
+# ----------------------------
+[key-mapping]
+preset = 'qwerty'
+
+[mode.main.binding]
+
+# Focus and move across windows, wrapping across monitors.
+cmd-alt-h = 'focus left --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-j = 'focus down --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-k = 'focus up --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-l = 'focus right --boundaries all-monitors-outer-frame --boundaries-action wrap-around-all-monitors'
+cmd-alt-shift-h = 'move left'
+cmd-alt-shift-j = 'move down'
+cmd-alt-shift-k = 'move up'
+cmd-alt-shift-l = 'move right'
+
+# Workspace switching, bottom row left-to-right.
+cmd-alt-v = 'workspace message'
+cmd-alt-b = 'workspace browser'
+cmd-alt-n = 'workspace code'
+cmd-alt-m = 'workspace meeting'
+
+# Send the focused window along (shift = move variant).
+cmd-alt-shift-v = [
+  'move-node-to-workspace message',
+  'workspace message',
+  'layout v_tiles',
+]
+cmd-alt-shift-b = [
+  'move-node-to-workspace browser',
+  'workspace browser',
+  'layout h_tiles',
+]
+cmd-alt-shift-n = [
+  'move-node-to-workspace code',
+  'workspace code',
+  'layout h_tiles',
+]
+cmd-alt-shift-m = [
+  'move-node-to-workspace meeting',
+  'workspace meeting',
+  'layout v_tiles',
+]
+
+# The stack: one on-demand accordion workspace summoned to whichever
+# monitor is focused (docs, chatgpt, reference reading). Cycle it with
+# cmd-alt-h/l, flip its orientation with cmd-alt-slash. It is not
+# persistent — empty means gone.
+cmd-alt-s = ['summon-workspace stack', 'workspace stack']
+cmd-alt-shift-s = [
+  'move-node-to-workspace stack',
+  'summon-workspace stack',
+  'workspace stack',
+  'layout h_accordion',
+]
+
+# Layout utils. flatten resets a mangled tree; balance evens out sizes —
+# the two survivors of the deleted service/resize modes.
+cmd-alt-slash = 'layout horizontal vertical'
+cmd-alt-f = 'fullscreen'
+cmd-alt-minus = 'flatten-workspace-tree'
+cmd-alt-equal = 'balance-sizes'
+cmd-alt-tab = 'workspace-back-and-forth'
+cmd-alt-r = 'reload-config'
+
+# Jump to the newest agent needing attention from anywhere: land on the
+# code workspace, focus the terminal, and let workmux switch tmux to the
+# agent's pane (the same jump alt+j does inside tmux).
+cmd-alt-a = [
+  'workspace code',
+  'exec-and-forget open -a Ghostty && /opt/homebrew/bin/workmux last-done',
+]
