@@ -22,6 +22,24 @@ apt_install() {
   if [ "$#" -gt 0 ]; then sudo apt-get install -y "$@"; fi
 }
 
+ensure_zsh_login_shell() {
+  # macOS ships zsh (default since Catalina) and the Linux core tier
+  # apt-installs it, but neither makes it the LOGIN shell on a machine
+  # that started on bash — and everything here assumes zsh.
+  case "$SHELL" in
+  */zsh) return 0 ;;
+  esac
+  zsh_path="$(command -v zsh || true)"
+  if [ -z "$zsh_path" ]; then
+    echo "warning: zsh not found; login shell unchanged" >&2
+    return 0
+  fi
+  # chsh refuses shells missing from /etc/shells.
+  grep -qx "$zsh_path" /etc/shells 2>/dev/null ||
+    printf '%s\n' "$zsh_path" | sudo tee -a /etc/shells >/dev/null
+  chsh -s "$zsh_path"
+}
+
 ask() {
   printf '%s [y/N] ' "$1"
   read -r answer
@@ -84,6 +102,7 @@ install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
     brew_install stow git gh git-delta uv starship fzf tmux node bat
+    ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
     ;;
@@ -92,6 +111,7 @@ install_tier_packages() {
     # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
+    ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
     ;;
