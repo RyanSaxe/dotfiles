@@ -30,6 +30,7 @@ import {
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
+import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
 import { pokemonFor } from "./pokemon.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
@@ -296,6 +297,8 @@ async function tick(counter: number): Promise<void> {
   const acked = updateAcks(acks, settled, panes);
   const hints = assignHints(settled);
   writeHints(settled, hints);
+  publishAttention(settled, acked);
+  pushPhone(settled, panes);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;

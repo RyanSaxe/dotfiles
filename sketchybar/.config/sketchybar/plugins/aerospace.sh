@@ -1,10 +1,12 @@
 #!/usr/bin/env zsh
 # Aerospace workspace indicator plugin
-# Updates workspace highlighting when workspace changes, colors update, or tmux bell fires
+# Updates workspace highlighting when the workspace changes, colors update,
+# or the rail daemon's agent attention state changes
 #
 # States:
+# - Agent waiting (code workspace): status_waiting semantic color
+# - Agent done (code workspace): status_done semantic color
 # - Active (focused): accent color (follows the pokemon)
-# - Bell (code workspace with tmux bell): notify color (follows the pokemon)
 # - Inactive: dim
 
 source "$HOME/.config/sketchybar/colors.sh"
@@ -25,21 +27,23 @@ fi
 # Extract workspace name from item name (space.email -> email)
 WORKSPACE="${NAME#space.}"
 
-# Check for tmux bell state from cache file (persists across events)
-# Written by tmux/scripts/bell-cache-updater.sh
-BELL_CACHE="$HOME/.cache/tmux-bell-active"
-if [[ -f "$BELL_CACHE" ]]; then
-  BELL_ACTIVE=$(cat "$BELL_CACHE" 2>/dev/null)
-else
-  BELL_ACTIVE="0"
-fi
+# Agent attention (waiting|done|none), written by the rail daemon whenever
+# an unacked agent status changes. Visiting the agent's window clears it.
+ATTENTION_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail/attention"
+ATTENTION="none"
+[[ -r "$ATTENTION_FILE" ]] && ATTENTION=$(<"$ATTENTION_FILE")
 
-# Determine state: bell > active > inactive
-if [[ "$WORKSPACE" == "code" && "$BELL_ACTIVE" == "1" ]]; then
-  # Bell state: code workspace has pending notification (shows even when focused)
+# Determine state: waiting > done > active > inactive (attention shows even
+# when the code workspace is focused)
+if [[ "$WORKSPACE" == "code" && "$ATTENTION" == "waiting" ]]; then
   sketchybar --set "$NAME" \
-    icon.color="$BELL_FG" \
-    background.color="$BELL_BG" \
+    icon.color="$AGENT_WAITING_FG" \
+    background.color="$AGENT_WAITING_BG" \
+    background.drawing=on
+elif [[ "$WORKSPACE" == "code" && "$ATTENTION" == "done" ]]; then
+  sketchybar --set "$NAME" \
+    icon.color="$AGENT_DONE_FG" \
+    background.color="$AGENT_DONE_BG" \
     background.drawing=on
 elif [[ "$WORKSPACE" == "$FOCUSED" ]]; then
   # Active workspace: prominent color with subtle background

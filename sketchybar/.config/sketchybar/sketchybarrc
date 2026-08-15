@@ -63,7 +63,7 @@ sketchybar --default "${default[@]}"
 # -----------------------------------------------------------------------------
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event pokemon_colors_changed
-sketchybar --add event tmux_bell_change
+sketchybar --add event agent_attention_change
 sketchybar --add event theme_changed
 
 # -----------------------------------------------------------------------------
@@ -127,9 +127,10 @@ for workspace in "${WORKSPACES[@]}"; do
     click_script="aerospace workspace $workspace" \
     script="$PLUGIN_DIR/aerospace.sh"
 
-  # Subscribe to events - code workspace also listens for tmux bell changes
+  # Subscribe to events - the code workspace also listens for the rail
+  # daemon's agent attention changes
   if [[ "$workspace" == "code" ]]; then
-    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed tmux_bell_change
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed agent_attention_change
   else
     sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
   fi
