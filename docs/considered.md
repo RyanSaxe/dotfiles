@@ -15,24 +15,23 @@ design session on the roadmap).
 
 ## Karabiner-Elements
 
-Low-level keyboard remapper. Was installed only to give Leader Key a
-shift-tap trigger; with Leader Key out, nothing uses it. Verdict:
-delete. Revisit only for needs no app-level config can express —
-remapping a physical modifier, per-device layouts, dual-role keys.
+Low-level keyboard remapper. Existed only to give Leader Key a
+shift-tap trigger; with Leader Key out, nothing uses it. Revisit only
+for needs no app-level config can express — remapping a physical
+modifier, per-device layouts, dual-role keys.
 
 ## Hammerspoon
 
-Lua automation runtime for macOS. v1 used it for the menu-bar mascot
-and an appearance watcher; both died in v2 (the rail owns the mascot,
-and `theme` sets OS appearance itself). Deleted in the macos-extras
-purge. Revisit for automation that must react to OS events with logic —
-the known recipe: a ~20-line launchd agent with WatchPaths on
-.GlobalPreferences.plist covers the one lost feature (auto `theme
-apply` on scheduled OS appearance flips) without any runtime.
+Lua automation runtime for macOS. Nothing here needs it: the rail owns
+the mascot and `theme` sets OS appearance itself. Revisit for
+automation that must react to OS events with logic — though the known
+lightweight recipe covers the likeliest case first: a ~20-line launchd
+agent with WatchPaths on .GlobalPreferences.plist re-runs `theme apply`
+when the OS flips appearance on a schedule, no runtime required.
 
 ## JankyBorders
 
-Colored border around the focused window. Trialed and removed
-2026-08-14 — the setup reads better without it. Revisit only if focus
-ambiguity becomes a real problem; HazeOver-style dimming is the
-stronger alternative (no public macOS API sets another app's opacity).
+Colored border around the focused window. Trialed and removed — the
+setup reads better without it. Revisit only if focus ambiguity becomes
+a real problem; HazeOver-style dimming is the stronger alternative (no
+public macOS API sets another app's opacity).

@@ -45,7 +45,7 @@ const AGENT_RECONCILE_TICKS = 20; // every 5s
 // plus the crust gutter renderRail appends.
 const RAIL_WIDTH = 22 + GUTTER_COLS;
 // Split feasibility, not policy: below this tmux can't fit rail + border
-// + any content. Visibility is Ryan's call via alt+g, never width magic.
+// + any content. Visibility is controlled by alt+g alone.
 const MIN_SPLIT_WIDTH = RAIL_WIDTH + 2;
 
 const STATE_DIR = join(XDG_STATE, "dotfiles/rail");
@@ -228,11 +228,11 @@ async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
   }
 }
 
-// Sprites are ALWAYS on (Ryan, 2026-08-15): capability detection tried
-// per-session, then server-wide gating, and both traded desktop mascots
-// for phone niceties he doesn't want. A non-kitty client (Termius)
-// renders the placeholder cells as a colored block in the mascot area —
-// tolerated; alt+g hides the rail on the phone anyway.
+// Sprites are unconditional. A client without kitty graphics renders the
+// placeholder cells as a colored block in the mascot area; hiding the
+// rail (alt+g) is the remedy there. Any conditional scheme is worse:
+// frames live in tmux's buffers, so a capability flip repaints every
+// rail and a mid-flip window switch shows the stale variant.
 
 // Terminals drop image data on restart and the daemon can't observe that;
 // a slow re-send through each visible rail pane keeps sprites alive.

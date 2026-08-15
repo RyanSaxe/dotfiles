@@ -4,7 +4,7 @@ import { blend, railBg, type Palette } from "../theme.js";
 // Session identity: the name is the rail's first cell — the window's
 // symmetric padding places it exactly at (19, 19) — over a full-width
 // accent rule. While a prefix chord is mid-flight the name flips to the
-// accent: the mode signal the old status pill used to carry.
+// accent, making the pending-key state visible at a glance.
 export function header(
   session: string,
   palette: Palette,
