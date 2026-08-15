@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # Date plugin - displays current date with calendar icon
-# Uses the accent color, which follows the pokemon
+# Uses the accent color, which follows the mascot
 
 source "$HOME/.config/sketchybar/colors.sh"
 

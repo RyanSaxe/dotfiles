@@ -6,7 +6,7 @@
 # States:
 # - Agent waiting (code workspace): status_waiting semantic color
 # - Agent done (code workspace): status_done semantic color
-# - Active (focused): accent color (follows the pokemon)
+# - Active (focused): accent color (follows the mascot)
 # - Inactive: dim
 
 source "$HOME/.config/sketchybar/colors.sh"

@@ -67,7 +67,7 @@ reload in place:
 ```sh
 theme dark
 theme light
-theme pokemon gengar   # accent colors extracted from a pokemon image
+theme mascot pokemon:gengar   # accent colors extracted from a mascot image
 ```
 
 ## Development

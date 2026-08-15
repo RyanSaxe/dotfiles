@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # Sketchybar configuration
 # Floating rounded bar, themed with the v2 token pipeline (colors.sh) and
-# pokemon color accents
+# mascot color accents
 #
 # Layout:
 # - Left: Date, Aerospace workspace indicators (V B N M)
@@ -62,7 +62,7 @@ sketchybar --default "${default[@]}"
 # Custom Events (must be defined before items subscribe to them)
 # -----------------------------------------------------------------------------
 sketchybar --add event aerospace_workspace_change
-sketchybar --add event pokemon_colors_changed
+sketchybar --add event mascot_colors_changed
 sketchybar --add event agent_attention_change
 sketchybar --add event theme_changed
 
@@ -90,7 +90,7 @@ sketchybar --add item date left \
   label.color="$ACCENT_COLOR" \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/date.sh" \
-  --subscribe date system_woke pokemon_colors_changed
+  --subscribe date system_woke mascot_colors_changed
 
 # -----------------------------------------------------------------------------
 # Aerospace Workspace Indicators (Left)
@@ -129,9 +129,9 @@ for workspace in "${WORKSPACES[@]}"; do
   # Subscribe to events - the code workspace also listens for the rail
   # daemon's agent attention changes
   if [[ "$workspace" == "code" ]]; then
-    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed agent_attention_change
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change mascot_colors_changed agent_attention_change
   else
-    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change mascot_colors_changed
   fi
 done
 
@@ -151,7 +151,7 @@ sketchybar --add item clock right \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/clock.sh" \
   label.padding_right=0 \
-  --subscribe clock system_woke pokemon_colors_changed
+  --subscribe clock system_woke mascot_colors_changed
 
 # Battery
 sketchybar --add item battery right \

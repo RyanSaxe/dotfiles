@@ -2,7 +2,7 @@
 # Runs off its own item's update_freq. sketchybar has no "just re-source and
 # everything restyles" primitive like tmux's @variables, so when the
 # rendered colors file changes mtime, this recolors the bar chrome directly
-# and fires pokemon_colors_changed for items that don't refresh often enough
+# and fires mascot_colors_changed for items that don't refresh often enough
 # on their own (date, workspaces) — mirrors tmux's theme-sync.sh convergence.
 source "$HOME/.config/sketchybar/colors.sh"
 
@@ -19,7 +19,7 @@ SEEN=""
 
 sketchybar --bar color="$BAR_COLOR" border_color="$BORDER_COLOR" \
   --default icon.color="$ICON_COLOR" label.color="$LABEL_COLOR" \
-  --trigger pokemon_colors_changed
+  --trigger mascot_colors_changed
 
 mkdir -p "${CACHE:h}"
 print -r -- "$MTIME" >|"$CACHE"
