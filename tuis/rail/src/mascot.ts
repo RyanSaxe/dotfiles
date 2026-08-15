@@ -1,4 +1,4 @@
-// Per-session pokemon identity. Each session's rail wears the pokemon
+// Per-session mascot identity. Each session's rail wears the mascot
 // mapped to its project (sessions are named after projects), falling back
 // to the tracked default — accent color and sprite both.
 
@@ -9,20 +9,20 @@ import { join } from "node:path";
 import { run } from "./data.js";
 import { XDG_STATE } from "./paths.js";
 
-const STATE_MAPPING = join(XDG_STATE, "dotfiles/pokemon.conf");
-// (The tracked default in ~/.config/theme/pokemon.conf is consumed by
-// `theme pokemon sync`, whose result lands in accents.conf — the rail
+const STATE_MAPPING = join(XDG_STATE, "dotfiles/mascot.conf");
+// (The tracked default in ~/.config/theme/mascot.conf is consumed by
+// `theme mascot sync`, whose result lands in accents.conf — the rail
 // reads that, never the default directly.)
 const ACCENTS_CONF = join(XDG_STATE, "dotfiles/accents.conf");
-const SPRITE_CACHE = join(homedir(), ".cache/dotfiles/pokemon");
-const POKEMON_ACCENTS = join(homedir(), ".local/bin/pokemon-accents");
+const MASCOT_ACCENTS = join(homedir(), ".local/bin/mascot-accents");
 
-export interface PokemonIdentity {
-  name: string;
-  shiny: boolean;
+export interface MascotIdentity {
+  // Provider-qualified, e.g. "pokemon:raikou".
+  value: string;
+  // Path to the provider's normalized sprite; null until extraction lands.
   spritePath: string | null;
-  // Hexes per mode, extracted from the sprite; null until extraction lands
-  // (frames render with the theme accent meanwhile).
+  // Hexes per mode, extracted from the provider's image; null until
+  // extraction lands (frames render with the theme accent meanwhile).
   accentDark: string | null;
   accentLight: string | null;
 }
@@ -59,39 +59,30 @@ function parseConf(path: string): Map<string, string> {
   }
 }
 
-// The sprite-cache naming convention, in exactly one place (it mirrors
-// what pokemon-accents writes).
-function spritePathFor(name: string, shiny: boolean): string | null {
-  const path = join(SPRITE_CACHE, `${name}${shiny ? "-shiny" : ""}-sprite.png`);
-  return existsSync(path) ? path : null;
-}
+const identities = new Map<string, MascotIdentity>();
 
-const identities = new Map<string, PokemonIdentity>();
-
-function identityFor(value: string): PokemonIdentity {
+function identityFor(value: string): MascotIdentity {
   const cached = identities.get(value);
   if (cached) return cached;
-  const shiny = value.endsWith(":shiny");
-  const name = shiny ? value.slice(0, -6) : value;
-  const identity: PokemonIdentity = {
-    name,
-    shiny,
-    spritePath: spritePathFor(name, shiny),
+  const identity: MascotIdentity = {
+    value,
+    spritePath: null,
     accentDark: null,
     accentLight: null,
   };
   identities.set(value, identity);
-  void extractAccents(identity);
+  void extract(identity);
   return identity;
 }
 
-// Accent extraction runs the same extractor the theme system uses; slow
-// (~1s) but cached for the daemon's lifetime per pokemon.
-async function extractAccents(identity: PokemonIdentity): Promise<void> {
+// Accents and the sprite pointer come from the same extractor the theme
+// system uses — the rail never hardcodes any provider's cache layout.
+// Slow (~1s) but cached for the daemon's lifetime per mascot.
+async function extract(identity: MascotIdentity): Promise<void> {
   try {
-    const args = identity.shiny ? [identity.name, "--shiny"] : [identity.name];
-    const { stdout } = await run(POKEMON_ACCENTS, args);
+    const { stdout } = await run(MASCOT_ACCENTS, [identity.value]);
     const conf = parseConfText(stdout);
+    identity.spritePath = conf.get("sprite") ?? null;
     identity.accentDark = conf.get("accent_dark") ?? null;
     identity.accentLight = conf.get("accent_light") ?? null;
   } catch {
@@ -99,27 +90,27 @@ async function extractAccents(identity: PokemonIdentity): Promise<void> {
   }
 }
 
-// The globally ACTIVE pokemon (whatever `theme pokemon`/the picker last
-// applied). Its accents are already extracted, so no extractor run.
-function activeIdentity(): PokemonIdentity | null {
+// The globally ACTIVE mascot (whatever `theme mascot`/the picker last
+// applied). accents.conf already carries its hexes and sprite pointer,
+// so no extractor run.
+function activeIdentity(): MascotIdentity | null {
   const conf = parseConf(ACCENTS_CONF);
-  const name = conf.get("pokemon");
-  if (!name) return null;
-  const shiny = conf.get("shiny") === "1";
+  const value = conf.get("mascot");
+  if (!value) return null;
+  const sprite = conf.get("sprite");
   return {
-    name,
-    shiny,
-    spritePath: spritePathFor(name, shiny),
+    value,
+    spritePath: sprite && existsSync(sprite) ? sprite : null,
     accentDark: conf.get("accent_dark") ?? null,
     accentLight: conf.get("accent_light") ?? null,
   };
 }
 
-// Session -> identity: the project's mapped pokemon wins; unmapped
-// sessions follow the globally active one (which `theme pokemon sync`
+// Session -> identity: the project's mapped mascot wins; unmapped
+// sessions follow the globally active one (which `theme mascot sync`
 // keeps aligned with the project you're in). Conf reads are mtime-gated
 // above, so picker changes still land within a tick.
-export function pokemonFor(session: string): PokemonIdentity | null {
+export function mascotFor(session: string): MascotIdentity | null {
   const mapped = parseConf(STATE_MAPPING).get(session);
   if (mapped) return identityFor(mapped);
   return activeIdentity();

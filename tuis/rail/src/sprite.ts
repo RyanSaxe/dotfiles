@@ -1,4 +1,4 @@
-// Pokemon sprite via kitty-graphics Unicode placeholders — the
+// Mascot sprite via kitty-graphics Unicode placeholders — the
 // multiplexer-safe half of the protocol. The PNG is transmitted once as a
 // VIRTUAL placement (U=1); the rail frame then contains placeholder cells
 // (U+10EEEE) whose foreground color encodes the image id and whose
