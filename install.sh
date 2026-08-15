@@ -75,6 +75,16 @@ ensure_package_manager() {
 # System packages per tier and OS, named per package manager. Stow packages
 # live in tiers/*.txt.
 
+# One inventory per package manager. POSIX sh has no arrays: these are
+# space-separated words, expanded unquoted on purpose (hence the shellcheck
+# disables at each use).
+CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat'
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf nodejs npm bat'
+MAC_BREW_FORMULAS='sketchybar'
+MAC_BREW_CASKS='aerospace'
+ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
+RAIL_DIR='tuis/rail'
+
 # zsh plugins are shallow git clones into one fixed path, sourced by .zshrc.
 # One mechanism on every OS — brew and apt disagree on names and paths.
 clone_plugin() {
@@ -88,26 +98,28 @@ clone_plugin() {
 }
 
 install_zsh_plugins() {
-  clone_plugin zsh-users/zsh-autosuggestions
-  clone_plugin zdharma-continuum/fast-syntax-highlighting
-  clone_plugin Aloxaf/fzf-tab
+  for plugin in $ZSH_PLUGINS; do
+    clone_plugin "$plugin"
+  done
 }
 
 # The rail TUI (tuis/rail) runs via tsx from its own node_modules.
 install_rail() {
-  (cd tuis/rail && npm install --no-fund --no-audit --silent)
+  (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
 }
 
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv starship fzf tmux node bat
+    # shellcheck disable=SC2086
+    brew_install $CORE_BREW_FORMULAS
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
     ;;
   core:Linux)
-    apt_install stow git gh git-delta curl zsh fzf nodejs npm bat
+    # shellcheck disable=SC2086
+    apt_install $CORE_APT_PACKAGES
     # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
@@ -122,12 +134,15 @@ install_tier_packages() {
     # (`brew trust` doesn't exist on older brews — hence the guard).
     brew tap felixkratz/formulae
     brew trust felixkratz/formulae 2>/dev/null || true
-    brew_install sketchybar
+    # shellcheck disable=SC2086
+    brew_install $MAC_BREW_FORMULAS
     # aerospace is a cask in nikitabobko's tap; install skips when present
     # (casks error on reinstall, unlike formulas).
     brew tap nikitabobko/tap
     brew trust nikitabobko/tap 2>/dev/null || true
-    brew list --cask aerospace >/dev/null 2>&1 || brew install --cask aerospace
+    for cask in $MAC_BREW_CASKS; do
+      brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
+    done
     # Per-machine notch compensation for aerospace's top gap.
     ./aerospace/.config/aerospace/configure.sh
     ;;
