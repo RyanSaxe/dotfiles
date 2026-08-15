@@ -228,38 +228,11 @@ async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
   }
 }
 
-// Sprites render only for sessions where EVERY attached client identifies
-// as a kitty-graphics terminal — the daemon can't see through tmux to the
-// outer terminal any other way, and emitting graphics at an incapable
-// client (a phone, a plain SSH terminal) shows up as garbage. tmux's own
-// client table is the source of truth, re-read every tick.
-async function capableSessions(): Promise<Set<string>> {
-  const capable = new Set<string>();
-  const incapable = new Set<string>();
-  const { stdout } = await tmux(
-    "list-clients",
-    "-F",
-    "#{client_session}\x1f#{client_termname}",
-  );
-  for (const clientLine of stdout.split("\n")) {
-    if (!clientLine) continue;
-    const [session, termname] = clientLine.split("\x1f");
-    if (!session) continue;
-    if (/ghostty|kitty/i.test(termname ?? "")) {
-      capable.add(session);
-    } else {
-      incapable.add(session);
-    }
-  }
-  // One incapable client anywhere disables sprites EVERYWHERE, not just
-  // its own session: tmux redraws a freshly-switched-to window from its
-  // stored buffer instantly, so a phone jumping into a capable session
-  // would flash that buffer's placeholder cells as garbage until the
-  // next tick repaints. Server-wide off keeps every buffer it can reach
-  // plain text; sprites return a tick after the client detaches.
-  if (incapable.size > 0) return new Set();
-  return capable;
-}
+// Sprites are ALWAYS on (Ryan, 2026-08-15): capability detection tried
+// per-session, then server-wide gating, and both traded desktop mascots
+// for phone niceties he doesn't want. A non-kitty client (Termius)
+// renders the placeholder cells as a colored block in the mascot area —
+// tolerated; alt+g hides the rail on the phone anyway.
 
 // Terminals drop image data on restart and the daemon can't observe that;
 // a slow re-send through each visible rail pane keeps sprites alive.
@@ -284,10 +257,9 @@ async function tick(counter: number): Promise<void> {
           agentsFresh = true;
         })
       : Promise.resolve();
-  // The polls are independent — one round-trip of latency, not four.
-  const [panes, spriteCapable, modeSessions] = await Promise.all([
+  // The polls are independent — one round-trip of latency, not three.
+  const [panes, modeSessions] = await Promise.all([
     collectPanes(),
-    capableSessions(),
     collectModeSessions(),
     refresh,
   ]);
@@ -321,10 +293,7 @@ async function tick(counter: number): Promise<void> {
       (palette.mode === "dark" ? pokemon?.accentDark : pokemon?.accentLight) ??
       palette.accent;
     const sessionPalette = { ...palette, accent };
-    const spritePath =
-      spriteCapable.has(pane.session) && pokemon?.spritePath
-        ? pokemon.spritePath
-        : null;
+    const spritePath = pokemon?.spritePath ?? null;
     const sprite = spritePath ? spriteId(spritePath) : null;
     const prefixHeld = modeSessions.has(pane.session);
     const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
