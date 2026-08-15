@@ -97,7 +97,11 @@ install_tier_packages() {
     ;;
   mac:Darwin)
     # sketchybar itself is mac-only; the plugins under sketchybar/ shell out
-    # to macOS-only tools (pmset, ipconfig) regardless.
+    # to macOS-only tools (pmset, ipconfig) regardless. It lives in the
+    # felixkratz tap, which newer brews refuse to install from untrusted
+    # (`brew trust` doesn't exist on older brews — hence the guard).
+    brew tap felixkratz/formulae
+    brew trust felixkratz/formulae 2>/dev/null || true
     brew_install sketchybar
     ;;
   *)
