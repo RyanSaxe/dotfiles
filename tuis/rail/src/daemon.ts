@@ -23,7 +23,7 @@ import { loadAcks, updateAcks } from "./acks.js";
 import {
   applyDoneHysteresis,
   collectAgents,
-  collectModeSessions,
+  collectClientFacts,
   collectPanes,
   run,
   tmux,
@@ -267,11 +267,12 @@ async function tick(counter: number): Promise<void> {
         })
       : Promise.resolve();
   // The polls are independent — one round-trip of latency, not three.
-  const [panes, modeSessions] = await Promise.all([
+  const [panes, clientFacts] = await Promise.all([
     collectPanes(),
-    collectModeSessions(),
+    collectClientFacts(),
     refresh,
   ]);
+  const { modeSessions, nonKittySessions } = clientFacts;
   const palette = loadPalette();
   // Keep every rail pane's default bg in step with the theme (spawn sets
   // it once; a mode flip changes crust under all existing panes).
@@ -335,11 +336,16 @@ async function tick(counter: number): Promise<void> {
       );
       frames.set(bucket, frame);
     }
+    // Frames are unconditional, transmission is not: sending image data
+    // through a pane a non-kitty client is viewing spews the payload as
+    // text there. Kitty terminals retain previously-loaded images, so
+    // mascots persist through a transmit pause and resume on detach.
     if (
       spritePath &&
       sprite !== null &&
       pane.sessionAttached &&
-      pane.windowActive
+      pane.windowActive &&
+      !nonKittySessions.has(pane.session)
     ) {
       maybeTransmit(pane, spritePath, sprite);
     }

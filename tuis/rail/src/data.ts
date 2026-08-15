@@ -177,24 +177,36 @@ export async function collectPanes(): Promise<Pane[]> {
   return panes;
 }
 
-// Sessions whose attached client is mid-chord: tmux prefix held, or the
-// agent jump table active. Polled per tick; the ~250ms lag is the accepted
-// cost of riding the daemon cadence.
-export async function collectModeSessions(): Promise<Set<string>> {
+export interface ClientFacts {
+  // Sessions whose attached client is mid-chord: tmux prefix held, or
+  // the agent jump table active.
+  modeSessions: Set<string>;
+  // Sessions with an attached client that lacks kitty graphics. Image
+  // TRANSMISSION must skip these: tmux forwards the passthrough to every
+  // viewing client, and a non-kitty client prints the multi-KB payload
+  // as literal text. (Placeholder FRAMES are unaffected — they are
+  // ordinary styled text and render camouflaged.)
+  nonKittySessions: Set<string>;
+}
+
+// One list-clients per tick answers both questions; the ~250ms lag is
+// the accepted cost of riding the daemon cadence.
+export async function collectClientFacts(): Promise<ClientFacts> {
   const { stdout } = await run("tmux", [
     "list-clients",
     "-F",
-    `#{client_session}${SEP}#{client_prefix}${SEP}#{client_key_table}`,
+    `#{client_session}${SEP}#{client_prefix}${SEP}#{client_key_table}${SEP}#{client_termname}`,
   ]);
-  const sessions = new Set<string>();
+  const modeSessions = new Set<string>();
+  const nonKittySessions = new Set<string>();
   for (const rawLine of stdout.split("\n")) {
     if (!rawLine) continue;
-    const [session, prefix, keyTable] = rawLine.split(SEP);
-    if (session && (prefix === "1" || keyTable === "agent")) {
-      sessions.add(session);
-    }
+    const [session, prefix, keyTable, termname] = rawLine.split(SEP);
+    if (!session) continue;
+    if (prefix === "1" || keyTable === "agent") modeSessions.add(session);
+    if (!/ghostty|kitty/i.test(termname ?? "")) nonKittySessions.add(session);
   }
-  return sessions;
+  return { modeSessions, nonKittySessions };
 }
 
 // Content windows of one session, rail panes excluded — the rail never
