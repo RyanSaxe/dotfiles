@@ -35,7 +35,8 @@ export interface RailData {
   acked: Set<string>;
   // Jump-hint digit per agent pane id (alt+a <digit>), viewer-relative.
   hints: Map<string, string>;
-  // Kitty image id for the footer sprite; null renders a blank footer.
+  // Kitty image id for the footer sprite; null reclaims the footer rows
+  // for content.
   sprite: number | null;
   // Pagination page for the body (0 = top); clamped by the renderer.
   page: number;
@@ -184,29 +185,46 @@ export interface ClientFacts {
   // Sessions with an attached client that lacks kitty graphics. Image
   // TRANSMISSION must skip these: tmux forwards the passthrough to every
   // viewing client, and a non-kitty client prints the multi-KB payload
-  // as literal text. (Placeholder FRAMES are unaffected — they are
-  // ordinary styled text and render camouflaged.)
+  // as literal text.
   nonKittySessions: Set<string>;
+  // Whether the most recently active client renders kitty graphics.
+  // Placeholder cells follow this bit: a terminal without the protocol
+  // cannot even LAY OUT the placeholder text (astral codepoint plus
+  // combining diacritics desync its column accounting and garble the
+  // whole pane), so frames carry the mascot only while a capable client
+  // is driving. Same contract as window-size latest — machine hand-offs
+  // repaint within a tick, same-machine switches never change it.
+  latestClientIsKitty: boolean;
 }
 
-// One list-clients per tick answers both questions; the ~250ms lag is
+// One list-clients per tick answers every question; the ~250ms lag is
 // the accepted cost of riding the daemon cadence.
 export async function collectClientFacts(): Promise<ClientFacts> {
   const { stdout } = await run("tmux", [
     "list-clients",
     "-F",
-    `#{client_session}${SEP}#{client_prefix}${SEP}#{client_key_table}${SEP}#{client_termname}`,
+    `#{client_session}${SEP}#{client_prefix}${SEP}#{client_key_table}${SEP}#{client_termname}${SEP}#{client_activity}`,
   ]);
   const modeSessions = new Set<string>();
   const nonKittySessions = new Set<string>();
+  // No clients at all: keep mascots in the buffers for the usual
+  // capable reattach.
+  let latestClientIsKitty = true;
+  let latestActivity = -1;
   for (const rawLine of stdout.split("\n")) {
     if (!rawLine) continue;
-    const [session, prefix, keyTable, termname] = rawLine.split(SEP);
+    const [session, prefix, keyTable, termname, activity] = rawLine.split(SEP);
     if (!session) continue;
+    const kitty = /ghostty|kitty/i.test(termname ?? "");
     if (prefix === "1" || keyTable === "agent") modeSessions.add(session);
-    if (!/ghostty|kitty/i.test(termname ?? "")) nonKittySessions.add(session);
+    if (!kitty) nonKittySessions.add(session);
+    const activityTs = Number(activity) || 0;
+    if (activityTs >= latestActivity) {
+      latestActivity = activityTs;
+      latestClientIsKitty = kitty;
+    }
   }
-  return { modeSessions, nonKittySessions };
+  return { modeSessions, nonKittySessions, latestClientIsKitty };
 }
 
 // Content windows of one session, rail panes excluded — the rail never

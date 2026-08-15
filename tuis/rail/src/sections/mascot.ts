@@ -8,10 +8,10 @@ import {
 import { railBg, type Palette } from "../theme.js";
 import { sectionHairline } from "./header.js";
 
-// Reserved footer: the mascot's home. When a sprite id is present the
-// footer rows carry kitty Unicode-placeholder cells and the terminal draws
-// the real pixel art over them; without one (no capable client attached,
-// no sprite cached) the footer stays blank — never boxes, never escapes.
+// The mascot's home, reserved by the renderer only when a sprite id is
+// present: the footer rows carry kitty Unicode-placeholder cells and the
+// terminal draws the real pixel art over them. Without a sprite the
+// renderer skips the footer entirely and content gets the rows.
 // Rows: hairline + hint/blank row + the sprite block.
 export const FOOTER_ROWS = SPRITE_ROWS + 2;
 

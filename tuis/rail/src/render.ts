@@ -61,7 +61,11 @@ export function renderRail(
   }
 
   const top = header(data.session, palette, inner, data.prefixHeld);
-  const hasFooter = height >= MIN_HEIGHT_FOR_MASCOT;
+  // The footer is reserved only when there is a sprite to put in it —
+  // no pokemon, or the driving client can't render kitty graphics, and
+  // the rows go to content instead (an overflow hint then borrows the
+  // bottom row exactly like a short pane).
+  const hasFooter = data.sprite !== null && height >= MIN_HEIGHT_FOR_MASCOT;
   // No blank row below the sprite: the 19pt bottom frame is the sprite's
   // lower margin (~one cell), matching the blank row above it — so the
   // mascot reads centered between the footer hairline and the window edge.

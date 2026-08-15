@@ -315,7 +315,9 @@ async function tick(counter: number): Promise<void> {
       (palette.mode === "dark" ? pokemon?.accentDark : pokemon?.accentLight) ??
       palette.accent;
     const sessionPalette = { ...palette, accent };
-    const spritePath = pokemon?.spritePath ?? null;
+    const spritePath = clientFacts.latestClientIsKitty
+      ? (pokemon?.spritePath ?? null)
+      : null;
     const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
     const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
