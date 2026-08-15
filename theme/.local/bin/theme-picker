@@ -2,16 +2,24 @@
 # Interactive theme switching with fzf. Designed for a tmux popup keybind,
 # and equally usable from any plain shell, including over SSH.
 #
-#   stage 1: toggle / light / dark / pokemon / shiny pokemon / none
-#   stage 2: (pokemon) fuzzy-pick from the full pokedex
-#   stage 3: (pokemon) scope — just now, this project, or global default
+#   stage 1: mascot providers (from the registry) / toggle / light / dark / none
+#   stage 2: (provider) fuzzy-pick an identity
+#   stage 3: (provider) scope — just now, this project, or global default
 set -eu
 
 pick() {
   fzf --reverse --prompt="$1 > " --height=100%
 }
 
-action="$(printf 'pokemon\nshiny pokemon\ntoggle\nlight\ndark\nnone\n' | pick theme)" || exit 0
+# Provider entries come from the registry; the picker hardcodes none.
+providers="$(mascot-accents --providers 2>/dev/null || true)"
+
+action="$(
+  {
+    [ -n "$providers" ] && printf '%s\n' "$providers"
+    printf 'toggle\nlight\ndark\nnone\n'
+  } | pick theme
+)" || exit 0
 
 case "$action" in
 toggle | light | dark)
@@ -34,24 +42,22 @@ toggle | light | dark)
   exit 0
   ;;
 none)
-  theme pokemon none
+  theme mascot none
   ;;
-"pokemon" | "shiny pokemon")
+*)
   # Deliberately NO sprite preview: images through the fzf/tmux/terminal
   # pipeline proved fragile and slow, three regressions deep. The mascot
   # is the preview — it appears the moment you pick.
-  name="$(pokemon-accents --names | pick pokemon)" || exit 0
+  name="$(mascot-accents --identities "$action" | pick "$action")" || exit 0
   scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
 
-  set -- pokemon
+  set -- mascot
   case "$scope" in
-  "this project") set -- pokemon project ;;
-  "global default") set -- pokemon default ;;
+  "this project") set -- mascot project ;;
+  "global default") set -- mascot default ;;
   esac
-  set -- "$@" "$name"
-  [ "$action" = "shiny pokemon" ] && set -- "$@" --shiny
 
-  theme "$@"
+  theme "$@" "$action:$name"
   ;;
 esac
 
