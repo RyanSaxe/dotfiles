@@ -85,23 +85,16 @@ tm() {
     return
   fi
 
-  # Create new session with first window (nvim)
+  # One shell window; anything else (nvim, agents, TUIs) is opened on
+  # demand or requested explicitly via commands/shortcuts.
   if [[ -n "$start_dir" ]]; then
-    tmux new-session -d -s "$session_name" -n "nvim" -c "$start_dir"
+    tmux new-session -d -s "$session_name" -n "zsh" -c "$start_dir"
   else
-    tmux new-session -d -s "$session_name" -n "nvim"
-  fi
-  tmux send-keys -t "$session_name:nvim" "nvim" Enter
-
-  # Create second window (terminal)
-  if [[ -n "$start_dir" ]]; then
-    tmux new-window -t "$session_name" -n "zsh" -c "$start_dir"
-  else
-    tmux new-window -t "$session_name" -n "zsh"
+    tmux new-session -d -s "$session_name" -n "zsh"
   fi
 
   # Track window names to prevent duplicates
-  local window_names=("nvim" "zsh")
+  local window_names=("zsh")
 
   # Create additional windows for each command
   for cmd in "${commands[@]}"; do
