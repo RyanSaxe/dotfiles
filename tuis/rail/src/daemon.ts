@@ -257,7 +257,13 @@ async function capableSessions(): Promise<Set<string>> {
       incapable.add(session);
     }
   }
-  for (const session of incapable) capable.delete(session);
+  // One incapable client anywhere disables sprites EVERYWHERE, not just
+  // its own session: tmux redraws a freshly-switched-to window from its
+  // stored buffer instantly, so a phone jumping into a capable session
+  // would flash that buffer's placeholder cells as garbage until the
+  // next tick repaints. Server-wide off keeps every buffer it can reach
+  // plain text; sprites return a tick after the client detaches.
+  if (incapable.size > 0) return new Set();
   return capable;
 }
 
