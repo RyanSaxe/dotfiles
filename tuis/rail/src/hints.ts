@@ -1,9 +1,11 @@
 // Jump hints: the elsewhere section's rows are numbered by display
 // position — 1 is always the top row of the rail you are looking at.
-// alt+a enters a one-key tmux table where the digit jumps to that row
-// (a / Enter jump to row 1, "what needs me most"). Because "elsewhere"
-// is relative to the viewing session, assignments are per session; the
-// daemon writes one mapping line per (viewing session, digit).
+// alt+a enters a one-key tmux table where the digit jumps to that row.
+// A second tap of a (or Enter) is the "what needs me most" jump: the
+// globally most-urgent agent, CURRENT SESSION INCLUDED — digits cover
+// what the elsewhere list shows, `a` covers everything. Because
+// "elsewhere" is relative to the viewing session, assignments are per
+// session; the daemon writes one mapping line per (viewing session, key).
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -41,13 +43,16 @@ export function assignHints(
 
 let lastWritten = "";
 
-// Line format: viewing session \t digit \t target session \t pane id.
-// `rail jump` greps the caller's session to resolve a digit.
+// Line format: viewing session \t key \t target session \t pane id,
+// where key is a digit or the literal `a` (global most-urgent). `rail
+// jump` greps the caller's session to resolve a key.
 export function writeHints(
   agents: Agent[],
   bySession: Map<string, Map<string, string>>,
+  acked: Set<string>,
 ): void {
   const sessionOf = new Map(agents.map((agent) => [agent.paneId, agent]));
+  const top = sortByUrgency(agents, acked)[0];
   const lines: string[] = [];
   for (const [session, hints] of bySession) {
     for (const [paneId, digit] of hints) {
@@ -55,6 +60,7 @@ export function writeHints(
       if (target)
         lines.push(`${session}\t${digit}\t${target.session}\t${paneId}`);
     }
+    if (top) lines.push(`${session}\ta\t${top.session}\t${top.paneId}`);
   }
   const joined = lines.sort().join("\n");
   if (joined === lastWritten) return;

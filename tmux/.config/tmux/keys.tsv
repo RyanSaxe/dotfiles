@@ -15,8 +15,8 @@ tmux	alt+,	rail page up
 tmux	alt+.	rail page down
 tmux	alt+a	enter agent jump table
 tmux	alt+a 1-9	jump to elsewhere agent N (rail chip)
-tmux	alt+a a	jump to top agent (what needs me)
-tmux	alt+a enter	jump to top agent
+tmux	alt+a a	jump to most urgent agent anywhere (incl. this session)
+tmux	alt+a enter	jump to most urgent agent anywhere
 tmux	alt+a esc	cancel agent table
 tmux	alt+/	this cheatsheet
 tmux	prefix r	reload tmux config

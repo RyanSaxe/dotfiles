@@ -299,7 +299,7 @@ async function tick(counter: number): Promise<void> {
   const acked = updateAcks(acks, settled, panes);
   const sessions = new Set(panes.map((pane) => pane.session));
   const hintsBySession = assignHints(settled, sessions, acked);
-  writeHints(settled, hintsBySession);
+  writeHints(settled, hintsBySession, acked);
   publishAttention(settled, acked);
   pushPhone(settled, panes);
 
