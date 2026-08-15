@@ -110,22 +110,17 @@ _to() {
   printf "%s\n" "${repo_table[@]}"
 }
 
-# Fuzzy find and cd into git repositories sorted by last commit date, then open tmux session
-# INTERFACE: to [same exact arguments as 'tm']
+# Fuzzy find a git repository (sorted by last commit date) and open or
+# attach its tmux session: one zsh window rooted in the repo.
+# `to -f` forces a rescan before picking; every pick also rescans in the
+# background so the next `to` is fresh.
 to() {
   emulate -L zsh
   set -o pipefail
 
-  local -a args=()
   local force=0
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -f|--force) force=1; shift ;;
-      *) args+=("$1"); shift ;;
-    esac
-  done
+  [[ "${1:-}" == "-f" || "${1:-}" == "--force" ]] && force=1
 
-  # Build cache file (with or without force)
   local cache_file
   if (( force )); then
     cache_file=$(cache_csv -f _to)
@@ -133,14 +128,12 @@ to() {
     cache_file=$(cache_csv _to)
   fi
 
-  # Use fzf to select repository
   local selected
   selected=$(
     sort -t, -k3,3r -- "$cache_file" \
     | column -t -s, \
     | fzf --prompt="Select repo: "
   )
-
   [[ -z "$selected" ]] && return 0
 
   # Extract repo path (2nd visible column after `column -t`)
@@ -148,6 +141,28 @@ to() {
   repo=$(awk -v FS='[[:space:]]+' '{print $2}' <<<"$selected")
   [[ -z "$repo" ]] && return 0
 
-  # Create tmux session in selected repository
-  tm -n "$repo" "${args[@]}"
+  # Stale-while-revalidate: this pick used the cached list; rescan now in
+  # the background so the NEXT pick reflects new repos and fresh dates.
+  ( cache_csv -f _to >/dev/null 2>&1 & )
+
+  # Same-name checkouts must not share a session: if the name is taken by
+  # a session rooted in a DIFFERENT directory, disambiguate with the
+  # parent directory so picking either checkout lands where you picked.
+  local session_name repo_real
+  session_name="$(_sanitize_tmux_session_name "$(basename "$repo")")"
+  repo_real="$(cd "$repo" && pwd -P)"
+  if tmux has-session -t "=$session_name" 2>/dev/null; then
+    local existing_path
+    # The trailing colon targets the session itself; bare `=name` resolves
+    # as a client target here and comes back empty.
+    existing_path="$(tmux display-message -p -t "=${session_name}:" '#{session_path}')"
+    if [[ "$(cd "$existing_path" 2>/dev/null && pwd -P)" != "$repo_real" ]]; then
+      session_name="$(_sanitize_tmux_session_name "$(basename "$repo")-$(basename "$(dirname "$repo")")")"
+    fi
+  fi
+
+  if ! tmux has-session -t "=$session_name" 2>/dev/null; then
+    tmux new-session -d -s "$session_name" -n "zsh" -c "$repo"
+  fi
+  _tmux_attach_or_switch "$session_name"
 }

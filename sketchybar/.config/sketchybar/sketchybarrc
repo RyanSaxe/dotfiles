@@ -4,7 +4,7 @@
 # pokemon color accents
 #
 # Layout:
-# - Left: Date, Aerospace workspace indicators (V B N M 1 2 3)
+# - Left: Date, Aerospace workspace indicators (V B N M)
 # - Right: CPU, Memory, WiFi, Battery, Clock
 
 setopt ERR_EXIT NO_UNSET PIPE_FAIL
@@ -63,7 +63,7 @@ sketchybar --default "${default[@]}"
 # -----------------------------------------------------------------------------
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event pokemon_colors_changed
-sketchybar --add event tmux_bell_change
+sketchybar --add event agent_attention_change
 sketchybar --add event theme_changed
 
 # -----------------------------------------------------------------------------
@@ -97,20 +97,19 @@ sketchybar --add item date left \
 # -----------------------------------------------------------------------------
 # Display keybinding letters matching aerospace.toml keybindings
 # Using zsh associative array (works in zsh 5.9)
-# Keys align with bottom row (V B N M) and match monitor layout left-to-right
+# Keys align with bottom row (V B N M) and match monitor layout
+# left-to-right. The on-demand stack workspace has no indicator — it is
+# transient by design.
 typeset -A WORKSPACE_KEYS
 WORKSPACE_KEYS=(
   message "V" # mail/messages (left monitor)
   browser "B" # center monitor
   code "N"    # center monitor
   meeting "M" # Teams meetings (right monitor)
-  monitor-1 "1"
-  monitor-2 "2"
-  monitor-3 "3"
 )
 
 # Workspace order (left to right in bar, matches monitor layout)
-WORKSPACES=("monitor-1" "monitor-2" "monitor-3" "message" "browser" "code" "meeting")
+WORKSPACES=("message" "browser" "code" "meeting")
 
 for workspace in "${WORKSPACES[@]}"; do
   key="${WORKSPACE_KEYS[$workspace]}"
@@ -127,9 +126,10 @@ for workspace in "${WORKSPACES[@]}"; do
     click_script="aerospace workspace $workspace" \
     script="$PLUGIN_DIR/aerospace.sh"
 
-  # Subscribe to events - code workspace also listens for tmux bell changes
+  # Subscribe to events - the code workspace also listens for the rail
+  # daemon's agent attention changes
   if [[ "$workspace" == "code" ]]; then
-    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed tmux_bell_change
+    sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed agent_attention_change
   else
     sketchybar --subscribe "space.$workspace" aerospace_workspace_change pokemon_colors_changed
   fi

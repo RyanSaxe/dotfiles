@@ -2,20 +2,12 @@ import { blank, line } from "../cells.js";
 import type { Agent } from "../data.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
 import {
-  agentRank,
   elapsedSpan,
   pill,
+  sortByUrgency,
   stateColor,
   type RailRow,
 } from "./rows.js";
-
-// Urgency first, acked last, newest activity breaking ties.
-function sortElsewhere(agents: Agent[], acked: Set<string>): Agent[] {
-  return [...agents].sort(
-    (a, b) =>
-      agentRank(a, acked) - agentRank(b, acked) || b.updatedTs - a.updatedTs,
-  );
-}
 
 // Row label: project/worktree, except the main worktree (named like the
 // project) reads better as project/branch.
@@ -41,7 +33,7 @@ export function elsewhereRows(
   const dim2 = blend(palette.dim2, bg, DIM_KEEP);
   const chipBg = blend(palette.surface0, bg, DIM_KEEP);
   const rows: RailRow[] = [];
-  for (const agent of sortElsewhere(agents, acked)) {
+  for (const agent of sortByUrgency(agents, acked)) {
     const { project, name } = label(agent);
     const nameFg = acked.has(agent.paneId)
       ? dim2
@@ -54,7 +46,7 @@ export function elsewhereRows(
         bg,
         [
           // The jump pill mirrors the window pills exactly — same shape,
-          // blended colors; alt+; then this letter lands on the pane.
+          // blended colors; alt+a then this digit lands on the pane.
           ...(hint ? pill(hint, dim2, chipBg, bg) : [{ text: "   ", fg: dim }]),
           { text: " ", fg: dim },
           { text: project, fg: dim },

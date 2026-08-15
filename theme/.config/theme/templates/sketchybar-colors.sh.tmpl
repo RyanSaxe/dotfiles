@@ -30,8 +30,13 @@ export WORKSPACE_INACTIVE_BG="0x00000000"
 export TIME_NORMAL="0xff{{accent_hex}}"
 export TIME_HIGHLIGHT="0xff{{notify_hex}}"
 
-export BELL_FG="0xff{{notify_hex}}"
-export BELL_BG="0x33{{notify_hex}}"
+# Agent attention (the code-workspace highlight, fed by the rail daemon):
+# the rail's status semantics — waiting outranks done, and both are
+# semantic tokens, never pokemon accents.
+export AGENT_WAITING_FG="0xff{{status_waiting_hex}}"
+export AGENT_WAITING_BG="0x33{{status_waiting_hex}}"
+export AGENT_DONE_FG="0xff{{status_done_hex}}"
+export AGENT_DONE_BG="0x33{{status_done_hex}}"
 
 # Threshold colors for battery/cpu/memory. warn is a semantic token; danger
 # has no role of its own, so it names the red palette hue directly (see

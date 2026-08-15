@@ -1,9 +1,8 @@
 #!/bin/sh
-# Runs from the status line every status-interval. When the rendered color
-# file changes, re-source it so the whole server recolors. Pull-based on
-# purpose: it runs inside tmux's own context, so no external process needs
-# the right PATH or permissions to recolor tmux — theme switches converge
-# within one status-interval on any machine.
+# Invoked by the rail daemon when the generated color files change (the
+# status line is off; the rail carries the chrome). When the rendered color
+# file changes, re-source it so the whole server recolors. mtime-guarded so
+# redundant invocations cost one stat, not a re-source.
 set -eu
 
 colors="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated/tmux-colors.conf"

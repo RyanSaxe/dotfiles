@@ -48,19 +48,26 @@ if (SPRITE_COLS > DIACRITICS.length || SPRITE_ROWS > DIACRITICS.length) {
   );
 }
 
-// Image ids double as the placeholder foreground color (24-bit). Derived
-// from a hash of the sprite path so an id is STABLE across daemon
-// restarts — a restart-reset counter would hand one pokemon's id to
-// another, and stale placeholders would show slices of the wrong sprite
-// until retransmission. The offset keeps ids clear of the small ones
-// other tools (nvim image plugins) allocate from zero.
-export function spriteId(spritePath: string): number {
+// Image ids double as the placeholder foreground color (24-bit), and the
+// color is ours to choose — so choose camouflage. The id sits within ±7
+// per channel of the rail background: a terminal without kitty graphics
+// renders the placeholder glyphs near-bg-on-bg (invisible) instead of a
+// vividly colored block, while a capable terminal only uses the color as
+// an id. The path hash fills the low bits so concurrent sprites stay
+// distinct, and an id is STABLE per (sprite, background) across daemon
+// restarts. A background change (theme mode flip) yields a new id;
+// callers must retransmit the image under it.
+export function spriteId(spritePath: string, bg: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < spritePath.length; i++) {
     hash ^= spritePath.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
-  return 0x100000 + (hash % 0xefffff);
+  const bgRgb = Number.parseInt(bg.replace("#", ""), 16) || 0;
+  const id = (bgRgb & 0xf8f8f8) | (hash & 0x070707);
+  // Id 0 is invalid in the protocol; only a pure-black bg with an
+  // all-zero hash nibble could produce it.
+  return id === 0 ? 0x070707 : id;
 }
 
 export function idToHex(id: number): string {
@@ -110,10 +117,13 @@ function readSprite(path: string): Buffer | null {
 // Send the PNG as a virtual placement through a VISIBLE pane's tty (tmux
 // only forwards passthrough for visible panes). Terminals drop image data
 // on restart, so callers re-send on a slow interval.
-export function transmitSprite(tty: string, spritePath: string): boolean {
+export function transmitSprite(
+  tty: string,
+  spritePath: string,
+  id: number,
+): boolean {
   const png = readSprite(spritePath);
   if (!png) return false;
-  const id = spriteId(spritePath);
   const b64 = png.toString("base64");
   let payload = "";
   for (let offset = 0; offset < b64.length; offset += CHUNK) {

@@ -6,3 +6,6 @@ scripts/*     text eol=lf
 
 # Keep generated-looking assets out of language statistics.
 **/generated/** linguist-generated=true
+
+# Per-machine notch compensation (see aerospace/.config/aerospace/configure.sh).
+aerospace/.config/aerospace/aerospace.toml filter=aerospace-notch

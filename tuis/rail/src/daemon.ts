@@ -10,8 +10,9 @@
 //
 // The daemon also enforces the rail's invariants every tick (self-heal):
 // rails are exactly RAIL_WIDTH wide, hold no scrollback, are never in
-// copy-mode, are never the selected pane, don't exist in narrow windows,
-// exist in wide ones while enabled, and never survive alone in a window.
+// copy-mode, are never the selected pane, exist in every window while
+// enabled (alt+g is the ONLY gate — no width policy), and never survive
+// alone in a window.
 
 import { existsSync, readFileSync, watch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -22,6 +23,7 @@ import { loadAcks, updateAcks } from "./acks.js";
 import {
   applyDoneHysteresis,
   collectAgents,
+  collectClientFacts,
   collectPanes,
   run,
   tmux,
@@ -30,21 +32,21 @@ import {
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
+import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
 import { pokemonFor } from "./pokemon.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
-import { loadPalette } from "./theme.js";
+import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
 // plus the crust gutter renderRail appends.
 const RAIL_WIDTH = 22 + GUTTER_COLS;
-// Hysteresis: rails die below 100 but only spawn above 110, so a window
-// hovering at the boundary can't flap between the two.
-const KILL_BELOW_WIDTH = 100;
-const SPAWN_ABOVE_WIDTH = 110;
+// Split feasibility, not policy: below this tmux can't fit rail + border
+// + any content. Visibility is controlled by alt+g alone.
+const MIN_SPLIT_WIDTH = RAIL_WIDTH + 2;
 
 const STATE_DIR = join(XDG_STATE, "dotfiles/rail");
 const PID_FILE = join(STATE_DIR, "daemon.pid");
@@ -61,6 +63,7 @@ const SYNC_OFF = "\x1b[?2026l";
 
 let agents: Agent[] = [];
 let agentsFresh = false;
+let appliedBg = "";
 const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
@@ -100,6 +103,12 @@ async function spawnRail(windowId: string): Promise<void> {
   );
   const paneId = stdout.trim();
   await tmux("set-option", "-p", "-t", paneId, "@rail", "1");
+  // The pane's DEFAULT background must match the frames: tmux clears a
+  // pane region to its default bg before redrawing on window/session
+  // switches, and a default that differs from the rail's crust flashes
+  // visibly on every switch. (Content panes don't need this — their bg
+  // already equals the terminal default.)
+  await tmux("select-pane", "-P", `bg=${railBg(loadPalette())}`, "-t", paneId);
   // No per-pane border styling: borders are crust-filled globally
   // (tmux.conf), which is attribution-proof — per-pane styles only ever
   // controlled half a shared border and the active pane's style took
@@ -133,12 +142,6 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
     // A rail alone in a window is a zombie: every content pane is gone.
     if (pane.windowPanes === 1) {
       await tmux("kill-window", "-t", pane.windowId).catch(() => {});
-      touched.add(pane.paneId);
-      continue;
-    }
-    // Narrow windows carry no rail; the content pane wins.
-    if (pane.windowWidth < KILL_BELOW_WIDTH) {
-      await tmux("kill-pane", "-t", pane.paneId).catch(() => {});
       touched.add(pane.paneId);
       continue;
     }
@@ -185,15 +188,15 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
     }
   }
 
-  // While enabled, every wide-enough window grows a rail — hooks make this
-  // instant, this reconcile makes it inevitable.
+  // While enabled, EVERY window grows a rail — no width policy, alt+g is
+  // the only gate. This reconcile makes it inevitable.
   if (enabled) {
     const seen = new Set<string>();
     for (const pane of panes) {
       if (seen.has(pane.windowId) || pane.isRail) continue;
       seen.add(pane.windowId);
       if (
-        pane.windowWidth >= SPAWN_ABOVE_WIDTH &&
+        pane.windowWidth >= MIN_SPLIT_WIDTH &&
         !railByWindow.has(pane.windowId)
       ) {
         await spawnRail(pane.windowId).catch(() => {});
@@ -232,43 +235,24 @@ async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
   }
 }
 
-// Sprites render only for sessions where EVERY attached client identifies
-// as a kitty-graphics terminal — the daemon can't see through tmux to the
-// outer terminal any other way, and emitting graphics at an incapable
-// client (a phone, a plain SSH terminal) shows up as garbage. tmux's own
-// client table is the source of truth, re-read every tick.
-async function capableSessions(): Promise<Set<string>> {
-  const capable = new Set<string>();
-  const incapable = new Set<string>();
-  const { stdout } = await tmux(
-    "list-clients",
-    "-F",
-    "#{client_session}\x1f#{client_termname}",
-  );
-  for (const clientLine of stdout.split("\n")) {
-    if (!clientLine) continue;
-    const [session, termname] = clientLine.split("\x1f");
-    if (!session) continue;
-    if (/ghostty|kitty/i.test(termname ?? "")) {
-      capable.add(session);
-    } else {
-      incapable.add(session);
-    }
-  }
-  for (const session of incapable) capable.delete(session);
-  return capable;
-}
+// Sprites are unconditional. A client without kitty graphics renders the
+// placeholder cells as a colored block in the mascot area; hiding the
+// rail (alt+g) is the remedy there. Any conditional scheme is worse:
+// frames live in tmux's buffers, so a capability flip repaints every
+// rail and a mid-flip window switch shows the stale variant.
 
 // Terminals drop image data on restart and the daemon can't observe that;
-// a slow re-send through each visible rail pane keeps sprites alive.
+// a slow re-send through each visible rail pane keeps sprites alive. The
+// key includes the id so an id change (camouflage follows the theme
+// background) retransmits immediately instead of waiting out the timer.
 const TRANSMIT_INTERVAL_MS = 60_000;
 const lastTransmit = new Map<string, number>();
 
-function maybeTransmit(pane: Pane, spritePath: string): void {
-  const key = `${pane.paneId}\x1f${spritePath}`;
+function maybeTransmit(pane: Pane, spritePath: string, id: number): void {
+  const key = `${pane.paneId}\x1f${spritePath}\x1f${id}`;
   const last = lastTransmit.get(key) ?? 0;
   if (Date.now() - last < TRANSMIT_INTERVAL_MS) return;
-  if (transmitSprite(pane.tty, spritePath)) {
+  if (transmitSprite(pane.tty, spritePath, id)) {
     lastTransmit.set(key, Date.now());
     // Repaint after the data lands so the placeholder cells composite.
     pushed.delete(pane.paneId);
@@ -283,19 +267,35 @@ async function tick(counter: number): Promise<void> {
         })
       : Promise.resolve();
   // The polls are independent — one round-trip of latency, not three.
-  const [panes, spriteCapable] = await Promise.all([
+  const [panes, clientFacts] = await Promise.all([
     collectPanes(),
-    capableSessions(),
+    collectClientFacts(),
     refresh,
   ]);
+  const { modeSessions, nonKittySessions } = clientFacts;
   const palette = loadPalette();
+  // Keep every rail pane's default bg in step with the theme (spawn sets
+  // it once; a mode flip changes crust under all existing panes).
+  const bg = railBg(palette);
+  if (bg !== appliedBg) {
+    for (const pane of panes) {
+      if (!pane.isRail) continue;
+      await tmux("select-pane", "-P", `bg=${bg}`, "-t", pane.paneId).catch(
+        () => {},
+      );
+    }
+    appliedBg = bg;
+  }
   const skip = await selfHeal(panes);
   await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
   const acked = updateAcks(acks, settled, panes);
-  const hints = assignHints(settled);
-  writeHints(settled, hints);
+  const sessions = new Set(panes.map((pane) => pane.session));
+  const hintsBySession = assignHints(settled, sessions, acked);
+  writeHints(settled, hintsBySession, acked);
+  publishAttention(settled, acked);
+  pushPhone(settled, panes);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;
@@ -315,12 +315,12 @@ async function tick(counter: number): Promise<void> {
       (palette.mode === "dark" ? pokemon?.accentDark : pokemon?.accentLight) ??
       palette.accent;
     const sessionPalette = { ...palette, accent };
-    const spritePath =
-      spriteCapable.has(pane.session) && pokemon?.spritePath
-        ? pokemon.spritePath
-        : null;
-    const sprite = spritePath ? spriteId(spritePath) : null;
-    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}`;
+    const spritePath = clientFacts.latestClientIsKitty
+      ? (pokemon?.spritePath ?? null)
+      : null;
+    const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
+    const prefixHeld = modeSessions.has(pane.session);
+    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
     let frame = frames.get(bucket);
     if (frame === undefined) {
       const data = {
@@ -328,17 +328,28 @@ async function tick(counter: number): Promise<void> {
         windows: windowsOf(panes, pane.session),
         agents: settled,
         acked,
-        hints,
+        hints: hintsBySession.get(pane.session) ?? new Map<string, string>(),
         sprite,
         page,
+        prefixHeld,
       };
       frame = toFrame(
         renderRail(data, sessionPalette, pane.width, pane.height),
       );
       frames.set(bucket, frame);
     }
-    if (spritePath && pane.sessionAttached && pane.windowActive) {
-      maybeTransmit(pane, spritePath);
+    // Frames are unconditional, transmission is not: sending image data
+    // through a pane a non-kitty client is viewing spews the payload as
+    // text there. Kitty terminals retain previously-loaded images, so
+    // mascots persist through a transmit pause and resume on detach.
+    if (
+      spritePath &&
+      sprite !== null &&
+      pane.sessionAttached &&
+      pane.windowActive &&
+      !nonKittySessions.has(pane.session)
+    ) {
+      maybeTransmit(pane, spritePath, sprite);
     }
     paintPane(pane, frame);
   }

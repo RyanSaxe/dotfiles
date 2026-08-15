@@ -158,8 +158,8 @@ render() {
 # converge on the generated files themselves:
 #   starship   re-reads its config every prompt
 #   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
-#   tmux       status-interval sync re-sources tmux-colors.conf on mtime
-#              change (tmux scripts/theme-sync.sh) — any OS, any context
+#   tmux       rail daemon watches the generated dir and re-sources
+#              tmux-colors.conf on change (tmux scripts/theme-sync.sh)
 #   mascot     rail watches the state directory
 #   ghostty    palette follows macOS appearance natively; custom shaders
 #              pick up new content on the next config reload
