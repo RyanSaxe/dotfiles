@@ -87,11 +87,15 @@ jobs:
           fi
           nvim --version | head -n 1
 
-      - name: Headless plugin restore from the lockfile
+      - name: Headless bootstrap from the lockfile
         run: |
           mkdir -p "$HOME/.config"
           ln -s "$PWD/nvim/.config/nvim" "$HOME/.config/nvim"
-          nvim --headless "+Lazy! restore" +qa
+          # First boot installs plugins at their locked versions, then mason
+          # and treesitter finish tool installs in the background; quitting
+          # early aborts them, so give the boot a settle window.
+          nvim --headless \
+            "+lua vim.defer_fn(function() vim.cmd('qa!') end, 120000)"
 
       - name: checkhealth reports no errors
         run: |
