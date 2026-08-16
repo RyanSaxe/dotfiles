@@ -155,16 +155,19 @@ function M.apply(tokens)
     hl(group:gsub("Bg", "Fg"), { link = "Comment" })
   end
 
-  -- Floats and pickers: chrome sits on the darker surface; accent is
-  -- the common frame, notify marks the input focus
-  hl("NormalFloat", { bg = r.bg_alt })
-  hl("FloatBorder", { fg = accent, bg = r.bg_alt })
-  hl("FloatTitle", { fg = accent, bg = r.bg_alt })
-  hl("SnacksPickerBorder", { fg = accent, bg = r.bg_alt })
-  hl("SnacksPickerTitle", { fg = accent, bg = r.bg_alt })
-  hl("SnacksPickerBoxTitle", { fg = notify, bg = r.bg_alt })
-  hl("SnacksPickerInputBorder", { fg = notify, bg = r.bg_alt })
-  hl("SnacksPickerInputTitle", { fg = notify, bg = r.bg_alt })
+  -- Chrome is crust, everywhere: floats, pickers, and (in the chrome
+  -- phase) statusline and bufferline share the rail's surface so the
+  -- whole frame reads as one piece. Accent is the common frame color,
+  -- notify marks the input focus.
+  local chrome = p.crust
+  hl("NormalFloat", { bg = chrome })
+  hl("FloatBorder", { fg = accent, bg = chrome })
+  hl("FloatTitle", { fg = accent, bg = chrome })
+  hl("SnacksPickerBorder", { fg = accent, bg = chrome })
+  hl("SnacksPickerTitle", { fg = accent, bg = chrome })
+  hl("SnacksPickerBoxTitle", { fg = notify, bg = chrome })
+  hl("SnacksPickerInputBorder", { fg = notify, bg = chrome })
+  hl("SnacksPickerInputTitle", { fg = notify, bg = chrome })
   hl("SnacksPickerPrompt", { fg = notify })
   hl("SnacksPickerToggle", { fg = accent, bg = bb(accent, 0.1) })
 end
