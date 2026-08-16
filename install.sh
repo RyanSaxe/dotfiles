@@ -451,24 +451,49 @@ upgrade_prek_hooks() {
     echo "  pin bump: review 'git diff .pre-commit-config.yaml' and commit" >>"$SUMMARY"
 }
 
+# Run one manager in a set -e subshell: its failure lands in the summary
+# instead of killing the run, and the managers after it still execute. The
+# subshell must be a plain statement — in an if/&& condition every shell
+# keeps set -e inert even when the subshell re-enables it.
+run_step() {
+  step="$1"
+  shift
+  set +e
+  (
+    set -e
+    "$@"
+  )
+  step_status=$?
+  set -e
+  if [ "$step_status" -ne 0 ]; then
+    echo "$step: FAILED (see output above)" >>"$SUMMARY"
+    UPGRADE_FAILED=1
+  fi
+}
+
 run_upgrade() {
   WORK="$(mktemp -d)"
-  trap 'rm -rf "$WORK"' EXIT
   SUMMARY="$WORK/summary"
   : >"$SUMMARY"
+  # Print whatever the run collected before cleaning up, however it exits.
+  trap '
+    echo
+    echo "==> upgrade summary"
+    cat "$SUMMARY"
+    rm -rf "$WORK"
+  ' EXIT
+  UPGRADE_FAILED=0
 
   case "$OS" in
-  Darwin) upgrade_brew ;;
-  Linux) upgrade_apt ;;
+  Darwin) run_step brew upgrade_brew ;;
+  Linux) run_step apt upgrade_apt ;;
   esac
-  upgrade_zsh_plugins
-  upgrade_rail
-  upgrade_uv_tools
-  upgrade_prek_hooks
+  run_step "zsh plugins" upgrade_zsh_plugins
+  run_step "npm ($RAIL_DIR)" upgrade_rail
+  run_step "uv tools" upgrade_uv_tools
+  run_step "prek hooks" upgrade_prek_hooks
 
-  echo
-  echo "==> upgrade summary"
-  cat "$SUMMARY"
+  exit "$UPGRADE_FAILED"
 }
 
 # -------------------------------------------------------------------- main
@@ -476,7 +501,6 @@ ensure_package_manager
 
 if [ "${1:-}" = upgrade ]; then
   run_upgrade
-  exit 0
 fi
 
 # No tiers on the command line: choose interactively. (An agents tier —
