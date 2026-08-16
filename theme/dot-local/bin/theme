@@ -311,11 +311,12 @@ publish_bat_theme() {
   return $status
 }
 
+# Routine rebuild progress stays off the terminal; errors still reach stderr.
 rebuild_bat_cache() {
   if command -v bat >/dev/null 2>&1; then
-    bat cache --build
+    bat cache --build >/dev/null
   elif command -v batcat >/dev/null 2>&1; then
-    batcat cache --build
+    batcat cache --build >/dev/null
   fi
 }
 
