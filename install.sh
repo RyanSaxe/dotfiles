@@ -82,7 +82,8 @@ ensure_package_manager() {
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
 CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat neovim lua-language-server stylua'
-CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf nodejs npm bat'
+# make: ensure_modern_stow builds stow from source on LTS boxes.
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat make'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
@@ -122,7 +123,12 @@ install_neovim_linux() {
   # tarball into ~/.local is both the install and the upgrade path.
   # lua-language-server and stylua stay mac-only for now: prek vendors its
   # own stylua, and lua editing happens on the mac.
-  curl -fsSL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz |
+  case "$(uname -m)" in
+  aarch64 | arm64) nvim_arch=arm64 ;;
+  *) nvim_arch=x86_64 ;;
+  esac
+  mkdir -p "$HOME/.local"
+  curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-$nvim_arch.tar.gz" |
     tar -xz -C "$HOME/.local" --strip-components=1
 }
 
