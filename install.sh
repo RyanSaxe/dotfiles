@@ -187,6 +187,21 @@ install_tier_packages() {
   esac
 }
 
+# Directories that receive generated files at runtime: theme publish_files
+# copies the rendered bat theme and ghostty shaders into ~/.config, and uv
+# installs tool shims into ~/.local/bin. Each must be a real directory
+# before stow runs: stow folds a missing directory into a symlink to the
+# package tree, and these writes would then land inside the repo. .stowrc's
+# --no-folding also prevents folding, but only when stow reads it (cwd is
+# the repo root and the file parses); the pre-create holds regardless.
+RUNTIME_WRITE_DIRS='.config/bat/themes .config/ghostty/shaders .local/bin'
+
+ensure_runtime_write_dirs() {
+  for dir in $RUNTIME_WRITE_DIRS; do
+    mkdir -p "${DOTFILES_TARGET:-$HOME}/$dir"
+  done
+}
+
 # Stow one package, cleaning up links left behind by files that were renamed
 # or deleted since the last run. Stow itself cannot do this: it unstows by
 # walking the CURRENT package tree, so links to files no longer in the tree
@@ -423,6 +438,7 @@ if [ "$#" -eq 0 ]; then
   fi
 fi
 
+ensure_runtime_write_dirs
 for tier in "$@"; do
   echo "==> $tier"
   install_tier "$tier"
