@@ -85,7 +85,13 @@ def mascot_cache(provider: str) -> Path:
     migrated = root / "pokemon"
     if legacy.is_dir() and not migrated.exists():
         root.mkdir(parents=True, exist_ok=True)
-        legacy.rename(migrated)
+        try:
+            legacy.rename(migrated)
+        except OSError:
+            # Concurrent invocations (theme sync, the rail's extractor)
+            # race this rename; losing means the other process migrated.
+            if not migrated.exists():
+                raise
     path = root / provider
     path.mkdir(parents=True, exist_ok=True)
     return path
