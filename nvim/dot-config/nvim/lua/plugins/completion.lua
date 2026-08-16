@@ -50,7 +50,8 @@ return {
         ["<CR>"] = { "accept", "fallback" },
         ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
         ["<C-e>"] = { "show_documentation", "hide_documentation" },
-        ["<C-c>"] = { "hide", "fallback" },
+        -- <C-c> is deliberately absent: a buffer-local blink map would
+        -- shadow the global cancel-all map that copilot.lua owns.
         ["<C-k>"] = { "select_prev", "fallback" },
         ["<C-j>"] = { "select_next", "fallback" },
         -- Tab: menu -> snippet field -> literal tab. The literal-tab
