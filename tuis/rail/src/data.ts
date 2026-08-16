@@ -190,6 +190,8 @@ export interface ClientFacts {
   // contract as window-size latest — machine hand-offs repaint within a
   // tick, same-machine switches never change it.
   latestClientIsKitty: boolean;
+  // Attached clients server-wide; zero lets the daemon idle its cadence.
+  clientCount: number;
 }
 
 const CLIENT_FORMAT = [
@@ -219,7 +221,12 @@ function clientFactsFrom(rows: string[][]): ClientFacts {
       latestClientIsKitty = kitty;
     }
   }
-  return { modeSessions, nonKittySessions, latestClientIsKitty };
+  return {
+    modeSessions,
+    nonKittySessions,
+    latestClientIsKitty,
+    clientCount: rows.length,
+  };
 }
 
 export interface Snapshot {

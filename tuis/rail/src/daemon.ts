@@ -3,10 +3,12 @@
 // tty. tmux interprets those writes into its own screen buffer, so frames
 // survive detach/attach and remote clients with no viewer process at all.
 //
-// Cadence: tmux geometry/windows every 250ms; agents reconciled every 5s
-// with instant refreshes when a workmux state file changes; palette re-read
-// when the theme system rewrites it. Frames are diffed per pane — an
-// unchanged rail costs zero writes.
+// Cadence: tmux geometry/windows every 250ms, stretched to 2s while the
+// rail is disabled or no client is attached (the enabled flag wakes it
+// instantly); agents reconciled every 5s with instant refreshes when a
+// workmux state file changes; palette re-read when the theme system
+// rewrites it. Frames are diffed per pane — an unchanged rail costs zero
+// writes.
 //
 // The daemon also enforces the rail's invariants every tick (self-heal):
 // rails are exactly RAIL_WIDTH wide, hold no scrollback, are never in
@@ -39,6 +41,11 @@ import { spriteId, transmitSprite, writeTty } from "./sprite.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
+// With the rail disabled or no client attached, nothing on screen can
+// change: stretch the cadence so the steady state costs ~nothing. The
+// enabled-flag watch in main() cuts an idle sleep short, so `rail on`
+// still lands within a tick.
+const IDLE_TICK_MS = 2000;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
 // plus the crust gutter renderRail appends.
@@ -118,9 +125,8 @@ async function spawnRail(windowId: string): Promise<void> {
 // Enforce every rail invariant against one snapshot. Any pane this touched
 // is skipped for painting this tick — it repaints next tick at its
 // corrected geometry.
-async function selfHeal(panes: Pane[]): Promise<Set<string>> {
+async function selfHeal(panes: Pane[], enabled: boolean): Promise<Set<string>> {
   const touched = new Set<string>();
-  const enabled = existsSync(ENABLED_FLAG);
 
   // Disabled means NO rail panes anywhere, and the daemon owns that
   // invariant: the launcher's kill sweep can race a tick that spawned a
@@ -278,7 +284,8 @@ function maybeTransmit(pane: Pane, spritePath: string, id: number): void {
   }
 }
 
-async function tick(counter: number): Promise<void> {
+// Returns whether the daemon may idle until the next tick.
+async function tick(counter: number): Promise<boolean> {
   const refresh =
     counter % AGENT_RECONCILE_TICKS === 0 || !agentsFresh
       ? refreshAgents().then(() => {
@@ -305,7 +312,8 @@ async function tick(counter: number): Promise<void> {
     }
     appliedBg = bg;
   }
-  const skip = await selfHeal(panes);
+  const enabled = existsSync(ENABLED_FLAG);
+  const skip = await selfHeal(panes, enabled);
   await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
@@ -378,6 +386,24 @@ async function tick(counter: number): Promise<void> {
   for (const paneId of pushed.keys()) {
     if (!alive.has(paneId)) pushed.delete(paneId);
   }
+
+  return !enabled || clientFacts.clientCount === 0;
+}
+
+// An interruptible sleep: the enabled-flag watch calls wakeLoop so
+// `rail on` never waits out an idle interval.
+let wakeLoop: () => void = () => {};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(finish, ms);
+    function finish(): void {
+      clearTimeout(timer);
+      wakeLoop = () => {};
+      resolve();
+    }
+    wakeLoop = finish;
+  });
 }
 
 async function alreadyRunning(): Promise<boolean> {
@@ -431,11 +457,16 @@ async function main(): Promise<void> {
     }, 30);
   });
 
+  watch(STATE_DIR, (_event, filename) => {
+    if (filename === "enabled") wakeLoop();
+  });
+
   let counter = 0;
   for (;;) {
     const started = Date.now();
+    let idle = false;
     try {
-      await tick(counter);
+      idle = await tick(counter);
     } catch (error) {
       // tmux server gone (or restarting): keep the daemon alive and poll
       // gently until it returns.
@@ -444,9 +475,8 @@ async function main(): Promise<void> {
     }
     counter += 1;
     const elapsed = Date.now() - started;
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.max(0, TICK_MS - elapsed)),
-    );
+    const cadence = idle ? IDLE_TICK_MS : TICK_MS;
+    await sleep(Math.max(0, cadence - elapsed));
   }
 }
 
