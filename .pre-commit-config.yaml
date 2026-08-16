@@ -149,6 +149,6 @@ repos:
       - id: theme-tests
         name: pytest (theme)
         language: system
-        entry: uv run --no-project --with pytest --with pillow pytest -q theme/tests
+        entry: uv run --no-project --with pytest --with pillow pytest -q tests/theme
         pass_filenames: false
-        files: "^theme/"
+        files: "^theme/|^tests/theme/"
