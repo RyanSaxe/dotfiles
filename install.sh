@@ -328,11 +328,14 @@ upgrade_rail() {
 
 upgrade_uv_tools() {
   echo "==> uv tools"
+  # --all reaches every uv tool on the machine, not just what install.sh
+  # installs (prek): personally installed tools drift too. Narrow to an
+  # inventory if that ever surprises.
   # Entry-point lines in `uv tool list` start with "- "; drop them. PEP 723
   # scripts need no step here: uv re-resolves them on every run.
-  uv tool list | awk '$1 != "-" && NF == 2' >"$WORK/uv.before"
+  uv tool list --color never | awk '$1 != "-" && NF == 2' >"$WORK/uv.before"
   uv tool upgrade --all
-  uv tool list | awk '$1 != "-" && NF == 2' >"$WORK/uv.after"
+  uv tool list --color never | awk '$1 != "-" && NF == 2' >"$WORK/uv.after"
   report_changes "uv tools" "$WORK/uv.before" "$WORK/uv.after"
 }
 
