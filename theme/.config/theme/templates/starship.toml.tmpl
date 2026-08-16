@@ -58,8 +58,12 @@ format = '[on ]({{fg_faint}})[$output]({{peach}}) '
 # repo root and asking starship's package module at each level — so a
 # monorepo half shows its own version, and the display never changes with
 # cd inside one package. All ~15 manifest formats are starship's, not ours.
+# pwd -P, not $PWD: git resolves symlinks and casing in --show-toplevel, so
+# a logical $PWD (symlinked or case-insensitive cd) never string-matches it
+# and the walk runs past the root. The empty-parent break is the backstop:
+# d='' is a fixed point of ${d%/*} and would loop forever.
 [custom.pkgversion]
-command = '''d="$PWD"; top="$(git rev-parse --show-toplevel)"; while :; do v="$(cd "$d" && starship module package)"; if [ -n "$v" ]; then printf %s "$v"; break; fi; [ "$d" = "$top" ] && break; d="${d%/*}"; done'''
+command = '''d="$(pwd -P)"; top="$(git rev-parse --show-toplevel)"; while :; do v="$(cd "$d" && starship module package)"; if [ -n "$v" ]; then printf %s "$v"; break; fi; [ "$d" = "$top" ] && break; d="${d%/*}"; [ -n "$d" ] || break; done'''
 when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1'
 format = '([at ]({{fg_faint}})[$output]({{pink}}) )'
 
