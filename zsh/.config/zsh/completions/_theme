@@ -4,14 +4,26 @@
 
 if (( CURRENT == 2 )); then
   local -a subcommands=(
-    'dark:switch to catppuccin mocha'
-    'light:switch to catppuccin latte'
+    'dark:switch both layers to catppuccin mocha'
+    'light:switch both layers to catppuccin latte'
     'toggle:flip between dark and light'
-    'apply:re-render the current mode'
+    'inner:change the terminal and content layer'
+    'outer:change the chrome and rail layer'
+    'both:change both layers'
+    'apply:re-render the current layer modes'
     'status:print mode and mascot accents'
     'mascot:accent colors and sprite from a mascot'
   )
   _describe 'theme command' subcommands
+elif [[ $words[2] == (inner|outer|both) ]]; then
+  if (( CURRENT == 3 )); then
+    local -a modes=(
+      'toggle:flip this layer'
+      'light:use the Latte palette'
+      'dark:use the Mocha palette'
+    )
+    _describe 'theme mode' modes
+  fi
 elif [[ $words[2] == mascot ]]; then
   # Provider-qualified identities from the per-provider name caches;
   # cheap and offline. compadd (not _describe): the values contain colons.

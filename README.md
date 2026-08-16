@@ -73,8 +73,22 @@ reload in place:
 ```sh
 theme dark
 theme light
+theme inner light
+theme outer dark
+theme both toggle
 theme mascot pokemon:gengar   # accent colors extracted from a mascot image
 ```
+
+The theme has two independently switchable surfaces. `inner` is terminal and
+content chrome (including Ghostty's native palette, shells, prompts, and bat);
+`outer` is the surrounding chrome (SketchyBar, the rail, tmux separators, and
+the Ghostty frame shader). Inner mode drives macOS appearance so Ghostty keeps
+its native light/dark theme pair; outer mode never changes the OS appearance.
+This permits combinations such as a light terminal inside dark chrome.
+
+Every consumer is registered as inner or outer in
+`theme/.config/theme/elements.conf`; mixed consumers use explicit namespaced
+tokens such as `{{inner_bg}}` and `{{outer_crust}}`.
 
 ### Mascot providers
 

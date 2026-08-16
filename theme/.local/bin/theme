@@ -2,16 +2,17 @@
 # One theme for every tool. Renders templates with the current palette and
 # semantic tokens; consumers watch the rendered files and converge.
 #
-#   theme dark      switch to catppuccin mocha
-#   theme light     switch to catppuccin latte
-#   theme toggle    flip between them
-#   theme apply     re-render the current mode (default: dark)
-#   theme status    print the current mode
+#   theme dark                 switch both layers to catppuccin mocha
+#   theme inner|outer MODE     switch one layer to dark, light, or toggle
+#   theme both MODE            switch both layers together
+#   theme apply                re-render the current layer modes
+#   theme status               print both layer modes
 #
 # Layers (see README: Theming):
 #   palettes/*.conf   raw color values        (layer 1)
 #   tokens.conf       role -> palette key     (layer 2)
-#   templates/*.tmpl  {{role}} placeholders   (layer 3)
+#   elements.conf     output -> inner/outer  (layer 3)
+#   templates/*.tmpl  {{role}} placeholders  (layer 4)
 # Rendered output lands in state, never in the repo.
 set -eu
 
@@ -31,10 +32,22 @@ MASCOT_CONF="$STATE/mascot.conf"
 # The global default is shareable and tracked; see mascot.conf in config.
 DEFAULT_CONF="$CONFIG/mascot.conf"
 GENERATED="$STATE/generated"
-MODE_FILE="$STATE/theme-mode"
+INNER_MODE_FILE="$STATE/inner-mode"
+OUTER_MODE_FILE="$STATE/outer-mode"
+ELEMENTS="$CONFIG/elements.conf"
 
-current_mode() {
-  if [ -f "$MODE_FILE" ]; then cat "$MODE_FILE"; else echo dark; fi
+layer_mode() {
+  mode_file="$INNER_MODE_FILE"
+  [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
+  if [ -f "$mode_file" ]; then cat "$mode_file"; else echo dark; fi
+}
+
+set_layer_mode() {
+  mode_file="$INNER_MODE_FILE"
+  [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
+  mkdir -p "$STATE"
+  printf '%s\n' "$2" >"$mode_file.tmp.$$"
+  mv "$mode_file.tmp.$$" "$mode_file"
 }
 
 palette_for_mode() {
@@ -78,6 +91,21 @@ set_mascot() {
   mv "$STATE/.accents.tmp" "$STATE/accents.conf"
 }
 
+# The old implementation stored one mode for every consumer. Preserve it as
+# the initial value for both layers when upgrading an existing installation.
+migrate_mode_state() {
+  [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ] && return 0
+  if [ -f "$STATE/theme-mode" ]; then
+    legacy_mode="$(cat "$STATE/theme-mode")"
+    case "$legacy_mode" in
+    dark | light)
+      [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
+      [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
+      ;;
+    esac
+  fi
+}
+
 # One-time migration from the pre-provider layout: mapped values gain
 # their provider prefix (X -> pokemon:X, X:shiny -> shiny-pokemon:X) and
 # accents.conf regenerates in the provider-qualified format (identity +
@@ -102,19 +130,11 @@ migrate_legacy_state() {
   fi
 }
 
-render() {
+append_mapping() {
   mode="$1"
-  palette="$(palette_for_mode "$mode")"
-  mkdir -p "$GENERATED"
+  palette="$2"
+  prefix="$3"
 
-  # Build a sed script resolving each {{role}} to its hex via the palette.
-  # A mascot (theme mascot <provider:id>) overrides accent/notify only,
-  # with the pair extracted for the current background mode.
-  accents="$STATE/accents.conf"
-  # Per-process temp name: the appearance watcher and a manual `theme` can
-  # render concurrently, and a shared file would corrupt both.
-  sed_script="$STATE/.render.$$.sed"
-  : >"$sed_script"
   while IFS='=' read -r role key; do
     case "$role" in ''#*) continue ;; esac
     hex="$(conf_get "$palette" "$key")"
@@ -130,49 +150,94 @@ render() {
       echo "error: token '$role' maps to '$key', not in $(basename "$palette")" >&2
       exit 1
     fi
-    printf 's/{{%s}}/%s/g\n' "$role" "$hex" >>"$sed_script"
-    # {{role_hex}} is the same color without '#', for formats that take raw
-    # hex digits (e.g. GLSL int literals: 0x{{accent_hex}}).
-    printf 's/{{%s_hex}}/%s/g\n' "$role" "${hex#\#}" >>"$sed_script"
+    name="${prefix}${role}"
+    printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
+    printf 's/{{%s_hex}}/%s/g\n' "$name" "${hex#\#}" >>"$sed_script"
   done <"$CONFIG/tokens.conf"
 
-  # Templates may also reference palette keys directly ({{mauve}}, {{sky}},
-  # {{green}}...) for SEMANTIC hue choices — meaning lives in the template,
-  # identity-sync lives in the accent/notify tokens. Names never collide.
-  # The palette's mode key renders too ({{mode}} -> dark|light), for
-  # consumers that take the scheme by name. The _hex variant is only
-  # emitted for color values.
   while IFS='=' read -r key hex; do
     case "$key" in ''#*) continue ;; esac
-    printf 's/{{%s}}/%s/g\n' "$key" "$hex" >>"$sed_script"
+    name="${prefix}${key}"
+    printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
     case "$hex" in
-    \#*) printf 's/{{%s_hex}}/%s/g\n' "$key" "${hex#\#}" >>"$sed_script" ;;
+    \#*) printf 's/{{%s_hex}}/%s/g\n' "$name" "${hex#\#}" >>"$sed_script" ;;
     esac
   done <"$palette"
+
+  printf 's/{{%smode}}/%s/g\n' "$prefix" "$mode" >>"$sed_script"
+}
+
+build_sed_script() {
+  default_layer="$1"
+  : >"$sed_script"
+
+  inner_mode="$(layer_mode inner)"
+  outer_mode="$(layer_mode outer)"
+  append_mapping "$inner_mode" "$(palette_for_mode "$inner_mode")" inner_
+  append_mapping "$outer_mode" "$(palette_for_mode "$outer_mode")" outer_
+
+  # Unqualified placeholders belong to the output's registered layer. Mixed
+  # templates use the explicit inner_/outer_ form above.
+  case "$default_layer" in
+  inner) append_mapping "$inner_mode" "$(palette_for_mode "$inner_mode")" "" ;;
+  outer) append_mapping "$outer_mode" "$(palette_for_mode "$outer_mode")" "" ;;
+  esac
+}
+
+render_template() {
+  template="$1"
+  output="$2"
+  default_layer="$3"
+  sed_script="$STATE/.render.$$.sed"
+  tmp="$output.tmp.$$"
+
+  build_sed_script "$default_layer"
+  sed -f "$sed_script" "$template" >"$tmp"
+  rm -f "$sed_script"
+  if grep -q '{{' "$tmp"; then
+    echo "error: unresolved tokens in $(basename "$template"):" >&2
+    grep -o '{{[^}]*}}' "$tmp" | sort -u >&2
+    rm -f "$tmp"
+    exit 1
+  fi
+  if [ ! -f "$output" ] || ! cmp -s "$tmp" "$output"; then
+    mv "$tmp" "$output"
+  else
+    rm -f "$tmp"
+  fi
+}
+
+render() {
+  inner_mode="$(layer_mode inner)"
+  outer_mode="$(layer_mode outer)"
+  mkdir -p "$GENERATED"
+
+  accents="$STATE/accents.conf"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
     [ -e "$tmpl" ] || continue
     out="$GENERATED/$(basename "$tmpl" .tmpl)"
-    sed -f "$sed_script" "$tmpl" >"$out"
-    # A surviving {{...}} means a template used an unknown role. Fail loudly.
-    if grep -q '{{' "$out"; then
-      echo "error: unresolved tokens in $(basename "$tmpl"):" >&2
-      grep -o '{{[a-z_]*}}' "$out" | sort -u >&2
+    element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
+    case "$element" in
+    inner | outer | mixed) render_template "$tmpl" "$out" "$element" ;;
+    *)
+      echo "error: no inner/outer registration for $(basename "$tmpl")" >&2
       exit 1
-    fi
+      ;;
+    esac
   done
-  rm -f "$sed_script"
 
-  echo "$mode" >"$MODE_FILE"
   publish_files
-  echo "theme: $mode"
+  echo "theme: inner=$inner_mode outer=$outer_mode"
 }
 
-# This script only WRITES state; it never pokes processes. It runs from
+# This script writes state and performs the small reloads required by
+# consumers that cannot watch their generated files. It runs from
 # many contexts (shells, ssh, the tmux server) whose environments differ,
 # and a push that works in one silently fails in another. Consumers
 # converge on the generated files themselves:
+#   bat        receives the generated theme and rebuilds its cache when it changes
 #   starship   re-reads its config every prompt
 #   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
 #   tmux       rail daemon watches the generated dir and re-sources
@@ -189,6 +254,23 @@ publish_files() {
     [ -f "$shader" ] || continue
     cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
   done
+  # bat has no token/template layer of its own: publish the rendered inner
+  # theme into its normal config directory and rebuild only when its content
+  # actually changed. `batcat` is the Debian/Ubuntu binary name.
+  bat_theme="$GENERATED/Dotfiles.tmTheme"
+  if [ -f "$bat_theme" ]; then
+    bat_dir="$HOME/.config/bat/themes"
+    mkdir -p "$bat_dir"
+    if [ ! -f "$bat_dir/Dotfiles.tmTheme" ] ||
+      ! cmp -s "$bat_theme" "$bat_dir/Dotfiles.tmTheme"; then
+      cp "$bat_theme" "$bat_dir/Dotfiles.tmTheme"
+      if command -v bat >/dev/null 2>&1; then
+        bat cache --build
+      elif command -v batcat >/dev/null 2>&1; then
+        batcat cache --build
+      fi
+    fi
+  fi
   # Exceptions to "never poke processes", for consumers with no
   # file-watching path of their own. Both are idempotent no-ops when the
   # target isn't running:
@@ -227,38 +309,84 @@ swatch() {
 show_accents() {
   accents="$STATE/accents.conf"
   [ -f "$accents" ] || return 0
-  mode="$(current_mode)"
-  echo "mascot: $(conf_get "$accents" mascot) ($mode)"
-  swatch "$(conf_get "$accents" "accent_$mode")" accent
-  swatch "$(conf_get "$accents" "notify_$mode")" notify
+  inner_mode="$(layer_mode inner)"
+  outer_mode="$(layer_mode outer)"
+  echo "mascot: $(conf_get "$accents" mascot) (inner=$inner_mode outer=$outer_mode)"
+  swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
+  swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
+  swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
+  swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
 }
 
+migrate_mode_state
 migrate_legacy_state
+
+apply_scope() {
+  scope="$1"
+  requested="$2"
+  case "$scope" in
+  inner | outer | both) ;;
+  *)
+    echo "error: unknown theme scope '$scope'" >&2
+    exit 1
+    ;;
+  esac
+  case "$requested" in
+  dark | light) mode="$requested" ;;
+  toggle)
+    if [ "$scope" = outer ]; then
+      current="$(layer_mode outer)"
+    else
+      current="$(layer_mode inner)"
+    fi
+    [ "$current" = dark ] && mode=light || mode=dark
+    ;;
+  *)
+    echo "error: mode must be dark, light, or toggle" >&2
+    exit 1
+    ;;
+  esac
+
+  case "$scope" in
+  inner) set_layer_mode inner "$mode" ;;
+  outer) set_layer_mode outer "$mode" ;;
+  both)
+    set_layer_mode inner "$mode"
+    set_layer_mode outer "$mode"
+    ;;
+  esac
+  # Ghostty's native light/dark theme pair is the inner terminal surface.
+  # Outer-only changes must never flip the OS appearance.
+  [ "$scope" = outer ] || set_os_appearance "$mode"
+  render
+}
 
 case "${1:-status}" in
 dark | light)
-  set_os_appearance "$1"
-  render "$1"
+  apply_scope both "$1"
   ;;
 toggle)
-  case "$(current_mode)" in
-  dark) set_os_appearance light && render light ;;
-  *) set_os_appearance dark && render dark ;;
-  esac
+  apply_scope both toggle
+  ;;
+inner | outer | both)
+  apply_scope "$1" "${2:?usage: theme inner|outer|both dark|light|toggle}"
   ;;
 apply)
-  # `theme apply [dark|light]` renders WITHOUT touching OS appearance —
-  # for catching the terminal up after the OS already changed (System
-  # Settings, schedule) without re-triggering that flip.
-  mode="${2:-$(current_mode)}"
-  case "$mode" in
-  dark | light) ;;
+  # `theme apply` catches generated consumers up with the persisted layer
+  # modes without touching OS appearance. The one-argument form preserves
+  # the old "apply both layers" behavior for appearance watchers.
+  case "${2:-}" in
+  '') render ;;
+  dark | light)
+    set_layer_mode inner "$2"
+    set_layer_mode outer "$2"
+    render
+    ;;
   *)
     echo "usage: theme apply [dark|light]" >&2
     exit 1
     ;;
   esac
-  render "$mode"
   ;;
 mascot)
   sub="${2:?usage: theme mascot <provider:id>|none|default <provider:id>|project <provider:id>|none|sync [project]}"
@@ -305,15 +433,16 @@ mascot)
     set_mascot "$sub"
     ;;
   esac
-  render "$(current_mode)"
+  render
   show_accents
   ;;
 status)
-  current_mode
+  echo "inner: $(layer_mode inner)"
+  echo "outer: $(layer_mode outer)"
   show_accents
   ;;
 *)
-  echo "usage: theme dark|light|toggle|apply|status|mascot <provider:id>|none" >&2
+  echo "usage: theme dark|light|toggle|inner|outer|both|apply|status|mascot <provider:id>|none" >&2
   exit 1
   ;;
 esac
