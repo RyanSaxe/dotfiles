@@ -164,7 +164,7 @@ install_tier_packages() {
       brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
     done
     # Per-machine notch compensation for aerospace's top gap.
-    ./aerospace/.config/aerospace/configure.sh
+    ./aerospace/dot-config/aerospace/configure.sh
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -185,7 +185,9 @@ stow_package() {
   manifest="$manifest_dir/$1.txt"
   mkdir -p "$manifest_dir"
 
-  current="$(cd "$1" && find . -type f | sort)"
+  # Manifest paths are target-side: stow --dotfiles links dot-* entries to
+  # their dotted names, and the cleanup below must visit those links.
+  current="$(cd "$1" && find . -type f | sed 's|/dot-|/.|g' | sort)"
 
   if [ -f "$manifest" ]; then
     printf '%s\n' "$current" | comm -23 "$manifest" - | while IFS= read -r gone; do
@@ -198,7 +200,7 @@ stow_package() {
     done
   fi
 
-  stow -R -t "$target" "$1"
+  stow -R --dotfiles -t "$target" "$1"
   printf '%s\n' "$current" >"$manifest"
 }
 
