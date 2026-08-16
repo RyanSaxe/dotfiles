@@ -4,6 +4,9 @@
 #   ./install.sh              interactive: choose tiers, then install
 #   ./install.sh core         non-interactive: install the named tiers
 #   ./install.sh core agents
+#   ./install.sh upgrade      upgrade every package manager, print a
+#                             before/after summary; pin bumps (rail
+#                             lockfile, prek revs) are left uncommitted
 #
 # Re-running updates: packages upgrade to current versions and symlinks are
 # restowed. Every step is idempotent.
@@ -75,6 +78,16 @@ ensure_package_manager() {
 # System packages per tier and OS, named per package manager. Stow packages
 # live in tiers/*.txt.
 
+# One inventory per package manager. POSIX sh has no arrays: these are
+# space-separated words, expanded unquoted on purpose (hence the shellcheck
+# disables at each use).
+CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat'
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf nodejs npm bat'
+MAC_BREW_FORMULAS='sketchybar'
+MAC_BREW_CASKS='aerospace'
+ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
+RAIL_DIR='tuis/rail'
+
 # zsh plugins are shallow git clones into one fixed path, sourced by .zshrc.
 # One mechanism on every OS — brew and apt disagree on names and paths.
 clone_plugin() {
@@ -88,29 +101,37 @@ clone_plugin() {
 }
 
 install_zsh_plugins() {
-  clone_plugin zsh-users/zsh-autosuggestions
-  clone_plugin zdharma-continuum/fast-syntax-highlighting
-  clone_plugin Aloxaf/fzf-tab
+  for plugin in $ZSH_PLUGINS; do
+    clone_plugin "$plugin"
+  done
 }
 
 # The rail TUI (tuis/rail) runs via tsx from its own node_modules.
 install_rail() {
-  (cd tuis/rail && npm install --no-fund --no-audit --silent)
+  (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
+}
+
+install_starship() {
+  # starship has no self-update; rerunning the official installer is also
+  # the upgrade path.
+  curl -sS https://starship.rs/install.sh | sh -s -- -y
 }
 
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
-    brew_install stow git gh git-delta uv starship fzf tmux node bat
+    # shellcheck disable=SC2086
+    brew_install $CORE_BREW_FORMULAS
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
     ;;
   core:Linux)
-    apt_install stow git gh git-delta curl zsh fzf nodejs npm bat
+    # shellcheck disable=SC2086
+    apt_install $CORE_APT_PACKAGES
     # uv and starship are not packaged in apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
-    command -v starship >/dev/null 2>&1 || curl -sS https://starship.rs/install.sh | sh -s -- -y
+    command -v starship >/dev/null 2>&1 || install_starship
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -122,12 +143,15 @@ install_tier_packages() {
     # (`brew trust` doesn't exist on older brews — hence the guard).
     brew tap felixkratz/formulae
     brew trust felixkratz/formulae 2>/dev/null || true
-    brew_install sketchybar
+    # shellcheck disable=SC2086
+    brew_install $MAC_BREW_FORMULAS
     # aerospace is a cask in nikitabobko's tap; install skips when present
     # (casks error on reinstall, unlike formulas).
     brew tap nikitabobko/tap
     brew trust nikitabobko/tap 2>/dev/null || true
-    brew list --cask aerospace >/dev/null 2>&1 || brew install --cask aerospace
+    for cask in $MAC_BREW_CASKS; do
+      brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
+    done
     # Per-machine notch compensation for aerospace's top gap.
     ./aerospace/.config/aerospace/configure.sh
     ;;
@@ -181,8 +205,184 @@ install_tier() {
   fi
 }
 
+# ----------------------------------------------------------------- upgrade
+# `./install.sh upgrade` — bring every package manager current and print one
+# before/after summary at the end instead of scrollback. Package-manager work
+# only: no stow, no symlinks (install owns those). Pinned versions (rail's
+# package-lock.json, prek hook revs) are bumped in the working tree but never
+# committed here; the diff is the proposal.
+
+# Append one summary section: "name old -> new" per changed package, from two
+# "name version..." snapshots.
+report_changes() {
+  {
+    echo "$1:"
+    changes="$(awk '
+      FILENAME == ARGV[1] { before[$1] = substr($0, length($1) + 2); next }
+      {
+        after = substr($0, length($1) + 2)
+        old = ($1 in before) ? before[$1] : "(new)"
+        if (old != after) print "  " $1 "  " old " -> " after
+      }
+    ' "$2" "$3")"
+    echo "${changes:-  up to date}"
+  } >>"$SUMMARY"
+}
+
+upgrade_brew() {
+  echo "==> brew"
+  brew update
+  formulas="$CORE_BREW_FORMULAS"
+  # Only mac-tier packages that are actually installed: upgrade must not
+  # pull GUI apps onto a machine that chose core only.
+  for formula in $MAC_BREW_FORMULAS; do
+    if brew list --versions "$formula" >/dev/null 2>&1; then
+      formulas="$formulas $formula"
+    fi
+  done
+  # A formula missing from the snapshot (nonzero exit) is not fatal: the
+  # brew_install below installs it and the summary reports it as (new).
+  # shellcheck disable=SC2086
+  brew list --versions $formulas >"$WORK/brew.before" || true
+  # shellcheck disable=SC2086
+  brew_install $formulas
+  # shellcheck disable=SC2086
+  brew list --versions $formulas >"$WORK/brew.after"
+  report_changes brew "$WORK/brew.before" "$WORK/brew.after"
+
+  for cask in $MAC_BREW_CASKS; do
+    if brew list --cask --versions "$cask" >"$WORK/cask.before" 2>/dev/null; then
+      brew upgrade --cask "$cask"
+      brew list --cask --versions "$cask" >"$WORK/cask.after"
+      report_changes "brew cask" "$WORK/cask.before" "$WORK/cask.after"
+    fi
+  done
+}
+
+upgrade_apt() {
+  echo "==> apt"
+  # shellcheck disable=SC2086
+  dpkg-query -W -f='${Package} ${Version}\n' $CORE_APT_PACKAGES 2>/dev/null |
+    sort >"$WORK/apt.before"
+  # shellcheck disable=SC2086
+  apt_install $CORE_APT_PACKAGES
+  # shellcheck disable=SC2086
+  dpkg-query -W -f='${Package} ${Version}\n' $CORE_APT_PACKAGES 2>/dev/null |
+    sort >"$WORK/apt.after"
+  report_changes apt "$WORK/apt.before" "$WORK/apt.after"
+
+  # The apt path installs uv and starship via their official installers, so
+  # they upgrade outside apt too (brew owns them on macOS).
+  echo "==> standalone installers"
+  {
+    uv --version
+    starship --version | head -n 1
+  } >"$WORK/installers.before"
+  uv self update
+  install_starship
+  {
+    uv --version
+    starship --version | head -n 1
+  } >"$WORK/installers.after"
+  report_changes installers "$WORK/installers.before" "$WORK/installers.after"
+}
+
+zsh_plugin_revs() {
+  for plugin in $ZSH_PLUGINS; do
+    dir="$HOME/.local/share/zsh/plugins/${plugin##*/}"
+    if [ -d "$dir/.git" ]; then
+      echo "${plugin##*/} $(git -C "$dir" rev-parse --short HEAD)"
+    fi
+  done
+}
+
+upgrade_zsh_plugins() {
+  echo "==> zsh plugins"
+  zsh_plugin_revs >"$WORK/plugins.before"
+  install_zsh_plugins
+  zsh_plugin_revs >"$WORK/plugins.after"
+  report_changes "zsh plugins" "$WORK/plugins.before" "$WORK/plugins.after"
+}
+
+# Direct rail deps at their locked versions. package-lock.json is the pin:
+# `npm update` bumps it here, install syncs other machines to it.
+rail_dep_versions() {
+  (cd "$RAIL_DIR" && node -e '
+    const lock = require("./package-lock.json");
+    const pkg = require("./package.json");
+    const names = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    for (const name of names.sort())
+      console.log(name, (lock.packages["node_modules/" + name] || {}).version);
+  ')
+}
+
+upgrade_rail() {
+  echo "==> npm ($RAIL_DIR)"
+  rail_dep_versions >"$WORK/rail.before"
+  (cd "$RAIL_DIR" && npm update --no-fund --no-audit --silent)
+  rail_dep_versions >"$WORK/rail.after"
+  report_changes "npm ($RAIL_DIR)" "$WORK/rail.before" "$WORK/rail.after"
+  git diff --quiet -- "$RAIL_DIR/package-lock.json" ||
+    echo "  pin bump: review 'git diff $RAIL_DIR/package-lock.json' and commit" >>"$SUMMARY"
+}
+
+upgrade_uv_tools() {
+  echo "==> uv tools"
+  # --all reaches every uv tool on the machine, not just what install.sh
+  # installs (prek): personally installed tools drift too. Narrow to an
+  # inventory if that ever surprises.
+  # Entry-point lines in `uv tool list` start with "- "; drop them. PEP 723
+  # scripts need no step here: uv re-resolves them on every run.
+  uv tool list --color never | awk '$1 != "-" && NF == 2' >"$WORK/uv.before"
+  uv tool upgrade --all
+  uv tool list --color never | awk '$1 != "-" && NF == 2' >"$WORK/uv.after"
+  report_changes "uv tools" "$WORK/uv.before" "$WORK/uv.after"
+}
+
+prek_hook_revs() {
+  awk '
+    $2 == "repo:" { repo = $3; sub(".*/", "", repo) }
+    $1 == "rev:" { print repo, $2 }
+  ' .pre-commit-config.yaml
+}
+
+upgrade_prek_hooks() {
+  echo "==> prek hooks"
+  prek_hook_revs >"$WORK/prek.before"
+  prek autoupdate
+  prek_hook_revs >"$WORK/prek.after"
+  report_changes "prek hooks" "$WORK/prek.before" "$WORK/prek.after"
+  git diff --quiet -- .pre-commit-config.yaml ||
+    echo "  pin bump: review 'git diff .pre-commit-config.yaml' and commit" >>"$SUMMARY"
+}
+
+run_upgrade() {
+  WORK="$(mktemp -d)"
+  trap 'rm -rf "$WORK"' EXIT
+  SUMMARY="$WORK/summary"
+  : >"$SUMMARY"
+
+  case "$OS" in
+  Darwin) upgrade_brew ;;
+  Linux) upgrade_apt ;;
+  esac
+  upgrade_zsh_plugins
+  upgrade_rail
+  upgrade_uv_tools
+  upgrade_prek_hooks
+
+  echo
+  echo "==> upgrade summary"
+  cat "$SUMMARY"
+}
+
 # -------------------------------------------------------------------- main
 ensure_package_manager
+
+if [ "${1:-}" = upgrade ]; then
+  run_upgrade
+  exit 0
+fi
 
 # No tiers on the command line: choose interactively. (An agents tier —
 # interactive AI-harness wiring — arrives with the ai-harness rebuild.)
