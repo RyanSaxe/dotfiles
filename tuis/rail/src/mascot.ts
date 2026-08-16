@@ -61,6 +61,9 @@ function parseConf(path: string): Map<string, string> {
 
 const identities = new Map<string, MascotIdentity>();
 
+// How long a failed extraction stays cached before a tick retries it.
+const EXTRACT_RETRY_MS = 30_000;
+
 function identityFor(value: string): MascotIdentity {
   const cached = identities.get(value);
   if (cached) return cached;
@@ -86,7 +89,12 @@ async function extract(identity: MascotIdentity): Promise<void> {
     identity.accentDark = conf.get("accent_dark") ?? null;
     identity.accentLight = conf.get("accent_light") ?? null;
   } catch {
-    // Extractor missing or failed: the theme accent stands in.
+    // Extractor failed (cold uv env, network blip): the theme accent
+    // stands in meanwhile, but the failure must not pin this identity to
+    // nulls until daemon restart — forget it after a beat so a later tick
+    // retries. The delay keeps a persistently failing extractor from
+    // respawning every 250ms tick.
+    setTimeout(() => identities.delete(identity.value), EXTRACT_RETRY_MS);
   }
 }
 
