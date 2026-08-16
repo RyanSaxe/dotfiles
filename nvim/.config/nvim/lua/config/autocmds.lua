@@ -1,0 +1,1 @@
+-- Autocmds on top of the LazyVim floor enter one decision at a time.

@@ -1,0 +1,3 @@
+-- Keymaps on top of the LazyVim floor enter one decision at a time.
+-- Constraint that must hold forever: never map bare <Esc> in terminal
+-- mode (embedded TUIs with vim bindings need it raw).
