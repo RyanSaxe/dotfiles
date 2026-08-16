@@ -104,6 +104,19 @@ conf_del() {
   fi
 }
 
+# Project keys are tmux session names: every mapping consumer (session
+# switchers, rail jumps) passes the session it targets, so interactive
+# resolution must match — including inside popups, whose cwd is the
+# session's creation directory, not the viewed pane. The repo/directory
+# name stands in only outside tmux.
+current_project() {
+  if [ -n "${TMUX:-}" ]; then
+    tmux display-message -p '#{session_name}'
+    return
+  fi
+  basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+}
+
 # Extract accents into state. $1 is a provider-qualified identity
 # (e.g. pokemon:raikou). Display is not this command's job: the rail
 # mascot watches state.
@@ -508,7 +521,7 @@ mascot)
     # (or the default), skipping the extraction when it is already active.
     # Session switchers (to/ts, rail jump) call this in the background.
     project="${3:-}"
-    [ -n "$project" ] || project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+    [ -n "$project" ] || project="$(current_project)"
     value=""
     [ -f "$MASCOT_CONF" ] && value="$(conf_get "$MASCOT_CONF" "$project")"
     [ -n "$value" ] || value="$(conf_get "$DEFAULT_CONF" default)"
@@ -526,7 +539,7 @@ mascot)
     conf_put "$DEFAULT_CONF" default "$value"
     ;;
   project)
-    project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+    project="$(current_project)"
     value="${3:?usage: theme mascot project <provider:id>|none}"
     if [ "$value" = none ]; then
       # Unmap this project and fall back to the global default, if one is set.
