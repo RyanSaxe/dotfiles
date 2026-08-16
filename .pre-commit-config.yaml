@@ -79,6 +79,9 @@ repos:
     hooks:
       - id: prettier
         types_or: [html, css, javascript, ts, json, yaml, markdown]
+        # lazy.nvim owns its lockfile's formatting and rewrites it on
+        # every sync; reformatting it here is perpetual churn.
+        exclude: lazy-lock\.json$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.49.1

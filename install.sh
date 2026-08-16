@@ -81,7 +81,7 @@ ensure_package_manager() {
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat'
+CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat neovim lua-language-server stylua'
 CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf nodejs npm bat'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
@@ -117,6 +117,15 @@ install_starship() {
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 }
 
+install_neovim_linux() {
+  # apt's neovim lags far behind the nvim config's 0.12 floor; the official
+  # tarball into ~/.local is both the install and the upgrade path.
+  # lua-language-server and stylua stay mac-only for now: prek vendors its
+  # own stylua, and lua editing happens on the mac.
+  curl -fsSL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz |
+    tar -xz -C "$HOME/.local" --strip-components=1
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
@@ -129,9 +138,11 @@ install_tier_packages() {
   core:Linux)
     # shellcheck disable=SC2086
     apt_install $CORE_APT_PACKAGES
-    # uv and starship are not packaged in apt; use the official installers.
+    # uv, starship, and a current neovim are not packaged (or too old) in
+    # apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || install_starship
+    command -v nvim >/dev/null 2>&1 || install_neovim_linux
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -271,18 +282,21 @@ upgrade_apt() {
     sort >"$WORK/apt.after"
   report_changes apt "$WORK/apt.before" "$WORK/apt.after"
 
-  # The apt path installs uv and starship via their official installers, so
-  # they upgrade outside apt too (brew owns them on macOS).
+  # The apt path installs uv, starship, and neovim via their official
+  # installers, so they upgrade outside apt too (brew owns them on macOS).
   echo "==> standalone installers"
   {
     uv --version
     starship --version | head -n 1
+    nvim --version | head -n 1
   } >"$WORK/installers.before"
   uv self update
   install_starship
+  install_neovim_linux
   {
     uv --version
     starship --version | head -n 1
+    nvim --version | head -n 1
   } >"$WORK/installers.after"
   report_changes installers "$WORK/installers.before" "$WORK/installers.after"
 }

@@ -42,6 +42,10 @@ alias tokens='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py tokens'
 alias nvim-clean='~/generic/dotfiles/scripts/nvim-clean.sh'
 alias diagnose='uvx ty check --output-format concise --no-progress --color never --exit-zero | rg -o "(error|warning)\[[^]]+\]" | sort | uniq -c | sort -nr | awk "{print \$2 \": \" \$1}"'
 
+# The v2 nvim config, side-by-side with v1 until cutover: v1 keeps
+# ~/.config/nvim, this launches ~/.config/nvim-v2. Alias dies at cutover.
+alias nvim2='NVIM_APPNAME=nvim-v2 nvim'
+
 # Quick edits
 alias zshrc='$EDITOR ~/.zshrc'
 
