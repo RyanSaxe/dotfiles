@@ -3,7 +3,9 @@
 #
 #   ./install.sh              interactive: choose tiers, then install
 #   ./install.sh core         non-interactive: install the named tiers
-#   ./install.sh core agents
+#   ./install.sh core mac
+#   ./install.sh stow         symlinks only: restow every tier (or the
+#                             named ones), no package installs
 #   ./install.sh upgrade      upgrade every package manager, print a
 #                             before/after summary; pin bumps (rail
 #                             lockfile, prek revs) are left uncommitted
@@ -289,18 +291,27 @@ remove_stale_packages() {
   done
 }
 
+stow_tier() {
+  if [ "$1" = mac ] && [ "$OS" != Darwin ]; then
+    echo "skipping mac tier: not macOS"
+    return 0
+  fi
+  # Tiers with no stow packages yet have no tiers/<name>.txt.
+  [ -s "tiers/$1.txt" ] || return 0
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    echo "stow: $pkg"
+    stow_package "$pkg"
+  done <"tiers/$1.txt"
+}
+
 install_tier() {
   if [ "$1" = mac ] && [ "$OS" != Darwin ]; then
     echo "skipping mac tier: not macOS"
     return 0
   fi
   install_tier_packages "$1"
-  # Tiers with no stow packages yet have no tiers/<name>.txt.
-  if [ -s "tiers/$1.txt" ]; then
-    while IFS= read -r pkg; do
-      stow_package "$pkg"
-    done <"tiers/$1.txt"
-  fi
+  stow_tier "$1"
 }
 
 # ----------------------------------------------------------------- upgrade
@@ -503,6 +514,19 @@ run_upgrade() {
 }
 
 # -------------------------------------------------------------------- main
+# `stow` verb: symlinks and their cleanup only, no package-manager work.
+# CI runs this same path against a scratch HOME.
+if [ "${1:-}" = stow ]; then
+  shift
+  [ "$#" -gt 0 ] || set -- core mac
+  if [ "$OS" = Linux ]; then ensure_modern_stow; fi
+  remove_stale_packages
+  for tier in "$@"; do
+    stow_tier "$tier"
+  done
+  exit 0
+fi
+
 ensure_package_manager
 
 if [ "${1:-}" = upgrade ]; then
