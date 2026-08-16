@@ -348,10 +348,16 @@ show_accents() {
   inner_mode="$(layer_mode inner)"
   outer_mode="$(layer_mode outer)"
   echo "mascot: $(conf_get "$accents" mascot) (inner=$inner_mode outer=$outer_mode)"
-  swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
-  swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
-  swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
-  swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
+  # Matching modes share one accent pair — two rows, not two duplicates.
+  if [ "$inner_mode" = "$outer_mode" ]; then
+    swatch "$(conf_get "$accents" "accent_$inner_mode")" accent
+    swatch "$(conf_get "$accents" "notify_$inner_mode")" notify
+  else
+    swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
+    swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
+    swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
+    swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
+  fi
 }
 
 migrate_mode_state
