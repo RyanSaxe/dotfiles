@@ -174,3 +174,29 @@ def test_render_survives_blank_and_comment_lines_in_conf_files(
     assert result.returncode == 0, result.stderr
     rendered = state_dir(home) / "generated/tmux-colors.conf"
     assert "{{" not in rendered.read_text()
+
+
+def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+
+    result = run_theme(home, config, "mascot", "pokemon:mew")
+
+    assert result.returncode == 0, result.stderr
+    rendered = (state_dir(home) / "generated/tmux-colors.conf").read_text()
+    assert 'set -g @accent "#ffcc00"' in rendered
+
+
+def test_failed_render_names_the_token_and_leaves_no_temp_files(
+    tmp_path: Path,
+) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    template = config / "theme/templates/frame.glsl.tmpl"
+    template.write_text(template.read_text() + "{{typo_token}}\n")
+
+    result = run_theme(home, config, "apply")
+
+    assert result.returncode == 1
+    assert "{{typo_token}}" in result.stderr
+    leftovers = [p.name for p in state_dir(home).iterdir() if ".render" in p.name]
+    assert leftovers == []

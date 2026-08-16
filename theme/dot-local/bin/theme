@@ -157,74 +157,71 @@ migrate_legacy_state() {
   fi
 }
 
-append_mapping() {
-  mode="$1"
-  palette="$2"
-  prefix="$3"
-
-  while IFS='=' read -r role key; do
-    case "$role" in '' | \#*) continue ;; esac
-    hex="$(conf_get "$palette" "$key")"
-    if [ -f "$accents" ]; then
-      case "$role" in
-      accent | notify)
-        override="$(conf_get "$accents" "${role}_${mode}")"
-        [ -n "$override" ] && hex="$override"
-        ;;
-      esac
-    fi
-    if [ -z "$hex" ]; then
-      echo "error: token '$role' maps to '$key', not in $(basename "$palette")" >&2
-      exit 1
-    fi
-    name="${prefix}${role}"
-    printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
-    printf 's/{{%s_hex}}/%s/g\n' "$name" "${hex#\#}" >>"$sed_script"
-  done <"$CONFIG/tokens.conf"
-
-  while IFS='=' read -r key hex; do
-    case "$key" in '' | \#*) continue ;; esac
-    name="${prefix}${key}"
-    printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
-    case "$hex" in
-    \#*) printf 's/{{%s_hex}}/%s/g\n' "$name" "${hex#\#}" >>"$sed_script" ;;
-    esac
-  done <"$palette"
-
-  printf 's/{{%smode}}/%s/g\n' "$prefix" "$mode" >>"$sed_script"
-}
-
-build_sed_script() {
-  default_layer="$1"
-  : >"$sed_script"
-
-  inner_mode="$(layer_mode inner)"
-  outer_mode="$(layer_mode outer)"
-  append_mapping "$inner_mode" "$(palette_for_mode "$inner_mode")" inner_
-  append_mapping "$outer_mode" "$(palette_for_mode "$outer_mode")" outer_
-
-  # Unqualified placeholders belong to the output's registered layer. Mixed
-  # templates use the explicit inner_/outer_ form above.
-  case "$default_layer" in
-  inner) append_mapping "$inner_mode" "$(palette_for_mode "$inner_mode")" "" ;;
-  outer) append_mapping "$outer_mode" "$(palette_for_mode "$outer_mode")" "" ;;
-  esac
+# Emit sed substitutions for one mapping pass — every token role, then every
+# raw palette key, under the given placeholder prefix. One awk join over
+# tokens.conf + palette (+ accent overrides); per-key lookups here once cost
+# hundreds of process spawns per render.
+emit_mapping() {
+  acc_arg=""
+  [ -f "$accents" ] && acc_arg="$accents"
+  awk -F= -v mode="$1" -v prefix="$3" -v palette_name="$(basename "$2")" '
+    function val(line, i) {
+      i = index(line, "=")
+      return i ? substr(line, i + 1) : ""
+    }
+    BEGIN {
+      pal_file = ARGV[ARGC - 2]
+      acc_file = (ARGC == 4) ? ARGV[1] : ""
+    }
+    $1 == "" || $1 ~ /^#/ { next }
+    FILENAME == acc_file {
+      acc[$1] = val($0)
+      next
+    }
+    FILENAME == pal_file {
+      pal[$1] = val($0)
+      # Palette lines land after the token lines, as {{key}} plus {{key_hex}}
+      # for color values; buffered because pal[] must fill before tokens read.
+      palette_out = palette_out sprintf("s/{{%s%s}}/%s/g\n", prefix, $1, val($0))
+      if (val($0) ~ /^#/)
+        palette_out = palette_out \
+          sprintf("s/{{%s%s_hex}}/%s/g\n", prefix, $1, substr(val($0), 2))
+      next
+    }
+    {
+      role = $1
+      hex = pal[val($0)]
+      if (acc_file != "" && (role == "accent" || role == "notify") &&
+        acc[role "_" mode] != "")
+        hex = acc[role "_" mode]
+      if (hex == "") {
+        printf "error: token '\''%s'\'' maps to '\''%s'\'', not in %s\n", \
+          role, val($0), palette_name >"/dev/stderr"
+        errored = 1
+        exit 1
+      }
+      printf "s/{{%s%s}}/%s/g\n", prefix, role, hex
+      sub(/^#/, "", hex)
+      printf "s/{{%s%s_hex}}/%s/g\n", prefix, role, hex
+    }
+    END {
+      if (errored) exit 1
+      printf "%s", palette_out
+      printf "s/{{%smode}}/%s/g\n", prefix, mode
+    }
+  ' ${acc_arg:+"$acc_arg"} "$2" "$CONFIG/tokens.conf"
 }
 
 render_template() {
   template="$1"
   output="$2"
-  default_layer="$3"
-  sed_script="$STATE/.render.$$.sed"
-  tmp="$output.tmp.$$"
+  sed_script="$3"
+  tmp="$workdir/$(basename "$output").tmp"
 
-  build_sed_script "$default_layer"
   sed -f "$sed_script" "$template" >"$tmp"
-  rm -f "$sed_script"
   if grep -q '{{' "$tmp"; then
     echo "error: unresolved tokens in $(basename "$template"):" >&2
     grep -o '{{[^}]*}}' "$tmp" | sort -u >&2
-    rm -f "$tmp"
     exit 1
   fi
   if [ ! -f "$output" ] || ! cmp -s "$tmp" "$output"; then
@@ -241,13 +238,35 @@ render() {
 
   accents="$STATE/accents.conf"
 
+  # The substitution script varies only by which layer owns the unqualified
+  # placeholders (mixed templates use explicit inner_/outer_ forms), so three
+  # prebuilt variants cover every template. The workdir also holds render
+  # temp files; the trap cleans it on every exit path.
+  workdir="$STATE/.render.$$"
+  trap 'rm -rf "$workdir"' EXIT
+  mkdir -p "$workdir"
+  inner_palette="$(palette_for_mode "$inner_mode")"
+  outer_palette="$(palette_for_mode "$outer_mode")"
+  {
+    emit_mapping "$inner_mode" "$inner_palette" inner_
+    emit_mapping "$outer_mode" "$outer_palette" outer_
+  } >"$workdir/mixed.sed"
+  {
+    cat "$workdir/mixed.sed"
+    emit_mapping "$inner_mode" "$inner_palette" ""
+  } >"$workdir/inner.sed"
+  {
+    cat "$workdir/mixed.sed"
+    emit_mapping "$outer_mode" "$outer_palette" ""
+  } >"$workdir/outer.sed"
+
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
     [ -e "$tmpl" ] || continue
     out="$GENERATED/$(basename "$tmpl" .tmpl)"
     element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
     case "$element" in
-    inner | outer | mixed) render_template "$tmpl" "$out" "$element" ;;
+    inner | outer | mixed) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
     *)
       echo "error: no inner/outer registration for $(basename "$tmpl")" >&2
       exit 1
