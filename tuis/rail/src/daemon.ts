@@ -411,10 +411,23 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+// Liveness alone is not holdership: an unclean death leaves the pidfile
+// behind, and the pid can be reused by an unrelated process. The holder
+// counts only while its command line is still a rail daemon.
+async function isRailDaemon(pid: number): Promise<boolean> {
+  try {
+    const { stdout } = await run("ps", ["-o", "command=", "-p", String(pid)]);
+    return stdout.includes("daemon.ts");
+  } catch {
+    // ps fails for a dead pid.
+    return false;
+  }
+}
+
 // Exclusive-create (wx) makes the pidfile the lock itself: two daemons
 // booting concurrently — npx tsx takes ~1s to get here, and tmux.conf
 // sourcing races `rail on` — can both pass a check-then-write gate, but
-// only one wins the create. A dead holder's file is unlinked and the
+// only one wins the create. A stale holder's file is unlinked and the
 // claim retried; the loop is bounded for the pathological case where
 // fresh claimants keep dying mid-race.
 async function claimPidfile(): Promise<boolean> {
@@ -423,16 +436,13 @@ async function claimPidfile(): Promise<boolean> {
       await writeFile(PID_FILE, String(process.pid), { flag: "wx" });
       return true;
     } catch {
-      // Pidfile exists; reclaim below only if its holder is dead.
+      // Pidfile exists; reclaim below only if it's stale.
     }
     try {
       const pid = Number(await readFile(PID_FILE, "utf8"));
-      if (pid > 0) {
-        process.kill(pid, 0);
-        return false;
-      }
+      if (pid > 0 && (await isRailDaemon(pid))) return false;
     } catch {
-      // Unreadable pidfile or dead holder: stale.
+      // Unreadable pidfile: stale.
     }
     await unlink(PID_FILE).catch(() => {});
   }
