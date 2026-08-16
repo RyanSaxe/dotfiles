@@ -37,6 +37,22 @@ jobs:
           fi
           stow --version | head -n 1
 
+      - name: Stow packages contain only dot- entries
+        run: |
+          # Everything inside a package deploys into HOME, so a non-dot
+          # entry links a literal name there (a tests/ dir once linked
+          # ~/tests). Checks every tier regardless of OS.
+          bad=""
+          for pkg in $(cat tiers/*.txt); do
+            for entry in $(ls -A "$pkg"); do
+              case "$entry" in dot-*) ;; *) bad="$bad $pkg/$entry" ;; esac
+            done
+          done
+          for path in $bad; do
+            echo "::error::stow package entry without dot- prefix: $path"
+          done
+          [ -z "$bad" ]
+
       - name: Stow every tier into a scratch home
         run: |
           scratch="$(mktemp -d)"
