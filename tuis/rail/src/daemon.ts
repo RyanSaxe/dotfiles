@@ -74,6 +74,12 @@ const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
 
+// daemon.log is the only forensic trail for incidents hours old; a line
+// without a time is undiagnosable.
+function logLine(message: string): void {
+  console.error(`${new Date().toISOString()} ${message}`);
+}
+
 async function refreshAgents(): Promise<void> {
   try {
     agents = await collectAgents();
@@ -452,7 +458,7 @@ async function claimPidfile(): Promise<boolean> {
 async function main(): Promise<void> {
   await mkdir(STATE_DIR, { recursive: true });
   if (!(await claimPidfile())) {
-    console.error("rail daemon already running");
+    logLine("rail daemon already running");
     process.exit(0);
   }
 
@@ -505,7 +511,7 @@ async function main(): Promise<void> {
     } catch (error) {
       // tmux server gone (or restarting): keep the daemon alive and poll
       // gently until it returns.
-      console.error(`tick failed: ${String(error)}`);
+      logLine(`tick failed: ${String(error)}`);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     counter += 1;
