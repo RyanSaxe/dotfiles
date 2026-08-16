@@ -47,6 +47,12 @@ const TICK_MS = 250;
 // still lands within a tick.
 const IDLE_TICK_MS = 2000;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
+// tmux's two dead-server voices, appended to the exec error via stderr.
+const NO_SERVER_PATTERN = /no server running|error connecting/i;
+// Failed ticks back off 2s apiece, so this is ~10s — enough to ride out
+// a server restart, short enough that a dead server doesn't leave the
+// daemon erroring forever.
+const NO_SERVER_EXIT_TICKS = 5;
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
 // plus the crust gutter renderRail appends.
 const RAIL_WIDTH = 22 + GUTTER_COLS;
@@ -503,15 +509,28 @@ async function main(): Promise<void> {
   });
 
   let counter = 0;
+  let noServerTicks = 0;
   for (;;) {
     const started = Date.now();
     let idle = false;
     try {
       idle = await tick(counter);
+      noServerTicks = 0;
     } catch (error) {
-      // tmux server gone (or restarting): keep the daemon alive and poll
-      // gently until it returns.
+      // Transient failures (server restarting, disk blip): keep the
+      // daemon alive and poll gently. A SUSTAINED dead server means it
+      // died out from under us — exit cleanly, taking the pidfile along
+      // so nothing trusts a corpse; tmux.conf's ensure-daemon respawns
+      // the daemon with the next server.
       logLine(`tick failed: ${String(error)}`);
+      noServerTicks = NO_SERVER_PATTERN.test(String(error))
+        ? noServerTicks + 1
+        : 0;
+      if (noServerTicks >= NO_SERVER_EXIT_TICKS) {
+        logLine("tmux server gone; exiting");
+        await unlink(PID_FILE).catch(() => {});
+        process.exit(0);
+      }
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     counter += 1;
