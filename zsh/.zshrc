@@ -110,4 +110,23 @@ _prompt_spacer() {
 }
 add-zsh-hook precmd _prompt_spacer
 
-command -v starship > /dev/null && eval "$(starship init zsh)"
+# Every segment on the two prompt lines is computed HERE, once per prompt:
+# one dash spawn (prompt-segments.sh) gathers all git facts in parallel and
+# starship renders the exported vars through in-process env_var modules —
+# it spawns nothing itself, so vi-mode keymap toggles (which re-expand
+# $PROMPT) reuse the last computation instead of re-running shell-outs.
+# Runs before prompt expansion by construction: zsh expands $PROMPT only
+# after every precmd has finished. The <US> separator (0x1f) cannot appear
+# in branch names or versions, so no quoting or eval is involved.
+_prompt_segments() {
+  local name value
+  unset _PROMPT_SEG_{SUBDIR,REPO_PARENT,DIR_PLAIN,BRANCH,BRANCH_BEHIND,PKG,AGE,CLEAN,DIRTY,ARROWS,PROJ_BAD,PROJ_OK,PROJ_PLAIN,DIR_NAME,PYVERSION}
+  while IFS=$'\x1f' read -r name value; do
+    typeset -gx "_PROMPT_SEG_${name}=${value}"
+  done < <(dash "$HOME/.config/zsh/prompt-segments.sh")
+}
+
+if command -v starship > /dev/null; then
+  add-zsh-hook precmd _prompt_segments
+  eval "$(starship init zsh)"
+fi

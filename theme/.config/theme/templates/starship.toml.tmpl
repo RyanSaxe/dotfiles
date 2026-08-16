@@ -12,112 +12,105 @@
 # plus the venv interpreter's version, faint. The caret never moves.
 # The prompt shows identity, declared facts, and chosen state — never
 # inventory (installed toolchains, incidental file types).
+#
+# Every segment is precomputed once per prompt by prompt-segments.sh (one
+# dash spawn, all git queries in parallel) and exported by the
+# _prompt_segments precmd (.zshrc) as _PROMPT_SEG_* vars; the env_var
+# modules below render them in-process — starship spawns no shells and
+# never scans the repo at render time. A segment hides by being UNSET: an
+# empty-string var would still render its connector words.
+#
 # Starship's add_newline pads EVERY prompt, including the first one in a
 # fresh pane — which reads as broken top padding under the window frame.
 # The blank line between commands comes from a zsh precmd instead (.zshrc),
 # which skips the first prompt.
 add_newline = false
-format = "${custom.subdir}${custom.repo_parent}${custom.dir_plain}${custom.branch}${custom.branch_behind}${custom.pkgversion}${custom.git_age}${custom.git_clean}${custom.git_dirty}$git_status$line_break${custom.proj_bad}${custom.proj_ok}${custom.proj_plain}${custom.dir_name}${custom.pyversion}$character"
+format = "${env_var._PROMPT_SEG_SUBDIR}${env_var._PROMPT_SEG_REPO_PARENT}${env_var._PROMPT_SEG_DIR_PLAIN}${env_var._PROMPT_SEG_BRANCH}${env_var._PROMPT_SEG_BRANCH_BEHIND}${env_var._PROMPT_SEG_PKG}${env_var._PROMPT_SEG_AGE}${env_var._PROMPT_SEG_CLEAN}${env_var._PROMPT_SEG_DIRTY}${env_var._PROMPT_SEG_ARROWS}$line_break${env_var._PROMPT_SEG_PROJ_BAD}${env_var._PROMPT_SEG_PROJ_OK}${env_var._PROMPT_SEG_PROJ_PLAIN}${env_var._PROMPT_SEG_DIR_NAME}${env_var._PROMPT_SEG_PYVERSION}$character"
 
-# WHERE, inside a repo: path relative to the repo root; hidden at the root
-# itself. Long paths collapse to first/…/last/two.
-[custom.subdir]
-command = '''p="$(git rev-parse --show-prefix)"; p="${p%/}"; n=$(printf %s "$p" | awk -F/ "{print NF}"); if [ "$n" -gt 3 ]; then printf %s "${p%%/*}/…/$(printf %s "$p" | awk -F/ "{print \$(NF-1)\"/\"\$NF}")"; else printf %s "$p"; fi'''
-when = '[ -n "$(git rev-parse --show-prefix 2>/dev/null)" ]'
-format = '[in ]({{fg_faint}})[$output]({{sky}}) '
+# WHERE — exactly one of the three shows: repo-relative path (hidden at the
+# repo root), the directory the repo lives in (at the root), or the parent
+# of the current folder (outside any repo). Long paths collapse to
+# first/…/last/two in the gather script.
+[env_var._PROMPT_SEG_SUBDIR]
+variable = "_PROMPT_SEG_SUBDIR"
+format = '[in ]({{fg_faint}})[$env_value]({{sky}}) '
 
-# WHERE, at a repo's root: the directory the repo lives in. Deeper inside,
-# custom.subdir takes over with the repo-relative position instead.
-[custom.repo_parent]
-command = '''top="$(git rev-parse --show-toplevel)"; p="${top%/*}"; [ -n "$p" ] || p=/; case "$p" in "$HOME") p="~" ;; "$HOME"/*) p="~${p#"$HOME"}" ;; esac; printf %s "$p"'''
-when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git rev-parse --show-prefix 2>/dev/null)" ]'
-format = '[in ]({{fg_faint}})[$output]({{sky}}) '
+[env_var._PROMPT_SEG_REPO_PARENT]
+variable = "_PROMPT_SEG_REPO_PARENT"
+format = '[in ]({{fg_faint}})[$env_value]({{sky}}) '
 
-# WHERE, outside any repo: the parent of the current folder — the folder's
-# own name sits on line 2 before the caret (see custom.dir_name). Hidden at
-# ~ itself, where line 2 shows just "~".
-[custom.dir_plain]
-command = '''p="${PWD%/*}"; [ -n "$p" ] || p=/; case "$p" in "$HOME") p="~" ;; "$HOME"/*) p="~${p#"$HOME"}" ;; esac; n=$(printf %s "$p" | awk -F/ "{print NF}"); if [ "$n" -gt 4 ]; then printf %s "${p%%/*}/…/$(printf %s "$p" | awk -F/ "{print \$(NF-1)\"/\"\$NF}")"; else printf %s "$p"; fi'''
-when = '! git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$PWD" != "$HOME" ]'
-format = '[in ]({{fg_faint}})[$output]({{sky}}) '
+[env_var._PROMPT_SEG_DIR_PLAIN]
+variable = "_PROMPT_SEG_DIR_PLAIN"
+format = '[in ]({{fg_faint}})[$env_value]({{sky}}) '
 
-# Branch, colored as a pull-reminder: mauve normally, orange when the last
+# Branch, colored as a pull-reminder: mauve normally, peach when the last
 # fetch recorded upstream commits this branch doesn't have. Purely local
-# (~2ms, offline-safe) — it can only know what the last fetch/pull learned.
-[custom.branch]
-command = 'git branch --show-current | grep . || git rev-parse --short HEAD'
-when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$(git rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)" -eq 0 ]'
-format = '[on ]({{fg_faint}})[$output]({{mauve}}) '
+# (offline-safe) — it can only know what the last fetch/pull learned.
+[env_var._PROMPT_SEG_BRANCH]
+variable = "_PROMPT_SEG_BRANCH"
+format = '[on ]({{fg_faint}})[$env_value]({{mauve}}) '
 
-[custom.branch_behind]
-command = 'git branch --show-current | grep . || git rev-parse --short HEAD'
-when = '[ "$(git rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)" -gt 0 ]'
-format = '[on ]({{fg_faint}})[$output]({{peach}}) '
+[env_var._PROMPT_SEG_BRANCH_BEHIND]
+variable = "_PROMPT_SEG_BRANCH_BEHIND"
+format = '[on ]({{fg_faint}})[$env_value]({{peach}}) '
 
-# The project's own declared version, found by walking UP from here to the
-# repo root and asking starship's package module at each level — so a
-# monorepo half shows its own version, and the display never changes with
-# cd inside one package. All ~15 manifest formats are starship's, not ours.
-[custom.pkgversion]
-command = '''d="$PWD"; top="$(git rev-parse --show-toplevel)"; while :; do v="$(cd "$d" && starship module package)"; if [ -n "$v" ]; then printf %s "$v"; break; fi; [ "$d" = "$top" ] && break; d="${d%/*}"; done'''
-when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1'
-format = '([at ]({{fg_faint}})[$output]({{pink}}) )'
+# The project's own declared version, from a parallel walk between here and
+# the repo root — so a monorepo half shows its own version, and the display
+# never changes with cd inside one package. All ~15 manifest formats are
+# starship's ([package] below), not ours.
+[env_var._PROMPT_SEG_PKG]
+variable = "_PROMPT_SEG_PKG"
+format = '[at ]({{fg_faint}})[$env_value]({{pink}}) '
 
-# Time since last commit — connectors fold in so they vanish outside repos.
-[custom.git_age]
-command = "git log -1 --format=%cr 2>/dev/null | sed 's/ ago//'"
-when = "git rev-parse HEAD >/dev/null 2>&1"
-format = '[from ]({{fg_faint}})[$output]({{info}})[ ago]({{fg_faint}}) '
+# Time since last commit.
+[env_var._PROMPT_SEG_AGE]
+variable = "_PROMPT_SEG_AGE"
+format = '[from ]({{fg_faint}})[$env_value]({{info}})[ ago]({{fg_faint}}) '
 
-# Clean/dirty as a single glanceable mark.
-[custom.git_clean]
-command = "echo ✓"
-when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git status --porcelain 2>/dev/null)" ]'
-format = '[$output]({{green}}) '
+# Clean/dirty as a single glanceable mark; the arrows are the old native
+# git_status $ahead_behind defaults (⇡ ⇣ ⇕, nothing when synced), fed by
+# the same rev-list count as the branch color.
+[env_var._PROMPT_SEG_CLEAN]
+variable = "_PROMPT_SEG_CLEAN"
+format = '[$env_value]({{green}}) '
 
-[custom.git_dirty]
-command = "echo ✗"
-when = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -n "$(git status --porcelain 2>/dev/null)" ]'
-format = '[$output]({{red}}) '
+[env_var._PROMPT_SEG_DIRTY]
+variable = "_PROMPT_SEG_DIRTY"
+format = '[$env_value]({{red}}) '
 
-# Only ahead/behind arrows; state marks come from the customs above.
-[git_status]
-format = '([$ahead_behind]({{fg_faint}}) )'
+[env_var._PROMPT_SEG_ARROWS]
+variable = "_PROMPT_SEG_ARROWS"
+format = '[$env_value]({{fg_faint}}) '
 
 # ---- line 2: project name as the venv status light --------------------
-# No venv: faint. Venv belonging to this project: green. Venv from some
-# OTHER project: red, showing the impostor's name.
-[custom.proj_plain]
-command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
-when = '[ -z "$VIRTUAL_ENV" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1'
-format = '[$output]({{lavender}}) '
+# No venv: faint project name (or bare folder name outside repos). Venv
+# belonging to this project: green. Venv from some OTHER project: red,
+# showing the impostor's name.
+[env_var._PROMPT_SEG_PROJ_BAD]
+variable = "_PROMPT_SEG_PROJ_BAD"
+format = '[$env_value]({{red}}) '
 
-# Outside any repo the caret keeps its anchor word, but faint: this is a
-# location, not a project — no verdict light to carry.
-[custom.dir_name]
-command = '[ "$PWD" = "$HOME" ] && printf "~" || basename "$PWD"'
-when = '! git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$VIRTUAL_ENV" ]'
-format = '[$output]({{fg_faint}}) '
+[env_var._PROMPT_SEG_PROJ_OK]
+variable = "_PROMPT_SEG_PROJ_OK"
+format = '[$env_value]({{green}}) '
 
-[custom.proj_ok]
-command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
-when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
-format = '[$output]({{green}}) '
+[env_var._PROMPT_SEG_PROJ_PLAIN]
+variable = "_PROMPT_SEG_PROJ_PLAIN"
+format = '[$env_value]({{lavender}}) '
 
-[custom.proj_bad]
-command = 'basename "$(dirname "$VIRTUAL_ENV")"'
-when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
-format = '[$output]({{red}}) '
+[env_var._PROMPT_SEG_DIR_NAME]
+variable = "_PROMPT_SEG_DIR_NAME"
+format = '[$env_value]({{fg_faint}}) '
 
-# The venv's interpreter version, read from pyvenv.cfg — instant, whereas
-# the standard python module launches the interpreter on every prompt.
-[custom.pyversion]
-command = 'sed -n -E "s/^version(_info)? *= *//p" "$VIRTUAL_ENV/pyvenv.cfg" | head -1 | cut -d. -f1,2'
-when = '[ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/pyvenv.cfg" ]'
-format = '[$output]({{fg_faint}}) '
+# The venv interpreter's version, read from pyvenv.cfg by the gather script
+# — instant, whereas the standard python module launches the interpreter.
+[env_var._PROMPT_SEG_PYVERSION]
+variable = "_PROMPT_SEG_PYVERSION"
+format = '[$env_value]({{fg_faint}}) '
 
 # Not in the prompt's format — this is the render backend for the pkgversion
-# walk above (`starship module package`). Plain output; the custom styles it.
+# walk in prompt-segments.sh (`starship module package`). Plain output; the
+# env_var module above styles it.
 [package]
 version_format = '${raw}'
 format = 'v${version}'
