@@ -46,10 +46,10 @@ function M.apply(tokens)
 
   local syn = {
     fn = p.peach, -- anything callable
-    type = p.teal,
+    type = p.green, -- out of the cyan region: members must never read as types
     structure = p.mauve, -- keywords, operators, punctuation: code shape
     variable = p.blue,
-    member = p.sapphire, -- members, parameters, builtins: dimmer blues
+    member = p.sky, -- members and parameters: lighter than variables, not a blue twin
     module = p.pink,
     constant = p.red, -- constants and private variables stand out alike
     literal = bb(r.fg, 0.7), -- literals must not pop
