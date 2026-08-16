@@ -93,9 +93,11 @@ function M.apply(tokens)
 
   -- Variables
   hl("@variable", { fg = syn.variable })
-  for _, g in ipairs({ "@variable.builtin", "@variable.member", "@variable.parameter" }) do
+  for _, g in ipairs({ "@variable.member", "@variable.parameter" }) do
     hl(g, { fg = syn.member })
   end
+  -- Receiver objects (self/cls/this) read as context, like modules.
+  hl("@variable.builtin", { fg = syn.module })
 
   -- Structure: the shape of code recedes into one calm color
   for _, g in ipairs({
