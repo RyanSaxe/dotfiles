@@ -92,17 +92,19 @@ set_mascot() {
 }
 
 # The old implementation stored one mode for every consumer. Preserve it as
-# the initial value for both layers when upgrading an existing installation.
+# the initial value for both layers when upgrading an existing installation,
+# then delete it — the layer files are the only mode state afterwards.
 migrate_mode_state() {
-  [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ] && return 0
-  if [ -f "$STATE/theme-mode" ]; then
-    legacy_mode="$(cat "$STATE/theme-mode")"
-    case "$legacy_mode" in
-    dark | light)
-      [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
-      [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
-      ;;
-    esac
+  [ -f "$STATE/theme-mode" ] || return 0
+  legacy_mode="$(cat "$STATE/theme-mode")"
+  case "$legacy_mode" in
+  dark | light)
+    [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
+    [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
+    ;;
+  esac
+  if [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ]; then
+    rm -f "$STATE/theme-mode"
   fi
 }
 
