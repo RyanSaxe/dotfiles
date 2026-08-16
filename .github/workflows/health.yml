@@ -100,6 +100,27 @@ jobs:
           grep -q 'set -g @crust "#11111b"' \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
+      - name: Generated artifacts stay out of the checkout
+        run: |
+          # theme publishes generated files into the scratch home. A publish
+          # directory that stow folded into a package symlink would receive
+          # them inside the checkout instead.
+          repo="$(pwd -P)"
+          for path in .config/bat/themes .config/ghostty/shaders; do
+            resolved="$(cd "$SCRATCH/$path" && pwd -P)"
+            case "$resolved" in
+            "$repo"/*)
+              echo "::error::$path resolves into the checkout: $resolved"
+              exit 1
+              ;;
+            esac
+          done
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            echo "::error::stow + theme apply wrote into the checkout"
+            exit 1
+          fi
+
   # "Does the editor come up?" — the nvim package restores its locked
   # plugins headlessly and checkhealth reports no errors. Unlike the
   # health job this one installs real packages (neovim itself).
