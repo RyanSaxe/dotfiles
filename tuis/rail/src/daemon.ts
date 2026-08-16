@@ -17,7 +17,7 @@
 // while disabled, and never survive alone in a window.
 
 import { existsSync, readFileSync, watch } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -406,26 +406,40 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-async function alreadyRunning(): Promise<boolean> {
-  try {
-    const pid = Number(await readFile(PID_FILE, "utf8"));
-    if (pid > 0) {
-      process.kill(pid, 0);
+// Exclusive-create (wx) makes the pidfile the lock itself: two daemons
+// booting concurrently — npx tsx takes ~1s to get here, and tmux.conf
+// sourcing races `rail on` — can both pass a check-then-write gate, but
+// only one wins the create. A dead holder's file is unlinked and the
+// claim retried; the loop is bounded for the pathological case where
+// fresh claimants keep dying mid-race.
+async function claimPidfile(): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await writeFile(PID_FILE, String(process.pid), { flag: "wx" });
       return true;
+    } catch {
+      // Pidfile exists; reclaim below only if its holder is dead.
     }
-  } catch {
-    // No pidfile or stale pid: not running.
+    try {
+      const pid = Number(await readFile(PID_FILE, "utf8"));
+      if (pid > 0) {
+        process.kill(pid, 0);
+        return false;
+      }
+    } catch {
+      // Unreadable pidfile or dead holder: stale.
+    }
+    await unlink(PID_FILE).catch(() => {});
   }
   return false;
 }
 
 async function main(): Promise<void> {
   await mkdir(STATE_DIR, { recursive: true });
-  if (await alreadyRunning()) {
+  if (!(await claimPidfile())) {
     console.error("rail daemon already running");
     process.exit(0);
   }
-  await writeFile(PID_FILE, String(process.pid));
 
   // Instant agent updates: workmux hooks write a state file the moment an
   // agent changes status. Debounced a hair so bursts coalesce.
