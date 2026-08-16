@@ -76,6 +76,41 @@ def state_dir(home: Path) -> Path:
     return home / "state/dotfiles"
 
 
+def test_project_mappings_survive_metacharacter_names(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+    names = ("a&b", "odd|proj", "dot.name")
+
+    for name in names:
+        project = home / name
+        project.mkdir()
+        first = run_theme(home, config, "mascot", "project", "pokemon:mew", cwd=project)
+        assert first.returncode == 0, first.stderr
+        remap = run_theme(
+            home, config, "mascot", "project", "pokemon:ditto", cwd=project
+        )
+        assert remap.returncode == 0, remap.stderr
+
+    mappings = (state_dir(home) / "mascot.conf").read_text().splitlines()
+    assert sorted(mappings) == sorted(f"{name}=pokemon:ditto" for name in names)
+
+
+def test_unmapping_removes_only_the_named_project(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+    state_dir(home).mkdir(parents=True)
+    (state_dir(home) / "mascot.conf").write_text(
+        "a&b=pokemon:mew\nother=pokemon:eevee\n"
+    )
+    project = home / "a&b"
+    project.mkdir()
+
+    result = run_theme(home, config, "mascot", "project", "none", cwd=project)
+
+    assert result.returncode == 0, result.stderr
+    assert (state_dir(home) / "mascot.conf").read_text() == "other=pokemon:eevee\n"
+
+
 def test_render_survives_blank_and_comment_lines_in_conf_files(
     tmp_path: Path,
 ) -> None:
