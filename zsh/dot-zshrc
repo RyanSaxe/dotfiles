@@ -1,9 +1,5 @@
 # Interactive shell configuration. Keybindings follow README: Conventions.
 
-# Repo root, derived from this file's own symlink — works wherever the repo
-# lives, with no hardcoded path. %x is the file currently being sourced.
-typeset -g DOTFILES_DIR="${${(%):-%x}:A:h:h}"
-
 # ----- stale $TMUX scrubber --------------------------------------------
 # A shell can inherit $TMUX from three broken situations: tmux crashed, a
 # new terminal inherited the parent's env, or the socket died. Detect by

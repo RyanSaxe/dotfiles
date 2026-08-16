@@ -5,8 +5,11 @@
 # OPTIMIZED: Uses single tmux call to get both values, single call to set both
 # Reduces from 4 tmux invocations to 1-2 for maximum speed
 
-# Get both values in one tmux call (pipe-separated)
-data="$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index}|#{@TMUX_CURR_PANE}')"
+# Get both values in one tmux call (pipe-separated). Pane ids (%N) are
+# stable for the pane's lifetime — session:window.pane coordinates are
+# not: renumber-windows shifts window indices whenever a window closes,
+# silently re-pointing the recorded pane at a different window.
+data="$(tmux display-message -p '#{pane_id}|#{@TMUX_CURR_PANE}')"
 curr="${data%%|*}"
 stored="${data#*|}"
 

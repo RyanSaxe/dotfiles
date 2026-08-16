@@ -77,6 +77,9 @@ cache_csv() {
 # Internal function to generate repository data
 # Finds all git repos and returns CSV data with last commit dates
 _to() {
+  local -a search_dirs repos repo_roots repo_table
+  local dir repo last_commit date_str repo_name
+
   # Directories to search
   search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic")
 
@@ -87,13 +90,14 @@ _to() {
     date_cmd() { date -r "$1" "+%Y-%m-%d %H:%M"; }
   fi
 
-  # Find all git repos using fd (fast directory search)
+  # Find all git repos using fd (fast directory search). ${(f)...} splits
+  # on newlines only, so repo paths with spaces stay whole.
   repos=()
   for dir in "${search_dirs[@]}"; do
-    [[ -d "$dir" ]] && repos+=($(fd .git -t d -H "$dir"))
+    [[ -d "$dir" ]] && repos+=(${(f)"$(fd .git -t d -H "$dir")"})
   done
 
-  repo_roots=($(printf "%s\n" "${repos[@]}" | sed 's|/\.git||' | sort -u))
+  repo_roots=(${(f)"$(printf "%s\n" "${repos[@]}" | sed 's|/\.git||' | sort -u)"})
 
   # Build table: repo_name,repo_path,date
   repo_table=()

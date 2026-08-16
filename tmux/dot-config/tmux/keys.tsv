@@ -6,6 +6,11 @@ tmux	alt+l	jump back to last pane
 tmux	ctrl+h/j/k/l	move between panes (vim-aware; skips the rail)
 tmux	ctrl+b/f	scroll full page up/down (vim-aware copy-mode)
 tmux	ctrl+u/d	scroll half page up/down (vim-aware copy-mode)
+tmux	copy v	begin selection
+tmux	copy ctrl+v	toggle rectangle selection
+tmux	copy y	copy selection and exit
+tmux	copy ctrl+h/j/k/l	move between panes (skips the rail)
+tmux	copy ctrl+\	last active pane
 tmux	alt+s	session switcher popup
 tmux	alt+o	repo picker popup (opens session)
 tmux	alt+c	theme picker popup
@@ -22,6 +27,10 @@ tmux	alt+/	this cheatsheet
 tmux	prefix r	reload tmux config
 tmux	prefix s	session switcher popup
 tmux	prefix o	repo picker popup
+tmux	prefix c	new window (inherits current path)
+tmux	prefix |/-	split pane right/below (inherits current path)
+tmux	prefix l	last window
+tmux	prefix L	last session
 aerospace	cmd+alt+h/j/k/l	focus window left/down/up/right
 aerospace	cmd+alt+shift+h/j/k/l	move window left/down/up/right
 aerospace	cmd+alt+v/b/n/m	workspace: message/browser/code/meeting
