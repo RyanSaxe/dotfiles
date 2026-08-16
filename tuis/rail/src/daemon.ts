@@ -235,11 +235,13 @@ async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
   }
 }
 
-// Sprites are unconditional. A client without kitty graphics renders the
-// placeholder cells as a colored block in the mascot area; hiding the
-// rail (alt+g) is the remedy there. Any conditional scheme is worse:
-// frames live in tmux's buffers, so a capability flip repaints every
-// rail and a mid-flip window switch shows the stale variant.
+// Mascot cells ride two gates. A terminal without kitty graphics cannot
+// even LAY OUT the placeholder text (astral codepoint plus combining
+// diacritics desync its column accounting and garble the pane), so a
+// frame carries the mascot only while the driving client is capable AND
+// no non-kitty client is viewing that session — frames live in tmux's
+// buffers, and a per-session leak paints garbage on whichever phone
+// client attaches next. Capability flips repaint within a tick.
 
 // Terminals drop image data on restart and the daemon can't observe that;
 // a slow re-send through each visible rail pane keeps sprites alive. The
@@ -315,9 +317,10 @@ async function tick(counter: number): Promise<void> {
       (palette.mode === "dark" ? mascot?.accentDark : mascot?.accentLight) ??
       palette.accent;
     const sessionPalette = { ...palette, accent };
-    const spritePath = clientFacts.latestClientIsKitty
-      ? (mascot?.spritePath ?? null)
-      : null;
+    const spritePath =
+      clientFacts.latestClientIsKitty && !nonKittySessions.has(pane.session)
+        ? (mascot?.spritePath ?? null)
+        : null;
     const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
     const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
@@ -338,16 +341,15 @@ async function tick(counter: number): Promise<void> {
       );
       frames.set(bucket, frame);
     }
-    // Frames are unconditional, transmission is not: sending image data
-    // through a pane a non-kitty client is viewing spews the payload as
-    // text there. Kitty terminals retain previously-loaded images, so
-    // mascots persist through a transmit pause and resume on detach.
+    // Transmission additionally needs a VISIBLE pane — tmux only forwards
+    // passthrough for panes on screen. Kitty terminals retain previously
+    // loaded images, so mascots persist through a transmit pause and
+    // resume on detach.
     if (
       spritePath &&
       sprite !== null &&
       pane.sessionAttached &&
-      pane.windowActive &&
-      !nonKittySessions.has(pane.session)
+      pane.windowActive
     ) {
       maybeTransmit(pane, spritePath, sprite);
     }

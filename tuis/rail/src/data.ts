@@ -182,18 +182,20 @@ export interface ClientFacts {
   // Sessions whose attached client is mid-chord: tmux prefix held, or
   // the agent jump table active.
   modeSessions: Set<string>;
-  // Sessions with an attached client that lacks kitty graphics. Image
-  // TRANSMISSION must skip these: tmux forwards the passthrough to every
-  // viewing client, and a non-kitty client prints the multi-KB payload
-  // as literal text.
+  // Sessions with an attached client that lacks kitty graphics. Both
+  // mascot halves must skip these: transmission, because tmux forwards
+  // the passthrough to every viewing client and a non-kitty client
+  // prints the multi-KB payload as literal text; frame content, because
+  // placeholder cells garble a non-kitty viewer (see below) and frames
+  // persist in tmux's buffers per session.
   nonKittySessions: Set<string>;
   // Whether the most recently active client renders kitty graphics.
-  // Placeholder cells follow this bit: a terminal without the protocol
-  // cannot even LAY OUT the placeholder text (astral codepoint plus
-  // combining diacritics desync its column accounting and garble the
-  // whole pane), so frames carry the mascot only while a capable client
-  // is driving. Same contract as window-size latest — machine hand-offs
-  // repaint within a tick, same-machine switches never change it.
+  // Placeholder cells need this bit AND a session clear of
+  // nonKittySessions: a terminal without the protocol cannot even LAY
+  // OUT the placeholder text (astral codepoint plus combining diacritics
+  // desync its column accounting and garble the whole pane). Same
+  // contract as window-size latest — machine hand-offs repaint within a
+  // tick, same-machine switches never change it.
   latestClientIsKitty: boolean;
 }
 
