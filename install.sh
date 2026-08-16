@@ -520,6 +520,7 @@ if [ "${1:-}" = stow ]; then
   shift
   [ "$#" -gt 0 ] || set -- core mac
   if [ "$OS" = Linux ]; then ensure_modern_stow; fi
+  ensure_runtime_write_dirs
   remove_stale_packages
   for tier in "$@"; do
     stow_tier "$tier"
