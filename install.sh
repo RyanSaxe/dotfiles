@@ -232,7 +232,8 @@ stow_package() {
 
   # Manifest paths are target-side: stow --dotfiles links dot-* entries to
   # their dotted names, and the cleanup below must visit those links.
-  current="$(cd "$1" && find . -type f | sed 's|/dot-|/.|g' | sort)"
+  # -type l: a symlink shipped in a package stows like a file.
+  current="$(cd "$1" && find . \( -type f -o -type l \) | sed 's|/dot-|/.|g' | sort)"
 
   if [ -f "$manifest" ]; then
     printf '%s\n' "$current" | comm -23 "$manifest" - | while IFS= read -r gone; do
@@ -242,11 +243,44 @@ stow_package() {
         rm "$link"
         echo "cleaned dangling link: $link"
       fi
+      prune_empty_dirs "$target" "${gone#./}"
     done
   fi
 
   stow -R --dotfiles -t "$target" "$1"
   printf '%s\n' "$current" >"$manifest"
+}
+
+# --no-folding makes stow create REAL directories around its per-file links,
+# so a removed file leaves its directory chain behind after the link is
+# cleaned. rmdir only ever deletes empty dirs and stops at the first
+# non-empty parent, inside the target.
+prune_empty_dirs() {
+  dir="${2%/*}"
+  if [ "$dir" != "$2" ]; then
+    (cd "$1" && rmdir -p "$dir") 2>/dev/null || true
+  fi
+}
+
+# install_tier visits only packages a tier currently names, so a package
+# dropped from every tier (or renamed) would keep its links and manifest
+# forever. Unstow by manifest; every listed entry still a symlink is ours.
+remove_stale_packages() {
+  target="${DOTFILES_TARGET:-$HOME}"
+  manifest_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/manifest"
+  for manifest in "$manifest_dir"/*.txt; do
+    [ -f "$manifest" ] || continue
+    pkg="${manifest##*/}"
+    pkg="${pkg%.txt}"
+    if grep -qx "$pkg" tiers/*.txt; then continue; fi
+    echo "unstowing removed package: $pkg"
+    while IFS= read -r entry; do
+      link="$target/${entry#./}"
+      if [ -L "$link" ]; then rm "$link"; fi
+      prune_empty_dirs "$target" "${entry#./}"
+    done <"$manifest"
+    rm "$manifest"
+  done
 }
 
 install_tier() {
@@ -455,6 +489,11 @@ if [ "$#" -eq 0 ]; then
 fi
 
 ensure_runtime_write_dirs
+
+# Before stowing: a renamed package's old links would conflict with its new
+# name's stow run.
+remove_stale_packages
+
 for tier in "$@"; do
   echo "==> $tier"
   install_tier "$tier"
