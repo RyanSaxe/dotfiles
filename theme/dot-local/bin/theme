@@ -140,7 +140,7 @@ append_mapping() {
   prefix="$3"
 
   while IFS='=' read -r role key; do
-    case "$role" in ''#*) continue ;; esac
+    case "$role" in '' | \#*) continue ;; esac
     hex="$(conf_get "$palette" "$key")"
     if [ -f "$accents" ]; then
       case "$role" in
@@ -160,7 +160,7 @@ append_mapping() {
   done <"$CONFIG/tokens.conf"
 
   while IFS='=' read -r key hex; do
-    case "$key" in ''#*) continue ;; esac
+    case "$key" in '' | \#*) continue ;; esac
     name="${prefix}${key}"
     printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
     case "$hex" in
