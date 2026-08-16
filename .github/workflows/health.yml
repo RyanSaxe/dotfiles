@@ -21,19 +21,13 @@ jobs:
 
       - name: Install stow and zsh
         run: |
+          # install.sh's stow verb upgrades a too-old stow itself
+          # (ensure_modern_stow), so no version handling here.
           if [ "$RUNNER_OS" = macOS ]; then
             brew install stow
           else
             sudo apt-get update -q
             sudo apt-get install -y stow zsh
-            # apt's 2.3.x breaks on --dotfiles dot- directories (fixed in
-            # 2.4); build the release tarball over it, as install.sh does.
-            if stow --version | grep -q 'version 2\.[0-3]\.'; then
-              build="$(mktemp -d)"
-              curl -fsSL https://ftp.gnu.org/gnu/stow/stow-2.4.1.tar.gz |
-                tar -xz -C "$build"
-              (cd "$build/stow-2.4.1" && ./configure && sudo make install) >/dev/null
-            fi
           fi
           stow --version | head -n 1
 
@@ -53,18 +47,46 @@ jobs:
           done
           [ -z "$bad" ]
 
-      - name: Stow every tier into a scratch home
+      - name: install.sh stows every tier into a scratch home
         run: |
+          # The installer's own stow path — stow_package, manifests,
+          # cleanup — not a re-implementation of it.
           scratch="$(mktemp -d)"
           echo "SCRATCH=$scratch" >> "$GITHUB_ENV"
-          tiers="tiers/core.txt"
-          if [ "$RUNNER_OS" = macOS ]; then tiers="$tiers tiers/mac.txt"; fi
-          # shellcheck disable=SC2086
-          cat $tiers | while IFS= read -r pkg; do
-            [ -n "$pkg" ] || continue
-            echo "stow: $pkg"
-            stow --dotfiles -t "$scratch" "$pkg"
-          done
+          HOME="$scratch" ./install.sh stow
+
+      - name: Restow cleans junk, removed files, and de-tiered packages
+        run: |
+          clone="$(mktemp -d)/clone"
+          home="$(mktemp -d)"
+          git clone -q . "$clone"
+          cd "$clone"
+
+          # Gitignored junk inside a package is deleted, never linked.
+          mkdir -p theme/tests/__pycache__
+          touch theme/tests/__pycache__/junk.pyc
+          HOME="$home" ./install.sh stow core
+          [ ! -e "$home/tests" ]
+          [ ! -e theme/tests ]
+
+          # Untracked files inside a package refuse to stow.
+          touch zsh/dot-config/zsh/wip.zsh
+          if HOME="$home" ./install.sh stow core; then
+            echo "::error::untracked package file did not refuse to stow"
+            exit 1
+          fi
+          rm zsh/dot-config/zsh/wip.zsh
+
+          # A removed file loses its link and its emptied directory chain.
+          git rm -q theme/dot-config/theme/templates/*.tmpl
+          HOME="$home" ./install.sh stow core
+          [ ! -e "$home/.config/theme/templates" ]
+
+          # A package dropped from every tier is unstowed entirely.
+          grep -v '^workmux$' tiers/core.txt > tiers/core.tmp
+          mv tiers/core.tmp tiers/core.txt
+          HOME="$home" ./install.sh stow core
+          [ ! -e "$home/.config/workmux" ]
 
       - name: Key targets resolve
         run: |

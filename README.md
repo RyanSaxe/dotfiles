@@ -4,8 +4,6 @@ Dotfiles for working from a Mac and SSHing into Linux boxes: Neovim, Ghostty,
 tmux, zsh, and git, themed as one system and installed with GNU Stow. Coding
 agents work inside the same environment and pass the same commit gates I do.
 
-![screenshot](docs/screenshot.png)
-
 ## Install
 
 ```sh
@@ -16,9 +14,9 @@ git clone https://github.com/RyanSaxe/dotfiles && cd dotfiles
 Clone it anywhere; nothing depends on where the repo lives. Works on a fresh
 machine: installs homebrew itself on macOS, system packages,
 and the symlinks for the tiers you pick — `core` everywhere, `mac` for GUI
-apps, `agents` for the AI harness. Pass tiers as arguments to skip the
-prompts (`./install.sh core` on a remote box), and re-run any time to update
-packages and symlinks.
+apps. Pass tiers as arguments to skip the prompts (`./install.sh core` on a
+remote box), and re-run any time to update packages and symlinks.
+`./install.sh stow` redoes the symlinks alone, with no package installs.
 
 `./install.sh upgrade` brings every package manager current — brew or apt,
 zsh plugins, the rail's npm deps, uv tools, prek hook revs — and prints one
@@ -60,18 +58,17 @@ another time relies on that list.
 
 ## Tools
 
-| Package      | Contents                                                                                              |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| `nvim`       | LazyVim-based Neovim. Personal plugins live in `nvim/dev/` as real, extractable plugins               |
-| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                           |
-| `ghostty`    | terminal emulator (macOS)                                                                             |
-| `sketchybar` | macOS menu bar replacement, aerospace/battery/cpu/memory/wifi widgets                                 |
-| `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status |
-| `git`        | git + gh, delta as pager                                                                              |
-| `bat`        | `cat` with syntax highlighting, themed with Catppuccin                                                |
-| `theme`      | the theming pipeline (below)                                                                          |
-| `ai-harness` | shared instructions, skills, and hooks for coding agents                                              |
-| `tiers`      | which packages install on which machines                                                              |
+| Package      | Contents                                                                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nvim`       | LazyVim-based Neovim. Mid-migration: not yet in a tier; the `nvim2` alias runs it under `NVIM_APPNAME=nvim-v2` until it's stowed as `~/.config/nvim` |
+| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                                                                          |
+| `ghostty`    | terminal emulator (macOS)                                                                                                                            |
+| `sketchybar` | macOS menu bar replacement, aerospace/battery/cpu/memory/wifi widgets                                                                                |
+| `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status                                                |
+| `git`        | git + gh, delta as pager                                                                                                                             |
+| `bat`        | `cat` with syntax highlighting, themed with Catppuccin                                                                                               |
+| `theme`      | the theming pipeline (below)                                                                                                                         |
+| `tiers`      | which packages install on which machines                                                                                                             |
 
 ## Conventions
 

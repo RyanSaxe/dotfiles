@@ -3,7 +3,9 @@
 #
 #   ./install.sh              interactive: choose tiers, then install
 #   ./install.sh core         non-interactive: install the named tiers
-#   ./install.sh core agents
+#   ./install.sh core mac
+#   ./install.sh stow         symlinks only: restow every tier (or the
+#                             named ones), no package installs
 #   ./install.sh upgrade      upgrade every package manager, print a
 #                             before/after summary; pin bumps (rail
 #                             lockfile, prek revs) are left uncommitted
@@ -82,7 +84,8 @@ ensure_package_manager() {
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
 CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat neovim lua-language-server stylua'
-CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf nodejs npm bat'
+# make: ensure_modern_stow builds stow from source on LTS boxes.
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat make'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
@@ -122,7 +125,12 @@ install_neovim_linux() {
   # tarball into ~/.local is both the install and the upgrade path.
   # lua-language-server and stylua stay mac-only for now: prek vendors its
   # own stylua, and lua editing happens on the mac.
-  curl -fsSL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz |
+  case "$(uname -m)" in
+  aarch64 | arm64) nvim_arch=arm64 ;;
+  *) nvim_arch=x86_64 ;;
+  esac
+  mkdir -p "$HOME/.local"
+  curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-$nvim_arch.tar.gz" |
     tar -xz -C "$HOME/.local" --strip-components=1
 }
 
@@ -214,9 +222,26 @@ stow_package() {
   manifest="$manifest_dir/$1.txt"
   mkdir -p "$manifest_dir"
 
+  # Stow deploys the filesystem, not the git index, so anything loose inside
+  # a package would symlink into HOME (bytecode caches once linked
+  # ~/tests/__pycache__). Gitignored files are declared junk: delete them,
+  # and the empty directory chains they leave. Untracked files may be
+  # unfinished work: refuse, so nothing links silently and nothing of value
+  # is deleted.
+  git clean -qfdX -- "$1"
+  find "$1" -mindepth 1 -type d -empty -delete
+  untracked="$(git ls-files --others --exclude-standard -- "$1")"
+  if [ -n "$untracked" ]; then
+    echo "error: untracked files in package $1 would stow into HOME:" >&2
+    printf '%s\n' "$untracked" | sed 's/^/  /' >&2
+    echo "commit or remove them, then re-run" >&2
+    exit 1
+  fi
+
   # Manifest paths are target-side: stow --dotfiles links dot-* entries to
   # their dotted names, and the cleanup below must visit those links.
-  current="$(cd "$1" && find . -type f | sed 's|/dot-|/.|g' | sort)"
+  # -type l: a symlink shipped in a package stows like a file.
+  current="$(cd "$1" && find . \( -type f -o -type l \) | sed 's|/dot-|/.|g' | sort)"
 
   if [ -f "$manifest" ]; then
     printf '%s\n' "$current" | comm -23 "$manifest" - | while IFS= read -r gone; do
@@ -226,11 +251,58 @@ stow_package() {
         rm "$link"
         echo "cleaned dangling link: $link"
       fi
+      prune_empty_dirs "$target" "${gone#./}"
     done
   fi
 
   stow -R --dotfiles -t "$target" "$1"
   printf '%s\n' "$current" >"$manifest"
+}
+
+# --no-folding makes stow create REAL directories around its per-file links,
+# so a removed file leaves its directory chain behind after the link is
+# cleaned. rmdir only ever deletes empty dirs and stops at the first
+# non-empty parent, inside the target.
+prune_empty_dirs() {
+  dir="${2%/*}"
+  if [ "$dir" != "$2" ]; then
+    (cd "$1" && rmdir -p "$dir") 2>/dev/null || true
+  fi
+}
+
+# install_tier visits only packages a tier currently names, so a package
+# dropped from every tier (or renamed) would keep its links and manifest
+# forever. Unstow by manifest; every listed entry still a symlink is ours.
+remove_stale_packages() {
+  target="${DOTFILES_TARGET:-$HOME}"
+  manifest_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/manifest"
+  for manifest in "$manifest_dir"/*.txt; do
+    [ -f "$manifest" ] || continue
+    pkg="${manifest##*/}"
+    pkg="${pkg%.txt}"
+    if grep -qx "$pkg" tiers/*.txt; then continue; fi
+    echo "unstowing removed package: $pkg"
+    while IFS= read -r entry; do
+      link="$target/${entry#./}"
+      if [ -L "$link" ]; then rm "$link"; fi
+      prune_empty_dirs "$target" "${entry#./}"
+    done <"$manifest"
+    rm "$manifest"
+  done
+}
+
+stow_tier() {
+  if [ "$1" = mac ] && [ "$OS" != Darwin ]; then
+    echo "skipping mac tier: not macOS"
+    return 0
+  fi
+  # Tiers with no stow packages yet have no tiers/<name>.txt.
+  [ -s "tiers/$1.txt" ] || return 0
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    echo "stow: $pkg"
+    stow_package "$pkg"
+  done <"tiers/$1.txt"
 }
 
 install_tier() {
@@ -239,12 +311,7 @@ install_tier() {
     return 0
   fi
   install_tier_packages "$1"
-  # Tiers with no stow packages yet have no tiers/<name>.txt.
-  if [ -s "tiers/$1.txt" ]; then
-    while IFS= read -r pkg; do
-      stow_package "$pkg"
-    done <"tiers/$1.txt"
-  fi
+  stow_tier "$1"
 }
 
 # ----------------------------------------------------------------- upgrade
@@ -401,32 +468,70 @@ upgrade_prek_hooks() {
     echo "  pin bump: review 'git diff .pre-commit-config.yaml' and commit" >>"$SUMMARY"
 }
 
+# Run one manager in a set -e subshell: its failure lands in the summary
+# instead of killing the run, and the managers after it still execute. The
+# subshell must be a plain statement — in an if/&& condition every shell
+# keeps set -e inert even when the subshell re-enables it.
+run_step() {
+  step="$1"
+  shift
+  set +e
+  (
+    set -e
+    "$@"
+  )
+  step_status=$?
+  set -e
+  if [ "$step_status" -ne 0 ]; then
+    echo "$step: FAILED (see output above)" >>"$SUMMARY"
+    UPGRADE_FAILED=1
+  fi
+}
+
 run_upgrade() {
   WORK="$(mktemp -d)"
-  trap 'rm -rf "$WORK"' EXIT
   SUMMARY="$WORK/summary"
   : >"$SUMMARY"
+  # Print whatever the run collected before cleaning up, however it exits.
+  trap '
+    echo
+    echo "==> upgrade summary"
+    cat "$SUMMARY"
+    rm -rf "$WORK"
+  ' EXIT
+  UPGRADE_FAILED=0
 
   case "$OS" in
-  Darwin) upgrade_brew ;;
-  Linux) upgrade_apt ;;
+  Darwin) run_step brew upgrade_brew ;;
+  Linux) run_step apt upgrade_apt ;;
   esac
-  upgrade_zsh_plugins
-  upgrade_rail
-  upgrade_uv_tools
-  upgrade_prek_hooks
+  run_step "zsh plugins" upgrade_zsh_plugins
+  run_step "npm ($RAIL_DIR)" upgrade_rail
+  run_step "uv tools" upgrade_uv_tools
+  run_step "prek hooks" upgrade_prek_hooks
 
-  echo
-  echo "==> upgrade summary"
-  cat "$SUMMARY"
+  exit "$UPGRADE_FAILED"
 }
 
 # -------------------------------------------------------------------- main
+# `stow` verb: symlinks and their cleanup only, no package-manager work.
+# CI runs this same path against a scratch HOME.
+if [ "${1:-}" = stow ]; then
+  shift
+  [ "$#" -gt 0 ] || set -- core mac
+  if [ "$OS" = Linux ]; then ensure_modern_stow; fi
+  ensure_runtime_write_dirs
+  remove_stale_packages
+  for tier in "$@"; do
+    stow_tier "$tier"
+  done
+  exit 0
+fi
+
 ensure_package_manager
 
 if [ "${1:-}" = upgrade ]; then
   run_upgrade
-  exit 0
 fi
 
 # No tiers on the command line: choose interactively. (An agents tier —
@@ -439,6 +544,11 @@ if [ "$#" -eq 0 ]; then
 fi
 
 ensure_runtime_write_dirs
+
+# Before stowing: a renamed package's old links would conflict with its new
+# name's stow run.
+remove_stale_packages
+
 for tier in "$@"; do
   echo "==> $tier"
   install_tier "$tier"
