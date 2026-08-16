@@ -103,14 +103,17 @@ command = '[ "$PWD" = "$HOME" ] && printf "~" || basename "$PWD"'
 when = '! git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$VIRTUAL_ENV" ]'
 format = '[$output]({{fg_faint}}) '
 
+# The venv path is captured verbatim at activation time, so like $PWD it can
+# carry symlinks or foreign casing — resolve it (cd + pwd -P) before comparing
+# against git's canonical toplevel, or a matching venv reads as an impostor.
 [custom.proj_ok]
 command = 'basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"'
-when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
+when = '[ -n "$VIRTUAL_ENV" ] && [ "$(cd "$(dirname "$VIRTUAL_ENV")" 2>/dev/null && pwd -P)" = "$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)" ]'
 format = '[$output]({{green}}) '
 
 [custom.proj_bad]
 command = 'basename "$(dirname "$VIRTUAL_ENV")"'
-when = '[ -n "$VIRTUAL_ENV" ] && [ "$(dirname "$VIRTUAL_ENV")" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" ]'
+when = '[ -n "$VIRTUAL_ENV" ] && [ "$(cd "$(dirname "$VIRTUAL_ENV")" 2>/dev/null && pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)" ]'
 format = '[$output]({{red}}) '
 
 # The venv's interpreter version, read from pyvenv.cfg — instant, whereas
