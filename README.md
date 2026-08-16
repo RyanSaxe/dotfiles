@@ -88,7 +88,7 @@ its native light/dark theme pair; outer mode never changes the OS appearance.
 This permits combinations such as a light terminal inside dark chrome.
 
 Every consumer is registered as inner or outer in
-`theme/.config/theme/elements.conf`; mixed consumers use explicit namespaced
+`theme/dot-config/theme/elements.conf`; mixed consumers use explicit namespaced
 tokens such as `{{inner_bg}}` and `{{outer_crust}}`.
 
 ### Mascot providers
