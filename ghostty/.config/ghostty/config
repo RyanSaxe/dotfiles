@@ -1,10 +1,9 @@
 # Ghostty configuration.
 #
-# Theme: ghostty follows macOS appearance NATIVELY via the light:/dark: pair
-# below — when the OS flips (System Settings, schedule, or the `theme`
-# command), ghostty recolors itself with no reload machinery. Catppuccin is
-# built into ghostty, so the palette needs no template; mascot accents live
-# in the prompt/fzf layer, not the terminal palette.
+# Theme: Ghostty's terminal palette is the inner surface and follows macOS
+# appearance NATIVELY via the light:/dark: pair below. Inner theme changes set
+# the OS appearance; outer changes never do. The generated frame shader is
+# outer chrome and can therefore be dark around a light terminal.
 theme = light:Catppuccin Latte,dark:Catppuccin Mocha
 
 # Option is Alt: makes the alt layer real for terminal-world keybinds
