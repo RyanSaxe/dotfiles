@@ -325,13 +325,28 @@ def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
     return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
-USAGE = "usage: mascot-accents <provider:id> | --providers | --identities <provider>"
+USAGE = (
+    "usage: mascot-accents <provider:id>"
+    " | --providers | --identities <provider> | --values"
+)
+
+
+def qualified_values(providers: dict[str, Provider]) -> list[str]:
+    """Every valid <provider:id> value; shell completion consumes this."""
+    return [
+        f"{name}:{identity}"
+        for name, provider in providers.items()
+        for identity in fetch_or_exit(provider.identities, f"identities for '{name}'")
+    ]
 
 
 def main() -> None:
     args = sys.argv[1:]
     if args == ["--providers"]:
         print("\n".join(PROVIDERS))
+        return
+    if args == ["--values"]:
+        print("\n".join(qualified_values(PROVIDERS)))
         return
     if len(args) == 2 and args[0] == "--identities":
         provider = PROVIDERS.get(args[1])

@@ -131,6 +131,26 @@ def test_pick_pair_single_hue_never_invents_a_color() -> None:
     assert notify[0] == accent[0]  # same hue, not a complement
 
 
+def test_qualified_values_cover_every_registered_provider() -> None:
+    def unused_fetch(name: str) -> object:
+        raise AssertionError("fetch is not part of value listing")
+
+    shared_names = ["raikou", "mew"]
+    registry = {
+        "pokemon": accents.Provider(lambda: shared_names, unused_fetch),
+        "shiny-pokemon": accents.Provider(lambda: shared_names, unused_fetch),
+    }
+
+    values = accents.qualified_values(registry)
+
+    assert values == [
+        "pokemon:raikou",
+        "pokemon:mew",
+        "shiny-pokemon:raikou",
+        "shiny-pokemon:mew",
+    ]
+
+
 def test_fetch_failures_exit_with_one_line_errors() -> None:
     def raise_http_404() -> object:
         raise accents.HTTPError("https://example", 404, "Not Found", None, None)
