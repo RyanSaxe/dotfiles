@@ -13,6 +13,8 @@
     "lazyvim.plugins.extras.util.mini-hipatterns"
   ],
   "install_version": 8,
-  "news": {},
+  "news": {
+    "NEWS.md": "11866"
+  },
   "version": 8
 }
