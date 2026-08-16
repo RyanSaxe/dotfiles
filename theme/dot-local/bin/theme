@@ -466,8 +466,10 @@ mascot)
     ;;
   default)
     value="${3:?usage: theme mascot default <provider:id>}"
-    conf_put "$DEFAULT_CONF" default "$value"
+    # Extraction validates the identity; only a working value may persist
+    # (this file is repo-tracked).
     set_mascot "$value"
+    conf_put "$DEFAULT_CONF" default "$value"
     ;;
   project)
     project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
@@ -479,9 +481,11 @@ mascot)
       fallback="$(conf_get "$DEFAULT_CONF" default)"
       [ -n "$fallback" ] && set_mascot "$fallback"
     else
+      # Extraction validates the identity; a failed value must not persist —
+      # background syncs would retry it forever.
+      set_mascot "$value"
       conf_put "$MASCOT_CONF" "$project" "$value"
       echo "mapped: $project -> $value"
-      set_mascot "$value"
     fi
     ;;
   *)

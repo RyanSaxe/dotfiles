@@ -111,6 +111,43 @@ def test_unmapping_removes_only_the_named_project(tmp_path: Path) -> None:
     assert (state_dir(home) / "mascot.conf").read_text() == "other=pokemon:eevee\n"
 
 
+def test_failed_extraction_persists_no_project_mapping(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_FAIL)
+    project = home / "proj"
+    project.mkdir()
+
+    result = run_theme(home, config, "mascot", "project", "pokemon:badmon", cwd=project)
+
+    assert result.returncode == 1
+    assert not (state_dir(home) / "mascot.conf").exists()
+
+
+def test_failed_extraction_leaves_tracked_default_untouched(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_FAIL)
+    tracked = config / "theme/mascot.conf"
+    before = tracked.read_text()
+
+    result = run_theme(home, config, "mascot", "default", "pokemon:badmon")
+
+    assert result.returncode == 1
+    assert tracked.read_text() == before
+
+
+def test_successful_mapping_persists_and_extracts(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+    project = home / "proj"
+    project.mkdir()
+
+    result = run_theme(home, config, "mascot", "project", "pokemon:mew", cwd=project)
+
+    assert result.returncode == 0, result.stderr
+    assert (state_dir(home) / "mascot.conf").read_text() == "proj=pokemon:mew\n"
+    assert "mascot=pokemon:mew" in (state_dir(home) / "accents.conf").read_text()
+
+
 def test_render_survives_blank_and_comment_lines_in_conf_files(
     tmp_path: Path,
 ) -> None:
