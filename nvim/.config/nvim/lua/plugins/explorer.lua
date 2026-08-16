@@ -1,8 +1,7 @@
--- The tree is snacks explorer on the RIGHT, mirroring the tmux rail on
--- the left of the window (bake-off verdict 2026-08-16; fyler lost on
--- information density). Width, background, and padding get unified with
--- the rail's look in the theme phase. mini.files is the edit layer:
--- batch filesystem mutations as buffer edits.
+-- Snacks explorer is the tree, opened on the RIGHT to mirror the tmux
+-- rail on the window's left; its width, background, and padding follow
+-- the rail's chrome. mini.files is the edit layer: batch filesystem
+-- mutations as buffer edits.
 return {
   {
     "folke/snacks.nvim",

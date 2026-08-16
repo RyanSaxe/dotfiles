@@ -12,8 +12,7 @@ return {
       ty = {
         settings = {
           ty = {
-            -- workspace mode is what makes workspace-wide diagnostics
-            -- pickers possible (they arrive with the review cockpit).
+            -- workspace mode enables workspace-wide diagnostics pickers.
             diagnosticMode = "workspace",
             inlayHints = {
               variableTypes = true,

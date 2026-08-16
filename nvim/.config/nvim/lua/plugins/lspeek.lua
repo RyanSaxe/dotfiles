@@ -1,7 +1,6 @@
 -- lspeek.nvim: peek LSP definitions in a read-only float without leaving
 -- the buffer. Inside the float: q close, <CR> open here, s/v split, t tab;
--- nested peeks stack. Minimal config for the base — the review-cockpit PR
--- adopts its newer features (stacked-preview navigation, line numbers).
+-- nested peeks stack.
 --
 -- gp/gP override vim's rarely used paste-and-move-cursor defaults.
 return {

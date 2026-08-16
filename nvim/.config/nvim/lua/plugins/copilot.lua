@@ -41,7 +41,7 @@ function M.toggle(bufnr)
   return new_state
 end
 
--- Toggle keybinds (a later PR) reach this through the global.
+-- Toggle keybinds reach this through the global.
 _G.CopilotBuffer = M
 
 vim.api.nvim_create_autocmd("BufDelete", {

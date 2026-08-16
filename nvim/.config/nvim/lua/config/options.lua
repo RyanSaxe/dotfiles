@@ -1,5 +1,4 @@
--- Options on top of the LazyVim floor. Each line exists by explicit
--- decision; LazyVim defaults cover everything else.
+-- Only deliberate divergences from the LazyVim floor live here.
 local opt = vim.opt
 
 opt.signcolumn = "number" -- signs replace the line number; no extra gutter
