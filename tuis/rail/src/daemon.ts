@@ -386,6 +386,11 @@ async function tick(counter: number): Promise<boolean> {
   for (const paneId of pushed.keys()) {
     if (!alive.has(paneId)) pushed.delete(paneId);
   }
+  for (const key of lastTransmit.keys()) {
+    if (!alive.has(key.slice(0, key.indexOf("\x1f")))) {
+      lastTransmit.delete(key);
+    }
+  }
 
   return !enabled || clientFacts.clientCount === 0;
 }
