@@ -31,6 +31,9 @@
 ---@field sapphire string
 ---@field blue string
 ---@field lavender string
+---@field semantic_add string
+---@field semantic_delete string
+---@field semantic_change string
 ---@field text string
 ---@field subtext1 string
 ---@field subtext0 string

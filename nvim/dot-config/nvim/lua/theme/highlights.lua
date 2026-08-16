@@ -133,23 +133,26 @@ function M.apply(tokens)
   hl("BlinkCmpGhostText", { fg = bb(p.pink, 0.5), bg = r.bg_alt })
   hl("CopilotSuggestion", { fg = bb(p.pink, 0.5) })
 
-  -- Diffs: primary-color washes so add/change/delete read at a glance
-  hl("DiffAdd", { bg = bb("#00ff00", 0.1) })
+  -- Semantic ops: designed in-palette washes shared by every tool.
+  -- Rows stay soft, changed words step up, gutter signs carry the
+  -- full accent.
+  hl("DiffAdd", { bg = bb(p.semantic_add, 0.2) })
   hl("DiffAdded", { link = "DiffAdd" })
-  hl("DiffChange", { bg = bb("#0000ff", 0.1) })
+  hl("DiffChange", { bg = bb(p.semantic_change, 0.2) })
   hl("DiffChanged", { link = "DiffChange" })
-  hl("DiffDelete", { bg = bb("#ff0000", 0.1) })
+  hl("DiffDelete", { bg = bb(p.semantic_delete, 0.2) })
   hl("DiffDeleted", { link = "DiffDelete" })
-  hl("DiffText", { fg = p.red, bg = bb("#0000ff", 0.1) })
-  hl("MiniDiffOverChange", { fg = p.red, bg = bb("#0000ff", 0.1) })
-  hl("MiniDiffOverChangeBuf", { bg = bb("#00ff00", 0.1) })
+  hl("DiffText", { bg = bb(p.semantic_change, 0.46) })
+  hl("MiniDiffOverAdd", { bg = bb(p.semantic_add, 0.46) })
+  hl("MiniDiffOverDelete", { bg = bb(p.semantic_delete, 0.46) })
+  hl("MiniDiffOverChange", { link = "DiffText" })
+  hl("MiniDiffOverChangeBuf", { bg = bb(p.semantic_add, 0.46) })
 
-  -- Gutter signs stay faint
-  hl("MiniDiffSignAdd", { fg = bb(p.teal, 0.7) })
+  hl("MiniDiffSignAdd", { fg = p.semantic_add })
   hl("GitSignsAdd", { link = "MiniDiffSignAdd" })
-  hl("MiniDiffSignChange", { fg = bb(p.mauve, 0.7) })
+  hl("MiniDiffSignChange", { fg = p.semantic_change })
   hl("GitSignsChange", { link = "MiniDiffSignChange" })
-  hl("MiniDiffSignDelete", { fg = bb(p.red, 0.7) })
+  hl("MiniDiffSignDelete", { fg = p.semantic_delete })
   hl("GitSignsDelete", { link = "MiniDiffSignDelete" })
 
   -- Todo-comment badges: fg-only, bold italic, trailing text stays quiet
