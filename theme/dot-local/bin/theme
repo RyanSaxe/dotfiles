@@ -41,7 +41,20 @@ ELEMENTS="$CONFIG/elements.conf"
 layer_mode() {
   mode_file="$INNER_MODE_FILE"
   [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
-  if [ -f "$mode_file" ]; then cat "$mode_file"; else echo dark; fi
+  [ -f "$mode_file" ] || {
+    echo dark
+    return
+  }
+  stored_mode="$(cat "$mode_file")"
+  case "$stored_mode" in
+  dark | light) echo "$stored_mode" ;;
+  *)
+    # A corrupt file must not kill every render (watchers call `theme
+    # apply`); fall back like a missing file, and say which file to fix.
+    echo "warning: $mode_file holds '$stored_mode', not dark|light; using dark" >&2
+    echo dark
+    ;;
+  esac
 }
 
 set_layer_mode() {

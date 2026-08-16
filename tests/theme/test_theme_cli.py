@@ -148,6 +148,20 @@ def test_successful_mapping_persists_and_extracts(tmp_path: Path) -> None:
     assert "mascot=pokemon:mew" in (state_dir(home) / "accents.conf").read_text()
 
 
+def test_corrupt_mode_file_falls_back_to_dark_with_a_warning(
+    tmp_path: Path,
+) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    state_dir(home).mkdir(parents=True)
+    (state_dir(home) / "inner-mode").write_text("banana\n")
+
+    result = run_theme(home, config, "apply")
+
+    assert result.returncode == 0, result.stderr
+    assert "inner-mode" in result.stderr and "banana" in result.stderr
+    assert "inner=dark" in result.stdout
+
+
 def test_render_survives_blank_and_comment_lines_in_conf_files(
     tmp_path: Path,
 ) -> None:
