@@ -22,12 +22,23 @@ end
 ---@type ThemeTokens|nil
 M.tokens = nil
 
+---@type table
+M.floor_opts = {}
+
 function M.apply()
   local tokens = M.load()
   M.tokens = tokens
   local light = tokens and tokens.mode == "light"
+  local flavour = light and "latte" or "mocha"
+  -- The generated palette IS the palette: feed it to the floor so every
+  -- plugin integration paints with it, never stock catppuccin values.
+  local opts = M.floor_opts
+  if tokens then
+    opts = vim.tbl_deep_extend("force", opts, { color_overrides = { [flavour] = tokens.palette } })
+  end
+  require("catppuccin").setup(opts)
   vim.o.background = light and "light" or "dark"
-  vim.cmd.colorscheme(light and "catppuccin-latte" or "catppuccin-mocha")
+  vim.cmd.colorscheme("catppuccin-" .. flavour)
 end
 
 local function watch()
@@ -50,7 +61,9 @@ local function watch()
   end)
 end
 
-function M.setup()
+---@param floor_opts table catppuccin setup opts from the plugin spec
+function M.setup(floor_opts)
+  M.floor_opts = floor_opts
   vim.api.nvim_create_autocmd("ColorScheme", {
     pattern = "catppuccin*",
     group = vim.api.nvim_create_augroup("theme_semantic_layer", { clear = true }),
