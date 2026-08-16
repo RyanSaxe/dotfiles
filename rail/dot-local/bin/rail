@@ -16,7 +16,7 @@ PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 # Resolve the repo through this script's own symlink (stow pattern).
 SCRIPT_PATH="$(readlink -f "$0")"
-REPO_ROOT="${SCRIPT_PATH%/rail/.local/bin/rail}"
+REPO_ROOT="${SCRIPT_PATH%/rail/dot-local/bin/rail}"
 RAIL_DIR="$REPO_ROOT/tuis/rail"
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"

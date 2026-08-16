@@ -43,13 +43,13 @@ repos:
         alias: ruff-format-uv-scripts
         name: ruff format (uv scripts)
         types_or: [file]
-        files: '^theme/\.local/bin/mascot-accents$'
+        files: "^theme/dot-local/bin/mascot-accents$"
       - id: ruff-check
         alias: ruff-check-uv-scripts
         name: ruff check (uv scripts)
         args: [--fix]
         types_or: [file]
-        files: '^theme/\.local/bin/mascot-accents$'
+        files: "^theme/dot-local/bin/mascot-accents$"
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.72
@@ -66,14 +66,14 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        exclude: '\.zsh$|^zsh/\.zshrc$|^zsh/\.zshenv$|^sketchybar/'
+        exclude: '\.zsh$|^zsh/dot-zshrc$|^zsh/dot-zshenv$|^sketchybar/'
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1
     hooks:
       - id: shfmt
         args: [--write, --indent, "2"]
-        exclude: '\.zsh$|^zsh/\.zshrc$|^zsh/\.zshenv$'
+        exclude: '\.zsh$|^zsh/dot-zshrc$|^zsh/dot-zshenv$'
 
   # ------------------------------------------- Web / Markdown / JSON / YAML
   - repo: https://github.com/rbubley/mirrors-prettier
@@ -142,13 +142,13 @@ repos:
         language: system
         entry: uv run -q --script dev/keycheck.py
         pass_filenames: false
-        files: '^(tmux/\.config/tmux/(tmux\.conf|keys\.tsv)|aerospace/\.config/aerospace/aerospace\.toml|ghostty/\.config/ghostty/config|zsh/\.zshrc|dev/keycheck\.py)$'
+        files: '^(tmux/dot-config/tmux/(tmux\.conf|keys\.tsv)|aerospace/dot-config/aerospace/aerospace\.toml|ghostty/dot-config/ghostty/config|zsh/dot-zshrc|dev/keycheck\.py)$'
 
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.
       - id: theme-tests
         name: pytest (theme)
         language: system
-        entry: uv run --no-project --with pytest --with pillow pytest -q theme/tests
+        entry: uv run --no-project --with pytest --with pillow pytest -q tests/theme
         pass_filenames: false
-        files: "^theme/"
+        files: "^theme/|^tests/theme/"

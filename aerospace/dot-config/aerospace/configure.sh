@@ -5,8 +5,8 @@
 set -eu
 
 SCRIPT_PATH="$(readlink -f "$0")"
-REPO_ROOT="${SCRIPT_PATH%/aerospace/.config/aerospace/configure.sh}"
-TOML_PATH="aerospace/.config/aerospace/aerospace.toml"
+REPO_ROOT="${SCRIPT_PATH%/aerospace/dot-config/aerospace/configure.sh}"
+TOML_PATH="aerospace/dot-config/aerospace/aerospace.toml"
 CACHE_FILE="$HOME/.cache/aerospace-notch-inset"
 
 # Top inset of the built-in display in points (0 when notchless).
@@ -28,9 +28,9 @@ printf '%s\n' "$INSET" >"$CACHE_FILE"
 
 # Register the smudge/clean filter (per-clone setting; paths repo-relative).
 git -C "$REPO_ROOT" config filter.aerospace-notch.smudge \
-  'aerospace/.config/aerospace/notch-filter.sh smudge'
+  'aerospace/dot-config/aerospace/notch-filter.sh smudge'
 git -C "$REPO_ROOT" config filter.aerospace-notch.clean \
-  'aerospace/.config/aerospace/notch-filter.sh clean'
+  'aerospace/dot-config/aerospace/notch-filter.sh clean'
 
 # Re-smudge the working copy. The index entry must be cleared first or git
 # considers the file up-to-date and skips the filter.

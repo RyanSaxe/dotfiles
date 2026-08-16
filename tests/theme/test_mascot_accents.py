@@ -15,7 +15,7 @@ _SPEC = importlib.util.spec_from_loader(
     "mascot_accents",
     importlib.machinery.SourceFileLoader(
         "mascot_accents",
-        str(Path(__file__).parent.parent / ".local/bin/mascot-accents"),
+        str(Path(__file__).parent.parent.parent / "theme/dot-local/bin/mascot-accents"),
     ),
 )
 assert _SPEC and _SPEC.loader

@@ -126,6 +126,19 @@ install_neovim_linux() {
     tar -xz -C "$HOME/.local" --strip-components=1
 }
 
+# apt's stow on LTS is 2.3.x, which breaks on --dotfiles dot- directories
+# (fixed in 2.4). Build the release tarball over it when too old.
+ensure_modern_stow() {
+  case "$(stow --version)" in
+  *"version 2."[0-3].*) ;;
+  *) return 0 ;;
+  esac
+  build="$(mktemp -d)"
+  curl -fsSL https://ftp.gnu.org/gnu/stow/stow-2.4.1.tar.gz | tar -xz -C "$build"
+  (cd "$build/stow-2.4.1" && ./configure && sudo make install) >/dev/null
+  rm -rf "$build"
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
@@ -138,6 +151,7 @@ install_tier_packages() {
   core:Linux)
     # shellcheck disable=SC2086
     apt_install $CORE_APT_PACKAGES
+    ensure_modern_stow
     # uv, starship, and a current neovim are not packaged (or too old) in
     # apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -164,7 +178,7 @@ install_tier_packages() {
       brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
     done
     # Per-machine notch compensation for aerospace's top gap.
-    ./aerospace/.config/aerospace/configure.sh
+    ./aerospace/dot-config/aerospace/configure.sh
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -185,7 +199,9 @@ stow_package() {
   manifest="$manifest_dir/$1.txt"
   mkdir -p "$manifest_dir"
 
-  current="$(cd "$1" && find . -type f | sort)"
+  # Manifest paths are target-side: stow --dotfiles links dot-* entries to
+  # their dotted names, and the cleanup below must visit those links.
+  current="$(cd "$1" && find . -type f | sed 's|/dot-|/.|g' | sort)"
 
   if [ -f "$manifest" ]; then
     printf '%s\n' "$current" | comm -23 "$manifest" - | while IFS= read -r gone; do
@@ -198,7 +214,7 @@ stow_package() {
     done
   fi
 
-  stow -R -t "$target" "$1"
+  stow -R --dotfiles -t "$target" "$1"
   printf '%s\n' "$current" >"$manifest"
 }
 

@@ -27,11 +27,12 @@ in the working tree but never committed: review the diff and commit
 deliberately.
 
 Each top-level directory is a stow package whose layout mirrors where its
-files land:
+files land. Hidden targets are named with a `dot-` prefix (stow's
+`--dotfiles` mode) so repo content stays visible to `rg`, `fd`, and editors:
 
 ```text
-nvim/.config/nvim/init.lua  ->  ~/.config/nvim/init.lua
-zsh/.zshrc                  ->  ~/.zshrc
+nvim/dot-config/nvim/init.lua  ->  ~/.config/nvim/init.lua
+zsh/dot-zshrc                  ->  ~/.zshrc
 ```
 
 Every tracked file is identical on every machine. Anything machine-specific
@@ -87,7 +88,7 @@ its native light/dark theme pair; outer mode never changes the OS appearance.
 This permits combinations such as a light terminal inside dark chrome.
 
 Every consumer is registered as inner or outer in
-`theme/.config/theme/elements.conf`; mixed consumers use explicit namespaced
+`theme/dot-config/theme/elements.conf`; mixed consumers use explicit namespaced
 tokens such as `{{inner_bg}}` and `{{outer_crust}}`.
 
 ### Mascot providers
@@ -95,7 +96,7 @@ tokens such as `{{inner_bg}}` and `{{outer_crust}}`.
 A mascot is any image the theme system can wear: the rail paints its sprite
 and the accent/notify colors are extracted from it. Identities are
 provider-qualified (`pokemon:gengar`), and providers live in
-`theme/.local/bin/mascot-accents` as a registry — the picker, completions,
+`theme/dot-local/bin/mascot-accents` as a registry — the picker, completions,
 and rail all build from it, so adding a source touches exactly one file.
 
 A provider is two functions registered under a name:

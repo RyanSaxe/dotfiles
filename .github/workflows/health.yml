@@ -26,7 +26,32 @@ jobs:
           else
             sudo apt-get update -q
             sudo apt-get install -y stow zsh
+            # apt's 2.3.x breaks on --dotfiles dot- directories (fixed in
+            # 2.4); build the release tarball over it, as install.sh does.
+            if stow --version | grep -q 'version 2\.[0-3]\.'; then
+              build="$(mktemp -d)"
+              curl -fsSL https://ftp.gnu.org/gnu/stow/stow-2.4.1.tar.gz |
+                tar -xz -C "$build"
+              (cd "$build/stow-2.4.1" && ./configure && sudo make install) >/dev/null
+            fi
           fi
+          stow --version | head -n 1
+
+      - name: Stow packages contain only dot- entries
+        run: |
+          # Everything inside a package deploys into HOME, so a non-dot
+          # entry links a literal name there (a tests/ dir once linked
+          # ~/tests). Checks every tier regardless of OS.
+          bad=""
+          for pkg in $(cat tiers/*.txt); do
+            for entry in $(ls -A "$pkg"); do
+              case "$entry" in dot-*) ;; *) bad="$bad $pkg/$entry" ;; esac
+            done
+          done
+          for path in $bad; do
+            echo "::error::stow package entry without dot- prefix: $path"
+          done
+          [ -z "$bad" ]
 
       - name: Stow every tier into a scratch home
         run: |
@@ -38,7 +63,7 @@ jobs:
           cat $tiers | while IFS= read -r pkg; do
             [ -n "$pkg" ] || continue
             echo "stow: $pkg"
-            stow -t "$scratch" "$pkg"
+            stow --dotfiles -t "$scratch" "$pkg"
           done
 
       - name: Key targets resolve
@@ -56,7 +81,7 @@ jobs:
 
       - name: zsh syntax
         run: |
-          find zsh -type f \( -name '.zsh*' -o -name '*.zsh' \) \
+          find zsh -type f \( -name 'dot-zsh*' -o -name '*.zsh' \) \
             -exec zsh -n {} +
 
       - name: Theme renders with no unresolved tokens
@@ -100,7 +125,7 @@ jobs:
       - name: Headless bootstrap from the lockfile
         run: |
           mkdir -p "$HOME/.config"
-          ln -s "$PWD/nvim/.config/nvim" "$HOME/.config/nvim"
+          ln -s "$PWD/nvim/dot-config/nvim" "$HOME/.config/nvim"
           # First boot installs plugins at their locked versions, then mason
           # and treesitter finish tool installs in the background; quitting
           # early aborts them, so give the boot a settle window.
