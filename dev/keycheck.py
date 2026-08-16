@@ -5,8 +5,9 @@
 """Drift check for the keybind cheatsheet (alt+/).
 
 Every chord bound in tmux.conf (root alt layer, agent table, prefix
-popups), aerospace.toml, ghostty's config, and zsh's bindkey calls must
-have a row in keys.tsv, so the popup can never silently fall behind the
+table, copy-mode-vi table — both `bind` and `bind-key` forms),
+aerospace.toml, ghostty's config, and zsh's bindkey calls must have a
+row in keys.tsv, so the popup can never silently fall behind the
 configs. The TSV may hold extra rows (esc, prefix aliases) — the check
 is config -> TSV only.
 """
@@ -51,13 +52,24 @@ def expand_tsv_chord(chord: str) -> set[str]:
 
 def tmux_chords(conf: str) -> set[str]:
     chords: set[str] = set()
-    for m in re.finditer(r"^bind-key -n '?(M|C)-([^ ']+)'? ", conf, re.MULTILINE):
+    for m in re.finditer(r"^bind(?:-key)? -n '?(M|C)-([^ ']+)'? ", conf, re.MULTILINE):
         mod = "alt" if m.group(1) == "M" else "ctrl"
         chords.add(f"{mod}+{normalize_key(m.group(2))}")
-    for m in re.finditer(r"^bind-key -T agent (\S+) ", conf, re.MULTILINE):
+    for m in re.finditer(r"^bind(?:-key)? -T agent (\S+) ", conf, re.MULTILINE):
         key = normalize_key(m.group(1).removeprefix("M-"))
         chords.add(f"alt+a {key}")
-    for m in re.finditer(r"^bind-key ([a-z0-9]) ", conf, re.MULTILINE):
+    for m in re.finditer(
+        r"^bind(?:-key)? -T copy-mode-vi '?([^ ']+)'? ", conf, re.MULTILINE
+    ):
+        key = m.group(1)
+        if key.startswith("C-"):
+            chords.add(f"copy ctrl+{normalize_key(key[2:])}")
+        else:
+            chords.add(f"copy {normalize_key(key)}")
+    # A single non-space character is a prefix-table key; flags (-n, -T)
+    # are two characters, so they can never match. Case is preserved:
+    # `l` (last window) and `L` (last session) are distinct binds.
+    for m in re.finditer(r"^bind(?:-key)? (\S) ", conf, re.MULTILINE):
         chords.add(f"prefix {m.group(1)}")
     return chords
 
