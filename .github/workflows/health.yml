@@ -38,7 +38,7 @@ jobs:
           cat $tiers | while IFS= read -r pkg; do
             [ -n "$pkg" ] || continue
             echo "stow: $pkg"
-            stow -t "$scratch" "$pkg"
+            stow --dotfiles -t "$scratch" "$pkg"
           done
 
       - name: Key targets resolve
@@ -56,7 +56,7 @@ jobs:
 
       - name: zsh syntax
         run: |
-          find zsh -type f \( -name '.zsh*' -o -name '*.zsh' \) \
+          find zsh -type f \( -name 'dot-zsh*' -o -name '*.zsh' \) \
             -exec zsh -n {} +
 
       - name: Theme renders with no unresolved tokens
@@ -100,7 +100,7 @@ jobs:
       - name: Headless bootstrap from the lockfile
         run: |
           mkdir -p "$HOME/.config"
-          ln -s "$PWD/nvim/.config/nvim" "$HOME/.config/nvim"
+          ln -s "$PWD/nvim/dot-config/nvim" "$HOME/.config/nvim"
           # First boot installs plugins at their locked versions, then mason
           # and treesitter finish tool installs in the background; quitting
           # early aborts them, so give the boot a settle window.
