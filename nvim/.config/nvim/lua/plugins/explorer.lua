@@ -2,6 +2,13 @@
 -- gets <leader>E so both run side by side until one wins. mini.files
 -- stays the quick edit-the-filesystem buffer meanwhile.
 return {
+  -- LazyVim binds <leader>E to the explorer's cwd variant and applies it
+  -- after fyler's mapping; release it so fyler owns the key.
+  {
+    "folke/snacks.nvim",
+    keys = { { "<leader>E", false } },
+  },
+
   {
     "FylerOrg/fyler.nvim",
     dependencies = { "nvim-mini/mini.icons" },
