@@ -19,6 +19,9 @@ require("lazy").setup({
   install = { colorscheme = { "catppuccin", "habamax" } },
   -- No update popups: upgrades happen deliberately, never by nag.
   checker = { enabled = false },
+  -- No plugin needs luarocks; leaving it on makes checkhealth error on
+  -- machines without a lua toolchain.
+  rocks = { enabled = false },
   performance = {
     rtp = {
       disabled_plugins = { "gzip", "tarPlugin", "tohtml", "tutor", "zipPlugin" },
