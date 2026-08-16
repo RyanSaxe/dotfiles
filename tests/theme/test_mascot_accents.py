@@ -131,6 +131,45 @@ def test_pick_pair_single_hue_never_invents_a_color() -> None:
     assert notify[0] == accent[0]  # same hue, not a complement
 
 
+def test_qualified_values_cover_every_registered_provider() -> None:
+    def unused_fetch(name: str) -> object:
+        raise AssertionError("fetch is not part of value listing")
+
+    shared_names = ["raikou", "mew"]
+    registry = {
+        "pokemon": accents.Provider(lambda: shared_names, unused_fetch),
+        "shiny-pokemon": accents.Provider(lambda: shared_names, unused_fetch),
+    }
+
+    values = accents.qualified_values(registry)
+
+    assert values == [
+        "pokemon:raikou",
+        "pokemon:mew",
+        "shiny-pokemon:raikou",
+        "shiny-pokemon:mew",
+    ]
+
+
+def test_fetch_failures_exit_with_one_line_errors() -> None:
+    def raise_http_404() -> object:
+        raise accents.HTTPError("https://example", 404, "Not Found", None, None)
+
+    def raise_offline() -> object:
+        raise accents.URLError("no route to host")
+
+    message = _exit_message(
+        lambda: accents.fetch_or_exit(raise_http_404, "'pokemon:badmon'")
+    )
+    assert message == "error: cannot fetch 'pokemon:badmon': HTTP 404 Not Found"
+
+    message = _exit_message(
+        lambda: accents.fetch_or_exit(raise_offline, "'pokemon:mew'")
+    )
+    assert "cannot fetch 'pokemon:mew'" in message
+    assert "no route to host" in message
+
+
 def test_styled_output_is_valid_hex() -> None:
     color = (0.75, 0.6, 0.8)
     for dark in (True, False):

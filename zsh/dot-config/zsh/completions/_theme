@@ -9,7 +9,7 @@ if (( CURRENT == 2 )); then
     'toggle:flip between dark and light'
     'inner:change the terminal and content layer'
     'outer:change the chrome and rail layer'
-    'both:change both layers'
+    'both:change both layers (toggle flips from the inner mode)'
     'apply:re-render the current layer modes'
     'status:print mode and mascot accents'
     'mascot:accent colors and sprite from a mascot'
@@ -25,14 +25,12 @@ elif [[ $words[2] == (inner|outer|both) ]]; then
     _describe 'theme mode' modes
   fi
 elif [[ $words[2] == mascot ]]; then
-  # Provider-qualified identities from the per-provider name caches;
-  # cheap and offline. compadd (not _describe): the values contain colons.
-  local -a values=() names=()
-  local names_file
-  for names_file in "${XDG_CACHE_HOME:-$HOME/.cache}"/dotfiles/mascots/*/names.txt(N); do
-    names=(${(f)"$(< "$names_file")"})
-    values+=("${names[@]/#/${names_file:h:t}:}")
-  done
+  # Provider-qualified identities straight from the registry: cache
+  # directory names don't map 1:1 to providers (shiny-pokemon shares the
+  # pokemon names cache). compadd (not _describe): the values contain
+  # colons. Errors silenced — no registry means no identity completions.
+  local -a values=()
+  values=(${(f)"$(mascot-accents --values 2>/dev/null)"})
   if (( CURRENT == 3 )); then
     _alternative \
       "actions:action:(none default project sync)" \

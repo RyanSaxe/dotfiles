@@ -4,7 +4,9 @@
 #
 #   theme dark                 switch both layers to catppuccin mocha
 #   theme inner|outer MODE     switch one layer to dark, light, or toggle
-#   theme both MODE            switch both layers together
+#   theme both MODE            switch both layers together; `both toggle`
+#                              flips to the opposite of the inner mode, so
+#                              diverged layers converge
 #   theme apply                re-render the current layer modes
 #   theme status               print both layer modes
 #
@@ -39,7 +41,20 @@ ELEMENTS="$CONFIG/elements.conf"
 layer_mode() {
   mode_file="$INNER_MODE_FILE"
   [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
-  if [ -f "$mode_file" ]; then cat "$mode_file"; else echo dark; fi
+  [ -f "$mode_file" ] || {
+    echo dark
+    return
+  }
+  stored_mode="$(cat "$mode_file")"
+  case "$stored_mode" in
+  dark | light) echo "$stored_mode" ;;
+  *)
+    # A corrupt file must not kill every render (watchers call `theme
+    # apply`); fall back like a missing file, and say which file to fix.
+    echo "warning: $mode_file holds '$stored_mode', not dark|light; using dark" >&2
+    echo dark
+    ;;
+  esac
 }
 
 set_layer_mode() {
@@ -57,25 +72,35 @@ palette_for_mode() {
   esac
 }
 
-# Look up one key in a key=value conf file.
+# Look up one key in a key=value conf file. Keys pass through ENVIRON so
+# regex/replacement metacharacters stay literal — project keys are arbitrary
+# directory names.
 conf_get() {
-  sed -n "s/^$2=//p" "$1"
+  key="$2" awk -F= '$1 == ENVIRON["key"] {
+    print substr($0, length(ENVIRON["key"]) + 2)
+  }' "$1"
 }
 
 # Set key=value in a conf file, replacing an existing entry (portable
 # in-place: sed -i differs between BSD and GNU).
 conf_put() {
-  if grep -q "^$2=" "$1" 2>/dev/null; then
-    sed "s|^$2=.*|$2=$3|" "$1" >"$1.tmp" && mv "$1.tmp" "$1"
-  else
-    printf '%s=%s\n' "$2" "$3" >>"$1"
-  fi
+  [ -f "$1" ] || : >"$1"
+  key="$2" value="$3" awk -F= '
+    $1 == ENVIRON["key"] { print ENVIRON["key"] "=" ENVIRON["value"]; found = 1; next }
+    { print }
+    END { if (!found) print ENVIRON["key"] "=" ENVIRON["value"] }
+  ' "$1" >"$1.tmp" && mv "$1.tmp" "$1"
 }
 
-# Remove a key from a conf file.
+# Remove a key from a conf file; the file is untouched when the key is
+# absent (state files have mtime watchers).
 conf_del() {
-  if grep -q "^$2=" "$1" 2>/dev/null; then
-    grep -v "^$2=" "$1" >"$1.tmp" && mv "$1.tmp" "$1"
+  [ -f "$1" ] || return 0
+  key="$2" awk -F= '$1 != ENVIRON["key"]' "$1" >"$1.tmp"
+  if cmp -s "$1.tmp" "$1"; then
+    rm -f "$1.tmp"
+  else
+    mv "$1.tmp" "$1"
   fi
 }
 
@@ -92,17 +117,19 @@ set_mascot() {
 }
 
 # The old implementation stored one mode for every consumer. Preserve it as
-# the initial value for both layers when upgrading an existing installation.
+# the initial value for both layers when upgrading an existing installation,
+# then delete it — the layer files are the only mode state afterwards.
 migrate_mode_state() {
-  [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ] && return 0
-  if [ -f "$STATE/theme-mode" ]; then
-    legacy_mode="$(cat "$STATE/theme-mode")"
-    case "$legacy_mode" in
-    dark | light)
-      [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
-      [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
-      ;;
-    esac
+  [ -f "$STATE/theme-mode" ] || return 0
+  legacy_mode="$(cat "$STATE/theme-mode")"
+  case "$legacy_mode" in
+  dark | light)
+    [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
+    [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
+    ;;
+  esac
+  if [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ]; then
+    rm -f "$STATE/theme-mode"
   fi
 }
 
@@ -130,74 +157,71 @@ migrate_legacy_state() {
   fi
 }
 
-append_mapping() {
-  mode="$1"
-  palette="$2"
-  prefix="$3"
-
-  while IFS='=' read -r role key; do
-    case "$role" in ''#*) continue ;; esac
-    hex="$(conf_get "$palette" "$key")"
-    if [ -f "$accents" ]; then
-      case "$role" in
-      accent | notify)
-        override="$(conf_get "$accents" "${role}_${mode}")"
-        [ -n "$override" ] && hex="$override"
-        ;;
-      esac
-    fi
-    if [ -z "$hex" ]; then
-      echo "error: token '$role' maps to '$key', not in $(basename "$palette")" >&2
-      exit 1
-    fi
-    name="${prefix}${role}"
-    printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
-    printf 's/{{%s_hex}}/%s/g\n' "$name" "${hex#\#}" >>"$sed_script"
-  done <"$CONFIG/tokens.conf"
-
-  while IFS='=' read -r key hex; do
-    case "$key" in ''#*) continue ;; esac
-    name="${prefix}${key}"
-    printf 's/{{%s}}/%s/g\n' "$name" "$hex" >>"$sed_script"
-    case "$hex" in
-    \#*) printf 's/{{%s_hex}}/%s/g\n' "$name" "${hex#\#}" >>"$sed_script" ;;
-    esac
-  done <"$palette"
-
-  printf 's/{{%smode}}/%s/g\n' "$prefix" "$mode" >>"$sed_script"
-}
-
-build_sed_script() {
-  default_layer="$1"
-  : >"$sed_script"
-
-  inner_mode="$(layer_mode inner)"
-  outer_mode="$(layer_mode outer)"
-  append_mapping "$inner_mode" "$(palette_for_mode "$inner_mode")" inner_
-  append_mapping "$outer_mode" "$(palette_for_mode "$outer_mode")" outer_
-
-  # Unqualified placeholders belong to the output's registered layer. Mixed
-  # templates use the explicit inner_/outer_ form above.
-  case "$default_layer" in
-  inner) append_mapping "$inner_mode" "$(palette_for_mode "$inner_mode")" "" ;;
-  outer) append_mapping "$outer_mode" "$(palette_for_mode "$outer_mode")" "" ;;
-  esac
+# Emit sed substitutions for one mapping pass — every token role, then every
+# raw palette key, under the given placeholder prefix. One awk join over
+# tokens.conf + palette (+ accent overrides); per-key lookups here once cost
+# hundreds of process spawns per render.
+emit_mapping() {
+  acc_arg=""
+  [ -f "$accents" ] && acc_arg="$accents"
+  awk -F= -v mode="$1" -v prefix="$3" -v palette_name="$(basename "$2")" '
+    function val(line, i) {
+      i = index(line, "=")
+      return i ? substr(line, i + 1) : ""
+    }
+    BEGIN {
+      pal_file = ARGV[ARGC - 2]
+      acc_file = (ARGC == 4) ? ARGV[1] : ""
+    }
+    $1 == "" || $1 ~ /^#/ { next }
+    FILENAME == acc_file {
+      acc[$1] = val($0)
+      next
+    }
+    FILENAME == pal_file {
+      pal[$1] = val($0)
+      # Palette lines land after the token lines, as {{key}} plus {{key_hex}}
+      # for color values; buffered because pal[] must fill before tokens read.
+      palette_out = palette_out sprintf("s/{{%s%s}}/%s/g\n", prefix, $1, val($0))
+      if (val($0) ~ /^#/)
+        palette_out = palette_out \
+          sprintf("s/{{%s%s_hex}}/%s/g\n", prefix, $1, substr(val($0), 2))
+      next
+    }
+    {
+      role = $1
+      hex = pal[val($0)]
+      if (acc_file != "" && (role == "accent" || role == "notify") &&
+        acc[role "_" mode] != "")
+        hex = acc[role "_" mode]
+      if (hex == "") {
+        printf "error: token '\''%s'\'' maps to '\''%s'\'', not in %s\n", \
+          role, val($0), palette_name >"/dev/stderr"
+        errored = 1
+        exit 1
+      }
+      printf "s/{{%s%s}}/%s/g\n", prefix, role, hex
+      sub(/^#/, "", hex)
+      printf "s/{{%s%s_hex}}/%s/g\n", prefix, role, hex
+    }
+    END {
+      if (errored) exit 1
+      printf "%s", palette_out
+      printf "s/{{%smode}}/%s/g\n", prefix, mode
+    }
+  ' ${acc_arg:+"$acc_arg"} "$2" "$CONFIG/tokens.conf"
 }
 
 render_template() {
   template="$1"
   output="$2"
-  default_layer="$3"
-  sed_script="$STATE/.render.$$.sed"
-  tmp="$output.tmp.$$"
+  sed_script="$3"
+  tmp="$workdir/$(basename "$output").tmp"
 
-  build_sed_script "$default_layer"
   sed -f "$sed_script" "$template" >"$tmp"
-  rm -f "$sed_script"
   if grep -q '{{' "$tmp"; then
     echo "error: unresolved tokens in $(basename "$template"):" >&2
     grep -o '{{[^}]*}}' "$tmp" | sort -u >&2
-    rm -f "$tmp"
     exit 1
   fi
   if [ ! -f "$output" ] || ! cmp -s "$tmp" "$output"; then
@@ -207,12 +231,36 @@ render_template() {
   fi
 }
 
+# Renders the persisted layer modes, or the explicitly passed pair
+# (inner outer) when the caller has not committed them to state yet.
 render() {
-  inner_mode="$(layer_mode inner)"
-  outer_mode="$(layer_mode outer)"
+  inner_mode="${1:-$(layer_mode inner)}"
+  outer_mode="${2:-$(layer_mode outer)}"
   mkdir -p "$GENERATED"
 
   accents="$STATE/accents.conf"
+
+  # The substitution script varies only by which layer owns the unqualified
+  # placeholders (mixed templates use explicit inner_/outer_ forms), so three
+  # prebuilt variants cover every template. The workdir also holds render
+  # temp files; the trap cleans it on every exit path.
+  workdir="$STATE/.render.$$"
+  trap 'rm -rf "$workdir"' EXIT
+  mkdir -p "$workdir"
+  inner_palette="$(palette_for_mode "$inner_mode")"
+  outer_palette="$(palette_for_mode "$outer_mode")"
+  {
+    emit_mapping "$inner_mode" "$inner_palette" inner_
+    emit_mapping "$outer_mode" "$outer_palette" outer_
+  } >"$workdir/mixed.sed"
+  {
+    cat "$workdir/mixed.sed"
+    emit_mapping "$inner_mode" "$inner_palette" ""
+  } >"$workdir/inner.sed"
+  {
+    cat "$workdir/mixed.sed"
+    emit_mapping "$outer_mode" "$outer_palette" ""
+  } >"$workdir/outer.sed"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
@@ -220,7 +268,7 @@ render() {
     out="$GENERATED/$(basename "$tmpl" .tmpl)"
     element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
     case "$element" in
-    inner | outer | mixed) render_template "$tmpl" "$out" "$element" ;;
+    inner | outer | mixed) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
     *)
       echo "error: no inner/outer registration for $(basename "$tmpl")" >&2
       exit 1
@@ -258,23 +306,7 @@ publish_files() {
     [ -f "$shader" ] || continue
     cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
   done
-  # bat has no token/template layer of its own: publish the rendered inner
-  # theme into its normal config directory and rebuild only when its content
-  # actually changed. `batcat` is the Debian/Ubuntu binary name.
-  bat_theme="$GENERATED/Dotfiles.tmTheme"
-  if [ -f "$bat_theme" ]; then
-    bat_dir="$HOME/.config/bat/themes"
-    mkdir -p "$bat_dir"
-    if [ ! -f "$bat_dir/Dotfiles.tmTheme" ] ||
-      ! cmp -s "$bat_theme" "$bat_dir/Dotfiles.tmTheme"; then
-      cp "$bat_theme" "$bat_dir/Dotfiles.tmTheme"
-      if command -v bat >/dev/null 2>&1; then
-        bat cache --build
-      elif command -v batcat >/dev/null 2>&1; then
-        batcat cache --build
-      fi
-    fi
-  fi
+  publish_bat_theme
   # Exceptions to "never poke processes", for consumers with no
   # file-watching path of their own. Both are idempotent no-ops when the
   # target isn't running:
@@ -285,6 +317,55 @@ publish_files() {
   pkill -USR2 -x ghostty 2>/dev/null || true
   command -v sketchybar >/dev/null 2>&1 &&
     sketchybar --trigger theme_changed 2>/dev/null || true
+}
+
+# bat has no token/template layer of its own: publish the rendered inner
+# theme into its normal config directory and rebuild only when its content
+# actually changed. Renders run concurrently (session switchers background
+# `theme mascot sync`), and parallel `bat cache --build` runs churn the
+# cache directory — a mkdir lock serializes the publish (flock is not
+# portable to macOS). The content check runs under the lock, so a waiter
+# whose theme another render already published coalesces into a no-op.
+# `batcat` is the Debian/Ubuntu binary name.
+publish_bat_theme() {
+  bat_theme="$GENERATED/Dotfiles.tmTheme"
+  [ -f "$bat_theme" ] || return 0
+  bat_dir="$HOME/.config/bat/themes"
+  mkdir -p "$bat_dir"
+  lock="$STATE/.bat-publish.lock"
+  waited=0
+  until mkdir "$lock" 2>/dev/null; do
+    holder="$(cat "$lock/pid" 2>/dev/null || true)"
+    # A holder that died mid-rebuild must not wedge every later render.
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+      rm -rf "$lock"
+      continue
+    fi
+    if [ "$waited" -ge 30 ]; then
+      echo "warning: bat publish lock is stuck, skipping cache rebuild" >&2
+      return 0
+    fi
+    waited=$((waited + 1))
+    sleep 1
+  done
+  echo $$ >"$lock/pid"
+  status=0
+  if [ ! -f "$bat_dir/Dotfiles.tmTheme" ] ||
+    ! cmp -s "$bat_theme" "$bat_dir/Dotfiles.tmTheme"; then
+    cp "$bat_theme" "$bat_dir/Dotfiles.tmTheme"
+    rebuild_bat_cache || status=$?
+  fi
+  rm -rf "$lock"
+  return $status
+}
+
+# Routine rebuild progress stays off the terminal; errors still reach stderr.
+rebuild_bat_cache() {
+  if command -v bat >/dev/null 2>&1; then
+    bat cache --build >/dev/null
+  elif command -v batcat >/dev/null 2>&1; then
+    batcat cache --build >/dev/null
+  fi
 }
 
 # macOS appearance is the master light/dark switch: setting it flips ghostty
@@ -316,12 +397,19 @@ show_accents() {
   inner_mode="$(layer_mode inner)"
   outer_mode="$(layer_mode outer)"
   echo "mascot: $(conf_get "$accents" mascot) (inner=$inner_mode outer=$outer_mode)"
-  swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
-  swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
-  swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
-  swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
+  # Matching modes share one accent pair — two rows, not two duplicates.
+  if [ "$inner_mode" = "$outer_mode" ]; then
+    swatch "$(conf_get "$accents" "accent_$inner_mode")" accent
+    swatch "$(conf_get "$accents" "notify_$inner_mode")" notify
+  else
+    swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
+    swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
+    swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
+    swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
+  fi
 }
 
+mkdir -p "$STATE"
 migrate_mode_state
 migrate_legacy_state
 
@@ -338,11 +426,12 @@ apply_scope() {
   case "$requested" in
   dark | light) mode="$requested" ;;
   toggle)
-    if [ "$scope" = outer ]; then
-      current="$(layer_mode outer)"
-    else
-      current="$(layer_mode inner)"
-    fi
+    # Toggling flips the named layer; `both` reads inner as its reference,
+    # so diverged layers converge to the opposite of the inner mode.
+    case "$scope" in
+    outer) current="$(layer_mode outer)" ;;
+    inner | both) current="$(layer_mode inner)" ;;
+    esac
     [ "$current" = dark ] && mode=light || mode=dark
     ;;
   *)
@@ -351,6 +440,23 @@ apply_scope() {
     ;;
   esac
 
+  case "$scope" in
+  inner)
+    target_inner="$mode"
+    target_outer="$(layer_mode outer)"
+    ;;
+  outer)
+    target_inner="$(layer_mode inner)"
+    target_outer="$mode"
+    ;;
+  both)
+    target_inner="$mode"
+    target_outer="$mode"
+    ;;
+  esac
+  # Render before persisting: a failed render must not leave the mode files
+  # or the OS appearance reporting a theme the generated files never got.
+  render "$target_inner" "$target_outer"
   case "$scope" in
   inner) set_layer_mode inner "$mode" ;;
   outer) set_layer_mode outer "$mode" ;;
@@ -362,7 +468,6 @@ apply_scope() {
   # Ghostty's native light/dark theme pair is the inner terminal surface.
   # Outer-only changes must never flip the OS appearance.
   [ "$scope" = outer ] || set_os_appearance "$mode"
-  render
 }
 
 case "${1:-status}" in
@@ -382,9 +487,9 @@ apply)
   case "${2:-}" in
   '') render ;;
   dark | light)
+    render "$2" "$2"
     set_layer_mode inner "$2"
     set_layer_mode outer "$2"
-    render
     ;;
   *)
     echo "usage: theme apply [dark|light]" >&2
@@ -415,8 +520,10 @@ mascot)
     ;;
   default)
     value="${3:?usage: theme mascot default <provider:id>}"
-    conf_put "$DEFAULT_CONF" default "$value"
+    # Extraction validates the identity; only a working value may persist
+    # (this file is repo-tracked).
     set_mascot "$value"
+    conf_put "$DEFAULT_CONF" default "$value"
     ;;
   project)
     project="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
@@ -428,9 +535,11 @@ mascot)
       fallback="$(conf_get "$DEFAULT_CONF" default)"
       [ -n "$fallback" ] && set_mascot "$fallback"
     else
+      # Extraction validates the identity; a failed value must not persist —
+      # background syncs would retry it forever.
+      set_mascot "$value"
       conf_put "$MASCOT_CONF" "$project" "$value"
       echo "mapped: $project -> $value"
-      set_mascot "$value"
     fi
     ;;
   *)

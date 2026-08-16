@@ -35,6 +35,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from os import environ
 from pathlib import Path
+from typing import TypeVar
+from urllib.error import HTTPError, URLError
 
 from PIL import Image
 
@@ -44,6 +46,22 @@ MIN_HUE_SEPARATION = 3  # buckets: 45 degrees
 SECOND_CLUSTER_MIN_WEIGHT = 0.02
 
 Hsv = tuple[float, float, float]
+
+
+T = TypeVar("T")
+
+
+def fetch_or_exit(action: Callable[[], T], what: str) -> T:
+    """Run a network-backed action; a fetch failure exits with a one-line
+    error instead of a urllib traceback."""
+    try:
+        return action()
+    except HTTPError as error:
+        raise SystemExit(
+            f"error: cannot fetch {what}: HTTP {error.code} {error.reason}"
+        ) from error
+    except URLError as error:
+        raise SystemExit(f"error: cannot fetch {what}: {error.reason}") from error
 
 
 def _get(url: str) -> bytes:
@@ -307,7 +325,19 @@ def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
     return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
-USAGE = "usage: mascot-accents <provider:id> | --providers | --identities <provider>"
+USAGE = (
+    "usage: mascot-accents <provider:id>"
+    " | --providers | --identities <provider> | --values"
+)
+
+
+def qualified_values(providers: dict[str, Provider]) -> list[str]:
+    """Every valid <provider:id> value; shell completion consumes this."""
+    return [
+        f"{name}:{identity}"
+        for name, provider in providers.items()
+        for identity in fetch_or_exit(provider.identities, f"identities for '{name}'")
+    ]
 
 
 def main() -> None:
@@ -315,18 +345,22 @@ def main() -> None:
     if args == ["--providers"]:
         print("\n".join(PROVIDERS))
         return
+    if args == ["--values"]:
+        print("\n".join(qualified_values(PROVIDERS)))
+        return
     if len(args) == 2 and args[0] == "--identities":
         provider = PROVIDERS.get(args[1])
         if provider is None:
             known = ", ".join(PROVIDERS)
             raise SystemExit(f"error: unknown provider '{args[1]}' (have: {known})")
-        print("\n".join(provider.identities()))
+        names = fetch_or_exit(provider.identities, f"identities for '{args[1]}'")
+        print("\n".join(names))
         return
     if len(args) != 1:
         raise SystemExit(USAGE)
     value = args[0]
     provider, identity = resolve(value)
-    images = provider.fetch(identity)
+    images = fetch_or_exit(lambda: provider.fetch(identity), f"'{value}'")
     accent, notify = pick_pair(*gather_pixels(images.palette))
     print(f"mascot={value}")
     print(f"sprite={images.sprite}")

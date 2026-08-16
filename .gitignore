@@ -2,7 +2,7 @@
 # committed docs are for humans.
 notes/
 
-# Generated theme output (layer 3) — emitted at runtime, never authored
+# Generated theme output — rendered at runtime into state, never authored
 **/generated/
 
 # Tool-writeback state. Design rule 1: these files are written by the tools
