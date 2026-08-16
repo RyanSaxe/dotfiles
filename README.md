@@ -67,8 +67,38 @@ reload in place:
 ```sh
 theme dark
 theme light
-theme pokemon gengar   # accent colors extracted from a pokemon image
+theme mascot pokemon:gengar   # accent colors extracted from a mascot image
 ```
+
+### Mascot providers
+
+A mascot is any image the theme system can wear: the rail paints its sprite
+and the accent/notify colors are extracted from it. Identities are
+provider-qualified (`pokemon:gengar`), and providers live in
+`theme/.local/bin/mascot-accents` as a registry — the picker, completions,
+and rail all build from it, so adding a source touches exactly one file.
+
+A provider is two functions registered under a name:
+
+```python
+def _my_identities() -> list[str]:
+    # What the picker offers. An API list, a directory of dropped
+    # images (identity = filename), anything enumerable.
+    ...
+
+def _my_fetch(identity: str) -> MascotImages:
+    # Cache under mascot_cache("my-source") and return the sprite PNG
+    # the rail paints plus the image accents extract from — often the
+    # same file (pokemon extracts from richer official artwork).
+    ...
+
+register("my-source", Provider(_my_identities, _my_fetch))
+```
+
+That's the whole surface. `theme mascot my-source:<id>`, the fzf picker
+entry, per-project sync, and the rail sprite all follow from the
+registration — see the `pokemon` provider for a full example and
+`shiny-pokemon` for wrapping an existing source as its own picker entry.
 
 ## Development
 

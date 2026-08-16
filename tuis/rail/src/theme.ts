@@ -41,7 +41,7 @@ const PALETTE_PATH =
 
 let cached: { palette: Palette; mtimeMs: number } | null = null;
 
-// The theme system rewrites tuis-colors.json on every mode/pokemon switch;
+// The theme system rewrites tuis-colors.json on every mode/mascot switch;
 // re-reading on mtime change is what makes the rail converge live.
 export function loadPalette(): Palette {
   const mtimeMs = statSync(PALETTE_PATH).mtimeMs;

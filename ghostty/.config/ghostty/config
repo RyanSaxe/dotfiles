@@ -3,7 +3,7 @@
 # Theme: ghostty follows macOS appearance NATIVELY via the light:/dark: pair
 # below — when the OS flips (System Settings, schedule, or the `theme`
 # command), ghostty recolors itself with no reload machinery. Catppuccin is
-# built into ghostty, so the palette needs no template; pokemon accents live
+# built into ghostty, so the palette needs no template; mascot accents live
 # in the prompt/fzf layer, not the terminal palette.
 theme = light:Catppuccin Latte,dark:Catppuccin Mocha
 
@@ -60,7 +60,7 @@ mouse-shift-capture = never
 
 # Theme-rendered shaders (from theme/templates/*.glsl.tmpl), copied here
 # by the `theme` command, which then signals ghostty (SIGUSR2 = reload) so
-# both follow palette/pokemon/mode switches with no keypress. The frame
+# both follow palette/mascot/mode switches with no keypress. The frame
 # shader runs last so its ring paints over everything at the edges.
 custom-shader = shaders/cursor_trail.glsl
 custom-shader = shaders/frame.glsl

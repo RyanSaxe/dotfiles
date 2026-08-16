@@ -1,4 +1,4 @@
-"""Unit tests for pokemon-accents' pure logic.
+"""Unit tests for mascot-accents' pure logic.
 
 The binary is an extensionless PEP 723 script; load it as a module directly.
 """
@@ -8,23 +8,49 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 _SPEC = importlib.util.spec_from_loader(
-    "pokemon_accents",
+    "mascot_accents",
     importlib.machinery.SourceFileLoader(
-        "pokemon_accents",
-        str(Path(__file__).parent.parent / ".local/bin/pokemon-accents"),
+        "mascot_accents",
+        str(Path(__file__).parent.parent / ".local/bin/mascot-accents"),
     ),
 )
 assert _SPEC and _SPEC.loader
 accents = importlib.util.module_from_spec(_SPEC)
-sys.modules["pokemon_accents"] = accents
+sys.modules["mascot_accents"] = accents
 _SPEC.loader.exec_module(accents)
 
 # PIL comes through the module under test, keeping this file stdlib-only for
 # the type checker (Pillow only exists inside the uv script's environment).
 Image = accents.Image
+
+
+def test_registry_resolves_qualified_identities() -> None:
+    provider, identity = accents.resolve("pokemon:raikou")
+    assert provider is accents.PROVIDERS["pokemon"]
+    assert identity == "raikou"
+    # Shiny is its own registered picker entry, not a flag.
+    assert "shiny-pokemon" in accents.PROVIDERS
+
+
+def _exit_message(action: Callable[[], object]) -> str:
+    # SystemExit instead of pytest.raises keeps this file stdlib-only for
+    # the type checker (see the loader note above).
+    try:
+        action()
+    except SystemExit as error:
+        return str(error)
+    raise AssertionError("expected SystemExit")
+
+
+def test_resolve_rejects_unqualified_and_unknown_values() -> None:
+    assert "not provider-qualified" in _exit_message(lambda: accents.resolve("raikou"))
+    assert "unknown provider" in _exit_message(
+        lambda: accents.resolve("digimon:agumon")
+    )
 
 
 def test_normalize_crops_centers_and_scales() -> None:

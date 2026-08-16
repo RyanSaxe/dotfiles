@@ -35,7 +35,7 @@ _tmux_attach_or_switch() {
   fi
   # The global accent (prompt, cursor trail, ghostty) follows the project
   # you just landed in; sessions are named after projects.
-  (theme pokemon sync "${target%%:*}" >/dev/null 2>&1 &)
+  (theme mascot sync "${target%%:*}" >/dev/null 2>&1 &)
 }
 
 # Switch tmux sessions with fzf (works inside and outside tmux)

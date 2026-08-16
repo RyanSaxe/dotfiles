@@ -2,7 +2,7 @@
 
 In-terminal sidebar: this session's tmux windows plus every agent
 everywhere, themed by the dotfiles theme system, wearing each project's
-pokemon. Cross-platform — anywhere tmux runs, the rail runs.
+mascot. Cross-platform — anywhere tmux runs, the rail runs.
 
 ## How it works
 
@@ -18,7 +18,7 @@ never flicker.
 - **Agents** come from `workmux status --json` (run from `$HOME` for the
   global view), reconciled every 5s with instant refreshes when a workmux
   state file changes.
-- **Theme** re-reads `tuis-colors.json` on change; a mode or pokemon
+- **Theme** re-reads `tuis-colors.json` on change; a mode or mascot
   switch recolors every rail within a tick.
 
 ## The grammar
@@ -38,7 +38,7 @@ never flicker.
 - A two-cell crust gutter ends every row: text and hairlines stop ~19pt
   (the frame's spacing unit) before the content surface, mirroring the
   frame crust left of the session name.
-- The footer is the mascot's home: the project's pokemon sprite rendered
+- The footer is the mascot's home: the project's mascot sprite rendered
   through kitty-graphics Unicode placeholders (`src/sprite.ts`) — the PNG
   is transmitted once as a virtual placement and the footer cells anchor
   it, so tmux redraws, switches, and the toggle carry it like text and

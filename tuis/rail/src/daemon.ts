@@ -34,7 +34,7 @@ import {
 import { assignHints, writeHints } from "./hints.js";
 import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
-import { pokemonFor } from "./pokemon.js";
+import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
 import { loadPalette, railBg } from "./theme.js";
@@ -308,15 +308,15 @@ async function tick(counter: number): Promise<void> {
   const frames = new Map<string, string>();
   for (const pane of panes) {
     if (!pane.isRail || skip.has(pane.paneId)) continue;
-    // Each session's rail wears its own pokemon accent: the identity
+    // Each session's rail wears its own mascot accent: the identity
     // follows the project mapping, not the globally active theme accent.
-    const pokemon = pokemonFor(pane.session);
+    const mascot = mascotFor(pane.session);
     const accent =
-      (palette.mode === "dark" ? pokemon?.accentDark : pokemon?.accentLight) ??
+      (palette.mode === "dark" ? mascot?.accentDark : mascot?.accentLight) ??
       palette.accent;
     const sessionPalette = { ...palette, accent };
     const spritePath = clientFacts.latestClientIsKitty
-      ? (pokemon?.spritePath ?? null)
+      ? (mascot?.spritePath ?? null)
       : null;
     const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
@@ -395,7 +395,7 @@ async function main(): Promise<void> {
   } catch {
     // Directory appears with the first agent; the 5s reconcile covers it.
   }
-  // Theme/pokemon switches rewrite the generated files: drop frame caches
+  // Theme/mascot switches rewrite the generated files: drop frame caches
   // so every pane repaints, and re-source tmux's own colors (this replaces
   // the statusline's theme-sync slot — the statusline is off while the
   // rail carries the chrome). A render touches every template output in a

@@ -14,6 +14,6 @@ if [[ -n "$prev" ]]; then
   window="${window_pane%.*}"
   pane="${window_pane#*.}"
 
-  # The shared jump primitive switches AND syncs the pokemon accent.
+  # The shared jump primitive switches AND syncs the mascot accent.
   "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" ":$window" ".$pane"
 fi

@@ -71,7 +71,7 @@ jump)
   [ -n "$hint_line" ] || exit 0
   session="$(printf '%s' "$hint_line" | cut -f3)"
   pane="$(printf '%s' "$hint_line" | cut -f4)"
-  # The shared jump primitive switches AND syncs the pokemon accent.
+  # The shared jump primitive switches AND syncs the mascot accent.
   "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
   ;;
 ensure-daemon)
