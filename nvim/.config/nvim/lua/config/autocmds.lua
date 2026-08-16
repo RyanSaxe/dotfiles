@@ -1,1 +1,1 @@
--- Autocmds on top of the LazyVim floor enter one decision at a time.
+-- Deliberately empty: the LazyVim floor is the autocmd surface.
