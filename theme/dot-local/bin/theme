@@ -274,6 +274,11 @@ render() {
     cat "$workdir/mixed.sed"
     emit_mapping "$outer_mode" "$outer_palette" ""
   } >"$workdir/outer.sed"
+  # Mode-pinned contexts: templates that must exist for BOTH modes at
+  # once — ghostty's native macOS-appearance switching reads a light and
+  # a dark theme file simultaneously — regardless of the current layers.
+  emit_mapping dark "$(palette_for_mode dark)" "" >"$workdir/dark.sed"
+  emit_mapping light "$(palette_for_mode light)" "" >"$workdir/light.sed"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
@@ -281,7 +286,7 @@ render() {
     out="$GENERATED/$(basename "$tmpl" .tmpl)"
     element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
     case "$element" in
-    inner | outer | mixed) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
+    inner | outer | mixed | dark | light) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
     *)
       echo "error: no inner/outer registration for $(basename "$tmpl")" >&2
       exit 1
@@ -318,6 +323,12 @@ publish_files() {
   for shader in "$GENERATED"/*.glsl; do
     [ -f "$shader" ] || continue
     cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
+  done
+  # Ghostty's native light/dark flip reads both theme files by name.
+  mkdir -p "$HOME/.config/ghostty/themes"
+  for gtheme in "$GENERATED"/jewelbox-*; do
+    [ -f "$gtheme" ] || continue
+    cp "$gtheme" "$HOME/.config/ghostty/themes/$(basename "$gtheme")"
   done
   publish_bat_theme
   # Exceptions to "never poke processes", for consumers with no

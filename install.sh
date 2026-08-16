@@ -202,7 +202,7 @@ install_tier_packages() {
 # package tree, and these writes would then land inside the repo. .stowrc's
 # --no-folding also prevents folding, but only when stow reads it (cwd is
 # the repo root and the file parses); the pre-create holds regardless.
-RUNTIME_WRITE_DIRS='.config/bat/themes .config/ghostty/shaders .local/bin'
+RUNTIME_WRITE_DIRS='.config/bat/themes .config/ghostty/shaders .config/ghostty/themes .local/bin'
 
 ensure_runtime_write_dirs() {
   for dir in $RUNTIME_WRITE_DIRS; do

@@ -130,7 +130,7 @@ jobs:
           # directory that stow folded into a package symlink would receive
           # them inside the checkout instead.
           repo="$(pwd -P)"
-          for path in .config/bat/themes .config/ghostty/shaders; do
+          for path in .config/bat/themes .config/ghostty/shaders .config/ghostty/themes; do
             resolved="$(cd "$SCRATCH/$path" && pwd -P)"
             case "$resolved" in
             "$repo"/*)
