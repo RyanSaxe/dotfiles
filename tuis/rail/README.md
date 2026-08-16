@@ -14,7 +14,9 @@ viewer process at all. Frames are diffed per pane and committed under
 synchronized output — an unchanged rail costs zero writes and repaints
 never flicker.
 
-- **tmux data** polls every 250ms (one `list-panes -a` call).
+- **tmux data** polls every 250ms (panes and clients in one
+  `list-panes -a \; list-clients` call), backing off to 2s while the
+  rail is disabled or no client is attached.
 - **Agents** come from `workmux status --json` (run from `$HOME` for the
   global view), reconciled every 5s with instant refreshes when a workmux
   state file changes.

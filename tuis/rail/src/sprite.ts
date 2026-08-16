@@ -7,7 +7,13 @@
 // toggle all carry the sprite exactly like text. Nothing ever needs
 // deleting: no cells, no image.
 
-import { closeSync, openSync, readFileSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  statSync,
+  writeSync,
+} from "node:fs";
 
 // Write raw bytes straight to a pane's tty, tolerating its death between
 // the poll and the write. The daemon paints frames through this too.
@@ -101,17 +107,24 @@ function wrapTmux(sequence: string): string {
 }
 
 const CHUNK = 4096;
-const spriteBytes = new Map<string, Buffer | null>();
+// Mtime-gated (the loadPalette pattern). Failures are never cached: a
+// sprite missing on first read (extraction not landed yet) must not stay
+// missing for the daemon's lifetime, and mascot-accents rewrites its
+// image cache in place — a partial read heals here once the write
+// completes, because completion moves the mtime.
+const spriteBytes = new Map<string, { mtimeMs: number; bytes: Buffer }>();
 
 function readSprite(path: string): Buffer | null {
-  if (!spriteBytes.has(path)) {
-    try {
-      spriteBytes.set(path, readFileSync(path));
-    } catch {
-      spriteBytes.set(path, null);
-    }
+  try {
+    const mtimeMs = statSync(path).mtimeMs;
+    const cached = spriteBytes.get(path);
+    if (cached && cached.mtimeMs === mtimeMs) return cached.bytes;
+    const bytes = readFileSync(path);
+    spriteBytes.set(path, { mtimeMs, bytes });
+    return bytes;
+  } catch {
+    return null;
   }
-  return spriteBytes.get(path) ?? null;
 }
 
 // Send the PNG as a virtual placement through a VISIBLE pane's tty (tmux

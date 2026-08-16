@@ -26,8 +26,15 @@ LOG_FILE="$STATE/daemon.log"
 
 mkdir -p "$STATE"
 
+# A pid being alive is not enough: a daemon that died ungracefully leaves
+# its pidfile behind, and the pid can be reused by an unrelated process —
+# trusting it froze rails with no self-recovery. The recorded pid counts
+# as running only if its command line is still a rail daemon.
 daemon_running() {
-  [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+  [ -f "$PID_FILE" ] || return 1
+  pid="$(cat "$PID_FILE")"
+  kill -0 "$pid" 2>/dev/null || return 1
+  ps -o command= -p "$pid" 2>/dev/null | grep -q 'daemon\.ts'
 }
 
 ensure_daemon() {
@@ -48,7 +55,8 @@ on)
   ;;
 off)
   # Focus mode: no status bar comes back — no chrome at all. Navigation
-  # stays on the alt binds; alt+g re-shows the rail.
+  # stays on the alt binds; alt+g re-shows the rail. The daemon enforces
+  # disabled -> no rails too; this sweep is just the instant path.
   rm -f "$ENABLED_FLAG"
   kill_rail_panes
   ;;

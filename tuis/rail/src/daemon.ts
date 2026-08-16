@@ -3,19 +3,21 @@
 // tty. tmux interprets those writes into its own screen buffer, so frames
 // survive detach/attach and remote clients with no viewer process at all.
 //
-// Cadence: tmux geometry/windows every 250ms; agents reconciled every 5s
-// with instant refreshes when a workmux state file changes; palette re-read
-// when the theme system rewrites it. Frames are diffed per pane — an
-// unchanged rail costs zero writes.
+// Cadence: tmux geometry/windows every 250ms, stretched to 2s while the
+// rail is disabled or no client is attached (the enabled flag wakes it
+// instantly); agents reconciled every 5s with instant refreshes when a
+// workmux state file changes; palette re-read when the theme system
+// rewrites it. Frames are diffed per pane — an unchanged rail costs zero
+// writes.
 //
 // The daemon also enforces the rail's invariants every tick (self-heal):
 // rails are exactly RAIL_WIDTH wide, hold no scrollback, are never in
 // copy-mode, are never the selected pane, exist in every window while
-// enabled (alt+g is the ONLY gate — no width policy), and never survive
-// alone in a window.
+// enabled (alt+g is the ONLY gate — no width policy), exist nowhere
+// while disabled, and never survive alone in a window.
 
 import { existsSync, readFileSync, watch } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -23,8 +25,7 @@ import { loadAcks, updateAcks } from "./acks.js";
 import {
   applyDoneHysteresis,
   collectAgents,
-  collectClientFacts,
-  collectPanes,
+  collectSnapshot,
   run,
   tmux,
   windowsOf,
@@ -40,7 +41,18 @@ import { spriteId, transmitSprite, writeTty } from "./sprite.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
+// With the rail disabled or no client attached, nothing on screen can
+// change: stretch the cadence so the steady state costs ~nothing. The
+// enabled-flag watch in main() cuts an idle sleep short, so `rail on`
+// still lands within a tick.
+const IDLE_TICK_MS = 2000;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
+// tmux's two dead-server voices, appended to the exec error via stderr.
+const NO_SERVER_PATTERN = /no server running|error connecting/i;
+// Failed ticks back off 2s apiece, so this is ~10s — enough to ride out
+// a server restart, short enough that a dead server doesn't leave the
+// daemon erroring forever.
+const NO_SERVER_EXIT_TICKS = 5;
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
 // plus the crust gutter renderRail appends.
 const RAIL_WIDTH = 22 + GUTTER_COLS;
@@ -67,6 +79,12 @@ let appliedBg = "";
 const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
+
+// daemon.log is the only forensic trail for incidents hours old; a line
+// without a time is undiagnosable.
+function logLine(message: string): void {
+  console.error(`${new Date().toISOString()} ${message}`);
+}
 
 async function refreshAgents(): Promise<void> {
   try {
@@ -119,9 +137,28 @@ async function spawnRail(windowId: string): Promise<void> {
 // Enforce every rail invariant against one snapshot. Any pane this touched
 // is skipped for painting this tick — it repaints next tick at its
 // corrected geometry.
-async function selfHeal(panes: Pane[]): Promise<Set<string>> {
+async function selfHeal(panes: Pane[], enabled: boolean): Promise<Set<string>> {
   const touched = new Set<string>();
-  const enabled = existsSync(ENABLED_FLAG);
+
+  // Disabled means NO rail panes anywhere, and the daemon owns that
+  // invariant: the launcher's kill sweep can race a tick that spawned a
+  // rail after the sweep listed panes, and a stray @rail pane planted
+  // any other way would otherwise be adopted and painted forever. The
+  // other heals are moot for panes being removed.
+  if (!enabled) {
+    for (const pane of panes) {
+      if (!pane.isRail) continue;
+      // A rail alone in its window would leave an empty window behind.
+      await (
+        pane.windowPanes === 1
+          ? tmux("kill-window", "-t", pane.windowId)
+          : tmux("kill-pane", "-t", pane.paneId)
+      ).catch(() => {});
+      touched.add(pane.paneId);
+    }
+    return touched;
+  }
+
   const railByWindow = new Map<string, Pane>();
   for (const pane of panes) {
     if (!pane.isRail) continue;
@@ -190,17 +227,15 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
 
   // While enabled, EVERY window grows a rail — no width policy, alt+g is
   // the only gate. This reconcile makes it inevitable.
-  if (enabled) {
-    const seen = new Set<string>();
-    for (const pane of panes) {
-      if (seen.has(pane.windowId) || pane.isRail) continue;
-      seen.add(pane.windowId);
-      if (
-        pane.windowWidth >= MIN_SPLIT_WIDTH &&
-        !railByWindow.has(pane.windowId)
-      ) {
-        await spawnRail(pane.windowId).catch(() => {});
-      }
+  const seen = new Set<string>();
+  for (const pane of panes) {
+    if (seen.has(pane.windowId) || pane.isRail) continue;
+    seen.add(pane.windowId);
+    if (
+      pane.windowWidth >= MIN_SPLIT_WIDTH &&
+      !railByWindow.has(pane.windowId)
+    ) {
+      await spawnRail(pane.windowId).catch(() => {});
     }
   }
   return touched;
@@ -235,11 +270,13 @@ async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
   }
 }
 
-// Sprites are unconditional. A client without kitty graphics renders the
-// placeholder cells as a colored block in the mascot area; hiding the
-// rail (alt+g) is the remedy there. Any conditional scheme is worse:
-// frames live in tmux's buffers, so a capability flip repaints every
-// rail and a mid-flip window switch shows the stale variant.
+// Mascot cells ride two gates. A terminal without kitty graphics cannot
+// even LAY OUT the placeholder text (astral codepoint plus combining
+// diacritics desync its column accounting and garble the pane), so a
+// frame carries the mascot only while the driving client is capable AND
+// no non-kitty client is viewing that session — frames live in tmux's
+// buffers, and a per-session leak paints garbage on whichever phone
+// client attaches next. Capability flips repaint within a tick.
 
 // Terminals drop image data on restart and the daemon can't observe that;
 // a slow re-send through each visible rail pane keeps sprites alive. The
@@ -259,17 +296,18 @@ function maybeTransmit(pane: Pane, spritePath: string, id: number): void {
   }
 }
 
-async function tick(counter: number): Promise<void> {
+// Returns whether the daemon may idle until the next tick.
+async function tick(counter: number): Promise<boolean> {
   const refresh =
     counter % AGENT_RECONCILE_TICKS === 0 || !agentsFresh
       ? refreshAgents().then(() => {
           agentsFresh = true;
         })
       : Promise.resolve();
-  // The polls are independent — one round-trip of latency, not three.
-  const [panes, clientFacts] = await Promise.all([
-    collectPanes(),
-    collectClientFacts(),
+  // The tmux poll and the agent refresh are independent — one round-trip
+  // of latency, not two.
+  const [{ panes, clientFacts }] = await Promise.all([
+    collectSnapshot(),
     refresh,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;
@@ -286,7 +324,8 @@ async function tick(counter: number): Promise<void> {
     }
     appliedBg = bg;
   }
-  const skip = await selfHeal(panes);
+  const enabled = existsSync(ENABLED_FLAG);
+  const skip = await selfHeal(panes, enabled);
   await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
@@ -315,9 +354,10 @@ async function tick(counter: number): Promise<void> {
       (palette.mode === "dark" ? mascot?.accentDark : mascot?.accentLight) ??
       palette.accent;
     const sessionPalette = { ...palette, accent };
-    const spritePath = clientFacts.latestClientIsKitty
-      ? (mascot?.spritePath ?? null)
-      : null;
+    const spritePath =
+      clientFacts.latestClientIsKitty && !nonKittySessions.has(pane.session)
+        ? (mascot?.spritePath ?? null)
+        : null;
     const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
     const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
@@ -338,16 +378,15 @@ async function tick(counter: number): Promise<void> {
       );
       frames.set(bucket, frame);
     }
-    // Frames are unconditional, transmission is not: sending image data
-    // through a pane a non-kitty client is viewing spews the payload as
-    // text there. Kitty terminals retain previously-loaded images, so
-    // mascots persist through a transmit pause and resume on detach.
+    // Transmission additionally needs a VISIBLE pane — tmux only forwards
+    // passthrough for panes on screen. Kitty terminals retain previously
+    // loaded images, so mascots persist through a transmit pause and
+    // resume on detach.
     if (
       spritePath &&
       sprite !== null &&
       pane.sessionAttached &&
-      pane.windowActive &&
-      !nonKittySessions.has(pane.session)
+      pane.windowActive
     ) {
       maybeTransmit(pane, spritePath, sprite);
     }
@@ -359,28 +398,75 @@ async function tick(counter: number): Promise<void> {
   for (const paneId of pushed.keys()) {
     if (!alive.has(paneId)) pushed.delete(paneId);
   }
+  for (const key of lastTransmit.keys()) {
+    if (!alive.has(key.slice(0, key.indexOf("\x1f")))) {
+      lastTransmit.delete(key);
+    }
+  }
+
+  return !enabled || clientFacts.clientCount === 0;
 }
 
-async function alreadyRunning(): Promise<boolean> {
-  try {
-    const pid = Number(await readFile(PID_FILE, "utf8"));
-    if (pid > 0) {
-      process.kill(pid, 0);
-      return true;
+// An interruptible sleep: the enabled-flag watch calls wakeLoop so
+// `rail on` never waits out an idle interval.
+let wakeLoop: () => void = () => {};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(finish, ms);
+    function finish(): void {
+      clearTimeout(timer);
+      wakeLoop = () => {};
+      resolve();
     }
+    wakeLoop = finish;
+  });
+}
+
+// Liveness alone is not holdership: an unclean death leaves the pidfile
+// behind, and the pid can be reused by an unrelated process. The holder
+// counts only while its command line is still a rail daemon.
+async function isRailDaemon(pid: number): Promise<boolean> {
+  try {
+    const { stdout } = await run("ps", ["-o", "command=", "-p", String(pid)]);
+    return stdout.includes("daemon.ts");
   } catch {
-    // No pidfile or stale pid: not running.
+    // ps fails for a dead pid.
+    return false;
+  }
+}
+
+// Exclusive-create (wx) makes the pidfile the lock itself: two daemons
+// booting concurrently — npx tsx takes ~1s to get here, and tmux.conf
+// sourcing races `rail on` — can both pass a check-then-write gate, but
+// only one wins the create. A stale holder's file is unlinked and the
+// claim retried; the loop is bounded for the pathological case where
+// fresh claimants keep dying mid-race.
+async function claimPidfile(): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await writeFile(PID_FILE, String(process.pid), { flag: "wx" });
+      return true;
+    } catch {
+      // Pidfile exists; reclaim below only if it's stale.
+    }
+    try {
+      const pid = Number(await readFile(PID_FILE, "utf8"));
+      if (pid > 0 && (await isRailDaemon(pid))) return false;
+    } catch {
+      // Unreadable pidfile: stale.
+    }
+    await unlink(PID_FILE).catch(() => {});
   }
   return false;
 }
 
 async function main(): Promise<void> {
   await mkdir(STATE_DIR, { recursive: true });
-  if (await alreadyRunning()) {
-    console.error("rail daemon already running");
+  if (!(await claimPidfile())) {
+    logLine("rail daemon already running");
     process.exit(0);
   }
-  await writeFile(PID_FILE, String(process.pid));
 
   // Instant agent updates: workmux hooks write a state file the moment an
   // agent changes status. Debounced a hair so bursts coalesce.
@@ -402,32 +488,55 @@ async function main(): Promise<void> {
   // burst; debounce so the burst costs one pass, not one per file event.
   let themePending: NodeJS.Timeout | null = null;
   let tuisColorsTouched = false;
-  watch(GENERATED_DIR, (_event, filename) => {
-    if (filename === "tuis-colors.json") tuisColorsTouched = true;
-    if (themePending) clearTimeout(themePending);
-    themePending = setTimeout(() => {
-      if (tuisColorsTouched) pushed.clear();
-      tuisColorsTouched = false;
-      run(THEME_SYNC, []).catch(() => {});
-    }, 30);
+  try {
+    watch(GENERATED_DIR, (_event, filename) => {
+      if (filename === "tuis-colors.json") tuisColorsTouched = true;
+      if (themePending) clearTimeout(themePending);
+      themePending = setTimeout(() => {
+        if (tuisColorsTouched) pushed.clear();
+        tuisColorsTouched = false;
+        run(THEME_SYNC, []).catch(() => {});
+      }, 30);
+    });
+  } catch {
+    // Fresh install: no generated dir until the theme system's first
+    // render. Palette reads fail the same way, so ticks back off until
+    // it lands; the watcher only returns on daemon restart.
+  }
+
+  watch(STATE_DIR, (_event, filename) => {
+    if (filename === "enabled") wakeLoop();
   });
 
   let counter = 0;
+  let noServerTicks = 0;
   for (;;) {
     const started = Date.now();
+    let idle = false;
     try {
-      await tick(counter);
+      idle = await tick(counter);
+      noServerTicks = 0;
     } catch (error) {
-      // tmux server gone (or restarting): keep the daemon alive and poll
-      // gently until it returns.
-      console.error(`tick failed: ${String(error)}`);
+      // Transient failures (server restarting, disk blip): keep the
+      // daemon alive and poll gently. A SUSTAINED dead server means it
+      // died out from under us — exit cleanly, taking the pidfile along
+      // so nothing trusts a corpse; tmux.conf's ensure-daemon respawns
+      // the daemon with the next server.
+      logLine(`tick failed: ${String(error)}`);
+      noServerTicks = NO_SERVER_PATTERN.test(String(error))
+        ? noServerTicks + 1
+        : 0;
+      if (noServerTicks >= NO_SERVER_EXIT_TICKS) {
+        logLine("tmux server gone; exiting");
+        await unlink(PID_FILE).catch(() => {});
+        process.exit(0);
+      }
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     counter += 1;
     const elapsed = Date.now() - started;
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.max(0, TICK_MS - elapsed)),
-    );
+    const cadence = idle ? IDLE_TICK_MS : TICK_MS;
+    await sleep(Math.max(0, cadence - elapsed));
   }
 }
 
