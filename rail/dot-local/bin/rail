@@ -67,7 +67,10 @@ jump)
   # viewing_session <tab> key <tab> target_session <tab> pane_id.
   digit="${2:?usage: rail jump <digit|a>}"
   viewing="$(tmux display-message -p '#{session_name}')"
-  hint_line="$(grep "^$viewing	$digit	" "$STATE/hints.tsv" 2>/dev/null | head -1 || true)"
+  # Literal field comparison, not grep: a session name with regex
+  # metacharacters (c++, foo[bar]) must still match its own hint rows.
+  hint_line="$(awk -F'\t' -v s="$viewing" -v k="$digit" \
+    '$1 == s && $2 == k { print; exit }' "$STATE/hints.tsv" 2>/dev/null || true)"
   [ -n "$hint_line" ] || exit 0
   session="$(printf '%s' "$hint_line" | cut -f3)"
   pane="$(printf '%s' "$hint_line" | cut -f4)"
