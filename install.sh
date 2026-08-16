@@ -214,6 +214,22 @@ stow_package() {
   manifest="$manifest_dir/$1.txt"
   mkdir -p "$manifest_dir"
 
+  # Stow deploys the filesystem, not the git index, so anything loose inside
+  # a package would symlink into HOME (bytecode caches once linked
+  # ~/tests/__pycache__). Gitignored files are declared junk: delete them,
+  # and the empty directory chains they leave. Untracked files may be
+  # unfinished work: refuse, so nothing links silently and nothing of value
+  # is deleted.
+  git clean -qfdX -- "$1"
+  find "$1" -mindepth 1 -type d -empty -delete
+  untracked="$(git ls-files --others --exclude-standard -- "$1")"
+  if [ -n "$untracked" ]; then
+    echo "error: untracked files in package $1 would stow into HOME:" >&2
+    printf '%s\n' "$untracked" | sed 's/^/  /' >&2
+    echo "commit or remove them, then re-run" >&2
+    exit 1
+  fi
+
   # Manifest paths are target-side: stow --dotfiles links dot-* entries to
   # their dotted names, and the cleanup below must visit those links.
   current="$(cd "$1" && find . -type f | sed 's|/dot-|/.|g' | sort)"
