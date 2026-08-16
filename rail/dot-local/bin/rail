@@ -48,7 +48,8 @@ on)
   ;;
 off)
   # Focus mode: no status bar comes back — no chrome at all. Navigation
-  # stays on the alt binds; alt+g re-shows the rail.
+  # stays on the alt binds; alt+g re-shows the rail. The daemon enforces
+  # disabled -> no rails too; this sweep is just the instant path.
   rm -f "$ENABLED_FLAG"
   kill_rail_panes
   ;;

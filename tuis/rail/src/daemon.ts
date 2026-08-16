@@ -11,8 +11,8 @@
 // The daemon also enforces the rail's invariants every tick (self-heal):
 // rails are exactly RAIL_WIDTH wide, hold no scrollback, are never in
 // copy-mode, are never the selected pane, exist in every window while
-// enabled (alt+g is the ONLY gate — no width policy), and never survive
-// alone in a window.
+// enabled (alt+g is the ONLY gate — no width policy), exist nowhere
+// while disabled, and never survive alone in a window.
 
 import { existsSync, readFileSync, watch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -122,6 +122,26 @@ async function spawnRail(windowId: string): Promise<void> {
 async function selfHeal(panes: Pane[]): Promise<Set<string>> {
   const touched = new Set<string>();
   const enabled = existsSync(ENABLED_FLAG);
+
+  // Disabled means NO rail panes anywhere, and the daemon owns that
+  // invariant: the launcher's kill sweep can race a tick that spawned a
+  // rail after the sweep listed panes, and a stray @rail pane planted
+  // any other way would otherwise be adopted and painted forever. The
+  // other heals are moot for panes being removed.
+  if (!enabled) {
+    for (const pane of panes) {
+      if (!pane.isRail) continue;
+      // A rail alone in its window would leave an empty window behind.
+      await (
+        pane.windowPanes === 1
+          ? tmux("kill-window", "-t", pane.windowId)
+          : tmux("kill-pane", "-t", pane.paneId)
+      ).catch(() => {});
+      touched.add(pane.paneId);
+    }
+    return touched;
+  }
+
   const railByWindow = new Map<string, Pane>();
   for (const pane of panes) {
     if (!pane.isRail) continue;
@@ -190,17 +210,15 @@ async function selfHeal(panes: Pane[]): Promise<Set<string>> {
 
   // While enabled, EVERY window grows a rail — no width policy, alt+g is
   // the only gate. This reconcile makes it inevitable.
-  if (enabled) {
-    const seen = new Set<string>();
-    for (const pane of panes) {
-      if (seen.has(pane.windowId) || pane.isRail) continue;
-      seen.add(pane.windowId);
-      if (
-        pane.windowWidth >= MIN_SPLIT_WIDTH &&
-        !railByWindow.has(pane.windowId)
-      ) {
-        await spawnRail(pane.windowId).catch(() => {});
-      }
+  const seen = new Set<string>();
+  for (const pane of panes) {
+    if (seen.has(pane.windowId) || pane.isRail) continue;
+    seen.add(pane.windowId);
+    if (
+      pane.windowWidth >= MIN_SPLIT_WIDTH &&
+      !railByWindow.has(pane.windowId)
+    ) {
+      await spawnRail(pane.windowId).catch(() => {});
     }
   }
   return touched;
