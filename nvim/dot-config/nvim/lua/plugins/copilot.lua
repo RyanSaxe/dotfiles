@@ -26,7 +26,10 @@ function M.set_state(bufnr, state)
     vim.schedule(function()
       local client = require("copilot.client")
       if not client.buf_is_attached(bufnr) then
-        client.buf_attach(bufnr)
+        -- Signature is buf_attach(force, bufnr); force is required so an
+        -- explicit enable beats copilot's internal filetype gate
+        -- (markdown is refused by default).
+        client.buf_attach(true, bufnr)
       end
     end)
   else
@@ -55,6 +58,16 @@ return {
   cmd = "Copilot",
   build = ":Copilot auth",
   event = "InsertEnter",
+  keys = {
+    {
+      "<leader>tc",
+      function()
+        local enabled = _G.CopilotBuffer.toggle()
+        vim.notify("Copilot " .. (enabled and "enabled" or "disabled") .. " for buffer", vim.log.levels.INFO)
+      end,
+      desc = "Toggle Copilot (Buffer)",
+    },
+  },
   opts = {
     suggestion = {
       enabled = true,

@@ -5,6 +5,17 @@
 return {
   { "nvim-mini/mini.pairs", enabled = false },
 
+  -- LazyVim maps i_<c-k> to signature help on every LspAttach, and that
+  -- buffer-local map would win over blink's menu-up. Blink's signature
+  -- window already owns signature UI, so the LSP keymap goes.
+  {
+    "neovim/nvim-lspconfig",
+    opts = function(_, opts)
+      local keys = opts.servers["*"].keys
+      keys[#keys + 1] = { "<c-k>", false, mode = "i" }
+    end,
+  },
+
   {
     "saghen/blink.cmp",
     ---@module 'blink.cmp'
@@ -39,7 +50,8 @@ return {
         ["<CR>"] = { "accept", "fallback" },
         ["<S-CR>"] = { "accept", "select_and_accept", "fallback" },
         ["<C-e>"] = { "show_documentation", "hide_documentation" },
-        ["<C-c>"] = { "hide", "fallback" },
+        -- <C-c> is deliberately absent: a buffer-local blink map would
+        -- shadow the global cancel-all map that copilot.lua owns.
         ["<C-k>"] = { "select_prev", "fallback" },
         ["<C-j>"] = { "select_next", "fallback" },
         -- Tab: menu -> snippet field -> literal tab. The literal-tab
@@ -58,11 +70,15 @@ return {
             return true
           end,
         },
-        -- S-Tab: accept copilot ghost text, else menu backwards —
-        -- mirrors zsh where S-Tab accepts the autosuggestion.
+        -- S-Tab: accept copilot ghost text (mirrors zsh where S-Tab
+        -- accepts the autosuggestion) -> menu backwards -> snippet field
+        -- backwards -> literal S-Tab, mirroring the Tab chain's shape.
+        -- The snippet guard keeps copilot-accept from stomping an active
+        -- snippet session; the literal fallback keeps S-Tab from
+        -- dead-keying when nothing is visible.
         ["<S-Tab>"] = {
           function(cmp)
-            if require("copilot.suggestion").is_visible() then
+            if require("copilot.suggestion").is_visible() and not vim.snippet.active() then
               require("copilot.suggestion").accept()
               return true
             end
@@ -70,6 +86,11 @@ return {
               return cmp.select_prev()
             end
             return false
+          end,
+          "snippet_backward",
+          function()
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<S-Tab>", true, false, true), "n", false)
+            return true
           end,
         },
         ["<Up>"] = { "select_prev", "fallback" },
