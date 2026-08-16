@@ -126,6 +126,19 @@ install_neovim_linux() {
     tar -xz -C "$HOME/.local" --strip-components=1
 }
 
+# apt's stow on LTS is 2.3.x, which breaks on --dotfiles dot- directories
+# (fixed in 2.4). Build the release tarball over it when too old.
+ensure_modern_stow() {
+  case "$(stow --version)" in
+  *"version 2."[0-3].*) ;;
+  *) return 0 ;;
+  esac
+  build="$(mktemp -d)"
+  curl -fsSL https://ftp.gnu.org/gnu/stow/stow-2.4.1.tar.gz | tar -xz -C "$build"
+  (cd "$build/stow-2.4.1" && ./configure && sudo make install) >/dev/null
+  rm -rf "$build"
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
@@ -138,6 +151,7 @@ install_tier_packages() {
   core:Linux)
     # shellcheck disable=SC2086
     apt_install $CORE_APT_PACKAGES
+    ensure_modern_stow
     # uv, starship, and a current neovim are not packaged (or too old) in
     # apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh

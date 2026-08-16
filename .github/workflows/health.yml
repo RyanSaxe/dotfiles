@@ -26,7 +26,16 @@ jobs:
           else
             sudo apt-get update -q
             sudo apt-get install -y stow zsh
+            # apt's 2.3.x breaks on --dotfiles dot- directories (fixed in
+            # 2.4); build the release tarball over it, as install.sh does.
+            if stow --version | grep -q 'version 2\.[0-3]\.'; then
+              build="$(mktemp -d)"
+              curl -fsSL https://ftp.gnu.org/gnu/stow/stow-2.4.1.tar.gz |
+                tar -xz -C "$build"
+              (cd "$build/stow-2.4.1" && ./configure && sudo make install) >/dev/null
+            fi
           fi
+          stow --version | head -n 1
 
       - name: Stow every tier into a scratch home
         run: |
