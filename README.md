@@ -38,6 +38,26 @@ zsh/dot-zshrc                  ->  ~/.zshrc
 Every tracked file is identical on every machine. Anything machine-specific
 resolves at runtime via `PATH` and `$HOME`; there is no templating.
 
+Symlinks point from `$HOME` into the repo, never the reverse, and generated
+files never land in the repo tree. Stow can violate this on its own: when a
+target directory does not exist it "folds" — links the whole directory into
+the repo — and every later write into that directory lands inside the
+package. Three layers prevent it:
+
+- `.stowrc` passes `--no-folding`: real directories, per-file links. It only
+  applies when stow runs from the repo root and the file parses.
+- `install.sh` pre-creates every directory that receives generated files at
+  runtime (`RUNTIME_WRITE_DIRS`) as a real directory before stowing, which
+  holds even when `.stowrc` is not read.
+- The health workflow stows into a scratch home, runs `theme apply`, and
+  fails if anything resolves into or dirties the checkout.
+
+A program that writes generated output under a stowed path — as `theme`
+publishes the rendered bat theme and ghostty shaders — needs its target
+directory added to `RUNTIME_WRITE_DIRS` in `install.sh`. The health check
+only exercises writes that happen during `theme apply`; anything written at
+another time relies on that list.
+
 ## Tools
 
 | Package      | Contents                                                                                              |

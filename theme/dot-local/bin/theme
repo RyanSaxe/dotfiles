@@ -245,6 +245,10 @@ render() {
 #   mascot     rail watches the state directory
 #   ghostty    palette follows macOS appearance natively; custom shaders
 #              pick up new content on the next config reload
+# Every directory this function writes into must be listed in install.sh's
+# RUNTIME_WRITE_DIRS: it must exist as a real directory before stow runs,
+# or stow can fold it into a symlink and these writes land inside the repo
+# (see README: Install).
 publish_files() {
   # File copies are context-independent writes: ghostty resolves
   # custom-shader paths relative to its config dir. Every rendered .glsl
