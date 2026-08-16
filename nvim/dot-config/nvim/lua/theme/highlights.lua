@@ -9,11 +9,16 @@
 --                     notify is deliberately rarer emphasis
 local M = {}
 
+---@param hex string
 local function to_rgb(hex)
   return tonumber(hex:sub(2, 3), 16), tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16)
 end
 
 -- Share `amount` of color over the background (amount=1 is pure color).
+---@param color string
+---@param bg string
+---@param amount number
+---@return string
 local function blend(color, bg, amount)
   local cr, cg, cb = to_rgb(color)
   local br, bg_, bb_ = to_rgb(bg)
@@ -23,13 +28,18 @@ local function blend(color, bg, amount)
   return string.format("#%02x%02x%02x", mix(cr, br), mix(cg, bg_), mix(cb, bb_))
 end
 
+---@param tokens ThemeTokens
 function M.apply(tokens)
   local p = tokens.palette
   local r = tokens.roles
   local accent, notify = tokens.accent, tokens.notify
+  ---@param color string
+  ---@param amount number
   local function bb(color, amount)
     return blend(color, r.bg, amount)
   end
+  ---@param group string
+  ---@param spec vim.api.keyset.highlight
   local function hl(group, spec)
     vim.api.nvim_set_hl(0, group, spec)
   end

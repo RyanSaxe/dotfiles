@@ -5,11 +5,12 @@
 -- (fresh machine, CI) the stock catppuccin floor stands alone.
 local M = {}
 
+---@type string
 local state_home = vim.env.XDG_STATE_HOME or (vim.env.HOME .. "/.local/state")
 local generated_dir = state_home .. "/dotfiles/generated"
 local tokens_path = generated_dir .. "/nvim-tokens.lua"
 
----@return table|nil
+---@return ThemeTokens|nil
 function M.load()
   local ok, tokens = pcall(dofile, tokens_path)
   if ok and type(tokens) == "table" then
@@ -18,6 +19,7 @@ function M.load()
   return nil
 end
 
+---@type ThemeTokens|nil
 M.tokens = nil
 
 function M.apply()
