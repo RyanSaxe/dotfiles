@@ -237,6 +237,7 @@ render() {
 # many contexts (shells, ssh, the tmux server) whose environments differ,
 # and a push that works in one silently fails in another. Consumers
 # converge on the generated files themselves:
+#   bat        receives the generated theme and rebuilds its cache when it changes
 #   starship   re-reads its config every prompt
 #   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
 #   tmux       rail daemon watches the generated dir and re-sources
@@ -253,6 +254,23 @@ publish_files() {
     [ -f "$shader" ] || continue
     cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
   done
+  # bat has no token/template layer of its own: publish the rendered inner
+  # theme into its normal config directory and rebuild only when its content
+  # actually changed. `batcat` is the Debian/Ubuntu binary name.
+  bat_theme="$GENERATED/Dotfiles.tmTheme"
+  if [ -f "$bat_theme" ]; then
+    bat_dir="$HOME/.config/bat/themes"
+    mkdir -p "$bat_dir"
+    if [ ! -f "$bat_dir/Dotfiles.tmTheme" ] ||
+      ! cmp -s "$bat_theme" "$bat_dir/Dotfiles.tmTheme"; then
+      cp "$bat_theme" "$bat_dir/Dotfiles.tmTheme"
+      if command -v bat >/dev/null 2>&1; then
+        bat cache --build
+      elif command -v batcat >/dev/null 2>&1; then
+        batcat cache --build
+      fi
+    fi
+  fi
   # Exceptions to "never poke processes", for consumers with no
   # file-watching path of their own. Both are idempotent no-ops when the
   # target isn't running:

@@ -64,6 +64,16 @@ jobs:
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" apply
           test -s "$SCRATCH/.local/state/dotfiles/generated/tuis-colors.json"
+          test -s "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
+          ! grep -q '{{' "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
+          printf 'light\n' > "$SCRATCH/.local/state/dotfiles/inner-mode"
+          printf 'dark\n' > "$SCRATCH/.local/state/dotfiles/outer-mode"
+          HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
+            "$SCRATCH/.local/bin/theme" apply
+          grep -q 'set -g @bg "#eff1f5"' \
+            "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
+          grep -q 'set -g @crust "#11111b"' \
+            "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
   # "Does the editor come up?" — the nvim package restores its locked
   # plugins headlessly and checkhealth reports no errors. Unlike the
