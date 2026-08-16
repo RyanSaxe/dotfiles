@@ -4,7 +4,9 @@
 #
 #   theme dark                 switch both layers to catppuccin mocha
 #   theme inner|outer MODE     switch one layer to dark, light, or toggle
-#   theme both MODE            switch both layers together
+#   theme both MODE            switch both layers together; `both toggle`
+#                              flips to the opposite of the inner mode, so
+#                              diverged layers converge
 #   theme apply                re-render the current layer modes
 #   theme status               print both layer modes
 #
@@ -368,11 +370,12 @@ apply_scope() {
   case "$requested" in
   dark | light) mode="$requested" ;;
   toggle)
-    if [ "$scope" = outer ]; then
-      current="$(layer_mode outer)"
-    else
-      current="$(layer_mode inner)"
-    fi
+    # Toggling flips the named layer; `both` reads inner as its reference,
+    # so diverged layers converge to the opposite of the inner mode.
+    case "$scope" in
+    outer) current="$(layer_mode outer)" ;;
+    inner | both) current="$(layer_mode inner)" ;;
+    esac
     [ "$current" = dark ] && mode=light || mode=dark
     ;;
   *)

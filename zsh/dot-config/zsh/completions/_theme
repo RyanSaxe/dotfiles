@@ -9,7 +9,7 @@ if (( CURRENT == 2 )); then
     'toggle:flip between dark and light'
     'inner:change the terminal and content layer'
     'outer:change the chrome and rail layer'
-    'both:change both layers'
+    'both:change both layers (toggle flips from the inner mode)'
     'apply:re-render the current layer modes'
     'status:print mode and mascot accents'
     'mascot:accent colors and sprite from a mascot'
