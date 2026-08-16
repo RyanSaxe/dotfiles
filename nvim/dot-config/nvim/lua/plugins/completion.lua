@@ -5,6 +5,17 @@
 return {
   { "nvim-mini/mini.pairs", enabled = false },
 
+  -- LazyVim maps i_<c-k> to signature help on every LspAttach, and that
+  -- buffer-local map would win over blink's menu-up. Blink's signature
+  -- window already owns signature UI, so the LSP keymap goes.
+  {
+    "neovim/nvim-lspconfig",
+    opts = function(_, opts)
+      local keys = opts.servers["*"].keys
+      keys[#keys + 1] = { "<c-k>", false, mode = "i" }
+    end,
+  },
+
   {
     "saghen/blink.cmp",
     ---@module 'blink.cmp'
