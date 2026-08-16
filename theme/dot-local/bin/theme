@@ -23,8 +23,8 @@ PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 # Palettes, tokens, and templates live next to this script in its stow
 # package; resolving our own symlink finds them wherever the repo lives.
 SCRIPT_PATH="$(readlink -f "$0")"
-PACKAGE_ROOT="${SCRIPT_PATH%/.local/bin/theme}"
-CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT/.config}/theme"
+PACKAGE_ROOT="${SCRIPT_PATH%/dot-local/bin/theme}"
+CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT/dot-config}/theme"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 # Mascot mappings are machine-personal state (project names must never
 # reach the public repo), not tracked config.
