@@ -1,0 +1,45 @@
+-- Headless Lua typecheck: the same lua-language-server the editor runs,
+-- with the nvim runtime and every installed plugin as typed libraries
+-- (lazydev's job, done statically). Run via `nvim -l dev/luals-check.lua`.
+--
+-- Skips cleanly where lua-language-server is not installed: the Lua
+-- toolchain is mac-only (see install.sh), and CI installs it explicitly.
+if vim.fn.executable("lua-language-server") == 0 then
+  print("luals-check: lua-language-server not installed, skipping")
+  os.exit(0)
+end
+
+local script_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h")
+local config_dir = vim.fs.normalize(script_dir .. "/../nvim/dot-config/nvim")
+
+---@type table<string, any>
+local luarc = vim.json.decode(table.concat(vim.fn.readfile(config_dir .. "/.luarc.json"), "\n"))
+
+---@type string[]
+local library = {}
+for _, path in ipairs(luarc["workspace.library"]) do
+  library[#library + 1] = path:gsub("%$VIMRUNTIME", vim.env.VIMRUNTIME)
+end
+-- Installed plugins are typed sources (snacks, blink, lazyvim, ...).
+-- Both appnames: the config runs as nvim-v2 until the stow cutover.
+local data_home = vim.env.XDG_DATA_HOME or (vim.env.HOME .. "/.local/share")
+for _, appname in ipairs({ "nvim", "nvim-v2" }) do
+  vim.list_extend(library, vim.fn.glob(data_home .. "/" .. appname .. "/lazy/*/lua", true, true))
+end
+luarc["workspace.library"] = library
+
+local generated = vim.fn.tempname() .. ".luarc.json"
+vim.fn.writefile({ vim.json.encode(luarc) }, generated)
+
+local result = vim
+  .system({
+    "lua-language-server",
+    "--check",
+    config_dir,
+    "--checklevel=Warning",
+    "--configpath",
+    generated,
+  })
+  :wait()
+io.write(result.stdout or "", result.stderr or "")
+os.exit(result.code)

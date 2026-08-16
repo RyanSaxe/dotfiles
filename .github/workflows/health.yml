@@ -177,6 +177,15 @@ jobs:
           nvim --headless \
             "+lua vim.defer_fn(function() vim.cmd('qa!') end, 120000)"
 
+      - name: Lua typecheck (strict)
+        if: runner.os == 'macOS'
+        run: |
+          # Types are OS-independent; one matrix leg carries the check.
+          # Runs after bootstrap so installed plugins serve as typed
+          # libraries (blink, snacks, LazyVim classes).
+          brew install lua-language-server
+          nvim -l dev/luals-check.lua
+
       - name: checkhealth reports no errors
         run: |
           nvim --headless "+silent checkhealth lazy" \
