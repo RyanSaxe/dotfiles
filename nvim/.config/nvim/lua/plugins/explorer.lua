@@ -13,7 +13,27 @@ return {
     "FylerOrg/fyler.nvim",
     dependencies = { "nvim-mini/mini.icons" },
     branch = "stable",
-    opts = {},
+    opts = {
+      extensions = {
+        git = { enabled = true },
+        -- Trash, never permanent delete (mirrors the mini.files stance).
+        trash = { enabled = true },
+        -- Keep the tree in sync with external filesystem changes.
+        watcher = { enabled = true },
+      },
+      integrations = { icon = "mini_icons" },
+      kind_presets = {
+        split_right_most = {
+          width = "30%",
+          win_opts = {
+            number = false,
+            relativenumber = false,
+            signcolumn = "no",
+            cursorline = true,
+          },
+        },
+      },
+    },
     keys = {
       {
         "<leader>E",
