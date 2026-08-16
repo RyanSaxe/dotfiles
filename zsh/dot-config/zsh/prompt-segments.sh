@@ -175,7 +175,11 @@ if [ -n "$VIRTUAL_ENV" ]; then
   venv_proj="${VIRTUAL_ENV%/*}"
   # $VIRTUAL_ENV keeps its activation-time spelling — resolve it before
   # comparing, or a matching venv reads as an impostor.
-  if [ "$(cd "$venv_proj" 2>/dev/null && pwd -P)" = "$anchor" ]; then
+  if [ ! -x "$VIRTUAL_ENV/bin/python" ]; then
+    # A deleted or half-built venv can stay exported until the next cd;
+    # green here would claim a working interpreter that is gone.
+    emit PROJ_BAD "${venv_proj##*/}"
+  elif [ "$(cd "$venv_proj" 2>/dev/null && pwd -P)" = "$anchor" ]; then
     emit PROJ_OK "${anchor##*/}"
   else
     emit PROJ_BAD "${venv_proj##*/}"

@@ -18,16 +18,20 @@ _venv_find() {
 _auto_venv() {
   local venv
   venv="$(_venv_find)"
-  if [[ -n "$venv" ]]; then
+  # A half-created venv (dir exists, bin/activate missing) must not be
+  # sourced — that would print an error on every chpwd.
+  if [[ -n "$venv" && -r "$venv/bin/activate" ]]; then
     # Re-source when switching projects, and also when the venv was inherited
     # through `exec zsh` (VIRTUAL_ENV survives but the deactivate fn does not).
     if [[ "$VIRTUAL_ENV" != "$venv" ]] || ! whence -w deactivate > /dev/null; then
       source "$venv/bin/activate"
       typeset -g _VENV_AUTO_ACTIVATED=1
     fi
-  elif [[ -n "$VIRTUAL_ENV" && -n "$_VENV_AUTO_ACTIVATED" ]]; then
+  elif [[ -n "$VIRTUAL_ENV" ]] &&
+    [[ -n "$_VENV_AUTO_ACTIVATED" || ! -x "$VIRTUAL_ENV/bin/python" ]]; then
     # We activated it, so leaving the project deactivates it. Manually
-    # activated venvs are left alone.
+    # activated venvs are left alone — unless the venv itself has vanished:
+    # a dead PATH entry serves nobody.
     whence -w deactivate > /dev/null && deactivate
     typeset -g _VENV_AUTO_ACTIVATED=
   fi
