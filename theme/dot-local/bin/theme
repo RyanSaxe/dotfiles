@@ -254,23 +254,7 @@ publish_files() {
     [ -f "$shader" ] || continue
     cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
   done
-  # bat has no token/template layer of its own: publish the rendered inner
-  # theme into its normal config directory and rebuild only when its content
-  # actually changed. `batcat` is the Debian/Ubuntu binary name.
-  bat_theme="$GENERATED/Dotfiles.tmTheme"
-  if [ -f "$bat_theme" ]; then
-    bat_dir="$HOME/.config/bat/themes"
-    mkdir -p "$bat_dir"
-    if [ ! -f "$bat_dir/Dotfiles.tmTheme" ] ||
-      ! cmp -s "$bat_theme" "$bat_dir/Dotfiles.tmTheme"; then
-      cp "$bat_theme" "$bat_dir/Dotfiles.tmTheme"
-      if command -v bat >/dev/null 2>&1; then
-        bat cache --build
-      elif command -v batcat >/dev/null 2>&1; then
-        batcat cache --build
-      fi
-    fi
-  fi
+  publish_bat_theme
   # Exceptions to "never poke processes", for consumers with no
   # file-watching path of their own. Both are idempotent no-ops when the
   # target isn't running:
@@ -281,6 +265,54 @@ publish_files() {
   pkill -USR2 -x ghostty 2>/dev/null || true
   command -v sketchybar >/dev/null 2>&1 &&
     sketchybar --trigger theme_changed 2>/dev/null || true
+}
+
+# bat has no token/template layer of its own: publish the rendered inner
+# theme into its normal config directory and rebuild only when its content
+# actually changed. Renders run concurrently (session switchers background
+# `theme mascot sync`), and parallel `bat cache --build` runs churn the
+# cache directory — a mkdir lock serializes the publish (flock is not
+# portable to macOS). The content check runs under the lock, so a waiter
+# whose theme another render already published coalesces into a no-op.
+# `batcat` is the Debian/Ubuntu binary name.
+publish_bat_theme() {
+  bat_theme="$GENERATED/Dotfiles.tmTheme"
+  [ -f "$bat_theme" ] || return 0
+  bat_dir="$HOME/.config/bat/themes"
+  mkdir -p "$bat_dir"
+  lock="$STATE/.bat-publish.lock"
+  waited=0
+  until mkdir "$lock" 2>/dev/null; do
+    holder="$(cat "$lock/pid" 2>/dev/null || true)"
+    # A holder that died mid-rebuild must not wedge every later render.
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+      rm -rf "$lock"
+      continue
+    fi
+    if [ "$waited" -ge 30 ]; then
+      echo "warning: bat publish lock is stuck, skipping cache rebuild" >&2
+      return 0
+    fi
+    waited=$((waited + 1))
+    sleep 1
+  done
+  echo $$ >"$lock/pid"
+  status=0
+  if [ ! -f "$bat_dir/Dotfiles.tmTheme" ] ||
+    ! cmp -s "$bat_theme" "$bat_dir/Dotfiles.tmTheme"; then
+    cp "$bat_theme" "$bat_dir/Dotfiles.tmTheme"
+    rebuild_bat_cache || status=$?
+  fi
+  rm -rf "$lock"
+  return $status
+}
+
+rebuild_bat_cache() {
+  if command -v bat >/dev/null 2>&1; then
+    bat cache --build
+  elif command -v batcat >/dev/null 2>&1; then
+    batcat cache --build
+  fi
 }
 
 # macOS appearance is the master light/dark switch: setting it flips ghostty
