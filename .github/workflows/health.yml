@@ -64,3 +64,41 @@ jobs:
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" apply
           test -s "$SCRATCH/.local/state/dotfiles/generated/tuis-colors.json"
+
+  # "Does the editor come up?" — the nvim package restores its locked
+  # plugins headlessly and checkhealth reports no errors. Unlike the
+  # health job this one installs real packages (neovim itself).
+  nvim:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install neovim
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install neovim
+          else
+            curl -fsSL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz |
+              sudo tar -xz -C /usr/local --strip-components=1
+          fi
+          nvim --version | head -n 1
+
+      - name: Headless plugin restore from the lockfile
+        run: |
+          mkdir -p "$HOME/.config"
+          ln -s "$PWD/nvim/.config/nvim" "$HOME/.config/nvim"
+          nvim --headless "+Lazy! restore" +qa
+
+      - name: checkhealth reports no errors
+        run: |
+          nvim --headless "+silent checkhealth lazy" \
+            "+silent w! /tmp/health.txt" +qa
+          cat /tmp/health.txt
+          if grep -q "ERROR" /tmp/health.txt; then
+            echo "::error::checkhealth reported errors"
+            exit 1
+          fi
