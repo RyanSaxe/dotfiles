@@ -187,6 +187,19 @@ def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
     assert 'set -g @accent "#ffcc00"' in rendered
 
 
+def test_mode_persists_only_after_a_successful_render(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    ok = run_theme(home, config, "inner", "dark")
+    assert ok.returncode == 0, ok.stderr
+    template = config / "theme/templates/frame.glsl.tmpl"
+    template.write_text(template.read_text() + "{{typo_token}}\n")
+
+    result = run_theme(home, config, "inner", "light")
+
+    assert result.returncode == 1
+    assert (state_dir(home) / "inner-mode").read_text() == "dark\n"
+
+
 def test_failed_render_names_the_token_and_leaves_no_temp_files(
     tmp_path: Path,
 ) -> None:

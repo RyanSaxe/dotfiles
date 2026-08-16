@@ -231,9 +231,11 @@ render_template() {
   fi
 }
 
+# Renders the persisted layer modes, or the explicitly passed pair
+# (inner outer) when the caller has not committed them to state yet.
 render() {
-  inner_mode="$(layer_mode inner)"
-  outer_mode="$(layer_mode outer)"
+  inner_mode="${1:-$(layer_mode inner)}"
+  outer_mode="${2:-$(layer_mode outer)}"
   mkdir -p "$GENERATED"
 
   accents="$STATE/accents.conf"
@@ -435,6 +437,23 @@ apply_scope() {
   esac
 
   case "$scope" in
+  inner)
+    target_inner="$mode"
+    target_outer="$(layer_mode outer)"
+    ;;
+  outer)
+    target_inner="$(layer_mode inner)"
+    target_outer="$mode"
+    ;;
+  both)
+    target_inner="$mode"
+    target_outer="$mode"
+    ;;
+  esac
+  # Render before persisting: a failed render must not leave the mode files
+  # or the OS appearance reporting a theme the generated files never got.
+  render "$target_inner" "$target_outer"
+  case "$scope" in
   inner) set_layer_mode inner "$mode" ;;
   outer) set_layer_mode outer "$mode" ;;
   both)
@@ -445,7 +464,6 @@ apply_scope() {
   # Ghostty's native light/dark theme pair is the inner terminal surface.
   # Outer-only changes must never flip the OS appearance.
   [ "$scope" = outer ] || set_os_appearance "$mode"
-  render
 }
 
 case "${1:-status}" in
@@ -465,9 +483,9 @@ apply)
   case "${2:-}" in
   '') render ;;
   dark | light)
+    render "$2" "$2"
     set_layer_mode inner "$2"
     set_layer_mode outer "$2"
-    render
     ;;
   *)
     echo "usage: theme apply [dark|light]" >&2
