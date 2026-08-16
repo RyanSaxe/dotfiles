@@ -466,15 +466,21 @@ async function main(): Promise<void> {
   // burst; debounce so the burst costs one pass, not one per file event.
   let themePending: NodeJS.Timeout | null = null;
   let tuisColorsTouched = false;
-  watch(GENERATED_DIR, (_event, filename) => {
-    if (filename === "tuis-colors.json") tuisColorsTouched = true;
-    if (themePending) clearTimeout(themePending);
-    themePending = setTimeout(() => {
-      if (tuisColorsTouched) pushed.clear();
-      tuisColorsTouched = false;
-      run(THEME_SYNC, []).catch(() => {});
-    }, 30);
-  });
+  try {
+    watch(GENERATED_DIR, (_event, filename) => {
+      if (filename === "tuis-colors.json") tuisColorsTouched = true;
+      if (themePending) clearTimeout(themePending);
+      themePending = setTimeout(() => {
+        if (tuisColorsTouched) pushed.clear();
+        tuisColorsTouched = false;
+        run(THEME_SYNC, []).catch(() => {});
+      }, 30);
+    });
+  } catch {
+    // Fresh install: no generated dir until the theme system's first
+    // render. Palette reads fail the same way, so ticks back off until
+    // it lands; the watcher only returns on daemon restart.
+  }
 
   watch(STATE_DIR, (_event, filename) => {
     if (filename === "enabled") wakeLoop();
