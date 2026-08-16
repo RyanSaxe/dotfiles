@@ -23,8 +23,7 @@ import { loadAcks, updateAcks } from "./acks.js";
 import {
   applyDoneHysteresis,
   collectAgents,
-  collectClientFacts,
-  collectPanes,
+  collectSnapshot,
   run,
   tmux,
   windowsOf,
@@ -286,10 +285,10 @@ async function tick(counter: number): Promise<void> {
           agentsFresh = true;
         })
       : Promise.resolve();
-  // The polls are independent — one round-trip of latency, not three.
-  const [panes, clientFacts] = await Promise.all([
-    collectPanes(),
-    collectClientFacts(),
+  // The tmux poll and the agent refresh are independent — one round-trip
+  // of latency, not two.
+  const [{ panes, clientFacts }] = await Promise.all([
+    collectSnapshot(),
     refresh,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;

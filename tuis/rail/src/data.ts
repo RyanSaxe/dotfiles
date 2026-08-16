@@ -123,7 +123,14 @@ export interface Pane {
   inMode: boolean;
 }
 
-const GLOBAL_FORMAT = [
+// Both listings run as ONE `;`-joined tmux invocation per tick — one
+// process spawn instead of two, measured at ~2x on poll cost. The
+// leading tag says which command produced each output line.
+const PANE_TAG = "P";
+const CLIENT_TAG = "C";
+
+const PANE_FORMAT = [
+  PANE_TAG,
   "#{session_name}",
   "#{session_attached}",
   "#{window_id}",
@@ -142,40 +149,26 @@ const GLOBAL_FORMAT = [
   "#{pane_in_mode}",
 ].join(SEP);
 
-// One tmux call per tick covers every session: rail panes to paint,
-// content windows to list, and geometry for frame buckets.
-export async function collectPanes(): Promise<Pane[]> {
-  const { stdout } = await run("tmux", [
-    "list-panes",
-    "-a",
-    "-F",
-    GLOBAL_FORMAT,
-  ]);
-  const panes: Pane[] = [];
-  for (const rawLine of stdout.split("\n")) {
-    if (!rawLine) continue;
-    const f = rawLine.split(SEP);
-    if (f.length < 16) continue;
-    panes.push({
-      session: f[0]!,
-      sessionAttached: Number(f[1]!) > 0,
-      windowId: f[2]!,
-      windowIndex: Number(f[3]!),
-      windowName: f[4]!,
-      windowActive: f[5] === "1",
-      windowPanes: Number(f[6]!),
-      windowWidth: Number(f[7]!),
-      paneId: f[8]!,
-      paneActive: f[9] === "1",
-      tty: f[10]!,
-      width: Number(f[11]!),
-      height: Number(f[12]!),
-      isRail: f[13] === "1",
-      historySize: Number(f[14]!),
-      inMode: f[15] === "1",
-    });
-  }
-  return panes;
+function parsePane(f: string[]): Pane | null {
+  if (f.length < 16) return null;
+  return {
+    session: f[0]!,
+    sessionAttached: Number(f[1]!) > 0,
+    windowId: f[2]!,
+    windowIndex: Number(f[3]!),
+    windowName: f[4]!,
+    windowActive: f[5] === "1",
+    windowPanes: Number(f[6]!),
+    windowWidth: Number(f[7]!),
+    paneId: f[8]!,
+    paneActive: f[9] === "1",
+    tty: f[10]!,
+    width: Number(f[11]!),
+    height: Number(f[12]!),
+    isRail: f[13] === "1",
+    historySize: Number(f[14]!),
+    inMode: f[15] === "1",
+  };
 }
 
 export interface ClientFacts {
@@ -199,23 +192,23 @@ export interface ClientFacts {
   latestClientIsKitty: boolean;
 }
 
-// One list-clients per tick answers every question; the ~250ms lag is
-// the accepted cost of riding the daemon cadence.
-export async function collectClientFacts(): Promise<ClientFacts> {
-  const { stdout } = await run("tmux", [
-    "list-clients",
-    "-F",
-    `#{client_session}${SEP}#{client_prefix}${SEP}#{client_key_table}${SEP}#{client_termname}${SEP}#{client_activity}`,
-  ]);
+const CLIENT_FORMAT = [
+  CLIENT_TAG,
+  "#{client_session}",
+  "#{client_prefix}",
+  "#{client_key_table}",
+  "#{client_termname}",
+  "#{client_activity}",
+].join(SEP);
+
+function clientFactsFrom(rows: string[][]): ClientFacts {
   const modeSessions = new Set<string>();
   const nonKittySessions = new Set<string>();
   // No clients at all: keep mascots in the buffers for the usual
   // capable reattach.
   let latestClientIsKitty = true;
   let latestActivity = -1;
-  for (const rawLine of stdout.split("\n")) {
-    if (!rawLine) continue;
-    const [session, prefix, keyTable, termname, activity] = rawLine.split(SEP);
+  for (const [session, prefix, keyTable, termname, activity] of rows) {
     if (!session) continue;
     const kitty = /ghostty|kitty/i.test(termname ?? "");
     if (prefix === "1" || keyTable === "agent") modeSessions.add(session);
@@ -227,6 +220,40 @@ export async function collectClientFacts(): Promise<ClientFacts> {
     }
   }
   return { modeSessions, nonKittySessions, latestClientIsKitty };
+}
+
+export interface Snapshot {
+  panes: Pane[];
+  clientFacts: ClientFacts;
+}
+
+// The whole tmux poll — every session's panes plus the client table — in
+// one exec; the ~250ms lag on client facts is the accepted cost of
+// riding the daemon cadence.
+export async function collectSnapshot(): Promise<Snapshot> {
+  const { stdout } = await run("tmux", [
+    "list-panes",
+    "-a",
+    "-F",
+    PANE_FORMAT,
+    ";",
+    "list-clients",
+    "-F",
+    CLIENT_FORMAT,
+  ]);
+  const panes: Pane[] = [];
+  const clientRows: string[][] = [];
+  for (const rawLine of stdout.split("\n")) {
+    if (!rawLine) continue;
+    const [tag, ...f] = rawLine.split(SEP);
+    if (tag === PANE_TAG) {
+      const pane = parsePane(f);
+      if (pane) panes.push(pane);
+    } else if (tag === CLIENT_TAG) {
+      clientRows.push(f);
+    }
+  }
+  return { panes, clientFacts: clientFactsFrom(clientRows) };
 }
 
 // Content windows of one session, rail panes excluded — the rail never
