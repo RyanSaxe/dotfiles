@@ -27,11 +27,12 @@ in the working tree but never committed: review the diff and commit
 deliberately.
 
 Each top-level directory is a stow package whose layout mirrors where its
-files land:
+files land. Hidden targets are named with a `dot-` prefix (stow's
+`--dotfiles` mode) so repo content stays visible to `rg`, `fd`, and editors:
 
 ```text
-nvim/.config/nvim/init.lua  ->  ~/.config/nvim/init.lua
-zsh/.zshrc                  ->  ~/.zshrc
+nvim/dot-config/nvim/init.lua  ->  ~/.config/nvim/init.lua
+zsh/dot-zshrc                  ->  ~/.zshrc
 ```
 
 Every tracked file is identical on every machine. Anything machine-specific
@@ -95,7 +96,7 @@ tokens such as `{{inner_bg}}` and `{{outer_crust}}`.
 A mascot is any image the theme system can wear: the rail paints its sprite
 and the accent/notify colors are extracted from it. Identities are
 provider-qualified (`pokemon:gengar`), and providers live in
-`theme/.local/bin/mascot-accents` as a registry — the picker, completions,
+`theme/dot-local/bin/mascot-accents` as a registry — the picker, completions,
 and rail all build from it, so adding a source touches exactly one file.
 
 A provider is two functions registered under a name:
