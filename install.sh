@@ -15,6 +15,10 @@
 set -eu
 
 OS="$(uname -s)"
+# No arguments and a real terminal means a human is driving: the tier and
+# agent pickers prompt. A scripted run takes the defaults instead.
+INTERACTIVE=0
+if [ "$#" -eq 0 ] && [ -t 0 ]; then INTERACTIVE=1; fi
 
 # ---------------------------------------------------------------- helpers
 brew_install() {
@@ -143,6 +147,52 @@ install_workmux() {
   esac
 }
 
+# Agent CLIs, by the name their binary answers to. brew casks on macOS (what
+# this machine already runs); npm elsewhere, into ~/.local so no sudo and no
+# root-owned files — zshenv already has that bin dir on PATH.
+AGENT_CLIS='claude codex copilot'
+
+install_agent_cli() {
+  case "$1" in
+  claude) agent_cask='claude-code@latest' agent_pkg='@anthropic-ai/claude-code' ;;
+  codex) agent_cask='codex' agent_pkg='@openai/codex' ;;
+  copilot) agent_cask='copilot-cli' agent_pkg='@github/copilot' ;;
+  *)
+    echo "error: unknown agent CLI: $1" >&2
+    return 1
+    ;;
+  esac
+  command -v "$1" >/dev/null 2>&1 && return 0
+  case "$OS" in
+  # Casks error on reinstall, unlike formulas.
+  Darwin) brew list --cask "$agent_cask" >/dev/null 2>&1 || brew install --cask "$agent_cask" ;;
+  *) npm install -g --prefix "$HOME/.local" "$agent_pkg" ;;
+  esac
+}
+
+# workmux discovers agents by their config directories, so the CLIs must land
+# first. Its `setup` writes the status-tracking hooks (merging into existing
+# settings, leaving custom entries alone) and refuses to run without a
+# terminal — hence the note instead of a call on a scripted install.
+setup_agents() {
+  chosen=''
+  for agent in $AGENT_CLIS; do
+    if [ "$INTERACTIVE" = 1 ]; then
+      ask "install the $agent CLI?" && chosen="$chosen $agent"
+    else
+      chosen="$chosen $agent"
+    fi
+  done
+  for agent in $chosen; do
+    install_agent_cli "$agent"
+  done
+  if [ "$INTERACTIVE" = 1 ]; then
+    workmux setup
+  else
+    echo "note: run \`workmux setup\` in a terminal to wire agent status hooks"
+  fi
+}
+
 install_neovim_linux() {
   # apt's neovim lags far behind the nvim config's 0.12 floor; the official
   # tarball into ~/.local is both the install and the upgrade path.
@@ -176,6 +226,7 @@ install_tier_packages() {
     # shellcheck disable=SC2086
     brew_install $CORE_BREW_FORMULAS
     install_workmux
+    setup_agents
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -190,6 +241,7 @@ install_tier_packages() {
     command -v starship >/dev/null 2>&1 || install_starship
     command -v nvim >/dev/null 2>&1 || install_neovim_linux
     install_workmux
+    setup_agents
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
