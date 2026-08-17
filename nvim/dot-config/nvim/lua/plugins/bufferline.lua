@@ -10,21 +10,9 @@ return {
     { "<leader>tB", "<cmd>set showtabline=2<cr>", desc = "Show Bufferline" },
   },
   opts = function()
-    local c = require("theme.chrome").colors()
-
-    -- The branch is context, cached async so the tabline render never
-    -- shells out.
-    vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged", "FocusGained" }, {
-      group = vim.api.nvim_create_augroup("chrome_branch", { clear = true }),
-      callback = function()
-        vim.system({ "git", "rev-parse", "--abbrev-ref", "HEAD" }, { text = true }, function(out)
-          local branch = out.code == 0 and vim.trim(out.stdout or "") or ""
-          vim.schedule(function()
-            vim.g.chrome_branch = branch
-          end)
-        end)
-      end,
-    })
+    local chrome = require("theme.chrome")
+    local c = chrome.colors()
+    chrome.track_git()
 
     local tab = { bg = c.mantle, fg = c.muted }
     local tab_active = { bg = c.base, fg = c.text }

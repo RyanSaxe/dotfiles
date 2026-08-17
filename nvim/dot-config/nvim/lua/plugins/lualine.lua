@@ -1,11 +1,9 @@
--- The instrument line: a fixed-geography statusline on the chrome
--- surface. Mode and recording sit left as solid chips; diagnostics,
--- the proportional diff gauge, and file position sit right. The gauge
--- and position are glyphs, not digits — indicators dim to surface
--- tones instead of disappearing, so the line never shifts.
-local GAUGE_CELLS = 6
-local BLOCKS = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }
-
+-- The dense grid: an honest-maximalist control room wrapping the
+-- buffer. The winbar (top) carries buffer telemetry — path,
+-- diagnostics, LSP clients, encoding, size. The statusline (bottom)
+-- carries session telemetry — mode, sync arrows, diff counts, words,
+-- position. Every fact has a fixed column; nothing appears twice
+-- (identity stays with the tabs, branch included).
 return {
   "nvim-lualine/lualine.nvim",
   event = "VeryLazy",
@@ -15,7 +13,9 @@ return {
     vim.o.showmode = false
   end,
   opts = function()
-    local c = require("theme.chrome").colors()
+    local chrome = require("theme.chrome")
+    local c = chrome.colors()
+    chrome.track_git()
 
     ---@return string
     local function mode_color()
@@ -45,55 +45,32 @@ return {
       return data and data.summary
     end
 
-    -- Proportional cell counts for the gauge; nil while the buffer has
-    -- no hunks (the dim track renders instead).
-    ---@return {add: integer, change: integer, delete: integer}|nil
-    local function gauge()
-      local s = diff_summary()
-      if not s then
-        return nil
+    ---@return string
+    local function lsp_clients()
+      ---@type string[]
+      local names = {}
+      for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+        names[#names + 1] = client.name
       end
-      ---@type integer, integer, integer
-      local add, change, delete = s.add or 0, s.change or 0, s.delete or 0
-      local total = add + change + delete
-      if total == 0 then
-        return nil
-      end
-      -- Every nonzero series keeps at least one cell; the largest series
-      -- absorbs the rounding remainder.
-      ---@param n integer
-      local function share(n)
-        return n > 0 and math.max(1, math.floor(n / total * GAUGE_CELLS)) or 0
-      end
-      local cells = { add = share(add), change = share(change), delete = share(delete) }
-      local used = cells.add + cells.change + cells.delete
-      local largest = "add"
-      if change > add then
-        largest = "change"
-      end
-      if delete > math.max(add, change) then
-        largest = "delete"
-      end
-      cells[largest] = cells[largest] + (GAUGE_CELLS - used)
-      return cells
+      return table.concat(names, "·")
     end
 
-    ---@param key "add"|"change"|"delete"
-    ---@param color string
-    local function gauge_segment(key, color)
-      return {
-        function()
-          local cells = gauge()
-          return cells and string.rep("▂", cells[key]) or ""
-        end,
-        color = { fg = color, bg = c.crust },
-        padding = 0,
-      }
+    ---@return string
+    local function file_size()
+      local bytes = vim.fn.getfsize(vim.api.nvim_buf_get_name(0))
+      if bytes <= 0 then
+        return ""
+      end
+      if bytes < 1024 then
+        return bytes .. "b"
+      end
+      return string.format("%.1fk", bytes / 1024)
     end
 
-    local chrome = { fg = c.text, bg = c.crust }
+    local flat = { fg = c.text, bg = c.crust }
     local muted = { fg = c.muted, bg = c.crust }
-    local section = { a = chrome, b = chrome, c = chrome }
+    local section = { a = flat, b = flat, c = flat }
+    local special_fts = { "snacks_dashboard", "snacks_picker_list", "snacks_picker_input" }
 
     return {
       options = {
@@ -110,27 +87,19 @@ return {
         icons_enabled = false,
         component_separators = { left = "", right = "" },
         section_separators = { left = "", right = "" },
-        disabled_filetypes = { statusline = { "snacks_dashboard" } },
+        disabled_filetypes = { statusline = special_fts, winbar = special_fts },
       },
+
+      -- Bottom row: session telemetry.
       sections = {
         lualine_a = {
-          -- A crust cell ahead of the mode chip: the line's edge stays
-          -- chrome-colored so ghostty's background extension shows frame,
-          -- never mode color.
-          {
-            function()
-              return " "
-            end,
-            color = chrome,
-            padding = 0,
-          },
           {
             "mode",
             fmt = function(s)
-              return s:sub(1, 1)
+              return s:sub(1, 3)
             end,
             color = function()
-              return { fg = c.crust, bg = mode_color(), gui = "bold" }
+              return { fg = mode_color(), bg = c.crust, gui = "bold" }
             end,
           },
           {
@@ -138,12 +107,79 @@ return {
               local reg = vim.fn.reg_recording()
               return reg ~= "" and ("● " .. reg) or ""
             end,
-            color = { fg = c.crust, bg = c.err, gui = "bold" },
+            color = { fg = c.err, bg = c.crust, gui = "bold" },
           },
         },
-        lualine_b = {},
-        lualine_c = {},
+        lualine_b = {
+          {
+            function()
+              ---@type integer
+              local n = vim.g.chrome_ahead or 0
+              return n > 0 and ("↑" .. n) or ""
+            end,
+            color = { fg = c.add, bg = c.crust },
+          },
+          {
+            function()
+              ---@type integer
+              local n = vim.g.chrome_behind or 0
+              return n > 0 and ("↓" .. n) or ""
+            end,
+            color = { fg = c.delete, bg = c.crust },
+          },
+        },
+        lualine_c = {
+          {
+            function()
+              local s = diff_summary()
+              return (s and (s.add or 0) > 0) and ("+" .. s.add) or ""
+            end,
+            color = { fg = c.add, bg = c.crust },
+          },
+          {
+            function()
+              local s = diff_summary()
+              return (s and (s.change or 0) > 0) and ("~" .. s.change) or ""
+            end,
+            color = { fg = c.change, bg = c.crust },
+          },
+          {
+            function()
+              local s = diff_summary()
+              return (s and (s.delete or 0) > 0) and ("−" .. s.delete) or ""
+            end,
+            color = { fg = c.delete, bg = c.crust },
+          },
+        },
         lualine_x = {
+          {
+            function()
+              return vim.fn.wordcount().words .. "w"
+            end,
+            color = muted,
+          },
+        },
+        lualine_y = {},
+        lualine_z = {
+          { "location", color = muted, padding = { left = 1, right = 0 } },
+          { "progress", color = muted },
+        },
+      },
+      inactive_sections = {},
+
+      -- Top row: buffer telemetry.
+      winbar = {
+        lualine_a = {
+          {
+            "filename",
+            path = 1,
+            symbols = { modified = " ●", readonly = " -", unnamed = "" },
+            color = function()
+              return { fg = vim.bo.modified and c.warn or c.text, bg = c.crust }
+            end,
+          },
+        },
+        lualine_b = {
           {
             "diagnostics",
             symbols = { error = "● ", warn = "▲ ", info = "◆ ", hint = "· " },
@@ -151,34 +187,20 @@ return {
             color = { bg = c.crust },
           },
         },
+        lualine_x = { { lsp_clients, color = muted } },
         lualine_y = {
-          gauge_segment("add", c.add),
-          gauge_segment("change", c.change),
-          gauge_segment("delete", c.delete),
           {
             function()
-              return gauge() == nil and string.rep("▂", GAUGE_CELLS) or ""
+              return vim.bo.fileencoding
             end,
-            color = { fg = c.dim, bg = c.crust },
-            padding = 0,
+            color = muted,
           },
         },
-        lualine_z = {
-          { "location", color = muted },
-          {
-            function()
-              local line = vim.fn.line(".")
-              local last = vim.fn.line("$")
-              return BLOCKS[math.max(1, math.ceil(line / last * #BLOCKS))]
-            end,
-            color = function()
-              return { fg = vim.bo.modified and c.warn or c.text, bg = c.crust }
-            end,
-            padding = { left = 0, right = 1 },
-          },
-        },
+        lualine_z = { { file_size, color = muted } },
       },
-      inactive_sections = {},
+      inactive_winbar = {
+        lualine_a = { { "filename", path = 1, color = muted } },
+      },
     }
   end,
 }
