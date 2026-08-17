@@ -185,6 +185,10 @@ export interface ClientFacts {
   // Most recent activity timestamp (epoch secs) across attached clients;
   // null with no clients. The non-macOS stand-in for input-idle presence.
   latestClientActivityTs: number | null;
+  // Sessions whose attached terminal window currently owns OS focus. The
+  // terminal reports it (focus-events), so this is per-client, travels
+  // over ssh, and is true only while someone is actually looking.
+  focusedSessions: Set<string>;
   // Whether the most recently active client renders kitty graphics.
   // Placeholder cells need this bit AND a session clear of
   // nonKittySessions: a terminal without the protocol cannot even LAY
@@ -204,20 +208,25 @@ const CLIENT_FORMAT = [
   "#{client_key_table}",
   "#{client_termname}",
   "#{client_activity}",
+  "#{client_flags}",
 ].join(SEP);
 
 function clientFactsFrom(rows: string[][]): ClientFacts {
   const modeSessions = new Set<string>();
   const nonKittySessions = new Set<string>();
+  const focusedSessions = new Set<string>();
   // No clients at all: keep mascots in the buffers for the usual
   // capable reattach.
   let latestClientIsKitty = true;
   let latestActivity = -1;
-  for (const [session, prefix, keyTable, termname, activity] of rows) {
+  for (const [session, prefix, keyTable, termname, activity, flags] of rows) {
     if (!session) continue;
     const kitty = /ghostty|kitty/i.test(termname ?? "");
     if (prefix === "1" || keyTable === "agent") modeSessions.add(session);
     if (!kitty) nonKittySessions.add(session);
+    if ((flags ?? "").split(",").includes("focused")) {
+      focusedSessions.add(session);
+    }
     const activityTs = Number(activity) || 0;
     if (activityTs >= latestActivity) {
       latestActivity = activityTs;
@@ -228,6 +237,7 @@ function clientFactsFrom(rows: string[][]): ClientFacts {
     modeSessions,
     nonKittySessions,
     latestClientActivityTs: latestActivity >= 0 ? latestActivity : null,
+    focusedSessions,
     latestClientIsKitty,
     clientCount: rows.length,
   };

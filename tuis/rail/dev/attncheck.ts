@@ -1,12 +1,13 @@
-// Exercises the attention-routing decisions: presence, terminal focus,
-// and which agents ride a phone ping (transitions vs departure sweep).
+// Exercises the attention-routing decisions: presence and which agents
+// ride a phone ping (transitions vs departure sweep). Terminal focus is
+// tmux's own client_flags now, exercised by ackcheck.
 //
 //   npx tsx dev/attncheck.ts
 
 import assert from "node:assert/strict";
 
 import { phoneBatch } from "../src/notifications.js";
-import { isPresent, terminalFocused } from "../src/probes.js";
+import { isPresent } from "../src/probes.js";
 import type { Agent, AgentStatus } from "../src/data.js";
 
 const agent = (paneId: string, status: AgentStatus): Agent => ({
@@ -28,12 +29,6 @@ assert.equal(isPresent(null, 950, 1000), true, "fresh client activity");
 assert.equal(isPresent(null, 100, 1000), false, "stale client activity");
 assert.equal(isPresent(null, null, 1000), false, "no signal is away");
 assert.equal(isPresent(30, 100, 1000), true, "input idle outranks clients");
-
-// ----- terminal focus ----------------------------------------------------
-assert.equal(terminalFocused("Ghostty"), true, "ghostty is the terminal");
-assert.equal(terminalFocused("kitty"), true, "kitty is the terminal");
-assert.equal(terminalFocused("Arc"), false, "a browser is not");
-assert.equal(terminalFocused(null), true, "no signal keeps old behavior");
 
 // ----- phone batch -------------------------------------------------------
 const waiting = agent("%1", "waiting");

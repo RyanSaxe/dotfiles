@@ -10,15 +10,9 @@ import { run } from "./data.js";
 // is the channel. Tunable.
 export const PRESENCE_IDLE_SECS = 120;
 
-// Same terminals the client termname detection in data.ts recognizes —
-// the apps whose OS focus means the rail is actually on screen.
-const TERMINAL_APP = /ghostty|kitty/i;
-
 export interface HostFacts {
   // Seconds since the last keyboard/mouse input; null when unprobeable.
   inputIdleSecs: number | null;
-  // Frontmost application name; null when unprobeable.
-  focusedApp: string | null;
 }
 
 // HIDIdleTime is reported in nanoseconds.
@@ -57,42 +51,9 @@ async function probeInputIdle(): Promise<number | null> {
   return secs;
 }
 
-async function probeFocusedApp(): Promise<string | null> {
-  try {
-    const { stdout } = await run("aerospace", [
-      "list-windows",
-      "--focused",
-      "--format",
-      "%{app-name}",
-    ]);
-    const name = stdout.trim();
-    if (name) return name;
-  } catch {
-    // aerospace missing or not running; lsappinfo answers the same question.
-  }
-  try {
-    const { stdout: front } = await run("lsappinfo", ["front"]);
-    const { stdout } = await run("lsappinfo", [
-      "info",
-      "-only",
-      "LSDisplayName",
-      front.trim(),
-    ]);
-    return /"LSDisplayName"="(.+)"/.exec(stdout)?.[1] ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export async function collectHostFacts(): Promise<HostFacts> {
-  if (platform() !== "darwin") {
-    return { inputIdleSecs: null, focusedApp: null };
-  }
-  const [inputIdleSecs, focusedApp] = await Promise.all([
-    probeInputIdle(),
-    probeFocusedApp(),
-  ]);
-  return { inputIdleSecs, focusedApp };
+  if (platform() !== "darwin") return { inputIdleSecs: null };
+  return { inputIdleSecs: await probeInputIdle() };
 }
 
 // Present = someone is at this machine. System input idle is the truth on
@@ -109,10 +70,4 @@ export function isPresent(
     return nowSecs - latestClientActivityTs < PRESENCE_IDLE_SECS;
   }
   return false;
-}
-
-// Whether a terminal owns the screen. No focus signal (non-macOS, probe
-// failure) keeps the old behavior: attachment alone counts as seeing.
-export function terminalFocused(focusedApp: string | null): boolean {
-  return focusedApp === null || TERMINAL_APP.test(focusedApp);
 }
