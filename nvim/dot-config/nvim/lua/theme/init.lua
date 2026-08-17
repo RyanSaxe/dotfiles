@@ -74,6 +74,7 @@ function M.setup(floor_opts)
     end,
   })
   M.apply()
+  require("theme.heatmap").setup()
   if vim.uv.fs_stat(generated_dir) then
     watch()
   end

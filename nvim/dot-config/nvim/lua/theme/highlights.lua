@@ -178,6 +178,25 @@ function M.apply(tokens)
   -- phase) statusline and bufferline share the rail's surface so the
   -- whole frame reads as one piece. Accent is the common frame color,
   -- notify marks the input focus.
+  -- The heatmap statusline's cells and mode bar; the bar itself sits
+  -- on crust like all chrome.
+  hl("StatusLine", { fg = r.fg_muted, bg = p.crust })
+  hl("StatusLineNC", { fg = r.fg_faint, bg = p.crust })
+  hl("ThemeHeatTrack", { fg = p.surface0, bg = p.crust })
+  hl("ThemeHeatAdd", { fg = p.semantic_add, bg = p.crust })
+  hl("ThemeHeatChange", { fg = p.semantic_change, bg = p.crust })
+  hl("ThemeHeatDelete", { fg = p.semantic_delete, bg = p.crust })
+  hl("ThemeHeatErr", { fg = p.red, bg = p.crust })
+  hl("ThemeHeatWarn", { fg = p.yellow, bg = p.crust })
+  hl("ThemeHeatCursor", { fg = r.fg, bg = p.crust, bold = true })
+  hl("ThemeHeatRec", { fg = p.red, bg = p.crust, bold = true })
+  hl("ThemeHeatModeNormal", { fg = accent, bg = p.crust, bold = true })
+  hl("ThemeHeatModeInsert", { fg = notify, bg = p.crust, bold = true })
+  hl("ThemeHeatModeVisual", { fg = p.mauve, bg = p.crust, bold = true })
+  hl("ThemeHeatModeCommand", { fg = p.pink, bg = p.crust, bold = true })
+  hl("ThemeHeatModeReplace", { fg = p.red, bg = p.crust, bold = true })
+  hl("ThemeHeatModeTerminal", { fg = p.green, bg = p.crust, bold = true })
+
   local chrome = p.crust
   hl("NormalFloat", { bg = chrome })
   hl("FloatBorder", { fg = accent, bg = chrome })
