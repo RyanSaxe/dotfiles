@@ -15,10 +15,20 @@ local config_dir = vim.fs.normalize(script_dir .. "/../nvim/dot-config/nvim")
 ---@type table<string, any>
 local luarc = vim.json.decode(table.concat(vim.fn.readfile(config_dir .. "/.luarc.json"), "\n"))
 
--- The same resolver the editor uses, required from the config itself so
--- there is exactly one answer to "what is a typed library".
-package.path = config_dir .. "/lua/?.lua;" .. package.path
-luarc["workspace.library"] = require("luals").libraries()
+-- This run has no lazydev, so it stands in for it: the vim runtime plus
+-- every installed plugin's lua dir. The EDITOR must never be given this
+-- list — lazydev fetches those on demand, and eagerly indexing 45
+-- plugins on every attach makes editing crawl. `.luarc.json` holds only
+-- the diagnostic policy, which both sides share; it must not name
+-- libraries, because LuaLS gives it precedence over client settings and
+-- a stale entry there silently overrides lazydev.
+---@type string[]
+local library = { vim.env.VIMRUNTIME .. "/lua" }
+local data_home = vim.env.XDG_DATA_HOME or (vim.env.HOME .. "/.local/share")
+for _, appname in ipairs({ "nvim", "nvim-v2" }) do
+  vim.list_extend(library, vim.fn.glob(data_home .. "/" .. appname .. "/lazy/*/lua", true, true))
+end
+luarc["workspace.library"] = library
 
 local generated = vim.fn.tempname() .. ".luarc.json"
 vim.fn.writefile({ vim.json.encode(luarc) }, generated)

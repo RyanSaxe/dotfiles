@@ -16,67 +16,86 @@
 -- would pass by doing nothing. Run via
 -- `nvim --headless -c 'luafile dev/editor-parity.lua'`.
 --
--- Each file is opened and waited on individually, which is what makes
--- this slow. Batching — `bufload` everything then settle once — does not
--- work: lua_ls does not reliably attach to buffers that were never
--- displayed, and the check hangs waiting for a client that never comes.
+-- Scope: ONE canary file, checked well — not a sweep of every file.
+-- The divergence this guards against is workspace-level (the editor
+-- missing a whole library), so one file that exercises the project's own
+-- types, the vim API, and a plugin type detects it immediately.
+--
+-- A full sweep was tried and abandoned: opening 25 files in one session
+-- keeps lazydev adding libraries as it meets new words, LuaLS re-indexes
+-- under each measurement, and the run reported ~200 phantom
+-- `Undefined global vim` warnings for files that are clean when opened
+-- on their own. Fighting lazydev's on-demand loading to test it would
+-- defeat the point of keeping it.
 local script_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h")
 local root = vim.fs.normalize(script_dir .. "/..")
-local lua_root = root .. "/nvim/dot-config/nvim/lua"
 
--- Generous: a cold lua_ls indexes every plugin library on first attach.
+-- Uses ThemeTokens (a project class), the vim API (runtime types), and
+-- catppuccin's palette (a plugin type): if any library is missing from
+-- the editor's workspace, this file lights up.
+local CANARY = root .. "/nvim/dot-config/nvim/lua/theme/highlights.lua"
+
 local ATTACH_TIMEOUT_MS = 60000
-local SETTLE_MS = 1500
+-- Diagnostics are not final when the server first answers, and no event
+-- says they are; a cold lua_ls has not even loaded its own stdlib meta.
+local POLL_MS = 250
+local STABLE_POLLS = 8
+local MAX_WAIT_MS = 40000
 
----@return string[]
-local function targets()
-  return vim.fn.glob(lua_root .. "/**/*.lua", true, true)
+---@param buf integer
+---@return string
+local function signature(buf)
+  ---@type string[]
+  local parts = {}
+  for _, d in ipairs(vim.diagnostic.get(buf)) do
+    parts[#parts + 1] = ("%d:%d:%s"):format(d.lnum, d.col, d.message)
+  end
+  table.sort(parts)
+  return table.concat(parts, "\n")
 end
 
----@param path string
----@return vim.Diagnostic[]
-local function diagnose(path)
-  vim.cmd.edit(vim.fn.fnameescape(path))
+vim.defer_fn(function()
+  vim.cmd.edit(vim.fn.fnameescape(CANARY))
   local buf = vim.api.nvim_get_current_buf()
+
   ---@return boolean
   local function has_client()
     return #vim.lsp.get_clients({ bufnr = buf, name = "lua_ls" }) > 0
   end
-  local attached = vim.wait(ATTACH_TIMEOUT_MS, has_client, 100)
-  if not attached then
-    error("lua_ls never attached to " .. path .. " — the check cannot verify anything")
+  if not vim.wait(ATTACH_TIMEOUT_MS, has_client, 100) then
+    io.write("editor-parity: lua_ls never attached — the check cannot verify anything\n")
+    os.exit(1)
   end
-  -- No event says "diagnostics are final"; let the server settle.
-  vim.wait(SETTLE_MS)
-  return vim.diagnostic.get(buf)
-end
 
--- Deferred so lazy.nvim has finished loading before the first file opens.
-vim.defer_fn(function()
-  ---@type string[]
-  local findings = {}
-  local paths = targets()
-  for _, path in ipairs(paths) do
-    for _, d in ipairs(diagnose(path)) do
-      findings[#findings + 1] = ("%s:%d:%d: [%s] %s"):format(
-        path:sub(#root + 2),
+  local previous, unchanged, waited = nil, 0, 0
+  while waited < MAX_WAIT_MS do
+    vim.wait(POLL_MS)
+    waited = waited + POLL_MS
+    local current = signature(buf)
+    unchanged = current == previous and unchanged + 1 or 0
+    previous = current
+    if unchanged >= STABLE_POLLS then
+      break
+    end
+  end
+
+  local diagnostics = vim.diagnostic.get(buf)
+  if #diagnostics == 0 then
+    io.write("editor-parity: the editor reports nothing on " .. CANARY:sub(#root + 2) .. "\n")
+    os.exit(0)
+  end
+
+  for _, d in ipairs(diagnostics) do
+    io.write(
+      ("%s:%d:%d: [%s] %s\n"):format(
+        CANARY:sub(#root + 2),
         d.lnum + 1,
         d.col + 1,
         vim.diagnostic.severity[d.severity],
         d.message
       )
-    end
+    )
   end
-
-  if #findings == 0 then
-    io.write(("editor-parity: %d files, no diagnostics in a live editor\n"):format(#paths))
-    os.exit(0)
-  end
-
-  table.sort(findings)
-  for _, finding in ipairs(findings) do
-    io.write(finding, "\n")
-  end
-  io.write(("editor-parity: %d diagnostic(s) the editor shows\n"):format(#findings))
+  io.write(("editor-parity: %d diagnostic(s) the editor shows and the headless check misses\n"):format(#diagnostics))
   os.exit(1)
 end, 3000)
