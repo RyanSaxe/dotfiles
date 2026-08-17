@@ -137,6 +137,31 @@ repos:
         pass_filenames: false
         files: "^tuis/rail/"
 
+      # The rail's attention routing: presence, terminal focus, and the
+      # transition/departure-sweep phone batch.
+      - id: rail-attncheck
+        name: attncheck (rail)
+        language: node
+        additional_dependencies: ["tsx@4.19.2"]
+        entry: sh
+        args: ["-c", "tsx tuis/rail/dev/attncheck.ts"]
+        pass_filenames: false
+        files: "^tuis/rail/"
+
+      # The idle_prompt escalation hook flips working→waiting and nothing
+      # else. Skips cleanly where zsh isn't installed.
+      - id: escalate-check
+        name: escalate-check (workmux hook)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "command -v zsh >/dev/null 2>&1 || exit 0; sh dev/escalate-check.sh",
+          ]
+        pass_filenames: false
+        files: "^(workmux/dot-local/bin/workmux-escalate-idle|dev/escalate-check\\.sh)$"
+
       # Strict Lua typecheck (no-unknown: annotations are required), same
       # engine and .luarc.json as the editor. Skips cleanly where nvim
       # or lua-language-server is missing — the Lua toolchain is mac-only
