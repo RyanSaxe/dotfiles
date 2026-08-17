@@ -19,7 +19,7 @@ const PAGE_DOWN_KEY = "⌥.";
 // The slab is 22 content cells; these two crust columns after them are
 // the visible right margin (the colorless tmux border beside them reads
 // as part of the gap). daemon.ts derives the pane width from this.
-export const GUTTER_COLS = 2;
+export const GUTTER_COLS = 1;
 
 // Pure frame renderer: RailData -> exactly `height` ANSI lines of `width`
 // cells. The daemon and the look-spike share this path verbatim.
@@ -30,10 +30,10 @@ export function renderRail(
   height: number,
 ): string[] {
   const bg = railBg(palette);
-  // The gutter (appended at the end) makes hairlines and text stop two
-  // cells (~19pt at font-size 16, the frame's spacing unit) before the
-  // slab meets the content surface — mirroring the 19pt of frame crust on
-  // the rail's left edge.
+  // The gutter (appended at the end) stops hairlines and text one cell
+  // short of the slab's edge; the crust pane-border column supplies the
+  // second, so text still rests ~19pt (two cells at font-size 16) from
+  // the content surface — mirroring the frame crust on the rail's left.
   const inner = width - GUTTER_COLS;
 
   const agentsByPane = new Map<string, Agent>();

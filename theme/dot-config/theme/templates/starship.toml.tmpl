@@ -13,6 +13,11 @@
 # The prompt shows identity, declared facts, and chosen state — never
 # inventory (installed toolchains, incidental file types).
 #
+# Both lines open with a space: tmux gives panes no padding, so the shell
+# owns its gutter and text rests off the pane border instead of hugging
+# it. Command output still starts at column 0 — nothing sits between an
+# app and the border.
+#
 # Every segment is precomputed once per prompt by prompt-segments.sh (one
 # dash spawn, all git queries in parallel) and exported by the
 # _prompt_segments precmd (.zshrc) as _PROMPT_SEG_* vars; the env_var
@@ -25,7 +30,7 @@
 # The blank line between commands comes from a zsh precmd instead (.zshrc),
 # which skips the first prompt.
 add_newline = false
-format = "${env_var._PROMPT_SEG_SUBDIR}${env_var._PROMPT_SEG_REPO_PARENT}${env_var._PROMPT_SEG_DIR_PLAIN}${env_var._PROMPT_SEG_BRANCH}${env_var._PROMPT_SEG_BRANCH_BEHIND}${env_var._PROMPT_SEG_PKG}${env_var._PROMPT_SEG_AGE}${env_var._PROMPT_SEG_CLEAN}${env_var._PROMPT_SEG_DIRTY}${env_var._PROMPT_SEG_ARROWS}$line_break${env_var._PROMPT_SEG_PROJ_BAD}${env_var._PROMPT_SEG_PROJ_OK}${env_var._PROMPT_SEG_PROJ_PLAIN}${env_var._PROMPT_SEG_DIR_NAME}${env_var._PROMPT_SEG_PYVERSION}$character"
+format = " ${env_var._PROMPT_SEG_SUBDIR}${env_var._PROMPT_SEG_REPO_PARENT}${env_var._PROMPT_SEG_DIR_PLAIN}${env_var._PROMPT_SEG_BRANCH}${env_var._PROMPT_SEG_BRANCH_BEHIND}${env_var._PROMPT_SEG_PKG}${env_var._PROMPT_SEG_AGE}${env_var._PROMPT_SEG_CLEAN}${env_var._PROMPT_SEG_DIRTY}${env_var._PROMPT_SEG_ARROWS}$line_break ${env_var._PROMPT_SEG_PROJ_BAD}${env_var._PROMPT_SEG_PROJ_OK}${env_var._PROMPT_SEG_PROJ_PLAIN}${env_var._PROMPT_SEG_DIR_NAME}${env_var._PROMPT_SEG_PYVERSION}$character"
 
 # WHERE — exactly one of the three shows: repo-relative path (hidden at the
 # repo root), the directory the repo lives in (at the root), or the parent

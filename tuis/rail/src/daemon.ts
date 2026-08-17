@@ -57,7 +57,7 @@ const NO_SERVER_PATTERN = /no server running|error connecting/i;
 const NO_SERVER_EXIT_TICKS = 5;
 // 22 content cells (~211pt at font-size 16, the verdicted rail width)
 // plus the crust gutter renderRail appends.
-const RAIL_WIDTH = 22 + GUTTER_COLS;
+const RAIL_WIDTH = 23 + GUTTER_COLS;
 // Split feasibility, not policy: below this tmux can't fit rail + border
 // + any content. Visibility is controlled by alt+g alone.
 const MIN_SPLIT_WIDTH = RAIL_WIDTH + 2;
@@ -238,35 +238,6 @@ async function selfHeal(panes: Pane[], enabled: boolean): Promise<Set<string>> {
   return touched;
 }
 
-// Auto separators: a window's crust hairlines show only with 2+ content
-// panes (@wborders read by the border styles at draw time). Hooks flip
-// the flag instantly; this reconcile makes it inevitable (break-pane,
-// join-pane — anything hookless). Only mismatches cost a tmux call.
-const windowBorders = new Map<string, boolean>();
-
-async function reconcileWindowBorders(panes: Pane[]): Promise<void> {
-  const counts = new Map<string, number>();
-  for (const pane of panes) {
-    if (pane.isRail) continue;
-    counts.set(pane.windowId, (counts.get(pane.windowId) ?? 0) + 1);
-  }
-  const seen = new Set<string>();
-  for (const pane of panes) {
-    if (seen.has(pane.windowId)) continue;
-    seen.add(pane.windowId);
-    const want = (counts.get(pane.windowId) ?? 0) >= 2;
-    if (windowBorders.get(pane.windowId) === want) continue;
-    windowBorders.set(pane.windowId, want);
-    const args = want
-      ? ["set-option", "-w", "-t", pane.windowId, "@wborders", "1"]
-      : ["set-option", "-w", "-t", pane.windowId, "-u", "@wborders"];
-    await tmux(...args).catch(() => {});
-  }
-  for (const windowId of windowBorders.keys()) {
-    if (!seen.has(windowId)) windowBorders.delete(windowId);
-  }
-}
-
 // Mascot cells ride two gates. A terminal without kitty graphics cannot
 // even LAY OUT the placeholder text (astral codepoint plus combining
 // diacritics desync its column accounting and garble the pane), so a
@@ -337,7 +308,6 @@ async function tick(counter: number): Promise<boolean> {
   }
   const enabled = existsSync(ENABLED_FLAG);
   const skip = await selfHeal(panes, enabled);
-  await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
   const acked = updateAcks(acks, settled, panes, clientFacts.focusedSessions);
