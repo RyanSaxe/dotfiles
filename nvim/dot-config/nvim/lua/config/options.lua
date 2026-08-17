@@ -6,6 +6,14 @@ opt.relativenumber = false -- flash owns jumps; relative numbers are noise
 opt.updatetime = 50 -- rest-on-symbol UI reacts near-instantly
 opt.clipboard = "unnamedplus" -- yank straight to the system clipboard
 
+-- Every cursor shape keeps the cell's full HEIGHT; only width varies.
+-- Load-bearing beyond taste: ghostty's frame shader infers the display
+-- scale from the cursor height (iCurrentCursor.w), so nvim's stock
+-- `r-cr-o:hor20` — a bar 20% of a cell tall — reads as a 1x display and
+-- collapses the frame ring to half its width the moment you enter
+-- Replace mode. Block there keeps the probe honest.
+vim.opt.guicursor = "n-v-c-sm-r-cr-o:block,i-ci-ve:ver25,t:block-blinkon500-blinkoff500-TermCursor"
+
 -- No remote plugins in use: skip the provider probes (python3's alone
 -- costs ~70ms on the first python buffer).
 vim.g.loaded_python3_provider = 0
