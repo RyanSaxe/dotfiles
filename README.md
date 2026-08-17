@@ -138,6 +138,16 @@ entry, per-project sync, and the rail sprite all follow from the
 registration — see the `pokemon` provider for a full example and
 `shiny-pokemon` for wrapping an existing source as its own picker entry.
 
+## Machine-local values
+
+Anything that can't live in git — secrets, per-machine ids — goes in an
+untracked `.env` at the repo root, which zsh and the rail launcher both
+load. `install.sh` creates it with a commented placeholder per required
+value and prints a loud reminder for every one still empty. Today that
+list is `CLAUDE_NOTIFICATION_ID`, the ntfy.sh topic the rail pings for
+agent notifications: leave it unset and phone notifications simply never
+send (`rail status` reports which state you're in).
+
 ## Development
 
 Every commit is gated by [prek](https://github.com/j178/prek): pinned

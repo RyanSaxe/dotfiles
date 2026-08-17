@@ -207,6 +207,33 @@ install_neovim_linux() {
     tar -xz -C "$HOME/.local" --strip-components=1
 }
 
+# Secrets and per-machine ids live in an untracked .env at the repo root,
+# loaded by zsh (env_init) and by the rail launcher. It can never be
+# installed for you — but a fresh box silently losing phone notifications
+# because nobody knew the file existed is worse than being nagged.
+#
+# One "NAME description" per line; the description is what the prompt shows.
+REQUIRED_ENV_VARS='CLAUDE_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
+
+ensure_env_file() {
+  if [ ! -f .env ]; then
+    {
+      echo "# Untracked machine-local secrets, loaded by zsh and the rail launcher."
+      echo "$REQUIRED_ENV_VARS" | while read -r name description; do
+        [ -n "$name" ] || continue
+        echo "# $description"
+        echo "$name="
+      done
+    } >.env
+  fi
+  echo "$REQUIRED_ENV_VARS" | while read -r name description; do
+    [ -n "$name" ] || continue
+    grep -q "^$name=." .env && continue
+    printf '\033[1;31mACTION REQUIRED\033[0m set %s in %s/.env — %s\n' \
+      "$name" "$PWD" "$description" >&2
+  done
+}
+
 # apt's stow on LTS is 2.3.x, which breaks on --dotfiles dot- directories
 # (fixed in 2.4). Build the release tarball over it when too old.
 ensure_modern_stow() {
@@ -646,6 +673,9 @@ if command -v bat >/dev/null 2>&1; then
 elif command -v batcat >/dev/null 2>&1; then
   batcat cache --build
 fi
+
+# Machine-local values nothing can install for you; warns loudly per gap.
+ensure_env_file
 
 # The commit gate for working on this repo (see README: Development).
 uv tool install --quiet prek
