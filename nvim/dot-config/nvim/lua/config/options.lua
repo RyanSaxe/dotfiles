@@ -21,8 +21,30 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
 
--- One global statusline, reduced to the mode cell; per-window facts
--- ride the winbar instead.
-vim.opt.laststatus = 3
+-- No statusline: it would band the full width and stop the outer
+-- surface short of the terminal floor. Mode rides the tab row,
+-- per-window facts ride the winbar.
+vim.opt.laststatus = 0
 vim.opt.cmdheight = 0
 vim.opt.showmode = false
+
+-- laststatus=0 removes the bar but NOT the divider between stacked
+-- windows: nvim still draws a statusline there, and an unset one falls
+-- back to the built-in default, which is why that row read as a
+-- filename. Blanked, it renders as a plain painted strip.
+vim.opt.statusline = " "
+
+-- Separators as painted bands rather than hairline glyphs. A drawn
+-- glyph leaves the cell's own background beside it — which is the gap
+-- next to the explorer, and what ghostty's always-extend smears at the
+-- edges. Space glyphs let the WinSeparator background be the divider,
+-- the same fix as the tmux border.
+vim.opt.fillchars:append({
+  vert = " ",
+  horiz = " ",
+  horizup = " ",
+  horizdown = " ",
+  vertleft = " ",
+  vertright = " ",
+  verthoriz = " ",
+})

@@ -1,16 +1,10 @@
--- Six facts, no backgrounds. Left: mode (one bold capital in the mode
--- color), branch, git counts. Right: diagnostic counts, then location.
--- Volatile segments sit at each group's inner end, so growth eats empty
--- middle instead of moving anything — location stays pinned to the
--- right edge, mode and branch to the left. While a macro records, the
--- location pulses red: no extra cells, no layout shift.
+-- There is no statusline. A global one spans the full width, so it cut
+-- the outer surface off one row above the terminal floor and a
+-- right-hand explorer stopped short of the edge instead of reading as
+-- the frame's right wall. Its two facts moved to surfaces that were
+-- already there: mode and recording to the tab row (global state on a
+-- global bar), per-window git and diagnostics to the winbar.
 return {
   { "nvim-lualine/lualine.nvim", enabled = false },
-  {
-    "nvim-mini/mini.statusline",
-    event = "VeryLazy",
-    config = function()
-      require("theme.statusline").setup()
-    end,
-  },
+  { "nvim-mini/mini.statusline", enabled = false },
 }

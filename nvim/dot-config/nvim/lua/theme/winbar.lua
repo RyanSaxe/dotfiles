@@ -1,54 +1,16 @@
--- Chrome content. The statusline is reduced to two cells at the bottom
--- left — a state dot and the mode capital — on the buffer's own
--- background, so it reads as part of the gutter rather than as an edge
--- band. Everything else moved up: the winbar carries per-window git and
--- diagnostic facts directly under the tab row.
+-- Per-window chrome. There is no statusline at all: it spanned the full
+-- width and cut the outer surface off before the terminal's bottom edge,
+-- so a right-hand explorer never reached the floor. Global state (mode,
+-- recording, branch) moved to the tab row, which is genuinely global;
+-- what is left here is per-window and belongs under the tab row —
+-- diagnostics on the left, git counts on the right.
 local M = {}
-
----@return string
-local function mode_group()
-  ---@type string
-  local m = vim.fn.mode():sub(1, 1)
-  if m == "i" then
-    return "ThemeStlInsert"
-  elseif m == "v" or m == "V" or m == "\22" or m == "s" then
-    return "ThemeStlVisual"
-  elseif m == "c" then
-    return "ThemeStlCommand"
-  elseif m == "R" then
-    return "ThemeStlReplace"
-  elseif m == "t" then
-    return "ThemeStlTerminal"
-  end
-  return "ThemeStlNormal"
-end
-
-local PULSE_MS = 450
-
----@type boolean
-local pulse_lit = false
-local pulse_timer = nil
-
--- The dot rides the mode's color, so the pair reads as one object; while
--- a macro records it blinks red instead.
----@return string
-local function state_group()
-  if vim.fn.reg_recording() ~= "" and pulse_lit then
-    return "ThemeStlRecording"
-  end
-  return mode_group()
-end
 
 ---@param group string
 ---@param text string
 ---@return string
 local function paint(group, text)
   return "%#" .. group .. "#" .. text
-end
-
----@return string
-function M.content()
-  return paint(state_group(), " ●") .. paint(mode_group(), " " .. vim.fn.mode():sub(1, 1):upper())
 end
 
 ---@return string
@@ -120,7 +82,7 @@ local function apply_winbar(win)
   end
   local buf = vim.api.nvim_win_get_buf(win)
   local normal = vim.bo[buf].buftype == "" and vim.bo[buf].filetype ~= ""
-  vim.wo[win].winbar = normal and "%!v:lua.require'theme.statusline'.winbar()" or ""
+  vim.wo[win].winbar = normal and "%!v:lua.require'theme.winbar'.winbar()" or ""
 end
 
 local function apply_all()
@@ -130,55 +92,8 @@ local function apply_all()
 end
 
 function M.setup()
-  require("mini.statusline").setup({
-    use_icons = false,
-    content = {
-      active = M.content,
-      inactive = M.content,
-    },
-  })
-
-  local group = vim.api.nvim_create_augroup("theme_chrome", { clear = true })
-  -- The first red frame comes from the autocmd, which runs in the main
-  -- loop and flushes before nvim waits for the next key; the blink that
-  -- follows needs a full redraw, since a statusline-only redraw from a
-  -- timer never reaches an idle screen.
-  vim.api.nvim_create_autocmd("RecordingEnter", {
-    group = group,
-    callback = function()
-      pulse_lit = true
-      vim.cmd.redrawstatus()
-      if pulse_timer then
-        return
-      end
-      pulse_timer = vim.uv.new_timer()
-      if not pulse_timer then
-        return
-      end
-      pulse_timer:start(
-        PULSE_MS,
-        PULSE_MS,
-        vim.schedule_wrap(function()
-          pulse_lit = not pulse_lit
-          vim.cmd("redraw")
-        end)
-      )
-    end,
-  })
-  vim.api.nvim_create_autocmd("RecordingLeave", {
-    group = group,
-    callback = function()
-      if pulse_timer then
-        pulse_timer:stop()
-        pulse_timer:close()
-        pulse_timer = nil
-      end
-      pulse_lit = false
-      vim.cmd.redrawstatus()
-    end,
-  })
   vim.api.nvim_create_autocmd({ "BufWinEnter", "FileType", "WinEnter", "WinNew" }, {
-    group = group,
+    group = vim.api.nvim_create_augroup("theme_winbar", { clear = true }),
     callback = function()
       apply_winbar(vim.api.nvim_get_current_win())
     end,
