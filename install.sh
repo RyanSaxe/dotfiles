@@ -121,6 +121,28 @@ install_starship() {
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 }
 
+install_workmux() {
+  # workmux drives every worktree/window in this setup and its config ships
+  # in the core tier, so the binary belongs here too. Homebrew serves it
+  # from the author's tap; Linux gets the release tarball (a bare binary),
+  # which is also the upgrade path.
+  case "$OS" in
+  Darwin)
+    brew tap raine/workmux
+    brew_install workmux
+    ;;
+  *)
+    case "$(uname -m)" in
+    aarch64 | arm64) workmux_arch=arm64 ;;
+    *) workmux_arch=amd64 ;;
+    esac
+    mkdir -p "$HOME/.local/bin"
+    curl -fsSL "https://github.com/raine/workmux/releases/latest/download/workmux-linux-$workmux_arch.tar.gz" |
+      tar -xz -C "$HOME/.local/bin"
+    ;;
+  esac
+}
+
 install_neovim_linux() {
   # apt's neovim lags far behind the nvim config's 0.12 floor; the official
   # tarball into ~/.local is both the install and the upgrade path.
@@ -153,6 +175,7 @@ install_tier_packages() {
   core:Darwin)
     # shellcheck disable=SC2086
     brew_install $CORE_BREW_FORMULAS
+    install_workmux
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -166,6 +189,7 @@ install_tier_packages() {
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || install_starship
     command -v nvim >/dev/null 2>&1 || install_neovim_linux
+    install_workmux
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -388,14 +412,17 @@ upgrade_apt() {
     uv --version
     starship --version | head -n 1
     nvim --version | head -n 1
+    workmux --version
   } >"$WORK/installers.before"
   uv self update
   install_starship
   install_neovim_linux
+  install_workmux
   {
     uv --version
     starship --version | head -n 1
     nvim --version | head -n 1
+    workmux --version
   } >"$WORK/installers.after"
   report_changes installers "$WORK/installers.before" "$WORK/installers.after"
 }
