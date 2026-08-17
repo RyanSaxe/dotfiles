@@ -50,12 +50,14 @@ return {
       return vim.bo[bufnr].buflisted and vim.bo[bufnr].buftype == ""
     end,
   },
+  ---@param opts table copilot setup opts from this spec
   config = function(_, opts)
     require("copilot").setup(opts)
 
     -- C-c is the universal cancel: closes the blink menu AND the ghost
     -- text in one press, staying in insert mode; falls through to the
     -- stock C-c (exit insert) when there is nothing to close.
+    ---@return string
     vim.keymap.set("i", "<C-c>", function()
       local anything_closed = false
 

@@ -193,6 +193,9 @@ jobs:
           brew install lua-language-server
           nvim -l dev/luals-check.lua
 
+      - name: every lua function documents its signature
+        run: nvim -l dev/annotation-check.lua
+
       - name: checkhealth reports no errors
         run: |
           nvim --headless "+silent checkhealth lazy" \

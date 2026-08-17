@@ -10,6 +10,7 @@
 local M = {}
 
 ---@param hex string
+---@return integer red, integer green, integer blue
 local function to_rgb(hex)
   return tonumber(hex:sub(2, 3), 16), tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16)
 end
@@ -22,6 +23,9 @@ end
 local function blend(color, bg, amount)
   local cr, cg, cb = to_rgb(color)
   local br, bg_, bb_ = to_rgb(bg)
+  ---@param c integer one channel of the color
+  ---@param b integer the same channel of the background
+  ---@return integer
   local mix = function(c, b)
     return math.floor(c * amount + b * (1 - amount) + 0.5)
   end
@@ -35,6 +39,7 @@ function M.apply(tokens)
   local accent, notify = tokens.accent, tokens.notify
   ---@param color string
   ---@param amount number
+  ---@return string
   local function bb(color, amount)
     return blend(color, r.bg, amount)
   end

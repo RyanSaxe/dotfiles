@@ -126,6 +126,7 @@ local function watch()
   -- The theme system writes via tmp+mv, so watch the directory and
   -- debounce: one repaint per render burst.
   local pending = false
+  ---@param filename string|nil
   handle:start(generated_dir, {}, function(_, filename)
     if filename ~= "nvim-tokens.lua" or pending then
       return
