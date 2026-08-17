@@ -1,0 +1,15 @@
+#!/usr/bin/env zsh
+# Claude Notification hook (idle_prompt matcher): input-idle while still
+# marked working means the agent is silently blocked — escalate to waiting
+# so the rail/phone can flag it. done and existing waiting are never
+# touched; those are truthful states, not misses.
+set -eu
+
+[ -n "${TMUX_PANE:-}" ] || exit 0
+
+# @workmux_status holds the status glyph format; the theme token inside it
+# names the status. No option set = no status to escalate.
+current="$(tmux show-options -w -v -t "$TMUX_PANE" @workmux_status 2>/dev/null || true)"
+case "$current" in
+*@status_working*) workmux set-window-status waiting ;;
+esac
