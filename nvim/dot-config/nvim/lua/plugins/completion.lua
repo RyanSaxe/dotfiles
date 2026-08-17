@@ -10,6 +10,7 @@ return {
   -- window already owns signature UI, so the LSP keymap goes.
   {
     "neovim/nvim-lspconfig",
+    ---@param opts PluginLspOpts
     opts = function(_, opts)
       local keys = opts.servers["*"].keys
       keys[#keys + 1] = { "<c-k>", false, mode = "i" }

@@ -4,12 +4,15 @@
 
 -- nil = filetype default, true = force enabled, false = force disabled
 local M = {}
+---@type table<integer, boolean>
 M.buffer_state = {}
 M.disabled_filetypes = {
   markdown = true,
   text = true,
 }
 
+---@param bufnr? integer
+---@return boolean
 function M.get_state(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   local explicit = M.buffer_state[bufnr]
@@ -19,6 +22,8 @@ function M.get_state(bufnr)
   return not M.disabled_filetypes[vim.bo[bufnr].filetype]
 end
 
+---@param bufnr? integer
+---@param state boolean|nil
 function M.set_state(bufnr, state)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   M.buffer_state[bufnr] = state
@@ -37,6 +42,8 @@ function M.set_state(bufnr, state)
   end
 end
 
+---@param bufnr? integer
+---@return boolean
 function M.toggle(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   local new_state = not M.get_state(bufnr)

@@ -1,0 +1,55 @@
+---@meta
+-- Type surface of the generated token file (nvim-tokens.lua). The file
+-- itself is rendered by the theme system and can't carry annotations;
+-- these classes give its consumers completion and typo guards.
+
+---@class ThemeRoles
+---@field bg string
+---@field bg_alt string
+---@field bg_highlight string
+---@field fg string
+---@field fg_muted string
+---@field fg_faint string
+---@field border string
+---@field warn string
+---@field success string
+---@field info string
+---@field ghost string
+
+---@class ThemePalette
+---@field rosewater string
+---@field flamingo string
+---@field pink string
+---@field mauve string
+---@field red string
+---@field maroon string
+---@field peach string
+---@field yellow string
+---@field green string
+---@field teal string
+---@field sky string
+---@field sapphire string
+---@field blue string
+---@field lavender string
+---@field semantic_add string
+---@field semantic_delete string
+---@field semantic_change string
+---@field text string
+---@field subtext1 string
+---@field subtext0 string
+---@field overlay2 string
+---@field overlay1 string
+---@field overlay0 string
+---@field surface2 string
+---@field surface1 string
+---@field surface0 string
+---@field base string
+---@field mantle string
+---@field crust string
+
+---@class ThemeTokens
+---@field mode "dark"|"light"
+---@field accent string
+---@field notify string
+---@field roles ThemeRoles
+---@field palette ThemePalette

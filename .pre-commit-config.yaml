@@ -23,8 +23,9 @@ repos:
       - id: check-added-large-files
 
   # ------------------------------------------------------------------ Lua
-  # Diagnostics/typecheck for Lua come from lua-language-server: live in the
-  # editor, and `lua-language-server --check` in CI once nvim/ exists (step 6).
+  # Typecheck lives in the local-hooks section (luals-check): the same
+  # lua-language-server the editor runs, strict mode, so annotations are
+  # required — Lua's tsc --noEmit.
   - repo: https://github.com/JohnnyMorganz/StyLua
     rev: v2.5.2
     hooks:
@@ -134,6 +135,22 @@ repos:
           ["-c", "XDG_STATE_HOME=$(mktemp -d) tsx tuis/rail/dev/ackcheck.ts"]
         pass_filenames: false
         files: "^tuis/rail/"
+
+      # Strict Lua typecheck (no-unknown: annotations are required), same
+      # engine and .luarc.json as the editor. Skips cleanly where nvim
+      # or lua-language-server is missing — the Lua toolchain is mac-only
+      # (see install.sh); CI installs it explicitly.
+      - id: luals-check
+        name: luals --check (nvim)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l dev/luals-check.lua",
+          ]
+        pass_filenames: false
+        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|dev/luals-check\.lua)$'
 
       # The keybind cheatsheet (alt+/) can never drift: every chord bound
       # in tmux.conf and aerospace.toml must have a keys.tsv row.

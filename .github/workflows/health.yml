@@ -119,9 +119,9 @@ jobs:
             "$SCRATCH/.local/bin/theme" inner light
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" outer dark
-          grep -q 'set -g @bg "#eff1f5"' \
+          grep -q 'set -g @bg "#f5f7fa"' \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
-          grep -q 'set -g @crust "#11111b"' \
+          grep -q 'set -g @crust "#06070a"' \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
       - name: Generated artifacts stay out of the checkout
@@ -130,7 +130,7 @@ jobs:
           # directory that stow folded into a package symlink would receive
           # them inside the checkout instead.
           repo="$(pwd -P)"
-          for path in .config/bat/themes .config/ghostty/shaders; do
+          for path in .config/bat/themes .config/ghostty/shaders .config/ghostty/themes; do
             resolved="$(cd "$SCRATCH/$path" && pwd -P)"
             case "$resolved" in
             "$repo"/*)
@@ -176,6 +176,15 @@ jobs:
           # early aborts them, so give the boot a settle window.
           nvim --headless \
             "+lua vim.defer_fn(function() vim.cmd('qa!') end, 120000)"
+
+      - name: Lua typecheck (strict)
+        if: runner.os == 'macOS'
+        run: |
+          # Types are OS-independent; one matrix leg carries the check.
+          # Runs after bootstrap so installed plugins serve as typed
+          # libraries (blink, snacks, LazyVim classes).
+          brew install lua-language-server
+          nvim -l dev/luals-check.lua
 
       - name: checkhealth reports no errors
         run: |
