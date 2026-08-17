@@ -1,11 +1,7 @@
 -- Only deliberate divergences from the LazyVim floor live here.
 local opt = vim.opt
 
-opt.signcolumn = "number" -- signs replace the line number; no extra gutter
--- LazyVim points statuscolumn at snacks, which draws signs and the
--- number as separate segments — that voids signcolumn="number". Clearing
--- it restores native rendering, where the merge actually happens.
-opt.statuscolumn = ""
+opt.signcolumn = "yes:1" -- signs get their own column; line numbers stay numbers
 opt.relativenumber = false -- flash owns jumps; relative numbers are noise
 opt.updatetime = 50 -- rest-on-symbol UI reacts near-instantly
 opt.clipboard = "unnamedplus" -- yank straight to the system clipboard
@@ -17,8 +13,7 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
 
--- No statusline: window identity floats (incline) and file shape rides
--- the scrollbar (satellite), so the bottom row belongs to code.
-vim.opt.laststatus = 0
+-- One global statusline; identity lives in the bufferline.
+vim.opt.laststatus = 3
 vim.opt.cmdheight = 0
 vim.opt.showmode = false

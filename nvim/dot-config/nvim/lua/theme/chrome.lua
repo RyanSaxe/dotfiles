@@ -56,32 +56,23 @@ function M.colors()
   }
 end
 
--- Git facts for the chrome, cached async so no bar render ever shells
--- out: branch, plus commits ahead/behind upstream.
+-- The branch name for the statusline, cached async so no render ever
+-- shells out.
 function M.track_git()
-  local group = vim.api.nvim_create_augroup("chrome_git", { clear = true })
-  vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged", "FocusGained", "BufWritePost" }, {
-    group = group,
-    callback = function()
-      vim.system({ "git", "rev-parse", "--abbrev-ref", "HEAD" }, { text = true }, function(out)
-        local branch = out.code == 0 and vim.trim(out.stdout or "") or ""
-        vim.schedule(function()
-          vim.g.chrome_branch = branch
-        end)
+  local function refresh()
+    vim.system({ "git", "rev-parse", "--abbrev-ref", "HEAD" }, { text = true }, function(out)
+      local branch = out.code == 0 and vim.trim(out.stdout or "") or ""
+      vim.schedule(function()
+        vim.g.chrome_branch = branch
       end)
-      vim.system({ "git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}" }, { text = true }, function(out)
-        local ahead, behind = 0, 0
-        if out.code == 0 then
-          local a, b = vim.trim(out.stdout or ""):match("^(%d+)%s+(%d+)$")
-          ahead, behind = tonumber(a) or 0, tonumber(b) or 0
-        end
-        vim.schedule(function()
-          vim.g.chrome_ahead = ahead
-          vim.g.chrome_behind = behind
-        end)
-      end)
-    end,
+    end)
+  end
+  vim.api.nvim_create_autocmd({ "DirChanged", "FocusGained", "BufWritePost" }, {
+    group = vim.api.nvim_create_augroup("chrome_git", { clear = true }),
+    callback = refresh,
   })
+  -- Setup runs after VimEnter has fired, so seed the value now too.
+  refresh()
 end
 
 return M
