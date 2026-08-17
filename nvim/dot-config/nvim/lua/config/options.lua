@@ -16,3 +16,9 @@ vim.g.loaded_python3_provider = 0
 vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
+
+-- No statusline: window identity floats (incline) and file shape rides
+-- the scrollbar (satellite), so the bottom row belongs to code.
+vim.opt.laststatus = 0
+vim.opt.cmdheight = 0
+vim.opt.showmode = false
