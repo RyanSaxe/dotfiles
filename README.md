@@ -58,17 +58,17 @@ another time relies on that list.
 
 ## Tools
 
-| Package      | Contents                                                                                                                                             |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nvim`       | LazyVim-based Neovim. Mid-migration: not yet in a tier; the `nvim2` alias runs it under `NVIM_APPNAME=nvim-v2` until it's stowed as `~/.config/nvim` |
-| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                                                                          |
-| `ghostty`    | terminal emulator (macOS)                                                                                                                            |
-| `sketchybar` | macOS menu bar replacement, aerospace/battery/cpu/memory/wifi widgets                                                                                |
-| `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status                                                |
-| `git`        | git + gh, delta as pager                                                                                                                             |
-| `bat`        | `cat` with syntax highlighting, themed with Catppuccin                                                                                               |
-| `theme`      | the theming pipeline (below)                                                                                                                         |
-| `tiers`      | which packages install on which machines                                                                                                             |
+| Package      | Contents                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| `nvim`       | LazyVim-based Neovim, themed from the generated tokens                                                |
+| `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                           |
+| `ghostty`    | terminal emulator (macOS)                                                                             |
+| `sketchybar` | macOS menu bar replacement, aerospace/battery/cpu/memory/wifi widgets                                 |
+| `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status |
+| `git`        | git + gh, delta as pager                                                                              |
+| `bat`        | `cat` with syntax highlighting, themed with Catppuccin                                                |
+| `theme`      | the theming pipeline (below)                                                                          |
+| `tiers`      | which packages install on which machines                                                              |
 
 ## Conventions
 

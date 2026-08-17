@@ -44,11 +44,6 @@ alias tokens='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py tokens'
 alias nvim-clean='~/generic/dotfiles/scripts/nvim-clean.sh'
 alias diagnose='uvx ty check --output-format concise --no-progress --color never --exit-zero | rg -o "(error|warning)\[[^]]+\]" | sort | uniq -c | sort -nr | awk "{print \$2 \": \" \$1}"'
 
-# Runs the nvim/ package config under NVIM_APPNAME=nvim-v2 while
-# ~/.config/nvim still points elsewhere. Delete this alias once the
-# package is stowed as ~/.config/nvim.
-alias nvim2='NVIM_APPNAME=nvim-v2 nvim'
-
 # Quick edits
 alias zshrc='$EDITOR ~/.zshrc'
 
