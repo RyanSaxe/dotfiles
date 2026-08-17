@@ -6,6 +6,7 @@ return {
     name = "catppuccin",
     priority = 1000,
     opts = { flavour = "mocha" },
+    ---@param opts table catppuccin setup opts from this spec
     config = function(_, opts)
       require("theme").setup(opts)
     end,

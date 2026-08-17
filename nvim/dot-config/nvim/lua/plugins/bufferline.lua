@@ -12,6 +12,7 @@
 -- The branch name for the tab row, cached async so no render shells out.
 local function track_git()
   local function refresh()
+    ---@param out vim.SystemCompleted
     vim.system({ "git", "rev-parse", "--abbrev-ref", "HEAD" }, { text = true }, function(out)
       local branch = out.code == 0 and vim.trim(out.stdout or "") or ""
       vim.schedule(function()
@@ -104,6 +105,7 @@ return {
   -- `opts` may be evaluated once, late, or never, and the first paint
   -- would then have no branch to show.
   init = track_git,
+  ---@return table
   opts = function()
     return {
       options = {
@@ -119,6 +121,7 @@ return {
           -- The right end of the row is the global-state readout: branch,
           -- then a state dot, then the mode capital. Both belong on a
           -- global bar — which the tab row is and a winbar is not.
+          ---@return { text: string, link: string }[]
           right = function()
             ---@type string
             local branch = vim.g.chrome_branch or ""
@@ -135,6 +138,7 @@ return {
           end,
         },
       },
+      ---@return table<string, vim.api.keyset.highlight>
       highlights = function()
         local s = surfaces()
         local tab = { bg = s.tab, fg = s.tab_fg }

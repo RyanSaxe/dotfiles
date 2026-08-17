@@ -178,6 +178,38 @@ repos:
         pass_filenames: false
         files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|dev/luals-check\.lua)$'
 
+      # LuaLS reports what it cannot INFER; it says nothing about an
+      # inferable-but-undocumented function. This is the other half:
+      # every parameter named in a ---@param, every value-returning
+      # function carrying a ---@return.
+      - id: annotation-check
+        name: annotation coverage (lua)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l dev/annotation-check.lua",
+          ]
+        pass_filenames: false
+        files: '^(nvim/.*\.lua|dev/.*\.lua)$'
+
+      # The one check that opens a real editor. `.luarc.json` must never
+      # name libraries: LuaLS gives it precedence over client settings, so
+      # a stale entry there silently overrides lazydev and the editor goes
+      # blind while this repo's other Lua checks stay green.
+      - id: editor-parity
+        name: editor parity (lua)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "command -v nvim >/dev/null 2>&1 || exit 0; nvim --headless -c 'luafile dev/editor-parity.lua'",
+          ]
+        pass_filenames: false
+        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|dev/editor-parity\.lua)$'
+
       # The keybind cheatsheet (alt+/) can never drift: every chord bound
       # in tmux.conf and aerospace.toml must have a keys.tsv row.
       - id: keycheck

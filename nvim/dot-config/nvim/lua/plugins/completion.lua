@@ -59,6 +59,8 @@ return {
         -- fallback is load-bearing: without it Tab dead-keys whenever
         -- the first two steps decline.
         ["<Tab>"] = {
+          ---@param cmp blink.cmp.API
+          ---@return boolean|nil
           function(cmp)
             if cmp.is_visible() then
               return cmp.select_next()
@@ -66,6 +68,7 @@ return {
             return false
           end,
           "snippet_forward",
+          ---@return boolean
           function()
             vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "n", false)
             return true
@@ -78,6 +81,8 @@ return {
         -- snippet session; the literal fallback keeps S-Tab from
         -- dead-keying when nothing is visible.
         ["<S-Tab>"] = {
+          ---@param cmp blink.cmp.API
+          ---@return boolean|nil
           function(cmp)
             if require("copilot.suggestion").is_visible() and not vim.snippet.active() then
               require("copilot.suggestion").accept()
@@ -89,6 +94,7 @@ return {
             return false
           end,
           "snippet_backward",
+          ---@return boolean
           function()
             vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<S-Tab>", true, false, true), "n", false)
             return true
@@ -122,6 +128,8 @@ return {
             score_offset = 90,
             override = {
               -- A '.' triggers completion for faster import lookup.
+              ---@param self blink.cmp.Source
+              ---@return string[]
               get_trigger_characters = function(self)
                 local trigger_characters = self:get_trigger_characters()
                 vim.list_extend(trigger_characters, { "." })
@@ -132,6 +140,7 @@ return {
           path = { min_keyword_length = 0 },
           -- Snippet completions stay hidden until a snippet story exists.
           snippets = {
+            ---@return boolean
             should_show_items = function()
               return false
             end,

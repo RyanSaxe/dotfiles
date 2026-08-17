@@ -15,14 +15,15 @@ local config_dir = vim.fs.normalize(script_dir .. "/../nvim/dot-config/nvim")
 ---@type table<string, any>
 local luarc = vim.json.decode(table.concat(vim.fn.readfile(config_dir .. "/.luarc.json"), "\n"))
 
+-- This run has no lazydev, so it stands in for it: the vim runtime plus
+-- every installed plugin's lua dir. The EDITOR must never be given this
+-- list — lazydev fetches those on demand, and eagerly indexing 45
+-- plugins on every attach makes editing crawl. `.luarc.json` holds only
+-- the diagnostic policy, which both sides share; it must not name
+-- libraries, because LuaLS gives it precedence over client settings and
+-- a stale entry there silently overrides lazydev.
 ---@type string[]
-local library = {}
-for _, path in ipairs(luarc["workspace.library"]) do
-  library[#library + 1] = path:gsub("%$VIMRUNTIME", vim.env.VIMRUNTIME)
-end
--- Installed plugins are typed sources (snacks, blink, lazyvim, ...).
--- nvim-v2 stays in the list for machines still holding the pre-stow data
--- dir; both resolve to the same config now that nvim is a stowed package.
+local library = { vim.env.VIMRUNTIME .. "/lua" }
 local data_home = vim.env.XDG_DATA_HOME or (vim.env.HOME .. "/.local/share")
 for _, appname in ipairs({ "nvim", "nvim-v2" }) do
   vim.list_extend(library, vim.fn.glob(data_home .. "/" .. appname .. "/lazy/*/lua", true, true))

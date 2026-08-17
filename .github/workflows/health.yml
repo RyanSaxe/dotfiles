@@ -193,6 +193,17 @@ jobs:
           brew install lua-language-server
           nvim -l dev/luals-check.lua
 
+      - name: every lua function documents its signature
+        run: nvim -l dev/annotation-check.lua
+
+      # dev/editor-parity.lua is deliberately NOT run here. It needs a warm
+      # editor with a language server actually attached, and a cold runner
+      # never gets one inside any sane budget — it spends its first minute
+      # compiling treesitter parsers, and lua_ls never arrives. The check
+      # refuses to report "clean" when it could not verify, so in CI it can
+      # only ever fail. It runs as a pre-commit hook instead, on machines
+      # that have the editor it is checking.
+
       - name: checkhealth reports no errors
         run: |
           nvim --headless "+silent checkhealth lazy" \
