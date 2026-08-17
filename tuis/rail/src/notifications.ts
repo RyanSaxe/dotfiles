@@ -48,6 +48,7 @@ const NTFY_URL =
 const lastStatus = new Map<string, AgentStatus>();
 let seeded = false;
 let wasPresent: boolean | null = null;
+let warnedNoChannel = false;
 
 // What rides this tick's ping. Present ticks send nothing. The departure
 // tick sweeps in every un-acked done/waiting agent alongside the raw
@@ -107,7 +108,18 @@ export function pushPhone(
     departed,
   );
 
-  if (transitions.length === 0 || !NTFY_URL) return;
+  if (transitions.length === 0) return;
+  // A channel that was never configured is the likeliest reason the phone
+  // stays quiet, and it used to be indistinguishable from a working one.
+  if (!NTFY_URL) {
+    if (!warnedNoChannel) {
+      warnedNoChannel = true;
+      logLine(
+        "no phone channel: set CLAUDE_NOTIFICATION_ID (or AI_HARNESS_NTFY_URL) in the dotfiles .env",
+      );
+    }
+    return;
+  }
   const waiting = transitions.filter((agent) => agent.status === "waiting");
   const first = transitions[0]!;
   const title =
