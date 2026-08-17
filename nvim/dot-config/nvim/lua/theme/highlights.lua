@@ -36,7 +36,8 @@ end
 function M.apply(tokens)
   local p = tokens.palette
   local r = tokens.roles
-  local accent, notify = tokens.accent, tokens.notify
+  -- Inner accent; the outer pair lives on `o` and paints the sidebars.
+  local accent = tokens.accent
   ---@param color string
   ---@param amount number
   ---@return string

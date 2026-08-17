@@ -15,19 +15,10 @@ local config_dir = vim.fs.normalize(script_dir .. "/../nvim/dot-config/nvim")
 ---@type table<string, any>
 local luarc = vim.json.decode(table.concat(vim.fn.readfile(config_dir .. "/.luarc.json"), "\n"))
 
----@type string[]
-local library = {}
-for _, path in ipairs(luarc["workspace.library"]) do
-  library[#library + 1] = path:gsub("%$VIMRUNTIME", vim.env.VIMRUNTIME)
-end
--- Installed plugins are typed sources (snacks, blink, lazyvim, ...).
--- nvim-v2 stays in the list for machines still holding the pre-stow data
--- dir; both resolve to the same config now that nvim is a stowed package.
-local data_home = vim.env.XDG_DATA_HOME or (vim.env.HOME .. "/.local/share")
-for _, appname in ipairs({ "nvim", "nvim-v2" }) do
-  vim.list_extend(library, vim.fn.glob(data_home .. "/" .. appname .. "/lazy/*/lua", true, true))
-end
-luarc["workspace.library"] = library
+-- The same resolver the editor uses, required from the config itself so
+-- there is exactly one answer to "what is a typed library".
+package.path = config_dir .. "/lua/?.lua;" .. package.path
+luarc["workspace.library"] = require("luals").libraries()
 
 local generated = vim.fn.tempname() .. ".luarc.json"
 vim.fn.writefile({ vim.json.encode(luarc) }, generated)

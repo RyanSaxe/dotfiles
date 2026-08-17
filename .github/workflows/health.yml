@@ -196,6 +196,12 @@ jobs:
       - name: every lua function documents its signature
         run: nvim -l dev/annotation-check.lua
 
+      # The acceptance criterion the other two cannot check: open every
+      # file in a real editor and fail on anything it shows. Slow (~40s),
+      # so it runs here rather than on every commit.
+      - name: the editor reports no diagnostics
+        run: nvim --headless -c "luafile dev/editor-parity.lua"
+
       - name: checkhealth reports no errors
         run: |
           nvim --headless "+silent checkhealth lazy" \
