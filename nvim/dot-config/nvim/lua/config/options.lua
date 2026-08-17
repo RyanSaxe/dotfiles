@@ -13,7 +13,8 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
 
--- One global statusline; identity lives in the bufferline.
+-- One global statusline, reduced to the mode cell; per-window facts
+-- ride the winbar instead.
 vim.opt.laststatus = 3
 vim.opt.cmdheight = 0
 vim.opt.showmode = false

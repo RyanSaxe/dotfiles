@@ -1,12 +1,9 @@
--- Content and highlights for the six-fact statusline (see
--- plugins/statusline.lua for the layout contract).
+-- Chrome content. The statusline is reduced to two cells at the bottom
+-- left — a state dot and the mode capital — on the buffer's own
+-- background, so it reads as part of the gutter rather than as an edge
+-- band. Everything else moved up: the winbar carries per-window git and
+-- diagnostic facts directly under the tab row.
 local M = {}
-
-local PULSE_MS = 450
-
----@type boolean
-local pulse_lit = false
-local pulse_timer = nil
 
 ---@return string
 local function mode_group()
@@ -26,11 +23,32 @@ local function mode_group()
   return "ThemeStlNormal"
 end
 
+local PULSE_MS = 450
+
+---@type boolean
+local pulse_lit = false
+local pulse_timer = nil
+
+-- The dot rides the mode's color, so the pair reads as one object; while
+-- a macro records it blinks red instead.
+---@return string
+local function state_group()
+  if vim.fn.reg_recording() ~= "" and pulse_lit then
+    return "ThemeStlRecording"
+  end
+  return mode_group()
+end
+
 ---@param group string
 ---@param text string
 ---@return string
 local function paint(group, text)
   return "%#" .. group .. "#" .. text
+end
+
+---@return string
+function M.content()
+  return paint(state_group(), " ●") .. paint(mode_group(), " " .. vim.fn.mode():sub(1, 1):upper())
 end
 
 ---@return string
@@ -58,7 +76,7 @@ local function git_counts()
   return table.concat(parts, " ")
 end
 
--- Counts only, colored by severity: the color IS the label.
+-- Counts only, colored by severity: the color is the label.
 ---@return string
 local function diagnostics()
   ---@type table<integer, integer>
@@ -69,11 +87,7 @@ local function diagnostics()
   local sev = vim.diagnostic.severity
   ---@type string[]
   local parts = {}
-  -- Errors and warnings only: info and hint live in the gutter.
-  for _, pair in ipairs({
-    { sev.ERROR, "ThemeStlError" },
-    { sev.WARN, "ThemeStlWarn" },
-  }) do
+  for _, pair in ipairs({ { sev.ERROR, "ThemeStlError" }, { sev.WARN, "ThemeStlWarn" } }) do
     local n = counts[pair[1]]
     if n then
       parts[#parts + 1] = paint(pair[2], tostring(n))
@@ -82,57 +96,30 @@ local function diagnostics()
   return table.concat(parts, " ")
 end
 
+-- Diagnostics sit left, above the number column; git sits right, under
+-- the tab row's branch.
 ---@return string
-local function location_group()
-  if vim.fn.reg_recording() ~= "" and pulse_lit then
-    return "ThemeStlRecording"
-  end
-  return "ThemeStlLocation"
+function M.winbar()
+  return " " .. diagnostics() .. "%=" .. git_counts() .. paint("ThemeStlBranch", " ")
 end
 
----@return string
-function M.content()
-  ---@type string
-  local branch = vim.g.chrome_branch or ""
-  local left = table.concat({
-    paint(mode_group(), " " .. vim.fn.mode():sub(1, 1):upper() .. " "),
-    branch ~= "" and paint("ThemeStlBranch", branch .. "  ") or "",
-    git_counts(),
-  })
-  local right = table.concat({
-    diagnostics(),
-    "  ",
-    paint(location_group(), "%l:%c "),
-  })
-  return left .. "%=" .. right
-end
-
-local function start_pulse()
-  if pulse_timer then
+-- Only real file windows get a winbar. Floats never render one, so
+-- pickers are already exempt; splits holding an explorer, help, or
+-- terminal must be excluded by hand.
+---@param win integer
+local function apply_winbar(win)
+  if vim.api.nvim_win_get_config(win).relative ~= "" then
     return
   end
-  pulse_timer = vim.uv.new_timer()
-  if not pulse_timer then
-    return
-  end
-  pulse_timer:start(
-    0,
-    PULSE_MS,
-    vim.schedule_wrap(function()
-      pulse_lit = not pulse_lit
-      vim.cmd.redrawstatus()
-    end)
-  )
+  local buf = vim.api.nvim_win_get_buf(win)
+  local normal = vim.bo[buf].buftype == "" and vim.bo[buf].filetype ~= ""
+  vim.wo[win].winbar = normal and "%!v:lua.require'theme.statusline'.winbar()" or ""
 end
 
-local function stop_pulse()
-  if pulse_timer then
-    pulse_timer:stop()
-    pulse_timer:close()
-    pulse_timer = nil
+local function apply_all()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    apply_winbar(win)
   end
-  pulse_lit = false
-  vim.cmd.redrawstatus()
 end
 
 function M.setup()
@@ -140,16 +127,57 @@ function M.setup()
     use_icons = false,
     content = {
       active = M.content,
-      inactive = function()
-        return "%#ThemeStlBranch#"
-      end,
+      inactive = M.content,
     },
   })
-  require("theme.chrome").track_git()
 
-  local group = vim.api.nvim_create_augroup("theme_statusline", { clear = true })
-  vim.api.nvim_create_autocmd("RecordingEnter", { group = group, callback = start_pulse })
-  vim.api.nvim_create_autocmd("RecordingLeave", { group = group, callback = stop_pulse })
+  local group = vim.api.nvim_create_augroup("theme_chrome", { clear = true })
+  -- The first red frame comes from the autocmd, which runs in the main
+  -- loop and flushes before nvim waits for the next key; the blink that
+  -- follows needs a full redraw, since a statusline-only redraw from a
+  -- timer never reaches an idle screen.
+  vim.api.nvim_create_autocmd("RecordingEnter", {
+    group = group,
+    callback = function()
+      pulse_lit = true
+      vim.cmd.redrawstatus()
+      if pulse_timer then
+        return
+      end
+      pulse_timer = vim.uv.new_timer()
+      if not pulse_timer then
+        return
+      end
+      pulse_timer:start(
+        PULSE_MS,
+        PULSE_MS,
+        vim.schedule_wrap(function()
+          pulse_lit = not pulse_lit
+          vim.cmd("redraw")
+        end)
+      )
+    end,
+  })
+  vim.api.nvim_create_autocmd("RecordingLeave", {
+    group = group,
+    callback = function()
+      if pulse_timer then
+        pulse_timer:stop()
+        pulse_timer:close()
+        pulse_timer = nil
+      end
+      pulse_lit = false
+      vim.cmd.redrawstatus()
+    end,
+  })
+  vim.api.nvim_create_autocmd({ "BufWinEnter", "FileType", "WinEnter", "WinNew" }, {
+    group = group,
+    callback = function()
+      apply_winbar(vim.api.nvim_get_current_win())
+    end,
+  })
+  -- Setup lands after the first windows exist, so seed them directly.
+  apply_all()
 end
 
 return M

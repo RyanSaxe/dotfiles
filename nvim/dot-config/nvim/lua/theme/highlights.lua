@@ -178,27 +178,28 @@ function M.apply(tokens)
   -- phase) statusline and bufferline share the rail's surface so the
   -- whole frame reads as one piece. Accent is the common frame color,
   -- notify marks the input focus.
-  -- The statusline: flat crust, every distinction carried by
-  -- foreground color so background extension has nothing to smear.
-  hl("StatusLine", { fg = r.fg_muted, bg = p.crust })
-  hl("StatusLineNC", { fg = r.fg_faint, bg = p.crust })
-  hl("MiniStatuslineInactive", { fg = r.fg_faint, bg = p.crust })
-  hl("ThemeStlNormal", { fg = accent, bg = p.crust, bold = true })
-  hl("ThemeStlInsert", { fg = p.mauve, bg = p.crust, bold = true })
-  hl("ThemeStlVisual", { fg = p.blue, bg = p.crust, bold = true })
-  hl("ThemeStlCommand", { fg = p.peach, bg = p.crust, bold = true })
-  hl("ThemeStlReplace", { fg = p.pink, bg = p.crust, bold = true })
-  hl("ThemeStlTerminal", { fg = p.green, bg = p.crust, bold = true })
-  hl("ThemeStlBranch", { fg = r.fg_faint, bg = p.crust })
-  hl("ThemeStlLocation", { fg = r.fg_muted, bg = p.crust })
-  hl("ThemeStlRecording", { fg = p.red, bg = p.crust, bold = true })
-  hl("ThemeStlAdd", { fg = p.semantic_add, bg = p.crust })
-  hl("ThemeStlChange", { fg = p.semantic_change, bg = p.crust })
-  hl("ThemeStlDelete", { fg = p.semantic_delete, bg = p.crust })
-  hl("ThemeStlError", { fg = p.red, bg = p.crust })
-  hl("ThemeStlWarn", { fg = p.yellow, bg = p.crust })
-  hl("ThemeStlInfo", { fg = p.blue, bg = p.crust })
-  hl("ThemeStlHint", { fg = p.teal, bg = p.crust })
+  -- The statusline and winbar are INNER: they sit on the buffer's own
+  -- background so the mode cell reads as part of the gutter and the
+  -- winbar as part of the file, not as chrome bands. Only the tab row
+  -- and floats live on the outer surface.
+  hl("StatusLine", { fg = r.fg_muted, bg = r.bg })
+  hl("StatusLineNC", { fg = r.fg_faint, bg = r.bg })
+  hl("MiniStatuslineInactive", { fg = r.fg_faint, bg = r.bg })
+  hl("WinBar", { fg = r.fg_muted, bg = r.bg })
+  hl("WinBarNC", { fg = r.fg_faint, bg = r.bg })
+  hl("ThemeStlNormal", { fg = accent, bg = r.bg, bold = true })
+  hl("ThemeStlInsert", { fg = p.mauve, bg = r.bg, bold = true })
+  hl("ThemeStlVisual", { fg = p.blue, bg = r.bg, bold = true })
+  hl("ThemeStlCommand", { fg = p.peach, bg = r.bg, bold = true })
+  hl("ThemeStlReplace", { fg = p.pink, bg = r.bg, bold = true })
+  hl("ThemeStlTerminal", { fg = p.green, bg = r.bg, bold = true })
+  hl("ThemeStlBranch", { fg = r.fg_faint, bg = r.bg })
+  hl("ThemeStlRecording", { fg = p.red, bg = r.bg, bold = true })
+  hl("ThemeStlAdd", { fg = p.semantic_add, bg = r.bg })
+  hl("ThemeStlChange", { fg = p.semantic_change, bg = r.bg })
+  hl("ThemeStlDelete", { fg = p.semantic_delete, bg = r.bg })
+  hl("ThemeStlError", { fg = p.red, bg = r.bg })
+  hl("ThemeStlWarn", { fg = p.yellow, bg = r.bg })
 
   local chrome = p.crust
   hl("NormalFloat", { bg = chrome })
