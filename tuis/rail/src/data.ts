@@ -182,6 +182,9 @@ export interface ClientFacts {
   // placeholder cells garble a non-kitty viewer (see below) and frames
   // persist in tmux's buffers per session.
   nonKittySessions: Set<string>;
+  // Most recent activity timestamp (epoch secs) across attached clients;
+  // null with no clients. The non-macOS stand-in for input-idle presence.
+  latestClientActivityTs: number | null;
   // Whether the most recently active client renders kitty graphics.
   // Placeholder cells need this bit AND a session clear of
   // nonKittySessions: a terminal without the protocol cannot even LAY
@@ -224,6 +227,7 @@ function clientFactsFrom(rows: string[][]): ClientFacts {
   return {
     modeSessions,
     nonKittySessions,
+    latestClientActivityTs: latestActivity >= 0 ? latestActivity : null,
     latestClientIsKitty,
     clientCount: rows.length,
   };

@@ -35,6 +35,7 @@ import {
 import { assignHints, writeHints } from "./hints.js";
 import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
+import { collectHostFacts, isPresent } from "./probes.js";
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
@@ -304,10 +305,11 @@ async function tick(counter: number): Promise<boolean> {
           agentsFresh = true;
         })
       : Promise.resolve();
-  // The tmux poll and the agent refresh are independent — one round-trip
-  // of latency, not two.
-  const [{ panes, clientFacts }] = await Promise.all([
+  // The tmux poll, the host probes, and the agent refresh are independent
+  // — one round-trip of latency, not three.
+  const [{ panes, clientFacts }, hostFacts] = await Promise.all([
     collectSnapshot(),
+    collectHostFacts(),
     refresh,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;
@@ -334,7 +336,12 @@ async function tick(counter: number): Promise<boolean> {
   const hintsBySession = assignHints(settled, sessions, acked);
   writeHints(settled, hintsBySession, acked);
   publishAttention(settled, acked);
-  pushPhone(settled, panes);
+  const present = isPresent(
+    hostFacts.inputIdleSecs,
+    clientFacts.latestClientActivityTs,
+    Date.now() / 1000,
+  );
+  pushPhone(settled, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;

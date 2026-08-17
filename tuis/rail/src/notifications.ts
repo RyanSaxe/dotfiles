@@ -5,7 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { run, type Agent, type AgentStatus, type Pane } from "./data.js";
+import { run, type Agent, type AgentStatus } from "./data.js";
 import { XDG_STATE } from "./paths.js";
 
 const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
@@ -48,21 +48,16 @@ const lastStatus = new Map<string, AgentStatus>();
 let seeded = false;
 
 // One ping per transition into done/waiting, batched per tick. The first
-// tick only seeds, so a daemon restart never replays pings; a visible pane
-// never pings — you are already looking at it.
-export function pushPhone(agents: Agent[], panes: Pane[]): void {
-  const visible = new Set(
-    panes
-      .filter((pane) => pane.sessionAttached && pane.windowActive)
-      .map((pane) => pane.paneId),
-  );
+// tick only seeds, so a daemon restart never replays pings. The phone is
+// the AWAY channel: while present, the rail and sketchybar own attention,
+// so every ping is suppressed — including the focused window's.
+export function pushPhone(agents: Agent[], present: boolean): void {
   const transitions: Agent[] = [];
   for (const agent of agents) {
     const previous = lastStatus.get(agent.paneId);
     lastStatus.set(agent.paneId, agent.status);
     if (!seeded || previous === agent.status) continue;
     if (agent.status === "working") continue;
-    if (visible.has(agent.paneId)) continue;
     transitions.push(agent);
   }
   seeded = true;
@@ -72,7 +67,7 @@ export function pushPhone(agents: Agent[], panes: Pane[]): void {
     if (!alive.has(paneId)) lastStatus.delete(paneId);
   }
 
-  if (transitions.length === 0 || !NTFY_URL) return;
+  if (present || transitions.length === 0 || !NTFY_URL) return;
   const waiting = transitions.filter((agent) => agent.status === "waiting");
   const first = transitions[0]!;
   const title =
