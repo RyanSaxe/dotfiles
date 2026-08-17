@@ -118,6 +118,6 @@ export function renderRail(
   const footer = hasFooter
     ? mascotFooter(palette, inner, data.sprite, pageHint)
     : [];
-  const gutter = bgEsc(bg) + "  " + RESET;
+  const gutter = bgEsc(bg) + " ".repeat(GUTTER_COLS) + RESET;
   return [...top, ...content, ...footer].map((row) => row + gutter);
 }
