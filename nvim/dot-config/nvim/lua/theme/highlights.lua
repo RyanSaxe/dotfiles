@@ -126,7 +126,10 @@ function M.apply(tokens)
 
   -- Comments and inlay hints read as one quiet voice
   hl("Comment", { fg = syn.comment, italic = true })
-  hl("LspInlayHint", { fg = syn.comment })
+  -- Inferred types blend toward the background from the type color:
+  -- still recessive, but readable as type information at a glance and
+  -- distinguishable from annotations the file actually declares.
+  hl("LspInlayHint", { fg = bb(syn.type, 0.45), italic = true })
 
   -- Editing surfaces
   hl("CursorLine", { bg = bb(p.mauve, 0.1) })

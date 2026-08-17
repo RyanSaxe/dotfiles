@@ -76,9 +76,16 @@ local function git_counts()
   return table.concat(parts, " ")
 end
 
--- Counts only, colored by severity: the color is the label.
+-- Glyph then count, colored by severity. The glyphs are read from the
+-- floor's icon table rather than copied here, so the winbar always
+-- shows exactly what the sign column shows.
 ---@return string
 local function diagnostics()
+  -- The sign column's own configured text is the single source: whoever
+  -- sets the signs, the winbar shows the same mark.
+  local signs = vim.diagnostic.config().signs
+  ---@type table<integer, string>
+  local marks = type(signs) == "table" and signs.text or {}
   ---@type table<integer, integer>
   local counts = {}
   for _, d in ipairs(vim.diagnostic.get(0)) do
@@ -87,10 +94,10 @@ local function diagnostics()
   local sev = vim.diagnostic.severity
   ---@type string[]
   local parts = {}
-  for _, pair in ipairs({ { sev.ERROR, "ThemeStlError" }, { sev.WARN, "ThemeStlWarn" } }) do
-    local n = counts[pair[1]]
+  for _, row in ipairs({ { sev.ERROR, "ThemeStlError" }, { sev.WARN, "ThemeStlWarn" } }) do
+    local n = counts[row[1]]
     if n then
-      parts[#parts + 1] = paint(pair[2], tostring(n))
+      parts[#parts + 1] = paint(row[2], (marks[row[1]] or "") .. n)
     end
   end
   return table.concat(parts, " ")
