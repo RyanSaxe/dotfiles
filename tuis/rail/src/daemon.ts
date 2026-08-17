@@ -35,7 +35,7 @@ import {
 import { assignHints, writeHints } from "./hints.js";
 import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
-import { collectHostFacts, isPresent } from "./probes.js";
+import { collectHostFacts, isPresent, terminalFocused } from "./probes.js";
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
@@ -331,7 +331,12 @@ async function tick(counter: number): Promise<boolean> {
   await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
-  const acked = updateAcks(acks, settled, panes);
+  const acked = updateAcks(
+    acks,
+    settled,
+    panes,
+    terminalFocused(hostFacts.focusedApp),
+  );
   const sessions = new Set(panes.map((pane) => pane.session));
   const hintsBySession = assignHints(settled, sessions, acked);
   writeHints(settled, hintsBySession, acked);

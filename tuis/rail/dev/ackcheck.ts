@@ -43,27 +43,32 @@ const pane = (windowActive: boolean, sessionAttached: boolean): Pane[] => [
 
 const acks = loadAcks();
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(false, true)).size,
+  updateAcks(acks, [agent(100)], pane(false, true), true).size,
   0,
   "unvisited stays colored",
 );
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(true, true)).size,
+  updateAcks(acks, [agent(100)], pane(true, true), false).size,
+  0,
+  "unfocused terminal does not ack",
+);
+assert.equal(
+  updateAcks(acks, [agent(100)], pane(true, true), true).size,
   1,
   "visiting acks",
 );
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(false, true)).size,
+  updateAcks(acks, [agent(100)], pane(false, true), true).size,
   1,
   "ack persists after leaving",
 );
 assert.equal(
-  updateAcks(acks, [agent(200)], pane(false, true)).size,
+  updateAcks(acks, [agent(200)], pane(false, true), true).size,
   0,
   "new status re-fires",
 );
 assert.equal(
-  updateAcks(acks, [agent(200)], pane(true, false)).size,
+  updateAcks(acks, [agent(200)], pane(true, false), true).size,
   0,
   "detached visit does not ack",
 );
