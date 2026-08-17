@@ -33,6 +33,7 @@ import {
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
+import { logLine } from "./log.js";
 import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
 import { collectHostFacts, isPresent, terminalFocused } from "./probes.js";
@@ -80,12 +81,6 @@ let appliedBg = "";
 const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
-
-// daemon.log is the only forensic trail for incidents hours old; a line
-// without a time is undiagnosable.
-function logLine(message: string): void {
-  console.error(`${new Date().toISOString()} ${message}`);
-}
 
 async function refreshAgents(): Promise<void> {
   try {

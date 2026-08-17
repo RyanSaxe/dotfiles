@@ -6,6 +6,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { run, type Agent, type AgentStatus } from "./data.js";
+import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
 const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
@@ -116,6 +117,11 @@ export function pushPhone(
   const body = transitions
     .map((agent) => `${agent.session}/${agent.windowName}: ${agent.status}`)
     .join("\n");
+  // A dropped ping is a missed agent: log it (no retries — an unreliable
+  // channel that says so beats retry machinery).
+  const names = transitions
+    .map((agent) => `${agent.session}/${agent.windowName}`)
+    .join(", ");
   fetch(NTFY_URL, {
     method: "POST",
     headers: {
@@ -124,5 +130,20 @@ export function pushPhone(
       Tags: "robot",
     },
     body,
-  }).catch(() => {});
+  }).then(
+    (response) => {
+      if (!response.ok) {
+        logLine(`ntfy send failed for ${names}: HTTP ${response.status}`);
+      }
+    },
+    (error: unknown) => {
+      // Node reports every network failure as "TypeError: fetch failed";
+      // the cause is the part that names what actually broke.
+      const cause = error instanceof Error ? error.cause : null;
+      const detail = cause
+        ? `${String(error)}: ${String(cause)}`
+        : String(error);
+      logLine(`ntfy send failed for ${names}: ${detail}`);
+    },
+  );
 }
