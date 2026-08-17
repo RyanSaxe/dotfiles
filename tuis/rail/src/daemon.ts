@@ -33,8 +33,10 @@ import {
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
+import { logLine } from "./log.js";
 import { publishAttention, pushPhone } from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
+import { collectHostFacts, isPresent } from "./probes.js";
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
@@ -76,15 +78,10 @@ const SYNC_OFF = "\x1b[?2026l";
 let agents: Agent[] = [];
 let agentsFresh = false;
 let appliedBg = "";
+let warnedNoPalette = false;
 const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
-
-// daemon.log is the only forensic trail for incidents hours old; a line
-// without a time is undiagnosable.
-function logLine(message: string): void {
-  console.error(`${new Date().toISOString()} ${message}`);
-}
 
 async function refreshAgents(): Promise<void> {
   try {
@@ -304,14 +301,28 @@ async function tick(counter: number): Promise<boolean> {
           agentsFresh = true;
         })
       : Promise.resolve();
-  // The tmux poll and the agent refresh are independent — one round-trip
-  // of latency, not two.
-  const [{ panes, clientFacts }] = await Promise.all([
+  // The tmux poll, the host probes, and the agent refresh are independent
+  // — one round-trip of latency, not three.
+  const [{ panes, clientFacts }, hostFacts] = await Promise.all([
     collectSnapshot(),
+    collectHostFacts(),
     refresh,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;
-  const palette = loadPalette();
+  // Every frame is a color: with no rendered theme there is nothing sane to
+  // paint, and rethrowing per tick would spin forever with no explanation.
+  // The generated-dir watch repaints everything the moment it lands.
+  let palette;
+  try {
+    palette = loadPalette();
+  } catch {
+    if (!warnedNoPalette) {
+      warnedNoPalette = true;
+      logLine("no palette yet; run `theme apply`. Rails stay unpainted");
+    }
+    return true;
+  }
+  warnedNoPalette = false;
   // Keep every rail pane's default bg in step with the theme (spawn sets
   // it once; a mode flip changes crust under all existing panes).
   const bg = railBg(palette);
@@ -329,12 +340,17 @@ async function tick(counter: number): Promise<boolean> {
   await reconcileWindowBorders(panes);
 
   const settled = applyDoneHysteresis(agents, Date.now() / 1000);
-  const acked = updateAcks(acks, settled, panes);
+  const acked = updateAcks(acks, settled, panes, clientFacts.focusedSessions);
   const sessions = new Set(panes.map((pane) => pane.session));
   const hintsBySession = assignHints(settled, sessions, acked);
   writeHints(settled, hintsBySession, acked);
   publishAttention(settled, acked);
-  pushPhone(settled, panes);
+  const present = isPresent(
+    hostFacts.inputIdleSecs,
+    clientFacts.latestClientActivityTs,
+    Date.now() / 1000,
+  );
+  pushPhone(settled, acked, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;

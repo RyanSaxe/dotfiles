@@ -30,8 +30,10 @@ never flicker.
 - Title color = state: mauve working, peach waiting, green done. No bold.
 - Elsewhere (other sessions' agents) sits at one uniform dim level,
   urgency-sorted: waiting, working, done, acked.
-- Visit-clears acks: seeing an agent's window silences its done/waiting
-  color everywhere until a new status event (`src/acks.ts`).
+- Visit-clears acks: seeing an agent's window — active, attached, and its
+  terminal window holding OS focus (tmux's own `client_flags`, so it works
+  over ssh) — silences its done/waiting color everywhere until a new
+  status event (`src/acks.ts`).
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
 - Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint

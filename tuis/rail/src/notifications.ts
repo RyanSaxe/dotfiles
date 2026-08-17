@@ -5,7 +5,8 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { run, type Agent, type AgentStatus, type Pane } from "./data.js";
+import { run, type Agent, type AgentStatus } from "./data.js";
+import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
 const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
@@ -46,24 +47,49 @@ const NTFY_URL =
 
 const lastStatus = new Map<string, AgentStatus>();
 let seeded = false;
+let wasPresent: boolean | null = null;
+let warnedNoChannel = false;
+
+// What rides this tick's ping. Present ticks send nothing. The departure
+// tick sweeps in every un-acked done/waiting agent alongside the raw
+// transitions — an agent that finished just before the walk-away is
+// unacked, so leaving is pure latency, never a miss window.
+export function phoneBatch(
+  transitions: Agent[],
+  agents: Agent[],
+  acked: Set<string>,
+  present: boolean,
+  departed: boolean,
+): Agent[] {
+  if (present) return [];
+  const batch = new Map<string, Agent>();
+  for (const agent of transitions) batch.set(agent.paneId, agent);
+  if (departed) {
+    for (const agent of agents) {
+      if (agent.status === "working" || acked.has(agent.paneId)) continue;
+      batch.set(agent.paneId, agent);
+    }
+  }
+  return [...batch.values()];
+}
 
 // One ping per transition into done/waiting, batched per tick. The first
-// tick only seeds, so a daemon restart never replays pings; a visible pane
-// never pings — you are already looking at it.
-export function pushPhone(agents: Agent[], panes: Pane[]): void {
-  const visible = new Set(
-    panes
-      .filter((pane) => pane.sessionAttached && pane.windowActive)
-      .map((pane) => pane.paneId),
-  );
-  const transitions: Agent[] = [];
+// tick only seeds, so a daemon restart never replays pings (nor replays
+// the departure sweep). The phone is the AWAY channel: while present, the
+// rail and sketchybar own attention, so every ping is suppressed —
+// including the focused window's.
+export function pushPhone(
+  agents: Agent[],
+  acked: Set<string>,
+  present: boolean,
+): void {
+  const rawTransitions: Agent[] = [];
   for (const agent of agents) {
     const previous = lastStatus.get(agent.paneId);
     lastStatus.set(agent.paneId, agent.status);
     if (!seeded || previous === agent.status) continue;
     if (agent.status === "working") continue;
-    if (visible.has(agent.paneId)) continue;
-    transitions.push(agent);
+    rawTransitions.push(agent);
   }
   seeded = true;
 
@@ -72,7 +98,28 @@ export function pushPhone(agents: Agent[], panes: Pane[]): void {
     if (!alive.has(paneId)) lastStatus.delete(paneId);
   }
 
-  if (transitions.length === 0 || !NTFY_URL) return;
+  const departed = wasPresent === true && !present;
+  wasPresent = present;
+  const transitions = phoneBatch(
+    rawTransitions,
+    agents,
+    acked,
+    present,
+    departed,
+  );
+
+  if (transitions.length === 0) return;
+  // A channel that was never configured is the likeliest reason the phone
+  // stays quiet, and it used to be indistinguishable from a working one.
+  if (!NTFY_URL) {
+    if (!warnedNoChannel) {
+      warnedNoChannel = true;
+      logLine(
+        "no phone channel: set CLAUDE_NOTIFICATION_ID (or AI_HARNESS_NTFY_URL) in the dotfiles .env",
+      );
+    }
+    return;
+  }
   const waiting = transitions.filter((agent) => agent.status === "waiting");
   const first = transitions[0]!;
   const title =
@@ -82,6 +129,11 @@ export function pushPhone(agents: Agent[], panes: Pane[]): void {
   const body = transitions
     .map((agent) => `${agent.session}/${agent.windowName}: ${agent.status}`)
     .join("\n");
+  // A dropped ping is a missed agent: log it (no retries — an unreliable
+  // channel that says so beats retry machinery).
+  const names = transitions
+    .map((agent) => `${agent.session}/${agent.windowName}`)
+    .join(", ");
   fetch(NTFY_URL, {
     method: "POST",
     headers: {
@@ -90,5 +142,20 @@ export function pushPhone(agents: Agent[], panes: Pane[]): void {
       Tags: "robot",
     },
     body,
-  }).catch(() => {});
+  }).then(
+    (response) => {
+      if (!response.ok) {
+        logLine(`ntfy send failed for ${names}: HTTP ${response.status}`);
+      }
+    },
+    (error: unknown) => {
+      // Node reports every network failure as "TypeError: fetch failed";
+      // the cause is the part that names what actually broke.
+      const cause = error instanceof Error ? error.cause : null;
+      const detail = cause
+        ? `${String(error)}: ${String(cause)}`
+        : String(error);
+      logLine(`ntfy send failed for ${names}: ${detail}`);
+    },
+  );
 }

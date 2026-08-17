@@ -15,6 +15,10 @@
 set -eu
 
 OS="$(uname -s)"
+# No arguments and a real terminal means a human is driving: the tier and
+# agent pickers prompt. A scripted run takes the defaults instead.
+INTERACTIVE=0
+if [ "$#" -eq 0 ] && [ -t 0 ]; then INTERACTIVE=1; fi
 
 # ---------------------------------------------------------------- helpers
 brew_install() {
@@ -83,9 +87,10 @@ ensure_package_manager() {
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat neovim lua-language-server stylua'
+CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat fd ripgrep neovim lua-language-server stylua'
 # make: ensure_modern_stow builds stow from source on LTS boxes.
-CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat make'
+# fd-find: apt names the binary fdfind; aliases.zsh renames it back.
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep make'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
@@ -120,6 +125,74 @@ install_starship() {
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 }
 
+install_workmux() {
+  # workmux drives every worktree/window in this setup and its config ships
+  # in the core tier, so the binary belongs here too. Homebrew serves it
+  # from the author's tap; Linux gets the release tarball (a bare binary),
+  # which is also the upgrade path.
+  case "$OS" in
+  Darwin)
+    brew tap raine/workmux
+    brew_install workmux
+    ;;
+  *)
+    case "$(uname -m)" in
+    aarch64 | arm64) workmux_arch=arm64 ;;
+    *) workmux_arch=amd64 ;;
+    esac
+    mkdir -p "$HOME/.local/bin"
+    curl -fsSL "https://github.com/raine/workmux/releases/latest/download/workmux-linux-$workmux_arch.tar.gz" |
+      tar -xz -C "$HOME/.local/bin"
+    ;;
+  esac
+}
+
+# Agent CLIs, by the name their binary answers to. brew casks on macOS (what
+# this machine already runs); npm elsewhere, into ~/.local so no sudo and no
+# root-owned files — zshenv already has that bin dir on PATH.
+AGENT_CLIS='claude codex copilot'
+
+install_agent_cli() {
+  case "$1" in
+  claude) agent_cask='claude-code@latest' agent_pkg='@anthropic-ai/claude-code' ;;
+  codex) agent_cask='codex' agent_pkg='@openai/codex' ;;
+  copilot) agent_cask='copilot-cli' agent_pkg='@github/copilot' ;;
+  *)
+    echo "error: unknown agent CLI: $1" >&2
+    return 1
+    ;;
+  esac
+  command -v "$1" >/dev/null 2>&1 && return 0
+  case "$OS" in
+  # Casks error on reinstall, unlike formulas.
+  Darwin) brew list --cask "$agent_cask" >/dev/null 2>&1 || brew install --cask "$agent_cask" ;;
+  *) npm install -g --prefix "$HOME/.local" "$agent_pkg" ;;
+  esac
+}
+
+# workmux discovers agents by their config directories, so the CLIs must land
+# first. Its `setup` writes the status-tracking hooks (merging into existing
+# settings, leaving custom entries alone) and refuses to run without a
+# terminal — hence the note instead of a call on a scripted install.
+setup_agents() {
+  chosen=''
+  for agent in $AGENT_CLIS; do
+    if [ "$INTERACTIVE" = 1 ]; then
+      ask "install the $agent CLI?" && chosen="$chosen $agent"
+    else
+      chosen="$chosen $agent"
+    fi
+  done
+  for agent in $chosen; do
+    install_agent_cli "$agent"
+  done
+  if [ "$INTERACTIVE" = 1 ]; then
+    workmux setup
+  else
+    echo "note: run \`workmux setup\` in a terminal to wire agent status hooks"
+  fi
+}
+
 install_neovim_linux() {
   # apt's neovim lags far behind the nvim config's 0.12 floor; the official
   # tarball into ~/.local is both the install and the upgrade path.
@@ -132,6 +205,33 @@ install_neovim_linux() {
   mkdir -p "$HOME/.local"
   curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-$nvim_arch.tar.gz" |
     tar -xz -C "$HOME/.local" --strip-components=1
+}
+
+# Secrets and per-machine ids live in an untracked .env at the repo root,
+# loaded by zsh (env_init) and by the rail launcher. It can never be
+# installed for you — but a fresh box silently losing phone notifications
+# because nobody knew the file existed is worse than being nagged.
+#
+# One "NAME description" per line; the description is what the prompt shows.
+REQUIRED_ENV_VARS='CLAUDE_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
+
+ensure_env_file() {
+  if [ ! -f .env ]; then
+    {
+      echo "# Untracked machine-local secrets, loaded by zsh and the rail launcher."
+      echo "$REQUIRED_ENV_VARS" | while read -r name description; do
+        [ -n "$name" ] || continue
+        echo "# $description"
+        echo "$name="
+      done
+    } >.env
+  fi
+  echo "$REQUIRED_ENV_VARS" | while read -r name description; do
+    [ -n "$name" ] || continue
+    grep -q "^$name=." .env && continue
+    printf '\033[1;31mACTION REQUIRED\033[0m set %s in %s/.env — %s\n' \
+      "$name" "$PWD" "$description" >&2
+  done
 }
 
 # apt's stow on LTS is 2.3.x, which breaks on --dotfiles dot- directories
@@ -152,6 +252,8 @@ install_tier_packages() {
   core:Darwin)
     # shellcheck disable=SC2086
     brew_install $CORE_BREW_FORMULAS
+    install_workmux
+    setup_agents
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -165,6 +267,8 @@ install_tier_packages() {
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || install_starship
     command -v nvim >/dev/null 2>&1 || install_neovim_linux
+    install_workmux
+    setup_agents
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -387,14 +491,17 @@ upgrade_apt() {
     uv --version
     starship --version | head -n 1
     nvim --version | head -n 1
+    workmux --version
   } >"$WORK/installers.before"
   uv self update
   install_starship
   install_neovim_linux
+  install_workmux
   {
     uv --version
     starship --version | head -n 1
     nvim --version | head -n 1
+    workmux --version
   } >"$WORK/installers.after"
   report_changes installers "$WORK/installers.before" "$WORK/installers.after"
 }
@@ -566,6 +673,9 @@ if command -v bat >/dev/null 2>&1; then
 elif command -v batcat >/dev/null 2>&1; then
   batcat cache --build
 fi
+
+# Machine-local values nothing can install for you; warns loudly per gap.
+ensure_env_file
 
 # The commit gate for working on this repo (see README: Development).
 uv tool install --quiet prek

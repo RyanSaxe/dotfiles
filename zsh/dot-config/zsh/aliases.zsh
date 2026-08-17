@@ -24,6 +24,8 @@ alias df='df -h'
 alias du='du -h'
 # apt installs bat's binary as batcat to avoid clashing with bacula-console.
 command -v batcat >/dev/null 2>&1 && alias bat='batcat'
+# ...and fd as fdfind, clashing with fdclone. Same rename, same remedy.
+command -v fdfind >/dev/null 2>&1 && alias fd='fdfind'
 # alias grep='grep --color=auto' -- commenting due to claude using grep a lot
 
 # Claude Code: unset TMUX env so the binary's hardcoded chalk-level cap
@@ -41,11 +43,6 @@ alias loc='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py loc'
 alias tokens='uv run -q --script ~/generic/dotfiles/scripts/repo_size.py tokens'
 alias nvim-clean='~/generic/dotfiles/scripts/nvim-clean.sh'
 alias diagnose='uvx ty check --output-format concise --no-progress --color never --exit-zero | rg -o "(error|warning)\[[^]]+\]" | sort | uniq -c | sort -nr | awk "{print \$2 \": \" \$1}"'
-
-# Runs the nvim/ package config under NVIM_APPNAME=nvim-v2 while
-# ~/.config/nvim still points elsewhere. Delete this alias once the
-# package is stowed as ~/.config/nvim.
-alias nvim2='NVIM_APPNAME=nvim-v2 nvim'
 
 # Quick edits
 alias zshrc='$EDITOR ~/.zshrc'

@@ -22,12 +22,21 @@ export function loadAcks(): AckStore {
 }
 
 // A pane is "visited" when its window is the active window of a session
-// someone is actually attached to — that is the moment a human saw it.
-function visitedPaneIds(agents: Agent[], panes: Pane[]): Set<string> {
+// someone is attached to AND that session's terminal window owns OS focus.
+// An attached client sitting behind a browser acks nothing.
+function visitedPaneIds(
+  agents: Agent[],
+  panes: Pane[],
+  focusedSessions: Set<string>,
+): Set<string> {
   const visible = new Set<string>();
   const attachedActive = new Set<string>();
   for (const pane of panes) {
-    if (pane.windowActive && pane.sessionAttached) {
+    if (
+      pane.windowActive &&
+      pane.sessionAttached &&
+      focusedSessions.has(pane.session)
+    ) {
       attachedActive.add(pane.paneId);
     }
   }
@@ -45,9 +54,10 @@ export function updateAcks(
   acks: AckStore,
   agents: Agent[],
   panes: Pane[],
+  focusedSessions: Set<string>,
 ): Set<string> {
   let changed = false;
-  const visited = visitedPaneIds(agents, panes);
+  const visited = visitedPaneIds(agents, panes, focusedSessions);
   const live = new Set(agents.map((agent) => agent.paneId));
 
   for (const paneId of Object.keys(acks)) {

@@ -26,6 +26,17 @@ LOG_FILE="$STATE/daemon.log"
 
 mkdir -p "$STATE"
 
+# The phone channel lives in the repo's untracked .env. Load it here because
+# the daemon is usually spawned by tmux's run-shell, which hands over the
+# SERVER's environment — frozen at whenever the server started — so an .env
+# added later would otherwise never reach it.
+if [ -f "$REPO_ROOT/.env" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$REPO_ROOT/.env"
+  set +a
+fi
+
 # A pid being alive is not enough: a daemon that died ungracefully leaves
 # its pidfile behind, and the pid can be reused by an unrelated process —
 # trusting it froze rails with no self-recovery. The recorded pid counts
@@ -112,6 +123,11 @@ status)
   fi
   if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
+  if [ -n "${AI_HARNESS_NTFY_URL:-}${CLAUDE_NOTIFICATION_ID:-}" ]; then
+    echo "phone: configured"
+  else
+    echo "phone: NOT configured (set CLAUDE_NOTIFICATION_ID in $REPO_ROOT/.env)"
+  fi
   ;;
 *)
   echo "usage: rail on|off|toggle|jump <letter>|page up|down|ensure-daemon|status" >&2

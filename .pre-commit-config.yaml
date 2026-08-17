@@ -60,14 +60,15 @@ repos:
   # ---------------------------------------------------------------- Shell
   # POSIX sh only — zsh interactive config is deliberately unlinted
   # (shellcheck has no zsh dialect; see docs/v2-plan.md#shell-language-split).
-  # sketchybar's plugins are zsh too (shebang, not extension), same reason.
+  # sketchybar's plugins and the workmux escalation hook are zsh too
+  # (shebang, not extension), same reason.
   # zsh/ is excluded per-file, not as a tree: prompt-segments.sh lives there
   # but is POSIX (dash) and stays gated.
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        exclude: '\.zsh$|^zsh/dot-zshrc$|^zsh/dot-zshenv$|^sketchybar/'
+        exclude: '\.zsh$|^zsh/dot-zshrc$|^zsh/dot-zshenv$|^sketchybar/|^workmux/dot-local/bin/workmux-escalate-idle$'
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1
@@ -135,6 +136,31 @@ repos:
           ["-c", "XDG_STATE_HOME=$(mktemp -d) tsx tuis/rail/dev/ackcheck.ts"]
         pass_filenames: false
         files: "^tuis/rail/"
+
+      # The rail's attention routing: presence, terminal focus, and the
+      # transition/departure-sweep phone batch.
+      - id: rail-attncheck
+        name: attncheck (rail)
+        language: node
+        additional_dependencies: ["tsx@4.19.2"]
+        entry: sh
+        args: ["-c", "tsx tuis/rail/dev/attncheck.ts"]
+        pass_filenames: false
+        files: "^tuis/rail/"
+
+      # The idle_prompt escalation hook flips working→waiting and nothing
+      # else. Skips cleanly where zsh isn't installed.
+      - id: escalate-check
+        name: escalate-check (workmux hook)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "command -v zsh >/dev/null 2>&1 || exit 0; sh dev/escalate-check.sh",
+          ]
+        pass_filenames: false
+        files: "^(workmux/dot-local/bin/workmux-escalate-idle|dev/escalate-check\\.sh)$"
 
       # Strict Lua typecheck (no-unknown: annotations are required), same
       # engine and .luarc.json as the editor. Skips cleanly where nvim
