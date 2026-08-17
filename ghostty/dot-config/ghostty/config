@@ -38,18 +38,16 @@ font-size = 16
 # shader detects the display scale itself). `extend-always` keeps the
 # sub-cell remainder in edge colors beneath the shader's ring; balance
 # splits it evenly.
-# The right side carries a one-cell breather (~10pt, mirroring the tmux
-# border column on the content's left) so text floats off the frame
-# symmetrically. The shader ring stays 19 on every side; extend-always
-# fills the breather with each edge cell's OWN background, so plain
-# panes get air while apps painting their edges (nvim chrome) visually
-# run to the frame.
-window-padding-x = 19,29
+# Padding is symmetric: the tmux border column is crust and reads as
+# chrome, not as air, so the right side needs no compensating breather.
+# extend-always still fills the sub-cell remainder with each edge cell's
+# own background beneath the shader's ring.
+window-padding-x = 19
 window-padding-y = 19
 window-padding-color = extend-always
-# balance OFF: it redistributes padding evenly across sides, which
-# silently averages away the asymmetric left/right pair (measured: 19,29
-# rendered as ~24,24). Sub-cell slack now sits at the right/bottom edges.
+# balance OFF: it redistributes padding evenly across sides, moving the
+# sub-cell remainder away from the right/bottom edges where the shader
+# expects it.
 window-padding-balance = false
 
 # Copying highlighted text needs no shortcut.

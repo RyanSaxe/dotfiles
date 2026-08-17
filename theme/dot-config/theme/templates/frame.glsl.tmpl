@@ -13,6 +13,13 @@
  * one cell tall, and a cell at font-size 16 is ~20pt — so ~20px means a
  * 1x display and ~40px means retina (macOS backing scale is only ever
  * 1x or 2x; fractional "looks like" modes still render at 2x).
+ *
+ * THE PROBE'S ONE REQUIREMENT: every cursor shape must be a full cell
+ * tall. A short cursor reads as a low-DPI display and halves the ring —
+ * visibly, since the uncovered padding then shows whatever is beneath.
+ * nvim's stock `r-cr-o:hor20` breaks this; see guicursor in nvim's
+ * config/options.lua. Any TUI that sets a horizontal-bar cursor needs
+ * the same treatment.
  */
 
 #define FRAME_HEX 0x{{crust_hex}}
@@ -36,8 +43,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float framePx = FRAME_PT * scale;
     vec2 fromEdge = min(fragCoord.xy, iResolution.xy - fragCoord.xy);
     float edge = min(fromEdge.x, fromEdge.y);
-    // One-pixel soft transition keeps the inner edge of the ring crisp
-    // without a hard aliased line.
-    float ring = 1.0 - smoothstep(framePx - 1.0, framePx, edge);
+    // Hard edge, not a gradient. framePx is a whole number of device
+    // pixels and lands exactly on a pixel boundary, so there is nothing
+    // to anti-alias — and a one-pixel blend between the ring and the
+    // content is a visible seam the moment the two differ in lightness,
+    // which is precisely the inner-light / outer-dark case.
+    float ring = edge < framePx ? 1.0 : 0.0;
     fragColor = vec4(mix(color.rgb, frameColor(), ring), color.a);
 }

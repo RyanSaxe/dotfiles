@@ -3,6 +3,80 @@
 -- layer in highlights.lua, and watches the generated dir so mode and
 -- mascot changes repaint running instances. Without a generated file
 -- (fresh machine, CI) the stock catppuccin floor stands alone.
+---@class ThemeRoles
+---@field bg string
+---@field bg_alt string
+---@field bg_highlight string
+---@field fg string
+---@field fg_muted string
+---@field fg_faint string
+---@field border string
+---@field warn string
+---@field success string
+---@field info string
+---@field ghost string
+
+---@class ThemePalette
+---@field rosewater string
+---@field flamingo string
+---@field pink string
+---@field mauve string
+---@field red string
+---@field maroon string
+---@field peach string
+---@field yellow string
+---@field green string
+---@field teal string
+---@field sky string
+---@field sapphire string
+---@field blue string
+---@field lavender string
+---@field semantic_add string
+---@field semantic_delete string
+---@field semantic_change string
+---@field text string
+---@field subtext1 string
+---@field subtext0 string
+---@field overlay2 string
+---@field overlay1 string
+---@field overlay0 string
+---@field surface2 string
+---@field surface1 string
+---@field surface0 string
+---@field base string
+---@field mantle string
+---@field crust string
+
+-- The surfaces of the OTHER layer. The editor's chrome touches terminal
+-- edges, so it paints in the outer mode even when the buffer is inner.
+---@class ThemeOuter
+---@field mode "dark"|"light"
+---@field accent string
+---@field notify string
+---@field bg string
+---@field fg string
+---@field fg_muted string
+---@field fg_faint string
+---@field border string
+---@field base string
+---@field mantle string
+---@field crust string
+---@field mauve string
+---@field pink string
+---@field blue string
+---@field peach string
+---@field green string
+---@field red string
+---@field yellow string
+
+---@class ThemeTokens
+---@field mode "dark"|"light"
+---@field accent string
+---@field notify string
+---@field outer ThemeOuter
+---@field roles ThemeRoles
+---@field palette ThemePalette
+
 local M = {}
 
 ---@type string
@@ -32,9 +106,12 @@ function M.apply()
   local flavour = light and "latte" or "mocha"
   -- The generated palette IS the palette: feed it to the floor so every
   -- plugin integration paints with it, never stock catppuccin values.
+  ---@type table
   local opts = M.floor_opts
   if tokens then
-    opts = vim.tbl_deep_extend("force", opts, { color_overrides = { [flavour] = tokens.palette } })
+    ---@type table
+    local merged = vim.tbl_deep_extend("force", opts, { color_overrides = { [flavour] = tokens.palette } })
+    opts = merged
   end
   require("catppuccin").setup(opts)
   vim.o.background = light and "light" or "dark"
@@ -74,6 +151,9 @@ function M.setup(floor_opts)
     end,
   })
   M.apply()
+  require("theme.surfaces").setup()
+  require("theme.winbar").setup()
+  require("theme.pulse").setup()
   if vim.uv.fs_stat(generated_dir) then
     watch()
   end
