@@ -96,6 +96,10 @@ function M.apply(tokens)
   for _, g in ipairs({ "@variable.member", "@variable.parameter" }) do
     hl(g, { fg = syn.member })
   end
+  -- LSP semantic tokens outrank treesitter; claim the member-shaped ones
+  -- or the floor's own mappings (lavender properties) leak through.
+  hl("@lsp.type.property", { link = "@variable.member" })
+  hl("@lsp.type.parameter", { link = "@variable.parameter" })
   -- Receiver objects (self/cls/this) read as context, like modules.
   hl("@variable.builtin", { fg = syn.module })
 
