@@ -78,6 +78,7 @@ const SYNC_OFF = "\x1b[?2026l";
 let agents: Agent[] = [];
 let agentsFresh = false;
 let appliedBg = "";
+let warnedNoPalette = false;
 const acks = loadAcks();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
@@ -308,7 +309,20 @@ async function tick(counter: number): Promise<boolean> {
     refresh,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;
-  const palette = loadPalette();
+  // Every frame is a color: with no rendered theme there is nothing sane to
+  // paint, and rethrowing per tick would spin forever with no explanation.
+  // The generated-dir watch repaints everything the moment it lands.
+  let palette;
+  try {
+    palette = loadPalette();
+  } catch {
+    if (!warnedNoPalette) {
+      warnedNoPalette = true;
+      logLine("no palette yet; run `theme apply`. Rails stay unpainted");
+    }
+    return true;
+  }
+  warnedNoPalette = false;
   // Keep every rail pane's default bg in step with the theme (spawn sets
   // it once; a mode flip changes crust under all existing panes).
   const bg = railBg(palette);
