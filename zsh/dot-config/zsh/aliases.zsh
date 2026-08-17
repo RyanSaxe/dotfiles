@@ -24,6 +24,8 @@ alias df='df -h'
 alias du='du -h'
 # apt installs bat's binary as batcat to avoid clashing with bacula-console.
 command -v batcat >/dev/null 2>&1 && alias bat='batcat'
+# ...and fd as fdfind, clashing with fdclone. Same rename, same remedy.
+command -v fdfind >/dev/null 2>&1 && alias fd='fdfind'
 # alias grep='grep --color=auto' -- commenting due to claude using grep a lot
 
 # Claude Code: unset TMUX env so the binary's hardcoded chalk-level cap

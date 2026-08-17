@@ -83,9 +83,10 @@ ensure_package_manager() {
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat neovim lua-language-server stylua'
+CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat fd ripgrep neovim lua-language-server stylua'
 # make: ensure_modern_stow builds stow from source on LTS boxes.
-CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat make'
+# fd-find: apt names the binary fdfind; aliases.zsh renames it back.
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep make'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
