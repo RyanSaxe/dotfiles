@@ -35,7 +35,10 @@ local root = vim.fs.normalize(script_dir .. "/..")
 -- the editor's workspace, this file lights up.
 local CANARY = root .. "/nvim/dot-config/nvim/lua/theme/highlights.lua"
 
-local ATTACH_TIMEOUT_MS = 60000
+-- Generous on purpose: a cold CI runner spends its first minute
+-- compiling treesitter parsers before any language server attaches.
+-- Failing here means "could not verify", never "verified clean".
+local ATTACH_TIMEOUT_MS = 240000
 -- Diagnostics are not final when the server first answers, and no event
 -- says they are; a cold lua_ls has not even loaded its own stdlib meta.
 local POLL_MS = 250

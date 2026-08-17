@@ -199,7 +199,12 @@ jobs:
       # The acceptance criterion the other two cannot check: what a real
       # editor shows.
       - name: the editor reports no diagnostics
-        run: nvim --headless -c "luafile dev/editor-parity.lua"
+        # Warm up first: a cold runner installs treesitter parsers on the
+        # first real session, and no language server attaches until that
+        # finishes.
+        run: |
+          nvim --headless "+Lazy! sync" "+qa" || true
+          nvim --headless -c "luafile dev/editor-parity.lua"
 
       - name: checkhealth reports no errors
         run: |
