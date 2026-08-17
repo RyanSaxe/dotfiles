@@ -126,14 +126,27 @@ for workspace in "${WORKSPACES[@]}"; do
     click_script="aerospace workspace $workspace" \
     script="$PLUGIN_DIR/aerospace.sh"
 
-  # Subscribe to events - the code workspace also listens for the rail
-  # daemon's agent attention changes
-  if [[ "$workspace" == "code" ]]; then
-    sketchybar --subscribe "space.$workspace" aerospace_workspace_change mascot_colors_changed agent_attention_change
-  else
-    sketchybar --subscribe "space.$workspace" aerospace_workspace_change mascot_colors_changed
-  fi
+  sketchybar --subscribe "space.$workspace" aerospace_workspace_change mascot_colors_changed
 done
+
+# The agent-attention letter: not an aerospace workspace, but it wears the
+# same shape because it answers the same question — where should I look.
+# It used to be the code workspace's own highlight, which conflated "an
+# agent needs you" with "this is where your terminal lives". Clicking it
+# is cmd-alt-a: jump to the agent that wants you.
+sketchybar --add item space.agent left \
+  --set space.agent \
+  icon="A" \
+  icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+  icon.padding_left=8 \
+  icon.padding_right=8 \
+  label.drawing=off \
+  background.color="$WORKSPACE_INACTIVE_BG" \
+  background.corner_radius=6 \
+  background.height=22 \
+  click_script="aerospace workspace code; open -a Ghostty; /opt/homebrew/bin/workmux last-done" \
+  script="$PLUGIN_DIR/agent.sh" \
+  --subscribe space.agent agent_attention_change mascot_colors_changed
 
 # -----------------------------------------------------------------------------
 # Right Side Items (ordered right-to-left)

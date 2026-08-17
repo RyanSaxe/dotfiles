@@ -1,13 +1,14 @@
 #!/usr/bin/env zsh
 # Aerospace workspace indicator plugin
-# Updates workspace highlighting when the workspace changes, colors update,
-# or the rail daemon's agent attention state changes
+# Updates workspace highlighting when the workspace changes or colors update.
 #
 # States:
-# - Agent waiting (code workspace): status_waiting semantic color
-# - Agent done (code workspace): status_done semantic color
 # - Active (focused): accent color (follows the mascot)
 # - Inactive: dim
+#
+# Agent attention is NOT here: it has its own "A" letter (plugins/agent.sh)
+# rather than borrowing the code workspace's highlight, which conflated
+# "an agent needs you" with "this is where your terminal lives".
 
 source "$HOME/.config/sketchybar/colors.sh"
 
@@ -27,25 +28,7 @@ fi
 # Extract workspace name from item name (space.email -> email)
 WORKSPACE="${NAME#space.}"
 
-# Agent attention (waiting|done|none), written by the rail daemon whenever
-# an unacked agent status changes. Visiting the agent's window clears it.
-ATTENTION_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail/attention"
-ATTENTION="none"
-[[ -r "$ATTENTION_FILE" ]] && ATTENTION=$(<"$ATTENTION_FILE")
-
-# Determine state: waiting > done > active > inactive (attention shows even
-# when the code workspace is focused)
-if [[ "$WORKSPACE" == "code" && "$ATTENTION" == "waiting" ]]; then
-  sketchybar --set "$NAME" \
-    icon.color="$AGENT_WAITING_FG" \
-    background.color="$AGENT_WAITING_BG" \
-    background.drawing=on
-elif [[ "$WORKSPACE" == "code" && "$ATTENTION" == "done" ]]; then
-  sketchybar --set "$NAME" \
-    icon.color="$AGENT_DONE_FG" \
-    background.color="$AGENT_DONE_BG" \
-    background.drawing=on
-elif [[ "$WORKSPACE" == "$FOCUSED" ]]; then
+if [[ "$WORKSPACE" == "$FOCUSED" ]]; then
   # Active workspace: prominent color with subtle background
   sketchybar --set "$NAME" \
     icon.color="$WORKSPACE_ACTIVE_FG" \
