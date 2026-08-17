@@ -114,14 +114,21 @@ jobs:
           test -s "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
           ! grep -q '{{' "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
           # Diverge the layers through the real CLI, exercising the mode
-          # persistence and per-layer render paths end to end.
+          # persistence and per-layer render paths end to end. The mixed
+          # render's contract: inner-prefixed tokens resolve against the
+          # inner palette, outer-prefixed against the outer. Expected hexes
+          # come from the palette files, so retuning a color never fails
+          # this check.
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" inner light
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" outer dark
-          grep -q 'set -g @bg "#eff1f5"' \
+          inner_bg="$(sed -n 's/^base=//p' theme/dot-config/theme/palettes/latte.conf)"
+          outer_crust="$(sed -n 's/^crust=//p' theme/dot-config/theme/palettes/mocha.conf)"
+          test -n "$inner_bg" && test -n "$outer_crust"
+          grep -qF "set -g @bg \"$inner_bg\"" \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
-          grep -q 'set -g @crust "#11111b"' \
+          grep -qF "set -g @crust \"$outer_crust\"" \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
       - name: Generated artifacts stay out of the checkout

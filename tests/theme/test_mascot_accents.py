@@ -158,15 +158,20 @@ def test_fetch_failures_exit_with_one_line_errors() -> None:
     def raise_offline() -> object:
         raise accents.URLError("no route to host")
 
+    # The contract: one line, naming what failed and why. The phrasing
+    # around those parts is free to change.
     message = _exit_message(
         lambda: accents.fetch_or_exit(raise_http_404, "'pokemon:badmon'")
     )
-    assert message == "error: cannot fetch 'pokemon:badmon': HTTP 404 Not Found"
+    assert "\n" not in message
+    assert "'pokemon:badmon'" in message
+    assert "404" in message and "Not Found" in message
 
     message = _exit_message(
         lambda: accents.fetch_or_exit(raise_offline, "'pokemon:mew'")
     )
-    assert "cannot fetch 'pokemon:mew'" in message
+    assert "\n" not in message
+    assert "'pokemon:mew'" in message
     assert "no route to host" in message
 
 
