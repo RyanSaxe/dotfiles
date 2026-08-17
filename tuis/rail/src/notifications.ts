@@ -3,6 +3,7 @@
 // transitions — never levels — so nothing repeats while a state persists.
 
 import { writeFileSync } from "node:fs";
+import { platform } from "node:os";
 import { join } from "node:path";
 
 import { run, type Agent, type AgentStatus } from "./data.js";
@@ -34,9 +35,24 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
   if (level === publishedLevel) return;
   publishedLevel = level;
   writeFileSync(ATTENTION_FILE, level);
+  // Edge-triggered, so this is one line per level change — the only record
+  // of why the bar looks the way it does. Without it, diagnosing a quiet
+  // notification means reconstructing the ack store by hand.
+  const pending = agents
+    .filter((agent) => agent.status !== "working" && !acked.has(agent.paneId))
+    .map((agent) => `${agent.session}/${agent.windowName}`);
+  logLine(`attention ${level} (pending: ${pending.join(", ") || "none"})`);
   // No sketchybar (Linux, or it isn't running) is fine — the file alone
-  // keeps the state truthful for whoever reads it next.
-  run("sketchybar", ["--trigger", "agent_attention_change"]).catch(() => {});
+  // keeps the state truthful for whoever reads it next. On macOS it is not
+  // fine, and used to be silent: a failed trigger looked exactly like a
+  // successful one, forever.
+  run("sketchybar", ["--trigger", "agent_attention_change"]).catch(
+    (error: unknown) => {
+      if (platform() === "darwin") {
+        logLine(`sketchybar trigger failed: ${String(error)}`);
+      }
+    },
+  );
 }
 
 const NTFY_URL =

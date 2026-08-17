@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 
-import { phoneBatch } from "../src/notifications.js";
+import { attentionLevel, phoneBatch } from "../src/notifications.js";
 import { isPresent } from "../src/probes.js";
 import type { Agent, AgentStatus } from "../src/data.js";
 
@@ -68,3 +68,30 @@ assert.deepEqual(
   "staying away re-pings nothing",
 );
 console.log("attention routing ok");
+
+// ----- the two channels are deliberately different ----------------------
+// The bar reads an ACK-FILTERED level; the phone reads raw TRANSITIONS.
+// An acked agent must go quiet on the bar while a fresh transition still
+// pings — collapsing these into one path is a plausible-looking
+// "simplification" that would silently break one of them.
+const ackedWaiting = new Set(["%1"]);
+assert.equal(
+  attentionLevel([waiting], ackedWaiting),
+  "none",
+  "visiting an agent clears the bar",
+);
+assert.deepEqual(
+  phoneBatch([waiting], [waiting], ackedWaiting, false, false),
+  [waiting],
+  "...but a transition still pings the phone",
+);
+assert.equal(
+  attentionLevel([waiting, done], none),
+  "waiting",
+  "waiting outranks done",
+);
+assert.equal(
+  attentionLevel([working], none),
+  "none",
+  "working is information, not attention",
+);
