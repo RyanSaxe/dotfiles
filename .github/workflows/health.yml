@@ -119,9 +119,9 @@ jobs:
             "$SCRATCH/.local/bin/theme" inner light
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" outer dark
-          grep -q 'set -g @bg "#f5f7fa"' \
+          grep -q 'set -g @bg "#eff1f5"' \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
-          grep -q 'set -g @crust "#06070a"' \
+          grep -q 'set -g @crust "#11111b"' \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
       - name: Generated artifacts stay out of the checkout
