@@ -46,19 +46,48 @@ const NTFY_URL =
 
 const lastStatus = new Map<string, AgentStatus>();
 let seeded = false;
+let wasPresent: boolean | null = null;
+
+// What rides this tick's ping. Present ticks send nothing. The departure
+// tick sweeps in every un-acked done/waiting agent alongside the raw
+// transitions — an agent that finished just before the walk-away is
+// unacked, so leaving is pure latency, never a miss window.
+export function phoneBatch(
+  transitions: Agent[],
+  agents: Agent[],
+  acked: Set<string>,
+  present: boolean,
+  departed: boolean,
+): Agent[] {
+  if (present) return [];
+  const batch = new Map<string, Agent>();
+  for (const agent of transitions) batch.set(agent.paneId, agent);
+  if (departed) {
+    for (const agent of agents) {
+      if (agent.status === "working" || acked.has(agent.paneId)) continue;
+      batch.set(agent.paneId, agent);
+    }
+  }
+  return [...batch.values()];
+}
 
 // One ping per transition into done/waiting, batched per tick. The first
-// tick only seeds, so a daemon restart never replays pings. The phone is
-// the AWAY channel: while present, the rail and sketchybar own attention,
-// so every ping is suppressed — including the focused window's.
-export function pushPhone(agents: Agent[], present: boolean): void {
-  const transitions: Agent[] = [];
+// tick only seeds, so a daemon restart never replays pings (nor replays
+// the departure sweep). The phone is the AWAY channel: while present, the
+// rail and sketchybar own attention, so every ping is suppressed —
+// including the focused window's.
+export function pushPhone(
+  agents: Agent[],
+  acked: Set<string>,
+  present: boolean,
+): void {
+  const rawTransitions: Agent[] = [];
   for (const agent of agents) {
     const previous = lastStatus.get(agent.paneId);
     lastStatus.set(agent.paneId, agent.status);
     if (!seeded || previous === agent.status) continue;
     if (agent.status === "working") continue;
-    transitions.push(agent);
+    rawTransitions.push(agent);
   }
   seeded = true;
 
@@ -67,7 +96,17 @@ export function pushPhone(agents: Agent[], present: boolean): void {
     if (!alive.has(paneId)) lastStatus.delete(paneId);
   }
 
-  if (present || transitions.length === 0 || !NTFY_URL) return;
+  const departed = wasPresent === true && !present;
+  wasPresent = present;
+  const transitions = phoneBatch(
+    rawTransitions,
+    agents,
+    acked,
+    present,
+    departed,
+  );
+
+  if (transitions.length === 0 || !NTFY_URL) return;
   const waiting = transitions.filter((agent) => agent.status === "waiting");
   const first = transitions[0]!;
   const title =

@@ -341,7 +341,7 @@ async function tick(counter: number): Promise<boolean> {
     clientFacts.latestClientActivityTs,
     Date.now() / 1000,
   );
-  pushPhone(settled, present);
+  pushPhone(settled, acked, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;
