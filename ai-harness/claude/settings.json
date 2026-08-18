@@ -2,6 +2,7 @@
   "model": "opus[1m]",
   "effortLevel": "xhigh",
   "alwaysThinkingEnabled": true,
+  "editorMode": "vim",
   "permissions": {
     "defaultMode": "auto"
   }
