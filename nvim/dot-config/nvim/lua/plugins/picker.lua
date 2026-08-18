@@ -46,6 +46,21 @@ return {
         files = { hidden = true },
         grep = { hidden = true },
         explorer = { hidden = true },
+        gh_diff = {
+          win = {
+            preview = {
+              keys = {
+                ["<leader>gdr"] = {
+                  function()
+                    require("review_surfaces").from_snacks()
+                  end,
+                  mode = { "n", "x" },
+                  desc = "Open Local CodeDiff",
+                },
+              },
+            },
+          },
+        },
       },
     },
   },

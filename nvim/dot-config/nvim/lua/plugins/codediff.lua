@@ -1,0 +1,72 @@
+return {
+  {
+    "esmuellert/codediff.nvim",
+    cmd = { "CodeDiff" },
+    dependencies = { "MunifTanjim/nui.nvim", "folke/snacks.nvim" },
+    opts = {
+      diff = {
+        layout = "side-by-side",
+        disable_inlay_hints = true,
+        cycle_hunks_across_files = true,
+      },
+      keymaps = {
+        view = {
+          quit = "q",
+          toggle_explorer = "<leader>b",
+          focus_explorer = "<leader>e",
+          next_hunk = "]h",
+          prev_hunk = "[h",
+          next_file = "]f",
+          prev_file = "[f",
+          diff_get = "do",
+          diff_put = "dp",
+          open_in_prev_tab = "gf",
+          close_on_open_in_prev_tab = false,
+          toggle_stage = "-",
+          hunk_textobject = "ih",
+          show_help = "g?",
+          align_move = "gm",
+          toggle_layout = "t",
+          toggle_compact = "gc",
+        },
+        explorer = {
+          select = "<CR>",
+          hover = "K",
+          refresh = "R",
+          toggle_view_mode = "i",
+          stage_all = "S",
+          unstage_all = "U",
+          restore = "X",
+          toggle_changes = "gu",
+          toggle_staged = "gs",
+          fold_open = "zo",
+          fold_open_recursive = "zO",
+          fold_close = "zc",
+          fold_close_recursive = "zC",
+          fold_toggle = "za",
+          fold_toggle_recursive = "zA",
+          fold_open_all = "zR",
+          fold_close_all = "zM",
+        },
+        history = {
+          select = "<CR>",
+          toggle_view_mode = "i",
+          refresh = "R",
+          fold_open = "zo",
+          fold_open_recursive = "zO",
+          fold_close = "zc",
+          fold_close_recursive = "zC",
+          fold_toggle = "za",
+          fold_toggle_recursive = "zA",
+          fold_open_all = "zR",
+          fold_close_all = "zM",
+        },
+      },
+    },
+    ---@param opts table CodeDiff setup opts from this spec
+    config = function(_, opts)
+      require("codediff").setup(opts)
+      require("review_surfaces").setup()
+    end,
+  },
+}
