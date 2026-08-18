@@ -1,0 +1,26 @@
+#!/usr/bin/env zsh
+
+set -euo pipefail
+
+: "${WM_PROJECT_ROOT:?workmux must provide WM_PROJECT_ROOT}"
+: "${WM_WORKTREE_PATH:?workmux must provide WM_WORKTREE_PATH}"
+
+for executable in git rsync; do
+  if ! command -v "$executable" >/dev/null 2>&1; then
+    print -u2 -- "workmux-copy-ignored: required command not found: $executable"
+    exit 1
+  fi
+done
+
+source_root="$(git -C "$WM_PROJECT_ROOT" rev-parse --show-toplevel)"
+destination_root="$(git -C "$WM_WORKTREE_PATH" rev-parse --show-toplevel)"
+
+if [[ "$source_root" == "$destination_root" ]]; then
+  print -u2 -- "workmux-copy-ignored: source and destination are the same worktree"
+  exit 1
+fi
+
+# Git is the authority on what is ignored. Null-delimited paths preserve
+# whitespace and newlines; rsync recreates parents and copies rather than links.
+git -C "$source_root" ls-files --others --ignored --exclude-standard -z |
+  rsync -a --from0 --files-from=- -- "$source_root/" "$destination_root/"
