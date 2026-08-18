@@ -18,11 +18,13 @@ layout stays out of the repo tree.
 
 | Package      | Contents                                                                                              |
 | ------------ | ----------------------------------------------------------------------------------------------------- |
+| `ai-harness` | global instructions, shared skill and tool roots, plus Claude, Codex, and Copilot adapters            |
 | `nvim`       | LazyVim-based Neovim, themed from the generated tokens                                                |
 | `zsh`        | zsh with a starship prompt and automatic `.venv` activation                                           |
 | `ghostty`    | terminal emulator (macOS)                                                                             |
 | `sketchybar` | macOS menu bar replacement: workspaces, agent attention, battery/cpu/memory/wifi                      |
 | `tmux`       | multiplexer, with [workmux](https://github.com/raine/workmux) for worktree-parallel agents and status |
+| `workmux`    | global worktree-agent defaults, status integration, and ignored-file replication                      |
 | `git`        | git + gh, delta as pager                                                                              |
 | `bat`        | `cat` with syntax highlighting, themed from the same tokens                                           |
 | `theme`      | the theming pipeline                                                                                  |
