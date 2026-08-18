@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import json
-import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -114,25 +113,11 @@ def validate_settings() -> None:
         raise HarnessError(f"{codex_path.relative_to(REPO_ROOT)} contains UI state")
 
 
-def validate_tools() -> None:
-    lsp_check = HARNESS_ROOT / "tools/lsp-check.zsh"
-    if not lsp_check.read_text().startswith("#!/usr/bin/env zsh\n"):
-        raise HarnessError("ai-harness/tools/lsp-check.zsh must target zsh")
-    if not lsp_check.stat().st_mode & stat.S_IXUSR:
-        raise HarnessError("ai-harness/tools/lsp-check.zsh must be executable")
-    for command in (("zsh", "-n", str(lsp_check)), (str(lsp_check), "--help")):
-        result = subprocess.run(command, capture_output=True, check=False, text=True)
-        if result.returncode:
-            details = result.stderr.strip() or result.stdout.strip()
-            raise HarnessError(f"{' '.join(command)} failed: {details}")
-
-
 def main() -> int:
     checks = (
         validate_manifests,
         validate_skills,
         validate_settings,
-        validate_tools,
     )
     try:
         for check in checks:

@@ -81,7 +81,7 @@ all three global instruction locations.
 
 ```text
 /etc/codex/skills                    -> ai-harness/skills
-~/.local/bin/lsp-check               -> ai-harness/tools/lsp-check.zsh
+~/.local/bin/<tool>                  -> ai-harness/tools/<tool>
 ```
 
 Codex scans `/etc/codex/skills` as its ADMIN scope independently from the USER
@@ -122,8 +122,9 @@ mutable UI or trust state there without touching Git. User and project layers
 can override reviewed repo settings.
 
 All three tracked settings files are intentionally empty in this scaffold.
-Existing v1 preferences, MCP servers, plugins, features, and custom permission
-presets will be reviewed individually before they are carried forward.
+Existing v1 skills, tools, references, preferences, MCP servers, plugins,
+features, and custom permission presets will be reviewed individually before
+they are carried forward.
 
 Workmux invokes Codex with the `dotfiles` profile, Luna at xhigh reasoning, and
 `approval_policy = "on-request"` plus `approvals_reviewer = "auto_review"`.

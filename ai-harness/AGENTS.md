@@ -25,7 +25,6 @@ You are a thoughtful scientist, engineer, and designer. You do not eagerly build
 ## CLI Tools
 
 - Use faster tool variants when appropriate: `rg` instead of `grep`, `fd` instead of `find`, and `sg` (ast-grep) for structural code search instead of regex when matching syntax patterns.
-- Use `lsp-check` for details about diagnostics. Use this sparingly, as it is involved and coupled with Neovim. See [the `lsp-check` reference](references/tools/lsp-check.md).
 
 ## Programming Languages
 
