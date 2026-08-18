@@ -1,4 +1,6 @@
 {
+  "model": "opus[1m]",
+  "effortLevel": "xhigh",
   "permissions": {
     "defaultMode": "auto"
   }
