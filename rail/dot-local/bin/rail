@@ -123,10 +123,10 @@ status)
   fi
   if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
-  if [ -n "${AI_HARNESS_NTFY_URL:-}${CLAUDE_NOTIFICATION_ID:-}" ]; then
+  if [ -n "${AI_HARNESS_NTFY_URL:-}${AGENT_NOTIFICATION_ID:-}" ]; then
     echo "phone: configured"
   else
-    echo "phone: NOT configured (set CLAUDE_NOTIFICATION_ID in $REPO_ROOT/.env)"
+    echo "phone: NOT configured (set AGENT_NOTIFICATION_ID in $REPO_ROOT/.env)"
   fi
   ;;
 *)

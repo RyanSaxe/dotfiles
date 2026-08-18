@@ -57,8 +57,8 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
 
 const NTFY_URL =
   process.env["AI_HARNESS_NTFY_URL"] ??
-  (process.env["CLAUDE_NOTIFICATION_ID"]
-    ? `https://ntfy.sh/ai-agent-notification-${process.env["CLAUDE_NOTIFICATION_ID"]}`
+  (process.env["AGENT_NOTIFICATION_ID"]
+    ? `https://ntfy.sh/ai-agent-notification-${process.env["AGENT_NOTIFICATION_ID"]}`
     : null);
 
 const lastStatus = new Map<string, AgentStatus>();
@@ -131,7 +131,7 @@ export function pushPhone(
     if (!warnedNoChannel) {
       warnedNoChannel = true;
       logLine(
-        "no phone channel: set CLAUDE_NOTIFICATION_ID (or AI_HARNESS_NTFY_URL) in the dotfiles .env",
+        "no phone channel: set AGENT_NOTIFICATION_ID (or AI_HARNESS_NTFY_URL) in the dotfiles .env",
       );
     }
     return;

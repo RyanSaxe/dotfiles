@@ -213,7 +213,7 @@ install_neovim_linux() {
 # because nobody knew the file existed is worse than being nagged.
 #
 # One "NAME description" per line; the description is what the prompt shows.
-REQUIRED_ENV_VARS='CLAUDE_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
+REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
 
 ensure_env_file() {
   if [ ! -f .env ]; then

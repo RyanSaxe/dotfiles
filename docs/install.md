@@ -76,6 +76,6 @@ untracked `.env` at the repo root, which zsh and the rail launcher both load.
 `install.sh` creates it with a commented placeholder per required value and
 prints a loud reminder for every one still empty.
 
-Today that list is `CLAUDE_NOTIFICATION_ID`, the ntfy.sh topic the rail pings
+Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail pings
 for agent notifications. Leave it unset and phone notifications simply never
 send; `rail status` reports which state you're in.
