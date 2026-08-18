@@ -1,2 +1,2 @@
-# Deliberate system-level Codex defaults belong here after individual review.
-# Mutable user, project, hook-trust, and UI state must remain in $CODEX_HOME.
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
