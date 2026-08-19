@@ -37,9 +37,16 @@ const reviewItems = [
   },
 ];
 
+const configuredTab = process.env.RAIL_TAB;
+
 const scene: RailData = {
   session: "dotfiles",
-  activeTab: process.env.RAIL_TAB === "review" ? "review" : "agents",
+  activeTab:
+    configuredTab === "reviews" || configuredTab === "review"
+      ? "reviews"
+      : configuredTab === "tasks"
+        ? "tasks"
+        : "agents",
   acked: new Set(process.env.RAIL_ACK ? [process.env.RAIL_ACK] : []),
   hints: new Map(),
   sprite: null,
@@ -112,7 +119,7 @@ scene.hints =
   new Map();
 
 // Defaults mirror the shipped pane geometry (daemon.ts RAIL_WIDTH).
-const width = Number(process.env.RAIL_WIDTH ?? 24);
+const width = Number(process.env.RAIL_WIDTH ?? 27);
 const height = Number(process.env.RAIL_HEIGHT ?? 41);
 process.stdout.write(
   renderRail(scene, loadPalette(), width, height).join("\n") + "\n",

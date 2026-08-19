@@ -1,5 +1,5 @@
-import { line } from "../cells.js";
-import type { RailTabId } from "../tabs.js";
+import { line, type Span } from "../cells.js";
+import type { RailTabAttention, RailTabId } from "../tabs.js";
 import { RAIL_TABS } from "../tabs.js";
 import { pill } from "./rows.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
@@ -26,22 +26,25 @@ export function header(
 }
 
 // The tab row replaces the old divider between local tmux windows and the
-// lower rail content. It is centered and occupies exactly one row, so every
-// tab keeps the same scroll/page geometry while the window list remains
-// visible above it.
+// lower rail content. Agents hugs the left edge, Reviews is centered, and
+// Tasks hugs the right edge; all three occupy one row above the lower scene.
 export function tabBar(
   activeTab: RailTabId,
-  reviewNeedsAttention: boolean,
+  attention: RailTabAttention,
   palette: Palette,
   width: number,
 ): string {
   const bg = railBg(palette);
-  const total =
-    RAIL_TABS.reduce((sum, tab) => sum + tab.label.length + 2, 0) +
-    RAIL_TABS.length -
-    1;
-  const pad = Math.max(0, Math.floor((width - total) / 2));
-  const spans = [{ text: " ".repeat(pad), fg: bg }];
+  const spans: Span[] = [];
+
+  const tabWidth = (tab: (typeof RAIL_TABS)[number]): number =>
+    tab.label.length + 2;
+  const starts = [
+    0,
+    Math.max(0, Math.floor((width - tabWidth(RAIL_TABS[1]!)) / 2)),
+    Math.max(0, width - tabWidth(RAIL_TABS[2]!)),
+  ];
+  let cursor = 0;
 
   for (const [index, tab] of RAIL_TABS.entries()) {
     const active = tab.id === activeTab;
@@ -50,11 +53,14 @@ export function tabBar(
       : blend(palette.surface0, bg, DIM_KEEP);
     const fg = active
       ? palette.base
-      : tab.id === "review" && reviewNeedsAttention
+      : attention[tab.id]
         ? palette.red
         : palette.dim2;
+    const start = starts[index] ?? cursor;
+    if (start > cursor)
+      spans.push({ text: " ".repeat(start - cursor), fg: bg });
     spans.push(...pill(tab.label, fg, chipBg, bg));
-    if (index < RAIL_TABS.length - 1) spans.push({ text: " ", fg: bg });
+    cursor = start + tabWidth(tab);
   }
   return line(width, bg, spans);
 }

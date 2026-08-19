@@ -9,6 +9,8 @@ import {
   mascotFooter,
 } from "./sections/mascot.js";
 import type { RailRow } from "./sections/rows.js";
+import { taskRows } from "./sections/tasks.js";
+import type { RailTabAttention } from "./tabs.js";
 import { windowRows } from "./sections/windows.js";
 import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 
@@ -17,7 +19,7 @@ import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 const PAGE_UP_KEY = "⌥,";
 const PAGE_DOWN_KEY = "⌥.";
 
-// The slab is 22 content cells; these two crust columns after them are
+// The slab is 26 content cells; these two crust columns after them are
 // the visible right margin (the colorless tmux border beside them reads
 // as part of the gap). daemon.ts derives the pane width from this.
 export const GUTTER_COLS = 1;
@@ -47,23 +49,30 @@ export function renderRail(
     }
   }
 
+  const tabAttention: RailTabAttention = {
+    // The Agents tab is the lower, elsewhere-agent list. Local agents remain
+    // visible as window rows above the tabs and carry their own state color.
+    agents: elsewhere.some(
+      (agent) => agent.status !== "working" && !data.acked.has(agent.paneId),
+    ),
+    reviews: data.review.unacknowledged.length > 0,
+    tasks: false,
+  };
+
   // Local tmux windows stay visible for every tab. The active tab owns only
   // the lower section below the centered tab bar.
   const body: RailRow[] = [
     ...windowRows(data.windows, agentsByPane, data.acked, palette, inner),
     { text: blank(inner, bg), item: false },
     {
-      text: tabBar(
-        data.activeTab,
-        data.review.unacknowledged.length > 0,
-        palette,
-        inner,
-      ),
+      text: tabBar(data.activeTab, tabAttention, palette, inner),
       item: false,
     },
   ];
-  if (data.activeTab === "review") {
+  if (data.activeTab === "reviews") {
     body.push(...reviewRows(data.review, palette, inner));
+  } else if (data.activeTab === "tasks") {
+    body.push(...taskRows(palette, inner));
   } else if (elsewhere.length > 0) {
     body.push(
       ...elsewhereRows(elsewhere, data.acked, data.hints, palette, inner),

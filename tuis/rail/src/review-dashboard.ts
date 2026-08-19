@@ -121,6 +121,14 @@ async function openUrl(url: string): Promise<void> {
   await run(opener, [url]);
 }
 
+export async function openReviewItem(itemIndex: number): Promise<boolean> {
+  const snapshot = loadReviewSnapshot();
+  const item = snapshot.unacknowledged[itemIndex];
+  if (item === undefined) return false;
+  await openUrl(item.url);
+  return true;
+}
+
 export async function main(): Promise<void> {
   for (;;) {
     const snapshot = loadReviewSnapshot();

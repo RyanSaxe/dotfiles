@@ -4,8 +4,10 @@
 #   rail on|off|toggle   enable/disable the rail everywhere
 #   rail jump <letter>   jump to the agent behind a hint letter
 #   rail page up|down    page the rail body when it overflows
-#   rail tab agents|review
+#   rail tab agents|reviews|tasks
 #                       switch the active rail tab
+#   rail element <number>
+#                       perform the focused tab's numbered element action
 #   rail review-dashboard
 #                       open the cached GitHub review inbox
 #   rail ensure-daemon   start the render daemon if it isn't running
@@ -93,7 +95,7 @@ toggle)
   fi
   ;;
 jump)
-  # Jump to the agent behind a hint key (alt+a <key> in tmux). Digits
+  # Jump to the agent behind a hint key (alt+space <digit> in tmux). Digits
   # are viewer-relative — 1 is the top elsewhere row of the CALLING
   # session's rail — and the literal key `a` is the globally most-urgent
   # agent, current session included. The daemon keeps hints.tsv current:
@@ -130,11 +132,12 @@ page)
   printf '%s' "$next" >"$STATE/page"
   ;;
 tab)
-  tab="${2:?usage: rail tab agents|review}"
+  tab="${2:?usage: rail tab agents|reviews|tasks}"
   case "$tab" in
-  agents | review) ;;
+  agents | reviews | tasks) ;;
+  review) tab=reviews ;;
   *)
-    echo "usage: rail tab agents|review" >&2
+    echo "usage: rail tab agents|reviews|tasks" >&2
     exit 1
     ;;
   esac
@@ -142,6 +145,18 @@ tab)
   # the top of the new one.
   printf '%s\n' "$tab" >"$STATE/tab"
   printf '0' >"$STATE/page"
+  ;;
+element)
+  number="${2:?usage: rail element <number>}"
+  case "$number" in
+  1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) ;;
+  *)
+    echo "usage: rail element <1-9>" >&2
+    exit 1
+    ;;
+  esac
+  cd "$RAIL_DIR"
+  exec npx tsx src/tab-element.ts "$number"
   ;;
 review-dashboard)
   cd "$RAIL_DIR"
@@ -163,7 +178,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|review|review-dashboard|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|reviews|tasks|element <number>|review-dashboard|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

@@ -80,16 +80,18 @@ attention list                   # current active items
 attention ack <item-id>          # local check/dismiss, no GitHub mutation
 ```
 
-The rail does not perform these network requests. The Review tab reads the
-observer's cached state. `alt+r` selects the Review rail tab; the
-tab is one compact line per unacknowledged item and highlights the Review badge
+The rail does not perform these network requests. The Reviews tab reads the
+observer's cached state. `alt+r` selects the Reviews rail tab; the
+tab is one compact line per unacknowledged item and highlights the Reviews badge
 until the item is acknowledged or disappears. `alt+R` opens the cached Review
 dashboard. Enter opens the selected PR in a browser, `ctrl-d` acknowledges it
 locally, and `ctrl-r` performs an explicit no-notify refresh.
 
-The tab registry is intentionally small: Agents and Review are the two live
-implementations. Tasks will join the same registry after its Obsidian and due-
-date contract is implemented; the rail never owns that future task logic.
+The tab registry is intentionally small: Agents, Reviews, and the future-ready
+Tasks surface share one element-action table. `alt+space` enters that table;
+the selected tab decides what a number means. Agent elements jump to their
+pane, review elements open their PR, and task elements will complete the task
+once the Obsidian source exists.
 
 ## Iterating on the look
 
@@ -107,5 +109,5 @@ XDG_STATE_HOME=$(mktemp -d) npx tsx dev/ackcheck.ts   # ack lifecycle
 
 - `workmux status --json` does not export interrupted/stale states; if
   they land upstream, consume them instead of local detection.
-- Tasks remain a future tab and will join as a sibling section once the task
-  engine and Obsidian source are ready.
+- Tasks are present as a future-ready tab slot; its Obsidian-backed elements
+  arrive with the task engine.

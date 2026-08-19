@@ -38,7 +38,8 @@ export interface RailData {
   review: ReviewSnapshot;
   // Pane ids whose done/waiting status has been seen (visit-clears).
   acked: Set<string>;
-  // Jump-hint digit per agent pane id (alt+a <digit>), viewer-relative.
+  // Jump-hint digit per agent pane id (alt+space <digit> on Agents),
+  // viewer-relative.
   hints: Map<string, string>;
   // Kitty image id for the footer sprite; null reclaims the footer rows
   // for content.
@@ -46,7 +47,7 @@ export interface RailData {
   // Pagination page for the body (0 = top); clamped by the renderer.
   page: number;
   // A client on this session is holding the tmux prefix or sitting in
-  // the agent key table — the header recolors as the mode signal.
+  // the focused-tab element table — the header recolors as the mode signal.
   prefixHeld: boolean;
 }
 
@@ -178,7 +179,7 @@ function parsePane(f: string[]): Pane | null {
 
 export interface ClientFacts {
   // Sessions whose attached client is mid-chord: tmux prefix held, or
-  // the agent jump table active.
+  // the focused-tab element table active.
   modeSessions: Set<string>;
   // Sessions with an attached client that lacks kitty graphics. Both
   // mascot halves must skip these: transmission, because tmux forwards
@@ -227,7 +228,7 @@ function clientFactsFrom(rows: string[][]): ClientFacts {
   for (const [session, prefix, keyTable, termname, activity, flags] of rows) {
     if (!session) continue;
     const kitty = /ghostty|kitty/i.test(termname ?? "");
-    if (prefix === "1" || keyTable === "agent") modeSessions.add(session);
+    if (prefix === "1" || keyTable === "tab") modeSessions.add(session);
     if (!kitty) nonKittySessions.add(session);
     if ((flags ?? "").split(",").includes("focused")) {
       focusedSessions.add(session);

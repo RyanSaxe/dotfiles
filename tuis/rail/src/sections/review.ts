@@ -72,12 +72,15 @@ export function reviewRows(
   for (const item of pending) {
     const color = kindColor(item.kind, palette);
     const chipBg = blend(palette.surface0, bg, DIM_KEEP);
+    const number = String(rows.filter((row) => row.item).length + 1);
     rows.push({ text: blank(width, bg), item: false });
     rows.push({
       text: line(
         width,
         bg,
         [
+          ...pill(number, palette.text, chipBg, bg),
+          { text: " ", fg: palette.dim },
           ...pill(kindGlyph(item.kind), color, chipBg, bg),
           { text: " ", fg: palette.dim },
           {
