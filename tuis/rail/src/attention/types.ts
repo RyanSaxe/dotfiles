@@ -68,6 +68,12 @@ export interface CiMemory {
   redEpoch: number;
 }
 
+export interface CiTransition {
+  memory: CiMemory;
+  item: AttentionItem | null;
+  newlyRed: boolean;
+}
+
 export interface RateLimit {
   cost: number;
   remaining: number;

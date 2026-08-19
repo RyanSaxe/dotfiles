@@ -1,0 +1,23 @@
+#!/bin/sh
+# Account-wide GitHub attention observer.
+#
+# The refresh worker is intentionally separate from tmux, Neovim, and the
+# rail renderer. launchd invokes `attention refresh` every five minutes on
+# macOS; the other commands are useful for diagnostics and local testing.
+set -eu
+
+PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+SCRIPT_PATH="$(readlink -f "$0")"
+REPO_ROOT="${SCRIPT_PATH%/rail/dot-local/bin/attention}"
+RAIL_DIR="$REPO_ROOT/tuis/rail"
+
+if [ -f "$REPO_ROOT/.env" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$REPO_ROOT/.env"
+  set +a
+fi
+
+cd "$RAIL_DIR"
+exec npx tsx src/attention/cli.ts "$@"

@@ -6,6 +6,12 @@ import {
 } from "../src/attention/config.js";
 import { applyCiTransition } from "../src/attention/ci.js";
 import { classifyPullRequest } from "../src/attention/classify.js";
+import { parseGithubResponse } from "../src/attention/github.js";
+import {
+  emptyObserverState,
+  markNotified,
+  reconcileAttention,
+} from "../src/attention/state.js";
 import type {
   GitHubActor,
   GitHubComment,
@@ -168,7 +174,8 @@ const firstCi = applyCiTransition(ciPr, undefined, "ryansaxe", config);
 assert.ok(firstCi.item);
 assert.equal(firstCi.memory.redEpoch, 1);
 const repeatedCi = applyCiTransition(ciPr, firstCi.memory, "ryansaxe", config);
-assert.equal(repeatedCi.item, null);
+assert.equal(repeatedCi.item?.id, firstCi.item?.id);
+assert.equal(repeatedCi.newlyRed, false);
 const recoveredCi = applyCiTransition(
   { ...ciPr, ciState: "SUCCESS" },
   repeatedCi.memory,
@@ -184,5 +191,68 @@ const redAgain = applyCiTransition(
 );
 assert.ok(redAgain.item);
 assert.equal(redAgain.memory.redEpoch, 2);
+
+const parsed = parseGithubResponse(
+  JSON.stringify({
+    data: {
+      viewer: { login: "ryansaxe" },
+      rateLimit: {
+        cost: 42,
+        remaining: 4990,
+        resetAt: "2026-08-19T17:00:00Z",
+      },
+      involved: {
+        nodes: [
+          {
+            number: 7,
+            title: "Improve observer",
+            url: "https://github.com/example/repo/pull/7",
+            updatedAt: "2026-08-19T16:00:00Z",
+            headRefOid: "head-1",
+            author: { login: "ryansaxe", __typename: "User" },
+            repository: { nameWithOwner: "example/repo" },
+            reviewThreads: { nodes: [] },
+            comments: { nodes: [] },
+            statusCheckRollup: { state: "SUCCESS" },
+          },
+        ],
+      },
+      requested: {
+        nodes: [
+          {
+            number: 7,
+            title: "Improve observer",
+            url: "https://github.com/example/repo/pull/7",
+            updatedAt: "2026-08-19T16:00:00Z",
+            headRefOid: "head-1",
+            author: { login: "ryansaxe", __typename: "User" },
+            repository: { nameWithOwner: "example/repo" },
+            reviewThreads: { nodes: [] },
+            comments: { nodes: [] },
+            statusCheckRollup: { state: "SUCCESS" },
+          },
+        ],
+      },
+    },
+  }),
+  21,
+);
+assert.equal(parsed.pullRequests.length, 1);
+assert.deepEqual(parsed.pullRequests[0]?.searchSources.sort(), [
+  "involved",
+  "requested",
+]);
+assert.equal(parsed.pullRequests[0]?.reviewRequested, true);
+
+const reviewItem = classifyPullRequest(mentioned, "ryansaxe", config)[0];
+assert.ok(reviewItem);
+const reconciled = reconcileAttention(emptyObserverState(), [reviewItem], {});
+assert.equal(reconciled.pendingNotifications.length, 1);
+const acknowledged = markNotified(
+  { ...reconciled.state, lastSuccessfulSyncAt: "2026-08-19T16:05:00Z" },
+  [reviewItem.id],
+);
+const repeated = reconcileAttention(acknowledged, [reviewItem], {});
+assert.equal(repeated.pendingNotifications.length, 0);
 
 console.log("attention checks passed");

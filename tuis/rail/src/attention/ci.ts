@@ -1,5 +1,10 @@
 import { normalizeLogin, type AttentionConfig } from "./config.js";
-import type { AttentionItem, CiMemory, PullRequestSnapshot } from "./types.js";
+import type {
+  AttentionItem,
+  CiMemory,
+  CiTransition,
+  PullRequestSnapshot,
+} from "./types.js";
 
 const RED_STATES = new Set(["FAILURE", "ERROR"]);
 
@@ -12,11 +17,6 @@ function ownsPullRequest(pr: PullRequestSnapshot, username: string): boolean {
     pr.author !== null &&
     normalizeLogin(pr.author.login) === normalizeLogin(username)
   );
-}
-
-export interface CiTransition {
-  memory: CiMemory;
-  item: AttentionItem | null;
 }
 
 export function applyCiTransition(
@@ -37,8 +37,8 @@ export function applyCiTransition(
     redEpoch,
   };
 
-  if (!config.ownPrCi || !ownsPullRequest(pr, username) || !newlyRed) {
-    return { memory, item: null };
+  if (!config.ownPrCi || !ownsPullRequest(pr, username) || !red) {
+    return { memory, item: null, newlyRed };
   }
 
   return {
@@ -55,5 +55,6 @@ export function applyCiTransition(
       createdAt: pr.updatedAt,
       priority: "high",
     },
+    newlyRed,
   };
 }
