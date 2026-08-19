@@ -37,9 +37,9 @@ never flicker.
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
 - Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint
-  renders in the footer row between the hairline and the sprite, so the
+  renders in the footer row above the sprite, so the
   list's spacing never changes.
-- A two-cell crust gutter ends every row: text and hairlines stop ~19pt
+- A two-cell crust gutter ends every row: text and the square tab divider stop ~19pt
   (the frame's spacing unit) before the content surface, mirroring the
   frame crust left of the session name.
 - The footer is the mascot's home: the project's mascot sprite rendered
@@ -57,6 +57,8 @@ rail on|off|toggle    # enable/disable + spawn/kill rail panes everywhere
                       # (on also turns the tmux status bar off; off restores)
 rail jump <letter>    # hint jump (bound to alt+; <letter>)
 rail page up|down     # page an overflowing rail (bound to alt+, / alt+.)
+rail dashboard reviews|tasks
+                      # table + preview dashboard for a rail tab
 rail ensure-daemon    # start the render daemon if it isn't running
 rail status           # daemon, flag, pane count
 ```
@@ -84,8 +86,10 @@ The rail does not perform these network requests. The Reviews tab reads the
 observer's cached state. `alt+r` selects the Reviews rail tab; the
 tab is one compact line per unacknowledged item and highlights the Reviews badge
 until the item is acknowledged or disappears. `alt+R` opens the cached Review
-dashboard. Enter opens the selected PR in a browser, `ctrl-d` acknowledges it
-locally, and `ctrl-r` performs an explicit no-notify refresh.
+table + preview dashboard. `alt+T` opens the same dashboard shell for the
+future-ready Tasks surface. Enter opens the selected PR in a browser,
+`ctrl-d` acknowledges it locally, and `r`/`ctrl-r` performs an explicit
+no-notify refresh.
 
 The tab registry is intentionally small: Agents, Reviews, and the future-ready
 Tasks surface share one element-action table. `alt+space` enters that table;

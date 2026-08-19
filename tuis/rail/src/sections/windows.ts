@@ -12,7 +12,7 @@ import {
 // Two orthogonal channels, never mixed: the accent-filled pill means only
 // "you are here"; a colored title always means agent state. Every row is
 // preceded by a blank spacer, so rows breathe and the gap below the header
-// rule equals the gap above the next hairline.
+// rule equals the gap above the next window item.
 export function windowRows(
   windows: Window[],
   agentsByPane: Map<string, Agent>,

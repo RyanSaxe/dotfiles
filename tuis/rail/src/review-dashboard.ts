@@ -1,10 +1,9 @@
-import { spawn } from "node:child_process";
 import { execFile } from "node:child_process";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { resolve } from "node:path";
 
-import { main as attentionMain } from "./attention/cli.js";
 import { loadReviewSnapshot } from "./attention/review.js";
 import {
   acknowledgeItem,
@@ -12,108 +11,95 @@ import {
   saveObserverState,
 } from "./attention/state.js";
 import type { AttentionItem } from "./attention/types.js";
+import {
+  runDashboard,
+  type DashboardData,
+  type DashboardItem,
+  type DashboardSurface,
+} from "./dashboard.js";
+import { fmtElapsed } from "./cells.js";
 
 const run = promisify(execFile);
-
-interface DashboardChoice {
-  action: "open" | "ack" | "refresh";
-  itemIndex: number;
-}
 
 function clean(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-function repositoryLabel(item: AttentionItem): string {
-  const slash = item.repository.lastIndexOf("/");
-  const repository =
-    slash >= 0 ? item.repository.slice(slash + 1) : item.repository;
-  return `${repository}#${item.number}`;
+function shortRepository(repository: string): string {
+  const slash = repository.lastIndexOf("/");
+  return slash >= 0 ? repository.slice(slash + 1) : repository;
 }
 
-export function formatReviewRow(
-  index: number,
-  item: AttentionItem,
-  acknowledged: boolean,
-): string {
-  const marker = acknowledged ? "✓" : "•";
-  const actor = item.actor?.login ?? "GitHub";
-  return [
-    String(index + 1).padStart(2),
-    `${marker} ${repositoryLabel(item)}`,
-    actor,
-    clean(item.title),
-    "—",
-    clean(item.summary),
-  ].join("\t");
+function age(createdAt: string): string {
+  const created = Date.parse(createdAt);
+  if (!Number.isFinite(created)) return "?";
+  return fmtElapsed(Math.max(0, (Date.now() - created) / 1000));
 }
 
-export function parseFzfOutput(output: string): DashboardChoice | null {
-  const lines = output.replace(/\r/g, "").split("\n");
-  while (lines.at(-1) === "") lines.pop();
-  const selected = lines.at(-1);
-  if (selected === undefined || selected === "") return null;
-  const itemIndex = Number.parseInt(selected.split("\t", 1)[0] ?? "", 10) - 1;
-  if (!Number.isInteger(itemIndex) || itemIndex < 0) return null;
-
-  const key = lines.length > 1 ? lines[0] : "";
-  switch (key) {
-    case "ctrl-d":
-      return { action: "ack", itemIndex };
-    case "ctrl-r":
-      return { action: "refresh", itemIndex };
-    default:
-      return { action: "open", itemIndex };
+function kindLabel(item: AttentionItem): string {
+  switch (item.kind) {
+    case "ci":
+      return "CI";
+    case "review_comment":
+      return "Review";
+    case "conversation":
+      return "Comment";
+    case "review_request":
+      return "Request";
   }
 }
 
-function choose(
-  items: AttentionItem[],
-  acknowledged: ReadonlySet<string>,
-): Promise<DashboardChoice | null> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      "fzf",
-      [
-        "--ansi",
-        "--border=rounded",
-        "--expect=ctrl-d,ctrl-r",
-        "--header=Enter open in browser  •  ctrl-d acknowledge  •  ctrl-r refresh  •  Esc close",
-        "--height=100%",
-        "--layout=reverse",
-        "--no-multi",
-        "--nth=2..",
-        "--pointer=▌",
-        "--prompt=Review > ",
-      ],
-      { stdio: ["pipe", "pipe", "inherit"] },
-    );
-    let output = "";
-    child.stdout?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => {
-      output += chunk;
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code !== 0) {
-        resolve(null);
-        return;
-      }
-      resolve(parseFzfOutput(output));
-    });
-    child.stdin?.end(
-      items
-        .map((item, index) =>
-          formatReviewRow(index, item, acknowledged.has(item.id)),
-        )
-        .join("\n"),
-    );
-  });
+export function reviewItem(
+  item: AttentionItem,
+  acknowledged: boolean,
+): DashboardItem {
+  const isCi = item.kind === "ci";
+  const actor = item.actor?.login ?? "GitHub";
+  return {
+    id: item.id,
+    project: shortRepository(item.repository),
+    reference: `#${item.number}`,
+    kind: kindLabel(item),
+    state: acknowledged ? "seen" : isCi ? "CI red" : "needs you",
+    time: age(item.createdAt),
+    title: clean(item.title),
+    preview: `${actor}: ${clean(item.summary)}`,
+    url: item.url,
+    tone: isCi ? "error" : "waiting",
+    acknowledged,
+  };
 }
 
-async function acknowledge(id: string): Promise<void> {
-  const state = await loadObserverState();
-  await saveObserverState(acknowledgeItem(state, id));
+export function reviewDashboardData(): DashboardData {
+  const snapshot = loadReviewSnapshot();
+  const items = snapshot.items.map((item) =>
+    reviewItem(item, snapshot.acknowledged.has(item.id)),
+  );
+  const seen = items.filter((item) => item.acknowledged).length;
+  const open = items.length - seen;
+  return {
+    surface: "reviews",
+    items,
+    status:
+      snapshot.lastError === null
+        ? `${open} open · ${seen} seen`
+        : "observer error",
+    emptyMessage:
+      snapshot.lastError === null
+        ? "Review inbox is clear"
+        : "Review observer has no usable snapshot",
+    error: snapshot.lastError,
+  };
+}
+
+export function taskDashboardData(): DashboardData {
+  return {
+    surface: "tasks",
+    items: [],
+    status: "source pending",
+    emptyMessage: "Tasks are waiting for Obsidian integration",
+    error: null,
+  };
 }
 
 async function openUrl(url: string): Promise<void> {
@@ -129,37 +115,51 @@ export async function openReviewItem(itemIndex: number): Promise<boolean> {
   return true;
 }
 
-export async function main(): Promise<void> {
-  for (;;) {
-    const snapshot = loadReviewSnapshot();
-    if (snapshot.items.length === 0) {
-      console.log("Review inbox is clear.");
-      return;
-    }
-    const choice = await choose(snapshot.items, snapshot.acknowledged);
-    if (choice === null) return;
-    const item = snapshot.items[choice.itemIndex];
-    if (item === undefined) continue;
+async function acknowledgeReview(item: DashboardItem): Promise<void> {
+  const state = await loadObserverState();
+  if (state.items[item.id] === undefined) return;
+  await saveObserverState(acknowledgeItem(state, item.id));
+}
 
-    if (choice.action === "ack") {
-      await acknowledge(item.id);
-      continue;
-    }
-    if (choice.action === "refresh") {
-      await attentionMain(["refresh", "--no-notify"]);
-      continue;
-    }
-    await openUrl(item.url);
-    return;
-  }
+async function refreshReviews(): Promise<DashboardData> {
+  // The observer owns the network lifecycle. The dashboard only requests an
+  // explicit no-notify refresh and then re-reads the durable local snapshot.
+  await run(join(homedir(), ".local", "bin", "attention"), [
+    "refresh",
+    "--no-notify",
+  ]);
+  return reviewDashboardData();
+}
+
+export async function main(
+  surface: DashboardSurface = "reviews",
+): Promise<void> {
+  const isReviews = surface === "reviews";
+  await runDashboard(isReviews ? reviewDashboardData() : taskDashboardData(), {
+    refresh: isReviews ? refreshReviews : async () => taskDashboardData(),
+    open: async (item) => {
+      if (item.url !== null) await openUrl(item.url);
+    },
+    acknowledge: isReviews
+      ? acknowledgeReview
+      : async () => {
+          throw new Error("task elements are not available yet");
+        },
+  });
 }
 
 const thisFile = fileURLToPath(import.meta.url);
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === thisFile) {
-  main().catch((error: unknown) => {
-    console.error(
-      `review dashboard: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  const surface = process.argv[2] ?? "reviews";
+  if (surface !== "reviews" && surface !== "tasks") {
+    console.error("usage: review-dashboard reviews|tasks");
     process.exitCode = 1;
-  });
+  } else {
+    main(surface).catch((error: unknown) => {
+      console.error(
+        `dashboard: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      process.exitCode = 1;
+    });
+  }
 }

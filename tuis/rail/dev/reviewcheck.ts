@@ -1,11 +1,12 @@
-// Exercises the Review dashboard's selection protocol without launching fzf.
-// The interactive surface is intentionally a thin wrapper around these pure
-// row and key-decoding functions.
+// Exercises the pure review-to-dashboard mapping and the shared dashboard
+// renderer without opening a terminal or contacting GitHub.
 
 import assert from "node:assert/strict";
 
-import { formatReviewRow, parseFzfOutput } from "../src/review-dashboard.js";
+import { renderDashboard } from "../src/dashboard.js";
+import { reviewItem } from "../src/review-dashboard.js";
 import type { AttentionItem } from "../src/attention/types.js";
+import type { Palette } from "../src/theme.js";
 
 const item: AttentionItem = {
   id: "review:fixture",
@@ -20,19 +21,49 @@ const item: AttentionItem = {
   priority: "normal",
 };
 
-assert.match(formatReviewRow(0, item, false), /repo#7/);
-assert.match(formatReviewRow(0, item, true), /✓/);
-assert.deepEqual(parseFzfOutput(`\n${formatReviewRow(0, item, false)}\n`), {
-  action: "open",
-  itemIndex: 0,
-});
-assert.deepEqual(
-  parseFzfOutput(`ctrl-d\n${formatReviewRow(0, item, false)}\n`),
-  { action: "ack", itemIndex: 0 },
+const palette: Palette = {
+  mode: "dark",
+  accent: "#f9e2af",
+  notify: "#f38ba8",
+  base: "#1e1e2e",
+  crust: "#11111b",
+  surface0: "#313244",
+  text: "#cdd6f4",
+  dim: "#7f849c",
+  dim2: "#6c7086",
+  lavender: "#b4befe",
+  mauve: "#cba6f7",
+  peach: "#fab387",
+  green: "#a6e3a1",
+  red: "#f38ba8",
+  statusWorking: "#cba6f7",
+  statusWaiting: "#fab387",
+  statusDone: "#a6e3a1",
+};
+
+const dashboardItem = reviewItem(item, false);
+assert.equal(dashboardItem.project, "repo");
+assert.equal(dashboardItem.reference, "#7");
+assert.equal(dashboardItem.kind, "Review");
+assert.equal(dashboardItem.state, "needs you");
+assert.equal(dashboardItem.tone, "waiting");
+
+const rendered = renderDashboard(
+  {
+    surface: "reviews",
+    items: [dashboardItem],
+    status: "1 open · 0 seen",
+    emptyMessage: "Review inbox is clear",
+    error: null,
+  },
+  0,
+  palette,
+  100,
+  24,
 );
-assert.deepEqual(
-  parseFzfOutput(`ctrl-r\n${formatReviewRow(0, item, false)}\n`),
-  { action: "refresh", itemIndex: 0 },
-);
-assert.equal(parseFzfOutput(""), null);
+const plain = rendered.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+assert.match(plain, /Rail dashboard/);
+assert.match(plain, /repo/);
+assert.match(plain, /Improve the review seam/);
+assert.match(plain, /Enter Open/);
 console.log("review dashboard checks passed");

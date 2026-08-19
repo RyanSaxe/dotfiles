@@ -25,6 +25,7 @@ tmux	alt+space esc	cancel focused-tab table
 tmux	alt+r	focus Reviews rail tab
 tmux	alt+R	open GitHub review dashboard
 tmux	alt+t	focus Tasks rail tab
+tmux	alt+T	open Tasks dashboard
 tmux	alt+/	this cheatsheet
 tmux	prefix r	reload tmux config
 tmux	prefix s	session switcher popup

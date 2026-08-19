@@ -8,8 +8,10 @@
 #                       switch the active rail tab
 #   rail element <number>
 #                       perform the focused tab's numbered element action
+#   rail dashboard reviews|tasks
+#                       open the table + preview dashboard for a rail tab
 #   rail review-dashboard
-#                       open the cached GitHub review inbox
+#                       compatibility alias for the Reviews dashboard
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
@@ -158,9 +160,21 @@ element)
   cd "$RAIL_DIR"
   exec npx tsx src/tab-element.ts "$number"
   ;;
+dashboard)
+  surface="${2:-reviews}"
+  case "$surface" in
+  reviews | tasks) ;;
+  *)
+    echo "usage: rail dashboard reviews|tasks" >&2
+    exit 1
+    ;;
+  esac
+  cd "$RAIL_DIR"
+  exec npx tsx src/review-dashboard.ts "$surface"
+  ;;
 review-dashboard)
   cd "$RAIL_DIR"
-  exec npx tsx src/review-dashboard.ts
+  exec npx tsx src/review-dashboard.ts reviews
   ;;
 status)
   if daemon_running; then
@@ -178,7 +192,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|reviews|tasks|element <number>|review-dashboard|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|review-dashboard|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

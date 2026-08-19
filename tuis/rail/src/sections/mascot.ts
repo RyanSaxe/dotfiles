@@ -6,14 +6,14 @@ import {
   SPRITE_ROWS,
 } from "../sprite.js";
 import { railBg, type Palette } from "../theme.js";
-import { sectionHairline } from "./header.js";
 
 // The mascot's home, reserved by the renderer only when a sprite id is
 // present: the footer rows carry kitty Unicode-placeholder cells and the
 // terminal draws the real pixel art over them. Without a sprite the
 // renderer skips the footer entirely and content gets the rows.
-// Rows: hairline + hint/blank row + the sprite block.
-export const FOOTER_ROWS = SPRITE_ROWS + 2;
+// Rows: hint/blank row + the sprite block. The square tab row is the rail's
+// only lower-section divider; the mascot no longer gets a second hairline.
+export const FOOTER_ROWS = SPRITE_ROWS + 1;
 
 // Only reserve the footer when the pane is tall enough that content
 // doesn't starve for it.
@@ -27,9 +27,8 @@ export function mascotFooter(
 ): string[] {
   const bg = railBg(palette);
   const rows: string[] = [
-    sectionHairline(palette, width),
-    // The row between the hairline and the sprite doubles as the
-    // pagination hint's home — out of the list, air on both sides.
+    // The row above the sprite doubles as the pagination hint's home — out
+    // of the list, with air on both sides.
     pageHint ? hintRow(palette, width, pageHint) : blank(width, bg),
   ];
   if (spriteIdValue === null || width < SPRITE_COLS + 2) {

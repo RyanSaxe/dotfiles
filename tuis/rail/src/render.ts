@@ -2,7 +2,7 @@ import { blank, hintRow } from "./cells.js";
 import { reviewRows } from "./sections/review.js";
 import type { Agent, RailData } from "./data.js";
 import { elsewhereRows } from "./sections/elsewhere.js";
-import { header, sectionHairline, tabBar } from "./sections/header.js";
+import { header, tabBar } from "./sections/header.js";
 import {
   FOOTER_ROWS,
   MIN_HEIGHT_FOR_MASCOT,
@@ -33,7 +33,7 @@ export function renderRail(
   height: number,
 ): string[] {
   const bg = railBg(palette);
-  // The gutter (appended at the end) stops hairlines and text one cell
+  // The gutter (appended at the end) stops the tab row and text one cell
   // short of the slab's edge; the crust pane-border column supplies the
   // second, so text still rests ~19pt (two cells at font-size 16) from
   // the content surface — mirroring the frame crust on the rail's left.
@@ -64,7 +64,6 @@ export function renderRail(
   const body: RailRow[] = [
     ...windowRows(data.windows, agentsByPane, data.acked, palette, inner),
     { text: blank(inner, bg), item: false },
-    { text: sectionHairline(palette, inner), item: false },
     {
       text: tabBar(data.activeTab, tabAttention, palette, inner),
       item: false,
@@ -88,7 +87,7 @@ export function renderRail(
   const hasFooter = data.sprite !== null && height >= MIN_HEIGHT_FOR_MASCOT;
   // No blank row below the sprite: the 19pt bottom frame is the sprite's
   // lower margin (~one cell), matching the blank row above it — so the
-  // mascot reads centered between the footer hairline and the window edge.
+  // mascot reads centered between the footer air and the window edge.
   const budget = height - top.length - (hasFooter ? FOOTER_ROWS : 0);
 
   let content: string[];
