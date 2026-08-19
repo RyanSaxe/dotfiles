@@ -419,6 +419,16 @@ stow_package() {
   manifest="$manifest_dir/$1.txt"
   mkdir -p "$manifest_dir"
 
+  # Neovim is the one intentional cutover boundary: v2 may be installed
+  # while the existing v1 config still owns ~/.config/nvim. Stow cannot
+  # safely take over a symlink it did not create, so leave that target alone
+  # and continue installing the rest of the tier. The explicit Neovim
+  # cutover can remove the link once v2 has passed its daily-use gate.
+  if [ "$1" = nvim ] && [ -L "$target/.config/nvim" ]; then
+    echo "stow: nvim (skipped; existing ~/.config/nvim is kept for cutover)"
+    return 0
+  fi
+
   # Stow deploys the filesystem, not the git index, so anything loose inside
   # a package would symlink into HOME (bytecode caches once linked
   # ~/tests/__pycache__). Gitignored files are declared junk: delete them,

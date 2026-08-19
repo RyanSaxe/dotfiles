@@ -44,6 +44,11 @@ nvim/dot-config/nvim/init.lua  ->  ~/.config/nvim/init.lua
 zsh/dot-zshrc                  ->  ~/.zshrc
 ```
 
+The existing `~/.config/nvim` target is an explicit cutover boundary. If it is
+already a symlink from the v1 configuration, the installer leaves it in place
+and continues installing the other packages; v2 Neovim is adopted only during
+the deliberate cutover phase.
+
 Every tracked file is identical on every machine. Anything machine-specific
 resolves at runtime via `PATH` and `$HOME`; there is no templating.
 
