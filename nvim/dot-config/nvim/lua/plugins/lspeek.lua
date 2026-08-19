@@ -8,9 +8,8 @@ return {
   cmd = { "LSPeekDef", "LSPeekTypeDef" },
   opts = {
     window = {
-      width = 120,
-      -- Effectively "as tall as the terminal": nvim clamps oversized floats.
-      height = 80,
+      width = 90,
+      height = 24,
       border = "single",
     },
     stack_limit = 5,

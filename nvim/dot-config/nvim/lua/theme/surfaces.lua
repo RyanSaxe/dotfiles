@@ -29,6 +29,12 @@ local function is_anchored_sidebar(win)
     return false
   end
   local buf = vim.api.nvim_win_get_buf(win)
+  -- CodeDiff's file panes use virtual `codediff://` buffers but still have a
+  -- non-empty buftype. Keep those panes on the inner base surface; the
+  -- explorer/history buffers below remain outer chrome.
+  if vim.api.nvim_buf_get_name(buf):match("^codediff://") then
+    return false
+  end
   return vim.bo[buf].buftype ~= "" or vim.bo[buf].filetype == "snacks_picker_list"
 end
 
@@ -71,7 +77,7 @@ end
 function M.setup()
   -- Every window, not just the current one: plugins open sidebars
   -- without ever focusing them.
-  vim.api.nvim_create_autocmd({ "BufWinEnter", "FileType", "WinNew", "WinEnter" }, {
+  vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType", "WinNew", "WinEnter" }, {
     group = vim.api.nvim_create_augroup("theme_surfaces", { clear = true }),
     callback = apply_all,
   })
