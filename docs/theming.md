@@ -60,6 +60,14 @@ Windows opt into the outer surface through `lua/theme/surfaces.lua`, which keys
 on whether a window is anchored rather than on plugin names, so a new sidebar
 plugin is themed the day it is installed.
 
+### Bat and delta
+
+`Dotfiles.tmTheme` renders in the inner context and is published to bat's theme
+directory. Git delta selects that generated theme explicitly. Bat and delta do
+not receive Neovim's semantic tokens, so the compact TextMate scope map mirrors
+the same function, type, structure, variable, member, module, constant, and
+literal roles as closely as their syntax grammars allow.
+
 ## Mascot providers
 
 A mascot is any image the theme system can wear: the rail paints its sprite and
