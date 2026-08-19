@@ -3,6 +3,34 @@ local M = {}
 ---@type table<integer, boolean>
 local inlay_hints_was_enabled = {}
 
+---@return string
+local function base_branch()
+  local root = vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
+  local result = vim
+    .system({
+      "git",
+      "symbolic-ref",
+      "--quiet",
+      "--short",
+      "refs/remotes/origin/HEAD",
+    }, { cwd = root, text = true })
+    :wait()
+  if result.code == 0 then
+    local branch = vim.trim(result.stdout or ""):match("^[^/]+/(.+)$")
+    if branch and branch ~= "" then
+      return branch
+    end
+  end
+  return "main"
+end
+
+---@param branch string
+---@param target string
+---@return boolean
+local function is_base_branch(branch, target)
+  return branch == target or branch == "origin/" .. target or branch == "remotes/origin/" .. target
+end
+
 ---@param message string
 ---@param level? integer
 local function notify(message, level)
@@ -17,9 +45,20 @@ end
 ---@param title string
 ---@param callback fun(ref: string)
 function M.pick_branch(title, callback)
+  local target = base_branch()
   Snacks.picker.git_branches({
     all = true,
     title = title,
+    ---@param picker snacks.Picker
+    on_show = function(picker)
+      for index, item in ipairs(picker:items()) do
+        if item.branch and is_base_branch(item.branch, target) then
+          picker.list:view(index)
+          Snacks.picker.actions.list_scroll_center(picker)
+          break
+        end
+      end
+    end,
     ---@param picker snacks.Picker
     ---@param item snacks.picker.Item
     confirm = function(picker, item)
@@ -41,6 +80,10 @@ function M.pick_commit(title, current_file, callback)
   local picker = current_file and Snacks.picker.git_log_file or Snacks.picker.git_log
   picker({
     title = title,
+    ---@param active_picker snacks.Picker
+    on_show = function(active_picker)
+      active_picker.list:view(2)
+    end,
     ---@param active_picker snacks.Picker
     ---@param item snacks.picker.Item
     confirm = function(active_picker, item)

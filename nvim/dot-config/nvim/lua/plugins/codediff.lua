@@ -74,6 +74,9 @@ return {
         height = 10,
         view_mode = "list",
         focus_on_select = true,
+        line_stats = {
+          enabled = true,
+        },
       },
       history = {
         position = "bottom",
@@ -147,7 +150,6 @@ return {
     ---@param opts table CodeDiff setup opts from this spec
     config = function(_, opts)
       require("codediff").setup(opts)
-      require("review_surfaces").setup()
     end,
   },
 }

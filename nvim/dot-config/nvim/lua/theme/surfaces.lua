@@ -29,6 +29,12 @@ local function is_anchored_sidebar(win)
     return false
   end
   local buf = vim.api.nvim_win_get_buf(win)
+  -- CodeDiff's file panes use virtual `codediff://` buffers but still have a
+  -- non-empty buftype. Keep those panes on the inner base surface; the
+  -- explorer/history buffers below remain outer chrome.
+  if vim.api.nvim_buf_get_name(buf):match("^codediff://") then
+    return false
+  end
   return vim.bo[buf].buftype ~= "" or vim.bo[buf].filetype == "snacks_picker_list"
 end
 

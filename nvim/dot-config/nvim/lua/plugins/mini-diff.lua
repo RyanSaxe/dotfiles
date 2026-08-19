@@ -32,8 +32,9 @@ return {
             return
           end
 
-          if require("review_surfaces").is_codediff_tab() then
-            vim.cmd("tabclose")
+          local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+          if ok and lifecycle.get_session(vim.api.nvim_get_current_tabpage()) then
+            lifecycle.close(vim.api.nvim_get_current_tabpage())
           end
         end,
         desc = "Close diff view",
