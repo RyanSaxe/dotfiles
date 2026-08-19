@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import type { ActorKind, GitHubActor } from "./types.js";
+import type { GitHubActor } from "./types.js";
 
 export interface AttentionConfig {
   actors: {
@@ -110,5 +110,5 @@ export function actorIsEligible(
   const login = normalizeLogin(actor.login);
   if (config.actors.ignore.includes(login)) return false;
   if (config.actors.allow.includes(login)) return true;
-  return actor.kind === ("user" satisfies ActorKind);
+  return actor.kind === "user";
 }

@@ -90,7 +90,7 @@ jobs:
 
       - name: Key targets resolve
         run: |
-          paths=".zshrc .config/tmux/tmux.conf .local/bin/theme .local/bin/rail"
+          paths=".zshrc .config/tmux/tmux.conf .local/bin/theme .local/bin/rail .local/bin/attention"
           if [ "$RUNNER_OS" = macOS ]; then
             paths="$paths .config/ghostty/config"
           fi

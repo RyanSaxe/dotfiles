@@ -157,6 +157,22 @@ export function retryAfterForFailure(
   return new Date(now + delaySeconds * 1000).toISOString();
 }
 
+export function retryAfterForRateLimit(
+  rateLimit: RateLimit,
+  now = Date.now(),
+): string | null {
+  const resetAt = Date.parse(rateLimit.resetAt);
+  const pressureThreshold = Math.max(100, rateLimit.cost * 10);
+  if (
+    !Number.isFinite(resetAt) ||
+    resetAt <= now ||
+    rateLimit.remaining > pressureThreshold
+  ) {
+    return null;
+  }
+  return new Date(resetAt).toISOString();
+}
+
 export function markFailure(
   state: ObserverState,
   error: string,

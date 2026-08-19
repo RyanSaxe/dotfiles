@@ -355,12 +355,24 @@ export function parseGithubResponse(
 }
 
 async function runGhGraphql(): Promise<string> {
-  const result = await execFileAsync(
-    "gh",
-    ["api", "graphql", "--field", `query=${GRAPHQL_QUERY}`],
-    { maxBuffer: 16 * 1024 * 1024 },
-  );
-  return result.stdout;
+  try {
+    const result = await execFileAsync(
+      "gh",
+      ["api", "graphql", "--field", `query=${GRAPHQL_QUERY}`],
+      { maxBuffer: 16 * 1024 * 1024, timeout: 60_000 },
+    );
+    return result.stdout;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "stderr" in error &&
+      typeof error.stderr === "string" &&
+      error.stderr.trim() !== ""
+    ) {
+      throw new Error(`gh api graphql: ${error.stderr.trim()}`);
+    }
+    throw error;
+  }
 }
 
 export async function fetchGithubSnapshot(

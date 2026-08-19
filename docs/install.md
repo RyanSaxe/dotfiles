@@ -76,6 +76,33 @@ untracked `.env` at the repo root, which zsh and the rail launcher both load.
 `install.sh` creates it with a commented placeholder per required value and
 prints a loud reminder for every one still empty.
 
-Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail pings
-for agent notifications. Leave it unset and phone notifications simply never
-send; `rail status` reports which state you're in.
+Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail and
+GitHub attention observer use for phone notifications. Leave it unset and
+phone notifications simply never send; `rail status` and `attention status`
+report the channel state.
+
+On macOS, installing the `core` tier also installs a user-level launchd job.
+It runs `~/.local/bin/attention refresh` at login and every five minutes. The
+worker is independent of tmux and Neovim, writes durable state under
+`~/.local/state/dotfiles/attention/`, and catches up after sleep or restart.
+It cannot poll while the Mac is fully powered off. Refreshes back off until
+the GitHub rate-limit reset when the remaining budget is under pressure.
+
+The observer uses the existing `gh` authentication. Before relying on it, run
+`gh auth status` and re-authenticate with `gh auth refresh -h github.com` if
+needed. Optional actor policy lives at
+`~/.config/dotfiles/attention.json`:
+
+```json
+{
+  "actors": {
+    "allow": ["claude-reviewer"],
+    "ignore": ["codecov", "snyk-bot", "sonarcloud"]
+  },
+  "own_pr_ci": true
+}
+```
+
+Inspect it with `attention status`, `attention list`, and
+`attention ack <item-id>`. The notification transport remains ntfy for now;
+the planned transport evaluation is recorded in `BACKLOG.md`.

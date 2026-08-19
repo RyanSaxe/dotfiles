@@ -116,9 +116,31 @@ install_zsh_plugins() {
   done
 }
 
-# The rail TUI (tuis/rail) runs via tsx from its own node_modules.
+# The rail TUI and account observer (tuis/rail) run via tsx from their own
+# node_modules.
 install_rail() {
   (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
+}
+
+install_attention_agent() {
+  [ "$OS" = Darwin ] || return 0
+  # Scratch-home health checks and explicit package-only runs must never touch
+  # the real user's launchd domain.
+  [ -z "${DOTFILES_TARGET:-}" ] || return 0
+
+  launch_agents="$HOME/Library/LaunchAgents"
+  plist="$launch_agents/com.ryansaxe.dotfiles.attention.plist"
+  state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/attention"
+  mkdir -p "$launch_agents" "$state_dir"
+  sed \
+    -e "s|__ATTENTION_BIN__|$HOME/.local/bin/attention|g" \
+    -e "s|__ATTENTION_LOG__|$state_dir/launchd.log|g" \
+    launchd/com.ryansaxe.dotfiles.attention.plist >"$plist"
+
+  domain="gui/$(id -u)"
+  launchctl bootout "$domain/com.ryansaxe.dotfiles.attention" 2>/dev/null || true
+  launchctl bootstrap "$domain" "$plist"
+  launchctl kickstart -k "$domain/com.ryansaxe.dotfiles.attention"
 }
 
 install_starship() {
@@ -280,7 +302,7 @@ install_neovim_linux() {
 # because nobody knew the file existed is worse than being nagged.
 #
 # One "NAME description" per line; the description is what the prompt shows.
-REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
+REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent and review phone notifications'
 
 ensure_env_file() {
   if [ ! -f .env ]; then
@@ -747,6 +769,17 @@ fi
 
 # Machine-local values nothing can install for you; warns loudly per gap.
 ensure_env_file
+
+# The account observer is independent of tmux and Neovim, but its user-level
+# launchd job is installed alongside the core rail package on macOS. Install
+# it after .env exists so the first RunAtLoad refresh sees the phone channel.
+if [ "$OS" = Darwin ] && [ -z "${DOTFILES_TARGET:-}" ]; then
+  for tier in "$@"; do
+    [ "$tier" = core ] || continue
+    install_attention_agent
+    break
+  done
+fi
 
 # The commit gate for working on this repo (see README: Development).
 uv tool install --quiet prek

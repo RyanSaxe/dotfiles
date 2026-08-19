@@ -64,6 +64,25 @@ rail status           # daemon, flag, pane count
 The CLI lives in the `rail` stow package (`rail/dot-local/bin/rail`);
 `install.sh` core installs node and this package's dependencies.
 
+## Account-wide GitHub attention
+
+The review observer is a separate process from the rail. On macOS, the core
+install registers `com.ryansaxe.dotfiles.attention` with the user's launchd;
+it runs `attention refresh` at login and every five minutes. It uses one
+account-level `gh api graphql` request, writes durable state under
+`~/.local/state/dotfiles/attention/`, and never requires an open repository,
+tmux session, or Neovim.
+
+```sh
+attention status                 # refresh/error/rate/channel diagnostics
+attention refresh --no-notify    # real fetch without a phone ping
+attention list                   # current active items
+attention ack <item-id>          # local check/dismiss, no GitHub mutation
+```
+
+The rail does not perform these network requests. Future Review-tab work will
+read the observer's cached state.
+
 ## Iterating on the look
 
 `dev/` holds the loop used to judge cells without touching a live client:

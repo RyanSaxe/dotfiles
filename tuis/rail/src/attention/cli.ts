@@ -15,6 +15,7 @@ import {
   markNotified,
   markSuccess,
   reconcileAttention,
+  retryAfterForRateLimit,
   retryIsActive,
   saveObserverState,
 } from "./state.js";
@@ -109,6 +110,13 @@ async function refresh(args: string[]): Promise<void> {
 
     const reconciled = reconcileAttention(state, items, ci);
     state = markSuccess(reconciled.state, snapshot.rateLimit, now);
+    const rateLimitRetry =
+      snapshot.rateLimit === null
+        ? null
+        : retryAfterForRateLimit(snapshot.rateLimit, Date.parse(now));
+    if (rateLimitRetry !== null) {
+      state = { ...state, retryAfter: rateLimitRetry };
+    }
     await saveObserverState(state);
 
     const endpoint = ntfyEndpoint();
@@ -143,11 +151,14 @@ async function refresh(args: string[]): Promise<void> {
         ? "initial"
         : `${Math.max(0, Date.parse(now) - Date.parse(previousSync))}ms since last success`;
     await logLine(
-      `refresh ok: ${snapshot.pullRequests.length} PRs, ${items.length} active items, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}`,
+      `refresh ok: ${snapshot.pullRequests.length} PRs, ${items.length} active items, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
     );
     console.log(
       `attention refresh: ${items.length} active item${items.length === 1 ? "" : "s"}; ${reconciled.pendingNotifications.length} notification${reconciled.pendingNotifications.length === 1 ? "" : "s"} pending`,
     );
+    if (rateLimitRetry !== null) {
+      console.log(`rate pressure: backing off until ${rateLimitRetry}`);
+    }
     if (
       notify &&
       endpoint === null &&

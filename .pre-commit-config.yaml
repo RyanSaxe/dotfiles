@@ -148,6 +148,17 @@ repos:
         pass_filenames: false
         files: "^tuis/rail/"
 
+      # Account-wide review classification, CI transition, parser, and local
+      # acknowledgment behavior. This fixture never contacts GitHub.
+      - id: rail-attentioncheck
+        name: attentioncheck (rail)
+        language: node
+        additional_dependencies: ["tsx@4.19.2"]
+        entry: sh
+        args: ["-c", "tsx tuis/rail/dev/attentioncheck.ts"]
+        pass_filenames: false
+        files: "^tuis/rail/"
+
       # The idle_prompt escalation hook flips working→waiting and nothing
       # else. Skips cleanly where zsh isn't installed.
       - id: escalate-check

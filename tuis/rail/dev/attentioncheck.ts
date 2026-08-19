@@ -8,9 +8,11 @@ import { applyCiTransition } from "../src/attention/ci.js";
 import { classifyPullRequest } from "../src/attention/classify.js";
 import { parseGithubResponse } from "../src/attention/github.js";
 import {
+  acknowledgeItem,
   emptyObserverState,
   markNotified,
   reconcileAttention,
+  retryAfterForRateLimit,
 } from "../src/attention/state.js";
 import type {
   GitHubActor,
@@ -192,6 +194,22 @@ const redAgain = applyCiTransition(
 assert.ok(redAgain.item);
 assert.equal(redAgain.memory.redEpoch, 2);
 
+const rateReset = "2026-08-19T17:00:00.000Z";
+assert.equal(
+  retryAfterForRateLimit(
+    { cost: 5, remaining: 99, resetAt: rateReset },
+    Date.parse("2026-08-19T16:00:00.000Z"),
+  ),
+  rateReset,
+);
+assert.equal(
+  retryAfterForRateLimit(
+    { cost: 5, remaining: 101, resetAt: rateReset },
+    Date.parse("2026-08-19T16:00:00.000Z"),
+  ),
+  null,
+);
+
 const parsed = parseGithubResponse(
   JSON.stringify({
     data: {
@@ -254,5 +272,30 @@ const acknowledged = markNotified(
 );
 const repeated = reconcileAttention(acknowledged, [reviewItem], {});
 assert.equal(repeated.pendingNotifications.length, 0);
+
+const checked = acknowledgeItem(reconciled.state, reviewItem.id);
+const checkedAgain = reconcileAttention(checked, [reviewItem], {});
+assert.equal(checkedAgain.pendingNotifications.length, 0);
+
+const newEvent = classifyPullRequest(
+  {
+    ...mentioned,
+    comments: [
+      ...mentioned.comments,
+      comment(
+        "mention-new",
+        human("reviewer"),
+        "@ryansaxe one more thing",
+        "2026-08-19T16:06:00Z",
+      ),
+    ],
+  },
+  "ryansaxe",
+  config,
+)[0];
+assert.ok(newEvent);
+assert.notEqual(newEvent.id, reviewItem.id);
+const resurfaced = reconcileAttention(checkedAgain.state, [newEvent], {});
+assert.equal(resurfaced.pendingNotifications.length, 1);
 
 console.log("attention checks passed");

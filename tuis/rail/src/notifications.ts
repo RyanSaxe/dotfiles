@@ -7,6 +7,7 @@ import { platform } from "node:os";
 import { join } from "node:path";
 
 import { run, type Agent, type AgentStatus } from "./data.js";
+import { ntfyEndpoint, sendNtfy } from "./attention/ntfy.js";
 import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
@@ -54,12 +55,6 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
     },
   );
 }
-
-const NTFY_URL =
-  process.env["AI_HARNESS_NTFY_URL"] ??
-  (process.env["AGENT_NOTIFICATION_ID"]
-    ? `https://ntfy.sh/ai-agent-notification-${process.env["AGENT_NOTIFICATION_ID"]}`
-    : null);
 
 const lastStatus = new Map<string, AgentStatus>();
 let seeded = false;
@@ -127,7 +122,8 @@ export function pushPhone(
   if (transitions.length === 0) return;
   // A channel that was never configured is the likeliest reason the phone
   // stays quiet, and it used to be indistinguishable from a working one.
-  if (!NTFY_URL) {
+  const endpoint = ntfyEndpoint();
+  if (endpoint === null) {
     if (!warnedNoChannel) {
       warnedNoChannel = true;
       logLine(
@@ -150,28 +146,19 @@ export function pushPhone(
   const names = transitions
     .map((agent) => `${agent.session}/${agent.windowName}`)
     .join(", ");
-  fetch(NTFY_URL, {
-    method: "POST",
-    headers: {
-      Title: title,
-      Priority: waiting.length > 0 ? "high" : "default",
-      Tags: "robot",
+  sendNtfy(
+    {
+      title,
+      body,
+      priority: waiting.length > 0 ? "high" : "default",
+      tags: ["robot"],
     },
-    body,
-  }).then(
-    (response) => {
-      if (!response.ok) {
-        logLine(`ntfy send failed for ${names}: HTTP ${response.status}`);
-      }
-    },
-    (error: unknown) => {
-      // Node reports every network failure as "TypeError: fetch failed";
-      // the cause is the part that names what actually broke.
-      const cause = error instanceof Error ? error.cause : null;
-      const detail = cause
-        ? `${String(error)}: ${String(cause)}`
-        : String(error);
-      logLine(`ntfy send failed for ${names}: ${detail}`);
-    },
-  );
+    endpoint,
+  ).catch((error: unknown) => {
+    // Node reports every network failure as "TypeError: fetch failed";
+    // the cause is the part that names what actually broke.
+    const cause = error instanceof Error ? error.cause : null;
+    const detail = cause ? `${String(error)}: ${String(cause)}` : String(error);
+    logLine(`ntfy send failed for ${names}: ${detail}`);
+  });
 }
