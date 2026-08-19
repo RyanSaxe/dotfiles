@@ -22,9 +22,12 @@ agents:
       - on-request
 
 # Reproduce the main worktree's ignored, untracked files in every new
-# worktree. A project post_create list must include "<global>" to retain this.
+# worktree. If the project uses BYOR, register and refresh the new checkout
+# after its .byor directory has been copied. A project post_create list must
+# include "<global>" to retain these hooks.
 post_create:
   - workmux-copy-ignored
+  - "if [ -d .byor ]; then byor sync; fi"
 
 # All worktrees under one root, out of the project directories.
 worktree_dir: ~/worktrees/{project}
