@@ -1,9 +1,9 @@
 """Behavioral tests for the `theme` CLI, run against a scratch HOME.
 
 Stub executables cover everything that would otherwise touch the live
-machine: osascript (macOS appearance), pkill (ghostty reload signal), and
-mascot-accents (network extraction). The config setup drops the bat
-template so publish never invokes bat. Stdlib-only imports, like
+machine: osascript (macOS appearance), bat (theme cache rebuild), pkill
+(ghostty reload signal), and mascot-accents (network extraction).
+Stdlib-only imports, like
 test_mascot_accents.py: the type checker's environment has no pytest;
 the built-in tmp_path fixture arrives by argument name.
 """
@@ -13,6 +13,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
+from xml.etree import ElementTree
 
 REPO = Path(__file__).parent.parent.parent
 THEME = REPO / "theme/dot-local/bin/theme"
@@ -33,7 +34,7 @@ exit 1
 def make_home(tmp_path: Path) -> Path:
     stubs = tmp_path / "stubbin"
     stubs.mkdir()
-    for name in ("osascript", "pkill"):
+    for name in ("bat", "osascript", "pkill"):
         stub = stubs / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
@@ -43,7 +44,6 @@ def make_home(tmp_path: Path) -> Path:
 def make_config(tmp_path: Path) -> Path:
     dst = tmp_path / "theme-config"
     shutil.copytree(REPO / "theme/dot-config", dst)
-    (dst / "theme/templates/Dotfiles.tmTheme.tmpl").unlink()
     return dst
 
 
@@ -174,6 +174,18 @@ def test_render_survives_blank_and_comment_lines_in_conf_files(
     assert result.returncode == 0, result.stderr
     rendered = state_dir(home) / "generated/tmux-colors.conf"
     assert "{{" not in rendered.read_text()
+
+
+def test_bat_theme_is_generated_as_valid_xml(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+
+    result = run_theme(home, config, "apply")
+
+    assert result.returncode == 0, result.stderr
+    rendered = state_dir(home) / "generated/Dotfiles.tmTheme"
+    contents = rendered.read_text()
+    assert "{{" not in contents
+    ElementTree.fromstring(contents)
 
 
 def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
