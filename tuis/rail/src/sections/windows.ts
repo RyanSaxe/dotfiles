@@ -1,10 +1,10 @@
-import { blank, line } from "../cells.js";
 import type { Agent, Window } from "../data.js";
 import { railBg, type Palette } from "../theme.js";
 import {
   agentRank,
   elapsedSpan,
   pill,
+  spacedItem,
   stateColor,
   type RailRow,
 } from "./rows.js";
@@ -40,9 +40,8 @@ export function windowRows(
         : win.active
           ? palette.text
           : palette.dim2;
-    rows.push({ text: blank(width, bg), item: false });
-    rows.push({
-      text: line(
+    rows.push(
+      ...spacedItem(
         width,
         bg,
         [
@@ -52,8 +51,7 @@ export function windowRows(
         ],
         agent ? elapsedSpan(agent, acked, palette) : undefined,
       ),
-      item: true,
-    });
+    );
   }
   return rows;
 }

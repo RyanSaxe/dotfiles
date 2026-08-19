@@ -1,7 +1,7 @@
-import { blank, fmtElapsed, line } from "../cells.js";
+import { fmtElapsed } from "../cells.js";
 import type { ReviewSnapshot } from "../attention/review.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
-import { pill, type RailRow } from "./rows.js";
+import { pill, spacedItem, type RailRow } from "./rows.js";
 
 function kindColor(kind: string, palette: Palette): string {
   switch (kind) {
@@ -39,22 +39,18 @@ export function reviewRows(
   const pending = snapshot.unacknowledged;
 
   if (snapshot.lastError !== null && pending.length === 0) {
-    rows.push({ text: blank(width, bg), item: false });
-    rows.push({
-      text: line(width, bg, [{ text: "observer error", fg: palette.red }]),
-      item: true,
-    });
+    rows.push(
+      ...spacedItem(width, bg, [{ text: "observer error", fg: palette.red }]),
+    );
     return rows;
   }
 
   if (pending.length === 0) {
-    rows.push({ text: blank(width, bg), item: false });
-    rows.push({
-      text: line(width, bg, [
+    rows.push(
+      ...spacedItem(width, bg, [
         { text: "Review clear", fg: blend(palette.green, bg, DIM_KEEP) },
       ]),
-      item: true,
-    });
+    );
     return rows;
   }
 
@@ -62,9 +58,8 @@ export function reviewRows(
     const color = kindColor(item.kind, palette);
     const chipBg = blend(palette.surface0, bg, DIM_KEEP);
     const number = String(rows.filter((row) => row.item).length + 1);
-    rows.push({ text: blank(width, bg), item: false });
-    rows.push({
-      text: line(
+    rows.push(
+      ...spacedItem(
         width,
         bg,
         [
@@ -79,8 +74,7 @@ export function reviewRows(
         ],
         { text: age(item.createdAt), fg: blend(color, bg, DIM_KEEP) },
       ),
-      item: true,
-    });
+    );
   }
   return rows;
 }

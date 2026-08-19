@@ -2,7 +2,7 @@
 // state colors, urgency ranking, and the elapsed-timer span. Sections
 // import from here, never from each other.
 
-import { fmtElapsed, type Span } from "../cells.js";
+import { blank, fmtElapsed, line, type Span } from "../cells.js";
 import type { Agent } from "../data.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
 
@@ -11,6 +11,21 @@ import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
 export interface RailRow {
   text: string;
   item: boolean;
+}
+
+// Every rail item gets the same breathing room and pagination identity. The
+// section decides only what belongs inside the row; this keeps new tabs from
+// inventing their own vertical rhythm or forgetting the item marker.
+export function spacedItem(
+  width: number,
+  background: string,
+  spans: Span[],
+  right?: Span,
+): RailRow[] {
+  return [
+    { text: blank(width, background), item: false },
+    { text: line(width, background, spans, right), item: true },
+  ];
 }
 
 // A three-cell pill: powerline caps around a single character. The SAME

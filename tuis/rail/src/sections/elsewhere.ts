@@ -1,10 +1,10 @@
-import { blank, line } from "../cells.js";
 import type { Agent } from "../data.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
 import {
   elapsedSpan,
   pill,
   sortByUrgency,
+  spacedItem,
   stateColor,
   type RailRow,
 } from "./rows.js";
@@ -39,14 +39,13 @@ export function elsewhereRows(
       ? dim2
       : blend(stateColor(agent.status, palette), bg, DIM_KEEP);
     const hint = hints.get(agent.paneId);
-    rows.push({ text: blank(width, bg), item: false });
-    rows.push({
-      text: line(
+    rows.push(
+      ...spacedItem(
         width,
         bg,
         [
           // The jump pill mirrors the window pills exactly — same shape,
-          // blended colors; alt+a then this digit lands on the pane.
+          // blended colors; alt+space then this digit lands on the pane.
           ...(hint ? pill(hint, dim2, chipBg, bg) : [{ text: "   ", fg: dim }]),
           { text: " ", fg: dim },
           { text: project, fg: dim },
@@ -54,8 +53,7 @@ export function elsewhereRows(
         ],
         elapsedSpan(agent, acked, palette),
       ),
-      item: true,
-    });
+    );
   }
   return rows;
 }
