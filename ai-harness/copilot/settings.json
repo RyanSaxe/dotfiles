@@ -1,5 +1,10 @@
 {
   "model": "claude-opus-4.7",
   "effortLevel": "xhigh",
-  "beep": false
+  "beep": false,
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.copilot/statusline.js",
+    "padding": 0
+  }
 }
