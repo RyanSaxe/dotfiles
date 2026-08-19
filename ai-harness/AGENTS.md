@@ -6,7 +6,7 @@ requirements. Both take precedence over these global defaults.
 
 <important>
 
-Read [How to Write Clearly](references/writing.md) before continuing. Its
+Read [How to Write and Communicate Clearly](references/writing.md) before continuing. Its
 principles govern your voice in conversation as well as plans, explanations,
 documentation, and review artifacts. Revisit it when writing substantial prose
 or when your communication starts to drift.
@@ -156,7 +156,7 @@ verified behavior, even if drafts or notes existed earlier.
 
 <important>
 
-Read [How to Write Clearly](references/writing.md) before writing or revising
+Read [How to Write and Communicate Clearly](references/writing.md) before writing or revising
 documentation.
 
 </important>
