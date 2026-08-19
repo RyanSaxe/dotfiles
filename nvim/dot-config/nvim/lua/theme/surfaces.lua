@@ -77,7 +77,7 @@ end
 function M.setup()
   -- Every window, not just the current one: plugins open sidebars
   -- without ever focusing them.
-  vim.api.nvim_create_autocmd({ "BufWinEnter", "FileType", "WinNew", "WinEnter" }, {
+  vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType", "WinNew", "WinEnter" }, {
     group = vim.api.nvim_create_augroup("theme_surfaces", { clear = true }),
     callback = apply_all,
   })
