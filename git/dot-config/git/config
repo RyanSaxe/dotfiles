@@ -28,6 +28,8 @@
 	diffFilter = delta --color-only
 [delta]
 	navigate = true
+	# Select the TextMate theme rendered by the shared theme pipeline.
+	syntax-theme = Dotfiles
 [diff]
 	tool = codediff
 [difftool "codediff"]
