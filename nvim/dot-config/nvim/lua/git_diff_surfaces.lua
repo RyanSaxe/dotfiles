@@ -39,11 +39,6 @@ local function branch_created_from(root)
     return nil
   end
 
-  local configured_base = git_output(root, { "config", "--get", "branch." .. branch .. ".workmux-base" })
-  if configured_base and configured_base ~= "HEAD" then
-    return configured_base
-  end
-
   local reflog = git_output(root, { "reflog", "show", "--format=%gs", branch })
   if not reflog then
     return nil
