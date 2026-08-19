@@ -13,13 +13,22 @@
 local original_picker_layouts = {}
 
 ---@param picker snacks.Picker
----@param _ snacks.picker.Item?
----@param action snacks.picker.Action
-local function set_review_layout(picker, _, action)
+---@param layout string
+local function set_review_layout(picker, layout)
   if not original_picker_layouts[picker.id] then
     original_picker_layouts[picker.id] = vim.deepcopy(picker.resolved_layout)
   end
-  picker:set_layout(action.layout)
+  picker:set_layout(layout)
+end
+
+---@param picker snacks.Picker
+local function set_review_vertical_layout(picker)
+  set_review_layout(picker, "review_vertical")
+end
+
+---@param picker snacks.Picker
+local function set_review_horizontal_layout(picker)
+  set_review_layout(picker, "review_horizontal")
 end
 
 ---@param picker snacks.Picker
@@ -46,14 +55,12 @@ end
 local function review_layout_keys(mode)
   return {
     ["<a-->"] = {
-      action = "set_review_layout",
-      layout = "review_vertical",
+      "set_review_vertical_layout",
       mode = mode,
       desc = "Switch to vertical layout",
     },
     ["<a-\\>"] = {
-      action = "set_review_layout",
-      layout = "review_horizontal",
+      "set_review_horizontal_layout",
       mode = mode,
       desc = "Switch to horizontal layout",
     },
@@ -107,7 +114,8 @@ return {
         layout = { backdrop = backdrop() },
       },
       actions = {
-        set_review_layout = set_review_layout,
+        set_review_vertical_layout = set_review_vertical_layout,
+        set_review_horizontal_layout = set_review_horizontal_layout,
         restore_picker_layout = restore_picker_layout,
         toggle_preview_wrap = toggle_preview_wrap,
       },
