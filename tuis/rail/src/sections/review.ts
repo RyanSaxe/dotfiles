@@ -1,16 +1,20 @@
 import { fmtElapsed } from "../cells.js";
 import type { ReviewSnapshot } from "../attention/review.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
-import { pill, spacedItem, type RailRow } from "./rows.js";
+import {
+  attentionTextColor,
+  pill,
+  spacedItem,
+  type AttentionTone,
+  type RailRow,
+} from "./rows.js";
 
-function kindColor(kind: string, palette: Palette): string {
+function kindTone(kind: string): AttentionTone {
   switch (kind) {
     case "ci":
-      return palette.red;
-    case "review_request":
-      return palette.peach;
+      return "error";
     default:
-      return palette.mauve;
+      return "waiting";
   }
 }
 
@@ -55,24 +59,26 @@ export function reviewRows(
   }
 
   for (const item of pending) {
-    const color = kindColor(item.kind, palette);
+    const tone = kindTone(item.kind);
     const chipBg = blend(palette.surface0, bg, DIM_KEEP);
+    const dim = blend(palette.dim, bg, DIM_KEEP);
     const number = String(rows.filter((row) => row.item).length + 1);
     rows.push(
       ...spacedItem(
         width,
         bg,
         [
-          ...pill(number, palette.text, chipBg, bg),
-          { text: " ", fg: palette.dim },
+          // The review number is the same quiet jump pill used for an
+          // elsewhere agent. Its attention lives in the primary text/time.
+          ...pill(number, blend(palette.dim2, bg, DIM_KEEP), chipBg, bg),
+          { text: " ", fg: dim },
           {
-            text: `${shortRepository(item.repository)}#${item.number}`,
-            fg: item.priority === "high" ? palette.text : palette.lavender,
+            text: `${shortRepository(item.repository)}#${item.number} `,
+            fg: dim,
           },
-          { text: " ", fg: palette.dim },
-          { text: summary(item), fg: palette.dim },
+          { text: summary(item), fg: attentionTextColor(tone, palette) },
         ],
-        { text: age(item.createdAt), fg: blend(color, bg, DIM_KEEP) },
+        { text: age(item.createdAt), fg: attentionTextColor(tone, palette) },
       ),
     );
   }

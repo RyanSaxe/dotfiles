@@ -13,6 +13,8 @@ export interface RailRow {
   item: boolean;
 }
 
+export type AttentionTone = Agent["status"] | "error";
+
 // Every rail item gets the same breathing room and pagination identity. The
 // section decides only what belongs inside the row; this keeps new tabs from
 // inventing their own vertical rhythm or forgetting the item marker.
@@ -47,14 +49,30 @@ export function pill(
 }
 
 export function stateColor(status: Agent["status"], palette: Palette): string {
-  switch (status) {
+  return attentionColor(status, palette);
+}
+
+// Every attention surface speaks the same color language. Reviews add only
+// the error tone for failing CI; human work maps to the existing waiting
+// tone instead of inventing a second notification palette.
+export function attentionColor(tone: AttentionTone, palette: Palette): string {
+  switch (tone) {
     case "working":
       return palette.statusWorking;
     case "waiting":
       return palette.statusWaiting;
     case "done":
       return palette.statusDone;
+    case "error":
+      return palette.red;
   }
+}
+
+export function attentionTextColor(
+  tone: AttentionTone,
+  palette: Palette,
+): string {
+  return blend(attentionColor(tone, palette), railBg(palette), DIM_KEEP);
 }
 
 // Urgency: waiting outranks working outranks done; acked rows rank last —
@@ -93,10 +111,10 @@ export function elapsedSpan(
 ): Span {
   const secs = agent.elapsedSecs;
   if (secs >= ELAPSED_ATTENTION_SECS) {
-    return { text: fmtElapsed(secs), fg: palette.red };
+    return { text: fmtElapsed(secs), fg: attentionTextColor("error", palette) };
   }
   const hue = acked.has(agent.paneId)
     ? palette.dim
-    : stateColor(agent.status, palette);
+    : attentionColor(agent.status, palette);
   return { text: fmtElapsed(secs), fg: blend(hue, railBg(palette), DIM_KEEP) };
 }
