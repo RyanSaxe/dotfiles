@@ -9,8 +9,12 @@
 from __future__ import annotations
 
 import json
+import os
+import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import TypeAlias
 
@@ -94,8 +98,18 @@ def validate_skills() -> None:
 
 
 def validate_settings() -> None:
-    read_json(HARNESS_ROOT / "claude/settings.json")
-    read_json(HARNESS_ROOT / "copilot/settings.json")
+    claude = read_json(HARNESS_ROOT / "claude/settings.json")
+    copilot = read_json(HARNESS_ROOT / "copilot/settings.json")
+
+    for name, settings in (("claude", claude), ("copilot", copilot)):
+        status_line = settings.get("statusLine")
+        if not isinstance(status_line, dict):
+            raise HarnessError(f"{name} settings require a statusLine object")
+        if status_line.get("type") != "command":
+            raise HarnessError(f"{name} statusLine must be a command")
+        command = status_line.get("command")
+        if not isinstance(command, str) or not command.endswith("statusline.js"):
+            raise HarnessError(f"{name} statusLine must invoke statusline.js")
 
     codex_path = HARNESS_ROOT / "codex/config.toml"
     config = tomllib.loads(codex_path.read_text())
@@ -111,6 +125,62 @@ def validate_settings() -> None:
     tui = config.get("tui")
     if isinstance(tui, dict) and "model_availability_nux" in tui:
         raise HarnessError(f"{codex_path.relative_to(REPO_ROOT)} contains UI state")
+    if not isinstance(tui, dict) or tui.get("theme") != "dotfiles":
+        raise HarnessError(
+            f"{codex_path.relative_to(REPO_ROOT)} must select dotfiles theme"
+        )
+    if tui.get("status_line_use_colors") is not True:
+        raise HarnessError(
+            f"{codex_path.relative_to(REPO_ROOT)} must color its status line"
+        )
+
+
+def validate_statusline() -> None:
+    statusline = HARNESS_ROOT / "statusline.js"
+    if not statusline.is_file() or not statusline.stat().st_mode & 0o111:
+        raise HarnessError(f"{statusline.relative_to(REPO_ROOT)} must be executable")
+
+    node = shutil.which("node")
+    if node is None:
+        raise HarnessError("node is required to execute the shared status line")
+    payloads = (
+        {
+            "workspace": {"current_dir": "/tmp/project"},
+            "model": {"display_name": "Opus"},
+            "effortLevel": "xhigh",
+            "context_window": {"used_percentage": 25},
+        },
+        {
+            "cwd": "/tmp/project",
+            "model": {"id": "Opus"},
+            "effort": {"level": "xhigh"},
+            "context_window": {"current_context_used_percentage": 25},
+        },
+    )
+    with tempfile.TemporaryDirectory() as state_home:
+        outputs = []
+        for payload in payloads:
+            result = subprocess.run(
+                [node, str(statusline)],
+                input=json.dumps(payload),
+                capture_output=True,
+                check=False,
+                text=True,
+                env={**os.environ, "XDG_STATE_HOME": state_home},
+            )
+            if result.returncode:
+                raise HarnessError(
+                    f"statusline failed its fixture: {result.stderr.strip()}"
+                )
+            outputs.append(re.sub(r"\x1b\[[0-9;]*m", "", result.stdout).strip())
+
+    if outputs[0] != outputs[1]:
+        raise HarnessError(
+            "Claude and Copilot payloads produced different status lines: "
+            f"{outputs[0]!r} != {outputs[1]!r}"
+        )
+    if not all(value in outputs[0] for value in ("project", "Opus/xhigh", "75% left")):
+        raise HarnessError(f"statusline omitted expected context: {outputs[0]!r}")
 
 
 def main() -> int:
@@ -118,6 +188,7 @@ def main() -> int:
         validate_manifests,
         validate_skills,
         validate_settings,
+        validate_statusline,
     )
     try:
         for check in checks:
