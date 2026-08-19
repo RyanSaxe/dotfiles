@@ -39,11 +39,14 @@ export function tabBar(
 
   const tabWidth = (tab: (typeof RAIL_TABS)[number]): number =>
     tab.label.length + 2;
-  const starts = [
+  // The rail's left exterior margin is Ghostty padding while its right
+  // visual seam includes the rail gutter and tmux border. The one-cell
+  // nudge compensates for that asymmetric frame around the odd-width pill.
+  const reviewStart = Math.max(
     0,
-    Math.max(0, Math.floor((width - tabWidth(RAIL_TABS[1]!)) / 2)),
-    Math.max(0, width - tabWidth(RAIL_TABS[2]!)),
-  ];
+    Math.floor((width - tabWidth(RAIL_TABS[1]!)) / 2) + 1,
+  );
+  const starts = [0, reviewStart, Math.max(0, width - tabWidth(RAIL_TABS[2]!))];
   let cursor = 0;
 
   for (const [index, tab] of RAIL_TABS.entries()) {

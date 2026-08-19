@@ -3,17 +3,6 @@ import type { ReviewSnapshot } from "../attention/review.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
 import { pill, type RailRow } from "./rows.js";
 
-function kindGlyph(kind: string): string {
-  switch (kind) {
-    case "ci":
-      return "!";
-    case "review_request":
-      return "?";
-    default:
-      return "@";
-  }
-}
-
 function kindColor(kind: string, palette: Palette): string {
   switch (kind) {
     case "ci":
@@ -80,8 +69,6 @@ export function reviewRows(
         bg,
         [
           ...pill(number, palette.text, chipBg, bg),
-          { text: " ", fg: palette.dim },
-          ...pill(kindGlyph(item.kind), color, chipBg, bg),
           { text: " ", fg: palette.dim },
           {
             text: `${shortRepository(item.repository)}#${item.number}`,

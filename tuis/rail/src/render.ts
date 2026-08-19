@@ -2,7 +2,7 @@ import { blank, hintRow } from "./cells.js";
 import { reviewRows } from "./sections/review.js";
 import type { Agent, RailData } from "./data.js";
 import { elsewhereRows } from "./sections/elsewhere.js";
-import { header, tabBar } from "./sections/header.js";
+import { header, sectionHairline, tabBar } from "./sections/header.js";
 import {
   FOOTER_ROWS,
   MIN_HEIGHT_FOR_MASCOT,
@@ -64,6 +64,7 @@ export function renderRail(
   const body: RailRow[] = [
     ...windowRows(data.windows, agentsByPane, data.acked, palette, inner),
     { text: blank(inner, bg), item: false },
+    { text: sectionHairline(palette, inner), item: false },
     {
       text: tabBar(data.activeTab, tabAttention, palette, inner),
       item: false,
