@@ -4,10 +4,20 @@ return {
     cmd = { "CodeDiff" },
     dependencies = { "MunifTanjim/nui.nvim", "folke/snacks.nvim" },
     opts = {
+      explorer = {
+        position = "bottom",
+        height = 10,
+        view_mode = "list",
+        focus_on_select = true,
+      },
       diff = {
         layout = "side-by-side",
+        original_position = "left",
         disable_inlay_hints = true,
+        cycle_next_hunk = false,
+        cycle_next_file = false,
         cycle_hunks_across_files = true,
+        jump_to_first_change = true,
       },
       keymaps = {
         view = {
@@ -24,7 +34,7 @@ return {
           close_on_open_in_prev_tab = false,
           toggle_stage = "-",
           hunk_textobject = "ih",
-          show_help = "g?",
+          show_help = "?",
           align_move = "gm",
           toggle_layout = "t",
           toggle_compact = "gc",
