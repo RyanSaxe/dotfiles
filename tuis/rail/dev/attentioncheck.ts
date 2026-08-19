@@ -1,0 +1,188 @@
+import assert from "node:assert/strict";
+
+import {
+  defaultAttentionConfig,
+  validateAttentionConfig,
+} from "../src/attention/config.js";
+import { applyCiTransition } from "../src/attention/ci.js";
+import { classifyPullRequest } from "../src/attention/classify.js";
+import type {
+  GitHubActor,
+  GitHubComment,
+  PullRequestSnapshot,
+} from "../src/attention/types.js";
+
+const human = (login: string): GitHubActor => ({ login, kind: "user" });
+const bot = (login: string): GitHubActor => ({ login, kind: "bot" });
+
+const comment = (
+  id: string,
+  author: GitHubActor,
+  body: string,
+  createdAt: string,
+  viewerHasReacted = false,
+): GitHubComment => ({
+  id,
+  author,
+  body,
+  createdAt,
+  url: `https://github.com/example/repo/pull/7#${id}`,
+  viewerHasReacted,
+});
+
+const pr = (
+  overrides: Partial<PullRequestSnapshot> = {},
+): PullRequestSnapshot => ({
+  repository: "example/repo",
+  number: 7,
+  title: "Improve observer",
+  url: "https://github.com/example/repo/pull/7",
+  updatedAt: "2026-08-19T16:00:00Z",
+  headSha: "head-1",
+  author: human("ryansaxe"),
+  ciState: "SUCCESS",
+  searchSources: ["involved"],
+  reviewRequested: false,
+  reviewRequestFingerprint: "",
+  comments: [],
+  reviewThreads: [],
+  ...overrides,
+});
+
+const config = defaultAttentionConfig();
+
+const humanThread = pr({
+  author: human("someone-else"),
+  reviewThreads: [
+    {
+      id: "thread-1",
+      isResolved: false,
+      comments: [
+        comment(
+          "c1",
+          human("ryansaxe"),
+          "I will check this.",
+          "2026-08-19T15:00:00Z",
+        ),
+        comment(
+          "c2",
+          human("reviewer"),
+          "Please fix this.",
+          "2026-08-19T16:01:00Z",
+        ),
+      ],
+    },
+  ],
+});
+assert.equal(classifyPullRequest(humanThread, "ryansaxe", config).length, 1);
+assert.equal(
+  classifyPullRequest(humanThread, "ryansaxe", config)[0]?.kind,
+  "review_comment",
+);
+
+const botThread = pr({
+  reviewThreads: [
+    {
+      id: "thread-bot",
+      isResolved: false,
+      comments: [
+        comment(
+          "bot-1",
+          bot("codecov"),
+          "Coverage is 81%.",
+          "2026-08-19T16:01:00Z",
+        ),
+      ],
+    },
+  ],
+});
+assert.equal(classifyPullRequest(botThread, "ryansaxe", config).length, 0);
+
+const allowConfig = validateAttentionConfig(
+  { actors: { allow: ["claude-reviewer"], ignore: [] }, own_pr_ci: true },
+  "fixture",
+);
+const allowedBot = pr({
+  reviewThreads: [
+    {
+      id: "thread-allowed",
+      isResolved: false,
+      comments: [
+        comment(
+          "bot-2",
+          bot("claude-reviewer"),
+          "Consider this change.",
+          "2026-08-19T16:02:00Z",
+        ),
+      ],
+    },
+  ],
+});
+assert.equal(
+  classifyPullRequest(allowedBot, "ryansaxe", allowConfig).length,
+  1,
+);
+assert.throws(
+  () =>
+    validateAttentionConfig(
+      { actors: { allow: ["bot"], ignore: ["BOT"] } },
+      "fixture",
+    ),
+  /cannot be both allowed and ignored/,
+);
+
+const mentioned = pr({
+  author: human("someone-else"),
+  comments: [
+    comment(
+      "mention",
+      human("reviewer"),
+      "@ryansaxe please take a look",
+      "2026-08-19T16:03:00Z",
+    ),
+  ],
+});
+assert.equal(classifyPullRequest(mentioned, "ryansaxe", config).length, 1);
+
+const reacted = pr({
+  reviewThreads: [
+    {
+      id: "thread-reacted",
+      isResolved: false,
+      comments: [
+        comment(
+          "reacted",
+          human("reviewer"),
+          "Acknowledged?",
+          "2026-08-19T16:04:00Z",
+          true,
+        ),
+      ],
+    },
+  ],
+});
+assert.equal(classifyPullRequest(reacted, "ryansaxe", config).length, 0);
+
+const ciPr = pr({ ciState: "FAILURE", headSha: "head-1" });
+const firstCi = applyCiTransition(ciPr, undefined, "ryansaxe", config);
+assert.ok(firstCi.item);
+assert.equal(firstCi.memory.redEpoch, 1);
+const repeatedCi = applyCiTransition(ciPr, firstCi.memory, "ryansaxe", config);
+assert.equal(repeatedCi.item, null);
+const recoveredCi = applyCiTransition(
+  { ...ciPr, ciState: "SUCCESS" },
+  repeatedCi.memory,
+  "ryansaxe",
+  config,
+);
+assert.equal(recoveredCi.item, null);
+const redAgain = applyCiTransition(
+  ciPr,
+  recoveredCi.memory,
+  "ryansaxe",
+  config,
+);
+assert.ok(redAgain.item);
+assert.equal(redAgain.memory.redEpoch, 2);
+
+console.log("attention checks passed");
