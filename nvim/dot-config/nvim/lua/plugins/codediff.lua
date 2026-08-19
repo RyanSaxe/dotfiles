@@ -1,14 +1,85 @@
+local diff_surfaces = require("git_diff_surfaces")
+
 return {
   {
     "esmuellert/codediff.nvim",
     cmd = { "CodeDiff" },
     dependencies = { "MunifTanjim/nui.nvim", "folke/snacks.nvim" },
+    keys = {
+      {
+        "<leader>gdf",
+        function()
+          ---@param ref string
+          diff_surfaces.pick_branch("CodeDiff: File against branch", function(ref)
+            diff_surfaces.open_codediff({ "file", ref })
+          end)
+        end,
+        desc = "CodeDiff file (branch)",
+      },
+      {
+        "<leader>gdF",
+        function()
+          ---@param ref string
+          diff_surfaces.pick_commit("CodeDiff: File against commit", true, function(ref)
+            diff_surfaces.open_codediff({ "file", ref })
+          end)
+        end,
+        desc = "CodeDiff file (commit)",
+      },
+      {
+        "<leader>gda",
+        function()
+          ---@param ref string
+          diff_surfaces.pick_branch("CodeDiff: All files against branch", function(ref)
+            diff_surfaces.open_codediff({ ref })
+          end)
+        end,
+        desc = "CodeDiff all files (branch)",
+      },
+      {
+        "<leader>gdA",
+        function()
+          ---@param ref string
+          diff_surfaces.pick_commit("CodeDiff: All files against commit", false, function(ref)
+            diff_surfaces.open_codediff({ ref })
+          end)
+        end,
+        desc = "CodeDiff all files (commit)",
+      },
+      {
+        "<leader>gds",
+        function()
+          ---@param ref string
+          diff_surfaces.pick_branch("CodeDiff: Review commit stack from branch", function(ref)
+            diff_surfaces.open_history_from_branch(ref)
+          end)
+        end,
+        desc = "CodeDiff stack review (branch)",
+      },
+      {
+        "<leader>gdS",
+        function()
+          diff_surfaces.pick_commit(
+            "CodeDiff: Review commit stack from commit",
+            false,
+            diff_surfaces.open_history_from_commit
+          )
+        end,
+        desc = "CodeDiff stack review (commit)",
+      },
+    },
     opts = {
       explorer = {
         position = "bottom",
         height = 10,
         view_mode = "list",
         focus_on_select = true,
+      },
+      history = {
+        position = "bottom",
+        height = 10,
+        view_mode = "list",
+        initial_focus = "history",
       },
       diff = {
         layout = "side-by-side",
@@ -24,8 +95,8 @@ return {
           quit = "q",
           toggle_explorer = "<leader>b",
           focus_explorer = "<leader>e",
-          next_hunk = "]h",
-          prev_hunk = "[h",
+          next_hunk = { "]h", "<Tab>" },
+          prev_hunk = { "[h", "<S-Tab>" },
           next_file = "]f",
           prev_file = "[f",
           diff_get = "do",

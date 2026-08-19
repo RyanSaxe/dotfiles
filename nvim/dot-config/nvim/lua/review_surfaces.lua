@@ -21,6 +21,8 @@ local switch_key = "<leader>gdr"
 
 ---@type table<integer, ReviewSurfaceContext>
 local contexts = {}
+---@type table<integer, boolean>
+local codediff_tabs = {}
 ---@type ReviewSurfaceContext?
 local pending_context
 local did_setup = false
@@ -143,6 +145,8 @@ local function on_codediff_open(event)
     return
   end
 
+  codediff_tabs[tabpage] = true
+
   local context = pending_context
   if context then
     contexts[tabpage] = context
@@ -190,6 +194,7 @@ local function on_codediff_close(event)
     return
   end
 
+  codediff_tabs[tabpage] = nil
   contexts[tabpage] = nil
 end
 
@@ -273,6 +278,13 @@ function M.to_snacks(tabpage)
     group = false,
     pattern = context.path,
   })
+end
+
+---@param tabpage integer?
+---@return boolean
+function M.is_codediff_tab(tabpage)
+  tabpage = tabpage or vim.api.nvim_get_current_tabpage()
+  return codediff_tabs[tabpage] == true
 end
 
 return M
