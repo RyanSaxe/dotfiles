@@ -16,6 +16,7 @@ ai-harness/
 ├── references/                 supporting documentation loaded on demand
 ├── skills/                     portable Agent Skills
 ├── tools/                      command-line tools for agents
+├── statusline.js               shared Claude/Copilot status line
 ├── .claude-plugin/plugin.json  Claude Code plugin manifest
 ├── plugin.json                 Copilot CLI plugin manifest
 ├── claude/                     Claude Code settings and extensions
@@ -39,12 +40,16 @@ Run the repository installer from the dotfiles root:
 
 ```sh
 ./install.sh
+# or, on an existing dotfiles installation:
+./install.sh agents
 ```
 
-The installer creates the links described below and configures the shell
-launchers. Re-run it after adding a tool or Codex agent that needs an individual
-link. Edits to existing files and additions under a linked directory need no
+The `agents` tier creates the links described below and configures the shell
+launchers. Re-run it after changing the repository location. Edits to existing
+files take effect immediately; additions under a linked directory need no
 install step.
+
+The Codex admin links under `/etc/codex` require `sudo`.
 
 ## Shared instructions
 
@@ -115,9 +120,10 @@ harness or another application stays in its native home, including credentials,
 sessions, caches, permissions, trust records, installed plugins, and downloaded
 skills.
 
-Claude receives its tracked settings with `--settings`. Copilot's
-`~/.copilot/settings.json` links to `copilot/settings.json`; changes made through
-Copilot are ordinary dotfile changes. Codex reads `codex/config.toml` from its
+Claude receives its tracked settings with `--settings`; its native
+`~/.claude/settings.json` remains available for Workmux and other hooks.
+Copilot's `~/.copilot/settings.json` links to `copilot/settings.json`; changes
+made through Copilot are ordinary dotfile changes. Codex reads `codex/config.toml` from its
 system layer:
 
 ```text
@@ -150,7 +156,9 @@ worktree behavior. Files installed by `workmux setup` stay in the harness's
 native directories.
 
 Theme and status-line integrations consume the generated colors in `../theme/`.
-They do not define a second palette.
+They do not define a second palette. Claude and Copilot call the shared
+`statusline.js`; Codex uses its native status-line items and the generated
+`dotfiles.tmTheme` in `~/.codex/themes`.
 
 ## Extending the harness
 

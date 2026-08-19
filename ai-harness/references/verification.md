@@ -6,7 +6,8 @@ where a person will actually encounter it?
 Automated checks establish useful facts, but a passing test suite is not the
 same as a working feature. Verify through the public interface whenever
 practical: run the command, use the UI, load the configuration with its real
-consumer, or call the library as a downstream user would.
+consumer, or call the library as a downstream user would. Whatever it is, you
+can test it as if you were a user.
 
 ## Match the effort to the change
 
@@ -39,4 +40,6 @@ inspect from a command result alone.
 
 Describe what you exercised and what you observed. Distinguish direct evidence
 from inference, and identify relevant behavior that was not verified. Never
-describe a check as proving more than it actually does.
+describe a check as proving more than it actually does. When possible provide a
+direct artifact as proof of verification. A statement that you opened the UI is
+worth substantially less than a screenshot of the UI itself.

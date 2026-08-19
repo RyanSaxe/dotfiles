@@ -13,6 +13,9 @@ Clone it anywhere. On a fresh machine this installs homebrew, system packages,
 and symlinks for the tiers you pick — `core` everywhere, `mac` for GUI apps.
 See [docs/install.md](docs/install.md) for tiers, upgrades, and how the stow
 layout stays out of the repo tree.
+The `agents` tier installs the live Claude, Codex, and Copilot harness links;
+it is included by the default install and can be run separately with
+`./install.sh agents`.
 
 ## What's in it
 
