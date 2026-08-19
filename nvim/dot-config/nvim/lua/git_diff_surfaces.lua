@@ -3,24 +3,81 @@ local M = {}
 ---@type table<integer, boolean>
 local inlay_hints_was_enabled = {}
 
+---@param root string
+---@param args string[]
+---@return string?
+local function git_output(root, args)
+  local command = { "git" }
+  vim.list_extend(command, args)
+  local result = vim.system(command, { cwd = root, text = true }):wait()
+  if result.code ~= 0 then
+    return nil
+  end
+
+  local output = vim.trim(result.stdout or "")
+  return output ~= "" and output or nil
+end
+
+---@param root string
+---@param ref string
+---@return boolean
+local function ref_exists(root, ref)
+  local result = vim
+    .system({ "git", "rev-parse", "--verify", "--quiet", ref }, {
+      cwd = root,
+      text = true,
+    })
+    :wait()
+  return result.code == 0
+end
+
+---@param root string
+---@return string?
+local function branch_created_from(root)
+  local branch = git_output(root, { "symbolic-ref", "--quiet", "--short", "HEAD" })
+  if not branch then
+    return nil
+  end
+
+  local configured_base = git_output(root, { "config", "--get", "branch." .. branch .. ".workmux-base" })
+  if configured_base and configured_base ~= "HEAD" then
+    return configured_base
+  end
+
+  local reflog = git_output(root, { "reflog", "show", "--format=%gs", branch })
+  if not reflog then
+    return nil
+  end
+
+  for entry in reflog:gmatch("[^\r\n]+") do
+    local created_from = entry:match("^branch: Created from (.+)$")
+    if created_from and ref_exists(root, "refs/heads/" .. created_from) then
+      return created_from
+    end
+  end
+
+  return nil
+end
+
 ---@return string
 local function base_branch()
   local root = vim.fs.root(0, { ".git" }) or vim.fn.getcwd()
-  local result = vim
-    .system({
-      "git",
-      "symbolic-ref",
-      "--quiet",
-      "--short",
-      "refs/remotes/origin/HEAD",
-    }, { cwd = root, text = true })
-    :wait()
-  if result.code == 0 then
-    local branch = vim.trim(result.stdout or ""):match("^[^/]+/(.+)$")
-    if branch and branch ~= "" then
-      return branch
-    end
+  local created_from = branch_created_from(root)
+  if created_from then
+    return created_from
   end
+
+  local remote_head = git_output(root, {
+    "symbolic-ref",
+    "--quiet",
+    "--short",
+    "refs/remotes/origin/HEAD",
+  })
+  local branch = remote_head and remote_head:match("^[^/]+/(.+)$")
+  if branch and branch ~= "" then
+    return branch
+  end
+
   return "main"
 end
 

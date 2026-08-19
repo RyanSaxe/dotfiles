@@ -129,7 +129,7 @@ return {
             title = "{title} {live} {flags}",
             { win = "preview", border = "bottom" },
             { win = "input", height = 1, border = "bottom" },
-            { win = "list", height = 5, border = "none" },
+            { win = "list", height = 8, border = "none" },
           },
         },
         review_horizontal = {

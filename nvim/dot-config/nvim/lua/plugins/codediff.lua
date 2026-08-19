@@ -6,8 +6,9 @@ return {
     cmd = { "CodeDiff" },
     dependencies = { "MunifTanjim/nui.nvim", "folke/snacks.nvim" },
     keys = {
+      { "<leader>gr", group = "Review" },
       {
-        "<leader>gdf",
+        "<leader>grf",
         function()
           ---@param ref string
           diff_surfaces.pick_branch("CodeDiff: File against branch", function(ref)
@@ -17,7 +18,7 @@ return {
         desc = "CodeDiff file (branch)",
       },
       {
-        "<leader>gdF",
+        "<leader>grF",
         function()
           ---@param ref string
           diff_surfaces.pick_commit("CodeDiff: File against commit", true, function(ref)
@@ -27,7 +28,7 @@ return {
         desc = "CodeDiff file (commit)",
       },
       {
-        "<leader>gda",
+        "<leader>gra",
         function()
           ---@param ref string
           diff_surfaces.pick_branch("CodeDiff: All files against branch", function(ref)
@@ -37,7 +38,7 @@ return {
         desc = "CodeDiff all files (branch)",
       },
       {
-        "<leader>gdA",
+        "<leader>grA",
         function()
           ---@param ref string
           diff_surfaces.pick_commit("CodeDiff: All files against commit", false, function(ref)
@@ -47,7 +48,7 @@ return {
         desc = "CodeDiff all files (commit)",
       },
       {
-        "<leader>gds",
+        "<leader>grs",
         function()
           ---@param ref string
           diff_surfaces.pick_branch("CodeDiff: Review commit stack from branch", function(ref)
@@ -57,7 +58,7 @@ return {
         desc = "CodeDiff stack review (branch)",
       },
       {
-        "<leader>gdS",
+        "<leader>grS",
         function()
           diff_surfaces.pick_commit(
             "CodeDiff: Review commit stack from commit",

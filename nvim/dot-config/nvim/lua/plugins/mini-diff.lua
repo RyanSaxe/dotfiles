@@ -5,7 +5,7 @@ return {
     dependencies = { "folke/snacks.nvim" },
     keys = {
       {
-        "<leader>gdo",
+        "<leader>gro",
         function()
           ---@param ref string
           require("git_diff_surfaces").pick_branch("Mini Diff: Select branch", function(ref)
@@ -15,7 +15,7 @@ return {
         desc = "Overlay diff (branch)",
       },
       {
-        "<leader>gdO",
+        "<leader>grO",
         function()
           ---@param ref string
           require("git_diff_surfaces").pick_commit("Mini Diff: Select commit", true, function(ref)
