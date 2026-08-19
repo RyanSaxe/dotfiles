@@ -10,8 +10,36 @@ import { assignHints } from "../src/hints.js";
 import { renderRail } from "../src/render.js";
 import { loadPalette } from "../src/theme.js";
 
+const reviewItems = [
+  {
+    id: "review:1",
+    kind: "review_comment" as const,
+    repository: "RyanSaxe/dotfiles-v2",
+    number: 90,
+    title: "Review cockpit",
+    url: "https://github.com/RyanSaxe/dotfiles-v2/pull/90",
+    summary: "Please take another look at this change",
+    actor: { login: "reviewer", kind: "user" as const },
+    createdAt: "2026-08-19T16:00:00Z",
+    priority: "normal" as const,
+  },
+  {
+    id: "ci:2",
+    kind: "ci" as const,
+    repository: "RyanSaxe/buffergolf.nvim",
+    number: 4,
+    title: "Improve buffer flow",
+    url: "https://github.com/RyanSaxe/buffergolf.nvim/pull/4",
+    summary: "CI is red",
+    actor: null,
+    createdAt: "2026-08-19T15:30:00Z",
+    priority: "high" as const,
+  },
+];
+
 const scene: RailData = {
   session: "dotfiles",
+  activeTab: process.env.RAIL_TAB === "review" ? "review" : "agents",
   acked: new Set(process.env.RAIL_ACK ? [process.env.RAIL_ACK] : []),
   hints: new Map(),
   sprite: null,
@@ -69,6 +97,14 @@ const scene: RailData = {
       branch: "evals",
     },
   ],
+  review: {
+    revision: 1,
+    lastSuccessfulSyncAt: "2026-08-19T16:00:00Z",
+    lastError: null,
+    items: reviewItems,
+    unacknowledged: reviewItems,
+    acknowledged: new Set<string>(),
+  },
 };
 
 scene.hints =

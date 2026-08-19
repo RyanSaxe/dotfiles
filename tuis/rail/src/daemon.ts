@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { loadAcks, updateAcks } from "./acks.js";
+import { loadReviewSnapshot } from "./attention/review.js";
 import {
   applyDoneHysteresis,
   collectAgents,
@@ -40,6 +41,7 @@ import { collectHostFacts, isPresent } from "./probes.js";
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
+import { loadRailTab } from "./tabs.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
@@ -330,6 +332,9 @@ async function tick(counter: number): Promise<boolean> {
     // No page file: top of the list.
   }
 
+  const activeTab = loadRailTab();
+  const review = loadReviewSnapshot();
+
   const frames = new Map<string, string>();
   for (const pane of panes) {
     if (!pane.isRail || skip.has(pane.paneId)) continue;
@@ -346,13 +351,15 @@ async function tick(counter: number): Promise<boolean> {
         : null;
     const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
-    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
+    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}\x1f${activeTab}\x1f${review.revision}`;
     let frame = frames.get(bucket);
     if (frame === undefined) {
       const data = {
         session: pane.session,
+        activeTab,
         windows: windowsOf(panes, pane.session),
         agents: settled,
+        review,
         acked,
         hints: hintsBySession.get(pane.session) ?? new Map<string, string>(),
         sprite,
@@ -491,7 +498,7 @@ async function main(): Promise<void> {
   }
 
   watch(STATE_DIR, (_event, filename) => {
-    if (filename === "enabled") wakeLoop();
+    if (filename === "enabled" || filename === "tab") wakeLoop();
   });
 
   let counter = 0;

@@ -1,7 +1,8 @@
 import { blank, hintRow } from "./cells.js";
+import { reviewRows } from "./sections/review.js";
 import type { Agent, RailData } from "./data.js";
 import { elsewhereRows } from "./sections/elsewhere.js";
-import { header, sectionHairline } from "./sections/header.js";
+import { header, tabBar } from "./sections/header.js";
 import {
   FOOTER_ROWS,
   MIN_HEIGHT_FOR_MASCOT,
@@ -46,15 +47,24 @@ export function renderRail(
     }
   }
 
-  // Every item row is preceded by a blank spacer — the breathing room is
-  // part of the design and never collapses; crowding is handled by
-  // pagination instead.
+  // Local tmux windows stay visible for every tab. The active tab owns only
+  // the lower section below the centered tab bar.
   const body: RailRow[] = [
     ...windowRows(data.windows, agentsByPane, data.acked, palette, inner),
+    { text: blank(inner, bg), item: false },
+    {
+      text: tabBar(
+        data.activeTab,
+        data.review.unacknowledged.length > 0,
+        palette,
+        inner,
+      ),
+      item: false,
+    },
   ];
-  if (elsewhere.length > 0) {
-    body.push({ text: blank(inner, bg), item: false });
-    body.push({ text: sectionHairline(palette, inner), item: false });
+  if (data.activeTab === "review") {
+    body.push(...reviewRows(data.review, palette, inner));
+  } else if (elsewhere.length > 0) {
     body.push(
       ...elsewhereRows(elsewhere, data.acked, data.hints, palette, inner),
     );
@@ -86,6 +96,16 @@ export function renderRail(
       if (row.item) {
         units.push(unit);
         unit = [];
+      }
+    }
+    // A centered tab bar is trailing furniture when there are no lower
+    // items (for example, an empty Agents tab). Keep it with the final unit
+    // instead of dropping it from the paginated scene.
+    if (unit.length > 0) {
+      if (units.length > 0) {
+        units[units.length - 1]!.push(...unit);
+      } else {
+        units.push(unit);
       }
     }
     const pages: RailRow[][] = [];

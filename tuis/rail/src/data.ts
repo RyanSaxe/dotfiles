@@ -2,6 +2,9 @@ import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 
+import type { ReviewSnapshot } from "./attention/review.js";
+import type { RailTabId } from "./tabs.js";
+
 // The one exec plumbing every module shares.
 export const run = promisify(execFile);
 export const tmux = (...args: string[]) => run("tmux", args);
@@ -29,8 +32,10 @@ export interface Window {
 
 export interface RailData {
   session: string;
+  activeTab: RailTabId;
   windows: Window[];
   agents: Agent[];
+  review: ReviewSnapshot;
   // Pane ids whose done/waiting status has been seen (visit-clears).
   acked: Set<string>;
   // Jump-hint digit per agent pane id (alt+a <digit>), viewer-relative.

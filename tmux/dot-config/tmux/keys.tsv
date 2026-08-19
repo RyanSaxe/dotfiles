@@ -14,15 +14,17 @@ tmux	copy ctrl+\	last active pane
 tmux	alt+s	session switcher popup
 tmux	alt+o	repo picker popup (opens session)
 tmux	alt+c	theme picker popup
-tmux	alt+d	agent dashboard popup
 tmux	alt+g	toggle rail / focus mode
 tmux	alt+,	rail page up
 tmux	alt+.	rail page down
-tmux	alt+a	enter agent jump table
+tmux	alt+a	focus Agents rail tab + enter jump table
+tmux	alt+A	open Workmux agent dashboard
 tmux	alt+a 1-9	jump to elsewhere agent N (rail chip)
 tmux	alt+a a	jump to most urgent agent anywhere (incl. this session)
 tmux	alt+a enter	jump to most urgent agent anywhere
 tmux	alt+a esc	cancel agent table
+tmux	alt+r	focus Review rail tab
+tmux	alt+R	open GitHub review dashboard
 tmux	alt+/	this cheatsheet
 tmux	prefix r	reload tmux config
 tmux	prefix s	session switcher popup

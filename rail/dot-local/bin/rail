@@ -4,6 +4,10 @@
 #   rail on|off|toggle   enable/disable the rail everywhere
 #   rail jump <letter>   jump to the agent behind a hint letter
 #   rail page up|down    page the rail body when it overflows
+#   rail tab agents|review
+#                       switch the active rail tab
+#   rail review-dashboard
+#                       open the cached GitHub review inbox
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
@@ -14,8 +18,18 @@ set -eu
 
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# Resolve the repo through this script's own symlink (stow pattern).
-SCRIPT_PATH="$(readlink -f "$0")"
+# Resolve the repo through this script's own symlink (stow pattern). macOS's
+# readlink has no -f flag, so keep this portable across macOS and Linux.
+SCRIPT_PATH="$0"
+while [ -L "$SCRIPT_PATH" ]; do
+  SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+  case "$LINK_TARGET" in
+  /*) SCRIPT_PATH="$LINK_TARGET" ;;
+  *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
+  esac
+done
+SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_ROOT="${SCRIPT_PATH%/rail/dot-local/bin/rail}"
 RAIL_DIR="$REPO_ROOT/tuis/rail"
 
@@ -115,6 +129,24 @@ page)
   [ "$next" -lt 0 ] && next=0
   printf '%s' "$next" >"$STATE/page"
   ;;
+tab)
+  tab="${2:?usage: rail tab agents|review}"
+  case "$tab" in
+  agents | review) ;;
+  *)
+    echo "usage: rail tab agents|review" >&2
+    exit 1
+    ;;
+  esac
+  # Pages are not meaningful across surfaces, so changing tabs starts at
+  # the top of the new one.
+  printf '%s\n' "$tab" >"$STATE/tab"
+  printf '0' >"$STATE/page"
+  ;;
+review-dashboard)
+  cd "$RAIL_DIR"
+  exec npx tsx src/review-dashboard.ts
+  ;;
 status)
   if daemon_running; then
     echo "daemon: running (pid $(cat "$PID_FILE"))"
@@ -122,6 +154,7 @@ status)
     echo "daemon: not running"
   fi
   if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
+  echo "tab: $(cat "$STATE/tab" 2>/dev/null || echo agents)"
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
   if [ -n "${AI_HARNESS_NTFY_URL:-}${AGENT_NOTIFICATION_ID:-}" ]; then
     echo "phone: configured"
@@ -130,7 +163,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|page up|down|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|review|review-dashboard|ensure-daemon|status" >&2
   exit 1
   ;;
 esac
