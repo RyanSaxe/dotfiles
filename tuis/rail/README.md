@@ -88,8 +88,8 @@ tab is one compact line per unacknowledged item and highlights the Reviews badge
 until the item is acknowledged or disappears. `alt+R` opens the cached Review
 table + preview dashboard. `alt+T` opens the same dashboard shell for the
 future-ready Tasks surface. Enter opens the selected PR in a browser,
-`ctrl-d` acknowledges it locally, and `r`/`ctrl-r` performs an explicit
-no-notify refresh.
+`ctrl-d` acknowledges it locally, `/` fuzzy-searches the table, and
+`r`/`ctrl-r` performs an explicit no-notify refresh.
 
 The tab registry is intentionally small: Agents, Reviews, and the future-ready
 Tasks surface share one element-action table. `alt+space` enters that table;

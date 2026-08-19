@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 
-import { renderDashboard } from "../src/dashboard.js";
+import { filterDashboardItems, renderDashboard } from "../src/dashboard.js";
 import { reviewItem } from "../src/review-dashboard.js";
 import type { AttentionItem } from "../src/attention/types.js";
 import type { Palette } from "../src/theme.js";
@@ -47,6 +47,8 @@ assert.equal(dashboardItem.reference, "#7");
 assert.equal(dashboardItem.kind, "Review");
 assert.equal(dashboardItem.state, "needs you");
 assert.equal(dashboardItem.tone, "waiting");
+assert.equal(filterDashboardItems([dashboardItem], "rvs").length, 1);
+assert.equal(filterDashboardItems([dashboardItem], "does-not-match").length, 0);
 
 const rendered = renderDashboard(
   {
@@ -62,8 +64,26 @@ const rendered = renderDashboard(
   24,
 );
 const plain = rendered.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
-assert.match(plain, /Rail dashboard/);
+assert.match(plain, /Reviews  \|  Tasks/);
 assert.match(plain, /repo/);
 assert.match(plain, /Improve the review seam/);
 assert.match(plain, /Enter Open/);
+
+const searching = renderDashboard(
+  {
+    surface: "reviews",
+    items: [dashboardItem],
+    status: "1 open · 0 seen",
+    emptyMessage: "Review inbox is clear",
+    error: null,
+  },
+  0,
+  palette,
+  100,
+  24,
+  "rvs",
+  true,
+).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+assert.match(searching, /\/rvs · 1\/1 matches/);
+assert.match(searching, /Enter Apply/);
 console.log("review dashboard checks passed");

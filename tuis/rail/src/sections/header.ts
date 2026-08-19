@@ -23,6 +23,15 @@ export function header(
   ];
 }
 
+// The mascot owns this lower-footer rule. It is deliberately not used above
+// the tab row: the square tabs are that divider.
+export function sectionHairline(palette: Palette, width: number): string {
+  const bg = railBg(palette);
+  return line(width, bg, [
+    { text: "─".repeat(width), fg: blend(palette.notify, bg, 0.5) },
+  ]);
+}
+
 // The tab row replaces the old divider between local tmux windows and the
 // lower rail content. Agents hugs the left edge, Reviews is centered, and
 // Tasks hugs the right edge; all three occupy one row above the lower scene.

@@ -87,7 +87,7 @@ export function renderRail(
   const hasFooter = data.sprite !== null && height >= MIN_HEIGHT_FOR_MASCOT;
   // No blank row below the sprite: the 19pt bottom frame is the sprite's
   // lower margin (~one cell), matching the blank row above it — so the
-  // mascot reads centered between the footer air and the window edge.
+  // mascot reads centered between the footer hairline and the window edge.
   const budget = height - top.length - (hasFooter ? FOOTER_ROWS : 0);
 
   let content: string[];

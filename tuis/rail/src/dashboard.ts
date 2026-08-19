@@ -1,4 +1,4 @@
-import { loadPalette, bg, fg, RESET, blend, type Palette } from "./theme.js";
+import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
 import type { AttentionTone } from "./sections/rows.js";
 
 export type DashboardSurface = "reviews" | "tasks";
@@ -72,8 +72,8 @@ function background(palette: Palette): string {
   return palette.base;
 }
 
-function borderColor(palette: Palette): string {
-  return blend(palette.lavender, background(palette), 0.58);
+function ruleColor(palette: Palette): string {
+  return blend(palette.lavender, background(palette), 0.45);
 }
 
 function mutedColor(palette: Palette): string {
@@ -99,20 +99,6 @@ function attentionColor(
   }
 }
 
-function rule(
-  width: number,
-  palette: Palette,
-  kind: "top" | "middle" | "bottom",
-  title?: string,
-): string {
-  const left = kind === "top" ? "╭" : kind === "bottom" ? "╰" : "├";
-  const right = kind === "top" ? "╮" : kind === "bottom" ? "╯" : "┤";
-  const inner = width - 2;
-  const label = title === undefined ? "" : ` ${title} `;
-  const fill = Math.max(0, inner - widthOf(label));
-  return `${fg(borderColor(palette))}${left}${label}${"─".repeat(fill)}${right}${RESET}`;
-}
-
 function content(
   width: number,
   palette: Palette,
@@ -131,43 +117,76 @@ function content(
   return output + RESET;
 }
 
-function row(
+function line(
   width: number,
   palette: Palette,
   cells: Cell[],
-  selected = false,
+  lineBackground = background(palette),
 ): string {
-  const lineBackground = selected
-    ? blend(palette.surface0, background(palette), 0.9)
-    : background(palette);
-  return `${fg(borderColor(palette))}│${content(width - 2, palette, cells, lineBackground)}${fg(borderColor(palette))}│${RESET}`;
+  return content(width, palette, cells, lineBackground);
 }
 
-function rightAlignedRow(
+function rightAlignedLine(
   width: number,
   palette: Palette,
   left: Cell[],
   rightText: string,
 ): string {
-  const inner = width - 2;
   const rightWidth = widthOf(rightText);
-  const leftWidth = Math.max(0, inner - rightWidth - 1);
-  return row(width, palette, [
-    {
-      text: padded(left.map((cell) => cell.text).join(""), leftWidth),
-      color: left[0]?.color,
-    },
-    { text: " ", color: background(palette) },
+  const gap = 2;
+  const leftWidth = Math.max(0, width - rightWidth - gap);
+  const leftText = left.map((cell) => cell.text).join("");
+  return line(width, palette, [
+    ...left,
+    { text: " ".repeat(Math.max(0, leftWidth - widthOf(leftText))) },
+    { text: " ".repeat(gap) },
     { text: rightText, color: mutedColor(palette) },
   ]);
 }
 
-function tableWidths(inner: number): number[] {
-  const fixed = [3, 18, 8, 11, 12, 8];
-  const separators = 6;
+function rule(width: number, palette: Palette, title?: string): string {
+  const label = title === undefined ? "" : ` ${title} `;
+  return line(width, palette, [
+    {
+      text: `${label}${"─".repeat(Math.max(0, width - widthOf(label)))}`,
+      color: ruleColor(palette),
+    },
+  ]);
+}
+
+function panelRule(
+  width: number,
+  palette: Palette,
+  kind: "top" | "bottom",
+  title?: string,
+): string {
+  const left = kind === "top" ? "╭" : "╰";
+  const right = kind === "top" ? "╮" : "╯";
+  const label = title === undefined ? "" : ` ${title} `;
+  return line(width, palette, [
+    {
+      text: `${left}${label}${"─".repeat(
+        Math.max(0, width - widthOf(label) - 2),
+      )}${right}`,
+      color: ruleColor(palette),
+    },
+  ]);
+}
+
+function panelLine(width: number, palette: Palette, cells: Cell[]): string {
+  return line(width, palette, [
+    { text: "│", color: ruleColor(palette) },
+    ...cells,
+    { text: "│", color: ruleColor(palette) },
+  ]);
+}
+
+function tableWidths(width: number): number[] {
+  const gap = 2;
+  const fixed = [4, 23, 9, 12, 14, 9];
   const title = Math.max(
-    8,
-    inner - separators - fixed.reduce((sum, width) => sum + width, 0),
+    12,
+    width - gap * 6 - fixed.reduce((sum, value) => sum + value, 0),
   );
   return [...fixed, title];
 }
@@ -176,10 +195,11 @@ function tableCells(
   values: string[],
   widths: number[],
   colors: string[],
+  gapColor: string,
 ): Cell[] {
   const cells: Cell[] = [];
   values.forEach((value, index) => {
-    if (index > 0) cells.push({ text: "│", color: colors[index] });
+    if (index > 0) cells.push({ text: "  ", color: gapColor });
     cells.push({
       text: padded(value, widths[index] ?? 0),
       color: colors[index] ?? colors[0],
@@ -189,14 +209,16 @@ function tableCells(
 }
 
 function tableHeader(width: number, palette: Palette): string {
-  const widths = tableWidths(width - 2);
-  return row(
+  const widths = tableWidths(width);
+  const muted = mutedColor(palette);
+  return line(
     width,
     palette,
     tableCells(
       ["#", "Project", "Ref", "Kind", "State", "Time", "Title"],
       widths,
-      Array.from({ length: widths.length }, () => mutedColor(palette)),
+      Array.from({ length: widths.length }, () => palette.text),
+      muted,
     ),
   );
 }
@@ -208,15 +230,19 @@ function tableItem(
   index: number,
   selected: boolean,
 ): string {
-  const widths = tableWidths(width - 2);
+  const widths = tableWidths(width);
   const tone = attentionColor(item, palette, selected);
   const neutral = selected ? palette.text : mutedColor(palette);
-  return row(
+  const marker = selected ? "▌" : " ";
+  const lineBackground = selected
+    ? blend(palette.surface0, background(palette), 0.9)
+    : background(palette);
+  return line(
     width,
     palette,
     tableCells(
       [
-        String(index + 1),
+        `${marker}${index + 1}`,
         item.project,
         item.reference,
         item.kind,
@@ -225,21 +251,32 @@ function tableItem(
         item.title,
       ],
       widths,
-      [neutral, neutral, neutral, neutral, tone, tone, tone],
+      [
+        selected ? palette.accent : neutral,
+        neutral,
+        neutral,
+        neutral,
+        tone,
+        tone,
+        tone,
+      ],
+      neutral,
     ),
-    selected,
+    lineBackground,
   );
 }
 
 function emptyTableRow(width: number, palette: Palette, text: string): string {
-  const widths = tableWidths(width - 2);
-  return row(
+  const widths = tableWidths(width);
+  const muted = mutedColor(palette);
+  return line(
     width,
     palette,
     tableCells(
-      ["", "", "", "", "", "", text],
+      ["", text, "", "", "", "", ""],
       widths,
-      Array.from({ length: widths.length }, () => mutedColor(palette)),
+      Array.from({ length: widths.length }, () => muted),
+      muted,
     ),
   );
 }
@@ -248,37 +285,96 @@ function previewLines(
   data: DashboardData,
   selected: DashboardItem | undefined,
   palette: Palette,
+  query: string,
 ): Cell[][] {
   if (selected === undefined) {
     return [
-      [{ text: data.emptyMessage, color: mutedColor(palette) }],
+      [
+        {
+          text: query === "" ? data.emptyMessage : `No matches for /${query}`,
+          color: mutedColor(palette),
+        },
+      ],
       [{ text: data.status, color: mutedColor(palette) }],
-      [{ text: "", color: palette.text }],
       [{ text: "", color: palette.text }],
     ];
   }
 
   const tone = attentionColor(selected, palette, false);
-  const lines: Cell[][] = [
+  return [
+    [{ text: selected.title, color: palette.text }],
     [
       {
-        text: `${selected.project}${selected.reference} · ${selected.kind}`,
+        text: `${selected.project}${selected.reference} · ${selected.kind} · ${selected.state}`,
         color: tone,
       },
     ],
-    [{ text: selected.title, color: palette.text }],
     [{ text: selected.preview, color: mutedColor(palette) }],
-    [
-      {
-        text: selected.url ?? "",
-        color: blend(palette.lavender, background(palette), 0.75),
-      },
-    ],
   ];
-  if (data.error !== null) {
-    lines[3] = [{ text: data.error, color: palette.red }];
+}
+
+function footerLine(
+  width: number,
+  palette: Palette,
+  searching: boolean,
+  query: string,
+): string {
+  if (searching) {
+    return line(width, palette, [
+      { text: `/${query}▌`, color: palette.accent },
+      {
+        text: "   Enter Apply   Esc Cancel   Backspace Delete",
+        color: mutedColor(palette),
+      },
+    ]);
   }
-  return lines;
+  return line(width, palette, [
+    { text: "/", color: palette.accent },
+    { text: " Search   ", color: palette.text },
+    { text: "↑↓ j/k", color: palette.text },
+    { text: " Navigate   ", color: mutedColor(palette) },
+    { text: "Enter", color: palette.text },
+    { text: " Open   ", color: mutedColor(palette) },
+    { text: "Ctrl-d", color: palette.text },
+    { text: " Acknowledge   ", color: mutedColor(palette) },
+    { text: "r", color: palette.text },
+    { text: " Refresh   ", color: mutedColor(palette) },
+    { text: "q", color: palette.text },
+    { text: " Quit", color: mutedColor(palette) },
+  ]);
+}
+
+function searchable(item: DashboardItem): string {
+  return [
+    item.project,
+    item.reference,
+    item.kind,
+    item.state,
+    item.time,
+    item.title,
+    item.preview,
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function fuzzyIncludes(value: string, query: string): boolean {
+  let cursor = 0;
+  for (const character of query.toLowerCase()) {
+    cursor = value.indexOf(character, cursor);
+    if (cursor < 0) return false;
+    cursor += 1;
+  }
+  return true;
+}
+
+export function filterDashboardItems(
+  items: readonly DashboardItem[],
+  query: string,
+): DashboardItem[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized === "") return [...items];
+  return items.filter((item) => fuzzyIncludes(searchable(item), normalized));
 }
 
 export function renderDashboard(
@@ -287,14 +383,20 @@ export function renderDashboard(
   palette: Palette,
   columns: number,
   rows: number,
+  query = "",
+  searching = false,
 ): string {
   const width = Math.max(64, columns);
   const height = Math.max(16, rows);
-  const items = data.items;
+  const items = filterDashboardItems(data.items, query);
   const selected = items[selectedIndex];
+  const status =
+    query.trim() === ""
+      ? data.status
+      : `${items.length}/${data.items.length} matches`;
   const tableLimit = Math.max(
     1,
-    Math.min(items.length || 1, Math.floor((height - 15) / 3)),
+    Math.min(items.length || 1, Math.floor((height - 10) / 2)),
   );
   const tableStart =
     items.length === 0
@@ -306,36 +408,37 @@ export function renderDashboard(
   const tableEnd = tableStart + tableLimit;
   const shown = items.slice(tableStart, tableEnd);
   const lines: string[] = [
-    rule(width, palette, "top"),
-    rightAlignedRow(
+    rightAlignedLine(
       width,
       palette,
       [
-        { text: "Rail dashboard   ", color: palette.text },
-        { text: surfaceLabel(data.surface), color: palette.accent },
+        { text: "  ", color: palette.text },
+        {
+          text: surfaceLabel(data.surface),
+          color:
+            data.surface === "reviews" ? palette.accent : mutedColor(palette),
+        },
+        { text: "  |  ", color: mutedColor(palette) },
+        {
+          text: "Tasks",
+          color:
+            data.surface === "tasks" ? palette.accent : mutedColor(palette),
+        },
       ],
-      data.status,
+      query.trim() === "" ? status : `/${query} · ${status}`,
     ),
-    rule(width, palette, "middle"),
-    row(width, palette, [
-      {
-        text: padded("Reviews", 10),
-        color:
-          data.surface === "reviews" ? palette.accent : mutedColor(palette),
-      },
-      { text: "  ", color: mutedColor(palette) },
-      {
-        text: "Tasks",
-        color: data.surface === "tasks" ? palette.accent : mutedColor(palette),
-      },
-    ]),
-    rule(width, palette, "middle"),
+    rule(width, palette),
     tableHeader(width, palette),
-    rule(width, palette, "middle"),
   ];
 
   if (shown.length === 0) {
-    lines.push(emptyTableRow(width, palette, data.emptyMessage));
+    lines.push(
+      emptyTableRow(
+        width,
+        palette,
+        query === "" ? data.emptyMessage : "No matching items",
+      ),
+    );
   } else {
     shown.forEach((item, offset) => {
       const index = tableStart + offset;
@@ -345,9 +448,9 @@ export function renderDashboard(
     });
     if (tableStart > 0 || tableEnd < items.length) {
       lines.push(
-        row(width, palette, [
+        line(width, palette, [
           {
-            text: `… ${tableStart} earlier · ${Math.max(0, items.length - tableEnd)} later`,
+            text: `  … ${tableStart} earlier · ${Math.max(0, items.length - tableEnd)} later`,
             color: mutedColor(palette),
           },
         ]),
@@ -355,36 +458,21 @@ export function renderDashboard(
     }
   }
 
-  const selectedLines = previewLines(data, selected, palette);
-  const fixedAfterTable = 1 + 1 + selectedLines.length + 1 + 1 + 1;
+  const selectedLines = previewLines(data, selected, palette, query);
+  const fixedAfterTable = 1 + selectedLines.length + 1 + 1;
   const previewFill = Math.max(0, height - lines.length - fixedAfterTable);
-  lines.push(rule(width, palette, "middle", "Preview"));
-  lines.push(
-    row(width, palette, [
-      {
-        text: selected?.title ?? surfaceLabel(data.surface),
-        color: palette.text,
-      },
-    ]),
-  );
+  const previewTitle = selected
+    ? `Preview: ${selected.project}${selected.reference}`
+    : `Preview: ${surfaceLabel(data.surface)}`;
+  lines.push(panelRule(width, palette, "top", previewTitle));
   for (const previewLine of selectedLines)
-    lines.push(row(width, palette, previewLine));
-  for (let index = 0; index < previewFill; index += 1) {
-    lines.push(row(width, palette, []));
-  }
-  lines.push(rule(width, palette, "middle"));
-  lines.push(
-    row(width, palette, [
-      {
-        text: "↑/↓ j/k Navigate   Enter Open   Ctrl-d Acknowledge   r Refresh   q/Esc Close",
-        color: mutedColor(palette),
-      },
-    ]),
-  );
-  lines.push(rule(width, palette, "bottom"));
+    lines.push(panelLine(width, palette, previewLine));
+  for (let index = 0; index < previewFill; index += 1)
+    lines.push(panelLine(width, palette, []));
+  lines.push(panelRule(width, palette, "bottom"));
+  lines.push(footerLine(width, palette, searching, query));
 
-  while (lines.length < height)
-    lines.splice(lines.length - 3, 0, row(width, palette, []));
+  while (lines.length < height) lines.push(line(width, palette, []));
   return `${CLEAR}${lines.slice(0, height).join("\n")}`;
 }
 
@@ -437,11 +525,16 @@ export async function runDashboard(
   let selectedIndex = 0;
   let busy = false;
   let settled = false;
+  let query = "";
+  let searching = false;
   const input = process.stdin;
   const output = process.stdout;
 
+  const visibleItems = (): DashboardItem[] =>
+    filterDashboardItems(data.items, query);
+
   const render = (): void => {
-    const maxIndex = Math.max(0, data.items.length - 1);
+    const maxIndex = Math.max(0, visibleItems().length - 1);
     selectedIndex = Math.min(selectedIndex, maxIndex);
     output.write(
       renderDashboard(
@@ -450,6 +543,8 @@ export async function runDashboard(
         loadPalette(),
         output.columns ?? 100,
         output.rows ?? 30,
+        query,
+        searching,
       ),
     );
   };
@@ -472,7 +567,7 @@ export async function runDashboard(
     const runAction = async (
       action: Exclude<DashboardKey, "up" | "down" | "quit" | null>,
     ): Promise<void> => {
-      const item = data.items[selectedIndex];
+      const item = visibleItems()[selectedIndex];
       if ((action === "open" || action === "acknowledge") && item === undefined)
         return;
       busy = true;
@@ -491,11 +586,50 @@ export async function runDashboard(
       }
     };
 
+    const onSearchData = (text: string): void => {
+      if (text === "\u0003") {
+        finish();
+        return;
+      }
+      if (text === "\u001b") {
+        searching = false;
+        query = "";
+        render();
+        return;
+      }
+      if (text === "\r" || text === "\n") {
+        searching = false;
+        render();
+        return;
+      }
+      if (text === "\u007f" || text === "\u0008") {
+        query = Array.from(query).slice(0, -1).join("");
+        selectedIndex = 0;
+        render();
+        return;
+      }
+      for (const character of text) {
+        if (character >= " " && character !== "\u007f") query += character;
+      }
+      selectedIndex = 0;
+      render();
+    };
+
     const onData = (chunk: string | Buffer): void => {
       if (busy) return;
-      const key = keyFor(
-        typeof chunk === "string" ? chunk : chunk.toString("utf8"),
-      );
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (searching) {
+        onSearchData(text);
+        return;
+      }
+      if (text === "/") {
+        searching = true;
+        query = "";
+        selectedIndex = 0;
+        render();
+        return;
+      }
+      const key = keyFor(text);
       if (key === "quit") {
         finish();
         return;
@@ -507,7 +641,7 @@ export async function runDashboard(
       }
       if (key === "down") {
         selectedIndex = Math.min(
-          Math.max(0, data.items.length - 1),
+          Math.max(0, visibleItems().length - 1),
           selectedIndex + 1,
         );
         render();

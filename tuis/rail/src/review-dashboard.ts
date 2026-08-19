@@ -80,15 +80,11 @@ export function reviewDashboardData(): DashboardData {
   return {
     surface: "reviews",
     items,
-    status:
-      snapshot.lastError === null
-        ? `${open} open · ${seen} seen`
-        : "observer error",
-    emptyMessage:
-      snapshot.lastError === null
-        ? "Review inbox is clear"
-        : "Review observer has no usable snapshot",
-    error: snapshot.lastError,
+    status: `${open} open · ${seen} seen`,
+    emptyMessage: "Review inbox is clear",
+    // Refresh failures belong in `attention status`; keeping them out of the
+    // selected review preview preserves the useful PR context.
+    error: null,
   };
 }
 
