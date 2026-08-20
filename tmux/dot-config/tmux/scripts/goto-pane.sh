@@ -10,6 +10,11 @@
 session="$1"
 window="$2"
 pane="$3"
+quiet="${4:-}"
+
+notify() {
+  [ "$quiet" = quiet ] || tmux display-message "$1"
+}
 
 # Validate the whole target before moving anything: after a failed
 # switch-client, an unconditional select-window/select-pane would still
@@ -17,11 +22,11 @@ pane="$3"
 # a wrong-session window hop. Emptiness is the pane aliveness test:
 # display-message exits 0 for a dead target, printing nothing.
 if ! tmux has-session -t "=$session" 2>/dev/null; then
-  tmux display-message "goto-pane: session '$session' is gone"
+  notify "goto-pane: session '$session' is gone"
   exit 0
 fi
 if [ -z "$(tmux display-message -p -t "$pane" '#{pane_id}' 2>/dev/null)" ]; then
-  tmux display-message "goto-pane: target pane is gone"
+  notify "goto-pane: target pane is gone"
   exit 0
 fi
 
