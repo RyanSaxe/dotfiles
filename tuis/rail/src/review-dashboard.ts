@@ -49,6 +49,29 @@ function kindLabel(item: AttentionItem): string {
   }
 }
 
+function ciLabel(
+  state: NonNullable<AttentionItem["context"]>["ciState"],
+): string | null {
+  return state === "UNKNOWN" ? null : state.toLowerCase();
+}
+
+function reviewDetails(item: AttentionItem): string[] {
+  const context = item.context;
+  if (context === undefined) return [];
+
+  const details: string[] = [];
+  if (context.author !== null) {
+    details.push(`PR author  @${context.author.login}`);
+  }
+  const ci = ciLabel(context.ciState);
+  if (ci !== null) details.push(`CI         ${ci}`);
+  if (context.body !== "") {
+    details.push("");
+    details.push(context.body);
+  }
+  return details;
+}
+
 export function reviewItem(
   item: AttentionItem,
   acknowledged: boolean,
@@ -64,6 +87,7 @@ export function reviewItem(
     time: age(item.createdAt),
     title: clean(item.title),
     preview: `${actor}: ${clean(item.summary)}`,
+    details: reviewDetails(item),
     url: item.url,
     tone: isCi ? "error" : "waiting",
     acknowledged,

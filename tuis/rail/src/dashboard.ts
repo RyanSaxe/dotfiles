@@ -12,6 +12,7 @@ export interface DashboardItem {
   time: string;
   title: string;
   preview: string;
+  details?: readonly string[];
   url: string | null;
   tone: AttentionTone;
   acknowledged: boolean;
@@ -80,12 +81,7 @@ function mutedColor(palette: Palette): string {
   return blend(palette.dim, background(palette), 0.72);
 }
 
-function attentionColor(
-  item: DashboardItem,
-  palette: Palette,
-  selected: boolean,
-): string {
-  if (selected) return palette.text;
+function attentionColor(item: DashboardItem, palette: Palette): string {
   if (item.acknowledged) return mutedColor(palette);
   switch (item.tone) {
     case "working":
@@ -231,7 +227,7 @@ function tableItem(
   selected: boolean,
 ): string {
   const widths = tableWidths(width);
-  const tone = attentionColor(item, palette, selected);
+  const tone = attentionColor(item, palette);
   const neutral = selected ? palette.text : mutedColor(palette);
   const marker = selected ? "▌" : " ";
   const lineBackground = selected
@@ -258,7 +254,7 @@ function tableItem(
         neutral,
         tone,
         tone,
-        tone,
+        selected ? palette.text : tone,
       ],
       neutral,
     ),
@@ -281,11 +277,41 @@ function emptyTableRow(width: number, palette: Palette, text: string): string {
   );
 }
 
+function wrapText(text: string, width: number): string[] {
+  if (text === "") return [""];
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (current === "") {
+      current = word;
+      continue;
+    }
+    if (widthOf(`${current} ${word}`) <= width) {
+      current += ` ${word}`;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current !== "") lines.push(current);
+  return lines.flatMap((lineText) => {
+    if (widthOf(lineText) <= width) return [lineText];
+    const characters = Array.from(lineText);
+    const chunks: string[] = [];
+    for (let index = 0; index < characters.length; index += width) {
+      chunks.push(characters.slice(index, index + width).join(""));
+    }
+    return chunks;
+  });
+}
+
 function previewLines(
   data: DashboardData,
   selected: DashboardItem | undefined,
   palette: Palette,
   query: string,
+  width: number,
 ): Cell[][] {
   if (selected === undefined) {
     return [
@@ -300,8 +326,8 @@ function previewLines(
     ];
   }
 
-  const tone = attentionColor(selected, palette, false);
-  return [
+  const tone = attentionColor(selected, palette);
+  const lines: Cell[][] = [
     [{ text: selected.title, color: palette.text }],
     [
       {
@@ -311,6 +337,13 @@ function previewLines(
     ],
     [{ text: selected.preview, color: mutedColor(palette) }],
   ];
+  const detailWidth = Math.max(1, width - 4);
+  for (const detail of selected.details ?? []) {
+    for (const wrapped of wrapText(detail, detailWidth)) {
+      lines.push([{ text: wrapped, color: mutedColor(palette) }]);
+    }
+  }
+  return lines;
 }
 
 function footerLine(
@@ -353,6 +386,7 @@ function searchable(item: DashboardItem): string {
     item.time,
     item.title,
     item.preview,
+    ...(item.details ?? []),
   ]
     .join(" ")
     .toLowerCase();
@@ -458,7 +492,7 @@ export function renderDashboard(
     }
   }
 
-  const selectedLines = previewLines(data, selected, palette, query);
+  const selectedLines = previewLines(data, selected, palette, query, width);
   const fixedAfterTable = 1 + selectedLines.length + 1 + 1;
   const previewFill = Math.max(0, height - lines.length - fixedAfterTable);
   const previewTitle = selected

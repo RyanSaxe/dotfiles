@@ -18,6 +18,7 @@ const GRAPHQL_QUERY = /* GraphQL */ `
   fragment PullRequestFields on PullRequest {
     number
     title
+    body
     url
     updatedAt
     headRefOid
@@ -130,6 +131,7 @@ interface RawThread {
 interface RawPullRequest {
   number?: number | null;
   title?: string | null;
+  body?: string | null;
   url?: string | null;
   updatedAt?: string | null;
   headRefOid?: string | null;
@@ -263,6 +265,7 @@ function parsePullRequest(
     repository,
     number,
     title: raw.title ?? `PR #${number}`,
+    body: raw.body ?? "",
     url: raw.url ?? `https://github.com/${repository}/pull/${number}`,
     updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
     headSha: raw.headRefOid ?? "",

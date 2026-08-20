@@ -1,4 +1,5 @@
 import { normalizeLogin, type AttentionConfig } from "./config.js";
+import { reviewContext } from "./context.js";
 import type {
   AttentionItem,
   CiMemory,
@@ -54,6 +55,7 @@ export function applyCiTransition(
       actor: null,
       createdAt: pr.updatedAt,
       priority: "high",
+      context: reviewContext(pr),
     },
     newlyRed,
   };

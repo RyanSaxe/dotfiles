@@ -14,6 +14,11 @@ const item: AttentionItem = {
   repository: "example/repo",
   number: 7,
   title: "Improve the review seam",
+  context: {
+    body: "Keep the dashboard context useful and concise.",
+    author: { login: "ryansaxe", kind: "user" },
+    ciState: "SUCCESS",
+  },
   url: "https://github.com/example/repo/pull/7",
   summary: "Please take another look",
   actor: { login: "reviewer", kind: "user" },
@@ -47,6 +52,12 @@ assert.equal(dashboardItem.reference, "#7");
 assert.equal(dashboardItem.kind, "Review");
 assert.equal(dashboardItem.state, "needs you");
 assert.equal(dashboardItem.tone, "waiting");
+assert.deepEqual(dashboardItem.details, [
+  "PR author  @ryansaxe",
+  "CI         success",
+  "",
+  "Keep the dashboard context useful and concise.",
+]);
 assert.equal(filterDashboardItems([dashboardItem], "rvs").length, 1);
 assert.equal(filterDashboardItems([dashboardItem], "does-not-match").length, 0);
 
@@ -67,6 +78,7 @@ const plain = rendered.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
 assert.match(plain, /Reviews  \|  Tasks/);
 assert.match(plain, /repo/);
 assert.match(plain, /Improve the review seam/);
+assert.match(plain, /Keep the dashboard context useful and concise/);
 assert.match(plain, /Enter Open/);
 
 const searching = renderDashboard(

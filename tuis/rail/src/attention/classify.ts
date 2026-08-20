@@ -3,6 +3,7 @@ import {
   normalizeLogin,
   type AttentionConfig,
 } from "./config.js";
+import { reviewContext } from "./context.js";
 import type {
   AttentionItem,
   GitHubComment,
@@ -66,6 +67,7 @@ function itemFromComment(
     actor: comment.author,
     createdAt: comment.createdAt,
     priority: "normal",
+    context: reviewContext(pr),
   };
 }
 
@@ -140,6 +142,7 @@ export function classifyPullRequest(
       actor: null,
       createdAt: pr.updatedAt,
       priority: "high",
+      context: reviewContext(pr),
     });
   }
 

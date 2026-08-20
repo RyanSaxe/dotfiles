@@ -29,10 +29,19 @@ export type CiState =
   | "NEUTRAL"
   | "UNKNOWN";
 
+// Context retained with an attention item so the dashboard can explain why a
+// PR needs attention without making its own network request.
+export interface ReviewContext {
+  body: string;
+  author: GitHubActor | null;
+  ciState: CiState;
+}
+
 export interface PullRequestSnapshot {
   repository: string;
   number: number;
   title: string;
+  body: string;
   url: string;
   updatedAt: string;
   headSha: string;
@@ -59,6 +68,7 @@ export interface AttentionItem {
   actor: GitHubActor | null;
   createdAt: string;
   priority: "normal" | "high";
+  context?: ReviewContext;
 }
 
 export interface CiMemory {

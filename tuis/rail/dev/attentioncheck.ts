@@ -44,6 +44,7 @@ const pr = (
   repository: "example/repo",
   number: 7,
   title: "Improve observer",
+  body: "Review the observer changes.",
   url: "https://github.com/example/repo/pull/7",
   updatedAt: "2026-08-19T16:00:00Z",
   headSha: "head-1",
@@ -224,6 +225,7 @@ const parsed = parseGithubResponse(
           {
             number: 7,
             title: "Improve observer",
+            body: "Review the observer changes.",
             url: "https://github.com/example/repo/pull/7",
             updatedAt: "2026-08-19T16:00:00Z",
             headRefOid: "head-1",
@@ -240,6 +242,7 @@ const parsed = parseGithubResponse(
           {
             number: 7,
             title: "Improve observer",
+            body: "Review the observer changes.",
             url: "https://github.com/example/repo/pull/7",
             updatedAt: "2026-08-19T16:00:00Z",
             headRefOid: "head-1",
@@ -261,6 +264,7 @@ assert.deepEqual(parsed.pullRequests[0]?.searchSources.sort(), [
   "requested",
 ]);
 assert.equal(parsed.pullRequests[0]?.reviewRequested, true);
+assert.equal(parsed.pullRequests[0]?.body, "Review the observer changes.");
 
 const reviewItem = classifyPullRequest(mentioned, "ryansaxe", config)[0];
 assert.ok(reviewItem);
