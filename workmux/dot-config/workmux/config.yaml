@@ -1,7 +1,33 @@
 # Global workmux configuration. Per-repo .workmux.yaml files override this
-# only where a project needs it (env-file copies, a different agent).
+# only where a project needs different hooks, files, or an agent.
 
-agent: claude
+agent: codex
+
+# Workmux invokes the binary directly, so make the global Codex defaults
+# explicit instead of relying on the interactive zsh wrapper.
+agents:
+  codex:
+    type: codex
+    command: codex
+    args:
+      - --profile
+      - dotfiles
+      - --model
+      - gpt-5.6-luna
+      - --config
+      - 'model_reasoning_effort="xhigh"'
+      - --config
+      - 'approvals_reviewer="auto_review"'
+      - --ask-for-approval
+      - on-request
+
+# Reproduce the main worktree's ignored, untracked files in every new
+# worktree. If the project uses BYOR, register and refresh the new checkout
+# after its .byor directory has been copied. A project post_create list must
+# include "<global>" to retain these hooks.
+post_create:
+  - workmux-copy-ignored
+  - "if [ -d .byor ]; then byor sync; fi"
 
 # All worktrees under one root, out of the project directories.
 worktree_dir: ~/worktrees/{project}

@@ -12,6 +12,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
 
+      - name: Install zsh
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y zsh
+          zsh --version
+
       # Some hook repos download their binary at build time (shellcheck-py,
       # shfmt), which flakes when upstream hosts hiccup. Cache the built hook
       # environments so downloads happen once per config change.

@@ -1,0 +1,14 @@
+{
+  "model": "opus[1m]",
+  "effortLevel": "xhigh",
+  "alwaysThinkingEnabled": true,
+  "editorMode": "vim",
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.claude/statusline.js",
+    "padding": 0
+  },
+  "permissions": {
+    "defaultMode": "auto"
+  }
+}

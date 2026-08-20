@@ -1,0 +1,19 @@
+model = "gpt-5.6-luna"
+model_reasoning_effort = "xhigh"
+
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+
+[tui]
+theme = "dotfiles"
+status_line = [
+  "project-name",
+  "git-branch",
+  "model-with-reasoning",
+  "context-remaining",
+  "used-tokens",
+  "five-hour-limit",
+  "weekly-limit",
+  "task-progress",
+]
+status_line_use_colors = true

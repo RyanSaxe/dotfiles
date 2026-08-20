@@ -15,6 +15,8 @@
 set -eu
 
 OS="$(uname -s)"
+REPO_ROOT="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+AI_HARNESS_SOURCE="$REPO_ROOT/ai-harness"
 # No arguments and a real terminal means a human is driving: the tier and
 # agent pickers prompt. A scripted run takes the defaults instead.
 INTERACTIVE=0
@@ -87,10 +89,10 @@ ensure_package_manager() {
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat fd ripgrep neovim lua-language-server stylua'
+CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua'
 # make: ensure_modern_stow builds stow from source on LTS boxes.
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
-CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep make'
+CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync make'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
@@ -175,6 +177,7 @@ install_agent_cli() {
 # settings, leaving custom entries alone) and refuses to run without a
 # terminal — hence the note instead of a call on a scripted install.
 setup_agents() {
+  [ "${AGENT_SETUP_DONE:-0}" = 1 ] && return 0
   chosen=''
   for agent in $AGENT_CLIS; do
     if [ "$INTERACTIVE" = 1 ]; then
@@ -191,6 +194,70 @@ setup_agents() {
   else
     echo "note: run \`workmux setup\` in a terminal to wire agent status hooks"
   fi
+  AGENT_SETUP_DONE=1
+}
+
+# AI harness files span plugin roots, native user directories, and Codex's
+# admin directory. Stow intentionally does not manage this package: every
+# link below points back to the authored tree, while application state stays
+# in the harness home.
+link_owned() {
+  source="$1"
+  target="$2"
+  target_dir="${target%/*}"
+  mkdir -p "$target_dir"
+  if [ -L "$target" ]; then
+    [ "$(readlink "$target")" = "$source" ] && return 0
+    rm "$target"
+  elif [ -e "$target" ]; then
+    echo "error: refusing to replace existing file: $target" >&2
+    echo "move it aside, then re-run the installer" >&2
+    return 1
+  fi
+  ln -s "$source" "$target"
+}
+
+link_system_owned() {
+  source="$1"
+  target="$2"
+  if sudo test -L "$target"; then
+    [ "$(sudo readlink "$target")" = "$source" ] && return 0
+    sudo rm "$target"
+  elif sudo test -e "$target"; then
+    echo "error: refusing to replace existing file: $target" >&2
+    echo "move it aside, then re-run the installer" >&2
+    return 1
+  fi
+  sudo mkdir -p "${target%/*}"
+  sudo ln -s "$source" "$target"
+}
+
+install_ai_harness() {
+  [ -d "$AI_HARNESS_SOURCE" ] || {
+    echo "error: missing $AI_HARNESS_SOURCE" >&2
+    return 1
+  }
+
+  # One stable root lets the shell wrappers pass the live repository to the
+  # Claude and Copilot plugin loaders without copying or generating files.
+  link_owned "$AI_HARNESS_SOURCE" "$HOME/.config/ai-harness"
+
+  link_owned "$AI_HARNESS_SOURCE/AGENTS.md" "$HOME/.claude/CLAUDE.md"
+  link_owned "$AI_HARNESS_SOURCE/statusline.js" "$HOME/.claude/statusline.js"
+  link_owned "$AI_HARNESS_SOURCE/references" "$HOME/.claude/references"
+
+  link_owned "$AI_HARNESS_SOURCE/AGENTS.md" "$HOME/.copilot/copilot-instructions.md"
+  link_owned "$AI_HARNESS_SOURCE/copilot/settings.json" "$HOME/.copilot/settings.json"
+  link_owned "$AI_HARNESS_SOURCE/statusline.js" "$HOME/.copilot/statusline.js"
+
+  link_owned "$AI_HARNESS_SOURCE/AGENTS.md" "$HOME/.codex/AGENTS.md"
+  link_system_owned "$AI_HARNESS_SOURCE/codex/config.toml" "/etc/codex/config.toml"
+  link_system_owned "$AI_HARNESS_SOURCE/skills" "/etc/codex/skills"
+
+  # The profile is deliberately native state. Codex may update it without
+  # turning application state into a dotfiles diff.
+  mkdir -p "$HOME/.codex"
+  [ -e "$HOME/.codex/dotfiles.config.toml" ] || : >"$HOME/.codex/dotfiles.config.toml"
 }
 
 install_neovim_linux() {
@@ -272,6 +339,10 @@ install_tier_packages() {
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
+    ;;
+  agents:Darwin | agents:Linux)
+    setup_agents
+    install_ai_harness
     ;;
   mac:Darwin)
     # sketchybar itself is mac-only; the plugins under sketchybar/ shell out
@@ -641,10 +712,10 @@ if [ "${1:-}" = upgrade ]; then
   run_upgrade
 fi
 
-# No tiers on the command line: choose interactively. (An agents tier —
-# interactive AI-harness wiring — arrives with the ai-harness rebuild.)
+# No tiers on the command line: choose interactively. The agents tier installs
+# the live harness links after the CLIs themselves are available.
 if [ "$#" -eq 0 ]; then
-  set -- core
+  set -- core agents
   if [ "$OS" = Darwin ] && ask "install the mac tier (GUI apps)?"; then
     set -- "$@" mac
   fi
