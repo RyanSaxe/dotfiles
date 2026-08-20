@@ -195,11 +195,11 @@ install_agent_cli() {
 }
 
 # workmux discovers agents by their config directories, so the CLIs must land
-# first. Its `setup` writes the status-tracking hooks (merging into existing
-# settings, leaving custom entries alone) and refuses to run without a
-# terminal — hence the note instead of a call on a scripted install.
+# first. Workmux setup is deliberately deferred until every selected tier has
+# installed its harness links: setup --hooks/--skills is non-interactive and
+# can then configure the complete filesystem state in one pass.
 setup_agents() {
-  [ "${AGENT_SETUP_DONE:-0}" = 1 ] && return 0
+  [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ] && return 0
   chosen=''
   for agent in $AGENT_CLIS; do
     if [ "$INTERACTIVE" = 1 ]; then
@@ -211,12 +211,7 @@ setup_agents() {
   for agent in $chosen; do
     install_agent_cli "$agent"
   done
-  if [ "$INTERACTIVE" = 1 ]; then
-    workmux setup
-  else
-    echo "note: run \`workmux setup\` in a terminal to wire agent status hooks"
-  fi
-  AGENT_SETUP_DONE=1
+  AGENT_CLIS_SETUP_DONE=1
 }
 
 # AI harness files span plugin roots, native user directories, and Codex's
@@ -363,6 +358,9 @@ install_tier_packages() {
     install_rail
     ;;
   agents:Darwin | agents:Linux)
+    # The agents tier can be installed on an existing machine without the
+    # core tier, but its final setup pass still needs the Workmux binary.
+    command -v workmux >/dev/null 2>&1 || install_workmux
     setup_agents
     install_ai_harness
     ;;
@@ -763,6 +761,16 @@ for tier in "$@"; do
   echo "==> $tier"
   install_tier "$tier"
 done
+
+# Workmux discovers agent configuration from the installed filesystem. Run its
+# explicit, non-interactive setup only after all requested tiers have linked
+# the harness files and the Workmux config. This makes both `./install.sh` and
+# explicit tier invocations complete installs; neither requires a follow-up
+# manual `workmux setup` command.
+if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
+  echo "==> workmux agent hooks and skills"
+  workmux setup --hooks --skills
+fi
 
 # Render the theme so every consumer has colors from the first shell.
 if [ -x "$HOME/.local/bin/theme" ]; then

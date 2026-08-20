@@ -19,7 +19,15 @@ A tier is a set of stow packages, declared in the `tiers` package.
 | `mac`  | GUI applications — ghostty, sketchybar, aerospace |
 
 Pass tiers as arguments to skip the prompts (`./install.sh core` on a remote
-box). `./install.sh stow` redoes the symlinks alone, with no package installs.
+box). The default `./install.sh` runs `core agents` and asks separately about
+the mac tier. `./install.sh stow` redoes the symlinks alone, with no package
+installs.
+
+When the core or agents tier installs the agent CLIs, the installer links the
+AI harness first and then automatically runs Workmux's non-interactive
+`setup --hooks --skills` pass. This configures status hooks and bundled skills
+in the same install, including explicit invocations such as
+`./install.sh core agents`; no follow-up `workmux setup` command is required.
 
 ## Upgrading
 
