@@ -95,17 +95,33 @@ async function collectAgents(): Promise<Agent[]> {
     }));
 }
 
-// Claude's Stop hook fires per TURN, so "done" flaps on while subagents
-// still run. Until status carries subagent awareness upstream, done must
-// hold for a quiet interval before the rail believes it.
-const DONE_STABLE_SECS = 10;
+// A status change must remain visible in Workmux for a short interval before
+// it reaches any attention surface. The daemon keeps the last accepted status
+// per pane, so this remains independent of which status is changing.
+const AGENT_STATUS_LAG_SECS = 5;
 
-export function applyDoneHysteresis(agents: Agent[], nowSecs: number): Agent[] {
-  return agents.map((agent) =>
-    agent.status === "done" && nowSecs - agent.updatedTs < DONE_STABLE_SECS
-      ? { ...agent, status: "working" as const }
-      : agent,
-  );
+export function stabilizeAgents(
+  agents: Agent[],
+  stableStatuses: Map<string, AgentStatus>,
+  nowSecs: number,
+): Agent[] {
+  const live = new Set(agents.map((agent) => agent.paneId));
+  for (const paneId of stableStatuses.keys()) {
+    if (!live.has(paneId)) stableStatuses.delete(paneId);
+  }
+
+  return agents.map((agent) => {
+    const stableStatus = stableStatuses.get(agent.paneId);
+    if (
+      stableStatus !== undefined &&
+      stableStatus !== agent.status &&
+      nowSecs - agent.updatedTs < AGENT_STATUS_LAG_SECS
+    ) {
+      return { ...agent, status: stableStatus };
+    }
+    stableStatuses.set(agent.paneId, agent.status);
+    return agent;
+  });
 }
 
 // ----- global snapshot (daemon) -----------------------------------------
