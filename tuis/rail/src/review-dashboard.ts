@@ -23,6 +23,12 @@ import {
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
 import { openPullRequestWorkspace } from "./workspace.js";
+import {
+  cleanupReviewWorktree,
+  focusReviewWorktree,
+  listReviewWorktrees,
+  type ReviewWorktree,
+} from "./worktrees.js";
 
 const run = promisify(execFile);
 
@@ -257,6 +263,54 @@ export function reviewDashboardData(): DashboardData {
   };
 }
 
+function worktreeItem(worktree: ReviewWorktree): DashboardItem {
+  const target = `${shortRepository(worktree.repository)}#${worktree.number}`;
+  return {
+    id: worktree.path,
+    repository: worktree.repository,
+    reference: `#${worktree.number}`,
+    from: worktree.attached ? "open" : "closed",
+    author: worktree.dirty ? "dirty" : "clean",
+    authorIsViewer: !worktree.dirty,
+    reason: worktree.branch,
+    metadata: [],
+    time: "",
+    title: worktree.branch,
+    url: null,
+    // Workspaces are not attention: a green row here means healthy, and a
+    // dirty one is the only thing worth a second look.
+    tone: worktree.dirty ? "issue" : "neutral",
+    preview: {
+      headline: `${target} · ${worktree.branch}`,
+      bullets: [],
+      body: [],
+      context: [
+        `worktree  ${worktree.path}`,
+        `session   ${worktree.session.trim()}`,
+        worktree.attached ? "session is open" : "session is closed",
+        worktree.dirty
+          ? "uncommitted changes — clean up will refuse"
+          : "clean — safe to clean up",
+      ],
+    },
+  };
+}
+
+export async function worktreeDashboardData(): Promise<DashboardData> {
+  const worktrees = await listReviewWorktrees();
+  const open = worktrees.filter((worktree) => worktree.attached).length;
+  return {
+    surface: "reviews",
+    items: worktrees.map(worktreeItem),
+    status:
+      worktrees.length === 0
+        ? "no review workspaces"
+        : `${worktrees.length} workspace${worktrees.length === 1 ? "" : "s"} · ${open} open`,
+    emptyMessage: "No pull request is checked out locally",
+    error: null,
+  };
+}
+
 export function taskDashboardData(): DashboardData {
   return {
     surface: "tasks",
@@ -357,6 +411,21 @@ export async function main(
       if (item.url !== null) await openUrl(item.url);
     },
     diff: reviewDiff,
+    worktrees: isReviews ? worktreeDashboardData : undefined,
+    focus: async (item) => {
+      const worktree = (await listReviewWorktrees()).find(
+        (candidate) => candidate.path === item.id,
+      );
+      if (worktree !== undefined) await focusReviewWorktree(worktree);
+    },
+    cleanup: async (item) => {
+      const worktree = (await listReviewWorktrees()).find(
+        (candidate) => candidate.path === item.id,
+      );
+      if (worktree === undefined) return "that workspace is already gone";
+      const result = await cleanupReviewWorktree(worktree);
+      return result.ok ? null : result.reason;
+    },
     acknowledge: isReviews
       ? acknowledgeReview
       : async () => {

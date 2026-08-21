@@ -3,6 +3,11 @@ import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
 
 export type DashboardSurface = "reviews" | "tasks";
 
+// Reviews has two views: the inbox, and the workspaces you have opened from
+// it. They are subtabs of one dashboard rather than separate popups, which is
+// what makes Enter feel like moving an item rather than losing it.
+export type DashboardView = "reviews" | "worktrees";
+
 // What an item needs attention FOR. The hue follows the object, per the
 // locked semantics: CI failure is red, pull-request activity peach, issue
 // activity mauve.
@@ -60,6 +65,13 @@ export interface DashboardData {
 
 export interface DashboardHandlers {
   refresh(): Promise<DashboardData>;
+  // The Worktrees view, rebuilt on demand. Absent for surfaces that have no
+  // second view.
+  worktrees?(): Promise<DashboardData>;
+  // Move the client to an open workspace.
+  focus?(item: DashboardItem): Promise<void>;
+  // Remove a workspace. Resolves with a reason when it declines.
+  cleanup?(item: DashboardItem): Promise<string | null>;
   // Resolves true when the dashboard should stand aside — opening a review
   // workspace switches the tmux client, and the popup has to be gone for you
   // to land in it.
@@ -82,6 +94,8 @@ type DashboardKey =
   | "scrollDown"
   | "diff"
   | "back"
+  | "view"
+  | "cleanup"
   | "quit"
   | null;
 
@@ -421,14 +435,20 @@ function tableCells(
   return cells;
 }
 
-function tableHeader(width: number, palette: Palette): string {
+function tableHeader(
+  width: number,
+  palette: Palette,
+  view: DashboardView,
+): string {
   const widths = tableWidths(width);
   const muted = mutedColor(palette);
   return line(
     width,
     palette,
     tableCells(
-      ["#", "PR", "From", "Author", "Needs you", "Size", "Age"],
+      view === "worktrees"
+        ? ["#", "PR", "Session", "Changes", "Branch", "", ""]
+        : ["#", "PR", "From", "Author", "Needs you", "Size", "Age"],
       widths,
       Array.from({ length: widths.length }, () => muted),
       muted,
@@ -680,6 +700,7 @@ function footerLine(
   searching: boolean,
   query: string,
   scrollable: boolean,
+  view: DashboardView,
 ): string {
   const muted = mutedColor(palette);
   if (searching) {
@@ -693,16 +714,55 @@ function footerLine(
       { text: " Cancel", color: muted },
     ]);
   }
-  const keys: Array<[string, string]> = [
-    ["/", "Search"],
-    ["↑↓", "Navigate"],
-    ["↵", "Open"],
-    ["b", "Browser"],
-    ["x", "Acknowledge"],
-    ["r", "Refresh"],
-  ];
-  if (scrollable) keys.push(["^u/^d", "Preview"]);
-  keys.push(["q", "Quit"]);
+  // Every key stays bound; the footer only advertises what fits. Ordered
+  // least essential first so a narrow frame drops "Refresh" long before it
+  // drops "Quit", instead of clipping the line mid-word.
+  const optional: Array<[string, string]> =
+    view === "worktrees"
+      ? [
+          ["r", "Refresh"],
+          ["/", "Search"],
+          ["X", "Clean up"],
+        ]
+      : [
+          ["r", "Refresh"],
+          ["b", "Browser"],
+          ["d", "Diff"],
+          ["/", "Search"],
+          ["x", "Acknowledge"],
+        ];
+  // Sticky-ish: when there IS more to read, saying so beats "Refresh".
+  if (scrollable) optional.splice(2, 0, ["^u/^d", "Preview"]);
+  const essential: Array<[string, string]> =
+    view === "worktrees"
+      ? [
+          ["↑↓", "Navigate"],
+          ["↵", "Focus"],
+          ["⇥", "Reviews"],
+          ["q", "Quit"],
+        ]
+      : [
+          ["↑↓", "Navigate"],
+          ["↵", "Open"],
+          ["⇥", "Worktrees"],
+          ["q", "Quit"],
+        ];
+
+  const measure = (entries: Array<[string, string]>): number =>
+    entries.reduce(
+      (total, [key, label], index) =>
+        total + widthOf(key) + widthOf(label) + 1 + (index > 0 ? 3 : 0),
+      0,
+    );
+
+  let shown = [...optional, ...essential];
+  let dropped = 0;
+  while (measure(shown) > width && dropped < optional.length) {
+    dropped += 1;
+    shown = [...optional.slice(dropped), ...essential];
+  }
+  const keys = shown;
+
   const cells: Cell[] = [];
   keys.forEach(([key, label], index) => {
     if (index > 0) cells.push({ text: " │ ", color: ruleColor(palette) });
@@ -830,6 +890,7 @@ export function renderDashboard(
   query = "",
   searching = false,
   previewOffset = 0,
+  view: DashboardView = "reviews",
 ): string {
   const width = Math.max(64, columns);
   const height = Math.max(16, rows);
@@ -850,14 +911,20 @@ export function renderDashboard(
       palette,
       [
         { text: " ", color: palette.text },
-        { text: surfaceLabel(data.surface), color: palette.accent },
+        {
+          text: surfaceLabel(data.surface),
+          color: view === "reviews" ? palette.accent : muted,
+        },
         { text: "  │  ", color: ruleColor(palette) },
-        { text: "Worktrees", color: muted },
+        {
+          text: "Worktrees",
+          color: view === "worktrees" ? palette.accent : muted,
+        },
       ],
       query.trim() === "" ? status : `/${query} · ${status}`,
     ),
     rule(width, palette),
-    tableHeader(width, palette),
+    tableHeader(width, palette, view),
   ];
 
   const all = tableRows(ranked);
@@ -965,7 +1032,7 @@ export function renderDashboard(
     );
   }
   lines.push(panelRule(width, palette, "bottom"));
-  lines.push(footerLine(width, palette, searching, query, maxOffset > 0));
+  lines.push(footerLine(width, palette, searching, query, maxOffset > 0, view));
 
   while (lines.length < height) lines.push(line(width, palette, []));
   return `${CLEAR}${lines.slice(0, height).join("\n")}`;
@@ -986,6 +1053,10 @@ function keyFor(chunk: string): DashboardKey {
       return "browser";
     case "d":
       return "diff";
+    case "\t":
+      return "view";
+    case "X":
+      return "cleanup";
     // Acknowledge is `x` so Ctrl-u/Ctrl-d can keep their vi meaning on the
     // preview panel.
     case "x":
@@ -1035,6 +1106,11 @@ export async function runDashboard(
   let previewOffset = 0;
   // The diff is a mode of this dashboard, not a separate program: `q` returns
   // to the list rather than closing the popup.
+  // Which subtab is showing. The inbox and its workspaces are two datasets
+  // behind one frame, so switching views swaps the data rather than the
+  // program.
+  let view: DashboardView = "reviews";
+  let inbox = initial;
   let diffLines: string[] | null = null;
   let diffTitle = "";
   let diffOffset = 0;
@@ -1043,6 +1119,17 @@ export async function runDashboard(
 
   const visibleItems = (): DashboardItem[] =>
     rankDashboardItems(data.items, query).map((entry) => entry.item);
+
+  const showView = async (next: DashboardView): Promise<void> => {
+    if (next === view) return;
+    if (next === "worktrees" && handlers.worktrees === undefined) return;
+    if (view === "reviews") inbox = data;
+    view = next;
+    data = next === "worktrees" ? await handlers.worktrees!() : inbox;
+    selectedIndex = 0;
+    previewOffset = 0;
+    query = "";
+  };
 
   const render = (): void => {
     if (diffLines !== null) {
@@ -1070,6 +1157,7 @@ export async function runDashboard(
         query,
         searching,
         previewOffset,
+        view,
       ),
     );
   };
@@ -1092,7 +1180,7 @@ export async function runDashboard(
     const runAction = async (
       action: Extract<
         DashboardKey,
-        "open" | "browser" | "acknowledge" | "refresh" | "diff"
+        "open" | "browser" | "acknowledge" | "refresh" | "diff" | "cleanup"
       >,
     ): Promise<void> => {
       const item = visibleItems()[selectedIndex];
@@ -1106,6 +1194,11 @@ export async function runDashboard(
           render();
           diffLines = await handlers.diff(item);
           diffTitle = `${item.repository}${item.reference}`;
+        }
+        if (action === "open" && item !== undefined && view === "worktrees") {
+          if (handlers.focus) await handlers.focus(item);
+          finish();
+          return;
         }
         if (action === "open" && item !== undefined) {
           const close = await handlers.open(item);
@@ -1126,7 +1219,24 @@ export async function runDashboard(
             Math.min(selectedIndex, visibleItems().length - 1),
           );
         }
-        if (action === "refresh") data = await handlers.refresh();
+        if (action === "cleanup" && item !== undefined && handlers.cleanup) {
+          const refused = await handlers.cleanup(item);
+          data =
+            refused === null
+              ? await handlers.worktrees!()
+              : { ...data, status: refused };
+          selectedIndex = Math.max(
+            0,
+            Math.min(selectedIndex, visibleItems().length - 1),
+          );
+        }
+        if (action === "refresh") {
+          data =
+            view === "worktrees" && handlers.worktrees
+              ? await handlers.worktrees()
+              : await handlers.refresh();
+          if (view === "reviews") inbox = data;
+        }
       } catch (error) {
         data = errorData(data, error);
       } finally {
@@ -1232,6 +1342,12 @@ export async function runDashboard(
       if (key === "scrollDown") {
         previewOffset += PREVIEW_SCROLL;
         render();
+        return;
+      }
+      if (key === "view") {
+        void showView(view === "reviews" ? "worktrees" : "reviews").then(
+          render,
+        );
         return;
       }
       if (key === "back" || key === null) return;

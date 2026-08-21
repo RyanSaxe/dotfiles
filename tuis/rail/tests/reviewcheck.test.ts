@@ -82,7 +82,7 @@ const frame = (
       },
       selected,
       palette,
-      100,
+      120,
       24,
       query,
       searching,
@@ -138,7 +138,7 @@ test("every rendered line is exactly the frame width", () => {
   // The panel border is placed by reserving inner width. Get that wrong and
   // each preview row ends in a stray │, which is what shipped before.
   for (const line of frame([reviewItem(attention(), VIEWER)]).split("\n")) {
-    assert.equal(line.length, 100);
+    assert.equal(line.length, 120);
   }
 });
 
@@ -328,4 +328,77 @@ test("the overflow line says which direction the rest is in", () => {
   );
   assert.match(frame(items, {}, 0), /↓ \d+ below/);
   assert.match(frame(items, {}, 39), /↑ \d+ above/);
+});
+
+test("the Worktrees view relabels its columns and its keys", () => {
+  const workspace: DashboardItem = {
+    id: "/w/pr-3",
+    repository: "owner/project",
+    reference: "#3",
+    from: "open",
+    author: "clean",
+    authorIsViewer: true,
+    reason: "test-pr-1",
+    metadata: [],
+    time: "",
+    title: "test-pr-1",
+    url: null,
+    tone: "neutral",
+    preview: {
+      headline: "project#3 · test-pr-1",
+      bullets: [],
+      body: [],
+      context: ["clean — safe to clean up"],
+    },
+  };
+  const rendered = strip(
+    renderDashboard(
+      {
+        surface: "reviews",
+        items: [workspace],
+        status: "1 workspace · 1 open",
+        emptyMessage: "No pull request is checked out locally",
+        error: null,
+      },
+      0,
+      palette,
+      120,
+      24,
+      "",
+      false,
+      0,
+      "worktrees",
+    ),
+  );
+  assert.match(rendered, /Session {2}/);
+  assert.match(rendered, /Changes/);
+  assert.match(rendered, /Branch/);
+  // Enter focuses a workspace rather than opening one, and cleanup is
+  // deliberately a capital so it cannot be hit by accident.
+  assert.match(rendered, /↵ Focus/);
+  assert.match(rendered, /X Clean up/);
+  assert.ok(!rendered.includes("Needs you"));
+});
+
+test("a narrow frame drops footer keys instead of clipping a word", () => {
+  const rendered = strip(
+    renderDashboard(
+      {
+        surface: "reviews",
+        items: [reviewItem(attention(), VIEWER)],
+        status: "1 needs you",
+        emptyMessage: "",
+        error: null,
+      },
+      0,
+      palette,
+      70,
+      24,
+    ),
+  );
+  const footer = rendered.split("\n").at(-1) ?? "";
+  assert.equal(footer.length, 70);
+  // Whatever survives, quitting and navigating always do.
+  assert.match(footer, /q Quit/);
+  assert.match(footer, /↑↓ Navigate/);
 });
