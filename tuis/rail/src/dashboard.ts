@@ -1,3 +1,4 @@
+import { rank, type Ranked } from "./search.js";
 import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
 import type { AttentionTone } from "./sections/rows.js";
 
@@ -187,19 +188,64 @@ function tableWidths(width: number): number[] {
   return [...fixed, title];
 }
 
+// Split one column into runs so the characters a search matched can be
+// colored. Positions index the ORIGINAL value; a clipped cell keeps only the
+// ones still visible, so the ellipsis never lights up.
+function columnCells(
+  value: string,
+  width: number,
+  color: string,
+  highlight: string | null,
+  positions: readonly number[],
+): Cell[] {
+  const shown = padded(value, width);
+  if (highlight === null || positions.length === 0) {
+    return [{ text: shown, color }];
+  }
+  const source = Array.from(value);
+  const marked = new Set(positions);
+  const cells: Cell[] = [];
+  let run = "";
+  let runIsHit = false;
+  const flush = (): void => {
+    if (run !== "")
+      cells.push({ text: run, color: runIsHit ? highlight : color });
+    run = "";
+  };
+  Array.from(shown).forEach((character, index) => {
+    const isHit = marked.has(index) && source[index] === character;
+    if (isHit !== runIsHit) {
+      flush();
+      runIsHit = isHit;
+    }
+    run += character;
+  });
+  flush();
+  return cells;
+}
+
 function tableCells(
   values: string[],
   widths: number[],
   colors: string[],
   gapColor: string,
+  highlight?: {
+    color: string;
+    hits: ReadonlyMap<number, readonly number[]>;
+  },
 ): Cell[] {
   const cells: Cell[] = [];
   values.forEach((value, index) => {
     if (index > 0) cells.push({ text: "  ", color: gapColor });
-    cells.push({
-      text: padded(value, widths[index] ?? 0),
-      color: colors[index] ?? colors[0],
-    });
+    cells.push(
+      ...columnCells(
+        value,
+        widths[index] ?? 0,
+        colors[index] ?? colors[0] ?? "",
+        highlight?.color ?? null,
+        highlight?.hits.get(index) ?? [],
+      ),
+    );
   });
   return cells;
 }
@@ -225,6 +271,7 @@ function tableItem(
   item: DashboardItem,
   index: number,
   selected: boolean,
+  hits: ReadonlyMap<number, readonly number[]> = new Map(),
 ): string {
   const widths = tableWidths(width);
   const tone = attentionColor(item, palette);
@@ -257,6 +304,13 @@ function tableItem(
         selected ? palette.text : tone,
       ],
       neutral,
+      {
+        color: palette.notify,
+        // Cell 0 is the row number, so a field at i renders in cell i + 1.
+        hits: new Map(
+          [...hits].map(([field, positions]) => [field + 1, positions]),
+        ),
+      },
     ),
     lineBackground,
   );
@@ -377,7 +431,10 @@ function footerLine(
   ]);
 }
 
-function searchable(item: DashboardItem): string {
+// The columns the table actually shows, in cell order. The PR/issue body is
+// deliberately absent: it is what made every query match, and highlighting a
+// match you cannot see is worse than not matching at all.
+function searchFields(item: DashboardItem): string[] {
   return [
     item.project,
     item.reference,
@@ -385,30 +442,16 @@ function searchable(item: DashboardItem): string {
     item.state,
     item.time,
     item.title,
-    item.preview,
-    ...(item.details ?? []),
-  ]
-    .join(" ")
-    .toLowerCase();
+  ];
 }
 
-function fuzzyIncludes(value: string, query: string): boolean {
-  let cursor = 0;
-  for (const character of query.toLowerCase()) {
-    cursor = value.indexOf(character, cursor);
-    if (cursor < 0) return false;
-    cursor += 1;
-  }
-  return true;
-}
+export type RankedItem = Ranked<DashboardItem>;
 
-export function filterDashboardItems(
+export function rankDashboardItems(
   items: readonly DashboardItem[],
   query: string,
-): DashboardItem[] {
-  const normalized = query.trim().toLowerCase();
-  if (normalized === "") return [...items];
-  return items.filter((item) => fuzzyIncludes(searchable(item), normalized));
+): RankedItem[] {
+  return rank(items, query, searchFields);
 }
 
 export function renderDashboard(
@@ -422,7 +465,8 @@ export function renderDashboard(
 ): string {
   const width = Math.max(64, columns);
   const height = Math.max(16, rows);
-  const items = filterDashboardItems(data.items, query);
+  const ranked = rankDashboardItems(data.items, query);
+  const items = ranked.map((entry) => entry.item);
   const selected = items[selectedIndex];
   const status =
     query.trim() === ""
@@ -440,7 +484,7 @@ export function renderDashboard(
           Math.max(0, items.length - tableLimit),
         );
   const tableEnd = tableStart + tableLimit;
-  const shown = items.slice(tableStart, tableEnd);
+  const shown = ranked.slice(tableStart, tableEnd);
   const lines: string[] = [
     rightAlignedLine(
       width,
@@ -474,10 +518,17 @@ export function renderDashboard(
       ),
     );
   } else {
-    shown.forEach((item, offset) => {
+    shown.forEach((entry, offset) => {
       const index = tableStart + offset;
       lines.push(
-        tableItem(width, palette, item, index, index === selectedIndex),
+        tableItem(
+          width,
+          palette,
+          entry.item,
+          index,
+          index === selectedIndex,
+          entry.hits,
+        ),
       );
     });
     if (tableStart > 0 || tableEnd < items.length) {
@@ -565,7 +616,7 @@ export async function runDashboard(
   const output = process.stdout;
 
   const visibleItems = (): DashboardItem[] =>
-    filterDashboardItems(data.items, query);
+    rankDashboardItems(data.items, query).map((entry) => entry.item);
 
   const render = (): void => {
     const maxIndex = Math.max(0, visibleItems().length - 1);

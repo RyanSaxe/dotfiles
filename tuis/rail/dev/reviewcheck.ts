@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 
-import { filterDashboardItems, renderDashboard } from "../src/dashboard.js";
+import { rankDashboardItems, renderDashboard } from "../src/dashboard.js";
 import { reviewItem } from "../src/review-dashboard.js";
 import type { AttentionItem } from "../src/attention/types.js";
 import type { Palette } from "../src/theme.js";
@@ -58,8 +58,8 @@ assert.deepEqual(dashboardItem.details, [
   "",
   "Keep the dashboard context useful and concise.",
 ]);
-assert.equal(filterDashboardItems([dashboardItem], "rvs").length, 1);
-assert.equal(filterDashboardItems([dashboardItem], "does-not-match").length, 0);
+assert.equal(rankDashboardItems([dashboardItem], "rvs").length, 1);
+assert.equal(rankDashboardItems([dashboardItem], "does-not-match").length, 0);
 
 const rendered = renderDashboard(
   {

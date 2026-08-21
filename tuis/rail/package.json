@@ -4,7 +4,8 @@
   "type": "module",
   "description": "In-terminal sidebar: tmux windows + agent status, themed by the dotfiles theme system",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
