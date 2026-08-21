@@ -1,20 +1,20 @@
 import { fmtElapsed } from "../cells.js";
 import type { ReviewSnapshot } from "../attention/review.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
-import {
-  attentionTextColor,
-  pill,
-  spacedItem,
-  type AttentionTone,
-  type RailRow,
-} from "./rows.js";
+import { pill, spacedItem, type RailRow } from "./rows.js";
 
-function kindTone(kind: string): AttentionTone {
+// Hue follows the object, matching the dashboard: red CI, peach
+// pull-request activity, mauve issue activity.
+function kindColor(kind: string, palette: Palette): string {
   switch (kind) {
     case "ci":
-      return "error";
+      return palette.red;
+    case "issue_comment":
+    case "issue_mention":
+    case "issue_opened":
+      return palette.mauve;
     default:
-      return "waiting";
+      return palette.peach;
   }
 }
 
@@ -59,26 +59,30 @@ export function reviewRows(
   }
 
   for (const item of pending) {
-    const tone = kindTone(item.kind);
     const chipBg = blend(palette.surface0, bg, DIM_KEEP);
     const dim = blend(palette.dim, bg, DIM_KEEP);
     const number = String(rows.filter((row) => row.item).length + 1);
+    // Attention colour sits on `repository#number` — the first stable token
+    // after the jump pill, and the one guaranteed to survive truncation at
+    // rail width. Summary and age are supporting text and stay dim, so a
+    // clipped summary can never take the signal with it.
+    const identityFg = blend(kindColor(item.kind, palette), bg, DIM_KEEP);
     rows.push(
       ...spacedItem(
         width,
         bg,
         [
           // The review number is the same quiet jump pill used for an
-          // elsewhere agent. Its attention lives in the primary text/time.
+          // elsewhere agent — numbered pills stay neutral everywhere.
           ...pill(number, blend(palette.dim2, bg, DIM_KEEP), chipBg, bg),
           { text: " ", fg: dim },
           {
             text: `${shortRepository(item.repository)}#${item.number} `,
-            fg: dim,
+            fg: identityFg,
           },
-          { text: summary(item), fg: attentionTextColor(tone, palette) },
+          { text: summary(item), fg: dim },
         ],
-        { text: age(item.createdAt), fg: attentionTextColor(tone, palette) },
+        { text: age(item.createdAt), fg: dim },
       ),
     );
   }

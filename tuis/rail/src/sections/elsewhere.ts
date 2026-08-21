@@ -35,7 +35,11 @@ export function elsewhereRows(
   const rows: RailRow[] = [];
   for (const agent of sortByUrgency(agents, acked)) {
     const { project, name } = label(agent);
-    const nameFg = acked.has(agent.paneId)
+    // The rail is narrow, so state colour lives on the FIRST stable token —
+    // the one that survives truncation. A trailing worktree name is the
+    // first thing to get clipped, which is exactly where the colour used
+    // to be.
+    const projectFg = acked.has(agent.paneId)
       ? dim2
       : blend(stateColor(agent.status, palette), bg, DIM_KEEP);
     const hint = hints.get(agent.paneId);
@@ -48,8 +52,8 @@ export function elsewhereRows(
           // blended colors; alt+space then this digit lands on the pane.
           ...(hint ? pill(hint, dim2, chipBg, bg) : [{ text: "   ", fg: dim }]),
           { text: " ", fg: dim },
-          { text: project, fg: dim },
-          { text: name, fg: nameFg },
+          { text: project, fg: projectFg },
+          { text: name, fg: dim },
         ],
         elapsedSpan(agent, acked, palette),
       ),

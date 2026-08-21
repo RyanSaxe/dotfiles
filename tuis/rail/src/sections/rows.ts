@@ -97,24 +97,20 @@ export function sortByUrgency(agents: Agent[], acked: Set<string>): Agent[] {
   );
 }
 
-// Timers whisper — blended well into the slab so their minute ticks never
-// pull the eye — but in the agent's STATE hue, so a truncated title still
-// shows its color through the timer. Acked rows drop to the neutral dim.
-// Past eight hours the timer turns full red: an agent left alone that
-// long IS the thing to look at.
-const ELAPSED_ATTENTION_SECS = 8 * 60 * 60;
-
+// Timers whisper. They are supporting text, never a severity channel: an
+// old item is not a more urgent item, so nothing here escalates with age.
+// The row's identity token carries the state hue instead.
 export function elapsedSpan(
   agent: Agent,
   acked: Set<string>,
   palette: Palette,
 ): Span {
-  const secs = agent.elapsedSecs;
-  if (secs >= ELAPSED_ATTENTION_SECS) {
-    return { text: fmtElapsed(secs), fg: attentionTextColor("error", palette) };
-  }
-  const hue = acked.has(agent.paneId)
-    ? palette.dim
-    : attentionColor(agent.status, palette);
-  return { text: fmtElapsed(secs), fg: blend(hue, railBg(palette), DIM_KEEP) };
+  return {
+    text: fmtElapsed(agent.elapsedSecs),
+    fg: blend(
+      acked.has(agent.paneId) ? palette.dim2 : palette.dim,
+      railBg(palette),
+      DIM_KEEP,
+    ),
+  };
 }
