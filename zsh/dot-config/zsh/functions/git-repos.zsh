@@ -80,8 +80,11 @@ _to() {
   local -a search_dirs repos repo_roots repo_table
   local dir repo last_commit date_str repo_name
 
-  # Directories to search
-  search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic")
+  # Directories to search. ~/repositories holds clones made by the review
+  # workspace resolver — repositories opened from the Reviews dashboard that
+  # were not already on disk. They are nested owner/name, which `fd` finds at
+  # any depth, so `to` lists them like any other checkout.
+  search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic" "$HOME/repositories")
 
   # Date formatting for Linux/macOS compatibility
   if date -d @0 "+%Y" >/dev/null 2>&1; then

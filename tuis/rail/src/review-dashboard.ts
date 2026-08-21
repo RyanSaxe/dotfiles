@@ -22,6 +22,7 @@ import {
   type MetaSpan,
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
+import { openPullRequestWorkspace } from "./workspace.js";
 
 const run = promisify(execFile);
 
@@ -318,6 +319,23 @@ async function reviewDiff(item: DashboardItem): Promise<string[]> {
   }
 }
 
+// Enter on a pull request resolves the repository, asks workmux for a
+// worktree and a session, and stands aside so the client lands in it.
+// Issues have no worktree, so they open where they are readable: the browser.
+async function openReviewWorkspace(item: DashboardItem): Promise<boolean> {
+  if (item.tone === "issue") {
+    if (item.url !== null) await openUrl(item.url);
+    return false;
+  }
+  const number = Number(item.reference.replace(/^#/, ""));
+  if (!Number.isFinite(number)) {
+    if (item.url !== null) await openUrl(item.url);
+    return false;
+  }
+  await openPullRequestWorkspace(item.repository, number);
+  return true;
+}
+
 async function refreshReviews(): Promise<DashboardData> {
   // The observer owns the network lifecycle. The dashboard only requests an
   // explicit no-notify refresh and then re-reads the durable local snapshot.
@@ -334,12 +352,7 @@ export async function main(
   const isReviews = surface === "reviews";
   await runDashboard(isReviews ? reviewDashboardData() : taskDashboardData(), {
     refresh: isReviews ? refreshReviews : async () => taskDashboardData(),
-    // Enter will grow into the workspace path; browser is a peer action,
-    // not a fallback, and deliberately does NOT clear the item — only a
-    // reply, a reaction, or `x` does.
-    open: async (item) => {
-      if (item.url !== null) await openUrl(item.url);
-    },
+    open: openReviewWorkspace,
     browser: async (item) => {
       if (item.url !== null) await openUrl(item.url);
     },

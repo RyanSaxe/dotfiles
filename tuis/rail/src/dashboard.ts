@@ -60,7 +60,10 @@ export interface DashboardData {
 
 export interface DashboardHandlers {
   refresh(): Promise<DashboardData>;
-  open(item: DashboardItem): Promise<void>;
+  // Resolves true when the dashboard should stand aside — opening a review
+  // workspace switches the tmux client, and the popup has to be gone for you
+  // to land in it.
+  open(item: DashboardItem): Promise<boolean>;
   browser(item: DashboardItem): Promise<void>;
   acknowledge(item: DashboardItem): Promise<void>;
   // Pre-coloured diff lines, or a single explanatory line for anything that
@@ -1104,7 +1107,13 @@ export async function runDashboard(
           diffLines = await handlers.diff(item);
           diffTitle = `${item.repository}${item.reference}`;
         }
-        if (action === "open" && item !== undefined) await handlers.open(item);
+        if (action === "open" && item !== undefined) {
+          const close = await handlers.open(item);
+          if (close) {
+            finish();
+            return;
+          }
+        }
         if (action === "browser" && item !== undefined)
           await handlers.browser(item);
         if (action === "acknowledge" && item !== undefined) {
