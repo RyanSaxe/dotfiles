@@ -519,16 +519,29 @@ type TableRow =
   | { kind: "item"; ordinal: number; entry: RankedItem };
 
 function tableRows(ranked: readonly RankedItem[]): TableRow[] {
+  // Items arrive in urgency order, which interleaves repositories, so
+  // grouping on "did the repository change" would print the same heading
+  // several times. Bucket instead: a repository appears once, positioned by
+  // its most urgent item, with that order preserved inside the group.
+  const groups = new Map<string, RankedItem[]>();
+  for (const entry of ranked) {
+    const bucket = groups.get(entry.item.repository);
+    if (bucket === undefined) groups.set(entry.item.repository, [entry]);
+    else bucket.push(entry);
+  }
+
   const rows: TableRow[] = [];
-  let current: string | null = null;
-  ranked.forEach((entry, ordinal) => {
-    if (entry.item.repository !== current) {
-      if (current !== null) rows.push({ kind: "blank" });
-      rows.push({ kind: "heading", repository: entry.item.repository });
-      current = entry.item.repository;
+  const ordinals = new Map<RankedItem, number>();
+  ranked.forEach((entry, ordinal) => ordinals.set(entry, ordinal));
+  let first = true;
+  for (const [repository, bucket] of groups) {
+    if (!first) rows.push({ kind: "blank" });
+    first = false;
+    rows.push({ kind: "heading", repository });
+    for (const entry of bucket) {
+      rows.push({ kind: "item", ordinal: ordinals.get(entry) ?? 0, entry });
     }
-    rows.push({ kind: "item", ordinal, entry });
-  });
+  }
   return rows;
 }
 
@@ -831,11 +844,13 @@ export function renderDashboard(
   ];
 
   const all = tableRows(ranked);
-  // Reserve: panel top + bottom + footer, and at least three preview lines.
-  const reserved = 3 + 3;
+  // The preview keeps a floor: panel borders and footer, plus room to read.
+  // A long inbox used to take the whole frame and squeeze the panel down to
+  // one blank row, which reads as broken rather than as full.
+  const previewFloor = 3 + 7;
   const limit = Math.max(
     1,
-    Math.min(all.length, height - lines.length - reserved),
+    Math.min(all.length, height - lines.length - previewFloor),
   );
   const shown = tableWindow(all, selectedIndex, limit);
 

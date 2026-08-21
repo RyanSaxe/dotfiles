@@ -144,6 +144,12 @@ export interface ObserverState {
   acknowledged: Record<string, string>;
   notified: Record<string, string>;
   ci: Record<string, CiMemory>;
+  // Per-repository floor for watched creations: the moment a repository was
+  // first seen. Anything opened before it is backlog and stays silent, so
+  // adding a repository never floods. The floor does not move, which is what
+  // lets an opened item persist in the inbox until it is acknowledged or the
+  // target closes.
+  watchFloor?: Record<string, string>;
 }
 
 export interface GitHubSnapshot {

@@ -238,3 +238,34 @@ test("state written before diff stats existed shows an empty cell", () => {
   );
   assert.deepEqual(legacy.metadata, []);
 });
+
+test("a repository is grouped once, however the items are ordered", () => {
+  // Items arrive in urgency order, which interleaves repositories. Grouping
+  // on "did the repository change" printed the same heading several times.
+  const rendered = frame([
+    reviewItem(attention({ id: "a", repository: "one/alpha" }), VIEWER),
+    reviewItem(attention({ id: "b", repository: "two/beta" }), VIEWER),
+    reviewItem(
+      attention({ id: "c", repository: "one/alpha", number: 8 }),
+      VIEWER,
+    ),
+  ]);
+  const headings = rendered
+    .split("\n")
+    .filter((line) => line.trim() === "one/alpha");
+  assert.equal(headings.length, 1);
+});
+
+test("a long inbox cannot squeeze the preview to nothing", () => {
+  const many = Array.from({ length: 60 }, (_, i) =>
+    reviewItem(
+      attention({ id: `i${i}`, number: i, repository: `org/repo${i % 3}` }),
+      VIEWER,
+    ),
+  );
+  const rendered = frame(many);
+  // The selected item's headline must survive a full table.
+  assert.match(rendered, /commented on repo0#0/);
+  assert.match(rendered, /q Quit/);
+  assert.equal(rendered.split("\n").length, 24);
+});

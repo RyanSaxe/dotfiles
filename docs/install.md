@@ -112,10 +112,30 @@ needed. Optional actor policy lives at
     "allow": ["claude-reviewer"],
     "ignore": ["codecov", "snyk-bot", "sonarcloud"]
   },
-  "own_pr_ci": true
+  "own_pr_ci": true,
+  "watch": [
+    { "repo": "someorg/infra" },
+    { "repo": "someorg/docs", "pull_requests": false }
+  ]
 }
 ```
 
+The file lives outside the repository, so it can hold private repository
+names without them ever being committed.
+
+`watch` reports pull requests and issues opened in repositories you are not
+otherwise involved in. Both kinds are included by default; set
+`pull_requests` or `issues` to `false` to narrow an entry. Draft pull
+requests are excluded, and one marked ready later counts as opened at that
+moment. Everything else behaves as it does elsewhere: your own work never
+notifies you, and bots stay suppressed unless allow-listed.
+
+Adding a repository is quiet. Each one records the moment it was first seen
+and only reports things opened after it, so a busy repository does not arrive
+as a backlog dump. That mark is kept even if you later remove the entry, so
+re-adding a repository stays quiet too.
+
 Inspect it with `attention status`, `attention list`, and
-`attention ack <item-id>`. The notification transport remains ntfy for now;
-the planned transport evaluation is recorded in `BACKLOG.md`.
+`attention ack <item-id>`. `attention status` reports notification-transport
+failures separately from GitHub failures: a phone notification that cannot be
+delivered never stops the observer from polling.

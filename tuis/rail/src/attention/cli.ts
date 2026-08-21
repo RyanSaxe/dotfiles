@@ -20,7 +20,7 @@ import {
   saveObserverState,
 } from "./state.js";
 import type { AttentionItem, ObserverState } from "./types.js";
-import { classifyTarget } from "./classify.js";
+import { classifyOpened, classifyTarget } from "./classify.js";
 
 const LOG_PATH = `${ATTENTION_STATE_DIR}/observer.log`;
 
@@ -92,11 +92,25 @@ async function refresh(args: string[]): Promise<void> {
     state = { ...state, lastAttemptAt: now };
     await saveObserverState(state);
     const config = loadAttentionConfig();
-    const snapshot = await fetchGithubSnapshot();
+    const snapshot = await fetchGithubSnapshot(config.watch);
     const items: AttentionItem[] = [];
     const ci: ObserverState["ci"] = {};
 
+    // A repository joins with its floor set to now, so the first poll after
+    // adding one is silent rather than a backlog dump.
+    const watchFloor: Record<string, string> = { ...(state.watchFloor ?? {}) };
+    for (const entry of config.watch) {
+      watchFloor[entry.repository] ??= now;
+    }
+
     for (const target of snapshot.targets) {
+      const opened = classifyOpened(
+        target,
+        snapshot.username,
+        config,
+        watchFloor[target.repository],
+      );
+      if (opened !== null) items.push(opened);
       items.push(...classifyTarget(target, snapshot.username, config));
       if (target.kind !== "pull_request") continue;
       const ciTransition = applyCiTransition(
@@ -111,7 +125,7 @@ async function refresh(args: string[]): Promise<void> {
 
     const reconciled = reconcileAttention(state, items, ci);
     state = markSuccess(
-      { ...reconciled.state, username: snapshot.username },
+      { ...reconciled.state, username: snapshot.username, watchFloor },
       snapshot.rateLimit,
       now,
     );

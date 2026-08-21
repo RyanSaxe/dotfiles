@@ -4,17 +4,26 @@ import { join } from "node:path";
 
 import type { GitHubActor } from "./types.js";
 
+// A repository to hear about even when you are not involved in it.
+export interface WatchedRepository {
+  repository: string;
+  pullRequests: boolean;
+  issues: boolean;
+}
+
 export interface AttentionConfig {
   actors: {
     allow: string[];
     ignore: string[];
   };
   ownPrCi: boolean;
+  watch: WatchedRepository[];
 }
 
 const DEFAULT_CONFIG: AttentionConfig = {
   actors: { allow: [], ignore: [] },
   ownPrCi: true,
+  watch: [],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,7 +51,55 @@ export function defaultAttentionConfig(): AttentionConfig {
       ignore: [...DEFAULT_CONFIG.actors.ignore],
     },
     ownPrCi: DEFAULT_CONFIG.ownPrCi,
+    watch: [],
   };
+}
+
+const REPOSITORY = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+function watchList(value: unknown, path: string): WatchedRepository[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `attention config ${path}: watch must be an array of { "repo": "owner/name" } entries`,
+    );
+  }
+  const seen = new Set<string>();
+  return value.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new Error(
+        `attention config ${path}: watch[${index}] must be an object with a "repo" key`,
+      );
+    }
+    const repository = entry["repo"];
+    if (typeof repository !== "string" || !REPOSITORY.test(repository)) {
+      throw new Error(
+        `attention config ${path}: watch[${index}].repo must be "owner/name", got ${JSON.stringify(repository)}`,
+      );
+    }
+    const key = repository.toLowerCase();
+    if (seen.has(key)) {
+      throw new Error(
+        `attention config ${path}: watch lists ${repository} more than once`,
+      );
+    }
+    seen.add(key);
+    const flag = (name: string): boolean => {
+      const raw = entry[name];
+      if (raw === undefined) return true;
+      if (typeof raw !== "boolean") {
+        throw new Error(
+          `attention config ${path}: watch[${index}].${name} must be true or false`,
+        );
+      }
+      return raw;
+    };
+    return {
+      repository,
+      pullRequests: flag("pull_requests"),
+      issues: flag("issues"),
+    };
+  });
 }
 
 export function validateAttentionConfig(
@@ -73,7 +130,11 @@ export function validateAttentionConfig(
     );
   }
 
-  return { actors: { allow, ignore }, ownPrCi };
+  return {
+    actors: { allow, ignore },
+    ownPrCi,
+    watch: watchList(value["watch"], path),
+  };
 }
 
 export function attentionConfigPath(): string {

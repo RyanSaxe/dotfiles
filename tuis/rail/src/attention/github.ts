@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import type { WatchedRepository } from "./config.js";
 import type {
   ActorKind,
   CiState,
@@ -16,7 +17,7 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
-const GRAPHQL_QUERY = /* GraphQL */ `
+const GRAPHQL_FRAGMENTS = /* GraphQL */ `
   fragment CommentFields on IssueComment {
     id
     author {
@@ -119,7 +120,9 @@ const GRAPHQL_QUERY = /* GraphQL */ `
       }
     }
   }
+`;
 
+const GRAPHQL_ROOT = /* GraphQL */ `
   query {
     viewer {
       login
@@ -162,8 +165,66 @@ const GRAPHQL_QUERY = /* GraphQL */ `
         }
       }
     }
+    WATCH_SEARCHES
   }
 `;
+
+// GitHub ORs repeated `repo:` qualifiers. Twenty fit comfortably inside the
+// query-length limit (verified: 575 characters, no error), so watch lists are
+// chunked at that size rather than issuing one search per repository.
+const WATCH_CHUNK = 20;
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    out.push(items.slice(index, index + size));
+  }
+  return out;
+}
+
+export function buildQuery(watch: readonly WatchedRepository[]): string {
+  const prRepos = watch
+    .filter((entry) => entry.pullRequests)
+    .map((entry) => entry.repository);
+  const issueRepos = watch
+    .filter((entry) => entry.issues)
+    .map((entry) => entry.repository);
+
+  const searches: string[] = [];
+  chunk(prRepos, WATCH_CHUNK).forEach((group, index) => {
+    const qualifiers = group.map((repo) => `repo:${repo}`).join(" ");
+    searches.push(`    watchedPrs${index}: search(
+      query: "is:open is:pr -is:draft sort:created-desc ${qualifiers}"
+      type: ISSUE
+      first: 50
+    ) {
+      nodes {
+        ... on PullRequest {
+          ...PullRequestFields
+        }
+      }
+    }`);
+  });
+  chunk(issueRepos, WATCH_CHUNK).forEach((group, index) => {
+    const qualifiers = group.map((repo) => `repo:${repo}`).join(" ");
+    searches.push(`    watchedIssues${index}: search(
+      query: "is:open is:issue sort:created-desc ${qualifiers}"
+      type: ISSUE
+      first: 50
+    ) {
+      nodes {
+        ... on Issue {
+          ...IssueFields
+        }
+      }
+    }`);
+  });
+
+  return (
+    GRAPHQL_FRAGMENTS +
+    GRAPHQL_ROOT.replace("WATCH_SEARCHES", searches.join("\n"))
+  );
+}
 
 interface RawActor {
   login?: string | null;
@@ -246,6 +307,8 @@ interface RawGraphqlData {
   prsInvolved?: RawSearch<RawPullRequest> | null;
   prsRequested?: RawSearch<RawPullRequest> | null;
   issuesInvolved?: RawSearch<RawIssue> | null;
+  // watchedPrs0, watchedIssues0, … — the count depends on the watch list.
+  [alias: string]: unknown;
 }
 
 interface RawGraphqlResponse {
@@ -254,7 +317,7 @@ interface RawGraphqlResponse {
 }
 
 export interface GraphqlRunner {
-  (): Promise<string>;
+  (query: string): Promise<string>;
 }
 
 function actorKind(typeName: string | null | undefined): ActorKind {
@@ -494,6 +557,21 @@ function mergeTargets(
   return [...merged.values()];
 }
 
+// The watch aliases are generated, so they are collected by prefix rather
+// than named. Their source marks the target as watched, which is what turns
+// a newly-opened target into an item.
+function watchSearches<T>(
+  data: RawGraphqlData,
+  prefix: string,
+): Array<{ source: string; search: RawSearch<T> | null | undefined }> {
+  return Object.keys(data)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => ({
+      source: "watched",
+      search: data[key] as RawSearch<T> | null | undefined,
+    }));
+}
+
 function parseRateLimit(raw: RawGraphqlData["rateLimit"]): RateLimit | null {
   if (
     raw === null ||
@@ -539,17 +617,21 @@ export function parseGithubResponse(
       [
         { source: "involved", search: data.prsInvolved },
         { source: "requested", search: data.prsRequested },
+        ...watchSearches<RawPullRequest>(data, "watchedPrs"),
       ],
-      [{ source: "involved", search: data.issuesInvolved }],
+      [
+        { source: "involved", search: data.issuesInvolved },
+        ...watchSearches<RawIssue>(data, "watchedIssues"),
+      ],
     ),
   };
 }
 
-async function runGhGraphql(): Promise<string> {
+async function runGhGraphql(query: string): Promise<string> {
   try {
     const result = await execFileAsync(
       "gh",
-      ["api", "graphql", "--field", `query=${GRAPHQL_QUERY}`],
+      ["api", "graphql", "--field", `query=${query}`],
       { maxBuffer: 16 * 1024 * 1024, timeout: 60_000 },
     );
     return result.stdout;
@@ -567,13 +649,10 @@ async function runGhGraphql(): Promise<string> {
 }
 
 export async function fetchGithubSnapshot(
+  watch: readonly WatchedRepository[] = [],
   runQuery: GraphqlRunner = runGhGraphql,
 ): Promise<GitHubSnapshot> {
   const started = performance.now();
-  const stdout = await runQuery();
+  const stdout = await runQuery(buildQuery(watch));
   return parseGithubResponse(stdout, Math.round(performance.now() - started));
-}
-
-export function graphqlQueryForTests(): string {
-  return GRAPHQL_QUERY;
 }

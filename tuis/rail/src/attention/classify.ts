@@ -157,6 +157,43 @@ export function classifyTarget(
   return items;
 }
 
+// A target from a watched repository that was opened after we started
+// watching. Your own work never notifies you, and the actor policy applies
+// exactly as it does everywhere else.
+export function classifyOpened(
+  target: GitHubTarget,
+  username: string,
+  config: AttentionConfig,
+  floor: string | undefined,
+): AttentionItem | null {
+  if (!target.searchSources.includes("watched")) return null;
+  if (floor === undefined || target.createdAt <= floor) return null;
+  if (target.author === null) return null;
+  if (normalizeLogin(target.author.login) === normalizeLogin(username)) {
+    return null;
+  }
+  if (!actorIsEligible(target.author, config)) return null;
+  // Drafts are excluded by the search itself; a draft marked ready later
+  // re-enters it and counts as opened at that moment.
+  return {
+    id: `opened:${target.repository}#${target.number}`,
+    kind: "opened",
+    targetKind: target.kind,
+    repository: target.repository,
+    number: target.number,
+    title: target.title,
+    url: target.url,
+    summary:
+      target.kind === "issue"
+        ? "New issue in a watched repository"
+        : "New pull request in a watched repository",
+    actor: target.author,
+    createdAt: target.createdAt,
+    priority: "normal",
+    context: reviewContext(target),
+  };
+}
+
 export function meaningfulComments(
   comments: GitHubComment[],
   config: AttentionConfig,
