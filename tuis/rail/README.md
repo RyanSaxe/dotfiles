@@ -87,9 +87,27 @@ observer's cached state. `alt+r` selects the Reviews rail tab; the
 tab is one compact line per unacknowledged item and highlights the Reviews badge
 until the item is acknowledged or disappears. `alt+R` opens the cached Review
 table + preview dashboard. `alt+T` opens the same dashboard shell for the
-future-ready Tasks surface. Enter opens the selected PR in a browser,
-`ctrl-d` acknowledges it locally, `/` fuzzy-searches the table, and
-`r`/`ctrl-r` performs an explicit no-notify refresh.
+future-ready Tasks surface.
+
+The Reviews dashboard has two views, switched with Tab:
+
+| view      | rows                                      | keys                                                                                         |
+| --------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Reviews   | what needs you, grouped by repository     | `↵` open a review workspace · `b` browser · `d` diff · `a` assisted review · `x` acknowledge |
+| Worktrees | pull requests already checked out locally | `↵` focus the session · `X` clean up                                                         |
+
+`/` searches the table, `r` refreshes without notifying, and `ctrl-u`/`ctrl-d`
+scroll the preview. Every key stays bound at any width; the footer only
+advertises what fits.
+
+`↵` on a review resolves the repository — cloning it into `~/repositories` if
+it is not already on disk — and asks workmux for a worktree on the pull
+request's branch, opening it as a `gh://` review buffer. No agent starts:
+`a` is the only path that runs one, and it adds a window to that same
+session rather than replacing the human one.
+
+Acknowledged items leave the table rather than dimming. A new external event
+arrives with a new id, so a cleared item returns on its own.
 
 The tab registry is intentionally small: Agents, Reviews, and the future-ready
 Tasks surface share one element-action table. `alt+space` enters that table;
