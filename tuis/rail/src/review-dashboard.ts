@@ -61,17 +61,14 @@ function plainText(markdown: string): string {
     .trim();
 }
 
-function excerpt(text: string, limit = 240): string {
-  const plain = plainText(text);
-  if (plain.length <= limit) return plain;
-  return `${plain.slice(0, limit - 1).trimEnd()}…`;
-}
-
-// The comment IS the thing you opened the panel to read, so it is not
-// truncated — Ctrl-u/Ctrl-d exist for the long ones. Supporting context
-// stays excerpted, because that is background rather than the point.
-function fullText(text: string): string {
-  return plainText(text);
+// Nothing shown in the panel is truncated. The panel scrolls, so a cap only
+// buys a description that stops mid-sentence. Paragraphs survive as separate
+// entries so the renderer can space them.
+function paragraphs(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map((paragraph) => plainText(paragraph))
+    .filter((paragraph) => paragraph !== "");
 }
 
 // What this row needs from you, stated as one phrase. The actor is NOT in
@@ -111,7 +108,7 @@ function previewFor(
       // Failing check names arrive with the shared target model; the
       // rollup state alone cannot name them.
       bullets: [],
-      body: context?.body ? [excerpt(context.body)] : [],
+      body: context?.body ? paragraphs(context.body) : [],
       context: trailer,
     };
   }
@@ -120,7 +117,7 @@ function previewFor(
     return {
       headline: `Review requested on ${target}`,
       bullets: [],
-      body: context?.body ? [excerpt(context.body)] : [],
+      body: context?.body ? paragraphs(context.body) : [],
       context: trailer,
     };
   }
@@ -129,7 +126,7 @@ function previewFor(
   return {
     headline: `${actor ? `@${actor}` : "Someone"} commented on ${target}`,
     bullets: [],
-    body: [fullText(item.summary)],
+    body: paragraphs(item.summary),
     context: trailer,
   };
 }

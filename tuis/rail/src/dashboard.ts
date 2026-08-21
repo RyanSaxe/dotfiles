@@ -501,8 +501,8 @@ function previewLines(
   }
 
   if (selected.preview.body.length > 0) {
-    lines.push([]);
     for (const paragraph of selected.preview.body) {
+      lines.push([]);
       for (const wrapped of wrapText(paragraph, inner)) {
         lines.push([{ text: wrapped, color: palette.text }]);
       }
