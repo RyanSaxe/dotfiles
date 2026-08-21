@@ -12,10 +12,13 @@ import {
 } from "./attention/state.js";
 import type { AttentionItem } from "./attention/types.js";
 import {
+  EMPTY_CELL,
   runDashboard,
   type DashboardData,
   type DashboardItem,
+  type DashboardPreview,
   type DashboardSurface,
+  type DashboardTone,
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
 
@@ -36,75 +39,139 @@ function age(createdAt: string): string {
   return fmtElapsed(Math.max(0, (Date.now() - created) / 1000));
 }
 
-function kindLabel(item: AttentionItem): string {
+function sameLogin(a: string | null, b: string | null): boolean {
+  if (a === null || b === null) return false;
+  return (
+    a.trim().replace(/^@/, "").toLowerCase() ===
+    b.trim().replace(/^@/, "").toLowerCase()
+  );
+}
+
+// GitHub bodies are markdown; the panel is not. Strip the syntax that
+// renders as noise in a terminal rather than dumping it verbatim, which is
+// what made the old preview unreadable.
+function plainText(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/(^|\s)#{1,6}\s+/g, "$1")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function excerpt(text: string, limit = 240): string {
+  const plain = plainText(text);
+  if (plain.length <= limit) return plain;
+  return `${plain.slice(0, limit - 1).trimEnd()}…`;
+}
+
+// The comment IS the thing you opened the panel to read, so it is not
+// truncated — Ctrl-u/Ctrl-d exist for the long ones. Supporting context
+// stays excerpted, because that is background rather than the point.
+function fullText(text: string): string {
+  return plainText(text);
+}
+
+// What this row needs from you, stated as one phrase. The actor is NOT in
+// here — it has its own column, and saying it twice is what made the old
+// table repeat itself.
+function reasonFor(item: AttentionItem, viewerOwnsTarget: boolean): string {
   switch (item.kind) {
     case "ci":
-      return "CI";
-    case "review_comment":
-      return "Review";
-    case "conversation":
-      return "Comment";
+      return "CI failed";
     case "review_request":
-      return "Request";
+      return "Review requested";
+    case "review_comment":
+      return "Commented on a review thread";
+    case "conversation":
+      return viewerOwnsTarget ? "Commented on your PR" : "Commented on this PR";
   }
 }
 
-function ciLabel(
-  state: NonNullable<AttentionItem["context"]>["ciState"],
-): string | null {
-  return state === "UNKNOWN" ? null : state.toLowerCase();
+function toneFor(item: AttentionItem): DashboardTone {
+  return item.kind === "ci" ? "ci" : "pull_request";
 }
 
-function reviewDetails(item: AttentionItem): string[] {
+function previewFor(
+  item: AttentionItem,
+  target: string,
+  viewerOwnsTarget: boolean,
+): DashboardPreview {
   const context = item.context;
-  if (context === undefined) return [];
+  const author = context?.author?.login ?? null;
+  const trailer: string[] = [clean(item.title)];
+  if (author !== null && !viewerOwnsTarget)
+    trailer.push(`opened by @${author}`);
 
-  const details: string[] = [];
-  if (context.author !== null) {
-    details.push(`PR author  @${context.author.login}`);
+  if (item.kind === "ci") {
+    return {
+      headline: `CI failed on ${target}`,
+      // Failing check names arrive with the shared target model; the
+      // rollup state alone cannot name them.
+      bullets: [],
+      body: context?.body ? [excerpt(context.body)] : [],
+      context: trailer,
+    };
   }
-  const ci = ciLabel(context.ciState);
-  if (ci !== null) details.push(`CI         ${ci}`);
-  if (context.body !== "") {
-    details.push("");
-    details.push(context.body);
+
+  if (item.kind === "review_request") {
+    return {
+      headline: `Review requested on ${target}`,
+      bullets: [],
+      body: context?.body ? [excerpt(context.body)] : [],
+      context: trailer,
+    };
   }
-  return details;
+
+  const actor = item.actor?.login;
+  return {
+    headline: `${actor ? `@${actor}` : "Someone"} commented on ${target}`,
+    bullets: [],
+    body: [fullText(item.summary)],
+    context: trailer,
+  };
 }
 
 export function reviewItem(
   item: AttentionItem,
-  acknowledged: boolean,
+  viewer: string | null,
 ): DashboardItem {
-  const isCi = item.kind === "ci";
-  const actor = item.actor?.login ?? "GitHub";
+  const target = `${shortRepository(item.repository)}#${item.number}`;
+  const author = item.context?.author?.login ?? null;
+  const viewerOwnsTarget = sameLogin(author, viewer);
   return {
     id: item.id,
-    project: shortRepository(item.repository),
+    repository: item.repository,
     reference: `#${item.number}`,
-    kind: kindLabel(item),
-    state: acknowledged ? "seen" : isCi ? "CI red" : "needs you",
+    // GitHub sends no actor for CI or a review request; Author carries
+    // those, so the cell stays honestly empty rather than inventing one.
+    from: item.actor === null ? EMPTY_CELL : `@${item.actor.login}`,
+    author: author === null ? EMPTY_CELL : `@${author}`,
+    authorIsViewer: viewerOwnsTarget,
+    reason: reasonFor(item, viewerOwnsTarget),
     time: age(item.createdAt),
     title: clean(item.title),
-    preview: `${actor}: ${clean(item.summary)}`,
-    details: reviewDetails(item),
     url: item.url,
-    tone: isCi ? "error" : "waiting",
-    acknowledged,
+    tone: toneFor(item),
+    preview: previewFor(item, target, viewerOwnsTarget),
   };
 }
 
 export function reviewDashboardData(): DashboardData {
   const snapshot = loadReviewSnapshot();
-  const items = snapshot.items.map((item) =>
-    reviewItem(item, snapshot.acknowledged.has(item.id)),
+  // Acknowledged items leave the table outright. A permanently dimmed row
+  // is a to-do you cannot finish; the locked semantics say an acknowledged
+  // item stays suppressed until a genuinely new external event, and a new
+  // event arrives with a new id, so it comes back on its own.
+  const items = snapshot.unacknowledged.map((item) =>
+    reviewItem(item, snapshot.username),
   );
-  const seen = items.filter((item) => item.acknowledged).length;
-  const open = items.length - seen;
   return {
     surface: "reviews",
     items,
-    status: `${open} open · ${seen} seen`,
+    status: items.length === 1 ? "1 needs you" : `${items.length} need you`,
     emptyMessage: "Review inbox is clear",
     // Refresh failures belong in `attention status`; keeping them out of the
     // selected review preview preserves the useful PR context.
@@ -157,7 +224,13 @@ export async function main(
   const isReviews = surface === "reviews";
   await runDashboard(isReviews ? reviewDashboardData() : taskDashboardData(), {
     refresh: isReviews ? refreshReviews : async () => taskDashboardData(),
+    // Enter will grow into the workspace path; browser is a peer action,
+    // not a fallback, and deliberately does NOT clear the item — only a
+    // reply, a reaction, or `x` does.
     open: async (item) => {
+      if (item.url !== null) await openUrl(item.url);
+    },
+    browser: async (item) => {
       if (item.url !== null) await openUrl(item.url);
     },
     acknowledge: isReviews

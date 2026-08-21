@@ -13,6 +13,7 @@ const STATE_PATH = join(
 
 export interface ReviewSnapshot {
   revision: number;
+  username: string | null;
   lastSuccessfulSyncAt: string | null;
   lastError: string | null;
   items: AttentionItem[];
@@ -27,6 +28,7 @@ let cachedSnapshot = emptyReviewSnapshot(0);
 function emptyReviewSnapshot(revision: number): ReviewSnapshot {
   return {
     revision,
+    username: null,
     lastSuccessfulSyncAt: null,
     lastError: null,
     items: [],
@@ -79,6 +81,7 @@ function readSnapshot(path: string, revision: number): ReviewSnapshot {
   const acknowledged = new Set(Object.keys(state.acknowledged));
   return {
     revision,
+    username: state.username ?? null,
     lastSuccessfulSyncAt: state.lastSuccessfulSyncAt,
     lastError: state.lastError,
     items,

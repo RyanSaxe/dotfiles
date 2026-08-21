@@ -109,7 +109,11 @@ async function refresh(args: string[]): Promise<void> {
     }
 
     const reconciled = reconcileAttention(state, items, ci);
-    state = markSuccess(reconciled.state, snapshot.rateLimit, now);
+    state = markSuccess(
+      { ...reconciled.state, username: snapshot.username },
+      snapshot.rateLimit,
+      now,
+    );
     const rateLimitRetry =
       snapshot.rateLimit === null
         ? null

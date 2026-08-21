@@ -1,22 +1,42 @@
 import { rank, type Ranked } from "./search.js";
 import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
-import type { AttentionTone } from "./sections/rows.js";
 
 export type DashboardSurface = "reviews" | "tasks";
 
+// What an item needs attention FOR. The hue follows the object, per the
+// locked semantics: CI failure is red, pull-request activity peach, issue
+// activity mauve.
+export type DashboardTone = "ci" | "pull_request" | "issue" | "neutral";
+
+// The selected item's panel, in the shape the design settled on: a headline
+// naming the trigger, the specifics beneath it, then dim context. `bullets`
+// carries failing check names and nothing else — passing checks are noise on
+// a row you are only looking at because something broke.
+export interface DashboardPreview {
+  headline: string;
+  bullets: readonly string[];
+  body: readonly string[];
+  context: readonly string[];
+}
+
 export interface DashboardItem {
   id: string;
-  project: string;
+  // owner/name. Rows are grouped under it, so it is a heading, not a column.
+  repository: string;
   reference: string;
-  kind: string;
-  state: string;
+  // Who triggered this. Blank where GitHub sends no actor (CI, review
+  // requests) — Author covers those cases.
+  from: string;
+  // Who opened the PR or issue. Always present, dimmed when it is you, so a
+  // column of your own name never competes for attention.
+  author: string;
+  authorIsViewer: boolean;
+  reason: string;
   time: string;
   title: string;
-  preview: string;
-  details?: readonly string[];
   url: string | null;
-  tone: AttentionTone;
-  acknowledged: boolean;
+  tone: DashboardTone;
+  preview: DashboardPreview;
 }
 
 export interface DashboardData {
@@ -30,11 +50,21 @@ export interface DashboardData {
 export interface DashboardHandlers {
   refresh(): Promise<DashboardData>;
   open(item: DashboardItem): Promise<void>;
+  browser(item: DashboardItem): Promise<void>;
   acknowledge(item: DashboardItem): Promise<void>;
 }
 
 type DashboardKey =
-  "up" | "down" | "open" | "acknowledge" | "refresh" | "quit" | null;
+  | "up"
+  | "down"
+  | "open"
+  | "browser"
+  | "acknowledge"
+  | "refresh"
+  | "scrollUp"
+  | "scrollDown"
+  | "quit"
+  | null;
 
 interface Cell {
   text: string;
@@ -47,6 +77,13 @@ const SHOW_CURSOR = `${ESC}[?25h`;
 const ALT_SCREEN = `${ESC}[?1049h`;
 const MAIN_SCREEN = `${ESC}[?1049l`;
 const CLEAR = `${ESC}[2J${ESC}[H`;
+
+// What a people column shows when GitHub gives no one to name.
+export const EMPTY_CELL = "—";
+
+// Half a small panel: enough that Ctrl-d feels like paging, small enough
+// that nothing scrolls past unseen.
+const PREVIEW_SCROLL = 6;
 
 function widthOf(text: string): number {
   return Array.from(text).length;
@@ -82,17 +119,16 @@ function mutedColor(palette: Palette): string {
   return blend(palette.dim, background(palette), 0.72);
 }
 
-function attentionColor(item: DashboardItem, palette: Palette): string {
-  if (item.acknowledged) return mutedColor(palette);
-  switch (item.tone) {
-    case "working":
-      return palette.statusWorking;
-    case "waiting":
-      return palette.statusWaiting;
-    case "done":
-      return palette.statusDone;
-    case "error":
+function toneColor(tone: DashboardTone, palette: Palette): string {
+  switch (tone) {
+    case "ci":
       return palette.red;
+    case "pull_request":
+      return palette.peach;
+    case "issue":
+      return palette.mauve;
+    case "neutral":
+      return palette.text;
   }
 }
 
@@ -170,22 +206,25 @@ function panelRule(
   ]);
 }
 
+// The closing border has to be placed at the panel's edge, not after the
+// text. `content` pads at the very end of a line, so without reserving the
+// inner width here every preview row ends in a stray `│`.
 function panelLine(width: number, palette: Palette, cells: Cell[]): string {
+  const inner = Math.max(0, width - 4);
+  const clipped: Cell[] = [];
+  let remaining = inner;
+  for (const cell of cells) {
+    if (remaining <= 0) break;
+    const text = clip(cell.text, remaining);
+    clipped.push({ ...cell, text });
+    remaining -= widthOf(text);
+  }
   return line(width, palette, [
-    { text: "│", color: ruleColor(palette) },
-    ...cells,
-    { text: "│", color: ruleColor(palette) },
+    { text: "│ ", color: ruleColor(palette) },
+    ...clipped,
+    { text: " ".repeat(Math.max(0, remaining)) },
+    { text: " │", color: ruleColor(palette) },
   ]);
-}
-
-function tableWidths(width: number): number[] {
-  const gap = 2;
-  const fixed = [4, 23, 9, 12, 14, 9];
-  const title = Math.max(
-    12,
-    width - gap * 6 - fixed.reduce((sum, value) => sum + value, 0),
-  );
-  return [...fixed, title];
 }
 
 // Split one column into runs so the characters a search matched can be
@@ -224,6 +263,19 @@ function columnCells(
   return cells;
 }
 
+function tableWidths(width: number): number[] {
+  const gap = 2;
+  // #, PR, From, Author and Age are fixed; the reason column takes the slack
+  // because it is the only cell whose content varies in length.
+  const fixed = [4, 7, 11, 11];
+  const age = 6;
+  const reason = Math.max(
+    16,
+    width - gap * 5 - fixed.reduce((sum, value) => sum + value, 0) - age,
+  );
+  return [...fixed, reason, age];
+}
+
 function tableCells(
   values: string[],
   widths: number[],
@@ -257,12 +309,26 @@ function tableHeader(width: number, palette: Palette): string {
     width,
     palette,
     tableCells(
-      ["#", "Project", "Ref", "Kind", "State", "Time", "Title"],
+      ["#", "PR", "From", "Author", "Needs you", "Age"],
       widths,
-      Array.from({ length: widths.length }, () => palette.text),
+      Array.from({ length: widths.length }, () => muted),
       muted,
     ),
   );
+}
+
+// The repository heading. It appears once per group, so it can afford the
+// full owner/name — which matters once watched repositories in other orgs
+// appear next to your own.
+function tableHeading(
+  width: number,
+  palette: Palette,
+  repository: string,
+): string {
+  return line(width, palette, [
+    { text: " ", color: mutedColor(palette) },
+    { text: repository, color: blend(palette.dim2, background(palette), 0.9) },
+  ]);
 }
 
 function tableItem(
@@ -274,8 +340,8 @@ function tableItem(
   hits: ReadonlyMap<number, readonly number[]> = new Map(),
 ): string {
   const widths = tableWidths(width);
-  const tone = attentionColor(item, palette);
-  const neutral = selected ? palette.text : mutedColor(palette);
+  const tone = toneColor(item.tone, palette);
+  const muted = mutedColor(palette);
   const marker = selected ? "▌" : " ";
   const lineBackground = selected
     ? blend(palette.surface0, background(palette), 0.9)
@@ -286,24 +352,24 @@ function tableItem(
     tableCells(
       [
         `${marker}${index + 1}`,
-        item.project,
         item.reference,
-        item.kind,
-        item.state,
+        item.from,
+        item.author,
+        item.reason,
         item.time,
-        item.title,
       ],
       widths,
       [
-        selected ? palette.accent : neutral,
-        neutral,
-        neutral,
-        neutral,
+        // The selection marker is structure, so it takes the mascot accent.
+        // Everything read as language takes a native color.
+        selected ? palette.accent : muted,
+        selected ? palette.text : blend(palette.text, background(palette), 0.8),
+        item.from === EMPTY_CELL ? muted : palette.text,
+        item.authorIsViewer ? muted : palette.text,
         tone,
-        tone,
-        selected ? palette.text : tone,
+        muted,
       ],
-      neutral,
+      muted,
       {
         color: palette.yellow,
         // Cell 0 is the row number, so a field at i renders in cell i + 1.
@@ -317,18 +383,52 @@ function tableItem(
 }
 
 function emptyTableRow(width: number, palette: Palette, text: string): string {
-  const widths = tableWidths(width);
   const muted = mutedColor(palette);
-  return line(
-    width,
-    palette,
-    tableCells(
-      ["", text, "", "", "", "", ""],
-      widths,
-      Array.from({ length: widths.length }, () => muted),
-      muted,
-    ),
+  return line(width, palette, [
+    { text: "  ", color: muted },
+    { text, color: muted },
+  ]);
+}
+
+// A rendered table is headings interleaved with items. Selection counts only
+// items, so the two are tracked separately and paginated together.
+type TableRow =
+  | { kind: "heading"; repository: string }
+  | { kind: "blank" }
+  | { kind: "item"; ordinal: number; entry: RankedItem };
+
+function tableRows(ranked: readonly RankedItem[]): TableRow[] {
+  const rows: TableRow[] = [];
+  let current: string | null = null;
+  ranked.forEach((entry, ordinal) => {
+    if (entry.item.repository !== current) {
+      if (current !== null) rows.push({ kind: "blank" });
+      rows.push({ kind: "heading", repository: entry.item.repository });
+      current = entry.item.repository;
+    }
+    rows.push({ kind: "item", ordinal, entry });
+  });
+  return rows;
+}
+
+// Window the rows so the selected item stays on screen.
+function tableWindow(
+  rows: readonly TableRow[],
+  selected: number,
+  limit: number,
+): TableRow[] {
+  if (rows.length <= limit) return [...rows];
+  const at = rows.findIndex(
+    (row) => row.kind === "item" && row.ordinal === selected,
   );
+  const anchor = at < 0 ? 0 : at;
+  let start = Math.min(
+    Math.max(0, anchor - Math.floor(limit / 2)),
+    Math.max(0, rows.length - limit),
+  );
+  // Never open a window on a blank spacer: it reads as a rendering fault.
+  if (rows[start]?.kind === "blank") start += 1;
+  return rows.slice(start, start + limit);
 }
 
 function wrapText(text: string, width: number): string[] {
@@ -360,6 +460,9 @@ function wrapText(text: string, width: number): string[] {
   });
 }
 
+// P2: lead with the trigger, then the specifics, then dim context. Nothing
+// here repeats the row — the table already said the repository, number and
+// age, and saying them twice is what made the old panel read as a dump.
 function previewLines(
   data: DashboardData,
   selected: DashboardItem | undefined,
@@ -367,81 +470,114 @@ function previewLines(
   query: string,
   width: number,
 ): Cell[][] {
+  const muted = mutedColor(palette);
   if (selected === undefined) {
     return [
       [
         {
           text: query === "" ? data.emptyMessage : `No matches for /${query}`,
-          color: mutedColor(palette),
+          color: muted,
         },
       ],
-      [{ text: data.status, color: mutedColor(palette) }],
-      [{ text: "", color: palette.text }],
     ];
   }
 
-  const tone = attentionColor(selected, palette);
+  const inner = Math.max(8, width - 6);
+  const tone = toneColor(selected.tone, palette);
+  const dim = blend(palette.dim, background(palette), 0.85);
   const lines: Cell[][] = [
-    [{ text: selected.title, color: palette.text }],
-    [
-      {
-        text: `${selected.project}${selected.reference} · ${selected.kind} · ${selected.state}`,
-        color: tone,
-      },
-    ],
-    [{ text: selected.preview, color: mutedColor(palette) }],
+    [],
+    [{ text: selected.preview.headline, color: tone }],
   ];
-  const detailWidth = Math.max(1, width - 4);
-  for (const detail of selected.details ?? []) {
-    for (const wrapped of wrapText(detail, detailWidth)) {
-      lines.push([{ text: wrapped, color: mutedColor(palette) }]);
+
+  if (selected.preview.bullets.length > 0) {
+    lines.push([]);
+    for (const bullet of selected.preview.bullets) {
+      lines.push([
+        { text: "  ✗ ", color: tone },
+        { text: bullet, color: palette.text },
+      ]);
     }
   }
+
+  if (selected.preview.body.length > 0) {
+    lines.push([]);
+    for (const paragraph of selected.preview.body) {
+      for (const wrapped of wrapText(paragraph, inner)) {
+        lines.push([{ text: wrapped, color: palette.text }]);
+      }
+    }
+  }
+
+  if (selected.preview.context.length > 0) {
+    lines.push([]);
+    lines.push([{ text: "─".repeat(Math.min(inner, 48)), color: dim }]);
+    for (const entry of selected.preview.context) {
+      for (const wrapped of wrapText(entry, inner)) {
+        lines.push([{ text: wrapped, color: muted }]);
+      }
+    }
+  }
+
+  lines.push([]);
   return lines;
 }
 
+// The Agents footer rhythm: bright key, dim label, dim separator, so the
+// two dashboards read as one application.
 function footerLine(
   width: number,
   palette: Palette,
   searching: boolean,
   query: string,
+  scrollable: boolean,
 ): string {
+  const muted = mutedColor(palette);
   if (searching) {
     return line(width, palette, [
-      { text: `/${query}▌`, color: palette.accent },
-      {
-        text: "   Enter Apply   Esc Cancel   Backspace Delete",
-        color: mutedColor(palette),
-      },
+      { text: "/", color: palette.accent },
+      { text: query, color: palette.text },
+      { text: "▌", color: palette.accent },
+      { text: "   Enter", color: palette.text },
+      { text: " Apply   ", color: muted },
+      { text: "Esc", color: palette.text },
+      { text: " Cancel", color: muted },
     ]);
   }
-  return line(width, palette, [
-    { text: "/", color: palette.accent },
-    { text: " Search   ", color: palette.text },
-    { text: "↑↓ j/k", color: palette.text },
-    { text: " Navigate   ", color: mutedColor(palette) },
-    { text: "Enter", color: palette.text },
-    { text: " Open   ", color: mutedColor(palette) },
-    { text: "Ctrl-d", color: palette.text },
-    { text: " Acknowledge   ", color: mutedColor(palette) },
-    { text: "r", color: palette.text },
-    { text: " Refresh   ", color: mutedColor(palette) },
-    { text: "q", color: palette.text },
-    { text: " Quit", color: mutedColor(palette) },
-  ]);
+  const keys: Array<[string, string]> = [
+    ["/", "Search"],
+    ["↑↓", "Navigate"],
+    ["↵", "Open"],
+    ["b", "Browser"],
+    ["x", "Acknowledge"],
+    ["r", "Refresh"],
+  ];
+  if (scrollable) keys.push(["^u/^d", "Preview"]);
+  keys.push(["q", "Quit"]);
+  const cells: Cell[] = [];
+  keys.forEach(([key, label], index) => {
+    if (index > 0) cells.push({ text: " │ ", color: ruleColor(palette) });
+    cells.push({ text: key, color: palette.text });
+    cells.push({ text: ` ${label}`, color: muted });
+  });
+  return line(width, palette, cells);
 }
 
 // The columns the table actually shows, in cell order. The PR/issue body is
 // deliberately absent: it is what made every query match, and highlighting a
 // match you cannot see is worse than not matching at all.
 function searchFields(item: DashboardItem): string[] {
+  // Cell order first, so a hit at index i highlights in cell i + 1. Title and
+  // repository trail because neither has a cell — the title lives in the
+  // preview and the repository is a heading — but both stay searchable.
   return [
-    item.project,
     item.reference,
-    item.kind,
-    item.state,
+    item.from,
+    item.author,
+    item.reason,
     item.time,
     item.title,
+    item.repository,
   ];
 }
 
@@ -462,46 +598,30 @@ export function renderDashboard(
   rows: number,
   query = "",
   searching = false,
+  previewOffset = 0,
 ): string {
   const width = Math.max(64, columns);
   const height = Math.max(16, rows);
   const ranked = rankDashboardItems(data.items, query);
   const items = ranked.map((entry) => entry.item);
   const selected = items[selectedIndex];
+  const muted = mutedColor(palette);
   const status =
     query.trim() === ""
       ? data.status
       : `${items.length}/${data.items.length} matches`;
-  const tableLimit = Math.max(
-    1,
-    Math.min(items.length || 1, Math.floor((height - 10) / 2)),
-  );
-  const tableStart =
-    items.length === 0
-      ? 0
-      : Math.min(
-          Math.max(0, selectedIndex - tableLimit + 1),
-          Math.max(0, items.length - tableLimit),
-        );
-  const tableEnd = tableStart + tableLimit;
-  const shown = ranked.slice(tableStart, tableEnd);
+
   const lines: string[] = [
+    // Subtabs, matching the Agents precedent. The active one takes the
+    // mascot accent because a highlighted tab is structure, not text.
     rightAlignedLine(
       width,
       palette,
       [
-        { text: "  ", color: palette.text },
-        {
-          text: surfaceLabel(data.surface),
-          color:
-            data.surface === "reviews" ? palette.accent : mutedColor(palette),
-        },
-        { text: "  |  ", color: mutedColor(palette) },
-        {
-          text: "Tasks",
-          color:
-            data.surface === "tasks" ? palette.accent : mutedColor(palette),
-        },
+        { text: " ", color: palette.text },
+        { text: surfaceLabel(data.surface), color: palette.accent },
+        { text: "  │  ", color: ruleColor(palette) },
+        { text: "Worktrees", color: muted },
       ],
       query.trim() === "" ? status : `/${query} · ${status}`,
     ),
@@ -509,7 +629,16 @@ export function renderDashboard(
     tableHeader(width, palette),
   ];
 
-  if (shown.length === 0) {
+  const all = tableRows(ranked);
+  // Reserve: panel top + bottom + footer, and at least three preview lines.
+  const reserved = 3 + 3;
+  const limit = Math.max(
+    1,
+    Math.min(all.length, height - lines.length - reserved),
+  );
+  const shown = tableWindow(all, selectedIndex, limit);
+
+  if (items.length === 0) {
     lines.push(
       emptyTableRow(
         width,
@@ -518,44 +647,72 @@ export function renderDashboard(
       ),
     );
   } else {
-    shown.forEach((entry, offset) => {
-      const index = tableStart + offset;
+    for (const row of shown) {
+      if (row.kind === "blank") lines.push(line(width, palette, []));
+      else if (row.kind === "heading")
+        lines.push(tableHeading(width, palette, row.repository));
+      else
+        lines.push(
+          tableItem(
+            width,
+            palette,
+            row.entry.item,
+            row.ordinal,
+            row.ordinal === selectedIndex,
+            row.entry.hits,
+          ),
+        );
+    }
+    if (shown.length < all.length) {
+      const hidden =
+        all.filter((row) => row.kind === "item").length -
+        shown.filter((row) => row.kind === "item").length;
       lines.push(
-        tableItem(
-          width,
-          palette,
-          entry.item,
-          index,
-          index === selectedIndex,
-          entry.hits,
-        ),
-      );
-    });
-    if (tableStart > 0 || tableEnd < items.length) {
-      lines.push(
-        line(width, palette, [
-          {
-            text: `  … ${tableStart} earlier · ${Math.max(0, items.length - tableEnd)} later`,
-            color: mutedColor(palette),
-          },
-        ]),
+        line(width, palette, [{ text: `  … ${hidden} more`, color: muted }]),
       );
     }
   }
 
-  const selectedLines = previewLines(data, selected, palette, query, width);
-  const fixedAfterTable = 1 + selectedLines.length + 1 + 1;
-  const previewFill = Math.max(0, height - lines.length - fixedAfterTable);
+  // Everything below is fixed height, so the preview can never push the
+  // panel border or the footer off the bottom of the popup — which is what
+  // a long PR body used to do.
   const previewTitle = selected
-    ? `Preview: ${selected.project}${selected.reference}`
+    ? `Preview: ${selected.repository}${selected.reference}`
     : `Preview: ${surfaceLabel(data.surface)}`;
+  const capacity = Math.max(1, height - lines.length - 3);
+  const content = previewLines(data, selected, palette, query, width);
+  // When there is more than fits, the last row becomes the scroll indicator,
+  // so it costs a line of content rather than covering one.
+  const overflows = content.length > capacity;
+  const room = overflows ? Math.max(1, capacity - 1) : capacity;
+  const maxOffset = Math.max(0, content.length - room);
+  const offset = Math.min(Math.max(0, previewOffset), maxOffset);
+  const visible = content.slice(offset, offset + room);
+
   lines.push(panelRule(width, palette, "top", previewTitle));
-  for (const previewLine of selectedLines)
+  for (const previewLine of visible)
     lines.push(panelLine(width, palette, previewLine));
-  for (let index = 0; index < previewFill; index += 1)
+  for (let index = visible.length; index < room; index += 1)
     lines.push(panelLine(width, palette, []));
+  if (overflows) {
+    // Say how much is left rather than clipping silently.
+    const remaining = maxOffset - offset;
+    const above = offset > 0 ? `↑ ${offset} above` : "";
+    const below =
+      remaining > 0
+        ? `↓ ${remaining} more line${remaining === 1 ? "" : "s"}`
+        : "";
+    lines.push(
+      panelLine(width, palette, [
+        {
+          text: [above, below].filter((part) => part !== "").join("   "),
+          color: muted,
+        },
+      ]),
+    );
+  }
   lines.push(panelRule(width, palette, "bottom"));
-  lines.push(footerLine(width, palette, searching, query));
+  lines.push(footerLine(width, palette, searching, query, maxOffset > 0));
 
   while (lines.length < height) lines.push(line(width, palette, []));
   return `${CLEAR}${lines.slice(0, height).join("\n")}`;
@@ -572,8 +729,16 @@ function keyFor(chunk: string): DashboardKey {
     case "\r":
     case "\n":
       return "open";
-    case "\u0004":
+    case "b":
+      return "browser";
+    // Acknowledge is `x` so Ctrl-u/Ctrl-d can keep their vi meaning on the
+    // preview panel.
+    case "x":
       return "acknowledge";
+    case "\u0015":
+      return "scrollUp";
+    case "\u0004":
+      return "scrollDown";
     case "r":
     case "\u0012":
       return "refresh";
@@ -612,6 +777,7 @@ export async function runDashboard(
   let settled = false;
   let query = "";
   let searching = false;
+  let previewOffset = 0;
   const input = process.stdin;
   const output = process.stdout;
 
@@ -630,6 +796,7 @@ export async function runDashboard(
         output.rows ?? 30,
         query,
         searching,
+        previewOffset,
       ),
     );
   };
@@ -650,23 +817,34 @@ export async function runDashboard(
     };
 
     const runAction = async (
-      action: Exclude<DashboardKey, "up" | "down" | "quit" | null>,
+      action: Extract<
+        DashboardKey,
+        "open" | "browser" | "acknowledge" | "refresh"
+      >,
     ): Promise<void> => {
       const item = visibleItems()[selectedIndex];
-      if ((action === "open" || action === "acknowledge") && item === undefined)
-        return;
+      if (action !== "refresh" && item === undefined) return;
       busy = true;
       try {
         if (action === "open" && item !== undefined) await handlers.open(item);
+        if (action === "browser" && item !== undefined)
+          await handlers.browser(item);
         if (action === "acknowledge" && item !== undefined) {
           await handlers.acknowledge(item);
+          // The row leaves the table, so the selection would otherwise
+          // land on whatever slid up into its place.
           data = await handlers.refresh();
+          selectedIndex = Math.max(
+            0,
+            Math.min(selectedIndex, visibleItems().length - 1),
+          );
         }
         if (action === "refresh") data = await handlers.refresh();
       } catch (error) {
         data = errorData(data, error);
       } finally {
         busy = false;
+        previewOffset = 0;
         render();
       }
     };
@@ -721,6 +899,7 @@ export async function runDashboard(
       }
       if (key === "up") {
         selectedIndex = Math.max(0, selectedIndex - 1);
+        previewOffset = 0;
         render();
         return;
       }
@@ -729,6 +908,19 @@ export async function runDashboard(
           Math.max(0, visibleItems().length - 1),
           selectedIndex + 1,
         );
+        previewOffset = 0;
+        render();
+        return;
+      }
+      // Half-page, the vi meaning. renderDashboard clamps to the real
+      // content height, so overscrolling is not possible.
+      if (key === "scrollUp") {
+        previewOffset = Math.max(0, previewOffset - PREVIEW_SCROLL);
+        render();
+        return;
+      }
+      if (key === "scrollDown") {
+        previewOffset += PREVIEW_SCROLL;
         render();
         return;
       }

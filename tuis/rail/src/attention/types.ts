@@ -92,6 +92,10 @@ export interface RateLimit {
 
 export interface ObserverState {
   version: 1;
+  // The authenticated login, kept so readers can tell "you" from everyone
+  // else without a network call. Optional: state written before this
+  // existed is still valid.
+  username?: string;
   lastAttemptAt: string | null;
   lastSuccessfulSyncAt: string | null;
   lastError: string | null;
