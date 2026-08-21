@@ -138,6 +138,47 @@ export async function listReviewWorktrees(
   );
 }
 
+// The local diff for a review worktree, coloured by delta.
+//
+// A review worktree exists to be read, so the diff is the useful thing to
+// show — not prose about the worktree. It is entirely local: the branch
+// against the default branch it forked from, no network call.
+export async function worktreeDiff(
+  worktree: ReviewWorktree,
+  width: number,
+): Promise<string[]> {
+  const head = await git(worktree.path, [
+    "symbolic-ref",
+    "--short",
+    "refs/remotes/origin/HEAD",
+  ]);
+  const base = head === "" ? "origin/main" : head;
+  try {
+    const { stdout } = await run(
+      "sh",
+      [
+        "-c",
+        'git diff "$1"...HEAD | delta --paging=never --width "$2"',
+        "sh",
+        base,
+        String(Math.max(40, width)),
+      ],
+      {
+        cwd: worktree.path,
+        env: GIT_FREE_ENV,
+        maxBuffer: 32 * 1024 * 1024,
+        timeout: 30_000,
+      },
+    );
+    const lines = stdout.replace(/\n$/, "").split("\n");
+    return lines.length === 1 && lines[0] === ""
+      ? [`No changes against ${base}.`]
+      : lines;
+  } catch {
+    return [`Could not diff against ${base}.`];
+  }
+}
+
 export async function focusReviewWorktree(
   worktree: ReviewWorktree,
 ): Promise<void> {
@@ -221,14 +262,9 @@ export async function openAssistedReview(
   worktree: ReviewWorktree,
 ): Promise<AssistedReview> {
   const existing = await windowNames(worktree.session);
-  // Repeating the action focuses the reviewer that is already running rather
-  // than starting a second one.
+  // Repeating the action is a no-op rather than a second reviewer. It does
+  // not steal focus either: you asked for a reviewer, not to go and watch it.
   if (existing.includes(ASSISTED_WINDOW)) {
-    await run("tmux", [
-      "select-window",
-      "-t",
-      `${worktree.session}:${ASSISTED_WINDOW}`,
-    ]);
     return { session: worktree.session, created: false };
   }
 
@@ -250,6 +286,10 @@ export async function openAssistedReview(
 
   await run("tmux", [
     "new-window",
+    // Detached: the reviewer starts in the background and the editor keeps
+    // focus. Reading the pull request is the point; the reviewer is a second
+    // opinion you go and read when it has one.
+    "-d",
     "-t",
     worktree.session,
     "-n",

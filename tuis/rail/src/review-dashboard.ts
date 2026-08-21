@@ -28,6 +28,7 @@ import {
   focusReviewWorktree,
   listReviewWorktrees,
   openAssistedReview,
+  worktreeDiff,
   type ReviewWorktree,
 } from "./worktrees.js";
 
@@ -268,6 +269,7 @@ interface PullRequestFacts {
   title: string;
   additions: number;
   deletions: number;
+  changedFiles: number;
   url: string | null;
 }
 
@@ -287,6 +289,7 @@ function factsFor(
     title: match === undefined ? "" : clean(match.title),
     additions: match?.context?.additions ?? 0,
     deletions: match?.context?.deletions ?? 0,
+    changedFiles: match?.context?.changedFiles ?? 0,
     url: match?.url ?? null,
   };
 }
@@ -294,6 +297,7 @@ function factsFor(
 function worktreeItem(
   worktree: ReviewWorktree,
   facts: PullRequestFacts,
+  diff: readonly string[],
 ): DashboardItem {
   const target = `${shortRepository(worktree.repository)}#${worktree.number}`;
   const context: string[] = [];
@@ -317,6 +321,8 @@ function worktreeItem(
             { text: `+${facts.additions}`, tone: "add" },
             { text: " ", tone: "muted" },
             { text: `-${facts.deletions}`, tone: "delete" },
+            { text: " ", tone: "muted" },
+            { text: `${facts.changedFiles}f`, tone: "change" },
           ],
     time: worktree.ageSecs === 0 ? "" : fmtElapsed(worktree.ageSecs),
     title: worktree.branch,
@@ -331,17 +337,10 @@ function worktreeItem(
     preview: {
       headline: `${target} · ${worktree.branch}`,
       bullets: [],
-      body: [],
-      context: [
-        ...context,
-        "",
-        worktree.attached
-          ? "The session is open — Enter focuses it."
-          : "The session is closed — Enter reopens it.",
-        worktree.dirty
-          ? "Uncommitted changes here. Clean up will refuse until they are gone."
-          : "Clean. X removes the worktree and its session, keeping the branch.",
-      ],
+      // The diff, not a description of the workspace. This worktree exists to
+      // be read; the row already said everything else.
+      body: [...diff],
+      context: worktree.dirty ? ["uncommitted changes in this worktree"] : [],
     },
   };
 }
@@ -349,11 +348,15 @@ function worktreeItem(
 export async function worktreeDashboardData(): Promise<DashboardData> {
   const worktrees = await listReviewWorktrees();
   const cached = loadReviewSnapshot().items;
+  const width = (process.stdout.columns ?? 100) - 6;
+  const diffs = await Promise.all(
+    worktrees.map(async (worktree) => worktreeDiff(worktree, width)),
+  );
   const open = worktrees.filter((worktree) => worktree.attached).length;
   return {
     surface: "reviews",
-    items: worktrees.map((worktree) =>
-      worktreeItem(worktree, factsFor(worktree, cached)),
+    items: worktrees.map((worktree, index) =>
+      worktreeItem(worktree, factsFor(worktree, cached), diffs[index] ?? []),
     ),
     status:
       worktrees.length === 0
@@ -440,6 +443,10 @@ async function openReviewWorkspace(item: DashboardItem): Promise<boolean> {
     return false;
   }
   await openPullRequestWorkspace(item.repository, number);
+  // The item moves rather than vanishes: it is a workspace now, listed under
+  // Worktrees. A genuinely new external event arrives with a new id and
+  // brings it back to the inbox on its own.
+  await acknowledgeReview(item);
   return true;
 }
 

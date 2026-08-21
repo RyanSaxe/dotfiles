@@ -935,10 +935,9 @@ export function renderDashboard(
   const items = ranked.map((entry) => entry.item);
   const selected = items[selectedIndex];
   const muted = mutedColor(palette);
+  // Only search says anything: a count of what is on screen is not news.
   const status =
-    query.trim() === ""
-      ? data.status
-      : `${items.length}/${data.items.length} matches`;
+    query.trim() === "" ? "" : `${items.length}/${data.items.length} matches`;
 
   const lines: string[] = [
     // Subtabs, matching the Agents precedent. The active one takes the
@@ -1028,6 +1027,7 @@ export function renderDashboard(
   // Everything below is fixed height, so the preview can never push the
   // panel border or the footer off the bottom of the popup — which is what
   // a long PR body used to do.
+  lines.push(line(width, palette, []));
   const previewTitle = selected
     ? `Preview: ${selected.repository}${selected.reference}`
     : `Preview: ${surfaceLabel(data.surface)}`;
@@ -1205,6 +1205,7 @@ export async function runDashboard(
 
   await new Promise<void>((resolve, reject) => {
     const cleanup = (): void => {
+      output.off("resize", onResize);
       input.off("data", onData);
       input.setRawMode?.(false);
       input.pause();
@@ -1267,6 +1268,8 @@ export async function runDashboard(
           );
         }
         if (action === "assist" && item !== undefined && handlers.assist) {
+          // Closes the popup so you land in the workspace, where the editor
+          // has focus and the reviewer is a window away.
           await handlers.assist(item);
           finish();
           return;
@@ -1406,6 +1409,14 @@ export async function runDashboard(
       void runAction(key);
     };
 
+    // A popup starts the process and sizes it a moment later, so the first
+    // frame can be drawn against stale dimensions — too tall for the window,
+    // which scrolls the header away until something forces a redraw. Redraw
+    // on resize, which also makes the dashboard survive a terminal resize.
+    const onResize = (): void => {
+      if (!settled) render();
+    };
+    output.on("resize", onResize);
     input.on("data", onData);
     input.setRawMode(true);
     input.setEncoding("utf8");

@@ -266,6 +266,12 @@ function M.apply(tokens)
   -- Snacks, wholesale (see plugins/explorer.lua for why it can't split).
   hl("SnacksNormal", { fg = o.fg, bg = o.crust })
   hl("SnacksNormalNC", { fg = o.fg_muted, bg = o.crust })
+  -- Snacks routes every window it owns through SnacksNormal, which is right
+  -- for pickers and floats — they are chrome. A gh:// pull request buffer is
+  -- not: it is something to read, so it takes the inner surface like any
+  -- other content.
+  hl("SnacksGhNormal", { fg = r.fg, bg = r.bg })
+  hl("SnacksGhNormalNC", { fg = r.fg_muted, bg = r.bg })
   hl("SnacksPicker", { bg = o.crust })
   hl("SnacksPickerList", { bg = o.crust })
   hl("SnacksPickerBox", { bg = o.crust })
