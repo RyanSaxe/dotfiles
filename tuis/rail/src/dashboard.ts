@@ -72,6 +72,8 @@ export interface DashboardHandlers {
   focus?(item: DashboardItem): Promise<void>;
   // Remove a workspace. Resolves with a reason when it declines.
   cleanup?(item: DashboardItem): Promise<string | null>;
+  // Add or focus a reviewer alongside the human review window.
+  assist?(item: DashboardItem): Promise<void>;
   // Resolves true when the dashboard should stand aside — opening a review
   // workspace switches the tmux client, and the popup has to be gone for you
   // to land in it.
@@ -96,6 +98,7 @@ type DashboardKey =
   | "back"
   | "view"
   | "cleanup"
+  | "assist"
   | "quit"
   | null;
 
@@ -722,11 +725,13 @@ function footerLine(
       ? [
           ["r", "Refresh"],
           ["/", "Search"],
+          ["a", "Assisted"],
           ["X", "Clean up"],
         ]
       : [
           ["r", "Refresh"],
           ["b", "Browser"],
+          ["a", "Assisted"],
           ["d", "Diff"],
           ["/", "Search"],
           ["x", "Acknowledge"],
@@ -1057,6 +1062,8 @@ function keyFor(chunk: string): DashboardKey {
       return "view";
     case "X":
       return "cleanup";
+    case "a":
+      return "assist";
     // Acknowledge is `x` so Ctrl-u/Ctrl-d can keep their vi meaning on the
     // preview panel.
     case "x":
@@ -1180,7 +1187,13 @@ export async function runDashboard(
     const runAction = async (
       action: Extract<
         DashboardKey,
-        "open" | "browser" | "acknowledge" | "refresh" | "diff" | "cleanup"
+        | "open"
+        | "browser"
+        | "acknowledge"
+        | "refresh"
+        | "diff"
+        | "cleanup"
+        | "assist"
       >,
     ): Promise<void> => {
       const item = visibleItems()[selectedIndex];
@@ -1218,6 +1231,11 @@ export async function runDashboard(
             0,
             Math.min(selectedIndex, visibleItems().length - 1),
           );
+        }
+        if (action === "assist" && item !== undefined && handlers.assist) {
+          await handlers.assist(item);
+          finish();
+          return;
         }
         if (action === "cleanup" && item !== undefined && handlers.cleanup) {
           const refused = await handlers.cleanup(item);

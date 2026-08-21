@@ -175,3 +175,64 @@ export async function cleanupReviewWorktree(
     return { ok: false, reason: detail };
   }
 }
+
+// The assisted-review window.
+//
+// workmux layouts describe panes, not windows, so a second window cannot come
+// from one. tmux creates it directly — which is additive rather than a race:
+// workmux still owns the session and the worktree, and removing either takes
+// this window with it.
+const ASSISTED_WINDOW = "codex";
+
+async function windowNames(session: string): Promise<string[]> {
+  try {
+    const { stdout } = await run("tmux", [
+      "list-windows",
+      "-t",
+      session,
+      "-F",
+      "#{window_name}",
+    ]);
+    return stdout
+      .split("\n")
+      .map((name) => name.trim())
+      .filter((name) => name !== "");
+  } catch {
+    return [];
+  }
+}
+
+export interface AssistedReview {
+  session: string;
+  created: boolean;
+}
+
+export async function openAssistedReview(
+  worktree: ReviewWorktree,
+): Promise<AssistedReview> {
+  const existing = await windowNames(worktree.session);
+  // Repeating the action focuses the reviewer that is already running rather
+  // than starting a second one.
+  if (existing.includes(ASSISTED_WINDOW)) {
+    await run("tmux", [
+      "select-window",
+      "-t",
+      `${worktree.session}:${ASSISTED_WINDOW}`,
+    ]);
+    return { session: worktree.session, created: false };
+  }
+
+  await run("tmux", [
+    "new-window",
+    "-t",
+    worktree.session,
+    "-n",
+    ASSISTED_WINDOW,
+    "-c",
+    worktree.path,
+    // Codex explicitly. The global workmux agent happens to be codex today,
+    // but this path must not depend on that staying true.
+    "codex",
+  ]);
+  return { session: worktree.session, created: true };
+}

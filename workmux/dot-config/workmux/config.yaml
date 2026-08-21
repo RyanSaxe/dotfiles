@@ -33,7 +33,6 @@ layouts:
       - command: review-open
         name: review
         focus: true
-
 # Reproduce the main worktree's ignored, untracked files in every new
 # worktree. If the project uses BYOR, register and refresh the new checkout
 # after its .byor directory has been copied. A project post_create list must

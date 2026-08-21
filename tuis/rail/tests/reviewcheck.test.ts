@@ -402,3 +402,10 @@ test("a narrow frame drops footer keys instead of clipping a word", () => {
   assert.match(footer, /q Quit/);
   assert.match(footer, /↑↓ Navigate/);
 });
+
+test("assisted review is its own key, never the normal open", () => {
+  const rendered = frame([reviewItem(attention(), VIEWER)]);
+  assert.match(rendered, /a Assisted/);
+  // Enter must stay the plain human path: nothing about it says agent.
+  assert.match(rendered, /↵ Open/);
+});

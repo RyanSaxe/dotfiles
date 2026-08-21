@@ -27,6 +27,7 @@ import {
   cleanupReviewWorktree,
   focusReviewWorktree,
   listReviewWorktrees,
+  openAssistedReview,
   type ReviewWorktree,
 } from "./worktrees.js";
 
@@ -417,6 +418,20 @@ export async function main(
         (candidate) => candidate.path === item.id,
       );
       if (worktree !== undefined) await focusReviewWorktree(worktree);
+    },
+    // Assisted review never starts implicitly. It adds a second window to the
+    // pull request's own session, so the human review stays where it was and
+    // the two are a window apart.
+    assist: async (item) => {
+      const number = Number(item.reference.replace(/^#/, ""));
+      if (!Number.isFinite(number) || item.tone === "issue") return;
+      await openPullRequestWorkspace(item.repository, number);
+      const worktree = (await listReviewWorktrees()).find(
+        (candidate) =>
+          candidate.repository === item.repository &&
+          candidate.number === number,
+      );
+      if (worktree !== undefined) await openAssistedReview(worktree);
     },
     cleanup: async (item) => {
       const worktree = (await listReviewWorktrees()).find(
