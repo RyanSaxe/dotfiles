@@ -33,6 +33,9 @@ export interface ReviewWorktree {
   session: string;
   attached: boolean;
   dirty: boolean;
+  // Seconds since the branch's last commit. Cheap, local, and a better
+  // answer to "is this stale" than when the directory was made.
+  ageSecs: number;
 }
 
 const REVIEW_WORKTREE = /^pr-(\d+)$/;
@@ -106,6 +109,7 @@ export async function listReviewWorktrees(
         await git(path, ["remote", "get-url", "origin"]),
       );
       if (repository === "") continue;
+      const committed = await git(path, ["log", "-1", "--format=%ct"]);
       const { target } = workspaceHandle(repository, number);
       // Record the name tmux actually has, so focusing a workspace does not
       // have to reconstruct the decoration.
@@ -119,6 +123,12 @@ export async function listReviewWorktrees(
         session: live ?? target,
         attached: live !== undefined,
         dirty: (await git(path, ["status", "--porcelain"])) !== "",
+        ageSecs: (() => {
+          const at = Number(committed);
+          return Number.isFinite(at) && at > 0
+            ? Math.max(0, Date.now() / 1000 - at)
+            : 0;
+        })(),
       });
     }
   }
@@ -222,6 +232,22 @@ export async function openAssistedReview(
     return { session: worktree.session, created: false };
   }
 
+  // Codex starts already knowing what it is for. The prompt asks it to make
+  // the human review easier rather than to replace it: findings and where to
+  // check them, not a verdict, and no changes to a worktree that exists to be
+  // read.
+  const prompt = [
+    `You are helping review pull request #${worktree.number} of`,
+    `${worktree.repository}, checked out here on branch ${worktree.branch}.`,
+    "Read the diff against its base branch and report what a careful reviewer",
+    "would want to know before reading it themselves: what the change is",
+    "trying to do, anything incorrect or risky, and anything the description",
+    "does not explain. Say where each point is, so it can be checked. Prefer a",
+    "short list of things worth attention over a summary of everything.",
+    "Do not modify files and do not post anything to GitHub — this worktree is",
+    "for reading, and the review is submitted by a human.",
+  ].join(" ");
+
   await run("tmux", [
     "new-window",
     "-t",
@@ -233,6 +259,7 @@ export async function openAssistedReview(
     // Codex explicitly. The global workmux agent happens to be codex today,
     // but this path must not depend on that staying true.
     "codex",
+    prompt,
   ]);
   return { session: worktree.session, created: true };
 }

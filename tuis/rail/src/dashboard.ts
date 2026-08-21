@@ -11,7 +11,8 @@ export type DashboardView = "reviews" | "worktrees";
 // What an item needs attention FOR. The hue follows the object, per the
 // locked semantics: CI failure is red, pull-request activity peach, issue
 // activity mauve.
-export type DashboardTone = "ci" | "pull_request" | "issue" | "neutral";
+export type DashboardTone =
+  "ci" | "pull_request" | "issue" | "clean" | "neutral";
 
 // The selected item's panel, in the shape the design settled on: a headline
 // naming the trigger, the specifics beneath it, then dim context. `bullets`
@@ -147,6 +148,23 @@ export function visibleWidth(text: string): number {
 // Delta does not wrap long content lines even when given --width, so a README
 // diff can hand us a 458-column line; letting it through would wrap in the
 // terminal and push the footer off the frame.
+// Writing into the very last cell of the very last row makes a terminal
+// advance, which scrolls the frame and takes the top line with it — the
+// header simply disappears. Every line here is padded to full width, so the
+// final one gives up a column. What is lost is trailing padding.
+export function frameLines(
+  lines: readonly string[],
+  height: number,
+  width: number,
+): string {
+  const visible = [...lines.slice(0, height)];
+  const last = visible.length - 1;
+  if (last >= 0) {
+    visible[last] = clipAnsi(visible[last] ?? "", Math.max(0, width - 1));
+  }
+  return visible.join("\n");
+}
+
 export function clipAnsi(text: string, width: number): string {
   if (width <= 0) return "";
   if (visibleWidth(text) <= width) return text;
@@ -221,6 +239,9 @@ function toneColor(tone: DashboardTone, palette: Palette): string {
       return palette.peach;
     case "issue":
       return palette.mauve;
+    case "clean":
+      // Healthy at a glance, which is what green is for.
+      return palette.green;
     case "neutral":
       return palette.text;
   }
@@ -450,7 +471,7 @@ function tableHeader(
     palette,
     tableCells(
       view === "worktrees"
-        ? ["#", "PR", "Session", "Changes", "Branch", "", ""]
+        ? ["#", "PR", "Session", "Changes", "Pull request", "Diff", "Age"]
         : ["#", "PR", "From", "Author", "Needs you", "Size", "Age"],
       widths,
       Array.from({ length: widths.length }, () => muted),
@@ -510,7 +531,13 @@ function tableItem(
         // Everything read as language takes a native color.
         selected ? palette.accent : muted,
         selected ? palette.text : blend(palette.text, background(palette), 0.8),
-        item.from === EMPTY_CELL ? muted : palette.text,
+        item.from === EMPTY_CELL
+          ? muted
+          : item.from === "open"
+            ? palette.green
+            : item.from === "closed"
+              ? muted
+              : palette.text,
         item.authorIsViewer ? muted : palette.text,
         tone,
         muted,
@@ -697,6 +724,11 @@ function previewLines(
 
 // The Agents footer rhythm: bright key, dim label, dim separator, so the
 // two dashboards read as one application.
+//
+// Built one column short of the frame. It is the last line, and writing into
+// the bottom-right cell makes a terminal advance — which scrolls the frame and
+// takes the header with it. Budgeting for that here means the adaptive key
+// list accounts for it, instead of a clip later stealing a letter from "Quit".
 function footerLine(
   width: number,
   palette: Palette,
@@ -881,9 +913,9 @@ export function renderDiffView(
     cells.push({ text: ` ${label}`, color: muted });
   });
   if (position !== "") cells.push({ text: position, color: muted });
-  lines.push(line(width, palette, cells));
+  lines.push(line(width - 1, palette, cells));
 
-  return `${CLEAR}${lines.slice(0, height).join("\n")}`;
+  return `${CLEAR}${frameLines(lines, height, width)}`;
 }
 
 export function renderDashboard(
@@ -1037,10 +1069,12 @@ export function renderDashboard(
     );
   }
   lines.push(panelRule(width, palette, "bottom"));
-  lines.push(footerLine(width, palette, searching, query, maxOffset > 0, view));
+  lines.push(
+    footerLine(width - 1, palette, searching, query, maxOffset > 0, view),
+  );
 
   while (lines.length < height) lines.push(line(width, palette, []));
-  return `${CLEAR}${lines.slice(0, height).join("\n")}`;
+  return `${CLEAR}${frameLines(lines, height, width)}`;
 }
 
 function keyFor(chunk: string): DashboardKey {

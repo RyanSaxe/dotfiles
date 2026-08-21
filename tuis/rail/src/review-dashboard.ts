@@ -264,34 +264,83 @@ export function reviewDashboardData(): DashboardData {
   };
 }
 
-function worktreeItem(worktree: ReviewWorktree): DashboardItem {
+interface PullRequestFacts {
+  title: string;
+  additions: number;
+  deletions: number;
+  url: string | null;
+}
+
+// The observer already knows this pull request if it is in the inbox. Reading
+// its cache keeps the Worktrees view free of network calls; a workspace whose
+// pull request is not an attention item simply shows less.
+function factsFor(
+  worktree: ReviewWorktree,
+  items: readonly AttentionItem[],
+): PullRequestFacts {
+  const match = items.find(
+    (item) =>
+      item.repository === worktree.repository &&
+      item.number === worktree.number,
+  );
+  return {
+    title: match === undefined ? "" : clean(match.title),
+    additions: match?.context?.additions ?? 0,
+    deletions: match?.context?.deletions ?? 0,
+    url: match?.url ?? null,
+  };
+}
+
+function worktreeItem(
+  worktree: ReviewWorktree,
+  facts: PullRequestFacts,
+): DashboardItem {
   const target = `${shortRepository(worktree.repository)}#${worktree.number}`;
+  const context: string[] = [];
+  if (facts.title !== "") context.push(facts.title);
+  context.push(`branch    ${worktree.branch}`);
+  context.push(`worktree  ${worktree.path}`);
+  context.push(`session   ${worktree.session.trim()}`);
   return {
     id: worktree.path,
     repository: worktree.repository,
     reference: `#${worktree.number}`,
     from: worktree.attached ? "open" : "closed",
-    author: worktree.dirty ? "dirty" : "clean",
+    author: worktree.dirty ? "uncommitted" : "clean",
+    // Reused as "dim this cell": a clean worktree is the boring case.
     authorIsViewer: !worktree.dirty,
-    reason: worktree.branch,
-    metadata: [],
-    time: "",
+    reason: facts.title === "" ? worktree.branch : facts.title,
+    metadata:
+      facts.additions === 0 && facts.deletions === 0
+        ? []
+        : [
+            { text: `+${facts.additions}`, tone: "add" },
+            { text: " ", tone: "muted" },
+            { text: `-${facts.deletions}`, tone: "delete" },
+          ],
+    time: worktree.ageSecs === 0 ? "" : fmtElapsed(worktree.ageSecs),
     title: worktree.branch,
-    url: null,
-    // Workspaces are not attention: a green row here means healthy, and a
-    // dirty one is the only thing worth a second look.
-    tone: worktree.dirty ? "issue" : "neutral",
+    url: facts.url,
+    // A workspace is not attention. Open and clean is the healthy case and
+    // reads green; uncommitted work is the only thing worth a second look.
+    tone: worktree.dirty
+      ? "pull_request"
+      : worktree.attached
+        ? "clean"
+        : "neutral",
     preview: {
       headline: `${target} · ${worktree.branch}`,
       bullets: [],
       body: [],
       context: [
-        `worktree  ${worktree.path}`,
-        `session   ${worktree.session.trim()}`,
-        worktree.attached ? "session is open" : "session is closed",
+        ...context,
+        "",
+        worktree.attached
+          ? "The session is open — Enter focuses it."
+          : "The session is closed — Enter reopens it.",
         worktree.dirty
-          ? "uncommitted changes — clean up will refuse"
-          : "clean — safe to clean up",
+          ? "Uncommitted changes here. Clean up will refuse until they are gone."
+          : "Clean. X removes the worktree and its session, keeping the branch.",
       ],
     },
   };
@@ -299,10 +348,13 @@ function worktreeItem(worktree: ReviewWorktree): DashboardItem {
 
 export async function worktreeDashboardData(): Promise<DashboardData> {
   const worktrees = await listReviewWorktrees();
+  const cached = loadReviewSnapshot().items;
   const open = worktrees.filter((worktree) => worktree.attached).length;
   return {
     surface: "reviews",
-    items: worktrees.map(worktreeItem),
+    items: worktrees.map((worktree) =>
+      worktreeItem(worktree, factsFor(worktree, cached)),
+    ),
     status:
       worktrees.length === 0
         ? "no review workspaces"

@@ -29,10 +29,18 @@ local function is_anchored_sidebar(win)
     return false
   end
   local buf = vim.api.nvim_win_get_buf(win)
-  -- CodeDiff's file panes use virtual `codediff://` buffers but still have a
-  -- non-empty buftype. Keep those panes on the inner base surface; the
-  -- explorer/history buffers below remain outer chrome.
-  if vim.api.nvim_buf_get_name(buf):match("^codediff://") then
+  -- Content that happens to live in a virtual buffer is still content, and
+  -- belongs on the inner surface. `buftype ~= ""` below means "not a file",
+  -- which is a good proxy for chrome right up until a plugin renders
+  -- something to read this way — CodeDiff's file panes, Snacks' pull request
+  -- and issue buffers. Both are anchored, neither is a sidebar.
+  --
+  -- Two exemptions is the point at which the rule is worth revisiting: an
+  -- allowlist of chrome filetypes would default new content buffers to the
+  -- inner surface, which is correct more often than the reverse. Noted in
+  -- notes/handoff/theme-role-completion.md rather than changed here.
+  local name = vim.api.nvim_buf_get_name(buf)
+  if name:match("^codediff://") or name:match("^gh://") then
     return false
   end
   return vim.bo[buf].buftype ~= "" or vim.bo[buf].filetype == "snacks_picker_list"

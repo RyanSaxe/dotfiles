@@ -134,12 +134,16 @@ test("rows group under their repository", () => {
   assert.match(rendered, /other\/thing/);
 });
 
-test("every rendered line is exactly the frame width", () => {
+test("every rendered line fills the frame, bar the last by one column", () => {
   // The panel border is placed by reserving inner width. Get that wrong and
   // each preview row ends in a stray │, which is what shipped before.
-  for (const line of frame([reviewItem(attention(), VIEWER)]).split("\n")) {
-    assert.equal(line.length, 120);
-  }
+  //
+  // The last line stops one column short on purpose: writing into the
+  // bottom-right cell makes a terminal advance, which scrolls the frame and
+  // takes the header with it.
+  const lines = frame([reviewItem(attention(), VIEWER)]).split("\n");
+  lines.slice(0, -1).forEach((line) => assert.equal(line.length, 120));
+  assert.equal(lines.at(-1)?.length, 119);
 });
 
 test("a long body cannot push the footer off the frame", () => {
@@ -372,7 +376,7 @@ test("the Worktrees view relabels its columns and its keys", () => {
   );
   assert.match(rendered, /Session {2}/);
   assert.match(rendered, /Changes/);
-  assert.match(rendered, /Branch/);
+  assert.match(rendered, /Pull request/);
   // Enter focuses a workspace rather than opening one, and cleanup is
   // deliberately a capital so it cannot be hit by accident.
   assert.match(rendered, /↵ Focus/);
@@ -397,7 +401,7 @@ test("a narrow frame drops footer keys instead of clipping a word", () => {
     ),
   );
   const footer = rendered.split("\n").at(-1) ?? "";
-  assert.equal(footer.length, 70);
+  assert.equal(footer.length, 69);
   // Whatever survives, quitting and navigating always do.
   assert.match(footer, /q Quit/);
   assert.match(footer, /↑↓ Navigate/);
