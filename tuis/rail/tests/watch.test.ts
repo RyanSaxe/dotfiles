@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { classifyOpened } from "../src/attention/classify.js";
 import {
   defaultAttentionConfig,
-  validateAttentionConfig,
+  watchedRepositories,
 } from "../src/attention/config.js";
 import { buildQuery } from "../src/attention/github.js";
 import type { IssueTarget, PullRequestTarget } from "../src/attention/types.js";
@@ -104,60 +104,47 @@ test("issues are watched the same way", () => {
   assert.equal(item?.targetKind, "issue");
 });
 
-test("watch config validates repositories and rejects duplicates", () => {
-  const parsed = validateAttentionConfig(
-    { watch: [{ repo: "a/b" }, { repo: "c/d", pull_requests: false }] },
-    "test",
-  );
-  assert.deepEqual(parsed.watch, [
-    { repository: "a/b", pullRequests: true, issues: true },
-    { repository: "c/d", pullRequests: false, issues: true },
+test("ATTENTION_WATCH parses a space-separated list", () => {
+  assert.deepEqual(watchedRepositories({ ATTENTION_WATCH: "a/b c/d" }), [
+    "a/b",
+    "c/d",
   ]);
-  assert.throws(
-    () => validateAttentionConfig({ watch: [{ repo: "nope" }] }, "test"),
-    /must be "owner\/name"/,
+  assert.deepEqual(
+    watchedRepositories({ ATTENTION_WATCH: " a/b,  c/d \n e/f " }),
+    ["a/b", "c/d", "e/f"],
   );
+  assert.deepEqual(watchedRepositories({}), []);
+  assert.deepEqual(watchedRepositories({ ATTENTION_WATCH: "   " }), []);
+});
+
+test("a duplicate repository is listed once", () => {
+  assert.deepEqual(watchedRepositories({ ATTENTION_WATCH: "a/b a/b c/d" }), [
+    "a/b",
+    "c/d",
+  ]);
+});
+
+test("a malformed entry is a literal, actionable error", () => {
   assert.throws(
-    () =>
-      validateAttentionConfig(
-        { watch: [{ repo: "a/b" }, { repo: "a/b" }] },
-        "test",
-      ),
-    /more than once/,
-  );
-  assert.throws(
-    () =>
-      validateAttentionConfig(
-        { watch: [{ repo: "a/b", issues: "yes" }] },
-        "test",
-      ),
-    /must be true or false/,
+    () => watchedRepositories({ ATTENTION_WATCH: "a/b notarepo c/d" }),
+    /expected space-separated "owner\/name" entries, got notarepo/,
   );
 });
 
-test("the query gains a search per kind and excludes drafts", () => {
-  const query = buildQuery([
-    { repository: "a/b", pullRequests: true, issues: true },
-    { repository: "c/d", pullRequests: false, issues: true },
-  ]);
+test("watching a repository covers its pull requests and its issues", () => {
+  const query = buildQuery(["a/b"]);
   assert.match(query, /watchedPrs0: search/);
   assert.match(query, /watchedIssues0: search/);
   assert.match(query, /-is:draft/);
-  assert.match(query, /repo:a\/b/);
-  // c/d opted out of pull requests, so it appears only in the issue search.
   const prSearch = query.slice(
     query.indexOf("watchedPrs0"),
     query.indexOf("watchedIssues0"),
   );
-  assert.ok(!prSearch.includes("repo:c/d"));
+  assert.match(prSearch, /repo:a\/b/);
 });
 
 test("more than twenty repositories chunk into extra searches", () => {
-  const many = Array.from({ length: 25 }, (_, i) => ({
-    repository: `org/repo${i}`,
-    pullRequests: true,
-    issues: false,
-  }));
+  const many = Array.from({ length: 25 }, (_, i) => `org/repo${i}`);
   const query = buildQuery(many);
   assert.match(query, /watchedPrs0: search/);
   assert.match(query, /watchedPrs1: search/);

@@ -112,28 +112,30 @@ needed. Optional actor policy lives at
     "allow": ["claude-reviewer"],
     "ignore": ["codecov", "snyk-bot", "sonarcloud"]
   },
-  "own_pr_ci": true,
-  "watch": [
-    { "repo": "someorg/infra" },
-    { "repo": "someorg/docs", "pull_requests": false }
-  ]
+  "own_pr_ci": true
 }
 ```
 
-The file lives outside the repository, so it can hold private repository
-names without them ever being committed.
+To hear about repositories you are not otherwise involved in, list them in
+`.env` rather than here:
 
-`watch` reports pull requests and issues opened in repositories you are not
-otherwise involved in. Both kinds are included by default; set
-`pull_requests` or `issues` to `false` to narrow an entry. Draft pull
-requests are excluded, and one marked ready later counts as opened at that
+```sh
+ATTENTION_WATCH="someorg/infra someorg/docs"
+```
+
+Repository names are the one part of this configuration that can be
+sensitive, and `.env` is the one file that never reaches git. It is already
+sourced by the observer's launcher, so nothing else needs configuring.
+Watching a repository covers its pull requests and its issues alike.
+
+Adding one is quiet. A watched repository might already have hundreds of open
+pull requests; the first poll that sees it records the moment, and only work
+opened after that is ever reported. The timestamp is kept even if you remove
+the entry later, so re-adding a repository stays quiet too.
+
+Drafts are excluded, and a draft marked ready later counts as opened at that
 moment. Everything else behaves as it does elsewhere: your own work never
 notifies you, and bots stay suppressed unless allow-listed.
-
-Adding a repository is quiet. Each one records the moment it was first seen
-and only reports things opened after it, so a busy repository does not arrive
-as a backlog dump. That mark is kept even if you later remove the entry, so
-re-adding a repository stays quiet too.
 
 Inspect it with `attention status`, `attention list`, and
 `attention ack <item-id>`. `attention status` reports notification-transport

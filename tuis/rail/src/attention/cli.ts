@@ -96,11 +96,14 @@ async function refresh(args: string[]): Promise<void> {
     const items: AttentionItem[] = [];
     const ci: ObserverState["ci"] = {};
 
-    // A repository joins with its floor set to now, so the first poll after
-    // adding one is silent rather than a backlog dump.
-    const watchFloor: Record<string, string> = { ...(state.watchFloor ?? {}) };
-    for (const entry of config.watch) {
-      watchFloor[entry.repository] ??= now;
+    // The first poll that sees a repository records the moment, and only
+    // things opened after it are ever reported. That is what keeps adding a
+    // repository quiet instead of dumping years of open work into the inbox.
+    const watchedSince: Record<string, string> = {
+      ...(state.watchedSince ?? {}),
+    };
+    for (const repository of config.watch) {
+      watchedSince[repository] ??= now;
     }
 
     for (const target of snapshot.targets) {
@@ -108,7 +111,7 @@ async function refresh(args: string[]): Promise<void> {
         target,
         snapshot.username,
         config,
-        watchFloor[target.repository],
+        watchedSince[target.repository],
       );
       if (opened !== null) items.push(opened);
       items.push(...classifyTarget(target, snapshot.username, config));
@@ -125,7 +128,7 @@ async function refresh(args: string[]): Promise<void> {
 
     const reconciled = reconcileAttention(state, items, ci);
     state = markSuccess(
-      { ...reconciled.state, username: snapshot.username, watchFloor },
+      { ...reconciled.state, username: snapshot.username, watchedSince },
       snapshot.rateLimit,
       now,
     );

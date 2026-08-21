@@ -4,20 +4,15 @@ import { join } from "node:path";
 
 import type { GitHubActor } from "./types.js";
 
-// A repository to hear about even when you are not involved in it.
-export interface WatchedRepository {
-  repository: string;
-  pullRequests: boolean;
-  issues: boolean;
-}
-
 export interface AttentionConfig {
   actors: {
     allow: string[];
     ignore: string[];
   };
   ownPrCi: boolean;
-  watch: WatchedRepository[];
+  // Repositories to hear about even when you are not involved in them.
+  // Watching one covers its pull requests and its issues alike.
+  watch: string[];
 }
 
 const DEFAULT_CONFIG: AttentionConfig = {
@@ -57,49 +52,26 @@ export function defaultAttentionConfig(): AttentionConfig {
 
 const REPOSITORY = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
-function watchList(value: unknown, path: string): WatchedRepository[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) {
+// The watch list lives in ATTENTION_WATCH rather than the config file, so a
+// list of company repository names never lands in the repository itself.
+// `.env` is already gitignored and already sourced by the observer's
+// launcher, which is why it needs no plumbing of its own.
+export function watchedRepositories(
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const raw = env["ATTENTION_WATCH"];
+  if (raw === undefined || raw.trim() === "") return [];
+  const names = raw
+    .split(/[\s,]+/)
+    .map((name) => name.trim())
+    .filter((name) => name !== "");
+  const invalid = names.filter((name) => !REPOSITORY.test(name));
+  if (invalid.length > 0) {
     throw new Error(
-      `attention config ${path}: watch must be an array of { "repo": "owner/name" } entries`,
+      `ATTENTION_WATCH: expected space-separated "owner/name" entries, got ${invalid.join(", ")}`,
     );
   }
-  const seen = new Set<string>();
-  return value.map((entry, index) => {
-    if (!isRecord(entry)) {
-      throw new Error(
-        `attention config ${path}: watch[${index}] must be an object with a "repo" key`,
-      );
-    }
-    const repository = entry["repo"];
-    if (typeof repository !== "string" || !REPOSITORY.test(repository)) {
-      throw new Error(
-        `attention config ${path}: watch[${index}].repo must be "owner/name", got ${JSON.stringify(repository)}`,
-      );
-    }
-    const key = repository.toLowerCase();
-    if (seen.has(key)) {
-      throw new Error(
-        `attention config ${path}: watch lists ${repository} more than once`,
-      );
-    }
-    seen.add(key);
-    const flag = (name: string): boolean => {
-      const raw = entry[name];
-      if (raw === undefined) return true;
-      if (typeof raw !== "boolean") {
-        throw new Error(
-          `attention config ${path}: watch[${index}].${name} must be true or false`,
-        );
-      }
-      return raw;
-    };
-    return {
-      repository,
-      pullRequests: flag("pull_requests"),
-      issues: flag("issues"),
-    };
-  });
+  return [...new Set(names)];
 }
 
 export function validateAttentionConfig(
@@ -130,11 +102,7 @@ export function validateAttentionConfig(
     );
   }
 
-  return {
-    actors: { allow, ignore },
-    ownPrCi,
-    watch: watchList(value["watch"], path),
-  };
+  return { actors: { allow, ignore }, ownPrCi, watch: [] };
 }
 
 export function attentionConfigPath(): string {
@@ -150,8 +118,10 @@ export function attentionConfigPath(): string {
 
 export function loadAttentionConfig(
   path = attentionConfigPath(),
+  env: NodeJS.ProcessEnv = process.env,
 ): AttentionConfig {
-  if (!existsSync(path)) return defaultAttentionConfig();
+  const watch = watchedRepositories(env);
+  if (!existsSync(path)) return { ...defaultAttentionConfig(), watch };
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
@@ -160,7 +130,7 @@ export function loadAttentionConfig(
       `attention config ${path}: invalid JSON (${String(error)})`,
     );
   }
-  return validateAttentionConfig(parsed, path);
+  return { ...validateAttentionConfig(parsed, path), watch };
 }
 
 export function actorIsEligible(

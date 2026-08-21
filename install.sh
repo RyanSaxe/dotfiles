@@ -299,6 +299,11 @@ install_neovim_linux() {
 # One "NAME description" per line; the description is what the prompt shows.
 REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent and review phone notifications'
 
+# Same file, but no nagging: these are genuinely optional. They live here
+# rather than in a tracked config because their values name private
+# repositories, and .env is the one place that never reaches git.
+OPTIONAL_ENV_VARS='ATTENTION_WATCH space-separated owner/name repositories to hear about even when you are not involved'
+
 ensure_env_file() {
   if [ ! -f .env ]; then
     {
@@ -307,6 +312,12 @@ ensure_env_file() {
         [ -n "$name" ] || continue
         echo "# $description"
         echo "$name="
+      done
+      echo "$OPTIONAL_ENV_VARS" | while read -r name description; do
+        [ -n "$name" ] || continue
+        echo
+        echo "# Optional. $description"
+        echo "# $name=\"owner/name other/name\""
       done
     } >.env
   fi

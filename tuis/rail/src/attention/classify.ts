@@ -164,10 +164,12 @@ export function classifyOpened(
   target: GitHubTarget,
   username: string,
   config: AttentionConfig,
-  floor: string | undefined,
+  watchedSince: string | undefined,
 ): AttentionItem | null {
   if (!target.searchSources.includes("watched")) return null;
-  if (floor === undefined || target.createdAt <= floor) return null;
+  if (watchedSince === undefined || target.createdAt <= watchedSince) {
+    return null;
+  }
   if (target.author === null) return null;
   if (normalizeLogin(target.author.login) === normalizeLogin(username)) {
     return null;

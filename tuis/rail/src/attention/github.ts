@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import type { WatchedRepository } from "./config.js";
 import type {
   ActorKind,
   CiState,
@@ -182,16 +181,11 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return out;
 }
 
-export function buildQuery(watch: readonly WatchedRepository[]): string {
-  const prRepos = watch
-    .filter((entry) => entry.pullRequests)
-    .map((entry) => entry.repository);
-  const issueRepos = watch
-    .filter((entry) => entry.issues)
-    .map((entry) => entry.repository);
-
+// Watching a repository covers both its pull requests and its issues, so
+// one list drives both searches.
+export function buildQuery(watch: readonly string[]): string {
   const searches: string[] = [];
-  chunk(prRepos, WATCH_CHUNK).forEach((group, index) => {
+  chunk(watch, WATCH_CHUNK).forEach((group, index) => {
     const qualifiers = group.map((repo) => `repo:${repo}`).join(" ");
     searches.push(`    watchedPrs${index}: search(
       query: "is:open is:pr -is:draft sort:created-desc ${qualifiers}"
@@ -205,7 +199,7 @@ export function buildQuery(watch: readonly WatchedRepository[]): string {
       }
     }`);
   });
-  chunk(issueRepos, WATCH_CHUNK).forEach((group, index) => {
+  chunk(watch, WATCH_CHUNK).forEach((group, index) => {
     const qualifiers = group.map((repo) => `repo:${repo}`).join(" ");
     searches.push(`    watchedIssues${index}: search(
       query: "is:open is:issue sort:created-desc ${qualifiers}"
@@ -649,7 +643,7 @@ async function runGhGraphql(query: string): Promise<string> {
 }
 
 export async function fetchGithubSnapshot(
-  watch: readonly WatchedRepository[] = [],
+  watch: readonly string[] = [],
   runQuery: GraphqlRunner = runGhGraphql,
 ): Promise<GitHubSnapshot> {
   const started = performance.now();
