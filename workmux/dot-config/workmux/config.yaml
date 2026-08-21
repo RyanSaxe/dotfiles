@@ -30,7 +30,7 @@ agents:
 layouts:
   review:
     panes:
-      - command: nvim
+      - command: review-open
         name: review
         focus: true
 
