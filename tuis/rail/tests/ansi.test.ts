@@ -70,7 +70,10 @@ test("an over-long diff line cannot push the footer off the frame", () => {
   // diff really does hand us 458-column lines.
   const long = `${GREEN}${"x".repeat(458)}\x1b[0m`;
   const frame = renderDiffView("repo#1", [long, "short"], 0, palette, 100, 20);
-  const plain = frame.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  const plain = frame
+    .replace(/\x1b\[\d+;1H/g, "\n")
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+    .replace(/^\n/, "");
   const lines = plain.split("\n");
   assert.equal(lines.length, 20);
   for (const line of lines)

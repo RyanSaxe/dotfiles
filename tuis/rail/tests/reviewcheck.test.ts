@@ -61,8 +61,13 @@ const palette: Palette = {
   statusDone: "#a6e3a1",
 };
 
+// Rows are placed with absolute cursor positioning rather than newlines, so
+// a frame has to be turned back into lines before it can be read.
 const strip = (text: string): string =>
-  text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  text
+    .replace(/\x1b\[\d+;1H/g, "\n")
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+    .replace(/^\n/, "");
 
 const frame = (
   items: DashboardItem[],

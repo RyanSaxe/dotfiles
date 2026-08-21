@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+
 import { rank, type Ranked } from "./search.js";
 import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
 
@@ -148,21 +150,22 @@ export function visibleWidth(text: string): number {
 // Delta does not wrap long content lines even when given --width, so a README
 // diff can hand us a 458-column line; letting it through would wrap in the
 // terminal and push the footer off the frame.
-// Writing into the very last cell of the very last row makes a terminal
-// advance, which scrolls the frame and takes the top line with it — the
-// header simply disappears. Every line here is padded to full width, so the
-// final one gives up a column. What is lost is trailing padding.
+// Each row is placed at an absolute position rather than separated by
+// newlines. A newline at the bottom of the window scrolls it, and so does
+// writing into the bottom-right cell — either one silently eats the header,
+// and both depend on the frame height exactly matching a window whose size
+// we are told about a moment late. Addressing rows directly removes the
+// whole class: nothing here can scroll, and a frame that is briefly too tall
+// overdraws its last row instead of pushing the first one off the top.
 export function frameLines(
   lines: readonly string[],
   height: number,
   width: number,
 ): string {
-  const visible = [...lines.slice(0, height)];
-  const last = visible.length - 1;
-  if (last >= 0) {
-    visible[last] = clipAnsi(visible[last] ?? "", Math.max(0, width - 1));
-  }
-  return visible.join("\n");
+  return lines
+    .slice(0, height)
+    .map((row, index) => `${ESC}[${index + 1};1H${clipAnsi(row, width)}`)
+    .join("");
 }
 
 export function clipAnsi(text: string, width: number): string {
@@ -1172,7 +1175,20 @@ export async function runDashboard(
     query = "";
   };
 
+  // Diagnostic: RAIL_FRAME_LOG records the size every frame is drawn at, so a
+  // mismatch between what we are told and what the window really is can be
+  // seen rather than guessed at.
+  const frameLog = process.env["RAIL_FRAME_LOG"];
+  const logFrame = (label: string): void => {
+    if (frameLog === undefined) return;
+    appendFileSync(
+      frameLog,
+      `${label} rows=${String(output.rows)} cols=${String(output.columns)}\n`,
+    );
+  };
+
   const render = (): void => {
+    logFrame("render");
     if (diffLines !== null) {
       output.write(
         renderDiffView(
@@ -1414,6 +1430,7 @@ export async function runDashboard(
     // which scrolls the header away until something forces a redraw. Redraw
     // on resize, which also makes the dashboard survive a terminal resize.
     const onResize = (): void => {
+      logFrame("resize");
       if (!settled) render();
     };
     output.on("resize", onResize);

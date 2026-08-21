@@ -103,7 +103,15 @@ export function batMarkdown(width: number): MarkdownRenderer {
           `--terminal-width=${Math.max(20, width)}`,
           "--wrap=character",
         ],
-        { input: source, encoding: "utf8", timeout: 5_000 },
+        {
+          input: source,
+          encoding: "utf8",
+          timeout: 5_000,
+          // execFileSync inherits stderr by default. Anything bat says would
+          // land on the terminal mid-frame and scroll it, taking the header
+          // with it — the frame owns this screen.
+          stdio: ["pipe", "pipe", "pipe"],
+        },
       )
         .replace(/\n$/, "")
         .split("\n");
