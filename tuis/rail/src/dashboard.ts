@@ -519,29 +519,16 @@ type TableRow =
   | { kind: "item"; ordinal: number; entry: RankedItem };
 
 function tableRows(ranked: readonly RankedItem[]): TableRow[] {
-  // Items arrive in urgency order, which interleaves repositories, so
-  // grouping on "did the repository change" would print the same heading
-  // several times. Bucket instead: a repository appears once, positioned by
-  // its most urgent item, with that order preserved inside the group.
-  const groups = new Map<string, RankedItem[]>();
-  for (const entry of ranked) {
-    const bucket = groups.get(entry.item.repository);
-    if (bucket === undefined) groups.set(entry.item.repository, [entry]);
-    else bucket.push(entry);
-  }
-
   const rows: TableRow[] = [];
-  const ordinals = new Map<RankedItem, number>();
-  ranked.forEach((entry, ordinal) => ordinals.set(entry, ordinal));
-  let first = true;
-  for (const [repository, bucket] of groups) {
-    if (!first) rows.push({ kind: "blank" });
-    first = false;
-    rows.push({ kind: "heading", repository });
-    for (const entry of bucket) {
-      rows.push({ kind: "item", ordinal: ordinals.get(entry) ?? 0, entry });
+  let current: string | null = null;
+  ranked.forEach((entry, ordinal) => {
+    if (entry.item.repository !== current) {
+      if (current !== null) rows.push({ kind: "blank" });
+      rows.push({ kind: "heading", repository: entry.item.repository });
+      current = entry.item.repository;
     }
-  }
+    rows.push({ kind: "item", ordinal, entry });
+  });
   return rows;
 }
 
@@ -562,7 +549,21 @@ function tableWindow(
   );
   // Never open a window on a blank spacer: it reads as a rendering fault.
   if (rows[start]?.kind === "blank") start += 1;
-  return rows.slice(start, start + limit);
+  const window = rows.slice(start, start + limit);
+
+  // Scrolled into the middle of a group, the heading is above the window and
+  // you lose track of which repository you are looking at. Carry it in.
+  if (window[0]?.kind === "item") {
+    for (let index = start - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row?.kind === "heading") {
+        // Drop the row furthest from the selection, not the nearest: taking
+        // it off the end would hide the selected row at the bottom of a list.
+        return [row, ...window.slice(1)];
+      }
+    }
+  }
+  return window;
 }
 
 function wrapText(text: string, width: number): string[] {
@@ -728,11 +729,24 @@ function searchFields(item: DashboardItem): string[] {
 
 export type RankedItem = Ranked<DashboardItem>;
 
+// Ranking decides urgency; grouping decides layout. Grouping has to happen
+// here rather than at render time so the array IS display order — otherwise
+// the row numbers, which are jump targets, come out of sequence.
+function groupByRepository(ranked: readonly RankedItem[]): RankedItem[] {
+  const groups = new Map<string, RankedItem[]>();
+  for (const entry of ranked) {
+    const bucket = groups.get(entry.item.repository);
+    if (bucket === undefined) groups.set(entry.item.repository, [entry]);
+    else bucket.push(entry);
+  }
+  return [...groups.values()].flat();
+}
+
 export function rankDashboardItems(
   items: readonly DashboardItem[],
   query: string,
 ): RankedItem[] {
-  return rank(items, query, searchFields);
+  return groupByRepository(rank(items, query, searchFields));
 }
 
 // A whole-width line carrying its own colour. The diff view is deliberately
@@ -880,11 +894,26 @@ export function renderDashboard(
         );
     }
     if (shown.length < all.length) {
-      const hidden =
-        all.filter((row) => row.kind === "item").length -
-        shown.filter((row) => row.kind === "item").length;
+      // Say which direction the rest is in, not just how much there is.
+      const ordinals = shown
+        .filter(
+          (row): row is Extract<TableRow, { kind: "item" }> =>
+            row.kind === "item",
+        )
+        .map((row) => row.ordinal);
+      const above = ordinals.length === 0 ? 0 : Math.min(...ordinals);
+      const below =
+        ordinals.length === 0
+          ? 0
+          : Math.max(0, items.length - 1 - Math.max(...ordinals));
+      const parts = [
+        above > 0 ? `↑ ${above} above` : "",
+        below > 0 ? `↓ ${below} below` : "",
+      ].filter((part) => part !== "");
       lines.push(
-        line(width, palette, [{ text: `  … ${hidden} more`, color: muted }]),
+        line(width, palette, [
+          { text: `  ${parts.join("   ")}`, color: muted },
+        ]),
       );
     }
   }

@@ -269,3 +269,63 @@ test("a long inbox cannot squeeze the preview to nothing", () => {
   assert.match(rendered, /q Quit/);
   assert.equal(rendered.split("\n").length, 24);
 });
+
+test("row numbers stay sequential once rows are grouped", () => {
+  // Ranking is by urgency, which interleaves repositories. If the numbers
+  // came from that order they would skip — 25, 27, 28, 30 — and they are
+  // jump targets, so they have to read as a sequence.
+  const items = Array.from({ length: 9 }, (_, i) =>
+    reviewItem(
+      attention({ id: `i${i}`, number: i, repository: `org/repo${i % 3}` }),
+      VIEWER,
+    ),
+  );
+  const numbers = frame(items)
+    .split("\n")
+    .map((line) => /^[▌ ](\d+)\s/.exec(line)?.[1])
+    .filter((value): value is string => value !== undefined)
+    .map(Number);
+  assert.ok(numbers.length >= 5);
+  assert.equal(numbers[0], 1);
+  for (let index = 1; index < numbers.length; index += 1) {
+    assert.equal(
+      numbers[index],
+      (numbers[index - 1] ?? 0) + 1,
+      `numbers must not skip: ${numbers.join(", ")}`,
+    );
+  }
+});
+
+test("the group heading is carried into a window that starts mid-group", () => {
+  const items = Array.from({ length: 40 }, (_, i) =>
+    reviewItem(
+      attention({ id: `i${i}`, number: i, repository: "org/only" }),
+      VIEWER,
+    ),
+  );
+  const rendered = frame(items, {}, 30);
+  assert.match(rendered, /org\/only/);
+  assert.match(rendered, /above/);
+});
+
+test("the selected row survives at the bottom of a long list", () => {
+  const items = Array.from({ length: 40 }, (_, i) =>
+    reviewItem(
+      attention({ id: `i${i}`, number: i, repository: `org/repo${i % 2}` }),
+      VIEWER,
+    ),
+  );
+  const rendered = frame(items, {}, 39);
+  assert.match(rendered, /▌40\s/);
+});
+
+test("the overflow line says which direction the rest is in", () => {
+  const items = Array.from({ length: 40 }, (_, i) =>
+    reviewItem(
+      attention({ id: `i${i}`, number: i, repository: "org/only" }),
+      VIEWER,
+    ),
+  );
+  assert.match(frame(items, {}, 0), /↓ \d+ below/);
+  assert.match(frame(items, {}, 39), /↑ \d+ above/);
+});
