@@ -5,17 +5,12 @@ import { pill, spacedItem, type RailRow } from "./rows.js";
 
 // Hue follows the object, matching the dashboard: red CI, peach
 // pull-request activity, mauve issue activity.
-function kindColor(kind: string, palette: Palette): string {
-  switch (kind) {
-    case "ci":
-      return palette.red;
-    case "issue_comment":
-    case "issue_mention":
-    case "issue_opened":
-      return palette.mauve;
-    default:
-      return palette.peach;
-  }
+function itemColor(
+  item: ReviewSnapshot["items"][number],
+  palette: Palette,
+): string {
+  if (item.kind === "ci") return palette.red;
+  return item.targetKind === "issue" ? palette.mauve : palette.peach;
 }
 
 function shortRepository(repository: string): string {
@@ -66,7 +61,7 @@ export function reviewRows(
     // after the jump pill, and the one guaranteed to survive truncation at
     // rail width. Summary and age are supporting text and stay dim, so a
     // clipped summary can never take the signal with it.
-    const identityFg = blend(kindColor(item.kind, palette), bg, DIM_KEEP);
+    const identityFg = blend(itemColor(item, palette), bg, DIM_KEEP);
     rows.push(
       ...spacedItem(
         width,

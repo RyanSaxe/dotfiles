@@ -7,7 +7,9 @@ import type {
   GitHubActor,
   GitHubComment,
   GitHubSnapshot,
-  PullRequestSnapshot,
+  GitHubTarget,
+  IssueTarget,
+  PullRequestTarget,
   RateLimit,
   ReviewThread,
 } from "./types.js";
@@ -15,12 +17,49 @@ import type {
 const execFileAsync = promisify(execFile);
 
 const GRAPHQL_QUERY = /* GraphQL */ `
+  fragment CommentFields on IssueComment {
+    id
+    author {
+      login
+      __typename
+    }
+    body
+    createdAt
+    url
+    reactionGroups {
+      viewerHasReacted
+    }
+  }
+
+  fragment IssueFields on Issue {
+    number
+    title
+    body
+    url
+    createdAt
+    updatedAt
+    author {
+      login
+      __typename
+    }
+    repository {
+      nameWithOwner
+    }
+    comments(last: 100) {
+      nodes {
+        ...CommentFields
+      }
+    }
+  }
+
   fragment PullRequestFields on PullRequest {
     number
     title
     body
     url
+    createdAt
     updatedAt
+    isDraft
     headRefOid
     author {
       login
@@ -52,21 +91,24 @@ const GRAPHQL_QUERY = /* GraphQL */ `
     }
     comments(last: 100) {
       nodes {
-        id
-        author {
-          login
-          __typename
-        }
-        body
-        createdAt
-        url
-        reactionGroups {
-          viewerHasReacted
-        }
+        ...CommentFields
       }
     }
     statusCheckRollup {
       state
+      contexts(last: 100) {
+        nodes {
+          __typename
+          ... on CheckRun {
+            name
+            conclusion
+          }
+          ... on StatusContext {
+            context
+            state
+          }
+        }
+      }
     }
   }
 
@@ -79,7 +121,7 @@ const GRAPHQL_QUERY = /* GraphQL */ `
       remaining
       resetAt
     }
-    involved: search(
+    prsInvolved: search(
       query: "is:open is:pr involves:@me"
       type: ISSUE
       first: 100
@@ -90,7 +132,7 @@ const GRAPHQL_QUERY = /* GraphQL */ `
         }
       }
     }
-    requested: search(
+    prsRequested: search(
       query: "is:open is:pr review-requested:@me"
       type: ISSUE
       first: 100
@@ -98,6 +140,17 @@ const GRAPHQL_QUERY = /* GraphQL */ `
       nodes {
         ... on PullRequest {
           ...PullRequestFields
+        }
+      }
+    }
+    issuesInvolved: search(
+      query: "is:open is:issue involves:@me"
+      type: ISSUE
+      first: 100
+    ) {
+      nodes {
+        ... on Issue {
+          ...IssueFields
         }
       }
     }
@@ -128,7 +181,29 @@ interface RawThread {
   comments?: { nodes?: Array<RawComment | null> | null } | null;
 }
 
+interface RawCheckContext {
+  __typename?: string | null;
+  name?: string | null;
+  conclusion?: string | null;
+  context?: string | null;
+  state?: string | null;
+}
+
+interface RawIssue {
+  number?: number | null;
+  title?: string | null;
+  body?: string | null;
+  url?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  author?: RawActor | null;
+  repository?: { nameWithOwner?: string | null } | null;
+  comments?: { nodes?: Array<RawComment | null> | null } | null;
+}
+
 interface RawPullRequest {
+  isDraft?: boolean | null;
+  createdAt?: string | null;
   number?: number | null;
   title?: string | null;
   body?: string | null;
@@ -139,11 +214,14 @@ interface RawPullRequest {
   repository?: { nameWithOwner?: string | null } | null;
   reviewThreads?: { nodes?: Array<RawThread | null> | null } | null;
   comments?: { nodes?: Array<RawComment | null> | null } | null;
-  statusCheckRollup?: { state?: string | null } | null;
+  statusCheckRollup?: {
+    state?: string | null;
+    contexts?: { nodes?: Array<RawCheckContext | null> | null } | null;
+  } | null;
 }
 
-interface RawSearch {
-  nodes?: Array<RawPullRequest | null> | null;
+interface RawSearch<T> {
+  nodes?: Array<T | null> | null;
 }
 
 interface RawGraphqlData {
@@ -153,8 +231,9 @@ interface RawGraphqlData {
     remaining?: number | null;
     resetAt?: string | null;
   } | null;
-  involved?: RawSearch | null;
-  requested?: RawSearch | null;
+  prsInvolved?: RawSearch<RawPullRequest> | null;
+  prsRequested?: RawSearch<RawPullRequest> | null;
+  issuesInvolved?: RawSearch<RawIssue> | null;
 }
 
 interface RawGraphqlResponse {
@@ -241,10 +320,66 @@ function ciState(state: string | null | undefined): CiState {
   }
 }
 
+// Only definitive failures. Cancelled, skipped, neutral, stale and pending
+// are not failures — the locked rule is that non-definitive states never
+// become a red alert, and naming them would make the preview lie.
+const FAILED_CONCLUSIONS = new Set([
+  "FAILURE",
+  "TIMED_OUT",
+  "ACTION_REQUIRED",
+  "STARTUP_FAILURE",
+]);
+const FAILED_STATUS_STATES = new Set(["ERROR", "FAILURE"]);
+
+function failingChecks(rollup: RawPullRequest["statusCheckRollup"]): string[] {
+  const names: string[] = [];
+  for (const context of rollup?.contexts?.nodes ?? []) {
+    if (context === null || context === undefined) continue;
+    if (context.__typename === "CheckRun") {
+      if (FAILED_CONCLUSIONS.has(context.conclusion ?? "")) {
+        names.push(context.name ?? "check");
+      }
+      continue;
+    }
+    if (FAILED_STATUS_STATES.has(context.state ?? "")) {
+      names.push(context.context ?? "status");
+    }
+  }
+  return [...new Set(names)];
+}
+
+function parseIssue(raw: RawIssue, source: string): IssueTarget | null {
+  const repository = raw.repository?.nameWithOwner;
+  const number = raw.number;
+  if (
+    repository === undefined ||
+    repository === null ||
+    number === undefined ||
+    number === null
+  ) {
+    return null;
+  }
+  return {
+    kind: "issue",
+    repository,
+    number,
+    title: raw.title ?? `Issue #${number}`,
+    body: raw.body ?? "",
+    url: raw.url ?? `https://github.com/${repository}/issues/${number}`,
+    createdAt: raw.createdAt ?? new Date(0).toISOString(),
+    updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
+    author: parseActor(raw.author),
+    searchSources: [source],
+    comments: (raw.comments?.nodes ?? [])
+      .map(parseComment)
+      .filter((comment): comment is GitHubComment => comment !== null),
+  };
+}
+
 function parsePullRequest(
   raw: RawPullRequest,
   source: string,
-): PullRequestSnapshot | null {
+): PullRequestTarget | null {
   const repository = raw.repository?.nameWithOwner;
   const number = raw.number;
   if (
@@ -262,15 +397,19 @@ function parsePullRequest(
     .map(parseThread)
     .filter((thread): thread is ReviewThread => thread !== null);
   return {
+    kind: "pull_request",
     repository,
     number,
     title: raw.title ?? `PR #${number}`,
     body: raw.body ?? "",
     url: raw.url ?? `https://github.com/${repository}/pull/${number}`,
+    createdAt: raw.createdAt ?? new Date(0).toISOString(),
     updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
+    isDraft: raw.isDraft === true,
     headSha: raw.headRefOid ?? "",
     author: parseActor(raw.author),
     ciState: ciState(raw.statusCheckRollup?.state),
+    failingChecks: failingChecks(raw.statusCheckRollup),
     searchSources: [source],
     reviewRequested: source === "requested",
     reviewRequestFingerprint: source === "requested" ? "viewer" : "",
@@ -279,19 +418,30 @@ function parsePullRequest(
   };
 }
 
-function mergePullRequests(
-  entries: Array<{ source: string; search: RawSearch | null | undefined }>,
-): PullRequestSnapshot[] {
-  const merged = new Map<string, PullRequestSnapshot>();
-  for (const entry of entries) {
+// One target can arrive from several searches; merge rather than duplicate,
+// keeping the review-request flag whichever search carried it.
+function mergeTargets(
+  pullRequests: Array<{
+    source: string;
+    search: RawSearch<RawPullRequest> | null | undefined;
+  }>,
+  issues: Array<{
+    source: string;
+    search: RawSearch<RawIssue> | null | undefined;
+  }>,
+): GitHubTarget[] {
+  const merged = new Map<string, GitHubTarget>();
+  const key = (target: GitHubTarget): string =>
+    `${target.kind}:${target.repository}#${target.number}`;
+
+  for (const entry of pullRequests) {
     for (const raw of entry.search?.nodes ?? []) {
-      if (raw === null) continue;
+      if (raw === null || raw === undefined) continue;
       const parsed = parsePullRequest(raw, entry.source);
       if (parsed === null) continue;
-      const key = `${parsed.repository}#${parsed.number}`;
-      const previous = merged.get(key);
-      if (previous === undefined) {
-        merged.set(key, parsed);
+      const previous = merged.get(key(parsed));
+      if (previous === undefined || previous.kind !== "pull_request") {
+        merged.set(key(parsed), parsed);
         continue;
       }
       previous.searchSources = [
@@ -306,6 +456,23 @@ function mergePullRequests(
       }
     }
   }
+
+  for (const entry of issues) {
+    for (const raw of entry.search?.nodes ?? []) {
+      if (raw === null || raw === undefined) continue;
+      const parsed = parseIssue(raw, entry.source);
+      if (parsed === null) continue;
+      const previous = merged.get(key(parsed));
+      if (previous === undefined) {
+        merged.set(key(parsed), parsed);
+        continue;
+      }
+      previous.searchSources = [
+        ...new Set([...previous.searchSources, entry.source]),
+      ];
+    }
+  }
+
   return [...merged.values()];
 }
 
@@ -350,10 +517,13 @@ export function parseGithubResponse(
     fetchedAt,
     requestDurationMs,
     rateLimit: parseRateLimit(data.rateLimit),
-    pullRequests: mergePullRequests([
-      { source: "involved", search: data.involved },
-      { source: "requested", search: data.requested },
-    ]),
+    targets: mergeTargets(
+      [
+        { source: "involved", search: data.prsInvolved },
+        { source: "requested", search: data.prsRequested },
+      ],
+      [{ source: "involved", search: data.issuesInvolved }],
+    ),
   };
 }
 

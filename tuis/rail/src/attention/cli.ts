@@ -20,7 +20,7 @@ import {
   saveObserverState,
 } from "./state.js";
 import type { AttentionItem, ObserverState } from "./types.js";
-import { classifyPullRequest } from "./classify.js";
+import { classifyTarget } from "./classify.js";
 
 const LOG_PATH = `${ATTENTION_STATE_DIR}/observer.log`;
 
@@ -96,15 +96,16 @@ async function refresh(args: string[]): Promise<void> {
     const items: AttentionItem[] = [];
     const ci: ObserverState["ci"] = {};
 
-    for (const pr of snapshot.pullRequests) {
-      items.push(...classifyPullRequest(pr, snapshot.username, config));
+    for (const target of snapshot.targets) {
+      items.push(...classifyTarget(target, snapshot.username, config));
+      if (target.kind !== "pull_request") continue;
       const ciTransition = applyCiTransition(
-        pr,
-        state.ci[`${pr.repository}#${pr.number}`],
+        target,
+        state.ci[`${target.repository}#${target.number}`],
         snapshot.username,
         config,
       );
-      ci[`${pr.repository}#${pr.number}`] = ciTransition.memory;
+      ci[`${target.repository}#${target.number}`] = ciTransition.memory;
       if (ciTransition.item !== null) items.push(ciTransition.item);
     }
 
@@ -155,7 +156,7 @@ async function refresh(args: string[]): Promise<void> {
         ? "initial"
         : `${Math.max(0, Date.parse(now) - Date.parse(previousSync))}ms since last success`;
     await logLine(
-      `refresh ok: ${snapshot.pullRequests.length} PRs, ${items.length} active items, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
+      `refresh ok: ${snapshot.targets.filter((t) => t.kind === "pull_request").length} PRs, ${snapshot.targets.filter((t) => t.kind === "issue").length} issues, ${items.length} active items, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
     );
     console.log(
       `attention refresh: ${items.length} active item${items.length === 1 ? "" : "s"}; ${reconciled.pendingNotifications.length} notification${reconciled.pendingNotifications.length === 1 ? "" : "s"} pending`,

@@ -5,7 +5,7 @@ import {
   validateAttentionConfig,
 } from "../src/attention/config.js";
 import { applyCiTransition } from "../src/attention/ci.js";
-import { classifyPullRequest } from "../src/attention/classify.js";
+import { classifyTarget } from "../src/attention/classify.js";
 import { parseGithubResponse } from "../src/attention/github.js";
 import {
   acknowledgeItem,
@@ -17,7 +17,7 @@ import {
 import type {
   GitHubActor,
   GitHubComment,
-  PullRequestSnapshot,
+  PullRequestTarget,
 } from "../src/attention/types.js";
 
 const human = (login: string): GitHubActor => ({ login, kind: "user" });
@@ -38,9 +38,7 @@ const comment = (
   viewerHasReacted,
 });
 
-const pr = (
-  overrides: Partial<PullRequestSnapshot> = {},
-): PullRequestSnapshot => ({
+const pr = (overrides: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   repository: "example/repo",
   number: 7,
   title: "Improve observer",
@@ -49,7 +47,11 @@ const pr = (
   updatedAt: "2026-08-19T16:00:00Z",
   headSha: "head-1",
   author: human("ryansaxe"),
+  kind: "pull_request",
+  isDraft: false,
+  createdAt: "2026-08-19T10:00:00Z",
   ciState: "SUCCESS",
+  failingChecks: [],
   searchSources: ["involved"],
   reviewRequested: false,
   reviewRequestFingerprint: "",
@@ -83,9 +85,9 @@ const humanThread = pr({
     },
   ],
 });
-assert.equal(classifyPullRequest(humanThread, "ryansaxe", config).length, 1);
+assert.equal(classifyTarget(humanThread, "ryansaxe", config).length, 1);
 assert.equal(
-  classifyPullRequest(humanThread, "ryansaxe", config)[0]?.kind,
+  classifyTarget(humanThread, "ryansaxe", config)[0]?.kind,
   "review_comment",
 );
 
@@ -105,7 +107,7 @@ const botThread = pr({
     },
   ],
 });
-assert.equal(classifyPullRequest(botThread, "ryansaxe", config).length, 0);
+assert.equal(classifyTarget(botThread, "ryansaxe", config).length, 0);
 
 const allowConfig = validateAttentionConfig(
   { actors: { allow: ["claude-reviewer"], ignore: [] }, own_pr_ci: true },
@@ -127,10 +129,7 @@ const allowedBot = pr({
     },
   ],
 });
-assert.equal(
-  classifyPullRequest(allowedBot, "ryansaxe", allowConfig).length,
-  1,
-);
+assert.equal(classifyTarget(allowedBot, "ryansaxe", allowConfig).length, 1);
 assert.throws(
   () =>
     validateAttentionConfig(
@@ -151,7 +150,7 @@ const mentioned = pr({
     ),
   ],
 });
-assert.equal(classifyPullRequest(mentioned, "ryansaxe", config).length, 1);
+assert.equal(classifyTarget(mentioned, "ryansaxe", config).length, 1);
 
 const reacted = pr({
   reviewThreads: [
@@ -170,7 +169,7 @@ const reacted = pr({
     },
   ],
 });
-assert.equal(classifyPullRequest(reacted, "ryansaxe", config).length, 0);
+assert.equal(classifyTarget(reacted, "ryansaxe", config).length, 0);
 
 const ciPr = pr({ ciState: "FAILURE", headSha: "head-1" });
 const firstCi = applyCiTransition(ciPr, undefined, "ryansaxe", config);
@@ -220,7 +219,7 @@ const parsed = parseGithubResponse(
         remaining: 4990,
         resetAt: "2026-08-19T17:00:00Z",
       },
-      involved: {
+      prsInvolved: {
         nodes: [
           {
             number: 7,
@@ -237,7 +236,7 @@ const parsed = parseGithubResponse(
           },
         ],
       },
-      requested: {
+      prsRequested: {
         nodes: [
           {
             number: 7,
@@ -258,15 +257,15 @@ const parsed = parseGithubResponse(
   }),
   21,
 );
-assert.equal(parsed.pullRequests.length, 1);
-assert.deepEqual(parsed.pullRequests[0]?.searchSources.sort(), [
+assert.equal(parsed.targets.length, 1);
+assert.deepEqual(parsed.targets[0]?.searchSources.sort(), [
   "involved",
   "requested",
 ]);
-assert.equal(parsed.pullRequests[0]?.reviewRequested, true);
-assert.equal(parsed.pullRequests[0]?.body, "Review the observer changes.");
+assert.equal(parsed.targets[0]?.reviewRequested, true);
+assert.equal(parsed.targets[0]?.body, "Review the observer changes.");
 
-const reviewItem = classifyPullRequest(mentioned, "ryansaxe", config)[0];
+const reviewItem = classifyTarget(mentioned, "ryansaxe", config)[0];
 assert.ok(reviewItem);
 const reconciled = reconcileAttention(emptyObserverState(), [reviewItem], {});
 assert.equal(reconciled.pendingNotifications.length, 1);
@@ -281,7 +280,7 @@ const checked = acknowledgeItem(reconciled.state, reviewItem.id);
 const checkedAgain = reconcileAttention(checked, [reviewItem], {});
 assert.equal(checkedAgain.pendingNotifications.length, 0);
 
-const newEvent = classifyPullRequest(
+const newEvent = classifyTarget(
   {
     ...mentioned,
     comments: [

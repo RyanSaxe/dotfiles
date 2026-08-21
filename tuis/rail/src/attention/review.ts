@@ -77,6 +77,9 @@ function readSnapshot(path: string, revision: number): ReviewSnapshot {
   const state = parseState(JSON.parse(readFileSync(path, "utf8")) as unknown);
   const items = Object.values(state.items)
     .filter(isAttentionItem)
+    // State written before targets existed has no targetKind; everything
+    // the observer knew about then was a pull request.
+    .map((item) => ({ ...item, targetKind: item.targetKind ?? "pull_request" }))
     .sort(itemSort);
   const acknowledged = new Set(Object.keys(state.acknowledged));
   return {

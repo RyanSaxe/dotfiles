@@ -75,20 +75,32 @@ function paragraphs(text: string): string[] {
 // here — it has its own column, and saying it twice is what made the old
 // table repeat itself.
 function reasonFor(item: AttentionItem, viewerOwnsTarget: boolean): string {
+  const object = item.targetKind === "issue" ? "issue" : "PR";
   switch (item.kind) {
-    case "ci":
-      return "CI failed";
+    case "ci": {
+      const checks = item.context?.failingChecks ?? [];
+      return checks.length > 0
+        ? `CI failed — ${checks.join(", ")}`
+        : "CI failed";
+    }
     case "review_request":
       return "Review requested";
     case "review_comment":
       return "Commented on a review thread";
+    case "opened":
+      return item.targetKind === "issue" ? "New issue opened" : "New PR opened";
     case "conversation":
-      return viewerOwnsTarget ? "Commented on your PR" : "Commented on this PR";
+      return viewerOwnsTarget
+        ? `Commented on your ${object}`
+        : `Commented on this ${object}`;
   }
 }
 
+// Hue follows the object, never the severity — except CI, which is the one
+// genuinely critical state.
 function toneFor(item: AttentionItem): DashboardTone {
-  return item.kind === "ci" ? "ci" : "pull_request";
+  if (item.kind === "ci") return "ci";
+  return item.targetKind === "issue" ? "issue" : "pull_request";
 }
 
 function previewFor(
@@ -105,9 +117,7 @@ function previewFor(
   if (item.kind === "ci") {
     return {
       headline: `CI failed on ${target}`,
-      // Failing check names arrive with the shared target model; the
-      // rollup state alone cannot name them.
-      bullets: [],
+      bullets: context?.failingChecks ?? [],
       body: context?.body ? paragraphs(context.body) : [],
       context: trailer,
     };

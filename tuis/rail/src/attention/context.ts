@@ -1,4 +1,4 @@
-import type { PullRequestSnapshot, ReviewContext } from "./types.js";
+import type { GitHubTarget, ReviewContext } from "./types.js";
 
 // Bodies are stored whole. The preview scrolls, so there is nothing a cap
 // buys except a description that stops mid-sentence. Paragraph breaks are
@@ -11,10 +11,11 @@ function normalizeBody(body: string): string {
     .trim();
 }
 
-export function reviewContext(pr: PullRequestSnapshot): ReviewContext {
+export function reviewContext(target: GitHubTarget): ReviewContext {
   return {
-    body: normalizeBody(pr.body),
-    author: pr.author,
-    ciState: pr.ciState,
+    body: normalizeBody(target.body),
+    author: target.author,
+    ciState: target.kind === "pull_request" ? target.ciState : "UNKNOWN",
+    failingChecks: target.kind === "pull_request" ? target.failingChecks : [],
   };
 }

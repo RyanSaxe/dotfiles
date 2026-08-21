@@ -15,6 +15,7 @@ const VIEWER = "ryansaxe";
 const attention = (over: Partial<AttentionItem> = {}): AttentionItem => ({
   id: "review:fixture",
   kind: "review_comment",
+  targetKind: "pull_request",
   repository: "example/repo",
   number: 7,
   title: "Improve the review seam",
@@ -22,6 +23,7 @@ const attention = (over: Partial<AttentionItem> = {}): AttentionItem => ({
     body: "## Summary\n\nKeep the dashboard context useful and concise.",
     author: { login: VIEWER, kind: "user" },
     ciState: "SUCCESS",
+    failingChecks: [],
   },
   url: "https://github.com/example/repo/pull/7",
   summary: "Please take another look",

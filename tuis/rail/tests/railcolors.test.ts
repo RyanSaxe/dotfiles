@@ -58,6 +58,7 @@ const dimmed = hex(blend(palette.dim, railBg(palette), DIM_KEEP));
 const item = (over: Partial<AttentionItem> = {}): AttentionItem => ({
   id: "x",
   kind: "conversation",
+  targetKind: "pull_request",
   repository: "owner/project",
   number: 12,
   title: "t",
@@ -99,7 +100,7 @@ test("CI is red and issue activity is mauve", () => {
     hex(blend(palette.red, railBg(palette), DIM_KEEP)),
   );
   const issue = reviewRows(
-    snapshot([item({ kind: "issue_comment" })]),
+    snapshot([item({ targetKind: "issue" })]),
     palette,
     40,
   )
