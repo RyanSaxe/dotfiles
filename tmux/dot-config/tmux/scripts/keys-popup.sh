@@ -1,7 +1,7 @@
 #!/bin/sh
 # Keybind cheatsheet (alt+/): every chord across tmux, aerospace, ghostty,
 # and zsh, fuzzy-searchable. keys.tsv is the curated source of truth,
-# drift-checked against the configs by dev/keycheck.py in prek/CI.
+# drift-checked against the configs by ci/keycheck.py in prek/CI.
 set -eu
 
 KEYS="$HOME/.config/tmux/keys.tsv"

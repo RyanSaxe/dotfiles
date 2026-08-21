@@ -150,19 +150,19 @@ repos:
         args:
           [
             "-c",
-            "command -v zsh >/dev/null 2>&1 || exit 0; sh dev/escalate-check.sh",
+            "command -v zsh >/dev/null 2>&1 || exit 0; sh ci/escalate-check.sh",
           ]
         pass_filenames: false
-        files: "^(workmux/dot-local/bin/workmux-escalate-idle|dev/escalate-check\\.sh)$"
+        files: "^(workmux/dot-local/bin/workmux-escalate-idle|ci/escalate-check\\.sh)$"
 
       # New worktrees receive copies of every ignored file, including nested
       # data and dotfiles, without copying unrelated untracked files.
       - id: workmux-copy-ignored-check
         name: copy ignored files (workmux hook)
         language: system
-        entry: zsh dev/workmux-copy-ignored-check.zsh
+        entry: zsh ci/workmux-copy-ignored-check.zsh
         pass_filenames: false
-        files: "^(workmux/dot-local/bin/workmux-copy-ignored|workmux/dot-config/workmux/config\\.yaml|dev/workmux-copy-ignored-check\\.zsh)$"
+        files: "^(workmux/dot-local/bin/workmux-copy-ignored|workmux/dot-config/workmux/config\\.yaml|ci/workmux-copy-ignored-check\\.zsh)$"
 
       # Strict Lua typecheck (no-unknown: annotations are required), same
       # engine and .luarc.json as the editor. Skips cleanly where nvim
@@ -175,10 +175,10 @@ repos:
         args:
           [
             "-c",
-            "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l dev/luals-check.lua",
+            "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l ci/luals-check.lua",
           ]
         pass_filenames: false
-        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|dev/luals-check\.lua)$'
+        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|ci/luals-check\.lua)$'
 
       # LuaLS reports what it cannot INFER; it says nothing about an
       # inferable-but-undocumented function. This is the other half:
@@ -191,10 +191,10 @@ repos:
         args:
           [
             "-c",
-            "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l dev/annotation-check.lua",
+            "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l ci/annotation-check.lua",
           ]
         pass_filenames: false
-        files: '^(nvim/.*\.lua|dev/.*\.lua)$'
+        files: '^(nvim/.*\.lua|ci/.*\.lua)$'
 
       # The one check that opens a real editor. `.luarc.json` must never
       # name libraries: LuaLS gives it precedence over client settings, so
@@ -207,28 +207,28 @@ repos:
         args:
           [
             "-c",
-            "command -v nvim >/dev/null 2>&1 || exit 0; nvim --headless -c 'luafile dev/editor-parity.lua'",
+            "command -v nvim >/dev/null 2>&1 || exit 0; nvim --headless -c 'luafile ci/editor-parity.lua'",
           ]
         pass_filenames: false
-        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|dev/editor-parity\.lua)$'
+        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|ci/editor-parity\.lua)$'
 
       # The keybind cheatsheet (alt+/) can never drift: every chord bound
       # in tmux.conf and aerospace.toml must have a keys.tsv row.
       - id: keycheck
         name: keycheck (cheatsheet drift)
         language: system
-        entry: uv run -q --script dev/keycheck.py
+        entry: uv run -q --script ci/keycheck.py
         pass_filenames: false
-        files: '^(tmux/dot-config/tmux/(tmux\.conf|keys\.tsv)|aerospace/dot-config/aerospace/aerospace\.toml|ghostty/dot-config/ghostty/config|zsh/dot-zshrc|dev/keycheck\.py)$'
+        files: '^(tmux/dot-config/tmux/(tmux\.conf|keys\.tsv)|aerospace/dot-config/aerospace/aerospace\.toml|ghostty/dot-config/ghostty/config|zsh/dot-zshrc|ci/keycheck\.py)$'
 
       # The global AI layer stays additive: authored skills/config are valid,
       # and no mutable harness or third-party state enters the repository.
       - id: ai-harness-check
         name: ai-harness contract
         language: system
-        entry: uv run -q --script dev/ai-harness-check.py
+        entry: uv run -q --script ci/ai-harness-check.py
         pass_filenames: false
-        files: '^(ai-harness/|dev/ai-harness-check\.py$)'
+        files: '^(ai-harness/|ci/ai-harness-check\.py$)'
 
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.

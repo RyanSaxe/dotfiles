@@ -99,11 +99,12 @@ once the Obsidian source exists.
 
 ## Iterating on the look
 
-`dev/` holds the loop used to judge cells without touching a live client:
+`scripts/` holds the loop used to judge cells without touching a live client,
+and `tests/` holds the suite:
 
 ```sh
-npx tsx dev/goldframe.ts | uv run -q --script dev/ansi2png.py frame.png
-XDG_STATE_HOME=$(mktemp -d) npx tsx dev/ackcheck.ts   # ack lifecycle
+npx tsx scripts/goldframe.ts | uv run -q --script scripts/ansi2png.py frame.png
+npm test                                            # the whole suite
 ```
 
 `TUIS_COLORS_PATH` pins an alternate palette (light-mode checks);

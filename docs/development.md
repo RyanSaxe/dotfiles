@@ -12,6 +12,31 @@ prek run --all-files                  # run every check manually
 Nothing in this repo is checked by review alone. If a rule matters, it is a
 hook — and when a hook fails, the fix is the code, not a suppression.
 
+## Where things live
+
+Three directories, split by what a file _is_ rather than who happens to run
+it:
+
+| Directory  | Holds                                                                      |
+| ---------- | -------------------------------------------------------------------------- |
+| `ci/`      | check scripts invoked by a pre-commit hook — bespoke, one entry point each |
+| `scripts/` | tools you run by hand, kept because they stay useful                       |
+| `tests/`   | suites a test runner discovers and reports on (`pytest`, `node --test`)    |
+
+Packages follow the same split locally: `tuis/rail/tests/` is the rail's
+suite, `tuis/rail/scripts/` its render tools.
+
+A throwaway debugging script belongs in none of them — delete it when the bug
+is fixed. If it survives because it turned out to be genuinely useful, it has
+earned a place in `scripts/`.
+
+Tests must not read machine state. A suite that asserts against the live
+theme, the real acknowledgment file, or the current mascot fails for reasons
+that have nothing to do with the change under test. Point the environment at
+a fixture and a temporary directory instead — the rail's `npm test` sets
+`TUIS_COLORS_PATH` and `XDG_STATE_HOME` before node starts, because both are
+read at import time.
+
 ## What the gate enforces
 
 | Language   | Checks                                                       |
@@ -32,12 +57,12 @@ escalation-hook checks.
 Lua is held to the same standard as TypeScript or Python here, which takes two
 tools because neither is sufficient alone.
 
-**`dev/luals-check.lua`** runs the same `lua-language-server` the editor runs,
+**`ci/luals-check.lua`** runs the same `lua-language-server` the editor runs,
 with `no-unknown` at `Any!` — nothing may have an uninferable type. It resolves
 the nvim runtime and every installed plugin as typed libraries, so CI sees what
 the editor sees.
 
-**`dev/annotation-check.lua`** covers what LuaLS structurally cannot. LuaLS
+**`ci/annotation-check.lua`** covers what LuaLS structurally cannot. LuaLS
 reports what it cannot _infer_; it is silent about a function that happens to be
 inferable but is undocumented. This passes a strict LuaLS run cleanly:
 
