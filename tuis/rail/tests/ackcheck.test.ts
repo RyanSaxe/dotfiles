@@ -1,7 +1,6 @@
-// Exercises the visit-clears ack lifecycle against an isolated state dir
-// (set XDG_STATE_HOME before running) and fails loudly on any deviation.
-//
-//   XDG_STATE_HOME=$(mktemp -d) npx tsx dev/ackcheck.ts
+// Exercises the visit-clears ack lifecycle and fails loudly on any
+// deviation. `npm test` runs every test under a throwaway XDG_STATE_HOME,
+// so this never touches the real acks.
 
 import assert from "node:assert/strict";
 

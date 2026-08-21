@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { rank, scoreFields, scoreTerm } from "./search.js";
+import { rank, scoreFields, scoreTerm } from "../src/search.js";
 
 // The bug this module exists to fix: the old filter tested whether a query
 // was a subsequence of every field joined together, so `/asdf` matched all

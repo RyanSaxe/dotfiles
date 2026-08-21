@@ -5,7 +5,7 @@
   "description": "In-terminal sidebar: tmux windows + agent status, themed by the dotfiles theme system",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/*.test.ts"
+    "test": "XDG_STATE_HOME=\"$(mktemp -d)\" TUIS_COLORS_PATH=tests/fixtures/tuis-colors.json node --import tsx --test tests/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

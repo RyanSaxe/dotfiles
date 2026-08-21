@@ -2,7 +2,7 @@
 // ride a phone ping (transitions vs departure sweep). Terminal focus is
 // tmux's own client_flags now, exercised by ackcheck.
 //
-//   npx tsx dev/attncheck.ts
+//   npm test
 
 import assert from "node:assert/strict";
 

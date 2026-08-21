@@ -3,7 +3,7 @@
 // (working / waiting / done), urgency sorting, and truncation. Pipe the
 // output through ansi2png.py to judge cells against the design.
 //
-//   npx tsx dev/goldframe.ts | uv run -q --script dev/ansi2png.py gold.png
+//   npx tsx scripts/goldframe.ts | uv run -q --script scripts/ansi2png.py gold.png
 
 import type { RailData } from "../src/data.js";
 import { assignHints } from "../src/hints.js";

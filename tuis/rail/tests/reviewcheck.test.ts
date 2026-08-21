@@ -37,6 +37,7 @@ const palette: Palette = {
   dim: "#7f849c",
   dim2: "#6c7086",
   lavender: "#b4befe",
+  yellow: "#f9e2af",
   mauve: "#cba6f7",
   peach: "#fab387",
   green: "#a6e3a1",

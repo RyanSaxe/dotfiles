@@ -14,6 +14,7 @@ export interface Palette {
   dim: string;
   dim2: string;
   lavender: string;
+  yellow: string;
   mauve: string;
   peach: string;
   green: string;

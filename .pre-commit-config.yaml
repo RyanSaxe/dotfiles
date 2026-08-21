@@ -125,37 +125,19 @@ repos:
         pass_filenames: false
         files: "^tuis/rail/"
 
-      # The rail's behavioral test: the visit-clears ack lifecycle,
-      # against a throwaway state dir.
-      - id: rail-ackcheck
-        name: ackcheck (rail)
-        language: node
-        additional_dependencies: ["tsx@4.19.2"]
+      # The rail's whole suite in one hook: ack lifecycle, attention
+      # routing, review classification/CI transitions, tab registry, and
+      # search ranking. Runs against a throwaway state dir and a fixture
+      # palette, so it never reads the machine's live theme or acks.
+      - id: rail-test
+        name: npm test (rail)
+        language: system
         entry: sh
         args:
-          ["-c", "XDG_STATE_HOME=$(mktemp -d) tsx tuis/rail/dev/ackcheck.ts"]
-        pass_filenames: false
-        files: "^tuis/rail/"
-
-      # The rail's attention routing: presence, terminal focus, and the
-      # transition/departure-sweep phone batch.
-      - id: rail-attncheck
-        name: attncheck (rail)
-        language: node
-        additional_dependencies: ["tsx@4.19.2"]
-        entry: sh
-        args: ["-c", "tsx tuis/rail/dev/attncheck.ts"]
-        pass_filenames: false
-        files: "^tuis/rail/"
-
-      # Account-wide review classification, CI transition, parser, and local
-      # acknowledgment behavior. This fixture never contacts GitHub.
-      - id: rail-attentioncheck
-        name: attentioncheck (rail)
-        language: node
-        additional_dependencies: ["tsx@4.19.2"]
-        entry: sh
-        args: ["-c", "tsx tuis/rail/dev/attentioncheck.ts"]
+          [
+            "-c",
+            "command -v npm >/dev/null 2>&1 || exit 0; cd tuis/rail && { [ -d node_modules ] || npm ci --silent --no-audit --no-fund; } && npm test --silent",
+          ]
         pass_filenames: false
         files: "^tuis/rail/"
 

@@ -305,7 +305,7 @@ function tableItem(
       ],
       neutral,
       {
-        color: palette.notify,
+        color: palette.yellow,
         // Cell 0 is the row number, so a field at i renders in cell i + 1.
         hits: new Map(
           [...hits].map(([field, positions]) => [field + 1, positions]),
