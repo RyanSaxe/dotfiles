@@ -19,6 +19,15 @@ export interface DashboardPreview {
   context: readonly string[];
 }
 
+// A metadata run carries meaning, not a colour: the table maps tones to the
+// palette so the data layer never needs to know a hex.
+export type MetaTone = "add" | "delete" | "change" | "muted";
+
+export interface MetaSpan {
+  text: string;
+  tone: MetaTone;
+}
+
 export interface DashboardItem {
   id: string;
   // owner/name. Rows are grouped under it, so it is a heading, not a column.
@@ -32,6 +41,8 @@ export interface DashboardItem {
   author: string;
   authorIsViewer: boolean;
   reason: string;
+  // Diff size for a pull request, labels for an issue.
+  metadata: readonly MetaSpan[];
   time: string;
   title: string;
   url: string | null;
@@ -52,6 +63,9 @@ export interface DashboardHandlers {
   open(item: DashboardItem): Promise<void>;
   browser(item: DashboardItem): Promise<void>;
   acknowledge(item: DashboardItem): Promise<void>;
+  // Pre-coloured diff lines, or a single explanatory line for anything that
+  // has no diff. Never null — an empty result would look like a hang.
+  diff(item: DashboardItem): Promise<string[]>;
 }
 
 type DashboardKey =
@@ -63,6 +77,8 @@ type DashboardKey =
   | "refresh"
   | "scrollUp"
   | "scrollDown"
+  | "diff"
+  | "back"
   | "quit"
   | null;
 
@@ -85,8 +101,53 @@ export const EMPTY_CELL = "—";
 // that nothing scrolls past unseen.
 const PREVIEW_SCROLL = 6;
 
+// Escape sequences occupy no columns. Anything that measures a line which
+// may carry colour has to strip them first, or every border lands wrong.
+const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
+
+// Colour is welcome inside our layout; cursor movement and erase are not.
+// Delta ends its lines with `\x1b[0K`, which erases to the right edge and
+// would wipe the padding and background we just drew. Keep SGR, drop the
+// rest.
+export function sanitizeAnsi(text: string): string {
+  return text.replace(ANSI, (sequence) =>
+    sequence.endsWith("m") ? sequence : "",
+  );
+}
+
 function widthOf(text: string): number {
   return Array.from(text).length;
+}
+
+export function visibleWidth(text: string): number {
+  return widthOf(text.replace(ANSI, ""));
+}
+
+// Clip a coloured line to a column budget without cutting an escape in half.
+// Delta does not wrap long content lines even when given --width, so a README
+// diff can hand us a 458-column line; letting it through would wrap in the
+// terminal and push the footer off the frame.
+export function clipAnsi(text: string, width: number): string {
+  if (width <= 0) return "";
+  if (visibleWidth(text) <= width) return text;
+  let out = "";
+  let used = 0;
+  let index = 0;
+  while (index < text.length && used < width) {
+    if (text[index] === "\x1b") {
+      ANSI.lastIndex = index;
+      const match = ANSI.exec(text);
+      if (match !== null && match.index === index) {
+        out += match[0];
+        index += match[0].length;
+        continue;
+      }
+    }
+    out += text[index];
+    used += 1;
+    index += 1;
+  }
+  return `${out}${RESET}`;
 }
 
 function clip(text: string, width: number): string {
@@ -117,6 +178,19 @@ function ruleColor(palette: Palette): string {
 
 function mutedColor(palette: Palette): string {
   return blend(palette.dim, background(palette), 0.72);
+}
+
+function metaColor(tone: MetaTone, palette: Palette): string {
+  switch (tone) {
+    case "add":
+      return palette.diffAdd;
+    case "delete":
+      return palette.diffDelete;
+    case "change":
+      return palette.diffChange;
+    case "muted":
+      return blend(palette.dim2, background(palette), 0.85);
+  }
 }
 
 function toneColor(tone: DashboardTone, palette: Palette): string {
@@ -209,6 +283,32 @@ function panelRule(
 // The closing border has to be placed at the panel's edge, not after the
 // text. `content` pads at the very end of a line, so without reserving the
 // inner width here every preview row ends in a stray `│`.
+// A pre-coloured line — bat or delta output — placed inside the panel. The
+// colours pass through untouched; only the width is measured, so the closing
+// border lands in the right column. Reset before the padding so a background
+// set by the content cannot bleed into it.
+function panelRawLine(width: number, palette: Palette, raw: string): string {
+  const inner = Math.max(0, width - 4);
+  const body = clipAnsi(sanitizeAnsi(raw), inner);
+  const used = visibleWidth(body);
+  const rule = ruleColor(palette);
+  const panel = background(palette);
+  return (
+    bg(panel) +
+    fg(rule) +
+    "│ " +
+    RESET +
+    bg(panel) +
+    body +
+    RESET +
+    bg(panel) +
+    " ".repeat(Math.max(0, inner - used)) +
+    fg(rule) +
+    " │" +
+    RESET
+  );
+}
+
 function panelLine(width: number, palette: Palette, cells: Cell[]): string {
   const inner = Math.max(0, width - 4);
   const clipped: Cell[] = [];
@@ -268,16 +368,17 @@ function tableWidths(width: number): number[] {
   // #, PR, From, Author and Age are fixed; the reason column takes the slack
   // because it is the only cell whose content varies in length.
   const fixed = [4, 7, 11, 11];
+  const meta = 14;
   const age = 6;
   const reason = Math.max(
     16,
-    width - gap * 5 - fixed.reduce((sum, value) => sum + value, 0) - age,
+    width - gap * 6 - fixed.reduce((sum, value) => sum + value, 0) - meta - age,
   );
-  return [...fixed, reason, age];
+  return [...fixed, reason, meta, age];
 }
 
 function tableCells(
-  values: string[],
+  values: Array<string | Cell[]>,
   widths: number[],
   colors: string[],
   gapColor: string,
@@ -289,15 +390,30 @@ function tableCells(
   const cells: Cell[] = [];
   values.forEach((value, index) => {
     if (index > 0) cells.push({ text: "  ", color: gapColor });
-    cells.push(
-      ...columnCells(
-        value,
-        widths[index] ?? 0,
-        colors[index] ?? colors[0] ?? "",
-        highlight?.color ?? null,
-        highlight?.hits.get(index) ?? [],
-      ),
-    );
+    const columnWidth = widths[index] ?? 0;
+    if (typeof value === "string") {
+      cells.push(
+        ...columnCells(
+          value,
+          columnWidth,
+          colors[index] ?? colors[0] ?? "",
+          highlight?.color ?? null,
+          highlight?.hits.get(index) ?? [],
+        ),
+      );
+      return;
+    }
+    // A pre-coloured column: each run keeps its own colour, and the cell is
+    // padded to width so the columns after it still line up.
+    let used = 0;
+    for (const cell of value) {
+      if (used >= columnWidth) break;
+      const text = clip(cell.text, columnWidth - used);
+      cells.push({ ...cell, text });
+      used += widthOf(text);
+    }
+    if (used < columnWidth)
+      cells.push({ text: " ".repeat(columnWidth - used) });
   });
   return cells;
 }
@@ -309,7 +425,7 @@ function tableHeader(width: number, palette: Palette): string {
     width,
     palette,
     tableCells(
-      ["#", "PR", "From", "Author", "Needs you", "Age"],
+      ["#", "PR", "From", "Author", "Needs you", "Size", "Age"],
       widths,
       Array.from({ length: widths.length }, () => muted),
       muted,
@@ -356,6 +472,10 @@ function tableItem(
         item.from,
         item.author,
         item.reason,
+        item.metadata.map((span) => ({
+          text: span.text,
+          color: metaColor(span.tone, palette),
+        })),
         item.time,
       ],
       widths,
@@ -367,6 +487,7 @@ function tableItem(
         item.from === EMPTY_CELL ? muted : palette.text,
         item.authorIsViewer ? muted : palette.text,
         tone,
+        muted,
         muted,
       ],
       muted,
@@ -463,13 +584,17 @@ function wrapText(text: string, width: number): string[] {
 // P2: lead with the trigger, then the specifics, then dim context. Nothing
 // here repeats the row — the table already said the repository, number and
 // age, and saying them twice is what made the old panel read as a dump.
+// A panel row is either cells we colour ourselves or a line that already
+// carries its own escapes.
+type PanelRow = Cell[] | { raw: string };
+
 function previewLines(
   data: DashboardData,
   selected: DashboardItem | undefined,
   palette: Palette,
   query: string,
   width: number,
-): Cell[][] {
+): PanelRow[] {
   const muted = mutedColor(palette);
   if (selected === undefined) {
     return [
@@ -485,7 +610,7 @@ function previewLines(
   const inner = Math.max(8, width - 6);
   const tone = toneColor(selected.tone, palette);
   const dim = blend(palette.dim, background(palette), 0.85);
-  const lines: Cell[][] = [
+  const lines: PanelRow[] = [
     [],
     [{ text: selected.preview.headline, color: tone }],
   ];
@@ -501,11 +626,18 @@ function previewLines(
   }
 
   if (selected.preview.body.length > 0) {
-    for (const paragraph of selected.preview.body) {
-      lines.push([]);
-      for (const wrapped of wrapText(paragraph, inner)) {
-        lines.push([{ text: wrapped, color: palette.text }]);
+    lines.push([]);
+    for (const rendered of selected.preview.body) {
+      // bat wraps its own output, so a coloured line passes through as-is —
+      // re-wrapping would split an escape sequence. The plain fallback has
+      // no escapes and does need wrapping.
+      if (!rendered.includes("\x1b") && visibleWidth(rendered) > inner) {
+        for (const wrapped of wrapText(rendered, inner)) {
+          lines.push({ raw: wrapped });
+        }
+        continue;
       }
+      lines.push({ raw: rendered });
     }
   }
 
@@ -588,6 +720,75 @@ export function rankDashboardItems(
   query: string,
 ): RankedItem[] {
   return rank(items, query, searchFields);
+}
+
+// A whole-width line carrying its own colour. The diff view is deliberately
+// full-bleed: the tmux popup already draws a border, and without side
+// borders there is no padding arithmetic to get wrong.
+function fullWidthRawLine(
+  width: number,
+  palette: Palette,
+  raw: string,
+): string {
+  const clipped = clipAnsi(sanitizeAnsi(raw), width);
+  const used = visibleWidth(clipped);
+  return (
+    bg(background(palette)) +
+    clipped +
+    RESET +
+    bg(background(palette)) +
+    " ".repeat(Math.max(0, width - used)) +
+    RESET
+  );
+}
+
+export function renderDiffView(
+  title: string,
+  diffLines: readonly string[],
+  offset: number,
+  palette: Palette,
+  columns: number,
+  rows: number,
+): string {
+  const width = Math.max(64, columns);
+  const height = Math.max(16, rows);
+  const muted = mutedColor(palette);
+  const capacity = Math.max(1, height - 3);
+  const maxOffset = Math.max(0, diffLines.length - capacity);
+  const at = Math.min(Math.max(0, offset), maxOffset);
+
+  const lines: string[] = [
+    line(width, palette, [
+      { text: " ", color: palette.text },
+      { text: title, color: palette.text },
+    ]),
+    rule(width, palette),
+  ];
+  for (const raw of diffLines.slice(at, at + capacity)) {
+    lines.push(fullWidthRawLine(width, palette, raw));
+  }
+  while (lines.length < height - 1) lines.push(line(width, palette, []));
+
+  const position =
+    maxOffset === 0
+      ? ""
+      : `  ${at + 1}-${Math.min(at + capacity, diffLines.length)} of ${diffLines.length}`;
+  const keys: Array<[string, string]> = [
+    ["j/k", "Scroll"],
+    ["^u/^d", "Page"],
+    ["b", "Browser"],
+    ["q", "Back"],
+  ];
+  const cells: Cell[] = [];
+  keys.forEach(([key, label], index) => {
+    if (index > 0) cells.push({ text: " │ ", color: ruleColor(palette) });
+    cells.push({ text: key, color: palette.text });
+    cells.push({ text: ` ${label}`, color: muted });
+  });
+  if (position !== "") cells.push({ text: position, color: muted });
+  lines.push(line(width, palette, cells));
+
+  return `${CLEAR}${lines.slice(0, height).join("\n")}`;
 }
 
 export function renderDashboard(
@@ -690,8 +891,13 @@ export function renderDashboard(
   const visible = content.slice(offset, offset + room);
 
   lines.push(panelRule(width, palette, "top", previewTitle));
-  for (const previewLine of visible)
-    lines.push(panelLine(width, palette, previewLine));
+  for (const previewLine of visible) {
+    lines.push(
+      Array.isArray(previewLine)
+        ? panelLine(width, palette, previewLine)
+        : panelRawLine(width, palette, previewLine.raw),
+    );
+  }
   for (let index = visible.length; index < room; index += 1)
     lines.push(panelLine(width, palette, []));
   if (overflows) {
@@ -731,6 +937,8 @@ function keyFor(chunk: string): DashboardKey {
       return "open";
     case "b":
       return "browser";
+    case "d":
+      return "diff";
     // Acknowledge is `x` so Ctrl-u/Ctrl-d can keep their vi meaning on the
     // preview panel.
     case "x":
@@ -778,6 +986,11 @@ export async function runDashboard(
   let query = "";
   let searching = false;
   let previewOffset = 0;
+  // The diff is a mode of this dashboard, not a separate program: `q` returns
+  // to the list rather than closing the popup.
+  let diffLines: string[] | null = null;
+  let diffTitle = "";
+  let diffOffset = 0;
   const input = process.stdin;
   const output = process.stdout;
 
@@ -785,6 +998,19 @@ export async function runDashboard(
     rankDashboardItems(data.items, query).map((entry) => entry.item);
 
   const render = (): void => {
+    if (diffLines !== null) {
+      output.write(
+        renderDiffView(
+          diffTitle,
+          diffLines,
+          diffOffset,
+          loadPalette(),
+          output.columns ?? 100,
+          output.rows ?? 30,
+        ),
+      );
+      return;
+    }
     const maxIndex = Math.max(0, visibleItems().length - 1);
     selectedIndex = Math.min(selectedIndex, maxIndex);
     output.write(
@@ -819,13 +1045,21 @@ export async function runDashboard(
     const runAction = async (
       action: Extract<
         DashboardKey,
-        "open" | "browser" | "acknowledge" | "refresh"
+        "open" | "browser" | "acknowledge" | "refresh" | "diff"
       >,
     ): Promise<void> => {
       const item = visibleItems()[selectedIndex];
       if (action !== "refresh" && item === undefined) return;
       busy = true;
       try {
+        if (action === "diff" && item !== undefined) {
+          diffTitle = `${item.repository}${item.reference}  fetching diff…`;
+          diffLines = [];
+          diffOffset = 0;
+          render();
+          diffLines = await handlers.diff(item);
+          diffTitle = `${item.repository}${item.reference}`;
+        }
         if (action === "open" && item !== undefined) await handlers.open(item);
         if (action === "browser" && item !== undefined)
           await handlers.browser(item);
@@ -844,7 +1078,7 @@ export async function runDashboard(
         data = errorData(data, error);
       } finally {
         busy = false;
-        previewOffset = 0;
+        if (action !== "diff") previewOffset = 0;
         render();
       }
     };
@@ -883,6 +1117,29 @@ export async function runDashboard(
       const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
       if (searching) {
         onSearchData(text);
+        return;
+      }
+      if (diffLines !== null) {
+        const key = keyFor(text);
+        if (text === "\u0003") {
+          finish();
+          return;
+        }
+        if (key === "quit" || key === "back") {
+          diffLines = null;
+          render();
+          return;
+        }
+        if (key === "up") diffOffset = Math.max(0, diffOffset - 1);
+        else if (key === "down") diffOffset += 1;
+        else if (key === "scrollUp")
+          diffOffset = Math.max(0, diffOffset - PREVIEW_SCROLL);
+        else if (key === "scrollDown") diffOffset += PREVIEW_SCROLL;
+        else if (key === "browser") {
+          void runAction("browser");
+          return;
+        }
+        render();
         return;
       }
       if (text === "/") {
@@ -924,7 +1181,8 @@ export async function runDashboard(
         render();
         return;
       }
-      if (key !== null) void runAction(key);
+      if (key === "back" || key === null) return;
+      void runAction(key);
     };
 
     input.on("data", onData);

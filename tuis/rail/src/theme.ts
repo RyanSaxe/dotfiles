@@ -15,6 +15,11 @@ export interface Palette {
   dim2: string;
   lavender: string;
   yellow: string;
+  // Diff semantics, deliberately muted so they never compete with the
+  // attention hues. See notes/handoff/theme-role-completion.md.
+  diffAdd: string;
+  diffDelete: string;
+  diffChange: string;
   mauve: string;
   peach: string;
   green: string;

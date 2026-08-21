@@ -25,6 +25,7 @@ const demo = (
   time: string,
   tone: DashboardItem["tone"],
   preview: DashboardItem["preview"],
+  metadata: DashboardItem["metadata"] = [],
 ): DashboardItem => ({
   id: `${repository}${reference}`,
   repository,
@@ -33,6 +34,7 @@ const demo = (
   author,
   authorIsViewer,
   reason,
+  metadata,
   time,
   title: preview.context[0] ?? "",
   url: null,
@@ -61,6 +63,13 @@ const DEMO: DashboardData = {
         body: [],
         context: ["Test PR 2: Add return value documentation"],
       },
+      [
+        { text: "+603", tone: "add" },
+        { text: " ", tone: "muted" },
+        { text: "-5", tone: "delete" },
+        { text: " ", tone: "muted" },
+        { text: "14f", tone: "change" },
+      ],
     ),
     demo(
       "RyanSaxe/buffergolf.nvim",
@@ -77,6 +86,13 @@ const DEMO: DashboardData = {
         body: ["Clarifies when the plugin disables itself during a session."],
         context: ["Clarify plugin disabling timing", "opened by @alice"],
       },
+      [
+        { text: "+18", tone: "add" },
+        { text: " ", tone: "muted" },
+        { text: "-4", tone: "delete" },
+        { text: " ", tone: "muted" },
+        { text: "2f", tone: "change" },
+      ],
     ),
     demo(
       "RyanSaxe/dotfiles-v2",
@@ -95,6 +111,13 @@ const DEMO: DashboardData = {
         ],
         context: ["feat(rail): add review workspaces"],
       },
+      [
+        { text: "+341", tone: "add" },
+        { text: " ", tone: "muted" },
+        { text: "-96", tone: "delete" },
+        { text: " ", tone: "muted" },
+        { text: "11f", tone: "change" },
+      ],
     ),
     demo(
       "RyanSaxe/dotfiles-v2",
@@ -113,6 +136,7 @@ const DEMO: DashboardData = {
         ],
         context: ["Rail flickers on theme switch"],
       },
+      [{ text: "bug", tone: "muted" }],
     ),
     demo(
       "someorg/infra",
@@ -129,6 +153,13 @@ const DEMO: DashboardData = {
         body: ["Rotates the staging credentials and drops the unused role."],
         context: ["Rotate staging credentials", "opened by @dana"],
       },
+      [
+        { text: "+41", tone: "add" },
+        { text: " ", tone: "muted" },
+        { text: "-12", tone: "delete" },
+        { text: " ", tone: "muted" },
+        { text: "3f", tone: "change" },
+      ],
     ),
     demo(
       "someorg/infra",
@@ -145,6 +176,7 @@ const DEMO: DashboardData = {
         body: ["Deploys intermittently fail to pick up the new secret."],
         context: ["Deploy misses rotated secret", "opened by @erin"],
       },
+      [{ text: "enhancement", tone: "muted" }],
     ),
   ],
 };

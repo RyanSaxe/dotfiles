@@ -49,6 +49,9 @@ const pr = (overrides: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   author: human("ryansaxe"),
   kind: "pull_request",
   isDraft: false,
+  additions: 0,
+  deletions: 0,
+  changedFiles: 0,
   createdAt: "2026-08-19T10:00:00Z",
   ciState: "SUCCESS",
   failingChecks: [],
@@ -262,7 +265,12 @@ assert.deepEqual(parsed.targets[0]?.searchSources.sort(), [
   "involved",
   "requested",
 ]);
-assert.equal(parsed.targets[0]?.reviewRequested, true);
+const first = parsed.targets[0];
+assert.equal(first?.kind, "pull_request");
+assert.equal(
+  first?.kind === "pull_request" ? first.reviewRequested : null,
+  true,
+);
 assert.equal(parsed.targets[0]?.body, "Review the observer changes.");
 
 const reviewItem = classifyTarget(mentioned, "ryansaxe", config)[0];

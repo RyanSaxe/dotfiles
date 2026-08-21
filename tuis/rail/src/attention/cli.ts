@@ -130,24 +130,38 @@ async function refresh(args: string[]): Promise<void> {
       endpoint !== null &&
       reconciled.pendingNotifications.length > 0
     ) {
-      await sendNtfy(
-        {
-          title: `${reconciled.pendingNotifications.length} GitHub item${reconciled.pendingNotifications.length === 1 ? "" : "s"} need you`,
-          body: notificationBody(reconciled.pendingNotifications, previousSync),
-          priority: reconciled.pendingNotifications.some(
-            (item) => item.priority === "high",
-          )
-            ? "high"
-            : "default",
-          tags: ["github", "review"],
-        },
-        endpoint,
-      );
-      state = markNotified(
-        state,
-        reconciled.pendingNotifications.map((item) => item.id),
-        now,
-      );
+      // A failure here must not look like a GitHub failure. The items are
+      // already stored and still correct; only their delivery failed, so it
+      // is logged and recorded separately rather than backing off the poll.
+      try {
+        await sendNtfy(
+          {
+            title: `${reconciled.pendingNotifications.length} GitHub item${reconciled.pendingNotifications.length === 1 ? "" : "s"} need you`,
+            body: notificationBody(
+              reconciled.pendingNotifications,
+              previousSync,
+            ),
+            priority: reconciled.pendingNotifications.some(
+              (item) => item.priority === "high",
+            )
+              ? "high"
+              : "default",
+            tags: ["github", "review"],
+          },
+          endpoint,
+        );
+        state = markNotified(
+          state,
+          reconciled.pendingNotifications.map((item) => item.id),
+          now,
+        );
+        state = { ...state, lastNotifyError: null };
+      } catch (error) {
+        // Left un-notified on purpose: the next poll retries delivery.
+        const message = errorMessage(error);
+        state = { ...state, lastNotifyError: message };
+        await logLine(`notify failed: ${message}`);
+      }
       await saveObserverState(state);
     }
 
@@ -192,6 +206,7 @@ async function status(): Promise<void> {
   console.log(`last success: ${state.lastSuccessfulSyncAt ?? "never"}`);
   console.log(`last attempt: ${state.lastAttemptAt ?? "never"}`);
   console.log(`last error: ${state.lastError ?? "none"}`);
+  console.log(`last notify error: ${state.lastNotifyError ?? "none"}`);
   console.log(`retry after: ${state.retryAfter ?? "none"}`);
   console.log(`active items: ${items.length}`);
   console.log(`unacknowledged: ${pending.length}`);

@@ -24,6 +24,10 @@ const attention = (over: Partial<AttentionItem> = {}): AttentionItem => ({
     author: { login: VIEWER, kind: "user" },
     ciState: "SUCCESS",
     failingChecks: [],
+    additions: 603,
+    deletions: 5,
+    changedFiles: 14,
+    labels: [],
   },
   url: "https://github.com/example/repo/pull/7",
   summary: "Please take another look",
@@ -45,6 +49,9 @@ const palette: Palette = {
   dim2: "#6c7086",
   lavender: "#b4befe",
   yellow: "#f9e2af",
+  diffAdd: "#60a474",
+  diffDelete: "#c16771",
+  diffChange: "#6197cd",
   mauve: "#cba6f7",
   peach: "#fab387",
   green: "#a6e3a1",
@@ -182,4 +189,52 @@ test("search still ranks and reports its count", () => {
     frame([item], {}, 0, "reviewer", true),
     /\/reviewer · 1\/1 matches/,
   );
+});
+
+test("a pull request is sized by its diff, an issue by its labels", () => {
+  const pr = reviewItem(attention(), VIEWER);
+  assert.deepEqual(
+    pr.metadata.map((span) => span.text),
+    ["+603", " ", "-5", " ", "14f"],
+  );
+  assert.deepEqual(
+    pr.metadata.filter((span) => span.tone !== "muted").map((s) => s.tone),
+    ["add", "delete", "change"],
+  );
+
+  const issue = reviewItem(
+    attention({
+      targetKind: "issue",
+      context: {
+        body: "b",
+        author: null,
+        ciState: "UNKNOWN",
+        failingChecks: [],
+        additions: 0,
+        deletions: 0,
+        changedFiles: 0,
+        labels: ["enhancement", "bug", "extra"],
+      },
+    }),
+    VIEWER,
+  );
+  assert.deepEqual(
+    issue.metadata.map((span) => span.text),
+    ["enhancement bug"],
+  );
+});
+
+test("state written before diff stats existed shows an empty cell", () => {
+  const legacy = reviewItem(
+    attention({
+      context: {
+        body: "b",
+        author: null,
+        ciState: "UNKNOWN",
+        failingChecks: [],
+      } as never,
+    }),
+    VIEWER,
+  );
+  assert.deepEqual(legacy.metadata, []);
 });

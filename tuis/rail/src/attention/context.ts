@@ -17,5 +17,9 @@ export function reviewContext(target: GitHubTarget): ReviewContext {
     author: target.author,
     ciState: target.kind === "pull_request" ? target.ciState : "UNKNOWN",
     failingChecks: target.kind === "pull_request" ? target.failingChecks : [],
+    additions: target.kind === "pull_request" ? target.additions : 0,
+    deletions: target.kind === "pull_request" ? target.deletions : 0,
+    changedFiles: target.kind === "pull_request" ? target.changedFiles : 0,
+    labels: target.kind === "issue" ? target.labels : [],
   };
 }

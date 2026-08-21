@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ import {
   type DashboardPreview,
   type DashboardSurface,
   type DashboardTone,
+  type MetaSpan,
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
 
@@ -71,6 +72,38 @@ function paragraphs(text: string): string[] {
     .filter((paragraph) => paragraph !== "");
 }
 
+// Markdown reaches the panel as pre-coloured lines. bat is a syntax
+// highlighter rather than a renderer — the `##` stays visible — but it is
+// already installed, already themed by the generated tmTheme, and needs no
+// markdown renderer of our own. Anything it cannot do falls back to plain
+// paragraphs rather than failing the frame.
+export type MarkdownRenderer = (markdown: string) => string[];
+
+export function batMarkdown(width: number): MarkdownRenderer {
+  return (markdown) => {
+    const source = markdown.trim();
+    if (source === "") return [];
+    try {
+      return execFileSync(
+        "bat",
+        [
+          "--language=md",
+          "--color=always",
+          "--paging=never",
+          "--style=plain",
+          `--terminal-width=${Math.max(20, width)}`,
+          "--wrap=character",
+        ],
+        { input: source, encoding: "utf8", timeout: 5_000 },
+      )
+        .replace(/\n$/, "")
+        .split("\n");
+    } catch {
+      return paragraphs(source);
+    }
+  };
+}
+
 // What this row needs from you, stated as one phrase. The actor is NOT in
 // here — it has its own column, and saying it twice is what made the old
 // table repeat itself.
@@ -98,6 +131,30 @@ function reasonFor(item: AttentionItem, viewerOwnsTarget: boolean): string {
 
 // Hue follows the object, never the severity — except CI, which is the one
 // genuinely critical state.
+// A PR is sized by its diff; an issue by its labels. Both answer "what kind
+// of thing is this" at a glance, which is what the column is for.
+function metadataFor(item: AttentionItem): MetaSpan[] {
+  const context = item.context;
+  if (context === undefined) return [];
+  if (item.targetKind === "issue") {
+    const labels = (context.labels ?? []).slice(0, 2).join(" ");
+    return labels === "" ? [] : [{ text: labels, tone: "muted" }];
+  }
+  // State written before diff stats existed carries none; an empty cell is
+  // honest, "+undefined" is not.
+  const added = context.additions ?? 0;
+  const removed = context.deletions ?? 0;
+  const files = context.changedFiles ?? 0;
+  if (added === 0 && removed === 0 && files === 0) return [];
+  return [
+    { text: `+${added}`, tone: "add" },
+    { text: " ", tone: "muted" },
+    { text: `-${removed}`, tone: "delete" },
+    { text: " ", tone: "muted" },
+    { text: `${files}f`, tone: "change" },
+  ];
+}
+
 function toneFor(item: AttentionItem): DashboardTone {
   if (item.kind === "ci") return "ci";
   return item.targetKind === "issue" ? "issue" : "pull_request";
@@ -107,18 +164,24 @@ function previewFor(
   item: AttentionItem,
   target: string,
   viewerOwnsTarget: boolean,
+  render: MarkdownRenderer,
 ): DashboardPreview {
   const context = item.context;
   const author = context?.author?.login ?? null;
   const trailer: string[] = [clean(item.title)];
-  if (author !== null && !viewerOwnsTarget)
+  if (author !== null && !viewerOwnsTarget) {
     trailer.push(`opened by @${author}`);
+  }
+
+  // The description always follows the trigger. You opened this because
+  // something happened; you still need to know what the PR or issue is.
+  const description = context?.body ? render(context.body) : [];
 
   if (item.kind === "ci") {
     return {
       headline: `CI failed on ${target}`,
       bullets: context?.failingChecks ?? [],
-      body: context?.body ? paragraphs(context.body) : [],
+      body: description,
       context: trailer,
     };
   }
@@ -127,16 +190,18 @@ function previewFor(
     return {
       headline: `Review requested on ${target}`,
       bullets: [],
-      body: context?.body ? paragraphs(context.body) : [],
+      body: description,
       context: trailer,
     };
   }
 
   const actor = item.actor?.login;
+  const comment = render(item.summary);
   return {
     headline: `${actor ? `@${actor}` : "Someone"} commented on ${target}`,
     bullets: [],
-    body: paragraphs(item.summary),
+    // The comment first, then the description it was made against.
+    body: description.length > 0 ? [...comment, "", ...description] : comment,
     context: trailer,
   };
 }
@@ -144,6 +209,7 @@ function previewFor(
 export function reviewItem(
   item: AttentionItem,
   viewer: string | null,
+  render: MarkdownRenderer = paragraphs,
 ): DashboardItem {
   const target = `${shortRepository(item.repository)}#${item.number}`;
   const author = item.context?.author?.login ?? null;
@@ -158,11 +224,12 @@ export function reviewItem(
     author: author === null ? EMPTY_CELL : `@${author}`,
     authorIsViewer: viewerOwnsTarget,
     reason: reasonFor(item, viewerOwnsTarget),
+    metadata: metadataFor(item),
     time: age(item.createdAt),
     title: clean(item.title),
     url: item.url,
     tone: toneFor(item),
-    preview: previewFor(item, target, viewerOwnsTarget),
+    preview: previewFor(item, target, viewerOwnsTarget, render),
   };
 }
 
@@ -172,8 +239,11 @@ export function reviewDashboardData(): DashboardData {
   // is a to-do you cannot finish; the locked semantics say an acknowledged
   // item stays suppressed until a genuinely new external event, and a new
   // event arrives with a new id, so it comes back on its own.
+  // Rendered once here, not per frame: the panel redraws on every keypress
+  // and shelling out to bat that often would make navigation crawl.
+  const render = batMarkdown((process.stdout.columns ?? 100) - 6);
   const items = snapshot.unacknowledged.map((item) =>
-    reviewItem(item, snapshot.username),
+    reviewItem(item, snapshot.username, render),
   );
   return {
     surface: "reviews",
@@ -215,6 +285,39 @@ async function acknowledgeReview(item: DashboardItem): Promise<void> {
   await saveObserverState(acknowledgeItem(state, item.id));
 }
 
+// `gh pr diff | delta`, with the arguments passed as positional parameters
+// so nothing from GitHub is ever interpolated into a shell string. Delta's
+// colours pass through untouched; the view only measures widths.
+async function reviewDiff(item: DashboardItem): Promise<string[]> {
+  if (item.tone === "issue") {
+    return ["An issue has no diff."];
+  }
+  const number = item.reference.replace(/^#/, "");
+  const width = String(Math.max(40, (process.stdout.columns ?? 100) - 2));
+  try {
+    const { stdout } = await run(
+      "sh",
+      [
+        "-c",
+        'gh pr diff "$1" --repo "$2" | delta --paging=never --width "$3"',
+        "sh",
+        number,
+        item.repository,
+        width,
+      ],
+      { maxBuffer: 32 * 1024 * 1024, timeout: 30_000 },
+    );
+    const lines = stdout.replace(/\n$/, "").split("\n");
+    return lines.length === 1 && lines[0] === ""
+      ? ["This pull request has no changes."]
+      : lines;
+  } catch (error) {
+    return [
+      `Could not load the diff: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+    ];
+  }
+}
+
 async function refreshReviews(): Promise<DashboardData> {
   // The observer owns the network lifecycle. The dashboard only requests an
   // explicit no-notify refresh and then re-reads the durable local snapshot.
@@ -240,6 +343,7 @@ export async function main(
     browser: async (item) => {
       if (item.url !== null) await openUrl(item.url);
     },
+    diff: reviewDiff,
     acknowledge: isReviews
       ? acknowledgeReview
       : async () => {

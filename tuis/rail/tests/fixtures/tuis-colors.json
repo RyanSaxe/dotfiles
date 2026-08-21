@@ -16,5 +16,8 @@
   "red": "#f38ba8",
   "statusWorking": "#cba6f7",
   "statusWaiting": "#fab387",
-  "statusDone": "#a6e3a1"
+  "statusDone": "#a6e3a1",
+  "diffAdd": "#60a474",
+  "diffDelete": "#c16771",
+  "diffChange": "#6197cd"
 }

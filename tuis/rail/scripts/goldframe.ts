@@ -14,6 +14,7 @@ const reviewItems = [
   {
     id: "review:1",
     kind: "review_comment" as const,
+    targetKind: "pull_request" as const,
     repository: "RyanSaxe/dotfiles-v2",
     number: 90,
     title: "Review cockpit",
@@ -26,6 +27,7 @@ const reviewItems = [
   {
     id: "ci:2",
     kind: "ci" as const,
+    targetKind: "pull_request" as const,
     repository: "RyanSaxe/buffergolf.nvim",
     number: 4,
     title: "Improve buffer flow",
@@ -106,6 +108,7 @@ const scene: RailData = {
   ],
   review: {
     revision: 1,
+    username: "ryansaxe",
     lastSuccessfulSyncAt: "2026-08-19T16:00:00Z",
     lastError: null,
     items: reviewItems,

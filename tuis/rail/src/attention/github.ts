@@ -45,6 +45,11 @@ const GRAPHQL_QUERY = /* GraphQL */ `
     repository {
       nameWithOwner
     }
+    labels(first: 5) {
+      nodes {
+        name
+      }
+    }
     comments(last: 100) {
       nodes {
         ...CommentFields
@@ -60,6 +65,9 @@ const GRAPHQL_QUERY = /* GraphQL */ `
     createdAt
     updatedAt
     isDraft
+    additions
+    deletions
+    changedFiles
     headRefOid
     author {
       login
@@ -198,12 +206,16 @@ interface RawIssue {
   updatedAt?: string | null;
   author?: RawActor | null;
   repository?: { nameWithOwner?: string | null } | null;
+  labels?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
   comments?: { nodes?: Array<RawComment | null> | null } | null;
 }
 
 interface RawPullRequest {
   isDraft?: boolean | null;
   createdAt?: string | null;
+  additions?: number | null;
+  deletions?: number | null;
+  changedFiles?: number | null;
   number?: number | null;
   title?: string | null;
   body?: string | null;
@@ -369,6 +381,9 @@ function parseIssue(raw: RawIssue, source: string): IssueTarget | null {
     createdAt: raw.createdAt ?? new Date(0).toISOString(),
     updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
     author: parseActor(raw.author),
+    labels: (raw.labels?.nodes ?? [])
+      .map((label) => label?.name ?? "")
+      .filter((name) => name !== ""),
     searchSources: [source],
     comments: (raw.comments?.nodes ?? [])
       .map(parseComment)
@@ -406,6 +421,9 @@ function parsePullRequest(
     createdAt: raw.createdAt ?? new Date(0).toISOString(),
     updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
     isDraft: raw.isDraft === true,
+    additions: raw.additions ?? 0,
+    deletions: raw.deletions ?? 0,
+    changedFiles: raw.changedFiles ?? 0,
     headSha: raw.headRefOid ?? "",
     author: parseActor(raw.author),
     ciState: ciState(raw.statusCheckRollup?.state),

@@ -38,6 +38,11 @@ export interface ReviewContext {
   // Only the checks that failed. A green check on a red PR is noise on a row
   // you are looking at precisely because something broke.
   failingChecks: string[];
+  // Scannable shape of the target: diff size for a PR, labels for an issue.
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  labels: string[];
 }
 
 export type TargetKind = "pull_request" | "issue";
@@ -61,6 +66,9 @@ interface TargetBase {
 export interface PullRequestTarget extends TargetBase {
   kind: "pull_request";
   isDraft: boolean;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
   headSha: string;
   ciState: CiState;
   failingChecks: string[];
@@ -71,6 +79,7 @@ export interface PullRequestTarget extends TargetBase {
 
 export interface IssueTarget extends TargetBase {
   kind: "issue";
+  labels: string[];
 }
 
 export type GitHubTarget = PullRequestTarget | IssueTarget;
@@ -124,6 +133,10 @@ export interface ObserverState {
   lastAttemptAt: string | null;
   lastSuccessfulSyncAt: string | null;
   lastError: string | null;
+  // The notification transport is downstream of attention data. Its failures
+  // are recorded here so they can never be mistaken for a GitHub failure,
+  // never back off polling, and never reach the Reviews table.
+  lastNotifyError?: string | null;
   consecutiveFailures: number;
   retryAfter: string | null;
   rateLimit: RateLimit | null;
