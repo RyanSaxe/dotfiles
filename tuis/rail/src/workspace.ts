@@ -7,8 +7,8 @@
 // would race it.
 
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { existsSync, type Dirent } from "node:fs";
+import { mkdir, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -72,25 +72,51 @@ async function remoteOf(directory: string): Promise<string | null> {
   }
 }
 
+// Walk for repositories rather than shelling out to `fd`.
+//
+// fd was the obvious choice and the wrong one: it is not installed
+// everywhere — Debian names the binary fdfind — and its absence made this
+// return nothing rather than fail, so every repository looked missing and
+// would have been cloned a second time. CI caught it; a fresh machine would
+// have too, silently.
+//
+// Depth is bounded and a repository is not descended into: checkouts live a
+// few levels under a root, and the contents of one are never another.
+const MAX_DEPTH = 4;
+const SKIP = new Set(["node_modules", ".venv", "venv", "target", "vendor"]);
+
 async function gitDirectories(roots: readonly string[]): Promise<string[]> {
-  const present = roots.filter((root) => existsSync(root));
-  if (present.length === 0) return [];
-  try {
-    const { stdout } = await run(
-      "fd",
-      [".git", "-t", "d", "-H", "--", ...present],
-      {
-        maxBuffer: 8 * 1024 * 1024,
-        env: GIT_FREE_ENV,
-      },
+  const found: string[] = [];
+
+  const walk = async (directory: string, depth: number): Promise<void> => {
+    if (depth > MAX_DEPTH) return;
+    let entries: Dirent[];
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    // A worktree's `.git` is a file, not a directory; both mark a checkout.
+    if (entries.some((entry) => entry.name === ".git")) {
+      found.push(directory);
+      return;
+    }
+    await Promise.all(
+      entries
+        .filter(
+          (entry) =>
+            entry.isDirectory() &&
+            !entry.name.startsWith(".") &&
+            !SKIP.has(entry.name),
+        )
+        .map(async (entry) => walk(join(directory, entry.name), depth + 1)),
     );
-    return stdout
-      .split("\n")
-      .filter((line) => line.trim() !== "")
-      .map((line) => dirname(line.replace(/\/$/, "")));
-  } catch {
-    return [];
-  }
+  };
+
+  await Promise.all(
+    roots.filter((root) => existsSync(root)).map(async (root) => walk(root, 0)),
+  );
+  return found;
 }
 
 // Match on the remote, not the directory name. They diverge often enough to
@@ -191,6 +217,26 @@ export function workmuxArguments(
   ];
 }
 
+// Where workmux puts a worktree, asked of git rather than assumed.
+async function findWorktree(
+  clone: string,
+  name: string,
+): Promise<string | null> {
+  try {
+    const { stdout } = await run("git", ["worktree", "list", "--porcelain"], {
+      cwd: clone,
+      env: GIT_FREE_ENV,
+    });
+    for (const line of stdout.split("\n")) {
+      const path = /^worktree (.+)$/.exec(line.trim())?.[1];
+      if (path !== undefined && path.endsWith(`/${name}`)) return path;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export interface OpenOptions {
   dryRun?: boolean;
 }
@@ -205,13 +251,46 @@ export async function openPullRequestWorkspace(
   const args = workmuxArguments(repository, pullRequest);
   if (options.dryRun === true) args.push("--dry-run");
 
-  const { stdout } = await run("workmux", args, {
-    cwd: clone,
-    timeout: 300_000,
-    maxBuffer: 4 * 1024 * 1024,
-    env: GIT_FREE_ENV,
-  });
-  const worktree = /^Worktree:\s*(.+)$/m.exec(stdout)?.[1]?.trim() ?? "";
+  // workmux both prepares the workspace and moves the client to it. The
+  // second half can fail on its own — switching clients from inside a popup
+  // is exactly that case — and a non-zero exit then hides a workspace that
+  // was created perfectly well. So a failure is only a failure if the
+  // worktree is not there afterwards.
+  let stdout = "";
+  try {
+    ({ stdout } = await run("workmux", args, {
+      cwd: clone,
+      timeout: 300_000,
+      maxBuffer: 4 * 1024 * 1024,
+      env: GIT_FREE_ENV,
+    }));
+  } catch (error) {
+    const settled = await findWorktree(clone, name);
+    if (settled === null) {
+      const detail =
+        error instanceof Error
+          ? (error.message.split("\n")[0] ?? error.message)
+          : String(error);
+      throw new Error(
+        `could not open a workspace for ${repository}#${pullRequest}: ${detail}`,
+      );
+    }
+    return {
+      repository,
+      number: pullRequest,
+      clone,
+      worktree: settled,
+      session: target,
+      cloned,
+    };
+  }
+  // Ask git where the worktree is rather than scraping it out of workmux's
+  // output: that line is only printed by --dry-run, so a real run left the
+  // path empty. `stdout` is still read for the dry-run case.
+  const worktree =
+    /^Worktree:\s*(.+)$/m.exec(stdout)?.[1]?.trim() ??
+    (await findWorktree(clone, name)) ??
+    "";
 
   return {
     repository,
