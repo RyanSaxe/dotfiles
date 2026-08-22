@@ -15,7 +15,11 @@
 set -eu
 
 OS="$(uname -s)"
-REPO_ROOT="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+# Physical (-P) so paths through symlinked components (/var -> /private/var
+# on macOS) can't split into logical/physical mixtures: dotbot computes
+# relative links physically, so a logical base or target home would produce
+# links that climb to the wrong root and a clean pass that misses them.
+REPO_ROOT="$(CDPATH='' cd -P "$(dirname "$0")" && pwd -P)"
 AI_HARNESS_SOURCE="$REPO_ROOT/ai-harness"
 # No arguments and a real terminal means a human is driving: the tier and
 # agent pickers prompt. A scripted run takes the defaults instead.
@@ -438,13 +442,15 @@ deploy_tier() {
   # Tiers with no symlinks to deploy have no tiers/<name>.yaml.
   [ -f "tiers/$1.yaml" ] || return 0
   echo "deploy: $1"
+  # Physical for the same reason as REPO_ROOT above.
+  deploy_home="$(cd -P "${DOTFILES_TARGET:-$HOME}" && pwd -P)"
   # DOTFILES_TARGET redirects the links (scratch-home checks); the uv cache
   # stays under the real home, pinned before HOME is overridden. The two
   # disabled warnings describe exactly that intent: the assignments exist
   # only for the dotbot process, and $HOME in the cache path is the outer one.
   # shellcheck disable=SC2097,SC2098
   UV_CACHE_DIR="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}" \
-    HOME="${DOTFILES_TARGET:-$HOME}" \
+    HOME="$deploy_home" \
     uvx --quiet dotbot -d "$REPO_ROOT" -c "tiers/$1.yaml"
 }
 
