@@ -1,8 +1,8 @@
 """Behavioral tests for the `vault` CLI, run against scratch vaults.
 
 Every run gets its own VAULT_DIR, its own XDG_CONFIG_HOME holding a copy of
-the shipped templates, and a PATH containing symlinks to exactly the tools
-the case allows — that last one is how "ripgrep is missing" becomes a fact
+the shipped templates, only the VAULT_OVERDUE_AFTER the case asks for, and a
+PATH containing symlinks to exactly the tools the case allows — that last one is how "ripgrep is missing" becomes a fact
 rather than a mock. The rest of the environment is inherited: the script's
 shebang is `uv run --script`, and uv resolves its interpreter through it.
 
@@ -59,10 +59,16 @@ def run_vault(
     cwd: Path | None = None,
     config: Path | None = None,
     tools: tuple[str, ...] = TOOLS,
+    overdue_after: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
     env["PATH"] = str(toolbox(tmp_path, tools=tools))
     env["XDG_CONFIG_HOME"] = str(config or config_home(tmp_path))
+    # Unset unless the case names one: a value exported in the shell running
+    # the suite would otherwise decide when a task due today reads overdue.
+    env.pop("VAULT_OVERDUE_AFTER", None)
+    if overdue_after is not None:
+        env["VAULT_OVERDUE_AFTER"] = overdue_after
     if vault is None:
         env["VAULT_DIR"] = str(tmp_path / "vault")
     elif vault == Path():
@@ -95,10 +101,17 @@ def today() -> date:
     return datetime.now().astimezone().date()
 
 
-def tasks_json(tmp_path: Path) -> list[dict]:
-    result = run_vault(tmp_path, "tasks", "--json")
+def tasks_json(tmp_path: Path, overdue_after: str | None = None) -> list[dict]:
+    result = run_vault(tmp_path, "tasks", "--json", overdue_after=overdue_after)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
+
+
+def states(tmp_path: Path, overdue_after: str | None = None) -> dict[str, str]:
+    return {
+        row["text"]: row["state"]
+        for row in tasks_json(tmp_path, overdue_after=overdue_after)
+    }
 
 
 def find(rows: list[dict], text: str) -> dict:
@@ -184,33 +197,80 @@ def test_a_project_is_the_projects_directory_and_null_elsewhere(
     assert find(rows, "ask about the naïve café façade")["project"] is None
 
 
-def test_due_states_are_calendar_distances_from_today(tmp_path: Path) -> None:
-    vault = make_vault(tmp_path)
-    offsets = {
-        "overdue": -1,
-        "today": 0,
-        "tomorrow": 1,
-        "near": 2,
-        "edge of near": 7,
-        "later": 8,
-    }
+# One task per due state, named for the state its distance from today
+# produces while the day still has time left in it.
+DUE_LADDER = {
+    "overdue": -1,
+    "today": 0,
+    "tomorrow": 1,
+    "near": 2,
+    "edge of near": 7,
+    "later": 8,
+}
+BEFORE_CUTOFF = {
+    "overdue": "overdue",
+    "today": "today",
+    "tomorrow": "tomorrow",
+    "near": "near",
+    "edge of near": "near",
+    "later": "later",
+    "undated": "none",
+}
+
+
+def write_due_ladder(vault: Path) -> None:
     lines = [
         f"- [ ] {name} {DUE} {today() + timedelta(days=offset)}"
-        for name, offset in offsets.items()
+        for name, offset in DUE_LADDER.items()
     ]
     write_note(vault, "inbox.md", "\n".join([*lines, "- [ ] undated", ""]))
 
-    states = {row["text"]: row["state"] for row in tasks_json(tmp_path)}
 
-    assert states == {
-        "overdue": "overdue",
-        "today": "today",
-        "tomorrow": "tomorrow",
-        "near": "near",
-        "edge of near": "near",
-        "later": "later",
-        "undated": "none",
+def test_due_states_are_calendar_distances_before_the_cutoff(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    write_due_ladder(vault)
+
+    # 23:59 has not passed on any run that finishes, so this is the table at
+    # any hour of the day rather than only before three in the afternoon.
+    assert states(tmp_path, overdue_after="23:59") == BEFORE_CUTOFF
+
+
+def test_the_cutoff_turns_the_day_a_task_is_due_overdue(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    write_due_ladder(vault)
+
+    # 00:00 has already passed at every hour, so the cutoff is always behind
+    # this run. Only the task due today moves; the rest are calendar work.
+    assert states(tmp_path, overdue_after="00:00") == {
+        **BEFORE_CUTOFF,
+        "today": "overdue",
     }
+
+
+def test_the_default_cutoff_leaves_every_other_date_alone(tmp_path: Path) -> None:
+    """Whatever the hour, the default moves nothing but the day tasks are due."""
+    vault = make_vault(tmp_path)
+    write_due_ladder(vault)
+
+    default = states(tmp_path)
+    del default["today"]
+
+    assert default == {
+        name: state for name, state in BEFORE_CUTOFF.items() if name != "today"
+    }
+
+
+def test_an_unreadable_cutoff_names_the_variable_and_its_format(
+    tmp_path: Path,
+) -> None:
+    make_vault(tmp_path)
+
+    for value in ("3pm", "25:00", "15"):
+        result = run_vault(tmp_path, "tasks", overdue_after=value)
+
+        assert result.returncode == 1, value
+        assert "VAULT_OVERDUE_AFTER" in result.stderr
+        assert "HH:MM" in result.stderr
 
 
 def test_fenced_code_and_hidden_directories_hold_no_tasks(tmp_path: Path) -> None:

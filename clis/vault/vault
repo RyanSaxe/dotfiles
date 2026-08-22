@@ -23,7 +23,8 @@ Identity is `<vault-relative-path>:<line>`, recomputed on every read: no
 index, no cache, no identifier written into the Markdown. Every write goes
 through here, so nothing else has to know the grammar — `add` resolves the
 project from the current directory's git remote, and dates are read here in
-every spelling a person is likely to type.
+every spelling a person is likely to type. A task due today turns overdue when
+this machine's clock passes $VAULT_OVERDUE_AFTER, 15:00 by default.
 
 Exit codes: 0 success, 1 a failed check or a bad request.
 """
@@ -38,7 +39,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from itertools import groupby
 from pathlib import Path, PurePosixPath
 
@@ -101,6 +102,14 @@ WEEKDAYS = (
     "sunday",
 )
 DATE_FORMS = "today, tmr, a weekday (fri or friday), 3d, or YYYY-MM-DD"
+
+# A due date names a day, and the day is the person's to spend: a task due
+# today reads `today` until the afternoon and `overdue` after it. The line
+# sits at 15:00 unless $VAULT_OVERDUE_AFTER moves it.
+OVERDUE_AFTER_VAR = "VAULT_OVERDUE_AFTER"
+DEFAULT_OVERDUE_AFTER = time(15, 0)
+CUTOFF_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
+CUTOFF_FORM = f"HH:MM on a 24-hour clock (the default is {DEFAULT_OVERDUE_AFTER:%H:%M})"
 
 VAULT_DIRS = ("assets", "daily", "people", "projects", "public")
 VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE, "inbox.md": "# inbox\n"}
@@ -310,18 +319,42 @@ def parse_date(value: str, today: date) -> date:
 
 # -------------------------------------------------------------------- tasks
 def local_today() -> date:
-    """Today on this machine's clock. Due states are calendar-only."""
+    """Today on this machine's clock."""
     return datetime.now().astimezone().date()
 
 
-def due_state(due: date | None, today: date) -> str:
+def overdue_cutoff() -> time:
+    """The time a task due today turns overdue, from $VAULT_OVERDUE_AFTER.
+
+    Unreadable settings are refused rather than replaced by the default: a
+    person who spelled the hour wrong wants the hour they meant, and a
+    silent 15:00 would look like the setting worked.
+    """
+    raw = os.environ.get(OVERDUE_AFTER_VAR, "").strip()
+    if not raw:
+        return DEFAULT_OVERDUE_AFTER
+    written = CUTOFF_RE.match(raw)
+    if written:
+        try:
+            return time(int(written.group(1)), int(written.group(2)))
+        except ValueError:
+            pass
+    raise SystemExit(f"cannot read {raw!r} as {OVERDUE_AFTER_VAR} — use {CUTOFF_FORM}")
+
+
+def local_past_cutoff() -> bool:
+    """Whether this machine's clock has passed today's cutoff."""
+    return datetime.now().astimezone().time() >= overdue_cutoff()
+
+
+def due_state(due: date | None, today: date, past_cutoff: bool) -> str:
     if due is None:
         return "none"
     days = (due - today).days
     if days < 0:
         return "overdue"
     if days == 0:
-        return "today"
+        return "overdue" if past_cutoff else "today"
     if days == 1:
         return "tomorrow"
     return "near" if days <= 7 else "later"
@@ -341,13 +374,13 @@ class Task:
     def id(self) -> str:
         return f"{self.file}:{self.line}"
 
-    def row(self, today: date) -> dict[str, object]:
+    def row(self, today: date, past_cutoff: bool) -> dict[str, object]:
         return {
             "id": self.id,
             "text": self.text,
             "done": self.done,
             "due": self.due.isoformat() if self.due else None,
-            "state": due_state(self.due, today),
+            "state": due_state(self.due, today, past_cutoff),
             "project": self.project,
             "section": self.section,
             "file": self.file,
@@ -396,12 +429,13 @@ def vault_tasks(vault: Path) -> list[Task]:
 def command_tasks(as_json: bool) -> int:
     vault = existing_vault()
     today = local_today()
+    past_cutoff = local_past_cutoff()
     tasks = vault_tasks(vault)
     if as_json:
-        rows = [task.row(today) for task in tasks]
+        rows = [task.row(today, past_cutoff) for task in tasks]
         print(json.dumps(rows, ensure_ascii=False, indent=2))
         return 0
-    print(render_tasks(tasks, today) if tasks else "no tasks")
+    print(render_tasks(tasks, today, past_cutoff) if tasks else "no tasks")
     return 0
 
 
@@ -791,11 +825,13 @@ class Row:
     kind: str = "task"
 
 
-def task_rows(tasks: list[Task], indent: str, last: bool, today: date) -> list[Row]:
+def task_rows(
+    tasks: list[Task], indent: str, last: bool, today: date, past_cutoff: bool
+) -> list[Row]:
     rows = []
     for position, task in enumerate(tasks):
         final = last and position == len(tasks) - 1
-        state = due_state(task.due, today)
+        state = due_state(task.due, today, past_cutoff)
         rows.append(
             Row(
                 prefix=indent + ("└── " if final else "├── "),
@@ -808,7 +844,7 @@ def task_rows(tasks: list[Task], indent: str, last: bool, today: date) -> list[R
     return rows
 
 
-def render_tasks(tasks: list[Task], today: date) -> str:
+def render_tasks(tasks: list[Task], today: date, past_cutoff: bool) -> str:
     """One tree per file, one branch per section, in document order."""
     rows: list[Row] = []
     for file, in_file in groupby(tasks, key=lambda task: task.file):
@@ -820,10 +856,12 @@ def render_tasks(tasks: list[Task], today: date) -> str:
         for position, (section, items) in enumerate(sections):
             last = position == len(sections) - 1
             if section is None:
-                rows.extend(task_rows(items, "", last, today))
+                rows.extend(task_rows(items, "", last, today, past_cutoff))
                 continue
             rows.append(Row("└── " if last else "├── ", section, kind="section"))
-            rows.extend(task_rows(items, "    " if last else "│   ", True, today))
+            rows.extend(
+                task_rows(items, "    " if last else "│   ", True, today, past_cutoff)
+            )
 
     width = max(len("TASK"), *(len(row.prefix + row.label) for row in rows))
     lines = [f"{paint('1', 'TASK'.ljust(width))}  {paint('1', 'DUE')}"]
