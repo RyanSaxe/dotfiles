@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { rankDashboardItems, renderDashboard } from "../src/dashboard.js";
-import type { DashboardData } from "../src/dashboard.js";
+import type { DashboardData, DashboardItem } from "../src/dashboard.js";
 import type { RailData } from "../src/data.js";
 import { renderRail } from "../src/render.js";
 import { taskItem } from "../src/review-dashboard.js";
@@ -526,4 +526,187 @@ test("a failed read reaches the dashboard as its empty message", () => {
     ),
   );
   assert.match(frame, /vault is not on PATH/);
+});
+
+// ----- the two orders ----------------------------------------------------
+
+// Two notes, five tasks, deliberately interleaved: what priority order is
+// for is seeing that today wants two things, one written in each note.
+const CROSS = output([
+  row({
+    id: "home.md:2",
+    file: "home.md",
+    line: 2,
+    project: null,
+    section: null,
+    text: "home overdue",
+    due: "2026-08-18",
+    state: "overdue",
+  }),
+  row({
+    id: "home.md:4",
+    file: "home.md",
+    line: 4,
+    project: null,
+    section: null,
+    text: "home today",
+    due: "2026-08-22",
+    state: "today",
+  }),
+  row({
+    id: "home.md:9",
+    file: "home.md",
+    line: 9,
+    project: null,
+    section: null,
+    text: "home someday",
+    due: null,
+    state: "none",
+  }),
+  row({
+    id: "work.md:3",
+    file: "work.md",
+    line: 3,
+    project: "work",
+    section: null,
+    text: "work today",
+    due: "2026-08-22",
+    state: "today",
+  }),
+  row({
+    id: "work.md:5",
+    file: "work.md",
+    line: 5,
+    project: "work",
+    section: null,
+    text: "work later",
+    due: "2026-09-30",
+    state: "later",
+  }),
+]);
+
+const crossItems = (): DashboardItem[] =>
+  parseTasks(CROSS).map((task) => taskItem(task));
+
+// The same rows under the review surface's footer, which has no sort key.
+const reviewLike = (): DashboardData => ({
+  ...crossData(),
+  surface: "reviews",
+});
+
+const crossData = (): DashboardData => ({
+  surface: "tasks",
+  items: crossItems(),
+  status: "5 open",
+  emptyMessage: "No open tasks",
+  error: null,
+});
+
+// Where a piece of text sits in the frame, by row.
+const rowOf = (frame: string, needle: string): number =>
+  plain(frame)
+    .split("\n")
+    .findIndex((line) => line.includes(needle));
+
+// A group heading is a row that says nothing but its label.
+const headingRow = (frame: string, label: string): number =>
+  plain(frame)
+    .split("\n")
+    .findIndex((line) => line.trim() === label);
+
+test("project order keeps a note together; priority order keeps a day together", () => {
+  const items = crossItems();
+  assert.deepEqual(
+    rankDashboardItems(items, "").map((entry) => entry.item.id),
+    ["home.md:2", "home.md:4", "home.md:9", "work.md:3", "work.md:5"],
+  );
+  // Urgency first, and inside a state the calendar and then the text — the
+  // order the task layer already sorted these into, kept across the regroup.
+  assert.deepEqual(
+    rankDashboardItems(items, "", "priority").map((entry) => entry.item.id),
+    ["home.md:2", "home.md:4", "work.md:3", "work.md:5", "home.md:9"],
+  );
+});
+
+test("the group headings become the due states, in the same dim voice", () => {
+  const byProject = renderDashboard(crossData(), 0, palette, 120, 40);
+  const byPriority = renderDashboard(
+    crossData(),
+    0,
+    palette,
+    120,
+    40,
+    "",
+    false,
+    0,
+    "reviews",
+    "priority",
+  );
+  // A heading per state, in urgency order, with both notes' today rows in
+  // the one block under it.
+  const at = (needle: string): number => rowOf(byPriority, needle);
+  const heading = (label: string): number => headingRow(byPriority, label);
+  assert.ok(heading("overdue") < at("home overdue"));
+  assert.ok(at("home overdue") < heading("today"));
+  assert.ok(heading("today") < at("home today"));
+  assert.ok(at("home today") < at("work today"));
+  assert.ok(at("work today") < heading("later"));
+  assert.ok(heading("later") < heading("none"));
+  // The notes' own headings are gone with them, and the state headings wear
+  // the file heading's exact colour: a heading is structure, never a second
+  // attention channel.
+  assert.equal(headingRow(byPriority, "home.md"), -1);
+  assert.ok(headingRow(byProject, "home.md") >= 0);
+  const dimHeading = hex(blend(palette.dim2, palette.base, 0.9));
+  assert.equal(colorOf(byPriority, "overdue"), dimHeading);
+  assert.equal(colorOf(byProject, "home.md"), dimHeading);
+});
+
+test("the sort key says where it goes, the way the subtab key does", () => {
+  const footer = (sort: "project" | "priority"): string =>
+    plain(
+      renderDashboard(
+        crossData(),
+        0,
+        palette,
+        120,
+        40,
+        "",
+        false,
+        0,
+        "reviews",
+        sort,
+      ),
+    );
+  assert.match(footer("project"), /s Priority/);
+  assert.match(footer("priority"), /s Project/);
+  // Reviews have one order, so the key is not advertised there.
+  assert.ok(
+    !plain(renderDashboard(reviewLike(), 0, palette, 120, 40)).includes(
+      " Priority",
+    ),
+  );
+});
+
+test("the row under the cursor is the row of whichever order is showing", () => {
+  const third = rankDashboardItems(crossItems(), "", "priority")[2];
+  const frame = plain(
+    renderDashboard(
+      crossData(),
+      2,
+      palette,
+      120,
+      40,
+      "",
+      false,
+      0,
+      "reviews",
+      "priority",
+    ),
+  );
+  // The marker is on the third row of the priority list — the task the
+  // dashboard's Enter and x would act on, not the third row of the notes.
+  const marked = frame.split("\n").find((line) => line.includes("\u258c3"));
+  assert.ok(marked?.includes(third?.item.reason ?? ""), marked);
+  assert.equal(third?.item.id, "work.md:3");
 });

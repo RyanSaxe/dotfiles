@@ -87,6 +87,16 @@ function isVaultTask(value: unknown): value is VaultTask {
   );
 }
 
+// The same rank, for a surface that holds rendered rows rather than tasks:
+// the Tasks dashboard sorts its own items, and the state reaches it as the
+// word in their State cell. One table ranks urgency everywhere.
+export function stateRank(state: string): number {
+  return state in STATE_ORDER
+    ? STATE_ORDER[state as TaskState]
+    : // Anything that is not a state sinks rather than jumps the queue.
+      Object.keys(STATE_ORDER).length;
+}
+
 export function byUrgency(a: VaultTask, b: VaultTask): number {
   return (
     STATE_ORDER[a.state] - STATE_ORDER[b.state] ||

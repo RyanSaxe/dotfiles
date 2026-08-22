@@ -489,7 +489,7 @@ export function taskItem(
   };
 }
 
-// Every open task, not the slab's four-state projection: this is the surface
+// Every open task, not the slab's three-state projection: this is the surface
 // with search and a preview, so later and undated work is findable here and
 // stays off the rail itself.
 export async function taskDashboardData(): Promise<DashboardData> {
