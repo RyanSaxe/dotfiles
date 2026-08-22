@@ -5,6 +5,10 @@ export LC_ALL="en_US.UTF-8"
 export EDITOR="nvim"
 export VISUAL="nvim"
 
+# The Markdown vault, read by the `vault` CLI and by Neovim. Exported from
+# every zsh, interactive or not, so an editor launched from anywhere finds it.
+export VAULT_DIR="$HOME/generic/vault"
+
 # Prepend a directory to PATH, once.
 path_add() {
   [[ ":$PATH:" == *":$1:"* ]] || PATH="$1:$PATH"

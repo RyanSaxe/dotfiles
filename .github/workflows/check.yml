@@ -12,10 +12,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
 
-      - name: Install zsh
+      # zsh runs the workmux hook checks; ripgrep is what the vault
+      # contract check shells out to, and pytest (vault) exercises it.
+      - name: Install zsh and ripgrep
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y zsh
+          sudo apt-get install -y zsh ripgrep
           zsh --version
 
       # Some hook repos download their binary at build time (shellcheck-py,
