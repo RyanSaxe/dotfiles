@@ -120,8 +120,9 @@ async function gitDirectories(roots: readonly string[]): Promise<string[]> {
 }
 
 // Match on the remote, not the directory name. They diverge often enough to
-// matter — dotfiles-v2 on disk is RyanSaxe/dotfiles on GitHub — and cloning a
-// second copy of a repository you already have would be the worst outcome.
+// matter — a worktree checked out as dotfiles-tidy on disk is still
+// RyanSaxe/dotfiles on GitHub — and cloning a second copy of a repository
+// you already have would be the worst outcome.
 export async function findClone(
   repository: string,
   roots: readonly string[] = SEARCH_ROOTS,

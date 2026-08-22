@@ -95,7 +95,7 @@ const DEMO: DashboardData = {
       ],
     ),
     demo(
-      "RyanSaxe/dotfiles-v2",
+      "RyanSaxe/dotfiles",
       "#94",
       "@alice",
       "@RyanSaxe",
@@ -104,7 +104,7 @@ const DEMO: DashboardData = {
       "2h",
       "pull_request",
       {
-        headline: "@alice commented on dotfiles-v2#94",
+        headline: "@alice commented on dotfiles#94",
         bullets: [],
         body: [
           "The resolver should probably clone into ~/repositories rather than reusing ~/generic — otherwise `to` picks up review checkouts as if they were projects.",
@@ -120,7 +120,7 @@ const DEMO: DashboardData = {
       ],
     ),
     demo(
-      "RyanSaxe/dotfiles-v2",
+      "RyanSaxe/dotfiles",
       "#312",
       "@bob",
       "@RyanSaxe",
@@ -129,7 +129,7 @@ const DEMO: DashboardData = {
       "3d",
       "issue",
       {
-        headline: "@bob commented on dotfiles-v2#312",
+        headline: "@bob commented on dotfiles#312",
         bullets: [],
         body: [
           "Still flickers on mocha to latte, but only on the second switch.",
