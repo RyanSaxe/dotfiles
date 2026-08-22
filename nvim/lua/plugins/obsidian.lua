@@ -84,5 +84,41 @@ return {
       end,
       desc = "New note",
     },
+    {
+      "<leader>of",
+      function()
+        require("vault.notes").find()
+      end,
+      desc = "Find note",
+    },
+    {
+      "<leader>og",
+      function()
+        require("vault.notes").grep()
+      end,
+      desc = "Grep notes",
+    },
+    { "<leader>ot", group = "Tasks" },
+    {
+      "<leader>ots",
+      function()
+        require("vault.tasks").search()
+      end,
+      desc = "Search tasks",
+    },
+    {
+      "<leader>otc",
+      function()
+        require("vault.tasks").capture(false)
+      end,
+      desc = "Create a task",
+    },
+    {
+      "<leader>otb",
+      function()
+        require("vault.tasks").capture(true)
+      end,
+      desc = "Create a task under the branch",
+    },
   },
 }

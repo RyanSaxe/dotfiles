@@ -164,4 +164,27 @@ function M.new()
   end)
 end
 
+-- Vault pickers are their own calls rather than options on the shared ones:
+-- picker.lua deliberately respects gitignore for code trees, and the vault
+-- is almost entirely gitignored by design — its allowlist keeps everything
+-- local but `public/`. Without `ignored` a note search here returns nothing
+-- and looks like an empty vault.
+---@return nil
+function M.find()
+  local dir = vault.require_dir()
+  if not dir then
+    return
+  end
+  Snacks.picker.files({ cwd = dir, ft = "md", hidden = true, ignored = true, title = "Vault notes" })
+end
+
+---@return nil
+function M.grep()
+  local dir = vault.require_dir()
+  if not dir then
+    return
+  end
+  Snacks.picker.grep({ cwd = dir, hidden = true, ignored = true, title = "Grep vault" })
+end
+
 return M
