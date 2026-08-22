@@ -1,0 +1,6 @@
+---
+type: note
+dir: .
+---
+
+# {{title}}

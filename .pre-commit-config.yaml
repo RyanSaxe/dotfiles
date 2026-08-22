@@ -44,13 +44,13 @@ repos:
         alias: ruff-format-uv-scripts
         name: ruff format (uv scripts)
         types_or: [file]
-        files: "^(theme/bin/mascot-accents|clis/repo-size/repo-size)$"
+        files: "^(theme/bin/mascot-accents|clis/repo-size/repo-size|clis/vault/vault)$"
       - id: ruff-check
         alias: ruff-check-uv-scripts
         name: ruff check (uv scripts)
         args: [--fix]
         types_or: [file]
-        files: "^(theme/bin/mascot-accents|clis/repo-size/repo-size)$"
+        files: "^(theme/bin/mascot-accents|clis/repo-size/repo-size|clis/vault/vault)$"
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.72
@@ -238,3 +238,13 @@ repos:
         entry: uv run --no-project --with pytest --with pillow pytest -q tests/theme
         pass_filenames: false
         files: "^theme/|^tests/theme/"
+
+      # The vault CLI against scratch vaults: the init/check contract, the
+      # task grammar, and the writes. Needs ripgrep for the .ignore check
+      # (the cases that do skip cleanly without it).
+      - id: vault-tests
+        name: pytest (vault)
+        language: system
+        entry: uv run --no-project --with pytest pytest -q tests/vault
+        pass_filenames: false
+        files: "^clis/vault/|^tests/vault/"

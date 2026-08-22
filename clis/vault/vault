@@ -1,0 +1,361 @@
+#!/usr/bin/env -S uv run -q --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""The vault contract: build a conforming Markdown vault, or validate one.
+
+    vault init [path] [--in-place]
+    vault check
+
+The vault is $VAULT_DIR (or the path given to `init`). Its shape is an
+allowlist: `.gitignore` keeps everything local except `public/`, and `.ignore`
+puts the gitignored notes back in ripgrep's view — without it, note search,
+quick-switch, backlinks, and tags silently return nothing.
+
+Exit codes: 0 conforming, 1 a failed check or a bad request.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+COLOR = False  # set from --color in main()
+
+VAULT_DIR_UNSET = (
+    "VAULT_DIR is not set — export VAULT_DIR=<path to your vault> "
+    "(the dotfiles' zshenv sets it)"
+)
+
+# The allowlist. A blocklist that misses a new directory publishes its
+# contents; an allowlist that misses one leaves it local, which is the
+# survivable direction. Only public/ ever leaves the machine.
+GITIGNORE = """/*
+!/.gitignore
+!/.ignore
+!/public/
+.obsidian/
+"""
+
+# ripgrep honors .ignore above every .gitignore, including nested ones.
+# obsidian.nvim builds a fixed `rg --no-config` command with no --no-ignore
+# and no escape hatch, so this file is the only thing that keeps a gitignored
+# vault visible to note search.
+IGNORE = """!*
+.git/
+"""
+
+# git scopes every command to one repository through the environment. A vault
+# command can run from inside another repository's hook, where GIT_DIR already
+# points elsewhere — `git init <vault>` would then re-initialize that
+# repository and leave the vault without one.
+GIT_SCOPE_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+)
+
+VAULT_DIRS = ("assets", "daily", "people", "projects", "public")
+VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE, "inbox.md": "# inbox\n"}
+
+# Templates ship next to this script and deploy to
+# $XDG_CONFIG_HOME/vault/templates. Every template but daily.md opens with a
+# `type:`/`dir:` header that the Neovim note-creation layer strips before
+# handing the body to obsidian.nvim; daily.md carries no header because
+# obsidian.nvim reads it verbatim as the daily-note template.
+FALLBACK_TEMPLATES = ("daily.md",)
+
+
+# ---------------------------------------------------------------------- git
+def git_env() -> dict[str, str]:
+    return {
+        name: value for name, value in os.environ.items() if name not in GIT_SCOPE_VARS
+    }
+
+
+# -------------------------------------------------------------- vault paths
+def vault_target(path_arg: str | None) -> Path:
+    """The vault a command acts on. May not exist yet — `init` creates it."""
+    if path_arg:
+        return Path(path_arg).expanduser().resolve()
+    raw = os.environ.get("VAULT_DIR")
+    if not raw:
+        raise SystemExit(VAULT_DIR_UNSET)
+    # Physical, so a vault reached through a symlinked ancestor (/var on
+    # macOS) compares equal to the same vault reached directly.
+    return Path(raw).expanduser().resolve()
+
+
+def existing_vault() -> Path:
+    vault = vault_target(None)
+    if not vault.is_dir():
+        raise SystemExit(f"VAULT_DIR points at a missing directory: {vault}")
+    return vault
+
+
+def markdown_files(root: Path) -> list[Path]:
+    """Every note under `root`, in a stable order.
+
+    Hidden directories are skipped: .git/ and .obsidian/ hold no notes, and
+    ripgrep skips them too, so `check` can compare the two walks directly.
+    """
+    found: list[Path] = []
+    for directory, subdirs, names in os.walk(root):
+        subdirs[:] = sorted(name for name in subdirs if not name.startswith("."))
+        for name in sorted(names):
+            if name.endswith(".md") and not name.startswith("."):
+                found.append(Path(directory) / name)
+    return found
+
+
+# --------------------------------------------------------------------- init
+def templates_dir() -> Path:
+    config = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(config) / "vault" / "templates"
+
+
+def shipped_templates() -> tuple[str, ...]:
+    """Template names this installation expects to find deployed."""
+    local = Path(__file__).resolve().parent / "templates"
+    if not local.is_dir():
+        return FALLBACK_TEMPLATES
+    return tuple(sorted(path.name for path in local.glob("*.md")))
+
+
+def command_init(path_arg: str | None, in_place: bool) -> int:
+    vault = vault_target(path_arg)
+    if vault.exists() and not in_place and any(vault.iterdir()):
+        raise SystemExit(
+            f"{vault} exists and is not empty — "
+            "use `vault init --in-place` to add only what is missing"
+        )
+
+    created: list[str] = []
+    vault.mkdir(parents=True, exist_ok=True)
+    for name in VAULT_DIRS:
+        directory = vault / name
+        if not directory.exists():
+            directory.mkdir()
+            created.append(f"{name}/")
+    for name, contents in VAULT_FILES.items():
+        note = vault / name
+        if not note.exists():
+            note.write_text(contents, encoding="utf-8")
+            created.append(name)
+    if not (vault / ".git").exists():
+        # init never clones: a personal repository URL has no place in the
+        # dotfiles. install.sh asks for one when a human is driving.
+        result = subprocess.run(
+            ["git", "init", "-q", str(vault)],
+            check=False,
+            capture_output=True,
+            env=git_env(),
+        )
+        if result.returncode != 0:
+            raise SystemExit(f"git init failed in {vault}")
+        created.append(".git/")
+
+    if not created:
+        print(f"{vault} already conforms")
+        return 0
+    print(f"vault {vault}")
+    for name in created:
+        print(f"  create {name}")
+    return 0
+
+
+# -------------------------------------------------------------------- check
+@dataclass
+class Finding:
+    level: str  # "ok", "warn", or "fail"
+    message: str
+    detail: str = ""
+
+
+def ripgrep_notes(vault: Path) -> set[str] | None:
+    """What obsidian.nvim's search can see, asked the way it asks."""
+    result = subprocess.run(
+        ["rg", "--no-config", "--type=md", "--files"],
+        cwd=vault,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode > 1:  # 1 is "no matches", not a failure
+        return None
+    return {line for line in result.stdout.splitlines() if line.endswith(".md")}
+
+
+def check_ignore(vault: Path) -> Finding:
+    if not (vault / ".ignore").is_file():
+        return Finding(
+            "fail",
+            "no .ignore",
+            "ripgrep then skips every gitignored note and the vault looks "
+            "empty to Neovim; `vault init --in-place` writes it",
+        )
+    visible = ripgrep_notes(vault)
+    if visible is None:
+        return Finding("fail", "ripgrep failed to list the vault")
+    walked = {path.relative_to(vault).as_posix() for path in markdown_files(vault)}
+    hidden = sorted(walked - visible)
+    if hidden:
+        sample = ", ".join(hidden[:3])
+        if len(hidden) > 3:
+            sample += f", and {len(hidden) - 3} more"
+        return Finding(
+            "fail",
+            f".ignore leaves {len(hidden)} note(s) invisible to Neovim",
+            sample,
+        )
+    return Finding("ok", f".ignore re-includes {len(walked)} note(s)")
+
+
+def check_templates() -> Finding:
+    directory = templates_dir()
+    if not directory.is_dir():
+        return Finding(
+            "fail",
+            f"no template directory: {directory}",
+            "re-run install.sh to deploy it",
+        )
+    missing = [name for name in shipped_templates() if not (directory / name).exists()]
+    if missing:
+        return Finding(
+            "fail",
+            f"template path does not resolve: {', '.join(missing)}",
+            f"expected under {directory}",
+        )
+    return Finding("ok", f"templates resolve under {directory}")
+
+
+def check_obsidian(vault: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    ancestors = [parent for parent in vault.parents if (parent / ".obsidian").is_dir()]
+    if ancestors:
+        findings.append(
+            Finding(
+                "warn",
+                f".obsidian/ in an ancestor of the vault: {ancestors[0]}",
+                "obsidian.nvim walks upward for it; the workspace is strict, "
+                "but other tools are not",
+            )
+        )
+
+    gitignore = vault / ".gitignore"
+    if not gitignore.is_file():
+        findings.append(
+            Finding("warn", "no .gitignore", "every note is a commit candidate")
+        )
+    elif ".obsidian/" not in gitignore.read_text(encoding="utf-8").split():
+        findings.append(
+            Finding(
+                "warn",
+                ".obsidian/ missing from .gitignore",
+                "the Obsidian application writes a versioned schema there",
+            )
+        )
+
+    nested: list[str] = []
+    for directory, subdirs, _ in os.walk(vault):
+        if ".git" in subdirs:
+            subdirs.remove(".git")
+        if ".obsidian" in subdirs:
+            subdirs.remove(".obsidian")
+            if Path(directory) != vault:
+                nested.append(Path(directory).relative_to(vault).as_posix())
+    if nested:
+        findings.append(
+            Finding(
+                "warn",
+                f"nested .obsidian/ under {', '.join(sorted(nested))}",
+                "only the vault root should ever hold one",
+            )
+        )
+    return findings
+
+
+def command_check() -> int:
+    vault = existing_vault()
+    findings = [Finding("ok", f"vault {vault}")]
+    if shutil.which("rg") is None:
+        findings.append(
+            Finding(
+                "fail",
+                "ripgrep (rg) is not on PATH",
+                "note search, quick-switch, backlinks, and tags all shell out to it",
+            )
+        )
+    else:
+        findings.append(check_ignore(vault))
+    findings.append(check_templates())
+    findings.extend(check_obsidian(vault))
+
+    for finding in findings:
+        print(render_finding(finding))
+    return 1 if any(finding.level == "fail" for finding in findings) else 0
+
+
+# ---------------------------------------------------------------- rendering
+def paint(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if COLOR else text
+
+
+LEVEL_COLORS = {"ok": "32", "warn": "33", "fail": "31"}
+
+
+def render_finding(finding: Finding) -> str:
+    label = paint(LEVEL_COLORS[finding.level], f"{finding.level:<4}")
+    line = f"{label}  {finding.message}"
+    return f"{line}\n      {paint('2', finding.detail)}" if finding.detail else line
+
+
+# --------------------------------------------------------------------- main
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    init = subparsers.add_parser("init", help="create a conforming vault")
+    init.add_argument(
+        "path", nargs="?", help="where to create it (default: $VAULT_DIR)"
+    )
+    init.add_argument(
+        "--in-place",
+        action="store_true",
+        help="add only what is missing from an existing directory",
+    )
+
+    check = subparsers.add_parser("check", help="validate $VAULT_DIR")
+    check.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="ANSI color use",
+    )
+    return parser.parse_args(argv)
+
+
+def main() -> int:
+    args = parse_args()
+    global COLOR
+    color = getattr(args, "color", "never")
+    COLOR = color == "always" or (
+        color == "auto" and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    )
+    if args.command == "init":
+        return command_init(args.path, args.in_place)
+    return command_check()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
