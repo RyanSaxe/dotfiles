@@ -41,12 +41,13 @@ aerospace	cmd+alt+shift+v/b/n/m	send window to workspace
 aerospace	cmd+alt+s	summon the stack (on-demand accordion)
 aerospace	cmd+alt+shift+s	throw window onto the stack
 aerospace	cmd+alt+a	jump to agent needing attention (from anywhere)
+aerospace	cmd+alt+r	jump to the terminal and open the Reviews dashboard
+aerospace	cmd+alt+shift+r	reload aerospace config
 aerospace	cmd+alt+tab	previous workspace
 aerospace	cmd+alt+f	fullscreen
 aerospace	cmd+alt+/	toggle split orientation
 aerospace	cmd+alt+minus	flatten layout (reset)
 aerospace	cmd+alt+equal	balance window sizes
-aerospace	cmd+alt+r	reload aerospace config
 ghostty	cmd+r	reload ghostty config
 ghostty	cmd+o	open ghostty config
 ghostty	shift+enter	newline without submitting

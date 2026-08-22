@@ -18,6 +18,24 @@ function shortRepository(repository: string): string {
   return slash >= 0 ? repository.slice(slash + 1) : repository;
 }
 
+// `repository#number` is the identity, and the number is the part that
+// actually identifies it. Clipping the whole token from the right removes the
+// number first — `buffergolf.nvim#…` says almost nothing. Shorten the
+// repository instead and keep the number whole.
+function identityLabel(
+  repository: string,
+  number: number,
+  budget: number,
+): string {
+  const name = shortRepository(repository);
+  const suffix = `#${number}`;
+  const full = `${name}${suffix}`;
+  if (full.length <= budget) return full;
+  const room = budget - suffix.length - 1;
+  if (room < 1) return suffix.slice(0, Math.max(1, budget));
+  return `${name.slice(0, room)}…${suffix}`;
+}
+
 function age(createdAt: string): string {
   const created = Date.parse(createdAt);
   if (!Number.isFinite(created)) return "?";
@@ -62,6 +80,13 @@ export function reviewRows(
     // rail width. Summary and age are supporting text and stay dim, so a
     // clipped summary can never take the signal with it.
     const identityFg = blend(itemColor(item, palette), bg, DIM_KEEP);
+    const elapsed = age(item.createdAt);
+    // The pill is three cells, then a space; the timer sits flush right with
+    // a cell of air. Whatever is left is the identity's, and the summary gets
+    // only what the identity does not need.
+    const budget = Math.max(1, width - 4 - elapsed.length - 1);
+    const identity = identityLabel(item.repository, item.number, budget);
+    const remaining = budget - identity.length - 1;
     rows.push(
       ...spacedItem(
         width,
@@ -71,13 +96,10 @@ export function reviewRows(
           // elsewhere agent — numbered pills stay neutral everywhere.
           ...pill(number, blend(palette.dim2, bg, DIM_KEEP), chipBg, bg),
           { text: " ", fg: dim },
-          {
-            text: `${shortRepository(item.repository)}#${item.number} `,
-            fg: identityFg,
-          },
-          { text: summary(item), fg: dim },
+          { text: identity, fg: identityFg },
+          ...(remaining > 1 ? [{ text: ` ${summary(item)}`, fg: dim }] : []),
         ],
-        { text: age(item.createdAt), fg: dim },
+        { text: elapsed, fg: dim },
       ),
     );
   }

@@ -8,6 +8,9 @@
 #                       switch the active rail tab
 #   rail element <number>
 #                       perform the focused tab's numbered element action
+#   rail dashboard-popup
+#                       open the Reviews dashboard as a tmux popup, for
+#                       entry points that live outside tmux
 #   rail dashboard reviews|tasks
 #                       open the table + preview dashboard for a rail tab
 #   rail review-dashboard
@@ -171,6 +174,14 @@ dashboard)
   esac
   cd "$RAIL_DIR"
   exec npx tsx src/review-dashboard.ts "$surface"
+  ;;
+dashboard-popup)
+  # Open the Reviews dashboard from outside tmux — the menu bar letter and
+  # the aerospace chord both land here. `display-popup` needs a client, so
+  # this only works when a terminal is attached; that is the point, since
+  # both entry points focus the terminal first.
+  exec tmux display-popup -h 80% -w 90% -E \
+    "TMUX_POPUP=1 $HOME/.local/bin/rail dashboard reviews"
   ;;
 review-dashboard)
   cd "$RAIL_DIR"

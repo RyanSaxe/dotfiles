@@ -38,6 +38,13 @@ export AGENT_WAITING_BG="0x33{{status_waiting_hex}}"
 export AGENT_DONE_FG="0xff{{status_done_hex}}"
 export AGENT_DONE_BG="0x33{{status_done_hex}}"
 
+# The review letter, using the dashboard's own hues: red for a failing check
+# on your own pull request, peach for anything else waiting on you.
+export REVIEW_CI_FG="0xff{{red_hex}}"
+export REVIEW_CI_BG="0x33{{red_hex}}"
+export REVIEW_PENDING_FG="0xff{{peach_hex}}"
+export REVIEW_PENDING_BG="0x33{{peach_hex}}"
+
 # Threshold colors for battery/cpu/memory. warn is a semantic token; danger
 # has no role of its own, so it names the red palette hue directly (see
 # starship.toml.tmpl's use of raw palette keys for the same pattern).

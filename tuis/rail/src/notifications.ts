@@ -8,10 +8,12 @@ import { join } from "node:path";
 
 import { run, type Agent, type AgentStatus } from "./data.js";
 import { ntfyEndpoint, sendNtfy } from "./attention/ntfy.js";
+import type { AttentionItem } from "./attention/types.js";
 import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
 const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
+const REVIEW_ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/review-attention");
 
 // waiting outranks done — the same urgency order the rail's rows use.
 export type AttentionLevel = "waiting" | "done" | "none";
@@ -48,6 +50,36 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
   // fine, and used to be silent: a failed trigger looked exactly like a
   // successful one, forever.
   run("sketchybar", ["--trigger", "agent_attention_change"]).catch(
+    (error: unknown) => {
+      if (platform() === "darwin") {
+        logLine(`sketchybar trigger failed: ${String(error)}`);
+      }
+    },
+  );
+}
+
+// The review letter in the menu bar, published the same way the agent one
+// is: a file with the level, and an edge-triggered sketchybar event. The bar
+// must not read the observer's state itself — that is a JSON document behind
+// a lock, and a menu bar polling it every few seconds is how a status
+// indicator becomes a source of load.
+export type ReviewLevel = "ci" | "review" | "none";
+
+export function reviewLevel(items: readonly AttentionItem[]): ReviewLevel {
+  if (items.length === 0) return "none";
+  // CI failure outranks conversation, matching the rows' own urgency.
+  return items.some((item) => item.kind === "ci") ? "ci" : "review";
+}
+
+let publishedReviewLevel: ReviewLevel | null = null;
+
+export function publishReviewAttention(items: readonly AttentionItem[]): void {
+  const level = reviewLevel(items);
+  if (level === publishedReviewLevel) return;
+  publishedReviewLevel = level;
+  writeFileSync(REVIEW_ATTENTION_FILE, level);
+  logLine(`review attention ${level} (${items.length} unacknowledged)`);
+  run("sketchybar", ["--trigger", "review_attention_change"]).catch(
     (error: unknown) => {
       if (platform() === "darwin") {
         logLine(`sketchybar trigger failed: ${String(error)}`);

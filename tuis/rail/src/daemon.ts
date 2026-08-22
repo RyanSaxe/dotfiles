@@ -36,7 +36,11 @@ import {
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
 import { logLine } from "./log.js";
-import { publishAttention, pushPhone } from "./notifications.js";
+import {
+  publishAttention,
+  publishReviewAttention,
+  pushPhone,
+} from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
 import { collectHostFacts, isPresent } from "./probes.js";
 import { mascotFor } from "./mascot.js";
@@ -319,6 +323,7 @@ async function tick(counter: number): Promise<boolean> {
   const hintsBySession = assignHints(settled, sessions, acked);
   writeHints(settled, hintsBySession, acked);
   publishAttention(settled, acked);
+  publishReviewAttention(loadReviewSnapshot().unacknowledged);
   const present = isPresent(
     hostFacts.inputIdleSecs,
     clientFacts.latestClientActivityTs,
