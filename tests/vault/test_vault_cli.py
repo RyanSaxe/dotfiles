@@ -414,3 +414,250 @@ def test_missing_vault_directory_is_named(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "nowhere" in result.stderr
+
+
+# ------------------------------------------------------------- task writing
+# git scopes commands through the environment, and this suite runs under prek,
+# where GIT_DIR is always set — the scratch repositories need it stripped for
+# the same reason the CLI strips it.
+GIT_SCOPE = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+)
+
+
+def git(cwd: Path, *args: str) -> None:
+    env = {name: value for name, value in os.environ.items() if name not in GIT_SCOPE}
+    env["GIT_AUTHOR_NAME"] = env["GIT_COMMITTER_NAME"] = "vault tests"
+    env["GIT_AUTHOR_EMAIL"] = env["GIT_COMMITTER_EMAIL"] = "tests@example.invalid"
+    subprocess.run(
+        ["git", "-C", str(cwd), *args], check=True, capture_output=True, env=env
+    )
+
+
+def scratch_project(tmp_path: Path, name: str = "scratch-widget") -> Path:
+    """A repository with a remote, which is all a project identity needs."""
+    project = tmp_path / "code" / name
+    project.mkdir(parents=True)
+    git(project, "init", "-q", "-b", "main")
+    git(project, "remote", "add", "origin", f"git@github.com:example-org/{name}.git")
+    (project / "README.md").write_text("scratch\n")
+    git(project, "add", "-A")
+    git(project, "commit", "-qm", "init")
+    return project
+
+
+def todo_text(vault: Path, name: str = "scratch-widget") -> str:
+    return (vault / "projects" / name / "TODO.md").read_text(encoding="utf-8")
+
+
+def test_add_names_the_project_after_the_remote_basename(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+
+    result = run_vault(tmp_path, "task", "add", "read that paper", cwd=project)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("projects/scratch-widget/TODO.md:3")
+    assert todo_text(vault) == "# scratch-widget\n\n- [ ] read that paper\n"
+
+
+def test_add_files_tasks_under_the_h1_until_a_branch_is_asked_for(
+    tmp_path: Path,
+) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+
+    run_vault(tmp_path, "task", "add", "first", cwd=project)
+    run_vault(tmp_path, "task", "add", "second", "--due", "3d", cwd=project)
+
+    assert todo_text(vault) == (
+        "# scratch-widget\n"
+        "\n"
+        "- [ ] first\n"
+        f"- [ ] second {DUE} {today() + timedelta(days=3)}\n"
+    )
+
+
+def test_add_with_branch_creates_the_heading_once_and_reuses_it(
+    tmp_path: Path,
+) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+    git(project, "checkout", "-q", "-b", "feat/narrow-rail")
+
+    run_vault(tmp_path, "task", "add", "above the branch", cwd=project)
+    run_vault(tmp_path, "task", "add", "under it", "--branch", cwd=project)
+    run_vault(tmp_path, "task", "add", "under it too", "--branch", cwd=project)
+
+    assert todo_text(vault) == (
+        "# scratch-widget\n"
+        "\n"
+        "- [ ] above the branch\n"
+        "\n"
+        "## feat/narrow-rail\n"
+        "\n"
+        "- [ ] under it\n"
+        "- [ ] under it too\n"
+    )
+    rows = tasks_json(tmp_path)
+    assert find(rows, "under it too")["section"] == "feat/narrow-rail"
+    assert find(rows, "above the branch")["section"] == "scratch-widget"
+
+
+def test_one_project_resolves_the_same_from_a_second_worktree(
+    tmp_path: Path,
+) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+    second = tmp_path / "code" / "elsewhere"
+    git(project, "worktree", "add", "-q", "-b", "feat/second", str(second))
+
+    run_vault(tmp_path, "task", "add", "from the first", cwd=project)
+    run_vault(tmp_path, "task", "add", "from the second", "--branch", cwd=second)
+
+    assert todo_text(vault) == (
+        "# scratch-widget\n"
+        "\n"
+        "- [ ] from the first\n"
+        "\n"
+        "## feat/second\n"
+        "\n"
+        "- [ ] from the second\n"
+    )
+
+
+def test_add_refuses_where_no_remote_names_a_project(tmp_path: Path) -> None:
+    make_vault(tmp_path)
+    bare = tmp_path / "code" / "no-remote"
+    bare.mkdir(parents=True)
+    git(bare, "init", "-q", "-b", "main")
+
+    outside = run_vault(tmp_path, "task", "add", "nope", cwd=tmp_path)
+    remoteless = run_vault(tmp_path, "task", "add", "nope", cwd=bare)
+
+    assert outside.returncode == 1
+    assert "not a git repository" in outside.stderr
+    assert remoteless.returncode == 1
+    assert "no git remote" in remoteless.stderr
+
+
+def test_done_flips_the_checkbox_and_says_so_the_second_time(
+    tmp_path: Path,
+) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+    run_vault(tmp_path, "task", "add", "read that paper", cwd=project)
+
+    first = run_vault(tmp_path, "task", "done", "projects/scratch-widget/TODO.md:3")
+    second = run_vault(tmp_path, "task", "done", "projects/scratch-widget/TODO.md:3")
+
+    assert first.returncode == 0, first.stderr
+    assert "- [x] read that paper" in first.stdout
+    assert todo_text(vault).endswith("- [x] read that paper\n")
+    assert second.returncode == 0, second.stderr
+    assert "already done" in second.stdout
+
+
+def test_due_adds_a_date_and_then_replaces_it(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+    run_vault(tmp_path, "task", "add", "ship the parser", cwd=project)
+    task_id = "projects/scratch-widget/TODO.md:3"
+
+    added = run_vault(tmp_path, "task", "due", task_id, "2026-12-01")
+    replaced = run_vault(tmp_path, "task", "due", task_id, "2027-01-15")
+
+    assert added.returncode == 0, added.stderr
+    assert replaced.returncode == 0, replaced.stderr
+    assert todo_text(vault).endswith(f"- [ ] ship the parser {DUE} 2027-01-15\n")
+
+
+def test_a_stale_id_refuses_to_write(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+    run_vault(tmp_path, "task", "add", "read that paper", cwd=project)
+    before = todo_text(vault)
+
+    heading = run_vault(tmp_path, "task", "done", "projects/scratch-widget/TODO.md:1")
+    beyond = run_vault(tmp_path, "task", "done", "projects/scratch-widget/TODO.md:99")
+    missing = run_vault(tmp_path, "task", "done", "nowhere.md:3")
+    nonsense = run_vault(tmp_path, "task", "done", "garbage")
+
+    for result in (heading, beyond, missing, nonsense):
+        assert result.returncode == 1, result.stdout
+    assert "re-run `vault tasks`" in heading.stderr
+    assert "re-run `vault tasks`" in beyond.stderr
+    assert "no such note in the vault" in missing.stderr
+    assert "not a task id" in nonsense.stderr
+    assert todo_text(vault) == before
+
+
+def test_a_fenced_task_is_never_a_write_target(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    write_note(vault, "inbox.md", "```\n- [ ] a code sample\n```\n")
+    before = (vault / "inbox.md").read_text()
+
+    result = run_vault(tmp_path, "task", "done", "inbox.md:2")
+
+    assert result.returncode == 1
+    assert (vault / "inbox.md").read_text() == before
+
+
+def test_writing_one_line_leaves_the_rest_of_the_note_alone(
+    tmp_path: Path,
+) -> None:
+    vault = make_vault(tmp_path)
+    note = "# notes\n\n- [ ] one\n\ntrailing prose, no newline at the end"
+    write_note(vault, "inbox.md", note)
+
+    result = run_vault(tmp_path, "task", "done", "inbox.md:3")
+
+    assert result.returncode == 0, result.stderr
+    assert (vault / "inbox.md").read_text() == note.replace("[ ] one", "[x] one")
+
+
+# -------------------------------------------------------------------- dates
+def test_every_date_form_resolves(tmp_path: Path) -> None:
+    make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+    forms = ("today", "tmr", "tomorrow", "3d", "2026-12-25", "fri", "friday")
+    for form in forms:
+        result = run_vault(tmp_path, "task", "add", form, "--due", form, cwd=project)
+        assert result.returncode == 0, result.stderr
+
+    due = {row["text"]: date.fromisoformat(row["due"]) for row in tasks_json(tmp_path)}
+
+    assert due["today"] == today()
+    assert due["tmr"] == today() + timedelta(days=1)
+    assert due["tomorrow"] == due["tmr"]
+    assert due["3d"] == today() + timedelta(days=3)
+    assert due["2026-12-25"] == date(2026, 12, 25)
+    # A weekday is the next one of that name, counting today as its own.
+    assert due["friday"] == due["fri"]
+    assert due["fri"].strftime("%A") == "Friday"
+    assert 0 <= (due["fri"] - today()).days <= 6
+
+
+def test_an_unreadable_date_is_refused_before_anything_is_written(
+    tmp_path: Path,
+) -> None:
+    vault = make_vault(tmp_path)
+    project = scratch_project(tmp_path)
+
+    impossible = run_vault(
+        tmp_path, "task", "add", "nope", "--due", "2026-02-30", cwd=project
+    )
+    nonsense = run_vault(
+        tmp_path, "task", "add", "nope", "--due", "someday", cwd=project
+    )
+
+    assert impossible.returncode == 1
+    assert nonsense.returncode == 1
+    assert "YYYY-MM-DD" in nonsense.stderr
+    assert not (vault / "projects" / "scratch-widget").exists()

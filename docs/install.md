@@ -86,6 +86,42 @@ One more glob caveat: Python's glob skips hidden files, so a dotted filename
 inside a globbed directory needs its own explicit mapping (as
 `~/.config/nvim/.luarc.json` has) or it silently never deploys.
 
+## The vault
+
+Notes live in a Markdown vault at `$VAULT_DIR` (`~/generic/vault`), which is a
+git repository of its own and never part of the dotfiles. `install.sh` is the
+only place that asks for one, and only when a human is driving it: it offers to
+clone a vault repository you already have — `owner/repo` or a full URL — or to
+create a fresh one, and then reports `vault check`. A scripted run does nothing
+here, so installation never blocks on a prompt or creates a vault you did not
+ask for.
+
+The `vault` CLI owns the vault's shape and its task state:
+
+```sh
+vault tasks [--json]                           # a tree, or one row per task
+vault task add <text> [--due DATE] [--branch]
+vault task done <ID>                           # ID is <path>:<line>
+vault task due <ID> <DATE>
+vault init [path] [--in-place]
+vault check
+```
+
+Task ids come from `vault tasks` and are recomputed every time, so nothing
+stores one and none appears in the Markdown. Dates are read in every spelling
+worth typing: `today`, `tmr`, a weekday (`fri`), `3d`, or `2026-08-25`. A
+task's project is the basename of the current repository's git remote, which
+means the same project resolves identically from every worktree of it.
+
+Two files carry the vault's contract and `vault check` enforces both.
+`.gitignore` is an allowlist: everything stays local except `public/`.
+`.ignore` is the load-bearing one — obsidian.nvim builds a fixed
+`rg --no-config` search command with no escape hatch, so without `.ignore`
+every gitignored note vanishes from search, quick-switch, backlinks, and tags
+with no error at all. It just looks like an empty vault. `check` catches that
+by comparing what ripgrep can see against a filesystem walk, which is also why
+a missing ripgrep fails the check rather than warning.
+
 ## Machine-local values
 
 Anything that can't live in git — secrets, per-machine ids — goes in an

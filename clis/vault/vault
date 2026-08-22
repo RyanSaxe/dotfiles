@@ -6,6 +6,9 @@
 """Task state for a Markdown vault, and the contract the vault itself keeps.
 
     vault tasks [--json]
+    vault task add <text> [--due DATE] [--branch]
+    vault task done <ID>
+    vault task due <ID> <DATE>
     vault init [path] [--in-place]
     vault check
 
@@ -17,7 +20,10 @@ quick-switch, backlinks, and tags silently return nothing.
 A task is a `- [ ]` list item in any note. Its section is the nearest heading
 above it and its project is the `projects/<name>/` directory holding the file.
 Identity is `<vault-relative-path>:<line>`, recomputed on every read: no
-index, no cache, no identifier written into the Markdown.
+index, no cache, no identifier written into the Markdown. Every write goes
+through here, so nothing else has to know the grammar — `add` resolves the
+project from the current directory's git remote, and dates are read here in
+every spelling a person is likely to type.
 
 Exit codes: 0 success, 1 a failed check or a bad request.
 """
@@ -32,7 +38,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from itertools import groupby
 from pathlib import Path, PurePosixPath
 
@@ -83,6 +89,18 @@ TASK_RE = re.compile(r"^(?P<indent>\s*)[-*+] \[(?P<mark>[ xX])\](?P<text> .*)?$"
 HEADING_RE = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<text>.*?)\s*$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 DUE_RE = re.compile(rf"\s*{DUE_SIGIL}\s*(\d{{4}}-\d{{2}}-\d{{2}})")
+ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+RELATIVE_RE = re.compile(r"^(\d+)d$")
+WEEKDAYS = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+DATE_FORMS = "today, tmr, a weekday (fri or friday), 3d, or YYYY-MM-DD"
 
 VAULT_DIRS = ("assets", "daily", "people", "projects", "public")
 VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE, "inbox.md": "# inbox\n"}
@@ -100,6 +118,58 @@ def git_env() -> dict[str, str]:
     return {
         name: value for name, value in os.environ.items() if name not in GIT_SCOPE_VARS
     }
+
+
+def git(cwd: Path, *args: str) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(cwd), *args],
+        check=False,
+        text=True,
+        capture_output=True,
+        env=git_env(),
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def remote_basename(url: str) -> str:
+    name = url.rstrip("/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+    return name.removesuffix(".git")
+
+
+def git_project(cwd: Path) -> str:
+    """A task's project: the basename of the repository's remote.
+
+    Two remotes whose basenames collide would share one project directory.
+    Saying so needs a remembered mapping from remote to directory, and this
+    CLI keeps no state at all, so nothing here can name the other remote.
+    """
+    if git(cwd, "rev-parse", "--show-toplevel") is None:
+        raise SystemExit(
+            f"not a git repository: {cwd} — a task's project is its remote's basename"
+        )
+    url = git(cwd, "remote", "get-url", "origin")
+    if url is None:
+        remotes = (git(cwd, "remote") or "").split()
+        if not remotes:
+            raise SystemExit(
+                f"no git remote in {cwd} — a task's project is its remote's basename"
+            )
+        if len(remotes) > 1:
+            raise SystemExit(
+                f"several remotes in {cwd} and no origin: {', '.join(remotes)}"
+            )
+        url = git(cwd, "remote", "get-url", remotes[0])
+    name = remote_basename(url or "")
+    if not name:
+        raise SystemExit(f"no project name in the git remote: {url}")
+    return name
+
+
+def git_branch(cwd: Path) -> str:
+    branch = git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+    if not branch or branch == "HEAD":
+        raise SystemExit(f"no branch checked out in {cwd} — --branch names a heading")
+    return branch
 
 
 # -------------------------------------------------------------- vault paths
@@ -211,6 +281,33 @@ def outline(lines: list[str]) -> Outline:
     return Outline(headings, entries)
 
 
+# -------------------------------------------------------------------- dates
+def parse_date(value: str, today: date) -> date:
+    """Every spelling of a due date, resolved once so no consumer repeats it.
+
+    A weekday counts today as its own next occurrence: asked for `fri` on a
+    Friday, a person means today.
+    """
+    text = value.strip().lower()
+    if text == "today":
+        return today
+    if text in ("tmr", "tomorrow"):
+        return today + timedelta(days=1)
+    ahead = RELATIVE_RE.match(text)
+    if ahead:
+        return today + timedelta(days=int(ahead.group(1)))
+    if len(text) >= 3:
+        for weekday, name in enumerate(WEEKDAYS):
+            if name.startswith(text):
+                return today + timedelta(days=(weekday - today.weekday()) % 7)
+    if ISO_RE.match(text):
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            pass
+    raise SystemExit(f"cannot read {value!r} as a date — use {DATE_FORMS}")
+
+
 # -------------------------------------------------------------------- tasks
 def local_today() -> date:
     """Today on this machine's clock. Due states are calendar-only."""
@@ -305,6 +402,176 @@ def command_tasks(as_json: bool) -> int:
         print(json.dumps(rows, ensure_ascii=False, indent=2))
         return 0
     print(render_tasks(tasks, today) if tasks else "no tasks")
+    return 0
+
+
+# ------------------------------------------------------------- task writing
+def read_keepends(path: Path) -> list[str]:
+    # Line endings are kept so rewriting one line leaves every other byte of
+    # the note exactly as its author left it.
+    with path.open(encoding="utf-8", newline="") as handle:
+        return handle.read().splitlines(keepends=True)
+
+
+def write_lines(path: Path, lines: list[str]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        handle.write("".join(lines))
+
+
+@dataclass
+class Location:
+    path: Path
+    relative: str
+    number: int  # 1-based
+    lines: list[str]  # line endings included
+    content: str  # the task line, without its ending
+    ending: str
+    done: bool
+    mark_at: int  # where the checkbox character sits in `content`
+
+    @property
+    def id(self) -> str:
+        return f"{self.relative}:{self.number}"
+
+    def rewrite(self, content: str) -> None:
+        self.lines[self.number - 1] = content + self.ending
+        write_lines(self.path, self.lines)
+        print(f"{self.id}  {content.strip()}")
+
+
+def resolve_id(vault: Path, task_id: str) -> Location:
+    """Find the line an id names, and prove it is still a task."""
+    relative, _, number = task_id.rpartition(":")
+    if not relative or not number.isdigit():
+        raise SystemExit(f"{task_id!r} is not a task id — expected <path>:<line>")
+    path = (vault / relative).resolve()
+    if not path.is_relative_to(vault) or not path.is_file():
+        raise SystemExit(f"no such note in the vault: {relative}")
+
+    lines = read_keepends(path)
+    index = int(number) - 1
+    stripped = [line.rstrip("\r\n") for line in lines]
+    # Ids move whenever a file above them changes, and the whole design
+    # recomputes rather than remembers them. Re-parse before writing so a
+    # stale id fails loudly instead of editing whatever now sits there.
+    entry = next(
+        (item for item in outline(stripped).entries if item.index == index), None
+    )
+    if entry is None:
+        raise SystemExit(
+            f"{task_id} is not a task line — ids move when a file changes; "
+            "re-run `vault tasks` for current ones"
+        )
+    match = TASK_RE.match(stripped[index])
+    assert match is not None  # outline() matched the same line
+    return Location(
+        path=path,
+        relative=relative,
+        number=index + 1,
+        lines=lines,
+        content=stripped[index],
+        ending=lines[index][len(stripped[index]) :],
+        done=entry.done,
+        mark_at=match.start("mark"),
+    )
+
+
+def section_bounds(
+    document: Outline, total: int, heading: Heading | None
+) -> tuple[int, int]:
+    """The lines a task belongs among: under a heading, or above the first
+    `##` when the task has no heading of its own."""
+    if heading is None:
+        first = document.headings[0] if document.headings else None
+        start = first.index + 1 if first and first.level == 1 else 0
+        end = next((item.index for item in document.headings if item.level >= 2), total)
+        return start, max(start, end)
+    end = next(
+        (
+            item.index
+            for item in document.headings
+            if item.index > heading.index and item.level <= heading.level
+        ),
+        total,
+    )
+    return heading.index + 1, end
+
+
+def insert_task(
+    lines: list[str], heading: str | None, entry: str
+) -> tuple[list[str], int]:
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    document = outline([line.rstrip("\r\n") for line in lines])
+
+    target: Heading | None = None
+    if heading is not None:
+        target = next(
+            (item for item in document.headings if item.text == heading), None
+        )
+        if target is None:
+            if lines and lines[-1].strip():
+                lines.append("\n")
+            lines.append(f"## {heading}\n")
+            target = Heading(len(lines) - 1, 2, heading)
+            document = Outline([*document.headings, target], document.entries)
+
+    start, end = section_bounds(document, len(lines), target)
+    point = end
+    while point > start and not lines[point - 1].strip():
+        point -= 1
+    block = [entry + "\n"]
+    if point > 0 and HEADING_RE.match(lines[point - 1].rstrip("\r\n")):
+        block.insert(0, "\n")
+    lines[point:point] = block
+    return lines, point + len(block)
+
+
+def task_line(text: str, due: date | None) -> str:
+    entry = f"- [ ] {text}"
+    return entry if due is None else f"{entry} {DUE_SIGIL} {due.isoformat()}"
+
+
+def command_add(vault: Path, text: str, due_value: str | None, branch: bool) -> int:
+    text = " ".join(text.split())
+    if not text:
+        raise SystemExit("a task needs some text")
+    due = parse_date(due_value, local_today()) if due_value else None
+    cwd = Path.cwd()
+    project = git_project(cwd)
+    heading = git_branch(cwd) if branch else None
+
+    path = vault / "projects" / project / "TODO.md"
+    if path.exists():
+        lines = read_keepends(path)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [f"# {project}\n"]
+
+    entry = task_line(text, due)
+    lines, number = insert_task(lines, heading, entry)
+    write_lines(path, lines)
+    print(f"{path.relative_to(vault).as_posix()}:{number}  {entry}")
+    return 0
+
+
+def command_done(vault: Path, task_id: str) -> int:
+    location = resolve_id(vault, task_id)
+    if location.done:
+        print(f"already done: {location.id}")
+        return 0
+    content = location.content
+    location.rewrite(
+        content[: location.mark_at] + "x" + content[location.mark_at + 1 :]
+    )
+    return 0
+
+
+def command_due(vault: Path, task_id: str, value: str) -> int:
+    due = parse_date(value, local_today())
+    location = resolve_id(vault, task_id)
+    undated = DUE_RE.sub("", location.content).rstrip()
+    location.rewrite(f"{undated} {DUE_SIGIL} {due.isoformat()}")
     return 0
 
 
@@ -595,6 +862,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="ANSI color use",
     )
 
+    task = subparsers.add_parser("task", help="add or change one task")
+    task_commands = task.add_subparsers(dest="task_command", required=True)
+
+    add = task_commands.add_parser("add", help="add a task to this project")
+    add.add_argument("text", help="the task, without the checkbox or the date")
+    add.add_argument("--due", metavar="DATE", help=f"one of: {DATE_FORMS}")
+    add.add_argument(
+        "--branch",
+        action="store_true",
+        help="file it under a heading named for the current branch",
+    )
+
+    done = task_commands.add_parser("done", help="complete a task")
+    done.add_argument("id", metavar="ID", help="<path>:<line>, from `vault tasks`")
+
+    due = task_commands.add_parser("due", help="reschedule a task")
+    due.add_argument("id", metavar="ID", help="<path>:<line>, from `vault tasks`")
+    due.add_argument("date", metavar="DATE", help=f"one of: {DATE_FORMS}")
+
     init = subparsers.add_parser("init", help="create a conforming vault")
     init.add_argument(
         "path", nargs="?", help="where to create it (default: $VAULT_DIR)"
@@ -624,6 +910,13 @@ def main() -> int:
     )
     if args.command == "tasks":
         return command_tasks(args.json)
+    if args.command == "task":
+        vault = existing_vault()
+        if args.task_command == "add":
+            return command_add(vault, args.text, args.due, args.branch)
+        if args.task_command == "done":
+            return command_done(vault, args.id)
+        return command_due(vault, args.id, args.date)
     if args.command == "init":
         return command_init(args.path, args.in_place)
     return command_check()
