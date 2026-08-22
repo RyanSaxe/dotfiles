@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { run } from "./data.js";
-import { openReviewItem } from "./review-dashboard.js";
+import { openReviewItem, openTaskElement } from "./review-dashboard.js";
 import { XDG_STATE } from "./paths.js";
 import { RAIL_TABS, loadRailTab } from "./tabs.js";
 
@@ -53,17 +53,25 @@ async function main(): Promise<void> {
         throw new Error(`no review element ${number}`);
       }
       return;
-    case "task_complete":
-      // The slab's task rows are not numbered: ids are recomputed on every
-      // read, so completing the Nth row of a frame that may be seconds old
-      // would be a keystroke aimed at whatever has since moved into it.
-      // Completing happens in the dashboard (alt+T), against the row you can
-      // see selected.
-      throw new Error("complete a task from the Tasks dashboard (alt+T)");
+    case "task_jump":
+      // A jump, never a completion: ids are recomputed on every read, so the
+      // Nth row of a frame that may be a refresh old is not something a
+      // destructive action may be aimed at. Opening the note is safe when
+      // the row has moved — you land on the task and can see it. Completing
+      // happens in the dashboard (alt+T), against the row you have selected.
+      if (!(await openTaskElement(number - 1))) {
+        throw new Error(`no task element ${number}`);
+      }
+      return;
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+// tmux shows ANY output or non-zero exit of a `run-shell` binding in a
+// view-mode overlay: the window is renamed `[tmux]` (the rail's own window
+// row says so) and the overlay sits there until you press q. A keystroke
+// that found nothing is not worth a modal — say it in the status line the
+// way every other tmux miss is said, and exit clean.
+main().catch(async (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  await run("tmux", ["display-message", `rail: ${message}`]).catch(() => {});
 });

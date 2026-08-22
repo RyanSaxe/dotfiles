@@ -183,38 +183,75 @@ test("due state is the only hue the slab spends", () => {
     hex(blend(color, railBg(palette), DIM_KEEP));
   assert.equal(colorOf(rendered, "overdue by a day"), shade(palette.red));
   assert.equal(colorOf(rendered, "due today"), shade(palette.peach));
-  assert.equal(colorOf(rendered, "due tomorrow"), shade(palette.peach));
+  // Today and tomorrow are the pair a glance has to tell apart, so tomorrow
+  // is yellow rather than a second peach row.
+  assert.equal(colorOf(rendered, "due tomorrow"), shade(palette.yellow));
   assert.equal(colorOf(rendered, "a near thing"), shade(palette.mauve));
 });
 
-test("every group states its due state in text, and the date rides along", () => {
-  const rendered = plain(
-    taskRows(snapshot(SPREAD), palette, 26)
-      .map((line) => line.text)
-      .join("\n"),
-  );
+// The item rows, without the spacers between them and without colour.
+const itemLines = (json: string, width = 26): string[] =>
+  taskRows(snapshot(json), palette, width)
+    .filter((line) => line.item)
+    .map((line) => plain(line.text));
+
+test("the slab is one urgency-ordered list, with no state labels", () => {
+  const lines = itemLines(SPREAD);
+  // No group headings: a row says its state in hue and in where it sits.
   for (const state of ["overdue", "today", "tomorrow", "near"]) {
-    assert.match(rendered, new RegExp(`^${state}\\s*$`, "m"));
+    assert.ok(
+      !taskRows(snapshot(SPREAD), palette, 26).some(
+        (line) => !line.item && plain(line.text).trim() === state,
+      ),
+    );
   }
-  assert.match(rendered, /08-21/);
+  // Urgency, then the calendar, then the text — the projection's order,
+  // rendered top to bottom with nothing between the rows.
+  railTasks(parseTasks(SPREAD)).forEach((task, index) => {
+    assert.ok((lines[index] ?? "").includes(task.text.slice(0, 12)));
+  });
+  assert.equal(lines.length, railTasks(parseTasks(SPREAD)).length);
   // Later and undated work never reaches the slab, in any form.
+  const rendered = lines.join("\n");
   assert.ok(!rendered.includes("due next month"));
   assert.ok(!rendered.includes("no date at all"));
   assert.ok(!rendered.includes("already done"));
 });
 
-test("rows keep the section's text column, and only informative dates", () => {
-  const rendered = plain(
-    taskRows(snapshot(SPREAD), palette, 26)
-      .map((line) => line.text)
-      .join("\n"),
+test("a task row is an agent row: numbered pill, text, right span", () => {
+  const lines = itemLines(SPREAD);
+  // The same three-cell pill the window and elsewhere rows use, numbering
+  // display positions: pill N is the Nth row of the slab's projection, which
+  // is exactly what alt+space N opens.
+  lines.forEach((line, index) => {
+    assert.ok(line.startsWith(`\ue0b6${String(index + 1)}\ue0b4 `));
+  });
+  assert.match(lines[1] ?? "", /overdue by a day\s+08-21$/);
+  // A date is the news for anything but today and tomorrow, where the day
+  // itself is what the row has to say.
+  assert.match(lines[2] ?? "", /due today\s+today$/);
+  assert.match(lines[3] ?? "", /due tomorrow\s+tmr$/);
+});
+
+test("the digits stop at nine, and the text column does not move", () => {
+  const many = output(
+    Array.from({ length: 11 }, (_, index) =>
+      row({
+        id: `many:${String(index)}`,
+        text: `task ${String(index).padStart(2, "0")}`,
+      }),
+    ),
   );
-  // A task has no jump target, so the pill's three cells stay empty — the
-  // text still starts where every other section's does.
-  assert.match(rendered, /^ {4}overdue by a day\s+08-21\s*$/m);
-  // Under "today" the date would only repeat the group label, so the row
-  // spends those cells on the text instead.
-  assert.match(rendered, /^ {4}due today\s*$/m);
+  const lines = itemLines(many);
+  // Nine is what the tmux element table binds; the dashboard is the overflow
+  // surface. A row past it keeps the pill's cells as air so the text column
+  // holds all the way down the list.
+  assert.ok((lines[8] ?? "").startsWith("\ue0b69\ue0b4 task 08"));
+  assert.ok((lines[9] ?? "").startsWith("    task 09"));
+  assert.equal(
+    (lines[9] ?? "").indexOf("task"),
+    (lines[8] ?? "").indexOf("task"),
+  );
 });
 
 test("a week with nothing due says so rather than showing an empty tab", () => {
@@ -348,12 +385,37 @@ test("a task becomes a row in its own vocabulary", () => {
 test("the due-state hues carry over to the dashboard", () => {
   const tone = (state: TaskState): string => taskItem(task({ state })).tone;
   assert.equal(tone("overdue"), "overdue");
-  assert.equal(tone("today"), "due_soon");
-  assert.equal(tone("tomorrow"), "due_soon");
+  assert.equal(tone("today"), "due_today");
+  assert.equal(tone("tomorrow"), "due_tomorrow");
   assert.equal(tone("near"), "due_near");
   // Later and undated work is real, but it is not urgent.
   assert.equal(tone("later"), "neutral");
   assert.equal(tone("none"), "neutral");
+});
+
+test("the dashboard spends the same four hues on the same four states", () => {
+  const states: TaskState[] = ["overdue", "today", "tomorrow", "near"];
+  const frame = renderDashboard(
+    {
+      surface: "tasks",
+      items: states.map((state, index) =>
+        taskItem(
+          task({ id: `t:${String(index)}`, state, text: `${state} row` }),
+        ),
+      ),
+      status: "4 open",
+      emptyMessage: "No open tasks",
+      error: null,
+    },
+    0,
+    palette,
+    120,
+    40,
+  );
+  assert.equal(colorOf(frame, "overdue row"), hex(palette.red));
+  assert.equal(colorOf(frame, "today row"), hex(palette.peach));
+  assert.equal(colorOf(frame, "tomorrow row"), hex(palette.yellow));
+  assert.equal(colorOf(frame, "near row"), hex(palette.mauve));
 });
 
 const data = (): DashboardData => ({

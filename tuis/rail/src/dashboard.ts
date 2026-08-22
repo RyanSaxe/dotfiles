@@ -12,15 +12,16 @@ export type DashboardView = "reviews" | "worktrees";
 
 // What an item needs attention FOR. The hue follows the object, per the
 // locked semantics: CI failure is red, pull-request activity peach, issue
-// activity mauve. Tasks reuse the same three hues for their due states —
-// overdue red, due today or tomorrow peach, due this week mauve — under
-// names that say what a task row actually means.
+// activity mauve. Tasks reuse those hues for their due states — overdue
+// red, due today peach, due this week mauve — and add yellow for tomorrow,
+// the one distinction a glance has to make between two urgent days.
 export type DashboardTone =
   | "ci"
   | "pull_request"
   | "issue"
   | "overdue"
-  | "due_soon"
+  | "due_today"
+  | "due_tomorrow"
   | "due_near"
   | "clean"
   | "neutral";
@@ -249,8 +250,10 @@ function toneColor(tone: DashboardTone, palette: Palette): string {
     case "overdue":
       return palette.red;
     case "pull_request":
-    case "due_soon":
+    case "due_today":
       return palette.peach;
+    case "due_tomorrow":
+      return palette.yellow;
     case "issue":
     case "due_near":
       return palette.mauve;

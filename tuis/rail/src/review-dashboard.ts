@@ -26,6 +26,7 @@ import { fmtElapsed } from "./cells.js";
 import {
   completeTask,
   loadTaskSnapshot,
+  railTasks,
   shortDue,
   type TaskState,
   type VaultTask,
@@ -383,15 +384,17 @@ export async function worktreeDashboardData(): Promise<DashboardData> {
   };
 }
 
-// The three due-state hues, under task names. Later and undated work is
-// real but not urgent, so it reads as ordinary text.
+// The four due-state hues, under task names. Today and tomorrow are the
+// pair a glance has to tell apart, so they keep separate tones. Later and
+// undated work is real but not urgent, so it reads as ordinary text.
 function taskTone(state: TaskState): DashboardTone {
   switch (state) {
     case "overdue":
       return "overdue";
     case "today":
+      return "due_today";
     case "tomorrow":
-      return "due_soon";
+      return "due_tomorrow";
     case "near":
       return "due_near";
     default:
@@ -510,24 +513,42 @@ export async function taskDashboardData(): Promise<DashboardData> {
   };
 }
 
-// Enter opens the note where the task is written, at its line. Neovim is the
-// vault's only editing interface, and a tmux window is where the popup can
-// close and leave you standing in it.
-async function openTaskSource(item: DashboardItem): Promise<boolean> {
+// Opening a task means opening the note where it is written, at its line.
+// Neovim is the vault's only editing interface, and a tmux window is where
+// the popup can close and leave you standing in it. The dashboard's Enter
+// and the rail's numbered pills both land here — one way in, so the two
+// surfaces cannot drift.
+async function openTaskNote(file: string, line: number): Promise<boolean> {
   const vault = process.env["VAULT_DIR"];
-  const line = Number(item.reference.replace(/^:/, ""));
   if (vault === undefined || !Number.isFinite(line)) return false;
   await run("tmux", [
     "new-window",
     "-c",
     vault,
     "-n",
-    basename(item.repository, ".md"),
+    basename(file, ".md"),
     "nvim",
     `+${String(line)}`,
-    join(vault, item.repository),
+    join(vault, file),
   ]);
   return true;
+}
+
+async function openTaskSource(item: DashboardItem): Promise<boolean> {
+  return openTaskNote(
+    item.repository,
+    Number(item.reference.replace(/^:/, "")),
+  );
+}
+
+// The rail's numbered task pills, resolved the way a review element is:
+// the vault is re-read at the keystroke, because ids move with the lines
+// they name and the frame on screen may be a refresh old. The digit is a
+// display position in the slab's projection, so the same sort decides both.
+export async function openTaskElement(index: number): Promise<boolean> {
+  const task = railTasks((await loadTaskSnapshot()).tasks)[index];
+  if (task === undefined) return false;
+  return openTaskNote(task.file, task.line);
 }
 
 async function openUrl(url: string): Promise<void> {

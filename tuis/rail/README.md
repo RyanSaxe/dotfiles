@@ -86,8 +86,9 @@ The rail does not perform these network requests. The Reviews tab reads the
 observer's cached state. `alt+r` selects the Reviews rail tab; the
 tab is one compact line per unacknowledged item and highlights the Reviews badge
 until the item is acknowledged or disappears. `alt+R` opens the cached Review
-table + preview dashboard. `alt+T` opens the same dashboard shell for the
-future-ready Tasks surface.
+table + preview dashboard. `alt+t` selects the Tasks rail tab — the vault's
+open work, urgency-ordered — and `alt+T` opens the same dashboard shell
+for it.
 
 The Reviews dashboard has two views, switched with Tab:
 
@@ -109,11 +110,13 @@ session rather than replacing the human one.
 Acknowledged items leave the table rather than dimming. A new external event
 arrives with a new id, so a cleared item returns on its own.
 
-The tab registry is intentionally small: Agents, Reviews, and the future-ready
-Tasks surface share one element-action table. `alt+space` enters that table;
-the selected tab decides what a number means. Agent elements jump to their
-pane, review elements open their PR, and task elements will complete the task
-once the Obsidian source exists.
+The tab registry is intentionally small: Agents, Reviews, and Tasks share one
+element-action table. `alt+space` enters that table; the selected tab decides
+what a number means. Agent elements jump to their pane, review elements open
+their PR, and task elements open the note where the task is written, at its
+line. A number never completes a task: ids are recomputed on every read, so
+the Nth row of a frame that may be a refresh old is only ever aimed at
+something safe. Completing is the dashboard's `x`, against a selected row.
 
 ## Iterating on the look
 
@@ -132,5 +135,3 @@ npm test                                            # the whole suite
 
 - `workmux status --json` does not export interrupted/stale states; if
   they land upstream, consume them instead of local detection.
-- Tasks are present as a future-ready tab slot; its Obsidian-backed elements
-  arrive with the task engine.

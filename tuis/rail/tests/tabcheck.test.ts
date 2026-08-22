@@ -11,7 +11,7 @@ assert.deepEqual(
   [
     ["agents", "Agents", "agent_jump"],
     ["reviews", "Reviews", "review_open"],
-    ["tasks", "Tasks", "task_complete"],
+    ["tasks", "Tasks", "task_jump"],
   ],
 );
 

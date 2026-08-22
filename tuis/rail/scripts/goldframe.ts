@@ -41,7 +41,7 @@ const reviewItems = [
 
 const configuredTab = process.env.RAIL_TAB;
 
-// Enough tasks to show the grouping, the three due-state hues, and the
+// Enough tasks to show the numbered pills, all four due-state hues, and the
 // truncation the slab actually applies.
 const tasks = [
   {
@@ -65,6 +65,17 @@ const tasks = [
     section: "feat/vault-rail",
     file: "projects/dotfiles/TODO.md",
     line: 9,
+  },
+  {
+    id: "projects/dotfiles/TODO.md:11",
+    text: "Take the recycling out",
+    done: false,
+    due: "2026-08-23",
+    state: "tomorrow" as const,
+    project: null,
+    section: null,
+    file: "projects/dotfiles/TODO.md",
+    line: 11,
   },
   {
     id: "inbox.md:3",
