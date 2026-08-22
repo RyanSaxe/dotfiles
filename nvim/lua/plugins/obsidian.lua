@@ -77,5 +77,12 @@ return {
     { "<leader>oy", obsidian("yesterday"), desc = "Daily note (yesterday)" },
     { "<leader>oo", obsidian("follow_link"), desc = "Follow link" },
     { "<leader>ob", obsidian("backlinks"), desc = "Backlinks" },
+    {
+      "<leader>on",
+      function()
+        require("vault.notes").new()
+      end,
+      desc = "New note",
+    },
   },
 }
