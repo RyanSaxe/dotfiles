@@ -98,6 +98,13 @@ return {
       end,
       desc = "Grep notes",
     },
+    {
+      "<leader>om",
+      function()
+        require("vault.meetings").capture()
+      end,
+      desc = "Capture a meeting",
+    },
     { "<leader>ot", group = "Tasks" },
     {
       "<leader>ots",
