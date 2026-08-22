@@ -82,6 +82,10 @@ sketchybar --add item theme_sync left \
 
 # -----------------------------------------------------------------------------
 # Date (Left - far left, before workspaces)
+#
+# label.padding_right overrides the 12px default, which is meant for the
+# right-hand readouts where labels have to clear each other. Here it only
+# pushed the first workspace letter away from the date it sits beside.
 # -----------------------------------------------------------------------------
 sketchybar --add item date left \
   --set date \
@@ -89,6 +93,7 @@ sketchybar --add item date left \
   icon="󰃭 " \
   icon.color="$ACCENT_COLOR" \
   label.color="$ACCENT_COLOR" \
+  label.padding_right=4 \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/date.sh" \
   --subscribe date system_woke mascot_colors_changed
