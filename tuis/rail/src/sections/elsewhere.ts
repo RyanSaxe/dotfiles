@@ -33,7 +33,7 @@ export function elsewhereRows(
   const dim2 = blend(palette.dim2, bg, DIM_KEEP);
   const chipBg = blend(palette.surface0, bg, DIM_KEEP);
   const rows: RailRow[] = [];
-  for (const agent of sortByUrgency(agents, acked)) {
+  for (const [index, agent] of sortByUrgency(agents, acked).entries()) {
     const { project, name } = label(agent);
     // The rail is narrow, so state colour lives on the FIRST stable token —
     // the one that survives truncation. A trailing worktree name is the
@@ -42,7 +42,10 @@ export function elsewhereRows(
     const projectFg = acked.has(agent.paneId)
       ? dim2
       : blend(stateColor(agent.status, palette), bg, DIM_KEEP);
-    const hint = hints.get(agent.paneId);
+    // The daemon hands out jump digits by display position, so the assigned
+    // digit and the row's own number are the same thing — read the map where
+    // it has one, so the pill can only ever say what the key will do.
+    const hint = hints.get(agent.paneId) ?? String(index + 1);
     rows.push(
       ...spacedItem(
         width,
@@ -50,7 +53,10 @@ export function elsewhereRows(
         [
           // The jump pill mirrors the window pills exactly — same shape,
           // blended colors; alt+space then this digit lands on the pane.
-          ...(hint ? pill(hint, dim2, chipBg, bg) : [{ text: "   ", fg: dim }]),
+          // Only 1-9 are in the tmux table, so a tenth pill is a position
+          // rather than a keystroke — the list keeps counting where the
+          // keyboard stops, instead of trailing off into blank cells.
+          ...pill(hint, dim2, chipBg, bg),
           { text: " ", fg: dim },
           { text: project, fg: projectFg },
           { text: name, fg: dim },

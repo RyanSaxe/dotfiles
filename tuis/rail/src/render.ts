@@ -11,6 +11,7 @@ import {
 import type { RailRow } from "./sections/rows.js";
 import { taskRows } from "./sections/tasks.js";
 import type { RailTabAttention } from "./tabs.js";
+import { hasOverdue } from "./tasks.js";
 import { windowRows } from "./sections/windows.js";
 import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 
@@ -56,7 +57,9 @@ export function renderRail(
       (agent) => agent.status !== "working" && !data.acked.has(agent.paneId),
     ),
     reviews: data.review.unacknowledged.length > 0,
-    tasks: false,
+    // A date that has already passed is the tasks equivalent of an agent
+    // waiting on you: the tab says so while you are looking at another one.
+    tasks: hasOverdue(data.tasks.tasks),
   };
 
   // Local tmux windows stay visible for every tab. The active tab owns only
@@ -72,7 +75,7 @@ export function renderRail(
   if (data.activeTab === "reviews") {
     body.push(...reviewRows(data.review, palette, inner));
   } else if (data.activeTab === "tasks") {
-    body.push(...taskRows(palette, inner));
+    body.push(...taskRows(data.tasks, palette, inner));
   } else if (elsewhere.length > 0) {
     body.push(
       ...elsewhereRows(elsewhere, data.acked, data.hints, palette, inner),

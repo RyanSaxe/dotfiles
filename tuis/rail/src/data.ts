@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 
 import type { ReviewSnapshot } from "./attention/review.js";
 import type { RailTabId } from "./tabs.js";
+import type { TaskSnapshot } from "./tasks.js";
 
 // The one exec plumbing every module shares.
 export const run = promisify(execFile);
@@ -36,6 +37,7 @@ export interface RailData {
   windows: Window[];
   agents: Agent[];
   review: ReviewSnapshot;
+  tasks: TaskSnapshot;
   // Pane ids whose done/waiting status has been seen (visit-clears).
   acked: Set<string>;
   // Jump-hint digit per agent pane id (alt+space <digit> on Agents),

@@ -1,6 +1,7 @@
 import { appendFileSync } from "node:fs";
 
 import { rank, type Ranked } from "./search.js";
+import { stateRank } from "./tasks.js";
 import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
 
 export type DashboardSurface = "reviews" | "tasks";
@@ -10,11 +11,27 @@ export type DashboardSurface = "reviews" | "tasks";
 // what makes Enter feel like moving an item rather than losing it.
 export type DashboardView = "reviews" | "worktrees";
 
+// How the table is ordered, and therefore how it is grouped: `project` keeps
+// each note's tasks together, `priority` throws the notes away and asks the
+// calendar instead, so "everything due today" is one block whatever it is
+// written in. Tasks only — a review inbox has one order.
+export type DashboardSort = "project" | "priority";
+
 // What an item needs attention FOR. The hue follows the object, per the
 // locked semantics: CI failure is red, pull-request activity peach, issue
-// activity mauve.
+// activity mauve. Tasks reuse those hues for their due states — overdue
+// red, due today peach, due this week mauve — and add yellow for tomorrow,
+// the one distinction a glance has to make between two urgent days.
 export type DashboardTone =
-  "ci" | "pull_request" | "issue" | "clean" | "neutral";
+  | "ci"
+  | "pull_request"
+  | "issue"
+  | "overdue"
+  | "due_today"
+  | "due_tomorrow"
+  | "due_near"
+  | "clean"
+  | "neutral";
 
 // The selected item's panel, in the shape the design settled on: a headline
 // naming the trigger, the specifics beneath it, then dim context. `bullets`
@@ -100,6 +117,7 @@ type DashboardKey =
   | "diff"
   | "back"
   | "view"
+  | "sort"
   | "cleanup"
   | "assist"
   | "quit"
@@ -237,10 +255,15 @@ function metaColor(tone: MetaTone, palette: Palette): string {
 function toneColor(tone: DashboardTone, palette: Palette): string {
   switch (tone) {
     case "ci":
+    case "overdue":
       return palette.red;
     case "pull_request":
+    case "due_today":
       return palette.peach;
+    case "due_tomorrow":
+      return palette.yellow;
     case "issue":
+    case "due_near":
       return palette.mauve;
     case "clean":
       // Healthy at a glance, which is what green is for.
@@ -462,9 +485,24 @@ function tableCells(
   return cells;
 }
 
+// The columns are one geometry serving three datasets, so only the labels
+// change. A Tasks table headed "PR / Needs you / Age" would be describing
+// the wrong thing in every cell.
+function headerLabels(
+  surface: DashboardSurface,
+  view: DashboardView,
+): string[] {
+  if (view === "worktrees")
+    return ["#", "PR", "Session", "Changes", "Pull request", "Diff", "Age"];
+  if (surface === "tasks")
+    return ["#", "Line", "State", "Section", "Task", "Project", "Due"];
+  return ["#", "PR", "From", "Author", "Needs you", "Size", "Age"];
+}
+
 function tableHeader(
   width: number,
   palette: Palette,
+  surface: DashboardSurface,
   view: DashboardView,
 ): string {
   const widths = tableWidths(width);
@@ -473,9 +511,7 @@ function tableHeader(
     width,
     palette,
     tableCells(
-      view === "worktrees"
-        ? ["#", "PR", "Session", "Changes", "Pull request", "Diff", "Age"]
-        : ["#", "PR", "From", "Author", "Needs you", "Size", "Age"],
+      headerLabels(surface, view),
       widths,
       Array.from({ length: widths.length }, () => muted),
       muted,
@@ -483,17 +519,13 @@ function tableHeader(
   );
 }
 
-// The repository heading. It appears once per group, so it can afford the
-// full owner/name — which matters once watched repositories in other orgs
-// appear next to your own.
-function tableHeading(
-  width: number,
-  palette: Palette,
-  repository: string,
-): string {
+// The group heading. It appears once per group, so it can afford the full
+// owner/name — which matters once watched repositories in other orgs appear
+// next to your own — or, in priority order, the due state the block is.
+function tableHeading(width: number, palette: Palette, label: string): string {
   return line(width, palette, [
     { text: " ", color: mutedColor(palette) },
-    { text: repository, color: blend(palette.dim2, background(palette), 0.9) },
+    { text: label, color: blend(palette.dim2, background(palette), 0.9) },
   ]);
 }
 
@@ -570,18 +602,22 @@ function emptyTableRow(width: number, palette: Palette, text: string): string {
 // A rendered table is headings interleaved with items. Selection counts only
 // items, so the two are tracked separately and paginated together.
 type TableRow =
-  | { kind: "heading"; repository: string }
+  | { kind: "heading"; label: string }
   | { kind: "blank" }
   | { kind: "item"; ordinal: number; entry: RankedItem };
 
-function tableRows(ranked: readonly RankedItem[]): TableRow[] {
+function tableRows(
+  ranked: readonly RankedItem[],
+  sort: DashboardSort,
+): TableRow[] {
   const rows: TableRow[] = [];
   let current: string | null = null;
   ranked.forEach((entry, ordinal) => {
-    if (entry.item.repository !== current) {
+    const label = groupLabel(entry.item, sort);
+    if (label !== current) {
       if (current !== null) rows.push({ kind: "blank" });
-      rows.push({ kind: "heading", repository: entry.item.repository });
-      current = entry.item.repository;
+      rows.push({ kind: "heading", label });
+      current = label;
     }
     rows.push({ kind: "item", ordinal, entry });
   });
@@ -738,7 +774,9 @@ function footerLine(
   searching: boolean,
   query: string,
   scrollable: boolean,
+  surface: DashboardSurface,
   view: DashboardView,
+  sort: DashboardSort,
 ): string {
   const muted = mutedColor(palette);
   if (searching) {
@@ -756,37 +794,54 @@ function footerLine(
   // least essential first so a narrow frame drops "Refresh" long before it
   // drops "Quit", instead of clipping the line mid-word.
   const optional: Array<[string, string]> =
-    view === "worktrees"
-      ? [
+    surface === "tasks"
+      ? // A task has no browser, no diff and no reviewer. `x` completes it
+        // through the CLI, which is the same key and the same "this row
+        // leaves the table" shape as acknowledging a review.
+        [
           ["r", "Refresh"],
+          // Named for where it goes, the way ⇥ names the subtab it opens.
+          ["s", sort === "project" ? "Priority" : "Project"],
           ["/", "Search"],
-          ["a", "Assisted"],
-          ["X", "Clean up"],
+          ["x", "Complete"],
         ]
-      : [
-          ["r", "Refresh"],
-          ["b", "Browser"],
-          ["a", "Assisted"],
-          ["d", "Diff"],
-          ["/", "Search"],
-          ["x", "Acknowledge"],
-        ];
+      : view === "worktrees"
+        ? [
+            ["r", "Refresh"],
+            ["/", "Search"],
+            ["a", "Assisted"],
+            ["X", "Clean up"],
+          ]
+        : [
+            ["r", "Refresh"],
+            ["b", "Browser"],
+            ["a", "Assisted"],
+            ["d", "Diff"],
+            ["/", "Search"],
+            ["x", "Acknowledge"],
+          ];
   // Sticky-ish: when there IS more to read, saying so beats "Refresh".
   if (scrollable) optional.splice(2, 0, ["^u/^d", "Preview"]);
   const essential: Array<[string, string]> =
-    view === "worktrees"
+    surface === "tasks"
       ? [
           ["↑↓", "Navigate"],
-          ["↵", "Focus"],
-          ["⇥", "Reviews"],
+          ["↵", "Open note"],
           ["q", "Quit"],
         ]
-      : [
-          ["↑↓", "Navigate"],
-          ["↵", "Open"],
-          ["⇥", "Worktrees"],
-          ["q", "Quit"],
-        ];
+      : view === "worktrees"
+        ? [
+            ["↑↓", "Navigate"],
+            ["↵", "Focus"],
+            ["⇥", "Reviews"],
+            ["q", "Quit"],
+          ]
+        : [
+            ["↑↓", "Navigate"],
+            ["↵", "Open"],
+            ["⇥", "Worktrees"],
+            ["q", "Quit"],
+          ];
 
   const measure = (entries: Array<[string, string]>): number =>
     entries.reduce(
@@ -832,24 +887,48 @@ function searchFields(item: DashboardItem): string[] {
 
 export type RankedItem = Ranked<DashboardItem>;
 
+// What a row is filed under, and what its group heading says. In project
+// order that is the repository or the note; in priority order it is the due
+// state, spelled exactly as the row's own State cell spells it.
+function groupLabel(item: DashboardItem, sort: DashboardSort): string {
+  return sort === "priority" ? item.from : item.repository;
+}
+
 // Ranking decides urgency; grouping decides layout. Grouping has to happen
 // here rather than at render time so the array IS display order — otherwise
 // the row numbers, which are jump targets, come out of sequence.
-function groupByRepository(ranked: readonly RankedItem[]): RankedItem[] {
+function groupByLabel(
+  ranked: readonly RankedItem[],
+  sort: DashboardSort,
+): RankedItem[] {
   const groups = new Map<string, RankedItem[]>();
   for (const entry of ranked) {
-    const bucket = groups.get(entry.item.repository);
-    if (bucket === undefined) groups.set(entry.item.repository, [entry]);
+    const label = groupLabel(entry.item, sort);
+    const bucket = groups.get(label);
+    if (bucket === undefined) groups.set(label, [entry]);
     else bucket.push(entry);
   }
   return [...groups.values()].flat();
 }
 
+// Priority order: the states in urgency order, and inside a state whatever
+// order the rows arrived in. That is not indifference — the task layer sorts
+// by the full due date and then the text before a row is ever built, and a
+// sort that is stable keeps it. Re-deriving the calendar from the `MM-DD`
+// in the Due cell would be a second, worse copy of that ordering.
+function byPriority(ranked: readonly RankedItem[]): RankedItem[] {
+  return [...ranked].sort(
+    (a, b) => stateRank(a.item.from) - stateRank(b.item.from),
+  );
+}
+
 export function rankDashboardItems(
   items: readonly DashboardItem[],
   query: string,
+  sort: DashboardSort = "project",
 ): RankedItem[] {
-  return groupByRepository(rank(items, query, searchFields));
+  const ranked = rank(items, query, searchFields);
+  return groupByLabel(sort === "priority" ? byPriority(ranked) : ranked, sort);
 }
 
 // A whole-width line carrying its own colour. The diff view is deliberately
@@ -931,10 +1010,11 @@ export function renderDashboard(
   searching = false,
   previewOffset = 0,
   view: DashboardView = "reviews",
+  sort: DashboardSort = "project",
 ): string {
   const width = Math.max(64, columns);
   const height = Math.max(16, rows);
-  const ranked = rankDashboardItems(data.items, query);
+  const ranked = rankDashboardItems(data.items, query, sort);
   const items = ranked.map((entry) => entry.item);
   const selected = items[selectedIndex];
   const muted = mutedColor(palette);
@@ -954,19 +1034,25 @@ export function renderDashboard(
           text: surfaceLabel(data.surface),
           color: view === "reviews" ? palette.accent : muted,
         },
-        { text: "  │  ", color: ruleColor(palette) },
-        {
-          text: "Worktrees",
-          color: view === "worktrees" ? palette.accent : muted,
-        },
+        // Workspaces are opened from reviews; the Tasks surface has one
+        // view, so it does not advertise a subtab that goes nowhere.
+        ...(data.surface === "reviews"
+          ? [
+              { text: "  │  ", color: ruleColor(palette) },
+              {
+                text: "Worktrees",
+                color: view === "worktrees" ? palette.accent : muted,
+              },
+            ]
+          : []),
       ],
       query.trim() === "" ? status : `/${query} · ${status}`,
     ),
     rule(width, palette),
-    tableHeader(width, palette, view),
+    tableHeader(width, palette, data.surface, view),
   ];
 
-  const all = tableRows(ranked);
+  const all = tableRows(ranked, sort);
   // The preview keeps a floor: panel borders and footer, plus room to read.
   // A long inbox used to take the whole frame and squeeze the panel down to
   // one blank row, which reads as broken rather than as full.
@@ -989,7 +1075,7 @@ export function renderDashboard(
     for (const row of shown) {
       if (row.kind === "blank") lines.push(line(width, palette, []));
       else if (row.kind === "heading")
-        lines.push(tableHeading(width, palette, row.repository));
+        lines.push(tableHeading(width, palette, row.label));
       else
         lines.push(
           tableItem(
@@ -1073,7 +1159,16 @@ export function renderDashboard(
   }
   lines.push(panelRule(width, palette, "bottom"));
   lines.push(
-    footerLine(width - 1, palette, searching, query, maxOffset > 0, view),
+    footerLine(
+      width - 1,
+      palette,
+      searching,
+      query,
+      maxOffset > 0,
+      data.surface,
+      view,
+      sort,
+    ),
   );
 
   while (lines.length < height) lines.push(line(width, palette, []));
@@ -1097,6 +1192,8 @@ function keyFor(chunk: string): DashboardKey {
       return "diff";
     case "\t":
       return "view";
+    case "s":
+      return "sort";
     case "X":
       return "cleanup";
     case "a":
@@ -1154,6 +1251,10 @@ export async function runDashboard(
   // behind one frame, so switching views swaps the data rather than the
   // program.
   let view: DashboardView = "reviews";
+  // Which order the table is in. A preference of the moment rather than a
+  // setting: it lives as long as the popup does, and every open starts in
+  // the order the notes are written in.
+  let sort: DashboardSort = "project";
   let inbox = initial;
   let diffLines: string[] | null = null;
   let diffTitle = "";
@@ -1161,8 +1262,22 @@ export async function runDashboard(
   const input = process.stdin;
   const output = process.stdout;
 
+  // The list as the frame shows it. Everything that acts on "the selected
+  // row" resolves it through here, so a re-sorted table moves the actions
+  // with it rather than aiming them at the old order.
   const visibleItems = (): DashboardItem[] =>
-    rankDashboardItems(data.items, query).map((entry) => entry.item);
+    rankDashboardItems(data.items, query, sort).map((entry) => entry.item);
+
+  // Re-sorting is a re-render of the snapshot already in hand — no CLI call,
+  // nothing re-read. The cursor follows its own row into the new order,
+  // because the row you were looking at is the reason you pressed the key.
+  const toggleSort = (): void => {
+    const selected = visibleItems()[selectedIndex];
+    sort = sort === "project" ? "priority" : "project";
+    const moved = visibleItems().findIndex((item) => item.id === selected?.id);
+    selectedIndex = moved < 0 ? 0 : moved;
+    previewOffset = 0;
+  };
 
   const showView = async (next: DashboardView): Promise<void> => {
     if (next === view) return;
@@ -1215,6 +1330,7 @@ export async function runDashboard(
         searching,
         previewOffset,
         view,
+        sort,
       ),
     );
   };
@@ -1412,6 +1528,14 @@ export async function runDashboard(
       }
       if (key === "scrollDown") {
         previewOffset += PREVIEW_SCROLL;
+        render();
+        return;
+      }
+      // Tasks only: a review inbox has one order, so the key is unbound
+      // there rather than silently doing nothing to a different list.
+      if (key === "sort") {
+        if (data.surface !== "tasks") return;
+        toggleSort();
         render();
         return;
       }

@@ -41,6 +41,56 @@ const reviewItems = [
 
 const configuredTab = process.env.RAIL_TAB;
 
+// Enough tasks to show the numbered pills, the three due-state hues the slab
+// spends, and the truncation it actually applies. The near-term row is in
+// here on purpose: the slab is overdue/today/tomorrow, so it must not draw.
+const tasks = [
+  {
+    id: "projects/dotfiles/TODO.md:7",
+    text: "Verify the review rail at the narrowest width",
+    done: false,
+    due: "2026-08-20",
+    state: "overdue" as const,
+    project: "dotfiles",
+    section: "feat/vault-rail",
+    file: "projects/dotfiles/TODO.md",
+    line: 7,
+  },
+  {
+    id: "projects/dotfiles/TODO.md:9",
+    text: "Ship the task parser",
+    done: false,
+    due: "2026-08-22",
+    state: "today" as const,
+    project: "dotfiles",
+    section: "feat/vault-rail",
+    file: "projects/dotfiles/TODO.md",
+    line: 9,
+  },
+  {
+    id: "projects/dotfiles/TODO.md:11",
+    text: "Take the recycling out",
+    done: false,
+    due: "2026-08-23",
+    state: "tomorrow" as const,
+    project: null,
+    section: null,
+    file: "projects/dotfiles/TODO.md",
+    line: 11,
+  },
+  {
+    id: "inbox.md:3",
+    text: "Read that paper on incremental parsing",
+    done: false,
+    due: "2026-08-26",
+    state: "near" as const,
+    project: null,
+    section: null,
+    file: "inbox.md",
+    line: 3,
+  },
+];
+
 const scene: RailData = {
   session: "dotfiles",
   activeTab:
@@ -54,6 +104,7 @@ const scene: RailData = {
   sprite: null,
   page: Number(process.env.RAIL_PAGE ?? 0),
   prefixHeld: Boolean(process.env.RAIL_PREFIX),
+  tasks: { tasks, error: null },
   windows: [
     { index: 1, name: "nvim", active: false, paneIds: ["%1"] },
     { index: 2, name: "zsh", active: true, paneIds: ["%2"] },

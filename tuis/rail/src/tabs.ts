@@ -8,7 +8,7 @@ import { XDG_STATE } from "./paths.js";
 // key table only supplies the number and never needs to know what it means.
 export type RailTabId = "agents" | "reviews" | "tasks";
 
-export type RailElementAction = "agent_jump" | "review_open" | "task_complete";
+export type RailElementAction = "agent_jump" | "review_open" | "task_jump";
 
 export type RailTabAttention = Readonly<Record<RailTabId, boolean>>;
 
@@ -36,7 +36,7 @@ export const RAIL_TABS: readonly RailTabDefinition[] = [
     id: "tasks",
     label: "Tasks",
     badge: "T",
-    elementAction: "task_complete",
+    elementAction: "task_jump",
   },
 ];
 

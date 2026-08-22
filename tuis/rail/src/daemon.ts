@@ -6,7 +6,9 @@
 // Cadence: tmux geometry/windows every 250ms, stretched to 2s while the
 // rail is disabled or no client is attached (the enabled flag wakes it
 // instantly); agents reconciled every 5s with instant refreshes when a
-// workmux state file changes; palette re-read when the theme system
+// workmux state file changes; the vault's tasks every 5s while the Tasks
+// tab is showing and every 60s while it is not, so the tab can say it has
+// overdue work from any tab; palette re-read when the theme system
 // rewrites it. Frames are diffed per pane — an unchanged rail costs zero
 // writes.
 //
@@ -47,6 +49,11 @@ import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
 import { loadRailTab } from "./tabs.js";
+import {
+  emptyTaskSnapshot,
+  loadTaskSnapshot,
+  type TaskSnapshot,
+} from "./tasks.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
@@ -56,6 +63,14 @@ const TICK_MS = 250;
 // still lands within a tick.
 const IDLE_TICK_MS = 2000;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
+// `vault tasks --json` re-walks the vault on every call, so the Tasks tab
+// gets the live cadence and every other tab a slow pulse — enough to keep
+// the tab's own overdue signal honest while you are looking elsewhere,
+// cheap enough to run all day. The tab file's watch drops the freshness
+// flag, so alt+t re-reads within a tick rather than showing whatever the
+// last visit left behind.
+const TASK_RECONCILE_TICKS = 20; // every 5s, while Tasks is the active tab
+const TASK_ATTENTION_TICKS = 240; // every 60s, from any other tab
 // tmux's two dead-server voices, appended to the exec error via stderr.
 const NO_SERVER_PATTERN = /no server running|error connecting/i;
 // Failed ticks back off 2s apiece, so this is ~10s — enough to ride out
@@ -84,6 +99,8 @@ const SYNC_OFF = "\x1b[?2026l";
 
 let agents: Agent[] = [];
 let agentsFresh = false;
+let taskSnapshot: TaskSnapshot = emptyTaskSnapshot();
+let tasksFresh = false;
 let appliedBg = "";
 let warnedNoPalette = false;
 const acks = loadAcks();
@@ -280,12 +297,23 @@ async function tick(counter: number): Promise<boolean> {
           agentsFresh = true;
         })
       : Promise.resolve();
+  const activeTab = loadRailTab();
+  const taskTicks =
+    activeTab === "tasks" ? TASK_RECONCILE_TICKS : TASK_ATTENTION_TICKS;
+  const refreshTasks =
+    counter % taskTicks === 0 || !tasksFresh
+      ? loadTaskSnapshot().then((snapshot) => {
+          taskSnapshot = snapshot;
+          tasksFresh = true;
+        })
+      : Promise.resolve();
   // The tmux poll, the host probes, and the agent refresh are independent
   // — one round-trip of latency, not three.
   const [{ panes, clientFacts }, hostFacts] = await Promise.all([
     collectSnapshot(),
     collectHostFacts(),
     refresh,
+    refreshTasks,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;
   // Every frame is a color: with no rendered theme there is nothing sane to
@@ -339,7 +367,6 @@ async function tick(counter: number): Promise<boolean> {
     // No page file: top of the list.
   }
 
-  const activeTab = loadRailTab();
   const review = loadReviewSnapshot();
 
   const frames = new Map<string, string>();
@@ -367,6 +394,7 @@ async function tick(counter: number): Promise<boolean> {
         windows: windowsOf(panes, pane.session),
         agents: settled,
         review,
+        tasks: taskSnapshot,
         acked,
         hints: hintsBySession.get(pane.session) ?? new Map<string, string>(),
         sprite,
@@ -506,6 +534,9 @@ async function main(): Promise<void> {
 
   watch(STATE_DIR, (_event, filename) => {
     if (filename === "enabled" || filename === "tab") wakeLoop();
+    // Landing on Tasks re-reads the vault rather than showing the slow
+    // pulse's last answer: the visit is what makes the list current.
+    if (filename === "tab") tasksFresh = false;
   });
 
   let counter = 0;
