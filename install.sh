@@ -402,7 +402,7 @@ install_tier_packages() {
 # junk and deleted before a glob can link them; untracked files may be
 # unfinished work, so they refuse to deploy rather than silently becoming
 # live configuration.
-DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin bat ghostty sketchybar aerospace'
+DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin clis bat ghostty sketchybar aerospace'
 
 ensure_uv() {
   command -v uvx >/dev/null 2>&1 && return 0

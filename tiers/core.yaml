@@ -52,6 +52,8 @@
     ~/.config/workmux/config.yaml: workmux/config.yaml
     ~/.config/bat/config: bat/config
     ~/.local/bin/theme: theme/bin/theme
+    ~/.local/bin/repo-size: clis/repo-size/repo-size
+    ~/.local/bin/editor-diagnostics: clis/editor-diagnostics/editor-diagnostics
     ~/.local/bin/theme-picker: theme/bin/theme-picker
     ~/.local/bin/mascot-accents: theme/bin/mascot-accents
     ~/.local/bin/rail: tuis/rail/bin/rail
