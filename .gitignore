@@ -7,8 +7,8 @@ notes/
 
 # Tool-writeback state. Design rule 1: these files are written by the tools
 # themselves, so tracking them produces permanent churn. (Deliberately
-# *.local.* and not *.local — the latter also matches stow packages'
-# .local/ directories and silently untracked the theme command once.)
+# *.local.* and not *.local — the latter once matched a .local/ source
+# directory and silently untracked the theme command.)
 *.local.*
 .env
 

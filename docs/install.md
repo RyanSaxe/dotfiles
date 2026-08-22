@@ -50,8 +50,8 @@ target explicitly; directories deploy through a glob, which creates real
 directories containing per-file links and picks up new files automatically:
 
 ```text
-nvim/dot-config/nvim/init.lua  ->  ~/.config/nvim/init.lua
-zsh/dot-zshrc                  ->  ~/.zshrc
+nvim/init.lua  ->  ~/.config/nvim/init.lua
+zsh/zshrc      ->  ~/.zshrc
 ```
 
 Renaming or deleting a repo file cannot leave a link dangling: each map's

@@ -3,8 +3,7 @@
 # Directives run in order: `create` makes the directories that receive
 # generated files at runtime (so nothing can turn them into links into the
 # repo), `clean` removes links whose repo file was renamed or deleted, and
-# `link` deploys per-file symlinks inside real directories — the same shape
-# stow's --no-folding produced.
+# `link` deploys per-file symlinks inside real directories.
 #
 # Globbed directories pick up new files automatically. Python's glob skips
 # hidden files, so a dotted name inside a globbed tree needs its own explicit
@@ -30,31 +29,33 @@
     ~/.local/bin: {}
 
 - link:
-    ~/.zshrc: zsh/dot-zshrc
-    ~/.zshenv: zsh/dot-zshenv
+    ~/.zshrc: zsh/zshrc
+    ~/.zshenv: zsh/zshenv
     ~/.config/zsh:
       glob: true
-      path: zsh/dot-config/zsh/**
+      path: zsh/**
+      exclude: [zsh/zshrc, zsh/zshenv]
     ~/.config/git:
       glob: true
-      path: git/dot-config/git/**
+      path: git/**
     ~/.config/theme:
       glob: true
-      path: theme/dot-config/theme/**
+      path: theme/**
+      exclude: [theme/bin/**]
     ~/.config/nvim:
       glob: true
-      path: nvim/dot-config/nvim/**
-    ~/.config/nvim/.luarc.json: nvim/dot-config/nvim/.luarc.json
+      path: nvim/**
+    ~/.config/nvim/.luarc.json: nvim/.luarc.json
     ~/.config/tmux:
       glob: true
-      path: tmux/dot-config/tmux/**
-    ~/.config/workmux/config.yaml: workmux/dot-config/workmux/config.yaml
-    ~/.config/bat/config: bat/dot-config/bat/config
-    ~/.local/bin/theme: theme/dot-local/bin/theme
-    ~/.local/bin/theme-picker: theme/dot-local/bin/theme-picker
-    ~/.local/bin/mascot-accents: theme/dot-local/bin/mascot-accents
-    ~/.local/bin/rail: rail/dot-local/bin/rail
-    ~/.local/bin/attention: rail/dot-local/bin/attention
-    ~/.local/bin/review-open: rail/dot-local/bin/review-open
-    ~/.local/bin/workmux-copy-ignored: workmux/dot-local/bin/workmux-copy-ignored
-    ~/.local/bin/workmux-escalate-idle: workmux/dot-local/bin/workmux-escalate-idle
+      path: tmux/**
+    ~/.config/workmux/config.yaml: workmux/config.yaml
+    ~/.config/bat/config: bat/config
+    ~/.local/bin/theme: theme/bin/theme
+    ~/.local/bin/theme-picker: theme/bin/theme-picker
+    ~/.local/bin/mascot-accents: theme/bin/mascot-accents
+    ~/.local/bin/rail: tuis/rail/bin/rail
+    ~/.local/bin/attention: tuis/rail/bin/attention
+    ~/.local/bin/review-open: tuis/rail/bin/review-open
+    ~/.local/bin/workmux-copy-ignored: workmux/bin/workmux-copy-ignored
+    ~/.local/bin/workmux-escalate-idle: workmux/bin/workmux-escalate-idle

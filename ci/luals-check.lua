@@ -10,7 +10,7 @@ if vim.fn.executable("lua-language-server") == 0 then
 end
 
 local script_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h")
-local config_dir = vim.fs.normalize(script_dir .. "/../nvim/dot-config/nvim")
+local config_dir = vim.fs.normalize(script_dir .. "/../nvim")
 
 ---@type table<string, any>
 local luarc = vim.json.decode(table.concat(vim.fn.readfile(config_dir .. "/.luarc.json"), "\n"))

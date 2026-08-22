@@ -377,7 +377,7 @@ install_tier_packages() {
       brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
     done
     # Per-machine notch compensation for aerospace's top gap.
-    ./aerospace/dot-config/aerospace/configure.sh
+    ./aerospace/configure.sh
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -388,10 +388,8 @@ install_tier_packages() {
 
 # ------------------------------------------------------------------ deploy
 # Symlinks are deployed by dotbot from one explicit map per tier
-# (tiers/<tier>.yaml): per-file links inside real directories — the shape
-# stow's --no-folding produced — plus native cleanup of links whose source
-# file was renamed or deleted, which stow needed a hand-rolled manifest
-# system for. dotbot runs through uvx, so the deployment tool itself needs
+# (tiers/<tier>.yaml): per-file links inside real directories, plus native
+# cleanup of links whose source file was renamed or deleted. dotbot runs through uvx, so the deployment tool itself needs
 # no install step anywhere uv exists.
 
 # Source directories the tier maps deploy from, kept in step with the glob
@@ -400,7 +398,7 @@ install_tier_packages() {
 # junk and deleted before a glob can link them; untracked files may be
 # unfinished work, so they refuse to deploy rather than silently becoming
 # live configuration.
-DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux rail bat ghostty sketchybar aerospace'
+DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin bat ghostty sketchybar aerospace'
 
 ensure_uv() {
   command -v uvx >/dev/null 2>&1 && return 0

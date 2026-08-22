@@ -17,11 +17,11 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-TMUX_CONF = REPO / "tmux/dot-config/tmux/tmux.conf"
-AEROSPACE_TOML = REPO / "aerospace/dot-config/aerospace/aerospace.toml"
-GHOSTTY_CONFIG = REPO / "ghostty/dot-config/ghostty/config"
-ZSHRC = REPO / "zsh/dot-zshrc"
-KEYS_TSV = REPO / "tmux/dot-config/tmux/keys.tsv"
+TMUX_CONF = REPO / "tmux/tmux.conf"
+AEROSPACE_TOML = REPO / "aerospace/aerospace.toml"
+GHOSTTY_CONFIG = REPO / "ghostty/config"
+ZSHRC = REPO / "zsh/zshrc"
+KEYS_TSV = REPO / "tmux/keys.tsv"
 
 KEY_WORDS = {"slash": "/", "comma": ",", "period": ".", "semicolon": ";"}
 

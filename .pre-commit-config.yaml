@@ -44,13 +44,13 @@ repos:
         alias: ruff-format-uv-scripts
         name: ruff format (uv scripts)
         types_or: [file]
-        files: "^theme/dot-local/bin/mascot-accents$"
+        files: "^theme/bin/mascot-accents$"
       - id: ruff-check
         alias: ruff-check-uv-scripts
         name: ruff check (uv scripts)
         args: [--fix]
         types_or: [file]
-        files: "^theme/dot-local/bin/mascot-accents$"
+        files: "^theme/bin/mascot-accents$"
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.72
@@ -68,14 +68,14 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        exclude: '\.zsh$|^zsh/dot-zshrc$|^zsh/dot-zshenv$|^sketchybar/|^workmux/dot-local/bin/workmux-(escalate-idle|copy-ignored)$'
+        exclude: '\.zsh$|^zsh/zshrc$|^zsh/zshenv$|^sketchybar/|^workmux/bin/workmux-(escalate-idle|copy-ignored)$'
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1
     hooks:
       - id: shfmt
         args: [--write, --indent, "2"]
-        exclude: '\.zsh$|^zsh/dot-zshrc$|^zsh/dot-zshenv$|^workmux/dot-local/bin/workmux-(escalate-idle|copy-ignored)$'
+        exclude: '\.zsh$|^zsh/zshrc$|^zsh/zshenv$|^workmux/bin/workmux-(escalate-idle|copy-ignored)$'
 
   # ------------------------------------------- Web / Markdown / JSON / YAML
   - repo: https://github.com/rbubley/mirrors-prettier
@@ -153,7 +153,7 @@ repos:
             "command -v zsh >/dev/null 2>&1 || exit 0; sh ci/escalate-check.sh",
           ]
         pass_filenames: false
-        files: "^(workmux/dot-local/bin/workmux-escalate-idle|ci/escalate-check\\.sh)$"
+        files: "^(workmux/bin/workmux-escalate-idle|ci/escalate-check\\.sh)$"
 
       # New worktrees receive copies of every ignored file, including nested
       # data and dotfiles, without copying unrelated untracked files.
@@ -162,7 +162,7 @@ repos:
         language: system
         entry: zsh ci/workmux-copy-ignored-check.zsh
         pass_filenames: false
-        files: "^(workmux/dot-local/bin/workmux-copy-ignored|workmux/dot-config/workmux/config\\.yaml|ci/workmux-copy-ignored-check\\.zsh)$"
+        files: "^(workmux/bin/workmux-copy-ignored|workmux/config\\.yaml|ci/workmux-copy-ignored-check\\.zsh)$"
 
       # Strict Lua typecheck (no-unknown: annotations are required), same
       # engine and .luarc.json as the editor. Skips cleanly where nvim
@@ -178,7 +178,7 @@ repos:
             "command -v nvim >/dev/null 2>&1 || exit 0; nvim -l ci/luals-check.lua",
           ]
         pass_filenames: false
-        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|ci/luals-check\.lua)$'
+        files: '^(nvim/.*\.lua|nvim/\.luarc\.json|ci/luals-check\.lua)$'
 
       # LuaLS reports what it cannot INFER; it says nothing about an
       # inferable-but-undocumented function. This is the other half:
@@ -210,7 +210,7 @@ repos:
             "command -v nvim >/dev/null 2>&1 || exit 0; nvim --headless -c 'luafile ci/editor-parity.lua'",
           ]
         pass_filenames: false
-        files: '^(nvim/.*\.lua|nvim/dot-config/nvim/\.luarc\.json|ci/editor-parity\.lua)$'
+        files: '^(nvim/.*\.lua|nvim/\.luarc\.json|ci/editor-parity\.lua)$'
 
       # The keybind cheatsheet (alt+/) can never drift: every chord bound
       # in tmux.conf and aerospace.toml must have a keys.tsv row.
@@ -219,7 +219,7 @@ repos:
         language: system
         entry: uv run -q --script ci/keycheck.py
         pass_filenames: false
-        files: '^(tmux/dot-config/tmux/(tmux\.conf|keys\.tsv)|aerospace/dot-config/aerospace/aerospace\.toml|ghostty/dot-config/ghostty/config|zsh/dot-zshrc|ci/keycheck\.py)$'
+        files: '^(tmux/(tmux\.conf|keys\.tsv)|aerospace/aerospace\.toml|ghostty/config|zsh/zshrc|ci/keycheck\.py)$'
 
       # The global AI layer stays additive: authored skills/config are valid,
       # and no mutable harness or third-party state enters the repository.

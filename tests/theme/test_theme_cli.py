@@ -16,7 +16,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 REPO = Path(__file__).parent.parent.parent
-THEME = REPO / "theme/dot-local/bin/theme"
+THEME = REPO / "theme/bin/theme"
 
 MASCOT_ACCENTS_OK = """#!/bin/sh
 printf 'mascot=%s\\n' "$1"
@@ -43,7 +43,9 @@ def make_home(tmp_path: Path) -> Path:
 
 def make_config(tmp_path: Path) -> Path:
     dst = tmp_path / "theme-config"
-    shutil.copytree(REPO / "theme/dot-config", dst)
+    shutil.copytree(
+        REPO / "theme", dst, ignore=shutil.ignore_patterns("bin", "__pycache__")
+    )
     return dst
 
 
@@ -126,7 +128,7 @@ def test_failed_extraction_persists_no_project_mapping(tmp_path: Path) -> None:
 def test_failed_extraction_leaves_tracked_default_untouched(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     stub_mascot_accents(home, MASCOT_ACCENTS_FAIL)
-    tracked = config / "theme/mascot.conf"
+    tracked = config / "mascot.conf"
     before = tracked.read_text()
 
     result = run_theme(home, config, "mascot", "default", "pokemon:badmon")
@@ -166,7 +168,7 @@ def test_render_survives_blank_and_comment_lines_in_conf_files(
     tmp_path: Path,
 ) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
-    tokens = config / "theme/tokens.conf"
+    tokens = config / "tokens.conf"
     tokens.write_text(tokens.read_text() + "\n\n# trailing comment\n")
 
     result = run_theme(home, config, "apply")
@@ -203,7 +205,7 @@ def test_mode_persists_only_after_a_successful_render(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     ok = run_theme(home, config, "inner", "dark")
     assert ok.returncode == 0, ok.stderr
-    template = config / "theme/templates/frame.glsl.tmpl"
+    template = config / "templates/frame.glsl.tmpl"
     template.write_text(template.read_text() + "{{typo_token}}\n")
 
     result = run_theme(home, config, "inner", "light")
@@ -216,7 +218,7 @@ def test_failed_render_names_the_token_and_leaves_no_temp_files(
     tmp_path: Path,
 ) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
-    template = config / "theme/templates/frame.glsl.tmpl"
+    template = config / "templates/frame.glsl.tmpl"
     template.write_text(template.read_text() + "{{typo_token}}\n")
 
     result = run_theme(home, config, "apply")

@@ -35,7 +35,7 @@ it is included by the default install and can be run separately with
 | `tiers`      | which packages install on which machines                                                              |
 
 Each top-level directory is a component; where its files land is declared in
-`tiers/<tier>.yaml`, so `nvim/dot-config/nvim/init.lua` deploys to
+`tiers/<tier>.yaml`, so `nvim/init.lua` deploys to
 `~/.config/nvim/init.lua`. Every tracked file is identical on every machine;
 anything machine-specific resolves at runtime.
 

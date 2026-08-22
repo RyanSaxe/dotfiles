@@ -55,16 +55,16 @@ jobs:
           [ ! -e theme/tests ]
 
           # Untracked files inside a source tree refuse to deploy.
-          touch zsh/dot-config/zsh/wip.zsh
+          touch zsh/wip.zsh
           if HOME="$home" ./install.sh links core; then
             echo "::error::untracked source file did not refuse to deploy"
             exit 1
           fi
-          rm zsh/dot-config/zsh/wip.zsh
+          rm zsh/wip.zsh
 
           # A removed file loses its link: dotbot's clean directive removes
           # dead links pointing into the repo, so none survive a redeploy.
-          git rm -q theme/dot-config/theme/templates/*.tmpl
+          git rm -q theme/templates/*.tmpl
           HOME="$home" ./install.sh links core
           dangling="$(find "$home/.config" -type l ! -exec test -e {} \; -print)"
           if [ -n "$dangling" ]; then
@@ -88,7 +88,7 @@ jobs:
 
       - name: zsh syntax
         run: |
-          find zsh -type f \( -name 'dot-zsh*' -o -name '*.zsh' \) \
+          find zsh -type f \( -name 'zshrc' -o -name 'zshenv' -o -name '*.zsh' \) \
             -exec zsh -n {} +
 
       - name: Theme renders with no unresolved tokens
@@ -108,8 +108,8 @@ jobs:
             "$SCRATCH/.local/bin/theme" inner light
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" outer dark
-          inner_bg="$(sed -n 's/^base=//p' theme/dot-config/theme/palettes/latte.conf)"
-          outer_crust="$(sed -n 's/^crust=//p' theme/dot-config/theme/palettes/mocha.conf)"
+          inner_bg="$(sed -n 's/^base=//p' theme/palettes/latte.conf)"
+          outer_crust="$(sed -n 's/^crust=//p' theme/palettes/mocha.conf)"
           test -n "$inner_bg" && test -n "$outer_crust"
           grep -qF "set -g @bg \"$inner_bg\"" \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
@@ -163,7 +163,7 @@ jobs:
       - name: Headless bootstrap from the lockfile
         run: |
           mkdir -p "$HOME/.config"
-          ln -s "$PWD/nvim/dot-config/nvim" "$HOME/.config/nvim"
+          ln -s "$PWD/nvim" "$HOME/.config/nvim"
           # First boot installs plugins at their locked versions, then mason
           # and treesitter finish tool installs in the background; quitting
           # early aborts them, so give the boot a settle window.

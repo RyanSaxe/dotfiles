@@ -13,10 +13,10 @@
       recursive: true
 
 - link:
-    ~/.config/ghostty/config: ghostty/dot-config/ghostty/config
+    ~/.config/ghostty/config: ghostty/config
     ~/.config/sketchybar:
       glob: true
-      path: sketchybar/dot-config/sketchybar/**
+      path: sketchybar/**
     ~/.config/aerospace:
       glob: true
-      path: aerospace/dot-config/aerospace/**
+      path: aerospace/**
