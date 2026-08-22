@@ -87,8 +87,8 @@ observer's cached state. `alt+r` selects the Reviews rail tab; the
 tab is one compact line per unacknowledged item and highlights the Reviews badge
 until the item is acknowledged or disappears. `alt+R` opens the cached Review
 table + preview dashboard. `alt+t` selects the Tasks rail tab — the vault's
-open work, urgency-ordered — and `alt+T` opens the same dashboard shell
-for it.
+open work, urgency-ordered, with the tab itself red while anything is
+overdue — and `alt+T` opens the same dashboard shell for it.
 
 The Reviews dashboard has two views, switched with Tab:
 

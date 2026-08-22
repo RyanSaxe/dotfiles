@@ -6,7 +6,9 @@
 // Cadence: tmux geometry/windows every 250ms, stretched to 2s while the
 // rail is disabled or no client is attached (the enabled flag wakes it
 // instantly); agents reconciled every 5s with instant refreshes when a
-// workmux state file changes; palette re-read when the theme system
+// workmux state file changes; the vault's tasks every 5s while the Tasks
+// tab is showing and every 60s while it is not, so the tab can say it has
+// overdue work from any tab; palette re-read when the theme system
 // rewrites it. Frames are diffed per pane — an unchanged rail costs zero
 // writes.
 //
@@ -61,11 +63,14 @@ const TICK_MS = 250;
 // still lands within a tick.
 const IDLE_TICK_MS = 2000;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
-// Tasks are read ONLY while the Tasks tab is showing: `vault tasks --json`
-// re-walks the vault on every call, and no other tab renders a task. The tab
-// file's watch drops the freshness flag, so alt+t re-reads within a tick
-// rather than showing whatever the last visit left behind.
+// `vault tasks --json` re-walks the vault on every call, so the Tasks tab
+// gets the live cadence and every other tab a slow pulse — enough to keep
+// the tab's own overdue signal honest while you are looking elsewhere,
+// cheap enough to run all day. The tab file's watch drops the freshness
+// flag, so alt+t re-reads within a tick rather than showing whatever the
+// last visit left behind.
 const TASK_RECONCILE_TICKS = 20; // every 5s, while Tasks is the active tab
+const TASK_ATTENTION_TICKS = 240; // every 60s, from any other tab
 // tmux's two dead-server voices, appended to the exec error via stderr.
 const NO_SERVER_PATTERN = /no server running|error connecting/i;
 // Failed ticks back off 2s apiece, so this is ~10s — enough to ride out
@@ -293,9 +298,10 @@ async function tick(counter: number): Promise<boolean> {
         })
       : Promise.resolve();
   const activeTab = loadRailTab();
+  const taskTicks =
+    activeTab === "tasks" ? TASK_RECONCILE_TICKS : TASK_ATTENTION_TICKS;
   const refreshTasks =
-    activeTab === "tasks" &&
-    (counter % TASK_RECONCILE_TICKS === 0 || !tasksFresh)
+    counter % taskTicks === 0 || !tasksFresh
       ? loadTaskSnapshot().then((snapshot) => {
           taskSnapshot = snapshot;
           tasksFresh = true;
@@ -528,8 +534,8 @@ async function main(): Promise<void> {
 
   watch(STATE_DIR, (_event, filename) => {
     if (filename === "enabled" || filename === "tab") wakeLoop();
-    // Landing on Tasks re-reads the vault: the surface is only polled while
-    // it is showing, so the visit is what makes it current.
+    // Landing on Tasks re-reads the vault rather than showing the slow
+    // pulse's last answer: the visit is what makes the list current.
     if (filename === "tab") tasksFresh = false;
   });
 

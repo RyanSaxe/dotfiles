@@ -117,6 +117,13 @@ export function railTasks(tasks: readonly VaultTask[]): VaultTask[] {
   return tasks.filter((task) => RAIL_STATES.has(task.state));
 }
 
+// The Tasks tab's attention flag: work whose date has already passed. Only
+// incomplete tasks are ever in a snapshot, so an overdue one is always
+// something still owed.
+export function hasOverdue(tasks: readonly VaultTask[]): boolean {
+  return tasks.some((task) => task.state === "overdue");
+}
+
 // The CLI already says exactly what is wrong — VAULT_DIR unset, a directory
 // that is not there — in one line on stderr. Prefer its sentence to ours;
 // only its absence needs words of our own.

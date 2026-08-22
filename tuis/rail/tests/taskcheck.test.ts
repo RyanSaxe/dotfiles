@@ -11,13 +11,17 @@ import { test } from "node:test";
 
 import { rankDashboardItems, renderDashboard } from "../src/dashboard.js";
 import type { DashboardData } from "../src/dashboard.js";
+import type { RailData } from "../src/data.js";
+import { renderRail } from "../src/render.js";
 import { taskItem } from "../src/review-dashboard.js";
 import { taskRows } from "../src/sections/tasks.js";
 import {
   completeTask,
+  hasOverdue,
   loadTaskSnapshot,
   parseTasks,
   railTasks,
+  type TaskSnapshot,
   type TaskState,
   type VaultTask,
 } from "../src/tasks.js";
@@ -175,6 +179,30 @@ test("a row that is not a task row is dropped, the rest survive", () => {
 
 const snapshot = (json: string) => ({ tasks: parseTasks(json), error: null });
 
+// A whole rail with the Agents tab showing, so what the Tasks tab says about
+// itself is the snapshot talking rather than the visible section.
+const railData = (tasks: TaskSnapshot): RailData => ({
+  session: "dotfiles",
+  activeTab: "agents",
+  windows: [],
+  agents: [],
+  review: {
+    revision: 1,
+    username: null,
+    lastSuccessfulSyncAt: null,
+    lastError: null,
+    items: [],
+    unacknowledged: [],
+    acknowledged: new Set<string>(),
+  },
+  tasks,
+  acked: new Set<string>(),
+  hints: new Map<string, string>(),
+  sprite: null,
+  page: 0,
+  prefixHeld: false,
+});
+
 test("due state is the only hue the slab spends", () => {
   const rendered = taskRows(snapshot(SPREAD), palette, 26)
     .map((line) => line.text)
@@ -251,6 +279,23 @@ test("the digits stop at nine, and the text column does not move", () => {
   assert.equal(
     (lines[9] ?? "").indexOf("task"),
     (lines[8] ?? "").indexOf("task"),
+  );
+});
+
+test("an overdue task is what turns the Tasks tab red", () => {
+  // The flag is read from the snapshot, not from the tab you are looking at:
+  // Agents is showing here and Tasks still has to say it.
+  const scene = (json: string): string =>
+    renderRail(railData(snapshot(json)), palette, 27, 24).join("\n");
+  const overdue = output([row({ state: "overdue", due: "2026-08-18" })]);
+  const calm = output([row({ state: "today" })]);
+  assert.equal(colorOf(scene(overdue), "Tasks"), hex(palette.red));
+  assert.equal(colorOf(scene(calm), "Tasks"), hex(palette.dim2));
+  // A completed task is nobody's attention, whatever its date says.
+  assert.equal(hasOverdue(parseTasks(overdue)), true);
+  assert.equal(
+    hasOverdue(parseTasks(output([row({ state: "overdue", done: true })]))),
+    false,
   );
 });
 
