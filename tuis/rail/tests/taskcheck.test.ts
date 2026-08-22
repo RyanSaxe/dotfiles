@@ -156,14 +156,14 @@ test("a completed task is not a task any surface acts on", () => {
   assert.ok(!ids(parseTasks(SPREAD)).includes("a:6"));
 });
 
-test("the slab shows only overdue, today, tomorrow and near", () => {
+test("the slab shows only overdue, today and tomorrow", () => {
+  // The slab is a glance at what is late and what the next two days ask
+  // for. Near-term work is real, and it lives in the dashboard.
   assert.deepEqual(ids(railTasks(parseTasks(SPREAD))), [
     "a:3",
     "a:8",
     "a:7",
     "a:5",
-    "a:9",
-    "a:1",
   ]);
 });
 
@@ -214,7 +214,9 @@ test("due state is the only hue the slab spends", () => {
   // Today and tomorrow are the pair a glance has to tell apart, so tomorrow
   // is yellow rather than a second peach row.
   assert.equal(colorOf(rendered, "due tomorrow"), shade(palette.yellow));
-  assert.equal(colorOf(rendered, "a near thing"), shade(palette.mauve));
+  // The mauve near-term row is the dashboard's; it has no hue here because
+  // it has no row here.
+  assert.equal(colorOf(rendered, "a near thing"), null);
 });
 
 // The item rows, without the spacers between them and without colour.
@@ -226,7 +228,7 @@ const itemLines = (json: string, width = 26): string[] =>
 test("the slab is one urgency-ordered list, with no state labels", () => {
   const lines = itemLines(SPREAD);
   // No group headings: a row says its state in hue and in where it sits.
-  for (const state of ["overdue", "today", "tomorrow", "near"]) {
+  for (const state of ["overdue", "today", "tomorrow"]) {
     assert.ok(
       !taskRows(snapshot(SPREAD), palette, 26).some(
         (line) => !line.item && plain(line.text).trim() === state,
@@ -239,8 +241,10 @@ test("the slab is one urgency-ordered list, with no state labels", () => {
     assert.ok((lines[index] ?? "").includes(task.text.slice(0, 12)));
   });
   assert.equal(lines.length, railTasks(parseTasks(SPREAD)).length);
-  // Later and undated work never reaches the slab, in any form.
+  // Near-term, later and undated work never reaches the slab, in any form.
   const rendered = lines.join("\n");
+  assert.ok(!rendered.includes("a near thing"));
+  assert.ok(!rendered.includes("near later still"));
   assert.ok(!rendered.includes("due next month"));
   assert.ok(!rendered.includes("no date at all"));
   assert.ok(!rendered.includes("already done"));
@@ -261,25 +265,36 @@ test("a task row is an agent row: numbered pill, text, right span", () => {
   assert.match(lines[3] ?? "", /due tomorrow\s+tmr$/);
 });
 
-test("the digits stop at nine, and the text column does not move", () => {
-  const many = output(
-    Array.from({ length: 11 }, (_, index) =>
-      row({
-        id: `many:${String(index)}`,
-        text: `task ${String(index).padStart(2, "0")}`,
-      }),
-    ),
-  );
-  const lines = itemLines(many);
-  // Nine is what the tmux element table binds; the dashboard is the overflow
-  // surface. A row past it keeps the pill's cells as air so the text column
-  // holds all the way down the list.
+// Eleven tasks, all of them today's: enough rows to run past the digits the
+// tmux table binds.
+const MANY = output(
+  Array.from({ length: 11 }, (_, index) =>
+    row({
+      id: `many:${String(index)}`,
+      text: `task ${String(index).padStart(2, "0")}`,
+    }),
+  ),
+);
+
+test("the numbering does not stop where the digits do", () => {
+  const lines = itemLines(MANY);
+  // Nine is what the element table binds, not what the list can count to. A
+  // row past it is numbered exactly like a pending review's tenth row: the
+  // pill says where the row sits, and only the first nine are pressable.
   assert.ok((lines[8] ?? "").startsWith("\ue0b69\ue0b4 task 08"));
-  assert.ok((lines[9] ?? "").startsWith("    task 09"));
-  assert.equal(
-    (lines[9] ?? "").indexOf("task"),
-    (lines[8] ?? "").indexOf("task"),
-  );
+  assert.ok((lines[9] ?? "").startsWith("\ue0b610\ue0b4 task 09"));
+  assert.ok((lines[10] ?? "").startsWith("\ue0b611\ue0b4 task 10"));
+});
+
+test("a two-digit pill costs the task text a cell, never the due span", () => {
+  for (const width of [26, 18, 14]) {
+    for (const line of itemLines(MANY, width)) {
+      // Every row is exactly the slab's width, and the due span ends flush
+      // right — the wider pill is paid for out of the text column.
+      assert.equal(Array.from(line).length, width);
+      assert.ok(line.endsWith("today"), `${String(width)}: ${line}`);
+    }
+  }
 });
 
 test("an overdue task is what turns the Tasks tab red", () => {

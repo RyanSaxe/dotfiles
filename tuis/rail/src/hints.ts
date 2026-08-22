@@ -17,7 +17,9 @@ import type { Agent } from "./data.js";
 
 const HINTS_PATH = join(XDG_STATE, "dotfiles/rail/hints.tsv");
 
-// Digits only: past nine agents the dashboard is the overflow surface.
+// Digits only: the tmux table binds 1-9, so nine rows is every key there
+// is to hand out. The rows past them still carry their display number on
+// the slab — a number that names a position rather than a keystroke.
 const MAX_HINTS = 9;
 
 // One digit map per viewing session, numbering that session's elsewhere

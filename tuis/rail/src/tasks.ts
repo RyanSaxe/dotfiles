@@ -54,14 +54,15 @@ const STATE_ORDER: Record<TaskState, number> = {
   none: 5,
 };
 
-// The due states the rail slab itself shows. Later and undated tasks stay in
-// the vault, the Tasks dashboard, and Neovim's picker; the sidebar is for
-// what the week actually needs.
+// The due states the rail slab itself shows: what is late, what today asks
+// for, and what tomorrow will. Everything further out — near-term, later,
+// undated — stays in the vault, the Tasks dashboard, and Neovim's picker.
+// The sidebar is a glance, and a glance that carries next week is a list you
+// stop reading.
 const RAIL_STATES: ReadonlySet<TaskState> = new Set([
   "overdue",
   "today",
   "tomorrow",
-  "near",
 ]);
 
 const STATES: ReadonlySet<string> = new Set(Object.keys(STATE_ORDER));

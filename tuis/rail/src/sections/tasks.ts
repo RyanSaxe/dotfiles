@@ -7,14 +7,9 @@ import {
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
 import { pill, spacedItem, type RailRow } from "./rows.js";
 
-// Digits only, exactly as the elsewhere agents number their jump pills: the
-// tmux element table binds 1-9, and the Tasks dashboard is the overflow
-// surface for everything past them.
-const MAX_ELEMENTS = 9;
-
 // Hue follows the due state, matching the dashboard: overdue red, today
-// peach, tomorrow yellow, near-term mauve. Today and tomorrow are the two
-// states a glance has to separate, so they never share a hue.
+// peach, tomorrow yellow. Today and tomorrow are the two states a glance has
+// to separate, so they never share a hue.
 function dueColor(state: TaskState, palette: Palette): string {
   switch (state) {
     case "overdue":
@@ -23,8 +18,9 @@ function dueColor(state: TaskState, palette: Palette): string {
       return palette.peach;
     case "tomorrow":
       return palette.yellow;
-    // Only the four rail states reach a row — later and undated tasks are
-    // filtered out before this.
+    // Only the three rail states reach a row; near, later and undated tasks
+    // are filtered out before this. The dashboard's near-term mauve is the
+    // fallback so an unfiltered row would still read as a due date.
     default:
       return palette.mauve;
   }
@@ -39,8 +35,8 @@ function dueSpan(state: TaskState, due: string | null, dim: string) {
   return { text: shortDue(due), fg: dim };
 }
 
-// The rail shows only what the week needs: incomplete tasks that are
-// overdue, due today or tomorrow, or due inside the next seven days.
+// The rail shows only what today needs: incomplete tasks that are overdue,
+// due today, or due tomorrow. Everything further out lives in the dashboard.
 //
 // A task row IS an agent row: numbered jump pill, an identity token colored
 // by state, and a right-aligned span of supporting text. alt+space then the
@@ -76,12 +72,13 @@ export function taskRows(
         width,
         bg,
         [
-          // The jump pill mirrors the window and elsewhere pills exactly.
-          // Past the ninth row there is no digit to press, so those rows
-          // keep the pill's three cells as air and the text column holds.
-          ...(index < MAX_ELEMENTS
-            ? pill(String(index + 1), dim2, chipBg, bg)
-            : [{ text: "   ", fg: dim }]),
+          // Every row is numbered, the way every pending review is. The tmux
+          // element table binds 1-9, so a pill past the ninth is a position
+          // rather than a keystroke — but a list that stops counting reads as
+          // a list that stopped. The tenth pill costs a cell of the task's
+          // text and nothing else: `line` gives the due span its width first,
+          // so it still lands flush right.
+          ...pill(String(index + 1), dim2, chipBg, bg),
           { text: " ", fg: dim },
           {
             text: task.text,

@@ -41,8 +41,9 @@ const reviewItems = [
 
 const configuredTab = process.env.RAIL_TAB;
 
-// Enough tasks to show the numbered pills, all four due-state hues, and the
-// truncation the slab actually applies.
+// Enough tasks to show the numbered pills, the three due-state hues the slab
+// spends, and the truncation it actually applies. The near-term row is in
+// here on purpose: the slab is overdue/today/tomorrow, so it must not draw.
 const tasks = [
   {
     id: "projects/dotfiles/TODO.md:7",
