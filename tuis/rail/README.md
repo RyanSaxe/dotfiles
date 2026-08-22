@@ -63,7 +63,7 @@ rail ensure-daemon    # start the render daemon if it isn't running
 rail status           # daemon, flag, pane count
 ```
 
-The CLI lives in the `rail` stow package (`rail/dot-local/bin/rail`);
+The CLI lives in `tuis/rail/bin/rail`;
 `install.sh` core installs node and this package's dependencies.
 
 ## Account-wide GitHub attention

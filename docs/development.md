@@ -77,7 +77,7 @@ So a second check parses every function with treesitter and requires a
 Parameters named `_` are skipped, `self` is implicit, and a zero-argument
 function returning nothing needs no annotation — there would be nothing to say.
 
-Types the project owns are declared in `nvim/dot-config/nvim/lua/theme/init.lua`
+Types the project owns are declared in `nvim/lua/theme/init.lua`
 and exposed to the editor through lazydev in `lua/plugins/lazydev.lua`, keyed on
 the word `Theme`. That is what lets `highlights.lua` annotate against
 `ThemeTokens` without requiring the module at runtime, while still loading

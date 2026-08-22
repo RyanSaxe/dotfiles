@@ -33,7 +33,7 @@ local root = vim.fs.normalize(script_dir .. "/..")
 -- Uses ThemeTokens (a project class), the vim API (runtime types), and
 -- catppuccin's palette (a plugin type): if any library is missing from
 -- the editor's workspace, this file lights up.
-local CANARY = root .. "/nvim/dot-config/nvim/lua/theme/highlights.lua"
+local CANARY = root .. "/nvim/lua/theme/highlights.lua"
 
 -- Generous on purpose: a cold CI runner spends its first minute
 -- compiling treesitter parsers before any language server attaches.

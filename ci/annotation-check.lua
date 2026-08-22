@@ -16,7 +16,7 @@ local script_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h
 local root = vim.fs.normalize(script_dir .. "/..")
 
 ---@type string[]
-local ROOTS = { root .. "/nvim/dot-config/nvim/lua", root .. "/dev" }
+local ROOTS = { root .. "/nvim/lua", root .. "/dev" }
 
 ---@param path string
 ---@return string[]

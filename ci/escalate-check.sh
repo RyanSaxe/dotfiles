@@ -4,7 +4,7 @@
 # tmux server or state dir is involved.
 set -eu
 
-script="$(dirname "$0")/../workmux/dot-local/bin/workmux-escalate-idle"
+script="$(dirname "$0")/../workmux/bin/workmux-escalate-idle"
 stubs="$(mktemp -d)"
 trap 'rm -rf "$stubs"' EXIT
 

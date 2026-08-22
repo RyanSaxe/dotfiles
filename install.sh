@@ -4,18 +4,22 @@
 #   ./install.sh              interactive: choose tiers, then install
 #   ./install.sh core         non-interactive: install the named tiers
 #   ./install.sh core mac
-#   ./install.sh stow         symlinks only: restow every tier (or the
+#   ./install.sh links        symlinks only: redeploy every tier (or the
 #                             named ones), no package installs
 #   ./install.sh upgrade      upgrade every package manager, print a
 #                             before/after summary; pin bumps (rail
 #                             lockfile, prek revs) are left uncommitted
 #
 # Re-running updates: packages upgrade to current versions and symlinks are
-# restowed. Every step is idempotent.
+# redeployed. Every step is idempotent.
 set -eu
 
 OS="$(uname -s)"
-REPO_ROOT="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+# Physical (-P) so paths through symlinked components (/var -> /private/var
+# on macOS) can't split into logical/physical mixtures: dotbot computes
+# relative links physically, so a logical base or target home would produce
+# links that climb to the wrong root and a clean pass that misses them.
+REPO_ROOT="$(CDPATH='' cd -P "$(dirname "$0")" && pwd -P)"
 AI_HARNESS_SOURCE="$REPO_ROOT/ai-harness"
 # No arguments and a real terminal means a human is driving: the tier and
 # agent pickers prompt. A scripted run takes the defaults instead.
@@ -83,16 +87,15 @@ ensure_package_manager() {
 }
 
 # ------------------------------------------------------------------- tiers
-# System packages per tier and OS, named per package manager. Stow packages
-# live in tiers/*.txt.
+# System packages per tier and OS, named per package manager. The symlink
+# deployment map for each tier lives in tiers/<tier>.yaml.
 
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='stow git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua'
-# make: ensure_modern_stow builds stow from source on LTS boxes.
+CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua'
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
-CORE_APT_PACKAGES='stow git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync make'
+CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='aerospace'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
@@ -215,7 +218,7 @@ setup_agents() {
 }
 
 # AI harness files span plugin roots, native user directories, and Codex's
-# admin directory. Stow intentionally does not manage this package: every
+# admin directory. The tier maps intentionally do not cover it: every
 # link below points back to the authored tree, while application state stays
 # in the harness home.
 link_owned() {
@@ -329,19 +332,6 @@ ensure_env_file() {
   done
 }
 
-# apt's stow on LTS is 2.3.x, which breaks on --dotfiles dot- directories
-# (fixed in 2.4). Build the release tarball over it when too old.
-ensure_modern_stow() {
-  case "$(stow --version)" in
-  *"version 2."[0-3].*) ;;
-  *) return 0 ;;
-  esac
-  build="$(mktemp -d)"
-  curl -fsSL https://ftp.gnu.org/gnu/stow/stow-2.4.1.tar.gz | tar -xz -C "$build"
-  (cd "$build/stow-2.4.1" && ./configure && sudo make install) >/dev/null
-  rm -rf "$build"
-}
-
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
@@ -356,7 +346,6 @@ install_tier_packages() {
   core:Linux)
     # shellcheck disable=SC2086
     apt_install $CORE_APT_PACKAGES
-    ensure_modern_stow
     # uv, starship, and a current neovim are not packaged (or too old) in
     # apt; use the official installers.
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -392,7 +381,7 @@ install_tier_packages() {
       brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
     done
     # Per-machine notch compensation for aerospace's top gap.
-    ./aerospace/dot-config/aerospace/configure.sh
+    ./aerospace/configure.sh
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -401,114 +390,68 @@ install_tier_packages() {
   esac
 }
 
-# Directories that receive generated files at runtime: theme publish_files
-# copies the rendered bat theme and ghostty shaders into ~/.config, and uv
-# installs tool shims into ~/.local/bin. Each must be a real directory
-# before stow runs: stow folds a missing directory into a symlink to the
-# package tree, and these writes would then land inside the repo. .stowrc's
-# --no-folding also prevents folding, but only when stow reads it (cwd is
-# the repo root and the file parses); the pre-create holds regardless.
-RUNTIME_WRITE_DIRS='.config/bat/themes .config/ghostty/shaders .config/ghostty/themes .local/bin'
+# ------------------------------------------------------------------ deploy
+# Symlinks are deployed by dotbot from one explicit map per tier
+# (tiers/<tier>.yaml): per-file links inside real directories, plus native
+# cleanup of links whose source file was renamed or deleted. dotbot runs through uvx, so the deployment tool itself needs
+# no install step anywhere uv exists.
 
-ensure_runtime_write_dirs() {
-  for dir in $RUNTIME_WRITE_DIRS; do
-    mkdir -p "${DOTFILES_TARGET:-$HOME}/$dir"
-  done
+# Source directories the tier maps deploy from, kept in step with the glob
+# patterns in tiers/*.yaml. Deployment reads the filesystem, not the git
+# index, so junk inside these trees matters: gitignored files are declared
+# junk and deleted before a glob can link them; untracked files may be
+# unfinished work, so they refuse to deploy rather than silently becoming
+# live configuration.
+DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin bat ghostty sketchybar aerospace'
+
+ensure_uv() {
+  command -v uvx >/dev/null 2>&1 && return 0
+  case "$OS" in
+  Darwin)
+    if command -v brew >/dev/null 2>&1; then
+      brew_install uv
+    else
+      echo "error: uv is required to deploy symlinks (brew install uv)" >&2
+      exit 1
+    fi
+    ;;
+  *) curl -LsSf https://astral.sh/uv/install.sh | sh ;;
+  esac
 }
 
-# Stow one package, cleaning up links left behind by files that were renamed
-# or deleted since the last run. Stow itself cannot do this: it unstows by
-# walking the CURRENT package tree, so links to files no longer in the tree
-# are never visited and dangle forever. We keep a manifest of what each
-# package stowed last time; anything in the old manifest but not the new tree
-# that is now a broken symlink gets removed.
-stow_package() {
-  target="${DOTFILES_TARGET:-$HOME}"
-  manifest_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/manifest"
-  manifest="$manifest_dir/$1.txt"
-  mkdir -p "$manifest_dir"
-
-  # Stow deploys the filesystem, not the git index, so anything loose inside
-  # a package would symlink into HOME (bytecode caches once linked
-  # ~/tests/__pycache__). Gitignored files are declared junk: delete them,
-  # and the empty directory chains they leave. Untracked files may be
-  # unfinished work: refuse, so nothing links silently and nothing of value
-  # is deleted.
-  git clean -qfdX -- "$1"
-  find "$1" -mindepth 1 -type d -empty -delete
-  untracked="$(git ls-files --others --exclude-standard -- "$1")"
+clean_deploy_sources() {
+  # shellcheck disable=SC2086
+  git clean -qfdX -- $DEPLOY_SOURCE_DIRS
+  # shellcheck disable=SC2086
+  find $DEPLOY_SOURCE_DIRS -mindepth 1 -type d -empty -delete 2>/dev/null || true
+  # shellcheck disable=SC2086
+  untracked="$(git ls-files --others --exclude-standard -- $DEPLOY_SOURCE_DIRS)"
   if [ -n "$untracked" ]; then
-    echo "error: untracked files in package $1 would stow into HOME:" >&2
+    echo "error: untracked files would deploy into HOME:" >&2
     printf '%s\n' "$untracked" | sed 's/^/  /' >&2
     echo "commit or remove them, then re-run" >&2
     exit 1
   fi
-
-  # Manifest paths are target-side: stow --dotfiles links dot-* entries to
-  # their dotted names, and the cleanup below must visit those links.
-  # -type l: a symlink shipped in a package stows like a file.
-  current="$(cd "$1" && find . \( -type f -o -type l \) | sed 's|/dot-|/.|g' | sort)"
-
-  if [ -f "$manifest" ]; then
-    printf '%s\n' "$current" | comm -23 "$manifest" - | while IFS= read -r gone; do
-      link="$target/${gone#./}"
-      # Only touch broken symlinks; a real file there is not ours to delete.
-      if [ -L "$link" ] && [ ! -e "$link" ]; then
-        rm "$link"
-        echo "cleaned dangling link: $link"
-      fi
-      prune_empty_dirs "$target" "${gone#./}"
-    done
-  fi
-
-  stow -R --dotfiles -t "$target" "$1"
-  printf '%s\n' "$current" >"$manifest"
 }
 
-# --no-folding makes stow create REAL directories around its per-file links,
-# so a removed file leaves its directory chain behind after the link is
-# cleaned. rmdir only ever deletes empty dirs and stops at the first
-# non-empty parent, inside the target.
-prune_empty_dirs() {
-  dir="${2%/*}"
-  if [ "$dir" != "$2" ]; then
-    (cd "$1" && rmdir -p "$dir") 2>/dev/null || true
-  fi
-}
-
-# install_tier visits only packages a tier currently names, so a package
-# dropped from every tier (or renamed) would keep its links and manifest
-# forever. Unstow by manifest; every listed entry still a symlink is ours.
-remove_stale_packages() {
-  target="${DOTFILES_TARGET:-$HOME}"
-  manifest_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/manifest"
-  for manifest in "$manifest_dir"/*.txt; do
-    [ -f "$manifest" ] || continue
-    pkg="${manifest##*/}"
-    pkg="${pkg%.txt}"
-    if grep -qx "$pkg" tiers/*.txt; then continue; fi
-    echo "unstowing removed package: $pkg"
-    while IFS= read -r entry; do
-      link="$target/${entry#./}"
-      if [ -L "$link" ]; then rm "$link"; fi
-      prune_empty_dirs "$target" "${entry#./}"
-    done <"$manifest"
-    rm "$manifest"
-  done
-}
-
-stow_tier() {
+deploy_tier() {
   if [ "$1" = mac ] && [ "$OS" != Darwin ]; then
     echo "skipping mac tier: not macOS"
     return 0
   fi
-  # Tiers with no stow packages yet have no tiers/<name>.txt.
-  [ -s "tiers/$1.txt" ] || return 0
-  while IFS= read -r pkg; do
-    [ -n "$pkg" ] || continue
-    echo "stow: $pkg"
-    stow_package "$pkg"
-  done <"tiers/$1.txt"
+  # Tiers with no symlinks to deploy have no tiers/<name>.yaml.
+  [ -f "tiers/$1.yaml" ] || return 0
+  echo "deploy: $1"
+  # Physical for the same reason as REPO_ROOT above.
+  deploy_home="$(cd -P "${DOTFILES_TARGET:-$HOME}" && pwd -P)"
+  # DOTFILES_TARGET redirects the links (scratch-home checks); the uv cache
+  # stays under the real home, pinned before HOME is overridden. The two
+  # disabled warnings describe exactly that intent: the assignments exist
+  # only for the dotbot process, and $HOME in the cache path is the outer one.
+  # shellcheck disable=SC2097,SC2098
+  UV_CACHE_DIR="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}" \
+    HOME="$deploy_home" \
+    uvx --quiet dotbot -d "$REPO_ROOT" -c "tiers/$1.yaml"
 }
 
 install_tier() {
@@ -517,13 +460,13 @@ install_tier() {
     return 0
   fi
   install_tier_packages "$1"
-  stow_tier "$1"
+  deploy_tier "$1"
 }
 
 # ----------------------------------------------------------------- upgrade
 # `./install.sh upgrade` — bring every package manager current and print one
 # before/after summary at the end instead of scrollback. Package-manager work
-# only: no stow, no symlinks (install owns those). Pinned versions (rail's
+# only: no symlink deployment (install owns that). Pinned versions (rail's
 # package-lock.json, prek hook revs) are bumped in the working tree but never
 # committed here; the diff is the proposal.
 
@@ -723,16 +666,15 @@ run_upgrade() {
 }
 
 # -------------------------------------------------------------------- main
-# `stow` verb: symlinks and their cleanup only, no package-manager work.
+# `links` verb: symlinks and their cleanup only, no package-manager work.
 # CI runs this same path against a scratch HOME.
-if [ "${1:-}" = stow ]; then
+if [ "${1:-}" = links ]; then
   shift
   [ "$#" -gt 0 ] || set -- core mac
-  if [ "$OS" = Linux ]; then ensure_modern_stow; fi
-  ensure_runtime_write_dirs
-  remove_stale_packages
+  ensure_uv
+  clean_deploy_sources
   for tier in "$@"; do
-    stow_tier "$tier"
+    deploy_tier "$tier"
   done
   exit 0
 fi
@@ -752,11 +694,8 @@ if [ "$#" -eq 0 ]; then
   fi
 fi
 
-ensure_runtime_write_dirs
-
-# Before stowing: a renamed package's old links would conflict with its new
-# name's stow run.
-remove_stale_packages
+ensure_uv
+clean_deploy_sources
 
 for tier in "$@"; do
   echo "==> $tier"

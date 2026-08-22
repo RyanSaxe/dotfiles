@@ -22,11 +22,11 @@ set -eu
 # make sure tmux and friends resolve.
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# Palettes, tokens, and templates live next to this script in its stow
-# package; resolving our own symlink finds them wherever the repo lives.
+# Palettes, tokens, and templates live in the component directory above
+# this script; resolving our own symlink finds them wherever the repo lives.
 SCRIPT_PATH="$(readlink -f "$0")"
-PACKAGE_ROOT="${SCRIPT_PATH%/dot-local/bin/theme}"
-CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT/dot-config}/theme"
+PACKAGE_ROOT="${SCRIPT_PATH%/bin/theme}"
+CONFIG="${THEME_CONFIG:-$PACKAGE_ROOT}"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 # Mascot mappings are machine-personal state (project names must never
 # reach the public repo), not tracked config.
@@ -311,10 +311,10 @@ render() {
 #   mascot     rail watches the state directory
 #   ghostty    palette follows macOS appearance natively; custom shaders
 #              pick up new content on the next config reload
-# Every directory this function writes into must be listed in install.sh's
-# RUNTIME_WRITE_DIRS: it must exist as a real directory before stow runs,
-# or stow can fold it into a symlink and these writes land inside the repo
-# (see README: Install).
+# Every directory this function writes into must be listed in the tier
+# map's create directive: it must exist as a real directory before links
+# deploy, or a link there would send these writes inside the repo
+# (see docs/install.md).
 publish_files() {
   # File copies are context-independent writes: ghostty resolves
   # custom-shader paths relative to its config dir. Every rendered .glsl

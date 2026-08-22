@@ -1,8 +1,0 @@
-git
-zsh
-theme
-nvim
-tmux
-workmux
-rail
-bat

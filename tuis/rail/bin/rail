@@ -25,7 +25,7 @@ set -eu
 
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# Resolve the repo through this script's own symlink (stow pattern). macOS's
+# Resolve the repo through this script's own symlink. macOS's
 # readlink has no -f flag, so keep this portable across macOS and Linux.
 SCRIPT_PATH="$0"
 while [ -L "$SCRIPT_PATH" ]; do
@@ -37,7 +37,7 @@ while [ -L "$SCRIPT_PATH" ]; do
   esac
 done
 SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
-REPO_ROOT="${SCRIPT_PATH%/rail/dot-local/bin/rail}"
+REPO_ROOT="${SCRIPT_PATH%/tuis/rail/bin/rail}"
 RAIL_DIR="$REPO_ROOT/tuis/rail"
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"

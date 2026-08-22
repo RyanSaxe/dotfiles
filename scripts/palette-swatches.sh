@@ -3,7 +3,7 @@
 # judging palette candidates in nvim. Open it and :so % — every hex
 # paints itself (dark text on light swatches and vice versa).
 set -eu
-pal_dir="$(cd "$(dirname "$0")/.." && pwd)/theme/dot-config/theme/palettes"
+pal_dir="$(cd "$(dirname "$0")/.." && pwd)/theme/palettes"
 out=/tmp/catppuccin-tokens.lua
 
 {

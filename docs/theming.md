@@ -41,7 +41,7 @@ palettes/*.conf     raw catppuccin values, verbatim
 ```
 
 Every consumer is registered as inner, outer, or mixed in
-`theme/dot-config/theme/elements.conf`. Mixed consumers get both namespaces and
+`theme/elements.conf`. Mixed consumers get both namespaces and
 must qualify every placeholder — `{{inner_bg}}`, `{{outer_crust}}` — because a
 bare name would silently pick one layer.
 
@@ -98,7 +98,7 @@ yes, it wants a native color.
 A mascot is any image the theme system can wear: the rail paints its sprite and
 the accent/notify colors are extracted from it. Identities are
 provider-qualified (`pokemon:gengar`), and providers live in
-`theme/dot-local/bin/mascot-accents` as a registry — the picker, completions,
+`theme/bin/mascot-accents` as a registry — the picker, completions,
 and rail all build from it, so adding a source touches exactly one file.
 
 A provider is two functions registered under a name:

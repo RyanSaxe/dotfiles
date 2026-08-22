@@ -151,7 +151,7 @@ unchanged. Otherwise keep MCP configuration under each harness directory.
 Codex MCP servers live in `codex/config.toml`. Credentials always come from the
 environment or a native credential store.
 
-[Workmux](../workmux/dot-config/workmux/config.yaml) defines agent launch and
+[Workmux](../workmux/config.yaml) defines agent launch and
 worktree behavior. Files installed by `workmux setup` stay in the harness's
 native directories.
 

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root="${0:A:h:h}"
-helper="$repo_root/workmux/dot-local/bin/workmux-copy-ignored"
+helper="$repo_root/workmux/bin/workmux-copy-ignored"
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/workmux-copy-ignored.XXXXXX")"
 trap 'rm -rf -- "$fixture_root"' EXIT
 
