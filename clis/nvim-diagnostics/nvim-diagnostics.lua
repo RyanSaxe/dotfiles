@@ -6,7 +6,7 @@
 -- loads plugins, so no server would ever attach and the check would pass by
 -- doing nothing (see ci/editor-parity.lua, which learned this first). The
 -- launcher next to this file runs
--- `nvim --headless "+luafile editor-diagnostics.lua"` and passes options
+-- `nvim --headless "+luafile nvim-diagnostics.lua"` and passes options
 -- through ED_* environment variables.
 --
 -- Files are processed in small batches — open, ask, close — the way an
@@ -82,7 +82,7 @@ local function env_severity(name)
   end
   local severity = SEVERITY_BY_NAME[value:upper()]
   if severity == nil then
-    emit(("editor-diagnostics: unknown severity %q for %s"):format(value, name))
+    emit(("nvim-diagnostics: unknown severity %q for %s"):format(value, name))
     os.exit(2)
   end
   return severity
@@ -122,7 +122,7 @@ local function collect_files(targets)
     if vim.fn.isdirectory(target) == 1 then
       local listed = vim.fn.systemlist({ "rg", "--files", "--hidden", "-g", "!.git", "--", target })
       if vim.v.shell_error ~= 0 then
-        emit("editor-diagnostics: rg --files failed for " .. target)
+        emit("nvim-diagnostics: rg --files failed for " .. target)
         os.exit(2)
       end
       for _, path in ipairs(listed) do
@@ -133,12 +133,12 @@ local function collect_files(targets)
     elseif vim.fn.filereadable(target) == 1 then
       keep(target)
     else
-      emit("editor-diagnostics: no such file or directory: " .. target)
+      emit("nvim-diagnostics: no such file or directory: " .. target)
       os.exit(2)
     end
   end
   if #files > MAX_FILES then
-    emit(("editor-diagnostics: %d files exceeds the %d cap; name a narrower target"):format(#files, MAX_FILES))
+    emit(("nvim-diagnostics: %d files exceeds the %d cap; name a narrower target"):format(#files, MAX_FILES))
     os.exit(2)
   end
   return files
@@ -334,7 +334,7 @@ end
 local function write_json(report, path)
   local handle, err = io.open(path, "w")
   if handle == nil then
-    emit("editor-diagnostics: cannot write " .. path .. ": " .. tostring(err))
+    emit("nvim-diagnostics: cannot write " .. path .. ": " .. tostring(err))
     os.exit(2)
   end
   handle:write(vim.json.encode({
@@ -355,7 +355,7 @@ vim.defer_fn(function()
 
   local files = collect_files(read_targets())
   if #files == 0 then
-    emit("editor-diagnostics: nothing to check (no files with a supported extension)")
+    emit("nvim-diagnostics: nothing to check (no files with a supported extension)")
     os.exit(2)
   end
 
@@ -519,17 +519,17 @@ vim.defer_fn(function()
   end
 
   if not any_attach then
-    emit("editor-diagnostics: no language server attached to any target — cannot verify anything")
+    emit("nvim-diagnostics: no language server attached to any target — cannot verify anything")
     os.exit(2)
   end
 
   report.verified = not ran_out and #report.unattached == 0 and #uncovered == 0
   if ran_out then
-    emit(("editor-diagnostics: ran out of budget after %ds; results are partial"):format(timeout_ms / 1000))
+    emit(("nvim-diagnostics: ran out of budget after %ds; results are partial"):format(timeout_ms / 1000))
   end
   for _, entry in ipairs(uncovered) do
     local who = #entry.silent > 0 and table.concat(entry.silent, ", ") or "no server"
-    emit(("editor-diagnostics: %s — %s never answered; this file is not verified"):format(entry.file, who))
+    emit(("nvim-diagnostics: %s — %s never answered; this file is not verified"):format(entry.file, who))
   end
   print_report(report)
   if json_path ~= nil and json_path ~= "" then

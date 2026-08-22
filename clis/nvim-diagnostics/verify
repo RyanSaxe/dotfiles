@@ -1,5 +1,5 @@
 #!/bin/bash
-# Proves editor-diagnostics against seeded failures — run it whenever you
+# Proves nvim-diagnostics against seeded failures — run it whenever you
 # doubt the tool. Needs the machine's real language servers (ty, ruff,
 # lua_ls), so like ci/editor-parity.lua it cannot run in CI.
 # The whole file is "run a condition, hand check() its $?" — that's the
@@ -28,27 +28,27 @@ printf 'def f(x: int) -> str:\n    return x\n' >type_error.py
 printf 'def broken(:\n' >syntax_error.py
 printf 'x: int = 1\n' >clean.py
 
-out="$(editor-diagnostics type_error.py 2>/dev/null)"
+out="$(nvim-diagnostics type_error.py 2>/dev/null)"
 rc=$?
 echo "$out" | grep -q "ERROR ty" && [ $rc -eq 0 ]
 check "single-file ty type error found, exit 0" $?
-editor-diagnostics type_error.py --fail-on ERROR >/dev/null 2>&1
+nvim-diagnostics type_error.py --fail-on ERROR >/dev/null 2>&1
 [ $? -eq 1 ]
 check "--fail-on ERROR exits 1" $?
-out="$(editor-diagnostics type_error.py --min-severity ERROR 2>/dev/null)"
+out="$(nvim-diagnostics type_error.py --min-severity ERROR 2>/dev/null)"
 ! echo "$out" | grep -q "WARN"
 check "--min-severity ERROR hides warnings" $?
-editor-diagnostics type_error.py --json "$W/report.json" >/dev/null 2>&1
+nvim-diagnostics type_error.py --json "$W/report.json" >/dev/null 2>&1
 jq -e '.summary.ERROR >= 1' "$W/report.json" >/dev/null 2>&1
 check "--json writes a report with errors counted" $?
-out="$(editor-diagnostics clean.py 2>/dev/null)"
+out="$(nvim-diagnostics clean.py 2>/dev/null)"
 rc=$?
 echo "$out" | grep -q "^0 findings" && [ $rc -eq 0 ] && ! echo "$out" | grep -q "NOT fully"
 check "clean file verifies clean, exit 0" $?
 
 mkdir -p "$W/luaproj" && cd "$W/luaproj" && git init -q .
 printf 'local x = totally_undefined_fn()\nreturn x\n' >bad.lua
-editor-diagnostics bad.lua 2>/dev/null | grep -q "Undefined global"
+nvim-diagnostics bad.lua 2>/dev/null | grep -q "Undefined global"
 check "lua_ls undefined global found" $?
 
 # The sweep class: 51 files, seeded errors, gitignore, agreement with
@@ -59,7 +59,7 @@ printf 'def broken(:\n' >pkg/syntax_err.py
 printf 'def g(x: int) -> str:\n    return x\n' >pkg/type_err.py
 printf 'y = undefined_name_xyz\n' >pkg/name_err.py
 mkdir -p ignored_dir && printf 'also broken(((\n' >ignored_dir/hidden_err.py && printf 'ignored_dir/\n' >.gitignore
-out="$(editor-diagnostics . 2>/dev/null)"
+out="$(nvim-diagnostics . 2>/dev/null)"
 rc=$?
 echo "$out" | grep -q "syntax_err.py"
 check "sweep: syntax error found across 51 files" $?
@@ -71,7 +71,7 @@ check "sweep: undefined name found" $?
 check "sweep: gitignored file excluded" $?
 ! echo "$out" | grep -q "NOT fully verified" && [ $rc -eq 0 ]
 check "sweep: fully verified, exit 0" $?
-single="$(editor-diagnostics pkg/type_err.py 2>/dev/null | grep -c "type_err")"
+single="$(nvim-diagnostics pkg/type_err.py 2>/dev/null | grep -c "type_err")"
 swept="$(echo "$out" | grep -c "type_err")"
 [ "$single" -eq "$swept" ]
 check "sweep agrees with single-file run" $?

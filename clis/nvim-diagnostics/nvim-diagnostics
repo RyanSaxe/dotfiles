@@ -4,7 +4,7 @@
 # file next to this launcher; this shim only turns flags into ED_* variables,
 # because a +luafile script has no argv of its own.
 #
-#   editor-diagnostics [target ...]        files or directories (default .)
+#   nvim-diagnostics [target ...]        files or directories (default .)
 #     --json PATH          also write a JSON report
 #     --min-severity SEV   show only SEV and above (ERROR|WARN|INFO|HINT)
 #     --fail-on SEV        exit 1 when findings at or above SEV exist
@@ -56,7 +56,7 @@ while [ "$#" -gt 0 ]; do
     exit 0
     ;;
   --*)
-    echo "editor-diagnostics: unknown option: $1" >&2
+    echo "nvim-diagnostics: unknown option: $1" >&2
     exit 2
     ;;
   *)
@@ -69,4 +69,4 @@ done
 
 ED_TARGETS="$targets"
 export ED_TARGETS ED_JSON ED_MIN_SEVERITY ED_FAIL_ON ED_TIMEOUT
-exec nvim --headless "+luafile $SCRIPT_DIR/editor-diagnostics.lua"
+exec nvim --headless "+luafile $SCRIPT_DIR/nvim-diagnostics.lua"

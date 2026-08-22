@@ -139,6 +139,14 @@ Passing tests and CI establish useful facts but do not, by themselves, prove
 that a feature works. Verify through the interface where the user encounters
 the change, with effort proportional to its risk, novelty, and consequence.
 
+`nvim-diagnostics <files-or-dirs>` reports what the editor's language
+servers would show and is a reliable verification loop for code changes. It
+is not fast on large repositories — run it near the end of the work, on the
+files you touched, when the result is worth the wait. When it disagrees with
+CI or pre-commit checks, prefer CI/pre-commit as the authority and report
+the discrepancy to the driver: a divergence between the editor and the gates
+is itself a finding worth fixing.
+
 <important>
 
 Read [Verification](references/verification.md) before planning or performing
