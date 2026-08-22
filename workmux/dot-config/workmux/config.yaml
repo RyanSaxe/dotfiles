@@ -21,6 +21,18 @@ agents:
       - --ask-for-approval
       - on-request
 
+# Named pane layouts, selected with `workmux add -l <name>`.
+#
+# `review` is the human review surface the rail's Reviews dashboard opens: one
+# pane, an editor, no agent. It exists as a layout rather than a flag because
+# the global `agent: codex` would otherwise start a reviewer nobody asked for
+# every time a pull request is opened to be read.
+layouts:
+  review:
+    panes:
+      - command: review-open
+        name: review
+        focus: true
 # Reproduce the main worktree's ignored, untracked files in every new
 # worktree. If the project uses BYOR, register and refresh the new checkout
 # after its .byor directory has been copied. A project post_create list must

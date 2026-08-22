@@ -4,6 +4,17 @@
 #   rail on|off|toggle   enable/disable the rail everywhere
 #   rail jump <letter>   jump to the agent behind a hint letter
 #   rail page up|down    page the rail body when it overflows
+#   rail tab agents|reviews|tasks
+#                       switch the active rail tab
+#   rail element <number>
+#                       perform the focused tab's numbered element action
+#   rail dashboard-popup
+#                       open the Reviews dashboard as a tmux popup, for
+#                       entry points that live outside tmux
+#   rail dashboard reviews|tasks
+#                       open the table + preview dashboard for a rail tab
+#   rail review-dashboard
+#                       compatibility alias for the Reviews dashboard
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
@@ -14,8 +25,18 @@ set -eu
 
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# Resolve the repo through this script's own symlink (stow pattern).
-SCRIPT_PATH="$(readlink -f "$0")"
+# Resolve the repo through this script's own symlink (stow pattern). macOS's
+# readlink has no -f flag, so keep this portable across macOS and Linux.
+SCRIPT_PATH="$0"
+while [ -L "$SCRIPT_PATH" ]; do
+  SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+  case "$LINK_TARGET" in
+  /*) SCRIPT_PATH="$LINK_TARGET" ;;
+  *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
+  esac
+done
+SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_ROOT="${SCRIPT_PATH%/rail/dot-local/bin/rail}"
 RAIL_DIR="$REPO_ROOT/tuis/rail"
 
@@ -79,7 +100,7 @@ toggle)
   fi
   ;;
 jump)
-  # Jump to the agent behind a hint key (alt+a <key> in tmux). Digits
+  # Jump to the agent behind a hint key (alt+space <digit> in tmux). Digits
   # are viewer-relative — 1 is the top elsewhere row of the CALLING
   # session's rail — and the literal key `a` is the globally most-urgent
   # agent, current session included. The daemon keeps hints.tsv current:
@@ -115,6 +136,57 @@ page)
   [ "$next" -lt 0 ] && next=0
   printf '%s' "$next" >"$STATE/page"
   ;;
+tab)
+  tab="${2:?usage: rail tab agents|reviews|tasks}"
+  case "$tab" in
+  agents | reviews | tasks) ;;
+  review) tab=reviews ;;
+  *)
+    echo "usage: rail tab agents|reviews|tasks" >&2
+    exit 1
+    ;;
+  esac
+  # Pages are not meaningful across surfaces, so changing tabs starts at
+  # the top of the new one.
+  printf '%s\n' "$tab" >"$STATE/tab"
+  printf '0' >"$STATE/page"
+  ;;
+element)
+  number="${2:?usage: rail element <number>}"
+  case "$number" in
+  1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) ;;
+  *)
+    echo "usage: rail element <1-9>" >&2
+    exit 1
+    ;;
+  esac
+  cd "$RAIL_DIR"
+  exec npx tsx src/tab-element.ts "$number"
+  ;;
+dashboard)
+  surface="${2:-reviews}"
+  case "$surface" in
+  reviews | tasks) ;;
+  *)
+    echo "usage: rail dashboard reviews|tasks" >&2
+    exit 1
+    ;;
+  esac
+  cd "$RAIL_DIR"
+  exec npx tsx src/review-dashboard.ts "$surface"
+  ;;
+dashboard-popup)
+  # Open the Reviews dashboard from outside tmux — the menu bar letter and
+  # the aerospace chord both land here. `display-popup` needs a client, so
+  # this only works when a terminal is attached; that is the point, since
+  # both entry points focus the terminal first.
+  exec tmux display-popup -h 80% -w 90% -E \
+    "TMUX_POPUP=1 $HOME/.local/bin/rail dashboard reviews"
+  ;;
+review-dashboard)
+  cd "$RAIL_DIR"
+  exec npx tsx src/review-dashboard.ts reviews
+  ;;
 status)
   if daemon_running; then
     echo "daemon: running (pid $(cat "$PID_FILE"))"
@@ -122,6 +194,7 @@ status)
     echo "daemon: not running"
   fi
   if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
+  echo "tab: $(cat "$STATE/tab" 2>/dev/null || echo agents)"
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
   if [ -n "${AI_HARNESS_NTFY_URL:-}${AGENT_NOTIFICATION_ID:-}" ]; then
     echo "phone: configured"
@@ -130,7 +203,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|page up|down|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|review-dashboard|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

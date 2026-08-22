@@ -7,10 +7,13 @@ import { platform } from "node:os";
 import { join } from "node:path";
 
 import { run, type Agent, type AgentStatus } from "./data.js";
+import { ntfyEndpoint, sendNtfy } from "./attention/ntfy.js";
+import type { AttentionItem } from "./attention/types.js";
 import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
 const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
+const REVIEW_ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/review-attention");
 
 // waiting outranks done — the same urgency order the rail's rows use.
 export type AttentionLevel = "waiting" | "done" | "none";
@@ -55,11 +58,35 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
   );
 }
 
-const NTFY_URL =
-  process.env["AI_HARNESS_NTFY_URL"] ??
-  (process.env["AGENT_NOTIFICATION_ID"]
-    ? `https://ntfy.sh/ai-agent-notification-${process.env["AGENT_NOTIFICATION_ID"]}`
-    : null);
+// The review letter in the menu bar, published the same way the agent one
+// is: a file with the level, and an edge-triggered sketchybar event. The bar
+// must not read the observer's state itself — that is a JSON document behind
+// a lock, and a menu bar polling it every few seconds is how a status
+// indicator becomes a source of load.
+export type ReviewLevel = "ci" | "review" | "none";
+
+export function reviewLevel(items: readonly AttentionItem[]): ReviewLevel {
+  if (items.length === 0) return "none";
+  // CI failure outranks conversation, matching the rows' own urgency.
+  return items.some((item) => item.kind === "ci") ? "ci" : "review";
+}
+
+let publishedReviewLevel: ReviewLevel | null = null;
+
+export function publishReviewAttention(items: readonly AttentionItem[]): void {
+  const level = reviewLevel(items);
+  if (level === publishedReviewLevel) return;
+  publishedReviewLevel = level;
+  writeFileSync(REVIEW_ATTENTION_FILE, level);
+  logLine(`review attention ${level} (${items.length} unacknowledged)`);
+  run("sketchybar", ["--trigger", "review_attention_change"]).catch(
+    (error: unknown) => {
+      if (platform() === "darwin") {
+        logLine(`sketchybar trigger failed: ${String(error)}`);
+      }
+    },
+  );
+}
 
 const lastStatus = new Map<string, AgentStatus>();
 let seeded = false;
@@ -127,7 +154,8 @@ export function pushPhone(
   if (transitions.length === 0) return;
   // A channel that was never configured is the likeliest reason the phone
   // stays quiet, and it used to be indistinguishable from a working one.
-  if (!NTFY_URL) {
+  const endpoint = ntfyEndpoint();
+  if (endpoint === null) {
     if (!warnedNoChannel) {
       warnedNoChannel = true;
       logLine(
@@ -150,28 +178,19 @@ export function pushPhone(
   const names = transitions
     .map((agent) => `${agent.session}/${agent.windowName}`)
     .join(", ");
-  fetch(NTFY_URL, {
-    method: "POST",
-    headers: {
-      Title: title,
-      Priority: waiting.length > 0 ? "high" : "default",
-      Tags: "robot",
+  sendNtfy(
+    {
+      title,
+      body,
+      priority: waiting.length > 0 ? "high" : "default",
+      tags: ["robot"],
     },
-    body,
-  }).then(
-    (response) => {
-      if (!response.ok) {
-        logLine(`ntfy send failed for ${names}: HTTP ${response.status}`);
-      }
-    },
-    (error: unknown) => {
-      // Node reports every network failure as "TypeError: fetch failed";
-      // the cause is the part that names what actually broke.
-      const cause = error instanceof Error ? error.cause : null;
-      const detail = cause
-        ? `${String(error)}: ${String(cause)}`
-        : String(error);
-      logLine(`ntfy send failed for ${names}: ${detail}`);
-    },
-  );
+    endpoint,
+  ).catch((error: unknown) => {
+    // Node reports every network failure as "TypeError: fetch failed";
+    // the cause is the part that names what actually broke.
+    const cause = error instanceof Error ? error.cause : null;
+    const detail = cause ? `${String(error)}: ${String(cause)}` : String(error);
+    logLine(`ntfy send failed for ${names}: ${detail}`);
+  });
 }

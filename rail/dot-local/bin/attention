@@ -1,0 +1,34 @@
+#!/bin/sh
+# Account-wide GitHub attention observer.
+#
+# The refresh worker is intentionally separate from tmux, Neovim, and the
+# rail renderer. launchd invokes `attention refresh` every five minutes on
+# macOS; the other commands are useful for diagnostics and local testing.
+set -eu
+
+PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# macOS's /usr/bin/readlink has no -f flag. Resolve the stow symlink with
+# POSIX readlink/cd so launchd and an interactive shell behave identically.
+SCRIPT_PATH="$0"
+while [ -L "$SCRIPT_PATH" ]; do
+  SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+  case "$LINK_TARGET" in
+  /*) SCRIPT_PATH="$LINK_TARGET" ;;
+  *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
+  esac
+done
+SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+REPO_ROOT="${SCRIPT_DIR%/rail/dot-local/bin}"
+RAIL_DIR="$REPO_ROOT/tuis/rail"
+
+if [ -f "$REPO_ROOT/.env" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$REPO_ROOT/.env"
+  set +a
+fi
+
+cd "$RAIL_DIR"
+exec npx tsx src/attention/cli.ts "$@"

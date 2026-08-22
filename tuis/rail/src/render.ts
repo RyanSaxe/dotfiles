@@ -1,13 +1,16 @@
 import { blank, hintRow } from "./cells.js";
+import { reviewRows } from "./sections/review.js";
 import type { Agent, RailData } from "./data.js";
 import { elsewhereRows } from "./sections/elsewhere.js";
-import { header, sectionHairline } from "./sections/header.js";
+import { header, tabBar } from "./sections/header.js";
 import {
   FOOTER_ROWS,
   MIN_HEIGHT_FOR_MASCOT,
   mascotFooter,
 } from "./sections/mascot.js";
 import type { RailRow } from "./sections/rows.js";
+import { taskRows } from "./sections/tasks.js";
+import type { RailTabAttention } from "./tabs.js";
 import { windowRows } from "./sections/windows.js";
 import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 
@@ -16,7 +19,7 @@ import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 const PAGE_UP_KEY = "⌥,";
 const PAGE_DOWN_KEY = "⌥.";
 
-// The slab is 22 content cells; these two crust columns after them are
+// The slab is 26 content cells; these two crust columns after them are
 // the visible right margin (the colorless tmux border beside them reads
 // as part of the gap). daemon.ts derives the pane width from this.
 export const GUTTER_COLS = 1;
@@ -30,7 +33,7 @@ export function renderRail(
   height: number,
 ): string[] {
   const bg = railBg(palette);
-  // The gutter (appended at the end) stops hairlines and text one cell
+  // The gutter (appended at the end) stops the tab row and text one cell
   // short of the slab's edge; the crust pane-border column supplies the
   // second, so text still rests ~19pt (two cells at font-size 16) from
   // the content surface — mirroring the frame crust on the rail's left.
@@ -46,15 +49,31 @@ export function renderRail(
     }
   }
 
-  // Every item row is preceded by a blank spacer — the breathing room is
-  // part of the design and never collapses; crowding is handled by
-  // pagination instead.
+  const tabAttention: RailTabAttention = {
+    // The Agents tab is the lower, elsewhere-agent list. Local agents remain
+    // visible as window rows above the tabs and carry their own state color.
+    agents: elsewhere.some(
+      (agent) => agent.status !== "working" && !data.acked.has(agent.paneId),
+    ),
+    reviews: data.review.unacknowledged.length > 0,
+    tasks: false,
+  };
+
+  // Local tmux windows stay visible for every tab. The active tab owns only
+  // the lower section below the centered tab bar.
   const body: RailRow[] = [
     ...windowRows(data.windows, agentsByPane, data.acked, palette, inner),
+    { text: blank(inner, bg), item: false },
+    {
+      text: tabBar(data.activeTab, tabAttention, palette, inner),
+      item: false,
+    },
   ];
-  if (elsewhere.length > 0) {
-    body.push({ text: blank(inner, bg), item: false });
-    body.push({ text: sectionHairline(palette, inner), item: false });
+  if (data.activeTab === "reviews") {
+    body.push(...reviewRows(data.review, palette, inner));
+  } else if (data.activeTab === "tasks") {
+    body.push(...taskRows(palette, inner));
+  } else if (elsewhere.length > 0) {
     body.push(
       ...elsewhereRows(elsewhere, data.acked, data.hints, palette, inner),
     );
@@ -86,6 +105,16 @@ export function renderRail(
       if (row.item) {
         units.push(unit);
         unit = [];
+      }
+    }
+    // A centered tab bar is trailing furniture when there are no lower
+    // items (for example, an empty Agents tab). Keep it with the final unit
+    // instead of dropping it from the paginated scene.
+    if (unit.length > 0) {
+      if (units.length > 0) {
+        units[units.length - 1]!.push(...unit);
+      } else {
+        units.push(unit);
       }
     }
     const pages: RailRow[][] = [];

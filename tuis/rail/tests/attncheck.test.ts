@@ -2,22 +2,26 @@
 // ride a phone ping (transitions vs departure sweep). Terminal focus is
 // tmux's own client_flags now, exercised by ackcheck.
 //
-//   npx tsx dev/attncheck.ts
+//   npm test
 
 import assert from "node:assert/strict";
 
+import { stabilizeAgents, type Agent, type AgentStatus } from "../src/data.js";
 import { attentionLevel, phoneBatch } from "../src/notifications.js";
 import { isPresent } from "../src/probes.js";
-import type { Agent, AgentStatus } from "../src/data.js";
 
-const agent = (paneId: string, status: AgentStatus): Agent => ({
+const agent = (
+  paneId: string,
+  status: AgentStatus,
+  updatedTs = 100,
+): Agent => ({
   session: "s",
   windowName: paneId,
   paneId,
   status,
   title: "t",
   elapsedSecs: 5,
-  updatedTs: 100,
+  updatedTs,
   worktree: "s",
   branch: "main",
 });
@@ -29,6 +33,31 @@ assert.equal(isPresent(null, 950, 1000), true, "fresh client activity");
 assert.equal(isPresent(null, 100, 1000), false, "stale client activity");
 assert.equal(isPresent(null, null, 1000), false, "no signal is away");
 assert.equal(isPresent(30, 100, 1000), true, "input idle outranks clients");
+
+// ----- status stabilization ---------------------------------------------
+const stableStatuses = new Map<string, AgentStatus>([["%1", "working"]]);
+const waitingChange = agent("%1", "waiting", 100);
+assert.equal(
+  stabilizeAgents([waitingChange], stableStatuses, 104)[0]?.status,
+  "working",
+  "a fresh status change stays provisional",
+);
+assert.equal(
+  stabilizeAgents([waitingChange], stableStatuses, 105)[0]?.status,
+  "waiting",
+  "a status that lasts five seconds is accepted",
+);
+const doneChange = agent("%1", "done", 106);
+assert.equal(
+  stabilizeAgents([doneChange], stableStatuses, 107)[0]?.status,
+  "waiting",
+  "every status gets the same stabilization window",
+);
+assert.equal(
+  stabilizeAgents([doneChange], stableStatuses, 111)[0]?.status,
+  "done",
+  "the latest stable status replaces the previous one",
+);
 
 // ----- phone batch -------------------------------------------------------
 const waiting = agent("%1", "waiting");

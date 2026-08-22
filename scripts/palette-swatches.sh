@@ -8,7 +8,7 @@ out=/tmp/catppuccin-tokens.lua
 
 {
   echo '-- Palette swatches. Source this file (:so %) and every hex below'
-  echo '-- paints itself. Regenerate after palette edits: dev/palette-swatches.sh'
+  echo '-- paints itself. Regenerate after palette edits: scripts/palette-swatches.sh'
   echo '--'
   echo '-- key              dark      light'
   awk -F= '

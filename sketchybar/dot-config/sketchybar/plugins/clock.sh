@@ -1,9 +1,13 @@
 #!/usr/bin/env zsh
 # Clock plugin - time only with meeting reminder highlighting.
-# SACRED: minutes 00, 29, 30, 59 highlight in the notify color so a meeting
-# never gets missed — 1 minute before and right at the start of every half
-# hour. Preserve this exactly; ported from v1's date.sh/clock.sh unchanged
-# except the color source.
+# SACRED: minutes 00, 29, 30, 59 highlight so a meeting never gets missed —
+# 1 minute before and right at the start of every half hour. Preserve this
+# exactly; ported from v1's date.sh/clock.sh unchanged except the color
+# source.
+#
+# The highlight is peach, not the mascot accent. It means check whether
+# something is starting, and that has to read the same way whichever mascot
+# is worn — a warning that changes colour with the wallpaper is decoration.
 
 source "$HOME/.config/sketchybar/colors.sh"
 

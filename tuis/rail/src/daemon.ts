@@ -22,24 +22,31 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { loadAcks, updateAcks } from "./acks.js";
+import { loadReviewSnapshot } from "./attention/review.js";
 import {
-  applyDoneHysteresis,
   collectAgents,
   collectSnapshot,
   run,
+  stabilizeAgents,
   tmux,
   windowsOf,
   type Agent,
+  type AgentStatus,
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
 import { logLine } from "./log.js";
-import { publishAttention, pushPhone } from "./notifications.js";
+import {
+  publishAttention,
+  publishReviewAttention,
+  pushPhone,
+} from "./notifications.js";
 import { XDG_STATE } from "./paths.js";
 import { collectHostFacts, isPresent } from "./probes.js";
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
+import { loadRailTab } from "./tabs.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
@@ -55,9 +62,9 @@ const NO_SERVER_PATTERN = /no server running|error connecting/i;
 // a server restart, short enough that a dead server doesn't leave the
 // daemon erroring forever.
 const NO_SERVER_EXIT_TICKS = 5;
-// 22 content cells (~211pt at font-size 16, the verdicted rail width)
-// plus the crust gutter renderRail appends.
-const RAIL_WIDTH = 23 + GUTTER_COLS;
+// 26 content cells: three terminal columns wider than the original rail,
+// approximately 25px at the current font, plus the crust gutter.
+const RAIL_WIDTH = 26 + GUTTER_COLS;
 // Split feasibility, not policy: below this tmux can't fit rail + border
 // + any content. Visibility is controlled by alt+g alone.
 const MIN_SPLIT_WIDTH = RAIL_WIDTH + 2;
@@ -80,6 +87,7 @@ let agentsFresh = false;
 let appliedBg = "";
 let warnedNoPalette = false;
 const acks = loadAcks();
+const stableStatuses = new Map<string, AgentStatus>();
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
 
@@ -309,12 +317,13 @@ async function tick(counter: number): Promise<boolean> {
   const enabled = existsSync(ENABLED_FLAG);
   const skip = await selfHeal(panes, enabled);
 
-  const settled = applyDoneHysteresis(agents, Date.now() / 1000);
+  const settled = stabilizeAgents(agents, stableStatuses, Date.now() / 1000);
   const acked = updateAcks(acks, settled, panes, clientFacts.focusedSessions);
   const sessions = new Set(panes.map((pane) => pane.session));
   const hintsBySession = assignHints(settled, sessions, acked);
   writeHints(settled, hintsBySession, acked);
   publishAttention(settled, acked);
+  publishReviewAttention(loadReviewSnapshot().unacknowledged);
   const present = isPresent(
     hostFacts.inputIdleSecs,
     clientFacts.latestClientActivityTs,
@@ -329,6 +338,9 @@ async function tick(counter: number): Promise<boolean> {
   } catch {
     // No page file: top of the list.
   }
+
+  const activeTab = loadRailTab();
+  const review = loadReviewSnapshot();
 
   const frames = new Map<string, string>();
   for (const pane of panes) {
@@ -346,13 +358,15 @@ async function tick(counter: number): Promise<boolean> {
         : null;
     const sprite = spritePath ? spriteId(spritePath, railBg(palette)) : null;
     const prefixHeld = modeSessions.has(pane.session);
-    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}`;
+    const bucket = `${pane.session}\x1f${pane.width}\x1f${pane.height}\x1f${sprite}\x1f${page}\x1f${prefixHeld}\x1f${activeTab}\x1f${review.revision}`;
     let frame = frames.get(bucket);
     if (frame === undefined) {
       const data = {
         session: pane.session,
+        activeTab,
         windows: windowsOf(panes, pane.session),
         agents: settled,
+        review,
         acked,
         hints: hintsBySession.get(pane.session) ?? new Map<string, string>(),
         sprite,
@@ -491,7 +505,7 @@ async function main(): Promise<void> {
   }
 
   watch(STATE_DIR, (_event, filename) => {
-    if (filename === "enabled") wakeLoop();
+    if (filename === "enabled" || filename === "tab") wakeLoop();
   });
 
   let counter = 0;

@@ -37,9 +37,9 @@ never flicker.
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
 - Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint
-  renders in the footer row between the hairline and the sprite, so the
+  renders in the footer row above the sprite, so the
   list's spacing never changes.
-- A two-cell crust gutter ends every row: text and hairlines stop ~19pt
+- A two-cell crust gutter ends every row: text and the square tab divider stop ~19pt
   (the frame's spacing unit) before the content surface, mirroring the
   frame crust left of the session name.
 - The footer is the mascot's home: the project's mascot sprite rendered
@@ -57,6 +57,8 @@ rail on|off|toggle    # enable/disable + spawn/kill rail panes everywhere
                       # (on also turns the tmux status bar off; off restores)
 rail jump <letter>    # hint jump (bound to alt+; <letter>)
 rail page up|down     # page an overflowing rail (bound to alt+, / alt+.)
+rail dashboard reviews|tasks
+                      # table + preview dashboard for a rail tab
 rail ensure-daemon    # start the render daemon if it isn't running
 rail status           # daemon, flag, pane count
 ```
@@ -64,13 +66,63 @@ rail status           # daemon, flag, pane count
 The CLI lives in the `rail` stow package (`rail/dot-local/bin/rail`);
 `install.sh` core installs node and this package's dependencies.
 
-## Iterating on the look
+## Account-wide GitHub attention
 
-`dev/` holds the loop used to judge cells without touching a live client:
+The review observer is a separate process from the rail. On macOS, the core
+install registers `com.ryansaxe.dotfiles.attention` with the user's launchd;
+it runs `attention refresh` at login and every five minutes. It uses one
+account-level `gh api graphql` request, writes durable state under
+`~/.local/state/dotfiles/attention/`, and never requires an open repository,
+tmux session, or Neovim.
 
 ```sh
-npx tsx dev/goldframe.ts | uv run -q --script dev/ansi2png.py frame.png
-XDG_STATE_HOME=$(mktemp -d) npx tsx dev/ackcheck.ts   # ack lifecycle
+attention status                 # refresh/error/rate/channel diagnostics
+attention refresh --no-notify    # real fetch without a phone ping
+attention list                   # current active items
+attention ack <item-id>          # local check/dismiss, no GitHub mutation
+```
+
+The rail does not perform these network requests. The Reviews tab reads the
+observer's cached state. `alt+r` selects the Reviews rail tab; the
+tab is one compact line per unacknowledged item and highlights the Reviews badge
+until the item is acknowledged or disappears. `alt+R` opens the cached Review
+table + preview dashboard. `alt+T` opens the same dashboard shell for the
+future-ready Tasks surface.
+
+The Reviews dashboard has two views, switched with Tab:
+
+| view      | rows                                      | keys                                                                                         |
+| --------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Reviews   | what needs you, grouped by repository     | `↵` open a review workspace · `b` browser · `d` diff · `a` assisted review · `x` acknowledge |
+| Worktrees | pull requests already checked out locally | `↵` focus the session · `X` clean up                                                         |
+
+`/` searches the table, `r` refreshes without notifying, and `ctrl-u`/`ctrl-d`
+scroll the preview. Every key stays bound at any width; the footer only
+advertises what fits.
+
+`↵` on a review resolves the repository — cloning it into `~/repositories` if
+it is not already on disk — and asks workmux for a worktree on the pull
+request's branch, opening it as a `gh://` review buffer. No agent starts:
+`a` is the only path that runs one, and it adds a window to that same
+session rather than replacing the human one.
+
+Acknowledged items leave the table rather than dimming. A new external event
+arrives with a new id, so a cleared item returns on its own.
+
+The tab registry is intentionally small: Agents, Reviews, and the future-ready
+Tasks surface share one element-action table. `alt+space` enters that table;
+the selected tab decides what a number means. Agent elements jump to their
+pane, review elements open their PR, and task elements will complete the task
+once the Obsidian source exists.
+
+## Iterating on the look
+
+`scripts/` holds the loop used to judge cells without touching a live client,
+and `tests/` holds the suite:
+
+```sh
+npx tsx scripts/goldframe.ts | uv run -q --script scripts/ansi2png.py frame.png
+npm test                                            # the whole suite
 ```
 
 `TUIS_COLORS_PATH` pins an alternate palette (light-mode checks);
@@ -80,5 +132,5 @@ XDG_STATE_HOME=$(mktemp -d) npx tsx dev/ackcheck.ts   # ack lifecycle
 
 - `workmux status --json` does not export interrupted/stale states; if
   they land upstream, consume them instead of local detection.
-- Future tabs (todos, review queue, PR checks) join as sibling sections
-  cycled by an external tmux bind.
+- Tasks are present as a future-ready tab slot; its Obsidian-backed elements
+  arrive with the task engine.

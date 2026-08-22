@@ -25,9 +25,7 @@ local luarc = vim.json.decode(table.concat(vim.fn.readfile(config_dir .. "/.luar
 ---@type string[]
 local library = { vim.env.VIMRUNTIME .. "/lua" }
 local data_home = vim.env.XDG_DATA_HOME or (vim.env.HOME .. "/.local/share")
-for _, appname in ipairs({ "nvim", "nvim-v2" }) do
-  vim.list_extend(library, vim.fn.glob(data_home .. "/" .. appname .. "/lazy/*/lua", true, true))
-end
+vim.list_extend(library, vim.fn.glob(data_home .. "/nvim/lazy/*/lua", true, true))
 luarc["workspace.library"] = library
 
 local generated = vim.fn.tempname() .. ".luarc.json"

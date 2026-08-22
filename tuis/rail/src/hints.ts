@@ -1,9 +1,10 @@
 // Jump hints: the elsewhere section's rows are numbered by display
 // position — 1 is always the top row of the rail you are looking at.
-// alt+a enters a one-key tmux table where the digit jumps to that row.
-// A second tap of a (or Enter) is the "what needs me most" jump: the
-// globally most-urgent agent, CURRENT SESSION INCLUDED — digits cover
-// what the elsewhere list shows, `a` covers everything. Because
+// alt+space enters a one-key tmux table where the digit jumps to that row.
+// The legacy `a`/Enter global jump remains available to scripts, but it is
+// no longer a user-facing key-table action. It targets the globally
+// most-urgent agent, CURRENT SESSION INCLUDED — digits cover what the
+// elsewhere list shows and `a` covers everything. Because
 // "elsewhere" is relative to the viewing session, assignments are per
 // session; the daemon writes one mapping line per (viewing session, key).
 
@@ -45,7 +46,7 @@ let lastWritten = "";
 
 // Line format: viewing session \t key \t target session \t pane id,
 // where key is a digit or the literal `a` (global most-urgent). `rail
-// jump` greps the caller's session to resolve a key.
+// jump` resolves the caller's session to a key.
 export function writeHints(
   agents: Agent[],
   bySession: Map<string, Map<string, string>>,

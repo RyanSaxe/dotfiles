@@ -64,6 +64,7 @@ sketchybar --default "${default[@]}"
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event mascot_colors_changed
 sketchybar --add event agent_attention_change
+sketchybar --add event review_attention_change
 sketchybar --add event theme_changed
 
 # -----------------------------------------------------------------------------
@@ -81,6 +82,10 @@ sketchybar --add item theme_sync left \
 
 # -----------------------------------------------------------------------------
 # Date (Left - far left, before workspaces)
+#
+# label.padding_right overrides the 12px default, which is meant for the
+# right-hand readouts where labels have to clear each other. Here it only
+# pushed the first workspace letter away from the date it sits beside.
 # -----------------------------------------------------------------------------
 sketchybar --add item date left \
   --set date \
@@ -88,6 +93,7 @@ sketchybar --add item date left \
   icon="󰃭 " \
   icon.color="$ACCENT_COLOR" \
   label.color="$ACCENT_COLOR" \
+  label.padding_right=4 \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/date.sh" \
   --subscribe date system_woke mascot_colors_changed
@@ -147,6 +153,24 @@ sketchybar --add item space.agent left \
   click_script="aerospace workspace code; open -a Ghostty; /opt/homebrew/bin/workmux last-done" \
   script="$PLUGIN_DIR/agent.sh" \
   --subscribe space.agent agent_attention_change mascot_colors_changed
+
+# The review letter, beside the agent one because it answers the neighbouring
+# question: an agent wants you versus GitHub wants you. Clicking it is
+# cmd-alt-r — land on the terminal and open the Reviews dashboard, which is
+# the same popup alt+R opens from inside tmux.
+sketchybar --add item space.review left \
+  --set space.review \
+  icon="R" \
+  icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+  icon.padding_left=8 \
+  icon.padding_right=8 \
+  label.drawing=off \
+  background.color="$WORKSPACE_INACTIVE_BG" \
+  background.corner_radius=6 \
+  background.height=22 \
+  click_script="aerospace workspace code; open -a Ghostty; $HOME/.local/bin/rail dashboard-popup" \
+  script="$PLUGIN_DIR/review.sh" \
+  --subscribe space.review review_attention_change mascot_colors_changed
 
 # -----------------------------------------------------------------------------
 # Right Side Items (ordered right-to-left)

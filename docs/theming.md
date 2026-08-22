@@ -68,6 +68,31 @@ not receive Neovim's semantic tokens, so the compact TextMate scope map mirrors
 the same function, type, structure, variable, member, module, constant, and
 literal roles as closely as their syntax grammars allow.
 
+## Using color
+
+Two rules decide which token a thing gets. Both exist so that changing the
+mascot can never make text unreadable or a state ambiguous.
+
+**Mascot-derived tokens accentuate structure, not text.** `accent` and
+`notify` are extracted from whatever mascot is worn, so their hue and contrast
+change without warning. Spend them on shape — the highlighted tab, a divider,
+a selection marker, a focused border — where a shifted hue reads as a
+different mood rather than a legibility problem. Never color running text,
+table cells, or a search match with them: the gold of one mascot sits almost
+invisibly on a red row that the cyan of another mascot would have carried.
+
+**Text takes native palette colors.** Anything a reader parses as language
+uses the palette keys directly — `red`, `peach`, `mauve`, `green`, `yellow`,
+`lavender` — because those are fixed by the Catppuccin flavour and stay
+legible in both modes. Semantic roles keep their meanings (`tokens.conf` is
+the source of truth); the remaining native colors are free for
+non-semantic text emphasis such as a search match, which is what `yellow`
+is used for in the rail's dashboards.
+
+The practical test: if the mascot changed to something with the opposite
+brightness, would this element become hard to read or hard to interpret? If
+yes, it wants a native color.
+
 ## Mascot providers
 
 A mascot is any image the theme system can wear: the rail paints its sprite and

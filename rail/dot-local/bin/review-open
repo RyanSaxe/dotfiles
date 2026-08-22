@@ -1,0 +1,28 @@
+#!/bin/sh
+# Open the current worktree's pull request as a Snacks.gh review buffer.
+#
+# The Reviews dashboard creates a workmux worktree checked out to the pull
+# request's branch, then this runs as that worktree's only pane. The branch is
+# the only input needed: `gh` resolves it to a pull request, and snacks.nvim
+# registers a BufReadCmd for `gh://owner/repo/pr/N` that renders the review —
+# description, conversation, reactions and all — rather than a bare editor.
+#
+# Falls back to a plain editor rather than failing: a worktree you can read is
+# more useful than an error, and the branch may have no pull request at all.
+set -eu
+
+PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+target=""
+if command -v gh >/dev/null 2>&1; then
+  target="$(
+    gh pr view --json number,headRepository,headRepositoryOwner \
+      --template 'gh://{{.headRepositoryOwner.login}}/{{.headRepository.name}}/pr/{{.number}}' \
+      2>/dev/null || true
+  )"
+fi
+
+case "$target" in
+gh://*/*/pr/[0-9]*) exec nvim "$target" ;;
+*) exec nvim ;;
+esac

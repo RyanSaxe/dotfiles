@@ -26,9 +26,14 @@ export WORKSPACE_ACTIVE_BG="0x33{{accent_hex}}"
 export WORKSPACE_INACTIVE_FG="0xff{{fg_faint_hex}}"
 export WORKSPACE_INACTIVE_BG="0x00000000"
 
-# The clock's meeting-warning state (see plugins/clock.sh).
+# The clock's meeting-warning state (see plugins/clock.sh). Normal is the
+# mascot accent, because a clock at rest is chrome. The warning is not: it
+# means check whether something is starting, so it takes peach — the fixed
+# "act now" hue — rather than following the mascot into whatever colour that
+# happens to be. Peach is named directly because no role carries it without
+# also being mascot-overridable; see notes/handoff/theme-role-completion.md.
 export TIME_NORMAL="0xff{{accent_hex}}"
-export TIME_HIGHLIGHT="0xff{{notify_hex}}"
+export TIME_HIGHLIGHT="0xff{{peach_hex}}"
 
 # Agent attention (the code-workspace highlight, fed by the rail daemon):
 # the rail's status semantics — waiting outranks done, and both are
@@ -37,6 +42,13 @@ export AGENT_WAITING_FG="0xff{{status_waiting_hex}}"
 export AGENT_WAITING_BG="0x33{{status_waiting_hex}}"
 export AGENT_DONE_FG="0xff{{status_done_hex}}"
 export AGENT_DONE_BG="0x33{{status_done_hex}}"
+
+# The review letter, using the dashboard's own hues: red for a failing check
+# on your own pull request, peach for anything else waiting on you.
+export REVIEW_CI_FG="0xff{{red_hex}}"
+export REVIEW_CI_BG="0x33{{red_hex}}"
+export REVIEW_PENDING_FG="0xff{{peach_hex}}"
+export REVIEW_PENDING_BG="0x33{{peach_hex}}"
 
 # Threshold colors for battery/cpu/memory. warn is a semantic token; danger
 # has no role of its own, so it names the red palette hue directly (see

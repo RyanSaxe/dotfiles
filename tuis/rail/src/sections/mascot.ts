@@ -12,7 +12,9 @@ import { sectionHairline } from "./header.js";
 // present: the footer rows carry kitty Unicode-placeholder cells and the
 // terminal draws the real pixel art over them. Without a sprite the
 // renderer skips the footer entirely and content gets the rows.
-// Rows: hairline + hint/blank row + the sprite block.
+// Rows: mascot hairline + hint/blank row + the sprite block. The square tab
+// row remains the divider above the lower rail; this rule separates the
+// lower content from the mascot itself.
 export const FOOTER_ROWS = SPRITE_ROWS + 2;
 
 // Only reserve the footer when the pane is tall enough that content
@@ -28,8 +30,8 @@ export function mascotFooter(
   const bg = railBg(palette);
   const rows: string[] = [
     sectionHairline(palette, width),
-    // The row between the hairline and the sprite doubles as the
-    // pagination hint's home — out of the list, air on both sides.
+    // The row between the hairline and the sprite doubles as the pagination
+    // hint's home — out of the list, with air on both sides.
     pageHint ? hintRow(palette, width, pageHint) : blank(width, bg),
   ];
   if (spriteIdValue === null || width < SPRITE_COLS + 2) {

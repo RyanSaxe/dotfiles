@@ -1,0 +1,23 @@
+{
+  "mode": "dark",
+  "accent": "#cba6f7",
+  "notify": "#fab387",
+  "base": "#1e1e2e",
+  "crust": "#11111b",
+  "surface0": "#313244",
+  "text": "#cdd6f4",
+  "dim": "#6c7086",
+  "dim2": "#9399b2",
+  "lavender": "#b4befe",
+  "yellow": "#f9e2af",
+  "mauve": "#cba6f7",
+  "peach": "#fab387",
+  "green": "#a6e3a1",
+  "red": "#f38ba8",
+  "statusWorking": "#cba6f7",
+  "statusWaiting": "#fab387",
+  "statusDone": "#a6e3a1",
+  "diffAdd": "#60a474",
+  "diffDelete": "#c16771",
+  "diffChange": "#6197cd"
+}

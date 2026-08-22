@@ -2,6 +2,9 @@ import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 
+import type { ReviewSnapshot } from "./attention/review.js";
+import type { RailTabId } from "./tabs.js";
+
 // The one exec plumbing every module shares.
 export const run = promisify(execFile);
 export const tmux = (...args: string[]) => run("tmux", args);
@@ -29,11 +32,14 @@ export interface Window {
 
 export interface RailData {
   session: string;
+  activeTab: RailTabId;
   windows: Window[];
   agents: Agent[];
+  review: ReviewSnapshot;
   // Pane ids whose done/waiting status has been seen (visit-clears).
   acked: Set<string>;
-  // Jump-hint digit per agent pane id (alt+a <digit>), viewer-relative.
+  // Jump-hint digit per agent pane id (alt+space <digit> on Agents),
+  // viewer-relative.
   hints: Map<string, string>;
   // Kitty image id for the footer sprite; null reclaims the footer rows
   // for content.
@@ -41,7 +47,7 @@ export interface RailData {
   // Pagination page for the body (0 = top); clamped by the renderer.
   page: number;
   // A client on this session is holding the tmux prefix or sitting in
-  // the agent key table — the header recolors as the mode signal.
+  // the focused-tab element table — the header recolors as the mode signal.
   prefixHeld: boolean;
 }
 
@@ -89,17 +95,33 @@ async function collectAgents(): Promise<Agent[]> {
     }));
 }
 
-// Claude's Stop hook fires per TURN, so "done" flaps on while subagents
-// still run. Until status carries subagent awareness upstream, done must
-// hold for a quiet interval before the rail believes it.
-const DONE_STABLE_SECS = 10;
+// A status change must remain visible in Workmux for a short interval before
+// it reaches any attention surface. The daemon keeps the last accepted status
+// per pane, so this remains independent of which status is changing.
+const AGENT_STATUS_LAG_SECS = 5;
 
-export function applyDoneHysteresis(agents: Agent[], nowSecs: number): Agent[] {
-  return agents.map((agent) =>
-    agent.status === "done" && nowSecs - agent.updatedTs < DONE_STABLE_SECS
-      ? { ...agent, status: "working" as const }
-      : agent,
-  );
+export function stabilizeAgents(
+  agents: Agent[],
+  stableStatuses: Map<string, AgentStatus>,
+  nowSecs: number,
+): Agent[] {
+  const live = new Set(agents.map((agent) => agent.paneId));
+  for (const paneId of stableStatuses.keys()) {
+    if (!live.has(paneId)) stableStatuses.delete(paneId);
+  }
+
+  return agents.map((agent) => {
+    const stableStatus = stableStatuses.get(agent.paneId);
+    if (
+      stableStatus !== undefined &&
+      stableStatus !== agent.status &&
+      nowSecs - agent.updatedTs < AGENT_STATUS_LAG_SECS
+    ) {
+      return { ...agent, status: stableStatus };
+    }
+    stableStatuses.set(agent.paneId, agent.status);
+    return agent;
+  });
 }
 
 // ----- global snapshot (daemon) -----------------------------------------
@@ -173,7 +195,7 @@ function parsePane(f: string[]): Pane | null {
 
 export interface ClientFacts {
   // Sessions whose attached client is mid-chord: tmux prefix held, or
-  // the agent jump table active.
+  // the focused-tab element table active.
   modeSessions: Set<string>;
   // Sessions with an attached client that lacks kitty graphics. Both
   // mascot halves must skip these: transmission, because tmux forwards
@@ -222,7 +244,7 @@ function clientFactsFrom(rows: string[][]): ClientFacts {
   for (const [session, prefix, keyTable, termname, activity, flags] of rows) {
     if (!session) continue;
     const kitty = /ghostty|kitty/i.test(termname ?? "");
-    if (prefix === "1" || keyTable === "agent") modeSessions.add(session);
+    if (prefix === "1" || keyTable === "tab") modeSessions.add(session);
     if (!kitty) nonKittySessions.add(session);
     if ((flags ?? "").split(",").includes("focused")) {
       focusedSessions.add(session);

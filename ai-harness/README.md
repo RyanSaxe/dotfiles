@@ -166,7 +166,7 @@ They do not define a second palette. Claude and Copilot call the shared
 2. Put harness-specific configuration under `claude/`, `copilot/`, or `codex/`.
 3. Add a manifest entry only when the corresponding directory exists.
 4. Keep generated state and third-party installations outside this package.
-5. Add a behavior check to `dev/ai-harness-check.py` when a stable contract can
+5. Add a behavior check to `ci/ai-harness-check.py` when a stable contract can
    be tested without asserting documentation text.
 
 Useful references:
@@ -181,7 +181,7 @@ Useful references:
 ## Validation
 
 ```sh
-uv run -q --script dev/ai-harness-check.py
+uv run -q --script ci/ai-harness-check.py
 claude plugin validate --strict ai-harness
 copilot --plugin-dir ai-harness plugin list
 ```

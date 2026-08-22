@@ -19,7 +19,15 @@ A tier is a set of stow packages, declared in the `tiers` package.
 | `mac`  | GUI applications — ghostty, sketchybar, aerospace |
 
 Pass tiers as arguments to skip the prompts (`./install.sh core` on a remote
-box). `./install.sh stow` redoes the symlinks alone, with no package installs.
+box). The default `./install.sh` runs `core agents` and asks separately about
+the mac tier. `./install.sh stow` redoes the symlinks alone, with no package
+installs.
+
+When the core or agents tier installs the agent CLIs, the installer links the
+AI harness first and then automatically runs Workmux's non-interactive
+`setup --hooks --skills` pass. This configures status hooks and bundled skills
+in the same install, including explicit invocations such as
+`./install.sh core agents`; no follow-up `workmux setup` command is required.
 
 ## Upgrading
 
@@ -43,6 +51,11 @@ so repo content stays visible to `rg`, `fd`, and editors:
 nvim/dot-config/nvim/init.lua  ->  ~/.config/nvim/init.lua
 zsh/dot-zshrc                  ->  ~/.zshrc
 ```
+
+The existing `~/.config/nvim` target is an explicit cutover boundary. If it is
+already a symlink from the v1 configuration, the installer leaves it in place
+and continues installing the other packages; v2 Neovim is adopted only during
+the deliberate cutover phase.
 
 Every tracked file is identical on every machine. Anything machine-specific
 resolves at runtime via `PATH` and `$HOME`; there is no templating.
@@ -76,6 +89,55 @@ untracked `.env` at the repo root, which zsh and the rail launcher both load.
 `install.sh` creates it with a commented placeholder per required value and
 prints a loud reminder for every one still empty.
 
-Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail pings
-for agent notifications. Leave it unset and phone notifications simply never
-send; `rail status` reports which state you're in.
+Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail and
+GitHub attention observer use for phone notifications. Leave it unset and
+phone notifications simply never send; `rail status` and `attention status`
+report the channel state.
+
+On macOS, installing the `core` tier also installs a user-level launchd job.
+It runs `~/.local/bin/attention refresh` at login and every five minutes. The
+worker is independent of tmux and Neovim, writes durable state under
+`~/.local/state/dotfiles/attention/`, and catches up after sleep or restart.
+It cannot poll while the Mac is fully powered off. Refreshes back off until
+the GitHub rate-limit reset when the remaining budget is under pressure.
+
+The observer uses the existing `gh` authentication. Before relying on it, run
+`gh auth status` and re-authenticate with `gh auth refresh -h github.com` if
+needed. Optional actor policy lives at
+`~/.config/dotfiles/attention.json`:
+
+```json
+{
+  "actors": {
+    "allow": ["claude-reviewer"],
+    "ignore": ["codecov", "snyk-bot", "sonarcloud"]
+  },
+  "own_pr_ci": true
+}
+```
+
+To hear about repositories you are not otherwise involved in, list them in
+`.env` rather than here:
+
+```sh
+ATTENTION_WATCH="someorg/infra someorg/docs"
+```
+
+Repository names are the one part of this configuration that can be
+sensitive, and `.env` is the one file that never reaches git. It is already
+sourced by the observer's launcher, so nothing else needs configuring.
+Watching a repository covers its pull requests and its issues alike.
+
+Adding one is quiet. A watched repository might already have hundreds of open
+pull requests; the first poll that sees it records the moment, and only work
+opened after that is ever reported. The timestamp is kept even if you remove
+the entry later, so re-adding a repository stays quiet too.
+
+Drafts are excluded, and a draft marked ready later counts as opened at that
+moment. Everything else behaves as it does elsewhere: your own work never
+notifies you, and bots stay suppressed unless allow-listed.
+
+Inspect it with `attention status`, `attention list`, and
+`attention ack <item-id>`. `attention status` reports notification-transport
+failures separately from GitHub failures: a phone notification that cannot be
+delivered never stops the observer from polling.

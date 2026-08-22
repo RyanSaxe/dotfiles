@@ -116,9 +116,31 @@ install_zsh_plugins() {
   done
 }
 
-# The rail TUI (tuis/rail) runs via tsx from its own node_modules.
+# The rail TUI and account observer (tuis/rail) run via tsx from their own
+# node_modules.
 install_rail() {
   (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
+}
+
+install_attention_agent() {
+  [ "$OS" = Darwin ] || return 0
+  # Scratch-home health checks and explicit package-only runs must never touch
+  # the real user's launchd domain.
+  [ -z "${DOTFILES_TARGET:-}" ] || return 0
+
+  launch_agents="$HOME/Library/LaunchAgents"
+  plist="$launch_agents/com.ryansaxe.dotfiles.attention.plist"
+  state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/attention"
+  mkdir -p "$launch_agents" "$state_dir"
+  sed \
+    -e "s|__ATTENTION_BIN__|$HOME/.local/bin/attention|g" \
+    -e "s|__ATTENTION_LOG__|$state_dir/launchd.log|g" \
+    launchd/com.ryansaxe.dotfiles.attention.plist >"$plist"
+
+  domain="gui/$(id -u)"
+  launchctl bootout "$domain/com.ryansaxe.dotfiles.attention" 2>/dev/null || true
+  launchctl bootstrap "$domain" "$plist"
+  launchctl kickstart -k "$domain/com.ryansaxe.dotfiles.attention"
 }
 
 install_starship() {
@@ -173,11 +195,11 @@ install_agent_cli() {
 }
 
 # workmux discovers agents by their config directories, so the CLIs must land
-# first. Its `setup` writes the status-tracking hooks (merging into existing
-# settings, leaving custom entries alone) and refuses to run without a
-# terminal — hence the note instead of a call on a scripted install.
+# first. Workmux setup is deliberately deferred until every selected tier has
+# installed its harness links: setup --hooks/--skills is non-interactive and
+# can then configure the complete filesystem state in one pass.
 setup_agents() {
-  [ "${AGENT_SETUP_DONE:-0}" = 1 ] && return 0
+  [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ] && return 0
   chosen=''
   for agent in $AGENT_CLIS; do
     if [ "$INTERACTIVE" = 1 ]; then
@@ -189,12 +211,7 @@ setup_agents() {
   for agent in $chosen; do
     install_agent_cli "$agent"
   done
-  if [ "$INTERACTIVE" = 1 ]; then
-    workmux setup
-  else
-    echo "note: run \`workmux setup\` in a terminal to wire agent status hooks"
-  fi
-  AGENT_SETUP_DONE=1
+  AGENT_CLIS_SETUP_DONE=1
 }
 
 # AI harness files span plugin roots, native user directories, and Codex's
@@ -280,7 +297,12 @@ install_neovim_linux() {
 # because nobody knew the file existed is worse than being nagged.
 #
 # One "NAME description" per line; the description is what the prompt shows.
-REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
+REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent and review phone notifications'
+
+# Same file, but no nagging: these are genuinely optional. They live here
+# rather than in a tracked config because their values name private
+# repositories, and .env is the one place that never reaches git.
+OPTIONAL_ENV_VARS='ATTENTION_WATCH space-separated owner/name repositories to hear about even when you are not involved'
 
 ensure_env_file() {
   if [ ! -f .env ]; then
@@ -290,6 +312,12 @@ ensure_env_file() {
         [ -n "$name" ] || continue
         echo "# $description"
         echo "$name="
+      done
+      echo "$OPTIONAL_ENV_VARS" | while read -r name description; do
+        [ -n "$name" ] || continue
+        echo
+        echo "# Optional. $description"
+        echo "# $name=\"owner/name other/name\""
       done
     } >.env
   fi
@@ -341,6 +369,9 @@ install_tier_packages() {
     install_rail
     ;;
   agents:Darwin | agents:Linux)
+    # The agents tier can be installed on an existing machine without the
+    # core tier, but its final setup pass still needs the Workmux binary.
+    command -v workmux >/dev/null 2>&1 || install_workmux
     setup_agents
     install_ai_harness
     ;;
@@ -732,6 +763,16 @@ for tier in "$@"; do
   install_tier "$tier"
 done
 
+# Workmux discovers agent configuration from the installed filesystem. Run its
+# explicit, non-interactive setup only after all requested tiers have linked
+# the harness files and the Workmux config. This makes both `./install.sh` and
+# explicit tier invocations complete installs; neither requires a follow-up
+# manual `workmux setup` command.
+if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
+  echo "==> workmux agent hooks and skills"
+  workmux setup --hooks --skills
+fi
+
 # Render the theme so every consumer has colors from the first shell.
 if [ -x "$HOME/.local/bin/theme" ]; then
   "$HOME/.local/bin/theme" apply
@@ -747,6 +788,17 @@ fi
 
 # Machine-local values nothing can install for you; warns loudly per gap.
 ensure_env_file
+
+# The account observer is independent of tmux and Neovim, but its user-level
+# launchd job is installed alongside the core rail package on macOS. Install
+# it after .env exists so the first RunAtLoad refresh sees the phone channel.
+if [ "$OS" = Darwin ] && [ -z "${DOTFILES_TARGET:-}" ]; then
+  for tier in "$@"; do
+    [ "$tier" = core ] || continue
+    install_attention_agent
+    break
+  done
+fi
 
 # The commit gate for working on this repo (see README: Development).
 uv tool install --quiet prek

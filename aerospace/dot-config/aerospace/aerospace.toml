@@ -143,7 +143,9 @@ cmd-alt-f = 'fullscreen'
 cmd-alt-minus = 'flatten-workspace-tree'
 cmd-alt-equal = 'balance-sizes'
 cmd-alt-tab = 'workspace-back-and-forth'
-cmd-alt-r = 'reload-config'
+# reload-config moved off cmd-alt-r to make room for the review chord below;
+# it is a development convenience, and the review jump is a daily one.
+cmd-alt-shift-r = 'reload-config'
 
 # Jump to the newest agent needing attention from anywhere: land on the
 # code workspace, focus the terminal, and let workmux switch tmux to the
@@ -151,4 +153,12 @@ cmd-alt-r = 'reload-config'
 cmd-alt-a = [
   'workspace code',
   'exec-and-forget open -a Ghostty && /opt/homebrew/bin/workmux last-done',
+]
+
+# The review half of the same idea: land on the terminal and open the Reviews
+# dashboard, the same popup alt+R opens from inside tmux. The menu bar's "R"
+# is the visible half of this chord, and clicking it runs the same command.
+cmd-alt-r = [
+  'workspace code',
+  'exec-and-forget open -a Ghostty && $HOME/.local/bin/rail dashboard-popup',
 ]
