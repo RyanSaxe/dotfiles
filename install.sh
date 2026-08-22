@@ -332,6 +332,57 @@ ensure_env_file() {
   done
 }
 
+# ------------------------------------------------------------------- vault
+# Notes live in a Markdown vault, which is a repository of its own and never
+# part of the dotfiles. This is the only place that offers to get one onto the
+# machine, and it never contains a personal repository URL. zsh/zshenv is
+# where the path is declared; the default repeats it for a first run, before
+# any shell has sourced it.
+VAULT_DIR="${VAULT_DIR:-$HOME/generic/vault}"
+export VAULT_DIR
+
+setup_vault() {
+  vault_bin="$HOME/.local/bin/vault"
+  # The CLI deploys with the core tier; with no CLI there is nothing to ask.
+  # Scratch-home checks must never create a vault in the real home either.
+  [ -x "$vault_bin" ] || return 0
+  [ -z "${DOTFILES_TARGET:-}" ] || return 0
+
+  command -v rg >/dev/null 2>&1 ||
+    echo "warning: ripgrep not found; note search, backlinks, and tags return nothing" >&2
+  command -v uv >/dev/null 2>&1 ||
+    echo "warning: uv not found; the vault CLI cannot run" >&2
+
+  if [ ! -d "$VAULT_DIR" ]; then
+    # A scripted run does nothing here: installation must never block on a
+    # prompt or create a vault nobody asked for. Neovim's health check
+    # reports the missing vault later instead.
+    [ "$INTERACTIVE" = 1 ] || return 0
+    echo "==> vault"
+    if ask "do you already have a vault repository?"; then
+      printf 'owner/repo or git URL: '
+      read -r vault_repo
+      case "$vault_repo" in
+      '')
+        echo "no repository given; skipping the vault" >&2
+        return 0
+        ;;
+      *://* | *@*:*) vault_url="$vault_repo" ;;
+      *) vault_url="https://github.com/$vault_repo" ;;
+      esac
+      # A newly created repository is empty. Cloning one succeeds and leaves
+      # a working tree with no commits, which is the expected starting state.
+      git clone "$vault_url" "$VAULT_DIR" || return 1
+      # Adds every missing part of the contract, changes nothing that exists.
+      "$vault_bin" init --in-place "$VAULT_DIR" || return 1
+    else
+      "$vault_bin" init "$VAULT_DIR" || return 1
+    fi
+  fi
+  # The report is the point: a failing check is actionable, not fatal.
+  "$vault_bin" check || true
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
@@ -727,6 +778,10 @@ fi
 
 # Machine-local values nothing can install for you; warns loudly per gap.
 ensure_env_file
+
+# The vault is content rather than configuration, so it is offered rather
+# than installed: a scripted run leaves the machine without one.
+setup_vault || echo "warning: vault setup did not complete" >&2
 
 # The account observer is independent of tmux and Neovim, but its user-level
 # launchd job is installed alongside the core rail package on macOS. Install
