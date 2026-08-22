@@ -9,16 +9,24 @@
 -- `nvim --headless "+luafile editor-diagnostics.lua"` and passes options
 -- through ED_* environment variables.
 --
--- Verification contract, shared with editor-parity: failing to attach or to
--- settle means "could not verify" (exit 2), never "verified clean". There is
--- no LSP signal for "all diagnostics delivered", so settling is observed:
--- the combined diagnostic signature must hold still across STABLE_POLLS
--- polls, and the clock is held while any server still reports $/progress
--- work (a cold pyright indexes far longer than any quiet window).
+-- Files are processed in small batches — open, ask, close — the way an
+-- editor session actually visits them. This is not just fidelity: ty wedges
+-- its request queue when ~50 documents are open at once (0.0.48 and 0.0.72
+-- both), while with a batch open every server answers in milliseconds.
+--
+-- Verification contract, shared with editor-parity: "could not verify" is
+-- never "verified clean". Modern servers are asked directly (the LSP pull
+-- model — nvim itself only pulls for the current buffer, which is why a
+-- naive headless sweep sees nothing for background files); push-only
+-- servers must announce each buffer via DiagnosticChanged. Any buffer no
+-- server ever covered, and any server that left pulls unanswered, is named
+-- in the output and the run exits 2.
 
-local POLL_MS = 250
-local STABLE_POLLS = 8
-local STRAGGLER_MS = 3000 -- extra attach time for other buffers after the first client
+local BATCH_SIZE = 10
+local ATTACH_GRACE_MS = 3000 -- for remaining buffers once one client arrives
+local PUSH_POLL_MS = 250
+local PUSH_STABLE_POLLS = 4
+local PULL_WINDOW_MS = 15000 -- per-batch ceiling; one lost reply must not eat the budget
 local MAX_FILES = 200
 
 -- Extensions worth opening: filetypes this setup runs language servers or
@@ -136,52 +144,27 @@ local function collect_files(targets)
   return files
 end
 
--- One string describing every diagnostic in every buffer: settling is "this
--- signature stopped changing", which observes convergence directly instead
--- of guessing from update timing.
+-- Ask every pull-capable client about every buffer in the batch, all
+-- requests in flight at once, one shared window collecting the answers. A
+-- stalled server must not discard a fast one's replies (sequential
+-- all-or-nothing buf_request_sync did exactly that).
 ---@param buffers integer[]
----@return string
-local function signature(buffers)
-  ---@type string[]
-  local parts = {}
-  for _, buffer in ipairs(buffers) do
-    for _, d in ipairs(vim.diagnostic.get(buffer)) do
-      parts[#parts + 1] = ("%d:%d:%d:%s"):format(buffer, d.lnum, d.col, d.message)
-    end
-  end
-  table.sort(parts)
-  return table.concat(parts, "\n")
-end
-
--- Servers that advertise diagnosticProvider are PULL-based: the editor asks
--- per buffer, and nvim only asks for the buffer you are in. In a headless
--- sweep the background buffers would never be asked at all — silence that
--- must not read as clean. Pulling explicitly is also the one deterministic
--- signal this protocol has: the server answers when it has computed.
--- Every request goes out asynchronously up front and one shared window
--- collects whatever lands. Partial answers are used: a server that stalls
--- (a busy ty queues pulls behind rechecking every opened file) must not
--- discard another server's instant replies, which is exactly what a
--- sequential all-or-nothing buf_request_sync did.
----@param buffers integer[]
----@param deadline fun(): integer remaining budget in milliseconds
+---@param budget_ms integer window to wait for the batch's replies
 ---@return table<integer, table[]> pulled diagnostics per buffer
----@return table<integer, boolean> answered buffers where every asked client replied
----@return table<string, integer> unanswered request count per client name
-local function pull_diagnostics(buffers, deadline)
-  ---@type table<integer, table[]>, table<integer, integer>, table<integer, integer>
-  local pulled, expected, got_ok = {}, {}, {}
+---@return table<integer, boolean> answered buffers with at least one pull reply
+---@return table<integer, string[]> silent client names per buffer that never replied
+local function pull_batch(buffers, budget_ms)
+  ---@type table<integer, table[]>, table<integer, integer>
+  local pulled, got_ok = {}, {}
   local outstanding = 0
-  ---@type table<string, integer>
-  local asked_by_name = {}
-  ---@type table<string, integer>
-  local answered_by_name = {}
+  ---@type table<integer, table<string, boolean>>
+  local waiting_on = {}
   for _, buffer in ipairs(buffers) do
     local params = { textDocument = vim.lsp.util.make_text_document_params(buffer) }
     for _, client in ipairs(vim.lsp.get_clients({ bufnr = buffer })) do
       if client:supports_method("textDocument/diagnostic", buffer) then
-        expected[buffer] = (expected[buffer] or 0) + 1
-        asked_by_name[client.name] = (asked_by_name[client.name] or 0) + 1
+        waiting_on[buffer] = waiting_on[buffer] or {}
+        waiting_on[buffer][client.name] = true
         outstanding = outstanding + 1
         client:request(
           "textDocument/diagnostic",
@@ -194,7 +177,7 @@ local function pull_diagnostics(buffers, deadline)
               return
             end
             got_ok[buffer] = (got_ok[buffer] or 0) + 1
-            answered_by_name[client.name] = (answered_by_name[client.name] or 0) + 1
+            waiting_on[buffer][client.name] = nil
             for _, item in ipairs(result.kind == "full" and result.items or {}) do
               pulled[buffer] = pulled[buffer] or {}
               pulled[buffer][#pulled[buffer] + 1] = {
@@ -213,28 +196,39 @@ local function pull_diagnostics(buffers, deadline)
     end
   end
   vim.wait(
-    math.max(0, deadline()),
+    math.max(0, budget_ms),
     ---@return boolean
     function()
       return outstanding == 0
     end,
-    200
+    100
   )
-
-  ---@type table<integer, boolean>
-  local answered = {}
-  for buffer in pairs(expected) do
+  ---@type table<integer, boolean>, table<integer, string[]>
+  local answered, silent = {}, {}
+  for buffer, names in pairs(waiting_on) do
     answered[buffer] = (got_ok[buffer] or 0) > 0
-  end
-  ---@type table<string, integer>
-  local unanswered = {}
-  for name, asked in pairs(asked_by_name) do
-    local missing = asked - (answered_by_name[name] or 0)
-    if missing > 0 then
-      unanswered[name] = missing
+    for name in pairs(names) do
+      silent[buffer] = silent[buffer] or {}
+      silent[buffer][#silent[buffer] + 1] = name
     end
   end
-  return pulled, answered, unanswered
+  return pulled, answered, silent
+end
+
+-- One string describing every diagnostic in the batch: for push-only
+-- servers, "this stopped changing" is the only convergence signal there is.
+---@param buffers integer[]
+---@return string
+local function signature(buffers)
+  ---@type string[]
+  local parts = {}
+  for _, buffer in ipairs(buffers) do
+    for _, d in ipairs(vim.diagnostic.get(buffer)) do
+      parts[#parts + 1] = ("%d:%d:%d:%s"):format(buffer, d.lnum, d.col, d.message)
+    end
+  end
+  table.sort(parts)
+  return table.concat(parts, "\n")
 end
 
 ---@class EditorDiagnosticsReport
@@ -243,43 +237,28 @@ end
 ---@field unattached string[]
 ---@field verified boolean
 
--- Merge pull replies (authoritative where a server answered) with anything
--- push-based already in vim.diagnostic, dedupe, then filter and sort.
+-- Fold one batch's results into the report: pull replies (authoritative
+-- where a server answered) merged with anything push-based in
+-- vim.diagnostic, deduped, filtered, and sorted.
+---@param report EditorDiagnosticsReport
 ---@param buffers integer[]
----@param min_severity integer|nil
----@param unattached string[]
----@param verified boolean
 ---@param pulled table<integer, table[]>
----@return EditorDiagnosticsReport
-local function build_report(buffers, min_severity, unattached, verified, pulled)
-  local report = {
-    files = {},
-    summary = { total = 0, ERROR = 0, WARN = 0, INFO = 0, HINT = 0 },
-    unattached = unattached,
-    verified = verified,
-  }
+---@param min_severity integer|nil
+local function fold_batch(report, buffers, pulled, min_severity)
   for _, buffer in ipairs(buffers) do
     local merged, seen = {}, {}
     for _, list in ipairs({ pulled[buffer] or {}, vim.diagnostic.get(buffer) }) do
       for _, d in ipairs(list) do
         local key = ("%d:%d:%d:%s"):format(d.lnum, d.col, d.severity, d.message)
-        if not seen[key] then
+        if not seen[key] and (min_severity == nil or d.severity <= min_severity) then
           seen[key] = true
           merged[#merged + 1] = d
         end
       end
     end
-    local diagnostics = vim.tbl_filter(
-      ---@param d vim.Diagnostic
-      ---@return boolean
-      function(d)
-        return min_severity == nil or d.severity <= min_severity
-      end,
-      merged
-    )
-    if #diagnostics > 0 then
+    if #merged > 0 then
       table.sort(
-        diagnostics,
+        merged,
         ---@param a vim.Diagnostic
         ---@param b vim.Diagnostic
         ---@return boolean
@@ -291,8 +270,13 @@ local function build_report(buffers, min_severity, unattached, verified, pulled)
         end
       )
       local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buffer), ":.")
+      -- A retried file replaces its earlier entry; keep the summary honest.
+      for _, old in ipairs(report.files[name] or {}) do
+        report.summary.total = report.summary.total - 1
+        report.summary[old.severity] = report.summary[old.severity] - 1
+      end
       local items = {}
-      for _, d in ipairs(diagnostics) do
+      for _, d in ipairs(merged) do
         local severity = SEVERITY_NAMES[d.severity] or "UNKNOWN"
         items[#items + 1] = {
           line = d.lnum + 1,
@@ -308,7 +292,6 @@ local function build_report(buffers, min_severity, unattached, verified, pulled)
       report.files[name] = items
     end
   end
-  return report
 end
 
 ---@param report EditorDiagnosticsReport
@@ -365,7 +348,7 @@ local function write_json(report, path)
 end
 
 vim.defer_fn(function()
-  local timeout_ms = env_number("ED_TIMEOUT", 60) * 1000
+  local timeout_ms = env_number("ED_TIMEOUT", 120) * 1000
   local min_severity = env_severity("ED_MIN_SEVERITY")
   local fail_on = env_severity("ED_FAIL_ON")
   local json_path = vim.env.ED_JSON
@@ -376,35 +359,8 @@ vim.defer_fn(function()
     os.exit(2)
   end
 
-  -- Hold the settle clock while any server reports active $/progress work:
-  -- a cold server pauses publishing while it indexes, and a quiet window
-  -- alone would misread that silence as "done".
-  ---@type table<string, boolean> active progress, keyed by client+token so
-  ---a duplicated begin or a lost end cannot wedge the count permanently
-  local progress = {}
-  vim.api.nvim_create_autocmd("LspProgress", {
-    ---@param event {data: {client_id: integer, params: {token: any, value: {kind: string}}}}
-    callback = function(event)
-      local kind = vim.tbl_get(event, "data", "params", "value", "kind")
-      local token = ("%s:%s"):format(
-        tostring(vim.tbl_get(event, "data", "client_id")),
-        tostring(vim.tbl_get(event, "data", "params", "token"))
-      )
-      if kind == "begin" then
-        progress[token] = true
-      elseif kind == "end" then
-        progress[token] = nil
-      end
-    end,
-  })
-  ---@return boolean
-  local function progress_active()
-    return next(progress) ~= nil
-  end
-
   -- Push-based servers announce themselves per buffer through
-  -- DiagnosticChanged (an empty publish still fires it). A buffer no pull
-  -- reply and no publish ever covered cannot be called verified.
+  -- DiagnosticChanged (an empty publish still fires it).
   ---@type table<integer, boolean>
   local publish_seen = {}
   vim.api.nvim_create_autocmd("DiagnosticChanged", {
@@ -414,11 +370,14 @@ vim.defer_fn(function()
     end,
   })
 
-  ---@type integer[]
-  local buffers = {}
-  for _, file in ipairs(files) do
-    vim.cmd.edit(vim.fn.fnameescape(file))
-    buffers[#buffers + 1] = vim.api.nvim_get_current_buf()
+  local started = vim.uv.hrtime()
+  ---@return integer elapsed milliseconds since the check started
+  local function elapsed_ms()
+    return math.floor((vim.uv.hrtime() - started) / 1e6)
+  end
+  ---@return integer remaining milliseconds of the run's budget
+  local function remaining_ms()
+    return timeout_ms - elapsed_ms()
   end
 
   ---@param buffer integer
@@ -427,118 +386,162 @@ vim.defer_fn(function()
     return #vim.lsp.get_clients({ bufnr = buffer }) > 0
   end
 
-  -- Attach phase: at least one server must arrive or nothing was verified.
-  -- Stragglers get a short extra window; buffers still serverless after it
-  -- are reported as such rather than silently counted clean.
-  local started = vim.uv.hrtime()
-  ---@return integer elapsed milliseconds since the check started
-  local function elapsed_ms()
-    return math.floor((vim.uv.hrtime() - started) / 1e6)
-  end
+  ---@type EditorDiagnosticsReport
+  local report = {
+    files = {},
+    summary = { total = 0, ERROR = 0, WARN = 0, INFO = 0, HINT = 0 },
+    unattached = {},
+    verified = false,
+  }
+  local any_attach = false
 
-  local any_attached = vim.wait(
-    timeout_ms,
-    ---@return boolean
-    function()
-      for _, buffer in ipairs(buffers) do
-        if attached(buffer) then
-          return true
+  -- Open one batch, wait for servers, ask them, fold the answers, close the
+  -- batch. Returns the files whose buffers no server covered (with the
+  -- silent client names) so a flaky reply can be retried instead of either
+  -- burning the whole budget or being reported as unverifiable.
+  ---@param list string[]
+  ---@return {file: string, silent: string[]}[] uncovered files
+  local function process_files(list)
+    ---@type {file: string, silent: string[]}[]
+    local uncovered = {}
+    ---@type integer[]
+    local buffers = {}
+    ---@type table<integer, string>
+    local file_of = {}
+    for _, file in ipairs(list) do
+      vim.cmd.edit(vim.fn.fnameescape(file))
+      local buffer = vim.api.nvim_get_current_buf()
+      buffers[#buffers + 1] = buffer
+      file_of[buffer] = file
+    end
+
+    -- Attach: wait for the first client (spawn cost, first batch only),
+    -- then a short grace for the rest of the batch.
+    vim.wait(
+      math.max(0, remaining_ms()),
+      ---@return boolean
+      function()
+        for _, buffer in ipairs(buffers) do
+          if attached(buffer) then
+            return true
+          end
+        end
+        return false
+      end,
+      100
+    )
+    vim.wait(
+      math.min(ATTACH_GRACE_MS, math.max(0, remaining_ms())),
+      ---@return boolean
+      function()
+        for _, buffer in ipairs(buffers) do
+          if not attached(buffer) then
+            return false
+          end
+        end
+        return true
+      end,
+      100
+    )
+
+    -- A short settle only when some attached client cannot be pulled —
+    -- push responses are the only thing worth waiting for here.
+    local has_push_only = false
+    for _, buffer in ipairs(buffers) do
+      for _, client in ipairs(vim.lsp.get_clients({ bufnr = buffer })) do
+        if not client:supports_method("textDocument/diagnostic", buffer) then
+          has_push_only = true
         end
       end
-      return false
-    end,
-    100
-  )
-  if not any_attached then
+    end
+    if has_push_only then
+      local previous, unchanged = nil, 0
+      while remaining_ms() > 0 and unchanged < PUSH_STABLE_POLLS do
+        vim.wait(PUSH_POLL_MS)
+        local current = signature(buffers)
+        unchanged = current == previous and unchanged + 1 or 0
+        previous = current
+      end
+    end
+
+    local pulled, answered, silent = pull_batch(buffers, math.min(PULL_WINDOW_MS, math.max(0, remaining_ms())))
+
+    for _, buffer in ipairs(buffers) do
+      if not attached(buffer) then
+        report.unattached[#report.unattached + 1] = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buffer), ":.")
+      else
+        any_attach = true
+        if not answered[buffer] and not publish_seen[buffer] then
+          uncovered[#uncovered + 1] = { file = file_of[buffer], silent = silent[buffer] or {} }
+        elseif silent[buffer] ~= nil then
+          -- Covered by someone, but a pull-capable server stayed silent:
+          -- that server's view of this file is still missing.
+          uncovered[#uncovered + 1] = { file = file_of[buffer], silent = silent[buffer] }
+        end
+      end
+    end
+
+    fold_batch(report, buffers, pulled, min_severity)
+
+    -- Close the batch (didClose) so the open-document count stays at what a
+    -- real editing session looks like; servers wedge far above it.
+    for _, buffer in ipairs(buffers) do
+      pcall(vim.api.nvim_buf_delete, buffer, { force = true })
+    end
+    return uncovered
+  end
+
+  ---@type {file: string, silent: string[]}[]
+  local uncovered = {}
+  local ran_out = false
+  for batch_start = 1, #files, BATCH_SIZE do
+    if remaining_ms() <= 0 then
+      ran_out = true
+      break
+    end
+    ---@type string[]
+    local batch = {}
+    for index = batch_start, math.min(batch_start + BATCH_SIZE - 1, #files) do
+      batch[#batch + 1] = files[index]
+    end
+    vim.list_extend(uncovered, process_files(batch))
+  end
+
+  -- One retry round: a single lost reply should cost one extra batch, not
+  -- the run's verdict.
+  if #uncovered > 0 and not ran_out and remaining_ms() > 5000 then
+    ---@type string[]
+    local retry = {}
+    for _, entry in ipairs(uncovered) do
+      retry[#retry + 1] = entry.file
+    end
+    uncovered = process_files(retry)
+  end
+
+  if not any_attach then
     emit("editor-diagnostics: no language server attached to any target — cannot verify anything")
     os.exit(2)
   end
-  vim.wait(
-    STRAGGLER_MS,
-    ---@return boolean
-    function()
-      for _, buffer in ipairs(buffers) do
-        if not attached(buffer) then
-          return false
-        end
-      end
-      return true
-    end,
-    100
-  )
 
-  ---@type string[]
-  local unattached = {}
-  for _, buffer in ipairs(buffers) do
-    if not attached(buffer) then
-      unattached[#unattached + 1] = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buffer), ":.")
-    end
+  report.verified = not ran_out and #report.unattached == 0 and #uncovered == 0
+  if ran_out then
+    emit(("editor-diagnostics: ran out of budget after %ds; results are partial"):format(timeout_ms / 1000))
   end
-
-  -- Settle phase: the diagnostic signature must hold still, with the
-  -- stability counter frozen while servers report progress. Bounded to half
-  -- the budget so the pull phase — the deterministic part — always gets the
-  -- rest, even if a server's progress never resolves.
-  local settle_deadline = math.min(timeout_ms, elapsed_ms() + math.min(20000, math.floor(timeout_ms / 2)))
-  local previous, unchanged = nil, 0
-  local settled = false
-  while elapsed_ms() < settle_deadline do
-    vim.wait(POLL_MS)
-    if not progress_active() then
-      local current = signature(buffers)
-      unchanged = current == previous and unchanged + 1 or 0
-      previous = current
-      if unchanged >= STABLE_POLLS then
-        settled = true
-        break
-      end
-    end
-  end
-
-  -- Pull phase, after push traffic has settled. Authoritative for every
-  -- server that answers; the servers that never answer a pull must have
-  -- covered their buffers via publish or the run is not verified.
-  local pulled, answered, unanswered = pull_diagnostics(
-    buffers,
-    ---@return integer
-    function()
-      return timeout_ms - elapsed_ms()
-    end
-  )
-  local uncovered = 0
-  for _, buffer in ipairs(buffers) do
-    if attached(buffer) and not answered[buffer] and not publish_seen[buffer] then
-      uncovered = uncovered + 1
-    end
-  end
-
-  local verified = settled and #unattached == 0 and uncovered == 0 and next(unanswered) == nil
-  local report = build_report(buffers, min_severity, unattached, verified, pulled)
-  if not settled then
-    emit(("editor-diagnostics: diagnostics did not settle within %ds"):format(timeout_ms / 1000))
-  end
-  for name, missing in pairs(unanswered) do
-    emit(
-      ("editor-diagnostics: %s left %d diagnostic pull(s) unanswered — its view is not verified"):format(
-        name,
-        missing
-      )
-    )
-  end
-  if uncovered > 0 then
-    emit(("editor-diagnostics: %d buffer(s) never reported diagnostics — cannot call them clean"):format(uncovered))
+  for _, entry in ipairs(uncovered) do
+    local who = #entry.silent > 0 and table.concat(entry.silent, ", ") or "no server"
+    emit(("editor-diagnostics: %s — %s never answered; this file is not verified"):format(entry.file, who))
   end
   print_report(report)
   if json_path ~= nil and json_path ~= "" then
     write_json(report, json_path)
   end
 
-  if fail_on ~= nil and (report.summary.total > 0) then
+  if fail_on ~= nil and report.summary.total > 0 then
     for index = 1, fail_on do
       if (report.summary[SEVERITY_NAMES[index]] or 0) > 0 then
         os.exit(1)
       end
     end
   end
-  os.exit(verified and 0 or 2)
+  os.exit(report.verified and 0 or 2)
 end, 50)
