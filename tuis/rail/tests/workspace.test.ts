@@ -91,9 +91,9 @@ const repoAt = (root: string, path: string, remote: string): string => {
 };
 
 test("a clone is matched by its remote, not its directory name", async () => {
-  // These diverge often enough to matter: dotfiles-v2 on disk is
-  // RyanSaxe/dotfiles on GitHub. Matching on the name would clone a second
-  // copy of a repository already present.
+  // These diverge often enough to matter: a worktree checked out as
+  // dotfiles-tidy on disk is still RyanSaxe/dotfiles on GitHub. Matching on
+  // the name would clone a second copy of a repository already present.
   const root = mkdtempSync(join(tmpdir(), "rail-ws-"));
   const expected = repoAt(
     root,

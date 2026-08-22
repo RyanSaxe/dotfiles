@@ -2,17 +2,21 @@
 
 typeset -g AI_HARNESS_ROOT="${AI_HARNESS_ROOT:-$HOME/.config/ai-harness}"
 
+# TMUX is unset so the binary's hardcoded chalk-level cap
+# (`if (process.env.TMUX && level > 2) level = 2`) doesn't fire; this keeps
+# truecolor bg rendering inside tmux. Tracking issue:
+# https://github.com/anthropics/claude-code/issues/36785
 claude() {
   local arg
   for arg in "$@"; do
     case "$arg" in
     --plugin-dir | --plugin-dir=* | --settings | --settings=* | plugin | plugins | mcp | doctor | help | --help | --version)
-      command claude "$@"
+      env -u TMUX claude "$@"
       return
       ;;
     esac
   done
-  command claude \
+  env -u TMUX claude \
     --plugin-dir "$AI_HARNESS_ROOT" \
     --settings "$AI_HARNESS_ROOT/claude/settings.json" \
     "$@"
