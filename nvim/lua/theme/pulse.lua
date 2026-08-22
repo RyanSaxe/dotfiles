@@ -78,7 +78,19 @@ function M.setup()
   local group = vim.api.nvim_create_augroup("theme_pulse", { clear = true })
   vim.api.nvim_create_autocmd("RecordingEnter", { group = group, callback = start })
   vim.api.nvim_create_autocmd("RecordingLeave", { group = group, callback = stop })
-  vim.api.nvim_create_autocmd("ModeChanged", { group = group, callback = repaint })
+  -- ModeChanged can fire from inside nvim_win_call — snacks' picker preview
+  -- runs `norm!` in its own window while you type — and a synchronous flush
+  -- at that instant clamps the input window's insert cursor back from
+  -- end-of-line, so the next character lands mid-string. Deferring puts the
+  -- flush after the caller restores the cursor. A mode() guard cannot catch
+  -- this: mode() already reads "n" inside that window call.
+  vim.api.nvim_create_autocmd("ModeChanged", {
+    group = group,
+    ---@return nil
+    callback = function()
+      vim.schedule(repaint)
+    end,
+  })
 end
 
 return M
