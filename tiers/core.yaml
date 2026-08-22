@@ -1,0 +1,60 @@
+# Deployment map for the core tier, executed by dotbot (see install.sh).
+#
+# Directives run in order: `create` makes the directories that receive
+# generated files at runtime (so nothing can turn them into links into the
+# repo), `clean` removes links whose repo file was renamed or deleted, and
+# `link` deploys per-file symlinks inside real directories — the same shape
+# stow's --no-folding produced.
+#
+# Globbed directories pick up new files automatically. Python's glob skips
+# hidden files, so a dotted name inside a globbed tree needs its own explicit
+# entry (as .luarc.json has); without one it silently never deploys.
+
+- defaults:
+    link:
+      create: true
+      relative: true
+      relink: true
+
+- create:
+    - ~/.config/bat/themes
+    - ~/.config/ghostty/shaders
+    - ~/.config/ghostty/themes
+    - ~/.local/bin
+
+- clean:
+    ~/:
+      recursive: false
+    ~/.config:
+      recursive: true
+    ~/.local/bin: {}
+
+- link:
+    ~/.zshrc: zsh/dot-zshrc
+    ~/.zshenv: zsh/dot-zshenv
+    ~/.config/zsh:
+      glob: true
+      path: zsh/dot-config/zsh/**
+    ~/.config/git:
+      glob: true
+      path: git/dot-config/git/**
+    ~/.config/theme:
+      glob: true
+      path: theme/dot-config/theme/**
+    ~/.config/nvim:
+      glob: true
+      path: nvim/dot-config/nvim/**
+    ~/.config/nvim/.luarc.json: nvim/dot-config/nvim/.luarc.json
+    ~/.config/tmux:
+      glob: true
+      path: tmux/dot-config/tmux/**
+    ~/.config/workmux/config.yaml: workmux/dot-config/workmux/config.yaml
+    ~/.config/bat/config: bat/dot-config/bat/config
+    ~/.local/bin/theme: theme/dot-local/bin/theme
+    ~/.local/bin/theme-picker: theme/dot-local/bin/theme-picker
+    ~/.local/bin/mascot-accents: theme/dot-local/bin/mascot-accents
+    ~/.local/bin/rail: rail/dot-local/bin/rail
+    ~/.local/bin/attention: rail/dot-local/bin/attention
+    ~/.local/bin/review-open: rail/dot-local/bin/review-open
+    ~/.local/bin/workmux-copy-ignored: workmux/dot-local/bin/workmux-copy-ignored
+    ~/.local/bin/workmux-escalate-idle: workmux/dot-local/bin/workmux-escalate-idle

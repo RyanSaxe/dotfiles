@@ -19,74 +19,59 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install stow and zsh
+      - name: Install uv and zsh
         run: |
-          # install.sh's stow verb upgrades a too-old stow itself
-          # (ensure_modern_stow), so no version handling here.
+          # uvx runs dotbot itself, so the deployment tool needs no install
+          # step of its own.
           if [ "$RUNNER_OS" = macOS ]; then
-            brew install stow
+            command -v uvx >/dev/null || brew install uv
           else
             sudo apt-get update -q
-            sudo apt-get install -y stow zsh
+            sudo apt-get install -y zsh
+            command -v uvx >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
-          stow --version | head -n 1
 
-      - name: Stow packages contain only dot- entries
+      - name: install.sh deploys every tier into a scratch home
         run: |
-          # Everything inside a package deploys into HOME, so a non-dot
-          # entry links a literal name there (a tests/ dir once linked
-          # ~/tests). Checks every tier regardless of OS.
-          bad=""
-          for pkg in $(cat tiers/*.txt); do
-            for entry in $(ls -A "$pkg"); do
-              case "$entry" in dot-*) ;; *) bad="$bad $pkg/$entry" ;; esac
-            done
-          done
-          for path in $bad; do
-            echo "::error::stow package entry without dot- prefix: $path"
-          done
-          [ -z "$bad" ]
-
-      - name: install.sh stows every tier into a scratch home
-        run: |
-          # The installer's own stow path — stow_package, manifests,
-          # cleanup — not a re-implementation of it.
+          # The installer's own deploy path — junk cleanup, the untracked
+          # guard, dotbot — not a re-implementation of it.
           scratch="$(mktemp -d)"
           echo "SCRATCH=$scratch" >> "$GITHUB_ENV"
-          HOME="$scratch" ./install.sh stow
+          HOME="$scratch" ./install.sh links
 
-      - name: Restow cleans junk, removed files, and de-tiered packages
+      - name: Redeploy cleans junk and removed files
         run: |
           clone="$(mktemp -d)/clone"
           home="$(mktemp -d)"
           git clone -q . "$clone"
           cd "$clone"
 
-          # Gitignored junk inside a package is deleted, never linked.
+          # Gitignored junk inside a source tree is deleted, never linked.
           mkdir -p theme/tests/__pycache__
           touch theme/tests/__pycache__/junk.pyc
-          HOME="$home" ./install.sh stow core
+          HOME="$home" ./install.sh links core
           [ ! -e "$home/tests" ]
           [ ! -e theme/tests ]
 
-          # Untracked files inside a package refuse to stow.
+          # Untracked files inside a source tree refuse to deploy.
           touch zsh/dot-config/zsh/wip.zsh
-          if HOME="$home" ./install.sh stow core; then
-            echo "::error::untracked package file did not refuse to stow"
+          if HOME="$home" ./install.sh links core; then
+            echo "::error::untracked source file did not refuse to deploy"
             exit 1
           fi
           rm zsh/dot-config/zsh/wip.zsh
 
-          # A removed file loses its link and its emptied directory chain.
+          # A removed file loses its link: dotbot's clean directive removes
+          # dead links pointing into the repo, so none survive a redeploy.
           git rm -q theme/dot-config/theme/templates/*.tmpl
-          HOME="$home" ./install.sh stow core
-          [ ! -e "$home/.config/theme/templates" ]
-
-          # A package dropped from every tier is unstowed entirely.
-          grep -v '^workmux$' tiers/core.txt > tiers/core.tmp
-          mv tiers/core.tmp tiers/core.txt
-          HOME="$home" ./install.sh stow core
-          [ ! -e "$home/.config/workmux" ]
+          HOME="$home" ./install.sh links core
+          dangling="$(find "$home/.config" -type l ! -exec test -e {} \; -print)"
+          if [ -n "$dangling" ]; then
+            printf '%s\n' "$dangling"
+            echo "::error::dangling links survived a redeploy"
+            exit 1
+          fi
 
       - name: Key targets resolve
         run: |
@@ -96,7 +81,7 @@ jobs:
           fi
           for path in $paths; do
             if [ ! -e "$SCRATCH/$path" ]; then
-              echo "::error::missing $path after stow"
+              echo "::error::missing $path after deploy"
               exit 1
             fi
           done
@@ -134,8 +119,9 @@ jobs:
       - name: Generated artifacts stay out of the checkout
         run: |
           # theme publishes generated files into the scratch home. A publish
-          # directory that stow folded into a package symlink would receive
-          # them inside the checkout instead.
+          # directory deployed as a link into the repo (instead of the real
+          # directory the tier map creates) would receive them inside the
+          # checkout instead.
           repo="$(pwd -P)"
           for path in .config/bat/themes .config/ghostty/shaders .config/ghostty/themes; do
             resolved="$(cd "$SCRATCH/$path" && pwd -P)"
@@ -148,7 +134,7 @@ jobs:
           done
           if [ -n "$(git status --porcelain)" ]; then
             git status --porcelain
-            echo "::error::stow + theme apply wrote into the checkout"
+            echo "::error::deploy + theme apply wrote into the checkout"
             exit 1
           fi
 

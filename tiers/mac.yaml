@@ -1,0 +1,22 @@
+# Deployment map for the mac tier (see tiers/core.yaml for how this works).
+# Cleaning ~/.config here as well keeps `./install.sh links mac` complete on
+# its own; a second clean pass over the same directory is a no-op.
+
+- defaults:
+    link:
+      create: true
+      relative: true
+      relink: true
+
+- clean:
+    ~/.config:
+      recursive: true
+
+- link:
+    ~/.config/ghostty/config: ghostty/dot-config/ghostty/config
+    ~/.config/sketchybar:
+      glob: true
+      path: sketchybar/dot-config/sketchybar/**
+    ~/.config/aerospace:
+      glob: true
+      path: aerospace/dot-config/aerospace/**

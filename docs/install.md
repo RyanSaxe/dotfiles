@@ -11,7 +11,8 @@ symlinks for the tiers you pick. Re-run it any time to update both.
 
 ## Tiers
 
-A tier is a set of stow packages, declared in the `tiers` package.
+A tier is a set of system packages plus one symlink deployment map,
+`tiers/<tier>.yaml`.
 
 | Tier   | For                                               |
 | ------ | ------------------------------------------------- |
@@ -20,7 +21,7 @@ A tier is a set of stow packages, declared in the `tiers` package.
 
 Pass tiers as arguments to skip the prompts (`./install.sh core` on a remote
 box). The default `./install.sh` runs `core agents` and asks separately about
-the mac tier. `./install.sh stow` redoes the symlinks alone, with no package
+the mac tier. `./install.sh links` redoes the symlinks alone, with no package
 installs.
 
 When the core or agents tier installs the agent CLIs, the installer links the
@@ -43,44 +44,47 @@ never committed: review the diff and commit deliberately.
 
 ## How the symlinks work
 
-Each top-level directory is a stow package whose layout mirrors where its files
-land. Hidden targets are named with a `dot-` prefix (stow's `--dotfiles` mode)
-so repo content stays visible to `rg`, `fd`, and editors:
+[Dotbot](https://github.com/anishathalye/dotbot) deploys each tier's map,
+`tiers/<tier>.yaml`, run through `uvx` by `install.sh`. A mapping names its
+target explicitly; directories deploy through a glob, which creates real
+directories containing per-file links and picks up new files automatically:
 
 ```text
 nvim/dot-config/nvim/init.lua  ->  ~/.config/nvim/init.lua
 zsh/dot-zshrc                  ->  ~/.zshrc
 ```
 
-The existing `~/.config/nvim` target is an explicit cutover boundary. If it is
-already a symlink from the v1 configuration, the installer leaves it in place
-and continues installing the other packages; v2 Neovim is adopted only during
-the deliberate cutover phase.
+Renaming or deleting a repo file cannot leave a link dangling: each map's
+`clean` directive removes dead links that point into this repo, and only
+those — a dead link belonging to another program is not ours to touch. One
+consequence of per-file links is that emptied directories are left behind as
+empty real directories rather than removed.
+
+Two guards run before deployment. Gitignored files inside the deployed source
+trees are junk and get deleted, so a glob can never link a bytecode cache into
+`$HOME`. Untracked files there refuse to deploy — they may be unfinished work,
+and nothing unfinished should silently become live configuration.
 
 Every tracked file is identical on every machine. Anything machine-specific
 resolves at runtime via `PATH` and `$HOME`; there is no templating.
 
-### Why folding is disabled
+### Generated files never land in the repo
 
-Symlinks point from `$HOME` into the repo, never the reverse, and generated
-files never land in the repo tree. Stow can violate this on its own: when a
-target directory does not exist it "folds" — links the whole directory into the
-repo — and every later write into that directory lands inside the package.
-Three layers prevent it:
+Symlinks point from `$HOME` into the repo, never the reverse. Directories that
+receive generated files at runtime — the rendered bat theme, ghostty shaders —
+are pre-created as real directories by each map's `create` directive, so those
+writes land in `$HOME` and not the checkout. The health workflow deploys into
+a scratch home, runs `theme apply`, and fails if anything resolves into or
+dirties the checkout.
 
-- `.stowrc` passes `--no-folding`: real directories, per-file links. It only
-  applies when stow runs from the repo root and the file parses.
-- `install.sh` pre-creates every directory that receives generated files at
-  runtime (`RUNTIME_WRITE_DIRS`) as a real directory before stowing, which
-  holds even when `.stowrc` is not read.
-- The health workflow stows into a scratch home, runs `theme apply`, and fails
-  if anything resolves into or dirties the checkout.
+**When adding a program that writes generated output under a deployed path**,
+add its target directory to the `create` directive in the tier map. The health
+check only exercises writes that happen during `theme apply`; anything written
+at another time relies on that list.
 
-**When adding a program that writes generated output under a stowed path** — as
-`theme` publishes the rendered bat theme and ghostty shaders — add its target
-directory to `RUNTIME_WRITE_DIRS` in `install.sh`. The health check only
-exercises writes that happen during `theme apply`; anything written at another
-time relies on that list.
+One more glob caveat: Python's glob skips hidden files, so a dotted filename
+inside a globbed directory needs its own explicit mapping (as
+`~/.config/nvim/.luarc.json` has) or it silently never deploys.
 
 ## Machine-local values
 

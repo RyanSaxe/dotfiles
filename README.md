@@ -1,8 +1,9 @@
 # dotfiles
 
 Dotfiles for working from a Mac and SSHing into Linux boxes: Neovim, Ghostty,
-tmux, zsh, and git, themed as one system and installed with GNU Stow. Coding
-agents work inside the same environment and pass the same commit gates I do.
+tmux, zsh, and git, themed as one system and deployed with
+[Dotbot](https://github.com/anishathalye/dotbot). Coding agents work inside
+the same environment and pass the same commit gates I do.
 
 ```sh
 git clone https://github.com/RyanSaxe/dotfiles && cd dotfiles
@@ -11,8 +12,8 @@ git clone https://github.com/RyanSaxe/dotfiles && cd dotfiles
 
 Clone it anywhere. On a fresh machine this installs homebrew, system packages,
 and symlinks for the tiers you pick — `core` everywhere, `mac` for GUI apps.
-See [docs/install.md](docs/install.md) for tiers, upgrades, and how the stow
-layout stays out of the repo tree.
+See [docs/install.md](docs/install.md) for tiers, upgrades, and how generated
+files stay out of the repo tree.
 The `agents` tier installs the live Claude, Codex, and Copilot harness links;
 it is included by the default install and can be run separately with
 `./install.sh agents`.
@@ -33,10 +34,10 @@ it is included by the default install and can be run separately with
 | `theme`      | the theming pipeline                                                                                  |
 | `tiers`      | which packages install on which machines                                                              |
 
-Each top-level directory is a stow package whose layout mirrors where its files
-land, so `nvim/dot-config/nvim/init.lua` becomes `~/.config/nvim/init.lua`.
-Every tracked file is identical on every machine; anything machine-specific
-resolves at runtime.
+Each top-level directory is a component; where its files land is declared in
+`tiers/<tier>.yaml`, so `nvim/dot-config/nvim/init.lua` deploys to
+`~/.config/nvim/init.lua`. Every tracked file is identical on every machine;
+anything machine-specific resolves at runtime.
 
 ## One keyboard, everywhere
 
