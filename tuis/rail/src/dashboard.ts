@@ -12,9 +12,18 @@ export type DashboardView = "reviews" | "worktrees";
 
 // What an item needs attention FOR. The hue follows the object, per the
 // locked semantics: CI failure is red, pull-request activity peach, issue
-// activity mauve.
+// activity mauve. Tasks reuse the same three hues for their due states —
+// overdue red, due today or tomorrow peach, due this week mauve — under
+// names that say what a task row actually means.
 export type DashboardTone =
-  "ci" | "pull_request" | "issue" | "clean" | "neutral";
+  | "ci"
+  | "pull_request"
+  | "issue"
+  | "overdue"
+  | "due_soon"
+  | "due_near"
+  | "clean"
+  | "neutral";
 
 // The selected item's panel, in the shape the design settled on: a headline
 // naming the trigger, the specifics beneath it, then dim context. `bullets`
@@ -237,10 +246,13 @@ function metaColor(tone: MetaTone, palette: Palette): string {
 function toneColor(tone: DashboardTone, palette: Palette): string {
   switch (tone) {
     case "ci":
+    case "overdue":
       return palette.red;
     case "pull_request":
+    case "due_soon":
       return palette.peach;
     case "issue":
+    case "due_near":
       return palette.mauve;
     case "clean":
       // Healthy at a glance, which is what green is for.
@@ -462,9 +474,24 @@ function tableCells(
   return cells;
 }
 
+// The columns are one geometry serving three datasets, so only the labels
+// change. A Tasks table headed "PR / Needs you / Age" would be describing
+// the wrong thing in every cell.
+function headerLabels(
+  surface: DashboardSurface,
+  view: DashboardView,
+): string[] {
+  if (view === "worktrees")
+    return ["#", "PR", "Session", "Changes", "Pull request", "Diff", "Age"];
+  if (surface === "tasks")
+    return ["#", "Line", "State", "Section", "Task", "Project", "Due"];
+  return ["#", "PR", "From", "Author", "Needs you", "Size", "Age"];
+}
+
 function tableHeader(
   width: number,
   palette: Palette,
+  surface: DashboardSurface,
   view: DashboardView,
 ): string {
   const widths = tableWidths(width);
@@ -473,9 +500,7 @@ function tableHeader(
     width,
     palette,
     tableCells(
-      view === "worktrees"
-        ? ["#", "PR", "Session", "Changes", "Pull request", "Diff", "Age"]
-        : ["#", "PR", "From", "Author", "Needs you", "Size", "Age"],
+      headerLabels(surface, view),
       widths,
       Array.from({ length: widths.length }, () => muted),
       muted,
@@ -738,6 +763,7 @@ function footerLine(
   searching: boolean,
   query: string,
   scrollable: boolean,
+  surface: DashboardSurface,
   view: DashboardView,
 ): string {
   const muted = mutedColor(palette);
@@ -756,37 +782,52 @@ function footerLine(
   // least essential first so a narrow frame drops "Refresh" long before it
   // drops "Quit", instead of clipping the line mid-word.
   const optional: Array<[string, string]> =
-    view === "worktrees"
-      ? [
+    surface === "tasks"
+      ? // A task has no browser, no diff and no reviewer. `x` completes it
+        // through the CLI, which is the same key and the same "this row
+        // leaves the table" shape as acknowledging a review.
+        [
           ["r", "Refresh"],
           ["/", "Search"],
-          ["a", "Assisted"],
-          ["X", "Clean up"],
+          ["x", "Complete"],
         ]
-      : [
-          ["r", "Refresh"],
-          ["b", "Browser"],
-          ["a", "Assisted"],
-          ["d", "Diff"],
-          ["/", "Search"],
-          ["x", "Acknowledge"],
-        ];
+      : view === "worktrees"
+        ? [
+            ["r", "Refresh"],
+            ["/", "Search"],
+            ["a", "Assisted"],
+            ["X", "Clean up"],
+          ]
+        : [
+            ["r", "Refresh"],
+            ["b", "Browser"],
+            ["a", "Assisted"],
+            ["d", "Diff"],
+            ["/", "Search"],
+            ["x", "Acknowledge"],
+          ];
   // Sticky-ish: when there IS more to read, saying so beats "Refresh".
   if (scrollable) optional.splice(2, 0, ["^u/^d", "Preview"]);
   const essential: Array<[string, string]> =
-    view === "worktrees"
+    surface === "tasks"
       ? [
           ["↑↓", "Navigate"],
-          ["↵", "Focus"],
-          ["⇥", "Reviews"],
+          ["↵", "Open note"],
           ["q", "Quit"],
         ]
-      : [
-          ["↑↓", "Navigate"],
-          ["↵", "Open"],
-          ["⇥", "Worktrees"],
-          ["q", "Quit"],
-        ];
+      : view === "worktrees"
+        ? [
+            ["↑↓", "Navigate"],
+            ["↵", "Focus"],
+            ["⇥", "Reviews"],
+            ["q", "Quit"],
+          ]
+        : [
+            ["↑↓", "Navigate"],
+            ["↵", "Open"],
+            ["⇥", "Worktrees"],
+            ["q", "Quit"],
+          ];
 
   const measure = (entries: Array<[string, string]>): number =>
     entries.reduce(
@@ -954,16 +995,22 @@ export function renderDashboard(
           text: surfaceLabel(data.surface),
           color: view === "reviews" ? palette.accent : muted,
         },
-        { text: "  │  ", color: ruleColor(palette) },
-        {
-          text: "Worktrees",
-          color: view === "worktrees" ? palette.accent : muted,
-        },
+        // Workspaces are opened from reviews; the Tasks surface has one
+        // view, so it does not advertise a subtab that goes nowhere.
+        ...(data.surface === "reviews"
+          ? [
+              { text: "  │  ", color: ruleColor(palette) },
+              {
+                text: "Worktrees",
+                color: view === "worktrees" ? palette.accent : muted,
+              },
+            ]
+          : []),
       ],
       query.trim() === "" ? status : `/${query} · ${status}`,
     ),
     rule(width, palette),
-    tableHeader(width, palette, view),
+    tableHeader(width, palette, data.surface, view),
   ];
 
   const all = tableRows(ranked);
@@ -1073,7 +1120,15 @@ export function renderDashboard(
   }
   lines.push(panelRule(width, palette, "bottom"));
   lines.push(
-    footerLine(width - 1, palette, searching, query, maxOffset > 0, view),
+    footerLine(
+      width - 1,
+      palette,
+      searching,
+      query,
+      maxOffset > 0,
+      data.surface,
+      view,
+    ),
   );
 
   while (lines.length < height) lines.push(line(width, palette, []));

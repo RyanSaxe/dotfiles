@@ -1,7 +1,7 @@
-// The vault task surface: what the slab shows, what it refuses to show, and
-// what it says when there is no vault. Nothing here touches a real vault —
-// the CLI is a fixture script, so the failure paths are exercised as the
-// rail actually meets them.
+// The vault task surface: what the slab shows, what it refuses to show, what
+// it says when there is no vault, and how a task becomes a dashboard row.
+// Nothing here touches a real vault — the CLI is a fixture script, so the
+// failure paths are exercised as the rail actually meets them.
 
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -9,12 +9,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { rankDashboardItems, renderDashboard } from "../src/dashboard.js";
+import type { DashboardData } from "../src/dashboard.js";
+import { taskItem } from "../src/review-dashboard.js";
 import { taskRows } from "../src/sections/tasks.js";
 import {
   completeTask,
   loadTaskSnapshot,
   parseTasks,
   railTasks,
+  type TaskState,
   type VaultTask,
 } from "../src/tasks.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../src/theme.js";
@@ -305,4 +309,99 @@ test("completing a task is the CLI's business, and its refusal is ours", async (
     ),
     /no task at projects\/dotfiles\/TODO.md:7/,
   );
+});
+
+// ----- the dashboard row -------------------------------------------------
+
+const task = (over: Partial<VaultTask> = {}): VaultTask => ({
+  id: "projects/dotfiles/TODO.md:7",
+  text: "Verify the review rail at the narrowest width",
+  done: false,
+  due: "2026-08-18",
+  state: "overdue",
+  project: "dotfiles",
+  section: "feat/vault-rail",
+  file: "projects/dotfiles/TODO.md",
+  line: 7,
+  ...over,
+});
+
+test("a task becomes a row in its own vocabulary", () => {
+  const item = taskItem(task(), ["  - [ ] something else"]);
+  // The heading is the note, the reference its line: together they are the
+  // id the CLI recomputes, which is also the panel's title.
+  assert.equal(item.repository, "projects/dotfiles/TODO.md");
+  assert.equal(item.reference, ":7");
+  assert.equal(`${item.repository}${item.reference}`, item.id);
+  assert.equal(item.from, "overdue");
+  assert.equal(item.author, "feat/vault-rail");
+  assert.equal(item.reason, "Verify the review rail at the narrowest width");
+  assert.deepEqual(item.metadata, [{ text: "dotfiles", tone: "muted" }]);
+  assert.equal(item.time, "08-18");
+  assert.equal(item.url, null);
+  assert.equal(item.preview.headline, "Overdue since 2026-08-18");
+  assert.deepEqual(item.preview.body, ["  - [ ] something else"]);
+  assert.ok(item.preview.context.includes("section feat/vault-rail"));
+  assert.ok(item.preview.context.includes("file projects/dotfiles/TODO.md:7"));
+});
+
+test("the due-state hues carry over to the dashboard", () => {
+  const tone = (state: TaskState): string => taskItem(task({ state })).tone;
+  assert.equal(tone("overdue"), "overdue");
+  assert.equal(tone("today"), "due_soon");
+  assert.equal(tone("tomorrow"), "due_soon");
+  assert.equal(tone("near"), "due_near");
+  // Later and undated work is real, but it is not urgent.
+  assert.equal(tone("later"), "neutral");
+  assert.equal(tone("none"), "neutral");
+});
+
+const data = (): DashboardData => ({
+  surface: "tasks",
+  items: [
+    taskItem(task()),
+    taskItem(
+      task({
+        id: "inbox.md:3",
+        file: "inbox.md",
+        line: 3,
+        text: "Read that paper",
+        due: "2026-09-30",
+        state: "later",
+        project: null,
+        section: null,
+      }),
+    ),
+  ],
+  status: "2 open · 1 overdue",
+  emptyMessage: "No open tasks",
+  error: null,
+});
+
+test("the table names task columns rather than review ones", () => {
+  const frame = plain(renderDashboard(data(), 0, palette, 120, 40));
+  assert.match(frame, /Line\s+State\s+Section\s+Task\s+Project\s+Due/);
+  assert.ok(!frame.includes("Needs you"));
+  // One view: there are no task workspaces to switch to.
+  assert.ok(!frame.includes("Worktrees"));
+  assert.match(frame, /x Complete/);
+});
+
+test("due state is searchable, because it is a cell and not only a colour", () => {
+  const matched = rankDashboardItems(data().items, "overdue");
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0]?.item.id, "projects/dotfiles/TODO.md:7");
+});
+
+test("a failed read reaches the dashboard as its empty message", () => {
+  const frame = plain(
+    renderDashboard(
+      { ...data(), items: [], emptyMessage: "vault is not on PATH" },
+      0,
+      palette,
+      120,
+      40,
+    ),
+  );
+  assert.match(frame, /vault is not on PATH/);
 });

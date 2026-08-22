@@ -54,9 +54,12 @@ async function main(): Promise<void> {
       }
       return;
     case "task_complete":
-      throw new Error(
-        "task elements are not available until the Obsidian task source is implemented",
-      );
+      // The slab's task rows are not numbered: ids are recomputed on every
+      // read, so completing the Nth row of a frame that may be seconds old
+      // would be a keystroke aimed at whatever has since moved into it.
+      // Completing happens in the dashboard (alt+T), against the row you can
+      // see selected.
+      throw new Error("complete a task from the Tasks dashboard (alt+T)");
   }
 }
 

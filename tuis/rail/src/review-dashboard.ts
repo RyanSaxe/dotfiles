@@ -1,6 +1,7 @@
 import { execFile, execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -22,6 +23,13 @@ import {
   type MetaSpan,
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
+import {
+  completeTask,
+  loadTaskSnapshot,
+  shortDue,
+  type TaskState,
+  type VaultTask,
+} from "./tasks.js";
 import { openPullRequestWorkspace } from "./workspace.js";
 import {
   cleanupReviewWorktree,
@@ -375,14 +383,151 @@ export async function worktreeDashboardData(): Promise<DashboardData> {
   };
 }
 
-export function taskDashboardData(): DashboardData {
+// The three due-state hues, under task names. Later and undated work is
+// real but not urgent, so it reads as ordinary text.
+function taskTone(state: TaskState): DashboardTone {
+  switch (state) {
+    case "overdue":
+      return "overdue";
+    case "today":
+    case "tomorrow":
+      return "due_soon";
+    case "near":
+      return "due_near";
+    default:
+      return "neutral";
+  }
+}
+
+// The headline answers "why is this in front of me", the way a review's
+// does. The row already carries the text.
+function taskHeadline(task: VaultTask): string {
+  const due = task.due ?? EMPTY_CELL;
+  switch (task.state) {
+    case "overdue":
+      return `Overdue since ${due}`;
+    case "today":
+      return `Due today (${due})`;
+    case "tomorrow":
+      return `Due tomorrow (${due})`;
+    case "near":
+    case "later":
+      return `Due ${due}`;
+    default:
+      return "No due date";
+  }
+}
+
+// Lines either side of the task, read from the note. It is the cheapest
+// useful thing the panel can say that the row does not: what else is on that
+// list. Reading is safe — the CLI is the only writer — and a note we cannot
+// read simply shows nothing.
+const SOURCE_CONTEXT = 3;
+
+function sourceLines(task: VaultTask, cache: Map<string, string[]>): string[] {
+  const vault = process.env["VAULT_DIR"];
+  if (vault === undefined) return [];
+  let lines = cache.get(task.file);
+  if (lines === undefined) {
+    try {
+      lines = readFileSync(join(vault, task.file), "utf8").split("\n");
+    } catch {
+      lines = [];
+    }
+    cache.set(task.file, lines);
+  }
+  const from = Math.max(0, task.line - 1 - SOURCE_CONTEXT);
+  return lines
+    .slice(from, task.line + SOURCE_CONTEXT)
+    .map(
+      (text, index) => `${from + index === task.line - 1 ? "▌ " : "  "}${text}`,
+    );
+}
+
+export function taskItem(
+  task: VaultTask,
+  source: readonly string[] = [],
+): DashboardItem {
+  return {
+    id: task.id,
+    // Rows group under the note they are written in, the way `vault tasks`
+    // itself prints one tree per file. With the line as the reference, the
+    // panel title is exactly the task's id.
+    repository: task.file,
+    reference: `:${String(task.line)}`,
+    // The state in text, in a searchable cell: `/overdue` is how you filter
+    // to it, and colour is never the only carrier.
+    from: task.state,
+    author: task.section ?? EMPTY_CELL,
+    // Reused as "dim this cell": the section says where the task sits, not
+    // what it is.
+    authorIsViewer: true,
+    reason: task.text,
+    metadata:
+      task.project === null ? [] : [{ text: task.project, tone: "muted" }],
+    time: shortDue(task.due),
+    title: task.text,
+    // Nothing to open in a browser: a task is a line in a local note.
+    url: null,
+    tone: taskTone(task.state),
+    preview: {
+      headline: taskHeadline(task),
+      bullets: [],
+      body: source,
+      // The headline already said when; this says where. The panel reflows
+      // its context, so these are sentences rather than aligned columns.
+      context: [
+        task.text,
+        `project ${task.project ?? EMPTY_CELL}`,
+        `section ${task.section ?? EMPTY_CELL}`,
+        `file ${task.id}`,
+      ],
+    },
+  };
+}
+
+// Every open task, not the slab's four-state projection: this is the surface
+// with search and a preview, so later and undated work is findable here and
+// stays off the rail itself.
+export async function taskDashboardData(): Promise<DashboardData> {
+  const snapshot = await loadTaskSnapshot();
+  const sources = new Map<string, string[]>();
+  const items = snapshot.tasks.map((task) =>
+    taskItem(task, sourceLines(task, sources)),
+  );
+  const overdue = snapshot.tasks.filter(
+    (task) => task.state === "overdue",
+  ).length;
+  const counted = `${String(items.length)} open${overdue === 0 ? "" : ` · ${String(overdue)} overdue`}`;
   return {
     surface: "tasks",
-    items: [],
-    status: "source pending",
-    emptyMessage: "Tasks are waiting for Obsidian integration",
-    error: null,
+    items,
+    status: snapshot.error ?? counted,
+    // The one place a failed read is visible: no rows, and the CLI's own
+    // sentence where the empty message would be.
+    emptyMessage: snapshot.error ?? "Nothing is open in the vault",
+    error: snapshot.error,
   };
+}
+
+// Enter opens the note where the task is written, at its line. Neovim is the
+// vault's only editing interface, and a tmux window is where the popup can
+// close and leave you standing in it.
+async function openTaskSource(item: DashboardItem): Promise<boolean> {
+  const vault = process.env["VAULT_DIR"];
+  const line = Number(item.reference.replace(/^:/, ""));
+  if (vault === undefined || !Number.isFinite(line)) return false;
+  await run("tmux", [
+    "new-window",
+    "-c",
+    vault,
+    "-n",
+    basename(item.repository, ".md"),
+    "nvim",
+    `+${String(line)}`,
+    join(vault, item.repository),
+  ]);
+  return true;
 }
 
 async function openUrl(url: string): Promise<void> {
@@ -472,13 +617,14 @@ export async function main(
   surface: DashboardSurface = "reviews",
 ): Promise<void> {
   const isReviews = surface === "reviews";
-  await runDashboard(isReviews ? reviewDashboardData() : taskDashboardData(), {
-    refresh: isReviews ? refreshReviews : async () => taskDashboardData(),
-    open: openReviewWorkspace,
+  const initial = isReviews ? reviewDashboardData() : await taskDashboardData();
+  await runDashboard(initial, {
+    refresh: isReviews ? refreshReviews : taskDashboardData,
+    open: isReviews ? openReviewWorkspace : openTaskSource,
     browser: async (item) => {
       if (item.url !== null) await openUrl(item.url);
     },
-    diff: reviewDiff,
+    diff: isReviews ? reviewDiff : async () => ["A task has no diff."],
     worktrees: isReviews ? worktreeDashboardData : undefined,
     focus: async (item) => {
       const worktree = (await listReviewWorktrees()).find(
@@ -508,11 +654,12 @@ export async function main(
       const result = await cleanupReviewWorktree(worktree);
       return result.ok ? null : result.reason;
     },
+    // Completing a task is the same gesture as acknowledging a review: the
+    // row leaves the table, and the refresh that follows re-reads the ids
+    // this write has just invalidated.
     acknowledge: isReviews
       ? acknowledgeReview
-      : async () => {
-          throw new Error("task elements are not available yet");
-        },
+      : async (item) => completeTask(item.id),
   });
 }
 
