@@ -35,12 +35,20 @@ local function is_anchored_sidebar(win)
   -- something to read this way — CodeDiff's file panes, Snacks' pull request
   -- and issue buffers. Both are anchored, neither is a sidebar.
   --
-  -- Two exemptions is the point at which the rule is worth revisiting: an
-  -- allowlist of chrome filetypes would default new content buffers to the
-  -- inner surface, which is correct more often than the reverse. Noted in
-  -- notes/handoff/theme-role-completion.md rather than changed here.
+  -- Three of these now, which is past the point where the rule is worth
+  -- revisiting: an allowlist of chrome filetypes would default new content
+  -- buffers to the inner surface, which is correct more often than the
+  -- reverse. Recorded in notes/handoff/theme-role-completion.md rather than
+  -- changed here, because it is a judgement about every plugin at once.
   local name = vim.api.nvim_buf_get_name(buf)
   if name:match("^codediff://") or name:match("^gh://") then
+    return false
+  end
+  -- The start screen is a thing you look at, not a sidebar. It is caught
+  -- late rather than at startup: snacks sets `nofile` after the first pass
+  -- runs, so the dashboard only turns to crust once something else — an
+  -- explorer, say — triggers another pass.
+  if vim.bo[buf].filetype == "snacks_dashboard" then
     return false
   end
   return vim.bo[buf].buftype ~= "" or vim.bo[buf].filetype == "snacks_picker_list"
