@@ -153,19 +153,105 @@ local function signature(buffers)
   return table.concat(parts, "\n")
 end
 
+-- Servers that advertise diagnosticProvider are PULL-based: the editor asks
+-- per buffer, and nvim only asks for the buffer you are in. In a headless
+-- sweep the background buffers would never be asked at all — silence that
+-- must not read as clean. Pulling explicitly is also the one deterministic
+-- signal this protocol has: the server answers when it has computed.
+-- Every request goes out asynchronously up front and one shared window
+-- collects whatever lands. Partial answers are used: a server that stalls
+-- (a busy ty queues pulls behind rechecking every opened file) must not
+-- discard another server's instant replies, which is exactly what a
+-- sequential all-or-nothing buf_request_sync did.
+---@param buffers integer[]
+---@param deadline fun(): integer remaining budget in milliseconds
+---@return table<integer, table[]> pulled diagnostics per buffer
+---@return table<integer, boolean> answered buffers where every asked client replied
+---@return table<string, integer> unanswered request count per client name
+local function pull_diagnostics(buffers, deadline)
+  ---@type table<integer, table[]>, table<integer, integer>, table<integer, integer>
+  local pulled, expected, got_ok = {}, {}, {}
+  local outstanding = 0
+  ---@type table<string, integer>
+  local asked_by_name = {}
+  ---@type table<string, integer>
+  local answered_by_name = {}
+  for _, buffer in ipairs(buffers) do
+    local params = { textDocument = vim.lsp.util.make_text_document_params(buffer) }
+    for _, client in ipairs(vim.lsp.get_clients({ bufnr = buffer })) do
+      if client:supports_method("textDocument/diagnostic", buffer) then
+        expected[buffer] = (expected[buffer] or 0) + 1
+        asked_by_name[client.name] = (asked_by_name[client.name] or 0) + 1
+        outstanding = outstanding + 1
+        client:request(
+          "textDocument/diagnostic",
+          params,
+          ---@param err table|nil
+          ---@param result {kind: string, items: table[]}|nil
+          function(err, result)
+            outstanding = outstanding - 1
+            if err ~= nil or result == nil then
+              return
+            end
+            got_ok[buffer] = (got_ok[buffer] or 0) + 1
+            answered_by_name[client.name] = (answered_by_name[client.name] or 0) + 1
+            for _, item in ipairs(result.kind == "full" and result.items or {}) do
+              pulled[buffer] = pulled[buffer] or {}
+              pulled[buffer][#pulled[buffer] + 1] = {
+                lnum = item.range.start.line,
+                col = item.range.start.character,
+                severity = item.severity or 1,
+                source = item.source,
+                code = item.code,
+                message = item.message,
+              }
+            end
+          end,
+          buffer
+        )
+      end
+    end
+  end
+  vim.wait(
+    math.max(0, deadline()),
+    ---@return boolean
+    function()
+      return outstanding == 0
+    end,
+    200
+  )
+
+  ---@type table<integer, boolean>
+  local answered = {}
+  for buffer in pairs(expected) do
+    answered[buffer] = (got_ok[buffer] or 0) > 0
+  end
+  ---@type table<string, integer>
+  local unanswered = {}
+  for name, asked in pairs(asked_by_name) do
+    local missing = asked - (answered_by_name[name] or 0)
+    if missing > 0 then
+      unanswered[name] = missing
+    end
+  end
+  return pulled, answered, unanswered
+end
+
 ---@class EditorDiagnosticsReport
 ---@field files table<string, table[]>
 ---@field summary table<string, integer>
 ---@field unattached string[]
 ---@field verified boolean
 
--- Gather, filter, and sort every diagnostic at or above min_severity.
+-- Merge pull replies (authoritative where a server answered) with anything
+-- push-based already in vim.diagnostic, dedupe, then filter and sort.
 ---@param buffers integer[]
 ---@param min_severity integer|nil
 ---@param unattached string[]
 ---@param verified boolean
+---@param pulled table<integer, table[]>
 ---@return EditorDiagnosticsReport
-local function build_report(buffers, min_severity, unattached, verified)
+local function build_report(buffers, min_severity, unattached, verified, pulled)
   local report = {
     files = {},
     summary = { total = 0, ERROR = 0, WARN = 0, INFO = 0, HINT = 0 },
@@ -173,13 +259,23 @@ local function build_report(buffers, min_severity, unattached, verified)
     verified = verified,
   }
   for _, buffer in ipairs(buffers) do
+    local merged, seen = {}, {}
+    for _, list in ipairs({ pulled[buffer] or {}, vim.diagnostic.get(buffer) }) do
+      for _, d in ipairs(list) do
+        local key = ("%d:%d:%d:%s"):format(d.lnum, d.col, d.severity, d.message)
+        if not seen[key] then
+          seen[key] = true
+          merged[#merged + 1] = d
+        end
+      end
+    end
     local diagnostics = vim.tbl_filter(
       ---@param d vim.Diagnostic
       ---@return boolean
       function(d)
         return min_severity == nil or d.severity <= min_severity
       end,
-      vim.diagnostic.get(buffer)
+      merged
     )
     if #diagnostics > 0 then
       table.sort(
@@ -283,16 +379,38 @@ vim.defer_fn(function()
   -- Hold the settle clock while any server reports active $/progress work:
   -- a cold server pauses publishing while it indexes, and a quiet window
   -- alone would misread that silence as "done".
-  local active_progress = 0
+  ---@type table<string, boolean> active progress, keyed by client+token so
+  ---a duplicated begin or a lost end cannot wedge the count permanently
+  local progress = {}
   vim.api.nvim_create_autocmd("LspProgress", {
-    ---@param event {data: {params: {value: {kind: string}}}}
+    ---@param event {data: {client_id: integer, params: {token: any, value: {kind: string}}}}
     callback = function(event)
       local kind = vim.tbl_get(event, "data", "params", "value", "kind")
+      local token = ("%s:%s"):format(
+        tostring(vim.tbl_get(event, "data", "client_id")),
+        tostring(vim.tbl_get(event, "data", "params", "token"))
+      )
       if kind == "begin" then
-        active_progress = active_progress + 1
+        progress[token] = true
       elseif kind == "end" then
-        active_progress = math.max(0, active_progress - 1)
+        progress[token] = nil
       end
+    end,
+  })
+  ---@return boolean
+  local function progress_active()
+    return next(progress) ~= nil
+  end
+
+  -- Push-based servers announce themselves per buffer through
+  -- DiagnosticChanged (an empty publish still fires it). A buffer no pull
+  -- reply and no publish ever covered cannot be called verified.
+  ---@type table<integer, boolean>
+  local publish_seen = {}
+  vim.api.nvim_create_autocmd("DiagnosticChanged", {
+    ---@param event {buf: integer}
+    callback = function(event)
+      publish_seen[event.buf] = true
     end,
   })
 
@@ -358,12 +476,15 @@ vim.defer_fn(function()
   end
 
   -- Settle phase: the diagnostic signature must hold still, with the
-  -- stability counter frozen while servers report progress.
+  -- stability counter frozen while servers report progress. Bounded to half
+  -- the budget so the pull phase — the deterministic part — always gets the
+  -- rest, even if a server's progress never resolves.
+  local settle_deadline = math.min(timeout_ms, elapsed_ms() + math.min(20000, math.floor(timeout_ms / 2)))
   local previous, unchanged = nil, 0
   local settled = false
-  while elapsed_ms() < timeout_ms do
+  while elapsed_ms() < settle_deadline do
     vim.wait(POLL_MS)
-    if active_progress == 0 then
+    if not progress_active() then
       local current = signature(buffers)
       unchanged = current == previous and unchanged + 1 or 0
       previous = current
@@ -374,10 +495,38 @@ vim.defer_fn(function()
     end
   end
 
-  local verified = settled and #unattached == 0
-  local report = build_report(buffers, min_severity, unattached, verified)
+  -- Pull phase, after push traffic has settled. Authoritative for every
+  -- server that answers; the servers that never answer a pull must have
+  -- covered their buffers via publish or the run is not verified.
+  local pulled, answered, unanswered = pull_diagnostics(
+    buffers,
+    ---@return integer
+    function()
+      return timeout_ms - elapsed_ms()
+    end
+  )
+  local uncovered = 0
+  for _, buffer in ipairs(buffers) do
+    if attached(buffer) and not answered[buffer] and not publish_seen[buffer] then
+      uncovered = uncovered + 1
+    end
+  end
+
+  local verified = settled and #unattached == 0 and uncovered == 0 and next(unanswered) == nil
+  local report = build_report(buffers, min_severity, unattached, verified, pulled)
   if not settled then
     emit(("editor-diagnostics: diagnostics did not settle within %ds"):format(timeout_ms / 1000))
+  end
+  for name, missing in pairs(unanswered) do
+    emit(
+      ("editor-diagnostics: %s left %d diagnostic pull(s) unanswered — its view is not verified"):format(
+        name,
+        missing
+      )
+    )
+  end
+  if uncovered > 0 then
+    emit(("editor-diagnostics: %d buffer(s) never reported diagnostics — cannot call them clean"):format(uncovered))
   end
   print_report(report)
   if json_path ~= nil and json_path ~= "" then
