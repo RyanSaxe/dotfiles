@@ -1,6 +1,6 @@
-# Working notes for AI agents and planning discussions. Never published;
+# Working task files and planning discussions for AI agents. Never published;
 # committed docs are for humans.
-notes/
+tasks/
 
 # Generated theme output — rendered at runtime into state, never authored
 **/generated/
