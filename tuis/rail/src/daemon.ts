@@ -47,6 +47,11 @@ import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
 import { loadRailTab } from "./tabs.js";
+import {
+  emptyTaskSnapshot,
+  loadTaskSnapshot,
+  type TaskSnapshot,
+} from "./tasks.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
@@ -56,6 +61,11 @@ const TICK_MS = 250;
 // still lands within a tick.
 const IDLE_TICK_MS = 2000;
 const AGENT_RECONCILE_TICKS = 20; // every 5s
+// Tasks are read ONLY while the Tasks tab is showing: `vault tasks --json`
+// re-walks the vault on every call, and no other tab renders a task. The tab
+// file's watch drops the freshness flag, so alt+t re-reads within a tick
+// rather than showing whatever the last visit left behind.
+const TASK_RECONCILE_TICKS = 20; // every 5s, while Tasks is the active tab
 // tmux's two dead-server voices, appended to the exec error via stderr.
 const NO_SERVER_PATTERN = /no server running|error connecting/i;
 // Failed ticks back off 2s apiece, so this is ~10s — enough to ride out
@@ -84,6 +94,8 @@ const SYNC_OFF = "\x1b[?2026l";
 
 let agents: Agent[] = [];
 let agentsFresh = false;
+let taskSnapshot: TaskSnapshot = emptyTaskSnapshot();
+let tasksFresh = false;
 let appliedBg = "";
 let warnedNoPalette = false;
 const acks = loadAcks();
@@ -280,12 +292,22 @@ async function tick(counter: number): Promise<boolean> {
           agentsFresh = true;
         })
       : Promise.resolve();
+  const activeTab = loadRailTab();
+  const refreshTasks =
+    activeTab === "tasks" &&
+    (counter % TASK_RECONCILE_TICKS === 0 || !tasksFresh)
+      ? loadTaskSnapshot().then((snapshot) => {
+          taskSnapshot = snapshot;
+          tasksFresh = true;
+        })
+      : Promise.resolve();
   // The tmux poll, the host probes, and the agent refresh are independent
   // — one round-trip of latency, not three.
   const [{ panes, clientFacts }, hostFacts] = await Promise.all([
     collectSnapshot(),
     collectHostFacts(),
     refresh,
+    refreshTasks,
   ]);
   const { modeSessions, nonKittySessions } = clientFacts;
   // Every frame is a color: with no rendered theme there is nothing sane to
@@ -339,7 +361,6 @@ async function tick(counter: number): Promise<boolean> {
     // No page file: top of the list.
   }
 
-  const activeTab = loadRailTab();
   const review = loadReviewSnapshot();
 
   const frames = new Map<string, string>();
@@ -367,6 +388,7 @@ async function tick(counter: number): Promise<boolean> {
         windows: windowsOf(panes, pane.session),
         agents: settled,
         review,
+        tasks: taskSnapshot,
         acked,
         hints: hintsBySession.get(pane.session) ?? new Map<string, string>(),
         sprite,
@@ -506,6 +528,9 @@ async function main(): Promise<void> {
 
   watch(STATE_DIR, (_event, filename) => {
     if (filename === "enabled" || filename === "tab") wakeLoop();
+    // Landing on Tasks re-reads the vault: the surface is only polled while
+    // it is showing, so the visit is what makes it current.
+    if (filename === "tab") tasksFresh = false;
   });
 
   let counter = 0;

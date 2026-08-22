@@ -72,7 +72,7 @@ export function renderRail(
   if (data.activeTab === "reviews") {
     body.push(...reviewRows(data.review, palette, inner));
   } else if (data.activeTab === "tasks") {
-    body.push(...taskRows(palette, inner));
+    body.push(...taskRows(data.tasks, palette, inner));
   } else if (elsewhere.length > 0) {
     body.push(
       ...elsewhereRows(elsewhere, data.acked, data.hints, palette, inner),
