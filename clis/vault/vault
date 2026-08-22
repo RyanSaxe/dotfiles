@@ -3,8 +3,9 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""The vault contract: build a conforming Markdown vault, or validate one.
+"""Task state for a Markdown vault, and the contract the vault itself keeps.
 
+    vault tasks [--json]
     vault init [path] [--in-place]
     vault check
 
@@ -13,18 +14,27 @@ allowlist: `.gitignore` keeps everything local except `public/`, and `.ignore`
 puts the gitignored notes back in ripgrep's view — without it, note search,
 quick-switch, backlinks, and tags silently return nothing.
 
-Exit codes: 0 conforming, 1 a failed check or a bad request.
+A task is a `- [ ]` list item in any note. Its section is the nearest heading
+above it and its project is the `projects/<name>/` directory holding the file.
+Identity is `<vault-relative-path>:<line>`, recomputed on every read: no
+index, no cache, no identifier written into the Markdown.
+
+Exit codes: 0 success, 1 a failed check or a bad request.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from datetime import date, datetime
+from itertools import groupby
+from pathlib import Path, PurePosixPath
 
 COLOR = False  # set from --color in main()
 
@@ -64,6 +74,15 @@ GIT_SCOPE_VARS = (
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_NAMESPACE",
 )
+
+# The task grammar. Any Markdown bullet reads as a task; writes always use
+# "-". A due date is the calendar emoji and an ISO date, and nothing else in
+# the line is given meaning — a section is whatever heading sits above it.
+DUE_SIGIL = "📅"
+TASK_RE = re.compile(r"^(?P<indent>\s*)[-*+] \[(?P<mark>[ xX])\](?P<text> .*)?$")
+HEADING_RE = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<text>.*?)\s*$")
+FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
+DUE_RE = re.compile(rf"\s*{DUE_SIGIL}\s*(\d{{4}}-\d{{2}}-\d{{2}})")
 
 VAULT_DIRS = ("assets", "daily", "people", "projects", "public")
 VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE, "inbox.md": "# inbox\n"}
@@ -116,6 +135,177 @@ def markdown_files(root: Path) -> list[Path]:
             if name.endswith(".md") and not name.startswith("."):
                 found.append(Path(directory) / name)
     return found
+
+
+# --------------------------------------------------------- markdown grammar
+@dataclass
+class Heading:
+    index: int  # 0-based line index
+    level: int
+    text: str
+
+
+@dataclass
+class Entry:
+    index: int
+    text: str
+    done: bool
+    due: date | None
+
+
+@dataclass
+class Outline:
+    headings: list[Heading]
+    entries: list[Entry]
+
+
+def read_lines(path: Path) -> list[str] | None:
+    """A note's lines, or None when the file is not text this can read."""
+    try:
+        return path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def split_due(text: str) -> tuple[str, date | None]:
+    match = DUE_RE.search(text)
+    if not match:
+        return text, None
+    try:
+        due = date.fromisoformat(match.group(1))
+    except ValueError:
+        return text, None  # an impossible date stays part of the text
+    return (text[: match.start()] + text[match.end() :]).strip(), due
+
+
+def outline(lines: list[str]) -> Outline:
+    """Headings and tasks in line order, blind to anything inside a fence.
+
+    Notes quote Markdown — this plan does it a dozen times — so a fenced
+    `- [ ]` is a code sample, not a task, and a fenced `#` is not a section.
+    """
+    headings: list[Heading] = []
+    entries: list[Entry] = []
+    fence = ""
+    for index, line in enumerate(lines):
+        fenced = FENCE_RE.match(line)
+        if fenced:
+            marker = fenced.group(1)
+            if not fence:
+                fence = marker
+            elif marker[0] == fence[0]:
+                fence = ""
+            continue
+        if fence:
+            continue
+        heading = HEADING_RE.match(line)
+        if heading and heading.group("text"):
+            headings.append(
+                Heading(index, len(heading.group("hashes")), heading.group("text"))
+            )
+            continue
+        task = TASK_RE.match(line)
+        if task:
+            text, due = split_due((task.group("text") or "").strip())
+            entries.append(Entry(index, text, task.group("mark") != " ", due))
+    return Outline(headings, entries)
+
+
+# -------------------------------------------------------------------- tasks
+def local_today() -> date:
+    """Today on this machine's clock. Due states are calendar-only."""
+    return datetime.now().astimezone().date()
+
+
+def due_state(due: date | None, today: date) -> str:
+    if due is None:
+        return "none"
+    days = (due - today).days
+    if days < 0:
+        return "overdue"
+    if days == 0:
+        return "today"
+    if days == 1:
+        return "tomorrow"
+    return "near" if days <= 7 else "later"
+
+
+@dataclass
+class Task:
+    file: str  # vault-relative
+    line: int  # 1-based
+    text: str
+    done: bool
+    due: date | None
+    section: str | None
+    project: str | None
+
+    @property
+    def id(self) -> str:
+        return f"{self.file}:{self.line}"
+
+    def row(self, today: date) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "text": self.text,
+            "done": self.done,
+            "due": self.due.isoformat() if self.due else None,
+            "state": due_state(self.due, today),
+            "project": self.project,
+            "section": self.section,
+            "file": self.file,
+            "line": self.line,
+        }
+
+
+def project_of(relative: str) -> str | None:
+    parts = PurePosixPath(relative).parts
+    return parts[1] if len(parts) > 2 and parts[0] == "projects" else None
+
+
+def file_tasks(relative: str, lines: list[str]) -> list[Task]:
+    document = outline(lines)
+    project = project_of(relative)
+    headings, cursor = document.headings, 0
+    section: str | None = None
+    tasks: list[Task] = []
+    for entry in document.entries:
+        while cursor < len(headings) and headings[cursor].index < entry.index:
+            section = headings[cursor].text
+            cursor += 1
+        tasks.append(
+            Task(
+                relative,
+                entry.index + 1,
+                entry.text,
+                entry.done,
+                entry.due,
+                section,
+                project,
+            )
+        )
+    return tasks
+
+
+def vault_tasks(vault: Path) -> list[Task]:
+    tasks: list[Task] = []
+    for path in markdown_files(vault):
+        lines = read_lines(path)
+        if lines is not None:
+            tasks.extend(file_tasks(path.relative_to(vault).as_posix(), lines))
+    return tasks
+
+
+def command_tasks(as_json: bool) -> int:
+    vault = existing_vault()
+    today = local_today()
+    tasks = vault_tasks(vault)
+    if as_json:
+        rows = [task.row(today) for task in tasks]
+        print(json.dumps(rows, ensure_ascii=False, indent=2))
+        return 0
+    print(render_tasks(tasks, today) if tasks else "no tasks")
+    return 0
 
 
 # --------------------------------------------------------------------- init
@@ -308,10 +498,81 @@ def command_check() -> int:
 
 # ---------------------------------------------------------------- rendering
 def paint(code: str, text: str) -> str:
-    return f"\033[{code}m{text}\033[0m" if COLOR else text
+    return f"\033[{code}m{text}\033[0m" if COLOR and code and text else text
 
 
 LEVEL_COLORS = {"ok": "32", "warn": "33", "fail": "31"}
+
+# The rail's due-state palette, in the terminal's approximation of it: overdue
+# red, today and tomorrow peach, near-term mauve.
+STATE_COLORS = {
+    "overdue": "31",
+    "today": "33",
+    "tomorrow": "33",
+    "near": "35",
+    "later": "2",
+}
+
+
+@dataclass
+class Row:
+    prefix: str
+    label: str
+    metric: str = ""
+    state: str = ""
+    done: bool = False
+    kind: str = "task"
+
+
+def task_rows(tasks: list[Task], indent: str, last: bool, today: date) -> list[Row]:
+    rows = []
+    for position, task in enumerate(tasks):
+        final = last and position == len(tasks) - 1
+        state = due_state(task.due, today)
+        rows.append(
+            Row(
+                prefix=indent + ("└── " if final else "├── "),
+                label=f"[{'x' if task.done else ' '}] {task.text}",
+                metric="" if task.due is None else f"{state} {task.due.isoformat()}",
+                state=state,
+                done=task.done,
+            )
+        )
+    return rows
+
+
+def render_tasks(tasks: list[Task], today: date) -> str:
+    """One tree per file, one branch per section, in document order."""
+    rows: list[Row] = []
+    for file, in_file in groupby(tasks, key=lambda task: task.file):
+        rows.append(Row("", file, kind="file"))
+        sections = [
+            (section, list(items))
+            for section, items in groupby(in_file, key=lambda task: task.section)
+        ]
+        for position, (section, items) in enumerate(sections):
+            last = position == len(sections) - 1
+            if section is None:
+                rows.extend(task_rows(items, "", last, today))
+                continue
+            rows.append(Row("└── " if last else "├── ", section, kind="section"))
+            rows.extend(task_rows(items, "    " if last else "│   ", True, today))
+
+    width = max(len("TASK"), *(len(row.prefix + row.label) for row in rows))
+    lines = [f"{paint('1', 'TASK'.ljust(width))}  {paint('1', 'DUE')}"]
+    for row in rows:
+        if row.kind == "file":
+            label = paint("36", row.label)
+        elif row.kind == "section":
+            label = paint("1", row.label)
+        else:
+            label = paint("2", row.label) if row.done else row.label
+        padding = " " * (width - len(row.prefix) - len(row.label))
+        metric = (
+            paint(STATE_COLORS.get(row.state, ""), row.metric) if row.metric else ""
+        )
+        lines.append(f"{paint('2', row.prefix)}{label}{padding}  {metric}".rstrip())
+    return "\n".join(lines)
 
 
 def render_finding(finding: Finding) -> str:
@@ -324,6 +585,15 @@ def render_finding(finding: Finding) -> str:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    tasks = subparsers.add_parser("tasks", help="every task in the vault")
+    tasks.add_argument("--json", action="store_true", help="one row per task")
+    tasks.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="ANSI color use",
+    )
 
     init = subparsers.add_parser("init", help="create a conforming vault")
     init.add_argument(
@@ -352,6 +622,8 @@ def main() -> int:
     COLOR = color == "always" or (
         color == "auto" and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
     )
+    if args.command == "tasks":
+        return command_tasks(args.json)
     if args.command == "init":
         return command_init(args.path, args.in_place)
     return command_check()
