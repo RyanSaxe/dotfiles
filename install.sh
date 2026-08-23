@@ -842,7 +842,8 @@ fi
 
 # Render the theme so every consumer has colors from the first shell.
 if [ -x "$HOME/.local/bin/theme" ]; then
-  "$HOME/.local/bin/theme" apply
+  "$HOME/.local/bin/theme" apply ||
+    echo "warning: theme apply failed; continuing without refreshed generated theme" >&2
 fi
 
 # Rebuild bat's theme cache now that `theme apply` has published the rendered
