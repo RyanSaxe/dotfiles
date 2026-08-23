@@ -252,6 +252,31 @@ link_system_owned() {
   sudo ln -s "$source" "$target"
 }
 
+remove_system_link_matching() {
+  target="$1"
+  suffix="$2"
+  if sudo test -L "$target"; then
+    link="$(sudo readlink "$target")"
+    case "$link" in *"$suffix") sudo rm "$target" ;; esac
+  fi
+}
+
+scrub_codex_user_defaults() {
+  for config in "$HOME/.codex/config.toml" "$HOME/.codex/dotfiles.config.toml"; do
+    [ -f "$config" ] || continue
+
+    tmp="$(mktemp "${TMPDIR:-/tmp}/codex-config.XXXXXX")"
+    awk '
+      BEGIN { in_top_level = 1 }
+      /^\[/ { in_top_level = 0 }
+      in_top_level && /^[[:space:]]*(model|model_reasoning_effort|service_tier|approval_policy|approvals_reviewer)[[:space:]]*=/ { next }
+      { print }
+    ' "$config" >"$tmp"
+    cat "$tmp" >"$config"
+    rm "$tmp"
+  done
+}
+
 install_ai_harness() {
   [ -d "$AI_HARNESS_SOURCE" ] || {
     echo "error: missing $AI_HARNESS_SOURCE" >&2
@@ -269,15 +294,18 @@ install_ai_harness() {
   link_owned "$AI_HARNESS_SOURCE/AGENTS.md" "$HOME/.copilot/copilot-instructions.md"
   link_owned "$AI_HARNESS_SOURCE/copilot/settings.json" "$HOME/.copilot/settings.json"
   link_owned "$AI_HARNESS_SOURCE/statusline.js" "$HOME/.copilot/statusline.js"
+  link_owned "$AI_HARNESS_SOURCE/references" "$HOME/.copilot/references"
 
   link_owned "$AI_HARNESS_SOURCE/AGENTS.md" "$HOME/.codex/AGENTS.md"
-  link_system_owned "$AI_HARNESS_SOURCE/codex/config.toml" "/etc/codex/config.toml"
+  link_owned "$AI_HARNESS_SOURCE/references" "$HOME/.codex/references"
+  remove_system_link_matching "/etc/codex/config.toml" "/ai-harness/codex/config.toml"
+  link_system_owned "$AI_HARNESS_SOURCE/codex/managed_config.toml" "/etc/codex/managed_config.toml"
   link_system_owned "$AI_HARNESS_SOURCE/skills" "/etc/codex/skills"
 
-  # The profile is deliberately native state. Codex may update it without
-  # turning application state into a dotfiles diff.
+  # Codex owns its user config as mutable state. Portable defaults come from
+  # managed config, so old top-level defaults should not linger here.
   mkdir -p "$HOME/.codex"
-  [ -e "$HOME/.codex/dotfiles.config.toml" ] || : >"$HOME/.codex/dotfiles.config.toml"
+  scrub_codex_user_defaults
 }
 
 install_neovim_linux() {

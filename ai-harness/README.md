@@ -25,14 +25,15 @@ ai-harness/
 ```
 
 Claude and Copilot load `ai-harness/` as a local plugin. Codex reads the same
-instructions and skills through explicit links. The shell launchers select the
-local plugin or Codex profile while preserving arguments passed by the user.
+instructions and skills through explicit links and gets portable defaults from
+managed configuration. The shell launchers select the local plugin or runtime
+Codex overrides while preserving arguments passed by the user.
 
 GNU Stow manages packages that map cleanly into one target tree. This package
 does not: the same source directory is a plugin root, selected files belong
-under `$HOME`, and Codex system configuration belongs under `/etc`. `install.sh`
-therefore creates the small set of links directly. The existing `workmux/`
-package continues to use Stow.
+under `$HOME`, and Codex managed configuration belongs under `/etc`.
+`install.sh` therefore creates the small set of links directly. The existing
+`workmux/` package continues to use Stow.
 
 ## Install
 
@@ -61,9 +62,12 @@ The Codex admin links under `/etc/codex` require `sudo`.
 | Copilot | `~/.copilot/copilot-instructions.md` |
 | Codex   | `~/.codex/AGENTS.md`                 |
 
-Each harness also receives a `references` link beside its instruction file, so
-relative links from `AGENTS.md` resolve consistently. Project instructions
-remain independent and take precedence through each harness's normal rules.
+`AGENTS.md` links shared references through `~/generic/dotfiles/ai-harness`,
+which avoids embedding a machine-specific `/Users/...` path while remaining
+independent of each harness's instruction-file location. The installer also
+links `references/` beside each instruction file for compatibility. Project
+instructions remain independent and take precedence through each harness's
+normal rules.
 
 ## Skills
 
@@ -99,11 +103,11 @@ to reload it.
 
 Harness-specific files use the native format of each CLI.
 
-| Harness | Settings                | Agents                           | Hooks                     |
-| ------- | ----------------------- | -------------------------------- | ------------------------- |
-| Claude  | `claude/settings.json`  | `claude/agents/<name>.md`        | `claude/hooks/hooks.json` |
-| Copilot | `copilot/settings.json` | `copilot/agents/<name>.agent.md` | `copilot/hooks.json`      |
-| Codex   | `codex/config.toml`     | `codex/agents/<name>.toml`       | inline in `config.toml`   |
+| Harness | Settings                    | Agents                           | Hooks                     |
+| ------- | --------------------------- | -------------------------------- | ------------------------- |
+| Claude  | `claude/settings.json`      | `claude/agents/<name>.md`        | `claude/hooks/hooks.json` |
+| Copilot | `copilot/settings.json`     | `copilot/agents/<name>.agent.md` | `copilot/hooks.json`      |
+| Codex   | `codex/managed_config.toml` | `codex/agents/<name>.toml`       | native user/project state |
 
 Add Claude and Copilot agent or hook directories to their plugin manifests
 when the first implementation is added. Codex agent files are linked
@@ -123,16 +127,19 @@ skills.
 Claude receives its tracked settings with `--settings`; its native
 `~/.claude/settings.json` remains available for Workmux and other hooks.
 Copilot's `~/.copilot/settings.json` links to `copilot/settings.json`; changes
-made through Copilot are ordinary dotfile changes. Codex reads `codex/config.toml` from its
-system layer:
+made through Copilot are ordinary dotfile changes. Codex keeps
+`~/.codex/config.toml` as mutable local state for trust records, notices,
+permissions, and other machine-specific data. Portable Codex defaults live in
+managed config:
 
 ```text
-/etc/codex/config.toml -> ai-harness/codex/config.toml
+/etc/codex/managed_config.toml -> ai-harness/codex/managed_config.toml
 ```
 
-Codex launches with `--profile dotfiles`. The profile remains a regular file at
-`~/.codex/dotfiles.config.toml`, where Codex can write user state without
-changing tracked system defaults.
+The interactive shell wrapper adds `model_reasoning_effort="xhigh"` for
+runtime launches. Workmux invokes Codex directly and adds
+`model_reasoning_effort="max"` in its own config. Reasoning effort is not in
+managed config because launcher-specific values must remain overridable.
 
 ## Tools and references
 
@@ -141,15 +148,18 @@ are linked individually into `~/.local/bin`; runtime output belongs under the
 appropriate XDG state or cache directory.
 
 `references/` contains focused documentation linked from `AGENTS.md` or a
-skill. Unlinked references are not loaded automatically, which keeps the global
+skill. Shared instructions use `~/generic/dotfiles/ai-harness/references/...`
+paths so every harness can resolve them from the same repository location.
+Unlinked references are not loaded automatically, which keeps the global
 instruction file small.
 
 ## MCP, Workmux, and themes
 
 Use a root `.mcp.json` only when Claude and Copilot can share the definition
 unchanged. Otherwise keep MCP configuration under each harness directory.
-Codex MCP servers live in `codex/config.toml`. Credentials always come from the
-environment or a native credential store.
+Portable required Codex MCP servers can live in `codex/managed_config.toml`;
+local or private MCP state stays in `~/.codex/config.toml`. Credentials always
+come from the environment or a native credential store.
 
 [Workmux](../workmux/config.yaml) defines agent launch and
 worktree behavior. Files installed by `workmux setup` stay in the harness's
@@ -173,7 +183,8 @@ Useful references:
 
 - [Claude Code plugins](https://code.claude.com/docs/en/plugins-reference)
 - [GitHub Copilot CLI plugins](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference)
-- [Codex configuration](https://developers.openai.com/codex/config-basic)
+- [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-basic)
+- [Codex managed configuration](https://learn.chatgpt.com/docs/enterprise/managed-configuration)
 - [Codex skills](https://developers.openai.com/codex/skills)
 - [Codex subagents](https://developers.openai.com/codex/subagents)
 - [Codex hooks](https://developers.openai.com/codex/hooks)
@@ -186,14 +197,16 @@ claude plugin validate --strict ai-harness
 copilot --plugin-dir ai-harness plugin list
 ```
 
-The repository check validates manifests, settings, and every skill with the
-Agent Skills reference validator. The configuration was last checked against
-Claude Code 2.1.221, Codex CLI 0.146.0, and Copilot CLI 1.0.80.
+The repository check validates manifests, settings syntax, the shared status
+line, and every skill with the Agent Skills reference validator. The
+configuration was last checked against Claude Code 2.1.221, Codex CLI 0.149.0,
+and Copilot CLI 1.0.80.
 
 ## Codex compatibility
 
-Codex's `/etc` links can move to a user-level plugin layer when one can preserve
-native state and live repository edits. Relevant upstream issues:
+Codex's managed `/etc` link can move to a user-level plugin layer when one can
+preserve native state, admin defaults, and live repository edits. Relevant
+upstream issues:
 [openai/codex#11061](https://github.com/openai/codex/issues/11061),
 [#14601](https://github.com/openai/codex/issues/14601),
 [#24961](https://github.com/openai/codex/issues/24961), and
