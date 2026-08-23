@@ -190,6 +190,27 @@ jobs:
             exit 1
           fi
 
+      - name: Theme palettes keep matching keys
+        run: |
+          palette_keys() {
+            sed -n 's/^\([a-z_0-9][a-z_0-9]*\)=.*/\1/p' "$1" | sort
+          }
+          diff -u <(palette_keys theme/palettes/mocha.conf) \
+            <(palette_keys theme/palettes/latte.conf)
+
+      - name: Theme renders a light outer layer
+        run: |
+          HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
+            "$SCRATCH/.local/bin/theme" outer light
+          stroke_hex="$(sed -n 's/^os_window_stroke=#//p' theme/palettes/latte.conf)"
+          test -n "$stroke_hex"
+          grep -qF "export BORDER_COLOR=\"0xff$stroke_hex\"" \
+            "$SCRATCH/.local/state/dotfiles/generated/sketchybar-colors.sh"
+          if grep -q '{{' "$SCRATCH/.local/state/dotfiles/generated/sketchybar-colors.sh"; then
+            echo "::error::light outer render left unresolved tokens"
+            exit 1
+          fi
+
   # "Does the editor come up?" — the nvim package restores its locked
   # plugins headlessly and checkhealth reports no errors. Unlike the
   # health job this one installs real packages (neovim itself).

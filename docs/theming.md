@@ -45,9 +45,12 @@ Every consumer is registered as inner, outer, or mixed in
 must qualify every placeholder — `{{inner_bg}}`, `{{outer_crust}}` — because a
 bare name would silently pick one layer.
 
-The palette files stay upstream-pure: the theme's identity lives in the **role
-assignments**, not in custom hex values. The only additions are the three
-`semantic_*` keys for diff rendering.
+The native palette keys preserve their upstream Catppuccin values: the theme's
+identity lives in the **role assignments**, not in custom hex values. The
+palettes also contain dotfiles-owned keys used by generated consumers:
+`semantic_*` keys for diff rendering and `os_window_stroke` for the macOS
+window border. Both palettes must define the same key set so every consumer
+can render in either mode; CI checks that invariant.
 
 ### Neovim
 
