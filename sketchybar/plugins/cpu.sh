@@ -4,7 +4,7 @@
 source "$HOME/.config/sketchybar/colors.sh"
 
 # Get CPU usage using top
-CPU=$(top -l 1 -n 0 2>/dev/null | grep "CPU usage" | awk '{print int($3)}')
+CPU=$(top -l 1 -n 0 2>/dev/null | grep "CPU usage" | awk '{user=$3; sys=$5; sub(/%$/, "", user); sub(/%$/, "", sys); print int(user + sys)}')
 
 if [[ -z "$CPU" ]]; then
   CPU="--"
