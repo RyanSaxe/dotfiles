@@ -1,5 +1,6 @@
 import { appendFileSync } from "node:fs";
 
+import { displayWidth, truncate } from "./cells.js";
 import { rank, type Ranked } from "./search.js";
 import { stateRank } from "./tasks.js";
 import { bg, blend, fg, loadPalette, RESET, type Palette } from "./theme.js";
@@ -128,6 +129,13 @@ interface Cell {
   color?: string;
 }
 
+type TableFieldCell = string | readonly MetaSpan[] | null;
+
+interface TableField {
+  search: string;
+  cell: TableFieldCell;
+}
+
 const ESC = "\x1b";
 const HIDE_CURSOR = `${ESC}[?25l`;
 const SHOW_CURSOR = `${ESC}[?25h`;
@@ -156,9 +164,7 @@ export function sanitizeAnsi(text: string): string {
   );
 }
 
-function widthOf(text: string): number {
-  return Array.from(text).length;
-}
+const widthOf = displayWidth;
 
 export function visibleWidth(text: string): number {
   return widthOf(text.replace(ANSI, ""));
@@ -202,20 +208,21 @@ export function clipAnsi(text: string, width: number): string {
         continue;
       }
     }
-    out += text[index];
-    used += 1;
-    index += 1;
+    const codePoint = text.codePointAt(index);
+    if (codePoint === undefined) break;
+    const character = String.fromCodePoint(codePoint);
+    const characterWidth = displayWidth(character);
+    if (used + characterWidth > width) break;
+    out += character;
+    used += characterWidth;
+    index += character.length;
   }
   return `${out}${RESET}`;
 }
 
 function clip(text: string, width: number): string {
   if (width <= 0) return "";
-  if (widthOf(text) <= width) return text;
-  if (width === 1) return "…";
-  return `${Array.from(text)
-    .slice(0, width - 1)
-    .join("")}…`;
+  return truncate(text, width);
 }
 
 function padded(text: string, width: number): string {
@@ -485,6 +492,46 @@ function tableCells(
   return cells;
 }
 
+function tableFieldText(cell: TableFieldCell): string {
+  if (cell === null) return "";
+  return typeof cell === "string"
+    ? cell
+    : cell.map((span) => span.text).join("");
+}
+
+function tableField(
+  cell: TableFieldCell,
+  search = tableFieldText(cell),
+): TableField {
+  return { search, cell };
+}
+
+function tableFields(item: DashboardItem): TableField[] {
+  return [
+    tableField(item.reference),
+    tableField(item.from),
+    tableField(item.author),
+    tableField(item.reason),
+    tableField(item.metadata),
+    tableField(item.time),
+    // Titles and repositories are useful search targets but are not row
+    // cells: the title lives in the preview and the repository is a heading.
+    tableField(null, item.title),
+    tableField(null, item.repository),
+  ];
+}
+
+function renderTableField(
+  cell: Exclude<TableFieldCell, null>,
+  palette: Palette,
+): string | Cell[] {
+  if (typeof cell === "string") return cell;
+  return cell.map((span) => ({
+    text: span.text,
+    color: metaColor(span.tone, palette),
+  }));
+}
+
 // The columns are one geometry serving three datasets, so only the labels
 // change. A Tasks table headed "PR / Needs you / Age" would be describing
 // the wrong thing in every cell.
@@ -544,22 +591,19 @@ function tableItem(
   const lineBackground = selected
     ? blend(palette.surface0, background(palette), 0.9)
     : background(palette);
+  const fields = tableFields(item);
+  const visibleFields: Array<string | Cell[]> = [];
+  const fieldCells = new Map<number, number>();
+  fields.forEach((field, index) => {
+    if (field.cell === null) return;
+    fieldCells.set(index, visibleFields.length);
+    visibleFields.push(renderTableField(field.cell, palette));
+  });
   return line(
     width,
     palette,
     tableCells(
-      [
-        `${marker}${index + 1}`,
-        item.reference,
-        item.from,
-        item.author,
-        item.reason,
-        item.metadata.map((span) => ({
-          text: span.text,
-          color: metaColor(span.tone, palette),
-        })),
-        item.time,
-      ],
+      [`${marker}${index + 1}`, ...visibleFields],
       widths,
       [
         // The selection marker is structure, so it takes the mascot accent.
@@ -581,9 +625,11 @@ function tableItem(
       muted,
       {
         color: palette.yellow,
-        // Cell 0 is the row number, so a field at i renders in cell i + 1.
         hits: new Map(
-          [...hits].map(([field, positions]) => [field + 1, positions]),
+          [...hits].flatMap(([field, positions]) => {
+            const cell = fieldCells.get(field);
+            return cell === undefined ? [] : [[cell + 1, positions]];
+          }),
         ),
       },
     ),
@@ -678,11 +724,20 @@ function wrapText(text: string, width: number): string[] {
   if (current !== "") lines.push(current);
   return lines.flatMap((lineText) => {
     if (widthOf(lineText) <= width) return [lineText];
-    const characters = Array.from(lineText);
     const chunks: string[] = [];
-    for (let index = 0; index < characters.length; index += width) {
-      chunks.push(characters.slice(index, index + width).join(""));
+    let chunk = "";
+    let chunkWidth = 0;
+    for (const character of lineText) {
+      const characterWidth = widthOf(character);
+      if (chunk !== "" && chunkWidth + characterWidth > width) {
+        chunks.push(chunk);
+        chunk = "";
+        chunkWidth = 0;
+      }
+      chunk += character;
+      chunkWidth += characterWidth;
     }
+    if (chunk !== "") chunks.push(chunk);
     return chunks;
   });
 }
@@ -867,22 +922,11 @@ function footerLine(
   return line(width, palette, cells);
 }
 
-// The columns the table actually shows, in cell order. The PR/issue body is
-// deliberately absent: it is what made every query match, and highlighting a
-// match you cannot see is worse than not matching at all.
+// Search fields and row cells come from the same descriptors. Search-only
+// fields still rank an item, but cannot leak their hit positions onto a
+// different visible cell.
 function searchFields(item: DashboardItem): string[] {
-  // Cell order first, so a hit at index i highlights in cell i + 1. Title and
-  // repository trail because neither has a cell — the title lives in the
-  // preview and the repository is a heading — but both stay searchable.
-  return [
-    item.reference,
-    item.from,
-    item.author,
-    item.reason,
-    item.time,
-    item.title,
-    item.repository,
-  ];
+  return tableFields(item).map((field) => field.search);
 }
 
 export type RankedItem = Ranked<DashboardItem>;

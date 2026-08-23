@@ -79,8 +79,8 @@ const NO_SERVER_PATTERN = /no server running|error connecting/i;
 const NO_SERVER_EXIT_TICKS = 5;
 // 28 content cells: five terminal columns wider than the original rail,
 // approximately 41px at the current font, plus the crust gutter. The tab
-// bar is why it is 28 and not 27: its three chips occupy 24 cells, so an
-// even content width is what lets the two gaps between them match.
+// bar derives chip positions from the registry, distributing spare cells
+// between the chips when the labels or tab count change.
 const RAIL_WIDTH = 28 + GUTTER_COLS;
 // Split feasibility, not policy: below this tmux can't fit rail + border
 // + any content. Visibility is controlled by alt+g alone.

@@ -10,10 +10,8 @@ export interface Span {
   bg?: string;
 }
 
-// Minimal display-width model: wide (CJK/emoji) = 2 cells, zero-width
+// Shared display-width model: wide (CJK/emoji) = 2 cells, zero-width
 // (combining marks, variation selectors, ZWJ) = 0, everything else = 1.
-// Agent titles are mostly ASCII plus glyphs like ✳ and braille spinners,
-// all width 1 — this covers the realistic input space.
 function charWidth(cp: number): number {
   if (
     cp === 0x200d || // zero-width joiner
@@ -38,13 +36,13 @@ function charWidth(cp: number): number {
   return 1;
 }
 
-function displayWidth(text: string): number {
+export function displayWidth(text: string): number {
   let width = 0;
   for (const ch of text) width += charWidth(ch.codePointAt(0)!);
   return width;
 }
 
-function truncate(text: string, max: number): string {
+export function truncate(text: string, max: number): string {
   if (displayWidth(text) <= max) return text;
   let width = 0;
   let out = "";

@@ -1,4 +1,4 @@
-import { line, type Span } from "../cells.js";
+import { displayWidth, line, type Span } from "../cells.js";
 import type { RailTabAttention, RailTabId } from "../tabs.js";
 import { RAIL_TABS } from "../tabs.js";
 import { blend, DIM_KEEP, railBg, type Palette } from "../theme.js";
@@ -33,10 +33,30 @@ export function sectionHairline(palette: Palette, width: number): string {
 }
 
 // The tab row replaces the old divider between local tmux windows and the
-// lower rail content. Agents hugs the left edge, Reviews is centered, and
-// Tasks hugs the right edge; all three occupy one row above the lower scene.
+// lower rail content. Chips keep registry order, and the gaps come from the
+// actual chip widths rather than a fixed number of tab positions.
 // The tabs are square so their full-width backgrounds make the row itself
 // the divider without introducing another hairline.
+function tabStarts(width: number, widths: readonly number[]): number[] {
+  if (widths.length === 0) return [];
+  if (widths.length === 1) return [0];
+
+  const total = widths.reduce((sum, tabWidth) => sum + tabWidth, 0);
+  const gapCount = widths.length - 1;
+  const free = Math.max(0, width - total);
+  const starts: number[] = [];
+  let cursor = 0;
+  let allocated = 0;
+  for (const [index, tabWidth] of widths.entries()) {
+    starts.push(cursor);
+    if (index === widths.length - 1) break;
+    const nextAllocated = Math.round((free * (index + 1)) / gapCount);
+    cursor += tabWidth + nextAllocated - allocated;
+    allocated = nextAllocated;
+  }
+  return starts;
+}
+
 export function tabBar(
   activeTab: RailTabId,
   attention: RailTabAttention,
@@ -47,15 +67,8 @@ export function tabBar(
   const spans: Span[] = [];
 
   const tabWidth = (tab: (typeof RAIL_TABS)[number]): number =>
-    tab.label.length + 2;
-  // The rail's left exterior margin is Ghostty padding while its right
-  // visual seam includes the rail gutter and tmux border. The one-cell
-  // nudge compensates for that asymmetric frame around the odd-width tab.
-  const reviewStart = Math.max(
-    0,
-    Math.floor((width - tabWidth(RAIL_TABS[1]!)) / 2) + 1,
-  );
-  const starts = [0, reviewStart, Math.max(0, width - tabWidth(RAIL_TABS[2]!))];
+    displayWidth(tab.label) + 2;
+  const starts = tabStarts(width, RAIL_TABS.map(tabWidth));
   let cursor = 0;
 
   for (const [index, tab] of RAIL_TABS.entries()) {
