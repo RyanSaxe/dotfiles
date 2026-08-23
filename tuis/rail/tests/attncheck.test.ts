@@ -6,7 +6,12 @@
 
 import assert from "node:assert/strict";
 
-import { stabilizeAgents, type Agent, type AgentStatus } from "../src/data.js";
+import {
+  AGENT_STATUS_LAG_SECS,
+  stabilizeAgents,
+  type Agent,
+  type AgentStatus,
+} from "../src/data.js";
 import { attentionLevel, phoneBatch } from "../src/notifications.js";
 import { isPresent } from "../src/probes.js";
 
@@ -35,26 +40,52 @@ assert.equal(isPresent(null, null, 1000), false, "no signal is away");
 assert.equal(isPresent(30, 100, 1000), true, "input idle outranks clients");
 
 // ----- status stabilization ---------------------------------------------
+// Boundaries are derived from the constant, never restated: a test that
+// spells out the window is a second copy of it, and the two drift.
+const CHANGED_AT = 100;
 const stableStatuses = new Map<string, AgentStatus>([["%1", "working"]]);
-const waitingChange = agent("%1", "waiting", 100);
+const waitingChange = agent("%1", "waiting", CHANGED_AT);
 assert.equal(
-  stabilizeAgents([waitingChange], stableStatuses, 104)[0]?.status,
+  stabilizeAgents(
+    [waitingChange],
+    stableStatuses,
+    CHANGED_AT + AGENT_STATUS_LAG_SECS - 1,
+  )[0]?.status,
   "working",
-  "a fresh status change stays provisional",
+  "a status change stays provisional right up to the window",
 );
 assert.equal(
-  stabilizeAgents([waitingChange], stableStatuses, 105)[0]?.status,
+  stabilizeAgents(
+    [waitingChange],
+    stableStatuses,
+    CHANGED_AT + AGENT_STATUS_LAG_SECS,
+  )[0]?.status,
   "waiting",
-  "a status that lasts five seconds is accepted",
+  "a status that lasts the full window is accepted",
 );
-const doneChange = agent("%1", "done", 106);
+const doneChange = agent("%1", "done", CHANGED_AT + AGENT_STATUS_LAG_SECS + 1);
 assert.equal(
-  stabilizeAgents([doneChange], stableStatuses, 107)[0]?.status,
+  stabilizeAgents(
+    [doneChange],
+    stableStatuses,
+    CHANGED_AT + AGENT_STATUS_LAG_SECS + 2,
+  )[0]?.status,
   "waiting",
   "every status gets the same stabilization window",
 );
+// The window is only meaningful in multiples of the sampling interval: the
+// daemon re-reads agents every 5s, so anything at or below that suppresses
+// nothing at all.
+assert.ok(
+  AGENT_STATUS_LAG_SECS > 5,
+  "the stabilization window must exceed the agent reconcile interval",
+);
 assert.equal(
-  stabilizeAgents([doneChange], stableStatuses, 111)[0]?.status,
+  stabilizeAgents(
+    [doneChange],
+    stableStatuses,
+    doneChange.updatedTs + AGENT_STATUS_LAG_SECS,
+  )[0]?.status,
   "done",
   "the latest stable status replaces the previous one",
 );

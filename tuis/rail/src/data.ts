@@ -97,10 +97,20 @@ async function collectAgents(): Promise<Agent[]> {
     }));
 }
 
-// A status change must remain visible in Workmux for a short interval before
-// it reaches any attention surface. The daemon keeps the last accepted status
-// per pane, so this remains independent of which status is changing.
-const AGENT_STATUS_LAG_SECS = 5;
+// A status change must remain visible in Workmux for this long before it
+// reaches any attention surface. The daemon keeps the last accepted status per
+// pane, so this stays independent of which status is changing.
+//
+// Read against the sampling rate, not the clock: daemon.ts re-reads
+// `workmux status` every AGENT_RECONCILE_TICKS (5s), so this window buys
+// roughly window/5 consecutive confirmations. At 5s that was one — a change
+// only had to be there when the next sample landed, which is why an agent
+// pausing for a second or two on its way into auto mode still lit the bar.
+// 30s asks for about six, and the longest such flicker measured in the
+// daemon's own attention log was 21s.
+//
+// The floor is the reconcile interval: below it this suppresses nothing.
+export const AGENT_STATUS_LAG_SECS = 30;
 
 export function stabilizeAgents(
   agents: Agent[],
