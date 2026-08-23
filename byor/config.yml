@@ -1,0 +1,19 @@
+version: 1
+paths:
+  rules: rules
+  repos: repos.yml
+  packages: packages
+  commands: commands
+ast_grep:
+  command: auto
+output:
+  concise: true
+ai:
+  agents:
+    - claude-code
+    - codex
+    - copilot
+    - opencode
+    - pi
+    - skill
+checks: []

@@ -1,0 +1,38 @@
+# Deployment map for the extras tier (see tiers/core.yaml for how this works).
+#
+# Optional tooling. Nothing here is needed to work on this machine, and a
+# machine without the tool should look as though the entry did not exist.
+#
+# Each entry states its own condition with dotbot's `if`, so the tier is a
+# list of independent extras rather than one thing that is on or off: a link
+# whose tool is missing is skipped, and its neighbours still deploy. Adding an
+# extra means adding entries and their own `if` — nothing outside this file
+# needs to learn about it.
+#
+# ~/.config/byor is a directory byor WRITES into — `byor init` and `byor
+# disable` rewrite repos.yml with absolute paths for this machine, and `byor
+# package install` fills packages/ with rules byor ships. Neither belongs in
+# the repo, so this is the bat/ghostty shape: a real directory with the
+# authored parts linked inside it. rules/ and scripts/ are linked whole, so a
+# rule written with `byor add` lands in the repo the moment it is saved.
+
+- defaults:
+    link:
+      create: true
+      relative: true
+      relink: true
+
+- clean:
+    ~/.config/byor:
+      recursive: true
+
+- link:
+    ~/.config/byor/config.yml:
+      path: byor/config.yml
+      if: command -v byor
+    ~/.config/byor/rules:
+      path: byor/rules
+      if: command -v byor
+    ~/.config/byor/scripts:
+      path: byor/scripts
+      if: command -v byor

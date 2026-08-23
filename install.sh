@@ -93,11 +93,15 @@ ensure_package_manager() {
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua'
+CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua jq'
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
-CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync'
+CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync jq'
 MAC_BREW_FORMULAS='sketchybar'
-MAC_BREW_CASKS='aerospace'
+MAC_BREW_CASKS='aerospace font-jetbrains-mono-nerd-font'
+# byor's rule engine. Not in Debian or Ubuntu, so Linux takes the npm build
+# into ~/.local like the agent CLIs do.
+EXTRAS_BREW_FORMULAS='ast-grep'
+EXTRAS_NPM_PACKAGES='@ast-grep/cli'
 ZSH_PLUGINS='zsh-users/zsh-autosuggestions zdharma-continuum/fast-syntax-highlighting Aloxaf/fzf-tab'
 RAIL_DIR='tuis/rail'
 
@@ -450,6 +454,25 @@ install_tier_packages() {
     # Per-machine notch compensation for aerospace's top gap.
     ./aerospace/configure.sh
     ;;
+  extras:Darwin | extras:Linux)
+    # Optional tooling. Nothing else depends on this tier, and a machine that
+    # declines it should look as though the tier did not exist — which is why
+    # deploy_tier refuses to link byor's config unless byor is actually here.
+    if [ "$OS" = Darwin ]; then
+      # shellcheck disable=SC2086
+      brew_install $EXTRAS_BREW_FORMULAS
+    else
+      # shellcheck disable=SC2086
+      command -v ast-grep >/dev/null 2>&1 ||
+        npm install -g --prefix "$HOME/.local" $EXTRAS_NPM_PACKAGES
+    fi
+    uv tool install --quiet byor
+    # byor owns its agent wiring and its shipped rule packages. Both commands
+    # are idempotent, so reproducing them beats the repo carrying copies that
+    # would drift out of step with the tool.
+    byor install >/dev/null 2>&1 || true
+    byor package install style >/dev/null 2>&1 || true
+    ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
     exit 1
@@ -470,7 +493,7 @@ install_tier_packages() {
 # deleted, and untracked files refuse to deploy. Note what a directory link
 # changes here — a file in one of these trees is live the moment it is
 # written, so the refusal below gates the deploy, not the file's visibility.
-DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin clis bat ghostty sketchybar aerospace'
+DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin clis bat ghostty sketchybar aerospace byor'
 
 ensure_uv() {
   command -v uvx >/dev/null 2>&1 && return 0
@@ -770,7 +793,7 @@ run_upgrade() {
 # CI runs this same path against a scratch HOME.
 if [ "${1:-}" = links ]; then
   shift
-  [ "$#" -gt 0 ] || set -- core mac
+  [ "$#" -gt 0 ] || set -- core mac extras
   ensure_uv
   clean_deploy_sources
   migrate_link_dirs
@@ -792,6 +815,9 @@ if [ "$#" -eq 0 ]; then
   set -- core agents
   if [ "$OS" = Darwin ] && ask "install the mac tier (GUI apps)?"; then
     set -- "$@" mac
+  fi
+  if ask "install the extras tier (byor and its rule engine)?"; then
+    set -- "$@" extras
   fi
 fi
 
