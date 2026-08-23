@@ -38,26 +38,20 @@ copilot() {
 codex() {
   local first_arg="${1:-}"
   local shell_env_config="shell_environment_policy.set={ UV_CACHE_DIR = \"$HOME/.cache/uv\", UV_TOOL_BIN_DIR = \"$HOME/.local/bin\", UV_TOOL_DIR = \"$HOME/.local/share/uv/tools\", UV_PYTHON_INSTALL_DIR = \"$HOME/.local/share/uv/python\", UV_SYSTEM_CERTS = \"true\" }"
-  local profile_args=(--profile dotfiles)
-  local arg
-
-  for arg in "$@"; do
-    case "$arg" in
-    --profile | -p | --profile=*)
-      profile_args=()
-      break
-      ;;
-    esac
-  done
+  local runtime_config_args=(-c "$shell_env_config" -c 'model_reasoning_effort="xhigh"')
 
   case "$first_arg" in
-  features | login | logout | update | completion | help | -h | --help | -V | --version)
+  agents | login | logout | mcp | plugin | mcp-server | app-server | remote-control | app | completion | update | doctor | sandbox | debug | apply | a | migrate-rollouts | cloud | exec-server | features | help | -h | --help | -V | --version)
     command codex "$@"
+    ;;
+  "" | -* | exec | e | review | resume | queue | archive | delete | unarchive | fork)
+    command codex \
+      "${runtime_config_args[@]}" \
+      "$@"
     ;;
   *)
     command codex \
-      "${profile_args[@]}" \
-      -c "$shell_env_config" \
+      "${runtime_config_args[@]}" \
       "$@"
     ;;
   esac

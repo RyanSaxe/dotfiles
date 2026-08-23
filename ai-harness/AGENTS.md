@@ -6,7 +6,7 @@ requirements. Both take precedence over these global defaults.
 
 <important>
 
-Read [How to Write and Communicate Clearly](references/writing.md) before continuing. Its
+Read [How to Write and Communicate Clearly](~/generic/dotfiles/ai-harness/references/writing.md) before continuing. Its
 principles govern your voice in conversation as well as plans, explanations,
 documentation, and review artifacts. Revisit it when writing substantial prose
 or when your communication starts to drift.
@@ -112,7 +112,7 @@ conventions and toolchain as part of the design.
 
 <important>
 
-Read [Development Practices](references/development.md) before planning or
+Read [Development Practices](~/generic/dotfiles/ai-harness/references/development.md) before planning or
 implementing substantial feature work, and revisit it when the design changes.
 
 </important>
@@ -128,7 +128,7 @@ the change; do not silence a check simply to make the work pass.
 
 <important>
 
-Read [Testing](references/testing.md) before writing or materially changing
+Read [Testing](~/generic/dotfiles/ai-harness/references/testing.md) before writing or materially changing
 tests.
 
 </important>
@@ -149,7 +149,7 @@ is itself a finding worth fixing.
 
 <important>
 
-Read [Verification](references/verification.md) before planning or performing
+Read [Verification](~/generic/dotfiles/ai-harness/references/verification.md) before planning or performing
 verification.
 
 </important>
@@ -164,7 +164,7 @@ verified behavior, even if drafts or notes existed earlier.
 
 <important>
 
-Read [How to Write and Communicate Clearly](references/writing.md) before writing or revising
+Read [How to Write and Communicate Clearly](~/generic/dotfiles/ai-harness/references/writing.md) before writing or revising
 documentation.
 
 </important>

@@ -3,23 +3,15 @@
 
 agent: codex
 
-# Workmux invokes the binary directly, so make the global Codex defaults
-# explicit instead of relying on the interactive zsh wrapper.
+# Workmux invokes the binary directly, so make its reasoning override explicit
+# instead of relying on the interactive zsh wrapper.
 agents:
   codex:
     type: codex
     command: codex
     args:
-      - --profile
-      - dotfiles
-      - --model
-      - gpt-5.6-luna
       - --config
-      - 'model_reasoning_effort="xhigh"'
-      - --config
-      - 'approvals_reviewer="auto_review"'
-      - --ask-for-approval
-      - on-request
+      - 'model_reasoning_effort="max"'
 
 # Named pane layouts, selected with `workmux add -l <name>`.
 #

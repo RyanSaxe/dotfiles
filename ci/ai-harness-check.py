@@ -111,28 +111,8 @@ def validate_settings() -> None:
         if not isinstance(command, str) or not command.endswith("statusline.js"):
             raise HarnessError(f"{name} statusLine must invoke statusline.js")
 
-    codex_path = HARNESS_ROOT / "codex/config.toml"
-    config = tomllib.loads(codex_path.read_text())
-    if "projects" in config:
-        raise HarnessError(
-            f"{codex_path.relative_to(REPO_ROOT)} contains project state"
-        )
-
-    hooks = config.get("hooks")
-    if isinstance(hooks, dict) and "state" in hooks:
-        raise HarnessError(f"{codex_path.relative_to(REPO_ROOT)} contains hook state")
-
-    tui = config.get("tui")
-    if isinstance(tui, dict) and "model_availability_nux" in tui:
-        raise HarnessError(f"{codex_path.relative_to(REPO_ROOT)} contains UI state")
-    if not isinstance(tui, dict) or tui.get("theme") != "dotfiles":
-        raise HarnessError(
-            f"{codex_path.relative_to(REPO_ROOT)} must select dotfiles theme"
-        )
-    if tui.get("status_line_use_colors") is not True:
-        raise HarnessError(
-            f"{codex_path.relative_to(REPO_ROOT)} must color its status line"
-        )
+    codex_path = HARNESS_ROOT / "codex/managed_config.toml"
+    tomllib.loads(codex_path.read_text())
 
 
 def validate_statusline() -> None:
