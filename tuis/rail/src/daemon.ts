@@ -77,9 +77,9 @@ const NO_SERVER_PATTERN = /no server running|error connecting/i;
 // a server restart, short enough that a dead server doesn't leave the
 // daemon erroring forever.
 const NO_SERVER_EXIT_TICKS = 5;
-// 26 content cells: three terminal columns wider than the original rail,
-// approximately 25px at the current font, plus the crust gutter.
-const RAIL_WIDTH = 26 + GUTTER_COLS;
+// 27 content cells: four terminal columns wider than the original rail,
+// approximately 33px at the current font, plus the crust gutter.
+const RAIL_WIDTH = 27 + GUTTER_COLS;
 // Split feasibility, not policy: below this tmux can't fit rail + border
 // + any content. Visibility is controlled by alt+g alone.
 const MIN_SPLIT_WIDTH = RAIL_WIDTH + 2;

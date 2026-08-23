@@ -119,7 +119,7 @@ export function parseTasks(stdout: string): VaultTask[] {
 }
 
 // `MM-DD`, the one due-date shorthand both surfaces show. The year is never
-// news for something due inside the week, and the slab is 26 cells wide.
+// news for something due inside the week, and the slab is 27 cells wide.
 export function shortDue(due: string | null): string {
   return due === null ? "" : due.slice(5);
 }
