@@ -13,10 +13,8 @@
       recursive: true
 
 - link:
+    # ghostty stays per-file: `theme` renders shaders and themes into its
+    # directory, so that one is real (see the `create` list in core.yaml).
     ~/.config/ghostty/config: ghostty/config
-    ~/.config/sketchybar:
-      glob: true
-      path: sketchybar/**
-    ~/.config/aerospace:
-      glob: true
-      path: aerospace/**
+    ~/.config/sketchybar: sketchybar
+    ~/.config/aerospace: aerospace

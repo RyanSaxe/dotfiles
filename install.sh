@@ -443,16 +443,17 @@ install_tier_packages() {
 
 # ------------------------------------------------------------------ deploy
 # Symlinks are deployed by dotbot from one explicit map per tier
-# (tiers/<tier>.yaml): per-file links inside real directories, plus native
-# cleanup of links whose source file was renamed or deleted. dotbot runs through uvx, so the deployment tool itself needs
-# no install step anywhere uv exists.
+# (tiers/<tier>.yaml): whole config directories linked as directories, per-file
+# links only where a program writes into the directory, plus native cleanup of
+# links whose source file was renamed or deleted. dotbot runs through uvx, so
+# the deployment tool itself needs no install step anywhere uv exists.
 
-# Source directories the tier maps deploy from, kept in step with the glob
-# patterns in tiers/*.yaml. Deployment reads the filesystem, not the git
-# index, so junk inside these trees matters: gitignored files are declared
-# junk and deleted before a glob can link them; untracked files may be
-# unfinished work, so they refuse to deploy rather than silently becoming
-# live configuration.
+# Source directories the tier maps deploy from. Deployment reads the
+# filesystem, not the git index, so junk inside these trees matters twice
+# over now that they are linked whole: gitignored files are declared junk and
+# deleted, and untracked files refuse to deploy. Note what a directory link
+# changes here — a file in one of these trees is live the moment it is
+# written, so the refusal below gates the deploy, not the file's visibility.
 DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin clis bat ghostty sketchybar aerospace'
 
 ensure_uv() {
@@ -483,6 +484,38 @@ clean_deploy_sources() {
     echo "commit or remove them, then re-run" >&2
     exit 1
   fi
+}
+
+# Config directories the map once filled with per-file links and now links
+# whole. An install from before that change has a real directory sitting where
+# the symlink belongs, and dotbot will not replace a directory it did not
+# create — so clear it here first.
+#
+# Only when every entry inside is a link or a directory, though. A regular
+# file is either something the owner put there or a program writing where the
+# map says nothing writes; both are worth stopping for, and neither is worth
+# deleting on the way past. Doing this rather than dotbot's `force` matters
+# for exactly that reason: `force` is an unconditional rmtree.
+LEGACY_LINK_DIRS='.config/zsh .config/git .config/theme .config/nvim .config/tmux .config/vault/templates .config/sketchybar .config/aerospace'
+
+migrate_link_dirs() {
+  # Same resolution as deploy_tier: DOTFILES_TARGET redirects scratch-home
+  # checks, and physical so a symlinked /var cannot split the comparison.
+  migrate_home="$(cd -P "${DOTFILES_TARGET:-$HOME}" && pwd -P)"
+  for rel in $LEGACY_LINK_DIRS; do
+    dir="$migrate_home/$rel"
+    # A link is already converted; a missing directory is a fresh machine.
+    { [ -d "$dir" ] && [ ! -L "$dir" ]; } || continue
+    strays="$(find "$dir" ! -type d ! -type l)"
+    if [ -n "$strays" ]; then
+      echo "error: $dir holds files this deploy did not put there:" >&2
+      printf '%s\n' "$strays" | sed 's/^/  /' >&2
+      echo "the map links this directory whole now; move them aside, then re-run" >&2
+      exit 1
+    fi
+    echo "converting $rel to a directory link"
+    rm -rf "$dir"
+  done
 }
 
 deploy_tier() {
@@ -724,6 +757,7 @@ if [ "${1:-}" = links ]; then
   [ "$#" -gt 0 ] || set -- core mac
   ensure_uv
   clean_deploy_sources
+  migrate_link_dirs
   for tier in "$@"; do
     deploy_tier "$tier"
   done
@@ -747,6 +781,7 @@ fi
 
 ensure_uv
 clean_deploy_sources
+migrate_link_dirs
 
 for tier in "$@"; do
   echo "==> $tier"

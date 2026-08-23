@@ -73,6 +73,58 @@ jobs:
             exit 1
           fi
 
+      - name: A legacy per-file layout upgrades to directory links
+        run: |
+          # Every other check here starts from an empty home, which is the one
+          # shape that can never catch an upgrade going wrong. This one starts
+          # from the layout an already-installed machine has: a real directory
+          # of per-file links where a single directory link now belongs. That
+          # shape is built by hand rather than checked out of git history,
+          # because once this is the history there would be nothing to test.
+          clone="$(mktemp -d)/clone"
+          home="$(mktemp -d)"
+          git clone -q . "$clone"
+          cd "$clone"
+
+          mkdir -p "$home/.config/nvim/lua/plugins"
+          ln -s "$clone/nvim/init.lua" "$home/.config/nvim/init.lua"
+          ln -s "$clone/nvim/lua/plugins/picker.lua" "$home/.config/nvim/lua/plugins/picker.lua"
+
+          HOME="$home" ./install.sh links core
+          if [ ! -L "$home/.config/nvim" ]; then
+            echo "::error::a legacy directory did not convert to a link"
+            exit 1
+          fi
+          # Hidden files needed their own map entry under the old globbing.
+          if [ ! -f "$home/.config/nvim/.luarc.json" ]; then
+            echo "::error::hidden file unreachable through the directory link"
+            exit 1
+          fi
+
+          # The whole point: a file written into the repo is live immediately,
+          # with no deploy step between writing it and a program reading it.
+          touch "$clone/nvim/lua/plugins/__probe.lua"
+          if [ ! -f "$home/.config/nvim/lua/plugins/__probe.lua" ]; then
+            echo "::error::a new repo file was not live without a redeploy"
+            exit 1
+          fi
+          rm "$clone/nvim/lua/plugins/__probe.lua"
+
+          # Converting means deleting a directory, so it stops at anything it
+          # did not put there instead of taking the file with it.
+          rm "$home/.config/nvim"
+          mkdir -p "$home/.config/nvim"
+          ln -s "$clone/nvim/init.lua" "$home/.config/nvim/init.lua"
+          echo data > "$home/.config/nvim/keepme.txt"
+          if HOME="$home" ./install.sh links core; then
+            echo "::error::deploy converted a directory holding a real file"
+            exit 1
+          fi
+          if [ ! -f "$home/.config/nvim/keepme.txt" ]; then
+            echo "::error::the real file was deleted by the conversion"
+            exit 1
+          fi
+
       - name: Key targets resolve
         run: |
           paths=".zshrc .config/tmux/tmux.conf .local/bin/theme .local/bin/rail .local/bin/attention"

@@ -3,11 +3,19 @@
 # Directives run in order: `create` makes the directories that receive
 # generated files at runtime (so nothing can turn them into links into the
 # repo), `clean` removes links whose repo file was renamed or deleted, and
-# `link` deploys per-file symlinks inside real directories.
+# `link` deploys the tree.
 #
-# Globbed directories pick up new files automatically. Python's glob skips
-# hidden files, so a dotted name inside a globbed tree needs its own explicit
-# entry (as .luarc.json has); without one it silently never deploys.
+# A config directory is linked WHOLE — one symlink, the repo directory behind
+# it. A file added to the repo is then live immediately, with no deploy step
+# between writing it and the program reading it. That is the default, and it
+# is what makes this map safe to forget about.
+#
+# The exception is a directory a program WRITES into, which would turn its
+# output into repo contents. Those get a real directory (`create` above) with
+# the individual files linked inside it: bat and ghostty receive rendered
+# themes and shaders, and ~/.local/bin is shared with everything else on the
+# machine. The test for a new entry is "does anything write here", not "is it
+# tidier one way".
 
 - defaults:
     link:
@@ -31,29 +39,20 @@
 - link:
     ~/.zshrc: zsh/zshrc
     ~/.zshenv: zsh/zshenv
-    ~/.config/zsh:
-      glob: true
-      path: zsh/**
-      exclude: [zsh/zshrc, zsh/zshenv]
-    ~/.config/git:
-      glob: true
-      path: git/**
-    ~/.config/theme:
-      glob: true
-      path: theme/**
-      exclude: [theme/bin/**]
-    ~/.config/nvim:
-      glob: true
-      path: nvim/**
-    ~/.config/nvim/.luarc.json: nvim/.luarc.json
-    ~/.config/tmux:
-      glob: true
-      path: tmux/**
+    # zshrc and zshenv are ALSO reachable at ~/.config/zsh/, which is
+    # harmless: zsh reads the two above, and sources only `aliases.zsh` and
+    # `functions/*.zsh` out of the directory.
+    ~/.config/zsh: zsh
+    # git writes here when `git config --global` runs, and that write lands
+    # in the repo as a tracked change. Deliberate: a global setting shows up
+    # in `git status` instead of silently replacing the link with a real file.
+    ~/.config/git: git
+    ~/.config/theme: theme
+    ~/.config/nvim: nvim
+    ~/.config/tmux: tmux
     ~/.config/workmux/config.yaml: workmux/config.yaml
     ~/.config/bat/config: bat/config
-    ~/.config/vault/templates:
-      glob: true
-      path: clis/vault/templates/**
+    ~/.config/vault/templates: clis/vault/templates
     ~/.local/bin/theme: theme/bin/theme
     ~/.local/bin/repo-size: clis/repo-size/repo-size
     ~/.local/bin/nvim-diagnostics: clis/nvim-diagnostics/nvim-diagnostics
