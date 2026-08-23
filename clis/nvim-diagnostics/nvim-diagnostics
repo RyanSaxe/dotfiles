@@ -8,7 +8,7 @@
 #     --json PATH          also write a JSON report
 #     --min-severity SEV   show only SEV and above (ERROR|WARN|INFO|HINT)
 #     --fail-on SEV        exit 1 when findings at or above SEV exist
-#     --timeout SECS       total budget across batches (default 120)
+#     --timeout SECS       total budget across files (default 120)
 #
 # Exit codes: 0 verified, 1 --fail-on triggered, 2 could not verify
 # (no server attached, diagnostics never settled, or bad usage).
