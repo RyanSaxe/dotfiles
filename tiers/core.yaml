@@ -54,11 +54,11 @@
     ~/.config/bat/config: bat/config
     ~/.config/vault/templates: clis/vault/templates
     ~/.local/bin/theme: theme/bin/theme
-    ~/.local/bin/repo-size: clis/repo-size/repo-size
+    ~/.local/bin/repo-size: clis/repo-size/repo-size.py
     ~/.local/bin/nvim-diagnostics: clis/nvim-diagnostics/nvim-diagnostics
-    ~/.local/bin/vault: clis/vault/vault
+    ~/.local/bin/vault: clis/vault/vault.py
     ~/.local/bin/theme-picker: theme/bin/theme-picker
-    ~/.local/bin/mascot-accents: theme/bin/mascot-accents
+    ~/.local/bin/mascot-accents: theme/bin/mascot-accents.py
     ~/.local/bin/rail: tuis/rail/bin/rail
     ~/.local/bin/attention: tuis/rail/bin/attention
     ~/.local/bin/review-open: tuis/rail/bin/review-open
