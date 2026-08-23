@@ -50,6 +50,11 @@ mkdir -p "$W/luaproj" && cd "$W/luaproj" && git init -q .
 printf 'local x = totally_undefined_fn()\nreturn x\n' >bad.lua
 nvim-diagnostics bad.lua 2>/dev/null | grep -q "Undefined global"
 check "lua_ls undefined global found" $?
+printf 'local M = {}\nreturn M\n' >clean.lua
+out="$(nvim-diagnostics clean.lua 2>/dev/null)"
+rc=$?
+echo "$out" | grep -q "^0 findings" && [ $rc -eq 0 ] && ! echo "$out" | grep -q "NOT fully"
+check "clean Lua file verifies clean, exit 0" $?
 
 # The sweep class: 51 files, seeded errors, gitignore, agreement with
 # single-file runs. This is the shape that once false-cleaned.
