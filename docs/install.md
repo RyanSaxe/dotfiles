@@ -37,11 +37,11 @@ for one machine, and `packages/` holds rules byor ships, which the tier
 reinstalls through `byor package install` rather than the repo keeping copies
 that drift.
 
-When the core or agents tier installs the agent CLIs, the installer links the
-AI harness first and then automatically runs Workmux's non-interactive
-`setup --hooks --skills` pass. This configures status hooks and bundled skills
-in the same install, including explicit invocations such as
-`./install.sh core agents`; no follow-up `workmux setup` command is required.
+The `core` and `agents` tiers each install the agent CLIs, link the AI harness,
+and automatically run Workmux's non-interactive `setup --hooks --skills` pass.
+This configures status hooks and bundled skills in the same install, including
+explicit invocations such as `./install.sh core`; no follow-up `workmux setup`
+command is required.
 
 ## Upgrading
 
@@ -59,24 +59,25 @@ never committed: review the diff and commit deliberately.
 
 [Dotbot](https://github.com/anishathalye/dotbot) deploys each tier's map,
 `tiers/<tier>.yaml`, run through `uvx` by `install.sh`. A mapping names its
-target explicitly; directories deploy through a glob, which creates real
-directories containing per-file links and picks up new files automatically:
+target explicitly. Config directories deploy as one directory symlink, so a
+file added to the repo is live immediately:
 
 ```text
 nvim/init.lua  ->  ~/.config/nvim/init.lua
 zsh/zshrc      ->  ~/.zshrc
 ```
 
-Renaming or deleting a repo file cannot leave a link dangling: each map's
-`clean` directive removes dead links that point into this repo, and only
-those — a dead link belonging to another program is not ours to touch. One
-consequence of per-file links is that emptied directories are left behind as
-empty real directories rather than removed.
+Directories that receive generated files at runtime stay real and use
+individual links instead. For those per-file links, each map's `clean`
+directive removes dead links that point into this repo, and only those — a dead
+link belonging to another program is not ours to touch. Whole-directory links
+do not create per-file links that can become orphaned.
 
 Two guards run before deployment. Gitignored files inside the deployed source
-trees are junk and get deleted, so a glob can never link a bytecode cache into
-`$HOME`. Untracked files there refuse to deploy — they may be unfinished work,
-and nothing unfinished should silently become live configuration.
+trees are junk and get deleted, so a bytecode cache cannot become live
+configuration through a directory link. Untracked files there refuse to deploy
+— they may be unfinished work, and nothing unfinished should silently become
+live configuration.
 
 Every tracked file is identical on every machine. Anything machine-specific
 resolves at runtime via `PATH` and `$HOME`; there is no templating.
@@ -95,9 +96,8 @@ add its target directory to the `create` directive in the tier map. The health
 check only exercises writes that happen during `theme apply`; anything written
 at another time relies on that list.
 
-One more glob caveat: Python's glob skips hidden files, so a dotted filename
-inside a globbed directory needs its own explicit mapping (as
-`~/.config/nvim/.luarc.json` has) or it silently never deploys.
+Directory links include hidden files and nested files without separate map
+entries.
 
 ## The vault
 

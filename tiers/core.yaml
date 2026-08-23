@@ -43,9 +43,6 @@
     # harmless: zsh reads the two above, and sources only `aliases.zsh` and
     # `functions/*.zsh` out of the directory.
     ~/.config/zsh: zsh
-    # git writes here when `git config --global` runs, and that write lands
-    # in the repo as a tracked change. Deliberate: a global setting shows up
-    # in `git status` instead of silently replacing the link with a real file.
     ~/.config/git: git
     ~/.config/theme: theme
     ~/.config/nvim: nvim
