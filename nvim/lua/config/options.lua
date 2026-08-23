@@ -6,6 +6,14 @@ opt.relativenumber = false -- flash owns jumps; relative numbers are noise
 opt.updatetime = 50 -- rest-on-symbol UI reacts near-instantly
 opt.clipboard = "unnamedplus" -- yank straight to the system clipboard
 
+-- Every float wears a border, including any plugin installed later that
+-- forgets to ask for one. Neovim reads this only for floats that do not name
+-- their own border, so the ones that do are untouched: snacks resolves
+-- `border = true` through here and already fell back to rounded, and noice
+-- draws its own frames (see plugins/noice.lua). What changes is mini.files,
+-- which hardcodes `single` only while this is unset.
+opt.winborder = "rounded"
+
 -- Every cursor shape keeps the cell's full HEIGHT; only width varies.
 -- Load-bearing beyond taste: ghostty's frame shader infers the display
 -- scale from the cursor height (iCurrentCursor.w), so nvim's stock
