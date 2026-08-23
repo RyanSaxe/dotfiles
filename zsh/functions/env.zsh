@@ -11,12 +11,13 @@ _load_dotenv() {
 
   # Check if .env file exists
   if [[ -f "$env_file" ]]; then
-    # Read and export each non-comment line as an environment variable
-    while IFS='=' read -r key value; do
-      # Skip comments and empty lines
-      if [[ ! "$key" =~ ^[[:space:]]*# ]] && [[ -n "$key" ]]; then
-        # Remove leading/trailing whitespace from key
-        key="$(echo "$key" | xargs)"
+    # Read and export each valid assignment, including a final line without a
+    # newline. The optional `export` prefix is syntax, not part of the key.
+    local line key value
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" =~ '^[[:space:]]*(export[[:space:]]+)?([[:alpha:]_][[:alnum:]_]*)[[:space:]]*=(.*)$' ]]; then
+        key="${match[2]}"
+        value="${match[3]}"
         # Remove quotes from value if present
         value="${value#\"}"
         value="${value%\"}"
