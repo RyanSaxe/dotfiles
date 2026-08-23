@@ -261,22 +261,6 @@ remove_system_link_matching() {
   fi
 }
 
-scrub_codex_user_defaults() {
-  for config in "$HOME/.codex/config.toml" "$HOME/.codex/dotfiles.config.toml"; do
-    [ -f "$config" ] || continue
-
-    tmp="$(mktemp "${TMPDIR:-/tmp}/codex-config.XXXXXX")"
-    awk '
-      BEGIN { in_top_level = 1 }
-      /^\[/ { in_top_level = 0 }
-      in_top_level && /^[[:space:]]*(model|model_reasoning_effort|service_tier|approval_policy|approvals_reviewer)[[:space:]]*=/ { next }
-      { print }
-    ' "$config" >"$tmp"
-    cat "$tmp" >"$config"
-    rm "$tmp"
-  done
-}
-
 install_ai_harness() {
   [ -d "$AI_HARNESS_SOURCE" ] || {
     echo "error: missing $AI_HARNESS_SOURCE" >&2
@@ -302,10 +286,14 @@ install_ai_harness() {
   link_system_owned "$AI_HARNESS_SOURCE/codex/managed_config.toml" "/etc/codex/managed_config.toml"
   link_system_owned "$AI_HARNESS_SOURCE/skills" "/etc/codex/skills"
 
-  # Codex owns its user config as mutable state. Portable defaults come from
-  # managed config, so old top-level defaults should not linger here.
+  # ~/.codex/config.toml is Codex's own mutable state and the installer does
+  # not edit it. Portable defaults live in managed config now, so a top-level
+  # `model` or `model_reasoning_effort` left in the user file will shadow
+  # them — but that file also holds settings nobody here put there, and
+  # rewriting it in place would be this script quietly editing personal
+  # configuration on every run. Removing those keys is a one-time cleanup for
+  # whoever carried the old shape forward, not an install step.
   mkdir -p "$HOME/.codex"
-  scrub_codex_user_defaults
 }
 
 install_neovim_linux() {
