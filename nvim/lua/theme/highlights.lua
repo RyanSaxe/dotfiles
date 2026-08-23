@@ -38,6 +38,7 @@ function M.apply(tokens)
   local r = tokens.roles
   -- Inner accent; the outer pair lives on `o` and paints the sidebars.
   local accent = tokens.accent
+  local notify = tokens.notify
   ---@param color string
   ---@param amount number
   ---@return string
@@ -220,6 +221,10 @@ function M.apply(tokens)
   hl("ThemeOuterNormal", { fg = o.fg_muted, bg = o.crust })
   hl("ThemeOuterNormalNC", { fg = o.fg_faint, bg = o.crust })
   hl("ThemeOuterCursorLine", { bg = o.mantle })
+  -- The outer copy of a picker's frame, for the explorer alone. Its only
+  -- framed window is the input, and notify is the color the pickers give
+  -- an input's border and title.
+  hl("ThemeOuterFrame", { fg = o.notify, bg = o.crust })
 
   -- Window separators are painted bands, not hairlines: a glyph drawn in
   -- fg leaves the cell's background showing, which ghostty's always-extend
@@ -263,29 +268,38 @@ function M.apply(tokens)
   end
   hl("ThemeBranch", { fg = o.fg_faint, bg = o.crust })
 
-  -- Snacks, wholesale (see plugins/explorer.lua for why it can't split).
-  hl("SnacksNormal", { fg = o.fg, bg = o.crust })
-  hl("SnacksNormalNC", { fg = o.fg_muted, bg = o.crust })
-  -- Snacks routes every window it owns through SnacksNormal, which is right
-  -- for pickers and floats — they are chrome. A gh:// pull request buffer is
-  -- not: it is something to read, so it takes the inner surface like any
-  -- other content.
+  -- Snacks, wholesale: one set of groups covers every window it owns, so
+  -- the surface is chosen once for all of them (see plugins/explorer.lua
+  -- for why it can't split). These hover over the buffer and never reach a
+  -- terminal edge, so they take the INNER surface. The explorer is the one
+  -- exception — it continues the tmux rail — and theme.surfaces repaints
+  -- its windows outer rather than splitting the groups here.
+  hl("SnacksNormal", { fg = r.fg, bg = r.bg })
+  hl("SnacksNormalNC", { fg = r.fg_muted, bg = r.bg })
+  -- The rest of the set every snacks window is opened with. Unnamed, they
+  -- fall back to the float groups and a window lands half on either surface.
+  hl("SnacksTitle", { fg = accent, bg = r.bg })
+  hl("SnacksFooter", { fg = r.fg_muted, bg = r.bg })
+  hl("SnacksWinBar", { fg = r.fg_muted, bg = r.bg })
+  hl("SnacksWinBarNC", { fg = r.fg_faint, bg = r.bg })
+  -- gh:// windows route through their own groups, so they have to be named
+  -- even while they land on the same surface as the rest.
   hl("SnacksGhNormal", { fg = r.fg, bg = r.bg })
   hl("SnacksGhNormalNC", { fg = r.fg_muted, bg = r.bg })
-  hl("SnacksPicker", { bg = o.crust })
-  hl("SnacksPickerList", { bg = o.crust })
-  hl("SnacksPickerBox", { bg = o.crust })
-  hl("SnacksPickerInput", { bg = o.crust })
-  hl("SnacksPickerBorder", { fg = o.accent, bg = o.crust })
-  hl("SnacksPickerTitle", { fg = o.accent, bg = o.crust })
-  hl("SnacksPickerBoxBorder", { fg = o.accent, bg = o.crust })
-  hl("SnacksPickerBoxTitle", { fg = o.notify, bg = o.crust })
-  hl("SnacksPickerListBorder", { fg = o.accent, bg = o.crust })
-  hl("SnacksPickerInputBorder", { fg = o.notify, bg = o.crust })
-  hl("SnacksPickerInputTitle", { fg = o.notify, bg = o.crust })
-  hl("SnacksPickerPrompt", { fg = o.notify })
-  hl("SnacksPickerToggle", { fg = o.accent, bg = o.mantle })
-  hl("SnacksWinSeparator", { fg = o.crust, bg = o.crust })
+  hl("SnacksPicker", { bg = r.bg })
+  hl("SnacksPickerList", { bg = r.bg })
+  hl("SnacksPickerBox", { bg = r.bg })
+  hl("SnacksPickerInput", { bg = r.bg })
+  hl("SnacksPickerBorder", { fg = accent, bg = r.bg })
+  hl("SnacksPickerTitle", { fg = accent, bg = r.bg })
+  hl("SnacksPickerBoxBorder", { fg = accent, bg = r.bg })
+  hl("SnacksPickerBoxTitle", { fg = notify, bg = r.bg })
+  hl("SnacksPickerListBorder", { fg = accent, bg = r.bg })
+  hl("SnacksPickerInputBorder", { fg = notify, bg = r.bg })
+  hl("SnacksPickerInputTitle", { fg = notify, bg = r.bg })
+  hl("SnacksPickerPrompt", { fg = notify })
+  hl("SnacksPickerToggle", { fg = accent, bg = r.bg_alt })
+  hl("SnacksWinSeparator", { fg = r.bg, bg = r.bg })
 end
 
 return M

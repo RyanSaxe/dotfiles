@@ -7,7 +7,9 @@
 -- the tmux rail, so they take the outer surface via `winhighlight`.
 --
 -- Doing it here rather than per-plugin means a new sidebar plugin is
--- themed the day it is installed, with no entry to add.
+-- themed the day it is installed, with no entry to add. The snacks
+-- explorer is the single named exception, below: it is a sidebar built
+-- out of floats, so the rule above cannot see it.
 local M = {}
 
 local WINHL = table.concat({
@@ -21,6 +23,64 @@ local WINHL = table.concat({
   "SnacksNormalNC:ThemeOuterNormalNC",
   "SnacksPickerList:ThemeOuterNormal",
 }, ",")
+
+-- The explorer is the one snacks window that belongs on the outer layer:
+-- it runs to the terminal's right edge and continues the tmux rail. Snacks
+-- paints it through the same groups as every other picker and asserts its
+-- own `winhighlight` last, so it can be singled out neither in the theme
+-- nor by a per-source override — only by rewriting its windows here.
+--
+-- Its list and input are floats inside a box, so `NormalFloat` carries the
+-- surface for those two and `Normal` for the box. Both are named. A later
+-- duplicate key wins in `winhighlight`, which is what lets these land on
+-- top of what snacks set.
+local EXPLORER_WINHL = table.concat({
+  "Normal:ThemeOuterNormal",
+  "NormalNC:ThemeOuterNormalNC",
+  "NormalFloat:ThemeOuterNormal",
+  "SignColumn:ThemeOuterNormal",
+  "EndOfBuffer:ThemeOuterNormal",
+  "WinSeparator:ThemeOuterWinSeparator",
+  "FloatBorder:ThemeOuterFrame",
+  "FloatTitle:ThemeOuterFrame",
+}, ",")
+
+---@param set table<integer, boolean>
+---@param wins table<any, snacks.win>|nil
+local function collect(set, wins)
+  if not wins then
+    return
+  end
+  for _, win in pairs(wins) do
+    ---@type integer|nil
+    local id = win.win
+    if id and vim.api.nvim_win_is_valid(id) then
+      set[id] = true
+    end
+  end
+end
+
+-- Windows belonging to an open explorer. `wins` holds its input and list,
+-- `box_wins` the container they float inside. A previewed file stays in the
+-- main editor window and is in neither, so this never claims the buffer.
+---@return table<integer, boolean>
+local function explorer_wins()
+  ---@type table<integer, boolean>
+  local set = {}
+  local ok, snacks = pcall(require, "snacks")
+  if not ok or not snacks.picker then
+    return set
+  end
+  ---@type snacks.Picker[]
+  local open = snacks.picker.get({ source = "explorer" })
+  for _, picker in ipairs(open) do
+    if picker.layout then
+      collect(set, picker.layout.wins)
+      collect(set, picker.layout.box_wins)
+    end
+  end
+  return set
+end
 
 ---@param win integer
 ---@return boolean
@@ -72,12 +132,20 @@ local function without_ours(winhighlight)
 end
 
 ---@param win integer
-local function apply(win)
+---@param explorer table<integer, boolean>
+local function apply(win, explorer)
   local base = without_ours(vim.wo[win].winhighlight)
+  ---@type string|nil
+  local outer = nil
+  if explorer[win] then
+    outer = EXPLORER_WINHL
+  elseif is_anchored_sidebar(win) then
+    outer = WINHL
+  end
   ---@type string
   local wanted = base
-  if is_anchored_sidebar(win) then
-    wanted = base == "" and WINHL or (base .. "," .. WINHL)
+  if outer then
+    wanted = base == "" and outer or (base .. "," .. outer)
   end
   if vim.wo[win].winhighlight ~= wanted then
     vim.wo[win].winhighlight = wanted
@@ -85,9 +153,18 @@ local function apply(win)
 end
 
 local function apply_all()
+  local explorer = explorer_wins()
   for _, win in ipairs(vim.api.nvim_list_wins()) do
-    apply(win)
+    apply(win, explorer)
   end
+end
+
+-- For a window that appears on a later tick than the call that asked for it:
+-- an autocmd pass would land after the first redraw and the window would be
+-- seen on the wrong surface before it corrected. Callers that know the moment
+-- their windows exist call this instead (see plugins/explorer.lua).
+function M.refresh()
+  apply_all()
 end
 
 function M.setup()
