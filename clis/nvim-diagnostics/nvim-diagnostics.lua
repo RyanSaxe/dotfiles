@@ -20,7 +20,8 @@
 -- files). Push-only servers have no response for a clean buffer, so the
 -- editor state is sampled only after the attached clients and diagnostics
 -- have settled. Any buffer no server ever covered, and any server that left
--- pulls unanswered, is named in the output and the run exits 2.
+-- pulls unanswered, or a directory sweep declined to open, is named in the
+-- output and the run exits 2.
 
 local BATCH_SIZE = 10
 local SETTLE_POLL_MS = 250
@@ -29,8 +30,8 @@ local PULL_WINDOW_MS = 15000 -- per-file ceiling; one lost reply must not eat th
 local MAX_FILES = 200
 
 -- Extensions worth opening: filetypes this setup runs language servers or
--- linters for. A directory sweep skips everything else; an explicit file
--- argument is always opened.
+-- linters for. A directory sweep reports everything else as skipped; an
+-- explicit file argument is always opened.
 local EXTENSIONS = {
   lua = true,
   py = true,
@@ -104,17 +105,34 @@ local function has_wanted_extension(path)
 end
 
 -- Expand targets into the list of files to open. Directories are swept with
--- rg (so .gitignore applies) and filtered by extension; files named
+-- rg (so .gitignore applies) and filtered by extension; skipped files are
+-- returned separately so a sweep can never call them clean. Files named
 -- explicitly are taken as-is.
 ---@param targets string[]
----@return string[]
+---@return string[] files, string[] skipped
 local function collect_files(targets)
-  local files, seen = {}, {}
+  local files, skipped, seen = {}, {}, {}
   ---@param path string
   local function keep(path)
-    if not seen[path] then
-      seen[path] = true
-      files[#files + 1] = path
+    if seen[path] == "file" then
+      return
+    end
+    if seen[path] == "skipped" then
+      for index, skipped_path in ipairs(skipped) do
+        if skipped_path == path then
+          table.remove(skipped, index)
+          break
+        end
+      end
+    end
+    seen[path] = "file"
+    files[#files + 1] = path
+  end
+  ---@param path string
+  local function skip(path)
+    if seen[path] == nil then
+      seen[path] = "skipped"
+      skipped[#skipped + 1] = path
     end
   end
   for _, target in ipairs(targets) do
@@ -127,6 +145,8 @@ local function collect_files(targets)
       for _, path in ipairs(listed) do
         if has_wanted_extension(path) then
           keep(path)
+        else
+          skip(path)
         end
       end
     elseif vim.fn.filereadable(target) == 1 then
@@ -140,7 +160,8 @@ local function collect_files(targets)
     emit(("nvim-diagnostics: %d files exceeds the %d cap; name a narrower target"):format(#files, MAX_FILES))
     os.exit(2)
   end
-  return files
+  table.sort(skipped)
+  return files, skipped
 end
 
 -- Ask every pull-capable client about every buffer in the batch, all
@@ -232,6 +253,7 @@ end
 
 ---@class EditorDiagnosticsReport
 ---@field files table<string, table[]>
+---@field skipped string[]
 ---@field summary table<string, integer>
 ---@field unattached string[]
 ---@field verified boolean
@@ -294,7 +316,19 @@ local function fold_batch(report, buffers, pulled, min_severity)
 end
 
 ---@param report EditorDiagnosticsReport
+local function print_skipped(report)
+  for _, name in ipairs(report.skipped) do
+    emit(
+      ("nvim-diagnostics: %s — skipped by directory sweep (unsupported or missing extension); this file is not verified"):format(
+        name
+      )
+    )
+  end
+end
+
+---@param report EditorDiagnosticsReport
 local function print_report(report)
+  print_skipped(report)
   ---@type string[]
   local names = vim.tbl_keys(report.files)
   table.sort(names)
@@ -339,6 +373,7 @@ local function write_json(report, path)
   handle:write(vim.json.encode({
     generated = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     verified = report.verified,
+    skipped = report.skipped,
     unattached = report.unattached,
     files = report.files,
     summary = report.summary,
@@ -352,9 +387,24 @@ vim.defer_fn(function()
   local fail_on = env_severity("ED_FAIL_ON")
   local json_path = vim.env.ED_JSON
 
-  local files = collect_files(read_targets())
+  local files, skipped = collect_files(read_targets())
+  ---@type EditorDiagnosticsReport
+  local report = {
+    files = {},
+    skipped = skipped,
+    summary = { total = 0, ERROR = 0, WARN = 0, INFO = 0, HINT = 0 },
+    unattached = {},
+    verified = false,
+  }
   if #files == 0 then
-    emit("nvim-diagnostics: nothing to check (no files with a supported extension)")
+    if #skipped == 0 then
+      emit("nvim-diagnostics: nothing to check (no files with a supported extension)")
+    else
+      print_report(report)
+    end
+    if json_path ~= nil and json_path ~= "" then
+      write_json(report, json_path)
+    end
     os.exit(2)
   end
 
@@ -488,13 +538,6 @@ vim.defer_fn(function()
     return false
   end
 
-  ---@type EditorDiagnosticsReport
-  local report = {
-    files = {},
-    summary = { total = 0, ERROR = 0, WARN = 0, INFO = 0, HINT = 0 },
-    unattached = {},
-    verified = false,
-  }
   local any_attach = false
 
   -- Open a batch, wait for servers, ask them, fold the answers, close the
@@ -647,11 +690,15 @@ vim.defer_fn(function()
   end
 
   if not any_attach then
+    print_skipped(report)
     emit("nvim-diagnostics: no language server attached to any target — cannot verify anything")
+    if json_path ~= nil and json_path ~= "" then
+      write_json(report, json_path)
+    end
     os.exit(2)
   end
 
-  report.verified = not ran_out and #report.unattached == 0 and #uncovered == 0
+  report.verified = not ran_out and #report.skipped == 0 and #report.unattached == 0 and #uncovered == 0
   if ran_out then
     emit(("nvim-diagnostics: ran out of budget after %ds; results are partial"):format(timeout_ms / 1000))
   end

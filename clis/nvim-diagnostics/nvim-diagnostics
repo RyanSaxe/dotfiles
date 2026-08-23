@@ -11,7 +11,8 @@
 #     --timeout SECS       total budget across files (default 120)
 #
 # Exit codes: 0 verified, 1 --fail-on triggered, 2 could not verify
-# (no server attached, diagnostics never settled, or bad usage).
+# (no server attached, diagnostics never settled, skipped directory files, or
+# bad usage).
 set -eu
 
 # Resolve through this script's own symlink. macOS's readlink has no -f flag,
