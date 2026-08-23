@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
-VAULT = REPO / "clis/vault/vault"
+VAULT = REPO / "clis/vault/vault.py"
 TEMPLATES = REPO / "clis/vault/templates"
 
 # The due-date sigil the grammar uses, spelled once here too.

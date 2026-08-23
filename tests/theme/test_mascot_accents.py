@@ -1,6 +1,6 @@
 """Unit tests for mascot-accents' pure logic.
 
-The binary is an extensionless PEP 723 script; load it as a module directly.
+The binary is a PEP 723 script; load it as a module directly.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ _SPEC = importlib.util.spec_from_loader(
     "mascot_accents",
     importlib.machinery.SourceFileLoader(
         "mascot_accents",
-        str(Path(__file__).parent.parent.parent / "theme/bin/mascot-accents"),
+        str(Path(__file__).parent.parent.parent / "theme/bin/mascot-accents.py"),
     ),
 )
 assert _SPEC and _SPEC.loader
