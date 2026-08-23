@@ -83,8 +83,9 @@ _to() {
   # Directories to search. ~/repositories holds clones made by the review
   # workspace resolver — repositories opened from the Reviews dashboard that
   # were not already on disk. They are nested owner/name, which `fd` finds at
-  # any depth, so `to` lists them like any other checkout.
-  search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic" "$HOME/repositories")
+  # any depth, so `to` lists them like any other checkout. ~/worktrees holds
+  # the isolated checkouts created by workmux.
+  search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic" "$HOME/repositories" "$HOME/worktrees")
 
   # Date formatting for Linux/macOS compatibility
   if date -d @0 "+%Y" >/dev/null 2>&1; then
@@ -97,15 +98,15 @@ _to() {
   # on newlines only, so repo paths with spaces stay whole.
   repos=()
   for dir in "${search_dirs[@]}"; do
-    [[ -d "$dir" ]] && repos+=(${(f)"$(fd .git -t d -H "$dir")"})
+    [[ -d "$dir" ]] && repos+=(${(f)"$(fd '^\.git$' -t d -t f -H "$dir")"})
   done
 
-  repo_roots=(${(f)"$(printf "%s\n" "${repos[@]}" | sed 's|/\.git||' | sort -u)"})
+  repo_roots=(${(f)"$(printf "%s\n" "${repos[@]}" | sed -E 's|/\.git/?$||' | sort -u)"})
 
   # Build table: repo_name,repo_path,date
   repo_table=()
   for repo in "${repo_roots[@]}"; do
-    if [[ -d "$repo/.git" ]]; then
+    if [[ -e "$repo/.git" ]]; then
       last_commit=$(git -C "$repo" log -1 --format="%ct" 2>/dev/null)
       last_commit=${last_commit:-0}
       date_str=$(date_cmd "$last_commit")
