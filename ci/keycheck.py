@@ -4,12 +4,13 @@
 # ///
 """Drift check for the keybind cheatsheet (alt+/).
 
-Every chord bound in tmux.conf (root alt layer, agent table, prefix
+Every chord bound in tmux.conf (root alt layer, focused-tab element table, prefix
 table, copy-mode-vi table — both `bind` and `bind-key` forms),
 aerospace.toml, ghostty's config, and zsh's bindkey calls must have a
 row in keys.tsv, so the popup can never silently fall behind the
-configs. The TSV may hold extra rows (esc, prefix aliases) — the check
-is config -> TSV only.
+configs. The TSV may hold extra rows (esc, prefix aliases); the focused-tab
+element table is checked in both directions so its bindings cannot disappear
+without the check noticing.
 """
 
 import re
@@ -55,9 +56,9 @@ def tmux_chords(conf: str) -> set[str]:
     for m in re.finditer(r"^bind(?:-key)? -n '?(M|C)-([^ ']+)'? ", conf, re.MULTILINE):
         mod = "alt" if m.group(1) == "M" else "ctrl"
         chords.add(f"{mod}+{normalize_key(m.group(2))}")
-    for m in re.finditer(r"^bind(?:-key)? -T agent (\S+) ", conf, re.MULTILINE):
+    for m in re.finditer(r"^bind(?:-key)? -T tab (\S+) ", conf, re.MULTILINE):
         key = normalize_key(m.group(1).removeprefix("M-"))
-        chords.add(f"alt+a {key}")
+        chords.add(f"alt+space {key}")
     for m in re.finditer(
         r"^bind(?:-key)? -T copy-mode-vi '?([^ ']+)'? ", conf, re.MULTILINE
     ):
@@ -125,7 +126,25 @@ def main() -> int:
     missing = sorted(bound - covered)
     for chord in missing:
         print(f"keycheck: '{chord}' is bound but missing from keys.tsv")
-    return 1 if missing else 0
+
+    # Extra TSV rows are valid generally, but the focused-tab table is a
+    # contract in both directions: its documented chords must still exist in
+    # tmux.conf after a binding is removed.
+    table_covered = {
+        chord
+        for chord in covered
+        if chord == "alt+space" or chord.startswith("alt+space ")
+    }
+    table_bound = {
+        chord
+        for chord in bound
+        if chord == "alt+space" or chord.startswith("alt+space ")
+    }
+    missing_table = sorted(table_covered - table_bound)
+    for chord in missing_table:
+        print(f"keycheck: '{chord}' is documented but not bound in tmux.conf")
+
+    return 1 if missing or missing_table else 0
 
 
 if __name__ == "__main__":

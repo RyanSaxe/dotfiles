@@ -61,6 +61,46 @@ vim.defer_fn(function()
   vim.cmd.edit(vim.fn.fnameescape(CANARY))
   local buf = vim.api.nvim_get_current_buf()
 
+  local activity_generation = 0
+  ---@type table<integer, integer>
+  local active_progress = {}
+  local function mark_activity()
+    activity_generation = activity_generation + 1
+  end
+
+  vim.api.nvim_create_autocmd({ "LspAttach", "LspDetach" }, {
+    callback = mark_activity,
+  })
+  vim.api.nvim_create_autocmd("DiagnosticChanged", {
+    ---@param event {buf: integer}
+    callback = function(event)
+      if event.buf == buf then
+        mark_activity()
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("LspProgress", {
+    ---@param event {data: {client_id: integer, params: {value: {kind: string}}}}
+    callback = function(event)
+      local data = event.data
+      local value = data and data.params and data.params.value
+      if data and value then
+        local client = vim.lsp.get_client_by_id(data.client_id)
+        if client ~= nil and client.name == "lua_ls" then
+          mark_activity()
+          if value.kind == "begin" then
+            active_progress[data.client_id] = (active_progress[data.client_id] or 0) + 1
+          elseif value.kind == "end" then
+            active_progress[data.client_id] = math.max(0, (active_progress[data.client_id] or 1) - 1)
+            if active_progress[data.client_id] == 0 then
+              active_progress[data.client_id] = nil
+            end
+          end
+        end
+      end
+    end,
+  })
+
   ---@return boolean
   local function has_client()
     return #vim.lsp.get_clients({ bufnr = buf, name = "lua_ls" }) > 0
@@ -70,16 +110,39 @@ vim.defer_fn(function()
     os.exit(1)
   end
 
-  local previous, unchanged, waited = nil, 0, 0
-  while waited < MAX_WAIT_MS do
-    vim.wait(POLL_MS)
-    waited = waited + POLL_MS
-    local current = signature(buf)
-    unchanged = current == previous and unchanged + 1 or 0
-    previous = current
-    if unchanged >= STABLE_POLLS then
-      break
+  local started = vim.uv.hrtime()
+  ---@return integer remaining milliseconds in the readiness budget
+  local function remaining_ms()
+    return MAX_WAIT_MS - math.floor((vim.uv.hrtime() - started) / 1e6)
+  end
+
+  local previous = signature(buf)
+  local previous_activity = activity_generation
+  local unchanged = 0
+  local settled = false
+  while remaining_ms() > 0 do
+    vim.wait(math.min(POLL_MS, math.max(0, remaining_ms())))
+    if not has_client() or next(active_progress) ~= nil then
+      unchanged = 0
+    else
+      local current = signature(buf)
+      if current ~= previous or activity_generation ~= previous_activity then
+        previous = current
+        previous_activity = activity_generation
+        unchanged = 0
+      else
+        unchanged = unchanged + 1
+      end
+      if unchanged >= STABLE_POLLS then
+        settled = true
+        break
+      end
     end
+  end
+
+  if not settled then
+    io.write("editor-parity: lua_ls diagnostics never settled — the check cannot verify anything\n")
+    os.exit(1)
   end
 
   local diagnostics = vim.diagnostic.get(buf)
