@@ -141,11 +141,24 @@ the change, with effort proportional to its risk, novelty, and consequence.
 
 `nvim-diagnostics <files-or-dirs>` reports what the editor's language
 servers would show and is a reliable verification loop for code changes. It
-is not fast on large repositories — run it near the end of the work, on the
-files you touched, when the result is worth the wait. When it disagrees with
-CI or pre-commit checks, prefer CI/pre-commit as the authority and report
-the discrepancy to the driver: a divergence between the editor and the gates
-is itself a finding worth fixing.
+starts a real Neovim/LSP session, so a cold run commonly takes 15–60 seconds
+and may use much of its timeout while servers start. Do not run it after every
+edit, during exploration, or across an entire repository by default. Use unit
+tests, formatters, linters, typecheckers, and targeted checks for iteration.
+
+Near the end of the task, run it once with all relevant changed files in a
+single invocation:
+
+```sh
+nvim-diagnostics path/to/changed.lua another/file.lua
+```
+
+Run a whole directory or repository only when the driver explicitly asks,
+when changing `nvim-diagnostics` itself, or when validating editor-wide
+behavior. Treat `NOT fully verified` as a failed verification, regardless of
+the finding count. When it disagrees with CI or pre-commit checks, prefer
+CI/pre-commit as the authority and report the discrepancy to the driver: a
+divergence between the editor and the gates is itself a finding worth fixing.
 
 <important>
 
