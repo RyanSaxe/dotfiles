@@ -14,15 +14,28 @@ symlinks for the tiers you pick. Re-run it any time to update both.
 A tier is a set of system packages plus one symlink deployment map,
 `tiers/<tier>.yaml`.
 
-| Tier   | For                                               |
-| ------ | ------------------------------------------------- |
-| `core` | everything, including remote Linux boxes over SSH |
-| `mac`  | GUI applications — ghostty, sketchybar, aerospace |
+| Tier     | For                                               |
+| -------- | ------------------------------------------------- |
+| `core`   | everything, including remote Linux boxes over SSH |
+| `mac`    | GUI applications — ghostty, sketchybar, aerospace |
+| `extras` | optional tooling — byor and its ast-grep engine   |
 
 Pass tiers as arguments to skip the prompts (`./install.sh core` on a remote
 box). The default `./install.sh` runs `core agents` and asks separately about
-the mac tier. `./install.sh links` redoes the symlinks alone, with no package
-installs.
+the mac and extras tiers. `./install.sh links` redoes the symlinks alone, with
+no package installs.
+
+Nothing depends on `extras`, and declining it leaves no trace. Every entry in
+its map carries its own `if` condition, so an extra whose tool is missing is
+skipped while its neighbours still deploy — the tier is a list of independent
+extras, not one switch. Adding one means adding entries and their condition to
+`tiers/extras.yaml`; nothing outside that file needs to know.
+
+For byor, the repo carries the part you write — `config.yml`, `rules/`,
+`scripts/`. What byor writes stays local: `repos.yml` records absolute paths
+for one machine, and `packages/` holds rules byor ships, which the tier
+reinstalls through `byor package install` rather than the repo keeping copies
+that drift.
 
 When the core or agents tier installs the agent CLIs, the installer links the
 AI harness first and then automatically runs Workmux's non-interactive
