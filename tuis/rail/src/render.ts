@@ -20,7 +20,7 @@ import { bg as bgEsc, railBg, RESET, type Palette } from "./theme.js";
 const PAGE_UP_KEY = "⌥,";
 const PAGE_DOWN_KEY = "⌥.";
 
-// The slab is 27 content cells; the crust column after them is
+// The slab is 28 content cells; the crust column after them is
 // the visible right margin (the colorless tmux border beside it reads
 // as part of the gap). daemon.ts derives the pane width from this.
 export const GUTTER_COLS = 1;

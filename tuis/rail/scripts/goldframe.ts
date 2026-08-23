@@ -173,7 +173,7 @@ scene.hints =
   new Map();
 
 // Defaults mirror the shipped pane geometry (daemon.ts RAIL_WIDTH).
-const width = Number(process.env.RAIL_WIDTH ?? 28);
+const width = Number(process.env.RAIL_WIDTH ?? 29);
 const height = Number(process.env.RAIL_HEIGHT ?? 41);
 process.stdout.write(
   renderRail(scene, loadPalette(), width, height).join("\n") + "\n",
