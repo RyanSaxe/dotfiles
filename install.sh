@@ -15,6 +15,17 @@
 set -eu
 
 OS="$(uname -s)"
+# Linux installers put user tools in ~/.local/bin. Add it before any package
+# or deploy step so this process can use tools that it installs there.
+if [ "$OS" = Linux ]; then
+  case ":${PATH:-}:" in
+  *":$HOME/.local/bin:"*) ;;
+  *)
+    PATH="$HOME/.local/bin${PATH:+:$PATH}"
+    export PATH
+    ;;
+  esac
+fi
 # Physical (-P) so paths through symlinked components (/var -> /private/var
 # on macOS) can't split into logical/physical mixtures: dotbot computes
 # relative links physically, so a logical base or target home would produce
@@ -180,7 +191,7 @@ install_workmux() {
 
 # Agent CLIs, by the name their binary answers to. brew casks on macOS (what
 # this machine already runs); npm elsewhere, into ~/.local so no sudo and no
-# root-owned files — zshenv already has that bin dir on PATH.
+# root-owned files — the bootstrap and zshenv put that bin dir on PATH.
 AGENT_CLIS='claude codex copilot'
 
 install_agent_cli() {
@@ -410,6 +421,7 @@ install_tier_packages() {
     brew_install $CORE_BREW_FORMULAS
     install_workmux
     setup_agents
+    install_ai_harness
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -424,6 +436,7 @@ install_tier_packages() {
     command -v nvim >/dev/null 2>&1 || install_neovim_linux
     install_workmux
     setup_agents
+    install_ai_harness
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
@@ -535,13 +548,21 @@ clean_deploy_sources() {
 # map says nothing writes; both are worth stopping for, and neither is worth
 # deleting on the way past. Doing this rather than dotbot's `force` matters
 # for exactly that reason: `force` is an unconditional rmtree.
-LEGACY_LINK_DIRS='.config/zsh .config/git .config/theme .config/nvim .config/tmux .config/vault/templates .config/sketchybar .config/aerospace'
+LEGACY_CORE_LINK_DIRS='.config/zsh .config/git .config/theme .config/nvim .config/tmux .config/vault/templates'
+LEGACY_MAC_LINK_DIRS='.config/sketchybar .config/aerospace'
 
 migrate_link_dirs() {
   # Same resolution as deploy_tier: DOTFILES_TARGET redirects scratch-home
   # checks, and physical so a symlinked /var cannot split the comparison.
   migrate_home="$(cd -P "${DOTFILES_TARGET:-$HOME}" && pwd -P)"
-  for rel in $LEGACY_LINK_DIRS; do
+  legacy_dirs=''
+  for tier in "$@"; do
+    case "$tier:$OS" in
+    core:*) legacy_dirs="$legacy_dirs $LEGACY_CORE_LINK_DIRS" ;;
+    mac:Darwin) legacy_dirs="$legacy_dirs $LEGACY_MAC_LINK_DIRS" ;;
+    esac
+  done
+  for rel in $legacy_dirs; do
     dir="$migrate_home/$rel"
     # A link is already converted; a missing directory is a fresh machine.
     { [ -d "$dir" ] && [ ! -L "$dir" ]; } || continue
@@ -796,7 +817,7 @@ if [ "${1:-}" = links ]; then
   [ "$#" -gt 0 ] || set -- core mac extras
   ensure_uv
   clean_deploy_sources
-  migrate_link_dirs
+  migrate_link_dirs "$@"
   for tier in "$@"; do
     deploy_tier "$tier"
   done
@@ -809,8 +830,8 @@ if [ "${1:-}" = upgrade ]; then
   run_upgrade
 fi
 
-# No tiers on the command line: choose interactively. The agents tier installs
-# the live harness links after the CLIs themselves are available.
+# No tiers on the command line: choose interactively. The core and agents tiers
+# install the live harness links after the CLIs themselves are available.
 if [ "$#" -eq 0 ]; then
   set -- core agents
   if [ "$OS" = Darwin ] && ask "install the mac tier (GUI apps)?"; then
@@ -823,7 +844,7 @@ fi
 
 ensure_uv
 clean_deploy_sources
-migrate_link_dirs
+migrate_link_dirs "$@"
 
 for tier in "$@"; do
   echo "==> $tier"

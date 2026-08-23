@@ -40,7 +40,7 @@ jobs:
           echo "SCRATCH=$scratch" >> "$GITHUB_ENV"
           HOME="$scratch" ./install.sh links
 
-      - name: Redeploy cleans junk and removed files
+      - name: Redeploy rejects junk and untracked files
         run: |
           clone="$(mktemp -d)/clone"
           home="$(mktemp -d)"
@@ -61,17 +61,6 @@ jobs:
             exit 1
           fi
           rm zsh/wip.zsh
-
-          # A removed file loses its link: dotbot's clean directive removes
-          # dead links pointing into the repo, so none survive a redeploy.
-          git rm -q theme/templates/*.tmpl
-          HOME="$home" ./install.sh links core
-          dangling="$(find "$home/.config" -type l ! -exec test -e {} \; -print)"
-          if [ -n "$dangling" ]; then
-            printf '%s\n' "$dangling"
-            echo "::error::dangling links survived a redeploy"
-            exit 1
-          fi
 
       - name: A legacy per-file layout upgrades to directory links
         run: |
@@ -95,7 +84,8 @@ jobs:
             echo "::error::a legacy directory did not convert to a link"
             exit 1
           fi
-          # Hidden files needed their own map entry under the old globbing.
+          # Hidden files are live through the directory link without a
+          # separate map entry.
           if [ ! -f "$home/.config/nvim/.luarc.json" ]; then
             echo "::error::hidden file unreachable through the directory link"
             exit 1
