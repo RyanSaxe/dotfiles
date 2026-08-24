@@ -77,14 +77,14 @@ cache_csv() {
 # Internal function to generate repository data
 # Finds all git repos and returns CSV data with last commit dates
 _to() {
-  local -a search_dirs repos repo_roots repo_table
+  local -a search_dirs repo_roots repo_table
   local dir repo last_commit date_str repo_name
 
   # Directories to search. ~/repositories holds clones made by the review
   # workspace resolver — repositories opened from the Reviews dashboard that
-  # were not already on disk. They are nested owner/name, which `fd` finds at
-  # any depth, so `to` lists them like any other checkout. ~/worktrees holds
-  # the isolated checkouts created by workmux.
+  # were not already on disk. They are nested owner/name, which the scan
+  # below finds at any depth, so `to` lists them like any other checkout.
+  # ~/worktrees holds the isolated checkouts created by workmux.
   search_dirs=("$HOME/work" "$HOME/projects" "$HOME/generic" "$HOME/repositories" "$HOME/worktrees")
 
   # Date formatting for Linux/macOS compatibility
@@ -94,25 +94,38 @@ _to() {
     date_cmd() { date -r "$1" "+%Y-%m-%d %H:%M"; }
   fi
 
-  # Find all git repos using fd (fast directory search). ${(f)...} splits
-  # on newlines only, so repo paths with spaces stay whole.
-  repos=()
-  for dir in "${search_dirs[@]}"; do
-    [[ -d "$dir" ]] && repos+=(${(f)"$(fd '^\.git$' -t d -t f -H "$dir")"})
-  done
+  # A repo is a directory holding .git — a directory for a clone, a file for
+  # a worktree. Walk for that marker directly rather than asking `fd`: `fd`
+  # honors .gitignore/.ignore, so a repo whose own ignore rules cover .git
+  # (~/generic/vault does) is invisible to it even with -H.
+  #
+  # Stop descending once a repo is found. Nothing inside a checkout is a
+  # separate project, which keeps vendored and backed-up clones out of the
+  # list without needing an exclusion list.
+  _to_scan() {
+    local d
+    for d in "$1"/*(N/D); do
+      if [[ -e "$d/.git" ]]; then
+        repo_roots+=("$d")
+      else
+        _to_scan "$d"
+      fi
+    done
+  }
 
-  repo_roots=(${(f)"$(printf "%s\n" "${repos[@]}" | sed -E 's|/\.git/?$||' | sort -u)"})
+  repo_roots=()
+  for dir in "${search_dirs[@]}"; do
+    [[ -d "$dir" ]] && _to_scan "$dir"
+  done
 
   # Build table: repo_name,repo_path,date
   repo_table=()
   for repo in "${repo_roots[@]}"; do
-    if [[ -e "$repo/.git" ]]; then
-      last_commit=$(git -C "$repo" log -1 --format="%ct" 2>/dev/null)
-      last_commit=${last_commit:-0}
-      date_str=$(date_cmd "$last_commit")
-      repo_name=$(basename "$repo")
-      repo_table+=("${repo_name},${repo},${date_str}")
-    fi
+    last_commit=$(git -C "$repo" log -1 --format="%ct" 2>/dev/null)
+    last_commit=${last_commit:-0}
+    date_str=$(date_cmd "$last_commit")
+    repo_name=$(basename "$repo")
+    repo_table+=("${repo_name},${repo},${date_str}")
   done
 
   printf "%s\n" "${repo_table[@]}"
