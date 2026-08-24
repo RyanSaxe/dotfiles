@@ -81,6 +81,11 @@ const NO_SERVER_EXIT_TICKS = 5;
 // approximately 41px at the current font, plus the crust gutter. The tab
 // bar derives chip positions from the registry, distributing spare cells
 // between the chips when the labels or tab count change.
+//
+// 28 rather than 27 because the distribution can only come out even when
+// the spare cells divide by the number of gaps. Today's three chips occupy
+// 24 cells, so an even content width gives 2 and 2 while an odd one gives
+// 2 and 1 — visibly off-centre, which is what 27 shipped as.
 const RAIL_WIDTH = 28 + GUTTER_COLS;
 // Split feasibility, not policy: below this tmux can't fit rail + border
 // + any content. Visibility is controlled by alt+g alone.
