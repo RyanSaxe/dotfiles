@@ -277,6 +277,9 @@ remove_system_link_matching() {
 }
 
 install_ai_harness() {
+  # Both the core and agents tiers want the harness, and the default run
+  # installs both — same reason setup_agents guards itself just above.
+  [ "${AI_HARNESS_SETUP_DONE:-0}" = 1 ] && return 0
   [ -d "$AI_HARNESS_SOURCE" ] || {
     echo "error: missing $AI_HARNESS_SOURCE" >&2
     return 1
@@ -309,6 +312,7 @@ install_ai_harness() {
   # configuration on every run. Removing those keys is a one-time cleanup for
   # whoever carried the old shape forward, not an install step.
   mkdir -p "$HOME/.codex"
+  AI_HARNESS_SETUP_DONE=1
 }
 
 install_neovim_linux() {
