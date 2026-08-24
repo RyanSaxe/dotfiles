@@ -57,6 +57,13 @@ return {
     templates = { folder = nil },
     daily_notes = {
       folder = "daily",
+      -- This format is also the note's id, and daily.md opens with `{{id}}`
+      -- rather than `{{date}}` so the heading cannot disagree with the
+      -- filename. The built-in `date` substitution discards the template
+      -- context and reads os.time(), which stamps a note made by `tomorrow`
+      -- or `yesterday` with the day it was created instead of the day it is
+      -- for — and workdays_only, on by default, widens that gap to three
+      -- days across a weekend.
       date_format = "YYYY-MM-DD",
       template = vault.templates_dir() .. "/daily.md",
       default_tags = {},

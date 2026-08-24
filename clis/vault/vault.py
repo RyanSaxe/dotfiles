@@ -112,7 +112,7 @@ CUTOFF_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
 CUTOFF_FORM = f"HH:MM on a 24-hour clock (the default is {DEFAULT_OVERDUE_AFTER:%H:%M})"
 
 VAULT_DIRS = ("assets", "daily", "people", "projects", "public")
-VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE, "inbox.md": "# inbox\n"}
+VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE}
 
 # Templates ship next to this script and deploy to
 # $XDG_CONFIG_HOME/vault/templates. Every template but daily.md opens with a

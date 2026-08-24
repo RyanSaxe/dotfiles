@@ -223,7 +223,7 @@ def write_due_ladder(vault: Path) -> None:
         f"- [ ] {name} {DUE} {today() + timedelta(days=offset)}"
         for name, offset in DUE_LADDER.items()
     ]
-    write_note(vault, "inbox.md", "\n".join([*lines, "- [ ] undated", ""]))
+    write_note(vault, "notes.md", "\n".join([*lines, "- [ ] undated", ""]))
 
 
 def test_due_states_are_calendar_distances_before_the_cutoff(tmp_path: Path) -> None:
@@ -340,7 +340,6 @@ def test_init_in_place_adds_only_the_missing_pieces(tmp_path: Path) -> None:
     (vault / "daily").mkdir(parents=True)
     existing = {
         vault / ".gitignore": "# hand written\n/*\n",
-        vault / "inbox.md": "# my inbox\n\n- a thought\n",
         vault / "daily/2026-08-22.md": "# 2026-08-22\n",
     }
     for path, contents in existing.items():
@@ -660,13 +659,13 @@ def test_a_stale_id_refuses_to_write(tmp_path: Path) -> None:
 
 def test_a_fenced_task_is_never_a_write_target(tmp_path: Path) -> None:
     vault = make_vault(tmp_path)
-    write_note(vault, "inbox.md", "```\n- [ ] a code sample\n```\n")
-    before = (vault / "inbox.md").read_text()
+    write_note(vault, "notes.md", "```\n- [ ] a code sample\n```\n")
+    before = (vault / "notes.md").read_text()
 
-    result = run_vault(tmp_path, "task", "done", "inbox.md:2")
+    result = run_vault(tmp_path, "task", "done", "notes.md:2")
 
     assert result.returncode == 1
-    assert (vault / "inbox.md").read_text() == before
+    assert (vault / "notes.md").read_text() == before
 
 
 def test_writing_one_line_leaves_the_rest_of_the_note_alone(
@@ -674,12 +673,12 @@ def test_writing_one_line_leaves_the_rest_of_the_note_alone(
 ) -> None:
     vault = make_vault(tmp_path)
     note = "# notes\n\n- [ ] one\n\ntrailing prose, no newline at the end"
-    write_note(vault, "inbox.md", note)
+    write_note(vault, "notes.md", note)
 
-    result = run_vault(tmp_path, "task", "done", "inbox.md:3")
+    result = run_vault(tmp_path, "task", "done", "notes.md:3")
 
     assert result.returncode == 0, result.stderr
-    assert (vault / "inbox.md").read_text() == note.replace("[ ] one", "[x] one")
+    assert (vault / "notes.md").read_text() == note.replace("[ ] one", "[x] one")
 
 
 # -------------------------------------------------------------------- dates
