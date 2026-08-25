@@ -3,6 +3,7 @@
 #
 #   rail on|off|toggle   enable/disable the rail everywhere
 #   rail jump <letter>   jump to the agent behind a hint letter
+#   rail jump-attention   jump to the rail's highest-priority pending agent
 #   rail page up|down    page the rail body when it overflows
 #   rail tab agents|reviews|tasks
 #                       switch the active rail tab
@@ -117,6 +118,10 @@ jump)
   # The shared jump primitive switches AND syncs the mascot accent.
   "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
   ;;
+jump-attention)
+  cd "$RAIL_DIR"
+  exec npx tsx src/jump-attention.ts
+  ;;
 ensure-daemon)
   ensure_daemon
   ;;
@@ -203,7 +208,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|review-dashboard|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump <letter>|jump-attention|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|review-dashboard|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

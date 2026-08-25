@@ -36,6 +36,9 @@ never flicker.
   status event (`src/acks.ts`).
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
+- Attention jump: `rail jump-attention` selects the highest-priority live
+  pane from the daemon's stabilized, unacknowledged set. It uses pane ids, so
+  a deleted pane is skipped instead of turning into a jump to another window.
 - Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint
   renders in the footer row above the sprite, so the
   list's spacing never changes.
@@ -56,6 +59,7 @@ never flicker.
 rail on|off|toggle    # enable/disable + spawn/kill rail panes everywhere
                       # (on also turns the tmux status bar off; off restores)
 rail jump <letter>    # hint jump (bound to alt+; <letter>)
+rail jump-attention   # jump to the highest-priority pending agent
 rail page up|down     # page an overflowing rail (bound to alt+, / alt+.)
 rail dashboard reviews|tasks
                       # table + preview dashboard for a rail tab

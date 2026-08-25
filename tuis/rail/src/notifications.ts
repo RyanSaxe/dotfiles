@@ -1,6 +1,6 @@
 // Agent attention pushed beyond the terminal: the sketchybar code-workspace
-// highlight and an ntfy phone ping. Both are edge-triggered on status
-// transitions — never levels — so nothing repeats while a state persists.
+// highlight and an ntfy phone ping. The bar is edge-triggered on level
+// transitions; the history records pending-set changes too.
 
 import { writeFileSync } from "node:fs";
 import { platform } from "node:os";
@@ -13,10 +13,22 @@ import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
 const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
+export const ATTENTION_TARGETS_FILE = join(
+  XDG_STATE,
+  "dotfiles/rail/attention-pending.json",
+);
 const REVIEW_ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/review-attention");
 
 // waiting outranks done — the same urgency order the rail's rows use.
 export type AttentionLevel = "waiting" | "done" | "none";
+
+export function agentIdentity(agent: Agent): string {
+  const kind = agent.agentKind || "agent";
+  const title = agent.title
+    ? ` title=${JSON.stringify(agent.title.replace(/\s+/g, " "))}`
+    : "";
+  return `${kind} ${agent.session}/${agent.windowName} pane=${agent.paneId}${title}`;
+}
 
 export function attentionLevel(
   agents: Agent[],
@@ -29,33 +41,62 @@ export function attentionLevel(
 }
 
 let publishedLevel: AttentionLevel | null = null;
+let publishedTargets: string | null = null;
 
 // Visit-clears carries through: acks feed the level, so landing on an
 // agent's window dims the sketchybar highlight the same tick it dims the
 // rail row.
 export function publishAttention(agents: Agent[], acked: Set<string>): void {
   const level = attentionLevel(agents, acked);
-  if (level === publishedLevel) return;
-  publishedLevel = level;
-  writeFileSync(ATTENTION_FILE, level);
-  // Edge-triggered, so this is one line per level change — the only record
-  // of why the bar looks the way it does. Without it, diagnosing a quiet
-  // notification means reconstructing the ack store by hand.
   const pending = agents
     .filter((agent) => agent.status !== "working" && !acked.has(agent.paneId))
-    .map((agent) => `${agent.session}/${agent.windowName}`);
-  logLine(`attention ${level} (pending: ${pending.join(", ") || "none"})`);
+    .sort(
+      (a, b) => b.updatedTs - a.updatedTs || a.paneId.localeCompare(b.paneId),
+    );
+  const serializedTargets = JSON.stringify(pending);
+  const targetKey = JSON.stringify(
+    pending.map((agent) => [
+      agent.paneId,
+      agent.status,
+      agent.updatedTs,
+      agent.agentKind,
+      agent.session,
+      agent.windowName,
+      agent.title,
+    ]),
+  );
+  const targetsChanged = targetKey !== publishedTargets;
+  if (targetsChanged) {
+    publishedTargets = targetKey;
+    writeFileSync(ATTENTION_TARGETS_FILE, serializedTargets);
+  }
+  if (!targetsChanged && level === publishedLevel) return;
+  const levelChanged = level !== publishedLevel;
+  if (levelChanged) {
+    publishedLevel = level;
+    writeFileSync(ATTENTION_FILE, level);
+  }
+  // The level file and Sketchybar event stay edge-triggered. The log also
+  // records pending-set changes, so it remains a useful history when two
+  // agents share a window or a new agent arrives at the same level. Include
+  // the kind and pane id so a Claude pane cannot look like a missing Codex
+  // pane, and two panes in the same window cannot collapse into one label.
+  logLine(
+    `attention ${level} (pending: ${pending.map(agentIdentity).join(", ") || "none"})`,
+  );
   // No sketchybar (Linux, or it isn't running) is fine — the file alone
   // keeps the state truthful for whoever reads it next. On macOS it is not
   // fine, and used to be silent: a failed trigger looked exactly like a
   // successful one, forever.
-  run("sketchybar", ["--trigger", "agent_attention_change"]).catch(
-    (error: unknown) => {
-      if (platform() === "darwin") {
-        logLine(`sketchybar trigger failed: ${String(error)}`);
-      }
-    },
-  );
+  if (levelChanged) {
+    run("sketchybar", ["--trigger", "agent_attention_change"]).catch(
+      (error: unknown) => {
+        if (platform() === "darwin") {
+          logLine(`sketchybar trigger failed: ${String(error)}`);
+        }
+      },
+    );
+  }
 }
 
 // The review letter in the menu bar, published the same way the agent one
@@ -171,13 +212,11 @@ export function pushPhone(
       ? `Agent ${first.status}: ${first.session}`
       : `${transitions.length} agents need you`;
   const body = transitions
-    .map((agent) => `${agent.session}/${agent.windowName}: ${agent.status}`)
+    .map((agent) => `${agentIdentity(agent)}: ${agent.status}`)
     .join("\n");
   // A dropped ping is a missed agent: log it (no retries — an unreliable
   // channel that says so beats retry machinery).
-  const names = transitions
-    .map((agent) => `${agent.session}/${agent.windowName}`)
-    .join(", ");
+  const names = transitions.map(agentIdentity).join(", ");
   sendNtfy(
     {
       title,

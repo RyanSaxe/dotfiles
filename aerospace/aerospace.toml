@@ -147,12 +147,12 @@ cmd-alt-tab = 'workspace-back-and-forth'
 # it is a development convenience, and the review jump is a daily one.
 cmd-alt-shift-r = 'reload-config'
 
-# Jump to the newest agent needing attention from anywhere: land on the
-# code workspace, focus the terminal, and let workmux switch tmux to the
-# agent's pane (the same jump alt+j does inside tmux).
+# Jump to the highest-priority agent needing attention from anywhere: land on
+# the code workspace, focus the terminal, and let the rail select the same
+# stabilized, pane-ID keyed attention set it publishes to the sidebar.
 cmd-alt-a = [
   'workspace code',
-  'exec-and-forget open -a Ghostty && /opt/homebrew/bin/workmux last-done',
+  'exec-and-forget open -a Ghostty && $HOME/.local/bin/rail jump-attention',
 ]
 
 # The review half of the same idea: land on the terminal and open the Reviews

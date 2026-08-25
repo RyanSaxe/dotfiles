@@ -16,6 +16,7 @@ export interface Agent {
   session: string;
   windowName: string;
   paneId: string;
+  agentKind?: string;
   status: AgentStatus;
   title: string;
   elapsedSecs: number;
@@ -61,6 +62,7 @@ interface WorkmuxAgent {
   session: string;
   window_name: string;
   pane_id: string;
+  agent_kind?: string;
   status: string;
   title: string;
   elapsed_secs: number;
@@ -88,6 +90,7 @@ async function collectAgents(): Promise<Agent[]> {
       session: agent.session,
       windowName: agent.window_name,
       paneId: agent.pane_id,
+      agentKind: agent.agent_kind ?? "",
       status: agent.status as AgentStatus,
       title: agent.title ?? "",
       elapsedSecs: agent.elapsed_secs ?? 0,

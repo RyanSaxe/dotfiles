@@ -21,6 +21,24 @@ export function loadAcks(): AckStore {
   }
 }
 
+// Resolve the persisted timestamps against the current agent snapshot. A
+// pane can receive a new status after it was visited, so the existence of an
+// ack record alone is not enough to call its current event acknowledged.
+export function acknowledgedPaneIds(
+  agents: Agent[],
+  acks: AckStore,
+): Set<string> {
+  return new Set(
+    agents
+      .filter(
+        (agent) =>
+          agent.status !== "working" &&
+          (acks[agent.paneId] ?? 0) >= agent.updatedTs,
+      )
+      .map((agent) => agent.paneId),
+  );
+}
+
 // A pane is "visited" when its window is the active window of a session
 // someone is attached to AND that session's terminal window owns OS focus.
 // An attached client sitting behind a browser acks nothing.
@@ -66,7 +84,6 @@ export function updateAcks(
       changed = true;
     }
   }
-  const acked = new Set<string>();
   for (const agent of agents) {
     if (
       visited.has(agent.paneId) &&
@@ -75,16 +92,10 @@ export function updateAcks(
       acks[agent.paneId] = agent.updatedTs;
       changed = true;
     }
-    if (
-      agent.status !== "working" &&
-      (acks[agent.paneId] ?? 0) >= agent.updatedTs
-    ) {
-      acked.add(agent.paneId);
-    }
   }
   if (changed) {
     mkdirSync(dirname(ACKS_PATH), { recursive: true });
     writeFileSync(ACKS_PATH, JSON.stringify(acks));
   }
-  return acked;
+  return acknowledgedPaneIds(agents, acks);
 }
