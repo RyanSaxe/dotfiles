@@ -1,5 +1,6 @@
--- Python is ty + ruff, nothing else. The explicit `false` entries stop
--- LazyVim or machine-present servers from attaching a second checker.
+-- Python is ty + ruff, nothing else. The `false` entries are checkers
+-- tried and rejected; naming them keeps a machine that happens to have
+-- one installed from attaching it as a second opinion.
 return {
   "neovim/nvim-lspconfig",
   opts = {
@@ -12,8 +13,6 @@ return {
       ty = {
         settings = {
           ty = {
-            -- workspace mode enables workspace-wide diagnostics pickers.
-            diagnosticMode = "workspace",
             inlayHints = {
               variableTypes = true,
               callArgumentNames = true,
