@@ -34,6 +34,10 @@ never flicker.
   terminal window holding OS focus (tmux's own `client_flags`, so it works
   over ssh) — silences its done/waiting color everywhere until a new
   status event (`src/acks.ts`).
+- Attention events are durable: a stabilized done/waiting event remains
+  pending if the agent resumes working, survives a rail restart, and clears
+  only after the pane is surfaced and visited or the pane disappears
+  (`src/attention-events.ts`).
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
 - Attention jump: `rail jump-attention` selects the highest-priority live

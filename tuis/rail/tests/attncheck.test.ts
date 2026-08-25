@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   AGENT_STATUS_LAG_SECS,
   stabilizeAgents,
+  type StableAgentState,
   type Agent,
   type AgentStatus,
 } from "../src/data.js";
@@ -43,7 +44,9 @@ assert.equal(isPresent(30, 100, 1000), true, "input idle outranks clients");
 // Boundaries are derived from the constant, never restated: a test that
 // spells out the window is a second copy of it, and the two drift.
 const CHANGED_AT = 100;
-const stableStatuses = new Map<string, AgentStatus>([["%1", "working"]]);
+const stableStatuses = new Map<string, StableAgentState>([
+  ["%1", { status: "working", updatedTs: 90 }],
+]);
 const waitingChange = agent("%1", "waiting", CHANGED_AT);
 assert.equal(
   stabilizeAgents(
@@ -58,10 +61,28 @@ assert.equal(
   stabilizeAgents(
     [waitingChange],
     stableStatuses,
+    CHANGED_AT + AGENT_STATUS_LAG_SECS - 1,
+  )[0]?.updatedTs,
+  90,
+  "a provisional status keeps the accepted status timestamp",
+);
+assert.equal(
+  stabilizeAgents(
+    [waitingChange],
+    stableStatuses,
     CHANGED_AT + AGENT_STATUS_LAG_SECS,
   )[0]?.status,
   "waiting",
   "a status that lasts the full window is accepted",
+);
+assert.equal(
+  stabilizeAgents(
+    [waitingChange],
+    stableStatuses,
+    CHANGED_AT + AGENT_STATUS_LAG_SECS,
+  )[0]?.updatedTs,
+  CHANGED_AT,
+  "the accepted status carries its own event timestamp",
 );
 const doneChange = agent("%1", "done", CHANGED_AT + AGENT_STATUS_LAG_SECS + 1);
 assert.equal(

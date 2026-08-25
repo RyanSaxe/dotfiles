@@ -9,6 +9,10 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { acknowledgedPaneIds, loadAcks, type AckStore } from "./acks.js";
+import {
+  loadAttentionEvents,
+  surfaceAttentionEvents,
+} from "./attention-events.js";
 import { collectAgents, run, tmux, type Agent } from "./data.js";
 import { agentIdentity, ATTENTION_TARGETS_FILE } from "./notifications.js";
 import { sortByUrgency } from "./sections/rows.js";
@@ -55,8 +59,19 @@ async function livePane(paneId: string): Promise<boolean> {
 
 export async function jumpAttention(): Promise<Agent | null> {
   const published = readPublishedAgents();
-  const agents = published ?? (await collectAgents());
   const acks: AckStore = loadAcks();
+  let live: Agent[] | null = null;
+  try {
+    live = await collectAgents();
+  } catch {
+    // The last published target set is safer than failing a jump during a
+    // transient Workmux read failure.
+  }
+  const events = loadAttentionEvents();
+  const agents =
+    live !== null && Object.keys(events).length > 0
+      ? surfaceAttentionEvents(live, events, acks)
+      : (published ?? live ?? []);
   const acked = acknowledgedPaneIds(agents, acks);
 
   for (const agent of attentionCandidates(agents, acked)) {
@@ -69,7 +84,7 @@ export async function jumpAttention(): Promise<Agent | null> {
         agent.session,
         agent.paneId,
         agent.paneId,
-        "quiet",
+        "strict",
       ]);
       console.log(`rail: jumped to ${agentIdentity(agent)}`);
       return agent;

@@ -115,9 +115,14 @@ async function collectAgents(): Promise<Agent[]> {
 // The floor is the reconcile interval: below it this suppresses nothing.
 export const AGENT_STATUS_LAG_SECS = 30;
 
+export interface StableAgentState {
+  status: AgentStatus;
+  updatedTs: number;
+}
+
 export function stabilizeAgents(
   agents: Agent[],
-  stableStatuses: Map<string, AgentStatus>,
+  stableStatuses: Map<string, StableAgentState>,
   nowSecs: number,
 ): Agent[] {
   const live = new Set(agents.map((agent) => agent.paneId));
@@ -126,15 +131,18 @@ export function stabilizeAgents(
   }
 
   return agents.map((agent) => {
-    const stableStatus = stableStatuses.get(agent.paneId);
+    const stable = stableStatuses.get(agent.paneId);
     if (
-      stableStatus !== undefined &&
-      stableStatus !== agent.status &&
+      stable !== undefined &&
+      stable.status !== agent.status &&
       nowSecs - agent.updatedTs < AGENT_STATUS_LAG_SECS
     ) {
-      return { ...agent, status: stableStatus };
+      return { ...agent, status: stable.status, updatedTs: stable.updatedTs };
     }
-    stableStatuses.set(agent.paneId, agent.status);
+    stableStatuses.set(agent.paneId, {
+      status: agent.status,
+      updatedTs: agent.updatedTs,
+    });
     return agent;
   });
 }

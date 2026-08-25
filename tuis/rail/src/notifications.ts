@@ -42,6 +42,8 @@ export function attentionLevel(
 
 let publishedLevel: AttentionLevel | null = null;
 let publishedTargets: string | null = null;
+let triggerPending = false;
+let triggerInFlight = false;
 
 // Visit-clears carries through: acks feed the level, so landing on an
 // agent's window dims the sketchybar highlight the same tick it dims the
@@ -67,14 +69,14 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
   );
   const targetsChanged = targetKey !== publishedTargets;
   if (targetsChanged) {
-    publishedTargets = targetKey;
     writeFileSync(ATTENTION_TARGETS_FILE, serializedTargets);
+    publishedTargets = targetKey;
   }
-  if (!targetsChanged && level === publishedLevel) return;
+  if (!targetsChanged && level === publishedLevel && !triggerPending) return;
   const levelChanged = level !== publishedLevel;
   if (levelChanged) {
-    publishedLevel = level;
     writeFileSync(ATTENTION_FILE, level);
+    publishedLevel = level;
   }
   // The level file and Sketchybar event stay edge-triggered. The log also
   // records pending-set changes, so it remains a useful history when two
@@ -88,14 +90,20 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
   // keeps the state truthful for whoever reads it next. On macOS it is not
   // fine, and used to be silent: a failed trigger looked exactly like a
   // successful one, forever.
-  if (levelChanged) {
-    run("sketchybar", ["--trigger", "agent_attention_change"]).catch(
-      (error: unknown) => {
+  if (levelChanged || targetsChanged) triggerPending = true;
+  if (triggerPending && !triggerInFlight) {
+    triggerInFlight = true;
+    run("sketchybar", ["--trigger", "agent_attention_change"])
+      .then(() => {
+        triggerPending = false;
+        triggerInFlight = false;
+      })
+      .catch((error: unknown) => {
+        triggerInFlight = false;
         if (platform() === "darwin") {
           logLine(`sketchybar trigger failed: ${String(error)}`);
         }
-      },
-    );
+      });
   }
 }
 

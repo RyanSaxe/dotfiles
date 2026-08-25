@@ -23,7 +23,13 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { loadAcks, updateAcks } from "./acks.js";
+import { acknowledgedPaneIds, loadAcks, updateAcks } from "./acks.js";
+import {
+  loadAttentionEvents,
+  reconcileAttentionEvents,
+  saveAttentionEvents,
+  surfaceAttentionEvents,
+} from "./attention-events.js";
 import { loadReviewSnapshot } from "./attention/review.js";
 import {
   collectAgents,
@@ -33,7 +39,6 @@ import {
   tmux,
   windowsOf,
   type Agent,
-  type AgentStatus,
   type Pane,
 } from "./data.js";
 import { assignHints, writeHints } from "./hints.js";
@@ -48,6 +53,11 @@ import { collectHostFacts, isPresent } from "./probes.js";
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { spriteId, transmitSprite, writeTty } from "./sprite.js";
+import {
+  loadStableStatuses,
+  saveStableStatuses,
+  stableStatusesKey,
+} from "./stability.js";
 import { loadRailTab } from "./tabs.js";
 import {
   emptyTaskSnapshot,
@@ -111,7 +121,10 @@ let tasksFresh = false;
 let appliedBg = "";
 let warnedNoPalette = false;
 const acks = loadAcks();
-const stableStatuses = new Map<string, AgentStatus>();
+const attentionEvents = loadAttentionEvents();
+let attentionEventsDirty = false;
+const stableStatuses = loadStableStatuses();
+let stableStatusesDirty = false;
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
 
@@ -352,19 +365,43 @@ async function tick(counter: number): Promise<boolean> {
   const enabled = existsSync(ENABLED_FLAG);
   const skip = await selfHeal(panes, enabled);
 
+  const stableBefore = stableStatusesKey(stableStatuses);
   const settled = stabilizeAgents(agents, stableStatuses, Date.now() / 1000);
-  const acked = updateAcks(acks, settled, panes, clientFacts.focusedSessions);
+  if (stableStatusesKey(stableStatuses) !== stableBefore) {
+    stableStatusesDirty = true;
+  }
+  if (stableStatusesDirty) {
+    try {
+      saveStableStatuses(stableStatuses);
+      stableStatusesDirty = false;
+    } catch (error) {
+      logLine(`status stability persistence failed: ${String(error)}`);
+    }
+  }
+  if (reconcileAttentionEvents(attentionEvents, settled, acks, agents)) {
+    attentionEventsDirty = true;
+  }
+  if (attentionEventsDirty) {
+    try {
+      saveAttentionEvents(attentionEvents);
+      attentionEventsDirty = false;
+    } catch (error) {
+      logLine(`attention event persistence failed: ${String(error)}`);
+    }
+  }
+  const surfaced = surfaceAttentionEvents(settled, attentionEvents, acks);
+  const acked = acknowledgedPaneIds(settled, acks);
   const sessions = new Set(panes.map((pane) => pane.session));
-  const hintsBySession = assignHints(settled, sessions, acked);
-  writeHints(settled, hintsBySession, acked);
-  publishAttention(settled, acked);
+  const hintsBySession = assignHints(surfaced, sessions, acked);
+  writeHints(surfaced, hintsBySession, acked);
+  publishAttention(surfaced, acked);
   publishReviewAttention(loadReviewSnapshot().unacknowledged);
   const present = isPresent(
     hostFacts.inputIdleSecs,
     clientFacts.latestClientActivityTs,
     Date.now() / 1000,
   );
-  pushPhone(settled, acked, present);
+  pushPhone(surfaced, acked, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;
@@ -399,7 +436,7 @@ async function tick(counter: number): Promise<boolean> {
         session: pane.session,
         activeTab,
         windows: windowsOf(panes, pane.session),
-        agents: settled,
+        agents: surfaced,
         review,
         tasks: taskSnapshot,
         acked,
@@ -438,6 +475,11 @@ async function tick(counter: number): Promise<boolean> {
       lastTransmit.delete(key);
     }
   }
+
+  // Publish/render first. A focused pane can acknowledge only what the
+  // current snapshot has actually surfaced; this avoids consuming a newly
+  // stable completion before the notification path sees it.
+  updateAcks(acks, settled, panes, clientFacts.focusedSessions);
 
   return !enabled || clientFacts.clientCount === 0;
 }
