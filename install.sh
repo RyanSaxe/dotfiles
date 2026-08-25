@@ -418,6 +418,16 @@ setup_vault() {
   "$vault_bin" check || true
 }
 
+# render-markdown renders LaTeX through the first converter it finds,
+# preferring utftex and falling back to latex2text. utftex is a brew
+# formula with no apt equivalent; pylatexenc ships latex2text and
+# installs the same way on every OS, so one mechanism covers both rather
+# than a mac-only formula plus a Linux fallback. nvim/lua/markdown/health.lua
+# fails the checkhealth report without one of them.
+install_latex_converter() {
+  uv tool install --quiet pylatexenc
+}
+
 install_tier_packages() {
   case "$1:$OS" in
   core:Darwin)
@@ -429,6 +439,7 @@ install_tier_packages() {
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
+    install_latex_converter
     ;;
   core:Linux)
     # shellcheck disable=SC2086
@@ -444,6 +455,7 @@ install_tier_packages() {
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
+    install_latex_converter
     ;;
   agents:Darwin | agents:Linux)
     # The agents tier can be installed on an existing machine without the
