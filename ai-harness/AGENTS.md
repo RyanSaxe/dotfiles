@@ -139,26 +139,28 @@ Passing tests and CI establish useful facts but do not, by themselves, prove
 that a feature works. Verify through the interface where the user encounters
 the change, with effort proportional to its risk, novelty, and consequence.
 
-`nvim-diagnostics <files-or-dirs>` reports what the editor's language
-servers would show and is a reliable verification loop for code changes. It
-starts a real Neovim/LSP session, so a cold run commonly takes 15–60 seconds
-and may use much of its timeout while servers start. Do not run it after every
-edit, during exploration, or across an entire repository by default. Use unit
-tests, formatters, linters, typecheckers, and targeted checks for iteration.
-
-Near the end of the task, run it once with all relevant changed files in a
-single invocation:
+`prek` runs the same checks as the commit gate and CI, so it is the
+authority on whether a change passes. Iterate with a targeted run and finish
+with the full one:
 
 ```sh
-nvim-diagnostics path/to/changed.lua another/file.lua
+prek run --files path/to/changed.lua another/file.ts
+prek run --all-files
 ```
 
-Run a whole directory or repository only when the driver explicitly asks,
-when changing `nvim-diagnostics` itself, or when validating editor-wide
-behavior. Treat `NOT fully verified` as a failed verification, regardless of
-the finding count. When it disagrees with CI or pre-commit checks, prefer
-CI/pre-commit as the authority and report the discrepancy to the driver: a
-divergence between the editor and the gates is itself a finding worth fixing.
+That covers formatting, linting, types, shell, and the Lua typecheck. The Lua
+half is `ci/luals-check.lua`, which drives the same lua-language-server the
+editor runs, with every installed plugin supplied as a typed library — so it
+sees what your editor would show in a file you never opened. Run it alone when
+only Lua changed:
+
+```sh
+nvim -l ci/luals-check.lua
+```
+
+None of this proves a feature works. In-editor behavior, rendering, and
+keybindings need the real interface, so open Neovim and use the thing you
+changed.
 
 <important>
 

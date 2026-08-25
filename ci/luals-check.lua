@@ -31,6 +31,15 @@ luarc["workspace.library"] = library
 local generated = vim.fn.tempname() .. ".luarc.json"
 vim.fn.writefile({ vim.json.encode(luarc) }, generated)
 
+-- Trace logging, kept on permanently rather than added when something
+-- goes wrong. This check has failed CI once on a file the triggering PR
+-- never touched and passed on rerun, and the obvious explanation -- a
+-- short plugin library degrading inference -- was tested and is wrong.
+-- An intermittent failure that leaves no evidence cannot be diagnosed
+-- after the fact, so the next occurrence has to explain itself. Set
+-- LUALS_LOGPATH to collect it somewhere durable; CI does.
+local logpath = vim.env.LUALS_LOGPATH or (vim.fn.tempname() .. ".luals-log")
+
 local result = vim
   .system({
     "lua-language-server",
@@ -39,7 +48,12 @@ local result = vim
     "--checklevel=Warning",
     "--configpath",
     generated,
+    "--loglevel=trace",
+    "--logpath=" .. logpath,
   })
   :wait()
 io.write(result.stdout or "", result.stderr or "")
+if result.code ~= 0 then
+  io.write(("luals-check: trace log written to %s\n"):format(logpath))
+end
 os.exit(result.code)
