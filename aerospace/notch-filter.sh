@@ -6,6 +6,11 @@
 # monitors. smudge (checkout) writes the per-monitor value; clean
 # (staging) normalizes back to the repo default so the machine-specific
 # number never lands in history.
+#
+# The 52 below is the shared default, derived from sketchybar's geometry
+# by the rule in aerospace.toml's [gaps] comment. It appears three times
+# here and once there; all four move together or one machine ends up
+# with the wrong gap.
 set -eu
 
 ACTION="${1:-}"
