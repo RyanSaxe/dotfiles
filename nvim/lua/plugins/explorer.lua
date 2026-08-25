@@ -5,11 +5,11 @@
 -- All snacks windows share one surface, and it is the INNER one. The
 -- explorer is the exception: it runs to the terminal's right edge and must
 -- continue the rail. It cannot be singled out where the colors are chosen,
--- because snacks builds it out of floats inside a non-float box, paints the
--- list through the one group every picker shares, and asserts its own
--- `winhighlight` last — which defeats both the anchored/floating test in
--- theme.surfaces and a per-source `wo` override. So theme.surfaces names
--- the explorer's own windows and repaints them outer after the fact.
+-- because snacks builds it out of floats inside a non-float box and paints
+-- the list through the one group every picker shares — which defeats the
+-- anchored/floating test in theme.surfaces. So theme.surfaces names the
+-- explorer's own windows and hands them a highlight namespace in which
+-- those shared groups mean the outer surface.
 return {
   {
     "folke/snacks.nvim",

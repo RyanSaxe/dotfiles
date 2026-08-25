@@ -272,8 +272,9 @@ function M.apply(tokens)
   -- the surface is chosen once for all of them (see plugins/explorer.lua
   -- for why it can't split). These hover over the buffer and never reach a
   -- terminal edge, so they take the INNER surface. The explorer is the one
-  -- exception — it continues the tmux rail — and theme.surfaces repaints
-  -- its windows outer rather than splitting the groups here.
+  -- exception — it continues the tmux rail — and theme.surfaces relinks
+  -- these groups to the outer ones inside its own highlight namespace,
+  -- rather than splitting them here.
   hl("SnacksNormal", { fg = r.fg, bg = r.bg })
   hl("SnacksNormalNC", { fg = r.fg_muted, bg = r.bg })
   -- The rest of the set every snacks window is opened with. Unnamed, they
