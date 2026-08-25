@@ -102,7 +102,13 @@ def ghostty_chords(config: str) -> set[str]:
 
 # Raw zle sequences -> readable chords. An unmapped sequence surfaces as
 # a loud "zsh-seq" miss so the human extends this table.
-ZSH_SEQUENCES = {"'^I'": "tab", "'^[[Z'": "shift+tab"}
+ZSH_SEQUENCES = {
+    "'^I'": "tab",
+    "'^[[Z'": "shift+tab",
+    "'^[[A'": "up",
+    "'^[[B'": "down",
+    "'z'": "z",
+}
 
 
 def zsh_chords(zshrc: str) -> set[str]:

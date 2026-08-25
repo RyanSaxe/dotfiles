@@ -53,3 +53,7 @@ ghostty	cmd+o	open ghostty config
 ghostty	shift+enter	newline without submitting
 zsh	tab	completion menu (fzf)
 zsh	shift+tab	accept ghost suggestion
+zsh	ctrl+r	fuzzy history search (fzf)
+zsh	up	search history for what is typed
+zsh	down	search history forward
+zsh	z	edit command in nvim (normal mode)
