@@ -8,6 +8,22 @@ return {
     keys = {
       { "<leader>gr", group = "Review" },
       {
+        "<leader>grq",
+        function()
+          -- One key closes whichever diff surface is up: the mini.diff
+          -- overlay if this buffer has one, else the codediff tab. Ported
+          -- from v1's <leader>gdq; the group moved to gr in v2.
+          if diff_surfaces.close_overlay() then
+            return
+          end
+          local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+          if ok and lifecycle.get_session(vim.api.nvim_get_current_tabpage()) then
+            vim.cmd.tabclose()
+          end
+        end,
+        desc = "Close diff view",
+      },
+      {
         "<leader>grf",
         function()
           ---@param ref string
