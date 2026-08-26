@@ -36,6 +36,11 @@ sudo ipconfig setverbose 1
 Skip it and the wifi item still renders, showing the disconnected icon on a
 connected machine.
 
+Karabiner-Elements (Caps Lock as Escape, Ctrl+hjkl arrows outside terminals)
+needs one approval on first run: open the app once and allow its driver
+extension under System Settings > Privacy & Security. Until then the remaps
+simply do not fire.
+
 Nothing depends on `extras`, and declining it leaves no trace. Every entry in
 its map carries its own `if` condition, so an extra whose tool is missing is
 skipped while its neighbours still deploy — the tier is a list of independent

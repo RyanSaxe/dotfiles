@@ -18,3 +18,8 @@
     ~/.config/ghostty/config: ghostty/config
     ~/.config/sketchybar: sketchybar
     ~/.config/aerospace: aerospace
+    # karabiner stays per-file: Karabiner-Elements writes GUI state and
+    # automatic_backups/ into its directory, so the directory is real and
+    # only the authored config is ours. It writes through the symlink, so
+    # a GUI change shows up as a dirty repo file -- visible, not silent.
+    ~/.config/karabiner/karabiner.json: karabiner/karabiner.json
