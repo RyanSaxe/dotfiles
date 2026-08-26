@@ -53,6 +53,12 @@ return {
     legacy_commands = false,
     workspaces = { { name = "vault", path = vault.dir(), strict = true } },
     ui = { enable = false },
+    -- [[-completion is served by the plugin's built-in obsidian-ls LSP
+    -- (the v1-era completion.blink switch is gone). Two tunings survive:
+    -- complete from the first character, and never offer creating a note
+    -- from the menu -- completion shows what exists, creation is its own
+    -- deliberate act.
+    completion = { min_chars = 1, create_new = false },
     frontmatter = { enabled = false },
     templates = { folder = nil },
     daily_notes = {
