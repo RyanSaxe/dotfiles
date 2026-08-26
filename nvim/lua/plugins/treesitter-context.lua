@@ -6,6 +6,13 @@
 return {
   "nvim-treesitter/nvim-treesitter-context",
   event = "LazyFile",
+  ---@param opts table
+  config = function(_, opts)
+    require("treesitter-context").setup(opts)
+    -- The selected tab follows the header's wash while it is visible;
+    -- see theme/context_chrome.lua.
+    require("theme.context_chrome").setup()
+  end,
   opts = {
     max_lines = 4,
     mode = "cursor",
