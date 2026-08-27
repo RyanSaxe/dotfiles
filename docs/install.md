@@ -25,6 +25,17 @@ box). The default `./install.sh` runs `core agents` and asks separately about
 the mac and extras tiers. `./install.sh links` redoes the symlinks alone, with
 no package installs.
 
+The `mac` tier has one prerequisite `install.sh` cannot satisfy for you.
+sketchybar's wifi item reads `ipconfig getsummary en0`, which reports the SSID
+only on a machine where this has been run once:
+
+```sh
+sudo ipconfig setverbose 1
+```
+
+Skip it and the wifi item still renders, showing the disconnected icon on a
+connected machine.
+
 Nothing depends on `extras`, and declining it leaves no trace. Every entry in
 its map carries its own `if` condition, so an extra whose tool is missing is
 skipped while its neighbours still deploy — the tier is a list of independent

@@ -38,10 +38,13 @@ return {
       },
     },
     panel = { enabled = false },
-    -- Commit messages are prose worth completing; copilot's own defaults
-    -- decide the rest.
+    -- Commit messages are prose worth completing. Notes are prose you
+    -- write yourself: the vault made markdown a writing surface, so
+    -- suggestions there are noise. Copilot's own defaults decide the rest.
     filetypes = {
       gitcommit = true,
+      markdown = false,
+      text = false,
     },
     -- Real buffers only: never scratch, terminal, or plugin windows.
     ---@param bufnr integer

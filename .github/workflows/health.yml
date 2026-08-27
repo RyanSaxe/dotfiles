@@ -241,6 +241,19 @@ jobs:
           # libraries (blink, snacks, LazyVim classes).
           brew install lua-language-server
           nvim -l ci/luals-check.lua
+        env:
+          LUALS_LOGPATH: ${{ runner.temp }}/luals-log
+
+      # This check has failed once on a file the PR never touched and
+      # passed on rerun. Keep the trace log when it fails so the next
+      # occurrence is diagnosable instead of just rerun.
+      - name: Upload Lua typecheck trace log
+        if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: luals-trace-log
+          path: ${{ runner.temp }}/luals-log
+          if-no-files-found: ignore
 
       - name: every lua function documents its signature
         run: nvim -l ci/annotation-check.lua

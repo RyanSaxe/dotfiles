@@ -77,6 +77,96 @@ local function review_layout_keys(mode)
   }
 end
 
+-- `<leader>sf` scopes a search to a directory picked from the current
+-- file's ancestors. Root detection cannot answer "this package":
+-- LazyVim's lsp detector returns the attached client's root_dir, which
+-- for a file inside node_modules or site-packages is the project, not
+-- the dependency. Locating a real package root needs per-ecosystem
+-- knowledge that does not extend to the next language, so the choice is
+-- offered rather than guessed. That also keeps "search my project from
+-- inside a dependency" reachable, which an automatic override would take
+-- away.
+
+-- Deep enough to reach a repo root from a nested dependency, short
+-- enough that the list stays scannable.
+local MAX_ANCESTORS = 12
+
+---Directories from the current file upward, nearest first.
+---@return string[]
+local function ancestors()
+  local name = vim.api.nvim_buf_get_name(0)
+  -- Trailing "." is unreachable in practice; it keeps the value a plain
+  -- string, since both dirname and cwd are optional.
+  local start = (name ~= "" and vim.fs.dirname(name)) or vim.uv.cwd() or "."
+  ---@type string[]
+  local dirs = { start }
+  for parent in vim.fs.parents(start) do
+    if #dirs >= MAX_ANCESTORS or parent == "/" then
+      break
+    end
+    dirs[#dirs + 1] = parent
+  end
+  return dirs
+end
+
+---@type fun(source: string, cwd: string)
+local open_scoped
+
+-- Snacks binds a picker's finder once at construction, so a live picker
+-- cannot change source. Closing and reopening on the same cwd is the
+-- pattern its own explorer uses. The typed query does not carry over:
+-- query history is namespaced per source.
+---@param picker snacks.Picker
+local function scope_to_files(picker)
+  local cwd = picker:cwd()
+  picker:close()
+  open_scoped("files", cwd)
+end
+
+---@param picker snacks.Picker
+local function scope_to_grep(picker)
+  local cwd = picker:cwd()
+  picker:close()
+  open_scoped("grep", cwd)
+end
+
+---Open one scoped picker. The flip keys are attached per picker rather
+---than globally, because <c-g> is toggle_live everywhere else.
+---@param source string `"grep"` or `"files"`
+---@param cwd string
+function open_scoped(source, cwd)
+  Snacks.picker[source]({
+    cwd = cwd,
+    actions = { scope_to_files = scope_to_files, scope_to_grep = scope_to_grep },
+    win = {
+      input = {
+        keys = {
+          ["<c-f>"] = { "scope_to_files", mode = { "n", "i" }, desc = "File names in this directory" },
+          ["<c-g>"] = { "scope_to_grep", mode = { "n", "i" }, desc = "File contents in this directory" },
+        },
+      },
+    },
+  })
+end
+
+---@param item string
+---@return string
+local function shorten(item)
+  return vim.fn.fnamemodify(item, ":~")
+end
+
+---@param choice string? nil when the selection is cancelled
+local function grep_chosen_directory(choice)
+  if choice then
+    open_scoped("grep", choice)
+  end
+end
+
+---Pick an ancestor directory, then search inside it.
+local function search_in_directory()
+  Snacks.picker.select(ancestors(), { prompt = "Search in", format_item = shorten }, grep_chosen_directory)
+end
+
 ---@return snacks.win.Backdrop|false
 local function backdrop()
   -- `theme.load()` rather than `theme.tokens`: snacks builds its options
@@ -93,6 +183,9 @@ end
 
 return {
   "folke/snacks.nvim",
+  keys = {
+    { "<leader>sf", search_in_directory, desc = "Search in Directory" },
+  },
   init = function()
     vim.api.nvim_create_autocmd("ColorScheme", {
       group = vim.api.nvim_create_augroup("picker_backdrop", { clear = true }),

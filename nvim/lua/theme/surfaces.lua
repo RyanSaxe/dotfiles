@@ -25,25 +25,49 @@ local WINHL = table.concat({
 }, ",")
 
 -- The explorer is the one snacks window that belongs on the outer layer:
--- it runs to the terminal's right edge and continues the tmux rail. Snacks
--- paints it through the same groups as every other picker and asserts its
--- own `winhighlight` last, so it can be singled out neither in the theme
--- nor by a per-source override — only by rewriting its windows here.
+-- it runs to the terminal's right edge and continues the tmux rail. It
+-- cannot say so in `winhighlight`, because snacks owns that value for the
+-- windows it builds and re-asserts it from `win.opts.wo` on every layout
+-- update — inside `eventignore=all`, so nothing here can even react to it.
+-- Per-source config is no way in either: the picker resolves `win.list`
+-- and `win.input` UNDER its own defaults rather than over them, so the
+-- value never reaches the window (folke/snacks.nvim#2942).
 --
--- Its list and input are floats inside a box, so `NormalFloat` carries the
--- surface for those two and `Normal` for the box. Both are named. A later
--- duplicate key wins in `winhighlight`, which is what lets these land on
--- top of what snacks set.
-local EXPLORER_WINHL = table.concat({
-  "Normal:ThemeOuterNormal",
-  "NormalNC:ThemeOuterNormalNC",
-  "NormalFloat:ThemeOuterNormal",
-  "SignColumn:ThemeOuterNormal",
-  "EndOfBuffer:ThemeOuterNormal",
-  "WinSeparator:ThemeOuterWinSeparator",
-  "FloatBorder:ThemeOuterFrame",
-  "FloatTitle:ThemeOuterFrame",
-}, ",")
+-- So the surface moves out of `winhighlight`. These windows get their own
+-- highlight namespace, in which the groups snacks paints them through mean
+-- the outer surface instead. A namespace is not a window option, so snacks
+-- never touches it: attach once and it holds. Groups left out keep their
+-- global definition, which is why only the ones carrying a surface are
+-- named here — and naming links rather than colors keeps every color
+-- decision in theme.highlights, where a mode change repaints the targets
+-- and these follow.
+local OUTER_NS = vim.api.nvim_create_namespace("theme_outer_surface")
+
+for group, link in pairs({
+  -- The box takes `Normal`, the list and input that float inside it take
+  -- `NormalFloat`. Which group carries either depends on the duplicate key
+  -- that won inside snacks, so both spellings of each are named.
+  SnacksNormal = "ThemeOuterNormal",
+  SnacksNormalNC = "ThemeOuterNormalNC",
+  SnacksPicker = "ThemeOuterNormal",
+  SnacksPickerBox = "ThemeOuterNormal",
+  SnacksPickerList = "ThemeOuterNormal",
+  SnacksPickerInput = "ThemeOuterNormal",
+  SignColumn = "ThemeOuterNormal",
+  EndOfBuffer = "ThemeOuterNormal",
+  SnacksPickerBorder = "ThemeOuterFrame",
+  SnacksPickerBoxBorder = "ThemeOuterFrame",
+  SnacksPickerListBorder = "ThemeOuterFrame",
+  SnacksPickerInputBorder = "ThemeOuterFrame",
+  SnacksTitle = "ThemeOuterFrame",
+  SnacksPickerTitle = "ThemeOuterFrame",
+  SnacksPickerBoxTitle = "ThemeOuterFrame",
+  SnacksPickerListTitle = "ThemeOuterFrame",
+  SnacksPickerInputTitle = "ThemeOuterFrame",
+  SnacksWinSeparator = "ThemeOuterWinSeparator",
+}) do
+  vim.api.nvim_set_hl(OUTER_NS, group, { link = link })
+end
 
 ---@param set table<integer, boolean>
 ---@param wins table<any, snacks.win>|nil
@@ -134,18 +158,22 @@ end
 ---@param win integer
 ---@param explorer table<integer, boolean>
 local function apply(win, explorer)
-  local base = without_ours(vim.wo[win].winhighlight)
-  ---@type string|nil
-  local outer = nil
+  -- The explorer carries its surface in a namespace, not in `winhighlight`.
   if explorer[win] then
-    outer = EXPLORER_WINHL
-  elseif is_anchored_sidebar(win) then
-    outer = WINHL
+    if vim.api.nvim_get_hl_ns({ winid = win }) ~= OUTER_NS then
+      vim.api.nvim_win_set_hl_ns(win, OUTER_NS)
+    end
+    return
   end
+  -- A window that once held the explorer is an ordinary window again.
+  if vim.api.nvim_get_hl_ns({ winid = win }) == OUTER_NS then
+    vim.api.nvim_win_set_hl_ns(win, -1)
+  end
+  local base = without_ours(vim.wo[win].winhighlight)
   ---@type string
   local wanted = base
-  if outer then
-    wanted = base == "" and outer or (base .. "," .. outer)
+  if is_anchored_sidebar(win) then
+    wanted = base == "" and WINHL or (base .. "," .. WINHL)
   end
   if vim.wo[win].winhighlight ~= wanted then
     vim.wo[win].winhighlight = wanted
