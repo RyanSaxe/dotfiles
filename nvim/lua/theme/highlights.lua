@@ -141,6 +141,15 @@ function M.apply(tokens)
   -- Editing surfaces
   hl("CursorLine", { bg = bb(p.mauve, 0.1) })
 
+  -- The sticky context header wears the same mauve wash as CursorLine:
+  -- both mark "where you are", one vertically, one structurally. The
+  -- bottom row underlines in a stronger mix to seal the header off from
+  -- the buffer.
+  hl("TreesitterContext", { bg = bb(p.mauve, 0.1) })
+  hl("TreesitterContextLineNumber", { fg = r.fg_faint, bg = bb(p.mauve, 0.1) })
+  hl("TreesitterContextBottom", { bg = bb(p.mauve, 0.1), underline = true, sp = bb(p.mauve, 0.5) })
+  hl("TreesitterContextLineNumberBottom", { link = "TreesitterContextBottom" })
+
   -- Ghost text: AI suggestions whisper in pink
   hl("BlinkCmpGhostText", { fg = bb(p.pink, 0.5), bg = r.bg_alt })
   hl("CopilotSuggestion", { fg = bb(p.pink, 0.5) })
