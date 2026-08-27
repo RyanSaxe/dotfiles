@@ -39,5 +39,8 @@ fi
 session="$(tmux display-message -p -t "$prev" '#{session_name}' 2>/dev/null)"
 [[ -n "$session" ]] || exit 0
 
-# The shared jump primitive switches AND syncs the mascot accent.
-"$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$prev" "$prev" quiet
+# The shared jump primitive switches AND syncs the mascot accent. Call
+# the sibling, not a $HOME path: the pair must come from the same tree,
+# or a worktree/sandbox copy of one script jumps through the deployed
+# copy of the other.
+"$(dirname "$(readlink -f "$0")")/goto-pane.sh" "$session" "$prev" "$prev" quiet
