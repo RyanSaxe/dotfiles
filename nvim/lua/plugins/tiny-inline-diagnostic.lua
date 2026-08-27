@@ -5,7 +5,13 @@
 return {
   {
     "rachartier/tiny-inline-diagnostic.nvim",
-    event = "VeryLazy",
+    -- BufReadPre, not VeryLazy: the plugin attaches per-buffer on
+    -- LspAttach, and the startup buffer's server attaches BEFORE
+    -- VeryLazy fires -- so the first file of every session silently got
+    -- no inline diagnostics (with stock virtual text off below, that
+    -- read as "diagnostics are broken"). Loading before the first read
+    -- puts the LspAttach handler in place before any server exists.
+    event = { "BufReadPre", "BufNewFile" },
     priority = 1000,
     keys = {
       {
