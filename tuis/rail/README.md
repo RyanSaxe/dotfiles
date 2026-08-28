@@ -19,7 +19,8 @@ never flicker.
   rail is disabled or no client is attached.
 - **Agents** come from `workmux status --json` (run from `$HOME` for the
   global view), reconciled every 5s with instant refreshes when a workmux
-  state file changes.
+  state file changes. Status age comes from Workmux's `status_ts` transition
+  timestamp, not its general `updated_ts` write timestamp.
 - **Theme** re-reads `tuis-colors.json` on change; an outer-mode or mascot
   switch recolors every rail within a tick.
 
@@ -27,22 +28,24 @@ never flicker.
 
 - Chip = place: number chips mirror `alt+N`; the accent-filled chip is the
   current window and nothing else.
-- Title color = state: mauve working, peach waiting, green done. No bold.
+- Title color = live state plus attention: mauve working, peach active waiting,
+  green active done. An acknowledged waiting/done row stays quiet while its
+  live status remains truthful. No bold.
 - Elsewhere (other sessions' agents) sits at one uniform dim level,
-  urgency-sorted: waiting, working, done, acked.
-- Visit-clears acks: seeing an agent's window — active, attached, and its
-  terminal window holding OS focus (tmux's own `client_flags`, so it works
-  over ssh) — silences its done/waiting color everywhere until a new
-  status event (`src/acks.ts`).
-- Attention events are durable: a stabilized done/waiting event remains
-  pending if the agent resumes working, survives a rail restart, and clears
-  only after the pane is surfaced and visited or the pane disappears
-  (`src/attention-events.ts`).
+  urgency-sorted: waiting, working, done, acknowledged.
+- Visit-clears acks: seeing an agent's window, when it is active and attached
+  and its terminal window holds OS focus (tmux's own `client_flags`, so it
+  works over ssh), acknowledges the current waiting/done transition
+  everywhere. A later transition has a new timestamp and alerts again
+  (`src/acks.ts`).
+- Status stabilization accepts waiting and done only after 30 seconds based on
+  their transition timestamp. A return to working is immediate, so a transient
+  waiting classification disappears instead of becoming a stale notification.
 - Jump hints: every agent gets a letter chip; `alt+;` then the letter
   jumps to that agent's pane (`src/hints.ts`, `rail jump`).
 - Attention jump: `rail jump-attention` selects the highest-priority live
-  pane from the daemon's stabilized, unacknowledged set. It uses pane ids, so
-  a deleted pane is skipped instead of turning into a jump to another window.
+  pane from the daemon's active notification set. It uses pane ids, so a
+  deleted pane is skipped instead of turning into a jump to another window.
 - Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint
   renders in the footer row above the sprite, so the
   list's spacing never changes.

@@ -5,9 +5,14 @@
 //   npm test
 
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import { acknowledgedPaneIds } from "../src/acks.js";
 import {
   AGENT_STATUS_LAG_SECS,
+  loadStatusTransitionTimes,
   stabilizeAgents,
   type StableAgentState,
   type Agent,
@@ -19,12 +24,14 @@ import { isPresent } from "../src/probes.js";
 const agent = (
   paneId: string,
   status: AgentStatus,
-  updatedTs = 100,
+  statusTs = 100,
+  updatedTs = statusTs,
 ): Agent => ({
   session: "s",
   windowName: paneId,
   paneId,
   status,
+  statusTs,
   title: "t",
   elapsedSecs: 5,
   updatedTs,
@@ -44,8 +51,22 @@ assert.equal(isPresent(30, 100, 1000), true, "input idle outranks clients");
 // Boundaries are derived from the constant, never restated: a test that
 // spells out the window is a second copy of it, and the two drift.
 const CHANGED_AT = 100;
+const workmuxAgentsDir = mkdtempSync(join(tmpdir(), "rail-workmux-agents-"));
+writeFileSync(
+  join(workmuxAgentsDir, "agent.json"),
+  JSON.stringify({
+    pane_key: { pane_id: "%state-file" },
+    status_ts: CHANGED_AT,
+    updated_ts: 10_000,
+  }),
+);
+assert.deepEqual(
+  loadStatusTransitionTimes(workmuxAgentsDir),
+  new Map([["%state-file", CHANGED_AT]]),
+  "status age comes from Workmux's state-file transition timestamp",
+);
 const stableStatuses = new Map<string, StableAgentState>([
-  ["%1", { status: "working", updatedTs: 90 }],
+  ["%1", { status: "working", statusTs: 90 }],
 ]);
 const waitingChange = agent("%1", "waiting", CHANGED_AT);
 assert.equal(
@@ -63,8 +84,8 @@ assert.equal(
     stableStatuses,
     CHANGED_AT + AGENT_STATUS_LAG_SECS - 1,
   )[0]?.updatedTs,
-  90,
-  "a provisional status keeps the accepted status timestamp",
+  CHANGED_AT,
+  "a provisional status keeps the current update timestamp",
 );
 assert.equal(
   stabilizeAgents(
@@ -80,9 +101,9 @@ assert.equal(
     [waitingChange],
     stableStatuses,
     CHANGED_AT + AGENT_STATUS_LAG_SECS,
-  )[0]?.updatedTs,
+  )[0]?.statusTs,
   CHANGED_AT,
-  "the accepted status carries its own event timestamp",
+  "the accepted status carries its own transition timestamp",
 );
 const doneChange = agent("%1", "done", CHANGED_AT + AGENT_STATUS_LAG_SECS + 1);
 assert.equal(
@@ -105,11 +126,49 @@ assert.equal(
   stabilizeAgents(
     [doneChange],
     stableStatuses,
-    doneChange.updatedTs + AGENT_STATUS_LAG_SECS,
+    doneChange.statusTs + AGENT_STATUS_LAG_SECS,
   )[0]?.status,
   "done",
   "the latest stable status replaces the previous one",
 );
+
+const heartbeatStatuses = new Map<string, StableAgentState>([
+  ["%heartbeat", { status: "working", statusTs: 90 }],
+]);
+const heartbeatWaiting = agent("%heartbeat", "waiting", CHANGED_AT, 10_000);
+assert.equal(
+  stabilizeAgents(
+    [heartbeatWaiting],
+    heartbeatStatuses,
+    CHANGED_AT + AGENT_STATUS_LAG_SECS,
+  )[0]?.status,
+  "waiting",
+  "stability uses status transition age, not the heartbeat timestamp",
+);
+
+const transientStatuses = new Map<string, StableAgentState>([
+  ["%transient", { status: "working", statusTs: 90 }],
+]);
+const transientWaiting = agent("%transient", "waiting", 300, 9_999);
+assert.equal(
+  stabilizeAgents(
+    [transientWaiting],
+    transientStatuses,
+    300 + AGENT_STATUS_LAG_SECS - 1,
+  )[0]?.status,
+  "working",
+  "a fresh waiting classification stays provisional",
+);
+const resumed = agent("%transient", "working", 301, 10_000);
+assert.equal(
+  stabilizeAgents([resumed], transientStatuses, 301)[0]?.status,
+  "working",
+  "returning to working discards transient waiting immediately",
+);
+assert.deepEqual(transientStatuses.get("%transient"), {
+  status: "working",
+  statusTs: 301,
+});
 
 // ----- phone batch -------------------------------------------------------
 const waiting = agent("%1", "waiting");
@@ -131,7 +190,7 @@ assert.deepEqual(
 assert.deepEqual(
   phoneBatch([], all, none, false, true),
   [waiting, done],
-  "departure sweeps un-acked done/waiting, never working",
+  "departure sweeps active done/waiting notifications, never working",
 );
 assert.deepEqual(
   phoneBatch([], all, new Set(["%1"]), false, true),
@@ -150,11 +209,9 @@ assert.deepEqual(
 );
 console.log("attention routing ok");
 
-// ----- the two channels are deliberately different ----------------------
-// The bar reads an ACK-FILTERED level; the phone reads raw TRANSITIONS.
-// An acked agent must go quiet on the bar while a fresh transition still
-// pings — collapsing these into one path is a plausible-looking
-// "simplification" that would silently break one of them.
+// ----- the two channels share the active notification projection ----------
+// Acknowledging a transition quiets every attention surface. A later
+// transition gets a new timestamp and becomes active again.
 const ackedWaiting = new Set(["%1"]);
 assert.equal(
   attentionLevel([waiting], ackedWaiting),
@@ -163,8 +220,15 @@ assert.equal(
 );
 assert.deepEqual(
   phoneBatch([waiting], [waiting], ackedWaiting, false, false),
-  [waiting],
-  "...but a transition still pings the phone",
+  [],
+  "an acknowledged transition does not ping the phone",
+);
+const laterWaiting = agent("%1", "waiting", 300);
+const laterAcked = acknowledgedPaneIds([laterWaiting], { "%1": 100 });
+assert.equal(
+  attentionLevel([laterWaiting], laterAcked),
+  "waiting",
+  "a later transition reactivates attention after acknowledgement",
 );
 assert.equal(
   attentionLevel([waiting, done], none),

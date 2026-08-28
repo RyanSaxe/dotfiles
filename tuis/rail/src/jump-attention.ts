@@ -1,7 +1,7 @@
-// Jump to the first live agent in the rail's current unacknowledged set.
+// Jump to the first live agent in the rail's current active-notification set.
 // The daemon publishes this set after status stabilization, so the command
-// cannot revive Workmux's raw status flicker or choose a different pane than
-// the rail is showing.
+// does not revive Workmux's raw status flicker or overlay a notification onto
+// a working agent.
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -10,12 +10,15 @@ import { fileURLToPath } from "node:url";
 
 import { acknowledgedPaneIds, loadAcks, type AckStore } from "./acks.js";
 import {
-  loadAttentionEvents,
-  surfaceAttentionEvents,
-} from "./attention-events.js";
-import { collectAgents, run, tmux, type Agent } from "./data.js";
+  collectAgents,
+  run,
+  stabilizeAgents,
+  tmux,
+  type Agent,
+} from "./data.js";
 import { agentIdentity, ATTENTION_TARGETS_FILE } from "./notifications.js";
 import { sortByUrgency } from "./sections/rows.js";
+import { loadStableStatuses } from "./stability.js";
 
 const GOTO_PANE = join(homedir(), ".config/tmux/scripts/goto-pane.sh");
 
@@ -36,10 +39,24 @@ function readPublishedAgents(): Agent[] | null {
     const parsed = JSON.parse(
       readFileSync(ATTENTION_TARGETS_FILE, "utf8"),
     ) as unknown;
-    return Array.isArray(parsed) ? (parsed as Agent[]) : null;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(isPublishedAgent);
   } catch {
     return null;
   }
+}
+
+function isPublishedAgent(value: unknown): value is Agent {
+  if (typeof value !== "object" || value === null) return false;
+  const agent = value as Partial<Agent>;
+  return (
+    typeof agent.session === "string" &&
+    typeof agent.windowName === "string" &&
+    typeof agent.paneId === "string" &&
+    (agent.status === "waiting" || agent.status === "done") &&
+    typeof agent.statusTs === "number" &&
+    Number.isFinite(agent.statusTs)
+  );
 }
 
 async function livePane(paneId: string): Promise<boolean> {
@@ -67,11 +84,28 @@ export async function jumpAttention(): Promise<Agent | null> {
     // The last published target set is safer than failing a jump during a
     // transient Workmux read failure.
   }
-  const events = loadAttentionEvents();
-  const agents =
-    live !== null && Object.keys(events).length > 0
-      ? surfaceAttentionEvents(live, events, acks)
-      : (published ?? live ?? []);
+  const current =
+    live === null
+      ? published
+      : (() => {
+          const settled = stabilizeAgents(
+            live,
+            loadStableStatuses(),
+            Date.now() / 1000,
+          );
+          if (published === null) return settled;
+          const settledByPane = new Map(
+            settled.map((agent) => [agent.paneId, agent]),
+          );
+          return published.flatMap((target) => {
+            const liveAgent = settledByPane.get(target.paneId);
+            return liveAgent?.status === target.status &&
+              liveAgent.statusTs === target.statusTs
+              ? [liveAgent]
+              : [];
+          });
+        })();
+  const agents = current ?? [];
   const acked = acknowledgedPaneIds(agents, acks);
 
   for (const agent of attentionCandidates(agents, acked)) {

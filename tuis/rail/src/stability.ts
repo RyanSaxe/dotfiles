@@ -19,13 +19,13 @@ export function loadStableStatuses(): Map<string, StableAgentState> {
     >;
     return new Map(
       Object.entries(parsed).flatMap(([paneId, state]) =>
-        STATUSES.has(state.status ?? "") && typeof state.updatedTs === "number"
+        STATUSES.has(state.status ?? "") && typeof state.statusTs === "number"
           ? [
               [
                 paneId,
                 {
                   status: state.status as AgentStatus,
-                  updatedTs: state.updatedTs,
+                  statusTs: state.statusTs,
                 },
               ] as const,
             ]

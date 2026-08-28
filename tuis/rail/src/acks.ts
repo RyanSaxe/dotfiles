@@ -1,7 +1,6 @@
-// Visit-clears acknowledgement. Landing on an agent's window clears its
-// done/waiting color everywhere, persistently — the color returns only
-// when a NEW status event arrives. Acks are keyed by pane id and store the
-// acknowledged status timestamp; "new" means updatedTs > acked ts.
+// Visit-clears acknowledgement. Landing on an agent's window clears the
+// current waiting/done notification everywhere, persistently. Acks are keyed
+// by pane id and store the last acknowledged status transition timestamp.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -10,6 +9,7 @@ import { XDG_STATE } from "./paths.js";
 import type { Agent, Pane } from "./data.js";
 
 const ACKS_PATH = join(XDG_STATE, "dotfiles/rail/acks.json");
+const UNACKNOWLEDGED = -1;
 
 export type AckStore = Record<string, number>;
 
@@ -21,9 +21,9 @@ export function loadAcks(): AckStore {
   }
 }
 
-// Resolve the persisted timestamps against the current agent snapshot. A
-// pane can receive a new status after it was visited, so the existence of an
-// ack record alone is not enough to call its current event acknowledged.
+// Resolve the persisted transition timestamps against the current live
+// snapshot. A working agent has no notification to acknowledge, even if an
+// old record remains for its pane.
 export function acknowledgedPaneIds(
   agents: Agent[],
   acks: AckStore,
@@ -33,7 +33,7 @@ export function acknowledgedPaneIds(
       .filter(
         (agent) =>
           agent.status !== "working" &&
-          (acks[agent.paneId] ?? 0) >= agent.updatedTs,
+          (acks[agent.paneId] ?? UNACKNOWLEDGED) >= agent.statusTs,
       )
       .map((agent) => agent.paneId),
   );
@@ -64,10 +64,9 @@ function visitedPaneIds(
   return visible;
 }
 
-// Advance acks for visited agents, prune agents that no longer exist, and
-// persist when anything moved. Returns the set of pane ids whose current
-// status is acknowledged (working is never acked — it is information, not
-// a notification).
+// Advance acks for visited waiting/done agents, prune panes that no longer
+// exist, and persist when anything moved. Working is never acknowledged: it
+// is live information, not a notification.
 export function updateAcks(
   acks: AckStore,
   agents: Agent[],
@@ -86,10 +85,11 @@ export function updateAcks(
   }
   for (const agent of agents) {
     if (
+      agent.status !== "working" &&
       visited.has(agent.paneId) &&
-      (acks[agent.paneId] ?? 0) < agent.updatedTs
+      (acks[agent.paneId] ?? UNACKNOWLEDGED) < agent.statusTs
     ) {
-      acks[agent.paneId] = agent.updatedTs;
+      acks[agent.paneId] = agent.statusTs;
       changed = true;
     }
   }

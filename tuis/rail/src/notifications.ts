@@ -1,6 +1,7 @@
-// Agent attention pushed beyond the terminal: the sketchybar code-workspace
-// highlight and an ntfy phone ping. The bar is edge-triggered on level
-// transitions; the history records pending-set changes too.
+// Agent attention pushed beyond the terminal: the Sketchybar code-workspace
+// highlight and an ntfy phone ping. Both consume the current live status and
+// its clearable notification projection. Nothing here turns old attention
+// into a second live status.
 
 import { writeFileSync } from "node:fs";
 import { platform } from "node:os";
@@ -12,7 +13,7 @@ import type { AttentionItem } from "./attention/types.js";
 import { logLine } from "./log.js";
 import { XDG_STATE } from "./paths.js";
 
-const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
+export const ATTENTION_FILE = join(XDG_STATE, "dotfiles/rail/attention");
 export const ATTENTION_TARGETS_FILE = join(
   XDG_STATE,
   "dotfiles/rail/attention-pending.json",
@@ -34,7 +35,9 @@ export function attentionLevel(
   agents: Agent[],
   acked: Set<string>,
 ): AttentionLevel {
-  const pending = agents.filter((agent) => !acked.has(agent.paneId));
+  const pending = agents.filter(
+    (agent) => agent.status !== "working" && !acked.has(agent.paneId),
+  );
   if (pending.some((agent) => agent.status === "waiting")) return "waiting";
   if (pending.some((agent) => agent.status === "done")) return "done";
   return "none";
@@ -53,14 +56,14 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
   const pending = agents
     .filter((agent) => agent.status !== "working" && !acked.has(agent.paneId))
     .sort(
-      (a, b) => b.updatedTs - a.updatedTs || a.paneId.localeCompare(b.paneId),
+      (a, b) => b.statusTs - a.statusTs || a.paneId.localeCompare(b.paneId),
     );
   const serializedTargets = JSON.stringify(pending);
   const targetKey = JSON.stringify(
     pending.map((agent) => [
       agent.paneId,
       agent.status,
-      agent.updatedTs,
+      agent.statusTs,
       agent.agentKind,
       agent.session,
       agent.windowName,
@@ -78,11 +81,11 @@ export function publishAttention(agents: Agent[], acked: Set<string>): void {
     writeFileSync(ATTENTION_FILE, level);
     publishedLevel = level;
   }
-  // The level file and Sketchybar event stay edge-triggered. The log also
-  // records pending-set changes, so it remains a useful history when two
-  // agents share a window or a new agent arrives at the same level. Include
-  // the kind and pane id so a Claude pane cannot look like a missing Codex
-  // pane, and two panes in the same window cannot collapse into one label.
+  // The level file and Sketchybar event stay edge-triggered. The log records
+  // changes to the active set, so two agents at the same level remain
+  // distinguishable. Include the kind and pane id so a Claude pane cannot
+  // look like a missing Codex pane, and two panes in one window cannot
+  // collapse into one label.
   logLine(
     `attention ${level} (pending: ${pending.map(agentIdentity).join(", ") || "none"})`,
   );
@@ -137,15 +140,15 @@ export function publishReviewAttention(items: readonly AttentionItem[]): void {
   );
 }
 
-const lastStatus = new Map<string, AgentStatus>();
+const lastStatus = new Map<string, { status: AgentStatus; statusTs: number }>();
 let seeded = false;
 let wasPresent: boolean | null = null;
 let warnedNoChannel = false;
 
 // What rides this tick's ping. Present ticks send nothing. The departure
-// tick sweeps in every un-acked done/waiting agent alongside the raw
-// transitions — an agent that finished just before the walk-away is
-// unacked, so leaving is pure latency, never a miss window.
+// tick sweeps in every active waiting/done notification alongside the raw
+// transitions, so an agent that finished just before the walk-away is not
+// missed.
 export function phoneBatch(
   transitions: Agent[],
   agents: Agent[],
@@ -155,7 +158,11 @@ export function phoneBatch(
 ): Agent[] {
   if (present) return [];
   const batch = new Map<string, Agent>();
-  for (const agent of transitions) batch.set(agent.paneId, agent);
+  for (const agent of transitions) {
+    if (agent.status !== "working" && !acked.has(agent.paneId)) {
+      batch.set(agent.paneId, agent);
+    }
+  }
   if (departed) {
     for (const agent of agents) {
       if (agent.status === "working" || acked.has(agent.paneId)) continue;
@@ -178,9 +185,18 @@ export function pushPhone(
   const rawTransitions: Agent[] = [];
   for (const agent of agents) {
     const previous = lastStatus.get(agent.paneId);
-    lastStatus.set(agent.paneId, agent.status);
-    if (!seeded || previous === agent.status) continue;
-    if (agent.status === "working") continue;
+    lastStatus.set(agent.paneId, {
+      status: agent.status,
+      statusTs: agent.statusTs,
+    });
+    if (
+      !seeded ||
+      (previous?.status === agent.status &&
+        previous.statusTs === agent.statusTs)
+    ) {
+      continue;
+    }
+    if (agent.status === "working" || acked.has(agent.paneId)) continue;
     rawTransitions.push(agent);
   }
   seeded = true;
