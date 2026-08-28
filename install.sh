@@ -605,24 +605,20 @@ install_tier_packages() {
 # written, so the refusal below gates the deploy, not the file's visibility.
 DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin clis bat ghostty sketchybar aerospace byor'
 
-# uv verifies TLS against its own bundled roots, not the OS trust store.
-# On machines behind TLS interception (corporate proxies re-signing
-# HTTPS with an IT-installed CA), every uv download then dies with
-# "invalid peer certificate: Unknown Issuer" -- the managed-Python fetch
-# was the first to hit it. System certs make uv read the OS store, which
-# carries the same public roots everywhere else, so this is safe
-# universally. Both spellings: UV_SYSTEM_CERTS is current, UV_NATIVE_TLS
-# covers older uvs that predate the rename.
+# uv verifies TLS against its own bundled roots rather than the OS
+# trust store, so on machines whose networks require a locally-trusted
+# CA, every uv download dies with "invalid peer certificate: Unknown
+# Issuer" -- the managed-Python fetch hit it first. System certs make
+# uv read the OS store, which carries the same public roots everywhere
+# else, so this is safe universally. Both spellings: UV_SYSTEM_CERTS is
+# current, UV_NATIVE_TLS covers older uvs that predate the rename.
 UV_SYSTEM_CERTS=true
 UV_NATIVE_TLS=1
 export UV_SYSTEM_CERTS UV_NATIVE_TLS
 
 # Machine-local overrides ride along on installs too, not just shells
-# (zshrc's env_init loads the same file). The motivating case: a
-# TLS-intercepted network breaks Gatekeeper's certificate-pinned
-# notarization checks, and HOMEBREW_CASK_OPTS=--no-quarantine in that
-# machine's .env is the per-machine fix -- see docs/install.md. Sourced
-# here so the FIRST install already honors it.
+# (zshrc's env_init loads the same file) -- see docs/install.md for the
+# known entries. Sourced here so the FIRST install already honors them.
 if [ -f ./.env ]; then
   set -a
   # shellcheck disable=SC1091
@@ -982,8 +978,7 @@ clean_deploy_sources
 migrate_link_dirs "$@"
 
 # Casks installed before this machine opted into --no-quarantine (see
-# docs/install.md) still carry the flag, and where Gatekeeper's pinned
-# notarization checks cannot complete, every launch re-prompts. Converge
+# docs/install.md) still carry the flag and keep re-prompting. Converge
 # on rerun instead of asking for per-app cleanup: strip quarantine from
 # every installed cask's payload -- no app list to maintain, agent-CLI
 # casks included. App artifacts move to /Applications (named by
