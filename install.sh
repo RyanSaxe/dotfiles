@@ -513,11 +513,15 @@ install_tier_packages() {
         npm install -g --prefix "$HOME/.local" $EXTRAS_NPM_PACKAGES
     fi
     uv tool install --quiet byor
-    # byor owns its agent wiring and its shipped rule packages. Both commands
-    # are idempotent, so reproducing them beats the repo carrying copies that
-    # would drift out of step with the tool.
-    byor install >/dev/null 2>&1 || true
-    byor package install style >/dev/null 2>&1 || true
+    # byor owns its agent wiring; reproducing the command beats the repo
+    # carrying copies that would drift out of step with the tool. The
+    # agent set is stated explicitly: with output silenced and stdin
+    # open, byor's interactive agent picker is an invisible prompt that
+    # hangs a fresh install forever (found the hard way, an hour in).
+    # The set mirrors AGENT_CLIS above. Shipped rule packages need no
+    # step anymore -- `byor package list` serves them from the install
+    # itself, and the old `byor package install` verb is gone.
+    byor install --agents claude-code,codex,copilot --non-interactive >/dev/null 2>&1 || true
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
