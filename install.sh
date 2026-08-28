@@ -188,9 +188,18 @@ install_attention_agent() {
     launchd/com.ryansaxe.dotfiles.attention.plist >"$plist"
 
   domain="gui/$(id -u)"
-  launchctl bootout "$domain/com.ryansaxe.dotfiles.attention" 2>/dev/null || true
+  label="com.ryansaxe.dotfiles.attention"
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+  # bootout is asynchronous: an immediate re-bootstrap races the removal
+  # and fails with "5: Input/output error" -- the CI converge run caught
+  # it. Wait for the label to actually leave the domain first.
+  tries=0
+  while launchctl print "$domain/$label" >/dev/null 2>&1 && [ "$tries" -lt 10 ]; do
+    sleep 1
+    tries=$((tries + 1))
+  done
   launchctl bootstrap "$domain" "$plist"
-  launchctl kickstart -k "$domain/com.ryansaxe.dotfiles.attention"
+  launchctl kickstart -k "$domain/$label"
 }
 
 install_starship() {
