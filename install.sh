@@ -77,8 +77,17 @@ ensure_package_manager() {
   Darwin)
     if ! command -v brew >/dev/null 2>&1; then
       echo "installing homebrew..."
-      NONINTERACTIVE=1 /bin/bash -c \
-        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      # Only --non-interactive sets NONINTERACTIVE: the flag also stops
+      # the Homebrew installer from asking for the sudo password, which
+      # aborts a first run on any machine without cached credentials.
+      # A person at the keyboard gets the prompts.
+      if [ "${BREW_NONINTERACTIVE:-0}" = 1 ]; then
+        NONINTERACTIVE=1 /bin/bash -c \
+          "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      else
+        /bin/bash -c \
+          "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      fi
     fi
     # A fresh brew is not on PATH yet.
     if [ -x /opt/homebrew/bin/brew ]; then
@@ -834,6 +843,21 @@ run_upgrade() {
 }
 
 # -------------------------------------------------------------------- main
+# --non-interactive: for unattended full installs (provisioning scripts;
+# CI only ever runs the `links` verb and never bootstraps brew). It makes
+# the Homebrew installer skip its RETURN prompt -- and with it, the sudo
+# password prompt, so it only works where sudo is already cached.
+BREW_NONINTERACTIVE=0
+filtered_args=''
+for arg in "$@"; do
+  case "$arg" in
+  --non-interactive) BREW_NONINTERACTIVE=1 ;;
+  *) filtered_args="$filtered_args $arg" ;;
+  esac
+done
+# shellcheck disable=SC2086
+set -- $filtered_args
+
 # `links` verb: symlinks and their cleanup only, no package-manager work.
 # CI runs this same path against a scratch HOME.
 if [ "${1:-}" = links ]; then
