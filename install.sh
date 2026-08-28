@@ -32,10 +32,26 @@ fi
 # links that climb to the wrong root and a clean pass that misses them.
 REPO_ROOT="$(CDPATH='' cd -P "$(dirname "$0")" && pwd -P)"
 AI_HARNESS_SOURCE="$REPO_ROOT/ai-harness"
+# One flag governs every prompt. --non-interactive answers yes to
+# everything -- all tiers, all agent CLIs -- and reads nothing from
+# stdin; it skips no work. It is how CI runs the real installer, and
+# what a provisioning script passes. Parsed here, before anything can
+# ask a question.
+NONINTERACTIVE=0
+filtered_args=''
+for arg in "$@"; do
+  case "$arg" in
+  --non-interactive) NONINTERACTIVE=1 ;;
+  *) filtered_args="$filtered_args $arg" ;;
+  esac
+done
+# shellcheck disable=SC2086
+set -- $filtered_args
+
 # No arguments and a real terminal means a human is driving: the tier and
 # agent pickers prompt. A scripted run takes the defaults instead.
 INTERACTIVE=0
-if [ "$#" -eq 0 ] && [ -t 0 ]; then INTERACTIVE=1; fi
+if [ "$NONINTERACTIVE" = 0 ] && [ "$#" -eq 0 ] && [ -t 0 ]; then INTERACTIVE=1; fi
 
 # ---------------------------------------------------------------- helpers
 brew_install() {
@@ -67,6 +83,8 @@ ensure_zsh_login_shell() {
 }
 
 ask() {
+  # Non-interactive means yes, not skip: every optional piece installs.
+  [ "$NONINTERACTIVE" = 1 ] && return 0
   printf '%s [y/N] ' "$1"
   read -r answer
   case "$answer" in [yY]*) return 0 ;; *) return 1 ;; esac
@@ -77,11 +95,11 @@ ensure_package_manager() {
   Darwin)
     if ! command -v brew >/dev/null 2>&1; then
       echo "installing homebrew..."
-      # Only --non-interactive sets NONINTERACTIVE: the flag also stops
-      # the Homebrew installer from asking for the sudo password, which
-      # aborts a first run on any machine without cached credentials.
-      # A person at the keyboard gets the prompts.
-      if [ "${BREW_NONINTERACTIVE:-0}" = 1 ]; then
+      # Only --non-interactive quiets the Homebrew installer: quiet mode
+      # also stops it asking for the sudo password, which aborts a first
+      # run on any machine without cached credentials. A person at the
+      # keyboard gets the prompts.
+      if [ "$NONINTERACTIVE" = 1 ]; then
         NONINTERACTIVE=1 /bin/bash -c \
           "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
       else
@@ -409,10 +427,23 @@ setup_vault() {
     echo "warning: uv not found; the vault CLI cannot run" >&2
 
   if [ ! -d "$VAULT_DIR" ]; then
-    # A scripted run does nothing here: installation must never block on a
-    # prompt or create a vault nobody asked for. Neovim's health check
-    # reports the missing vault later instead.
-    [ "$INTERACTIVE" = 1 ] || return 0
+    # A scripted run cannot invent the answer to "which vault repo?":
+    # VAULT_REPO in the machine's .env supplies it, and without one this
+    # is a NAMED skip -- never silent -- with Neovim's health check as
+    # the durable reminder.
+    if [ "$INTERACTIVE" != 1 ]; then
+      if [ -n "${VAULT_REPO:-}" ]; then
+        vault_url="$VAULT_REPO"
+        case "$vault_url" in
+        *://* | *@*:*) ;;
+        *) vault_url="git@github.com:$vault_url.git" ;;
+        esac
+        git clone "$vault_url" "$VAULT_DIR" || echo "warning: vault clone failed; rerun after fixing access" >&2
+        return 0
+      fi
+      echo "vault: skipped (no VAULT_REPO in .env; interactive runs prompt instead)"
+      return 0
+    fi
     echo "==> vault"
     if ask "do you already have a vault repository?"; then
       printf 'owner/repo or git URL: '
@@ -884,21 +915,6 @@ run_upgrade() {
 }
 
 # -------------------------------------------------------------------- main
-# --non-interactive: for unattended full installs (provisioning scripts;
-# CI only ever runs the `links` verb and never bootstraps brew). It makes
-# the Homebrew installer skip its RETURN prompt -- and with it, the sudo
-# password prompt, so it only works where sudo is already cached.
-BREW_NONINTERACTIVE=0
-filtered_args=''
-for arg in "$@"; do
-  case "$arg" in
-  --non-interactive) BREW_NONINTERACTIVE=1 ;;
-  *) filtered_args="$filtered_args $arg" ;;
-  esac
-done
-# shellcheck disable=SC2086
-set -- $filtered_args
-
 # `links` verb: symlinks and their cleanup only, no package-manager work.
 # CI runs this same path against a scratch HOME.
 if [ "${1:-}" = links ]; then
@@ -919,8 +935,17 @@ if [ "${1:-}" = upgrade ]; then
   run_upgrade
 fi
 
-# No tiers on the command line: choose interactively. The core and agents tiers
-# install the live harness links after the CLIs themselves are available.
+# Non-interactive runs must not stall inside a sudo step (chsh,
+# karabiner's pkg): demand cached credentials up front and fail with the
+# remedy instead of hanging where nobody can answer. CI runners have
+# passwordless sudo and sail through.
+if [ "$NONINTERACTIVE" = 1 ] && ! sudo -n true 2>/dev/null; then
+  echo "error: --non-interactive needs cached sudo credentials; run 'sudo -v' first" >&2
+  exit 1
+fi
+
+# No tiers on the command line: choose interactively -- or, non-interactive,
+# take everything; the flag answers yes, it never narrows the install.
 if [ "$#" -eq 0 ]; then
   set -- core agents
   if [ "$OS" = Darwin ] && ask "install the mac tier (GUI apps)?"; then
