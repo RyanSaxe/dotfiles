@@ -1034,7 +1034,7 @@ if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
     # status hook, both printed by setup on every platform.
     waited=0
     while [ "$waited" -lt 120 ]; do
-      if [ -e "$HOME/.claude/skills" ] && [ -e "$HOME/.copilot/hooks/workmux-status.js" ]; then
+      if [ -e "$HOME/.claude/skills" ] && [ -e "$HOME/.copilot/hooks/workmux-status.json" ]; then
         break
       fi
       sleep 2
@@ -1044,7 +1044,7 @@ if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
     cat "$setup_log"
     rm -f "$setup_log"
     kill "$setup_pid" 2>/dev/null || true
-    if [ ! -e "$HOME/.claude/skills" ] || [ ! -e "$HOME/.copilot/hooks/workmux-status.js" ]; then
+    if [ ! -e "$HOME/.claude/skills" ] || [ ! -e "$HOME/.copilot/hooks/workmux-status.json" ]; then
       echo "error: workmux setup produced no hooks/skills within 120s" >&2
       exit 1
     fi
