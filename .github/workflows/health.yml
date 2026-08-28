@@ -239,7 +239,16 @@ jobs:
           # Types are OS-independent; one matrix leg carries the check.
           # Runs after bootstrap so installed plugins serve as typed
           # libraries (blink, snacks, LazyVim classes).
-          brew install lua-language-server
+          # The runner image ships a stale formula index, so a plain
+          # install keeps its preinstalled lua-language-server (3.18.2-dev
+          # when last traced). That dev build diagnoses files while the
+          # library index is still loading -- the captured trace shows a
+          # publish at :50 with meta files still streaming in at :55 --
+          # which is the intermittent "Cannot infer type" on files no PR
+          # touched. Current releases have not reproduced it locally.
+          brew update --quiet
+          brew install lua-language-server || brew upgrade lua-language-server
+          lua-language-server --version
           nvim -l ci/luals-check.lua
         env:
           LUALS_LOGPATH: ${{ runner.temp }}/luals-log
