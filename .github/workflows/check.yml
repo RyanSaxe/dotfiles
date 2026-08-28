@@ -20,6 +20,11 @@ jobs:
           sudo apt-get install -y zsh ripgrep
           zsh --version
 
+      - name: Install StyLua
+        run: |
+          npm install --global --prefix "$HOME/.local" @johnnymorganz/stylua-bin@2.5.2
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       # Some hook repos download their binary at build time (shellcheck-py,
       # shfmt), which flakes when upstream hosts hiccup. Cache the built hook
       # environments so downloads happen once per config change.
@@ -28,8 +33,7 @@ jobs:
           path: ~/.cache/prek
           key: prek-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      # prek downloads the exact hook versions pinned in .pre-commit-config.yaml —
-      # the same ones the local pre-commit hook runs. No other tool installation:
-      # if CI needs a binary the config doesn't pin, that's a config bug.
+      # prek downloads the exact hook versions pinned in .pre-commit-config.yaml;
+      # StyLua is the intentional system-hook exception and is installed above.
       - name: Run all hooks
         run: uvx prek run --all-files --show-diff-on-failure

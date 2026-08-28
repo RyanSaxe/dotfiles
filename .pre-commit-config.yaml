@@ -1,10 +1,10 @@
 # The single source of truth for code quality gates.
 #
 # Run by prek locally on commit and by CI via `prek run --all-files` — the same
-# pinned versions in both places, downloaded by prek itself, so hook and CI can
-# never disagree. Formatters FIX files rather than reject them: a version skew
-# against the editor's on-save formatter shows up as a silent reformat, never a
-# blocked commit.
+# pinned versions in both places, with system hooks provisioned by the installer
+# and CI. Formatters FIX files rather than reject them: a version skew against
+# the editor's on-save formatter shows up as a silent reformat, never a blocked
+# commit.
 #
 # Editor parity: nvim resolves project-local tools first (.venv/bin via
 # venv.zsh, node_modules/.bin via conform), then globals. See
@@ -29,7 +29,10 @@ repos:
   - repo: https://github.com/JohnnyMorganz/StyLua
     rev: v2.5.2
     hooks:
-      - id: stylua-github
+      # The GitHub hook downloads its binary from Python build code. Use the
+      # pinned system binary instead so that build-time Python TLS is not part
+      # of the editor or commit path.
+      - id: stylua-system
 
   # --------------------------------------------------------------- Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -55,12 +58,17 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
+        # shellcheck-py downloads its binary through urllib during build.
+        # Keep this hook's interpreter scoped; do not set a global UV_PYTHON.
+        language_version: python3.12
         exclude: '\.zsh$|^zsh/zshrc$|^zsh/zshenv$|^sketchybar/|^workmux/bin/workmux-(escalate-idle|copy-ignored)$'
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1
     hooks:
       - id: shfmt
+        # pre-commit-shfmt downloads its binary through urllib during build.
+        language_version: python3.12
         args: [--write, --indent, "2"]
         exclude: '\.zsh$|^zsh/zshrc$|^zsh/zshenv$|^workmux/bin/workmux-(escalate-idle|copy-ignored)$'
 

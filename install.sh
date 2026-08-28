@@ -139,6 +139,7 @@ ensure_package_manager() {
 CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua jq'
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
 CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync jq'
+STYLUA_NPM_PACKAGE='@johnnymorganz/stylua-bin@2.5.2'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='ghostty aerospace font-jetbrains-mono-nerd-font karabiner-elements'
 # byor's rule engine. Not in Debian or Ubuntu, so Linux takes the npm build
@@ -170,6 +171,17 @@ install_zsh_plugins() {
 # node_modules.
 install_rail() {
   (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
+}
+
+install_stylua_linux() {
+  # The pre-commit hook uses StyLua's system variant. Keep the Linux binary at
+  # the same pinned release as the hook manifest, in the user tool directory
+  # already placed first on Linux PATH.
+  if command -v stylua >/dev/null 2>&1 &&
+    [ "$(stylua --version 2>/dev/null)" = "stylua 2.5.2" ]; then
+    return 0
+  fi
+  npm install --global --prefix "$HOME/.local" "$STYLUA_NPM_PACKAGE"
 }
 
 install_attention_agent() {
@@ -370,8 +382,8 @@ install_ai_harness() {
 install_neovim_linux() {
   # apt's neovim lags far behind the nvim config's 0.12 floor; the official
   # tarball into ~/.local is both the install and the upgrade path.
-  # lua-language-server and stylua stay mac-only for now: prek vendors its
-  # own stylua, and lua editing happens on the mac.
+  # lua-language-server stays mac-only for now. StyLua is installed separately
+  # on Linux because the hook uses its system binary on every platform.
   case "$(uname -m)" in
   aarch64 | arm64) nvim_arch=arm64 ;;
   *) nvim_arch=x86_64 ;;
@@ -514,6 +526,7 @@ install_tier_packages() {
     command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
     command -v starship >/dev/null 2>&1 || install_starship
     command -v nvim >/dev/null 2>&1 || install_neovim_linux
+    install_stylua_linux
     install_workmux
     setup_agents
     install_ai_harness
@@ -803,6 +816,7 @@ upgrade_apt() {
   uv self update
   install_starship
   install_neovim_linux
+  install_stylua_linux
   install_workmux
   {
     uv --version

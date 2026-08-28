@@ -181,13 +181,17 @@ Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail and
 GitHub attention observer use for phone notifications.
 
 The `.env` also carries optional per-machine overrides, and `install.sh`
-sources it so they apply from the first run. For example, on a machine where
-cask apps re-prompt at every launch because notarization checks cannot
-complete, `HOMEBREW_CASK_OPTS=--no-quarantine` in that machine's `.env`
-stops the recurring prompts; rerunning `./install.sh` afterwards also
-converges apps installed before the entry existed. Leave it unset and
-phone notifications simply never send; `rail status` and `attention status`
-report the channel state.
+sources it so they apply from the first run. Keep values that depend on the
+machine or local environment there; do not commit them to the repository.
+
+`AGENT_NOTIFICATION_ID` is optional; leave it unset and phone notifications
+simply never send. `rail status` and `attention status` report the channel
+state.
+
+The Pokémon mascot provider fetches data and images over HTTPS with Python's
+standard library. `theme/bin/mascot-accents.py` declares Python 3.12 for that
+script only; it does not set `UV_PYTHON`, so other `uv`, `uv run`, and `uvx`
+commands can select the Python version required by their own project or tool.
 
 On macOS, installing the `core` tier also installs a user-level launchd job.
 It runs `~/.local/bin/attention refresh` at login and every five minutes. The

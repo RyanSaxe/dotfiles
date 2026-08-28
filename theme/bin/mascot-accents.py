@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run -q --script
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.12,<3.13"
 # dependencies = ["pillow"]
 # ///
 """Extract a two-hue accent pair from a mascot's image.

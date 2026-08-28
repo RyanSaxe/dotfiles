@@ -4,6 +4,11 @@ Every commit is gated by [prek](https://github.com/j178/prek): pinned
 formatters, linters, and type checkers, defined once in
 `.pre-commit-config.yaml` and run identically in CI.
 
+The shellcheck and shfmt hooks pin Python 3.12 only for their isolated hook
+installers; no project-wide Python version is selected. StyLua uses its
+system-hook variant, with the pinned binary supplied by Homebrew on macOS and
+the installer/CI npm step on Linux.
+
 ```sh
 git config core.hooksPath .githooks   # enable the gate
 prek run --all-files                  # run every check manually
