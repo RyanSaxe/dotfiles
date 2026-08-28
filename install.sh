@@ -867,6 +867,10 @@ if [ "$#" -eq 0 ]; then
 fi
 
 ensure_uv
+# uv normally fetches a managed CPython on demand, but a fresh machine
+# refused to install byor over a missing >=3.11 interpreter anyway.
+# Guarantee one up front; idempotent and instant when already present.
+uv python install
 clean_deploy_sources
 migrate_link_dirs "$@"
 
