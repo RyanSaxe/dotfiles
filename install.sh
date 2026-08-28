@@ -923,10 +923,33 @@ uv python install
 clean_deploy_sources
 migrate_link_dirs "$@"
 
+# Casks installed before this machine opted into --no-quarantine (see
+# docs/install.md) still carry the flag, and where Gatekeeper's pinned
+# notarization checks cannot complete, every launch re-prompts. Converge
+# on rerun instead of asking for per-app cleanup: strip quarantine from
+# every installed cask's payload -- no app list to maintain, agent-CLI
+# casks included. App artifacts move to /Applications (named by
+# basename; some carry a subdirectory prefix); everything else stays in
+# the Caskroom.
+dequarantine_casks() {
+  case "${HOMEBREW_CASK_OPTS:-}" in *--no-quarantine*) ;; *) return 0 ;; esac
+  command -v brew >/dev/null 2>&1 || return 0
+  xattr -dr com.apple.quarantine "$(brew --caskroom)" 2>/dev/null || true
+  brew info --cask --json=v2 --installed 2>/dev/null |
+    jq -r '.casks[].artifacts[] | objects | .app // empty | .[] | strings' |
+    while IFS= read -r app; do
+      app="/Applications/$(basename "$app")"
+      [ -e "$app" ] && xattr -dr com.apple.quarantine "$app" 2>/dev/null
+    done
+  return 0
+}
+
 for tier in "$@"; do
   echo "==> $tier"
   install_tier "$tier"
 done
+
+[ "$OS" = Darwin ] && dequarantine_casks
 
 # Workmux discovers agent configuration from the installed filesystem. Run its
 # explicit, non-interactive setup only after all requested tiers have linked
