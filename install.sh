@@ -541,6 +541,18 @@ install_tier_packages() {
 # written, so the refusal below gates the deploy, not the file's visibility.
 DEPLOY_SOURCE_DIRS='git zsh theme nvim tmux workmux tuis/rail/bin clis bat ghostty sketchybar aerospace byor'
 
+# uv verifies TLS against its own bundled roots, not the OS trust store.
+# On machines behind TLS interception (corporate proxies re-signing
+# HTTPS with an IT-installed CA), every uv download then dies with
+# "invalid peer certificate: Unknown Issuer" -- the managed-Python fetch
+# was the first to hit it. System certs make uv read the OS store, which
+# carries the same public roots everywhere else, so this is safe
+# universally. Both spellings: UV_SYSTEM_CERTS is current, UV_NATIVE_TLS
+# covers older uvs that predate the rename.
+UV_SYSTEM_CERTS=true
+UV_NATIVE_TLS=1
+export UV_SYSTEM_CERTS UV_NATIVE_TLS
+
 ensure_uv() {
   command -v uvx >/dev/null 2>&1 && return 0
   case "$OS" in
