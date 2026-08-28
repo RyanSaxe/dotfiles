@@ -32,10 +32,26 @@ fi
 # links that climb to the wrong root and a clean pass that misses them.
 REPO_ROOT="$(CDPATH='' cd -P "$(dirname "$0")" && pwd -P)"
 AI_HARNESS_SOURCE="$REPO_ROOT/ai-harness"
+# One flag governs every prompt. --non-interactive answers yes to
+# everything -- all tiers, all agent CLIs -- and reads nothing from
+# stdin; it skips no work. It is how CI runs the real installer, and
+# what a provisioning script passes. Parsed here, before anything can
+# ask a question.
+NONINTERACTIVE=0
+filtered_args=''
+for arg in "$@"; do
+  case "$arg" in
+  --non-interactive) NONINTERACTIVE=1 ;;
+  *) filtered_args="$filtered_args $arg" ;;
+  esac
+done
+# shellcheck disable=SC2086
+set -- $filtered_args
+
 # No arguments and a real terminal means a human is driving: the tier and
 # agent pickers prompt. A scripted run takes the defaults instead.
 INTERACTIVE=0
-if [ "$#" -eq 0 ] && [ -t 0 ]; then INTERACTIVE=1; fi
+if [ "$NONINTERACTIVE" = 0 ] && [ "$#" -eq 0 ] && [ -t 0 ]; then INTERACTIVE=1; fi
 
 # ---------------------------------------------------------------- helpers
 brew_install() {
@@ -63,10 +79,17 @@ ensure_zsh_login_shell() {
   # chsh refuses shells missing from /etc/shells.
   grep -qx "$zsh_path" /etc/shells 2>/dev/null ||
     printf '%s\n' "$zsh_path" | sudo tee -a /etc/shells >/dev/null
-  chsh -s "$zsh_path"
+  # Through sudo, not bare: chsh prompts for the USER's password via
+  # PAM, which is the one prompt no sudo cache covers -- both CI
+  # platforms hung the whole install on it. Root changes any shell
+  # without a password, and interactive machines already vouched for
+  # sudo one line up.
+  sudo chsh -s "$zsh_path" "$(id -un)"
 }
 
 ask() {
+  # Non-interactive means yes, not skip: every optional piece installs.
+  [ "$NONINTERACTIVE" = 1 ] && return 0
   printf '%s [y/N] ' "$1"
   read -r answer
   case "$answer" in [yY]*) return 0 ;; *) return 1 ;; esac
@@ -77,11 +100,11 @@ ensure_package_manager() {
   Darwin)
     if ! command -v brew >/dev/null 2>&1; then
       echo "installing homebrew..."
-      # Only --non-interactive sets NONINTERACTIVE: the flag also stops
-      # the Homebrew installer from asking for the sudo password, which
-      # aborts a first run on any machine without cached credentials.
-      # A person at the keyboard gets the prompts.
-      if [ "${BREW_NONINTERACTIVE:-0}" = 1 ]; then
+      # Only --non-interactive quiets the Homebrew installer: quiet mode
+      # also stops it asking for the sudo password, which aborts a first
+      # run on any machine without cached credentials. A person at the
+      # keyboard gets the prompts.
+      if [ "$NONINTERACTIVE" = 1 ]; then
         NONINTERACTIVE=1 /bin/bash -c \
           "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
       else
@@ -165,9 +188,18 @@ install_attention_agent() {
     launchd/com.ryansaxe.dotfiles.attention.plist >"$plist"
 
   domain="gui/$(id -u)"
-  launchctl bootout "$domain/com.ryansaxe.dotfiles.attention" 2>/dev/null || true
+  label="com.ryansaxe.dotfiles.attention"
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+  # bootout is asynchronous: an immediate re-bootstrap races the removal
+  # and fails with "5: Input/output error" -- the CI converge run caught
+  # it. Wait for the label to actually leave the domain first.
+  tries=0
+  while launchctl print "$domain/$label" >/dev/null 2>&1 && [ "$tries" -lt 10 ]; do
+    sleep 1
+    tries=$((tries + 1))
+  done
   launchctl bootstrap "$domain" "$plist"
-  launchctl kickstart -k "$domain/com.ryansaxe.dotfiles.attention"
+  launchctl kickstart -k "$domain/$label"
 }
 
 install_starship() {
@@ -409,10 +441,23 @@ setup_vault() {
     echo "warning: uv not found; the vault CLI cannot run" >&2
 
   if [ ! -d "$VAULT_DIR" ]; then
-    # A scripted run does nothing here: installation must never block on a
-    # prompt or create a vault nobody asked for. Neovim's health check
-    # reports the missing vault later instead.
-    [ "$INTERACTIVE" = 1 ] || return 0
+    # A scripted run cannot invent the answer to "which vault repo?":
+    # VAULT_REPO in the machine's .env supplies it, and without one this
+    # is a NAMED skip -- never silent -- with Neovim's health check as
+    # the durable reminder.
+    if [ "$INTERACTIVE" != 1 ]; then
+      if [ -n "${VAULT_REPO:-}" ]; then
+        vault_url="$VAULT_REPO"
+        case "$vault_url" in
+        *://* | *@*:*) ;;
+        *) vault_url="git@github.com:$vault_url.git" ;;
+        esac
+        git clone "$vault_url" "$VAULT_DIR" || echo "warning: vault clone failed; rerun after fixing access" >&2
+        return 0
+      fi
+      echo "vault: skipped (no VAULT_REPO in .env; interactive runs prompt instead)"
+      return 0
+    fi
     echo "==> vault"
     if ask "do you already have a vault repository?"; then
       printf 'owner/repo or git URL: '
@@ -522,18 +567,21 @@ install_tier_packages() {
     # step anymore -- `byor package list` serves them from the install
     # itself, and the old `byor package install` verb is gone.
     byor install --agents claude-code,codex,copilot --non-interactive >/dev/null 2>&1 || true
-    # byor install writes ~/.config/byor/config.yml as a REAL file,
-    # replacing even a deployed symlink (verified: it clobbered one).
-    # That generated default is disposable tool output; the repo's
-    # config is authoritative and deploys as a link right below. Clear
-    # the generated copy so deploy never refuses -- on this one path,
-    # "exists but is a regular file" is always the tool's doing. Without
-    # this, every full run with extras fails its deploy and aborts
-    # before the post-tier steps.
-    byor_config="$HOME/.config/byor/config.yml"
-    if [ -f "$byor_config" ] && [ ! -L "$byor_config" ]; then
-      rm -f "$byor_config"
-    fi
+    # byor install writes real files into ~/.config/byor -- config.yml,
+    # a starter rules/ directory -- replacing even deployed symlinks
+    # (verified: it clobbered a link; CI then caught rules/ the same
+    # way). Everything it generates there is disposable tool output; the
+    # repo's copies are authoritative and deploy as links right below,
+    # and user-authored rules belong in the repo, never loose in HOME.
+    # Clear whatever the tier is about to link that exists as a
+    # non-link, so deploy never refuses and the run never aborts before
+    # the post-tier steps.
+    for byor_path in config.yml rules scripts; do
+      byor_target="$HOME/.config/byor/$byor_path"
+      if [ -e "$byor_target" ] && [ ! -L "$byor_target" ]; then
+        rm -rf "$byor_target"
+      fi
+    done
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -884,21 +932,6 @@ run_upgrade() {
 }
 
 # -------------------------------------------------------------------- main
-# --non-interactive: for unattended full installs (provisioning scripts;
-# CI only ever runs the `links` verb and never bootstraps brew). It makes
-# the Homebrew installer skip its RETURN prompt -- and with it, the sudo
-# password prompt, so it only works where sudo is already cached.
-BREW_NONINTERACTIVE=0
-filtered_args=''
-for arg in "$@"; do
-  case "$arg" in
-  --non-interactive) BREW_NONINTERACTIVE=1 ;;
-  *) filtered_args="$filtered_args $arg" ;;
-  esac
-done
-# shellcheck disable=SC2086
-set -- $filtered_args
-
 # `links` verb: symlinks and their cleanup only, no package-manager work.
 # CI runs this same path against a scratch HOME.
 if [ "${1:-}" = links ]; then
@@ -919,8 +952,17 @@ if [ "${1:-}" = upgrade ]; then
   run_upgrade
 fi
 
-# No tiers on the command line: choose interactively. The core and agents tiers
-# install the live harness links after the CLIs themselves are available.
+# Non-interactive runs must not stall inside a sudo step (chsh,
+# karabiner's pkg): demand cached credentials up front and fail with the
+# remedy instead of hanging where nobody can answer. CI runners have
+# passwordless sudo and sail through.
+if [ "$NONINTERACTIVE" = 1 ] && ! sudo -n true 2>/dev/null; then
+  echo "error: --non-interactive needs cached sudo credentials; run 'sudo -v' first" >&2
+  exit 1
+fi
+
+# No tiers on the command line: choose interactively -- or, non-interactive,
+# take everything; the flag answers yes, it never narrows the install.
 if [ "$#" -eq 0 ]; then
   set -- core agents
   if [ "$OS" = Darwin ] && ask "install the mac tier (GUI apps)?"; then
@@ -974,7 +1016,48 @@ done
 # manual `workmux setup` command.
 if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
   echo "==> workmux agent hooks and skills"
-  workmux setup --hooks --skills
+  # workmux setup refuses to run without a terminal even in its
+  # flag-driven form. It prompts for nothing with --hooks --skills, so
+  # in a headless run (CI, provisioning) lend it a pty via script(1) --
+  # skipping it would leave agents without status hooks, and
+  # --non-interactive promises to skip nothing.
+  # Headless is hard-won territory (four CI stalls to map it): workmux
+  # setup demands a tty, and on FRESH state it asks "Install bundled
+  # skills? [Y/n]" on that tty -- a prompt no machine with recorded
+  # state ever shows, so local tests never saw it and the pty swallowed
+  # it in CI logs until the output was captured to a file. `yes` answers
+  # it (and anything future) in the affirmative, which is exactly what
+  # --non-interactive promises; the artifact poll below stays as the
+  # success signal, immune to whatever the tool does around its exit.
+  if [ -t 0 ]; then
+    workmux setup --hooks --skills
+  else
+    setup_log="$(mktemp)"
+    if [ "$OS" = Darwin ]; then
+      yes 2>/dev/null | script -q /dev/null workmux setup --hooks --skills >"$setup_log" 2>&1 &
+    else
+      yes 2>/dev/null | script -qec "workmux setup --hooks --skills" /dev/null >"$setup_log" 2>&1 &
+    fi
+    setup_pid=$!
+    # The artifacts ARE the success signal: the skills link farm and the
+    # status hook, both printed by setup on every platform.
+    waited=0
+    while [ "$waited" -lt 120 ]; do
+      if [ -e "$HOME/.claude/skills" ] && [ -e "$HOME/.copilot/hooks/workmux-status.json" ]; then
+        break
+      fi
+      sleep 2
+      waited=$((waited + 2))
+    done
+    sleep 2 # let the log finish writing
+    cat "$setup_log"
+    rm -f "$setup_log"
+    kill "$setup_pid" 2>/dev/null || true
+    if [ ! -e "$HOME/.claude/skills" ] || [ ! -e "$HOME/.copilot/hooks/workmux-status.json" ]; then
+      echo "error: workmux setup produced no hooks/skills within 120s" >&2
+      exit 1
+    fi
+  fi
 fi
 
 # Render the theme so every consumer has colors from the first shell.

@@ -1,0 +1,64 @@
+# The real installer, executed end to end -- not the links subset the
+# health workflow uses. Exists because the fresh-machine path shipped
+# months of latent breakage (missing casks, tap trust, hidden prompts,
+# a config clobber) that only fired on an actual new laptop: nothing
+# had ever run it. Runners have passwordless sudo, so the sudo steps
+# genuinely execute; stdin is closed, so any hidden prompt fails fast
+# instead of hanging a human.
+#
+# Known-untestable here, by design: TLS-intercepted proxies (the
+# .env-gated UV/cask handling runs as no-ops), the Gatekeeper dialog
+# itself, karabiner's driver-approval UI, and the first-ever Homebrew
+# bootstrap (runners ship brew).
+name: install
+on:
+  pull_request:
+    paths:
+      - install.sh
+      - tiers/**
+      - zsh/functions/dotfiles.zsh
+      - .github/workflows/install.yml
+  push:
+    branches: [develop]
+    paths:
+      - install.sh
+      - tiers/**
+      - zsh/functions/dotfiles.zsh
+      - .github/workflows/install.yml
+  schedule:
+    # Weekly: ecosystem drift (a Homebrew policy change, a renamed verb)
+    # breaks this path between our own changes, not during them.
+    - cron: "17 12 * * 1"
+  workflow_dispatch:
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: full install, non-interactive
+        timeout-minutes: 25
+        run: ./install.sh --non-interactive
+
+      - name: second run converges
+        # Idempotence is the actual promise: rerunning must succeed from
+        # the state the first run left behind (the byor config clobber
+        # hid exactly here).
+        timeout-minutes: 15
+        run: ./install.sh --non-interactive
+
+      - name: installed surface spot checks
+        run: |
+          set -eux
+          test -L "$HOME/.config/nvim"
+          test -L "$HOME/.config/byor/config.yml"
+          command -v workmux
+          command -v byor
+          command -v prek
+          command -v nvim
