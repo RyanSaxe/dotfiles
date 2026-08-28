@@ -21,7 +21,9 @@ A tier is a set of system packages plus one symlink deployment map,
 | `extras` | optional tooling — byor and its ast-grep engine   |
 
 Pass tiers as arguments to skip the prompts (`./install.sh core` on a remote
-box). The default `./install.sh` runs `core agents` and asks separately about
+box). `--non-interactive` additionally silences the Homebrew installer's
+prompts for unattended provisioning — including its sudo password prompt, so
+it only works where sudo credentials are already cached. The default `./install.sh` runs `core agents` and asks separately about
 the mac and extras tiers. `./install.sh links` redoes the symlinks alone, with
 no package installs.
 

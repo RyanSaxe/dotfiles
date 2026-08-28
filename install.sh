@@ -77,8 +77,17 @@ ensure_package_manager() {
   Darwin)
     if ! command -v brew >/dev/null 2>&1; then
       echo "installing homebrew..."
-      NONINTERACTIVE=1 /bin/bash -c \
-        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      # Only --non-interactive sets NONINTERACTIVE: the flag also stops
+      # the Homebrew installer from asking for the sudo password, which
+      # aborts a first run on any machine without cached credentials.
+      # A person at the keyboard gets the prompts.
+      if [ "${BREW_NONINTERACTIVE:-0}" = 1 ]; then
+        NONINTERACTIVE=1 /bin/bash -c \
+          "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      else
+        /bin/bash -c \
+          "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      fi
     fi
     # A fresh brew is not on PATH yet.
     if [ -x /opt/homebrew/bin/brew ]; then
@@ -108,7 +117,7 @@ CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rs
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
 CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync jq'
 MAC_BREW_FORMULAS='sketchybar'
-MAC_BREW_CASKS='aerospace font-jetbrains-mono-nerd-font karabiner-elements'
+MAC_BREW_CASKS='ghostty aerospace font-jetbrains-mono-nerd-font karabiner-elements'
 # byor's rule engine. Not in Debian or Ubuntu, so Linux takes the npm build
 # into ~/.local like the agent CLIs do.
 EXTRAS_BREW_FORMULAS='ast-grep'
@@ -167,6 +176,17 @@ install_starship() {
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 }
 
+# Tap and trust in one motion. Homebrew 6 ignores third-party taps until
+# `brew trust` runs -- a fresh machine taps successfully and then finds
+# no formulae. Older brews have no trust command; the gate keeps them
+# working. Every future tap goes through here, not bare `brew tap`.
+brew_tap_trusted() {
+  brew tap "$1"
+  if brew trust --help >/dev/null 2>&1; then
+    brew trust "$1"
+  fi
+}
+
 install_workmux() {
   # workmux drives every worktree/window in this setup and its config ships
   # in the core tier, so the binary belongs here too. Homebrew serves it
@@ -174,7 +194,7 @@ install_workmux() {
   # which is also the upgrade path.
   case "$OS" in
   Darwin)
-    brew tap raine/workmux
+    brew_tap_trusted raine/workmux
     brew_install workmux
     ;;
   *)
@@ -467,16 +487,13 @@ install_tier_packages() {
   mac:Darwin)
     # sketchybar itself is mac-only; the plugins under sketchybar/ shell out
     # to macOS-only tools (pmset, ipconfig) regardless. It lives in the
-    # felixkratz tap, which newer brews refuse to install from untrusted
-    # (`brew trust` doesn't exist on older brews — hence the guard).
-    brew tap felixkratz/formulae
-    brew trust felixkratz/formulae 2>/dev/null || true
+    # felixkratz tap.
+    brew_tap_trusted felixkratz/formulae
     # shellcheck disable=SC2086
     brew_install $MAC_BREW_FORMULAS
     # aerospace is a cask in nikitabobko's tap; install skips when present
     # (casks error on reinstall, unlike formulas).
-    brew tap nikitabobko/tap
-    brew trust nikitabobko/tap 2>/dev/null || true
+    brew_tap_trusted nikitabobko/tap
     for cask in $MAC_BREW_CASKS; do
       brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
     done
@@ -826,6 +843,21 @@ run_upgrade() {
 }
 
 # -------------------------------------------------------------------- main
+# --non-interactive: for unattended full installs (provisioning scripts;
+# CI only ever runs the `links` verb and never bootstraps brew). It makes
+# the Homebrew installer skip its RETURN prompt -- and with it, the sudo
+# password prompt, so it only works where sudo is already cached.
+BREW_NONINTERACTIVE=0
+filtered_args=''
+for arg in "$@"; do
+  case "$arg" in
+  --non-interactive) BREW_NONINTERACTIVE=1 ;;
+  *) filtered_args="$filtered_args $arg" ;;
+  esac
+done
+# shellcheck disable=SC2086
+set -- $filtered_args
+
 # `links` verb: symlinks and their cleanup only, no package-manager work.
 # CI runs this same path against a scratch HOME.
 if [ "${1:-}" = links ]; then
@@ -859,6 +891,10 @@ if [ "$#" -eq 0 ]; then
 fi
 
 ensure_uv
+# uv normally fetches a managed CPython on demand, but a fresh machine
+# refused to install byor over a missing >=3.11 interpreter anyway.
+# Guarantee one up front; idempotent and instant when already present.
+uv python install
 clean_deploy_sources
 migrate_link_dirs "$@"
 
