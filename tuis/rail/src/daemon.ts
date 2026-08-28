@@ -24,12 +24,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { acknowledgedPaneIds, loadAcks, updateAcks } from "./acks.js";
-import {
-  loadAttentionEvents,
-  reconcileAttentionEvents,
-  saveAttentionEvents,
-  surfaceAttentionEvents,
-} from "./attention-events.js";
 import { loadReviewSnapshot } from "./attention/review.js";
 import {
   collectAgents,
@@ -121,8 +115,6 @@ let tasksFresh = false;
 let appliedBg = "";
 let warnedNoPalette = false;
 const acks = loadAcks();
-const attentionEvents = loadAttentionEvents();
-let attentionEventsDirty = false;
 const stableStatuses = loadStableStatuses();
 let stableStatusesDirty = false;
 // Last frame written per pane id — the no-flicker, no-waste diff.
@@ -378,30 +370,21 @@ async function tick(counter: number): Promise<boolean> {
       logLine(`status stability persistence failed: ${String(error)}`);
     }
   }
-  if (reconcileAttentionEvents(attentionEvents, settled, acks, agents)) {
-    attentionEventsDirty = true;
-  }
-  if (attentionEventsDirty) {
-    try {
-      saveAttentionEvents(attentionEvents);
-      attentionEventsDirty = false;
-    } catch (error) {
-      logLine(`attention event persistence failed: ${String(error)}`);
-    }
-  }
-  const surfaced = surfaceAttentionEvents(settled, attentionEvents, acks);
-  const acked = acknowledgedPaneIds(settled, acks);
+  // A focused pane acknowledges its current stable notification before any
+  // downstream surface consumes the snapshot. This keeps row styling,
+  // Sketchybar, jump targets, and phone routing in lockstep on a visit.
+  const acked = updateAcks(acks, settled, panes, clientFacts.focusedSessions);
   const sessions = new Set(panes.map((pane) => pane.session));
-  const hintsBySession = assignHints(surfaced, sessions, acked);
-  writeHints(surfaced, hintsBySession, acked);
-  publishAttention(surfaced, acked);
+  const hintsBySession = assignHints(settled, sessions, acked);
+  writeHints(settled, hintsBySession, acked);
+  publishAttention(settled, acked);
   publishReviewAttention(loadReviewSnapshot().unacknowledged);
   const present = isPresent(
     hostFacts.inputIdleSecs,
     clientFacts.latestClientActivityTs,
     Date.now() / 1000,
   );
-  pushPhone(surfaced, acked, present);
+  pushPhone(settled, acked, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
   let page = 0;
@@ -436,7 +419,7 @@ async function tick(counter: number): Promise<boolean> {
         session: pane.session,
         activeTab,
         windows: windowsOf(panes, pane.session),
-        agents: surfaced,
+        agents: settled,
         review,
         tasks: taskSnapshot,
         acked,
@@ -475,11 +458,6 @@ async function tick(counter: number): Promise<boolean> {
       lastTransmit.delete(key);
     }
   }
-
-  // Publish/render first. A focused pane can acknowledge only what the
-  // current snapshot has actually surfaced; this avoids consuming a newly
-  // stable completion before the notification path sees it.
-  updateAcks(acks, settled, panes, clientFacts.focusedSessions);
 
   return !enabled || clientFacts.clientCount === 0;
 }

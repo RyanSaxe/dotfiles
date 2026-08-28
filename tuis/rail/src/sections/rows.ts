@@ -87,13 +87,13 @@ export function agentRank(agent: Agent, acked: Set<string>): number {
   return acked.has(agent.paneId) ? 3 : URGENCY[agent.status];
 }
 
-// The one display order for agent lists: urgency first, acked last,
-// newest activity breaking ties. Jump hints number this exact order, so
+// The one display order for agent lists: urgency first, acknowledged last,
+// newest status transition breaking ties. Jump hints number this exact order, so
 // anything that renders agents MUST sort through here.
 export function sortByUrgency(agents: Agent[], acked: Set<string>): Agent[] {
   return [...agents].sort(
     (a, b) =>
-      agentRank(a, acked) - agentRank(b, acked) || b.updatedTs - a.updatedTs,
+      agentRank(a, acked) - agentRank(b, acked) || b.statusTs - a.statusTs,
   );
 }
 

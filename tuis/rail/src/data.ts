@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
 import type { ReviewSnapshot } from "./attention/review.js";
@@ -18,6 +20,9 @@ export interface Agent {
   paneId: string;
   agentKind?: string;
   status: AgentStatus;
+  // Workmux's status transition time. Unlike updatedTs, this does not move
+  // when a state file is rewritten for a heartbeat or title change.
+  statusTs: number;
   title: string;
   elapsedSecs: number;
   updatedTs: number;
@@ -39,7 +44,7 @@ export interface RailData {
   agents: Agent[];
   review: ReviewSnapshot;
   tasks: TaskSnapshot;
-  // Pane ids whose done/waiting status has been seen (visit-clears).
+  // Pane ids whose current waiting/done notification has been acknowledged.
   acked: Set<string>;
   // Jump-hint digit per agent pane id (alt+space <digit> on Agents),
   // viewer-relative.
@@ -57,6 +62,12 @@ export interface RailData {
 // tmux formats can't contain our field separator; \x1f never appears in
 // window names or pane ids.
 const SEP = "\x1f";
+const WORKMUX_AGENTS_DIR = join(homedir(), ".local/state/workmux/agents");
+
+interface WorkmuxAgentState {
+  pane_key?: { pane_id?: unknown };
+  status_ts?: unknown;
+}
 
 interface WorkmuxAgent {
   session: string;
@@ -64,6 +75,7 @@ interface WorkmuxAgent {
   pane_id: string;
   agent_kind?: string;
   status: string;
+  status_ts?: number | null;
   title: string;
   elapsed_secs: number;
   updated_ts: number;
@@ -77,6 +89,43 @@ const AGENT_STATUSES: ReadonlySet<string> = new Set([
   "done",
 ]);
 
+// `workmux status --json` does not include status_ts in installed releases,
+// although the per-agent state files retain it. Read that authoritative
+// transition timestamp so heartbeat/title writes cannot reset the grace
+// period. A future Workmux JSON field still wins in collectAgents below.
+export function loadStatusTransitionTimes(
+  agentsDir = WORKMUX_AGENTS_DIR,
+): Map<string, number> {
+  let files;
+  try {
+    files = readdirSync(agentsDir, { withFileTypes: true });
+  } catch {
+    return new Map();
+  }
+
+  const timestamps = new Map<string, number>();
+  for (const file of files) {
+    if (!file.isFile() || !file.name.endsWith(".json")) continue;
+    try {
+      const state = JSON.parse(
+        readFileSync(join(agentsDir, file.name), "utf8"),
+      ) as WorkmuxAgentState;
+      const paneId = state.pane_key?.pane_id;
+      const statusTs = state.status_ts;
+      if (
+        typeof paneId === "string" &&
+        typeof statusTs === "number" &&
+        Number.isFinite(statusTs)
+      ) {
+        timestamps.set(paneId, statusTs);
+      }
+    } catch {
+      // Workmux can rewrite a state file while the directory is read.
+    }
+  }
+  return timestamps;
+}
+
 async function collectAgents(): Promise<Agent[]> {
   // Run from $HOME: `workmux status` scopes to the repository of its cwd,
   // and a non-repo cwd is what yields the global, all-projects view.
@@ -84,6 +133,7 @@ async function collectAgents(): Promise<Agent[]> {
     cwd: homedir(),
   });
   const parsed = JSON.parse(stdout) as { agents?: WorkmuxAgent[] };
+  const transitionTimes = loadStatusTransitionTimes();
   return (parsed.agents ?? [])
     .filter((agent) => AGENT_STATUSES.has(agent.status))
     .map((agent) => ({
@@ -92,6 +142,7 @@ async function collectAgents(): Promise<Agent[]> {
       paneId: agent.pane_id,
       agentKind: agent.agent_kind ?? "",
       status: agent.status as AgentStatus,
+      statusTs: agent.status_ts ?? transitionTimes.get(agent.pane_id) ?? 0,
       title: agent.title ?? "",
       elapsedSecs: agent.elapsed_secs ?? 0,
       updatedTs: agent.updated_ts ?? 0,
@@ -100,24 +151,22 @@ async function collectAgents(): Promise<Agent[]> {
     }));
 }
 
-// A status change must remain visible in Workmux for this long before it
-// reaches any attention surface. The daemon keeps the last accepted status per
-// pane, so this stays independent of which status is changing.
+// A waiting or done transition must remain visible in Workmux for this long
+// before it becomes the live status used by attention surfaces. The age comes
+// from Workmux's status_ts, not updated_ts: the latter also changes for
+// heartbeats and title updates. Working transitions are accepted immediately
+// so a transient waiting state can disappear completely.
 //
-// Read against the sampling rate, not the clock: daemon.ts re-reads
-// `workmux status` every AGENT_RECONCILE_TICKS (5s), so this window buys
-// roughly window/5 consecutive confirmations. At 5s that was one — a change
-// only had to be there when the next sample landed, which is why an agent
-// pausing for a second or two on its way into auto mode still lit the bar.
-// 30s asks for about six, and the longest such flicker measured in the
-// daemon's own attention log was 21s.
+// The daemon re-reads `workmux status` every 5s, so 30s asks for about six
+// observations. The window is long enough to ride out Codex's brief
+// auto-classification waiting state without delaying a real return to work.
 //
 // The floor is the reconcile interval: below it this suppresses nothing.
 export const AGENT_STATUS_LAG_SECS = 30;
 
 export interface StableAgentState {
   status: AgentStatus;
-  updatedTs: number;
+  statusTs: number;
 }
 
 export function stabilizeAgents(
@@ -132,16 +181,37 @@ export function stabilizeAgents(
 
   return agents.map((agent) => {
     const stable = stableStatuses.get(agent.paneId);
-    if (
-      stable !== undefined &&
-      stable.status !== agent.status &&
-      nowSecs - agent.updatedTs < AGENT_STATUS_LAG_SECS
-    ) {
-      return { ...agent, status: stable.status, updatedTs: stable.updatedTs };
+    // Returning to working is authoritative. Holding on to a stale waiting
+    // or done state here would make a live agent look blocked and would let
+    // an old notification keep it in attention surfaces.
+    if (agent.status === "working") {
+      stableStatuses.set(agent.paneId, {
+        status: agent.status,
+        statusTs: agent.statusTs,
+      });
+      return agent;
+    }
+
+    const recent = nowSecs - agent.statusTs < AGENT_STATUS_LAG_SECS;
+    if (recent && stable === undefined) {
+      // There is no earlier observation to restore, so treat a fresh
+      // non-working status as provisional working until it settles.
+      stableStatuses.set(agent.paneId, {
+        status: "working",
+        statusTs: agent.statusTs,
+      });
+      return { ...agent, status: "working" };
+    }
+    if (recent && stable !== undefined && stable.status !== agent.status) {
+      return {
+        ...agent,
+        status: stable.status,
+        statusTs: stable.statusTs,
+      };
     }
     stableStatuses.set(agent.paneId, {
       status: agent.status,
-      updatedTs: agent.updatedTs,
+      statusTs: agent.statusTs,
     });
     return agent;
   });

@@ -15,6 +15,7 @@ const agent = (
   paneId,
   agentKind: paneId === "%claude" ? "claude" : "codex",
   status,
+  statusTs: updatedTs,
   title: paneId,
   elapsedSecs: 0,
   updatedTs,
@@ -30,7 +31,7 @@ const working = agent("%working", "working", 400);
 assert.match(
   agentIdentity(agent("%claude", "done", 500)),
   /^claude dotfiles\/%claude pane=%claude title=/,
-  "attention history names the agent kind and pane",
+  "attention targets name the agent kind and pane",
 );
 
 assert.deepEqual(

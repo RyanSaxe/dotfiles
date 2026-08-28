@@ -7,11 +7,12 @@ import assert from "node:assert/strict";
 import { loadAcks, updateAcks } from "../src/acks.js";
 import type { Agent, Pane } from "../src/data.js";
 
-const agent = (updatedTs: number): Agent => ({
+const agent = (statusTs: number, updatedTs = statusTs): Agent => ({
   session: "s",
   windowName: "w",
   paneId: "%1",
   status: "done",
+  statusTs,
   title: "t",
   elapsedSecs: 5,
   updatedTs,
@@ -79,5 +80,14 @@ assert.equal(
   0,
   "detached visit does not ack",
 );
-assert.equal(loadAcks()["%1"], 100, "acks persist to disk");
+assert.equal(
+  updateAcks(acks, [agent(300, 10_000)], pane(true, true), FOCUSED).size,
+  1,
+  "a visited heartbeat does not change the transition being acknowledged",
+);
+assert.equal(
+  loadAcks()["%1"],
+  300,
+  "acks persist the status transition timestamp",
+);
 console.log("ack lifecycle ok");

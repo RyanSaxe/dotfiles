@@ -122,6 +122,7 @@ const agent = (over: Partial<Agent> = {}): Agent => ({
   windowName: "w",
   paneId: "%1",
   status: "waiting",
+  statusTs: 0,
   title: "t",
   elapsedSecs: 30 * 60 * 60,
   updatedTs: 0,
@@ -139,6 +140,22 @@ test("agent colour sits on the leading project/ token", () => {
     hex(blend(palette.statusWaiting, railBg(palette), DIM_KEEP)),
   );
   assert.equal(colorOf(rendered, "featurebranch"), dimmed);
+});
+
+test("acknowledged waiting stays quiet while its live status remains waiting", () => {
+  const rendered = elsewhereRows(
+    [agent()],
+    new Set(["%1"]),
+    new Map(),
+    palette,
+    40,
+  )
+    .map((row) => row.text)
+    .join("\n");
+  assert.equal(
+    colorOf(rendered, "proj/"),
+    hex(blend(palette.dim2, railBg(palette), DIM_KEEP)),
+  );
 });
 
 test("an ancient timer is still dim — age never escalates severity", () => {
@@ -159,6 +176,7 @@ const crowd = (): Agent[] =>
     agent({
       session: `proj${String(index).padStart(2, "0")}`,
       paneId: `%${String(index + 1)}`,
+      statusTs: 100 - index,
       updatedTs: 100 - index,
     }),
   );
