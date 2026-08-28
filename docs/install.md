@@ -175,8 +175,10 @@ sources it so they apply from the first run. The known one:
 HOMEBREW_CASK_OPTS=--no-quarantine
 ```
 
-Apps installed before setting it keep their quarantine flag; clear those once
-with `xattr -dr com.apple.quarantine /Applications/<App>.app`. Leave it unset and
+Apps installed before setting it keep their quarantine flag; rerunning
+`./install.sh` after adding the entry strips it from every installed cask —
+the agent CLIs (claude, codex, copilot) are casks on macOS too, so they are
+covered by the same sweep. Leave it unset and
 phone notifications simply never send; `rail status` and `attention status`
 report the channel state.
 
