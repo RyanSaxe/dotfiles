@@ -79,7 +79,12 @@ ensure_zsh_login_shell() {
   # chsh refuses shells missing from /etc/shells.
   grep -qx "$zsh_path" /etc/shells 2>/dev/null ||
     printf '%s\n' "$zsh_path" | sudo tee -a /etc/shells >/dev/null
-  chsh -s "$zsh_path"
+  # Through sudo, not bare: chsh prompts for the USER's password via
+  # PAM, which is the one prompt no sudo cache covers -- both CI
+  # platforms hung the whole install on it. Root changes any shell
+  # without a password, and interactive machines already vouched for
+  # sudo one line up.
+  sudo chsh -s "$zsh_path" "$(id -un)"
 }
 
 ask() {
