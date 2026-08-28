@@ -108,7 +108,7 @@ CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rs
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
 CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync jq'
 MAC_BREW_FORMULAS='sketchybar'
-MAC_BREW_CASKS='aerospace font-jetbrains-mono-nerd-font karabiner-elements'
+MAC_BREW_CASKS='ghostty aerospace font-jetbrains-mono-nerd-font karabiner-elements'
 # byor's rule engine. Not in Debian or Ubuntu, so Linux takes the npm build
 # into ~/.local like the agent CLIs do.
 EXTRAS_BREW_FORMULAS='ast-grep'
