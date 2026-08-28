@@ -43,12 +43,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: full install, non-interactive
+        timeout-minutes: 25
         run: ./install.sh --non-interactive
 
       - name: second run converges
         # Idempotence is the actual promise: rerunning must succeed from
         # the state the first run left behind (the byor config clobber
         # hid exactly here).
+        timeout-minutes: 15
         run: ./install.sh --non-interactive
 
       - name: installed surface spot checks

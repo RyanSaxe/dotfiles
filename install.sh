@@ -1012,12 +1012,17 @@ if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
   # in a headless run (CI, provisioning) lend it a pty via script(1) --
   # skipping it would leave agents without status hooks, and
   # --non-interactive promises to skip nothing.
+  # The </dev/null matters: script(1) copies ITS stdin to the pty and
+  # exits on EOF. A headless caller whose stdin is a never-closing pipe
+  # (CI) otherwise leaves script running after workmux finishes -- both
+  # platforms stalled 38 minutes exactly here, output complete, process
+  # orphaned.
   if [ -t 0 ]; then
     workmux setup --hooks --skills
   elif [ "$OS" = Darwin ]; then
-    script -q /dev/null workmux setup --hooks --skills
+    script -q /dev/null workmux setup --hooks --skills </dev/null
   else
-    script -qec "workmux setup --hooks --skills" /dev/null
+    script -qec "workmux setup --hooks --skills" /dev/null </dev/null
   fi
 fi
 
