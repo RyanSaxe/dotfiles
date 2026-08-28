@@ -558,18 +558,21 @@ install_tier_packages() {
     # step anymore -- `byor package list` serves them from the install
     # itself, and the old `byor package install` verb is gone.
     byor install --agents claude-code,codex,copilot --non-interactive >/dev/null 2>&1 || true
-    # byor install writes ~/.config/byor/config.yml as a REAL file,
-    # replacing even a deployed symlink (verified: it clobbered one).
-    # That generated default is disposable tool output; the repo's
-    # config is authoritative and deploys as a link right below. Clear
-    # the generated copy so deploy never refuses -- on this one path,
-    # "exists but is a regular file" is always the tool's doing. Without
-    # this, every full run with extras fails its deploy and aborts
-    # before the post-tier steps.
-    byor_config="$HOME/.config/byor/config.yml"
-    if [ -f "$byor_config" ] && [ ! -L "$byor_config" ]; then
-      rm -f "$byor_config"
-    fi
+    # byor install writes real files into ~/.config/byor -- config.yml,
+    # a starter rules/ directory -- replacing even deployed symlinks
+    # (verified: it clobbered a link; CI then caught rules/ the same
+    # way). Everything it generates there is disposable tool output; the
+    # repo's copies are authoritative and deploy as links right below,
+    # and user-authored rules belong in the repo, never loose in HOME.
+    # Clear whatever the tier is about to link that exists as a
+    # non-link, so deploy never refuses and the run never aborts before
+    # the post-tier steps.
+    for byor_path in config.yml rules scripts; do
+      byor_target="$HOME/.config/byor/$byor_path"
+      if [ -e "$byor_target" ] && [ ! -L "$byor_target" ]; then
+        rm -rf "$byor_target"
+      fi
+    done
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
