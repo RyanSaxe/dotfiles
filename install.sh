@@ -167,6 +167,17 @@ install_starship() {
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 }
 
+# Tap and trust in one motion. Homebrew 6 ignores third-party taps until
+# `brew trust` runs -- a fresh machine taps successfully and then finds
+# no formulae. Older brews have no trust command; the gate keeps them
+# working. Every future tap goes through here, not bare `brew tap`.
+brew_tap_trusted() {
+  brew tap "$1"
+  if brew trust --help >/dev/null 2>&1; then
+    brew trust "$1"
+  fi
+}
+
 install_workmux() {
   # workmux drives every worktree/window in this setup and its config ships
   # in the core tier, so the binary belongs here too. Homebrew serves it
@@ -174,7 +185,7 @@ install_workmux() {
   # which is also the upgrade path.
   case "$OS" in
   Darwin)
-    brew tap raine/workmux
+    brew_tap_trusted raine/workmux
     brew_install workmux
     ;;
   *)
@@ -467,16 +478,13 @@ install_tier_packages() {
   mac:Darwin)
     # sketchybar itself is mac-only; the plugins under sketchybar/ shell out
     # to macOS-only tools (pmset, ipconfig) regardless. It lives in the
-    # felixkratz tap, which newer brews refuse to install from untrusted
-    # (`brew trust` doesn't exist on older brews — hence the guard).
-    brew tap felixkratz/formulae
-    brew trust felixkratz/formulae 2>/dev/null || true
+    # felixkratz tap.
+    brew_tap_trusted felixkratz/formulae
     # shellcheck disable=SC2086
     brew_install $MAC_BREW_FORMULAS
     # aerospace is a cask in nikitabobko's tap; install skips when present
     # (casks error on reinstall, unlike formulas).
-    brew tap nikitabobko/tap
-    brew trust nikitabobko/tap 2>/dev/null || true
+    brew_tap_trusted nikitabobko/tap
     for cask in $MAC_BREW_CASKS; do
       brew list --cask "$cask" >/dev/null 2>&1 || brew install --cask "$cask"
     done
