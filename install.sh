@@ -1012,21 +1012,22 @@ if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
   # in a headless run (CI, provisioning) lend it a pty via script(1) --
   # skipping it would leave agents without status hooks, and
   # --non-interactive promises to skip nothing.
-  # Headless is hard-won territory: workmux setup demands a tty, and
-  # given one (via script(1)) it spawns a long-lived background process
-  # that keeps the pty open -- so ANY foreground wait hangs forever,
-  # whatever stdin/stdout are wired to. Three stalled CI runs proved
-  # this layer by layer. So headless mode stops waiting on the process
-  # and verifies the OUTCOME: background the shim, poll for the
-  # artifacts setup exists to produce, replay its log, reap stragglers.
+  # Headless is hard-won territory (four CI stalls to map it): workmux
+  # setup demands a tty, and on FRESH state it asks "Install bundled
+  # skills? [Y/n]" on that tty -- a prompt no machine with recorded
+  # state ever shows, so local tests never saw it and the pty swallowed
+  # it in CI logs until the output was captured to a file. `yes` answers
+  # it (and anything future) in the affirmative, which is exactly what
+  # --non-interactive promises; the artifact poll below stays as the
+  # success signal, immune to whatever the tool does around its exit.
   if [ -t 0 ]; then
     workmux setup --hooks --skills
   else
     setup_log="$(mktemp)"
     if [ "$OS" = Darwin ]; then
-      script -q /dev/null workmux setup --hooks --skills </dev/null >"$setup_log" 2>&1 &
+      yes 2>/dev/null | script -q /dev/null workmux setup --hooks --skills >"$setup_log" 2>&1 &
     else
-      script -qec "workmux setup --hooks --skills" /dev/null </dev/null >"$setup_log" 2>&1 &
+      yes 2>/dev/null | script -qec "workmux setup --hooks --skills" /dev/null >"$setup_log" 2>&1 &
     fi
     setup_pid=$!
     # The artifacts ARE the success signal: the skills link farm and the
