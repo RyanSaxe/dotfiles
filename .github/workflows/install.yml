@@ -6,10 +6,10 @@
 # genuinely execute; stdin is closed, so any hidden prompt fails fast
 # instead of hanging a human.
 #
-# Known-untestable here, by design: TLS-intercepted proxies (the
-# .env-gated UV/cask handling runs as no-ops), the Gatekeeper dialog
-# itself, karabiner's driver-approval UI, and the first-ever Homebrew
-# bootstrap (runners ship brew).
+# Known-untestable here, by design: networks needing a locally-trusted
+# CA (the .env-gated handling runs as no-ops), launch-time app dialogs,
+# karabiner's driver-approval UI, and the first-ever Homebrew bootstrap
+# (runners ship brew).
 name: install
 on:
   pull_request:

@@ -181,21 +181,11 @@ Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail and
 GitHub attention observer use for phone notifications.
 
 The `.env` also carries optional per-machine overrides, and `install.sh`
-sources it so they apply from the first run. The known one:
-
-```sh
-# TLS-intercepted networks (corporate proxies) break Gatekeeper's
-# certificate-pinned notarization checks, so every cask app opens to
-# "could not verify free of malware", again after each upgrade. This
-# waives Gatekeeper for cask-installed apps on THIS machine only;
-# brew's checksums still gate the artifacts.
-HOMEBREW_CASK_OPTS=--no-quarantine
-```
-
-Apps installed before setting it keep their quarantine flag; rerunning
-`./install.sh` after adding the entry strips it from every installed cask —
-the agent CLIs (claude, codex, copilot) are casks on macOS too, so they are
-covered by the same sweep. Leave it unset and
+sources it so they apply from the first run. For example, on a machine where
+cask apps re-prompt at every launch because notarization checks cannot
+complete, `HOMEBREW_CASK_OPTS=--no-quarantine` in that machine's `.env`
+stops the recurring prompts; rerunning `./install.sh` afterwards also
+converges apps installed before the entry existed. Leave it unset and
 phone notifications simply never send; `rail status` and `attention status`
 report the channel state.
 
