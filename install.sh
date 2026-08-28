@@ -553,6 +553,19 @@ UV_SYSTEM_CERTS=true
 UV_NATIVE_TLS=1
 export UV_SYSTEM_CERTS UV_NATIVE_TLS
 
+# Machine-local overrides ride along on installs too, not just shells
+# (zshrc's env_init loads the same file). The motivating case: a
+# TLS-intercepted network breaks Gatekeeper's certificate-pinned
+# notarization checks, and HOMEBREW_CASK_OPTS=--no-quarantine in that
+# machine's .env is the per-machine fix -- see docs/install.md. Sourced
+# here so the FIRST install already honors it.
+if [ -f ./.env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
 ensure_uv() {
   command -v uvx >/dev/null 2>&1 && return 0
   case "$OS" in
