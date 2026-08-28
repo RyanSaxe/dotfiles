@@ -181,11 +181,8 @@ Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail and
 GitHub attention observer use for phone notifications.
 
 The `.env` also carries optional per-machine overrides, and `install.sh`
-sources it so they apply from the first run. For example, on a machine where
-cask apps re-prompt at every launch because notarization checks cannot
-complete, `HOMEBREW_CASK_OPTS=--no-quarantine` in that machine's `.env`
-stops the recurring prompts; rerunning `./install.sh` afterwards also
-converges apps installed before the entry existed.
+sources it so they apply from the first run. Keep values that depend on the
+machine or local environment there; do not commit them to the repository.
 
 `AGENT_NOTIFICATION_ID` is optional; leave it unset and phone notifications
 simply never send. `rail status` and `attention status` report the channel
