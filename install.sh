@@ -1007,7 +1007,18 @@ done
 # manual `workmux setup` command.
 if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
   echo "==> workmux agent hooks and skills"
-  workmux setup --hooks --skills
+  # workmux setup refuses to run without a terminal even in its
+  # flag-driven form. It prompts for nothing with --hooks --skills, so
+  # in a headless run (CI, provisioning) lend it a pty via script(1) --
+  # skipping it would leave agents without status hooks, and
+  # --non-interactive promises to skip nothing.
+  if [ -t 0 ]; then
+    workmux setup --hooks --skills
+  elif [ "$OS" = Darwin ]; then
+    script -q /dev/null workmux setup --hooks --skills
+  else
+    script -qec "workmux setup --hooks --skills" /dev/null
+  fi
 fi
 
 # Render the theme so every consumer has colors from the first shell.
