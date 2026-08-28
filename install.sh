@@ -1012,23 +1012,41 @@ if [ "${AGENT_CLIS_SETUP_DONE:-0}" = 1 ]; then
   # in a headless run (CI, provisioning) lend it a pty via script(1) --
   # skipping it would leave agents without status hooks, and
   # --non-interactive promises to skip nothing.
-  # Headless mechanics, each learned from a stalled CI run: stdin from
-  # /dev/null because script(1) copies its stdin to the pty and only
-  # exits on EOF; output to a FILE (replayed after) because first-time
-  # setup spawns a background workmux that inherits stdout, and a CI
-  # step waits for its output pipe to close -- the run then hangs with
-  # every foreground process already gone.
+  # Headless is hard-won territory: workmux setup demands a tty, and
+  # given one (via script(1)) it spawns a long-lived background process
+  # that keeps the pty open -- so ANY foreground wait hangs forever,
+  # whatever stdin/stdout are wired to. Three stalled CI runs proved
+  # this layer by layer. So headless mode stops waiting on the process
+  # and verifies the OUTCOME: background the shim, poll for the
+  # artifacts setup exists to produce, replay its log, reap stragglers.
   if [ -t 0 ]; then
     workmux setup --hooks --skills
   else
     setup_log="$(mktemp)"
     if [ "$OS" = Darwin ]; then
-      script -q /dev/null workmux setup --hooks --skills </dev/null >"$setup_log" 2>&1
+      script -q /dev/null workmux setup --hooks --skills </dev/null >"$setup_log" 2>&1 &
     else
-      script -qec "workmux setup --hooks --skills" /dev/null </dev/null >"$setup_log" 2>&1
+      script -qec "workmux setup --hooks --skills" /dev/null </dev/null >"$setup_log" 2>&1 &
     fi
+    setup_pid=$!
+    # The artifacts ARE the success signal: the skills link farm and the
+    # status hook, both printed by setup on every platform.
+    waited=0
+    while [ "$waited" -lt 120 ]; do
+      if [ -e "$HOME/.claude/skills" ] && [ -e "$HOME/.copilot/hooks/workmux-status.js" ]; then
+        break
+      fi
+      sleep 2
+      waited=$((waited + 2))
+    done
+    sleep 2 # let the log finish writing
     cat "$setup_log"
     rm -f "$setup_log"
+    kill "$setup_pid" 2>/dev/null || true
+    if [ ! -e "$HOME/.claude/skills" ] || [ ! -e "$HOME/.copilot/hooks/workmux-status.js" ]; then
+      echo "error: workmux setup produced no hooks/skills within 120s" >&2
+      exit 1
+    fi
   fi
 fi
 
