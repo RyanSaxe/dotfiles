@@ -197,8 +197,10 @@ On macOS, installing the `core` tier also installs a user-level launchd job.
 It runs `~/.local/bin/attention refresh` at login and every five minutes. The
 worker is independent of tmux and Neovim, writes durable state under
 `~/.local/state/dotfiles/attention/`, and catches up after sleep or restart.
-It cannot poll while the Mac is fully powered off. Refreshes back off until
-the GitHub rate-limit reset when the remaining budget is under pressure.
+It uses a durable activity checkpoint with bounded paginated requests and a
+periodic full reconciliation. It cannot poll while the Mac is fully powered
+off. Refreshes back off until the GitHub rate-limit reset when the remaining
+budget is under pressure.
 
 The observer uses the existing `gh` authentication. Before relying on it, run
 `gh auth status` and re-authenticate with `gh auth refresh -h github.com` if
