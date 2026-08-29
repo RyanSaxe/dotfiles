@@ -10,6 +10,7 @@ import importlib.util
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 _SPEC = importlib.util.spec_from_loader(
     "mascot_accents",
@@ -28,12 +29,50 @@ _SPEC.loader.exec_module(accents)
 Image = accents.Image
 
 
+def local_mascot_dir(tmp_path: Path, monkeypatch: Any) -> Path:
+    data_home = tmp_path / "data"
+    monkeypatch.setenv("XDG_DATA_HOME", str(data_home))
+    return data_home / "dotfiles/mascots"
+
+
 def test_registry_resolves_qualified_identities() -> None:
     provider, identity = accents.resolve("pokemon:raikou")
     assert provider is accents.PROVIDERS["pokemon"]
     assert identity == "raikou"
     # Shiny is its own registered picker entry, not a flag.
     assert "shiny-pokemon" in accents.PROVIDERS
+
+
+def test_local_provider_lists_png_filenames(tmp_path: Path, monkeypatch: Any) -> None:
+    mascot_dir = local_mascot_dir(tmp_path, monkeypatch)
+    mascot_dir.mkdir(parents=True)
+    Image.new("RGBA", (8, 8), (40, 80, 220, 255)).save(mascot_dir / "cat.png")
+    (mascot_dir / "notes.txt").write_text("not a mascot")
+
+    assert accents.PROVIDERS["local"].identities() == ["cat.png"]
+
+
+def test_local_provider_resolves_a_png_fixture(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    mascot_dir = local_mascot_dir(tmp_path, monkeypatch)
+    mascot_dir.mkdir(parents=True)
+    source = mascot_dir / "cat.png"
+    Image.new("RGBA", (8, 8), (40, 80, 220, 255)).save(source)
+
+    provider, identity = accents.resolve("local:cat.png")
+    images = provider.fetch(identity)
+
+    assert images == accents.MascotImages(sprite=source, palette=source)
+
+
+def test_local_provider_reports_a_missing_png(tmp_path: Path, monkeypatch: Any) -> None:
+    mascot_dir = local_mascot_dir(tmp_path, monkeypatch)
+    mascot_dir.mkdir(parents=True)
+
+    message = _exit_message(lambda: accents.PROVIDERS["local"].fetch("missing.png"))
+
+    assert "local mascot PNG not found: missing.png" in message
 
 
 def _exit_message(action: Callable[[], object]) -> str:

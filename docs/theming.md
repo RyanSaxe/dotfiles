@@ -11,6 +11,7 @@ theme inner light
 theme outer dark
 theme both toggle
 theme mascot pokemon:gengar   # accent colors extracted from a mascot image
+theme mascot local:cat.png      # a machine-local image
 ```
 
 ## Two surfaces
@@ -127,3 +128,10 @@ That's the whole surface. `theme mascot my-source:<id>`, the fzf picker entry,
 per-project sync, and the rail sprite all follow from the registration — see the
 `pokemon` provider for a full example and `shiny-pokemon` for wrapping an
 existing source as its own picker entry.
+
+### Local images
+
+Put PNG files in `$XDG_DATA_HOME/dotfiles/mascots`. When `XDG_DATA_HOME` is
+unset, use `~/.local/share/dotfiles/mascots`. The local provider lists the PNG
+filenames in that directory as relative identities, such as `local:cat.png`,
+and resolves the selected file at runtime.
