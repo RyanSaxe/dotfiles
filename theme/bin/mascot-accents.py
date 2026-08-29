@@ -151,6 +151,41 @@ def resolve(value: str) -> tuple[Provider, str]:
     return provider, identity
 
 
+# ----- local provider -----------------------------------------------------
+
+
+def local_mascot_dir() -> Path:
+    """Return the user-owned directory scanned by the local provider."""
+    data_home = environ.get("XDG_DATA_HOME") or str(Path.home() / ".local/share")
+    return Path(data_home) / "dotfiles/mascots"
+
+
+def _local_identities() -> list[str]:
+    directory = local_mascot_dir()
+    if not directory.is_dir():
+        return []
+    return sorted(
+        path.name
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() == ".png"
+    )
+
+
+def _local_fetch(identity: str) -> MascotImages:
+    """Resolve a local filename to the PNG the rail and extractor consume."""
+    path = local_mascot_dir() / identity
+    if (
+        Path(identity).name != identity
+        or path.suffix.lower() != ".png"
+        or not path.is_file()
+    ):
+        raise SystemExit(f"error: local mascot PNG not found: {identity}")
+    return MascotImages(sprite=path, palette=path)
+
+
+register("local", Provider(_local_identities, _local_fetch))
+
+
 # ----- pokemon provider ---------------------------------------------------
 
 POKEAPI = "https://pokeapi.co/api/v2/pokemon/"
