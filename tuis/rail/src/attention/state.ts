@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import type {
   AttentionItem,
   CiMemory,
+  GithubSyncCheckpoint,
   ObserverState,
   RateLimit,
 } from "./types.js";
@@ -23,6 +24,7 @@ export const ATTENTION_STATE_DIR = join(
 );
 export const ATTENTION_STATE_PATH = join(ATTENTION_STATE_DIR, "state.json");
 export const ATTENTION_LOCK_PATH = join(ATTENTION_STATE_DIR, "refresh.lock");
+export const FULL_RECONCILIATION_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 function emptyRecord<T>(): Record<string, T> {
   return {};
@@ -41,6 +43,10 @@ export function emptyObserverState(): ObserverState {
     acknowledged: emptyRecord<string>(),
     notified: emptyRecord<string>(),
     ci: emptyRecord<CiMemory>(),
+    githubSync: {
+      processedThrough: null,
+      lastFullReconciliationAt: null,
+    },
   };
 }
 
@@ -173,6 +179,46 @@ export function retryAfterForRateLimit(
   return new Date(resetAt).toISOString();
 }
 
+function githubSyncCheckpoint(state: ObserverState): GithubSyncCheckpoint {
+  return (
+    state.githubSync ?? {
+      processedThrough: null,
+      lastFullReconciliationAt: null,
+    }
+  );
+}
+
+export function shouldRunFullReconciliation(
+  state: ObserverState,
+  now = Date.now(),
+): boolean {
+  const checkpoint = githubSyncCheckpoint(state);
+  if (checkpoint.processedThrough === null) return true;
+  if (checkpoint.lastFullReconciliationAt === null) return true;
+  const lastFull = Date.parse(checkpoint.lastFullReconciliationAt);
+  return (
+    !Number.isFinite(lastFull) ||
+    now - lastFull >= FULL_RECONCILIATION_INTERVAL_MS
+  );
+}
+
+export function commitGithubSync(
+  state: ObserverState,
+  processedThrough: string,
+  fullReconciliation: boolean,
+): ObserverState {
+  const previous = githubSyncCheckpoint(state);
+  return {
+    ...state,
+    githubSync: {
+      processedThrough,
+      lastFullReconciliationAt: fullReconciliation
+        ? processedThrough
+        : previous.lastFullReconciliationAt,
+    },
+  };
+}
+
 export function markFailure(
   state: ObserverState,
   error: string,
@@ -236,6 +282,60 @@ export function reconcileAttention(
       notified,
       ci,
     },
+    pendingNotifications,
+  };
+}
+
+function attentionTargetKey(item: AttentionItem): string {
+  return `${item.targetKind}:${item.repository}#${item.number}`;
+}
+
+// Incremental fetches return only targets whose remote activity may have
+// changed. Remove old items for those targets, retain the rest, and let the
+// existing classifier output replace the removed items. A full pass keeps the
+// old replacement behavior so closed targets and stale CI memory disappear.
+export function reconcileGithubAttention(
+  previous: ObserverState,
+  items: AttentionItem[],
+  ci: Record<string, CiMemory>,
+  refreshedTargetKeys: readonly string[],
+  fullReconciliation: boolean,
+): ReconciledState {
+  if (fullReconciliation) return reconcileAttention(previous, items, ci);
+  const refreshed = new Set(refreshedTargetKeys);
+  const retained = Object.values(previous.items).filter(
+    (item) => !refreshed.has(attentionTargetKey(item)),
+  );
+  return reconcileAttention(previous, [...retained, ...items], {
+    ...previous.ci,
+    ...ci,
+  });
+}
+
+// A baseline records the existing inbox without sending a phone notification
+// for old activity. Activity stamped at or after the baseline start remains
+// pending, so a target changing while the baseline is fetched is not hidden.
+export function suppressBaselineNotifications(
+  reconciled: ReconciledState,
+  baselineAt: string,
+): ReconciledState {
+  const baseline = Date.parse(baselineAt);
+  if (!Number.isFinite(baseline)) {
+    throw new Error(`baseline timestamp is not a date: ${baselineAt}`);
+  }
+  const notified = { ...reconciled.state.notified };
+  const pendingNotifications = reconciled.pendingNotifications.filter(
+    (item) => {
+      const createdAt = Date.parse(item.createdAt);
+      if (Number.isFinite(createdAt) && createdAt < baseline) {
+        notified[item.id] = baselineAt;
+        return false;
+      }
+      return true;
+    },
+  );
+  return {
+    state: { ...reconciled.state, notified },
     pendingNotifications,
   };
 }

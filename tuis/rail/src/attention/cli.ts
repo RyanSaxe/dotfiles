@@ -4,20 +4,23 @@ import { dirname, resolve } from "node:path";
 
 import { loadAttentionConfig } from "./config.js";
 import { applyCiTransition } from "./ci.js";
-import { fetchGithubSnapshot } from "./github.js";
+import { fetchGithubSync } from "./github.js";
 import { sendNtfy, ntfyEndpoint } from "./ntfy.js";
 import {
   acknowledgeItem,
   acquireRefreshLock,
   ATTENTION_STATE_DIR,
+  commitGithubSync,
   loadObserverState,
   markFailure,
   markNotified,
   markSuccess,
-  reconcileAttention,
+  reconcileGithubAttention,
   retryAfterForRateLimit,
   retryIsActive,
   saveObserverState,
+  shouldRunFullReconciliation,
+  suppressBaselineNotifications,
 } from "./state.js";
 import type { AttentionItem, ObserverState } from "./types.js";
 import { classifyOpened, classifyTarget } from "./classify.js";
@@ -64,16 +67,18 @@ function activeItems(state: ObserverState): AttentionItem[] {
 
 function parseRefreshOptions(args: string[]): {
   force: boolean;
+  full: boolean;
   notify: boolean;
 } {
   return {
     force: args.includes("--force"),
+    full: args.includes("--full"),
     notify: !args.includes("--no-notify"),
   };
 }
 
 async function refresh(args: string[]): Promise<void> {
-  const { force, notify } = parseRefreshOptions(args);
+  const { force, full, notify } = parseRefreshOptions(args);
   const lock = await acquireRefreshLock();
   if (lock === null) {
     console.log("attention refresh already running");
@@ -92,7 +97,15 @@ async function refresh(args: string[]): Promise<void> {
     state = { ...state, lastAttemptAt: now };
     await saveObserverState(state);
     const config = loadAttentionConfig();
-    const snapshot = await fetchGithubSnapshot(config.watch);
+    const fullReconciliation =
+      full || shouldRunFullReconciliation(state, Date.parse(now));
+    const sync = await fetchGithubSync({
+      watch: config.watch,
+      since: state.githubSync?.processedThrough ?? null,
+      fullReconciliation,
+      startedAt: now,
+    });
+    const snapshot = sync.snapshot;
     const items: AttentionItem[] = [];
     const ci: ObserverState["ci"] = {};
 
@@ -126,11 +139,27 @@ async function refresh(args: string[]): Promise<void> {
       if (ciTransition.item !== null) items.push(ciTransition.item);
     }
 
-    const reconciled = reconcileAttention(state, items, ci);
-    state = markSuccess(
-      { ...reconciled.state, username: snapshot.username, watchedSince },
-      snapshot.rateLimit,
-      now,
+    let reconciled = reconcileGithubAttention(
+      state,
+      items,
+      ci,
+      sync.refreshedTargetKeys,
+      sync.fullReconciliation,
+    );
+    const initialBaseline =
+      state.githubSync?.processedThrough === undefined ||
+      state.githubSync?.processedThrough === null;
+    if (initialBaseline) {
+      reconciled = suppressBaselineNotifications(reconciled, now);
+    }
+    state = commitGithubSync(
+      markSuccess(
+        { ...reconciled.state, username: snapshot.username, watchedSince },
+        snapshot.rateLimit,
+        now,
+      ),
+      sync.processedThrough,
+      sync.fullReconciliation,
     );
     const rateLimitRetry =
       snapshot.rateLimit === null
@@ -223,6 +252,12 @@ async function status(): Promise<void> {
   console.log(`last success: ${state.lastSuccessfulSyncAt ?? "never"}`);
   console.log(`last attempt: ${state.lastAttemptAt ?? "never"}`);
   console.log(`last error: ${state.lastError ?? "none"}`);
+  console.log(
+    `GitHub processed through: ${state.githubSync?.processedThrough ?? "never"}`,
+  );
+  console.log(
+    `last full reconciliation: ${state.githubSync?.lastFullReconciliationAt ?? "never"}`,
+  );
   console.log(`last notify error: ${state.lastNotifyError ?? "none"}`);
   console.log(`retry after: ${state.retryAfter ?? "none"}`);
   console.log(`active items: ${items.length}`);
@@ -270,7 +305,7 @@ function usage(): void {
   console.log(`usage: attention <command>
 
 commands:
-  refresh [--force] [--no-notify]  fetch account-wide GitHub attention
+  refresh [--force] [--full] [--no-notify]  fetch account-wide GitHub attention
   status                           show observer state and rate limit
   list [--json]                    show active attention items
   ack <item-id>                    acknowledge one item locally`);

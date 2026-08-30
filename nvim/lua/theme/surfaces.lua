@@ -7,7 +7,7 @@
 -- the tmux rail, so they take the outer surface via `winhighlight`.
 --
 -- Doing it here rather than per-plugin means a new sidebar plugin is
--- themed the day it is installed, with no entry to add. The snacks
+-- themed the day it is installed, with no entry to add. The Snacks
 -- explorer is the single named exception, below: it is a sidebar built
 -- out of floats, so the rule above cannot see it.
 local M = {}
@@ -18,10 +18,6 @@ local WINHL = table.concat({
   "SignColumn:ThemeOuterNormal",
   "EndOfBuffer:ThemeOuterNormal",
   "WinSeparator:ThemeOuterWinSeparator",
-  -- Snacks routes every one of its windows through these, float or not.
-  "SnacksNormal:ThemeOuterNormal",
-  "SnacksNormalNC:ThemeOuterNormalNC",
-  "SnacksPickerList:ThemeOuterNormal",
 }, ",")
 
 -- The explorer is the one snacks window that belongs on the outer layer:
@@ -29,42 +25,36 @@ local WINHL = table.concat({
 -- cannot say so in `winhighlight`, because snacks owns that value for the
 -- windows it builds and re-asserts it from `win.opts.wo` on every layout
 -- update — inside `eventignore=all`, so nothing here can even react to it.
--- Per-source config is no way in either: the picker resolves `win.list`
--- and `win.input` UNDER its own defaults rather than over them, so the
--- value never reaches the window (folke/snacks.nvim#2942).
+-- A per-source winhighlight override is unreliable too: the picker resolves
+-- win.list and win.input under its own defaults rather than over them, so
+-- the value never reaches the window (folke/snacks.nvim#2942).
 --
--- So the surface moves out of `winhighlight`. These windows get their own
--- highlight namespace, in which the groups snacks paints them through mean
--- the outer surface instead. A namespace is not a window option, so snacks
--- never touches it: attach once and it holds. Groups left out keep their
--- global definition, which is why only the ones carrying a surface are
--- named here — and naming links rather than colors keeps every color
--- decision in theme.highlights, where a mode change repaints the targets
--- and these follow.
+-- So the surface moves out of winhighlight. These windows get their own
+-- highlight namespace, in which the source groups Snacks paints mean the
+-- outer surface instead. Neovim gives an active namespace
+-- precedence over winhighlight, so this namespace must define the source
+-- groups, not the destination names in Snacks' mappings. A namespace is
+-- not a window option, so Snacks never touches it. Naming links rather than
+-- colors keeps every color decision in theme.highlights, where a mode change
+-- repaints the targets and these follow.
 local OUTER_NS = vim.api.nvim_create_namespace("theme_outer_surface")
 
 for group, link in pairs({
-  -- The box takes `Normal`, the list and input that float inside it take
-  -- `NormalFloat`. Which group carries either depends on the duplicate key
-  -- that won inside snacks, so both spellings of each are named.
-  SnacksNormal = "ThemeOuterNormal",
-  SnacksNormalNC = "ThemeOuterNormalNC",
-  SnacksPicker = "ThemeOuterNormal",
-  SnacksPickerBox = "ThemeOuterNormal",
-  SnacksPickerList = "ThemeOuterNormal",
-  SnacksPickerInput = "ThemeOuterNormal",
+  -- Snacks uses these source groups for explorer bodies, frames, and
+  -- window furniture. The destination groups remain the existing theme
+  -- roles, so this namespace adds no palette.
+  Normal = "ThemeOuterNormal",
+  NormalNC = "ThemeOuterNormalNC",
+  NormalFloat = "ThemeOuterNormal",
+  WinBar = "ThemeOuterNormal",
+  WinBarNC = "ThemeOuterNormalNC",
   SignColumn = "ThemeOuterNormal",
   EndOfBuffer = "ThemeOuterNormal",
-  SnacksPickerBorder = "ThemeOuterFrame",
-  SnacksPickerBoxBorder = "ThemeOuterFrame",
-  SnacksPickerListBorder = "ThemeOuterFrame",
-  SnacksPickerInputBorder = "ThemeOuterFrame",
-  SnacksTitle = "ThemeOuterFrame",
-  SnacksPickerTitle = "ThemeOuterFrame",
-  SnacksPickerBoxTitle = "ThemeOuterFrame",
-  SnacksPickerListTitle = "ThemeOuterFrame",
-  SnacksPickerInputTitle = "ThemeOuterFrame",
-  SnacksWinSeparator = "ThemeOuterWinSeparator",
+  FloatBorder = "ThemeOuterFrame",
+  FloatTitle = "ThemeOuterFrame",
+  FloatFooter = "ThemeOuterFrame",
+  CursorLine = "ThemeOuterCursorLine",
+  WinSeparator = "ThemeOuterWinSeparator",
 }) do
   vim.api.nvim_set_hl(OUTER_NS, group, { link = link })
 end
@@ -84,9 +74,20 @@ local function collect(set, wins)
   end
 end
 
--- Windows belonging to an open explorer. `wins` holds its input and list,
--- `box_wins` the container they float inside. A previewed file stays in the
--- main editor window and is in neither, so this never claims the buffer.
+---@param set table<integer, boolean>
+---@param win snacks.win|nil
+local function collect_one(set, win)
+  ---@type integer|nil
+  local id = win and win.win
+  if id and vim.api.nvim_win_is_valid(id) then
+    set[id] = true
+  end
+end
+
+-- The picker exposes layout containers in box_wins and list/input windows
+-- separately. Only an open explorer's root, boxes, list, and input windows
+-- belong to the outer surface. The preview window is intentionally excluded
+-- so its file content remains inner.
 ---@return table<integer, boolean>
 local function explorer_wins()
   ---@type table<integer, boolean>
@@ -99,9 +100,11 @@ local function explorer_wins()
   local open = snacks.picker.get({ source = "explorer" })
   for _, picker in ipairs(open) do
     if picker.layout then
-      collect(set, picker.layout.wins)
+      collect_one(set, picker.layout.root)
       collect(set, picker.layout.box_wins)
     end
+    collect_one(set, picker.list and picker.list.win)
+    collect_one(set, picker.input and picker.input.win)
   end
   return set
 end
@@ -109,6 +112,12 @@ end
 ---@param win integer
 ---@return boolean
 local function is_anchored_sidebar(win)
+  -- The exact explorer windows are selected before this function runs.
+  -- Every other Snacks window keeps its inner surface, even if it is
+  -- anchored and would otherwise look like generic chrome.
+  if vim.w[win].snacks_win then
+    return false
+  end
   if vim.api.nvim_win_get_config(win).relative ~= "" then
     return false
   end
@@ -135,7 +144,7 @@ local function is_anchored_sidebar(win)
   if vim.bo[buf].filetype == "snacks_dashboard" then
     return false
   end
-  return vim.bo[buf].buftype ~= "" or vim.bo[buf].filetype == "snacks_picker_list"
+  return vim.bo[buf].buftype ~= ""
 end
 
 -- `winhighlight` is window-local, not buffer-local: a window that once
