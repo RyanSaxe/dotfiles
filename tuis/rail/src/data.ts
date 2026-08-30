@@ -157,12 +157,12 @@ async function collectAgents(): Promise<Agent[]> {
 // heartbeats and title updates. Working transitions are accepted immediately
 // so a transient waiting state can disappear completely.
 //
-// The daemon re-reads `workmux status` every 5s, so 30s asks for about six
+// The daemon re-reads `workmux status` every 5s, so 60s asks for about twelve
 // observations. The window is long enough to ride out Codex's brief
 // auto-classification waiting state without delaying a real return to work.
 //
 // The floor is the reconcile interval: below it this suppresses nothing.
-export const AGENT_STATUS_LAG_SECS = 30;
+export const AGENT_STATUS_LAG_SECS = 60;
 
 export interface StableAgentState {
   status: AgentStatus;
