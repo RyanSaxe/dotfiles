@@ -72,6 +72,13 @@ not receive Neovim's semantic tokens, so the compact TextMate scope map mirrors
 the same function, type, structure, variable, member, module, constant, and
 literal roles as closely as their syntax grammars allow.
 
+### Zsh syntax highlighting
+
+fast-syntax-highlighting.ini is generated in the inner context from the same
+Catppuccin palette and role substitutions as the other syntax consumers.
+zsh/zshrc passes the file to F-Sy-H when the plugin is installed, then
+reapplies it when either the generated shell colors or F-Sy-H theme changes.
+
 ## Using color
 
 Two rules decide which token a thing gets. Both exist so that changing the

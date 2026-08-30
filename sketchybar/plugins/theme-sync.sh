@@ -15,7 +15,11 @@ MTIME=$(stat -f %m "$COLORS_FILE" 2>/dev/null || stat -c %Y "$COLORS_FILE" 2>/de
 SEEN=""
 [[ -f "$CACHE" ]] && SEEN=$(<"$CACHE")
 
-[[ "$MTIME" == "$SEEN" ]] && exit 0
+# A theme_changed event is authoritative even when only the inner layer
+# changed and the outer colors file kept the same mtime.
+if [[ "$SENDER" != "theme_changed" && "$MTIME" == "$SEEN" ]]; then
+  exit 0
+fi
 
 sketchybar --bar color="$BAR_COLOR" border_color="$BORDER_COLOR" \
   --default icon.color="$ICON_COLOR" label.color="$LABEL_COLOR" \

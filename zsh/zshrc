@@ -101,6 +101,7 @@ bindkey -M vicmd 'z' edit-command-line
 THEME_GENERATED="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated"
 
 autoload -U add-zsh-hook
+THEME_FSH="$THEME_GENERATED/fast-syntax-highlighting.ini"
 
 if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
   _theme_shell_colors() {
@@ -109,15 +110,21 @@ if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
     if (( ${+functions[fzf-tab-complete]} && ${+FZF_THEME_COLORS} )); then
       zstyle ':fzf-tab:*' fzf-flags $FZF_THEME_COLORS
     fi
+    if (( $+functions[fast-theme] )) && [[ -r "$THEME_FSH" ]]; then
+      fast-theme -q "$THEME_FSH"
+    fi
   }
   _theme_shell_colors
   # Re-apply when `theme` regenerates, so running shells follow a switch.
   zmodload -F zsh/stat b:zstat
   typeset -g _THEME_COLORS_MTIME="$(zstat +mtime "$THEME_GENERATED/shell-colors.zsh" 2> /dev/null)"
+  typeset -g _THEME_FSH_MTIME="$(zstat +mtime "$THEME_FSH" 2> /dev/null)"
   _theme_refresh() {
     local mtime="$(zstat +mtime "$THEME_GENERATED/shell-colors.zsh" 2> /dev/null)"
-    if [[ "$mtime" != "$_THEME_COLORS_MTIME" ]]; then
+    local fsh_mtime="$(zstat +mtime "$THEME_FSH" 2> /dev/null)"
+    if [[ "$mtime" != "$_THEME_COLORS_MTIME" || "$fsh_mtime" != "$_THEME_FSH_MTIME" ]]; then
       typeset -g _THEME_COLORS_MTIME="$mtime"
+      typeset -g _THEME_FSH_MTIME="$fsh_mtime"
       _theme_shell_colors
     fi
   }

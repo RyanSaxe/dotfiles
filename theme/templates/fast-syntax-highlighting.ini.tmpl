@@ -1,0 +1,80 @@
+; Rendered by the theme command; colors come from the active inner Catppuccin palette.
+
+[base]
+default          = none
+unknown-token    = {{red}},bold
+commandseparator = {{fg_faint}}
+redirection      = {{mauve}}
+here-string-tri  = {{peach}}
+here-string-text = {{fg_muted}}
+here-string-var  = {{sky}},bg:{{bg_highlight}}
+exec-descriptor  = {{peach}},bold
+comment          = {{fg_faint}},bold
+correct-subtle   = {{bg_highlight}}
+incorrect-subtle = {{red}}
+subtle-separator = {{fg_faint}}
+subtle-bg        = bg:{{bg_alt}}
+secondary        =
+recursive-base   = {{fg_muted}}
+
+[command-point]
+reserved-word    = {{mauve}}
+subcommand       = {{mauve}}
+alias            = {{peach}}
+suffix-alias     = {{peach}}
+global-alias     = bg:{{bg_highlight}}
+builtin          = {{peach}}
+function         = {{peach}}
+command          = {{peach}}
+precommand       = {{mauve}}
+hashed-command   = {{peach}}
+single-sq-bracket = {{mauve}}
+double-sq-bracket = {{mauve}}
+double-paren     = {{mauve}}
+
+[paths]
+path          = {{blue}}
+pathseparator  =
+path-to-dir   = {{blue}},underline
+globbing      = {{blue}},bold
+globbing-ext  = {{blue}}
+
+[brackets]
+paired-bracket = bg:{{bg_highlight}}
+bracket-level-1 = {{mauve}},bold
+bracket-level-2 = {{blue}},bold
+bracket-level-3 = {{sky}},bold
+
+[arguments]
+single-hyphen-option   = {{fg_muted}}
+double-hyphen-option   = {{fg_muted}}
+back-quoted-argument   = none
+single-quoted-argument = {{green}}
+double-quoted-argument = {{green}}
+dollar-quoted-argument = {{green}}
+
+[in-string]
+back-dollar-quoted-argument           = {{pink}}
+back-or-dollar-double-quoted-argument = {{pink}}
+
+[other]
+variable             = {{blue}}
+assign               = none
+assign-array-bracket = {{mauve}}
+history-expansion    = {{info}},bold
+
+[math]
+mathvar = {{blue}},bold
+mathnum = {{red}}
+matherr = {{red}},bold
+
+[for-loop]
+forvar  = {{blue}}
+fornum  = {{red}}
+foroper = {{mauve}}
+forsep  = {{fg_faint}}
+
+[case]
+case-input       = {{blue}}
+case-parentheses = {{mauve}}
+case-condition   = bg:{{bg_highlight}}

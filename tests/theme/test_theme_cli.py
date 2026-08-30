@@ -190,6 +190,38 @@ def test_bat_theme_is_generated_as_valid_xml(tmp_path: Path) -> None:
     ElementTree.fromstring(contents)
 
 
+def test_fsh_theme_is_generated_and_tracks_inner_mode(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+
+    dark_result = run_theme(home, config, "apply")
+
+    assert dark_result.returncode == 0, dark_result.stderr
+    rendered = state_dir(home) / "generated/fast-syntax-highlighting.ini"
+    dark_contents = rendered.read_text()
+    assert "{{" not in dark_contents
+    assert "[command-point]" in dark_contents
+    assert "reserved-word" in dark_contents
+    dark_mauve = next(
+        line.split("=", 1)[1]
+        for line in (config / "palettes/mocha.conf").read_text().splitlines()
+        if line.startswith("mauve=")
+    )
+    assert f"reserved-word    = {dark_mauve}" in dark_contents
+
+    light_result = run_theme(home, config, "inner", "light")
+
+    assert light_result.returncode == 0, light_result.stderr
+    light_contents = rendered.read_text()
+    assert light_contents != dark_contents
+    assert "reserved-word" in light_contents
+    light_mauve = next(
+        line.split("=", 1)[1]
+        for line in (config / "palettes/latte.conf").read_text().splitlines()
+        if line.startswith("mauve=")
+    )
+    assert f"reserved-word    = {light_mauve}" in light_contents
+
+
 def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     stub_mascot_accents(home, MASCOT_ACCENTS_OK)

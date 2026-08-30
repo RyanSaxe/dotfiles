@@ -138,6 +138,9 @@ jobs:
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" apply
           test -s "$SCRATCH/.local/state/dotfiles/generated/tuis-colors.json"
+          test -s "$SCRATCH/.local/state/dotfiles/generated/fast-syntax-highlighting.ini"
+          ! grep -q '{{' \
+            "$SCRATCH/.local/state/dotfiles/generated/fast-syntax-highlighting.ini"
           test -s "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
           ! grep -q '{{' "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
           # Diverge the layers through the real CLI, exercising the mode
