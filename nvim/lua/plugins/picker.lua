@@ -1,8 +1,8 @@
 -- Pickers respect gitignore but never hide dotfiles: dotfile-heavy
 -- trees are daily terrain here and default hiding buries them.
 --
--- The backdrop washes everything behind the picker toward the OUTER
--- crust rather than toward black, so what recedes still reads as this
+-- The backdrop washes everything behind the picker toward crust
+-- rather than toward black, so what recedes still reads as this
 -- theme. Snacks bakes that color into a highlight group on every open,
 -- so it cannot be a group we repaint — the color has to be handed over
 -- as a value. It re-reads `Snacks.config.picker` on every open though,
@@ -178,7 +178,7 @@ local function backdrop()
   if not tokens then
     return false
   end
-  return { bg = tokens.outer.crust, blend = 60, transparent = true }
+  return { bg = tokens.palette.crust, blend = 60, transparent = true }
 end
 
 return {

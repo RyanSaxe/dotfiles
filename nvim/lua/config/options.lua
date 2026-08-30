@@ -29,7 +29,7 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
 
--- No statusline: it would band the full width and stop the outer
+-- No statusline: it would band the full width and stop the chrome
 -- surface short of the terminal floor. Mode rides the tab row,
 -- per-window facts ride the winbar.
 vim.opt.laststatus = 0

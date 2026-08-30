@@ -2,12 +2,13 @@
 -- rail on the window's left. mini.files is the edit layer: batch
 -- filesystem mutations as buffer edits.
 --
--- Snacks windows default to the INNER surface. The explorer is the
+-- Snacks windows default to the content surface. The explorer is the
 -- exception: its root, boxes, list, and input run to the terminal's right
--- edge and continue the rail. Its preview is content and stays inner.
--- Snacks paints these windows through shared source groups, so
--- theme.surfaces scopes an active namespace to those explorer windows and
--- maps the source groups to the existing outer roles.
+-- edge and continue the rail, so they take the chrome surface. Its
+-- preview is content and stays content. Snacks paints these windows
+-- through shared source groups, so theme.surfaces scopes an active
+-- namespace to those explorer windows and maps the source groups to the
+-- existing chrome roles.
 return {
   {
     "folke/snacks.nvim",

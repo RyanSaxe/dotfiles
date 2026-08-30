@@ -1076,7 +1076,7 @@ if [ -x "$HOME/.local/bin/theme" ]; then
 fi
 
 # Rebuild bat's theme cache now that `theme apply` has published the rendered
-# inner theme; apt names the binary batcat (see zsh/aliases.zsh for the alias).
+# theme; apt names the binary batcat (see zsh/aliases.zsh for the alias).
 if command -v bat >/dev/null 2>&1; then
   bat cache --build
 elif command -v batcat >/dev/null 2>&1; then

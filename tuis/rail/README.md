@@ -21,7 +21,7 @@ never flicker.
   global view), reconciled every 5s with instant refreshes when a workmux
   state file changes. Status age comes from Workmux's `status_ts` transition
   timestamp, not its general `updated_ts` write timestamp.
-- **Theme** re-reads `tuis-colors.json` on change; an outer-mode or mascot
+- **Theme** re-reads `tuis-colors.json` on change; a mode or mascot
   switch recolors every rail within a tick.
 
 ## The grammar

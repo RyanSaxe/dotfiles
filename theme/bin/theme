@@ -2,21 +2,20 @@
 # One theme for every tool. Renders templates with the current palette and
 # semantic tokens; consumers watch the rendered files and converge.
 #
-#   theme dark                 switch both layers to catppuccin mocha
-#   theme inner|outer MODE     switch one layer to dark, light, or toggle
-#   theme both MODE            switch both layers together; `both toggle`
-#                              flips to the opposite of the inner mode, so
-#                              diverged layers converge
-#   theme apply                re-render the current layer modes
-#   theme status               print both layer modes
+#   theme dark|light           switch mode (sets macOS appearance too)
+#   theme toggle               flip to the other mode
+#   theme apply                re-render the persisted mode
+#   theme apply dark|light     render + persist without touching macOS
+#                              appearance (for appearance watchers)
+#   theme status               print the mode and accents
 #
 # Layers (see README: Theming):
 #   palettes/*.conf   raw color values                    (layer 1)
 #   tokens.conf       role -> palette key                 (layer 2)
-#   elements.conf     output -> render context            (layer 3)
+#   elements.conf     mode-pinned render exceptions       (layer 3)
 #   templates/*.tmpl  {{role}} placeholders               (layer 4)
-# A render context is inner, outer, mixed, or one of the mode-pinned dark
-# and light — see elements.conf.
+# Templates render in the current mode unless elements.conf pins them to
+# dark or light (ghostty reads both of its theme files at once).
 # Rendered output lands in state, never in the repo.
 set -eu
 
@@ -36,35 +35,30 @@ MASCOT_CONF="$STATE/mascot.conf"
 # The global default is shareable and tracked; see mascot.conf in config.
 DEFAULT_CONF="$CONFIG/mascot.conf"
 GENERATED="$STATE/generated"
-INNER_MODE_FILE="$STATE/inner-mode"
-OUTER_MODE_FILE="$STATE/outer-mode"
+MODE_FILE="$STATE/mode"
 ELEMENTS="$CONFIG/elements.conf"
 
-layer_mode() {
-  mode_file="$INNER_MODE_FILE"
-  [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
-  [ -f "$mode_file" ] || {
+current_mode() {
+  [ -f "$MODE_FILE" ] || {
     echo dark
     return
   }
-  stored_mode="$(cat "$mode_file")"
+  stored_mode="$(cat "$MODE_FILE")"
   case "$stored_mode" in
   dark | light) echo "$stored_mode" ;;
   *)
     # A corrupt file must not kill every render (watchers call `theme
     # apply`); fall back like a missing file, and say which file to fix.
-    echo "warning: $mode_file holds '$stored_mode', not dark|light; using dark" >&2
+    echo "warning: $MODE_FILE holds '$stored_mode', not dark|light; using dark" >&2
     echo dark
     ;;
   esac
 }
 
-set_layer_mode() {
-  mode_file="$INNER_MODE_FILE"
-  [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
+set_mode() {
   mkdir -p "$STATE"
-  printf '%s\n' "$2" >"$mode_file.tmp.$$"
-  mv "$mode_file.tmp.$$" "$mode_file"
+  printf '%s\n' "$1" >"$MODE_FILE.tmp.$$"
+  mv "$MODE_FILE.tmp.$$" "$MODE_FILE"
 }
 
 palette_for_mode() {
@@ -131,21 +125,24 @@ set_mascot() {
   mv "$STATE/.accents.tmp" "$STATE/accents.conf"
 }
 
-# The old implementation stored one mode for every consumer. Preserve it as
-# the initial value for both layers when upgrading an existing installation,
-# then delete it — the layer files are the only mode state afterwards.
+# Older installations stored per-layer modes (inner-mode/outer-mode) or a
+# single theme-mode. Seed the mode file from inner-mode — the layer that
+# drove macOS appearance, so the truthful one — then delete the legacy
+# files; the mode file is the only mode state afterwards.
 migrate_mode_state() {
-  [ -f "$STATE/theme-mode" ] || return 0
-  legacy_mode="$(cat "$STATE/theme-mode")"
-  case "$legacy_mode" in
-  dark | light)
-    [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
-    [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
-    ;;
-  esac
-  if [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ]; then
-    rm -f "$STATE/theme-mode"
+  if [ ! -f "$MODE_FILE" ]; then
+    for legacy in "$STATE/inner-mode" "$STATE/theme-mode"; do
+      [ -f "$legacy" ] || continue
+      legacy_mode="$(cat "$legacy")"
+      case "$legacy_mode" in
+      dark | light)
+        set_mode "$legacy_mode"
+        break
+        ;;
+      esac
+    done
   fi
+  rm -f "$STATE/inner-mode" "$STATE/outer-mode" "$STATE/theme-mode"
 }
 
 # One-time migration from the pre-provider layout: mapped values gain
@@ -249,36 +246,20 @@ render_template() {
 # Renders the persisted layer modes, or the explicitly passed pair
 # (inner outer) when the caller has not committed them to state yet.
 render() {
-  inner_mode="${1:-$(layer_mode inner)}"
-  outer_mode="${2:-$(layer_mode outer)}"
+  mode="${1:-$(current_mode)}"
   mkdir -p "$GENERATED"
 
   accents="$STATE/accents.conf"
 
-  # The substitution script varies only by which layer owns the unqualified
-  # placeholders (mixed templates use explicit inner_/outer_ forms), so three
-  # prebuilt variants cover every template. The workdir also holds render
-  # temp files; the trap cleans it on every exit path.
+  # The workdir holds the prebuilt substitution scripts and render temp
+  # files; the trap cleans it on every exit path.
   workdir="$STATE/.render.$$"
   trap 'rm -rf "$workdir"' EXIT
   mkdir -p "$workdir"
-  inner_palette="$(palette_for_mode "$inner_mode")"
-  outer_palette="$(palette_for_mode "$outer_mode")"
-  {
-    emit_mapping "$inner_mode" "$inner_palette" inner_
-    emit_mapping "$outer_mode" "$outer_palette" outer_
-  } >"$workdir/mixed.sed"
-  {
-    cat "$workdir/mixed.sed"
-    emit_mapping "$inner_mode" "$inner_palette" ""
-  } >"$workdir/inner.sed"
-  {
-    cat "$workdir/mixed.sed"
-    emit_mapping "$outer_mode" "$outer_palette" ""
-  } >"$workdir/outer.sed"
+  emit_mapping "$mode" "$(palette_for_mode "$mode")" "" >"$workdir/mode.sed"
   # Mode-pinned contexts: templates that must exist for BOTH modes at
   # once — ghostty's native macOS-appearance switching reads a light and
-  # a dark theme file simultaneously — regardless of the current layers.
+  # a dark theme file simultaneously — regardless of the current mode.
   emit_mapping dark "$(palette_for_mode dark)" "" >"$workdir/dark.sed"
   emit_mapping light "$(palette_for_mode light)" "" >"$workdir/light.sed"
 
@@ -288,16 +269,17 @@ render() {
     out="$GENERATED/$(basename "$tmpl" .tmpl)"
     element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
     case "$element" in
-    inner | outer | mixed | dark | light) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
+    dark | light) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
+    '') render_template "$tmpl" "$out" "$workdir/mode.sed" ;;
     *)
-      echo "error: no inner/outer registration for $(basename "$tmpl")" >&2
+      echo "error: elements.conf pins $(basename "$tmpl") to '$element', not dark|light" >&2
       exit 1
       ;;
     esac
   done
 
   publish_files
-  echo "theme: inner=$inner_mode outer=$outer_mode"
+  echo "theme: mode=$mode"
 }
 
 # This script writes state and performs the small reloads required by
@@ -435,102 +417,47 @@ swatch() {
 show_accents() {
   accents="$STATE/accents.conf"
   [ -f "$accents" ] || return 0
-  inner_mode="$(layer_mode inner)"
-  outer_mode="$(layer_mode outer)"
-  echo "mascot: $(conf_get "$accents" mascot) (inner=$inner_mode outer=$outer_mode)"
-  # Matching modes share one accent pair — two rows, not two duplicates.
-  if [ "$inner_mode" = "$outer_mode" ]; then
-    swatch "$(conf_get "$accents" "accent_$inner_mode")" accent
-    swatch "$(conf_get "$accents" "notify_$inner_mode")" notify
-  else
-    swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
-    swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
-    swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
-    swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
-  fi
+  mode="$(current_mode)"
+  echo "mascot: $(conf_get "$accents" mascot) (mode=$mode)"
+  swatch "$(conf_get "$accents" "accent_$mode")" accent
+  swatch "$(conf_get "$accents" "notify_$mode")" notify
 }
 
 mkdir -p "$STATE"
 migrate_mode_state
 migrate_legacy_state
 
-apply_scope() {
-  scope="$1"
-  requested="$2"
-  case "$scope" in
-  inner | outer | both) ;;
-  *)
-    echo "error: unknown theme scope '$scope'" >&2
-    exit 1
-    ;;
-  esac
-  case "$requested" in
-  dark | light) mode="$requested" ;;
+apply_mode() {
+  case "$1" in
+  dark | light) mode="$1" ;;
   toggle)
-    # Toggling flips the named layer; `both` reads inner as its reference,
-    # so diverged layers converge to the opposite of the inner mode.
-    case "$scope" in
-    outer) current="$(layer_mode outer)" ;;
-    inner | both) current="$(layer_mode inner)" ;;
-    esac
-    [ "$current" = dark ] && mode=light || mode=dark
+    [ "$(current_mode)" = dark ] && mode=light || mode=dark
     ;;
   *)
     echo "error: mode must be dark, light, or toggle" >&2
     exit 1
     ;;
   esac
-
-  case "$scope" in
-  inner)
-    target_inner="$mode"
-    target_outer="$(layer_mode outer)"
-    ;;
-  outer)
-    target_inner="$(layer_mode inner)"
-    target_outer="$mode"
-    ;;
-  both)
-    target_inner="$mode"
-    target_outer="$mode"
-    ;;
-  esac
-  # Render before persisting: a failed render must not leave the mode files
+  # Render before persisting: a failed render must not leave the mode file
   # or the OS appearance reporting a theme the generated files never got.
-  render "$target_inner" "$target_outer"
-  case "$scope" in
-  inner) set_layer_mode inner "$mode" ;;
-  outer) set_layer_mode outer "$mode" ;;
-  both)
-    set_layer_mode inner "$mode"
-    set_layer_mode outer "$mode"
-    ;;
-  esac
-  # Ghostty's native light/dark theme pair is the inner terminal surface.
-  # Outer-only changes must never flip the OS appearance.
-  [ "$scope" = outer ] || set_os_appearance "$mode"
+  render "$mode"
+  set_mode "$mode"
+  set_os_appearance "$mode"
 }
 
 case "${1:-status}" in
-dark | light)
-  apply_scope both "$1"
-  ;;
-toggle)
-  apply_scope both toggle
-  ;;
-inner | outer | both)
-  apply_scope "$1" "${2:?usage: theme inner|outer|both dark|light|toggle}"
+dark | light | toggle)
+  apply_mode "$1"
   ;;
 apply)
-  # `theme apply` catches generated consumers up with the persisted layer
-  # modes without touching OS appearance. The one-argument form preserves
-  # the old "apply both layers" behavior for appearance watchers.
+  # `theme apply` catches generated consumers up with the persisted mode
+  # without touching OS appearance. The one-argument form is for
+  # appearance watchers: render + persist, no osascript loop-back.
   case "${2:-}" in
   '') render ;;
   dark | light)
-    render "$2" "$2"
-    set_layer_mode inner "$2"
-    set_layer_mode outer "$2"
+    render "$2"
+    set_mode "$2"
     ;;
   *)
     echo "usage: theme apply [dark|light]" >&2
@@ -591,12 +518,11 @@ mascot)
   show_accents
   ;;
 status)
-  echo "inner: $(layer_mode inner)"
-  echo "outer: $(layer_mode outer)"
+  echo "mode: $(current_mode)"
   show_accents
   ;;
 *)
-  echo "usage: theme dark|light|toggle|inner|outer|both|apply|status|mascot <provider:id>|none" >&2
+  echo "usage: theme dark|light|toggle|apply [dark|light]|status|mascot <provider:id>|none" >&2
   exit 1
   ;;
 esac

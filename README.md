@@ -55,17 +55,17 @@ chord that isn't listed fails the build.
 
 ## One theme, everywhere
 
-Catppuccin rendered from a single token file into every tool. No config
-hardcodes a color:
+One palette per mode rendered from a single token file into every tool. No
+config hardcodes a color:
 
 ```sh
 theme dark
-theme inner light               # light terminal inside dark chrome
+theme light
 theme mascot pokemon:gengar     # accents extracted from a mascot image
 ```
 
-Two surfaces switch independently — `inner` is content, `outer` is the chrome
-around it — which is why a light editor can sit inside a dark frame. See
+Chrome (sketchybar, the rail, sidebars) paints the deepest background tier;
+content paints base — one palette, two surfaces. See
 [docs/theming.md](docs/theming.md) for the pipeline, how to add a consumer, and
 how to write a mascot provider.
 

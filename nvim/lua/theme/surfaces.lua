@@ -1,10 +1,10 @@
--- Which windows paint on the OUTER layer.
+-- Which windows paint on the chrome surface (crust, like the tmux rail).
 --
 -- Neovim already separates hovering from anchored chrome: floats get
 -- `NormalFloat`, everything else gets `Normal`. So the only windows that
 -- need saying are the anchored non-file ones — an explorer, a help
 -- split, a diagnostics list. Those run to a terminal edge and continue
--- the tmux rail, so they take the outer surface via `winhighlight`.
+-- the tmux rail, so they take the chrome surface via `winhighlight`.
 --
 -- Doing it here rather than per-plugin means a new sidebar plugin is
 -- themed the day it is installed, with no entry to add. The Snacks
@@ -13,15 +13,16 @@
 local M = {}
 
 local WINHL = table.concat({
-  "Normal:ThemeOuterNormal",
-  "NormalNC:ThemeOuterNormalNC",
-  "SignColumn:ThemeOuterNormal",
-  "EndOfBuffer:ThemeOuterNormal",
-  "WinSeparator:ThemeOuterWinSeparator",
+  "Normal:ThemeChromeNormal",
+  "NormalNC:ThemeChromeNormalNC",
+  "SignColumn:ThemeChromeNormal",
+  "EndOfBuffer:ThemeChromeNormal",
+  "WinSeparator:ThemeChromeWinSeparator",
 }, ",")
 
--- The explorer is the one snacks window that belongs on the outer layer:
--- it runs to the terminal's right edge and continues the tmux rail. It
+-- The explorer is the one snacks window that belongs on the chrome
+-- surface: it runs to the terminal's right edge and continues the tmux
+-- rail. It
 -- cannot say so in `winhighlight`, because snacks owns that value for the
 -- windows it builds and re-asserts it from `win.opts.wo` on every layout
 -- update — inside `eventignore=all`, so nothing here can even react to it.
@@ -31,32 +32,32 @@ local WINHL = table.concat({
 --
 -- So the surface moves out of winhighlight. These windows get their own
 -- highlight namespace, in which the source groups Snacks paints mean the
--- outer surface instead. Neovim gives an active namespace
+-- chrome surface instead. Neovim gives an active namespace
 -- precedence over winhighlight, so this namespace must define the source
 -- groups, not the destination names in Snacks' mappings. A namespace is
 -- not a window option, so Snacks never touches it. Naming links rather than
 -- colors keeps every color decision in theme.highlights, where a mode change
 -- repaints the targets and these follow.
-local OUTER_NS = vim.api.nvim_create_namespace("theme_outer_surface")
+local CHROME_NS = vim.api.nvim_create_namespace("theme_chrome_surface")
 
 for group, link in pairs({
   -- Snacks uses these source groups for explorer bodies, frames, and
   -- window furniture. The destination groups remain the existing theme
   -- roles, so this namespace adds no palette.
-  Normal = "ThemeOuterNormal",
-  NormalNC = "ThemeOuterNormalNC",
-  NormalFloat = "ThemeOuterNormal",
-  WinBar = "ThemeOuterNormal",
-  WinBarNC = "ThemeOuterNormalNC",
-  SignColumn = "ThemeOuterNormal",
-  EndOfBuffer = "ThemeOuterNormal",
-  FloatBorder = "ThemeOuterFrame",
-  FloatTitle = "ThemeOuterFrame",
-  FloatFooter = "ThemeOuterFrame",
-  CursorLine = "ThemeOuterCursorLine",
-  WinSeparator = "ThemeOuterWinSeparator",
+  Normal = "ThemeChromeNormal",
+  NormalNC = "ThemeChromeNormalNC",
+  NormalFloat = "ThemeChromeNormal",
+  WinBar = "ThemeChromeNormal",
+  WinBarNC = "ThemeChromeNormalNC",
+  SignColumn = "ThemeChromeNormal",
+  EndOfBuffer = "ThemeChromeNormal",
+  FloatBorder = "ThemeChromeFrame",
+  FloatTitle = "ThemeChromeFrame",
+  FloatFooter = "ThemeChromeFrame",
+  CursorLine = "ThemeChromeCursorLine",
+  WinSeparator = "ThemeChromeWinSeparator",
 }) do
-  vim.api.nvim_set_hl(OUTER_NS, group, { link = link })
+  vim.api.nvim_set_hl(CHROME_NS, group, { link = link })
 end
 
 ---@param set table<integer, boolean>
@@ -86,8 +87,8 @@ end
 
 -- The picker exposes layout containers in box_wins and list/input windows
 -- separately. Only an open explorer's root, boxes, list, and input windows
--- belong to the outer surface. The preview window is intentionally excluded
--- so its file content remains inner.
+-- belong to the chrome surface. The preview window is intentionally
+-- excluded so its file content stays on the content surface.
 ---@return table<integer, boolean>
 local function explorer_wins()
   ---@type table<integer, boolean>
@@ -113,7 +114,7 @@ end
 ---@return boolean
 local function is_anchored_sidebar(win)
   -- The exact explorer windows are selected before this function runs.
-  -- Every other Snacks window keeps its inner surface, even if it is
+  -- Every other Snacks window keeps its content surface, even if it is
   -- anchored and would otherwise look like generic chrome.
   if vim.w[win].snacks_win then
     return false
@@ -123,16 +124,16 @@ local function is_anchored_sidebar(win)
   end
   local buf = vim.api.nvim_win_get_buf(win)
   -- Content that happens to live in a virtual buffer is still content, and
-  -- belongs on the inner surface. `buftype ~= ""` below means "not a file",
+  -- keeps the content surface. `buftype ~= ""` below means "not a file",
   -- which is a good proxy for chrome right up until a plugin renders
   -- something to read this way — CodeDiff's file panes, Snacks' pull request
   -- and issue buffers. Both are anchored, neither is a sidebar.
   --
   -- Three of these now, which is past the point where the rule is worth
   -- revisiting: an allowlist of chrome filetypes would default new content
-  -- buffers to the inner surface, which is correct more often than the
-  -- reverse. Recorded in notes/handoff/theme-role-completion.md rather than
-  -- changed here, because it is a judgement about every plugin at once.
+  -- buffers to the content surface, which is correct more often than the
+  -- reverse. Not changed here, because it is a judgement about every
+  -- plugin at once.
   local name = vim.api.nvim_buf_get_name(buf)
   if name:match("^codediff://") or name:match("^gh://") then
     return false
@@ -148,7 +149,7 @@ local function is_anchored_sidebar(win)
 end
 
 -- `winhighlight` is window-local, not buffer-local: a window that once
--- held a sidebar keeps painting outer after a file is opened in it.
+-- held a sidebar keeps painting chrome after a file is opened in it.
 -- So every pass rebuilds the value from scratch — strip what we own,
 -- then re-add it only if the window still qualifies.
 ---@param winhighlight string
@@ -157,7 +158,7 @@ local function without_ours(winhighlight)
   ---@type string[]
   local kept = {}
   for entry in winhighlight:gmatch("[^,]+") do
-    if not entry:find("ThemeOuter", 1, true) then
+    if not entry:find("ThemeChrome", 1, true) then
       kept[#kept + 1] = entry
     end
   end
@@ -169,13 +170,13 @@ end
 local function apply(win, explorer)
   -- The explorer carries its surface in a namespace, not in `winhighlight`.
   if explorer[win] then
-    if vim.api.nvim_get_hl_ns({ winid = win }) ~= OUTER_NS then
-      vim.api.nvim_win_set_hl_ns(win, OUTER_NS)
+    if vim.api.nvim_get_hl_ns({ winid = win }) ~= CHROME_NS then
+      vim.api.nvim_win_set_hl_ns(win, CHROME_NS)
     end
     return
   end
   -- A window that once held the explorer is an ordinary window again.
-  if vim.api.nvim_get_hl_ns({ winid = win }) == OUTER_NS then
+  if vim.api.nvim_get_hl_ns({ winid = win }) == CHROME_NS then
     vim.api.nvim_win_set_hl_ns(win, -1)
   end
   local base = without_ours(vim.wo[win].winhighlight)
