@@ -11,7 +11,8 @@ CACHE="$HOME/.cache/sketchybar-colors-mtime"
 
 [[ -f "$COLORS_FILE" ]] || exit 0
 
-MTIME=$(stat -f %m "$COLORS_FILE" 2>/dev/null || stat -c %Y "$COLORS_FILE" 2>/dev/null)
+zmodload -F zsh/stat b:zstat
+MTIME=$(zstat +mtime "$COLORS_FILE" 2>/dev/null)
 SEEN=""
 [[ -f "$CACHE" ]] && SEEN=$(<"$CACHE")
 
