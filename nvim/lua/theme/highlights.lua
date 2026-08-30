@@ -224,8 +224,9 @@ function M.apply(tokens)
   hl("MiniFilesTitleFocused", { fg = accent, bg = float })
 
   -- The outer surface: sidebars that run to a terminal edge and read as
-  -- a continuation of the tmux rail. Windows opt in via `winhighlight`
-  -- (see theme.surfaces), so this is the only place the color is named.
+  -- a continuation of the tmux rail. Ordinary sidebars opt in via
+  -- winhighlight; the Snacks explorer uses an active namespace in
+  -- theme.surfaces. This is the only place the outer color is named.
   local o = tokens.outer
   hl("ThemeOuterNormal", { fg = o.fg_muted, bg = o.crust })
   hl("ThemeOuterNormalNC", { fg = o.fg_faint, bg = o.crust })
@@ -277,13 +278,12 @@ function M.apply(tokens)
   end
   hl("ThemeBranch", { fg = o.fg_faint, bg = o.crust })
 
-  -- Snacks, wholesale: one set of groups covers every window it owns, so
-  -- the surface is chosen once for all of them (see plugins/explorer.lua
-  -- for why it can't split). These hover over the buffer and never reach a
-  -- terminal edge, so they take the INNER surface. The explorer is the one
-  -- exception — it continues the tmux rail — and theme.surfaces relinks
-  -- these groups to the outer ones inside its own highlight namespace,
-  -- rather than splitting them here.
+  -- Snacks defaults to the INNER surface: its windows hover over the buffer
+  -- and do not reach a terminal edge. The explorer is scoped separately in
+  -- theme.surfaces, which applies an active namespace to its root, boxes,
+  -- list, and input windows. The global Snacks groups remain inner, while
+  -- the namespace maps the source groups used by those windows to the outer
+  -- roles.
   hl("SnacksNormal", { fg = r.fg, bg = r.bg })
   hl("SnacksNormalNC", { fg = r.fg_muted, bg = r.bg })
   -- The rest of the set every snacks window is opened with. Unnamed, they

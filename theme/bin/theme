@@ -305,7 +305,8 @@ render() {
 # converge on the generated files themselves:
 #   bat        receives the generated theme and rebuilds its cache when it changes
 #   starship   re-reads its config every prompt
-#   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
+#   zsh / fzf / F-Sy-H  precmd reapplies generated colors on mtime change
+#              (.zshrc)
 #   tmux       rail daemon watches the generated dir and re-sources
 #              tmux-colors.conf on change (tmux scripts/theme-sync.sh)
 #   mascot     rail watches the state directory

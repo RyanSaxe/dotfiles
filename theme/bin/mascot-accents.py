@@ -44,6 +44,8 @@ HUE_BUCKETS = 24  # 15 degrees each
 MIN_HUE_SEPARATION = 3  # buckets: 45 degrees
 # A second cluster this much weaker than the primary is noise, not a hue.
 SECOND_CLUSTER_MIN_WEIGHT = 0.02
+RED_HUE_WINDOW = 12 / 360
+MIN_RED_SATURATION = 0.45
 
 Hsv = tuple[float, float, float]
 
@@ -347,6 +349,20 @@ def pick_pair(vivid: list[Hsv], pale: list[Hsv]) -> tuple[Hsv, Hsv]:
     return accent, accent
 
 
+def is_saturated_red(color: Hsv) -> bool:
+    """Return whether a generated color is clearly red, not orange or yellow."""
+    hue, saturation, _ = color
+    distance_from_red = min(hue, 1 - hue)
+    return distance_from_red <= RED_HUE_WINDOW and saturation >= MIN_RED_SATURATION
+
+
+def adjust_pair(accent: Hsv, notify: Hsv) -> tuple[Hsv, Hsv]:
+    """Promote the second color when the primary is an overly red accent."""
+    if is_saturated_red(accent) and not is_saturated_red(notify):
+        return notify, accent
+    return accent, notify
+
+
 def styled(color: Hsv, *, dark_background: bool, bright: bool) -> str:
     """Pastel-but-vibrant, tuned per background mode."""
     h, s, _ = color
@@ -396,7 +412,7 @@ def main() -> None:
     value = args[0]
     provider, identity = resolve(value)
     images = fetch_or_exit(lambda: provider.fetch(identity), f"'{value}'")
-    accent, notify = pick_pair(*gather_pixels(images.palette))
+    accent, notify = adjust_pair(*pick_pair(*gather_pixels(images.palette)))
     print(f"mascot={value}")
     print(f"sprite={images.sprite}")
     print(f"accent_dark={styled(accent, dark_background=True, bright=False)}")
