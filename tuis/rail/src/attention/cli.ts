@@ -215,8 +215,11 @@ async function refresh(args: string[]): Promise<void> {
       previousSync === null
         ? "initial"
         : `${Math.max(0, Date.parse(now) - Date.parse(previousSync))}ms since last success`;
+    // "this pass" counts are the incremental delta — routinely all zeros
+    // on a healthy quiet poll; "stored" is the persisted item set the rail
+    // actually shows.
     await logLine(
-      `refresh ok: ${snapshot.targets.filter((t) => t.kind === "pull_request").length} PRs, ${snapshot.targets.filter((t) => t.kind === "issue").length} issues, ${items.length} active items, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
+      `refresh ok: ${snapshot.targets.filter((t) => t.kind === "pull_request").length} PRs, ${snapshot.targets.filter((t) => t.kind === "issue").length} issues, ${items.length} items this pass, ${Object.keys(reconciled.state.items).length} stored, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
     );
     console.log(
       `attention refresh: ${items.length} active item${items.length === 1 ? "" : "s"}; ${reconciled.pendingNotifications.length} notification${reconciled.pendingNotifications.length === 1 ? "" : "s"} pending`,
