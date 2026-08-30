@@ -373,17 +373,25 @@ async function tick(counter: number): Promise<boolean> {
   // A focused pane acknowledges its current stable notification before any
   // downstream surface consumes the snapshot. This keeps row styling,
   // Sketchybar, jump targets, and phone routing in lockstep on a visit.
-  const acked = updateAcks(acks, settled, panes, clientFacts.focusedSessions);
-  const sessions = new Set(panes.map((pane) => pane.session));
-  const hintsBySession = assignHints(settled, sessions, acked);
-  writeHints(settled, hintsBySession, acked);
-  publishAttention(settled, acked);
-  publishReviewAttention(loadReviewSnapshot().unacknowledged);
+  // Presence gates the visit: away from the machine, nothing acks, so a
+  // parked-but-focused client cannot swallow the phone push.
   const present = isPresent(
     hostFacts.inputIdleSecs,
     clientFacts.latestClientActivityTs,
     Date.now() / 1000,
   );
+  const acked = updateAcks(
+    acks,
+    settled,
+    panes,
+    clientFacts.focusedSessions,
+    present,
+  );
+  const sessions = new Set(panes.map((pane) => pane.session));
+  const hintsBySession = assignHints(settled, sessions, acked);
+  writeHints(settled, hintsBySession, acked);
+  publishAttention(settled, acked);
+  publishReviewAttention(loadReviewSnapshot().unacknowledged);
   pushPhone(settled, acked, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
