@@ -329,7 +329,7 @@ publish_files() {
   done
   # Ghostty's native light/dark flip reads both theme files by name.
   mkdir -p "$HOME/.config/ghostty/themes"
-  for gtheme in "$GENERATED"/jewelbox-*; do
+  for gtheme in "$GENERATED"/dotfiles-*; do
     [ -f "$gtheme" ] || continue
     cp "$gtheme" "$HOME/.config/ghostty/themes/$(basename "$gtheme")"
   done
