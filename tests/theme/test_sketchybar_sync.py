@@ -37,7 +37,6 @@ def test_theme_event_refreshes_with_unchanged_colors_mtime(tmp_path: Path) -> No
         "XDG_STATE_HOME": str(home / "state"),
         "PATH": f"{home / 'stubbin'}:/usr/bin:/bin",
         "SKETCHYBAR_LOG": str(log),
-        "SENDER": "",
     }
 
     startup = subprocess.run(
@@ -52,11 +51,12 @@ def test_theme_event_refreshes_with_unchanged_colors_mtime(tmp_path: Path) -> No
     assert "--trigger mascot_colors_changed" in log.read_text()
 
     log.write_text("")
+    unchanged_env = {**env, "SENDER": "routine"}
     unchanged = subprocess.run(
         ["zsh", str(SYNC)],
         capture_output=True,
         text=True,
-        env=env,
+        env=unchanged_env,
         check=False,
     )
     assert unchanged.returncode == 0, unchanged.stderr
