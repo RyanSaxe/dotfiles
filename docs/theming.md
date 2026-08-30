@@ -34,7 +34,7 @@ running to the edge continues the tmux rail and is outer.
 ## The pipeline
 
 ```text
-palettes/*.conf     raw catppuccin values, verbatim
+palettes/*.conf     upstream catppuccin values plus dotfiles-owned keys
    -> tokens.conf   roles: bg, fg_muted, border, warn, ...
    -> elements.conf which context each rendered file uses
    -> templates/    one per consumer

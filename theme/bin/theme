@@ -11,10 +11,12 @@
 #   theme status               print both layer modes
 #
 # Layers (see README: Theming):
-#   palettes/*.conf   raw color values        (layer 1)
-#   tokens.conf       role -> palette key     (layer 2)
-#   elements.conf     output -> inner/outer  (layer 3)
-#   templates/*.tmpl  {{role}} placeholders  (layer 4)
+#   palettes/*.conf   raw color values                    (layer 1)
+#   tokens.conf       role -> palette key                 (layer 2)
+#   elements.conf     output -> render context            (layer 3)
+#   templates/*.tmpl  {{role}} placeholders               (layer 4)
+# A render context is inner, outer, mixed, or one of the mode-pinned dark
+# and light — see elements.conf.
 # Rendered output lands in state, never in the repo.
 set -eu
 
