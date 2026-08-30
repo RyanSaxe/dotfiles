@@ -118,6 +118,14 @@ export interface CiTransition {
   newlyRed: boolean;
 }
 
+// This is a time boundary in GitHub's updated-activity stream. It is not a
+// GraphQL page cursor. Cursors are valid for walking one response and are not
+// durable change-feed positions.
+export interface GithubSyncCheckpoint {
+  processedThrough: string | null;
+  lastFullReconciliationAt: string | null;
+}
+
 export interface RateLimit {
   cost: number;
   remaining: number;
@@ -144,6 +152,7 @@ export interface ObserverState {
   acknowledged: Record<string, string>;
   notified: Record<string, string>;
   ci: Record<string, CiMemory>;
+  githubSync?: GithubSyncCheckpoint;
   // When each watched repository was first seen. Only things opened after
   // that moment are ever reported, so adding a repository does not drag its
   // whole backlog in. The timestamp never moves, which is what lets a
