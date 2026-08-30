@@ -170,6 +170,26 @@ def test_pick_pair_single_hue_never_invents_a_color() -> None:
     assert notify[0] == accent[0]  # same hue, not a complement
 
 
+def test_adjust_pair_promotes_nonred_accent_over_red_primary() -> None:
+    red = (2 / 360, 0.80, 0.85)
+    gold = (45 / 360, 0.70, 0.90)
+
+    assert accents.adjust_pair(red, gold) == (gold, red)
+
+
+def test_adjust_pair_leaves_orange_and_yellow_primary_alone() -> None:
+    blue = (220 / 360, 0.70, 0.85)
+    for warm_color in ((20 / 360, 0.80, 0.85), (50 / 360, 0.70, 0.90)):
+        assert accents.adjust_pair(warm_color, blue) == (warm_color, blue)
+
+
+def test_adjust_pair_does_not_swap_when_both_colors_are_red() -> None:
+    red = (2 / 360, 0.80, 0.85)
+    crimson = (350 / 360, 0.75, 0.80)
+
+    assert accents.adjust_pair(red, crimson) == (red, crimson)
+
+
 def test_qualified_values_cover_every_registered_provider() -> None:
     def unused_fetch(name: str) -> object:
         raise AssertionError("fetch is not part of value listing")
