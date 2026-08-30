@@ -1,9 +1,8 @@
--- The tab row straddles both theme layers. Its fill and the branch name
--- ride the OUTER surface, because the row touches the terminal's top
+-- The tab row spans two surfaces. Its fill and the branch name ride the
+-- chrome surface (crust), because the row touches the terminal's top
 -- edge and must read as one piece with the tmux rail; the tabs
--- themselves ride the INNER surface, so the active tab looks cut out of
--- the buffer below it. When inner and outer run different modes, the
--- row is genuinely two-toned — that is the point, not a bug.
+-- themselves ride the content surface, so the active tab looks cut out
+-- of the buffer below it.
 --
 -- `highlights` is a function on purpose: bufferline re-invokes it on
 -- every ColorScheme, so a live mode flip repaints the row. A baked table
@@ -29,27 +28,22 @@ local function track_git()
 end
 
 ---@class TabRowSurfaces
----@field fill string outer: the row's own background
----@field fill_fg string outer: text sitting directly on the fill
----@field tab string inner: an unselected tab
----@field tab_fg string inner
----@field active string inner: the selected tab, matching the buffer
----@field active_fg string inner
----@field warn string inner: a dirty tab's label
----@field mode table<string, string> outer: one color per vim mode
----@field recording string outer
-
--- Every color is tagged with the layer it belongs to. Text on a tab must
--- come from the INNER roles and text on the fill from the OUTER ones —
--- otherwise the two halves of the row disagree the moment the layers run
--- different modes, which is exactly the case this split exists for.
+---@field fill string chrome: the row's own background
+---@field fill_fg string chrome: text sitting directly on the fill
+---@field tab string content: an unselected tab
+---@field tab_fg string content
+---@field active string content: the selected tab, matching the buffer
+---@field active_fg string content
+---@field warn string content: a dirty tab's label
+---@field mode table<string, string> chrome: one color per vim mode
+---@field recording string chrome
 ---@return TabRowSurfaces
 local function surfaces()
   ---@type ThemeTokens|nil
   local tokens = require("theme").tokens
   if not tokens then
-    -- No generated theme (fresh machine, CI). There is only one layer,
-    -- and its colors come from the floor's own palette — never from
+    -- No generated theme (fresh machine, CI). The colors come from the
+    -- floor's own palette — never from
     -- hexes written down here, which would be a second source of truth
     -- that silently drifts from the colorscheme.
     local c = require("catppuccin.palettes").get_palette()
@@ -63,10 +57,10 @@ local function surfaces()
       warn = c.yellow,
     }
   end
-  local o, p = tokens.outer, tokens.palette
+  local p = tokens.palette
   return {
-    fill = o.crust,
-    fill_fg = o.fg_faint,
+    fill = p.crust,
+    fill_fg = tokens.roles.fg_faint,
     tab = p.mantle,
     tab_fg = tokens.roles.fg_faint,
     active = p.base,

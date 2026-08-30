@@ -190,12 +190,10 @@ function M.apply(tokens)
 
   -- Chrome splits by whether a surface touches a terminal edge.
   --
-  -- Floats hover over the buffer and never reach an edge, so they take
-  -- the INNER crust. Sidebars do reach an edge and continue the tmux
-  -- rail, so they take the OUTER one (see ThemeOuterNormal below). Both
-  -- are crust; when the layers run different modes they are different
-  -- colors, which is the whole distinction. Accent is the common frame
-  -- color, notify marks the input focus.
+  -- Floats hover over the buffer and paint the float tier; sidebars run
+  -- to an edge and continue the tmux rail on crust (see ThemeChromeNormal
+  -- below). Accent is the common frame color, notify marks the input
+  -- focus.
   hl("StatusLine", { fg = r.fg_muted, bg = r.bg })
   hl("StatusLineNC", { fg = r.fg_faint, bg = r.bg })
   hl("MiniStatuslineInactive", { fg = r.fg_faint, bg = r.bg })
@@ -223,31 +221,30 @@ function M.apply(tokens)
   hl("MiniFilesBorder", { fg = accent, bg = float })
   hl("MiniFilesTitleFocused", { fg = accent, bg = float })
 
-  -- The outer surface: sidebars that run to a terminal edge and read as
+  -- The chrome surface: sidebars that run to a terminal edge and read as
   -- a continuation of the tmux rail. Ordinary sidebars opt in via
   -- winhighlight; the Snacks explorer uses an active namespace in
-  -- theme.surfaces. This is the only place the outer color is named.
-  local o = tokens.outer
-  hl("ThemeOuterNormal", { fg = o.fg_muted, bg = o.crust })
-  hl("ThemeOuterNormalNC", { fg = o.fg_faint, bg = o.crust })
-  hl("ThemeOuterCursorLine", { bg = o.mantle })
-  -- The outer copy of a picker's frame, for the explorer alone. Its only
+  -- theme.surfaces. This is the only place the chrome crust is named.
+  hl("ThemeChromeNormal", { fg = r.fg_muted, bg = p.crust })
+  hl("ThemeChromeNormalNC", { fg = r.fg_faint, bg = p.crust })
+  hl("ThemeChromeCursorLine", { bg = p.mantle })
+  -- The chrome copy of a picker's frame, for the explorer alone. Its only
   -- framed window is the input, and notify is the color the pickers give
   -- an input's border and title.
-  hl("ThemeOuterFrame", { fg = o.notify, bg = o.crust })
+  hl("ThemeChromeFrame", { fg = notify, bg = p.crust })
 
   -- Window separators are painted bands, not hairlines: a glyph drawn in
   -- fg leaves the cell's background showing, which ghostty's always-extend
   -- then smears at the edges and which never merges with the explorer
   -- beside it. Space glyphs (see fillchars) plus a background make the
   -- divider one solid strip of chrome, exactly as on the tmux side.
-  hl("WinSeparator", { fg = o.crust, bg = o.crust })
+  hl("WinSeparator", { fg = p.crust, bg = p.crust })
   hl("VertSplit", { link = "WinSeparator" })
-  hl("ThemeOuterWinSeparator", { link = "WinSeparator" })
+  hl("ThemeChromeWinSeparator", { link = "WinSeparator" })
   -- With no statusline, nvim still draws one as the divider between
   -- stacked windows. Blanked in options.lua, it becomes the horizontal
   -- twin of the band above.
-  hl("StatusLine", { fg = o.crust, bg = o.crust })
+  hl("StatusLine", { fg = p.crust, bg = p.crust })
   hl("StatusLineNC", { link = "StatusLine" })
 
   -- The tab row's state readout. These are real groups rather than
@@ -256,15 +253,15 @@ function M.apply(tokens)
   -- mode color would never change again.
   ---@type table<string, string>
   local modes = {
-    Normal = o.accent,
-    Insert = o.mauve,
-    Visual = o.blue,
-    Command = o.peach,
-    Replace = o.pink,
-    Terminal = o.green,
+    Normal = accent,
+    Insert = p.mauve,
+    Visual = p.blue,
+    Command = p.peach,
+    Replace = p.pink,
+    Terminal = p.green,
   }
   for name, color in pairs(modes) do
-    hl("ThemeMode" .. name, { fg = color, bg = o.crust, bold = true })
+    hl("ThemeMode" .. name, { fg = color, bg = p.crust, bold = true })
   end
   -- The recording fade, precomputed. A cell can only hold one color, so
   -- the animation is a ramp of groups the pulse timer walks. Cosine, not
@@ -274,16 +271,14 @@ function M.apply(tokens)
   local pulse = require("theme.pulse")
   for i = 1, pulse.FRAMES do
     local wave = 0.5 + 0.5 * math.cos(2 * math.pi * (i - 1) / pulse.FRAMES)
-    hl(pulse.group(i), { fg = blend(o.red, o.crust, 0.35 + 0.65 * wave), bg = o.crust, bold = true })
+    hl(pulse.group(i), { fg = blend(p.red, p.crust, 0.35 + 0.65 * wave), bg = p.crust, bold = true })
   end
-  hl("ThemeBranch", { fg = o.fg_faint, bg = o.crust })
+  hl("ThemeBranch", { fg = r.fg_faint, bg = p.crust })
 
-  -- Snacks defaults to the INNER surface: its windows hover over the buffer
-  -- and do not reach a terminal edge. The explorer is scoped separately in
-  -- theme.surfaces, which applies an active namespace to its root, boxes,
-  -- list, and input windows. The global Snacks groups remain inner, while
-  -- the namespace maps the source groups used by those windows to the outer
-  -- roles.
+  -- Snacks windows hover over the buffer and do not reach a terminal
+  -- edge, so they paint the content surface. The explorer is scoped
+  -- separately in theme.surfaces, which applies an active namespace
+  -- mapping the source groups used by its windows to the chrome roles.
   hl("SnacksNormal", { fg = r.fg, bg = r.bg })
   hl("SnacksNormalNC", { fg = r.fg_muted, bg = r.bg })
   -- The rest of the set every snacks window is opened with. Unnamed, they

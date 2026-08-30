@@ -143,22 +143,20 @@ jobs:
             "$SCRATCH/.local/state/dotfiles/generated/fast-syntax-highlighting.ini"
           test -s "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
           ! grep -q '{{' "$SCRATCH/.config/bat/themes/Dotfiles.tmTheme"
-          # Diverge the layers through the real CLI, exercising the mode
-          # persistence and per-layer render paths end to end. The mixed
-          # render's contract: inner-prefixed tokens resolve against the
-          # inner palette, outer-prefixed against the outer. Expected hexes
-          # come from the palette files, so retuning a color never fails
-          # this check.
+          # Switch modes through the real CLI, exercising mode persistence
+          # and both palettes end to end. Expected hexes come from the
+          # palette files, so retuning a color never fails this check.
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
-            "$SCRATCH/.local/bin/theme" inner light
-          HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
-            "$SCRATCH/.local/bin/theme" outer dark
-          inner_bg="$(sed -n 's/^base=//p' theme/palettes/latte.conf)"
-          outer_crust="$(sed -n 's/^crust=//p' theme/palettes/mocha.conf)"
-          test -n "$inner_bg" && test -n "$outer_crust"
-          grep -qF "set -g @bg \"$inner_bg\"" \
+            "$SCRATCH/.local/bin/theme" apply light
+          light_bg="$(sed -n 's/^base=//p' theme/palettes/latte.conf)"
+          test -n "$light_bg"
+          grep -qF "set -g @bg \"$light_bg\"" \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
-          grep -qF "set -g @crust \"$outer_crust\"" \
+          HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
+            "$SCRATCH/.local/bin/theme" apply dark
+          dark_crust="$(sed -n 's/^crust=//p' theme/palettes/mocha.conf)"
+          test -n "$dark_crust"
+          grep -qF "set -g @crust \"$dark_crust\"" \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
       - name: Generated artifacts stay out of the checkout
@@ -191,16 +189,16 @@ jobs:
           diff -u <(palette_keys theme/palettes/mocha.conf) \
             <(palette_keys theme/palettes/latte.conf)
 
-      - name: Theme renders a light outer layer
+      - name: Light render carries the light window stroke
         run: |
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
-            "$SCRATCH/.local/bin/theme" outer light
+            "$SCRATCH/.local/bin/theme" apply light
           stroke_hex="$(sed -n 's/^os_window_stroke=#//p' theme/palettes/latte.conf)"
           test -n "$stroke_hex"
           grep -qF "export BORDER_COLOR=\"0xff$stroke_hex\"" \
             "$SCRATCH/.local/state/dotfiles/generated/sketchybar-colors.sh"
           if grep -q '{{' "$SCRATCH/.local/state/dotfiles/generated/sketchybar-colors.sh"; then
-            echo "::error::light outer render left unresolved tokens"
+            echo "::error::light render left unresolved tokens"
             exit 1
           fi
 

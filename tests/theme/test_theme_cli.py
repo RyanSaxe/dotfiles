@@ -155,13 +155,13 @@ def test_corrupt_mode_file_falls_back_to_dark_with_a_warning(
 ) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     state_dir(home).mkdir(parents=True)
-    (state_dir(home) / "inner-mode").write_text("banana\n")
+    (state_dir(home) / "mode").write_text("banana\n")
 
     result = run_theme(home, config, "apply")
 
     assert result.returncode == 0, result.stderr
-    assert "inner-mode" in result.stderr and "banana" in result.stderr
-    assert "inner=dark" in result.stdout
+    assert "banana" in result.stderr and "not dark|light" in result.stderr
+    assert "mode=dark" in result.stdout
 
 
 def test_render_survives_blank_and_comment_lines_in_conf_files(
@@ -190,7 +190,7 @@ def test_bat_theme_is_generated_as_valid_xml(tmp_path: Path) -> None:
     ElementTree.fromstring(contents)
 
 
-def test_fsh_theme_is_generated_and_tracks_inner_mode(tmp_path: Path) -> None:
+def test_fsh_theme_is_generated_and_tracks_mode(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
 
     dark_result = run_theme(home, config, "apply")
@@ -208,7 +208,7 @@ def test_fsh_theme_is_generated_and_tracks_inner_mode(tmp_path: Path) -> None:
     )
     assert f"reserved-word    = {dark_mauve}" in dark_contents
 
-    light_result = run_theme(home, config, "inner", "light")
+    light_result = run_theme(home, config, "light")
 
     assert light_result.returncode == 0, light_result.stderr
     light_contents = rendered.read_text()
@@ -235,15 +235,15 @@ def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
 
 def test_mode_persists_only_after_a_successful_render(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
-    ok = run_theme(home, config, "inner", "dark")
+    ok = run_theme(home, config, "dark")
     assert ok.returncode == 0, ok.stderr
     template = config / "templates/frame.glsl.tmpl"
     template.write_text(template.read_text() + "{{typo_token}}\n")
 
-    result = run_theme(home, config, "inner", "light")
+    result = run_theme(home, config, "light")
 
     assert result.returncode == 1
-    assert (state_dir(home) / "inner-mode").read_text() == "dark\n"
+    assert (state_dir(home) / "mode").read_text() == "dark\n"
 
 
 def test_failed_render_names_the_token_and_leaves_no_temp_files(

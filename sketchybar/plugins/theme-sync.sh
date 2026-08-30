@@ -16,8 +16,8 @@ MTIME=$(zstat +mtime "$COLORS_FILE" 2>/dev/null)
 SEEN=""
 [[ -f "$CACHE" ]] && SEEN=$(<"$CACHE")
 
-# A theme_changed event is authoritative even when only the inner layer
-# changed and the outer colors file kept the same mtime.
+# A theme_changed event is authoritative even when the colors file kept
+# the same mtime (a render can leave identical bytes untouched).
 if [[ "$SENDER" != "theme_changed" && "$MTIME" == "$SEEN" ]]; then
   exit 0
 fi
