@@ -1,5 +1,5 @@
-// The locked attention semantics, exercised against fixtures. One classifier
-// serves pull requests and issues, so each rule is asserted on both.
+// The attention contract is target-level: one PR or issue row can carry
+// comment, opened, and CI reasons without multiplying rows.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -7,8 +7,9 @@ import { test } from "node:test";
 import { classifyTarget } from "../src/attention/classify.js";
 import { applyCiTransition } from "../src/attention/ci.js";
 import { defaultAttentionConfig } from "../src/attention/config.js";
-import { parseGithubResponse } from "../src/attention/github.js";
+import { buildQuery, parseGithubResponse } from "../src/attention/github.js";
 import type {
+  AttentionItem,
   GitHubComment,
   IssueTarget,
   PullRequestTarget,
@@ -26,8 +27,6 @@ const comment = (
   id,
   author: { login, kind: login.endsWith("[bot]") ? "bot" : "user" },
   body,
-  // Ordering matters: "your own reply clears it" depends on which comment
-  // is genuinely last, so the id's number drives the timestamp.
   createdAt: new Date(
     Date.parse("2026-08-20T10:00:00Z") +
       Number(id.replace(/\D/g, "") || "0") * 60_000,
@@ -55,8 +54,6 @@ const pr = (over: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   ciState: "SUCCESS",
   failingChecks: [],
   searchSources: ["involved"],
-  reviewRequested: false,
-  reviewRequestFingerprint: "",
   comments: [],
   reviewThreads: [],
   ...over,
@@ -78,130 +75,252 @@ const issue = (over: Partial<IssueTarget> = {}): IssueTarget => ({
   ...over,
 });
 
+function reasons(item: AttentionItem | null): string[] {
+  return item?.reasons.map((reason) => reason.kind) ?? [];
+}
+
 for (const [label, make] of [
   ["pull request", pr],
   ["issue", issue],
 ] as const) {
   test(`${label}: authoring one alone produces no item`, () => {
-    assert.deepEqual(classifyTarget(make(), ME, config), []);
+    assert.equal(classifyTarget(make(), ME, config), null);
   });
 
-  test(`${label}: someone else responding produces one item`, () => {
-    const items = classifyTarget(
-      make({ comments: [comment("c1", "alice")] }) as never,
+  test(`${label}: owned external activity produces one comment row`, () => {
+    const item = classifyTarget(
+      make({ comments: [comment("c1", "alice")] }),
       ME,
       config,
     );
-    assert.equal(items.length, 1);
-    assert.equal(items[0]?.actor?.login, "alice");
-    assert.equal(items[0]?.targetKind, make().kind);
+    assert.equal(item?.reasons.length, 1);
+    assert.equal(item?.reasons[0]?.kind, "comment");
+    assert.equal(item?.reasons[0]?.actor?.login, "alice");
+    assert.equal(item?.targetKind, make().kind);
   });
 
-  test(`${label}: your own reply clears it`, () => {
-    const items = classifyTarget(
-      make({ comments: [comment("c1", "alice"), comment("c2", ME)] }) as never,
+  test(`${label}: your own reply clears the external activity`, () => {
+    const item = classifyTarget(
+      make({ comments: [comment("c1", "alice"), comment("c2", ME)] }),
       ME,
       config,
     );
-    assert.deepEqual(items, []);
+    assert.equal(item, null);
   });
 
-  test(`${label}: your reaction clears it`, () => {
-    const items = classifyTarget(
+  test(`${label}: your reaction clears the external activity`, () => {
+    const item = classifyTarget(
       make({
         comments: [comment("c1", "alice", "hi", { viewerHasReacted: true })],
-      }) as never,
+      }),
       ME,
       config,
     );
-    assert.deepEqual(items, []);
+    assert.equal(item, null);
   });
 
-  test(`${label}: a later external response reopens it`, () => {
-    const items = classifyTarget(
+  test(`${label}: a later external response reopens the same target row`, () => {
+    const item = classifyTarget(
       make({
         comments: [
           comment("c1", "alice"),
           comment("c2", ME),
           comment("c333", "bob"),
         ],
-      }) as never,
+      }),
       ME,
       config,
     );
-    assert.equal(items.length, 1);
-    assert.equal(items[0]?.actor?.login, "bob");
+    assert.equal(item?.reasons.length, 1);
+    assert.equal(item?.reasons[0]?.actor?.login, "bob");
   });
 
   test(`${label}: bots stay silent unless allow-listed`, () => {
     const withBot = make({ comments: [comment("c1", "dependabot[bot]")] });
-    assert.deepEqual(classifyTarget(withBot as never, ME, config), []);
+    assert.equal(classifyTarget(withBot, ME, config), null);
     const allowed = {
       ...config,
       actors: { allow: ["dependabot[bot]"], ignore: [] },
     };
-    assert.equal(classifyTarget(withBot as never, ME, allowed).length, 1);
+    assert.equal(classifyTarget(withBot, ME, allowed)?.reasons.length, 1);
   });
 
-  test(`${label}: a stranger's thread you never touched is ignored`, () => {
+  test(`${label}: an untouched unrelated target is ignored`, () => {
     const theirs = make({
       author: { login: "carol", kind: "user" },
       comments: [comment("c1", "dave")],
     });
-    assert.deepEqual(classifyTarget(theirs as never, ME, config), []);
+    assert.equal(classifyTarget(theirs, ME, config), null);
   });
 
-  test(`${label}: repeated polling yields the same id`, () => {
+  test(`${label}: direct participation makes later target activity relevant`, () => {
+    const theirs = make({
+      author: { login: "carol", kind: "user" },
+      comments: [comment("c1", ME), comment("c2", "dave")],
+    });
+    const item = classifyTarget(theirs, ME, config);
+    assert.deepEqual(reasons(item), ["comment"]);
+    assert.equal(item?.reasons[0]?.actor?.login, "dave");
+  });
+
+  test(`${label}: a direct mention makes later target activity relevant`, () => {
+    const theirs = make({
+      author: { login: "carol", kind: "user" },
+      comments: [
+        comment("c1", "reviewer", "@ryansaxe please take a look"),
+        comment("c2", "dave"),
+      ],
+    });
+    assert.deepEqual(reasons(classifyTarget(theirs, ME, config)), ["comment"]);
+  });
+
+  test(`${label}: repeated polling keeps the target id and activity key stable`, () => {
     const target = make({ comments: [comment("c1", "alice")] });
-    const first = classifyTarget(target as never, ME, config);
-    const second = classifyTarget(target as never, ME, config);
-    assert.equal(first[0]?.id, second[0]?.id);
+    const first = classifyTarget(target, ME, config);
+    const second = classifyTarget(target, ME, config);
+    assert.equal(first?.id, `${make().kind}:me/repo#${make().number}`);
+    assert.equal(first?.id, second?.id);
+    assert.equal(first?.activityKey, second?.activityKey);
   });
 }
 
-test("issues never carry review threads or review requests", () => {
-  const items = classifyTarget(
-    issue({ comments: [comment("c1", "alice")] }),
+test("a pull request merges all conversation and review-thread comments into one row", () => {
+  const item = classifyTarget(
+    pr({
+      comments: [comment("c1", "alice")],
+      reviewThreads: [
+        {
+          id: "thread-1",
+          isResolved: true,
+          comments: [comment("c2", "bob")],
+        },
+      ],
+    }),
     ME,
     config,
   );
-  assert.equal(items.length, 1);
-  assert.equal(items[0]?.kind, "conversation");
+  assert.equal(item?.reasons.length, 1);
+  assert.equal(item?.reasons[0]?.actor?.login, "bob");
 });
 
-test("CI reports one aggregated item naming only what failed", () => {
+test("a watched target can carry opened and comment reasons in one row", () => {
+  const target = pr({
+    repository: "someorg/infra",
+    number: 77,
+    author: { login: "dana", kind: "user" },
+    createdAt: "2026-08-20T10:00:00Z",
+    searchSources: ["watched"],
+    comments: [comment("c1", "alice")],
+  });
+  const item = classifyTarget(target, ME, config, {
+    baselineAt: "2026-08-20T10:00:00Z",
+    watchedSince: "2026-08-20T10:00:00Z",
+  });
+  assert.deepEqual(reasons(item), ["comment", "opened"]);
+  assert.equal(item?.id, "pull_request:someorg/infra#77");
+});
+
+test("watching a repository reports comments on an existing target only after watch starts", () => {
+  const target = pr({
+    repository: "someorg/infra",
+    author: { login: "dana", kind: "user" },
+    createdAt: "2026-07-01T10:00:00Z",
+    searchSources: ["watched"],
+    comments: [
+      comment("c1", "alice", "old", {
+        createdAt: "2026-07-01T11:00:00Z",
+      }),
+      comment("c2", "bob", "new", {
+        createdAt: "2026-08-20T10:01:00Z",
+      }),
+    ],
+  });
+  const item = classifyTarget(target, ME, config, {
+    baselineAt: "2026-08-01T00:00:00Z",
+    watchedSince: "2026-08-20T10:00:00Z",
+  });
+  assert.deepEqual(reasons(item), ["comment"]);
+  assert.equal(item?.reasons[0]?.actor?.login, "bob");
+});
+
+test("a watched target opened before the watch floor stays silent without new activity", () => {
+  const target = pr({
+    repository: "someorg/infra",
+    author: { login: "dana", kind: "user" },
+    createdAt: "2026-07-01T10:00:00Z",
+    searchSources: ["watched"],
+  });
+  assert.equal(
+    classifyTarget(target, ME, config, {
+      baselineAt: "2026-08-01T00:00:00Z",
+      watchedSince: "2026-08-20T10:00:00Z",
+    }),
+    null,
+  );
+});
+
+test("a watched target opened by the viewer is not an opened reason", () => {
+  const target = pr({
+    repository: "someorg/infra",
+    createdAt: "2026-08-20T10:00:00Z",
+    searchSources: ["watched"],
+  });
+  assert.equal(
+    classifyTarget(target, ME, config, {
+      watchedSince: "2026-08-01T00:00:00Z",
+    }),
+    null,
+  );
+});
+
+test("a watched draft is not an opened reason", () => {
+  const target = pr({
+    repository: "someorg/infra",
+    author: { login: "dana", kind: "user" },
+    createdAt: "2026-08-20T10:00:00Z",
+    isDraft: true,
+    searchSources: ["watched"],
+  });
+  assert.equal(
+    classifyTarget(target, ME, config, {
+      watchedSince: "2026-08-01T00:00:00Z",
+    }),
+    null,
+  );
+});
+
+test("CI produces a reason, not a second target item", () => {
   const failing = pr({
     ciState: "FAILURE",
     failingChecks: ["lint", "typecheck"],
   });
-  const { item } = applyCiTransition(failing, undefined, ME, config);
-  assert.equal(item?.kind, "ci");
-  assert.match(item?.summary ?? "", /lint, typecheck/);
-  assert.deepEqual(item?.context?.failingChecks, ["lint", "typecheck"]);
+  const { reason } = applyCiTransition(failing, undefined, ME, config);
+  assert.equal(reason?.kind, "ci");
+  assert.match(reason?.summary ?? "", /lint, typecheck/);
 });
 
 test("a non-definitive rollup is not a red alert", () => {
   for (const state of ["PENDING", "NEUTRAL", "EXPECTED", "UNKNOWN"] as const) {
-    const { item } = applyCiTransition(
+    const { reason } = applyCiTransition(
       pr({ ciState: state }),
       undefined,
       ME,
       config,
     );
-    assert.equal(item, null, `${state} must not alert`);
+    assert.equal(reason, null, `${state} must not alert`);
   }
 });
 
-test("a steady red CI does not re-alert on the next poll", () => {
+test("a steady red CI keeps the same reason after the first alert", () => {
   const failing = pr({ ciState: "FAILURE", failingChecks: ["lint"] });
   const first = applyCiTransition(failing, undefined, ME, config);
   const second = applyCiTransition(failing, first.memory, ME, config);
   assert.equal(first.newlyRed, true);
   assert.equal(second.newlyRed, false);
-  assert.equal(first.item?.id, second.item?.id);
+  assert.equal(first.reason?.id, second.reason?.id);
 });
 
-test("a new head commit re-alerts with a fresh id", () => {
+test("a new head commit creates a new CI activity revision", () => {
   const first = applyCiTransition(
     pr({ ciState: "FAILURE", failingChecks: ["lint"] }),
     undefined,
@@ -209,13 +328,55 @@ test("a new head commit re-alerts with a fresh id", () => {
     config,
   );
   const second = applyCiTransition(
-    pr({ ciState: "FAILURE", failingChecks: ["lint"], headSha: "sha-2" }),
+    pr({
+      ciState: "FAILURE",
+      failingChecks: ["lint"],
+      headSha: "sha-2",
+    }),
     first.memory,
     ME,
     config,
   );
   assert.equal(second.newlyRed, true);
-  assert.notEqual(first.item?.id, second.item?.id);
+  assert.notEqual(first.reason?.id, second.reason?.id);
+});
+
+test("an old red CI state is suppressed by the initial baseline", () => {
+  const failing = pr({
+    ciState: "FAILURE",
+    updatedAt: "2026-08-20T10:00:00Z",
+  });
+  const first = applyCiTransition(
+    failing,
+    undefined,
+    ME,
+    config,
+    "2026-08-21T00:00:00Z",
+  );
+  const second = applyCiTransition(
+    failing,
+    first.memory,
+    ME,
+    config,
+    "2026-08-21T00:00:00Z",
+  );
+  assert.equal(first.reason, null);
+  assert.equal(second.reason, null);
+  assert.equal(first.memory.alerted, false);
+});
+
+test("CI is restricted to the viewer's own pull requests", () => {
+  const failing = pr({
+    author: { login: "alice", kind: "user" },
+    ciState: "FAILURE",
+  });
+  assert.equal(applyCiTransition(failing, undefined, ME, config).reason, null);
+});
+
+test("the discovery query has no reviewer-request search", () => {
+  const query = buildQuery([]);
+  assert.ok(!query.includes("review-requested"));
+  assert.ok(!query.includes("prsRequested"));
 });
 
 test("only failing checks are extracted from the rollup", () => {
@@ -273,7 +434,6 @@ test("only failing checks are extracted from the rollup", () => {
           },
         ],
       },
-      prsRequested: { nodes: [] },
       issuesInvolved: { nodes: [] },
     },
   });
@@ -292,7 +452,6 @@ test("issues parse into targets alongside pull requests", () => {
       viewer: { login: ME },
       rateLimit: { cost: 1, remaining: 100, resetAt: "2026-08-20T11:00:00Z" },
       prsInvolved: { nodes: [] },
-      prsRequested: { nodes: [] },
       issuesInvolved: {
         nodes: [
           {

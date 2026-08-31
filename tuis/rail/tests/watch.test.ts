@@ -1,20 +1,33 @@
-// Watched repositories: hear about new pull requests and issues in a
-// repository even when you are not involved in it.
+// Watched repositories begin at their configured start time and share the
+// same target-level row as account-wide attention.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { classifyOpened } from "../src/attention/classify.js";
+import { classifyTarget } from "../src/attention/classify.js";
 import {
   defaultAttentionConfig,
   watchedRepositories,
 } from "../src/attention/config.js";
 import { buildQuery } from "../src/attention/github.js";
-import type { IssueTarget, PullRequestTarget } from "../src/attention/types.js";
+import type {
+  GitHubComment,
+  IssueTarget,
+  PullRequestTarget,
+} from "../src/attention/types.js";
 
 const ME = "ryansaxe";
 const FLOOR = "2026-08-01T00:00:00Z";
 const config = defaultAttentionConfig();
+
+const comment = (createdAt: string): GitHubComment => ({
+  id: "comment-1",
+  author: { login: "dana", kind: "user" },
+  body: "A new comment",
+  createdAt,
+  url: "https://example.test/comment-1",
+  viewerHasReacted: false,
+});
 
 const watched = (over: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   kind: "pull_request",
@@ -34,55 +47,96 @@ const watched = (over: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   ciState: "SUCCESS",
   failingChecks: [],
   searchSources: ["watched"],
-  reviewRequested: false,
-  reviewRequestFingerprint: "",
   comments: [],
   reviewThreads: [],
   ...over,
 });
 
-test("a target opened after the floor becomes an item", () => {
-  const item = classifyOpened(watched(), ME, config, FLOOR);
-  assert.equal(item?.kind, "opened");
-  assert.equal(item?.actor?.login, "dana");
+function classify(
+  target: PullRequestTarget | IssueTarget,
+  watchedSince = FLOOR,
+) {
+  return classifyTarget(target, ME, config, {
+    baselineAt: FLOOR,
+    watchedSince,
+  });
+}
+
+test("a target opened after the floor becomes one opened item", () => {
+  const item = classify(watched());
+  assert.deepEqual(
+    item?.reasons.map((reason) => reason.kind),
+    ["opened"],
+  );
+  assert.equal(item?.reasons[0]?.actor?.login, "dana");
   assert.equal(item?.targetKind, "pull_request");
 });
 
 test("a target opened before the floor stays silent", () => {
-  // Adding a repository must not dump its backlog.
   const old = watched({ createdAt: "2026-07-01T00:00:00Z" });
-  assert.equal(classifyOpened(old, ME, config, FLOOR), null);
+  assert.equal(classify(old), null);
 });
 
-test("a repository with no floor yet is silent", () => {
-  assert.equal(classifyOpened(watched(), ME, config, undefined), null);
+test("a repository with no watch floor is silent for opened activity", () => {
+  assert.equal(
+    classifyTarget(watched(), ME, config, { baselineAt: FLOOR }),
+    null,
+  );
 });
 
-test("your own work never notifies you", () => {
+test("your own work never creates an opened reason", () => {
   const mine = watched({ author: { login: ME, kind: "user" } });
-  assert.equal(classifyOpened(mine, ME, config, FLOOR), null);
+  assert.equal(classify(mine), null);
 });
 
 test("bots stay suppressed unless allow-listed", () => {
   const bot = watched({ author: { login: "renovate[bot]", kind: "bot" } });
-  assert.equal(classifyOpened(bot, ME, config, FLOOR), null);
+  assert.equal(classify(bot), null);
   const allowed = {
     ...config,
     actors: { allow: ["renovate[bot]"], ignore: [] },
   };
-  assert.notEqual(classifyOpened(bot, ME, allowed, FLOOR), null);
+  assert.equal(
+    classifyTarget(bot, ME, allowed, {
+      baselineAt: FLOOR,
+      watchedSince: FLOOR,
+    })?.reasons[0]?.kind,
+    "opened",
+  );
 });
 
-test("a target you merely happen to be involved in is not an opened item", () => {
+test("a target found through account involvement is not an opened watch item", () => {
   const involved = watched({ searchSources: ["involved"] });
-  assert.equal(classifyOpened(involved, ME, config, FLOOR), null);
+  assert.equal(classify(involved), null);
 });
 
-test("the id is stable, so a persisting target keeps one item", () => {
-  const first = classifyOpened(watched(), ME, config, FLOOR);
-  const second = classifyOpened(watched(), ME, config, FLOOR);
+test("watching still starts now when a target also appears in account discovery", () => {
+  const target = watched({
+    searchSources: ["involved", "watched"],
+    createdAt: "2026-07-01T00:00:00Z",
+    comments: [comment("2026-08-10T00:00:00Z")],
+  });
+  assert.equal(classify(target, "2026-08-20T10:00:00Z"), null);
+});
+
+test("the opened row has a stable target id", () => {
+  const first = classify(watched());
+  const second = classify(watched());
+  assert.equal(first?.id, "pull_request:someorg/infra#77");
   assert.equal(first?.id, second?.id);
-  assert.equal(first?.id, "opened:someorg/infra#77");
+  assert.equal(first?.activityKey, second?.activityKey);
+});
+
+test("a new comment on an existing watched target is reported after watch starts", () => {
+  const target = watched({
+    createdAt: "2026-07-01T00:00:00Z",
+    comments: [comment("2026-08-20T10:01:00Z")],
+  });
+  const item = classify(target, "2026-08-20T10:00:00Z");
+  assert.deepEqual(
+    item?.reasons.map((reason) => reason.kind),
+    ["comment"],
+  );
 });
 
 test("issues are watched the same way", () => {
@@ -100,8 +154,9 @@ test("issues are watched the same way", () => {
     searchSources: ["watched"],
     comments: [],
   };
-  const item = classifyOpened(issue, ME, config, FLOOR);
-  assert.equal(item?.targetKind, "issue");
+  const item = classify(issue);
+  assert.equal(item?.id, "issue:someorg/infra#481");
+  assert.equal(item?.reasons[0]?.kind, "opened");
 });
 
 test("ATTENTION_WATCH parses a space-separated list", () => {
@@ -131,11 +186,12 @@ test("a malformed entry is a literal, actionable error", () => {
   );
 });
 
-test("watching a repository covers its pull requests and its issues", () => {
+test("watching a repository covers pull requests and issues without reviewer requests", () => {
   const query = buildQuery(["a/b"]);
   assert.match(query, /watchedPrs0: search/);
   assert.match(query, /watchedIssues0: search/);
   assert.match(query, /-is:draft/);
+  assert.ok(!query.includes("review-requested"));
   const prSearch = query.slice(
     query.indexOf("watchedPrs0"),
     query.indexOf("watchedIssues0"),

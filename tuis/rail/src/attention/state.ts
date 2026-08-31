@@ -17,6 +17,7 @@ import type {
   RateLimit,
 } from "./types.js";
 
+export const ATTENTION_STATE_VERSION = 2;
 export const ATTENTION_STATE_DIR = join(
   process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"),
   "dotfiles",
@@ -32,7 +33,7 @@ function emptyRecord<T>(): Record<string, T> {
 
 export function emptyObserverState(): ObserverState {
   return {
-    version: 1,
+    version: ATTENTION_STATE_VERSION,
     lastAttemptAt: null,
     lastSuccessfulSyncAt: null,
     lastError: null,
@@ -41,12 +42,13 @@ export function emptyObserverState(): ObserverState {
     rateLimit: null,
     items: emptyRecord<AttentionItem>(),
     acknowledged: emptyRecord<string>(),
-    notified: emptyRecord<string>(),
     ci: emptyRecord<CiMemory>(),
+    baselineAt: null,
     githubSync: {
       processedThrough: null,
       lastFullReconciliationAt: null,
     },
+    watchedSince: {},
   };
 }
 
@@ -61,7 +63,22 @@ function errorCode(error: unknown): string | null {
 }
 
 function parseState(value: unknown, path: string): ObserverState {
-  if (!isRecord(value) || value["version"] !== 1) {
+  if (!isRecord(value)) {
+    throw new Error(
+      `attention state ${path}: unsupported or corrupt state file`,
+    );
+  }
+  // The attention schema intentionally has no migration path. A new observer
+  // starts from a clean baseline instead of carrying old per-comment rows into
+  // the target-level inbox.
+  if (value["version"] !== ATTENTION_STATE_VERSION) {
+    return emptyObserverState();
+  }
+  if (
+    !isRecord(value["items"]) ||
+    !isRecord(value["acknowledged"]) ||
+    !isRecord(value["ci"])
+  ) {
     throw new Error(
       `attention state ${path}: unsupported or corrupt state file`,
     );
@@ -250,61 +267,72 @@ export function markSuccess(
   };
 }
 
-export interface ReconciledState {
-  state: ObserverState;
-  pendingNotifications: AttentionItem[];
+function activityIds(activityKey: string): Set<string> {
+  return new Set(activityKey.split("|").filter((id) => id !== ""));
 }
 
+export function activityAcknowledgesItem(
+  activityKey: string | undefined,
+  item: AttentionItem,
+): boolean {
+  if (activityKey === undefined) return false;
+  const acknowledged = activityIds(activityKey);
+  return item.reasons.every((reason) => acknowledged.has(reason.id));
+}
+
+function isAcknowledged(
+  acknowledged: Record<string, string>,
+  item: AttentionItem,
+): boolean {
+  return activityAcknowledgesItem(acknowledged[item.id], item);
+}
+
+export function unacknowledgedItems(state: ObserverState): AttentionItem[] {
+  return Object.values(state.items).filter(
+    (item) => !isAcknowledged(state.acknowledged, item),
+  );
+}
+
+// Items are target-level records. An acknowledgement survives a refresh when
+// every current reason was already part of the dismissed activity revision.
 export function reconcileAttention(
   previous: ObserverState,
   items: AttentionItem[],
   ci: Record<string, CiMemory>,
-): ReconciledState {
+): ObserverState {
   const currentItems: Record<string, AttentionItem> = Object.fromEntries(
     items.map((item) => [item.id, item]),
   );
-  const currentIds = new Set(Object.keys(currentItems));
   const acknowledged = Object.fromEntries(
-    Object.entries(previous.acknowledged).filter(([id]) => currentIds.has(id)),
-  );
-  const notified = Object.fromEntries(
-    Object.entries(previous.notified).filter(([id]) => currentIds.has(id)),
-  );
-  const pendingNotifications = items.filter(
-    (item) =>
-      acknowledged[item.id] === undefined && notified[item.id] === undefined,
+    Object.entries(previous.acknowledged).filter(
+      ([id, activityKey]) =>
+        currentItems[id] !== undefined &&
+        activityAcknowledgesItem(activityKey, currentItems[id]),
+    ),
   );
   return {
-    state: {
-      ...previous,
-      items: currentItems,
-      acknowledged,
-      notified,
-      ci,
-    },
-    pendingNotifications,
+    ...previous,
+    items: currentItems,
+    acknowledged,
+    ci,
   };
-}
-
-function attentionTargetKey(item: AttentionItem): string {
-  return `${item.targetKind}:${item.repository}#${item.number}`;
 }
 
 // Incremental fetches return only targets whose remote activity may have
 // changed. Remove old items for those targets, retain the rest, and let the
-// existing classifier output replace the removed items. A full pass keeps the
-// old replacement behavior so closed targets and stale CI memory disappear.
+// classifier replace the refreshed targets. A full pass also removes closed
+// targets and stale CI memory.
 export function reconcileGithubAttention(
   previous: ObserverState,
   items: AttentionItem[],
   ci: Record<string, CiMemory>,
   refreshedTargetKeys: readonly string[],
   fullReconciliation: boolean,
-): ReconciledState {
+): ObserverState {
   if (fullReconciliation) return reconcileAttention(previous, items, ci);
   const refreshed = new Set(refreshedTargetKeys);
   const retained = Object.values(previous.items).filter(
-    (item) => !refreshed.has(attentionTargetKey(item)),
+    (item) => !refreshed.has(item.id),
   );
   return reconcileAttention(previous, [...retained, ...items], {
     ...previous.ci,
@@ -312,51 +340,16 @@ export function reconcileGithubAttention(
   });
 }
 
-// A baseline records the existing inbox without sending a phone notification
-// for old activity. Activity stamped at or after the baseline start remains
-// pending, so a target changing while the baseline is fetched is not hidden.
-export function suppressBaselineNotifications(
-  reconciled: ReconciledState,
-  baselineAt: string,
-): ReconciledState {
-  const baseline = Date.parse(baselineAt);
-  if (!Number.isFinite(baseline)) {
-    throw new Error(`baseline timestamp is not a date: ${baselineAt}`);
-  }
-  const notified = { ...reconciled.state.notified };
-  const pendingNotifications = reconciled.pendingNotifications.filter(
-    (item) => {
-      const createdAt = Date.parse(item.createdAt);
-      if (Number.isFinite(createdAt) && createdAt < baseline) {
-        notified[item.id] = baselineAt;
-        return false;
-      }
-      return true;
-    },
-  );
-  return {
-    state: { ...reconciled.state, notified },
-    pendingNotifications,
-  };
-}
-
 export function acknowledgeItem(
   state: ObserverState,
   id: string,
-  now = new Date().toISOString(),
 ): ObserverState {
-  if (state.items[id] === undefined) {
+  const item = state.items[id];
+  if (item === undefined) {
     throw new Error(`attention item not found or no longer active: ${id}`);
   }
-  return { ...state, acknowledged: { ...state.acknowledged, [id]: now } };
-}
-
-export function markNotified(
-  state: ObserverState,
-  ids: string[],
-  now = new Date().toISOString(),
-): ObserverState {
-  const notified = { ...state.notified };
-  for (const id of ids) notified[id] = now;
-  return { ...state, notified };
+  return {
+    ...state,
+    acknowledged: { ...state.acknowledged, [id]: item.activityKey },
+  };
 }

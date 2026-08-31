@@ -1,11 +1,11 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { loadAttentionConfig } from "./config.js";
 import { applyCiTransition } from "./ci.js";
+import { attentionItem, classifyTarget } from "./classify.js";
 import { fetchGithubSync } from "./github.js";
-import { sendNtfy, ntfyEndpoint } from "./ntfy.js";
 import {
   acknowledgeItem,
   acquireRefreshLock,
@@ -13,17 +13,15 @@ import {
   commitGithubSync,
   loadObserverState,
   markFailure,
-  markNotified,
   markSuccess,
   reconcileGithubAttention,
   retryAfterForRateLimit,
   retryIsActive,
   saveObserverState,
   shouldRunFullReconciliation,
-  suppressBaselineNotifications,
+  unacknowledgedItems,
 } from "./state.js";
-import type { AttentionItem, ObserverState } from "./types.js";
-import { classifyOpened, classifyTarget } from "./classify.js";
+import type { AttentionItem, AttentionReason, ObserverState } from "./types.js";
 
 const LOG_PATH = `${ATTENTION_STATE_DIR}/observer.log`;
 
@@ -36,29 +34,29 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function primaryReason(item: AttentionItem): AttentionReason {
+  const reason = item.reasons[0];
+  if (reason === undefined)
+    throw new Error(`attention item ${item.id} has no reason`);
+  return reason;
+}
+
 function itemSort(a: AttentionItem, b: AttentionItem): number {
-  if (a.priority !== b.priority) return a.priority === "high" ? -1 : 1;
-  return b.createdAt.localeCompare(a.createdAt);
+  const aReason = primaryReason(a);
+  const bReason = primaryReason(b);
+  if (aReason.priority !== bReason.priority) {
+    return aReason.priority === "high" ? -1 : 1;
+  }
+  return bReason.createdAt.localeCompare(aReason.createdAt);
 }
 
 function itemLine(item: AttentionItem, acknowledged: boolean): string {
   const marker = acknowledged ? "✓" : "•";
-  const actor = item.actor?.login ?? "GitHub";
-  return `${marker} ${item.repository}#${item.number} [${item.kind}] ${actor}: ${item.summary} — ${item.url}`;
-}
-
-function notificationBody(
-  items: AttentionItem[],
-  previousSync: string | null,
-): string {
-  const prefix =
-    previousSync === null
-      ? "Initial GitHub attention sync"
-      : `GitHub attention since ${previousSync}`;
-  return [
-    prefix,
-    ...items.sort(itemSort).map((item) => itemLine(item, false)),
-  ].join("\n");
+  const actor =
+    item.reasons.find((reason) => reason.actor !== null)?.actor?.login ??
+    "GitHub";
+  const reasons = item.reasons.map((reason) => reason.summary).join(" | ");
+  return `${marker} ${item.repository}#${item.number} ${actor}: ${reasons} — ${item.url}`;
 }
 
 function activeItems(state: ObserverState): AttentionItem[] {
@@ -68,17 +66,25 @@ function activeItems(state: ObserverState): AttentionItem[] {
 function parseRefreshOptions(args: string[]): {
   force: boolean;
   full: boolean;
-  notify: boolean;
 } {
   return {
     force: args.includes("--force"),
     full: args.includes("--full"),
-    notify: !args.includes("--no-notify"),
   };
 }
 
+function watchStarts(
+  configured: readonly string[],
+  previous: Record<string, string> | undefined,
+  now: string,
+): Record<string, string> {
+  return Object.fromEntries(
+    configured.map((repository) => [repository, previous?.[repository] ?? now]),
+  );
+}
+
 async function refresh(args: string[]): Promise<void> {
-  const { force, full, notify } = parseRefreshOptions(args);
+  const { force, full } = parseRefreshOptions(args);
   const lock = await acquireRefreshLock();
   if (lock === null) {
     console.log("attention refresh already running");
@@ -97,6 +103,9 @@ async function refresh(args: string[]): Promise<void> {
     state = { ...state, lastAttemptAt: now };
     await saveObserverState(state);
     const config = loadAttentionConfig();
+    const initialBaseline = state.baselineAt === null;
+    const baselineAt = state.baselineAt ?? now;
+    const watchedSince = watchStarts(config.watch, state.watchedSince, now);
     const fullReconciliation =
       full || shouldRunFullReconciliation(state, Date.parse(now));
     const sync = await fetchGithubSync({
@@ -109,52 +118,42 @@ async function refresh(args: string[]): Promise<void> {
     const items: AttentionItem[] = [];
     const ci: ObserverState["ci"] = {};
 
-    // The first poll that sees a repository records the moment, and only
-    // things opened after it are ever reported. That is what keeps adding a
-    // repository quiet instead of dumping years of open work into the inbox.
-    const watchedSince: Record<string, string> = {
-      ...(state.watchedSince ?? {}),
-    };
-    for (const repository of config.watch) {
-      watchedSince[repository] ??= now;
-    }
-
     for (const target of snapshot.targets) {
-      const opened = classifyOpened(
-        target,
-        snapshot.username,
-        config,
-        watchedSince[target.repository],
-      );
-      if (opened !== null) items.push(opened);
-      items.push(...classifyTarget(target, snapshot.username, config));
-      if (target.kind !== "pull_request") continue;
-      const ciTransition = applyCiTransition(
-        target,
-        state.ci[`${target.repository}#${target.number}`],
-        snapshot.username,
-        config,
-      );
-      ci[`${target.repository}#${target.number}`] = ciTransition.memory;
-      if (ciTransition.item !== null) items.push(ciTransition.item);
+      const classified = classifyTarget(target, snapshot.username, config, {
+        baselineAt,
+        watchedSince: watchedSince[target.repository],
+      });
+      const reasons = [...(classified?.reasons ?? [])];
+      if (target.kind === "pull_request") {
+        const ciKey = `${target.repository}#${target.number}`;
+        const ciTransition = applyCiTransition(
+          target,
+          state.ci[ciKey],
+          snapshot.username,
+          config,
+          baselineAt,
+        );
+        ci[ciKey] = ciTransition.memory;
+        if (ciTransition.reason !== null) reasons.push(ciTransition.reason);
+      }
+      if (reasons.length > 0) items.push(attentionItem(target, reasons));
     }
 
-    let reconciled = reconcileGithubAttention(
+    state = reconcileGithubAttention(
       state,
       items,
       ci,
       sync.refreshedTargetKeys,
       sync.fullReconciliation,
     );
-    const initialBaseline =
-      state.githubSync?.processedThrough === undefined ||
-      state.githubSync?.processedThrough === null;
-    if (initialBaseline) {
-      reconciled = suppressBaselineNotifications(reconciled, now);
-    }
     state = commitGithubSync(
       markSuccess(
-        { ...reconciled.state, username: snapshot.username, watchedSince },
+        {
+          ...state,
+          username: snapshot.username,
+          baselineAt,
+          watchedSince,
+        },
         snapshot.rateLimit,
         now,
       ),
@@ -170,69 +169,20 @@ async function refresh(args: string[]): Promise<void> {
     }
     await saveObserverState(state);
 
-    const endpoint = ntfyEndpoint();
-    if (
-      notify &&
-      endpoint !== null &&
-      reconciled.pendingNotifications.length > 0
-    ) {
-      // A failure here must not look like a GitHub failure. The items are
-      // already stored and still correct; only their delivery failed, so it
-      // is logged and recorded separately rather than backing off the poll.
-      try {
-        await sendNtfy(
-          {
-            title: `${reconciled.pendingNotifications.length} GitHub item${reconciled.pendingNotifications.length === 1 ? "" : "s"} need you`,
-            body: notificationBody(
-              reconciled.pendingNotifications,
-              previousSync,
-            ),
-            priority: reconciled.pendingNotifications.some(
-              (item) => item.priority === "high",
-            )
-              ? "high"
-              : "default",
-            tags: ["github", "review"],
-          },
-          endpoint,
-        );
-        state = markNotified(
-          state,
-          reconciled.pendingNotifications.map((item) => item.id),
-          now,
-        );
-        state = { ...state, lastNotifyError: null };
-      } catch (error) {
-        // Left un-notified on purpose: the next poll retries delivery.
-        const message = errorMessage(error);
-        state = { ...state, lastNotifyError: message };
-        await logLine(`notify failed: ${message}`);
-      }
-      await saveObserverState(state);
-    }
-
+    const active = activeItems(state);
+    const pending = unacknowledgedItems(state);
     const gap =
       previousSync === null
         ? "initial"
         : `${Math.max(0, Date.parse(now) - Date.parse(previousSync))}ms since last success`;
-    // "this pass" counts are the incremental delta — routinely all zeros
-    // on a healthy quiet poll; "stored" is the persisted item set the rail
-    // actually shows.
     await logLine(
-      `refresh ok: ${snapshot.targets.filter((t) => t.kind === "pull_request").length} PRs, ${snapshot.targets.filter((t) => t.kind === "issue").length} issues, ${items.length} items this pass, ${Object.keys(reconciled.state.items).length} stored, ${reconciled.pendingNotifications.length} pending notifications, ${snapshot.requestDurationMs}ms request, ${gap}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
+      `refresh ok: ${snapshot.targets.filter((t) => t.kind === "pull_request").length} PRs, ${snapshot.targets.filter((t) => t.kind === "issue").length} issues, ${items.length} items this pass, ${active.length} stored, ${pending.length} unacknowledged, ${snapshot.requestDurationMs}ms request, ${gap}${initialBaseline ? ", baseline established" : ""}${rateLimitRetry === null ? "" : `, rate pressure until ${rateLimitRetry}`}`,
     );
     console.log(
-      `attention refresh: ${items.length} active item${items.length === 1 ? "" : "s"}; ${reconciled.pendingNotifications.length} notification${reconciled.pendingNotifications.length === 1 ? "" : "s"} pending`,
+      `attention refresh: ${active.length} active item${active.length === 1 ? "" : "s"}; ${pending.length} unacknowledged`,
     );
     if (rateLimitRetry !== null) {
       console.log(`rate pressure: backing off until ${rateLimitRetry}`);
-    }
-    if (
-      notify &&
-      endpoint === null &&
-      reconciled.pendingNotifications.length > 0
-    ) {
-      console.log("phone notification skipped: ntfy channel is not configured");
     }
   } catch (error) {
     const message = errorMessage(error);
@@ -248,26 +198,21 @@ async function refresh(args: string[]): Promise<void> {
 async function status(): Promise<void> {
   const state = await loadObserverState();
   const items = activeItems(state);
-  const pending = items.filter(
-    (item) => state.acknowledged[item.id] === undefined,
-  );
+  const pending = unacknowledgedItems(state);
   console.log(`state: ${ATTENTION_STATE_DIR}/state.json`);
   console.log(`last success: ${state.lastSuccessfulSyncAt ?? "never"}`);
   console.log(`last attempt: ${state.lastAttemptAt ?? "never"}`);
   console.log(`last error: ${state.lastError ?? "none"}`);
+  console.log(`baseline: ${state.baselineAt ?? "not established"}`);
   console.log(
     `GitHub processed through: ${state.githubSync?.processedThrough ?? "never"}`,
   );
   console.log(
     `last full reconciliation: ${state.githubSync?.lastFullReconciliationAt ?? "never"}`,
   );
-  console.log(`last notify error: ${state.lastNotifyError ?? "none"}`);
   console.log(`retry after: ${state.retryAfter ?? "none"}`);
   console.log(`active items: ${items.length}`);
   console.log(`unacknowledged: ${pending.length}`);
-  console.log(
-    `ntfy: ${ntfyEndpoint() === null ? "not configured" : "configured"}`,
-  );
   if (state.rateLimit !== null) {
     console.log(
       `rate limit: ${state.rateLimit.remaining} remaining, cost ${state.rateLimit.cost}, reset ${state.rateLimit.resetAt}`,
@@ -288,10 +233,13 @@ async function list(args: string[]): Promise<void> {
     return;
   }
   for (const item of activeItems(state)) {
-    console.log(itemLine(item, state.acknowledged[item.id] !== undefined));
+    console.log(
+      itemLine(item, state.acknowledged[item.id] === item.activityKey),
+    );
   }
-  if (Object.keys(state.items).length === 0)
+  if (Object.keys(state.items).length === 0) {
     console.log("no active attention items");
+  }
 }
 
 async function acknowledge(args: string[]): Promise<void> {
@@ -308,10 +256,10 @@ function usage(): void {
   console.log(`usage: attention <command>
 
 commands:
-  refresh [--force] [--full] [--no-notify]  fetch account-wide GitHub attention
-  status                           show observer state and rate limit
-  list [--json]                    show active attention items
-  ack <item-id>                    acknowledge one item locally`);
+  refresh [--force] [--full]  fetch account-wide GitHub attention
+  status                     show observer state and rate limit
+  list [--json]              show active attention items
+  ack <item-id>              acknowledge one item locally`);
 }
 
 export async function main(args = process.argv.slice(2)): Promise<void> {

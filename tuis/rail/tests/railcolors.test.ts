@@ -11,7 +11,7 @@ import { elsewhereRows } from "../src/sections/elsewhere.js";
 import { sortByUrgency } from "../src/sections/rows.js";
 import type { ReviewSnapshot } from "../src/attention/review.js";
 import type { Agent } from "../src/data.js";
-import type { AttentionItem } from "../src/attention/types.js";
+import type { AttentionItem, AttentionReason } from "../src/attention/types.js";
 import type { Palette } from "../src/theme.js";
 import { blend, DIM_KEEP, railBg } from "../src/theme.js";
 
@@ -60,20 +60,33 @@ const colorOf = (rendered: string, needle: string): string | null => {
 
 const dimmed = hex(blend(palette.dim, railBg(palette), DIM_KEEP));
 
-const item = (over: Partial<AttentionItem> = {}): AttentionItem => ({
-  id: "x",
-  kind: "conversation",
-  targetKind: "pull_request",
-  repository: "owner/project",
-  number: 12,
-  title: "t",
-  url: "u",
-  summary: "SUMMARYTEXT",
-  actor: { login: "a", kind: "user" },
-  createdAt: new Date(Date.now() - 90_000_000).toISOString(),
-  priority: "normal",
-  ...over,
-});
+type AttentionOverrides = Partial<
+  Omit<AttentionItem, "activityKey" | "reasons">
+> & { reason?: Partial<AttentionReason> };
+
+const item = (over: AttentionOverrides = {}): AttentionItem => {
+  const { reason: reasonOverride, ...itemOverride } = over;
+  const reason: AttentionReason = {
+    id: "comment:fixture",
+    kind: "comment",
+    summary: "SUMMARYTEXT",
+    actor: { login: "a", kind: "user" },
+    createdAt: new Date(Date.now() - 90_000_000).toISOString(),
+    priority: "normal",
+    ...reasonOverride,
+  };
+  return {
+    id: "pull_request:owner/project#12",
+    targetKind: "pull_request",
+    repository: "owner/project",
+    number: 12,
+    title: "t",
+    url: "u",
+    reasons: [reason],
+    activityKey: reason.id,
+    ...itemOverride,
+  };
+};
 
 const snapshot = (items: AttentionItem[]): ReviewSnapshot => ({
   revision: 1,
@@ -97,7 +110,11 @@ test("review colour sits on repository#number, not the summary", () => {
 });
 
 test("CI is red and issue activity is mauve", () => {
-  const ci = reviewRows(snapshot([item({ kind: "ci" })]), palette, 40)
+  const ci = reviewRows(
+    snapshot([item({ reason: { kind: "ci" } })]),
+    palette,
+    40,
+  )
     .map((r) => r.text)
     .join("\n");
   assert.equal(

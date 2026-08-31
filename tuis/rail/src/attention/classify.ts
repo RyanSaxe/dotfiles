@@ -6,11 +6,19 @@ import {
 import { reviewContext } from "./context.js";
 import type {
   AttentionItem,
+  AttentionReason,
   GitHubComment,
   GitHubTarget,
-  PullRequestTarget,
-  ReviewThread,
 } from "./types.js";
+
+export interface ClassificationOptions {
+  // Historical activity before this boundary is never promoted into the
+  // inbox. Once established, the boundary remains in observer state.
+  baselineAt?: string | null;
+  // Applies to watched targets that are not already account-wide targets
+  // through ownership or direct participation.
+  watchedSince?: string;
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -26,14 +34,33 @@ export function mentionsViewer(body: string, username: string): boolean {
   return boundary.test(body);
 }
 
+function timestamp(value: string, label: string): number {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`GitHub ${label} is not a date: ${value}`);
+  }
+  return parsed;
+}
+
+function floorTimestamp(
+  value: string | null | undefined,
+  label: string,
+): number | null {
+  return value === undefined || value === null ? null : timestamp(value, label);
+}
+
+function atOrAfter(value: string, floor: number | null): boolean {
+  return floor === null || timestamp(value, "comment") >= floor;
+}
+
 function latestComment(comments: GitHubComment[]): GitHubComment | null {
-  return comments.reduce<GitHubComment | null>(
-    (latest, comment) =>
-      latest === null || comment.createdAt > latest.createdAt
-        ? comment
-        : latest,
-    null,
-  );
+  return comments.reduce<GitHubComment | null>((latest, comment) => {
+    if (latest === null) return comment;
+    const order = comment.createdAt.localeCompare(latest.createdAt);
+    return order > 0 || (order === 0 && comment.id > latest.id)
+      ? comment
+      : latest;
+  }, null);
 }
 
 function isViewerComment(comment: GitHubComment, username: string): boolean {
@@ -43,148 +70,139 @@ function isViewerComment(comment: GitHubComment, username: string): boolean {
   );
 }
 
-function participated(comments: GitHubComment[], username: string): boolean {
-  return comments.some(
-    (comment) =>
-      isViewerComment(comment, username) ||
-      mentionsViewer(comment.body, username),
-  );
+function uniqueComments(target: GitHubTarget): GitHubComment[] {
+  const comments = [...target.comments];
+  if (target.kind === "pull_request") {
+    for (const thread of target.reviewThreads) {
+      comments.push(...thread.comments);
+    }
+  }
+  const byId = new Map<string, GitHubComment>();
+  for (const comment of comments) byId.set(comment.id, comment);
+  return [...byId.values()];
 }
 
-function itemFromComment(
-  target: GitHubTarget,
-  kind: "review_comment" | "conversation",
-  comment: GitHubComment,
-  id: string,
-): AttentionItem {
-  return {
-    id,
-    kind,
-    targetKind: target.kind,
-    repository: target.repository,
-    number: target.number,
-    title: target.title,
-    url: target.url,
-    summary: comment.body.replace(/\s+/g, " ").trim() || "New GitHub comment",
-    actor: comment.author,
-    createdAt: comment.createdAt,
-    priority: "normal",
-    context: reviewContext(target),
-  };
-}
-
-function classifyCommentSet(
-  target: GitHubTarget,
+function participated(
   comments: GitHubComment[],
   username: string,
   config: AttentionConfig,
-  kind: "review_comment" | "conversation",
-  idPrefix: string,
-): AttentionItem | null {
-  const meaningful = comments.filter((comment) =>
-    actorIsEligible(comment.author, config),
+): boolean {
+  return comments.some(
+    (comment) =>
+      isViewerComment(comment, username) ||
+      (actorIsEligible(comment.author, config) &&
+        mentionsViewer(comment.body, username)),
   );
-  const last = latestComment(meaningful);
+}
+
+function targetIsOwned(target: GitHubTarget, username: string): boolean {
+  return (
+    target.author !== null &&
+    normalizeLogin(target.author.login) === normalizeLogin(username)
+  );
+}
+
+function targetIsWatched(target: GitHubTarget): boolean {
+  return target.searchSources.includes("watched");
+}
+
+function commentFloor(
+  target: GitHubTarget,
+  options: ClassificationOptions,
+  accountWide: boolean,
+): number | null {
+  const floors = [
+    floorTimestamp(options.baselineAt, "attention baseline"),
+  ].filter((floor): floor is number => floor !== null);
+  if (targetIsWatched(target) && !accountWide) {
+    const watched = floorTimestamp(options.watchedSince, "watch start");
+    if (watched !== null) floors.push(watched);
+  }
+  return floors.length === 0 ? null : Math.max(...floors);
+}
+
+function commentReason(
+  target: GitHubTarget,
+  username: string,
+  config: AttentionConfig,
+  floor: number | null,
+): AttentionReason | null {
+  const meaningful = uniqueComments(target).filter(
+    (comment) =>
+      isViewerComment(comment, username) ||
+      actorIsEligible(comment.author, config),
+  );
+  const recent = meaningful.filter((comment) =>
+    atOrAfter(comment.createdAt, floor),
+  );
+  const external = recent.filter(
+    (comment) =>
+      !isViewerComment(comment, username) &&
+      actorIsEligible(comment.author, config),
+  );
+  const latestExternal = latestComment(external);
+  if (latestExternal === null) return null;
+
+  // A direct reply or a reaction handles all activity up to that point. A
+  // later external comment remains visible even when an older one was reacted
+  // to.
+  const latestAction = latestComment(
+    recent.filter(
+      (comment) =>
+        isViewerComment(comment, username) || comment.viewerHasReacted,
+    ),
+  );
   if (
-    last === null ||
-    isViewerComment(last, username) ||
-    last.viewerHasReacted
+    latestAction !== null &&
+    timestamp(latestAction.createdAt, "comment") >=
+      timestamp(latestExternal.createdAt, "comment")
   ) {
     return null;
   }
 
-  const owned =
-    target.author !== null &&
-    normalizeLogin(target.author.login) === normalizeLogin(username);
-  if (!owned && !participated(meaningful, username)) return null;
-
-  return itemFromComment(target, kind, last, `${idPrefix}:${last.id}`);
+  return {
+    id: `comment:${latestExternal.id}`,
+    kind: "comment",
+    summary:
+      latestExternal.body.replace(/\s+/g, " ").trim() || "New GitHub comment",
+    actor: latestExternal.author,
+    createdAt: latestExternal.createdAt,
+    priority: "normal",
+  };
 }
 
-// One classifier for both kinds. A PR adds review threads and review
-// requests on top; everything else — comments, mentions, participation,
-// ownership, clearing — is identical, so it is written once.
-export function classifyTarget(
-  target: GitHubTarget,
-  username: string,
-  config: AttentionConfig,
-): AttentionItem[] {
-  const items: AttentionItem[] = [];
-
-  if (target.kind === "pull_request") {
-    for (const thread of target.reviewThreads) {
-      if (thread.isResolved) continue;
-      const item = classifyCommentSet(
-        target,
-        thread.comments,
-        username,
-        config,
-        "review_comment",
-        `review:${thread.id}`,
-      );
-      if (item !== null) items.push(item);
-    }
-  }
-
-  const conversation = classifyCommentSet(
-    target,
-    target.comments,
-    username,
-    config,
-    "conversation",
-    `conversation:${target.repository}#${target.number}`,
-  );
-  if (conversation !== null) items.push(conversation);
-
-  if (target.kind === "pull_request" && target.reviewRequested) {
-    const fingerprint = target.reviewRequestFingerprint || "viewer";
-    items.push({
-      id: `review-request:${target.repository}#${target.number}:${fingerprint}`,
-      kind: "review_request",
-      targetKind: "pull_request",
-      repository: target.repository,
-      number: target.number,
-      title: target.title,
-      url: target.url,
-      summary: "GitHub requested your review",
-      actor: null,
-      createdAt: target.updatedAt,
-      priority: "high",
-      context: reviewContext(target),
-    });
-  }
-
-  return items;
-}
-
-// A target from a watched repository that was opened after we started
-// watching. Your own work never notifies you, and the actor policy applies
-// exactly as it does everywhere else.
-export function classifyOpened(
+function openedReason(
   target: GitHubTarget,
   username: string,
   config: AttentionConfig,
   watchedSince: string | undefined,
-): AttentionItem | null {
-  if (!target.searchSources.includes("watched")) return null;
-  if (watchedSince === undefined || target.createdAt <= watchedSince) {
-    return null;
-  }
-  if (target.author === null) return null;
-  if (normalizeLogin(target.author.login) === normalizeLogin(username)) {
-    return null;
-  }
+): AttentionReason | null {
+  const floor = floorTimestamp(watchedSince, "watch start");
+  if (!targetIsWatched(target) || floor === null) return null;
+  const createdAt = timestamp(target.createdAt, "target creation");
+  if (createdAt < floor) return null;
+  if (target.kind === "pull_request" && target.isDraft) return null;
+  if (target.author === null || targetIsOwned(target, username)) return null;
   if (!actorIsEligible(target.author, config)) return null;
-  // Drafts are excluded by the search itself; a draft marked ready later
-  // re-enters it and counts as opened at that moment.
+
+  const latestAction = latestComment(
+    uniqueComments(target).filter(
+      (comment) =>
+        (isViewerComment(comment, username) ||
+          actorIsEligible(comment.author, config)) &&
+        (isViewerComment(comment, username) || comment.viewerHasReacted),
+    ),
+  );
+  if (
+    latestAction !== null &&
+    timestamp(latestAction.createdAt, "comment") >= createdAt
+  ) {
+    return null;
+  }
+
   return {
-    id: `opened:${target.repository}#${target.number}`,
+    id: `opened:${target.kind}:${target.repository}#${target.number}`,
     kind: "opened",
-    targetKind: target.kind,
-    repository: target.repository,
-    number: target.number,
-    title: target.title,
-    url: target.url,
     summary:
       target.kind === "issue"
         ? "New issue in a watched repository"
@@ -192,32 +210,63 @@ export function classifyOpened(
     actor: target.author,
     createdAt: target.createdAt,
     priority: "normal",
+  };
+}
+
+function reasonOrder(a: AttentionReason, b: AttentionReason): number {
+  if (a.priority !== b.priority) return a.priority === "high" ? -1 : 1;
+  const byTime = b.createdAt.localeCompare(a.createdAt);
+  return byTime !== 0 ? byTime : a.id.localeCompare(b.id);
+}
+
+export function attentionItem(
+  target: GitHubTarget,
+  reasons: readonly AttentionReason[],
+): AttentionItem {
+  if (reasons.length === 0) {
+    throw new Error("cannot create attention item without a reason");
+  }
+  const ordered = [...reasons].sort(reasonOrder);
+  return {
+    id: `${target.kind}:${target.repository}#${target.number}`,
+    targetKind: target.kind,
+    repository: target.repository,
+    number: target.number,
+    title: target.title,
+    url: target.url,
+    reasons: ordered,
+    activityKey: ordered
+      .map((reason) => reason.id)
+      .sort()
+      .join("|"),
     context: reviewContext(target),
   };
 }
 
-export function meaningfulComments(
-  comments: GitHubComment[],
-  config: AttentionConfig,
-): GitHubComment[] {
-  return comments.filter((comment) => actorIsEligible(comment.author, config));
-}
-
-export function reviewThreadIsActionable(
-  thread: ReviewThread,
-  pr: PullRequestTarget,
+// One row represents the target. Pull-request review comments and issue
+// comments use the same stream, with no special thread-level inbox behavior.
+export function classifyTarget(
+  target: GitHubTarget,
   username: string,
   config: AttentionConfig,
-): boolean {
-  if (thread.isResolved) return false;
-  return (
-    classifyCommentSet(
-      pr,
-      thread.comments,
+  options: ClassificationOptions = {},
+): AttentionItem | null {
+  const allComments = uniqueComments(target);
+  const accountWide =
+    targetIsOwned(target, username) ||
+    participated(allComments, username, config);
+  const relevant = accountWide || targetIsWatched(target);
+  const reasons: AttentionReason[] = [];
+  if (relevant) {
+    const comment = commentReason(
+      target,
       username,
       config,
-      "review_comment",
-      `review:${thread.id}`,
-    ) !== null
-  );
+      commentFloor(target, options, accountWide),
+    );
+    if (comment !== null) reasons.push(comment);
+  }
+  const opened = openedReason(target, username, config, options.watchedSince);
+  if (opened !== null) reasons.push(opened);
+  return reasons.length === 0 ? null : attentionItem(target, reasons);
 }

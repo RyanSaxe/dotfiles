@@ -89,20 +89,32 @@ state under `~/.local/state/dotfiles/attention/` and never requires an open
 repository, tmux session, or Neovim.
 
 ```sh
-attention status                 # refresh/error/rate/channel diagnostics
-attention refresh --no-notify    # real fetch without a phone ping
+attention status                 # refresh/error/rate diagnostics
+attention refresh                # fetch account-wide GitHub attention
 attention refresh --full         # force a full paginated reconciliation
 attention list                   # current active items
 attention ack <item-id>          # local check/dismiss, no GitHub mutation
 ```
 
 The rail does not perform these network requests. The Reviews tab reads the
-observer's cached state. `alt+r` selects the Reviews rail tab; the
-tab is one compact line per unacknowledged item and highlights the Reviews badge
-until the item is acknowledged or disappears. `alt+R` opens the cached Review
-table + preview dashboard. `alt+t` selects the Tasks rail tab — the vault's
-open work, urgency-ordered, with the tab itself red while anything is
-overdue — and `alt+T` opens the same dashboard shell for it.
+observer's cached state. `alt+r` selects the Reviews rail tab; the tab is one
+compact line per unacknowledged target and highlights the Reviews badge until
+the target is acknowledged or disappears. `alt+R` opens the cached Review table
+and preview dashboard. `alt+t` selects the Tasks rail tab — the vault's open
+work, urgency-ordered, with the tab itself red while anything is overdue — and
+`alt+T` opens the same dashboard shell for it.
+
+The first successful refresh establishes a clean baseline, so existing GitHub
+activity is not imported into the inbox. Each pull request or issue is one row;
+comment and CI reasons are combined on that row. Acknowledging a row clears its
+current activity revision. A later external comment or a new CI failure on the
+same target changes the revision and brings the row back.
+
+Watching a repository starts at the moment it is added. Existing open targets
+are not backfilled, while newly opened non-draft targets and later comments on
+targets in that repository are eligible. Your own targets are excluded from
+watch-opened activity, and reviewer-request notifications are not part of the
+observer.
 
 The Reviews dashboard has two views, switched with Tab:
 
@@ -111,7 +123,7 @@ The Reviews dashboard has two views, switched with Tab:
 | Reviews   | what needs you, grouped by repository     | `↵` open a review workspace · `b` browser · `d` diff · `a` assisted review · `x` acknowledge |
 | Worktrees | pull requests already checked out locally | `↵` focus the session · `X` clean up                                                         |
 
-`/` searches the table, `r` refreshes without notifying, and `ctrl-u`/`ctrl-d`
+`/` searches the table, `r` refreshes, and `ctrl-u`/`ctrl-d`
 scroll the preview. Every key stays bound at any width; the footer only
 advertises what fits.
 
@@ -122,7 +134,7 @@ request's branch, opening it as a `gh://` review buffer. No agent starts:
 session rather than replacing the human one.
 
 Acknowledged items leave the table rather than dimming. A new external event
-arrives with a new id, so a cleared item returns on its own.
+changes the target's activity revision, so a cleared item returns on its own.
 
 The tab registry is intentionally small: Agents, Reviews, and Tasks share one
 element-action table. `alt+space` enters that table; the selected tab decides

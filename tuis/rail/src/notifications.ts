@@ -1,7 +1,5 @@
 // Agent attention pushed beyond the terminal: the Sketchybar code-workspace
-// highlight and an ntfy phone ping. Both consume the current live status and
-// its clearable notification projection. Nothing here turns old attention
-// into a second live status.
+// highlight and an ntfy phone ping. Both consume current agent status.
 
 import { writeFileSync } from "node:fs";
 import { platform } from "node:os";
@@ -119,8 +117,12 @@ export type ReviewLevel = "ci" | "review" | "none";
 
 export function reviewLevel(items: readonly AttentionItem[]): ReviewLevel {
   if (items.length === 0) return "none";
-  // CI failure outranks conversation, matching the rows' own urgency.
-  return items.some((item) => item.kind === "ci") ? "ci" : "review";
+  // CI failure outranks comments, matching the rows' own urgency.
+  return items.some((item) =>
+    item.reasons.some((reason) => reason.kind === "ci"),
+  )
+    ? "ci"
+    : "review";
 }
 
 let publishedReviewLevel: ReviewLevel | null = null;

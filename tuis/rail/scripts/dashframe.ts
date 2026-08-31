@@ -77,11 +77,11 @@ const DEMO: DashboardData = {
       "—",
       "@alice",
       false,
-      "Review requested",
+      "New PR opened",
       "1d",
       "pull_request",
       {
-        headline: "Review requested on buffergolf.nvim#6",
+        headline: "New PR opened in buffergolf.nvim#6",
         bullets: [],
         body: ["Clarifies when the plugin disables itself during a session."],
         context: ["Clarify plugin disabling timing", "opened by @alice"],
