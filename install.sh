@@ -399,7 +399,7 @@ install_neovim_linux() {
 # because nobody knew the file existed is worse than being nagged.
 #
 # One "NAME description" per line; the description is what the prompt shows.
-REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent and review phone notifications'
+REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
 
 # Same file, but no nagging: these are genuinely optional. They live here
 # rather than in a tracked config because their values name private

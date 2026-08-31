@@ -9,12 +9,17 @@ import {
   commitGithubSync,
   emptyObserverState,
   FULL_RECONCILIATION_INTERVAL_MS,
+  acknowledgeItem,
   reconcileAttention,
   reconcileGithubAttention,
   shouldRunFullReconciliation,
-  suppressBaselineNotifications,
+  unacknowledgedItems,
 } from "../src/attention/state.js";
-import type { AttentionItem, GitHubActor } from "../src/attention/types.js";
+import type {
+  AttentionItem,
+  AttentionReason,
+  GitHubActor,
+} from "../src/attention/types.js";
 
 const ME = "ryansaxe";
 const START = "2026-08-29T10:05:00.000Z";
@@ -170,9 +175,6 @@ function paginatedPullRequestRunner(): {
           true,
           "discovery-2",
         ),
-        prsRequested: page([
-          discoveryNode("pr-1", 7, "2026-08-29T10:01:00.000Z"),
-        ]),
         issuesInvolved: page([]),
       });
     }
@@ -194,7 +196,7 @@ test("full sync paginates discovery and nested detail connections, then deduplic
   assert.equal(result.processedThrough, START);
   assert.deepEqual(result.refreshedTargetKeys, ["pull_request:example/repo#7"]);
   assert.equal(result.snapshot.targets.length, 1);
-  assert.deepEqual(target?.searchSources.sort(), ["involved", "requested"]);
+  assert.deepEqual(target?.searchSources.sort(), ["involved"]);
   assert.equal(target?.kind, "pull_request");
   assert.equal(target?.comments.length, 2);
   assert.equal(
@@ -223,7 +225,6 @@ test("incremental discovery uses a coarse date bound but details only targets pa
           discoveryNode("old", 1, "2026-08-29T08:59:00.000Z"),
           discoveryNode("new", 2, "2026-08-29T09:01:00.000Z"),
         ]),
-        prsRequested: page([]),
         issuesInvolved: page([]),
       });
     }
@@ -334,36 +335,41 @@ function attentionItem(
   number: number,
   createdAt: string,
 ): AttentionItem {
-  return {
-    id,
-    kind: "conversation",
-    targetKind: "pull_request",
-    repository,
-    number,
-    title: "Review",
-    url: `https://github.com/${repository}/pull/${number}`,
+  const reason: AttentionReason = {
+    id: `comment:${createdAt}`,
+    kind: "comment",
     summary: "A comment",
     actor: actor("alice"),
     createdAt,
     priority: "normal",
   };
+  return {
+    id,
+    targetKind: "pull_request",
+    repository,
+    number,
+    title: "Review",
+    url: `https://github.com/${repository}/pull/${number}`,
+    reasons: [reason],
+    activityKey: reason.id,
+  };
 }
 
 test("incremental reconciliation replaces only refreshed targets and keeps other acknowledgements", () => {
   const changed = attentionItem(
-    "conversation:example/repo#1:old",
+    "pull_request:example/repo#1",
     "example/repo",
     1,
     "2026-08-29T09:00:00.000Z",
   );
   const unchanged = attentionItem(
-    "conversation:other/repo#2:kept",
+    "pull_request:other/repo#2",
     "other/repo",
     2,
     "2026-08-29T09:00:00.000Z",
   );
   const replacement = attentionItem(
-    "conversation:example/repo#1:new",
+    "pull_request:example/repo#1",
     "example/repo",
     1,
     "2026-08-29T10:01:00.000Z",
@@ -371,7 +377,7 @@ test("incremental reconciliation replaces only refreshed targets and keeps other
   const previous = {
     ...emptyObserverState(),
     items: { [changed.id]: changed, [unchanged.id]: unchanged },
-    acknowledged: { [unchanged.id]: CHECKPOINT },
+    acknowledged: { [unchanged.id]: unchanged.activityKey },
   };
 
   const result = reconcileGithubAttention(
@@ -383,31 +389,40 @@ test("incremental reconciliation replaces only refreshed targets and keeps other
   );
 
   assert.deepEqual(
-    Object.keys(result.state.items).sort(),
+    Object.keys(result.items).sort(),
     [replacement.id, unchanged.id].sort(),
   );
-  assert.equal(result.state.acknowledged[unchanged.id], CHECKPOINT);
-  assert.equal(result.pendingNotifications.length, 1);
-  assert.equal(result.pendingNotifications[0]?.id, replacement.id);
+  assert.equal(result.acknowledged[unchanged.id], unchanged.activityKey);
+  assert.deepEqual(
+    unacknowledgedItems(result).map((item) => item.id),
+    [replacement.id],
+  );
 });
 
-test("baseline seeds old activity as notified but keeps activity at or after baseline pending", () => {
+test("an acknowledgement hides one activity revision but a later event reopens the same target", () => {
   const old = attentionItem(
-    "old",
+    "pull_request:example/repo#1",
     "example/repo",
     1,
     "2026-08-29T10:04:59.000Z",
   );
-  const fresh = attentionItem("fresh", "example/repo", 2, START);
-  const reconciled = reconcileAttention(emptyObserverState(), [old, fresh], {});
-  const baseline = suppressBaselineNotifications(reconciled, START);
+  const acknowledged = acknowledgeItem(
+    reconcileAttention(emptyObserverState(), [old], {}),
+    old.id,
+  );
+  assert.deepEqual(unacknowledgedItems(acknowledged), []);
 
+  const fresh = attentionItem(
+    "pull_request:example/repo#1",
+    "example/repo",
+    1,
+    START,
+  );
+  const resurfaced = reconcileAttention(acknowledged, [fresh], {});
   assert.deepEqual(
-    baseline.pendingNotifications.map((item) => item.id),
+    unacknowledgedItems(resurfaced).map((item) => item.id),
     [fresh.id],
   );
-  assert.equal(baseline.state.notified[old.id], START);
-  assert.equal(baseline.state.notified[fresh.id], undefined);
 });
 
 test("full reconciliation is periodic, while incremental commits keep the last full timestamp", () => {

@@ -101,12 +101,6 @@ function discoverySpecs(
       query: `is:open is:pr involves:@me sort:updated-desc${updated}`,
     },
     {
-      alias: "prsRequested",
-      kind: "pull_request",
-      source: "requested",
-      query: `is:open is:pr review-requested:@me sort:updated-desc${updated}`,
-    },
-    {
       alias: "issuesInvolved",
       kind: "issue",
       source: "involved",
@@ -304,7 +298,6 @@ interface RawGraphqlData {
     resetAt?: string | null;
   } | null;
   prsInvolved?: RawSearch<RawPullRequest> | null;
-  prsRequested?: RawSearch<RawPullRequest> | null;
   issuesInvolved?: RawSearch<RawIssue> | null;
   // watchedPrs0, watchedIssues0, … — the count depends on the watch list.
   [alias: string]: unknown;
@@ -491,15 +484,12 @@ function parsePullRequest(
     ciState: ciState(raw.statusCheckRollup?.state),
     failingChecks: failingChecks(raw.statusCheckRollup),
     searchSources: [source],
-    reviewRequested: source === "requested",
-    reviewRequestFingerprint: source === "requested" ? "viewer" : "",
     comments,
     reviewThreads,
   };
 }
 
-// One target can arrive from several searches; merge rather than duplicate,
-// keeping the review-request flag whichever search carried it.
+// One target can arrive from several searches; merge rather than duplicate.
 function mergeTargets(
   pullRequests: Array<{
     source: string;
@@ -527,13 +517,6 @@ function mergeTargets(
       previous.searchSources = [
         ...new Set([...previous.searchSources, entry.source]),
       ];
-      previous.reviewRequested ||= parsed.reviewRequested;
-      if (
-        previous.reviewRequestFingerprint === "" &&
-        parsed.reviewRequestFingerprint !== ""
-      ) {
-        previous.reviewRequestFingerprint = parsed.reviewRequestFingerprint;
-      }
     }
   }
 
@@ -625,7 +608,6 @@ export function parseGithubResponse(
     targets: mergeTargets(
       [
         { source: "involved", search: data.prsInvolved },
-        { source: "requested", search: data.prsRequested },
         ...watchSearches<RawPullRequest>(data, "watchedPrs"),
       ],
       [
@@ -1206,10 +1188,6 @@ async function fetchTargetDetails(
           `GitHub GraphQL: ${githubTargetKey(target)} returned an incomplete review thread`,
         );
       }
-      if (thread.isResolved === true) {
-        thread.comments = { nodes: [] };
-        continue;
-      }
       const comments = await fetchThreadComments(thread.id, runQuery);
       rateLimit = comments.rateLimit ?? rateLimit;
       thread.isResolved = comments.thread.isResolved;
@@ -1233,10 +1211,6 @@ async function fetchTargetDetails(
     );
   }
   parsed.searchSources = [...target.searchSources];
-  if (parsed.kind === "pull_request") {
-    parsed.reviewRequested = target.searchSources.includes("requested");
-    parsed.reviewRequestFingerprint = parsed.reviewRequested ? "viewer" : "";
-  }
   return { target: parsed, rateLimit };
 }
 
