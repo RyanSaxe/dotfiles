@@ -50,7 +50,12 @@ return {
               wins[#wins + 1] = win
               local config = vim.api.nvim_win_get_config(win)
               -- +2: the width excludes the border column on either side.
-              right = math.max(right, config.col + config.width + 2)
+              local col = assert(tonumber(config.col))
+              local width = assert(tonumber(config.width))
+              local edge = col + width + 2
+              if edge > right then
+                right = edge
+              end
             end
           end
           -- Already flush against the right edge — which is also what a

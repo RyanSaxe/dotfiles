@@ -15,6 +15,9 @@ local root_contexts = {}
 ---@type table<integer, string>
 local pending_paths = {}
 
+---@type table<integer, integer>
+local setup_generations = {}
+
 ---@class GitReviewSavedScroll
 ---@field value boolean?
 ---@type table<integer, table<integer, GitReviewSavedScroll>>
@@ -413,6 +416,30 @@ local function restore_codediff_scroll(tabpage)
 end
 
 ---@param tabpage integer
+---@return boolean
+local function displayed_buffers_match_session(tabpage)
+  local lifecycle = require("codediff.ui.lifecycle")
+  local original_buf, modified_buf = lifecycle.get_buffers(tabpage)
+  local original_win, modified_win = lifecycle.get_windows(tabpage)
+  if not original_buf or not modified_buf or not original_win or not modified_win then
+    return false
+  end
+  if not vim.api.nvim_buf_is_valid(original_buf) or not vim.api.nvim_buf_is_valid(modified_buf) then
+    return false
+  end
+  if not vim.api.nvim_win_is_valid(original_win) or not vim.api.nvim_win_is_valid(modified_win) then
+    return false
+  end
+
+  if original_win == modified_win then
+    return vim.api.nvim_win_get_buf(modified_win) == modified_buf
+  end
+
+  return vim.api.nvim_win_get_buf(original_win) == original_buf
+    and vim.api.nvim_win_get_buf(modified_win) == modified_buf
+end
+
+---@param tabpage integer
 ---@param context GitReviewContext
 local function remember_context(tabpage, context)
   local attached = vim.deepcopy(context)
@@ -442,17 +469,34 @@ local function setup_codediff_tab(tabpage)
 end
 
 ---@param tabpage integer
-local function setup_codediff_tab_when_ready(tabpage)
-  schedule(function()
-    setup_codediff_tab(tabpage)
+---@param expected_path string?
+local function setup_codediff_tab_when_ready(tabpage, expected_path)
+  local generation = (setup_generations[tabpage] or 0) + 1
+  setup_generations[tabpage] = generation
 
-    -- CodeDiff can replace the placeholder buffers after it emits its file
-    -- selection event. The second pass catches those buffers without making
-    -- PR association part of the keymap lifecycle.
-    vim.defer_fn(function()
+  local attempts = 0
+  local function retry()
+    if setup_generations[tabpage] ~= generation or not vim.api.nvim_tabpage_is_valid(tabpage) then
+      return
+    end
+
+    attempts = attempts + 1
+    local lifecycle = require("codediff.ui.lifecycle")
+    local session = lifecycle.get_session(tabpage)
+    local path_ready = not expected_path or session_path(tabpage) == expected_path
+    if session and path_ready and displayed_buffers_match_session(tabpage) then
       setup_codediff_tab(tabpage)
-    end, 50)
-  end)
+      return
+    end
+
+    if attempts < 100 then
+      vim.defer_fn(retry, 50)
+    end
+  end
+
+  -- CodeDiff emits its events before scheduled rendering and before the
+  -- explorer has finished replacing its placeholder buffers.
+  vim.defer_fn(retry, 0)
 end
 
 ---@param event vim.api.keyset.create_autocmd.callback_args
@@ -475,7 +519,7 @@ local function on_codediff_file_select(event)
     return
   end
 
-  setup_codediff_tab_when_ready(tabpage)
+  setup_codediff_tab_when_ready(tabpage, path)
 
   local context = tab_contexts[tabpage]
   if context then
@@ -496,6 +540,7 @@ local function on_codediff_close(event)
   local context = tab_contexts[tabpage]
   tab_contexts[tabpage] = nil
   pending_paths[tabpage] = nil
+  setup_generations[tabpage] = (setup_generations[tabpage] or 0) + 1
   restore_codediff_scroll(tabpage)
   if context and root_contexts[context.root] and root_contexts[context.root].number == context.number then
     root_contexts[context.root] = nil
