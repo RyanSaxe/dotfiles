@@ -144,9 +144,9 @@ local function fetch_pr_context(root, repo, number, quiet, callback)
 end
 
 ---@param root string
----@param branch string
+---@param name string
 ---@param callback fun(path: string?, error: string?)
-local function find_worktree(root, branch, callback)
+local function find_worktree(root, name, callback)
   ---@param result vim.SystemCompleted
   vim.system({ "git", "worktree", "list", "--porcelain" }, { cwd = root, text = true }, function(result)
     schedule(function()
@@ -155,14 +155,11 @@ local function find_worktree(root, branch, callback)
         return
       end
 
-      local current_path ---@type string?
       local found ---@type string?
       for line in (result.stdout or ""):gmatch("[^\r\n]+") do
         local path = line:match("^worktree (.+)$")
-        if path then
-          current_path = path
-        elseif line == "branch refs/heads/" .. branch then
-          found = current_path
+        if path and vim.fs.basename(path) == name then
+          found = path
           break
         end
       end
@@ -217,7 +214,7 @@ local function create_worktree(root, context, callback)
     return
   end
 
-  local branch = "pr-" .. tostring(context.number)
+  local name = "pr-" .. tostring(context.number)
   local command = {
     "workmux",
     "add",
@@ -226,7 +223,7 @@ local function create_worktree(root, context, callback)
     "--session",
     "--open-if-exists",
     "--name",
-    branch,
+    name,
     "--target-name",
     workmux_target(context.repo, context.number),
     "--background",
@@ -238,7 +235,7 @@ local function create_worktree(root, context, callback)
     schedule(function()
       ---@param path string?
       ---@param worktree_error string?
-      find_worktree(root, branch, function(path, worktree_error)
+      find_worktree(root, name, function(path, worktree_error)
         if path then
           callback(path)
           return
@@ -312,16 +309,16 @@ function M.open_in_codediff(item)
       return
     end
 
-    local branch = "pr-" .. tostring(number)
+    local worktree_name = "pr-" .. tostring(number)
     local current_branch = git_output(root, { "branch", "--show-current" })
-    if current_branch == branch then
+    if current_branch == worktree_name then
       context.root = root
       open_codediff(context)
       return
     end
 
     ---@param path string?
-    find_worktree(root, branch, function(path)
+    find_worktree(root, worktree_name, function(path)
       if path then
         context.root = path
         open_codediff(context)
@@ -487,6 +484,7 @@ function M.setup()
   local actions = require("snacks.gh.actions")
   actions.actions.open_in_codediff = {
     desc = "Open in CodeDiff",
+    icon = "󰦓 ",
     title = "Open PR #{number} in CodeDiff",
     priority = 150,
     type = "pr",
