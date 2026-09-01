@@ -250,7 +250,27 @@ return {
         files = { hidden = true },
         grep = { hidden = true },
         explorer = { hidden = true },
+        gh_diff = {
+          group = false,
+          ---@param picker snacks.Picker
+          on_show = function(picker)
+            Snacks.picker.actions.focus_preview(picker)
+          end,
+          win = {
+            preview = {
+              keys = {
+                ["<Tab>"] = { "list_down", mode = { "n", "x" }, desc = "Next hunk" },
+                ["<S-Tab>"] = { "list_up", mode = { "n", "x" }, desc = "Previous hunk" },
+              },
+            },
+          },
+        },
       },
     },
   },
+  ---@param opts table
+  config = function(_, opts)
+    require("snacks").setup(opts)
+    require("git_review").setup()
+  end,
 }
