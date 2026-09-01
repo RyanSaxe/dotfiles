@@ -8,23 +8,6 @@ local M = {}
 ---@field head string?
 ---@field path string?
 
----@type table<integer, GitReviewContext>
-local tab_contexts = {}
----@type table<string, GitReviewContext>
-local root_contexts = {}
----@type table<integer, string>
-local pending_paths = {}
-
----@type table<integer, integer>
-local setup_generations = {}
-
----@class GitReviewSavedScroll
----@field value boolean?
----@type table<integer, table<integer, GitReviewSavedScroll>>
-local saved_scroll_options = {}
-
-local did_setup = false
-
 ---@param message string
 ---@param level? integer
 local function notify(message, level)
@@ -262,7 +245,6 @@ end
 local function open_codediff(context)
   ---@param ref string
   ensure_base_ref(context.root, context.base, function(ref)
-    root_contexts[context.root] = vim.deepcopy(context)
     local ok, error_message = pcall(function()
       vim.cmd({
         cmd = "CodeDiff",
@@ -367,189 +349,18 @@ local function session_path(tabpage)
   end
 end
 
----@param tabpage integer
----@return boolean
-local function install_codediff_keymap(tabpage)
-  local lifecycle = require("codediff.ui.lifecycle")
-  return lifecycle.set_tab_keymap(tabpage, "n", "<localleader>c", function()
-    M.open_snacks(tabpage)
-  end, { desc = "Open PR diff in Snacks" })
-end
-
----@param tabpage integer
----@param bufnr integer?
-local function save_scroll_option(tabpage, bufnr)
-  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
-    return
-  end
-
-  local states = saved_scroll_options[tabpage] or {}
-  if not states[bufnr] then
-    states[bufnr] = { value = vim.b[bufnr].snacks_scroll }
-    vim.b[bufnr].snacks_scroll = false
-  end
-  saved_scroll_options[tabpage] = states
-end
-
----@param tabpage integer
-local function disable_codediff_scroll(tabpage)
-  local lifecycle = require("codediff.ui.lifecycle")
-  local original_buf, modified_buf = lifecycle.get_buffers(tabpage)
-  save_scroll_option(tabpage, original_buf)
-  save_scroll_option(tabpage, modified_buf)
-end
-
----@param tabpage integer
-local function restore_codediff_scroll(tabpage)
-  local states = saved_scroll_options[tabpage]
-  if not states then
-    return
-  end
-
-  for bufnr, saved in pairs(states) do
-    if vim.api.nvim_buf_is_valid(bufnr) then
-      vim.b[bufnr].snacks_scroll = saved.value
-    end
-  end
-
-  saved_scroll_options[tabpage] = nil
-end
-
----@param tabpage integer
----@return boolean
-local function displayed_buffers_match_session(tabpage)
-  local lifecycle = require("codediff.ui.lifecycle")
-  local original_buf, modified_buf = lifecycle.get_buffers(tabpage)
-  local original_win, modified_win = lifecycle.get_windows(tabpage)
-  if not original_buf or not modified_buf or not original_win or not modified_win then
-    return false
-  end
-  if not vim.api.nvim_buf_is_valid(original_buf) or not vim.api.nvim_buf_is_valid(modified_buf) then
-    return false
-  end
-  if not vim.api.nvim_win_is_valid(original_win) or not vim.api.nvim_win_is_valid(modified_win) then
-    return false
-  end
-
-  if original_win == modified_win then
-    return vim.api.nvim_win_get_buf(modified_win) == modified_buf
-  end
-
-  return vim.api.nvim_win_get_buf(original_win) == original_buf
-    and vim.api.nvim_win_get_buf(modified_win) == modified_buf
-end
-
----@param tabpage integer
----@param context GitReviewContext
-local function remember_context(tabpage, context)
-  local attached = vim.deepcopy(context)
-  attached.path = pending_paths[tabpage] or session_path(tabpage) or attached.path
-  tab_contexts[tabpage] = attached
-  pending_paths[tabpage] = nil
-end
-
----@param tabpage integer
-local function setup_codediff_tab(tabpage)
-  local lifecycle = require("codediff.ui.lifecycle")
-  local session = lifecycle.get_session(tabpage)
-  if not session then
-    return
-  end
-
-  install_codediff_keymap(tabpage)
-  disable_codediff_scroll(tabpage)
-
-  if session.git_root then
-    local root = normalize(session.git_root)
-    local context = root_contexts[root]
-    if context and not tab_contexts[tabpage] then
-      remember_context(tabpage, context)
-    end
-  end
-end
-
----@param tabpage integer
----@param expected_path string?
-local function setup_codediff_tab_when_ready(tabpage, expected_path)
-  local generation = (setup_generations[tabpage] or 0) + 1
-  setup_generations[tabpage] = generation
-
-  local attempts = 0
-  local function retry()
-    if setup_generations[tabpage] ~= generation or not vim.api.nvim_tabpage_is_valid(tabpage) then
-      return
-    end
-
-    attempts = attempts + 1
-    local lifecycle = require("codediff.ui.lifecycle")
-    local session = lifecycle.get_session(tabpage)
-    local path_ready = not expected_path or session_path(tabpage) == expected_path
-    if session and path_ready and displayed_buffers_match_session(tabpage) then
-      setup_codediff_tab(tabpage)
-      return
-    end
-
-    if attempts < 100 then
-      vim.defer_fn(retry, 50)
-    end
-  end
-
-  -- CodeDiff emits its events before scheduled rendering and before the
-  -- explorer has finished replacing its placeholder buffers.
-  vim.defer_fn(retry, 0)
-end
-
----@param event vim.api.keyset.create_autocmd.callback_args
-local function on_codediff_open(event)
-  local data = event.data
-  local tabpage = data and data.tabpage
-  if type(tabpage) ~= "number" then
-    return
-  end
-
-  setup_codediff_tab_when_ready(tabpage)
-end
-
----@param event vim.api.keyset.create_autocmd.callback_args
-local function on_codediff_file_select(event)
-  local data = event.data
-  local tabpage = data and data.tabpage
-  local path = data and data.path
-  if type(tabpage) ~= "number" or type(path) ~= "string" or path == "" then
-    return
-  end
-
-  setup_codediff_tab_when_ready(tabpage, path)
-
-  local context = tab_contexts[tabpage]
-  if context then
-    context.path = path
-  else
-    pending_paths[tabpage] = path
-  end
-end
-
----@param event vim.api.keyset.create_autocmd.callback_args
-local function on_codediff_close(event)
-  local data = event.data
-  local tabpage = data and data.tabpage
-  if type(tabpage) ~= "number" then
-    return
-  end
-
-  local context = tab_contexts[tabpage]
-  tab_contexts[tabpage] = nil
-  pending_paths[tabpage] = nil
-  setup_generations[tabpage] = (setup_generations[tabpage] or 0) + 1
-  restore_codediff_scroll(tabpage)
-  if context and root_contexts[context.root] and root_contexts[context.root].number == context.number then
-    root_contexts[context.root] = nil
-  end
+---@param root string
+---@return integer?
+local function worktree_pr_number(root)
+  local branch = git_output(root, { "branch", "--show-current" })
+  local number = branch and branch:match("pr%-(%d+)$")
+  return number and tonumber(number) or nil
 end
 
 ---@param context GitReviewContext
 local function open_snacks_for_context(context)
   local opts = {
+    cwd = context.root,
     show_delay = 0,
     repo = context.repo,
     pr = context.number,
@@ -564,52 +375,33 @@ end
 
 ---@param tabpage integer
 function M.open_snacks(tabpage)
-  local context = tab_contexts[tabpage]
-  if not context then
-    local root = session_root(tabpage)
-    if not root then
+  local root = session_root(tabpage)
+  if not root then
+    notify("This CodeDiff view is not associated with a pull request", vim.log.levels.WARN)
+    return
+  end
+
+  local repo = remote_repo(root)
+  if not repo then
+    notify("This CodeDiff view is not associated with a GitHub repository", vim.log.levels.WARN)
+    return
+  end
+
+  local number = worktree_pr_number(root)
+  ---@param context GitReviewContext?
+  fetch_pr_context(root, repo, number, true, function(context)
+    if not context then
       notify("This CodeDiff view is not associated with a pull request", vim.log.levels.WARN)
       return
     end
 
-    context = root_contexts[root]
-    if context then
-      remember_context(tabpage, context)
-      open_snacks_for_context(tab_contexts[tabpage])
-      return
-    end
-
-    local repo = remote_repo(root)
-    if not repo then
-      notify("This CodeDiff view is not associated with a pull request: no GitHub origin remote", vim.log.levels.WARN)
-      return
-    end
-
-    ---@param pr_context GitReviewContext?
-    ---@param error_message string?
-    fetch_pr_context(root, repo, nil, true, function(pr_context, error_message)
-      if not pr_context then
-        local detail = error_message and (": " .. error_message) or ""
-        notify("Could not resolve a pull request for this CodeDiff view" .. detail, vim.log.levels.WARN)
-        return
-      end
-
-      root_contexts[root] = pr_context
-      remember_context(tabpage, pr_context)
-      open_snacks_for_context(tab_contexts[tabpage])
-    end)
-    return
-  end
-
-  open_snacks_for_context(context)
+    context.root = root
+    context.path = session_path(tabpage)
+    open_snacks_for_context(context)
+  end)
 end
 
 function M.setup()
-  if did_setup then
-    return
-  end
-  did_setup = true
-
   local actions = require("snacks.gh.actions")
   actions.actions.open_in_codediff = {
     desc = "Open in CodeDiff",
@@ -622,23 +414,6 @@ function M.setup()
       M.open_in_codediff(item)
     end,
   }
-
-  local group = vim.api.nvim_create_augroup("git_review_surfaces", { clear = true })
-  vim.api.nvim_create_autocmd("User", {
-    group = group,
-    pattern = "CodeDiffOpen",
-    callback = on_codediff_open,
-  })
-  vim.api.nvim_create_autocmd("User", {
-    group = group,
-    pattern = "CodeDiffFileSelect",
-    callback = on_codediff_file_select,
-  })
-  vim.api.nvim_create_autocmd("User", {
-    group = group,
-    pattern = "CodeDiffClose",
-    callback = on_codediff_close,
-  })
 end
 
 return M

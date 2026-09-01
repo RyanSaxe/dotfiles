@@ -256,14 +256,6 @@ return {
           on_show = function(picker)
             Snacks.picker.actions.focus_preview(picker)
           end,
-          win = {
-            preview = {
-              keys = {
-                ["<Tab>"] = { "list_down", mode = { "n", "x" }, desc = "Next hunk" },
-                ["<S-Tab>"] = { "list_up", mode = { "n", "x" }, desc = "Previous hunk" },
-              },
-            },
-          },
         },
       },
     },
