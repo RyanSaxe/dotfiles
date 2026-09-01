@@ -14,8 +14,11 @@ local tab_contexts = {}
 local root_contexts = {}
 ---@type table<integer, string>
 local pending_paths = {}
----@type table<integer, boolean>
-local pending_discovery = {}
+
+---@class GitReviewSavedScroll
+---@field value boolean?
+---@type table<integer, table<integer, GitReviewSavedScroll>>
+local saved_scroll_options = {}
 
 local did_setup = false
 
@@ -93,7 +96,7 @@ end
 ---@param repo string
 ---@param number integer?
 ---@param quiet boolean
----@param callback fun(context: GitReviewContext?)
+---@param callback fun(context: GitReviewContext?, error_message: string?)
 local function fetch_pr_context(root, repo, number, quiet, callback)
   local args = { "gh", "pr", "view" }
   if number then
@@ -105,30 +108,33 @@ local function fetch_pr_context(root, repo, number, quiet, callback)
   vim.system(args, { cwd = root, text = true }, function(result)
     schedule(function()
       if result.code ~= 0 then
+        local detail = command_error(result)
         if not quiet then
           local subject = number and (" PR #" .. tostring(number)) or " current branch"
-          notify("Could not resolve" .. subject .. ": " .. command_error(result), vim.log.levels.ERROR)
+          notify("Could not resolve" .. subject .. ": " .. detail, vim.log.levels.ERROR)
         end
-        callback()
+        callback(nil, detail)
         return
       end
 
       local ok, data = pcall(vim.json.decode, result.stdout or "")
       if not ok or type(data) ~= "table" then
+        local detail = "invalid GitHub response"
         if not quiet then
           notify("Could not parse the GitHub PR details", vim.log.levels.ERROR)
         end
-        callback()
+        callback(nil, detail)
         return
       end
 
       local actual_number = tonumber(data.number or number)
       local base = type(data.baseRefName) == "string" and data.baseRefName or nil
       if not actual_number or not base or base == "" then
+        local detail = "the GitHub PR did not include a base branch"
         if not quiet then
           notify("The GitHub PR did not include a base branch", vim.log.levels.ERROR)
         end
-        callback()
+        callback(nil, detail)
         return
       end
 
@@ -138,7 +144,7 @@ local function fetch_pr_context(root, repo, number, quiet, callback)
         number = actual_number,
         base = base,
         head = type(data.headRefName) == "string" and data.headRefName or nil,
-      })
+      }, nil)
     end)
   end)
 end
@@ -339,6 +345,14 @@ end
 
 ---@param tabpage integer
 ---@return string?
+local function session_root(tabpage)
+  local lifecycle = require("codediff.ui.lifecycle")
+  local session = lifecycle.get_session(tabpage)
+  return session and session.git_root and normalize(session.git_root) or nil
+end
+
+---@param tabpage integer
+---@return string?
 local function session_path(tabpage)
   local lifecycle = require("codediff.ui.lifecycle")
   local original, modified = lifecycle.get_paths(tabpage)
@@ -351,48 +365,93 @@ local function session_path(tabpage)
 end
 
 ---@param tabpage integer
+---@return boolean
 local function install_codediff_keymap(tabpage)
   local lifecycle = require("codediff.ui.lifecycle")
-  lifecycle.set_tab_keymap(tabpage, "n", "<localleader>c", function()
+  return lifecycle.set_tab_keymap(tabpage, "n", "<localleader>c", function()
     M.open_snacks(tabpage)
   end, { desc = "Open PR diff in Snacks" })
 end
 
 ---@param tabpage integer
+---@param bufnr integer?
+local function save_scroll_option(tabpage, bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  local states = saved_scroll_options[tabpage] or {}
+  if not states[bufnr] then
+    states[bufnr] = { value = vim.b[bufnr].snacks_scroll }
+    vim.b[bufnr].snacks_scroll = false
+  end
+  saved_scroll_options[tabpage] = states
+end
+
+---@param tabpage integer
+local function disable_codediff_scroll(tabpage)
+  local lifecycle = require("codediff.ui.lifecycle")
+  local original_buf, modified_buf = lifecycle.get_buffers(tabpage)
+  save_scroll_option(tabpage, original_buf)
+  save_scroll_option(tabpage, modified_buf)
+end
+
+---@param tabpage integer
+local function restore_codediff_scroll(tabpage)
+  local states = saved_scroll_options[tabpage]
+  if not states then
+    return
+  end
+
+  for bufnr, saved in pairs(states) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      vim.b[bufnr].snacks_scroll = saved.value
+    end
+  end
+
+  saved_scroll_options[tabpage] = nil
+end
+
+---@param tabpage integer
 ---@param context GitReviewContext
-local function attach_context(tabpage, context)
+local function remember_context(tabpage, context)
   local attached = vim.deepcopy(context)
   attached.path = pending_paths[tabpage] or session_path(tabpage) or attached.path
   tab_contexts[tabpage] = attached
   pending_paths[tabpage] = nil
-  install_codediff_keymap(tabpage)
 end
 
 ---@param tabpage integer
----@param root string
-local function discover_context(tabpage, root)
-  if pending_discovery[tabpage] then
-    return
-  end
-  pending_discovery[tabpage] = true
-
-  local repo = remote_repo(root)
-  if not repo then
-    pending_discovery[tabpage] = nil
+local function setup_codediff_tab(tabpage)
+  local lifecycle = require("codediff.ui.lifecycle")
+  local session = lifecycle.get_session(tabpage)
+  if not session then
     return
   end
 
-  ---@param context GitReviewContext?
-  fetch_pr_context(root, repo, nil, true, function(context)
-    pending_discovery[tabpage] = nil
-    local lifecycle = require("codediff.ui.lifecycle")
-    local session = lifecycle.get_session(tabpage)
-    if not session or session.git_root == nil or normalize(session.git_root) ~= root or not context then
-      return
+  install_codediff_keymap(tabpage)
+  disable_codediff_scroll(tabpage)
+
+  if session.git_root then
+    local root = normalize(session.git_root)
+    local context = root_contexts[root]
+    if context and not tab_contexts[tabpage] then
+      remember_context(tabpage, context)
     end
+  end
+end
 
-    root_contexts[root] = context
-    attach_context(tabpage, context)
+---@param tabpage integer
+local function setup_codediff_tab_when_ready(tabpage)
+  schedule(function()
+    setup_codediff_tab(tabpage)
+
+    -- CodeDiff can replace the placeholder buffers after it emits its file
+    -- selection event. The second pass catches those buffers without making
+    -- PR association part of the keymap lifecycle.
+    vim.defer_fn(function()
+      setup_codediff_tab(tabpage)
+    end, 50)
   end)
 end
 
@@ -404,19 +463,7 @@ local function on_codediff_open(event)
     return
   end
 
-  local lifecycle = require("codediff.ui.lifecycle")
-  local session = lifecycle.get_session(tabpage)
-  if not session or not session.git_root then
-    return
-  end
-
-  local root = normalize(session.git_root)
-  local context = root_contexts[root]
-  if context then
-    attach_context(tabpage, context)
-  else
-    discover_context(tabpage, root)
-  end
+  setup_codediff_tab_when_ready(tabpage)
 end
 
 ---@param event vim.api.keyset.create_autocmd.callback_args
@@ -428,10 +475,11 @@ local function on_codediff_file_select(event)
     return
   end
 
+  setup_codediff_tab_when_ready(tabpage)
+
   local context = tab_contexts[tabpage]
   if context then
     context.path = path
-    install_codediff_keymap(tabpage)
   else
     pending_paths[tabpage] = path
   end
@@ -448,20 +496,14 @@ local function on_codediff_close(event)
   local context = tab_contexts[tabpage]
   tab_contexts[tabpage] = nil
   pending_paths[tabpage] = nil
-  pending_discovery[tabpage] = nil
+  restore_codediff_scroll(tabpage)
   if context and root_contexts[context.root] and root_contexts[context.root].number == context.number then
     root_contexts[context.root] = nil
   end
 end
 
----@param tabpage integer
-function M.open_snacks(tabpage)
-  local context = tab_contexts[tabpage]
-  if not context then
-    notify("This CodeDiff view is not associated with a pull request", vim.log.levels.WARN)
-    return
-  end
-
+---@param context GitReviewContext
+local function open_snacks_for_context(context)
   local opts = {
     show_delay = 0,
     repo = context.repo,
@@ -473,6 +515,48 @@ function M.open_snacks(tabpage)
     opts.pattern = context.path .. ":"
   end
   Snacks.picker.gh_diff(opts)
+end
+
+---@param tabpage integer
+function M.open_snacks(tabpage)
+  local context = tab_contexts[tabpage]
+  if not context then
+    local root = session_root(tabpage)
+    if not root then
+      notify("This CodeDiff view is not associated with a pull request", vim.log.levels.WARN)
+      return
+    end
+
+    context = root_contexts[root]
+    if context then
+      remember_context(tabpage, context)
+      open_snacks_for_context(tab_contexts[tabpage])
+      return
+    end
+
+    local repo = remote_repo(root)
+    if not repo then
+      notify("This CodeDiff view is not associated with a pull request: no GitHub origin remote", vim.log.levels.WARN)
+      return
+    end
+
+    ---@param pr_context GitReviewContext?
+    ---@param error_message string?
+    fetch_pr_context(root, repo, nil, true, function(pr_context, error_message)
+      if not pr_context then
+        local detail = error_message and (": " .. error_message) or ""
+        notify("Could not resolve a pull request for this CodeDiff view" .. detail, vim.log.levels.WARN)
+        return
+      end
+
+      root_contexts[root] = pr_context
+      remember_context(tabpage, pr_context)
+      open_snacks_for_context(tab_contexts[tabpage])
+    end)
+    return
+  end
+
+  open_snacks_for_context(context)
 end
 
 function M.setup()
