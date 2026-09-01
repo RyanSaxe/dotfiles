@@ -11,11 +11,13 @@ import { buildQuery, parseGithubResponse } from "../src/attention/github.js";
 import type {
   AttentionItem,
   GitHubComment,
+  GitHubReview,
   IssueTarget,
   PullRequestTarget,
 } from "../src/attention/types.js";
 
 const ME = "ryansaxe";
+const FLOOR = "2026-08-20T00:00:00Z";
 const config = defaultAttentionConfig();
 
 const comment = (
@@ -34,6 +36,20 @@ const comment = (
   url: `https://example.test/${id}`,
   viewerHasReacted: false,
   ...over,
+});
+
+const review = (
+  id: string,
+  state: GitHubReview["state"],
+  submittedAt = "2026-08-20T10:01:00Z",
+  body = "",
+): GitHubReview => ({
+  id,
+  author: { login: "alice", kind: "user" },
+  body,
+  state,
+  submittedAt,
+  url: `https://example.test/${id}`,
 });
 
 const pr = (over: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
@@ -56,6 +72,7 @@ const pr = (over: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   searchSources: ["involved"],
   comments: [],
   reviewThreads: [],
+  reviews: [],
   ...over,
 });
 
@@ -201,6 +218,97 @@ test("a pull request merges all conversation and review-thread comments into one
   );
   assert.equal(item?.reasons.length, 1);
   assert.equal(item?.reasons[0]?.actor?.login, "bob");
+});
+
+test("an external formal review on your pull request becomes review attention", () => {
+  const item = classifyTarget(
+    pr({
+      reviews: [review("review-1", "APPROVED", "2026-08-20T10:01:00Z", "LGTM")],
+    }),
+    ME,
+    config,
+    { baselineAt: FLOOR },
+  );
+  assert.deepEqual(reasons(item), ["review"]);
+  assert.equal(item?.reasons[0]?.reviewState, "APPROVED");
+  assert.equal(item?.reasons[0]?.actor?.login, "alice");
+  assert.equal(item?.reasons[0]?.priority, "normal");
+});
+
+test("changes requested on your pull request has high priority", () => {
+  const item = classifyTarget(
+    pr({ reviews: [review("review-1", "CHANGES_REQUESTED")] }),
+    ME,
+    config,
+    { baselineAt: FLOOR },
+  );
+  assert.equal(item?.reasons[0]?.reviewState, "CHANGES_REQUESTED");
+  assert.equal(item?.reasons[0]?.priority, "high");
+});
+
+test("a comment-only formal review carries its summary", () => {
+  const item = classifyTarget(
+    pr({
+      reviews: [
+        review("review-1", "COMMENTED", "2026-08-20T10:01:00Z", "See note"),
+      ],
+    }),
+    ME,
+    config,
+    { baselineAt: FLOOR },
+  );
+  assert.equal(item?.reasons[0]?.reviewState, "COMMENTED");
+  assert.equal(item?.reasons[0]?.summary, "Submitted review: See note");
+});
+
+test("formal reviews are limited to pull requests authored by the viewer", () => {
+  const item = classifyTarget(
+    pr({
+      author: { login: "carol", kind: "user" },
+      reviews: [review("review-1", "APPROVED")],
+    }),
+    ME,
+    config,
+  );
+  assert.equal(item, null);
+});
+
+test("dismissed and historical formal reviews stay out of the inbox", () => {
+  assert.equal(
+    classifyTarget(
+      pr({ reviews: [review("review-1", "DISMISSED")] }),
+      ME,
+      config,
+      { baselineAt: FLOOR },
+    ),
+    null,
+  );
+  assert.equal(
+    classifyTarget(
+      pr({
+        reviews: [review("review-2", "APPROVED", "2026-08-19T10:00:00Z")],
+      }),
+      ME,
+      config,
+      { baselineAt: FLOOR },
+    ),
+    null,
+  );
+  assert.equal(
+    classifyTarget(
+      pr({
+        reviews: [
+          {
+            ...review("review-3", "APPROVED"),
+            author: { login: ME, kind: "user" },
+          },
+        ],
+      }),
+      ME,
+      config,
+    ),
+    null,
+  );
 });
 
 test("a watched target can carry opened and comment reasons in one row", () => {

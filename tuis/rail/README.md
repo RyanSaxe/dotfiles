@@ -106,9 +106,12 @@ work, urgency-ordered, with the tab itself red while anything is overdue — and
 
 The first successful refresh establishes a clean baseline, so existing GitHub
 activity is not imported into the inbox. Each pull request or issue is one row;
-comment and CI reasons are combined on that row. Acknowledging a row clears its
-current activity revision. A later external comment or a new CI failure on the
-same target changes the revision and brings the row back.
+comment, formal review, and CI reasons are combined on that row. On pull
+requests authored by you, new `APPROVED`, `CHANGES_REQUESTED`, and `COMMENTED`
+reviews are reported with the reviewer's state and summary. Acknowledging a row
+clears its current activity revision. A later external comment, formal review,
+or new CI failure on the same target changes the revision and brings the row
+back.
 
 Watching a repository starts at the moment it is added. Existing open targets
 are not backfilled, while newly opened non-draft targets and later comments on

@@ -137,6 +137,38 @@ test("the reason phrase never repeats the actor", () => {
   assert.ok(!item.reason.includes("reviewer"));
 });
 
+test("formal review states are visible in the row and preview", () => {
+  const item = reviewItem(
+    attention({
+      reason: {
+        kind: "review",
+        reviewState: "APPROVED",
+        summary: "Approved review: LGTM",
+      },
+    }),
+    VIEWER,
+  );
+  assert.equal(item.from, "@reviewer");
+  assert.equal(item.reason, "Approved your PR");
+  assert.match(item.preview.headline, /@reviewer approved repo#7/);
+  assert.match(item.preview.body.join(" "), /LGTM/);
+});
+
+test("changes requested keeps its actionable wording", () => {
+  const item = reviewItem(
+    attention({
+      reason: {
+        kind: "review",
+        reviewState: "CHANGES_REQUESTED",
+        summary: "Changes requested",
+      },
+    }),
+    VIEWER,
+  );
+  assert.equal(item.reason, "Changes requested on your PR");
+  assert.match(item.preview.headline, /requested changes on repo#7/);
+});
+
 test("markdown is stripped from preview bodies", () => {
   const item = reviewItem(
     attention({ reason: { kind: "ci", actor: null } }),

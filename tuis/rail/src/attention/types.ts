@@ -20,6 +20,18 @@ export interface ReviewThread {
   comments: GitHubComment[];
 }
 
+export type GitHubReviewState =
+  "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED";
+
+export interface GitHubReview {
+  id: string;
+  author: GitHubActor | null;
+  body: string;
+  state: GitHubReviewState;
+  submittedAt: string;
+  url: string;
+}
+
 export type CiState =
   | "SUCCESS"
   | "FAILURE"
@@ -73,6 +85,7 @@ export interface PullRequestTarget extends TargetBase {
   ciState: CiState;
   failingChecks: string[];
   reviewThreads: ReviewThread[];
+  reviews: GitHubReview[];
 }
 
 export interface IssueTarget extends TargetBase {
@@ -82,7 +95,7 @@ export interface IssueTarget extends TargetBase {
 
 export type GitHubTarget = PullRequestTarget | IssueTarget;
 
-export type AttentionKind = "comment" | "ci" | "opened";
+export type AttentionKind = "comment" | "ci" | "opened" | "review";
 
 export interface AttentionReason {
   // The stable event identity lets a target row become active again when a
@@ -93,6 +106,7 @@ export interface AttentionReason {
   actor: GitHubActor | null;
   createdAt: string;
   priority: "normal" | "high";
+  reviewState?: GitHubReviewState;
 }
 
 export interface AttentionItem {

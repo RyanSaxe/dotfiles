@@ -23,6 +23,7 @@ import {
 import type {
   GitHubActor,
   GitHubComment,
+  GitHubReview,
   PullRequestTarget,
 } from "../src/attention/types.js";
 
@@ -58,6 +59,21 @@ const comment = (
   viewerHasReacted,
 });
 
+const review = (
+  id: string,
+  author: GitHubActor,
+  state: GitHubReview["state"],
+  submittedAt: string,
+  body = "",
+): GitHubReview => ({
+  id,
+  author,
+  body,
+  state,
+  submittedAt,
+  url: `https://github.com/example/repo/pull/7#${id}`,
+});
+
 const pr = (overrides: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   repository: "example/repo",
   number: 7,
@@ -78,6 +94,7 @@ const pr = (overrides: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   searchSources: ["involved"],
   comments: [],
   reviewThreads: [],
+  reviews: [],
   ...overrides,
 });
 

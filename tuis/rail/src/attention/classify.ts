@@ -8,6 +8,8 @@ import type {
   AttentionItem,
   AttentionReason,
   GitHubComment,
+  GitHubActor,
+  GitHubReview,
   GitHubTarget,
 } from "./types.js";
 
@@ -49,8 +51,12 @@ function floorTimestamp(
   return value === undefined || value === null ? null : timestamp(value, label);
 }
 
-function atOrAfter(value: string, floor: number | null): boolean {
-  return floor === null || timestamp(value, "comment") >= floor;
+function atOrAfter(
+  value: string,
+  floor: number | null,
+  label: string,
+): boolean {
+  return floor === null || timestamp(value, label) >= floor;
 }
 
 function latestComment(comments: GitHubComment[]): GitHubComment | null {
@@ -63,11 +69,24 @@ function latestComment(comments: GitHubComment[]): GitHubComment | null {
   }, null);
 }
 
-function isViewerComment(comment: GitHubComment, username: string): boolean {
+function latestReview(reviews: GitHubReview[]): GitHubReview | null {
+  return reviews.reduce<GitHubReview | null>((latest, review) => {
+    if (latest === null) return review;
+    const order = review.submittedAt.localeCompare(latest.submittedAt);
+    return order > 0 || (order === 0 && review.id > latest.id)
+      ? review
+      : latest;
+  }, null);
+}
+
+function isViewerActor(actor: GitHubActor | null, username: string): boolean {
   return (
-    comment.author !== null &&
-    normalizeLogin(comment.author.login) === normalizeLogin(username)
+    actor !== null && normalizeLogin(actor.login) === normalizeLogin(username)
   );
+}
+
+function isViewerComment(comment: GitHubComment, username: string): boolean {
+  return isViewerActor(comment.author, username);
 }
 
 function uniqueComments(target: GitHubTarget): GitHubComment[] {
@@ -133,7 +152,7 @@ function commentReason(
       actorIsEligible(comment.author, config),
   );
   const recent = meaningful.filter((comment) =>
-    atOrAfter(comment.createdAt, floor),
+    atOrAfter(comment.createdAt, floor, "comment"),
   );
   const external = recent.filter(
     (comment) =>
@@ -168,6 +187,54 @@ function commentReason(
     actor: latestExternal.author,
     createdAt: latestExternal.createdAt,
     priority: "normal",
+  };
+}
+
+function reviewVerb(state: GitHubReview["state"]): string {
+  switch (state) {
+    case "APPROVED":
+      return "Approved review";
+    case "CHANGES_REQUESTED":
+      return "Changes requested";
+    case "COMMENTED":
+      return "Submitted review";
+    case "DISMISSED":
+      return "Dismissed review";
+  }
+}
+
+function reviewReason(
+  target: GitHubTarget,
+  username: string,
+  config: AttentionConfig,
+  floor: number | null,
+): AttentionReason | null {
+  if (target.kind !== "pull_request" || !targetIsOwned(target, username)) {
+    return null;
+  }
+  const recent = target.reviews.filter(
+    (review) =>
+      review.state !== "DISMISSED" &&
+      review.author !== null &&
+      !isViewerActor(review.author, username) &&
+      actorIsEligible(review.author, config) &&
+      atOrAfter(review.submittedAt, floor, "review"),
+  );
+  const latest = latestReview(recent);
+  if (latest === null) return null;
+
+  const body = latest.body.replace(/\s+/g, " ").trim();
+  return {
+    id: `review:${latest.id}`,
+    kind: "review",
+    reviewState: latest.state,
+    summary:
+      body === ""
+        ? reviewVerb(latest.state)
+        : `${reviewVerb(latest.state)}: ${body}`,
+    actor: latest.author,
+    createdAt: latest.submittedAt,
+    priority: latest.state === "CHANGES_REQUESTED" ? "high" : "normal",
   };
 }
 
@@ -243,8 +310,8 @@ export function attentionItem(
   };
 }
 
-// One row represents the target. Pull-request review comments and issue
-// comments use the same stream, with no special thread-level inbox behavior.
+// One row represents the target. Pull-request review comments, formal reviews,
+// and issue comments use the same target-level inbox behavior.
 export function classifyTarget(
   target: GitHubTarget,
   username: string,
@@ -258,13 +325,11 @@ export function classifyTarget(
   const relevant = accountWide || targetIsWatched(target);
   const reasons: AttentionReason[] = [];
   if (relevant) {
-    const comment = commentReason(
-      target,
-      username,
-      config,
-      commentFloor(target, options, accountWide),
-    );
+    const floor = commentFloor(target, options, accountWide);
+    const comment = commentReason(target, username, config, floor);
     if (comment !== null) reasons.push(comment);
+    const review = reviewReason(target, username, config, floor);
+    if (review !== null) reasons.push(review);
   }
   const opened = openedReason(target, username, config, options.watchedSince);
   if (opened !== null) reasons.push(opened);

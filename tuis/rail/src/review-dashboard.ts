@@ -144,6 +144,42 @@ function primaryReason(item: AttentionItem): AttentionReason {
   return reason;
 }
 
+function reviewPhrase(
+  reason: AttentionReason,
+  object: string,
+  ownsTarget: boolean,
+): string {
+  const suffix = ownsTarget ? `your ${object}` : `this ${object}`;
+  switch (reason.reviewState) {
+    case "APPROVED":
+      return `Approved ${suffix}`;
+    case "CHANGES_REQUESTED":
+      return `Changes requested on ${suffix}`;
+    case "COMMENTED":
+      return `Submitted a review on ${suffix}`;
+    default:
+      return `Reviewed ${suffix}`;
+  }
+}
+
+function reviewHeadline(
+  reason: AttentionReason,
+  target: string,
+  actor: string | undefined,
+): string {
+  const who = actor === undefined ? "Someone" : `@${actor}`;
+  switch (reason.reviewState) {
+    case "APPROVED":
+      return `${who} approved ${target}`;
+    case "CHANGES_REQUESTED":
+      return `${who} requested changes on ${target}`;
+    case "COMMENTED":
+      return `${who} submitted a review on ${target}`;
+    default:
+      return `${who} reviewed ${target}`;
+  }
+}
+
 // What this row needs from you, stated as one phrase. All reasons belong to
 // the same target, so a CI failure and a new comment are joined in one row.
 function reasonFor(item: AttentionItem, viewerOwnsTarget: boolean): string {
@@ -151,12 +187,16 @@ function reasonFor(item: AttentionItem, viewerOwnsTarget: boolean): string {
   const reasons: string[] = [];
   const ci = reasonsOf(item, "ci");
   const comments = reasonsOf(item, "comment");
+  const reviews = reasonsOf(item, "review");
   const opened = reasonsOf(item, "opened");
   if (ci.length > 0) {
     const checks = item.context?.failingChecks ?? [];
     reasons.push(
       checks.length > 0 ? `CI failed — ${checks.join(", ")}` : "CI failed",
     );
+  }
+  if (reviews.length > 0) {
+    reasons.push(reviewPhrase(reviews[0]!, object, viewerOwnsTarget));
   }
   if (comments.length > 0) {
     reasons.push(
@@ -223,11 +263,29 @@ function previewFor(
 
   const ci = reasonsOf(item, "ci");
   const comments = reasonsOf(item, "comment");
+  const reviews = reasonsOf(item, "review");
   const opened = reasonsOf(item, "opened");
   const latestComment = comments[0];
   const comment =
     latestComment === undefined ? [] : render(latestComment.summary);
+  const latestReview = reviews[0];
+  const review = latestReview === undefined ? [] : render(latestReview.summary);
   const bullets = ci.length > 0 ? (context?.failingChecks ?? []) : [];
+  if (ci.length > 0 && reviews.length > 0) {
+    const reviewText =
+      latestReview === undefined
+        ? `new review on ${target}`
+        : reviewHeadline(latestReview, target, latestReview.actor?.login);
+    return {
+      headline: `CI failed and ${reviewText}`,
+      bullets,
+      body:
+        review.length > 0
+          ? [...review, ...(description.length > 0 ? ["", ...description] : [])]
+          : description,
+      context: trailer,
+    };
+  }
   if (ci.length > 0 && comments.length > 0) {
     return {
       headline: `CI failed and new comment on ${target}`,
@@ -241,6 +299,22 @@ function previewFor(
       headline: `CI failed on ${target}`,
       bullets,
       body: description,
+      context: trailer,
+    };
+  }
+
+  if (reviews.length > 0 && latestReview !== undefined) {
+    return {
+      headline: reviewHeadline(latestReview, target, latestReview.actor?.login),
+      bullets: [],
+      body:
+        review.length > 0
+          ? [
+              ...review,
+              ...(comments.length > 0 ? ["", ...comment] : []),
+              ...(description.length > 0 ? ["", ...description] : []),
+            ]
+          : description,
       context: trailer,
     };
   }
@@ -276,8 +350,14 @@ export function reviewItem(
   const author = item.context?.author?.login ?? null;
   const viewerOwnsTarget = sameLogin(author, viewer);
   const comment = reasonsOf(item, "comment")[0];
-  const actor = comment?.actor ?? reasonsOf(item, "opened")[0]?.actor ?? null;
+  const review = reasonsOf(item, "review")[0];
   const reason = primaryReason(item);
+  const actor =
+    reason.actor ??
+    comment?.actor ??
+    review?.actor ??
+    reasonsOf(item, "opened")[0]?.actor ??
+    null;
   return {
     id: item.id,
     repository: item.repository,

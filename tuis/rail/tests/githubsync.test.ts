@@ -70,6 +70,22 @@ function rawComment(id: string, createdAt: string, login = "alice") {
   };
 }
 
+function rawReview(
+  id: string,
+  state = "APPROVED",
+  submittedAt = "2026-08-29T10:02:00.000Z",
+  login = "alice",
+) {
+  return {
+    id,
+    author: { login, __typename: "User" },
+    body: `review ${id}`,
+    state,
+    submittedAt,
+    url: `https://github.com/example/repo/pull/7#${id}`,
+  };
+}
+
 function rawPullRequest(
   id: string,
   comments: ReturnType<typeof rawComment>[],
@@ -77,6 +93,7 @@ function rawPullRequest(
   contexts: unknown[] = [],
   updatedAt = "2026-08-29T10:01:00.000Z",
   number = 7,
+  reviews: unknown[] = [],
 ) {
   return {
     id,
@@ -95,6 +112,7 @@ function rawPullRequest(
     repository: { nameWithOwner: "example/repo" },
     comments: page(comments),
     reviewThreads: page(reviewThreads),
+    reviews: page(reviews),
     statusCheckRollup: {
       state: "SUCCESS",
       contexts: page(contexts),
@@ -148,6 +166,9 @@ function paginatedPullRequestRunner(): {
         ],
         secondPage ? [] : [{ id: "thread-1", isResolved: false }],
         secondPage ? [] : [],
+        "2026-08-29T10:01:00.000Z",
+        7,
+        [],
       );
       if (!secondPage) {
         details.comments = page(
@@ -156,6 +177,15 @@ function paginatedPullRequestRunner(): {
           "comments-2",
         );
         details.reviewThreads = page([{ id: "thread-1", isResolved: false }]);
+        details.reviews = page([rawReview("formal-1")], true, "reviews-2");
+      } else {
+        details.reviews = page([
+          rawReview(
+            "formal-2",
+            "CHANGES_REQUESTED",
+            "2026-08-29T10:05:00.000Z",
+          ),
+        ]);
       }
       return graphqlResponse({ rateLimit: RATE_LIMIT, node: details });
     }
@@ -205,11 +235,21 @@ test("full sync paginates discovery and nested detail connections, then deduplic
       : null,
     2,
   );
+  assert.equal(
+    target?.kind === "pull_request" ? target.reviews.length : null,
+    2,
+  );
+  assert.equal(
+    target?.kind === "pull_request" ? target.reviews[1]?.state : null,
+    "CHANGES_REQUESTED",
+  );
   assert.ok(queries.some((query) => query.includes('after: "discovery-2"')));
   assert.equal(
     queries.filter((query) => query.includes('node(id: "pr-1")')).length,
     2,
   );
+  assert.ok(queries.some((query) => query.includes("reviews(")));
+  assert.ok(queries.some((query) => query.includes('after: "reviews-2"')));
   assert.ok(queries.every((query) => !query.includes("comments(last:")));
 });
 

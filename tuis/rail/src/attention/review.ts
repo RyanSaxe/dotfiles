@@ -2,7 +2,12 @@ import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import type { AttentionItem, AttentionReason, ObserverState } from "./types.js";
+import type {
+  AttentionItem,
+  AttentionReason,
+  GitHubReviewState,
+  ObserverState,
+} from "./types.js";
 import { activityAcknowledgesItem, ATTENTION_STATE_VERSION } from "./state.js";
 
 const STATE_PATH = join(
@@ -42,13 +47,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isAttentionReason(value: unknown): value is AttentionReason {
+function isReviewState(value: unknown): value is GitHubReviewState {
   return (
-    isRecord(value) &&
+    value === "APPROVED" ||
+    value === "CHANGES_REQUESTED" ||
+    value === "COMMENTED" ||
+    value === "DISMISSED"
+  );
+}
+
+function isAttentionReason(value: unknown): value is AttentionReason {
+  if (!isRecord(value)) return false;
+  const kind = value["kind"];
+  const reviewState = value["reviewState"];
+  return (
     typeof value["id"] === "string" &&
-    (value["kind"] === "comment" ||
-      value["kind"] === "ci" ||
-      value["kind"] === "opened") &&
+    (kind === "comment" ||
+      kind === "ci" ||
+      kind === "opened" ||
+      kind === "review") &&
+    (kind !== "review" || isReviewState(reviewState)) &&
+    (kind === "review" || reviewState === undefined) &&
     typeof value["summary"] === "string" &&
     typeof value["createdAt"] === "string" &&
     (value["priority"] === "normal" || value["priority"] === "high")

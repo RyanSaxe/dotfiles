@@ -49,6 +49,7 @@ const watched = (over: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   searchSources: ["watched"],
   comments: [],
   reviewThreads: [],
+  reviews: [],
   ...over,
 });
 

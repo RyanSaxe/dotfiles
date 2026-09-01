@@ -6,6 +6,8 @@ import type {
   CiState,
   GitHubActor,
   GitHubComment,
+  GitHubReview,
+  GitHubReviewState,
   GitHubSnapshot,
   GitHubTarget,
   IssueTarget,
@@ -221,6 +223,15 @@ interface RawThread {
   comments?: RawSearch<RawComment> | null;
 }
 
+interface RawReview {
+  id?: string | null;
+  author?: RawActor | null;
+  body?: string | null;
+  state?: string | null;
+  submittedAt?: string | null;
+  url?: string | null;
+}
+
 interface RawCheckContext {
   __typename?: string | null;
   name?: string | null;
@@ -259,6 +270,7 @@ interface RawPullRequest {
   author?: RawActor | null;
   repository?: { nameWithOwner?: string | null } | null;
   reviewThreads?: RawSearch<RawThread> | null;
+  reviews?: RawSearch<RawReview> | null;
   comments?: RawSearch<RawComment> | null;
   statusCheckRollup?: RawStatusCheckRollup | null;
 }
@@ -373,6 +385,42 @@ function parseThread(thread: RawThread | null): ReviewThread | null {
   };
 }
 
+function reviewState(
+  state: string | null | undefined,
+): GitHubReviewState | null {
+  switch (state) {
+    case "APPROVED":
+    case "CHANGES_REQUESTED":
+    case "COMMENTED":
+    case "DISMISSED":
+      return state;
+    default:
+      return null;
+  }
+}
+
+function parseReview(review: RawReview | null): GitHubReview | null {
+  if (
+    review === null ||
+    review.id === undefined ||
+    review.id === null ||
+    review.submittedAt === undefined ||
+    review.submittedAt === null
+  ) {
+    return null;
+  }
+  const state = reviewState(review.state);
+  if (state === null) return null;
+  return {
+    id: review.id,
+    author: parseActor(review.author),
+    body: review.body ?? "",
+    state,
+    submittedAt: review.submittedAt,
+    url: review.url ?? "",
+  };
+}
+
 function ciState(state: string | null | undefined): CiState {
   switch (state) {
     case "SUCCESS":
@@ -466,6 +514,9 @@ function parsePullRequest(
   const reviewThreads = (raw.reviewThreads?.nodes ?? [])
     .map(parseThread)
     .filter((thread): thread is ReviewThread => thread !== null);
+  const reviews = (raw.reviews?.nodes ?? [])
+    .map(parseReview)
+    .filter((review): review is GitHubReview => review !== null);
   return {
     kind: "pull_request",
     repository,
@@ -486,6 +537,7 @@ function parsePullRequest(
     searchSources: [source],
     comments,
     reviewThreads,
+    reviews,
   };
 }
 
@@ -792,12 +844,13 @@ async function discoverTargets(
   };
 }
 
-type DetailConnection = "comments" | "labels" | "reviewThreads" | "contexts";
+type DetailConnection =
+  "comments" | "labels" | "reviewThreads" | "reviews" | "contexts";
 
 function detailConnections(kind: DiscoveredTarget["kind"]): DetailConnection[] {
   return kind === "issue"
     ? ["comments", "labels"]
-    : ["comments", "reviewThreads", "contexts"];
+    : ["comments", "reviewThreads", "reviews", "contexts"];
 }
 
 function pageInfoFields(): string {
@@ -884,6 +937,25 @@ function buildDetailQuery(
           ${pageInfoFields()}
         }`
       : "";
+    const reviews = active.has("reviews")
+      ? `reviews(
+          first: ${DETAIL_PAGE_SIZE}
+          after: ${cursorArgument(cursors.get("reviews"))}
+        ) {
+          nodes {
+            id
+            author {
+              login
+              __typename
+            }
+            body
+            state
+            submittedAt
+            url
+          }
+          ${pageInfoFields()}
+        }`
+      : "";
     const contexts = active.has("contexts")
       ? `contexts(
             first: ${DETAIL_PAGE_SIZE}
@@ -912,6 +984,7 @@ function buildDetailQuery(
       headRefOid
       ${comments}
       ${reviewThreads}
+      ${reviews}
       statusCheckRollup {
         state
         ${contexts}
@@ -1017,6 +1090,9 @@ function mergePullRequestPage(
       previous?.reviewThreads,
       current.reviewThreads,
     );
+  }
+  if (current.reviews !== undefined) {
+    merged.reviews = appendConnection(previous?.reviews, current.reviews);
   }
   if (current.statusCheckRollup !== undefined) {
     if (current.statusCheckRollup === null) {
@@ -1140,6 +1216,13 @@ async function fetchTargetDetails(
             pullRequest.reviewThreads,
             `${githubTargetKey(target)} review threads`,
           ).pageInfo,
+        );
+      }
+      if (active.has("reviews")) {
+        pageInfos.set(
+          "reviews",
+          readPage(pullRequest.reviews, `${githubTargetKey(target)} reviews`)
+            .pageInfo,
         );
       }
       if (active.has("contexts")) {
