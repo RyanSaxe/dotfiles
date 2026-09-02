@@ -1,0 +1,11 @@
+#!/bin/sh
+# theme's publish step pokes the real ghostty by name (pkill -USR2 -x
+# ghostty), which would reload the driver's live terminal mid-run. Swallow
+# exactly that; anything else passes through. Effective because pkill lives
+# in /usr/bin, so even scripts that prepend the homebrew dirs resolve this
+# shim first.
+set -eu
+for arg; do
+  [ "$arg" = ghostty ] && exit 0
+done
+exec /usr/bin/pkill "$@"
