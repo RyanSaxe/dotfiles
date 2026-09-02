@@ -72,6 +72,47 @@ export function writeTty(tty: string, payload: string): boolean {
   }
 }
 
+// The async twin, for painting many panes at once: identical semantics,
+// but the EAGAIN pause is an awaited timer instead of a thread-blocking
+// Atomics.wait — so eighty panes' drain pauses overlap instead of
+// summing. The syscalls themselves are sub-millisecond; the pauses are
+// what serialized the old full repaint.
+export async function writeTtyAsync(
+  tty: string,
+  payload: string,
+): Promise<boolean> {
+  let fd: number;
+  try {
+    fd = openSync(
+      tty,
+      constants.O_WRONLY | constants.O_NONBLOCK | constants.O_NOCTTY,
+    );
+  } catch {
+    return false;
+  }
+  try {
+    const bytes = Buffer.from(payload, "utf8");
+    const deadline = Date.now() + writeDeadlineMs(bytes.length);
+    let offset = 0;
+    while (offset < bytes.length) {
+      try {
+        offset += writeSync(fd, bytes, offset);
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== "EAGAIN" ||
+          Date.now() >= deadline
+        ) {
+          return false;
+        }
+        await new Promise((resolve) => setTimeout(resolve, WRITE_PAUSE_MS));
+      }
+    }
+    return true;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 // Footer block the sprite is scaled over. Terminal cells are roughly 1:2
 // (9.6pt x 20.8pt at font-size 16), so 18x8 cells is ~173x166pt — near
 // square, and 18 centers exactly in the 22-column rail (2 cols each side).

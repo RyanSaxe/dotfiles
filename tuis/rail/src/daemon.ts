@@ -62,7 +62,8 @@ import {
 import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { makeRefreshScheduler } from "./scheduler.js";
-import { spriteId, transmitSprite, writeTty } from "./sprite.js";
+import { fillOrder, makePaintScheduler } from "./paint.js";
+import { spriteId, transmitSprite, writeTtyAsync } from "./sprite.js";
 import {
   loadStableStatuses,
   saveStableStatuses,
@@ -153,18 +154,24 @@ let stableStatusesDirty = false;
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
 
-function paintPane(pane: Pane, frame: string): void {
-  if (pushed.get(pane.paneId) === frame) return;
-  if (writeTty(pane.tty, SYNC_ON + HIDE_CURSOR + frame + SYNC_OFF)) {
-    pushed.set(pane.paneId, frame);
-    countPanePainted();
-  } else {
-    // A failed write leaves the pane's contents unknown (a wedged pty may
-    // have taken a partial frame): forget the cache so the next refresh
-    // always retries instead of assuming this frame is on screen.
-    pushed.delete(pane.paneId);
-  }
-}
+// Visible rails paint before the refresh returns; the rest fill in the
+// background, latest-frame-wins (src/paint.ts). `pushed` tracks the last
+// COMPLETED write per pane — a rare revert-while-filling can briefly show
+// a superseded frame, and the reconcile backstop repaints it within 2s.
+const painter = makePaintScheduler({
+  write: writeTtyAsync,
+  onResult(paneId, frame, ok) {
+    if (ok) {
+      pushed.set(paneId, frame);
+      countPanePainted();
+    } else {
+      // A failed write leaves the pane's contents unknown (a wedged pty
+      // may have taken a partial frame): forget the cache so the next
+      // refresh always retries instead of assuming this frame landed.
+      pushed.delete(paneId);
+    }
+  },
+});
 
 function toFrame(lines: string[]): string {
   return lines.map((text, row) => `\x1b[${row + 1};1H${text}`).join("");
@@ -565,6 +572,13 @@ async function refreshAndRender(): Promise<void> {
   }
 
   const frames = new Map<string, string>();
+  const visibleTargets: { paneId: string; tty: string; frame: string }[] = [];
+  const hiddenTargets: {
+    paneId: string;
+    tty: string;
+    frame: string;
+    sessionAttached: boolean;
+  }[] = [];
   for (const pane of panes) {
     if (!pane.isRail || skip.has(pane.paneId)) continue;
     // Each session's rail wears its own mascot accent: the identity
@@ -614,8 +628,24 @@ async function refreshAndRender(): Promise<void> {
     ) {
       maybeTransmit(pane, spritePath, sprite);
     }
-    paintPane(pane, frame);
+    // Diff on the exact payload onResult stores, tty wrapping included.
+    const payload = SYNC_ON + HIDE_CURSOR + frame + SYNC_OFF;
+    if (pushed.get(pane.paneId) !== payload) {
+      const target = { paneId: pane.paneId, tty: pane.tty, frame: payload };
+      if (pane.windowActive && pane.sessionAttached) {
+        visibleTargets.push(target);
+      } else {
+        hiddenTargets.push({
+          ...target,
+          sessionAttached: pane.sessionAttached,
+        });
+      }
+    }
   }
+  // The person-facing panes gate the refresh (wall-time ~= one pane);
+  // everything off-screen drains behind them in likely-to-jump order.
+  painter.fill(fillOrder(hiddenTargets));
+  await painter.paintVisible(visibleTargets);
 
   // Forget panes that no longer exist so their ids can't shadow reused ones.
   const alive = new Set(panes.map((pane) => pane.paneId));
