@@ -2,7 +2,7 @@
 // mapped to its project (sessions are named after projects), falling back
 // to the tracked default — accent color and sprite both.
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -14,6 +14,10 @@ const STATE_MAPPING = join(XDG_STATE, "dotfiles/mascot.conf");
 // `theme mascot sync`, whose result lands in accents.conf — the rail
 // reads that, never the default directly.)
 const ACCENTS_CONF = join(XDG_STATE, "dotfiles/accents.conf");
+// The theme script caches extraction results per mascot per extractor
+// version (accents-<astamp>/<key>.conf). The rail only reads that cache —
+// the theme script stays its sole writer.
+const THEME_CACHE = join(XDG_STATE, "dotfiles/cache/theme");
 const MASCOT_ACCENTS = join(homedir(), ".local/bin/mascot-accents");
 
 export interface MascotIdentity {
@@ -78,10 +82,46 @@ function identityFor(value: string): MascotIdentity {
   return identity;
 }
 
+// The theme script's cache key: anything outside its conservative set
+// collapses to '-' (same tr class as `mascot_key` in theme/bin/theme).
+function mascotKey(value: string): string {
+  return value.replace(/[^A-Za-z0-9._\n-]/g, "-");
+}
+
+// Look up the theme script's accents cache; the mascot= line inside the
+// conf disambiguates the lossy key. Newest generation wins when an
+// unpruned older one still lingers.
+function cachedAccents(value: string): Map<string, string> | null {
+  try {
+    const generations = readdirSync(THEME_CACHE)
+      .filter((name) => name.startsWith("accents-"))
+      .map((name) => join(THEME_CACHE, name))
+      .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    for (const dir of generations) {
+      const path = join(dir, `${mascotKey(value)}.conf`);
+      if (!existsSync(path)) continue;
+      const conf = parseConfText(readFileSync(path, "utf8"));
+      if (conf.get("mascot") === value) return conf;
+    }
+  } catch {
+    // Unreadable cache = miss; the extractor below covers it.
+  }
+  return null;
+}
+
 // Accents and the sprite pointer come from the same extractor the theme
 // system uses — the rail never hardcodes any provider's cache layout.
-// Slow (~1s) but cached for the daemon's lifetime per mascot.
+// The theme script's accents cache answers first (pure file read); the
+// extractor (~1s uv/python) only runs for a mascot the theme system has
+// never extracted on this machine.
 async function extract(identity: MascotIdentity): Promise<void> {
+  const cached = cachedAccents(identity.value);
+  if (cached) {
+    identity.spritePath = cached.get("sprite") ?? null;
+    identity.accentDark = cached.get("accent_dark") ?? null;
+    identity.accentLight = cached.get("accent_light") ?? null;
+    return;
+  }
   try {
     const { stdout } = await run(MASCOT_ACCENTS, [identity.value]);
     const conf = parseConfText(stdout);
