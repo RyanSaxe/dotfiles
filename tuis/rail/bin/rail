@@ -24,7 +24,11 @@
 # (hooks, this script) would race it and duplicate panes, so none exists.
 set -eu
 
-PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# Appended, not prepended: run-shell hands over a minimal PATH that lacks
+# homebrew, so these must be reachable — but a caller that deliberately
+# shadows a tool earlier in PATH (the perf harness shims workmux/vault)
+# must win. Nothing rail needs exists in BOTH an earlier dir and here.
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 
 # Resolve the repo through this script's own symlink. macOS's
 # readlink has no -f flag, so keep this portable across macOS and Linux.
@@ -44,9 +48,13 @@ RAIL_DIR="$REPO_ROOT/tuis/rail"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"
 ENABLED_FLAG="$STATE/enabled"
 PID_FILE="$STATE/daemon.pid"
-LOG_FILE="$STATE/daemon.log"
+# The log lives OUTSIDE $STATE: the daemon fs.watch()es its state dir, so
+# a log in there turned every stderr line into a watch event that re-fired
+# the daemon's own watcher.
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail-logs"
+LOG_FILE="$LOG_DIR/daemon.log"
 
-mkdir -p "$STATE"
+mkdir -p "$STATE" "$LOG_DIR"
 
 # The phone channel lives in the repo's untracked .env. Load it here because
 # the daemon is usually spawned by tmux's run-shell, which hands over the
@@ -72,6 +80,13 @@ daemon_running() {
 
 ensure_daemon() {
   daemon_running && return 0
+  # One generation of rotation, at spawn: the daemon appends to this fd
+  # for its whole life, so a size gate anywhere else would never trim it.
+  if [ -f "$LOG_FILE" ] && [ "$(wc -c <"$LOG_FILE")" -gt 1048576 ]; then
+    # Racing ensure_daemons can both pass the size gate; the loser's mv
+    # must not abort the whole script under set -eu.
+    mv "$LOG_FILE" "$LOG_FILE.1" 2>/dev/null || true
+  fi
   (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
 }
 

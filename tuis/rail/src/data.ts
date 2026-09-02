@@ -129,8 +129,13 @@ export function loadStatusTransitionTimes(
 async function collectAgents(): Promise<Agent[]> {
   // Run from $HOME: `workmux status` scopes to the repository of its cwd,
   // and a non-repo cwd is what yields the global, all-projects view.
+  // execFile's default 1MB maxBuffer rejects on a large agent fleet — the
+  // caller's catch would then hold stale agents forever with no error in
+  // sight. The timeout keeps a hung workmux from wedging every tick.
   const { stdout } = await run("workmux", ["status", "--json"], {
     cwd: homedir(),
+    maxBuffer: 8 * 1024 * 1024,
+    timeout: 10_000,
   });
   const parsed = JSON.parse(stdout) as { agents?: WorkmuxAgent[] };
   const transitionTimes = loadStatusTransitionTimes();

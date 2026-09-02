@@ -23,7 +23,7 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { acknowledgedPaneIds, loadAcks, updateAcks } from "./acks.js";
+import { loadAcks, updateAcks } from "./acks.js";
 import { loadReviewSnapshot } from "./attention/review.js";
 import {
   collectAgents,
@@ -58,6 +58,13 @@ import {
   loadTaskSnapshot,
   type TaskSnapshot,
 } from "./tasks.js";
+import {
+  countPaint,
+  countPanePainted,
+  dump,
+  recordTick,
+  timed,
+} from "./telemetry.js";
 import { loadPalette, railBg } from "./theme.js";
 
 const TICK_MS = 250;
@@ -120,11 +127,21 @@ let stableStatusesDirty = false;
 // Last frame written per pane id — the no-flicker, no-waste diff.
 const pushed = new Map<string, string>();
 
+let agentsFailing = false;
 async function refreshAgents(): Promise<void> {
   try {
     agents = await collectAgents();
-  } catch {
-    // workmux missing or transient failure: keep the last known agents.
+    agentsFailing = false;
+  } catch (error) {
+    // workmux missing or transient failure: keep the last known agents,
+    // but say so once per failure streak — silent staleness paints dead
+    // agents as live indefinitely.
+    if (!agentsFailing) {
+      agentsFailing = true;
+      logLine(
+        `workmux refresh failed; painting stale agents: ${String(error)}`,
+      );
+    }
   }
 }
 
@@ -132,6 +149,7 @@ function paintPane(pane: Pane, frame: string): void {
   if (pushed.get(pane.paneId) === frame) return;
   if (writeTty(pane.tty, SYNC_ON + HIDE_CURSOR + frame + SYNC_OFF)) {
     pushed.set(pane.paneId, frame);
+    countPanePainted();
   }
 }
 
@@ -305,7 +323,7 @@ function maybeTransmit(pane: Pane, spritePath: string, id: number): void {
 async function tick(counter: number): Promise<boolean> {
   const refresh =
     counter % AGENT_RECONCILE_TICKS === 0 || !agentsFresh
-      ? refreshAgents().then(() => {
+      ? timed("workmux", refreshAgents()).then(() => {
           agentsFresh = true;
         })
       : Promise.resolve();
@@ -314,7 +332,7 @@ async function tick(counter: number): Promise<boolean> {
     activeTab === "tasks" ? TASK_RECONCILE_TICKS : TASK_ATTENTION_TICKS;
   const refreshTasks =
     counter % taskTicks === 0 || !tasksFresh
-      ? loadTaskSnapshot().then((snapshot) => {
+      ? timed("vault", loadTaskSnapshot()).then((snapshot) => {
           taskSnapshot = snapshot;
           tasksFresh = true;
         })
@@ -322,8 +340,8 @@ async function tick(counter: number): Promise<boolean> {
   // The tmux poll, the host probes, and the agent refresh are independent
   // — one round-trip of latency, not three.
   const [{ panes, clientFacts }, hostFacts] = await Promise.all([
-    collectSnapshot(),
-    collectHostFacts(),
+    timed("snapshot", collectSnapshot()),
+    timed("ioreg", collectHostFacts()),
     refresh,
     refreshTasks,
   ]);
@@ -355,7 +373,7 @@ async function tick(counter: number): Promise<boolean> {
     appliedBg = bg;
   }
   const enabled = existsSync(ENABLED_FLAG);
-  const skip = await selfHeal(panes, enabled);
+  const skip = await timed("selfHeal", selfHeal(panes, enabled));
 
   const stableBefore = stableStatusesKey(stableStatuses);
   const settled = stabilizeAgents(agents, stableStatuses, Date.now() / 1000);
@@ -391,7 +409,8 @@ async function tick(counter: number): Promise<boolean> {
   const hintsBySession = assignHints(settled, sessions, acked);
   writeHints(settled, hintsBySession, acked);
   publishAttention(settled, acked);
-  publishReviewAttention(loadReviewSnapshot().unacknowledged);
+  const review = loadReviewSnapshot();
+  publishReviewAttention(review.unacknowledged);
   pushPhone(settled, acked, present);
 
   // Pagination state, written by `rail page up|down`; the renderer clamps.
@@ -401,8 +420,6 @@ async function tick(counter: number): Promise<boolean> {
   } catch {
     // No page file: top of the list.
   }
-
-  const review = loadReviewSnapshot();
 
   const frames = new Map<string, string>();
   for (const pane of panes) {
@@ -440,6 +457,7 @@ async function tick(counter: number): Promise<boolean> {
         renderRail(data, sessionPalette, pane.width, pane.height),
       );
       frames.set(bucket, frame);
+      countPaint();
     }
     // Transmission additionally needs a VISIBLE pane — tmux only forwards
     // passthrough for panes on screen. Kitty terminals retain previously
@@ -531,6 +549,13 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // Telemetry on demand: `kill -USR2 $(cat daemon.pid)` drops the tick
+  // ring and counters into the log as one JSON line, live, without
+  // touching the daemon's cadence.
+  process.on("SIGUSR2", () => {
+    logLine(`telemetry ${dump()}`);
+  });
+
   // Instant agent updates: workmux hooks write a state file the moment an
   // agent changes status. Debounced a hair so bursts coalesce.
   let pending: NodeJS.Timeout | null = null;
@@ -582,6 +607,7 @@ async function main(): Promise<void> {
     try {
       idle = await tick(counter);
       noServerTicks = 0;
+      recordTick(counter, Date.now() - started);
     } catch (error) {
       // Transient failures (server restarting, disk blip): keep the
       // daemon alive and poll gently. A SUSTAINED dead server means it
