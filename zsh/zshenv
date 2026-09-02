@@ -16,12 +16,48 @@ path_add() {
 
 case "$OSTYPE" in
 darwin*)
-  # Homebrew: Apple Silicon, then Intel.
+  # Homebrew: Apple Silicon, then Intel. `brew shellenv` output changes
+  # only when brew itself does, so cache it keyed on the binary's mtime —
+  # this file runs in EVERY zsh, agent tool shells included, and the
+  # cached copy saves a brew fork per shell. The emitted text defers all
+  # env-dependent work (path_helper, ${MANPATH-}) to source time, so
+  # sourcing the cache is exactly eval'ing fresh output.
+  _brew=""
   if [[ -x /opt/homebrew/bin/brew ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+    _brew=/opt/homebrew/bin/brew
   elif [[ -x /usr/local/bin/brew ]]; then
-    eval "$(/usr/local/bin/brew shellenv)"
+    _brew=/usr/local/bin/brew
   fi
+  # Mirror brew's own idempotence guard (cmd/shellenv.sh): when PATH
+  # already leads with prefix/bin:prefix/sbin, `brew shellenv` prints
+  # nothing and today's eval is a no-op — skip even the cache source, so
+  # nested shells (tmux panes, agent shells) keep their inherited PATH
+  # order instead of letting path_helper reshuffle it.
+  _brew_prefix="${_brew%/bin/brew}"
+  if [[ -n "$_brew" && "${PATH%%:${_brew_prefix}/sbin*}" != "${_brew_prefix}/bin" ]]; then
+    _brew_cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/brew-shellenv.zsh"
+    if [[ ! -r "$_brew_cache" || "$_brew" -nt "$_brew_cache" ]]; then
+      mkdir -p "${_brew_cache:h}" 2> /dev/null
+      # Neutral PATH + explicit shell name: brew 4.x prints NOTHING when
+      # brew already leads PATH (idempotence guard), so a regeneration
+      # from an agent shell would cache emptiness and strip brew from
+      # every fresh login shell. The -s guard refuses such a cache.
+      # Write-then-rename: concurrent shell starts race this block, and a
+      # half-written cache must never be sourceable.
+      if PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$_brew" shellenv zsh > "$_brew_cache.$$" 2> /dev/null &&
+        [[ -s "$_brew_cache.$$" ]]; then
+        mv -f "$_brew_cache.$$" "$_brew_cache"
+      else
+        rm -f "$_brew_cache.$$"
+      fi
+    fi
+    if [[ -r "$_brew_cache" ]]; then
+      source "$_brew_cache"
+    else
+      eval "$("$_brew" shellenv)" # cache dir unwritable — stay correct
+    fi
+  fi
+  unset _brew _brew_prefix _brew_cache
   ;;
 esac
 

@@ -1,24 +1,43 @@
 # Interactive shell configuration. Keybindings follow README: Conventions.
 
+# ----- popup fast path -------------------------------------------------
+# Popup bindings pass TMUX_POPUP=1 (tmux.conf); those shells get a minimal
+# rc and skip everything below. This must run before the scrubber: popups
+# are not panes, so the tty check fails by design there — scrubbing would
+# make `to`/`ts` nest a tmux session inside the popup.
+if [[ -n "$TMUX_POPUP" ]]; then
+  source "$HOME/.config/zsh/zshrc.minimal"
+  return
+fi
+
 # ----- stale $TMUX scrubber --------------------------------------------
 # A shell can inherit $TMUX from three broken situations: tmux crashed, a
 # new terminal inherited the parent's env, or the socket died. Detect by
-# checking whether THIS tty is actually one of tmux's pane ttys.
-# NEVER scrub inside a tmux popup: popups are not panes, so the tty check
-# fails by design there — scrubbing would make `to`/`ts` nest a tmux
-# session inside the popup. Popup bindings pass TMUX_POPUP=1.
-if [[ -n "$TMUX" && -z "$TMUX_POPUP" ]]; then
+# checking whether THIS tty is actually the tty of a live tmux pane.
+if [[ -n "$TMUX" ]]; then
   _tmux_socket="${TMUX%%,*}"
-  if ! tmux -S "$_tmux_socket" list-clients &> /dev/null; then
+  if [[ ! -S "$_tmux_socket" ]]; then
+    # No socket file, no server — learned without spawning anything.
     unset TMUX TMUX_PANE
-  else
+  elif [[ -n "$TMUX_PANE" ]]; then
+    # O(1): ask for this pane's tty instead of listing every pane.
     _current_tty="$(tty 2> /dev/null)"
-    if [[ -n "$_current_tty" ]] &&
+    if ! _pane_tty="$(tmux -S "$_tmux_socket" display-message -p -t "$TMUX_PANE" '#{pane_tty}' 2> /dev/null)"; then
+      unset TMUX TMUX_PANE # server dead or pane gone
+    elif [[ -n "$_current_tty" && "$_pane_tty" != "$_current_tty" ]]; then
+      unset TMUX TMUX_PANE # inherited env: this tty is not that pane
+    fi
+  else
+    # Env kept $TMUX but lost $TMUX_PANE: fall back to the full scan.
+    _current_tty="$(tty 2> /dev/null)"
+    if ! tmux -S "$_tmux_socket" list-clients &> /dev/null; then
+      unset TMUX TMUX_PANE
+    elif [[ -n "$_current_tty" ]] &&
       ! tmux -S "$_tmux_socket" list-panes -a -F "#{pane_tty}" 2> /dev/null | grep -Fxq "$_current_tty"; then
       unset TMUX TMUX_PANE
     fi
   fi
-  unset _tmux_socket _current_tty
+  unset _tmux_socket _current_tty _pane_tty
 fi
 
 # ----- history ---------------------------------------------------------
@@ -29,7 +48,23 @@ setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS HIST_VERIFY
 
 # ----- completion ------------------------------------------------------
 fpath=("$HOME/.config/zsh/completions" $fpath)
-autoload -Uz compinit && compinit
+autoload -Uz compinit
+# -C trusts the existing dump, skipping the per-start security audit and
+# fpath rescan; a full compinit re-runs both once the dump is a day old.
+# The touch restarts the 24h window even when compinit leaves an
+# up-to-date dump untouched. Accepted trade (PLAN.md): newly installed
+# completions can show up as much as 24h late.
+_zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
+_zcompdump_fresh=("$_zcompdump"(N.mh-24))
+if (( $#_zcompdump_fresh )); then
+  compinit -C -d "$_zcompdump"
+else
+  compinit -d "$_zcompdump"
+  # Only restart the 24h window on a real dump: a failed compinit would
+  # otherwise mint an empty file that -C then trusts for a day.
+  [[ -s "$_zcompdump" ]] && touch "$_zcompdump" 2> /dev/null
+fi
+unset _zcompdump _zcompdump_fresh
 # Case-insensitive matching.
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 
@@ -155,11 +190,14 @@ if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
     if (( ${+functions[fzf-tab-complete]} && ${+FZF_THEME_COLORS} )); then
       zstyle ':fzf-tab:*' fzf-flags $FZF_THEME_COLORS
     fi
+  }
+  _theme_fsh() {
     if (( $+functions[fast-theme] )) && [[ -r "$THEME_FSH" ]]; then
       fast-theme -q "$THEME_FSH"
     fi
   }
   _theme_shell_colors
+  _theme_fsh
   # Re-apply when `theme` regenerates, so running shells follow a switch.
   zmodload -F zsh/stat b:zstat
   # Inode+mtime, not mtime alone: the publisher replaces files by mv (new
@@ -178,16 +216,20 @@ if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
   typeset -g _THEME_COLORS_STAMP="$REPLY"
   _theme_stamp "$THEME_FSH"
   typeset -g _THEME_FSH_STAMP="$REPLY"
+  # The two files change independently: mascot flips rewrite shell-colors
+  # only (the fsh ini carries no accent placeholders), so tracking each
+  # stamp separately keeps the fast-theme cycle — the expensive half — off
+  # every open shell's next prompt after a flip.
   _theme_refresh() {
-    local colors_stamp fsh_stamp
     _theme_stamp "$THEME_GENERATED/shell-colors.zsh"
-    colors_stamp="$REPLY"
-    _theme_stamp "$THEME_FSH"
-    fsh_stamp="$REPLY"
-    if [[ "$colors_stamp" != "$_THEME_COLORS_STAMP" || "$fsh_stamp" != "$_THEME_FSH_STAMP" ]]; then
-      typeset -g _THEME_COLORS_STAMP="$colors_stamp"
-      typeset -g _THEME_FSH_STAMP="$fsh_stamp"
+    if [[ "$REPLY" != "$_THEME_COLORS_STAMP" ]]; then
+      typeset -g _THEME_COLORS_STAMP="$REPLY"
       _theme_shell_colors
+    fi
+    _theme_stamp "$THEME_FSH"
+    if [[ "$REPLY" != "$_THEME_FSH_STAMP" ]]; then
+      typeset -g _THEME_FSH_STAMP="$REPLY"
+      _theme_fsh
     fi
   }
   add-zsh-hook precmd _theme_refresh
@@ -206,10 +248,11 @@ _prompt_spacer() {
 add-zsh-hook precmd _prompt_spacer
 
 # Every segment on the two prompt lines is computed HERE, once per prompt:
-# one dash spawn (prompt-segments.sh) gathers all git facts in parallel and
-# starship renders the exported vars through in-process env_var modules —
-# it spawns nothing itself, so vi-mode keymap toggles (which re-expand
-# $PROMPT) reuse the last computation instead of re-running shell-outs.
+# one dash spawn (prompt-segments.sh) gathers the git and package facts,
+# exported as _PROMPT_SEG_* vars that starship reads through env_var
+# modules. Each $PROMPT expansion still execs starship once — --keymap is
+# what flips the vi-mode character — but a keymap toggle reuses this
+# computation instead of re-running the shell-outs.
 # Runs before prompt expansion by construction: zsh expands $PROMPT only
 # after every precmd has finished. The <US> separator (0x1f) cannot appear
 # in branch names or versions, so no quoting or eval is involved.
@@ -224,4 +267,8 @@ _prompt_segments() {
 if command -v starship > /dev/null; then
   add-zsh-hook precmd _prompt_segments
   eval "$(starship init zsh)"
+  # The template has no right_format, but starship's stock init installs
+  # an RPROMPT that execs starship once per render anyway — to print
+  # nothing. Emptying it halves the per-render exec count.
+  RPROMPT=''
 fi

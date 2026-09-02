@@ -244,7 +244,7 @@ if [ "$in_repo" = true ]; then
     done
     set -f
     if [ $# -gt 0 ]; then
-      key="$(stat -nf '%N=%m;' -- "$@" 2>/dev/null)"
+      key="$(stat -nf '%N=%m;' -- "$@" 2>/dev/null || stat -c '%n=%Y;' -- "$@" 2>/dev/null | tr -d '\n')"
       val='' hit=false
       if [ -f "$cache_file" ]; then
         while IFS="$tab" read -r cdir ckey cval; do
@@ -265,11 +265,15 @@ if [ "$in_repo" = true ]; then
         tmpf="$(mktemp "$cache_dir/.pkg-versions.XXXXXX")" && {
           {
             if [ -f "$cache_file" ]; then
-              while IFS= read -r cline; do
-                case "$cline" in
-                "$d$tab"*) ;;
-                *) printf '%s\n' "$cline" ;;
-                esac
+              # Drop this dir's old line AND any dir that no longer exists.
+              # Rewrites only happen on a miss, so pruning here bounds the
+              # file to live manifest dirs — a worktree-per-agent setup
+              # otherwise accretes a line per dead worktree forever, and
+              # every prompt reads the whole file to answer a hit.
+              while IFS="$tab" read -r cdir ckey cval; do
+                [ "$cdir" = "$d" ] && continue
+                [ -d "$cdir" ] || continue
+                printf '%s\t%s\t%s\n' "$cdir" "$ckey" "$cval"
               done <"$cache_file"
             fi
             printf '%s\t%s\t%s\n' "$d" "$key" "$val"
