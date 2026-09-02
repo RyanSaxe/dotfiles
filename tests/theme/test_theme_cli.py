@@ -25,6 +25,15 @@ printf 'accent_dark=#ffcc00\\nnotify_dark=#aa66ff\\n'
 printf 'accent_light=#997700\\nnotify_light=#7744aa\\n'
 """
 
+MASCOT_ACCENTS_PROVIDERS = """#!/bin/sh
+echo "call" >>"$HOME/mascot-accents.calls"
+if [ "$1" = "--providers" ]; then
+  printf 'pokemon\nlocal\n'
+  exit 0
+fi
+printf 'mascot=%s\nsprite=/dev/null\n' "$1"
+"""
+
 MASCOT_ACCENTS_FAIL = """#!/bin/sh
 echo "error: cannot fetch '$1'" >&2
 exit 1
@@ -308,6 +317,41 @@ def test_bare_mascot_form_is_gone(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "usage" in result.stderr
+
+
+def test_providers_are_cached_after_the_first_call(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_PROVIDERS)
+
+    first = run_theme(home, config, "mascot", "providers")
+    second = run_theme(home, config, "mascot", "providers")
+
+    assert first.returncode == 0, first.stderr
+    assert first.stdout == "pokemon\nlocal\n"
+    assert second.stdout == first.stdout
+    calls = (home / "mascot-accents.calls").read_text().splitlines()
+    assert len(calls) == 1, "the second call must answer from the cache"
+
+
+def test_a_new_provider_invalidates_the_cache(tmp_path: Path) -> None:
+    # Providers are registered inside the extractor script, so adding one
+    # changes the script — and the cache key. A freshly added provider
+    # must appear on the very next call, never a stale list.
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_PROVIDERS)
+    assert run_theme(home, config, "mascot", "providers").returncode == 0
+
+    stub_mascot_accents(
+        home,
+        MASCOT_ACCENTS_PROVIDERS.replace(
+            "printf 'pokemon\nlocal\n'",
+            "printf 'pokemon\nlocal\ndigimon\n'",
+        ),
+    )
+    result = run_theme(home, config, "mascot", "providers")
+
+    assert result.returncode == 0, result.stderr
+    assert "digimon" in result.stdout
 
 
 def test_mode_persists_only_after_a_successful_render(tmp_path: Path) -> None:

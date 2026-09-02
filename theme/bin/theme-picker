@@ -13,7 +13,8 @@ pick() {
 }
 
 # Provider entries come from the registry; the picker hardcodes none.
-providers="$(mascot-accents --providers 2>/dev/null || true)"
+# Through the theme cache: the raw call is a uv/python start per press.
+providers="$(theme mascot providers 2>/dev/null || true)"
 
 action="$(
   {

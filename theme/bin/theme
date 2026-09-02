@@ -656,7 +656,7 @@ apply)
   esac
   ;;
 mascot)
-  sub="${2:?usage: theme mascot default <provider:id>|project <provider:id>|none|clear-projects|none|sync [project]}"
+  sub="${2:?usage: theme mascot default <provider:id>|project <provider:id>|none|clear-projects|providers|none|sync [project]}"
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
@@ -746,6 +746,30 @@ mascot)
     fi
     exec "$0" mascot sync
     ;;
+  providers)
+    # The picker calls this before its first frame; the raw
+    # `mascot-accents --providers` is a uv/python start (seconds on a
+    # cold uv cache) per keypress. Providers are registered inside the
+    # extractor script, so the astamp key makes a newly added provider a
+    # guaranteed cache miss — the list can never go stale.
+    ensure_cache_ids
+    providers_cache="$CACHE/providers-$astamp.txt"
+    if [ ! -f "$providers_cache" ]; then
+      mkdir -p "$CACHE"
+      if ! mascot-accents --providers >"$providers_cache.tmp.$$" 2>/dev/null; then
+        rm -f "$providers_cache.tmp.$$"
+        exit 1
+      fi
+      mv "$providers_cache.tmp.$$" "$providers_cache"
+      # Old generations die with their extractor version.
+      for stale in "$CACHE"/providers-*.txt; do
+        [ -f "$stale" ] || continue
+        [ "$stale" = "$providers_cache" ] || rm -f "$stale"
+      done
+    fi
+    cat "$providers_cache"
+    exit 0
+    ;;
   clear-projects)
     # Everyone back onto the global default, no exceptions: the explicit
     # escape hatch for "I want all projects uniform right now".
@@ -754,7 +778,7 @@ mascot)
     exec "$0" mascot sync
     ;;
   *)
-    echo "usage: theme mascot default|project|clear-projects|none|sync" >&2
+    echo "usage: theme mascot default|project|clear-projects|providers|none|sync" >&2
     exit 1
     ;;
   esac
