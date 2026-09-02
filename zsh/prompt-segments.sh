@@ -1,10 +1,12 @@
 #!/bin/dash
-# Every prompt fact, gathered in ONE spawn per prompt. Git queries run as
-# parallel jobs (total ~= the slowest, not the sum) and each visible segment
-# prints as a NAME<US>value line for the _prompt_segments precmd (.zshrc) to
-# export as _PROMPT_SEG_* vars; the starship template renders those through
-# native env_var modules, in-process. Starship spawns nothing at render time
-# — the old custom modules cost two login-zsh spawns each, ~79ms per prompt.
+# Every prompt fact, gathered in ONE spawn per prompt. Three sequential git
+# commands cover everything git knows — `status --porcelain=v2 --branch` for
+# branch/ahead-behind/dirty, one combined rev-parse for paths and the
+# detached short head, `log -1` for age — and each visible segment prints as
+# a NAME<US>value line for the _prompt_segments precmd (.zshrc) to export as
+# _PROMPT_SEG_* vars; the starship template renders those through native
+# env_var modules, in-process. Starship spawns nothing at render time — the
+# old custom modules cost two login-zsh spawns each, ~79ms per prompt.
 #
 # dash, not zsh: the one deliberate exception to the zsh scripts convention
 # (AGENTS.md). This runs on every prompt, and a dash spawn is ~1ms where a
@@ -20,75 +22,69 @@
 # spellings on both sides — display of non-repo paths stays logical.
 pwd_p="$(pwd -P)"
 
+# The prompt must never contend for index.lock or rewrite the index behind
+# a running git command; `status` below would otherwise do both. Same
+# setting starship uses for its own git calls. Output is unaffected.
+GIT_OPTIONAL_LOCKS=0
+export GIT_OPTIONAL_LOCKS
+
 # Directory names may contain glob characters; collapse() word-splits paths.
+# The package probe below is the one spot that needs globbing and re-enables
+# it locally.
 set -f
 
-tmp="${TMPDIR:-/tmp}/prompt-seg.$$"
-mkdir -p "$tmp"
-trap 'rm -rf "$tmp"' EXIT
-
-# One combined rev-parse replaces the eight scattered probes the old custom
-# modules ran. --abbrev-ref must NOT join it: that mode sticks to later args,
-# so the detached-HEAD hash comes from --short and the branch name from the
-# parallel --show-current below.
-git rev-parse --is-inside-work-tree --show-toplevel --show-prefix --short HEAD \
-  >"$tmp/rp" 2>/dev/null &
-rp_pid=$!
-
-git branch --show-current >"$tmp/br" 2>/dev/null &
-br_pid=$!
-git rev-list --left-right --count '@{u}...HEAD' >"$tmp/lr" 2>/dev/null &
-lr_pid=$!
-git log -1 --format=%cr >"$tmp/age" 2>/dev/null &
-age_pid=$!
-git status --porcelain >"$tmp/st" 2>/dev/null &
-st_pid=$!
-
-wait "$rp_pid"
-in_repo=false top='' prefix='' shorthead=''
-if [ -s "$tmp/rp" ]; then
+# One combined rev-parse answers: in a repo at all (top stays empty outside
+# one, and inside .git/ or a bare repo where nothing prints), where the root
+# is, where we are inside it, and the short head for detached display. In a
+# repo with no commits yet the trailing `--short HEAD` fails AFTER toplevel
+# and prefix printed — the partial output is exactly the partial truth
+# (shorthead stays empty). --abbrev-ref must NOT join this command: that
+# mode sticks to later args.
+rp="$(git rev-parse --show-toplevel --show-prefix --short HEAD 2>/dev/null)"
+top='' prefix='' shorthead=''
+if [ -n "$rp" ]; then
   {
-    read -r in_repo
     read -r top
     read -r prefix
     read -r shorthead
-  } <"$tmp/rp"
+  } <<EOF
+$rp
+EOF
 fi
+in_repo=false
+[ -n "$top" ] && in_repo=true
 
-# Package version: probe every level from here to the repo root AT ONCE and
-# take the deepest hit — same winner as a serial walk at a fraction of the
-# wall time. Manifest detection stays starship's (`starship module package`,
-# all ~15 formats); this script never learns a manifest name. The guards —
-# canonical start, strictly shortening d, break at empty — keep the walk
-# from ever leaving the repo or looping.
+# Branch, ahead/behind, and dirtiness from one status call. Header lines
+# (`# branch.*`) always precede entries, so the first non-header line means
+# a dirty tree and ends the parse. `branch.ab +A -B` appears only when an
+# upstream is set AND its ref resolves — absent, ahead/behind stay 0, which
+# matches the old script's failed `rev-list @{u}...HEAD` (no arrows, plain
+# branch color). `branch.head` is `(detached)` on a detached HEAD, where the
+# old `git branch --show-current` printed nothing.
+branch='' ahead=0 behind=0 dirty=false age=''
 if [ "$in_repo" = true ]; then
-  (
-    d="$pwd_p" i=0
-    while :; do
-      (cd "$d" && starship module package >"$tmp/pkg.$i") &
-      [ "$d" = "$top" ] && break
-      case "$d" in */*) d="${d%/*}" ;; *) break ;; esac
-      [ -n "$d" ] || break
-      i=$((i + 1))
-    done
-    wait
-    j=0
-    while [ "$j" -le "$i" ]; do
-      if [ -s "$tmp/pkg.$j" ]; then
-        cp "$tmp/pkg.$j" "$tmp/pkg"
-        break
-      fi
-      j=$((j + 1))
-    done
-  ) &
-  pkg_pid=$!
+  st="$(git status --porcelain=v2 --branch 2>/dev/null)"
+  while IFS= read -r line; do
+    case "$line" in
+    '# branch.head '*) branch="${line#"# branch.head "}" ;;
+    '# branch.ab '*)
+      ab="${line#"# branch.ab "}"
+      ahead="${ab%% *}" ahead="${ahead#+}"
+      behind="${ab#* }" behind="${behind#-}"
+      ;;
+    '#'*) ;;
+    ?*)
+      dirty=true
+      break
+      ;;
+    esac
+  done <<EOF
+$st
+EOF
+  [ "$branch" = '(detached)' ] && branch=''
+  # Time since last commit; empty (hidden) while a repo has no commits yet.
+  age="$(git log -1 --format=%cr 2>/dev/null)"
 fi
-
-# An unfinished job's file reads as empty — which is a MEANING here (clean
-# tree, no upstream, no commits) — so every remaining git job must complete
-# before anything below reads its file. The pkg walk keeps running alongside;
-# it is waited for last, right before PKG emits.
-wait "$br_pid" "$lr_pid" "$age_pid" "$st_pid"
 
 emit() { # $1 name, $2 value — a hidden segment is simply never emitted
   [ -n "$2" ] || return 0
@@ -131,23 +127,15 @@ if [ "$in_repo" = true ]; then
     [ -n "$p" ] || p=/
     emit REPO_PARENT "$(home_tilde "$p")"
   fi
-  # Branch: named, or short hash when detached (mirrors the old
-  # `git branch --show-current | grep . || git rev-parse --short HEAD`).
-  branch=''
-  [ -s "$tmp/br" ] && read -r branch <"$tmp/br"
+  # Branch: named, or short hash when detached.
   [ -n "$branch" ] || branch="$shorthead"
-  ahead=0 behind=0
-  if [ -s "$tmp/lr" ]; then
-    # left = upstream-only commits (behind), right = ours (ahead)
-    read -r behind ahead <"$tmp/lr"
-  fi
   if [ "$behind" -gt 0 ]; then
     emit BRANCH_BEHIND "$branch"
   else
     emit BRANCH "$branch"
   fi
-  # Ahead/behind arrows: the same rev-list counts as the branch color, the
-  # same default symbols native git_status printed, nothing when synced.
+  # Ahead/behind arrows: the same counts as the branch color, the same
+  # default symbols native git_status printed, nothing when synced.
   if [ "$ahead" -gt 0 ] && [ "$behind" -gt 0 ]; then
     emit ARROWS '⇕'
   elif [ "$ahead" -gt 0 ]; then
@@ -155,12 +143,10 @@ if [ "$in_repo" = true ]; then
   elif [ "$behind" -gt 0 ]; then
     emit ARROWS '⇣'
   fi
-  # Time since last commit; hidden while a repo has no commits yet.
-  if [ -s "$tmp/age" ]; then
-    read -r age <"$tmp/age"
+  if [ -n "$age" ]; then
     emit AGE "${age% ago}"
   fi
-  if [ -s "$tmp/st" ]; then emit DIRTY '✗'; else emit CLEAN '✓'; fi
+  if [ "$dirty" = true ]; then emit DIRTY '✗'; else emit CLEAN '✓'; fi
 elif [ "$PWD" != "$HOME" ]; then
   # Outside any repo: line 1 shows the parent of the current folder; the
   # folder's own name sits on line 2. Hidden at ~ itself.
@@ -214,8 +200,93 @@ else
   emit DIR_NAME "$name"
 fi
 
-[ -n "${pkg_pid:-}" ] && wait "$pkg_pid"
-if [ -s "$tmp/pkg" ]; then
-  read -r pkg <"$tmp/pkg"
+# ---- package version: probe-first walk with an mtime-keyed cache -------
+# Walk from here up to the repo root; the deepest level that yields a
+# version wins (the same winner as the old spawn-starship-at-every-level
+# walk). A level with no manifest costs only [ -f ] checks — zero spawns.
+# A level WITH manifests keys a cache entry on their batched mtimes (one
+# stat spawn); a hit answers with zero further spawns, and only a miss runs
+# `starship module package` there — so a prompt costs one starship spawn
+# per manifest level per content change, not N+1 spawns every time. An
+# empty cached value means "manifest present but starship prints no
+# version" — remembered so the walk continues upward without respawning.
+#
+# Cache: ${XDG_CACHE_HOME:-~/.cache}/dotfiles/pkg-versions.tsv, one
+# dir<TAB>key<TAB>value line per manifest dir ever visited (tiny; safe to
+# delete any time), rewritten atomically via mktemp+mv on a miss.
+#
+# The manifest list mirrors what starship 1.26.0's package module reads
+# (src/modules/package.rs; https://starship.rs/config/#package). DRIFT
+# RISK: this probe decides where starship even runs, so a manifest format
+# a newer starship learns stays invisible here until this list learns it
+# too. `stat -nf` is BSD/macOS (all one line, no per-file newline).
+PKG_MANIFESTS='package.json deno.json deno.jsonc jsr.json jsr.jsonc
+Cargo.toml pyproject.toml setup.cfg composer.json gradle.properties
+build.gradle Project.toml mix.exs Chart.yaml pom.xml meson.build shard.yml
+v.mod vpkg.json build.sbt daml.yaml pubspec.yaml DESCRIPTION galaxy.yml'
+
+pkg=''
+if [ "$in_repo" = true ]; then
+  cache_file="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/pkg-versions.tsv"
+  tab="$(printf '\t')"
+  nl="$(printf '\nx')" nl="${nl%x}"
+  d="$pwd_p"
+  while :; do
+    set --
+    # The unquoted expansion is deliberate: the list word-splits on spaces.
+    # shellcheck disable=SC2086
+    for m in $PKG_MANIFESTS; do
+      [ -f "$d/$m" ] && set -- "$@" "$d/$m"
+    done
+    set +f
+    for m in "$d"/*.nimble; do # nim is the one glob-named manifest
+      [ -f "$m" ] && set -- "$@" "$m"
+    done
+    set -f
+    if [ $# -gt 0 ]; then
+      key="$(stat -nf '%N=%m;' -- "$@" 2>/dev/null)"
+      val='' hit=false
+      if [ -f "$cache_file" ]; then
+        while IFS="$tab" read -r cdir ckey cval; do
+          if [ "$cdir" = "$d" ]; then
+            [ "$ckey" = "$key" ] && {
+              hit=true
+              val="$cval"
+            }
+            break
+          fi
+        done <"$cache_file"
+      fi
+      if [ "$hit" = false ]; then
+        val="$(cd "$d" && starship module package 2>/dev/null)"
+        val="${val%%"$nl"*}"
+        cache_dir="${cache_file%/*}"
+        mkdir -p "$cache_dir"
+        tmpf="$(mktemp "$cache_dir/.pkg-versions.XXXXXX")" && {
+          {
+            if [ -f "$cache_file" ]; then
+              while IFS= read -r cline; do
+                case "$cline" in
+                "$d$tab"*) ;;
+                *) printf '%s\n' "$cline" ;;
+                esac
+              done <"$cache_file"
+            fi
+            printf '%s\t%s\t%s\n' "$d" "$key" "$val"
+          } >"$tmpf"
+          mv -f "$tmpf" "$cache_file"
+        }
+      fi
+      if [ -n "$val" ]; then
+        pkg="$val"
+        break
+      fi
+    fi
+    [ "$d" = "$top" ] && break
+    case "$d" in */*) d="${d%/*}" ;; *) break ;; esac
+    [ -n "$d" ] || break
+  done
+fi
+if [ -n "$pkg" ]; then
   emit PKG "$pkg"
 fi
