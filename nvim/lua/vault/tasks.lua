@@ -1,7 +1,5 @@
--- Tasks, all of them through the `vault` CLI. Neovim never edits a task line
--- and never parses one: the CLI owns the grammar, the project resolution,
--- and every date spelling, so this file is a prompt, a picker, and two
--- process calls.
+-- Tasks flow through the `vault` CLI. Neovim prompts, scopes, and presents
+-- them; the CLI owns the Markdown grammar, project resolution, and dates.
 local vault = require("vault")
 
 local M = {}
@@ -23,6 +21,16 @@ local STATE_HL = {
   today = "DiagnosticWarn",
   tomorrow = "DiagnosticWarn",
   near = "DiagnosticHint",
+}
+
+---@type table<string, integer>
+local STATE_ORDER = {
+  overdue = 1,
+  today = 2,
+  tomorrow = 3,
+  near = 4,
+  later = 5,
+  none = 6,
 }
 
 ---@param cwd string
@@ -59,24 +67,44 @@ local function git(cwd, args)
   return out ~= "" and out or nil
 end
 
--- Display only, and deliberately so. `vault task add` resolves the project
--- from the git remote of the directory it runs in and prints where the task
--- landed; that printed line is what the notification reports. This asks the
--- same question early enough to put the answer in the prompt title. When it
--- cannot answer — no repository, no origin — the title simply says less,
--- and the CLI still resolves and still reports.
+---@param cwd string
+---@return string|nil
+function M.project(cwd)
+  if not git(cwd, { "rev-parse", "--show-toplevel" }) then
+    return nil
+  end
+  local remote = git(cwd, { "remote", "get-url", "origin" })
+  if not remote then
+    local remotes = git(cwd, { "remote" })
+    ---@type string|nil
+    local first
+    local count = 0
+    if remotes then
+      count = 0
+      for name in remotes:gmatch("%S+") do
+        count = count + 1
+        first = name
+      end
+    end
+    remote = count == 1 and first and git(cwd, { "remote", "get-url", first }) or nil
+  end
+  if not remote then
+    return nil
+  end
+  local trimmed = remote:gsub("/+$", "")
+  local base = trimmed:match("([^/:]+)$") or trimmed
+  return base:gsub("%.git$", "")
+end
+
 ---@param cwd string
 ---@param branch boolean
 ---@return string
 local function prompt_title(cwd, branch)
   ---@type string[]
   local parts = {}
-
-  local remote = git(cwd, { "remote", "get-url", "origin" })
-  if remote then
-    local trimmed = (remote:gsub("/+$", ""))
-    local base = trimmed:match("([^/:]+)$") or trimmed
-    parts[#parts + 1] = (base:gsub("%.git$", ""))
+  local project = M.project(cwd)
+  if project then
+    parts[#parts + 1] = project
   end
 
   if branch then
@@ -89,10 +117,7 @@ local function prompt_title(cwd, branch)
   return #parts == 0 and "Task" or ("Task → " .. table.concat(parts, " / "))
 end
 
--- The date is a suffix on the same line: "Ship the parser @fri". Only a
--- token after whitespace counts, so an address inside the text survives.
--- Everything after the @ goes to the CLI untouched — every spelling of a
--- date is read in exactly one place, and it is not this one.
+-- The date is a suffix on the same line: "Ship the parser @fri".
 ---@param input string
 ---@return string text, string|nil due
 local function split_due(input)
@@ -103,8 +128,6 @@ local function split_due(input)
   return vim.trim(input), nil
 end
 
--- `--branch` files the task under a heading named for the checked-out
--- branch; without it the task lands under the project file's own H1.
 ---@param branch boolean
 ---@return nil
 function M.capture(branch)
@@ -112,10 +135,7 @@ function M.capture(branch)
     return
   end
 
-  -- The project comes from the working directory, so the window's cwd is
-  -- the question being asked — including where `:lcd` has moved it.
   local cwd = vim.fn.getcwd()
-
   ---@param input string|nil
   vim.ui.input({ prompt = prompt_title(cwd, branch) }, function(input)
     if not input then
@@ -146,8 +166,6 @@ function M.capture(branch)
   end)
 end
 
--- Every task in the vault, as the CLI sees it. Its own seam so the picker
--- above it is the only part that needs a window.
 ---@param on_rows fun(rows: vault.TaskRow[])
 ---@return nil
 function M.rows(on_rows)
@@ -175,24 +193,49 @@ function M.rows(on_rows)
   end)
 end
 
--- The query grammar is the matcher's, not a parser here: each item carries
--- `#project`, `@state`, its section, and its text in the string the matcher
--- scores, so `overdue`, `@today`, `#dotfiles`, and plain words all work
--- without anything in this file knowing about them.
+---@param a vault.TaskRow
+---@param b vault.TaskRow
+---@return boolean
+local function task_order(a, b)
+  local a_order = STATE_ORDER[a.state] or STATE_ORDER.none
+  local b_order = STATE_ORDER[b.state] or STATE_ORDER.none
+  if a_order ~= b_order then
+    return a_order < b_order
+  end
+  if a.due ~= b.due then
+    if not a.due then
+      return false
+    end
+    if not b.due then
+      return true
+    end
+    return a.due < b.due
+  end
+  local a_text, b_text = a.text:lower(), b.text:lower()
+  if a_text ~= b_text then
+    return a_text < b_text
+  end
+  if a.text ~= b.text then
+    return a.text < b.text
+  end
+  if a.file ~= b.file then
+    return a.file < b.file
+  end
+  return a.line < b.line
+end
+
 ---@param dir string
 ---@param row vault.TaskRow
 ---@return snacks.picker.finder.Item
 local function item(dir, row)
-  ---@type string[]
-  local tokens = { row.text, "@" .. row.state }
+  -- This is intentionally plain text. Snacks supplies its normal fuzzy/live
+  -- matcher; task state and project are display metadata, not a query syntax.
+  local tokens = { row.text, row.file }
   if row.project then
-    tokens[#tokens + 1] = "#" .. row.project
+    tokens[#tokens + 1] = row.project
   end
   if row.section then
     tokens[#tokens + 1] = row.section
-  end
-  if row.done then
-    tokens[#tokens + 1] = "@done"
   end
 
   return {
@@ -210,11 +253,11 @@ local function format(picker_item)
   local row = picker_item.task
   ---@type snacks.picker.Highlight[]
   local parts = {
-    { row.done and "[x] " or "[ ] ", row.done and "Comment" or "Special" },
-    { row.text, row.done and "Comment" or nil },
+    { "[ ] ", "Special" },
+    { row.text, nil },
   }
   if row.project then
-    parts[#parts + 1] = { "  #" .. row.project, "Comment" }
+    parts[#parts + 1] = { "  " .. row.project, "Comment" }
   end
   if row.section and row.section ~= row.project then
     parts[#parts + 1] = { "  " .. row.section, "Comment" }
@@ -225,30 +268,101 @@ local function format(picker_item)
   return parts
 end
 
+---@param scope? "all"|"project"
 ---@return nil
-function M.search()
+function M.search(scope)
+  scope = scope or "all"
   local dir = vault.require_dir()
   if not dir then
     return
   end
 
-  ---@param rows vault.TaskRow[]
-  M.rows(function(rows)
-    if #rows == 0 then
-      vim.notify("no tasks in the vault")
+  ---@type string|nil
+  local project
+  if scope == "project" then
+    project = M.project(vim.fn.getcwd())
+    if not project then
+      vim.notify("the current directory has no identifiable git project", vim.log.levels.ERROR)
       return
     end
+  end
+
+  ---@param rows vault.TaskRow[]
+  M.rows(function(rows)
+    ---@type vault.TaskRow[]
+    local matching = {}
+    for _, row in ipairs(rows) do
+      if not row.done and (not project or row.project == project) then
+        matching[#matching + 1] = row
+      end
+    end
+    table.sort(matching, task_order)
+    if #matching == 0 then
+      vim.notify(scope == "project" and ("no open tasks for " .. project) or "no open tasks")
+      return
+    end
+
     ---@type snacks.picker.finder.Item[]
     local items = {}
-    for _, row in ipairs(rows) do
+    for _, row in ipairs(matching) do
       items[#items + 1] = item(dir, row)
     end
     Snacks.picker.pick({
-      title = "Vault tasks",
+      title = scope == "project" and ("Tasks: " .. project) or "Vault tasks",
       items = items,
       format = format,
       preview = "file",
     })
+  end)
+end
+
+---@param result vim.SystemCompleted
+---@return nil
+local function refresh_after_due(result)
+  if result.code ~= 0 then
+    vim.notify(failure(result), vim.log.levels.ERROR)
+    return
+  end
+  vim.cmd.checktime()
+  vim.notify(vim.trim(result.stdout or ""))
+end
+
+---@return nil
+function M.set_due()
+  local dir = vault.require_dir()
+  if not dir then
+    return
+  end
+  local path = vim.fs.normalize(vim.api.nvim_buf_get_name(0))
+  if path == "" or not path:match("%.md$") or vim.fn.filereadable(path) == 0 then
+    vim.notify("place the cursor in a saved Markdown task", vim.log.levels.ERROR)
+    return
+  end
+  if path ~= dir and not vim.startswith(path, dir .. "/") then
+    vim.notify("the current task is outside the vault", vim.log.levels.ERROR)
+    return
+  end
+  if vim.bo.modified then
+    vim.notify("save the note before setting a task date", vim.log.levels.ERROR)
+    return
+  end
+
+  local relative = vim.fs.relpath(dir, path)
+  if not relative then
+    vim.notify("could not resolve the current note inside the vault", vim.log.levels.ERROR)
+    return
+  end
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  ---@param input string|nil
+  vim.ui.input({ prompt = "Due date (@today, @fri, @tmr, @3d, or YYYY-MM-DD)" }, function(input)
+    if not input then
+      return
+    end
+    local value = vim.trim(input):gsub("^@", "")
+    if value == "" then
+      return
+    end
+    vault_cli(dir, { "task", "due", (relative .. ":" .. line), value }, refresh_after_due)
   end)
 end
 

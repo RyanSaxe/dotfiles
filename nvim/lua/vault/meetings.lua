@@ -1,20 +1,24 @@
--- Meeting capture: one prompt, `Name @time`, the same shape as a task.
+-- Meeting notes and reciprocal links between vault notes.
 --
--- A meeting is a heading inside today's daily note rather than a file of its
--- own, so the daily note stays the index of the day. Meetings are prose:
--- Neovim writes them and nothing else reads them, which is exactly why they
--- are not the CLI's business the way tasks are.
-local vault = require("vault")
+-- Meetings are running notes in `meetings/`. An occurrence links the meeting
+-- note and the relevant daily note in both directions; other note pairs use
+-- a small reciprocal `## Links` section.
 local notes = require("vault.notes")
+local vault = require("vault")
 
 local M = {}
 
-local TIME_FORMS = "@3pm, @9:30am, or @15:00"
+local DAILY_RE = "^daily/(%d%d%d%d%-%d%d%-%d%d)%.md$"
+local MEETING_RE = "^meetings/.+%.md$"
+local TIME_FORMS = "10:00, 3pm, or leave blank"
 
 ---@param token string
 ---@return string|nil
 local function clock(token)
-  token = token:lower()
+  token = vim.trim(token):lower():gsub("^@", "")
+  if token == "" then
+    return ""
+  end
 
   local hour, minute, meridiem = token:match("^(%d%d?):(%d%d)([ap]m)$")
   if not hour then
@@ -49,93 +53,122 @@ local function clock(token)
   return ("%02d:%s"):format(value, minute)
 end
 
----@param name string
+---@param note { relative: string, path: string, title: string }
+---@return string|nil
+local function daily_date(note)
+  return note.relative:match(DAILY_RE)
+end
+
+---@param note { relative: string, path: string, title: string }
+---@return boolean
+local function is_meeting(note)
+  return note.relative:match(MEETING_RE) ~= nil
+end
+
+---@param relative string
 ---@return string
-local function slugify(name)
-  local slug = name:lower()
-  slug = slug:gsub("[^%w]+", "-")
-  slug = slug:gsub("^%-+", "")
-  slug = slug:gsub("%-+$", "")
-  return slug
+local function link_target(relative)
+  return (relative:gsub("%.md$", ""))
 end
 
--- The heading goes at the end of the note, through the buffer rather than
--- behind it: the daily note is very often already open, and writing to disk
--- under a loaded buffer is how two versions of a day start disagreeing.
+---@param note { relative: string, path: string, title: string }
+---@param target { relative: string, path: string, title: string }
 ---@param at string
----@param slug string
----@param name string
 ---@return nil
-local function append_heading(at, slug, name)
-  local buf = vim.api.nvim_get_current_buf()
-  local last = vim.api.nvim_buf_line_count(buf)
-  local tail = vim.api.nvim_buf_get_lines(buf, last - 1, last, false)[1] or ""
-
-  ---@type string[]
-  local block = {}
-  if vim.trim(tail) ~= "" then
-    block[#block + 1] = ""
-  end
-  block[#block + 1] = ("## %s [[%s|%s]]"):format(at, slug, name)
-  block[#block + 1] = ""
-
-  vim.api.nvim_buf_set_lines(buf, last, last, false, block)
-  vim.api.nvim_win_set_cursor(0, { last + #block, 0 })
-  vim.cmd.update()
-end
-
----@return nil
-function M.capture()
-  if not vault.require_notes() then
+local function link_occurrence(note, target, at)
+  local date = daily_date(note) or daily_date(target)
+  local daily = daily_date(note) and note or target
+  local meeting = is_meeting(note) and note or target
+  if not date or not daily or not meeting then
     return
   end
 
-  ---@param input string|nil
-  vim.ui.input({ prompt = "Meeting" }, function(input)
-    if not input or vim.trim(input) == "" then
-      return
-    end
+  ---@type string
+  local daily_link
+  daily_link = at == "" and "- [[%s|%s]]" or "- %s [[%s|%s]]"
+  if at == "" then
+    daily_link = string.format(daily_link, link_target(meeting.relative), meeting.title)
+  else
+    daily_link = string.format(daily_link, at, link_target(meeting.relative), meeting.title)
+  end
+  ---@type string
+  local meeting_link
+  meeting_link = at == "" and "- %s [[%s|%s]]" or "- %s %s [[%s|%s]]"
+  if at == "" then
+    meeting_link = string.format(meeting_link, date, link_target(daily.relative), date)
+  else
+    meeting_link = string.format(meeting_link, date, at, link_target(daily.relative), date)
+  end
 
-    local name, token = input:match("^(.-)%s+@(%S+)%s*$")
-    name = name and vim.trim(name) or ""
-    if name == "" or not token then
-      vim.notify(("a meeting heading is a start time: write `Name %s`"):format(TIME_FORMS), vim.log.levels.ERROR)
-      return
-    end
+  if not notes.editable(daily.path) or not notes.editable(meeting.path) then
+    return
+  end
+  notes.append_unique(daily.path, daily_link, "## Meetings")
+  notes.append_unique(meeting.path, meeting_link, "## Meetings")
+  vim.notify(("linked %s and %s"):format(daily.title, meeting.title))
+end
 
-    local at = clock(token)
-    if not at then
-      vim.notify(("`@%s` is not a start time — use %s"):format(token, TIME_FORMS), vim.log.levels.ERROR)
-      return
-    end
+---@param note { relative: string, path: string, title: string }
+---@param target { relative: string, path: string, title: string }
+---@return nil
+local function link_notes(note, target)
+  if note.path == target.path then
+    vim.notify("choose a different note", vim.log.levels.ERROR)
+    return
+  end
 
-    local slug = slugify(name)
-    if slug == "" then
-      vim.notify(("no file name can be made from %q"):format(name), vim.log.levels.ERROR)
-      return
-    end
+  if (daily_date(note) and is_meeting(target)) or (daily_date(target) and is_meeting(note)) then
+    ---@param input string|nil
+    vim.ui.input({ prompt = ("Meeting time (%s): "):format(TIME_FORMS) }, function(input)
+      if input == nil then
+        return
+      end
+      local at = clock(input)
+      if not at then
+        vim.notify(("not a meeting time: %s"):format(TIME_FORMS), vim.log.levels.ERROR)
+        return
+      end
+      link_occurrence(note, target, at)
+    end)
+    return
+  end
 
-    local person = notes.types().person
-    if not person then
-      vim.notify(
-        ("no `person` template under %s — re-run install.sh"):format(vault.templates_dir()),
-        vim.log.levels.ERROR
-      )
-      return
-    end
+  local note_link = ("- [[%s|%s]]"):format(link_target(target.relative), target.title)
+  local target_link = ("- [[%s|%s]]"):format(link_target(note.relative), note.title)
+  if not notes.editable(note.path) or not notes.editable(target.path) then
+    return
+  end
+  notes.append_unique(note.path, note_link, "## Links")
+  notes.append_unique(target.path, target_link, "## Links")
+  vim.notify(("linked %s and %s"):format(note.title, target.title))
+end
 
-    -- The person note goes through the same type-driven creation as
-    -- <leader>on, with the slug as its file name and the typed name as its
-    -- title, and it is not opened: the meeting is what was being captured.
-    notes.create(person, { id = slug, title = name, open = false })
+---@return nil
+function M.search()
+  if not vault.require_notes() then
+    return
+  end
+  ---@param selected vault.NoteItem
+  notes.pick("meeting", function(selected)
+    notes.open_or_create("meeting", selected)
+  end)
+end
 
-    ---@type any
-    local daily = require("obsidian.daily").today()
-    if not daily:exists() then
-      daily:write()
+---@return nil
+function M.link()
+  local current = notes.current()
+  if not current then
+    return
+  end
+  ---@param selected vault.NoteItem
+  notes.pick_all(function(selected)
+    if selected.file and selected.relative then
+      link_notes(current, {
+        path = selected.file,
+        relative = selected.relative,
+        title = selected.title,
+      })
     end
-    daily:open({ sync = true })
-    append_heading(at, slug, name)
   end)
 end
 

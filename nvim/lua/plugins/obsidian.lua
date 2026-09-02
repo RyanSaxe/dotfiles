@@ -91,11 +91,11 @@ return {
     { "<leader>oo", obsidian("follow_link"), desc = "Follow link" },
     { "<leader>ob", obsidian("backlinks"), desc = "Backlinks" },
     {
-      "<leader>on",
+      "<leader>op",
       function()
-        require("vault.notes").new()
+        require("vault.notes").people()
       end,
-      desc = "New note",
+      desc = "People",
     },
     {
       "<leader>of",
@@ -114,17 +114,38 @@ return {
     {
       "<leader>om",
       function()
-        require("vault.meetings").capture()
+        require("vault.meetings").search()
       end,
-      desc = "Capture a meeting",
+      desc = "Meetings",
+    },
+    {
+      "<leader>ol",
+      function()
+        require("vault.meetings").link()
+      end,
+      desc = "Link vault notes",
     },
     { "<leader>ot", group = "Tasks" },
     {
       "<leader>ots",
       function()
-        require("vault.tasks").search()
+        require("vault.tasks").search("all")
       end,
-      desc = "Search tasks",
+      desc = "Search all open tasks",
+    },
+    {
+      "<leader>otS",
+      function()
+        require("vault.tasks").search("project")
+      end,
+      desc = "Search project tasks",
+    },
+    {
+      "<leader>otd",
+      function()
+        require("vault.tasks").set_due()
+      end,
+      desc = "Set task date",
     },
     {
       "<leader>otc",
