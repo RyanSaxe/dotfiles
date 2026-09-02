@@ -134,15 +134,23 @@ mascot_key() {
 }
 
 # Compute the cache generation stamps once per run. rstamp covers every
-# render input (tokens, elements, palettes, templates — names and content),
-# astamp the accent extractor; editing any of them lands new renders in a
-# fresh generation instead of reusing stale entries. The SCHEMA line forces
-# a new generation when the cache layout itself changes.
+# render input (tokens, elements, palettes, templates, the extractor, and
+# this script — names and content); editing any of them lands new renders
+# in a fresh generation instead of reusing stale entries. astamp covers
+# only the extractor, so render-input edits never re-run extraction (an
+# extractor edit moves both stamps: new accents demand new renders). The
+# SCHEMA line forces a new generation when the cache layout itself changes.
 ensure_cache_ids() {
   [ -n "${rstamp:-}" ] && return 0
+  # Stamp the extractor accents_for actually invokes (PATH resolution,
+  # symlinks followed); fall back to the repo copy when it is not on PATH.
+  extractor="$(command -v mascot-accents || true)"
+  [ -n "$extractor" ] && extractor="$(readlink -f "$extractor")"
+  [ -f "$extractor" ] || extractor="$PACKAGE_ROOT/bin/mascot-accents.py"
   set --
   for input in "$CONFIG/tokens.conf" "$ELEMENTS" \
-    "$CONFIG"/palettes/*.conf "$CONFIG"/templates/*.tmpl; do
+    "$CONFIG"/palettes/*.conf "$CONFIG"/templates/*.tmpl \
+    "$extractor" "$SCRIPT_PATH"; do
     [ -f "$input" ] && set -- "$@" "$input"
   done
   rstamp="$({
@@ -151,7 +159,7 @@ ensure_cache_ids() {
   } | cksum | awk '{print $1 "-" $2}')"
   astamp="$({
     printf 'SCHEMA=1\n'
-    cat /dev/null "$PACKAGE_ROOT/bin/mascot-accents.py" 2>/dev/null
+    cat /dev/null "$extractor" 2>/dev/null
   } | cksum | awk '{print $1 "-" $2}')"
 }
 
@@ -313,13 +321,15 @@ build_entry() { # entry mode accents-file [force]
   entry="$1"
   entry_mode="$2"
   accents="$3"
-  build="$CACHE/.build.$$.${entry##*/}"
+  # mktemp, never $$: backgrounded warm builds outlive the parent shell
+  # whose PID a name would carry, and a recycled PID could collide.
+  mkdir -p "$CACHE"
+  build="$(mktemp -d "$CACHE/.build.${entry##*/}.XXXXXX")"
   # The workdir holds the prebuilt substitution scripts and render temp
   # files; the trap covers the error exits (render_template exits the
   # script on failure).
   workdir="$build/.work"
   trap 'rm -rf "$build"' EXIT
-  rm -rf "$build"
   mkdir -p "$workdir"
   emit_mapping "$entry_mode" "$(palette_for_mode "$entry_mode")" "" >"$workdir/mode.sed"
   # Mode-pinned contexts: templates that must exist for BOTH modes at
@@ -355,12 +365,14 @@ build_entry() { # entry mode accents-file [force]
     echo "error: could not publish cache entry $entry" >&2
     exit 1
   }
-  prune_cache
 }
 
-# After a successful cold build: old generations go (their stamps can never
-# match again), as do builds abandoned by dead processes. Live-pid builds
-# stay — a concurrent render may still be mid-rename.
+# After a foreground cold build: old generations go (their stamps can never
+# match again), as do build dirs old enough to be a crashed render's
+# leftovers. Age only, never PID liveness — a backgrounded warm build's
+# parent has already exited, so its live build would read as abandoned.
+# Never called from background builds: their stamps date from their parent's
+# start, and pruning by a stale stamp would eat a newer generation mid-sync.
 prune_cache() {
   for stale in "$CACHE"/render-* "$CACHE"/accents-*; do
     [ -e "$stale" ] || continue
@@ -369,12 +381,8 @@ prune_cache() {
     *) rm -rf "$stale" ;;
     esac
   done
-  for stale in "$CACHE"/.build.*; do
-    [ -e "$stale" ] || continue
-    builder="${stale##*/.build.}"
-    builder="${builder%%.*}"
-    kill -0 "$builder" 2>/dev/null || rm -rf "$stale"
-  done
+  find "$CACHE" -maxdepth 1 -name '.build.*' -mmin +60 \
+    -exec rm -rf {} + 2>/dev/null || true
 }
 
 # After a flip the opposite mode's entry warms in the background, so the
@@ -399,18 +407,20 @@ render() { # [mode] [force]
   mkey="$(mascot_key "$active")"
   entry="$CACHE/render-$rstamp/$mode-$mkey"
   acc_file="$CACHE/accents-$astamp/$mkey.conf"
-  # Seed the accents cache from live state: apply/dark/light re-render the
-  # active mascot without re-running the extractor (renders stay offline,
-  # today's contract).
-  if [ -n "$active" ] && [ ! -f "$acc_file" ]; then
-    mkdir -p "$CACHE/accents-$astamp"
-    cp "$STATE/accents.conf" "$CACHE/accents-$astamp/.$mkey.tmp.$$"
-    mv "$CACHE/accents-$astamp/.$mkey.tmp.$$" "$acc_file"
-  fi
+  # Offline contract: apply/dark/light never run the extractor. They prefer
+  # the cached extraction for this identity; when it is missing they render
+  # against live accents.conf directly — never banked into the cache, where
+  # unlabeled state would masquerade as this extractor's output (mascot
+  # sync's cold path re-extracts and rebuilds, restoring coherence).
+  [ -f "$acc_file" ] || acc_file="$STATE/accents.conf"
   if [ -n "${2:-}" ] || [ ! -f "$entry/.complete" ]; then
     build_entry "$entry" "$mode" "$acc_file" "${2:-}"
+    prune_cache
   fi
-  publish_from "$entry" "${2:-}"
+  publish_from "$entry" "${2:-}" || {
+    echo "error: cache entry $entry vanished before publish" >&2
+    exit 1
+  }
   echo "theme: mode=$mode"
 }
 
@@ -440,6 +450,9 @@ render() { # [mode] [force]
 # and nvim fs_event are inode-pinned, so a symlink flip would silently
 # break every one of them.
 publish_from() { # entry [force]
+  # A pruned or never-built entry must fail (callers treat it as a cache
+  # miss); globbing an absent dir would silently publish nothing.
+  [ -f "$1/.complete" ] || return 1
   mkdir -p "$GENERATED"
   ghostty_dirty=""
   tmtheme_dirty=""
@@ -482,6 +495,9 @@ publish_from() { # entry [force]
       [ -f "$gtheme" ] || continue
       cp "$gtheme" "$HOME/.config/ghostty/themes/${gtheme##*/}"
     done
+    # A repair that re-copied shader/theme targets must also signal:
+    # ghostty's loaded state is exactly what the repair distrusts.
+    ghostty_dirty=1
     publish_bat_theme
     publish_codex_theme
   elif [ -n "$tmtheme_dirty" ]; then
@@ -673,14 +689,32 @@ mascot)
     entry="$CACHE/render-$rstamp/$mode-$mkey"
     acc_file="$CACHE/accents-$astamp/$mkey.conf"
     if [ ! -f "$entry/.complete" ] || [ ! -f "$acc_file" ]; then
+      # A missing accents entry means extraction is about to run: any
+      # pre-existing render entry was built against other accents (the
+      # live-state fallback in render), so rebuild it, .complete or not.
+      rebuild=""
+      [ -f "$acc_file" ] || rebuild=force
       acc_file="$(accents_for "$value")" || exit 1
-      [ -f "$entry/.complete" ] || build_entry "$entry" "$mode" "$acc_file"
-      # A later jump superseded this sync while it rendered: leave the
-      # cache warm for the next visit, flip nothing.
-      [ "$(cat "$STATE/.mascot-requested" 2>/dev/null)" = "$value" ] || exit 0
+      if [ -n "$rebuild" ] || [ ! -f "$entry/.complete" ]; then
+        build_entry "$entry" "$mode" "$acc_file" "$rebuild"
+        prune_cache
+      fi
+    fi
+    # A later jump superseded this sync while it rendered: leave the
+    # cache warm for the next visit, flip nothing. Checked before the
+    # publish so the flip and the accents install stand or fall together.
+    [ "$(cat "$STATE/.mascot-requested" 2>/dev/null)" = "$value" ] || exit 0
+    if ! publish_from "$entry"; then
+      # The entry vanished between the .complete check and the publish (a
+      # concurrent prune): treat it as a cache miss — rebuild, publish for
+      # real, and never install accents for a flip that did not land.
+      build_entry "$entry" "$mode" "$acc_file" force
+      publish_from "$entry" || {
+        echo "error: cache entry $entry vanished before publish" >&2
+        exit 1
+      }
     fi
     install_accents "$acc_file"
-    publish_from "$entry"
     warm_opposite "$mode" "$mkey" "$acc_file"
     exit 0
     ;;

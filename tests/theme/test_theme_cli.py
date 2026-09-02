@@ -353,6 +353,95 @@ def test_render_input_change_invalidates_cached_entries(tmp_path: Path) -> None:
     assert calls.read_text().splitlines() == ["pokemon:mew", "pokemon:ditto"]
 
 
+def test_extractor_edit_invalidates_cached_renders(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING)
+    map_projects(home)
+    calls = home / "mascot-accents.calls"
+    for project in ("proja", "projb"):
+        cold = run_theme(home, config, "mascot", "sync", project)
+        assert cold.returncode == 0, cold.stderr
+    # An extractor edit that changes its output: both stamps move, so the
+    # banked mew render (old accent) must never be flipped in again.
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING.replace("ffcc00", "123456"))
+
+    result = run_theme(home, config, "mascot", "sync", "proja")
+
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().splitlines() == [
+        "pokemon:mew",
+        "pokemon:ditto",
+        "pokemon:mew",
+    ]
+    rendered = (state_dir(home) / "generated/tmux-colors.conf").read_text()
+    assert 'set -g @accent "#123456"' in rendered
+    assert "#ffcc00" not in rendered
+
+
+def test_apply_does_not_bank_live_accents_into_the_cache(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING)
+    map_projects(home)
+    calls = home / "mascot-accents.calls"
+    cold = run_theme(home, config, "mascot", "sync", "proja")
+    assert cold.returncode == 0, cold.stderr
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING.replace("ffcc00", "123456"))
+
+    applied = run_theme(home, config, "apply")
+
+    assert applied.returncode == 0, applied.stderr
+    # apply renders offline against live accents.conf without laundering it
+    # into the cache as if the edited extractor had produced it.
+    assert calls.read_text().splitlines() == ["pokemon:mew"]
+    banked = list((state_dir(home) / "cache/theme").glob("accents-*/*.conf"))
+    assert banked == []
+    # The unpoisoned cache re-extracts on the next visit and lands the
+    # edited extractor's accent.
+    for project in ("projb", "proja"):
+        sync = run_theme(home, config, "mascot", "sync", project)
+        assert sync.returncode == 0, sync.stderr
+    assert calls.read_text().splitlines() == [
+        "pokemon:mew",
+        "pokemon:ditto",
+        "pokemon:mew",
+    ]
+    rendered = (state_dir(home) / "generated/tmux-colors.conf").read_text()
+    assert 'set -g @accent "#123456"' in rendered
+
+
+def test_cold_sync_that_extracted_rebuilds_a_complete_entry(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING)
+    map_projects(home)
+    calls = home / "mascot-accents.calls"
+    cold = run_theme(home, config, "mascot", "sync", "proja")
+    assert cold.returncode == 0, cold.stderr
+    # Rebuild mew's entry from accents the extractor never produced: drop
+    # the extraction cache, hand-edit live accents, and force-render.
+    for banked in (state_dir(home) / "cache/theme").glob("accents-*"):
+        shutil.rmtree(banked)
+    accents = state_dir(home) / "accents.conf"
+    accents.write_text(accents.read_text().replace("ffcc00", "999999"))
+    doctored = run_theme(home, config, "apply")
+    assert doctored.returncode == 0, doctored.stderr
+
+    flip_away = run_theme(home, config, "mascot", "sync", "projb")
+    assert flip_away.returncode == 0, flip_away.stderr
+    result = run_theme(home, config, "mascot", "sync", "proja")
+
+    assert result.returncode == 0, result.stderr
+    # The sync just re-extracted mew, so the doctored .complete entry was
+    # rebuilt against the fresh accents, not flipped in.
+    assert calls.read_text().splitlines() == [
+        "pokemon:mew",
+        "pokemon:ditto",
+        "pokemon:mew",
+    ]
+    rendered = (state_dir(home) / "generated/tmux-colors.conf").read_text()
+    assert 'set -g @accent "#ffcc00"' in rendered
+    assert "#999999" not in rendered
+
+
 def test_superseded_sync_leaves_the_flip_to_the_later_jump(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     stub_mascot_accents(home, MASCOT_ACCENTS_SUPERSEDING)
