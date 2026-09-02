@@ -172,4 +172,42 @@ function M.link()
   end)
 end
 
+---@return nil
+function M.link_today()
+  if not vault.require_notes() then
+    return
+  end
+  local current = notes.current()
+  if not current then
+    return
+  end
+
+  local date = os.date("%Y-%m-%d")
+  local relative = "daily/" .. date .. ".md"
+  local path = vim.fs.normalize(vault.dir() .. "/" .. relative)
+  if current.path == path then
+    vim.notify("today's daily note is the current note", vim.log.levels.INFO)
+    return
+  end
+
+  if vim.fn.filereadable(path) == 0 then
+    local daily_dir = vim.fs.normalize(vault.dir() .. "/daily")
+    if vim.fn.mkdir(daily_dir, "p") == 0 and vim.fn.isdirectory(daily_dir) == 0 then
+      vim.notify(("could not create daily note directory: %s"):format(daily_dir), vim.log.levels.ERROR)
+      return
+    end
+    ---@type any
+    local daily = require("obsidian.daily").today()
+    if not daily:exists() then
+      daily:write()
+    end
+  end
+
+  if vim.fn.filereadable(path) == 0 then
+    vim.notify(("could not create today's daily note: %s"):format(path), vim.log.levels.ERROR)
+    return
+  end
+  link_notes(current, { path = path, relative = relative, title = notes.title(path) })
+end
+
 return M

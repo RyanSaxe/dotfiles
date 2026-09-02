@@ -96,74 +96,118 @@ function M.project(cwd)
   return base:gsub("%.git$", "")
 end
 
----@param cwd string
----@param branch boolean
----@return string
-local function prompt_title(cwd, branch)
-  ---@type string[]
-  local parts = {}
-  local project = M.project(cwd)
-  if project then
-    parts[#parts + 1] = project
+---@param dir string
+---@param project string
+---@return string|nil
+local function project_file(dir, project)
+  if project == "" or project == "." or project == ".." or project:find("[/\\]") then
+    vim.notify(("unsafe project name: %s"):format(project), vim.log.levels.ERROR)
+    return nil
   end
 
-  if branch then
-    local head = git(cwd, { "rev-parse", "--abbrev-ref", "HEAD" })
-    if head and head ~= "HEAD" then
-      parts[#parts + 1] = head
+  local path = vim.fs.normalize(dir .. "/projects/" .. project .. "/TODO.md")
+  if path ~= dir and not vim.startswith(path, dir .. "/") then
+    vim.notify("the project task file would be outside the vault", vim.log.levels.ERROR)
+    return nil
+  end
+  if vim.fn.isdirectory(path) == 1 then
+    vim.notify(("project task path is a directory: %s"):format(path), vim.log.levels.ERROR)
+    return nil
+  end
+
+  local parent = vim.fs.dirname(path)
+  if vim.fn.mkdir(parent, "p") == 0 and vim.fn.isdirectory(parent) == 0 then
+    vim.notify(("could not create project task directory: %s"):format(parent), vim.log.levels.ERROR)
+    return nil
+  end
+  if vim.fn.filereadable(path) == 0 then
+    if vim.fn.writefile({ "# " .. project, "" }, path) ~= 0 or vim.fn.filereadable(path) == 0 then
+      vim.notify(("could not create project task file: %s"):format(path), vim.log.levels.ERROR)
+      return nil
     end
   end
-
-  return #parts == 0 and "Task" or ("Task → " .. table.concat(parts, " / "))
+  return path
 end
 
--- The date is a suffix on the same line: "Ship the parser @fri".
----@param input string
----@return string text, string|nil due
-local function split_due(input)
-  local text, due = input:match("^(.-)%s+@(%S+)%s*$")
-  if text and vim.trim(text) ~= "" then
-    return vim.trim(text), due
-  end
-  return vim.trim(input), nil
-end
-
----@param branch boolean
+---@param with_branch boolean
 ---@return nil
-function M.capture(branch)
-  if not vault.require_dir() then
+function M.open_project(with_branch)
+  local dir = vault.require_dir()
+  if not dir then
+    return
+  end
+  local cwd = vim.fn.getcwd()
+  local project = M.project(cwd)
+  if not project then
+    vim.notify("the current directory has no identifiable git project", vim.log.levels.ERROR)
     return
   end
 
-  local cwd = vim.fn.getcwd()
-  ---@param input string|nil
-  vim.ui.input({ prompt = prompt_title(cwd, branch) }, function(input)
-    if not input then
+  ---@type string|nil
+  local branch
+  if with_branch then
+    branch = git(cwd, { "rev-parse", "--abbrev-ref", "HEAD" })
+    if not branch or branch == "HEAD" then
+      vim.notify("the current checkout has no branch", vim.log.levels.ERROR)
       return
     end
-    local text, due = split_due(input)
-    if text == "" then
+  end
+
+  local path = project_file(dir, project)
+  if not path then
+    return
+  end
+  vim.cmd({ cmd = "edit", args = { path } })
+  if not branch then
+    return
+  end
+
+  local heading = "## " .. branch
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  for row, line in ipairs(lines) do
+    if line == heading then
+      vim.api.nvim_win_set_cursor(0, { row, 0 })
       return
     end
+  end
+  if vim.bo.modified then
+    vim.notify("save the project task file before adding its branch section", vim.log.levels.ERROR)
+    return
+  end
 
-    ---@type string[]
-    local args = { "task", "add", text }
-    if due then
-      vim.list_extend(args, { "--due", due })
-    end
-    if branch then
-      args[#args + 1] = "--branch"
-    end
+  ---@type string[]
+  local block = {}
+  local heading_line = #lines + 1
+  if #lines > 0 and vim.trim(lines[#lines]) ~= "" then
+    block[#block + 1] = ""
+    heading_line = heading_line + 1
+  end
+  block[#block + 1] = heading
+  block[#block + 1] = ""
+  vim.api.nvim_buf_set_lines(0, #lines, #lines, false, block)
+  vim.cmd.update()
+  vim.api.nvim_win_set_cursor(0, { heading_line, 0 })
+end
 
-    ---@param result vim.SystemCompleted
-    vault_cli(cwd, args, function(result)
-      if result.code ~= 0 then
-        vim.notify(failure(result), vim.log.levels.ERROR)
-        return
-      end
-      vim.notify(vim.trim(result.stdout or ""))
-    end)
-  end)
+---@return nil
+function M.checkbox()
+  local path = vim.api.nvim_buf_get_name(0)
+  if vim.bo.filetype ~= "markdown" and not path:match("%.md$") then
+    vim.notify("place the cursor in a Markdown file", vim.log.levels.ERROR)
+    return
+  end
+  if not vim.bo.modifiable then
+    vim.notify("the current buffer is not modifiable", vim.log.levels.ERROR)
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local current = vim.api.nvim_get_current_line()
+  local indent = current:match("^%s*") or ""
+  ---@type string
+  local text = indent .. "- [ ] "
+  vim.api.nvim_buf_set_lines(0, cursor[1], cursor[1], false, { text })
+  vim.api.nvim_win_set_cursor(0, { cursor[1] + 1, #text })
 end
 
 ---@param on_rows fun(rows: vault.TaskRow[])

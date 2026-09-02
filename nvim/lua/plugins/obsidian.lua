@@ -125,6 +125,13 @@ return {
       end,
       desc = "Link vault notes",
     },
+    {
+      "<leader>oL",
+      function()
+        require("vault.meetings").link_today()
+      end,
+      desc = "Link today's daily note",
+    },
     { "<leader>ot", group = "Tasks" },
     {
       "<leader>ots",
@@ -150,16 +157,23 @@ return {
     {
       "<leader>otc",
       function()
-        require("vault.tasks").capture(false)
+        require("vault.tasks").checkbox()
       end,
-      desc = "Create a task",
+      desc = "Insert checkbox",
     },
     {
-      "<leader>otb",
+      "<leader>otp",
       function()
-        require("vault.tasks").capture(true)
+        require("vault.tasks").open_project(false)
       end,
-      desc = "Create a task under the branch",
+      desc = "Open project tasks",
+    },
+    {
+      "<leader>otP",
+      function()
+        require("vault.tasks").open_project(true)
+      end,
+      desc = "Open branch tasks",
     },
   },
 }

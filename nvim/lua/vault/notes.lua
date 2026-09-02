@@ -17,6 +17,7 @@ local M = {}
 ---@field title string
 ---@field file string|nil
 ---@field relative string|nil
+---@field date string|nil
 ---@field create boolean|nil
 
 ---@param path string
@@ -224,6 +225,12 @@ local function relative(root, path)
 end
 
 ---@param path string
+---@return string|nil
+local function note_date(path)
+  return path:match("^daily/(%d%d%d%d%-%d%d%-%d%d)%.md$")
+end
+
+---@param path string
 ---@param root string
 ---@return vault.NoteItem
 local function item(path, root)
@@ -234,6 +241,7 @@ local function item(path, root)
     title = title,
     file = path,
     relative = rel,
+    date = note_date(rel),
     create = false,
   }
 end
@@ -250,6 +258,34 @@ local function format(picker_item)
   }
 end
 
+---@param a vault.NoteItem
+---@param b vault.NoteItem
+---@return boolean
+local function note_order(a, b)
+  local today = os.date("%Y-%m-%d")
+  if a.date == today and b.date ~= today then
+    return true
+  end
+  if b.date == today and a.date ~= today then
+    return false
+  end
+  if a.date ~= b.date then
+    if not a.date then
+      return false
+    end
+    if not b.date then
+      return true
+    end
+    return a.date > b.date
+  end
+  local a_text = (a.title .. " " .. (a.relative or "")):lower()
+  local b_text = (b.title .. " " .. (b.relative or "")):lower()
+  if a_text ~= b_text then
+    return a_text < b_text
+  end
+  return (a.relative or "") < (b.relative or "")
+end
+
 ---@param callback fun(item: vault.NoteItem)
 ---@param opts { title: string, files: string[], create: string|nil }
 ---@return nil
@@ -260,12 +296,14 @@ local function pick_items(callback, opts)
   for _, path in ipairs(opts.files) do
     items[#items + 1] = item(path, root)
   end
+  table.sort(items, note_order)
   if opts.create then
     items[#items + 1] = {
       text = opts.create,
       title = opts.create,
       file = nil,
       relative = nil,
+      date = nil,
       create = true,
     }
   end
