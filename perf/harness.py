@@ -41,7 +41,9 @@ REPO = Path(__file__).resolve().parent.parent
 SHIMS = REPO / "perf" / "shims"
 RESULTS = REPO / "perf" / "results"
 GOTO_PANE = ".config/tmux/scripts/goto-pane.sh"
-GO_BACK = ".config/tmux/scripts/go-back-pane.sh"
+# The production M-l path: goto-pane's back mode (go-back-pane.sh is a
+# superseded wrapper kept only until the live-server cutover).
+GO_BACK_ARGS = (".config/tmux/scripts/goto-pane.sh", "back")
 
 # Plain-text strings that only the named tab's body renders; capture-pane
 # polling keys repaint detection on them.
@@ -601,7 +603,7 @@ class Harness:
 
     def metric_go_back(self) -> None:
         metric = Metric("alt+L end-to-end", note="landing asserted")
-        script = str(self.home / GO_BACK)
+        script = str(self.home / GO_BACK_ARGS[0])
         origin = self.window_content_pane("perf-s0:1")
         away = self.window_content_pane("perf-s1:1")
         self.goto(origin)
@@ -627,7 +629,7 @@ class Harness:
                 continue
             expected = self.option("@TMUX_PREV_PANE")
             start = time.monotonic()
-            self.run_script(script)
+            self.run_script(script, "back")
             if not self.wait_or_censor(
                 metric,
                 "go-back landing",
@@ -863,7 +865,7 @@ class Harness:
         return origin, target
 
     def scenario_go_back(self, origin: str, target: str) -> None:
-        self.run_script(str(self.home / GO_BACK))
+        self.run_script(str(self.home / GO_BACK_ARGS[0]), GO_BACK_ARGS[1])
         self.wait_for("go-back landing", lambda: self.active_pane()[1] == origin)
         curr, prev = self.settle_history()
         self.check(
@@ -891,7 +893,7 @@ class Harness:
         self.wait_for("PREV=temp", lambda: self.option("@TMUX_PREV_PANE") == temp)
         self.tmux("kill-pane", "-t", temp)
         time.sleep(0.3)
-        self.run_script(str(self.home / GO_BACK))
+        self.run_script(str(self.home / GO_BACK_ARGS[0]), GO_BACK_ARGS[1])
         time.sleep(0.5)
         _, pane = self.active_pane()
         prev = self.option("@TMUX_PREV_PANE")
@@ -923,7 +925,7 @@ class Harness:
         self.goto(origin)
         self.goto(target)
         self.settle_history()
-        script = str(self.home / GO_BACK)
+        script = str(self.home / GO_BACK_ARGS[0])
         _, seat = self.active_pane()
         # Ten concurrent go-backs, exactly how ten fast M-l presses would
         # land — each pinned via TMUX_PANE to the pane the presses fired
@@ -931,7 +933,10 @@ class Harness:
         env = dict(self.tool_env, TMUX_PANE=seat)
         procs = [
             subprocess.Popen(
-                [script], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                [script, "back"],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             for _ in range(10)
         ]
@@ -950,7 +955,7 @@ class Harness:
         )
         # And the history still works: one more go-back must land on PREV.
         expected = prev
-        self.run_script(script)
+        self.run_script(script, "back")
         landed = True
         try:
             self.wait_for(

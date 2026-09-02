@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Superseded by `goto-pane.sh back` — kept only while a live server still runs the old key bindings (PLAN.md Phase 6 deletes it).
 # Go back to previous pane (works across sessions)
 # Called by: bind -n M-l run-shell '~/.config/tmux/scripts/go-back-pane.sh'
 

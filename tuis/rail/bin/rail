@@ -180,6 +180,38 @@ element)
     exit 1
     ;;
   esac
+  # The agents tab resolves in pure shell: an element press is on the
+  # keypress path, and a Node cold start would hold the tmux command
+  # queue for ~a second. Tab normalization mirrors loadRailTab
+  # (src/tabs.ts): missing/unreadable/unknown -> agents, legacy
+  # "review" -> reviews.
+  tab="$(cat "$STATE/tab" 2>/dev/null || true)"
+  case "$tab" in
+  review) tab=reviews ;;
+  agents | reviews | tasks) ;;
+  *) tab=agents ;;
+  esac
+  if [ "$tab" = agents ]; then
+    # Digits are viewer-relative — 1 is the top elsewhere row of the
+    # CALLING session's rail. The daemon keeps hints.tsv current:
+    # viewing_session <tab> key <tab> target_session <tab> pane_id.
+    viewing="$(tmux display-message -p '#{session_name}')"
+    # Literal field comparison, not grep: a session name with regex
+    # metacharacters (c++, foo[bar]) must still match its own hint rows.
+    hint_line="$(awk -F'\t' -v s="$viewing" -v k="$number" \
+      '$1 == s && $2 == k { print; exit }' "$STATE/hints.tsv" 2>/dev/null || true)"
+    if [ -z "$hint_line" ]; then
+      # A keystroke that found nothing is not worth a modal run-shell
+      # overlay — say it in the status line and exit clean, exactly as
+      # the Node path's miss does.
+      tmux display-message "rail: no agent element $number"
+      exit 0
+    fi
+    session="$(printf '%s' "$hint_line" | cut -f3)"
+    pane="$(printf '%s' "$hint_line" | cut -f4)"
+    # The shared jump primitive switches AND syncs the mascot accent.
+    exec "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
+  fi
   cd "$RAIL_DIR"
   exec npx tsx src/tab-element.ts "$number"
   ;;

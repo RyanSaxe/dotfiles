@@ -1,4 +1,5 @@
 #!/bin/sh
+# Superseded by the in-server history hooks in tmux.conf — kept only while a live server still runs the old hook set (PLAN.md Phase 6 deletes it).
 # Track one pane-focus event for "go back" functionality.
 # Called by hooks as: track-pane.sh <pane-id>
 #

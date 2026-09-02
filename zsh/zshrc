@@ -78,6 +78,51 @@ if command -v fzf > /dev/null; then
   bindkey -M vicmd -r '^T' '\ec' 2> /dev/null
 fi
 
+# While an fzf widget holds the line, C-j/C-k must reach fzf, not switch
+# panes. tmux routes those keys in-server off the @is_fzf pane option
+# (the is_vim format in tmux.conf), so each widget marks its own
+# lifetime: one tmux spawn on entry, one on exit — never per keystroke.
+# The wrappers call the saved functions directly, not through zle, so
+# zsh-autosuggestions re-binding the widget names at first prompt cannot
+# reroute the inner dispatch. Popups are not panes; they skip this.
+if [[ -n "$TMUX_PANE" && -z "$TMUX_POPUP" ]]; then
+  # fzf-tab is sourced above, so both widget functions exist by now.
+  # The orig-copy check makes a re-source a no-op: copying an already
+  # wrapped widget over its own saved original would recurse.
+  for _w in fzf-history-widget fzf-tab-complete; do
+    (( ${+functions[$_w]} )) || continue
+    (( ${+functions[_is_fzf_orig_$_w]} )) && continue
+    functions -c "$_w" "_is_fzf_orig_$_w"
+    eval "$_w() {
+      tmux set-option -p -t \"\$TMUX_PANE\" @is_fzf 1
+      {
+        _is_fzf_orig_$_w \"\$@\"
+      } always {
+        tmux set-option -pu -t \"\$TMUX_PANE\" @is_fzf
+      }
+    }"
+  done
+  unset _w
+
+  # nvim clears @is_vim on exit/suspend, but a SIGKILL'd nvim cannot; a
+  # stale 1 would misroute C-hjkl into whatever non-shell program runs in
+  # the pane next. The shell regains the foreground exactly when that
+  # crash happens, so clear once after any command that could have owned
+  # the option — vim-ish commands and the porcelains that spawn editors.
+  # Everything else costs nothing (no spawn, flag never set).
+  _is_vim_preexec() {
+    [[ "$1" =~ '(^|[ /|;])(n?vim?x?|view|git|jj)([ ;|]|$)' ]] && _IS_VIM_CLEAR=1
+  }
+  _is_vim_precmd() {
+    [[ -n "${_IS_VIM_CLEAR:-}" ]] || return 0
+    unset _IS_VIM_CLEAR
+    (tmux set-option -pu -t "$TMUX_PANE" @is_vim 2> /dev/null &)
+  }
+  autoload -U add-zsh-hook
+  add-zsh-hook preexec _is_vim_preexec
+  add-zsh-hook precmd _is_vim_precmd
+fi
+
 # Up/down search history for what is already typed, rather than walking
 # it blindly. k/j in normal mode are left alone.
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
