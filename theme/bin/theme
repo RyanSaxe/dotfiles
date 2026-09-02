@@ -189,12 +189,6 @@ install_accents() {
 
 # Make $1 (a provider-qualified identity, e.g. pokemon:raikou) the live
 # accents. Display is not this command's job: the rail mascot watches state.
-set_mascot() {
-  ensure_cache_ids
-  acc_file="$(accents_for "$1")" || exit 1
-  install_accents "$acc_file"
-}
-
 # Older installations stored per-layer modes (inner-mode/outer-mode) or a
 # single theme-mode. Seed the mode file from inner-mode — the layer that
 # drove macOS appearance, so the truthful one — then delete the legacy
@@ -659,7 +653,7 @@ apply)
   esac
   ;;
 mascot)
-  sub="${2:?usage: theme mascot <provider:id>|none|default <provider:id>|project <provider:id>|none|sync [project]}"
+  sub="${2:?usage: theme mascot default <provider:id>|project <provider:id>|none|clear-projects|none|sync [project]}"
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
@@ -674,6 +668,11 @@ mascot)
     value=""
     [ -f "$MASCOT_CONF" ] && value="$(conf_get "$MASCOT_CONF" "$project")"
     [ -n "$value" ] || value="$(conf_get "$DEFAULT_CONF" default)"
+    # Seed the rail's default mirror on installs that predate it.
+    if [ ! -f "$STATE/mascot-default.conf" ]; then
+      _default="$(conf_get "$DEFAULT_CONF" default)"
+      [ -n "$_default" ] && conf_put "$STATE/mascot-default.conf" default "$_default"
+    fi
     [ -n "$value" ] || exit 0
     current=""
     [ -f "$STATE/accents.conf" ] && current="$(conf_get "$STATE/accents.conf" mascot)"
@@ -720,30 +719,44 @@ mascot)
     ;;
   default)
     value="${3:?usage: theme mascot default <provider:id>}"
-    # Extraction validates the identity; only a working value may persist
-    # (this file is repo-tracked).
-    set_mascot "$value"
+    # Extraction validates the identity and warms the cache WITHOUT
+    # touching the live accent: what is on screen always follows the
+    # CURRENT session's effective mascot (mapping first), so changing the
+    # fallback while sitting in a mapped project changes nothing visibly.
+    ensure_cache_ids
+    accents_for "$value" >/dev/null || exit 1
     conf_put "$DEFAULT_CONF" default "$value"
+    # State mirror: the rail resolves per-session mascots (mapping, then
+    # default) and cannot reach the repo-tracked config file.
+    conf_put "$STATE/mascot-default.conf" default "$value"
+    exec "$0" mascot sync
     ;;
   project)
     project="$(current_project)"
     value="${3:?usage: theme mascot project <provider:id>|none}"
     if [ "$value" = none ]; then
-      # Unmap this project and fall back to the global default, if one is set.
       conf_del "$MASCOT_CONF" "$project"
       echo "unmapped: $project"
-      fallback="$(conf_get "$DEFAULT_CONF" default)"
-      [ -n "$fallback" ] && set_mascot "$fallback"
     else
       # Extraction validates the identity; a failed value must not persist —
       # background syncs would retry it forever.
-      set_mascot "$value"
+      ensure_cache_ids
+      accents_for "$value" >/dev/null || exit 1
       conf_put "$MASCOT_CONF" "$project" "$value"
       echo "mapped: $project -> $value"
     fi
+    exec "$0" mascot sync
+    ;;
+  clear-projects)
+    # Everyone back onto the global default, no exceptions: the explicit
+    # escape hatch for "I want all projects uniform right now".
+    : >"$MASCOT_CONF"
+    echo "cleared: all project mascots"
+    exec "$0" mascot sync
     ;;
   *)
-    set_mascot "$sub"
+    echo "usage: theme mascot default|project|clear-projects|none|sync" >&2
+    exit 1
     ;;
   esac
   render

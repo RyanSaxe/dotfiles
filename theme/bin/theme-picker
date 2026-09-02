@@ -5,7 +5,7 @@
 #   stage 1: mascot providers (from the registry) / toggle / light /
 #            dark / none
 #   stage 2: (provider) fuzzy-pick an identity
-#   stage 3: (provider) scope — just now, this project, or global default
+#   stage 3: (provider) scope — this project or global default
 set -eu
 
 pick() {
@@ -18,7 +18,7 @@ providers="$(mascot-accents --providers 2>/dev/null || true)"
 action="$(
   {
     [ -n "$providers" ] && printf '%s\n' "$providers"
-    printf 'toggle\nlight\ndark\nnone\n'
+    printf 'toggle\nlight\ndark\nclear projects\nnone\n'
   } | pick theme
 )" || exit 0
 
@@ -42,6 +42,10 @@ toggle | light | dark)
   fi
   exit 0
   ;;
+"clear projects")
+  # Every project back onto the global default.
+  theme mascot clear-projects
+  ;;
 none)
   theme mascot none
   ;;
@@ -50,15 +54,15 @@ none)
   # pipeline proved fragile and slow, three regressions deep. The mascot
   # is the preview — it appears the moment you pick.
   name="$(mascot-accents --identities "$action" | pick "$action")" || exit 0
-  scope="$(printf 'just now\nthis project\nglobal default\n' | pick scope)" || exit 0
+  # "just now" was deprecated: the visible accent always follows the
+  # current session's effective mascot (project mapping, else default),
+  # so a scope-less immediate set had nothing coherent to mean.
+  scope="$(printf 'this project\nglobal default\n' | pick scope)" || exit 0
 
-  set -- mascot
   case "$scope" in
-  "this project") set -- mascot project ;;
-  "global default") set -- mascot default ;;
+  "this project") theme mascot project "$action:$name" ;;
+  "global default") theme mascot default "$action:$name" ;;
   esac
-
-  theme "$@" "$action:$name"
   ;;
 esac
 

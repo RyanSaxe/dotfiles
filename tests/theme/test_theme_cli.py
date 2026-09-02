@@ -255,12 +255,61 @@ def test_fsh_theme_is_generated_and_tracks_mode(tmp_path: Path) -> None:
 def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+    project = tmp_path / "proj"
+    project.mkdir()
 
-    result = run_theme(home, config, "mascot", "pokemon:mew")
+    result = run_theme(home, config, "mascot", "project", "pokemon:mew", cwd=project)
 
     assert result.returncode == 0, result.stderr
     rendered = (state_dir(home) / "generated/tmux-colors.conf").read_text()
     assert 'set -g @accent "#ffcc00"' in rendered
+
+
+def test_default_change_keeps_the_mapped_accent_on_screen(tmp_path: Path) -> None:
+    # The visible accent follows the CURRENT session's effective mascot:
+    # changing the fallback while a mapped project is active must update
+    # the tracked default (and its state mirror for the rail) without
+    # repainting anything with the new mascot's accent.
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+    project = tmp_path / "proj"
+    project.mkdir()
+    mapped = run_theme(home, config, "mascot", "project", "pokemon:mew", cwd=project)
+    assert mapped.returncode == 0, mapped.stderr
+
+    result = run_theme(home, config, "mascot", "default", "pokemon:ditto", cwd=project)
+
+    assert result.returncode == 0, result.stderr
+    assert "default=pokemon:ditto" in (config / "mascot.conf").read_text()
+    mirror = state_dir(home) / "mascot-default.conf"
+    assert mirror.read_text() == "default=pokemon:ditto\n"
+    assert "mascot=pokemon:mew" in (state_dir(home) / "accents.conf").read_text()
+
+
+def test_clear_projects_reverts_everyone_to_the_default(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_OK)
+    project = tmp_path / "proj"
+    project.mkdir()
+    assert run_theme(home, config, "mascot", "default", "pokemon:ditto").returncode == 0
+    assert (
+        run_theme(home, config, "mascot", "project", "pokemon:mew", cwd=project)
+    ).returncode == 0
+
+    result = run_theme(home, config, "mascot", "clear-projects", cwd=project)
+
+    assert result.returncode == 0, result.stderr
+    assert (state_dir(home) / "mascot.conf").read_text() == ""
+    assert "mascot=pokemon:ditto" in (state_dir(home) / "accents.conf").read_text()
+
+
+def test_bare_mascot_form_is_gone(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+
+    result = run_theme(home, config, "mascot", "pokemon:mew")
+
+    assert result.returncode == 1
+    assert "usage" in result.stderr
 
 
 def test_mode_persists_only_after_a_successful_render(tmp_path: Path) -> None:
