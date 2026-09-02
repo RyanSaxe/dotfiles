@@ -72,7 +72,7 @@ session list before/after, and the scratch daemon's `HOME` from `ps -E`.
 | metric                    | what is timed                                                                                                                                              |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | window-select cmd / drain | `select-window` round trip; then until the focus hooks converge `@TMUX_CURR_PANE`                                                                          |
-| alt+L end-to-end          | `go-back-pane.sh` spawn until the client sits on the expected pane                                                                                         |
+| alt+L end-to-end          | `goto-pane.sh back` spawn until the client sits on the expected pane                                                                                       |
 | element jump              | `rail element 1` against hints.tsv until the client lands on the hinted agent pane                                                                         |
 | tab write → repaint       | tab-file write until `capture-pane` of the visible rail shows the new tab's marker (reviews and tasks measured separately — tasks includes the vault exec) |
 | popup shell (warm/cold)   | pty-timed `TMUX_POPUP=1 zsh -ic exit`; cold removes the zcompdump first                                                                                    |

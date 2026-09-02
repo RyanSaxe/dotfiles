@@ -110,7 +110,7 @@ conf_del() {
 }
 
 # Project keys are tmux session names: every mapping consumer (session
-# switchers, rail jumps) passes the session it targets, so interactive
+# switchers, rail element/attention jumps) passes the session it targets, so
 # resolution must match — including inside popups, whose cwd is the
 # session's creation directory, not the viewed pane. The repo/directory
 # name stands in only outside tmux.
@@ -661,7 +661,7 @@ mascot)
   sync)
     # Make the global accent follow a project: apply its mapped mascot
     # (or the default), skipping everything when it is already active.
-    # Session switchers (to/ts, rail jump) call this in the background;
+    # Session switchers (to/ts, rail element/attention) call this in the background;
     # a warm flip is pure file copies — no extractor, no renderer.
     project="${3:-}"
     [ -n "$project" ] || project="$(current_project)"

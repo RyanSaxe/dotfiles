@@ -42,8 +42,7 @@ REPO = Path(__file__).resolve().parent.parent
 SHIMS = REPO / "perf" / "shims"
 RESULTS = REPO / "perf" / "results"
 GOTO_PANE = ".config/tmux/scripts/goto-pane.sh"
-# The production M-l path: goto-pane's back mode (go-back-pane.sh is a
-# superseded wrapper kept only until the live-server cutover).
+# The production M-l path: goto-pane's back mode.
 GO_BACK_ARGS = (".config/tmux/scripts/goto-pane.sh", "back")
 
 # Plain-text strings that only the named tab's body renders; capture-pane
@@ -843,9 +842,9 @@ class Harness:
         # session's ACTIVE window, so switch-client lands directly on the
         # target with no intervening select-window. (A jump to a
         # non-active window of that session adds an intermediate focus
-        # event whose async track-pane hook races goto-pane's compensating
-        # write on today's code — the exact race Phase 1's HIST_LOCK
-        # removes. This scenario asserts the semantic both share.)
+        # event; the native pane-history hooks and goto-pane's HIST_LOCK
+        # keep that from corrupting the pair. This scenario asserts the
+        # round-trip semantic directly.)
         target = self.session_active_content_pane("perf-s1")
         self.run_script(
             str(self.home / GOTO_PANE), "perf-s1", target, target, target=origin

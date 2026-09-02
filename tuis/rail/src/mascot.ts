@@ -136,7 +136,7 @@ async function extract(identity: MascotIdentity): Promise<void> {
     // stands in meanwhile, but the failure must not pin this identity to
     // nulls until daemon restart — forget it after a beat so a later tick
     // retries. The delay keeps a persistently failing extractor from
-    // respawning every 250ms tick.
+    // respawning on every refresh.
     setTimeout(() => identities.delete(identity.value), EXTRACT_RETRY_MS);
   }
 }

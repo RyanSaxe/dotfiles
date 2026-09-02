@@ -78,7 +78,7 @@ import {
   countPaint,
   countPanePainted,
   dump,
-  recordTick,
+  recordRefresh,
   timed,
 } from "./telemetry.js";
 import { loadPalette, railBg } from "./theme.js";
@@ -475,7 +475,7 @@ const clientPoller = makePoller<string>({
   onChange: () => scheduler.request("client"),
 });
 
-// Today's tick body, reading the pollers' caches: one snapshot, one heal,
+// The refresh body, reading the pollers' caches: one snapshot, one heal,
 // one render pass. Every wake source funnels here through the scheduler.
 async function refreshAndRender(): Promise<void> {
   const started = Date.now();
@@ -631,7 +631,7 @@ async function refreshAndRender(): Promise<void> {
   lastEnabled = enabled;
   lastClientCount = clientFacts.clientCount;
   refreshCounter += 1;
-  recordTick(refreshCounter, Date.now() - started);
+  recordRefresh(refreshCounter, Date.now() - started);
 }
 
 // The scheduler's runner: failures stay inside (a rejected run must not

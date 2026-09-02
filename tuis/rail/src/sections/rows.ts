@@ -68,13 +68,6 @@ export function attentionColor(tone: AttentionTone, palette: Palette): string {
   }
 }
 
-export function attentionTextColor(
-  tone: AttentionTone,
-  palette: Palette,
-): string {
-  return blend(attentionColor(tone, palette), railBg(palette), DIM_KEEP);
-}
-
 // Urgency: waiting outranks working outranks done; acked rows rank last —
 // their news has been seen.
 const URGENCY: Record<Agent["status"], number> = {

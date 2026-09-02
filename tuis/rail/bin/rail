@@ -2,7 +2,6 @@
 # Rail control: the in-terminal sidebar (tuis/rail).
 #
 #   rail on|off|toggle   enable/disable the rail everywhere
-#   rail jump <letter>   jump to the agent behind a hint letter
 #   rail jump-attention   jump to the rail's highest-priority pending agent
 #   rail page up|down    page the rail body when it overflows
 #   rail tab agents|reviews|tasks
@@ -14,8 +13,6 @@
 #                       entry points that live outside tmux
 #   rail dashboard reviews|tasks
 #                       open the table + preview dashboard for a rail tab
-#   rail review-dashboard
-#                       compatibility alias for the Reviews dashboard
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
@@ -167,24 +164,6 @@ toggle)
     "$0" on
   fi
   ;;
-jump)
-  # Jump to the agent behind a hint key (alt+space <digit> in tmux). Digits
-  # are viewer-relative — 1 is the top elsewhere row of the CALLING
-  # session's rail — and the literal key `a` is the globally most-urgent
-  # agent, current session included. The daemon keeps hints.tsv current:
-  # viewing_session <tab> key <tab> target_session <tab> pane_id.
-  digit="${2:?usage: rail jump <digit|a>}"
-  viewing="$(tmux display-message -p '#{session_name}')"
-  # Literal field comparison, not grep: a session name with regex
-  # metacharacters (c++, foo[bar]) must still match its own hint rows.
-  hint_line="$(awk -F'\t' -v s="$viewing" -v k="$digit" \
-    '$1 == s && $2 == k { print; exit }' "$STATE/hints.tsv" 2>/dev/null || true)"
-  [ -n "$hint_line" ] || exit 0
-  session="$(printf '%s' "$hint_line" | cut -f3)"
-  pane="$(printf '%s' "$hint_line" | cut -f4)"
-  # The shared jump primitive switches AND syncs the mascot accent.
-  "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
-  ;;
 jump-attention)
   run_entry jump-attention
   ;;
@@ -283,9 +262,6 @@ dashboard-popup)
   exec tmux display-popup -h 80% -w 90% -E \
     "TMUX_POPUP=1 $HOME/.local/bin/rail dashboard reviews"
   ;;
-review-dashboard)
-  run_entry review-dashboard reviews
-  ;;
 status)
   if daemon_running; then
     echo "daemon: running (pid $(cat "$PID_FILE"))"
@@ -306,7 +282,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|jump-attention|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|review-dashboard|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump-attention|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|dashboard-popup|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

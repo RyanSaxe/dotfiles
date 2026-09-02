@@ -14,15 +14,22 @@ viewer process at all. Frames are diffed per pane and committed under
 synchronized output — an unchanged rail costs zero writes and repaints
 never flicker.
 
-- **tmux data** polls every 250ms (panes and clients in one
-  `list-panes -a \; list-clients` call), backing off to 2s while the
-  rail is disabled or no client is attached.
+- **tmux data** is event-driven: a control-mode client (`src/control.ts`)
+  delivers structural notifications the moment a window, pane, or session
+  changes, and every wake source funnels into one refresh scheduler
+  (`src/scheduler.ts`) that coalesces bursts and never drops a signal. A
+  reconcile backstop refreshes every 2s (10s while the rail is disabled
+  with no client attached) so nothing on screen ever depends on an event
+  arriving; a separate 250ms `list-clients` poll carries the live
+  prefix/key-table/focus bits the control protocol does not announce.
 - **Agents** come from `workmux status --json` (run from `$HOME` for the
-  global view), reconciled every 5s with instant refreshes when a workmux
-  state file changes. Status age comes from Workmux's `status_ts` transition
-  timestamp, not its general `updated_ts` write timestamp.
+  global view), polled every 5s with instant refreshes when a workmux
+  state file changes — and only when the agent content actually changed,
+  so heartbeat rewrites wake nothing. Status age comes from Workmux's
+  `status_ts` transition timestamp, not its general `updated_ts` write
+  timestamp.
 - **Theme** re-reads `tuis-colors.json` on change; a mode or mascot
-  switch recolors every rail within a tick.
+  switch recolors every rail on the next refresh.
 
 ## The grammar
 
@@ -38,11 +45,13 @@ never flicker.
   works over ssh), acknowledges the current waiting/done transition
   everywhere. A later transition has a new timestamp and alerts again
   (`src/acks.ts`).
-- Status stabilization accepts waiting and done only after 30 seconds based on
+- Status stabilization accepts waiting and done only after 60 seconds based on
   their transition timestamp. A return to working is immediate, so a transient
   waiting classification disappears instead of becoming a stale notification.
-- Jump hints: every agent gets a letter chip; `alt+;` then the letter
-  jumps to that agent's pane (`src/hints.ts`, `rail jump`).
+- Jump hints: every elsewhere row is numbered by its display position;
+  `alt+space` then the digit jumps to that agent's pane (`src/hints.ts`,
+  `rail element`). The literal `a` — the globally most-urgent agent — is a
+  scripts-only key, not a rail row.
 - Attention jump: `rail jump-attention` selects the highest-priority live
   pane from the daemon's active notification set. It uses pane ids, so a
   deleted pane is skipped instead of turning into a jump to another window.
@@ -64,12 +73,15 @@ never flicker.
 
 ```sh
 rail on|off|toggle    # enable/disable + spawn/kill rail panes everywhere
-                      # (on also turns the tmux status bar off; off restores)
-rail jump <letter>    # hint jump (bound to alt+; <letter>)
+                      # (the tmux status bar is off system-wide — the rail
+                      # carries the chrome; off is focus mode, no chrome)
+rail tab agents|reviews|tasks   # switch the active rail tab (alt+a/r/t)
+rail element <number> # the focused tab's numbered action (alt+space <n>)
 rail jump-attention   # jump to the highest-priority pending agent
 rail page up|down     # page an overflowing rail (bound to alt+, / alt+.)
 rail dashboard reviews|tasks
                       # table + preview dashboard for a rail tab
+rail dashboard-popup  # open the Reviews dashboard from outside tmux
 rail ensure-daemon    # start the render daemon if it isn't running
 rail status           # daemon, flag, pane count
 ```

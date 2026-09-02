@@ -1372,11 +1372,3 @@ async function runGhGraphql(query: string): Promise<string> {
     throw error;
   }
 }
-
-export async function fetchGithubSnapshot(
-  watch: readonly string[] = [],
-  runQuery: GraphqlRunner = runGhGraphql,
-): Promise<GitHubSnapshot> {
-  return (await fetchGithubSync({ watch, fullReconciliation: true }, runQuery))
-    .snapshot;
-}
