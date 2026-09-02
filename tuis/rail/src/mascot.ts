@@ -10,8 +10,9 @@ import { run } from "./data.js";
 import { XDG_STATE } from "./paths.js";
 
 const STATE_MAPPING = join(XDG_STATE, "dotfiles/mascot.conf");
-// The tracked global default, mirrored into state by `theme mascot
-// default` (the rail cannot reach the repo-tracked config file).
+// The machine-local global default, written by `theme mascot default`.
+// Deliberately per-machine state, never repo config: a laptop and a
+// desktop can wear different mascots.
 const STATE_DEFAULT = join(XDG_STATE, "dotfiles/mascot-default.conf");
 // (The tracked default in ~/.config/theme/mascot.conf is consumed by
 // `theme mascot sync`, whose result lands in accents.conf — the rail

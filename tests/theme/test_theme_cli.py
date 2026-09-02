@@ -155,16 +155,15 @@ def test_failed_extraction_persists_no_project_mapping(tmp_path: Path) -> None:
     assert not (state_dir(home) / "mascot.conf").exists()
 
 
-def test_failed_extraction_leaves_tracked_default_untouched(tmp_path: Path) -> None:
+def test_failed_extraction_leaves_the_default_untouched(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     stub_mascot_accents(home, MASCOT_ACCENTS_FAIL)
-    tracked = config / "mascot.conf"
-    before = tracked.read_text()
+    default_conf = state_dir(home) / "mascot-default.conf"
 
     result = run_theme(home, config, "mascot", "default", "pokemon:badmon")
 
     assert result.returncode == 1
-    assert tracked.read_text() == before
+    assert not default_conf.exists()
 
 
 def test_successful_mapping_persists_and_extracts(tmp_path: Path) -> None:
@@ -280,9 +279,8 @@ def test_default_change_keeps_the_mapped_accent_on_screen(tmp_path: Path) -> Non
     result = run_theme(home, config, "mascot", "default", "pokemon:ditto", cwd=project)
 
     assert result.returncode == 0, result.stderr
-    assert "default=pokemon:ditto" in (config / "mascot.conf").read_text()
-    mirror = state_dir(home) / "mascot-default.conf"
-    assert mirror.read_text() == "default=pokemon:ditto\n"
+    default_conf = state_dir(home) / "mascot-default.conf"
+    assert default_conf.read_text() == "default=pokemon:ditto\n"
     assert "mascot=pokemon:mew" in (state_dir(home) / "accents.conf").read_text()
 
 

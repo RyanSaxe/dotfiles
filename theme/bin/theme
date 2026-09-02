@@ -36,8 +36,11 @@ STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 # Mascot mappings are machine-personal state (project names must never
 # reach the public repo), not tracked config.
 MASCOT_CONF="$STATE/mascot.conf"
-# The global default is shareable and tracked; see mascot.conf in config.
-DEFAULT_CONF="$CONFIG/mascot.conf"
+
+# Machine-local on purpose: the global default is taste-per-machine (a
+# laptop and a desktop can wear different mascots), so it lives in state,
+# never in the repo. Project mappings were always machine state.
+DEFAULT_CONF="$STATE/mascot-default.conf"
 GENERATED="$STATE/generated"
 MODE_FILE="$STATE/mode"
 ELEMENTS="$CONFIG/elements.conf"
@@ -667,11 +670,8 @@ mascot)
     [ -n "$project" ] || project="$(current_project)"
     value=""
     [ -f "$MASCOT_CONF" ] && value="$(conf_get "$MASCOT_CONF" "$project")"
-    [ -n "$value" ] || value="$(conf_get "$DEFAULT_CONF" default)"
-    # Seed the rail's default mirror on installs that predate it.
-    if [ ! -f "$STATE/mascot-default.conf" ]; then
-      _default="$(conf_get "$DEFAULT_CONF" default)"
-      [ -n "$_default" ] && conf_put "$STATE/mascot-default.conf" default "$_default"
+    if [ -z "$value" ] && [ -f "$DEFAULT_CONF" ]; then
+      value="$(conf_get "$DEFAULT_CONF" default)"
     fi
     [ -n "$value" ] || exit 0
     current=""
@@ -725,10 +725,9 @@ mascot)
     # fallback while sitting in a mapped project changes nothing visibly.
     ensure_cache_ids
     accents_for "$value" >/dev/null || exit 1
+    # One write serves every consumer: the rail reads this same state
+    # file to resolve unmapped sessions.
     conf_put "$DEFAULT_CONF" default "$value"
-    # State mirror: the rail resolves per-session mascots (mapping, then
-    # default) and cannot reach the repo-tracked config file.
-    conf_put "$STATE/mascot-default.conf" default "$value"
     exec "$0" mascot sync
     ;;
   project)
