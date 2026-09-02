@@ -162,14 +162,31 @@ if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
   _theme_shell_colors
   # Re-apply when `theme` regenerates, so running shells follow a switch.
   zmodload -F zsh/stat b:zstat
-  typeset -g _THEME_COLORS_MTIME="$(zstat +mtime "$THEME_GENERATED/shell-colors.zsh" 2> /dev/null)"
-  typeset -g _THEME_FSH_MTIME="$(zstat +mtime "$THEME_FSH" 2> /dev/null)"
+  # Inode+mtime, not mtime alone: the publisher replaces files by mv (new
+  # inode) only on content change, and two flips inside one second share
+  # a whole-second mtime.
+  _theme_stamp() {
+    # Sets REPLY. Pure builtins: this runs every precmd.
+    local -a _i _m
+    if zstat -A _i +inode "$1" 2> /dev/null && zstat -A _m +mtime "$1" 2> /dev/null; then
+      REPLY="${_i[1]}-${_m[1]}"
+    else
+      REPLY=""
+    fi
+  }
+  _theme_stamp "$THEME_GENERATED/shell-colors.zsh"
+  typeset -g _THEME_COLORS_STAMP="$REPLY"
+  _theme_stamp "$THEME_FSH"
+  typeset -g _THEME_FSH_STAMP="$REPLY"
   _theme_refresh() {
-    local mtime="$(zstat +mtime "$THEME_GENERATED/shell-colors.zsh" 2> /dev/null)"
-    local fsh_mtime="$(zstat +mtime "$THEME_FSH" 2> /dev/null)"
-    if [[ "$mtime" != "$_THEME_COLORS_MTIME" || "$fsh_mtime" != "$_THEME_FSH_MTIME" ]]; then
-      typeset -g _THEME_COLORS_MTIME="$mtime"
-      typeset -g _THEME_FSH_MTIME="$fsh_mtime"
+    local colors_stamp fsh_stamp
+    _theme_stamp "$THEME_GENERATED/shell-colors.zsh"
+    colors_stamp="$REPLY"
+    _theme_stamp "$THEME_FSH"
+    fsh_stamp="$REPLY"
+    if [[ "$colors_stamp" != "$_THEME_COLORS_STAMP" || "$fsh_stamp" != "$_THEME_FSH_STAMP" ]]; then
+      typeset -g _THEME_COLORS_STAMP="$colors_stamp"
+      typeset -g _THEME_FSH_STAMP="$fsh_stamp"
       _theme_shell_colors
     fi
   }
