@@ -22,6 +22,15 @@
 # The daemon is the ONLY thing that creates rail panes: while the enabled
 # flag is set it reconciles every window within a tick. A second spawner
 # (hooks, this script) would race it and duplicate panes, so none exists.
+#
+# Keypress-path commands (tab/page/on/off/toggle and the agents-tab
+# element) touch only the state dir: no symlink walk, no .env, no build
+# check, no Node. Everything repo-shaped is resolved lazily by the
+# functions below, so only the commands that need it pay for it.
+#
+# Node entrypoints run from esbuild bundles in dist/ (a ~30ms node boot);
+# RAIL_RUN=tsx flips every one of them back to `npx tsx src/…` for
+# running uncompiled sources or A/B-ing the build pipeline.
 set -eu
 
 # Appended, not prepended: run-shell hands over a minimal PATH that lacks
@@ -29,21 +38,6 @@ set -eu
 # shadows a tool earlier in PATH (the perf harness shims workmux/vault)
 # must win. Nothing rail needs exists in BOTH an earlier dir and here.
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
-
-# Resolve the repo through this script's own symlink. macOS's
-# readlink has no -f flag, so keep this portable across macOS and Linux.
-SCRIPT_PATH="$0"
-while [ -L "$SCRIPT_PATH" ]; do
-  SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
-  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
-  case "$LINK_TARGET" in
-  /*) SCRIPT_PATH="$LINK_TARGET" ;;
-  *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
-  esac
-done
-SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
-REPO_ROOT="${SCRIPT_PATH%/tuis/rail/bin/rail}"
-RAIL_DIR="$REPO_ROOT/tuis/rail"
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"
 ENABLED_FLAG="$STATE/enabled"
@@ -54,32 +48,82 @@ PID_FILE="$STATE/daemon.pid"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail-logs"
 LOG_FILE="$LOG_DIR/daemon.log"
 
-mkdir -p "$STATE" "$LOG_DIR"
+mkdir -p "$STATE"
 
-# The phone channel lives in the repo's untracked .env. Load it here because
-# the daemon is usually spawned by tmux's run-shell, which hands over the
-# SERVER's environment — frozen at whenever the server started — so an .env
-# added later would otherwise never reach it.
-if [ -f "$REPO_ROOT/.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . "$REPO_ROOT/.env"
-  set +a
-fi
+# Resolve the repo through this script's own symlink. macOS's readlink has
+# no -f flag, so keep this portable across macOS and Linux. A function so
+# the keypress paths never pay for the walk.
+resolve_rail_dir() {
+  [ -n "${RAIL_DIR:-}" ] && return 0
+  SCRIPT_PATH="$0"
+  while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+    case "$LINK_TARGET" in
+    /*) SCRIPT_PATH="$LINK_TARGET" ;;
+    *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
+    esac
+  done
+  REPO_ROOT="${SCRIPT_PATH%/tuis/rail/bin/rail}"
+  RAIL_DIR="$REPO_ROOT/tuis/rail"
+}
+
+# The phone channel lives in the repo's untracked .env. Load it before
+# spawning the daemon because the daemon is usually spawned by tmux's
+# run-shell, which hands over the SERVER's environment — frozen at whenever
+# the server started — so an .env added later would otherwise never reach it.
+load_env() {
+  if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "$REPO_ROOT/.env"
+    set +a
+  fi
+}
 
 # A pid being alive is not enough: a daemon that died ungracefully leaves
 # its pidfile behind, and the pid can be reused by an unrelated process —
 # trusting it froze rails with no self-recovery. The recorded pid counts
-# as running only if its command line is still a rail daemon.
+# as running only if its command line is still a rail daemon. The pattern
+# matches both runtimes: `…/tuis/rail/dist/daemon.mjs` (bundled) and the
+# tsx loader's `…/tuis/rail/node_modules/tsx/… src/daemon.ts` — the same
+# pattern the daemon's own pidfile takeover check uses (src/daemon.ts).
 daemon_running() {
   [ -f "$PID_FILE" ] || return 1
   pid="$(cat "$PID_FILE")"
   kill -0 "$pid" 2>/dev/null || return 1
-  ps -o command= -p "$pid" 2>/dev/null | grep -q 'daemon\.ts'
+  ps -o command= -p "$pid" 2>/dev/null | grep -qE 'rail.*daemon\.(ts|mjs)'
+}
+
+# Rebuild the dist bundles when any source is newer than the build stamp
+# (~5ms probe), so edit-and-press keeps working without a manual build.
+ensure_built() {
+  stamp="$RAIL_DIR/dist/.stamp"
+  if [ ! -f "$stamp" ] ||
+    [ -n "$(find "$RAIL_DIR/src" -newer "$stamp" -print -quit)" ]; then
+    (cd "$RAIL_DIR" && npm run --silent build)
+  fi
+}
+
+# Exec a Node entrypoint: `run_entry <basename> [args…]` runs
+# dist/<basename>.mjs, or src/<basename>.ts under RAIL_RUN=tsx.
+run_entry() {
+  resolve_rail_dir
+  entry="$1"
+  shift
+  cd "$RAIL_DIR"
+  if [ "${RAIL_RUN:-}" = tsx ]; then
+    exec npx tsx "src/$entry.ts" "$@"
+  fi
+  ensure_built
+  exec node "$RAIL_DIR/dist/$entry.mjs" "$@"
 }
 
 ensure_daemon() {
   daemon_running && return 0
+  resolve_rail_dir
+  load_env
+  mkdir -p "$LOG_DIR"
   # One generation of rotation, at spawn: the daemon appends to this fd
   # for its whole life, so a size gate anywhere else would never trim it.
   if [ -f "$LOG_FILE" ] && [ "$(wc -c <"$LOG_FILE")" -gt 1048576 ]; then
@@ -87,7 +131,15 @@ ensure_daemon() {
     # must not abort the whole script under set -eu.
     mv "$LOG_FILE" "$LOG_FILE.1" 2>/dev/null || true
   fi
-  (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
+  if [ "${RAIL_RUN:-}" = tsx ]; then
+    (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
+  else
+    ensure_built
+    # Absolute entry path on purpose: daemon_running above matches the
+    # command line against rail.*daemon.(ts|mjs), and a relative argv
+    # would carry neither.
+    (cd "$RAIL_DIR" && nohup node "$RAIL_DIR/dist/daemon.mjs" >>"$LOG_FILE" 2>&1 &)
+  fi
 }
 
 kill_rail_panes() {
@@ -134,8 +186,7 @@ jump)
   "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
   ;;
 jump-attention)
-  cd "$RAIL_DIR"
-  exec npx tsx src/jump-attention.ts
+  run_entry jump-attention
   ;;
 ensure-daemon)
   ensure_daemon
@@ -181,10 +232,9 @@ element)
     ;;
   esac
   # The agents tab resolves in pure shell: an element press is on the
-  # keypress path, and a Node cold start would hold the tmux command
-  # queue for ~a second. Tab normalization mirrors loadRailTab
-  # (src/tabs.ts): missing/unreadable/unknown -> agents, legacy
-  # "review" -> reviews.
+  # keypress path, and even the bundled Node boot would be paid before
+  # the jump. Tab normalization mirrors loadRailTab (src/tabs.ts):
+  # missing/unreadable/unknown -> agents, legacy "review" -> reviews.
   tab="$(cat "$STATE/tab" 2>/dev/null || true)"
   case "$tab" in
   review) tab=reviews ;;
@@ -212,8 +262,7 @@ element)
     # The shared jump primitive switches AND syncs the mascot accent.
     exec "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
   fi
-  cd "$RAIL_DIR"
-  exec npx tsx src/tab-element.ts "$number"
+  run_entry tab-element "$number"
   ;;
 dashboard)
   surface="${2:-reviews}"
@@ -224,8 +273,7 @@ dashboard)
     exit 1
     ;;
   esac
-  cd "$RAIL_DIR"
-  exec npx tsx src/review-dashboard.ts "$surface"
+  run_entry review-dashboard "$surface"
   ;;
 dashboard-popup)
   # Open the Reviews dashboard from outside tmux — the menu bar letter and
@@ -236,8 +284,7 @@ dashboard-popup)
     "TMUX_POPUP=1 $HOME/.local/bin/rail dashboard reviews"
   ;;
 review-dashboard)
-  cd "$RAIL_DIR"
-  exec npx tsx src/review-dashboard.ts reviews
+  run_entry review-dashboard reviews
   ;;
 status)
   if daemon_running; then
@@ -248,6 +295,10 @@ status)
   if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
   echo "tab: $(cat "$STATE/tab" 2>/dev/null || echo agents)"
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
+  # The one diagnostic that needs the repo: resolved here, lazily, so the
+  # phone line stays truthful without taxing any keypress path.
+  resolve_rail_dir
+  load_env
   if [ -n "${AI_HARNESS_NTFY_URL:-}${AGENT_NOTIFICATION_ID:-}" ]; then
     echo "phone: configured"
   else

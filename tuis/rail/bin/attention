@@ -31,4 +31,14 @@ if [ -f "$REPO_ROOT/.env" ]; then
 fi
 
 cd "$RAIL_DIR"
-exec npx tsx src/attention/cli.ts "$@"
+# Bundled dist by default (a ~30ms node boot instead of the ~1s npx tsx
+# cold start); RAIL_RUN=tsx flips back to running the TypeScript source.
+if [ "${RAIL_RUN:-}" = tsx ]; then
+  exec npx tsx src/attention/cli.ts "$@"
+fi
+# Rebuild when any source is newer than the build stamp — bin/rail's
+# ensure_built, inlined — so launchd never runs a stale bundle.
+if [ ! -f dist/.stamp ] || [ -n "$(find src -newer dist/.stamp -print -quit)" ]; then
+  npm run --silent build
+fi
+exec node "$RAIL_DIR/dist/attention/cli.mjs" "$@"

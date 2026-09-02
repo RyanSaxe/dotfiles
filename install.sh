@@ -167,10 +167,12 @@ install_zsh_plugins() {
   done
 }
 
-# The rail TUI and account observer (tuis/rail) run via tsx from their own
-# node_modules.
+# The rail TUI and account observer (tuis/rail) run as esbuild bundles from
+# dist/. Build here so the first keypress never pays for it; bin/rail and
+# bin/attention rebuild on demand when sources are newer than the stamp.
 install_rail() {
   (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
+  (cd "$RAIL_DIR" && npm run --silent build)
 }
 
 install_stylua_linux() {

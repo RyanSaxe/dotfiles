@@ -22,7 +22,7 @@ export interface TickRecord {
   tickCounter: number;
 }
 
-type Span = "snapshot" | "workmux" | "vault" | "ioreg" | "selfHeal";
+type Span = "snapshot" | "workmux" | "vault" | "ioreg" | "selfHeal" | "client";
 
 const SLOW_TICK_MS = 250;
 const SLOW_LOG_WINDOW_MS = 10_000;
@@ -38,6 +38,7 @@ const spans: Record<Span, number> = {
   vault: 0,
   ioreg: 0,
   selfHeal: 0,
+  client: 0,
 };
 let paintCount = 0;
 let panesPainted = 0;
@@ -46,7 +47,14 @@ let panesPainted = 0;
 // vault each map 1:1 to an exec; ioreg and selfHeal count calls.
 const counters: { ticks: number; spans: Record<Span, number> } = {
   ticks: 0,
-  spans: { snapshot: 0, workmux: 0, vault: 0, ioreg: 0, selfHeal: 0 },
+  spans: {
+    snapshot: 0,
+    workmux: 0,
+    vault: 0,
+    ioreg: 0,
+    selfHeal: 0,
+    client: 0,
+  },
 };
 
 // Time one awaited leg without serializing it — tick()'s Promise.all stays

@@ -10,6 +10,9 @@ import { run } from "./data.js";
 import { XDG_STATE } from "./paths.js";
 
 const STATE_MAPPING = join(XDG_STATE, "dotfiles/mascot.conf");
+// The tracked global default, mirrored into state by `theme mascot
+// default` (the rail cannot reach the repo-tracked config file).
+const STATE_DEFAULT = join(XDG_STATE, "dotfiles/mascot-default.conf");
 // (The tracked default in ~/.config/theme/mascot.conf is consumed by
 // `theme mascot sync`, whose result lands in accents.conf — the rail
 // reads that, never the default directly.)
@@ -161,5 +164,13 @@ function activeIdentity(): MascotIdentity | null {
 export function mascotFor(session: string): MascotIdentity | null {
   const mapped = parseConf(STATE_MAPPING).get(session);
   if (mapped) return identityFor(mapped);
+  // Unmapped sessions wear the tracked global default (mirrored into
+  // state by `theme mascot default`), not whatever accent happens to be
+  // published — the published accent follows the ACTIVE session, which
+  // may be a mapped one.
+  const fallback = parseConf(STATE_DEFAULT).get("default");
+  if (fallback) return identityFor(fallback);
+  // Installs that predate the mirror: the published accent is the best
+  // remaining guess.
   return activeIdentity();
 }

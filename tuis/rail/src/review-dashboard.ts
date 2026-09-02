@@ -14,6 +14,7 @@ import {
 import type { AttentionItem, AttentionReason } from "./attention/types.js";
 import {
   EMPTY_CELL,
+  renderDashboard,
   runDashboard,
   type DashboardData,
   type DashboardItem,
@@ -23,6 +24,7 @@ import {
   type MetaSpan,
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
+import { loadPalette } from "./theme.js";
 import {
   completeTask,
   loadTaskSnapshot,
@@ -752,7 +754,43 @@ export async function main(
   surface: DashboardSurface = "reviews",
 ): Promise<void> {
   const isReviews = surface === "reviews";
-  const initial = isReviews ? reviewDashboardData() : await taskDashboardData();
+  let initial: DashboardData;
+  if (isReviews) {
+    initial = reviewDashboardData();
+  } else {
+    // The vault read behind the tasks surface takes long enough to leave
+    // the popup blank. Paint the dashboard chrome with a loading status
+    // first — runDashboard's own opening render replaces it the moment the
+    // data lands (the duplicated alt-screen/hide-cursor writes are
+    // idempotent escapes).
+    if (process.stdout.isTTY) {
+      const loading: DashboardData = {
+        surface,
+        items: [],
+        status: "loading…",
+        emptyMessage: "Loading tasks…",
+        error: null,
+      };
+      process.stdout.write(
+        `\u001b[?1049h\u001b[?25l${renderDashboard(
+          loading,
+          0,
+          loadPalette(),
+          process.stdout.columns ?? 100,
+          process.stdout.rows ?? 30,
+        )}`,
+      );
+    }
+    try {
+      initial = await taskDashboardData();
+    } catch (error) {
+      // Leave the terminal usable: the error is about to print to a screen
+      // this frame would otherwise still own.
+      if (process.stdout.isTTY)
+        process.stdout.write("\u001b[?1049l\u001b[?25h");
+      throw error;
+    }
+  }
   await runDashboard(initial, {
     refresh: isReviews ? refreshReviews : taskDashboardData,
     open: isReviews ? openReviewWorkspace : openTaskSource,
@@ -799,7 +837,15 @@ export async function main(
 }
 
 const thisFile = fileURLToPath(import.meta.url);
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === thisFile) {
+// The build bundles this module INTO dist/tab-element.mjs, where
+// import.meta.url is the running bundle's own URL and would equal argv[1] —
+// firing this guard from a different program. The basename test pins it to
+// review-dashboard's own bundle (dist/review-dashboard.mjs) or source file.
+if (
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === thisFile &&
+  basename(thisFile).startsWith("review-dashboard.")
+) {
   const surface = process.argv[2] ?? "reviews";
   if (surface !== "reviews" && surface !== "tasks") {
     console.error("usage: review-dashboard reviews|tasks");

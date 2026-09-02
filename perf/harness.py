@@ -24,6 +24,7 @@ import io
 import math
 import os
 import pty
+import re
 import shutil
 import signal
 import struct
@@ -1130,7 +1131,10 @@ class Harness:
             text=True,
             check=False,
         )
-        return pid if "daemon.ts" in result.stdout else None
+        # Match both the tsx source form and the bundled dist form — the
+        # same pattern bin/rail and the daemon use for liveness.
+        alive = re.search(r"rail.*daemon\.(ts|mjs)", result.stdout) is not None
+        return pid if alive else None
 
     def teardown(self) -> None:
         pid = self._daemon_pid()
