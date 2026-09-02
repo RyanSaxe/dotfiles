@@ -1,6 +1,0 @@
----
-type: note
-dir: .
----
-
-# {{title}}
