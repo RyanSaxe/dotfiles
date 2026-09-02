@@ -30,6 +30,29 @@ echo "error: cannot fetch '$1'" >&2
 exit 1
 """
 
+# Counts invocations and gives each mascot a distinct accent, so tests can
+# both assert extraction counts (the warm-flip contract: zero spawns) and
+# see a flip actually land in rendered output.
+MASCOT_ACCENTS_COUNTING = """#!/bin/sh
+echo "$1" >>"$HOME/mascot-accents.calls"
+case "$1" in
+pokemon:mew) accent=ffcc00 ;;
+*) accent=00ccff ;;
+esac
+printf 'mascot=%s\\nsprite=/dev/null\\n' "$1"
+printf 'accent_dark=#%s\\nnotify_dark=#aa66ff\\n' "$accent"
+printf 'accent_light=#997700\\nnotify_light=#7744aa\\n'
+"""
+
+# Simulates a later jump landing while this extraction is still running:
+# the superseded guard gets overwritten mid-sync.
+MASCOT_ACCENTS_SUPERSEDING = """#!/bin/sh
+printf 'pokemon:later\\n' >"$XDG_STATE_HOME/dotfiles/.mascot-requested"
+printf 'mascot=%s\\nsprite=/dev/null\\n' "$1"
+printf 'accent_dark=#ffcc00\\nnotify_dark=#aa66ff\\n'
+printf 'accent_light=#997700\\nnotify_light=#7744aa\\n'
+"""
+
 
 def make_home(tmp_path: Path) -> Path:
     stubs = tmp_path / "stubbin"
@@ -76,6 +99,13 @@ def run_theme(
 
 def state_dir(home: Path) -> Path:
     return home / "state/dotfiles"
+
+
+def map_projects(home: Path) -> None:
+    state_dir(home).mkdir(parents=True, exist_ok=True)
+    (state_dir(home) / "mascot.conf").write_text(
+        "proja=pokemon:mew\nprojb=pokemon:ditto\n"
+    )
 
 
 def test_project_mappings_survive_metacharacter_names(tmp_path: Path) -> None:
@@ -259,3 +289,97 @@ def test_failed_render_names_the_token_and_leaves_no_temp_files(
     assert "{{typo_token}}" in result.stderr
     leftovers = [p.name for p in state_dir(home).iterdir() if ".render" in p.name]
     assert leftovers == []
+    builds = list((state_dir(home) / "cache/theme").glob(".build.*"))
+    assert builds == []
+
+
+def test_warm_sync_spawns_no_extractor(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING)
+    map_projects(home)
+    calls = home / "mascot-accents.calls"
+    for project in ("proja", "projb"):
+        cold = run_theme(home, config, "mascot", "sync", project)
+        assert cold.returncode == 0, cold.stderr
+    assert calls.read_text().splitlines() == ["pokemon:mew", "pokemon:ditto"]
+
+    warm = run_theme(home, config, "mascot", "sync", "proja")
+
+    assert warm.returncode == 0, warm.stderr
+    assert calls.read_text().splitlines() == ["pokemon:mew", "pokemon:ditto"]
+    assert "mascot=pokemon:mew" in (state_dir(home) / "accents.conf").read_text()
+
+
+def test_fsh_ini_mtime_survives_a_warm_mascot_flip(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING)
+    map_projects(home)
+    for project in ("proja", "projb"):
+        cold = run_theme(home, config, "mascot", "sync", project)
+        assert cold.returncode == 0, cold.stderr
+    ini = state_dir(home) / "generated/fast-syntax-highlighting.ini"
+    tmux = state_dir(home) / "generated/tmux-colors.conf"
+    ini_before = ini.stat().st_mtime_ns
+    tmux_before = tmux.stat().st_mtime_ns
+
+    warm = run_theme(home, config, "mascot", "sync", "proja")
+
+    assert warm.returncode == 0, warm.stderr
+    # The flip landed (accent-varying file republished with mew's accent)...
+    assert tmux.stat().st_mtime_ns != tmux_before
+    assert 'set -g @accent "#ffcc00"' in tmux.read_text()
+    # ...without touching the accent-independent ini, so shells stay quiet.
+    assert ini.stat().st_mtime_ns == ini_before
+
+
+def test_render_input_change_invalidates_cached_entries(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_COUNTING)
+    map_projects(home)
+    calls = home / "mascot-accents.calls"
+    for project in ("proja", "projb"):
+        cold = run_theme(home, config, "mascot", "sync", project)
+        assert cold.returncode == 0, cold.stderr
+    template = config / "templates/tmux-colors.conf.tmpl"
+    template.write_text(template.read_text() + 'set -g @stamp-probe "{{accent}}"\n')
+
+    result = run_theme(home, config, "mascot", "sync", "proja")
+
+    assert result.returncode == 0, result.stderr
+    rendered = (state_dir(home) / "generated/tmux-colors.conf").read_text()
+    assert 'set -g @stamp-probe "#ffcc00"' in rendered
+    # The accents cache is stamped separately: a render-input edit must not
+    # re-run the extractor.
+    assert calls.read_text().splitlines() == ["pokemon:mew", "pokemon:ditto"]
+
+
+def test_superseded_sync_leaves_the_flip_to_the_later_jump(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    stub_mascot_accents(home, MASCOT_ACCENTS_SUPERSEDING)
+    map_projects(home)
+
+    result = run_theme(home, config, "mascot", "sync", "proja")
+
+    assert result.returncode == 0, result.stderr
+    # The later jump owns the flip: nothing was installed or published...
+    assert not (state_dir(home) / "accents.conf").exists()
+    assert not (state_dir(home) / "generated").exists()
+    # ...but the render is banked, so the next visit to proja is warm.
+    entries = list(
+        (state_dir(home) / "cache/theme").glob("render-*/dark-pokemon-mew/.complete")
+    )
+    assert entries
+
+
+def test_republish_preserves_unchanged_file_mtimes(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+    first = run_theme(home, config, "apply")
+    assert first.returncode == 0, first.stderr
+    generated = state_dir(home) / "generated"
+    before = {p.name: p.stat().st_mtime_ns for p in generated.iterdir()}
+
+    again = run_theme(home, config, "apply")
+
+    assert again.returncode == 0, again.stderr
+    after = {p.name: p.stat().st_mtime_ns for p in generated.iterdir()}
+    assert after == before

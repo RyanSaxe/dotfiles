@@ -17,6 +17,10 @@
 # Templates render in the current mode unless elements.conf pins them to
 # dark or light (ghostty reads both of its theme files at once).
 # Rendered output lands in state, never in the repo.
+#
+# Renders are cached per (mode, mascot) under cache/theme, stamped by the
+# content of every render input — revisiting a project is pure file copies
+# (no extractor, no renderer), and `rm -rf` of the cache is always safe.
 set -eu
 
 # This script is invoked from contexts with a bare PATH (launchd) —
@@ -37,6 +41,11 @@ DEFAULT_CONF="$CONFIG/mascot.conf"
 GENERATED="$STATE/generated"
 MODE_FILE="$STATE/mode"
 ELEMENTS="$CONFIG/elements.conf"
+# Pre-rendered entries: render-<rstamp>/<mode>-<key>/ holds one full set of
+# generated files, accents-<astamp>/<key>.conf one extraction result. The
+# stamps are content checksums, so edits land in a new generation and old
+# generations are pruned — never reused stale.
+CACHE="$STATE/cache/theme"
 
 current_mode() {
   [ -f "$MODE_FILE" ] || {
@@ -113,16 +122,69 @@ current_project() {
   basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 }
 
-# Extract accents into state. $1 is a provider-qualified identity
-# (e.g. pokemon:raikou). Display is not this command's job: the rail
-# mascot watches state.
-set_mascot() {
-  # Atomic write: a failed extraction must not clobber working accents.
-  if ! mascot-accents "$1" >"$STATE/.accents.tmp"; then
-    rm -f "$STATE/.accents.tmp"
-    exit 1
+# Cache directory keys must be single path segments: anything outside a
+# conservative character set collapses to '-'. Lossy on purpose — the
+# mascot= line inside each cached conf still holds the exact value.
+mascot_key() {
+  if [ -n "$1" ]; then
+    printf '%s' "$1" | tr -c 'A-Za-z0-9._\n-' '-'
+  else
+    echo none
   fi
-  mv "$STATE/.accents.tmp" "$STATE/accents.conf"
+}
+
+# Compute the cache generation stamps once per run. rstamp covers every
+# render input (tokens, elements, palettes, templates — names and content),
+# astamp the accent extractor; editing any of them lands new renders in a
+# fresh generation instead of reusing stale entries. The SCHEMA line forces
+# a new generation when the cache layout itself changes.
+ensure_cache_ids() {
+  [ -n "${rstamp:-}" ] && return 0
+  set --
+  for input in "$CONFIG/tokens.conf" "$ELEMENTS" \
+    "$CONFIG"/palettes/*.conf "$CONFIG"/templates/*.tmpl; do
+    [ -f "$input" ] && set -- "$@" "$input"
+  done
+  rstamp="$({
+    printf 'SCHEMA=1 %s\n' "$*"
+    cat /dev/null "$@"
+  } | cksum | awk '{print $1 "-" $2}')"
+  astamp="$({
+    printf 'SCHEMA=1\n'
+    cat /dev/null "$PACKAGE_ROOT/bin/mascot-accents.py" 2>/dev/null
+  } | cksum | awk '{print $1 "-" $2}')"
+}
+
+# Extraction results are cached per mascot per extractor version: the
+# uv/python child runs once per identity, ever; every later flip is file
+# copies. Prints the cached conf path.
+accents_for() {
+  akey="$(mascot_key "$1")"
+  acc_dir="$CACHE/accents-$astamp"
+  if [ ! -f "$acc_dir/$akey.conf" ]; then
+    mkdir -p "$acc_dir"
+    # Atomic write: a failed extraction must not leave a half-written entry.
+    if ! mascot-accents "$1" >"$acc_dir/.$akey.tmp.$$"; then
+      rm -f "$acc_dir/.$akey.tmp.$$"
+      return 1
+    fi
+    mv "$acc_dir/.$akey.tmp.$$" "$acc_dir/$akey.conf"
+  fi
+  printf '%s\n' "$acc_dir/$akey.conf"
+}
+
+# Atomic install into live state; the rail watches this file.
+install_accents() {
+  cp "$1" "$STATE/.accents.tmp.$$"
+  mv "$STATE/.accents.tmp.$$" "$STATE/accents.conf"
+}
+
+# Make $1 (a provider-qualified identity, e.g. pokemon:raikou) the live
+# accents. Display is not this command's job: the rail mascot watches state.
+set_mascot() {
+  ensure_cache_ids
+  acc_file="$(accents_for "$1")" || exit 1
+  install_accents "$acc_file"
 }
 
 # Older installations stored per-layer modes (inner-mode/outer-mode) or a
@@ -243,20 +305,23 @@ render_template() {
   fi
 }
 
-# Renders the persisted layer modes, or the explicitly passed pair
-# (inner outer) when the caller has not committed them to state yet.
-render() {
-  mode="${1:-$(current_mode)}"
-  mkdir -p "$GENERATED"
-
-  accents="$STATE/accents.conf"
-
+# Render every template for one mode against one accents file into a cache
+# entry. The build lands in a private dir and publishes by a single rename:
+# a half-built entry is never visible, and losing the rename race to a
+# concurrent render is a hit, not an error. force replaces an existing entry.
+build_entry() { # entry mode accents-file [force]
+  entry="$1"
+  entry_mode="$2"
+  accents="$3"
+  build="$CACHE/.build.$$.${entry##*/}"
   # The workdir holds the prebuilt substitution scripts and render temp
-  # files; the trap cleans it on every exit path.
-  workdir="$STATE/.render.$$"
-  trap 'rm -rf "$workdir"' EXIT
+  # files; the trap covers the error exits (render_template exits the
+  # script on failure).
+  workdir="$build/.work"
+  trap 'rm -rf "$build"' EXIT
+  rm -rf "$build"
   mkdir -p "$workdir"
-  emit_mapping "$mode" "$(palette_for_mode "$mode")" "" >"$workdir/mode.sed"
+  emit_mapping "$entry_mode" "$(palette_for_mode "$entry_mode")" "" >"$workdir/mode.sed"
   # Mode-pinned contexts: templates that must exist for BOTH modes at
   # once — ghostty's native macOS-appearance switching reads a light and
   # a dark theme file simultaneously — regardless of the current mode.
@@ -266,7 +331,7 @@ render() {
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
     [ -e "$tmpl" ] || continue
-    out="$GENERATED/$(basename "$tmpl" .tmpl)"
+    out="$build/$(basename "$tmpl" .tmpl)"
     element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
     case "$element" in
     dark | light) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
@@ -278,11 +343,79 @@ render() {
     esac
   done
 
-  publish_files
+  rm -rf "$workdir"
+  : >"$build/.complete"
+  mkdir -p "${entry%/*}"
+  [ "${4:-}" = force ] && rm -rf "$entry"
+  # BSD mv nests into an existing target instead of failing; either way the
+  # loser's build goes below and the winner's complete entry stays.
+  mv "$build" "$entry" 2>/dev/null || true
+  rm -rf "${entry:?}/${build##*/}" "$build"
+  [ -f "$entry/.complete" ] || {
+    echo "error: could not publish cache entry $entry" >&2
+    exit 1
+  }
+  prune_cache
+}
+
+# After a successful cold build: old generations go (their stamps can never
+# match again), as do builds abandoned by dead processes. Live-pid builds
+# stay — a concurrent render may still be mid-rename.
+prune_cache() {
+  for stale in "$CACHE"/render-* "$CACHE"/accents-*; do
+    [ -e "$stale" ] || continue
+    case "$stale" in
+    "$CACHE/render-$rstamp" | "$CACHE/accents-$astamp") ;;
+    *) rm -rf "$stale" ;;
+    esac
+  done
+  for stale in "$CACHE"/.build.*; do
+    [ -e "$stale" ] || continue
+    builder="${stale##*/.build.}"
+    builder="${builder%%.*}"
+    kill -0 "$builder" 2>/dev/null || rm -rf "$stale"
+  done
+}
+
+# After a flip the opposite mode's entry warms in the background, so the
+# next `theme toggle` is a warm flip too. Fire-and-forget: a failure only
+# means toggle renders cold.
+warm_opposite() { # mode key accents-file
+  opp=light
+  [ "$1" = light ] && opp=dark
+  opp_entry="$CACHE/render-$rstamp/$opp-$2"
+  [ -f "$opp_entry/.complete" ] && return 0
+  (build_entry "$opp_entry" "$opp" "$3" </dev/null >/dev/null 2>&1 &)
+}
+
+# Route a full render through the cache: a hit publishes without rendering,
+# a miss builds the entry first. force rebuilds the entry and re-copies the
+# out-of-tree targets even when nothing changed (the repair path).
+render() { # [mode] [force]
+  mode="${1:-$(current_mode)}"
+  ensure_cache_ids
+  active=""
+  [ -f "$STATE/accents.conf" ] && active="$(conf_get "$STATE/accents.conf" mascot)"
+  mkey="$(mascot_key "$active")"
+  entry="$CACHE/render-$rstamp/$mode-$mkey"
+  acc_file="$CACHE/accents-$astamp/$mkey.conf"
+  # Seed the accents cache from live state: apply/dark/light re-render the
+  # active mascot without re-running the extractor (renders stay offline,
+  # today's contract).
+  if [ -n "$active" ] && [ ! -f "$acc_file" ]; then
+    mkdir -p "$CACHE/accents-$astamp"
+    cp "$STATE/accents.conf" "$CACHE/accents-$astamp/.$mkey.tmp.$$"
+    mv "$CACHE/accents-$astamp/.$mkey.tmp.$$" "$acc_file"
+  fi
+  if [ -n "${2:-}" ] || [ ! -f "$entry/.complete" ]; then
+    build_entry "$entry" "$mode" "$acc_file" "${2:-}"
+  fi
+  publish_from "$entry" "${2:-}"
   echo "theme: mode=$mode"
 }
 
-# This script writes state and performs the small reloads required by
+# Publish one cache entry into generated/ and the copy-out targets. This
+# script writes state and performs the small reloads required by
 # consumers that cannot watch their generated files. It runs from
 # many contexts (shells, ssh, the tmux server) whose environments differ,
 # and a push that works in one silently fails in another. Consumers
@@ -300,31 +433,74 @@ render() {
 # map's create directive: it must exist as a real directory before links
 # deploy, or a link there would send these writes inside the repo
 # (see docs/install.md).
-publish_files() {
-  # File copies are context-independent writes: ghostty resolves
-  # custom-shader paths relative to its config dir. Every rendered .glsl
-  # is a shader by convention — no name list to maintain.
-  mkdir -p "$HOME/.config/ghostty/shaders"
-  for shader in "$GENERATED"/*.glsl; do
-    [ -f "$shader" ] || continue
-    cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
+#
+# Per-file copy-if-changed: unchanged files keep their exact mtimes, so a
+# mascot flip never fires the watchers of accent-independent files (the
+# fsh ini, frame.glsl). generated/ stays a flat real dir — rail fs.watch
+# and nvim fs_event are inode-pinned, so a symlink flip would silently
+# break every one of them.
+publish_from() { # entry [force]
+  mkdir -p "$GENERATED"
+  ghostty_dirty=""
+  tmtheme_dirty=""
+  for src in "$1"/*; do
+    [ -f "$src" ] || continue
+    base="${src##*/}"
+    out="$GENERATED/$base"
+    if [ ! -f "$out" ] || ! cmp -s "$src" "$out"; then
+      # Same-directory temp + rename: watchers see one atomic change.
+      cp "$src" "$GENERATED/.pub.$$"
+      mv "$GENERATED/.pub.$$" "$out"
+      case "$base" in
+      *.glsl)
+        # File copies are context-independent writes: ghostty resolves
+        # custom-shader paths relative to its config dir. Every rendered
+        # .glsl is a shader by convention — no name list to maintain.
+        mkdir -p "$HOME/.config/ghostty/shaders"
+        cp "$out" "$HOME/.config/ghostty/shaders/$base"
+        ghostty_dirty=1
+        ;;
+      dotfiles-*)
+        # Ghostty's native light/dark flip reads both theme files by name.
+        mkdir -p "$HOME/.config/ghostty/themes"
+        cp "$out" "$HOME/.config/ghostty/themes/$base"
+        ghostty_dirty=1
+        ;;
+      Dotfiles.tmTheme) tmtheme_dirty=1 ;;
+      esac
+    fi
   done
-  # Ghostty's native light/dark flip reads both theme files by name.
-  mkdir -p "$HOME/.config/ghostty/themes"
-  for gtheme in "$GENERATED"/dotfiles-*; do
-    [ -f "$gtheme" ] || continue
-    cp "$gtheme" "$HOME/.config/ghostty/themes/$(basename "$gtheme")"
-  done
-  publish_bat_theme
-  publish_codex_theme
+  if [ "${2:-}" = force ]; then
+    # The repair path (`theme apply`): re-copy the out-of-tree targets even
+    # when generated/ already matched, in case a target copy was lost.
+    mkdir -p "$HOME/.config/ghostty/shaders" "$HOME/.config/ghostty/themes"
+    for shader in "$GENERATED"/*.glsl; do
+      [ -f "$shader" ] || continue
+      cp "$shader" "$HOME/.config/ghostty/shaders/${shader##*/}"
+    done
+    for gtheme in "$GENERATED"/dotfiles-*; do
+      [ -f "$gtheme" ] || continue
+      cp "$gtheme" "$HOME/.config/ghostty/themes/${gtheme##*/}"
+    done
+    publish_bat_theme
+    publish_codex_theme
+  elif [ -n "$tmtheme_dirty" ]; then
+    # Both self-compare against their targets; gating here just keeps the
+    # warm flip free of their lock/cmp process spawns.
+    publish_bat_theme
+    publish_codex_theme
+  fi
   # Exceptions to "never poke processes", for consumers with no
   # file-watching path of their own. Both are idempotent no-ops when the
   # target isn't running:
   #   ghostty re-reads shader FILES only on a config reload (SIGUSR2) —
-  #   its native light/dark flip doesn't trigger one.
+  #   its native light/dark flip doesn't trigger one. Gated on an actual
+  #   shader/theme change so mascot flips don't reload every window.
   #   sketchybar converges instantly on this event; its 30s mtime timer
   #   (plugins/theme-sync.sh) is only the backstop.
-  pkill -USR2 -x ghostty 2>/dev/null || true
+  if [ -n "$ghostty_dirty" ]; then
+    pkill -USR2 -x ghostty 2>/dev/null || true
+  fi
   command -v sketchybar >/dev/null 2>&1 &&
     sketchybar --trigger theme_changed 2>/dev/null || true
 }
@@ -453,10 +629,11 @@ apply)
   # `theme apply` catches generated consumers up with the persisted mode
   # without touching OS appearance. The one-argument form is for
   # appearance watchers: render + persist, no osascript loop-back.
+  # Both force-render past the cache: apply is the repair hammer.
   case "${2:-}" in
-  '') render ;;
+  '') render '' force ;;
   dark | light)
-    render "$2"
+    render "$2" force
     set_mode "$2"
     ;;
   *)
@@ -473,8 +650,9 @@ mascot)
     ;;
   sync)
     # Make the global accent follow a project: apply its mapped mascot
-    # (or the default), skipping the extraction when it is already active.
-    # Session switchers (to/ts, rail jump) call this in the background.
+    # (or the default), skipping everything when it is already active.
+    # Session switchers (to/ts, rail jump) call this in the background;
+    # a warm flip is pure file copies — no extractor, no renderer.
     project="${3:-}"
     [ -n "$project" ] || project="$(current_project)"
     value=""
@@ -484,7 +662,27 @@ mascot)
     current=""
     [ -f "$STATE/accents.conf" ] && current="$(conf_get "$STATE/accents.conf" mascot)"
     [ "$value" = "$current" ] && exit 0
-    set_mascot "$value"
+    # Superseded guard: a later jump overwrites this file, and a slow cold
+    # sync re-checks it after rendering — the last jump wins, however long
+    # its predecessors take.
+    printf '%s\n' "$value" >"$STATE/.mascot-requested.tmp.$$"
+    mv "$STATE/.mascot-requested.tmp.$$" "$STATE/.mascot-requested"
+    mode="$(current_mode)"
+    ensure_cache_ids
+    mkey="$(mascot_key "$value")"
+    entry="$CACHE/render-$rstamp/$mode-$mkey"
+    acc_file="$CACHE/accents-$astamp/$mkey.conf"
+    if [ ! -f "$entry/.complete" ] || [ ! -f "$acc_file" ]; then
+      acc_file="$(accents_for "$value")" || exit 1
+      [ -f "$entry/.complete" ] || build_entry "$entry" "$mode" "$acc_file"
+      # A later jump superseded this sync while it rendered: leave the
+      # cache warm for the next visit, flip nothing.
+      [ "$(cat "$STATE/.mascot-requested" 2>/dev/null)" = "$value" ] || exit 0
+    fi
+    install_accents "$acc_file"
+    publish_from "$entry"
+    warm_opposite "$mode" "$mkey" "$acc_file"
+    exit 0
     ;;
   default)
     value="${3:?usage: theme mascot default <provider:id>}"
