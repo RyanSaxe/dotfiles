@@ -1,0 +1,55 @@
+id: keyword-only-args
+language: Python
+severity: warning
+message: Parameters after the first two must be keyword-only. Two positional
+  parameters is a maximum, not a target; one or zero can be clearer.
+utils:
+  positional-param:
+    any:
+    - kind: identifier
+    - kind: typed_parameter
+    - kind: default_parameter
+    - kind: typed_default_parameter
+  counted-param:
+    all:
+    - matches: positional-param
+    - not:
+        regex: ^(self|cls)$
+    - not:
+        follows:
+          stopBy: end
+          any:
+          - kind: keyword_separator
+          - kind: list_splat_pattern
+rule:
+  kind: parameters
+  has:
+    all:
+    - matches: counted-param
+    - follows:
+        stopBy: end
+        all:
+        - matches: counted-param
+        - follows:
+            stopBy: end
+            matches: counted-param
+metadata:
+  byor:
+    rationale: >
+      Long positional argument lists make call sites unreadable and brittle.
+      After the first two positional arguments, callers should name the values
+      they pass so reviews and future signature changes stay clear.
+    agent_prompt: >
+      Insert a bare `*` after the last positional parameter so every later
+      argument is keyword-only, for example def f(a, b, *, c, d). self and cls
+      do not count; parameters before a `/` do. Do not pick a signature
+      mechanically: two positional parameters is a maximum, not a target.
+      Choose zero, one, or two by how call sites read. A natural, unambiguous
+      order like add(2, 3) or a single obvious subject like save_user(user)
+      reads well positionally; booleans, config values, and parameters of the
+      same type belong after the `*` even when a positional slot is free.
+      Update call sites to pass keyword arguments by name.
+    tags:
+    - python
+    - style-guide
+    - greenfield

@@ -1,0 +1,31 @@
+id: python.require-function-return-type
+language: Python
+severity: warning
+message: Functions and methods should declare return types.
+rule:
+  all:
+  - kind: function_definition
+  - not:
+      has:
+        field: return_type
+        regex: .+
+  - not:
+      has:
+        field: name
+        regex: ^__[^_].*__$
+metadata:
+  byor:
+    rationale: >
+      Return annotations make interfaces explicit and keep function contracts
+      visible to readers, agents, and type checkers. Python protocol dunder
+      methods are exempt because their return contracts are already defined by
+      the language.
+    agent_prompt: >
+      Add a precise return type annotation. Use None for procedures and keep the
+      output type stricter than permissive input types. Dunder protocol methods
+      such as __init__ may rely on their standard Python return contract.
+    tags:
+    - python
+    - typing
+    - style-guide
+    - greenfield

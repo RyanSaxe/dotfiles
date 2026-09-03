@@ -1,0 +1,57 @@
+id: python.no-importlib
+language: Python
+severity: warning
+message: Avoid importlib in Python code, except importlib.resources and importlib.metadata.
+rule:
+  any:
+    - all:
+        - kind: import_statement
+        - has:
+            stopBy: end
+            kind: dotted_name
+            all:
+              - regex: '^importlib(\.|$)'
+              - not:
+                  regex: '^importlib\.(resources|metadata)(\.|$)'
+    - all:
+        - kind: import_from_statement
+        - has:
+            field: module_name
+            all:
+              - regex: '^importlib\.'
+              - not:
+                  regex: '^importlib\.(resources|metadata)(\.|$)'
+    - all:
+        - kind: import_from_statement
+        - has:
+            field: module_name
+            regex: '^importlib$'
+        - any:
+            - has:
+                stopBy: end
+                kind: dotted_name
+                not:
+                  regex: '^(importlib|resources|metadata)$'
+            - has:
+                kind: wildcard_import
+metadata:
+  byor:
+    rationale: >
+      Dynamic module loading (import_module, reload, importlib.util,
+      importlib.machinery, and the rest of the importlib machinery) makes
+      imports harder for agents, type checkers, linters, and reviewers to
+      reason about. Everything under importlib is banned except
+      importlib.resources and importlib.metadata, which are static, legitimate
+      stdlib APIs for package data and versions.
+    agent_prompt: >
+      Do not import importlib or any of its machinery submodules
+      (importlib.util, importlib.machinery, importlib.abc, import_module,
+      reload, ...) here. Prefer explicit top-level imports, including normal
+      try/except import fallbacks for optional standard-library support. The
+      only allowed exceptions are importlib.resources and importlib.metadata,
+      in any import form. If truly dynamic plugin loading is required, ask for
+      review before adding an exception.
+    tags:
+      - python
+      - style-guide
+      - greenfield

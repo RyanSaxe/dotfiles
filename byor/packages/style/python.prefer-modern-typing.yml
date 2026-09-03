@@ -1,0 +1,41 @@
+id: python.prefer-modern-typing
+language: Python
+severity: warning
+message: Prefer modern Python type syntax over legacy typing aliases.
+rule:
+  any:
+  - pattern: from typing import List
+  - pattern: from typing import List as $ALIAS
+  - pattern: from typing import Dict
+  - pattern: from typing import Dict as $ALIAS
+  - pattern: from typing import Tuple
+  - pattern: from typing import Tuple as $ALIAS
+  - pattern: from typing import Set
+  - pattern: from typing import Set as $ALIAS
+  - pattern: from typing import FrozenSet
+  - pattern: from typing import FrozenSet as $ALIAS
+  - pattern: from typing import Union
+  - pattern: from typing import Union as $ALIAS
+  - pattern: from typing import Optional
+  - pattern: from typing import Optional as $ALIAS
+  - pattern: typing.List
+  - pattern: typing.Dict
+  - pattern: typing.Tuple
+  - pattern: typing.Set
+  - pattern: typing.FrozenSet
+  - pattern: typing.Union
+  - pattern: typing.Optional
+metadata:
+  byor:
+    rationale: >
+      The Python style guide uses Python 3.11+ type syntax: list, dict, tuple,
+      set, | unions, and | None instead of legacy aliases from typing.
+    agent_prompt: >
+      Replace legacy typing aliases with built-in collection generics and modern
+      union syntax. Keep imports such as Protocol, Literal, Callable, TypeVar,
+      Generic, and Annotated when they are actually needed.
+    tags:
+    - python
+    - typing
+    - style-guide
+    - greenfield

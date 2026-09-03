@@ -1,0 +1,31 @@
+id: python.no-typing-cast
+language: Python
+severity: warning
+message: Avoid typing.cast in Python code.
+rule:
+  any:
+  - pattern: from typing import cast
+  - pattern: from typing import cast as $ALIAS
+  - pattern: from typing_extensions import cast
+  - pattern: from typing_extensions import cast as $ALIAS
+  - pattern: typing.cast($TYPE, $VALUE)
+  - pattern: typing_extensions.cast($TYPE, $VALUE)
+  - pattern: cast($TYPE, $VALUE)
+metadata:
+  byor:
+    rationale: >
+      Casting hides type-model problems and can make invalid assumptions
+      invisible to reviewers and type checkers. Most casts should be replaced
+      with narrowing, clearer signatures, protocols, or better value flow.
+    agent_prompt: >
+      Do not use typing.cast here. Fix the type by narrowing, changing the
+      signature, introducing a protocol, or restructuring the value flow. Keep a
+      cast only when the needed invariant cannot be expressed by Python's type
+      system. If this is genuinely necessary, add `# ast-grep-ignore:
+      python.no-typing-cast` on its own line directly above the offending line,
+      with a short comment above it explaining the type-system limitation.
+    tags:
+    - python
+    - typing
+    - style-guide
+    - greenfield

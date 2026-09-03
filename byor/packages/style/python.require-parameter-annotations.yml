@@ -1,0 +1,31 @@
+id: python.require-parameter-annotations
+language: Python
+severity: warning
+message: Function and method parameters should have type annotations.
+rule:
+  any:
+  - all:
+    - kind: parameters > identifier
+    - not:
+        regex: ^(self|cls)$
+  - all:
+    - kind: parameters > default_parameter
+    - not:
+        has:
+          field: name
+          regex: ^(self|cls)$
+  - kind: parameters > list_splat_pattern
+  - kind: parameters > dictionary_splat_pattern
+metadata:
+  byor:
+    rationale: >
+      Parameter annotations make interfaces explicit and support the style
+      guide's interface-first development practice.
+    agent_prompt: >
+      Add a precise parameter annotation. Prefer flexible input abstractions
+      such as Sequence or Mapping where that makes the caller contract clearer.
+    tags:
+    - python
+    - typing
+    - style-guide
+    - greenfield

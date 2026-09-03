@@ -1,0 +1,30 @@
+version: 1
+paths:
+  rules: rules
+  packages: packages
+  repos: repos.yml
+ast_grep:
+  command: auto
+ai:
+  agents:
+    - codex
+    - copilot
+    - skill
+output:
+  concise: true
+checks: []
+init:
+  private: true
+  packages:
+    - style
+profiles:
+  existing:
+    description: Exclude greenfield rules and checks for mature repositories.
+    rules:
+      excluded_tags:
+        - greenfield
+      excluded_rule_ids: []
+    checks:
+      excluded_tags:
+        - greenfield
+      excluded: []
