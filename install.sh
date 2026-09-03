@@ -591,7 +591,7 @@ install_tier_packages() {
     # Clear whatever the tier is about to link that exists as a
     # non-link, so deploy never refuses and the run never aborts before
     # the post-tier steps.
-    for byor_path in config.yml rules scripts; do
+    for byor_path in config.yml rules scripts packages; do
       byor_target="$HOME/.config/byor/$byor_path"
       if [ -e "$byor_target" ] && [ ! -L "$byor_target" ]; then
         rm -rf "$byor_target"
