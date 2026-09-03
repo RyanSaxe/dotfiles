@@ -167,10 +167,12 @@ install_zsh_plugins() {
   done
 }
 
-# The rail TUI and account observer (tuis/rail) run via tsx from their own
-# node_modules.
+# The rail TUI and account observer (tuis/rail) run as esbuild bundles from
+# dist/. Build here so the first keypress never pays for it; bin/rail and
+# bin/attention rebuild on demand when sources are newer than the stamp.
 install_rail() {
   (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
+  (cd "$RAIL_DIR" && npm run --silent build)
 }
 
 install_stylua_linux() {
@@ -399,7 +401,7 @@ install_neovim_linux() {
 # because nobody knew the file existed is worse than being nagged.
 #
 # One "NAME description" per line; the description is what the prompt shows.
-REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent and review phone notifications'
+REQUIRED_ENV_VARS='AGENT_NOTIFICATION_ID ntfy.sh topic id for agent phone notifications'
 
 # Same file, but no nagging: these are genuinely optional. They live here
 # rather than in a tracked config because their values name private
@@ -589,12 +591,19 @@ install_tier_packages() {
     # Clear whatever the tier is about to link that exists as a
     # non-link, so deploy never refuses and the run never aborts before
     # the post-tier steps.
-    for byor_path in config.yml rules scripts; do
+    for byor_path in config.yml rules scripts packages; do
       byor_target="$HOME/.config/byor/$byor_path"
       if [ -e "$byor_target" ] && [ ! -L "$byor_target" ]; then
         rm -rf "$byor_target"
       fi
     done
+    # ~/sgconfig.yml joins the link map with the same authority rule: the
+    # repo copy is the source, and a machine that followed the old
+    # hosting-byor cp instructions has a plain-file copy the deploy would
+    # otherwise refuse over.
+    if [ -e "$HOME/sgconfig.yml" ] && [ ! -L "$HOME/sgconfig.yml" ]; then
+      rm -f "$HOME/sgconfig.yml"
+    fi
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
@@ -1076,7 +1085,7 @@ if [ -x "$HOME/.local/bin/theme" ]; then
 fi
 
 # Rebuild bat's theme cache now that `theme apply` has published the rendered
-# inner theme; apt names the binary batcat (see zsh/aliases.zsh for the alias).
+# theme; apt names the binary batcat (see zsh/aliases.zsh for the alias).
 if command -v bat >/dev/null 2>&1; then
   bat cache --build
 elif command -v batcat >/dev/null 2>&1; then

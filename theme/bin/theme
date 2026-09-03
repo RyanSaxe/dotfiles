@@ -2,20 +2,25 @@
 # One theme for every tool. Renders templates with the current palette and
 # semantic tokens; consumers watch the rendered files and converge.
 #
-#   theme dark                 switch both layers to catppuccin mocha
-#   theme inner|outer MODE     switch one layer to dark, light, or toggle
-#   theme both MODE            switch both layers together; `both toggle`
-#                              flips to the opposite of the inner mode, so
-#                              diverged layers converge
-#   theme apply                re-render the current layer modes
-#   theme status               print both layer modes
+#   theme dark|light           switch mode (sets macOS appearance too)
+#   theme toggle               flip to the other mode
+#   theme apply                re-render the persisted mode
+#   theme apply dark|light     render + persist without touching macOS
+#                              appearance (for appearance watchers)
+#   theme status               print the mode and accents
 #
 # Layers (see README: Theming):
-#   palettes/*.conf   raw color values        (layer 1)
-#   tokens.conf       role -> palette key     (layer 2)
-#   elements.conf     output -> inner/outer  (layer 3)
-#   templates/*.tmpl  {{role}} placeholders  (layer 4)
+#   palettes/*.conf   raw color values                    (layer 1)
+#   tokens.conf       role -> palette key                 (layer 2)
+#   elements.conf     mode-pinned render exceptions       (layer 3)
+#   templates/*.tmpl  {{role}} placeholders               (layer 4)
+# Templates render in the current mode unless elements.conf pins them to
+# dark or light (ghostty reads both of its theme files at once).
 # Rendered output lands in state, never in the repo.
+#
+# Renders are cached per (mode, mascot) under cache/theme, stamped by the
+# content of every render input — revisiting a project is pure file copies
+# (no extractor, no renderer), and `rm -rf` of the cache is always safe.
 set -eu
 
 # This script is invoked from contexts with a bare PATH (launchd) —
@@ -31,38 +36,41 @@ STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 # Mascot mappings are machine-personal state (project names must never
 # reach the public repo), not tracked config.
 MASCOT_CONF="$STATE/mascot.conf"
-# The global default is shareable and tracked; see mascot.conf in config.
-DEFAULT_CONF="$CONFIG/mascot.conf"
-GENERATED="$STATE/generated"
-INNER_MODE_FILE="$STATE/inner-mode"
-OUTER_MODE_FILE="$STATE/outer-mode"
-ELEMENTS="$CONFIG/elements.conf"
 
-layer_mode() {
-  mode_file="$INNER_MODE_FILE"
-  [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
-  [ -f "$mode_file" ] || {
+# Machine-local on purpose: the global default is taste-per-machine (a
+# laptop and a desktop can wear different mascots), so it lives in state,
+# never in the repo. Project mappings were always machine state.
+DEFAULT_CONF="$STATE/mascot-default.conf"
+GENERATED="$STATE/generated"
+MODE_FILE="$STATE/mode"
+ELEMENTS="$CONFIG/elements.conf"
+# Pre-rendered entries: render-<rstamp>/<mode>-<key>/ holds one full set of
+# generated files, accents-<astamp>/<key>.conf one extraction result. The
+# stamps are content checksums, so edits land in a new generation and old
+# generations are pruned — never reused stale.
+CACHE="$STATE/cache/theme"
+
+current_mode() {
+  [ -f "$MODE_FILE" ] || {
     echo dark
     return
   }
-  stored_mode="$(cat "$mode_file")"
+  stored_mode="$(cat "$MODE_FILE")"
   case "$stored_mode" in
   dark | light) echo "$stored_mode" ;;
   *)
     # A corrupt file must not kill every render (watchers call `theme
     # apply`); fall back like a missing file, and say which file to fix.
-    echo "warning: $mode_file holds '$stored_mode', not dark|light; using dark" >&2
+    echo "warning: $MODE_FILE holds '$stored_mode', not dark|light; using dark" >&2
     echo dark
     ;;
   esac
 }
 
-set_layer_mode() {
-  mode_file="$INNER_MODE_FILE"
-  [ "$1" = outer ] && mode_file="$OUTER_MODE_FILE"
+set_mode() {
   mkdir -p "$STATE"
-  printf '%s\n' "$2" >"$mode_file.tmp.$$"
-  mv "$mode_file.tmp.$$" "$mode_file"
+  printf '%s\n' "$1" >"$MODE_FILE.tmp.$$"
+  mv "$MODE_FILE.tmp.$$" "$MODE_FILE"
 }
 
 palette_for_mode() {
@@ -105,7 +113,7 @@ conf_del() {
 }
 
 # Project keys are tmux session names: every mapping consumer (session
-# switchers, rail jumps) passes the session it targets, so interactive
+# switchers, rail element/attention jumps) passes the session it targets, so
 # resolution must match — including inside popups, whose cwd is the
 # session's creation directory, not the viewed pane. The repo/directory
 # name stands in only outside tmux.
@@ -117,33 +125,91 @@ current_project() {
   basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 }
 
-# Extract accents into state. $1 is a provider-qualified identity
-# (e.g. pokemon:raikou). Display is not this command's job: the rail
-# mascot watches state.
-set_mascot() {
-  # Atomic write: a failed extraction must not clobber working accents.
-  if ! mascot-accents "$1" >"$STATE/.accents.tmp"; then
-    rm -f "$STATE/.accents.tmp"
-    exit 1
+# Cache directory keys must be single path segments: anything outside a
+# conservative character set collapses to '-'. Lossy on purpose — the
+# mascot= line inside each cached conf still holds the exact value.
+mascot_key() {
+  if [ -n "$1" ]; then
+    printf '%s' "$1" | tr -c 'A-Za-z0-9._\n-' '-'
+  else
+    echo none
   fi
-  mv "$STATE/.accents.tmp" "$STATE/accents.conf"
 }
 
-# The old implementation stored one mode for every consumer. Preserve it as
-# the initial value for both layers when upgrading an existing installation,
-# then delete it — the layer files are the only mode state afterwards.
-migrate_mode_state() {
-  [ -f "$STATE/theme-mode" ] || return 0
-  legacy_mode="$(cat "$STATE/theme-mode")"
-  case "$legacy_mode" in
-  dark | light)
-    [ -f "$INNER_MODE_FILE" ] || set_layer_mode inner "$legacy_mode"
-    [ -f "$OUTER_MODE_FILE" ] || set_layer_mode outer "$legacy_mode"
-    ;;
-  esac
-  if [ -f "$INNER_MODE_FILE" ] && [ -f "$OUTER_MODE_FILE" ]; then
-    rm -f "$STATE/theme-mode"
+# Compute the cache generation stamps once per run. rstamp covers every
+# render input (tokens, elements, palettes, templates, the extractor, and
+# this script — names and content); editing any of them lands new renders
+# in a fresh generation instead of reusing stale entries. astamp covers
+# only the extractor, so render-input edits never re-run extraction (an
+# extractor edit moves both stamps: new accents demand new renders). The
+# SCHEMA line forces a new generation when the cache layout itself changes.
+ensure_cache_ids() {
+  [ -n "${rstamp:-}" ] && return 0
+  # Stamp the extractor accents_for actually invokes (PATH resolution,
+  # symlinks followed); fall back to the repo copy when it is not on PATH.
+  extractor="$(command -v mascot-accents || true)"
+  [ -n "$extractor" ] && extractor="$(readlink -f "$extractor")"
+  [ -f "$extractor" ] || extractor="$PACKAGE_ROOT/bin/mascot-accents.py"
+  set --
+  for input in "$CONFIG/tokens.conf" "$ELEMENTS" \
+    "$CONFIG"/palettes/*.conf "$CONFIG"/templates/*.tmpl \
+    "$extractor" "$SCRIPT_PATH"; do
+    [ -f "$input" ] && set -- "$@" "$input"
+  done
+  rstamp="$({
+    printf 'SCHEMA=1 %s\n' "$*"
+    cat /dev/null "$@"
+  } | cksum | awk '{print $1 "-" $2}')"
+  astamp="$({
+    printf 'SCHEMA=1\n'
+    cat /dev/null "$extractor" 2>/dev/null
+  } | cksum | awk '{print $1 "-" $2}')"
+}
+
+# Extraction results are cached per mascot per extractor version: the
+# uv/python child runs once per identity, ever; every later flip is file
+# copies. Prints the cached conf path.
+accents_for() {
+  akey="$(mascot_key "$1")"
+  acc_dir="$CACHE/accents-$astamp"
+  if [ ! -f "$acc_dir/$akey.conf" ]; then
+    mkdir -p "$acc_dir"
+    # Atomic write: a failed extraction must not leave a half-written entry.
+    if ! mascot-accents "$1" >"$acc_dir/.$akey.tmp.$$"; then
+      rm -f "$acc_dir/.$akey.tmp.$$"
+      return 1
+    fi
+    mv "$acc_dir/.$akey.tmp.$$" "$acc_dir/$akey.conf"
   fi
+  printf '%s\n' "$acc_dir/$akey.conf"
+}
+
+# Atomic install into live state; the rail watches this file.
+install_accents() {
+  cp "$1" "$STATE/.accents.tmp.$$"
+  mv "$STATE/.accents.tmp.$$" "$STATE/accents.conf"
+}
+
+# Make $1 (a provider-qualified identity, e.g. pokemon:raikou) the live
+# accents. Display is not this command's job: the rail mascot watches state.
+# Older installations stored per-layer modes (inner-mode/outer-mode) or a
+# single theme-mode. Seed the mode file from inner-mode — the layer that
+# drove macOS appearance, so the truthful one — then delete the legacy
+# files; the mode file is the only mode state afterwards.
+migrate_mode_state() {
+  if [ ! -f "$MODE_FILE" ]; then
+    for legacy in "$STATE/inner-mode" "$STATE/theme-mode"; do
+      [ -f "$legacy" ] || continue
+      legacy_mode="$(cat "$legacy")"
+      case "$legacy_mode" in
+      dark | light)
+        set_mode "$legacy_mode"
+        break
+        ;;
+      esac
+    done
+  fi
+  rm -f "$STATE/inner-mode" "$STATE/outer-mode" "$STATE/theme-mode"
 }
 
 # One-time migration from the pre-provider layout: mapped values gain
@@ -244,68 +310,127 @@ render_template() {
   fi
 }
 
-# Renders the persisted layer modes, or the explicitly passed pair
-# (inner outer) when the caller has not committed them to state yet.
-render() {
-  inner_mode="${1:-$(layer_mode inner)}"
-  outer_mode="${2:-$(layer_mode outer)}"
-  mkdir -p "$GENERATED"
-
-  accents="$STATE/accents.conf"
-
-  # The substitution script varies only by which layer owns the unqualified
-  # placeholders (mixed templates use explicit inner_/outer_ forms), so three
-  # prebuilt variants cover every template. The workdir also holds render
-  # temp files; the trap cleans it on every exit path.
-  workdir="$STATE/.render.$$"
-  trap 'rm -rf "$workdir"' EXIT
+# Render every template for one mode against one accents file into a cache
+# entry. The build lands in a private dir and publishes by a single rename:
+# a half-built entry is never visible, and losing the rename race to a
+# concurrent render is a hit, not an error. force replaces an existing entry.
+build_entry() { # entry mode accents-file [force]
+  entry="$1"
+  entry_mode="$2"
+  accents="$3"
+  # mktemp, never $$: backgrounded warm builds outlive the parent shell
+  # whose PID a name would carry, and a recycled PID could collide.
+  mkdir -p "$CACHE"
+  build="$(mktemp -d "$CACHE/.build.${entry##*/}.XXXXXX")"
+  # The workdir holds the prebuilt substitution scripts and render temp
+  # files; the trap covers the error exits (render_template exits the
+  # script on failure).
+  workdir="$build/.work"
+  trap 'rm -rf "$build"' EXIT
   mkdir -p "$workdir"
-  inner_palette="$(palette_for_mode "$inner_mode")"
-  outer_palette="$(palette_for_mode "$outer_mode")"
-  {
-    emit_mapping "$inner_mode" "$inner_palette" inner_
-    emit_mapping "$outer_mode" "$outer_palette" outer_
-  } >"$workdir/mixed.sed"
-  {
-    cat "$workdir/mixed.sed"
-    emit_mapping "$inner_mode" "$inner_palette" ""
-  } >"$workdir/inner.sed"
-  {
-    cat "$workdir/mixed.sed"
-    emit_mapping "$outer_mode" "$outer_palette" ""
-  } >"$workdir/outer.sed"
+  emit_mapping "$entry_mode" "$(palette_for_mode "$entry_mode")" "" >"$workdir/mode.sed"
   # Mode-pinned contexts: templates that must exist for BOTH modes at
   # once — ghostty's native macOS-appearance switching reads a light and
-  # a dark theme file simultaneously — regardless of the current layers.
+  # a dark theme file simultaneously — regardless of the current mode.
   emit_mapping dark "$(palette_for_mode dark)" "" >"$workdir/dark.sed"
   emit_mapping light "$(palette_for_mode light)" "" >"$workdir/light.sed"
 
   for tmpl in "$CONFIG/templates/"*.tmpl; do
     # An unmatched glob stays literal; never render a file named "*".
     [ -e "$tmpl" ] || continue
-    out="$GENERATED/$(basename "$tmpl" .tmpl)"
+    out="$build/$(basename "$tmpl" .tmpl)"
     element="$(conf_get "$ELEMENTS" "$(basename "$tmpl" .tmpl)")"
     case "$element" in
-    inner | outer | mixed | dark | light) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
+    dark | light) render_template "$tmpl" "$out" "$workdir/$element.sed" ;;
+    '') render_template "$tmpl" "$out" "$workdir/mode.sed" ;;
     *)
-      echo "error: no inner/outer registration for $(basename "$tmpl")" >&2
+      echo "error: elements.conf pins $(basename "$tmpl") to '$element', not dark|light" >&2
       exit 1
       ;;
     esac
   done
 
-  publish_files
-  echo "theme: inner=$inner_mode outer=$outer_mode"
+  rm -rf "$workdir"
+  : >"$build/.complete"
+  mkdir -p "${entry%/*}"
+  [ "${4:-}" = force ] && rm -rf "$entry"
+  # BSD mv nests into an existing target instead of failing; either way the
+  # loser's build goes below and the winner's complete entry stays.
+  mv "$build" "$entry" 2>/dev/null || true
+  rm -rf "${entry:?}/${build##*/}" "$build"
+  [ -f "$entry/.complete" ] || {
+    echo "error: could not publish cache entry $entry" >&2
+    exit 1
+  }
 }
 
-# This script writes state and performs the small reloads required by
+# After a foreground cold build: old generations go (their stamps can never
+# match again), as do build dirs old enough to be a crashed render's
+# leftovers. Age only, never PID liveness — a backgrounded warm build's
+# parent has already exited, so its live build would read as abandoned.
+# Never called from background builds: their stamps date from their parent's
+# start, and pruning by a stale stamp would eat a newer generation mid-sync.
+prune_cache() {
+  for stale in "$CACHE"/render-* "$CACHE"/accents-*; do
+    [ -e "$stale" ] || continue
+    case "$stale" in
+    "$CACHE/render-$rstamp" | "$CACHE/accents-$astamp") ;;
+    *) rm -rf "$stale" ;;
+    esac
+  done
+  find "$CACHE" -maxdepth 1 -name '.build.*' -mmin +60 \
+    -exec rm -rf {} + 2>/dev/null || true
+}
+
+# After a flip the opposite mode's entry warms in the background, so the
+# next `theme toggle` is a warm flip too. Fire-and-forget: a failure only
+# means toggle renders cold.
+warm_opposite() { # mode key accents-file
+  opp=light
+  [ "$1" = light ] && opp=dark
+  opp_entry="$CACHE/render-$rstamp/$opp-$2"
+  [ -f "$opp_entry/.complete" ] && return 0
+  (build_entry "$opp_entry" "$opp" "$3" </dev/null >/dev/null 2>&1 &)
+}
+
+# Route a full render through the cache: a hit publishes without rendering,
+# a miss builds the entry first. force rebuilds the entry and re-copies the
+# out-of-tree targets even when nothing changed (the repair path).
+render() { # [mode] [force]
+  mode="${1:-$(current_mode)}"
+  ensure_cache_ids
+  active=""
+  [ -f "$STATE/accents.conf" ] && active="$(conf_get "$STATE/accents.conf" mascot)"
+  mkey="$(mascot_key "$active")"
+  entry="$CACHE/render-$rstamp/$mode-$mkey"
+  acc_file="$CACHE/accents-$astamp/$mkey.conf"
+  # Offline contract: apply/dark/light never run the extractor. They prefer
+  # the cached extraction for this identity; when it is missing they render
+  # against live accents.conf directly — never banked into the cache, where
+  # unlabeled state would masquerade as this extractor's output (mascot
+  # sync's cold path re-extracts and rebuilds, restoring coherence).
+  [ -f "$acc_file" ] || acc_file="$STATE/accents.conf"
+  if [ -n "${2:-}" ] || [ ! -f "$entry/.complete" ]; then
+    build_entry "$entry" "$mode" "$acc_file" "${2:-}"
+    prune_cache
+  fi
+  publish_from "$entry" "${2:-}" || {
+    echo "error: cache entry $entry vanished before publish" >&2
+    exit 1
+  }
+  echo "theme: mode=$mode"
+}
+
+# Publish one cache entry into generated/ and the copy-out targets. This
+# script writes state and performs the small reloads required by
 # consumers that cannot watch their generated files. It runs from
 # many contexts (shells, ssh, the tmux server) whose environments differ,
 # and a push that works in one silently fails in another. Consumers
 # converge on the generated files themselves:
 #   bat        receives the generated theme and rebuilds its cache when it changes
 #   starship   re-reads its config every prompt
-#   zsh / fzf  precmd re-sources shell colors on mtime change (.zshrc)
+#   zsh / fzf / F-Sy-H  precmd reapplies generated colors on mtime change
+#              (.zshrc)
 #   tmux       rail daemon watches the generated dir and re-sources
 #              tmux-colors.conf on change (tmux scripts/theme-sync.sh)
 #   mascot     rail watches the state directory
@@ -315,31 +440,80 @@ render() {
 # map's create directive: it must exist as a real directory before links
 # deploy, or a link there would send these writes inside the repo
 # (see docs/install.md).
-publish_files() {
-  # File copies are context-independent writes: ghostty resolves
-  # custom-shader paths relative to its config dir. Every rendered .glsl
-  # is a shader by convention — no name list to maintain.
-  mkdir -p "$HOME/.config/ghostty/shaders"
-  for shader in "$GENERATED"/*.glsl; do
-    [ -f "$shader" ] || continue
-    cp "$shader" "$HOME/.config/ghostty/shaders/$(basename "$shader")"
+#
+# Per-file copy-if-changed: unchanged files keep their exact mtimes, so a
+# mascot flip never fires the watchers of accent-independent files (the
+# fsh ini, frame.glsl). generated/ stays a flat real dir — rail fs.watch
+# and nvim fs_event are inode-pinned, so a symlink flip would silently
+# break every one of them.
+publish_from() { # entry [force]
+  # A pruned or never-built entry must fail (callers treat it as a cache
+  # miss); globbing an absent dir would silently publish nothing.
+  [ -f "$1/.complete" ] || return 1
+  mkdir -p "$GENERATED"
+  ghostty_dirty=""
+  tmtheme_dirty=""
+  for src in "$1"/*; do
+    [ -f "$src" ] || continue
+    base="${src##*/}"
+    out="$GENERATED/$base"
+    if [ ! -f "$out" ] || ! cmp -s "$src" "$out"; then
+      # Same-directory temp + rename: watchers see one atomic change.
+      cp "$src" "$GENERATED/.pub.$$"
+      mv "$GENERATED/.pub.$$" "$out"
+      case "$base" in
+      *.glsl)
+        # File copies are context-independent writes: ghostty resolves
+        # custom-shader paths relative to its config dir. Every rendered
+        # .glsl is a shader by convention — no name list to maintain.
+        mkdir -p "$HOME/.config/ghostty/shaders"
+        cp "$out" "$HOME/.config/ghostty/shaders/$base"
+        ghostty_dirty=1
+        ;;
+      dotfiles-*)
+        # Ghostty's native light/dark flip reads both theme files by name.
+        mkdir -p "$HOME/.config/ghostty/themes"
+        cp "$out" "$HOME/.config/ghostty/themes/$base"
+        ghostty_dirty=1
+        ;;
+      Dotfiles.tmTheme) tmtheme_dirty=1 ;;
+      esac
+    fi
   done
-  # Ghostty's native light/dark flip reads both theme files by name.
-  mkdir -p "$HOME/.config/ghostty/themes"
-  for gtheme in "$GENERATED"/jewelbox-*; do
-    [ -f "$gtheme" ] || continue
-    cp "$gtheme" "$HOME/.config/ghostty/themes/$(basename "$gtheme")"
-  done
-  publish_bat_theme
-  publish_codex_theme
+  if [ "${2:-}" = force ]; then
+    # The repair path (`theme apply`): re-copy the out-of-tree targets even
+    # when generated/ already matched, in case a target copy was lost.
+    mkdir -p "$HOME/.config/ghostty/shaders" "$HOME/.config/ghostty/themes"
+    for shader in "$GENERATED"/*.glsl; do
+      [ -f "$shader" ] || continue
+      cp "$shader" "$HOME/.config/ghostty/shaders/${shader##*/}"
+    done
+    for gtheme in "$GENERATED"/dotfiles-*; do
+      [ -f "$gtheme" ] || continue
+      cp "$gtheme" "$HOME/.config/ghostty/themes/${gtheme##*/}"
+    done
+    # A repair that re-copied shader/theme targets must also signal:
+    # ghostty's loaded state is exactly what the repair distrusts.
+    ghostty_dirty=1
+    publish_bat_theme
+    publish_codex_theme
+  elif [ -n "$tmtheme_dirty" ]; then
+    # Both self-compare against their targets; gating here just keeps the
+    # warm flip free of their lock/cmp process spawns.
+    publish_bat_theme
+    publish_codex_theme
+  fi
   # Exceptions to "never poke processes", for consumers with no
   # file-watching path of their own. Both are idempotent no-ops when the
   # target isn't running:
   #   ghostty re-reads shader FILES only on a config reload (SIGUSR2) —
-  #   its native light/dark flip doesn't trigger one.
+  #   its native light/dark flip doesn't trigger one. Gated on an actual
+  #   shader/theme change so mascot flips don't reload every window.
   #   sketchybar converges instantly on this event; its 30s mtime timer
   #   (plugins/theme-sync.sh) is only the backstop.
-  pkill -USR2 -x ghostty 2>/dev/null || true
+  if [ -n "$ghostty_dirty" ]; then
+    pkill -USR2 -x ghostty 2>/dev/null || true
+  fi
   command -v sketchybar >/dev/null 2>&1 &&
     sketchybar --trigger theme_changed 2>/dev/null || true
 }
@@ -432,102 +606,48 @@ swatch() {
 show_accents() {
   accents="$STATE/accents.conf"
   [ -f "$accents" ] || return 0
-  inner_mode="$(layer_mode inner)"
-  outer_mode="$(layer_mode outer)"
-  echo "mascot: $(conf_get "$accents" mascot) (inner=$inner_mode outer=$outer_mode)"
-  # Matching modes share one accent pair — two rows, not two duplicates.
-  if [ "$inner_mode" = "$outer_mode" ]; then
-    swatch "$(conf_get "$accents" "accent_$inner_mode")" accent
-    swatch "$(conf_get "$accents" "notify_$inner_mode")" notify
-  else
-    swatch "$(conf_get "$accents" "accent_$inner_mode")" "accent inner"
-    swatch "$(conf_get "$accents" "notify_$inner_mode")" "notify inner"
-    swatch "$(conf_get "$accents" "accent_$outer_mode")" "accent outer"
-    swatch "$(conf_get "$accents" "notify_$outer_mode")" "notify outer"
-  fi
+  mode="$(current_mode)"
+  echo "mascot: $(conf_get "$accents" mascot) (mode=$mode)"
+  swatch "$(conf_get "$accents" "accent_$mode")" accent
+  swatch "$(conf_get "$accents" "notify_$mode")" notify
 }
 
 mkdir -p "$STATE"
 migrate_mode_state
 migrate_legacy_state
 
-apply_scope() {
-  scope="$1"
-  requested="$2"
-  case "$scope" in
-  inner | outer | both) ;;
-  *)
-    echo "error: unknown theme scope '$scope'" >&2
-    exit 1
-    ;;
-  esac
-  case "$requested" in
-  dark | light) mode="$requested" ;;
+apply_mode() {
+  case "$1" in
+  dark | light) mode="$1" ;;
   toggle)
-    # Toggling flips the named layer; `both` reads inner as its reference,
-    # so diverged layers converge to the opposite of the inner mode.
-    case "$scope" in
-    outer) current="$(layer_mode outer)" ;;
-    inner | both) current="$(layer_mode inner)" ;;
-    esac
-    [ "$current" = dark ] && mode=light || mode=dark
+    [ "$(current_mode)" = dark ] && mode=light || mode=dark
     ;;
   *)
     echo "error: mode must be dark, light, or toggle" >&2
     exit 1
     ;;
   esac
-
-  case "$scope" in
-  inner)
-    target_inner="$mode"
-    target_outer="$(layer_mode outer)"
-    ;;
-  outer)
-    target_inner="$(layer_mode inner)"
-    target_outer="$mode"
-    ;;
-  both)
-    target_inner="$mode"
-    target_outer="$mode"
-    ;;
-  esac
-  # Render before persisting: a failed render must not leave the mode files
+  # Render before persisting: a failed render must not leave the mode file
   # or the OS appearance reporting a theme the generated files never got.
-  render "$target_inner" "$target_outer"
-  case "$scope" in
-  inner) set_layer_mode inner "$mode" ;;
-  outer) set_layer_mode outer "$mode" ;;
-  both)
-    set_layer_mode inner "$mode"
-    set_layer_mode outer "$mode"
-    ;;
-  esac
-  # Ghostty's native light/dark theme pair is the inner terminal surface.
-  # Outer-only changes must never flip the OS appearance.
-  [ "$scope" = outer ] || set_os_appearance "$mode"
+  render "$mode"
+  set_mode "$mode"
+  set_os_appearance "$mode"
 }
 
 case "${1:-status}" in
-dark | light)
-  apply_scope both "$1"
-  ;;
-toggle)
-  apply_scope both toggle
-  ;;
-inner | outer | both)
-  apply_scope "$1" "${2:?usage: theme inner|outer|both dark|light|toggle}"
+dark | light | toggle)
+  apply_mode "$1"
   ;;
 apply)
-  # `theme apply` catches generated consumers up with the persisted layer
-  # modes without touching OS appearance. The one-argument form preserves
-  # the old "apply both layers" behavior for appearance watchers.
+  # `theme apply` catches generated consumers up with the persisted mode
+  # without touching OS appearance. The one-argument form is for
+  # appearance watchers: render + persist, no osascript loop-back.
+  # Both force-render past the cache: apply is the repair hammer.
   case "${2:-}" in
-  '') render ;;
+  '') render '' force ;;
   dark | light)
-    render "$2" "$2"
-    set_layer_mode inner "$2"
-    set_layer_mode outer "$2"
+    render "$2" force
+    set_mode "$2"
     ;;
   *)
     echo "usage: theme apply [dark|light]" >&2
@@ -536,64 +656,141 @@ apply)
   esac
   ;;
 mascot)
-  sub="${2:?usage: theme mascot <provider:id>|none|default <provider:id>|project <provider:id>|none|sync [project]}"
+  sub="${2:?usage: theme mascot default <provider:id>|project <provider:id>|none|clear-projects|providers|none|sync [project]}"
   case "$sub" in
   none)
     rm -f "$STATE/accents.conf"
     ;;
   sync)
     # Make the global accent follow a project: apply its mapped mascot
-    # (or the default), skipping the extraction when it is already active.
-    # Session switchers (to/ts, rail jump) call this in the background.
+    # (or the default), skipping everything when it is already active.
+    # Session switchers (to/ts, rail element/attention) call this in the background;
+    # a warm flip is pure file copies — no extractor, no renderer.
     project="${3:-}"
     [ -n "$project" ] || project="$(current_project)"
     value=""
     [ -f "$MASCOT_CONF" ] && value="$(conf_get "$MASCOT_CONF" "$project")"
-    [ -n "$value" ] || value="$(conf_get "$DEFAULT_CONF" default)"
+    if [ -z "$value" ] && [ -f "$DEFAULT_CONF" ]; then
+      value="$(conf_get "$DEFAULT_CONF" default)"
+    fi
     [ -n "$value" ] || exit 0
     current=""
     [ -f "$STATE/accents.conf" ] && current="$(conf_get "$STATE/accents.conf" mascot)"
     [ "$value" = "$current" ] && exit 0
-    set_mascot "$value"
+    # Superseded guard: a later jump overwrites this file, and a slow cold
+    # sync re-checks it after rendering — the last jump wins, however long
+    # its predecessors take.
+    printf '%s\n' "$value" >"$STATE/.mascot-requested.tmp.$$"
+    mv "$STATE/.mascot-requested.tmp.$$" "$STATE/.mascot-requested"
+    mode="$(current_mode)"
+    ensure_cache_ids
+    mkey="$(mascot_key "$value")"
+    entry="$CACHE/render-$rstamp/$mode-$mkey"
+    acc_file="$CACHE/accents-$astamp/$mkey.conf"
+    if [ ! -f "$entry/.complete" ] || [ ! -f "$acc_file" ]; then
+      # A missing accents entry means extraction is about to run: any
+      # pre-existing render entry was built against other accents (the
+      # live-state fallback in render), so rebuild it, .complete or not.
+      rebuild=""
+      [ -f "$acc_file" ] || rebuild=force
+      acc_file="$(accents_for "$value")" || exit 1
+      if [ -n "$rebuild" ] || [ ! -f "$entry/.complete" ]; then
+        build_entry "$entry" "$mode" "$acc_file" "$rebuild"
+        prune_cache
+      fi
+    fi
+    # A later jump superseded this sync while it rendered: leave the
+    # cache warm for the next visit, flip nothing. Checked before the
+    # publish so the flip and the accents install stand or fall together.
+    [ "$(cat "$STATE/.mascot-requested" 2>/dev/null)" = "$value" ] || exit 0
+    if ! publish_from "$entry"; then
+      # The entry vanished between the .complete check and the publish (a
+      # concurrent prune): treat it as a cache miss — rebuild, publish for
+      # real, and never install accents for a flip that did not land.
+      build_entry "$entry" "$mode" "$acc_file" force
+      publish_from "$entry" || {
+        echo "error: cache entry $entry vanished before publish" >&2
+        exit 1
+      }
+    fi
+    install_accents "$acc_file"
+    warm_opposite "$mode" "$mkey" "$acc_file"
+    exit 0
     ;;
   default)
     value="${3:?usage: theme mascot default <provider:id>}"
-    # Extraction validates the identity; only a working value may persist
-    # (this file is repo-tracked).
-    set_mascot "$value"
+    # Extraction validates the identity and warms the cache WITHOUT
+    # touching the live accent: what is on screen always follows the
+    # CURRENT session's effective mascot (mapping first), so changing the
+    # fallback while sitting in a mapped project changes nothing visibly.
+    ensure_cache_ids
+    accents_for "$value" >/dev/null || exit 1
+    # One write serves every consumer: the rail reads this same state
+    # file to resolve unmapped sessions.
     conf_put "$DEFAULT_CONF" default "$value"
+    exec "$0" mascot sync
     ;;
   project)
     project="$(current_project)"
     value="${3:?usage: theme mascot project <provider:id>|none}"
     if [ "$value" = none ]; then
-      # Unmap this project and fall back to the global default, if one is set.
       conf_del "$MASCOT_CONF" "$project"
       echo "unmapped: $project"
-      fallback="$(conf_get "$DEFAULT_CONF" default)"
-      [ -n "$fallback" ] && set_mascot "$fallback"
     else
       # Extraction validates the identity; a failed value must not persist —
       # background syncs would retry it forever.
-      set_mascot "$value"
+      ensure_cache_ids
+      accents_for "$value" >/dev/null || exit 1
       conf_put "$MASCOT_CONF" "$project" "$value"
       echo "mapped: $project -> $value"
     fi
+    exec "$0" mascot sync
+    ;;
+  providers)
+    # The picker calls this before its first frame; the raw
+    # `mascot-accents --providers` is a uv/python start (seconds on a
+    # cold uv cache) per keypress. Providers are registered inside the
+    # extractor script, so the astamp key makes a newly added provider a
+    # guaranteed cache miss — the list can never go stale.
+    ensure_cache_ids
+    providers_cache="$CACHE/providers-$astamp.txt"
+    if [ ! -f "$providers_cache" ]; then
+      mkdir -p "$CACHE"
+      if ! mascot-accents --providers >"$providers_cache.tmp.$$" 2>/dev/null; then
+        rm -f "$providers_cache.tmp.$$"
+        exit 1
+      fi
+      mv "$providers_cache.tmp.$$" "$providers_cache"
+      # Old generations die with their extractor version.
+      for stale in "$CACHE"/providers-*.txt; do
+        [ -f "$stale" ] || continue
+        [ "$stale" = "$providers_cache" ] || rm -f "$stale"
+      done
+    fi
+    cat "$providers_cache"
+    exit 0
+    ;;
+  clear-projects)
+    # Everyone back onto the global default, no exceptions: the explicit
+    # escape hatch for "I want all projects uniform right now".
+    : >"$MASCOT_CONF"
+    echo "cleared: all project mascots"
+    exec "$0" mascot sync
     ;;
   *)
-    set_mascot "$sub"
+    echo "usage: theme mascot default|project|clear-projects|providers|none|sync" >&2
+    exit 1
     ;;
   esac
   render
   show_accents
   ;;
 status)
-  echo "inner: $(layer_mode inner)"
-  echo "outer: $(layer_mode outer)"
+  echo "mode: $(current_mode)"
   show_accents
   ;;
 *)
-  echo "usage: theme dark|light|toggle|inner|outer|both|apply|status|mascot <provider:id>|none" >&2
+  echo "usage: theme dark|light|toggle|apply [dark|light]|status|mascot <provider:id>|none" >&2
   exit 1
   ;;
 esac

@@ -9,6 +9,7 @@
 
 import {
   closeSync,
+  constants,
   openSync,
   readFileSync,
   statSync,
@@ -17,14 +18,98 @@ import {
 
 // Write raw bytes straight to a pane's tty, tolerating its death between
 // the poll and the write. The daemon paints frames through this too.
+//
+// Non-blocking on purpose: a pty whose reader stalled would otherwise
+// block THIS process and stall every rail behind the one wedged pane.
+// O_NOCTTY because opening a tty must never adopt it as our controlling
+// terminal. A pty only accepts ~1KB per write, so a healthy frame always
+// needs several writes with tmux draining between them — EAGAIN inside
+// the deadline is normal backpressure and retries after a 1ms pause.
+// Only a pty that stays clogged past the deadline fails the write; the
+// caller then leaves its diff cache unset and the next refresh rewrites
+// the whole frame (rows are cursor-addressed, so a rewrite over torn
+// output is idempotent).
+
+// Sized to a conservative ~0.5KB/ms drain floor plus slack: a frame
+// (~15KB) caps near 55ms, a sprite transmit (~100KB) near 220ms — while
+// a truly wedged pty used to stall the daemon indefinitely.
+const writeDeadlineMs = (byteLength: number): number => 25 + byteLength / 512;
+const WRITE_PAUSE_MS = 1;
+// Atomics.wait is the one synchronous sub-10ms pause Node offers; the
+// cell always holds the expected 0, so the wait just times out.
+const pauseCell = new Int32Array(new SharedArrayBuffer(4));
+
 export function writeTty(tty: string, payload: string): boolean {
+  let fd: number;
   try {
-    const fd = openSync(tty, "w");
-    writeSync(fd, payload);
-    closeSync(fd);
-    return true;
+    fd = openSync(
+      tty,
+      constants.O_WRONLY | constants.O_NONBLOCK | constants.O_NOCTTY,
+    );
   } catch {
     return false;
+  }
+  try {
+    const bytes = Buffer.from(payload, "utf8");
+    const deadline = Date.now() + writeDeadlineMs(bytes.length);
+    let offset = 0;
+    while (offset < bytes.length) {
+      try {
+        offset += writeSync(fd, bytes, offset);
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== "EAGAIN" ||
+          Date.now() >= deadline
+        ) {
+          return false;
+        }
+        Atomics.wait(pauseCell, 0, 0, WRITE_PAUSE_MS);
+      }
+    }
+    return true;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+// The async twin, for painting many panes at once: identical semantics,
+// but the EAGAIN pause is an awaited timer instead of a thread-blocking
+// Atomics.wait — so eighty panes' drain pauses overlap instead of
+// summing. The syscalls themselves are sub-millisecond; the pauses are
+// what serialized the old full repaint.
+export async function writeTtyAsync(
+  tty: string,
+  payload: string,
+): Promise<boolean> {
+  let fd: number;
+  try {
+    fd = openSync(
+      tty,
+      constants.O_WRONLY | constants.O_NONBLOCK | constants.O_NOCTTY,
+    );
+  } catch {
+    return false;
+  }
+  try {
+    const bytes = Buffer.from(payload, "utf8");
+    const deadline = Date.now() + writeDeadlineMs(bytes.length);
+    let offset = 0;
+    while (offset < bytes.length) {
+      try {
+        offset += writeSync(fd, bytes, offset);
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== "EAGAIN" ||
+          Date.now() >= deadline
+        ) {
+          return false;
+        }
+        await new Promise((resolve) => setTimeout(resolve, WRITE_PAUSE_MS));
+      }
+    }
+    return true;
+  } finally {
+    closeSync(fd);
   }
 }
 

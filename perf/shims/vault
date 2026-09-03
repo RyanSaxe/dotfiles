@@ -1,0 +1,42 @@
+#!/bin/sh
+# Fake vault: deterministic `tasks --json` with one overdue task so the
+# Tasks tab renders a stable marker ("fixture") and the overdue tab
+# attention path runs. Every call is counted for exec-rate metrics.
+set -eu
+if [ -n "${PERF_COUNT_DIR:-}" ]; then
+  printf '%s\n' "$*" >>"$PERF_COUNT_DIR/vault.count"
+fi
+case "${1:-} ${2:-}" in
+"tasks --json")
+  cat <<'JSON'
+[
+  {
+    "id": "perf.md:1",
+    "text": "overdue fixture",
+    "done": false,
+    "due": "2026-01-01",
+    "state": "overdue",
+    "project": null,
+    "section": null,
+    "file": "perf.md",
+    "line": 1
+  },
+  {
+    "id": "perf.md:2",
+    "text": "today fixture",
+    "done": false,
+    "due": "2026-09-02",
+    "state": "today",
+    "project": null,
+    "section": null,
+    "file": "perf.md",
+    "line": 2
+  }
+]
+JSON
+  ;;
+*)
+  echo "perf vault shim: unsupported args: $*" >&2
+  exit 1
+  ;;
+esac

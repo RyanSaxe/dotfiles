@@ -53,7 +53,7 @@ DETAIL_ADVICE = (
     "existing prose instead of replacing it, and never paste one generic "
     "paragraph across files"
 )
-PYFILES_LIB = Path(__file__).resolve().parent / "lib" / "pyfiles.py"
+PYFILES_LIB = Path("~/.config/byor/scripts/lib/pyfiles.py").expanduser()
 # Sentence heuristic: an ender counts only before whitespace plus a
 # non-lowercase character or at the end of the text, so "Python 3.10" and
 # "e.g. tuples" do not count; stripping abbreviations first also keeps

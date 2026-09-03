@@ -5,10 +5,12 @@
   "description": "In-terminal sidebar: tmux windows + agent status, themed by the dotfiles theme system",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "build": "esbuild src/daemon.ts src/review-dashboard.ts src/tab-element.ts src/jump-attention.ts src/attention/cli.ts --bundle --platform=node --format=esm --target=node20 --outdir=dist --out-extension:.js=.mjs --log-level=warning && touch dist/.stamp",
     "test": "XDG_STATE_HOME=\"$(mktemp -d)\" TUIS_COLORS_PATH=tests/fixtures/tuis-colors.json node --import tsx --test tests/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "esbuild": "~0.28.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }

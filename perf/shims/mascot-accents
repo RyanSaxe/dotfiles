@@ -1,0 +1,32 @@
+#!/bin/sh
+# Fake extractor: deterministic accents per identity, no uv, no Pillow, no
+# network. The invocation count IS the metric — Phase 4's warm-flip target
+# is zero calls here. The sprite path deliberately does not exist, so the
+# rail renders accent-only (the pty client is non-kitty anyway).
+set -eu
+identity="${1:?usage: mascot-accents <provider:id>}"
+if [ -n "${PERF_COUNT_DIR:-}" ]; then
+  printf '%s\n' "$identity" >>"$PERF_COUNT_DIR/mascot-accents.count"
+fi
+case "$identity" in
+perf:alpha)
+  accent_dark="#f38ba8" accent_light="#d20f39"
+  notify_dark="#fab387" notify_light="#fe640b"
+  ;;
+perf:beta)
+  accent_dark="#a6e3a1" accent_light="#40a02b"
+  notify_dark="#f9e2af" notify_light="#df8e1d"
+  ;;
+*)
+  accent_dark="#89b4fa" accent_light="#1e66f5"
+  notify_dark="#f5c2e7" notify_light="#ea76cb"
+  ;;
+esac
+cat <<CONF
+mascot=$identity
+sprite=$HOME/.cache/perf-sprites/$identity.png
+accent_dark=$accent_dark
+accent_light=$accent_light
+notify_dark=$notify_dark
+notify_light=$notify_light
+CONF

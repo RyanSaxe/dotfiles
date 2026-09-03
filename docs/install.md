@@ -177,16 +177,15 @@ untracked `.env` at the repo root, which zsh and the rail launcher both load.
 `install.sh` creates it with a commented placeholder per required value and
 prints a loud reminder for every one still empty.
 
-Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic the rail and
-GitHub attention observer use for phone notifications.
+Today that list is `AGENT_NOTIFICATION_ID`, the ntfy.sh topic used for agent
+phone notifications.
 
 The `.env` also carries optional per-machine overrides, and `install.sh`
 sources it so they apply from the first run. Keep values that depend on the
 machine or local environment there; do not commit them to the repository.
 
-`AGENT_NOTIFICATION_ID` is optional; leave it unset and phone notifications
-simply never send. `rail status` and `attention status` report the channel
-state.
+`AGENT_NOTIFICATION_ID` is optional; leave it unset and agent phone
+notifications simply never send. `rail status` reports the channel state.
 
 The Pokémon mascot provider fetches data and images over HTTPS with Python's
 standard library. `theme/bin/mascot-accents.py` declares Python 3.12 for that
@@ -197,8 +196,10 @@ On macOS, installing the `core` tier also installs a user-level launchd job.
 It runs `~/.local/bin/attention refresh` at login and every five minutes. The
 worker is independent of tmux and Neovim, writes durable state under
 `~/.local/state/dotfiles/attention/`, and catches up after sleep or restart.
-It cannot poll while the Mac is fully powered off. Refreshes back off until
-the GitHub rate-limit reset when the remaining budget is under pressure.
+It uses a durable activity checkpoint with bounded paginated requests and a
+periodic full reconciliation. It cannot poll while the Mac is fully powered
+off. Refreshes back off until the GitHub rate-limit reset when the remaining
+budget is under pressure.
 
 The observer uses the existing `gh` authentication. Before relying on it, run
 `gh auth status` and re-authenticate with `gh auth refresh -h github.com` if
@@ -225,18 +226,20 @@ ATTENTION_WATCH="someorg/infra someorg/docs"
 Repository names are the one part of this configuration that can be
 sensitive, and `.env` is the one file that never reaches git. It is already
 sourced by the observer's launcher, so nothing else needs configuring.
-Watching a repository covers its pull requests and its issues alike.
+Watching a repository covers its pull requests and its issues alike. Adding
+one starts the watch at that moment. A watched repository might already have
+hundreds of open pull requests or issues; those existing targets are not
+backfilled. New targets and new comments on existing targets are reported
+from the watch start onward. Removing and later re-adding a repository starts
+a new watch.
 
-Adding one is quiet. A watched repository might already have hundreds of open
-pull requests; the first poll that sees it records the moment, and only work
-opened after that is ever reported. The timestamp is kept even if you remove
-the entry later, so re-adding a repository stays quiet too.
-
-Drafts are excluded, and a draft marked ready later counts as opened at that
-moment. Everything else behaves as it does elsewhere: your own work never
-notifies you, and bots stay suppressed unless allow-listed.
+Draft pull requests are excluded from watch-opened activity. Everything else
+behaves as it does elsewhere: your own work never notifies you, and bots stay
+suppressed unless allow-listed.
 
 Inspect it with `attention status`, `attention list`, and
-`attention ack <item-id>`. `attention status` reports notification-transport
-failures separately from GitHub failures: a phone notification that cannot be
-delivered never stops the observer from polling.
+`attention ack <item-id>`. Each target has one row, even when it has several
+reasons to need attention. The first successful sync establishes a clean
+baseline, so old activity is not imported; later refreshes catch up while the
+computer was asleep. Acknowledging a row clears its current activity revision,
+and a later external comment or CI failure creates a new revision.

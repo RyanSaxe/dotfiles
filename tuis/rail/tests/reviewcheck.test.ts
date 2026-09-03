@@ -7,35 +7,48 @@ import { test } from "node:test";
 import { rankDashboardItems, renderDashboard } from "../src/dashboard.js";
 import type { DashboardData, DashboardItem } from "../src/dashboard.js";
 import { reviewItem } from "../src/review-dashboard.js";
-import type { AttentionItem } from "../src/attention/types.js";
+import type { AttentionItem, AttentionReason } from "../src/attention/types.js";
 import type { Palette } from "../src/theme.js";
 
 const VIEWER = "ryansaxe";
 
-const attention = (over: Partial<AttentionItem> = {}): AttentionItem => ({
-  id: "review:fixture",
-  kind: "review_comment",
-  targetKind: "pull_request",
-  repository: "example/repo",
-  number: 7,
-  title: "Improve the review seam",
-  context: {
-    body: "## Summary\n\nKeep the dashboard context useful and concise.",
-    author: { login: VIEWER, kind: "user" },
-    ciState: "SUCCESS",
-    failingChecks: [],
-    additions: 603,
-    deletions: 5,
-    changedFiles: 14,
-    labels: [],
-  },
-  url: "https://github.com/example/repo/pull/7",
-  summary: "Please take another look",
-  actor: { login: "reviewer", kind: "user" },
-  createdAt: "2026-08-19T16:00:00Z",
-  priority: "normal",
-  ...over,
-});
+type AttentionOverrides = Partial<
+  Omit<AttentionItem, "activityKey" | "reasons">
+> & { reason?: Partial<AttentionReason> };
+
+const attention = (over: AttentionOverrides = {}): AttentionItem => {
+  const { reason: reasonOverride, ...itemOverride } = over;
+  const reason: AttentionReason = {
+    id: "comment:fixture",
+    kind: "comment",
+    summary: "Please take another look",
+    actor: { login: "reviewer", kind: "user" },
+    createdAt: "2026-08-19T16:00:00Z",
+    priority: "normal",
+    ...reasonOverride,
+  };
+  return {
+    id: "pull_request:example/repo#7",
+    targetKind: "pull_request",
+    repository: "example/repo",
+    number: 7,
+    title: "Improve the review seam",
+    context: {
+      body: "## Summary\n\nKeep the dashboard context useful and concise.",
+      author: { login: VIEWER, kind: "user" },
+      ciState: "SUCCESS",
+      failingChecks: [],
+      additions: 603,
+      deletions: 5,
+      changedFiles: 14,
+      labels: [],
+    },
+    url: "https://github.com/example/repo/pull/7",
+    reasons: [reason],
+    activityKey: reason.id,
+    ...itemOverride,
+  };
+};
 
 const palette: Palette = {
   mode: "dark",
@@ -102,27 +115,65 @@ test("From is empty where GitHub sends no actor; Author always names someone", (
   assert.equal(commented.author, "@ryansaxe");
   assert.equal(commented.authorIsViewer, true);
 
-  const ci = reviewItem(attention({ kind: "ci", actor: null }), VIEWER);
+  const ci = reviewItem(
+    attention({ reason: { kind: "ci", actor: null } }),
+    VIEWER,
+  );
   assert.equal(ci.from, "—");
   assert.equal(ci.author, "@ryansaxe");
 });
 
 test("tone follows the object, not the severity", () => {
-  assert.equal(reviewItem(attention({ kind: "ci" }), VIEWER).tone, "ci");
   assert.equal(
-    reviewItem(attention({ kind: "conversation" }), VIEWER).tone,
-    "pull_request",
+    reviewItem(attention({ reason: { kind: "ci" } }), VIEWER).tone,
+    "ci",
   );
+  assert.equal(reviewItem(attention(), VIEWER).tone, "pull_request");
 });
 
 test("the reason phrase never repeats the actor", () => {
-  const item = reviewItem(attention({ kind: "conversation" }), VIEWER);
+  const item = reviewItem(attention(), VIEWER);
   assert.equal(item.reason, "Commented on your PR");
   assert.ok(!item.reason.includes("reviewer"));
 });
 
+test("formal review states are visible in the row and preview", () => {
+  const item = reviewItem(
+    attention({
+      reason: {
+        kind: "review",
+        reviewState: "APPROVED",
+        summary: "Approved review: LGTM",
+      },
+    }),
+    VIEWER,
+  );
+  assert.equal(item.from, "@reviewer");
+  assert.equal(item.reason, "Approved your PR");
+  assert.match(item.preview.headline, /@reviewer approved repo#7/);
+  assert.match(item.preview.body.join(" "), /LGTM/);
+});
+
+test("changes requested keeps its actionable wording", () => {
+  const item = reviewItem(
+    attention({
+      reason: {
+        kind: "review",
+        reviewState: "CHANGES_REQUESTED",
+        summary: "Changes requested",
+      },
+    }),
+    VIEWER,
+  );
+  assert.equal(item.reason, "Changes requested on your PR");
+  assert.match(item.preview.headline, /requested changes on repo#7/);
+});
+
 test("markdown is stripped from preview bodies", () => {
-  const item = reviewItem(attention({ kind: "ci", actor: null }), VIEWER);
+  const item = reviewItem(
+    attention({ reason: { kind: "ci", actor: null } }),
+    VIEWER,
+  );
   assert.ok(!item.preview.body.join(" ").includes("#"));
   assert.match(item.preview.body.join(" "), /Keep the dashboard context/);
 });
@@ -153,7 +204,7 @@ test("every rendered line fills the frame, bar the last by one column", () => {
 
 test("a long body cannot push the footer off the frame", () => {
   const long = attention({
-    summary: "wall of text. ".repeat(400),
+    reason: { summary: "wall of text. ".repeat(400) },
   });
   const rendered = frame([reviewItem(long, VIEWER)]);
   assert.equal(rendered.split("\n").length, 24);
@@ -162,17 +213,22 @@ test("a long body cannot push the footer off the frame", () => {
 });
 
 test("scrolling past the end clamps instead of blanking the panel", () => {
-  const long = attention({ summary: "paragraph. ".repeat(400) });
+  const long = attention({ reason: { summary: "paragraph. ".repeat(400) } });
   const rendered = frame([reviewItem(long, VIEWER)], {}, 0, "", false, 9999);
   assert.match(rendered, /above/);
   assert.match(rendered, /q Quit/);
 });
 
 test("the preview scroll hint appears only when there is more to see", () => {
-  const short = frame([reviewItem(attention({ summary: "brief" }), VIEWER)]);
+  const short = frame([
+    reviewItem(attention({ reason: { summary: "brief" } }), VIEWER),
+  ]);
   assert.ok(!short.includes("^u/^d"));
   const long = frame([
-    reviewItem(attention({ summary: "long. ".repeat(400) }), VIEWER),
+    reviewItem(
+      attention({ reason: { summary: "long. ".repeat(400) } }),
+      VIEWER,
+    ),
   ]);
   assert.match(long, /\^u\/\^d Preview/);
 });

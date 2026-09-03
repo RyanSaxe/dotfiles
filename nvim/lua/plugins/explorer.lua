@@ -2,14 +2,13 @@
 -- rail on the window's left. mini.files is the edit layer: batch
 -- filesystem mutations as buffer edits.
 --
--- All snacks windows share one surface, and it is the INNER one. The
--- explorer is the exception: it runs to the terminal's right edge and must
--- continue the rail. It cannot be singled out where the colors are chosen,
--- because snacks builds it out of floats inside a non-float box and paints
--- the list through the one group every picker shares — which defeats the
--- anchored/floating test in theme.surfaces. So theme.surfaces names the
--- explorer's own windows and hands them a highlight namespace in which
--- those shared groups mean the outer surface.
+-- Snacks windows default to the content surface. The explorer is the
+-- exception: its root, boxes, list, and input run to the terminal's right
+-- edge and continue the rail, so they take the chrome surface. Its
+-- preview is content and stays content. Snacks paints these windows
+-- through shared source groups, so theme.surfaces scopes an active
+-- namespace to those explorer windows and maps the source groups to the
+-- existing chrome roles.
 return {
   {
     "folke/snacks.nvim",
@@ -19,8 +18,8 @@ return {
           explorer = {
             layout = { layout = { position = "right" } },
             -- The picker builds its windows a tick after the call that opens
-            -- it, so an autocmd pass only reaches them after the first redraw
-            -- — long enough to see the explorer painted on the wrong surface.
+            -- it, so an autocmd pass only reaches them after the first redraw,
+            -- long enough to see the explorer painted on the wrong surface.
             -- `on_show` runs in the tick that creates them, before any paint.
             on_show = function()
               require("theme.surfaces").refresh()
@@ -51,7 +50,12 @@ return {
               wins[#wins + 1] = win
               local config = vim.api.nvim_win_get_config(win)
               -- +2: the width excludes the border column on either side.
-              right = math.max(right, config.col + config.width + 2)
+              local col = assert(tonumber(config.col))
+              local width = assert(tonumber(config.width))
+              local edge = col + width + 2
+              if edge > right then
+                right = edge
+              end
             end
           end
           -- Already flush against the right edge — which is also what a

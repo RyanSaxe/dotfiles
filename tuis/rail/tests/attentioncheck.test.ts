@@ -1,41 +1,77 @@
-import assert from "node:assert/strict";
+// Exercises the account-wide attention contract without contacting GitHub.
 
+import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { applyCiTransition } from "../src/attention/ci.js";
+import { attentionItem, classifyTarget } from "../src/attention/classify.js";
 import {
   defaultAttentionConfig,
   validateAttentionConfig,
 } from "../src/attention/config.js";
-import { applyCiTransition } from "../src/attention/ci.js";
-import { classifyTarget } from "../src/attention/classify.js";
 import { parseGithubResponse } from "../src/attention/github.js";
 import {
   acknowledgeItem,
   emptyObserverState,
-  markNotified,
+  loadObserverState,
   reconcileAttention,
   retryAfterForRateLimit,
+  unacknowledgedItems,
 } from "../src/attention/state.js";
 import type {
   GitHubActor,
   GitHubComment,
+  GitHubReview,
   PullRequestTarget,
 } from "../src/attention/types.js";
 
-const human = (login: string): GitHubActor => ({ login, kind: "user" });
+const ME = "ryansaxe";
+const BASELINE = "2026-08-19T16:00:00.000Z";
+
+const oldStateDirectory = await mkdtemp(join(tmpdir(), "rail-attention-"));
+const oldStatePath = join(oldStateDirectory, "state.json");
+await writeFile(
+  oldStatePath,
+  JSON.stringify({ version: 1, items: { "old-comment": {} } }),
+);
+const cleanState = await loadObserverState(oldStatePath);
+assert.equal(cleanState.version, 2);
+assert.deepEqual(cleanState.items, {});
+assert.equal(cleanState.baselineAt, null);
+await rm(oldStateDirectory, { recursive: true, force: true });
+
+const user = (login: string): GitHubActor => ({ login, kind: "user" });
 const bot = (login: string): GitHubActor => ({ login, kind: "bot" });
 
 const comment = (
   id: string,
   author: GitHubActor,
-  body: string,
   createdAt: string,
   viewerHasReacted = false,
 ): GitHubComment => ({
   id,
   author,
-  body,
+  body: `comment ${id}`,
   createdAt,
   url: `https://github.com/example/repo/pull/7#${id}`,
   viewerHasReacted,
+});
+
+const review = (
+  id: string,
+  author: GitHubActor,
+  state: GitHubReview["state"],
+  submittedAt: string,
+  body = "",
+): GitHubReview => ({
+  id,
+  author,
+  body,
+  state,
+  submittedAt,
+  url: `https://github.com/example/repo/pull/7#${id}`,
 });
 
 const pr = (overrides: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
@@ -44,95 +80,121 @@ const pr = (overrides: Partial<PullRequestTarget> = {}): PullRequestTarget => ({
   title: "Improve observer",
   body: "Review the observer changes.",
   url: "https://github.com/example/repo/pull/7",
-  updatedAt: "2026-08-19T16:00:00Z",
+  createdAt: "2026-08-19T10:00:00.000Z",
+  updatedAt: "2026-08-19T17:00:00.000Z",
   headSha: "head-1",
-  author: human("ryansaxe"),
+  author: user(ME),
   kind: "pull_request",
   isDraft: false,
   additions: 0,
   deletions: 0,
   changedFiles: 0,
-  createdAt: "2026-08-19T10:00:00Z",
   ciState: "SUCCESS",
   failingChecks: [],
   searchSources: ["involved"],
-  reviewRequested: false,
-  reviewRequestFingerprint: "",
   comments: [],
   reviewThreads: [],
+  reviews: [],
   ...overrides,
 });
 
 const config = defaultAttentionConfig();
 
-const humanThread = pr({
-  author: human("someone-else"),
-  reviewThreads: [
-    {
-      id: "thread-1",
-      isResolved: false,
-      comments: [
-        comment(
-          "c1",
-          human("ryansaxe"),
-          "I will check this.",
-          "2026-08-19T15:00:00Z",
-        ),
-        comment(
-          "c2",
-          human("reviewer"),
-          "Please fix this.",
-          "2026-08-19T16:01:00Z",
-        ),
-      ],
-    },
-  ],
+const externalComment = comment(
+  "external",
+  user("alice"),
+  "2026-08-19T16:01:00.000Z",
+);
+const commented = pr({
+  author: user(ME),
+  comments: [externalComment],
 });
-assert.equal(classifyTarget(humanThread, "ryansaxe", config).length, 1);
-assert.equal(
-  classifyTarget(humanThread, "ryansaxe", config)[0]?.kind,
-  "review_comment",
+const firstItem = classifyTarget(commented, ME, config, {
+  baselineAt: BASELINE,
+});
+assert.equal(firstItem?.id, "pull_request:example/repo#7");
+assert.deepEqual(
+  firstItem?.reasons.map((reason) => reason.kind),
+  ["comment"],
 );
 
-const botThread = pr({
-  reviewThreads: [
-    {
-      id: "thread-bot",
-      isResolved: false,
-      comments: [
-        comment(
-          "bot-1",
-          bot("codecov"),
-          "Coverage is 81%.",
-          "2026-08-19T16:01:00Z",
-        ),
-      ],
-    },
-  ],
-});
-assert.equal(classifyTarget(botThread, "ryansaxe", config).length, 0);
+const acknowledged = acknowledgeItem(
+  reconcileAttention(emptyObserverState(), [firstItem!], {}),
+  firstItem!.id,
+);
+assert.deepEqual(unacknowledgedItems(acknowledged), []);
 
-const allowConfig = validateAttentionConfig(
-  { actors: { allow: ["claude-reviewer"], ignore: [] }, own_pr_ci: true },
+const laterComment = comment(
+  "later",
+  user("alice"),
+  "2026-08-19T17:01:00.000Z",
+);
+const laterItem = classifyTarget(
+  { ...commented, comments: [externalComment, laterComment] },
+  ME,
+  config,
+  { baselineAt: BASELINE },
+);
+assert.equal(laterItem?.id, firstItem?.id);
+assert.notEqual(laterItem?.activityKey, firstItem?.activityKey);
+assert.equal(
+  unacknowledgedItems(reconcileAttention(acknowledged, [laterItem!], {}))
+    .length,
+  1,
+);
+
+const replied = classifyTarget(
+  {
+    ...commented,
+    comments: [
+      externalComment,
+      comment("reply", user(ME), "2026-08-19T16:02:00.000Z"),
+    ],
+  },
+  ME,
+  config,
+  { baselineAt: BASELINE },
+);
+assert.equal(replied, null);
+
+const reacted = classifyTarget(
+  {
+    ...commented,
+    comments: [{ ...externalComment, viewerHasReacted: true }],
+  },
+  ME,
+  config,
+  { baselineAt: BASELINE },
+);
+assert.equal(reacted, null);
+
+const botComment = classifyTarget(
+  {
+    ...commented,
+    comments: [comment("bot", bot("ci-bot"), externalComment.createdAt)],
+  },
+  ME,
+  config,
+  { baselineAt: BASELINE },
+);
+assert.equal(botComment, null);
+
+const allowedBotConfig = validateAttentionConfig(
+  { actors: { allow: ["ci-bot"], ignore: [] }, own_pr_ci: true },
   "fixture",
 );
-const allowedBot = pr({
-  reviewThreads: [
+assert.equal(
+  classifyTarget(
     {
-      id: "thread-allowed",
-      isResolved: false,
-      comments: [
-        comment(
-          "bot-2",
-          bot("claude-reviewer"),
-          "Consider this change.",
-          "2026-08-19T16:02:00Z",
-        ),
-      ],
+      ...commented,
+      comments: [comment("bot", bot("ci-bot"), externalComment.createdAt)],
     },
-  ],
-});
-assert.equal(classifyTarget(allowedBot, "ryansaxe", allowConfig).length, 1);
+    ME,
+    allowedBotConfig,
+    { baselineAt: BASELINE },
+  )?.reasons[0]?.actor?.login,
+  "ci-bot",
+);
 assert.throws(
   () =>
     validateAttentionConfig(
@@ -142,60 +204,58 @@ assert.throws(
   /cannot be both allowed and ignored/,
 );
 
-const mentioned = pr({
-  author: human("someone-else"),
-  comments: [
-    comment(
-      "mention",
-      human("reviewer"),
-      "@ryansaxe please take a look",
-      "2026-08-19T16:03:00Z",
-    ),
-  ],
-});
-assert.equal(classifyTarget(mentioned, "ryansaxe", config).length, 1);
-
-const reacted = pr({
-  reviewThreads: [
-    {
-      id: "thread-reacted",
-      isResolved: false,
-      comments: [
-        comment(
-          "reacted",
-          human("reviewer"),
-          "Acknowledged?",
-          "2026-08-19T16:04:00Z",
-          true,
-        ),
-      ],
-    },
-  ],
-});
-assert.equal(classifyTarget(reacted, "ryansaxe", config).length, 0);
-
-const ciPr = pr({ ciState: "FAILURE", headSha: "head-1" });
-const firstCi = applyCiTransition(ciPr, undefined, "ryansaxe", config);
-assert.ok(firstCi.item);
+const ciPr = pr({ ciState: "FAILURE", failingChecks: ["lint"] });
+const firstCi = applyCiTransition(ciPr, undefined, ME, config, BASELINE);
+assert.equal(firstCi.reason?.kind, "ci");
 assert.equal(firstCi.memory.redEpoch, 1);
-const repeatedCi = applyCiTransition(ciPr, firstCi.memory, "ryansaxe", config);
-assert.equal(repeatedCi.item?.id, firstCi.item?.id);
+const combined = attentionItem(ciPr, [firstItem!.reasons[0]!, firstCi.reason!]);
+assert.equal(combined.id, "pull_request:example/repo#7");
+assert.equal(combined.reasons.length, 2);
+const acknowledgedCombined = acknowledgeItem(
+  reconcileAttention(emptyObserverState(), [combined], {}),
+  combined.id,
+);
+const ciOnly = attentionItem(ciPr, [firstCi.reason!]);
+assert.deepEqual(
+  unacknowledgedItems(reconcileAttention(acknowledgedCombined, [ciOnly], {})),
+  [],
+);
+const repeatedCi = applyCiTransition(
+  ciPr,
+  firstCi.memory,
+  ME,
+  config,
+  BASELINE,
+);
+assert.equal(repeatedCi.reason?.id, firstCi.reason?.id);
 assert.equal(repeatedCi.newlyRed, false);
 const recoveredCi = applyCiTransition(
   { ...ciPr, ciState: "SUCCESS" },
   repeatedCi.memory,
-  "ryansaxe",
+  ME,
   config,
+  BASELINE,
 );
-assert.equal(recoveredCi.item, null);
+assert.equal(recoveredCi.reason, null);
 const redAgain = applyCiTransition(
   ciPr,
   recoveredCi.memory,
-  "ryansaxe",
+  ME,
   config,
+  BASELINE,
 );
-assert.ok(redAgain.item);
 assert.equal(redAgain.memory.redEpoch, 2);
+assert.equal(redAgain.reason?.kind, "ci");
+
+const historicalCi = applyCiTransition(
+  { ...ciPr, updatedAt: "2026-08-19T15:59:00.000Z" },
+  undefined,
+  ME,
+  config,
+  BASELINE,
+);
+assert.equal(historicalCi.reason, null);
+assert.equal(historicalCi.memory.alerted, false);
 
 const rateReset = "2026-08-19T17:00:00.000Z";
 assert.equal(
@@ -216,11 +276,11 @@ assert.equal(
 const parsed = parseGithubResponse(
   JSON.stringify({
     data: {
-      viewer: { login: "ryansaxe" },
+      viewer: { login: ME },
       rateLimit: {
         cost: 42,
         remaining: 4990,
-        resetAt: "2026-08-19T17:00:00Z",
+        resetAt: rateReset,
       },
       prsInvolved: {
         nodes: [
@@ -229,84 +289,23 @@ const parsed = parseGithubResponse(
             title: "Improve observer",
             body: "Review the observer changes.",
             url: "https://github.com/example/repo/pull/7",
-            updatedAt: "2026-08-19T16:00:00Z",
+            updatedAt: "2026-08-19T17:00:00.000Z",
             headRefOid: "head-1",
-            author: { login: "ryansaxe", __typename: "User" },
+            author: { login: ME, __typename: "User" },
             repository: { nameWithOwner: "example/repo" },
             reviewThreads: { nodes: [] },
             comments: { nodes: [] },
             statusCheckRollup: { state: "SUCCESS" },
           },
         ],
-      },
-      prsRequested: {
-        nodes: [
-          {
-            number: 7,
-            title: "Improve observer",
-            body: "Review the observer changes.",
-            url: "https://github.com/example/repo/pull/7",
-            updatedAt: "2026-08-19T16:00:00Z",
-            headRefOid: "head-1",
-            author: { login: "ryansaxe", __typename: "User" },
-            repository: { nameWithOwner: "example/repo" },
-            reviewThreads: { nodes: [] },
-            comments: { nodes: [] },
-            statusCheckRollup: { state: "SUCCESS" },
-          },
-        ],
+        pageInfo: { hasNextPage: false, endCursor: null },
       },
     },
   }),
   21,
 );
 assert.equal(parsed.targets.length, 1);
-assert.deepEqual(parsed.targets[0]?.searchSources.sort(), [
-  "involved",
-  "requested",
-]);
-const first = parsed.targets[0];
-assert.equal(first?.kind, "pull_request");
-assert.equal(
-  first?.kind === "pull_request" ? first.reviewRequested : null,
-  true,
-);
-assert.equal(parsed.targets[0]?.body, "Review the observer changes.");
-
-const reviewItem = classifyTarget(mentioned, "ryansaxe", config)[0];
-assert.ok(reviewItem);
-const reconciled = reconcileAttention(emptyObserverState(), [reviewItem], {});
-assert.equal(reconciled.pendingNotifications.length, 1);
-const acknowledged = markNotified(
-  { ...reconciled.state, lastSuccessfulSyncAt: "2026-08-19T16:05:00Z" },
-  [reviewItem.id],
-);
-const repeated = reconcileAttention(acknowledged, [reviewItem], {});
-assert.equal(repeated.pendingNotifications.length, 0);
-
-const checked = acknowledgeItem(reconciled.state, reviewItem.id);
-const checkedAgain = reconcileAttention(checked, [reviewItem], {});
-assert.equal(checkedAgain.pendingNotifications.length, 0);
-
-const newEvent = classifyTarget(
-  {
-    ...mentioned,
-    comments: [
-      ...mentioned.comments,
-      comment(
-        "mention-new",
-        human("reviewer"),
-        "@ryansaxe one more thing",
-        "2026-08-19T16:06:00Z",
-      ),
-    ],
-  },
-  "ryansaxe",
-  config,
-)[0];
-assert.ok(newEvent);
-assert.notEqual(newEvent.id, reviewItem.id);
-const resurfaced = reconcileAttention(checkedAgain.state, [newEvent], {});
-assert.equal(resurfaced.pendingNotifications.length, 1);
+assert.deepEqual(parsed.targets[0]?.searchSources, ["involved"]);
+assert.ok(!JSON.stringify(parsed).includes("reviewRequested"));
 
 console.log("attention checks passed");

@@ -11,9 +11,10 @@ import {
   loadObserverState,
   saveObserverState,
 } from "./attention/state.js";
-import type { AttentionItem } from "./attention/types.js";
+import type { AttentionItem, AttentionReason } from "./attention/types.js";
 import {
   EMPTY_CELL,
+  renderDashboard,
   runDashboard,
   type DashboardData,
   type DashboardItem,
@@ -23,6 +24,7 @@ import {
   type MetaSpan,
 } from "./dashboard.js";
 import { fmtElapsed } from "./cells.js";
+import { loadPalette } from "./theme.js";
 import {
   completeTask,
   loadTaskSnapshot,
@@ -130,29 +132,87 @@ export function batMarkdown(width: number): MarkdownRenderer {
   };
 }
 
-// What this row needs from you, stated as one phrase. The actor is NOT in
-// here — it has its own column, and saying it twice is what made the old
-// table repeat itself.
+function reasonsOf(
+  item: AttentionItem,
+  kind: AttentionReason["kind"],
+): AttentionReason[] {
+  return item.reasons.filter((reason) => reason.kind === kind);
+}
+
+function primaryReason(item: AttentionItem): AttentionReason {
+  const reason = item.reasons[0];
+  if (reason === undefined)
+    throw new Error(`attention item ${item.id} has no reason`);
+  return reason;
+}
+
+function reviewPhrase(
+  reason: AttentionReason,
+  object: string,
+  ownsTarget: boolean,
+): string {
+  const suffix = ownsTarget ? `your ${object}` : `this ${object}`;
+  switch (reason.reviewState) {
+    case "APPROVED":
+      return `Approved ${suffix}`;
+    case "CHANGES_REQUESTED":
+      return `Changes requested on ${suffix}`;
+    case "COMMENTED":
+      return `Submitted a review on ${suffix}`;
+    default:
+      return `Reviewed ${suffix}`;
+  }
+}
+
+function reviewHeadline(
+  reason: AttentionReason,
+  target: string,
+  actor: string | undefined,
+): string {
+  const who = actor === undefined ? "Someone" : `@${actor}`;
+  switch (reason.reviewState) {
+    case "APPROVED":
+      return `${who} approved ${target}`;
+    case "CHANGES_REQUESTED":
+      return `${who} requested changes on ${target}`;
+    case "COMMENTED":
+      return `${who} submitted a review on ${target}`;
+    default:
+      return `${who} reviewed ${target}`;
+  }
+}
+
+// What this row needs from you, stated as one phrase. All reasons belong to
+// the same target, so a CI failure and a new comment are joined in one row.
 function reasonFor(item: AttentionItem, viewerOwnsTarget: boolean): string {
   const object = item.targetKind === "issue" ? "issue" : "PR";
-  switch (item.kind) {
-    case "ci": {
-      const checks = item.context?.failingChecks ?? [];
-      return checks.length > 0
-        ? `CI failed — ${checks.join(", ")}`
-        : "CI failed";
-    }
-    case "review_request":
-      return "Review requested";
-    case "review_comment":
-      return "Commented on a review thread";
-    case "opened":
-      return item.targetKind === "issue" ? "New issue opened" : "New PR opened";
-    case "conversation":
-      return viewerOwnsTarget
-        ? `Commented on your ${object}`
-        : `Commented on this ${object}`;
+  const reasons: string[] = [];
+  const ci = reasonsOf(item, "ci");
+  const comments = reasonsOf(item, "comment");
+  const reviews = reasonsOf(item, "review");
+  const opened = reasonsOf(item, "opened");
+  if (ci.length > 0) {
+    const checks = item.context?.failingChecks ?? [];
+    reasons.push(
+      checks.length > 0 ? `CI failed — ${checks.join(", ")}` : "CI failed",
+    );
   }
+  if (reviews.length > 0) {
+    reasons.push(reviewPhrase(reviews[0]!, object, viewerOwnsTarget));
+  }
+  if (comments.length > 0) {
+    reasons.push(
+      viewerOwnsTarget
+        ? `Commented on your ${object}`
+        : `Commented on this ${object}`,
+    );
+  }
+  if (opened.length > 0) {
+    reasons.push(
+      item.targetKind === "issue" ? "New issue opened" : "New PR opened",
+    );
+  }
+  return reasons.join(" + ");
 }
 
 // Hue follows the object, never the severity — except CI, which is the one
@@ -182,7 +242,7 @@ function metadataFor(item: AttentionItem): MetaSpan[] {
 }
 
 function toneFor(item: AttentionItem): DashboardTone {
-  if (item.kind === "ci") return "ci";
+  if (reasonsOf(item, "ci").length > 0) return "ci";
   return item.targetKind === "issue" ? "issue" : "pull_request";
 }
 
@@ -203,26 +263,77 @@ function previewFor(
   // something happened; you still need to know what the PR or issue is.
   const description = context?.body ? render(context.body) : [];
 
-  if (item.kind === "ci") {
+  const ci = reasonsOf(item, "ci");
+  const comments = reasonsOf(item, "comment");
+  const reviews = reasonsOf(item, "review");
+  const opened = reasonsOf(item, "opened");
+  const latestComment = comments[0];
+  const comment =
+    latestComment === undefined ? [] : render(latestComment.summary);
+  const latestReview = reviews[0];
+  const review = latestReview === undefined ? [] : render(latestReview.summary);
+  const bullets = ci.length > 0 ? (context?.failingChecks ?? []) : [];
+  if (ci.length > 0 && reviews.length > 0) {
+    const reviewText =
+      latestReview === undefined
+        ? `new review on ${target}`
+        : reviewHeadline(latestReview, target, latestReview.actor?.login);
+    return {
+      headline: `CI failed and ${reviewText}`,
+      bullets,
+      body:
+        review.length > 0
+          ? [...review, ...(description.length > 0 ? ["", ...description] : [])]
+          : description,
+      context: trailer,
+    };
+  }
+  if (ci.length > 0 && comments.length > 0) {
+    return {
+      headline: `CI failed and new comment on ${target}`,
+      bullets,
+      body: description.length > 0 ? [...comment, "", ...description] : comment,
+      context: trailer,
+    };
+  }
+  if (ci.length > 0) {
     return {
       headline: `CI failed on ${target}`,
-      bullets: context?.failingChecks ?? [],
+      bullets,
       body: description,
       context: trailer,
     };
   }
 
-  if (item.kind === "review_request") {
+  if (reviews.length > 0 && latestReview !== undefined) {
     return {
-      headline: `Review requested on ${target}`,
+      headline: reviewHeadline(latestReview, target, latestReview.actor?.login),
+      bullets: [],
+      body:
+        review.length > 0
+          ? [
+              ...review,
+              ...(comments.length > 0 ? ["", ...comment] : []),
+              ...(description.length > 0 ? ["", ...description] : []),
+            ]
+          : description,
+      context: trailer,
+    };
+  }
+
+  if (opened.length > 0 && comments.length === 0) {
+    return {
+      headline:
+        item.targetKind === "issue"
+          ? `New issue opened in ${target}`
+          : `New PR opened in ${target}`,
       bullets: [],
       body: description,
       context: trailer,
     };
   }
 
-  const actor = item.actor?.login;
-  const comment = render(item.summary);
+  const actor = latestComment?.actor?.login;
   return {
     headline: `${actor ? `@${actor}` : "Someone"} commented on ${target}`,
     bullets: [],
@@ -240,18 +351,27 @@ export function reviewItem(
   const target = `${shortRepository(item.repository)}#${item.number}`;
   const author = item.context?.author?.login ?? null;
   const viewerOwnsTarget = sameLogin(author, viewer);
+  const comment = reasonsOf(item, "comment")[0];
+  const review = reasonsOf(item, "review")[0];
+  const reason = primaryReason(item);
+  const actor =
+    reason.actor ??
+    comment?.actor ??
+    review?.actor ??
+    reasonsOf(item, "opened")[0]?.actor ??
+    null;
   return {
     id: item.id,
     repository: item.repository,
     reference: `#${item.number}`,
-    // GitHub sends no actor for CI or a review request; Author carries
-    // those, so the cell stays honestly empty rather than inventing one.
-    from: item.actor === null ? EMPTY_CELL : `@${item.actor.login}`,
+    // GitHub sends no actor for CI; Author carries the target owner, while a
+    // comment or opening reason names the actor who caused this row.
+    from: actor === null ? EMPTY_CELL : `@${actor.login}`,
     author: author === null ? EMPTY_CELL : `@${author}`,
     authorIsViewer: viewerOwnsTarget,
     reason: reasonFor(item, viewerOwnsTarget),
     metadata: metadataFor(item),
-    time: age(item.createdAt),
+    time: age(reason.createdAt),
     title: clean(item.title),
     url: item.url,
     tone: toneFor(item),
@@ -262,9 +382,8 @@ export function reviewItem(
 export function reviewDashboardData(): DashboardData {
   const snapshot = loadReviewSnapshot();
   // Acknowledged items leave the table outright. A permanently dimmed row
-  // is a to-do you cannot finish; the locked semantics say an acknowledged
-  // item stays suppressed until a genuinely new external event, and a new
-  // event arrives with a new id, so it comes back on its own.
+  // is a to-do you cannot finish; an acknowledged item stays suppressed until
+  // a genuinely new external event changes the target's activity revision.
   // Rendered once here, not per frame: the panel redraws on every keypress
   // and shelling out to bat that often would make navigation crawl.
   const render = batMarkdown((process.stdout.columns ?? 100) - 6);
@@ -618,19 +737,16 @@ async function openReviewWorkspace(item: DashboardItem): Promise<boolean> {
   }
   await openPullRequestWorkspace(item.repository, number);
   // The item moves rather than vanishes: it is a workspace now, listed under
-  // Worktrees. A genuinely new external event arrives with a new id and
-  // brings it back to the inbox on its own.
+  // Worktrees. A genuinely new external event changes the activity revision
+  // and brings the target back to the inbox on its own.
   await acknowledgeReview(item);
   return true;
 }
 
 async function refreshReviews(): Promise<DashboardData> {
-  // The observer owns the network lifecycle. The dashboard only requests an
-  // explicit no-notify refresh and then re-reads the durable local snapshot.
-  await run(join(homedir(), ".local", "bin", "attention"), [
-    "refresh",
-    "--no-notify",
-  ]);
+  // The observer owns the network lifecycle. The dashboard requests a refresh
+  // and then re-reads the durable local snapshot.
+  await run(join(homedir(), ".local", "bin", "attention"), ["refresh"]);
   return reviewDashboardData();
 }
 
@@ -638,7 +754,43 @@ export async function main(
   surface: DashboardSurface = "reviews",
 ): Promise<void> {
   const isReviews = surface === "reviews";
-  const initial = isReviews ? reviewDashboardData() : await taskDashboardData();
+  let initial: DashboardData;
+  if (isReviews) {
+    initial = reviewDashboardData();
+  } else {
+    // The vault read behind the tasks surface takes long enough to leave
+    // the popup blank. Paint the dashboard chrome with a loading status
+    // first — runDashboard's own opening render replaces it the moment the
+    // data lands (the duplicated alt-screen/hide-cursor writes are
+    // idempotent escapes).
+    if (process.stdout.isTTY) {
+      const loading: DashboardData = {
+        surface,
+        items: [],
+        status: "loading…",
+        emptyMessage: "Loading tasks…",
+        error: null,
+      };
+      process.stdout.write(
+        `\u001b[?1049h\u001b[?25l${renderDashboard(
+          loading,
+          0,
+          loadPalette(),
+          process.stdout.columns ?? 100,
+          process.stdout.rows ?? 30,
+        )}`,
+      );
+    }
+    try {
+      initial = await taskDashboardData();
+    } catch (error) {
+      // Leave the terminal usable: the error is about to print to a screen
+      // this frame would otherwise still own.
+      if (process.stdout.isTTY)
+        process.stdout.write("\u001b[?1049l\u001b[?25h");
+      throw error;
+    }
+  }
   await runDashboard(initial, {
     refresh: isReviews ? refreshReviews : taskDashboardData,
     open: isReviews ? openReviewWorkspace : openTaskSource,
@@ -685,7 +837,15 @@ export async function main(
 }
 
 const thisFile = fileURLToPath(import.meta.url);
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === thisFile) {
+// The build bundles this module INTO dist/tab-element.mjs, where
+// import.meta.url is the running bundle's own URL and would equal argv[1] —
+// firing this guard from a different program. The basename test pins it to
+// review-dashboard's own bundle (dist/review-dashboard.mjs) or source file.
+if (
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === thisFile &&
+  basename(thisFile).startsWith("review-dashboard.")
+) {
   const surface = process.argv[2] ?? "reviews";
   if (surface !== "reviews" && surface !== "tasks") {
     console.error("usage: review-dashboard reviews|tasks");

@@ -47,8 +47,8 @@ export function assignHints(
 let lastWritten = "";
 
 // Line format: viewing session \t key \t target session \t pane id,
-// where key is a digit or the literal `a` (global most-urgent). `rail
-// jump` resolves the caller's session to a key.
+// where key is a digit or the literal `a` (global most-urgent). The
+// `rail element` command resolves the caller's session to a key.
 export function writeHints(
   agents: Agent[],
   bySession: Map<string, Map<string, string>>,
