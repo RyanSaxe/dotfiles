@@ -597,6 +597,13 @@ install_tier_packages() {
         rm -rf "$byor_target"
       fi
     done
+    # ~/sgconfig.yml joins the link map with the same authority rule: the
+    # repo copy is the source, and a machine that followed the old
+    # hosting-byor cp instructions has a plain-file copy the deploy would
+    # otherwise refuse over.
+    if [ -e "$HOME/sgconfig.yml" ] && [ ! -L "$HOME/sgconfig.yml" ]; then
+      rm -f "$HOME/sgconfig.yml"
+    fi
     ;;
   *)
     echo "error: unknown tier for $OS: $1" >&2
