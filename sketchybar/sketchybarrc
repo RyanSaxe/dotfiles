@@ -177,8 +177,9 @@ sketchybar --add item space.review left \
 # -----------------------------------------------------------------------------
 
 # Clock (rightmost) - time with clock icon
-# Highlights in the notify color at meeting reminder times (00, 29, 30, 59
-# minutes) - see plugins/clock.sh
+# Highlights in peach at meeting reminder times (00, 29, 30, 59 minutes):
+# the fixed palette peach, deliberately not the mascot's notify color -
+# see plugins/clock.sh
 sketchybar --add item clock right \
   --set clock \
   update_freq=15 \

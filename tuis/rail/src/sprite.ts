@@ -115,7 +115,7 @@ export async function writeTtyAsync(
 
 // Footer block the sprite is scaled over. Terminal cells are roughly 1:2
 // (9.6pt x 20.8pt at font-size 16), so 18x8 cells is ~173x166pt — near
-// square, and 18 centers exactly in the 22-column rail (2 cols each side).
+// square, and 18 sits centered in the 28-cell slab (5 cols each side).
 export const SPRITE_COLS = 18;
 export const SPRITE_ROWS = 8;
 

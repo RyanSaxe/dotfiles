@@ -58,7 +58,7 @@ never flicker.
 - Overflow paginates by whole items (`alt+,` / `alt+.`); the page hint
   renders in the footer row above the sprite, so the
   list's spacing never changes.
-- A two-cell crust gutter ends every row: text and the square tab divider stop ~19pt
+- A one-cell crust gutter ends every row: text and the square tab divider stop ~19pt
   (the frame's spacing unit) before the content surface, mirroring the
   frame crust left of the session name.
 - The footer is the mascot's home: the project's mascot sprite rendered
