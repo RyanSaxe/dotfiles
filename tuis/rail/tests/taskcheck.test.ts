@@ -437,7 +437,7 @@ test("a task becomes a row in its own vocabulary", () => {
   assert.equal(item.time, "08-18");
   assert.equal(item.url, null);
   assert.equal(item.preview.headline, "Overdue since 2026-08-18");
-  assert.deepEqual(item.preview.body, ["  - [ ] something else"]);
+  assert.deepEqual(item.preview.body(), ["  - [ ] something else"]);
   assert.ok(item.preview.context.includes("section feat/vault-rail"));
   assert.ok(item.preview.context.includes("file projects/dotfiles/TODO.md:7"));
 });

@@ -132,6 +132,25 @@ export function batMarkdown(width: number): MarkdownRenderer {
   };
 }
 
+// A preview block renders when its row is first selected, and never again:
+// bat is a process per block, and rendering every row up front paid for
+// previews nobody looked at.
+function once<T>(compute: () => T): () => T {
+  let computed: { value: T } | null = null;
+  return () => {
+    if (computed === null) computed = { value: compute() };
+    return computed.value;
+  };
+}
+
+// Blocks stacked with a blank line between them; an empty block leaves no
+// gap behind.
+function stacked(...blocks: ReadonlyArray<readonly string[]>): string[] {
+  return blocks
+    .filter((block) => block.length > 0)
+    .flatMap((block, index) => (index === 0 ? [...block] : ["", ...block]));
+}
+
 function reasonsOf(
   item: AttentionItem,
   kind: AttentionReason["kind"],
@@ -261,17 +280,20 @@ function previewFor(
 
   // The description always follows the trigger. You opened this because
   // something happened; you still need to know what the PR or issue is.
-  const description = context?.body ? render(context.body) : [];
+  const description = once(() => (context?.body ? render(context.body) : []));
 
   const ci = reasonsOf(item, "ci");
   const comments = reasonsOf(item, "comment");
   const reviews = reasonsOf(item, "review");
   const opened = reasonsOf(item, "opened");
   const latestComment = comments[0];
-  const comment =
-    latestComment === undefined ? [] : render(latestComment.summary);
+  const comment = once(() =>
+    latestComment === undefined ? [] : render(latestComment.summary),
+  );
   const latestReview = reviews[0];
-  const review = latestReview === undefined ? [] : render(latestReview.summary);
+  const review = once(() =>
+    latestReview === undefined ? [] : render(latestReview.summary),
+  );
   const bullets = ci.length > 0 ? (context?.failingChecks ?? []) : [];
   if (ci.length > 0 && reviews.length > 0) {
     const reviewText =
@@ -281,10 +303,7 @@ function previewFor(
     return {
       headline: `CI failed and ${reviewText}`,
       bullets,
-      body:
-        review.length > 0
-          ? [...review, ...(description.length > 0 ? ["", ...description] : [])]
-          : description,
+      body: () => stacked(review(), description()),
       context: trailer,
     };
   }
@@ -292,7 +311,7 @@ function previewFor(
     return {
       headline: `CI failed and new comment on ${target}`,
       bullets,
-      body: description.length > 0 ? [...comment, "", ...description] : comment,
+      body: () => stacked(comment(), description()),
       context: trailer,
     };
   }
@@ -309,14 +328,7 @@ function previewFor(
     return {
       headline: reviewHeadline(latestReview, target, latestReview.actor?.login),
       bullets: [],
-      body:
-        review.length > 0
-          ? [
-              ...review,
-              ...(comments.length > 0 ? ["", ...comment] : []),
-              ...(description.length > 0 ? ["", ...description] : []),
-            ]
-          : description,
+      body: () => stacked(review(), comment(), description()),
       context: trailer,
     };
   }
@@ -338,7 +350,7 @@ function previewFor(
     headline: `${actor ? `@${actor}` : "Someone"} commented on ${target}`,
     bullets: [],
     // The comment first, then the description it was made against.
-    body: description.length > 0 ? [...comment, "", ...description] : comment,
+    body: () => stacked(comment(), description()),
     context: trailer,
   };
 }
@@ -384,8 +396,9 @@ export function reviewDashboardData(): DashboardData {
   // Acknowledged items leave the table outright. A permanently dimmed row
   // is a to-do you cannot finish; an acknowledged item stays suppressed until
   // a genuinely new external event changes the target's activity revision.
-  // Rendered once here, not per frame: the panel redraws on every keypress
-  // and shelling out to bat that often would make navigation crawl.
+  // One renderer for the table; each row renders its own blocks on first
+  // selection (previewFor), so an inbox of forty costs one bat run per
+  // block you actually look at.
   const render = batMarkdown((process.stdout.columns ?? 100) - 6);
   const items = snapshot.unacknowledged.map((item) =>
     reviewItem(item, snapshot.username, render),
@@ -475,7 +488,7 @@ function worktreeItem(
       bullets: [],
       // The diff, not a description of the workspace. This worktree exists to
       // be read; the row already said everything else.
-      body: [...diff],
+      body: () => diff,
       context: worktree.dirty ? ["uncommitted changes in this worktree"] : [],
     },
   };
@@ -595,7 +608,7 @@ export function taskItem(
     preview: {
       headline: taskHeadline(task),
       bullets: [],
-      body: source,
+      body: () => source,
       // The headline already said when; this says where. The panel reflows
       // its context, so these are sentences rather than aligned columns.
       context: [

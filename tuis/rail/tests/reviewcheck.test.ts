@@ -151,7 +151,7 @@ test("formal review states are visible in the row and preview", () => {
   assert.equal(item.from, "@reviewer");
   assert.equal(item.reason, "Approved your PR");
   assert.match(item.preview.headline, /@reviewer approved repo#7/);
-  assert.match(item.preview.body.join(" "), /LGTM/);
+  assert.match(item.preview.body().join(" "), /LGTM/);
 });
 
 test("changes requested keeps its actionable wording", () => {
@@ -174,8 +174,26 @@ test("markdown is stripped from preview bodies", () => {
     attention({ reason: { kind: "ci", actor: null } }),
     VIEWER,
   );
-  assert.ok(!item.preview.body.join(" ").includes("#"));
-  assert.match(item.preview.body.join(" "), /Keep the dashboard context/);
+  assert.ok(!item.preview.body().join(" ").includes("#"));
+  assert.match(item.preview.body().join(" "), /Keep the dashboard context/);
+});
+
+test("a preview body renders once, on demand", () => {
+  // The fixture has a comment and a description: two blocks. Neither
+  // renders at construction, both render on the first ask, and a second
+  // ask renders nothing.
+  let renders = 0;
+  const counting = (markdown: string): string[] => {
+    renders += 1;
+    return [markdown];
+  };
+  const item = reviewItem(attention(), VIEWER, counting);
+  assert.equal(renders, 0);
+
+  const first = item.preview.body();
+  assert.equal(renders, 2);
+  assert.deepEqual(item.preview.body(), first);
+  assert.equal(renders, 2);
 });
 
 test("rows group under their repository", () => {
@@ -412,7 +430,7 @@ test("the Worktrees view relabels its columns and its keys", () => {
     preview: {
       headline: "project#3 · test-pr-1",
       bullets: [],
-      body: [],
+      body: () => [],
       context: ["clean — safe to clean up"],
     },
   };

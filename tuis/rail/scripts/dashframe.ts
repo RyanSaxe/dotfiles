@@ -60,7 +60,7 @@ const DEMO: DashboardData = {
       {
         headline: "CI failed on buffergolf.nvim#4",
         bullets: ["lint", "typecheck"],
-        body: [],
+        body: () => [],
         context: ["Test PR 2: Add return value documentation"],
       },
       [
@@ -83,7 +83,9 @@ const DEMO: DashboardData = {
       {
         headline: "New PR opened in buffergolf.nvim#6",
         bullets: [],
-        body: ["Clarifies when the plugin disables itself during a session."],
+        body: () => [
+          "Clarifies when the plugin disables itself during a session.",
+        ],
         context: ["Clarify plugin disabling timing", "opened by @alice"],
       },
       [
@@ -106,7 +108,7 @@ const DEMO: DashboardData = {
       {
         headline: "@alice commented on dotfiles#94",
         bullets: [],
-        body: [
+        body: () => [
           "The resolver should probably clone into ~/repositories rather than reusing ~/generic — otherwise `to` picks up review checkouts as if they were projects.",
         ],
         context: ["feat(rail): add review workspaces"],
@@ -131,7 +133,7 @@ const DEMO: DashboardData = {
       {
         headline: "@bob commented on dotfiles#312",
         bullets: [],
-        body: [
+        body: () => [
           "Still flickers on mocha to latte, but only on the second switch.",
         ],
         context: ["Rail flickers on theme switch"],
@@ -150,7 +152,9 @@ const DEMO: DashboardData = {
       {
         headline: "@dana opened someorg/infra#77",
         bullets: [],
-        body: ["Rotates the staging credentials and drops the unused role."],
+        body: () => [
+          "Rotates the staging credentials and drops the unused role.",
+        ],
         context: ["Rotate staging credentials", "opened by @dana"],
       },
       [
@@ -173,7 +177,7 @@ const DEMO: DashboardData = {
       {
         headline: "@erin opened someorg/infra#481",
         bullets: [],
-        body: ["Deploys intermittently fail to pick up the new secret."],
+        body: () => ["Deploys intermittently fail to pick up the new secret."],
         context: ["Deploy misses rotated secret", "opened by @erin"],
       },
       [{ text: "enhancement", tone: "muted" }],

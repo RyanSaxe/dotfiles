@@ -37,11 +37,13 @@ export type DashboardTone =
 // The selected item's panel, in the shape the design settled on: a headline
 // naming the trigger, the specifics beneath it, then dim context. `bullets`
 // carries failing check names and nothing else — passing checks are noise on
-// a row you are only looking at because something broke.
+// a row you are only looking at because something broke. `body` is asked
+// for rather than carried: a review body is markdown through bat, and only
+// the selected row's is ever on screen.
 export interface DashboardPreview {
   headline: string;
   bullets: readonly string[];
-  body: readonly string[];
+  body: () => readonly string[];
   context: readonly string[];
 }
 
@@ -789,9 +791,10 @@ function previewLines(
     }
   }
 
-  if (selected.preview.body.length > 0) {
+  const body = selected.preview.body();
+  if (body.length > 0) {
     lines.push([]);
-    for (const rendered of selected.preview.body) {
+    for (const rendered of body) {
       // bat wraps its own output, so a coloured line passes through as-is —
       // re-wrapping would split an escape sequence. The plain fallback has
       // no escapes and does need wrapping.
