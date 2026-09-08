@@ -159,7 +159,7 @@ sketchybar --add item space.agent left \
   background.color="$WORKSPACE_INACTIVE_BG" \
   background.corner_radius=6 \
   background.height=22 \
-  click_script="aerospace workspace code; open -a Ghostty; $HOME/.local/bin/rail jump-attention" \
+  click_script="$HOME/.config/aerospace/focus-terminal.sh && $HOME/.local/bin/rail jump-attention" \
   script="$PLUGIN_DIR/agent.sh" \
   --subscribe space.agent agent_attention_change mascot_colors_changed
 
@@ -177,7 +177,7 @@ sketchybar --add item space.review left \
   background.color="$WORKSPACE_INACTIVE_BG" \
   background.corner_radius=6 \
   background.height=22 \
-  click_script="aerospace workspace code; open -a Ghostty; $HOME/.local/bin/rail dashboard-popup" \
+  click_script="$HOME/.config/aerospace/focus-terminal.sh && $HOME/.local/bin/rail dashboard-popup" \
   script="$PLUGIN_DIR/review.sh" \
   --subscribe space.review review_attention_change mascot_colors_changed
 
