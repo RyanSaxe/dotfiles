@@ -625,8 +625,8 @@ export async function taskDashboardData(): Promise<DashboardData> {
     surface: "tasks",
     items,
     status: snapshot.error ?? counted,
-    // The one place a failed read is visible: no rows, and the CLI's own
-    // sentence where the empty message would be.
+    // A failed read shows as no rows with the CLI's own sentence where the
+    // empty message would be; the header's notice slot carries it too.
     emptyMessage: snapshot.error ?? "Nothing is open in the vault",
     error: snapshot.error,
   };
@@ -828,11 +828,19 @@ export async function main(
       return result.ok ? null : result.reason;
     },
     // Completing a task is the same gesture as acknowledging a review: the
-    // row leaves the table, and the refresh that follows re-reads the ids
-    // this write has just invalidated.
+    // row leaves the table, and the local reread that follows picks up the
+    // ids this write has just invalidated. Neither touches the network — an
+    // acknowledgement is a suppression flag in local state, and a completed
+    // task is a line the vault CLI rewrote.
     acknowledge: isReviews
-      ? acknowledgeReview
-      : async (item) => completeTask(item.id),
+      ? async (item) => {
+          await acknowledgeReview(item);
+          return reviewDashboardData();
+        }
+      : async (item) => {
+          await completeTask(item.id);
+          return taskDashboardData();
+        },
   });
 }
 

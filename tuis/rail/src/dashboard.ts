@@ -100,7 +100,10 @@ export interface DashboardHandlers {
   // to land in it.
   open(item: DashboardItem): Promise<boolean>;
   browser(item: DashboardItem): Promise<void>;
-  acknowledge(item: DashboardItem): Promise<void>;
+  // Removes the row and resolves with the table without it. An
+  // acknowledgement is a local write, so the reread behind it is local too:
+  // `r` is the only key that fetches.
+  acknowledge(item: DashboardItem): Promise<DashboardData>;
   // Pre-coloured diff lines, or a single explanatory line for anything that
   // has no diff. Never null — an empty result would look like a hang.
   diff(item: DashboardItem): Promise<string[]>;
@@ -1055,6 +1058,7 @@ export function renderDashboard(
   previewOffset = 0,
   view: DashboardView = "reviews",
   sort: DashboardSort = "project",
+  notice: string | null = null,
 ): string {
   const width = Math.max(64, columns);
   const height = Math.max(16, rows);
@@ -1062,9 +1066,12 @@ export function renderDashboard(
   const items = ranked.map((entry) => entry.item);
   const selected = items[selectedIndex];
   const muted = mutedColor(palette);
-  // Only search says anything: a count of what is on screen is not news.
-  const status =
+  // The header's right-hand slot: an action in progress, else a failure
+  // nothing else reports, else the search count. A count of what is on
+  // screen is not news, so with nothing to say the slot stays blank.
+  const matches =
     query.trim() === "" ? "" : `${items.length}/${data.items.length} matches`;
+  const status = notice ?? data.error ?? matches;
 
   const lines: string[] = [
     // Subtabs, matching the Agents precedent. The active one takes the
@@ -1285,6 +1292,8 @@ export async function runDashboard(
   let data = initial;
   let selectedIndex = 0;
   let busy = false;
+  // What the header's right-hand slot says while an action runs.
+  let notice: string | null = null;
   let settled = false;
   let query = "";
   let searching = false;
@@ -1375,6 +1384,7 @@ export async function runDashboard(
         previewOffset,
         view,
         sort,
+        notice,
       ),
     );
   };
@@ -1395,6 +1405,24 @@ export async function runDashboard(
       resolve();
     };
 
+    // A sync is the one action long enough to need a pulse: `busy` drops
+    // every key until it returns, and a frame that does not change reads as
+    // a hang. The label gains a dot each quarter second.
+    const pulse = (label: string): (() => void) => {
+      let ticks = 0;
+      const draw = (): void => {
+        notice = `${label}${".".repeat(ticks % 4)}`;
+        ticks += 1;
+        render();
+      };
+      draw();
+      const timer = setInterval(draw, 250);
+      return () => {
+        clearInterval(timer);
+        notice = null;
+      };
+    };
+
     const runAction = async (
       action: Extract<
         DashboardKey,
@@ -1409,7 +1437,11 @@ export async function runDashboard(
     ): Promise<void> => {
       const item = visibleItems()[selectedIndex];
       if (action !== "refresh" && item === undefined) return;
+      // A workspace row is not an attention item: acknowledging one would
+      // swap the Worktrees table for the inbox.
+      if (action === "acknowledge" && view === "worktrees") return;
       busy = true;
+      const stopPulse = action === "refresh" ? pulse("refreshing") : null;
       try {
         if (action === "diff" && item !== undefined) {
           diffTitle = `${item.repository}${item.reference}  fetching diff…`;
@@ -1434,10 +1466,9 @@ export async function runDashboard(
         if (action === "browser" && item !== undefined)
           await handlers.browser(item);
         if (action === "acknowledge" && item !== undefined) {
-          await handlers.acknowledge(item);
+          data = await handlers.acknowledge(item);
           // The row leaves the table, so the selection would otherwise
           // land on whatever slid up into its place.
-          data = await handlers.refresh();
           selectedIndex = Math.max(
             0,
             Math.min(selectedIndex, visibleItems().length - 1),
@@ -1471,6 +1502,7 @@ export async function runDashboard(
       } catch (error) {
         data = errorData(data, error);
       } finally {
+        stopPulse?.();
         busy = false;
         if (action !== "diff") previewOffset = 0;
         render();
