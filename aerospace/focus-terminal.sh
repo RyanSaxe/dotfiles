@@ -13,7 +13,7 @@
 # and R letters in sketchybarrc, ahead of the rail command each of them runs.
 set -eu
 
-aerospace workspace code >/dev/null
+aerospace workspace code >/dev/null 2>&1
 window="$(aerospace list-windows --workspace code \
   --app-bundle-id com.mitchellh.ghostty --format '%{window-id}' 2>/dev/null |
   head -n 1)"
