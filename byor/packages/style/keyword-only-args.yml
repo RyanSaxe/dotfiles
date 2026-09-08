@@ -4,6 +4,19 @@ severity: warning
 message: Parameters after the first two must be keyword-only. Two positional
   parameters is a maximum, not a target; one or zero can be clearer.
 utils:
+  # *args and **kwargs, bare or annotated. An annotated splat is a
+  # typed_parameter wrapping the splat pattern, so both shapes are named here:
+  # a splat is never a positional slot, and everything after one is already
+  # keyword-only.
+  splat-param:
+    any:
+      - kind: list_splat_pattern
+      - kind: dictionary_splat_pattern
+      - kind: typed_parameter
+        has:
+          any:
+            - kind: list_splat_pattern
+            - kind: dictionary_splat_pattern
   positional-param:
     any:
       - kind: identifier
@@ -14,13 +27,15 @@ utils:
     all:
       - matches: positional-param
       - not:
+          matches: splat-param
+      - not:
           regex: ^(self|cls)$
       - not:
           follows:
             stopBy: end
             any:
               - kind: keyword_separator
-              - kind: list_splat_pattern
+              - matches: splat-param
 rule:
   kind: parameters
   has:
