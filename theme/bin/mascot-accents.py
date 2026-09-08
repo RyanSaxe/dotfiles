@@ -101,19 +101,6 @@ def mascot_cache(provider: str) -> Path:
     root = (
         Path(environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "dotfiles/mascots"
     )
-    # One-time migration from the pre-provider layout, where the pokemon
-    # cache WAS the whole cache.
-    legacy = root.parent / "pokemon"
-    migrated = root / "pokemon"
-    if legacy.is_dir() and not migrated.exists():
-        root.mkdir(parents=True, exist_ok=True)
-        try:
-            legacy.rename(migrated)
-        except OSError:
-            # Concurrent invocations (theme sync, the rail's extractor)
-            # race this rename; losing means the other process migrated.
-            if not migrated.exists():
-                raise
     path = root / provider
     path.mkdir(parents=True, exist_ok=True)
     return path

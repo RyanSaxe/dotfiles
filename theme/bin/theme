@@ -190,52 +190,6 @@ install_accents() {
   mv "$STATE/.accents.tmp.$$" "$STATE/accents.conf"
 }
 
-# Make $1 (a provider-qualified identity, e.g. pokemon:raikou) the live
-# accents. Display is not this command's job: the rail mascot watches state.
-# Older installations stored per-layer modes (inner-mode/outer-mode) or a
-# single theme-mode. Seed the mode file from inner-mode — the layer that
-# drove macOS appearance, so the truthful one — then delete the legacy
-# files; the mode file is the only mode state afterwards.
-migrate_mode_state() {
-  if [ ! -f "$MODE_FILE" ]; then
-    for legacy in "$STATE/inner-mode" "$STATE/theme-mode"; do
-      [ -f "$legacy" ] || continue
-      legacy_mode="$(cat "$legacy")"
-      case "$legacy_mode" in
-      dark | light)
-        set_mode "$legacy_mode"
-        break
-        ;;
-      esac
-    done
-  fi
-  rm -f "$STATE/inner-mode" "$STATE/outer-mode" "$STATE/theme-mode"
-}
-
-# One-time migration from the pre-provider layout: mapped values gain
-# their provider prefix (X -> pokemon:X, X:shiny -> shiny-pokemon:X) and
-# accents.conf regenerates in the provider-qualified format (identity +
-# sprite pointer). Every image involved is already cached, so this is
-# offline; on failure the legacy file stays and the next run retries.
-migrate_legacy_state() {
-  if [ -f "$STATE/pokemon.conf" ] && [ ! -f "$MASCOT_CONF" ]; then
-    sed -e 's/=\(.*\):shiny$/=shiny-pokemon:\1/' -e 't' -e 's/=/=pokemon:/' \
-      "$STATE/pokemon.conf" >"$MASCOT_CONF"
-    rm "$STATE/pokemon.conf"
-  fi
-  legacy=""
-  [ -f "$STATE/accents.conf" ] && legacy="$(conf_get "$STATE/accents.conf" pokemon)"
-  if [ -n "$legacy" ]; then
-    value="pokemon:$legacy"
-    [ "$(conf_get "$STATE/accents.conf" shiny)" = "1" ] && value="shiny-pokemon:$legacy"
-    if mascot-accents "$value" >"$STATE/.accents.tmp" 2>/dev/null; then
-      mv "$STATE/.accents.tmp" "$STATE/accents.conf"
-    else
-      rm -f "$STATE/.accents.tmp"
-    fi
-  fi
-}
-
 # Emit sed substitutions for one mapping pass — every token role, then every
 # raw palette key, under the given placeholder prefix. One awk join over
 # tokens.conf + palette (+ accent overrides); per-key lookups here once cost
@@ -613,8 +567,6 @@ show_accents() {
 }
 
 mkdir -p "$STATE"
-migrate_mode_state
-migrate_legacy_state
 
 apply_mode() {
   case "$1" in

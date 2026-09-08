@@ -188,9 +188,6 @@ install_stylua_linux() {
 
 install_attention_agent() {
   [ "$OS" = Darwin ] || return 0
-  # Scratch-home health checks and explicit package-only runs must never touch
-  # the real user's launchd domain.
-  [ -z "${DOTFILES_TARGET:-}" ] || return 0
 
   launch_agents="$HOME/Library/LaunchAgents"
   plist="$launch_agents/com.ryansaxe.dotfiles.attention.plist"
@@ -333,15 +330,6 @@ link_system_owned() {
   sudo ln -s "$source" "$target"
 }
 
-remove_system_link_matching() {
-  target="$1"
-  suffix="$2"
-  if sudo test -L "$target"; then
-    link="$(sudo readlink "$target")"
-    case "$link" in *"$suffix") sudo rm "$target" ;; esac
-  fi
-}
-
 install_ai_harness() {
   # Both the core and agents tiers want the harness, and the default run
   # installs both — same reason setup_agents guards itself just above.
@@ -366,7 +354,6 @@ install_ai_harness() {
 
   link_owned "$AI_HARNESS_SOURCE/AGENTS.md" "$HOME/.codex/AGENTS.md"
   link_owned "$AI_HARNESS_SOURCE/references" "$HOME/.codex/references"
-  remove_system_link_matching "/etc/codex/config.toml" "/ai-harness/codex/config.toml"
   link_system_owned "$AI_HARNESS_SOURCE/codex/managed_config.toml" "/etc/codex/managed_config.toml"
   link_system_owned "$AI_HARNESS_SOURCE/skills" "/etc/codex/skills"
 
@@ -445,9 +432,7 @@ export VAULT_DIR
 setup_vault() {
   vault_bin="$HOME/.local/bin/vault"
   # The CLI deploys with the core tier; with no CLI there is nothing to ask.
-  # Scratch-home checks must never create a vault in the real home either.
   [ -x "$vault_bin" ] || return 0
-  [ -z "${DOTFILES_TARGET:-}" ] || return 0
 
   command -v rg >/dev/null 2>&1 ||
     echo "warning: ripgrep not found; note search, backlinks, and tags return nothing" >&2
@@ -678,46 +663,6 @@ clean_deploy_sources() {
   fi
 }
 
-# Config directories the map once filled with per-file links and now links
-# whole. An install from before that change has a real directory sitting where
-# the symlink belongs, and dotbot will not replace a directory it did not
-# create — so clear it here first.
-#
-# Only when every entry inside is a link or a directory, though. A regular
-# file is either something the owner put there or a program writing where the
-# map says nothing writes; both are worth stopping for, and neither is worth
-# deleting on the way past. Doing this rather than dotbot's `force` matters
-# for exactly that reason: `force` is an unconditional rmtree.
-LEGACY_CORE_LINK_DIRS='.config/zsh .config/git .config/theme .config/nvim .config/tmux .config/vault/templates'
-LEGACY_MAC_LINK_DIRS='.config/sketchybar .config/aerospace'
-
-migrate_link_dirs() {
-  # Same resolution as deploy_tier: DOTFILES_TARGET redirects scratch-home
-  # checks, and physical so a symlinked /var cannot split the comparison.
-  migrate_home="$(cd -P "${DOTFILES_TARGET:-$HOME}" && pwd -P)"
-  legacy_dirs=''
-  for tier in "$@"; do
-    case "$tier:$OS" in
-    core:*) legacy_dirs="$legacy_dirs $LEGACY_CORE_LINK_DIRS" ;;
-    mac:Darwin) legacy_dirs="$legacy_dirs $LEGACY_MAC_LINK_DIRS" ;;
-    esac
-  done
-  for rel in $legacy_dirs; do
-    dir="$migrate_home/$rel"
-    # A link is already converted; a missing directory is a fresh machine.
-    { [ -d "$dir" ] && [ ! -L "$dir" ]; } || continue
-    strays="$(find "$dir" ! -type d ! -type l)"
-    if [ -n "$strays" ]; then
-      echo "error: $dir holds files this deploy did not put there:" >&2
-      printf '%s\n' "$strays" | sed 's/^/  /' >&2
-      echo "the map links this directory whole now; move them aside, then re-run" >&2
-      exit 1
-    fi
-    echo "converting $rel to a directory link"
-    rm -rf "$dir"
-  done
-}
-
 deploy_tier() {
   if [ "$1" = mac ] && [ "$OS" != Darwin ]; then
     echo "skipping mac tier: not macOS"
@@ -726,12 +671,12 @@ deploy_tier() {
   # Tiers with no symlinks to deploy have no tiers/<name>.yaml.
   [ -f "tiers/$1.yaml" ] || return 0
   echo "deploy: $1"
-  # Physical for the same reason as REPO_ROOT above.
-  deploy_home="$(cd -P "${DOTFILES_TARGET:-$HOME}" && pwd -P)"
-  # DOTFILES_TARGET redirects the links (scratch-home checks); the uv cache
-  # stays under the real home, pinned before HOME is overridden. The two
-  # disabled warnings describe exactly that intent: the assignments exist
-  # only for the dotbot process, and $HOME in the cache path is the outer one.
+  # Physical for the same reason as REPO_ROOT above; dotbot sees the physical
+  # home so its relative links resolve. The uv cache path is pinned before
+  # HOME is overridden. The two disabled warnings describe exactly that
+  # intent: the assignments exist only for the dotbot process, and $HOME in
+  # the cache path is the outer one.
+  deploy_home="$(cd -P "$HOME" && pwd -P)"
   # shellcheck disable=SC2097,SC2098
   UV_CACHE_DIR="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}" \
     HOME="$deploy_home" \
@@ -958,7 +903,6 @@ if [ "${1:-}" = links ]; then
   [ "$#" -gt 0 ] || set -- core mac extras
   ensure_uv
   clean_deploy_sources
-  migrate_link_dirs "$@"
   for tier in "$@"; do
     deploy_tier "$tier"
   done
@@ -998,7 +942,6 @@ ensure_uv
 # Guarantee one up front; idempotent and instant when already present.
 uv python install
 clean_deploy_sources
-migrate_link_dirs "$@"
 
 # Casks installed before this machine opted into --no-quarantine (see
 # docs/install.md) still carry the flag and keep re-prompting. Converge
@@ -1102,7 +1045,7 @@ setup_vault || echo "warning: vault setup did not complete" >&2
 # The account observer is independent of tmux and Neovim, but its user-level
 # launchd job is installed alongside the core rail package on macOS. Install
 # it after .env exists so the first RunAtLoad refresh sees the phone channel.
-if [ "$OS" = Darwin ] && [ -z "${DOTFILES_TARGET:-}" ]; then
+if [ "$OS" = Darwin ]; then
   for tier in "$@"; do
     [ "$tier" = core ] || continue
     install_attention_agent

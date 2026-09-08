@@ -194,9 +194,6 @@ function M.apply(tokens)
   -- to an edge and continue the tmux rail on crust (see ThemeChromeNormal
   -- below). Accent is the common frame color, notify marks the input
   -- focus.
-  hl("StatusLine", { fg = r.fg_muted, bg = r.bg })
-  hl("StatusLineNC", { fg = r.fg_faint, bg = r.bg })
-  hl("MiniStatuslineInactive", { fg = r.fg_faint, bg = r.bg })
   hl("WinBar", { fg = r.fg_muted, bg = r.bg })
   hl("WinBarNC", { fg = r.fg_faint, bg = r.bg })
   hl("ThemeStlNormal", { fg = accent, bg = r.bg, bold = true })

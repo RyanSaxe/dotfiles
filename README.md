@@ -81,5 +81,3 @@ prek run --all-files                  # run every check manually
 
 See [docs/development.md](docs/development.md) for what each check enforces,
 including how Lua is held to the same typing standard as the rest.
-
-Also: [what was considered and left out](docs/considered.md).
