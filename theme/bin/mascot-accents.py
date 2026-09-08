@@ -18,11 +18,13 @@ Prints key=value lines consumed by the `theme` command:
     accent_light=#...         notify_light=#...
 
 Every color must actually exist on the mascot. The accent is the dominant
-vivid hue cluster; the bright accent is the most distinct OTHER hue present,
-searched in relaxing tiers (vivid at 45°+, vivid at 30°+, pale clusters like
-cream fins). A truly single-hue mascot gets two brightnesses of its one hue
-— never a synthesized complement. Wallpaper-palette tools fail here: small
-identity areas (gengar's red eyes) vanish under frequency-based extraction.
+vivid hue cluster, or the dominant pale one when nothing on the mascot is
+vivid (mewtwo is grey and dusty mauve); the bright accent is the most
+distinct OTHER hue present, searched in relaxing tiers (vivid at 45°+,
+vivid at 30°+, pale clusters like cream fins). A truly single-hue mascot
+gets two brightnesses of its one hue — never a synthesized complement.
+Wallpaper-palette tools fail here: small identity areas (gengar's red eyes)
+vanish under frequency-based extraction.
 """
 
 from __future__ import annotations
@@ -257,10 +259,11 @@ register(
 def gather_pixels(image_path: Path) -> tuple[list[Hsv], list[Hsv]]:
     """Split usable pixels into vivid and pale-but-tinted.
 
-    Pale pixels (cream fins, pastel markings) are too washed to lead, but
-    when a mascot has no second vivid hue they are the honest source of an
-    accent — shiny gyarados is red plus cream-gold, not red plus anything
-    invented.
+    Pale pixels (cream fins, pastel markings) are too washed to lead while
+    anything vivid exists, but they are the honest source of an accent when
+    nothing else is — shiny gyarados is red plus cream-gold, not red plus
+    anything invented, and mewtwo is mauve rather than an error. Only a
+    greyscale image, with no tinted pixel at all, has nothing to offer.
     """
     img = Image.open(image_path).convert("RGBA")
     img.thumbnail((96, 96))
@@ -279,8 +282,8 @@ def gather_pixels(image_path: Path) -> tuple[list[Hsv], list[Hsv]]:
             vivid.append((h, s, v))
         elif s >= 0.10:
             pale.append((h, s, v))
-    if not vivid:
-        raise SystemExit("error: image has no vivid pixels to extract from")
+    if not vivid and not pale:
+        raise SystemExit("error: image is greyscale; it has no hue to extract")
     return vivid, pale
 
 
@@ -326,20 +329,25 @@ def _best_secondary(
 
 
 def pick_pair(vivid: list[Hsv], pale: list[Hsv]) -> tuple[Hsv, Hsv]:
-    """Accent = dominant vivid hue; notify = the most distinct OTHER
-    hue actually present, searched in relaxing tiers: vivid at 45°+, vivid at
-    30°+ (red-vs-gold pokemon), then pale clusters. Every color must exist on
-    the mascot — with a single-hue mascot the pair is two brightnesses of
-    its one hue, never an invented complement.
+    """Accent = dominant vivid hue, or dominant pale hue when nothing is
+    vivid; notify = the most distinct OTHER hue actually present, searched
+    in relaxing tiers: the lead set at 45°+, at 30°+ (red-vs-gold pokemon),
+    then pale clusters. Every color must exist on the mascot — with a
+    single-hue mascot the pair is two brightnesses of its one hue, never an
+    invented complement.
     """
-    vivid_weights = cluster_weights(vivid)
-    primary = max(range(HUE_BUCKETS), key=lambda i: vivid_weights[i])
-    threshold = vivid_weights[primary] * SECOND_CLUSTER_MIN_WEIGHT
-    accent = representative(vivid, primary)
+    # A mascot painted only in dusty pigment (mewtwo) has no vivid pixel at
+    # all. Its pale hue leads; styled() restores the saturation, so the
+    # accent comes out as vivid as any other.
+    lead = vivid or pale
+    lead_weights = cluster_weights(lead)
+    primary = max(range(HUE_BUCKETS), key=lambda i: lead_weights[i])
+    threshold = lead_weights[primary] * SECOND_CLUSTER_MIN_WEIGHT
+    accent = representative(lead, primary)
 
     tiers: list[tuple[list[Hsv], list[float], int]] = [
-        (vivid, vivid_weights, MIN_HUE_SEPARATION),
-        (vivid, vivid_weights, MIN_HUE_SEPARATION - 1),
+        (lead, lead_weights, MIN_HUE_SEPARATION),
+        (lead, lead_weights, MIN_HUE_SEPARATION - 1),
         (pale, cluster_weights(pale), MIN_HUE_SEPARATION - 1),
     ]
     for pixels, weights, separation in tiers:

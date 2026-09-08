@@ -170,6 +170,33 @@ def test_pick_pair_single_hue_never_invents_a_color() -> None:
     assert notify[0] == accent[0]  # same hue, not a complement
 
 
+def test_pick_pair_leads_with_pale_hue_when_nothing_is_vivid() -> None:
+    # A synthetic mewtwo: a grey body with a dusty mauve tail. Nothing on him
+    # clears the vivid gate, so the mauve leads instead of extraction failing,
+    # and as a one-hue mascot the notify color is that same hue.
+    image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+    image.paste(Image.new("RGBA", (60, 60), (200, 196, 204, 255)), (18, 18))  # grey
+    image.paste(Image.new("RGBA", (20, 30), (196, 160, 196, 255)), (60, 40))  # mauve
+
+    vivid, pale = _pixels_of(image)
+    assert vivid == []
+    accent, notify = accents.pick_pair(vivid, pale)
+
+    mauve_hue = accents.colorsys.rgb_to_hsv(196 / 255, 160 / 255, 196 / 255)[0]
+    assert abs(accent[0] - mauve_hue) < 0.06
+    assert notify[0] == accent[0]
+
+
+def test_gather_pixels_rejects_a_greyscale_image(tmp_path: Path) -> None:
+    # Pure greys carry no hue; amplifying one would invent a color.
+    path = tmp_path / "grey.png"
+    Image.new("RGBA", (16, 16), (128, 128, 128, 255)).save(path)
+
+    message = _exit_message(lambda: accents.gather_pixels(path))
+
+    assert "greyscale" in message
+
+
 def test_adjust_pair_promotes_nonred_accent_over_red_primary() -> None:
     red = (2 / 360, 0.80, 0.85)
     gold = (45 / 360, 0.70, 0.90)
