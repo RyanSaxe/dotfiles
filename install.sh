@@ -534,8 +534,11 @@ install_tier_packages() {
     # to macOS-only tools (pmset, ipconfig) regardless. It lives in the
     # felixkratz tap.
     brew_tap_trusted felixkratz/formulae
+    # The upstream makefile declares `clean` and `universal` as parallel
+    # prerequisites. Homebrew's default parallel make can therefore delete
+    # bin/ while the universal build is writing object files into it.
     # shellcheck disable=SC2086
-    brew_install $MAC_BREW_FORMULAS
+    HOMEBREW_MAKE_JOBS=1 brew_install $MAC_BREW_FORMULAS
     # aerospace is a cask in nikitabobko's tap; install skips when present
     # (casks error on reinstall, unlike formulas).
     brew_tap_trusted nikitabobko/tap
