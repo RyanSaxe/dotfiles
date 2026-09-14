@@ -1,0 +1,23 @@
+id: python.no-staticmethod
+language: Python
+severity: warning
+message: Prefer a module-level function over @staticmethod.
+rule:
+  pattern: "@staticmethod"
+metadata:
+  byor:
+    rationale: >
+      The style guide treats functions as the default and classes as tools for
+      state, inheritance, or cohesive object behavior. Static methods often mean
+      a class is being used as a namespace.
+    agent_prompt: >
+      Move this behavior to a module-level function unless it is genuinely part
+      of the class contract or is required by a framework API. If this is
+      genuinely necessary, add `# ast-grep-ignore: python.no-staticmethod` on
+      its own line directly above the offending line, with a short comment
+      above it explaining why.
+    tags:
+      - python
+      - oop
+      - style-guide
+      - greenfield

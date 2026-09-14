@@ -20,6 +20,18 @@ export interface ReviewThread {
   comments: GitHubComment[];
 }
 
+export type GitHubReviewState =
+  "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED";
+
+export interface GitHubReview {
+  id: string;
+  author: GitHubActor | null;
+  body: string;
+  state: GitHubReviewState;
+  submittedAt: string;
+  url: string;
+}
+
 export type CiState =
   | "SUCCESS"
   | "FAILURE"
@@ -72,9 +84,8 @@ export interface PullRequestTarget extends TargetBase {
   headSha: string;
   ciState: CiState;
   failingChecks: string[];
-  reviewRequested: boolean;
-  reviewRequestFingerprint: string;
   reviewThreads: ReviewThread[];
+  reviews: GitHubReview[];
 }
 
 export interface IssueTarget extends TargetBase {
@@ -84,24 +95,34 @@ export interface IssueTarget extends TargetBase {
 
 export type GitHubTarget = PullRequestTarget | IssueTarget;
 
-export type AttentionKind =
-  "review_comment" | "conversation" | "review_request" | "ci" | "opened";
+export type AttentionKind = "comment" | "ci" | "opened" | "review";
 
-export interface AttentionItem {
+export interface AttentionReason {
+  // The stable event identity lets a target row become active again when a
+  // later event replaces the one that was acknowledged.
   id: string;
   kind: AttentionKind;
-  // Which object this is about. Carried separately from `kind` so the reason
-  // and the object stay independent — an issue comment and a PR comment are
-  // the same reason on different objects, and only the object picks the hue.
+  summary: string;
+  actor: GitHubActor | null;
+  createdAt: string;
+  priority: "normal" | "high";
+  reviewState?: GitHubReviewState;
+}
+
+export interface AttentionItem {
+  // One row per GitHub target. This is deliberately not a comment or thread
+  // id: new activity updates this row instead of adding another one.
+  id: string;
   targetKind: TargetKind;
   repository: string;
   number: number;
   title: string;
   url: string;
-  summary: string;
-  actor: GitHubActor | null;
-  createdAt: string;
-  priority: "normal" | "high";
+  // Reasons are kept together so CI and comment activity can share one row.
+  reasons: AttentionReason[];
+  // The sorted reason ids form the current activity revision. Acknowledgement
+  // remains valid while current reasons are a subset of that revision.
+  activityKey: string;
   context?: ReviewContext;
 }
 
@@ -110,12 +131,23 @@ export interface CiMemory {
   headSha: string;
   red: boolean;
   redEpoch: number;
+  // A red state discovered before the initial baseline is remembered but does
+  // not become an alert later merely because the target was refreshed.
+  alerted: boolean;
 }
 
 export interface CiTransition {
   memory: CiMemory;
-  item: AttentionItem | null;
+  reason: AttentionReason | null;
   newlyRed: boolean;
+}
+
+// This is a time boundary in GitHub's updated-activity stream. It is not a
+// GraphQL page cursor. Cursors are valid for walking one response and are not
+// durable change-feed positions.
+export interface GithubSyncCheckpoint {
+  processedThrough: string | null;
+  lastFullReconciliationAt: string | null;
 }
 
 export interface RateLimit {
@@ -125,7 +157,7 @@ export interface RateLimit {
 }
 
 export interface ObserverState {
-  version: 1;
+  version: 2;
   // The authenticated login, kept so readers can tell "you" from everyone
   // else without a network call. Optional: state written before this
   // existed is still valid.
@@ -133,21 +165,19 @@ export interface ObserverState {
   lastAttemptAt: string | null;
   lastSuccessfulSyncAt: string | null;
   lastError: string | null;
-  // The notification transport is downstream of attention data. Its failures
-  // are recorded here so they can never be mistaken for a GitHub failure,
-  // never back off polling, and never reach the Reviews table.
-  lastNotifyError?: string | null;
   consecutiveFailures: number;
   retryAfter: string | null;
   rateLimit: RateLimit | null;
   items: Record<string, AttentionItem>;
+  // Maps a stable target id to the reason ids the user dismissed.
   acknowledged: Record<string, string>;
-  notified: Record<string, string>;
   ci: Record<string, CiMemory>;
-  // When each watched repository was first seen. Only things opened after
-  // that moment are ever reported, so adding a repository does not drag its
-  // whole backlog in. The timestamp never moves, which is what lets a
-  // reported item stay in the inbox until it is acknowledged or closed.
+  // The first successful sync establishes this boundary. Activity before it
+  // is historical state, not a new Rail item.
+  baselineAt: string | null;
+  githubSync?: GithubSyncCheckpoint;
+  // When each currently watched repository was first seen. Only activity after
+  // that moment is reported for watched-only targets.
   watchedSince?: Record<string, string>;
 }
 

@@ -24,7 +24,7 @@ import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 
-PYFILES_LIB = Path(__file__).resolve().parent / "lib" / "pyfiles.py"
+PYFILES_LIB = Path("~/.config/byor/scripts/lib/pyfiles.py").expanduser()
 
 
 @dataclass(frozen=True)

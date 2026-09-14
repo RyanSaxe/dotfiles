@@ -1,75 +1,74 @@
 # Theming
 
-Catppuccin — Mocha in dark, Latte in light — rendered from one token file into
+One palette per mode — Catppuccin Mocha accents in dark, the same accents on
+this repo's warm neutral ramp in light — rendered from one token file into
 every tool. No config hardcodes a color; apps consume generated palettes and
-reload in place.
+reload in place. Switching the mode also switches macOS appearance, so ghostty
+follows along through its native light/dark theme pair.
 
 ```sh
 theme dark
 theme light
-theme inner light
-theme outer dark
-theme both toggle
+theme toggle
 theme mascot pokemon:gengar   # accent colors extracted from a mascot image
+theme mascot local:cat.png      # a machine-local image
 ```
 
 ## Two surfaces
 
-The theme has two independently switchable layers:
-
-| Layer   | What it covers                                                                                            |
-| ------- | --------------------------------------------------------------------------------------------------------- |
-| `inner` | terminal and content chrome — ghostty's native palette, shells, prompts, bat, the editor's buffers        |
-| `outer` | the surrounding chrome — sketchybar, the rail, tmux separators, the ghostty frame shader, editor sidebars |
-
-Inner mode drives macOS appearance so ghostty keeps its native light/dark theme
-pair; outer mode never changes the OS appearance. This permits combinations such
-as a light terminal inside dark chrome.
-
-The split is not decorative. It answers one question per surface: **does this
-touch a terminal edge?** A float hovering over a buffer is inner; a sidebar
-running to the edge continues the tmux rail and is outer.
+Chrome and content are different tiers of one palette. Anything that touches
+a terminal edge — sketchybar, the rail, tmux separators, the ghostty frame
+shader, editor sidebars — paints crust, the deepest background tier; content
+(buffers, shells, prompts) paints base. A float hovering over a buffer is
+content; a sidebar running to the edge continues the tmux rail and is chrome.
 
 ## The pipeline
 
 ```text
-palettes/*.conf     raw catppuccin values, verbatim
+palettes/*.conf     dark and light palette values
    -> tokens.conf   roles: bg, fg_muted, border, warn, ...
-   -> elements.conf which context each rendered file uses
+   -> elements.conf mode-pinned render exceptions
    -> templates/    one per consumer
    -> ~/.local/state/dotfiles/generated/
 ```
 
-Every consumer is registered as inner, outer, or mixed in
-`theme/elements.conf`. Mixed consumers get both namespaces and
-must qualify every placeholder — `{{inner_bg}}`, `{{outer_crust}}` — because a
-bare name would silently pick one layer.
+Templates render in the current mode. The only registrations in
+`theme/elements.conf` are mode-pinned exceptions: ghostty's theme pair
+(`dotfiles-dark`, `dotfiles-light`) renders in its named mode on every pass,
+because ghostty reads both files simultaneously for its native
+appearance switching.
 
-The native palette keys preserve their upstream Catppuccin values: the theme's
-identity lives in the **role assignments**, not in custom hex values. The
-palettes also contain dotfiles-owned keys used by generated consumers:
-`semantic_*` keys for diff rendering and `os_window_stroke` for the macOS
-window border. Both palettes must define the same key set so every consumer
-can render in either mode; CI checks that invariant.
+The dark palette preserves upstream Catppuccin Mocha values; the light
+palette keeps Latte's accent hues on a warmer, higher-contrast neutral ramp.
+The theme's identity lives in the **role assignments**, not in custom accent
+hexes. The palettes also contain dotfiles-owned keys used by generated
+consumers: `semantic_*` keys for diff rendering and `os_window_stroke` for
+the macOS window border. Both palettes must define the same key set so every
+consumer can render in either mode; CI checks that invariant.
 
 ### Neovim
 
-`nvim-tokens.lua` renders in the mixed context, because the editor spans both
-layers: its buffers are inner, but the tab row's fill and any sidebar touch an
-edge. `lua/theme/highlights.lua` is the semantic layer and the file to extend —
+`lua/theme/highlights.lua` is the semantic layer and the file to extend —
 add groups referencing the role tables, never a raw hex.
 
-Windows opt into the outer surface through `lua/theme/surfaces.lua`, which keys
-on whether a window is anchored rather than on plugin names, so a new sidebar
-plugin is themed the day it is installed.
+Windows opt into the chrome surface through `lua/theme/surfaces.lua`, which
+keys on whether a window is anchored rather than on plugin names, so a new
+sidebar plugin is themed the day it is installed.
 
 ### Bat and delta
 
-`Dotfiles.tmTheme` renders in the inner context and is published to bat's theme
+`Dotfiles.tmTheme` is published to bat's theme
 directory. Git delta selects that generated theme explicitly. Bat and delta do
 not receive Neovim's semantic tokens, so the compact TextMate scope map mirrors
 the same function, type, structure, variable, member, module, constant, and
 literal roles as closely as their syntax grammars allow.
+
+### Zsh syntax highlighting
+
+fast-syntax-highlighting.ini is generated from the same palette and role
+substitutions as the other syntax consumers.
+zsh/zshrc passes the file to F-Sy-H when the plugin is installed, then
+reapplies it when either the generated shell colors or F-Sy-H theme changes.
 
 ## Using color
 
@@ -127,3 +126,10 @@ That's the whole surface. `theme mascot my-source:<id>`, the fzf picker entry,
 per-project sync, and the rail sprite all follow from the registration — see the
 `pokemon` provider for a full example and `shiny-pokemon` for wrapping an
 existing source as its own picker entry.
+
+### Local images
+
+Put PNG files in `$XDG_DATA_HOME/dotfiles/mascots`. When `XDG_DATA_HOME` is
+unset, use `~/.local/share/dotfiles/mascots`. The local provider lists the PNG
+filenames in that directory as relative identities, such as `local:cat.png`,
+and resolves the selected file at runtime.

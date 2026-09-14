@@ -1,0 +1,19 @@
+id: python.no-eval
+language: Python
+severity: error
+message: Do not use eval; dynamic code execution is unsafe.
+rule:
+  any:
+    - pattern: eval($$$ARGS)
+    - pattern: builtins.eval($$$ARGS)
+metadata:
+  byor:
+    rationale: >
+      eval executes arbitrary Python code and creates security, reviewability,
+      and debugging risks.
+    agent_prompt: >
+      Replace eval with explicit parsing, validation, dispatch tables, or
+      ast.literal_eval when the input is data rather than code.
+    tags:
+      - python
+      - security

@@ -129,8 +129,13 @@ export function loadStatusTransitionTimes(
 async function collectAgents(): Promise<Agent[]> {
   // Run from $HOME: `workmux status` scopes to the repository of its cwd,
   // and a non-repo cwd is what yields the global, all-projects view.
+  // execFile's default 1MB maxBuffer rejects on a large agent fleet — the
+  // caller's catch would then hold stale agents forever with no error in
+  // sight. The timeout keeps a hung workmux from wedging every tick.
   const { stdout } = await run("workmux", ["status", "--json"], {
     cwd: homedir(),
+    maxBuffer: 8 * 1024 * 1024,
+    timeout: 10_000,
   });
   const parsed = JSON.parse(stdout) as { agents?: WorkmuxAgent[] };
   const transitionTimes = loadStatusTransitionTimes();
@@ -157,12 +162,12 @@ async function collectAgents(): Promise<Agent[]> {
 // heartbeats and title updates. Working transitions are accepted immediately
 // so a transient waiting state can disappear completely.
 //
-// The daemon re-reads `workmux status` every 5s, so 30s asks for about six
+// The daemon re-reads `workmux status` every 5s, so 60s asks for about twelve
 // observations. The window is long enough to ride out Codex's brief
 // auto-classification waiting state without delaying a real return to work.
 //
 // The floor is the reconcile interval: below it this suppresses nothing.
-export const AGENT_STATUS_LAG_SECS = 30;
+export const AGENT_STATUS_LAG_SECS = 60;
 
 export interface StableAgentState {
   status: AgentStatus;
@@ -244,10 +249,12 @@ export interface Pane {
 const PANE_TAG = "P";
 const CLIENT_TAG = "C";
 
+// No #{session_attached} here: the daemon's control-mode client counts
+// as attached and would poison it, so sessionAttached derives from the
+// FILTERED client rows instead (attachedSessions below).
 const PANE_FORMAT = [
   PANE_TAG,
   "#{session_name}",
-  "#{session_attached}",
   "#{window_id}",
   "#{window_index}",
   "#{window_name}",
@@ -264,25 +271,25 @@ const PANE_FORMAT = [
   "#{pane_in_mode}",
 ].join(SEP);
 
-function parsePane(f: string[]): Pane | null {
-  if (f.length < 16) return null;
+function parsePane(f: string[], attachedSessions: Set<string>): Pane | null {
+  if (f.length < 15) return null;
   return {
     session: f[0]!,
-    sessionAttached: Number(f[1]!) > 0,
-    windowId: f[2]!,
-    windowIndex: Number(f[3]!),
-    windowName: f[4]!,
-    windowActive: f[5] === "1",
-    windowPanes: Number(f[6]!),
-    windowWidth: Number(f[7]!),
-    paneId: f[8]!,
-    paneActive: f[9] === "1",
-    tty: f[10]!,
-    width: Number(f[11]!),
-    height: Number(f[12]!),
-    isRail: f[13] === "1",
-    historySize: Number(f[14]!),
-    inMode: f[15] === "1",
+    sessionAttached: attachedSessions.has(f[0]!),
+    windowId: f[1]!,
+    windowIndex: Number(f[2]!),
+    windowName: f[3]!,
+    windowActive: f[4] === "1",
+    windowPanes: Number(f[5]!),
+    windowWidth: Number(f[6]!),
+    paneId: f[7]!,
+    paneActive: f[8] === "1",
+    tty: f[9]!,
+    width: Number(f[10]!),
+    height: Number(f[11]!),
+    isRail: f[12] === "1",
+    historySize: Number(f[13]!),
+    inMode: f[14] === "1",
   };
 }
 
@@ -314,8 +321,15 @@ export interface ClientFacts {
   latestClientIsKitty: boolean;
   // Attached clients server-wide; zero lets the daemon idle its cadence.
   clientCount: number;
+  // Sessions with at least one REAL client attached. Panes derive
+  // sessionAttached from this set rather than #{session_attached},
+  // which cannot tell a person from the daemon's own control client.
+  attachedSessions: Set<string>;
 }
 
+// Every fact here is about PEOPLE at terminals, so the daemon's own
+// control-mode client is filtered out of all of them — it holds no
+// prefix, renders nothing, and its activity timestamp is machine noise.
 const CLIENT_FORMAT = [
   CLIENT_TAG,
   "#{client_session}",
@@ -324,18 +338,31 @@ const CLIENT_FORMAT = [
   "#{client_termname}",
   "#{client_activity}",
   "#{client_flags}",
+  "#{client_control_mode}",
 ].join(SEP);
 
 function clientFactsFrom(rows: string[][]): ClientFacts {
   const modeSessions = new Set<string>();
   const nonKittySessions = new Set<string>();
   const focusedSessions = new Set<string>();
+  const attachedSessions = new Set<string>();
   // No clients at all: keep mascots in the buffers for the usual
   // capable reattach.
   let latestClientIsKitty = true;
   let latestActivity = -1;
-  for (const [session, prefix, keyTable, termname, activity, flags] of rows) {
-    if (!session) continue;
+  let clientCount = 0;
+  for (const [
+    session,
+    prefix,
+    keyTable,
+    termname,
+    activity,
+    flags,
+    controlMode,
+  ] of rows) {
+    if (!session || controlMode === "1") continue;
+    clientCount += 1;
+    attachedSessions.add(session);
     const kitty = /ghostty|kitty/i.test(termname ?? "");
     if (prefix === "1" || keyTable === "tab") modeSessions.add(session);
     if (!kitty) nonKittySessions.add(session);
@@ -354,7 +381,8 @@ function clientFactsFrom(rows: string[][]): ClientFacts {
     latestClientActivityTs: latestActivity >= 0 ? latestActivity : null,
     focusedSessions,
     latestClientIsKitty,
-    clientCount: rows.length,
+    clientCount,
+    attachedSessions,
   };
 }
 
@@ -363,10 +391,79 @@ export interface Snapshot {
   clientFacts: ClientFacts;
 }
 
-// The whole tmux poll — every session's panes plus the client table — in
-// one exec; the ~250ms lag on client facts is the accepted cost of
-// riding the daemon cadence.
-export async function collectSnapshot(): Promise<Snapshot> {
+// Tagged listing output (panes + clients, any order) into one Snapshot.
+// Client rows resolve first: pane attachment derives from them.
+export function parseSnapshot(stdout: string): Snapshot {
+  const paneRows: string[][] = [];
+  const clientRows: string[][] = [];
+  for (const rawLine of stdout.split("\n")) {
+    if (!rawLine) continue;
+    const [tag, ...f] = rawLine.split(SEP);
+    if (tag === PANE_TAG) {
+      paneRows.push(f);
+    } else if (tag === CLIENT_TAG) {
+      clientRows.push(f);
+    }
+  }
+  const clientFacts = clientFactsFrom(clientRows);
+  const panes: Pane[] = [];
+  for (const f of paneRows) {
+    const pane = parsePane(f, clientFacts.attachedSessions);
+    if (pane) panes.push(pane);
+  }
+  return { panes, clientFacts };
+}
+
+// A way to run the listings without an exec: the daemon passes the
+// control client's command() here, and each string is one tmux command
+// line answered over the control socket.
+export type SnapshotRunner = (commandLine: string) => Promise<string>;
+
+// The whole tmux poll — every session's panes plus the client table.
+// Through a runner it costs zero processes; the exec fallback (control
+// down or disabled) batches both listings into one invocation.
+// Just the client facts, from a lone list-clients — no list-panes. The
+// control protocol has no notification for prefix-held, key-table, or
+// client focus, so those bits (which the rail paints live) are polled
+// cheaply on their own cadence instead of riding the expensive pane
+// snapshot or waiting out the reconcile backstop.
+export async function collectClientFacts(
+  runner?: SnapshotRunner,
+): Promise<ClientFacts> {
+  const out = runner
+    ? await runner(`list-clients -F '${CLIENT_FORMAT}'`)
+    : (await run("tmux", ["list-clients", "-F", CLIENT_FORMAT])).stdout;
+  const rows: string[][] = [];
+  for (const line of out.split("\n")) {
+    if (!line.startsWith(`${CLIENT_TAG}${SEP}`)) continue;
+    rows.push(line.split(SEP).slice(1));
+  }
+  return clientFactsFrom(rows);
+}
+
+// The render-affecting client bits, order-stable, so a poller can tell a
+// meaningful change from mere activity-timestamp churn.
+export function clientModeSignature(facts: ClientFacts): string {
+  const sorted = (set: Set<string>): string => [...set].sort().join(",");
+  return [
+    sorted(facts.modeSessions),
+    sorted(facts.focusedSessions),
+    sorted(facts.nonKittySessions),
+    facts.clientCount,
+    facts.latestClientIsKitty ? "1" : "0",
+  ].join("|");
+}
+
+export async function collectSnapshot(
+  runner?: SnapshotRunner,
+): Promise<Snapshot> {
+  if (runner) {
+    const [paneOut, clientOut] = await Promise.all([
+      runner(`list-panes -a -F '${PANE_FORMAT}'`),
+      runner(`list-clients -F '${CLIENT_FORMAT}'`),
+    ]);
+    return parseSnapshot(`${paneOut}\n${clientOut}`);
+  }
   const { stdout } = await run("tmux", [
     "list-panes",
     "-a",
@@ -377,19 +474,7 @@ export async function collectSnapshot(): Promise<Snapshot> {
     "-F",
     CLIENT_FORMAT,
   ]);
-  const panes: Pane[] = [];
-  const clientRows: string[][] = [];
-  for (const rawLine of stdout.split("\n")) {
-    if (!rawLine) continue;
-    const [tag, ...f] = rawLine.split(SEP);
-    if (tag === PANE_TAG) {
-      const pane = parsePane(f);
-      if (pane) panes.push(pane);
-    } else if (tag === CLIENT_TAG) {
-      clientRows.push(f);
-    }
-  }
-  return { panes, clientFacts: clientFactsFrom(clientRows) };
+  return parseSnapshot(stdout);
 }
 
 // Content windows of one session, rail panes excluded — the rail never

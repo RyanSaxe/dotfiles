@@ -2,6 +2,7 @@ app	chord	action
 tmux	alt+1-9	switch to window N
 tmux	alt+n	new window
 tmux	alt+q	detach client
+tmux	alt+k	fzf session kill popup
 tmux	alt+l	jump back to last pane
 tmux	ctrl+h/j/k/l	move between panes (vim-aware; skips the rail)
 tmux	ctrl+b/f	scroll full page up/down (vim-aware copy-mode)

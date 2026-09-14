@@ -5,6 +5,7 @@ opt.signcolumn = "yes:1" -- signs get their own column; line numbers stay number
 opt.relativenumber = false -- flash owns jumps; relative numbers are noise
 opt.updatetime = 50 -- rest-on-symbol UI reacts near-instantly
 opt.clipboard = "unnamedplus" -- yank straight to the system clipboard
+opt.swapfile = false -- worktrees and short-lived review sessions do not need swapfiles
 
 -- Every float wears a border, including any plugin installed later that
 -- forgets to ask for one. Neovim reads this only for floats that do not name
@@ -29,7 +30,7 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
 
--- No statusline: it would band the full width and stop the outer
+-- No statusline: it would band the full width and stop the chrome
 -- surface short of the terminal floor. Mode rides the tab row,
 -- per-window facts ride the winbar.
 vim.opt.laststatus = 0
