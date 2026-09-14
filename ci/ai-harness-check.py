@@ -168,7 +168,7 @@ def validate_planning_sessions() -> None:
     if node is None:
         raise HarnessError("node is required to check interactive planning sessions")
     result = subprocess.run(
-        [node, "--test", str(REPO_ROOT / "tests/plan-interactively/session.test.mjs")],
+        [node, "--test", str(REPO_ROOT / "tests/interactive-plan/session.test.mjs")],
         capture_output=True,
         check=False,
         text=True,

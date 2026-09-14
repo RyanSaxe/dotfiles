@@ -1,9 +1,9 @@
 ---
-name: plan-interactively
-description: Plan work through short conversation, interactive browser proposals, and a durable HTML handoff. Use only when the user explicitly invokes plan-interactively by name. Never select this skill automatically for an ordinary planning or implementation request.
+name: interactive-plan
+description: Plan work through short conversation, interactive browser proposals, and a durable HTML handoff. Use only when the user explicitly invokes interactive-plan by name. Never select this skill automatically for an ordinary planning or implementation request.
 ---
 
-# Plan interactively
+# Interactive plan
 
 Develop the user's idea into a plan they understand and approve. Use conversation
 to uncover intent and interactive proposals to resolve meaningful choices. The

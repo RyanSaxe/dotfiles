@@ -10,11 +10,11 @@ import test from "node:test";
 import {
   assemble,
   build,
-} from "../../ai-harness/skills/plan-interactively/scripts/build.mjs";
+} from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
 import {
   artifactData,
   serve,
-} from "../../ai-harness/skills/plan-interactively/scripts/session.mjs";
+} from "../../ai-harness/skills/interactive-plan/scripts/session.mjs";
 
 const exec = promisify(execFile);
 const root = path.resolve(
@@ -23,7 +23,7 @@ const root = path.resolve(
 );
 const helper = path.join(
   root,
-  "ai-harness/skills/plan-interactively/scripts/session.mjs",
+  "ai-harness/skills/interactive-plan/scripts/session.mjs",
 );
 const frame = await assemble({
   artifactId: "example",

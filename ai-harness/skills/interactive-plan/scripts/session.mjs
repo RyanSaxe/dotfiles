@@ -556,7 +556,7 @@ export async function main(argv) {
   if (command === "start") {
     directory ||= path.join(
       process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"),
-      "plan-interactively",
+      "interactive-plan",
       "sessions",
       crypto.randomUUID(),
     );
@@ -632,7 +632,7 @@ if (
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   main(process.argv.slice(2)).catch((error) => {
-    console.error(`plan-interactively: ${error.message}`);
+    console.error(`interactive-plan: ${error.message}`);
     process.exitCode = 1;
   });
 }

@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const plan = JSON.parse($("plan-data").textContent);
 const session = JSON.parse($("session-config").textContent);
-const storageKey = `plan-interactively:${session.sessionId || "offline"}:${plan.artifactId}:${plan.revision}`;
+const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}:${plan.revision}`;
 let state = {
   notes: [],
   choices: {},
