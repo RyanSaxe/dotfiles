@@ -464,6 +464,7 @@ function M.append_unique(path, line, heading)
         break
       end
     end
+    ---@cast finish integer
     while finish > section + 1 and vim.trim(lines[finish - 1]) == "" do
       finish = finish - 1
     end
