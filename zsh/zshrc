@@ -47,7 +47,7 @@ SAVEHIST=50000
 setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS HIST_VERIFY
 
 # ----- completion ------------------------------------------------------
-fpath=("$HOME/.config/zsh/completions" $fpath)
+fpath=("$HOME/.config/zsh/completions" "$HOME/.zfunc" $fpath)
 autoload -Uz compinit
 # -C trusts the existing dump, skipping the per-start security audit and
 # fpath rescan; a full compinit re-runs both once the dump is a day old.
