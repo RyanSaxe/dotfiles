@@ -1,0 +1,1392 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Interactive plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fff;
+        --panel: #f8f8f8;
+        --side: #f3f3f3;
+        --line: #d5d5d5;
+        --ink: #242424;
+        --muted: #616161;
+        --blue: #005fb8;
+        --soft: #e8e8e8;
+        --code: #f3f3f3;
+        font:
+          14px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #1f1f1f;
+        --panel: #252526;
+        --side: #181818;
+        --line: #414141;
+        --ink: #ccc;
+        --muted: #a3a3a3;
+        --blue: #75beff;
+        --soft: #313131;
+        --code: #181818;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+        background: none;
+        border: 0;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 3px;
+      }
+      a {
+        color: var(--blue);
+        text-underline-offset: 3px;
+      }
+      p {
+        margin: 0 0 16px;
+      }
+      h1 {
+        font-size: 34px;
+        line-height: 1.2;
+        letter-spacing: -1px;
+        font-weight: 600;
+        margin: 0 0 24px;
+      }
+      h1:focus {
+        outline: 0;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 32px 0 15px;
+      }
+      h3 {
+        font-size: 14px;
+        margin: 0 0 10px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      .muted,
+      .small {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 235px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        padding: 30px 18px;
+        border-right: 1px solid var(--line);
+        background: var(--side);
+      }
+      .brand {
+        padding: 0 12px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .brand span {
+        color: var(--blue);
+        font:
+          20px Georgia,
+          serif;
+        margin-right: 8px;
+      }
+      .revision {
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1.4px;
+        margin: 35px 12px 12px;
+      }
+      .sidebar nav {
+        display: grid;
+        gap: 9px;
+      }
+      .sidebar nav button {
+        text-align: left;
+        border-left: 2px solid transparent;
+        padding: 9px 13px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .sidebar nav button[aria-current="page"] {
+        border-left-color: var(--blue);
+        color: var(--ink);
+        font-weight: 600;
+      }
+      main {
+        min-width: 0;
+      }
+      .topbar {
+        min-height: 76px;
+        padding: 16px 35px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+      }
+      .content {
+        max-width: 1090px;
+        margin: auto;
+        padding: 28px 42px 80px;
+      }
+      .btn {
+        padding: 8px 13px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 5px;
+        font-size: 12px;
+      }
+      .btn.primary {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: var(--bg);
+      }
+      :root:not([data-theme="dark"]) .btn.primary {
+        color: white;
+      }
+      .btn.quiet {
+        border-color: transparent;
+        background: none;
+        color: var(--muted);
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 24px;
+        background: var(--panel);
+        margin: 20px 0;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin: 28px 0 15px;
+      }
+      .section-head h2 {
+        margin: 0;
+      }
+      .recommendation {
+        border-left: 2px solid var(--blue);
+        padding-left: 15px;
+        margin: 20px 0;
+      }
+      [data-choice] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 18px 0;
+      }
+      [data-choice] [data-value] {
+        border: 1px solid var(--line);
+        padding: 8px 13px;
+        border-radius: 5px;
+      }
+      [data-choice] [aria-pressed="true"] {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      pre {
+        overflow: auto;
+        padding: 20px;
+        border: 1px solid var(--line);
+        background: var(--code);
+        border-radius: 5px;
+        font:
+          12px/1.8 ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+      }
+      code {
+        font:
+          12px/1.8 ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+      }
+      .shiki {
+        background: var(--code) !important;
+        margin: 0;
+      }
+      .shiki,
+      .shiki span {
+        color: var(--shiki-light) !important;
+      }
+      :root[data-theme="dark"] .shiki,
+      :root[data-theme="dark"] .shiki span {
+        color: var(--shiki-dark) !important;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+      }
+      img,
+      svg {
+        max-width: 100%;
+      }
+      [data-math],
+      [data-diagram] {
+        overflow: auto;
+      }
+      [data-chart] {
+        height: 300px;
+        min-width: 0;
+      }
+      .renderer-error {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .page-actions {
+        display: flex;
+        gap: 12px;
+        border-top: 1px solid var(--line);
+        margin-top: 35px;
+        padding-top: 20px;
+      }
+      .feedback-group {
+        margin-bottom: 28px;
+      }
+      .group-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 12px;
+      }
+      .group-head h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .note {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .note p {
+        white-space: pre-wrap;
+      }
+      blockquote {
+        margin: 10px 0;
+        border-left: 2px solid var(--line);
+        padding-left: 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .submitbar {
+        position: sticky;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        border-top: 1px solid var(--line);
+        padding: 18px 0;
+        background: var(--bg);
+      }
+      .status {
+        padding: 25px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        margin: 0 0 30px;
+        background: var(--panel);
+      }
+      .status h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+      }
+      .status p {
+        margin: 0;
+      }
+      .status .row {
+        margin-top: 15px;
+      }
+      .spinner {
+        width: 26px;
+        height: 26px;
+        border: 2px solid var(--line);
+        border-top-color: var(--blue);
+        border-radius: 50%;
+        flex-shrink: 0;
+        animation: spin 1.2s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation: none;
+        }
+      }
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 140px;
+        resize: vertical;
+        margin: 10px 0 16px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 12px;
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 13px;
+      }
+      dialog {
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      dialog::backdrop {
+        background: #0005;
+      }
+      .drawer {
+        position: fixed;
+        inset: 0 0 0 auto;
+        height: 100dvh;
+        max-height: none;
+        width: 420px;
+        max-width: 100vw;
+        margin: 0;
+        padding: 24px;
+        border: 0;
+        border-left: 1px solid var(--line);
+      }
+      .dialog-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .dialog-head h2 {
+        margin: 0;
+      }
+      .dialog {
+        position: fixed;
+        inset: 0;
+        margin: auto;
+        width: min(440px, 92vw);
+        height: fit-content;
+        max-height: 90dvh;
+        padding: 25px;
+        border-radius: 6px;
+      }
+      .dialog h2 {
+        margin: 0 0 18px;
+      }
+      .dialog .actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      .quote-button {
+        position: fixed;
+        bottom: 22px;
+        right: 22px;
+        z-index: 2;
+      }
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 90vw;
+        padding: 10px 16px;
+        border-radius: 5px;
+        color: var(--bg);
+        background: var(--ink);
+        z-index: 5;
+        font-size: 12px;
+      }
+      @media (max-width: 720px) {
+        .app {
+          display: block;
+        }
+        .sidebar {
+          height: auto;
+          position: static;
+          padding: 16px;
+        }
+        .sidebar nav {
+          display: flex;
+          overflow: auto;
+          gap: 14px;
+          margin-top: 15px;
+        }
+        .sidebar nav button {
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .revision {
+          margin: 12px 12px 0;
+        }
+        .topbar {
+          padding: 12px 16px;
+          flex-wrap: wrap;
+        }
+        .content {
+          padding: 24px 18px 70px;
+        }
+        h1 {
+          font-size: 29px;
+        }
+        .two {
+          grid-template-columns: 1fr;
+        }
+        table {
+          display: block;
+          overflow: auto;
+        }
+        .drawer {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand"><span>p/</span>plan-interactively</div>
+        <div class="revision" id="revision"></div>
+        <nav id="navigation" aria-label="Plan pages"></nav>
+      </aside>
+      <main>
+        <header class="topbar">
+          <span class="small" id="artifact-title"></span>
+          <div class="row">
+            <button class="btn quiet" id="theme">Dark mode</button
+            ><button class="btn" id="review">
+              Feedback <span class="count">0</span></button
+            ><button class="btn primary" id="accept" hidden disabled>
+              Accept plan
+            </button>
+          </div>
+        </header>
+        <div class="content">
+          <section id="reading">
+            <h1 tabindex="-1" id="page-title"></h1>
+            <div id="page-content"></div>
+            <div class="page-actions">
+              <button class="btn" id="page-comment">Comment on this page</button
+              ><button class="btn" id="page-review">Review feedback →</button>
+            </div>
+          </section>
+          <section id="feedback" hidden>
+            <h1 tabindex="-1">Review your feedback</h1>
+            <div class="status" id="agent-status" role="status" hidden>
+              <div class="row">
+                <span
+                  class="spinner"
+                  id="spinner"
+                  aria-hidden="true"
+                  hidden
+                ></span>
+                <div>
+                  <h2 id="status-title"></h2>
+                  <p class="small" id="status-detail"></p>
+                </div>
+              </div>
+              <div class="row">
+                <button class="btn" id="reply" hidden>Reply to question</button
+                ><a class="btn" id="update" hidden>View update →</a
+                ><a class="btn" id="final-plan" hidden>View accepted plan →</a>
+              </div>
+              <code id="plan-path" hidden></code>
+            </div>
+            <div id="feedback-groups"></div>
+            <div class="group-head">
+              <h2>Overall</h2>
+              <button class="btn quiet" id="overall-note">Add note</button>
+            </div>
+            <div id="overall-notes"></div>
+            <div class="submitbar">
+              <div class="small" id="submit-status"></div>
+              <div class="row">
+                <button class="btn quiet" id="export">Export copy</button
+                ><button class="btn primary" id="submit" disabled>
+                  Submit feedback
+                </button>
+              </div>
+            </div>
+            <p class="small" id="storage-status"></p>
+            <p class="small" id="connection-status"></p>
+          </section>
+        </div>
+      </main>
+    </div>
+    <dialog class="drawer" id="note-dialog" aria-labelledby="note-title">
+      <form id="note-form">
+        <div class="dialog-head">
+          <h2 id="note-title">Add note</h2>
+          <button
+            class="btn quiet"
+            type="button"
+            data-close="note-dialog"
+            aria-label="Close note"
+          >
+            ✕
+          </button>
+        </div>
+        <p class="small" id="note-anchor"></p>
+        <blockquote id="note-quote" hidden></blockquote>
+        <label for="note-text">Feedback</label
+        ><textarea id="note-text" required></textarea>
+        <div class="row">
+          <button type="submit" class="btn primary">Add to feedback</button
+          ><button type="button" class="btn" data-close="note-dialog">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      class="dialog"
+      id="question-dialog"
+      aria-labelledby="question-title"
+    >
+      <form id="question-form">
+        <h2 id="question-title">Reply to the agent</h2>
+        <p id="question-text"></p>
+        <label for="question-reply">Your reply</label
+        ><textarea id="question-reply" required></textarea>
+        <p class="small" id="question-error" role="status"></p>
+        <div class="row">
+          <button type="submit" class="btn primary" id="send-reply">
+            Send reply</button
+          ><button type="button" class="btn" data-close="question-dialog">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
+      <h2 id="accept-title">Accept this plan?</h2>
+      <p id="accept-detail"></p>
+      <p class="small">
+        Choose whether the waiting agent should begin implementation or save the
+        plan for later.
+      </p>
+      <p class="small" id="accept-error" role="status"></p>
+      <div class="actions">
+        <button class="btn primary" data-accept-mode="implement">
+          Accept and start implementation</button
+        ><button class="btn" data-accept-mode="save">
+          Accept and save for later</button
+        ><button class="btn quiet" data-close="accept-dialog">Cancel</button>
+      </div>
+    </dialog>
+    <button class="btn primary quote-button" id="quote" hidden>
+      Comment on selection
+    </button>
+    <div class="toast" id="toast" role="status" hidden></div>
+
+    <script type="application/json" id="session-config">
+      {}
+    </script>
+    <script type="application/json" id="plan-data">
+      {
+        "artifactId": "proposal",
+        "revision": "1",
+        "kind": "exploration",
+        "title": "Work proposal",
+        "pages": [
+          {
+            "id": "overview",
+            "title": "Work proposal",
+            "html": "<p>Describe the proposed work and its meaningful alternatives here.</p>"
+          }
+        ]
+      }
+    </script>
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const plan = JSON.parse($("plan-data").textContent);
+      const session = JSON.parse($("session-config").textContent);
+      const storageKey = `plan-interactively:${session.sessionId || "offline"}:${plan.artifactId}:${plan.revision}`;
+      let state = {
+        notes: [],
+        choices: {},
+        theme: matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light",
+        submitted: null,
+        pending: null,
+      };
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        if (saved && Array.isArray(saved.notes) && saved.choices) state = saved;
+      } catch {
+        /* The in-memory draft and export remain usable. */
+      }
+      let page = plan.pages[0],
+        remote = null,
+        connected = false,
+        editing = null,
+        noteContext = null,
+        selected = "",
+        question = null,
+        questionEvent = null,
+        acceptance = null,
+        submissionError = "",
+        toastTimer;
+      const charts = new Map();
+      const snapshot = () =>
+        JSON.stringify({ notes: state.notes, choices: state.choices });
+      const dirty = () =>
+        state.notes.length + Object.keys(state.choices).length;
+      const current = () =>
+        remote?.current?.artifactId === plan.artifactId &&
+        remote?.current?.revision === plan.revision;
+      function notify(message) {
+        $("toast").textContent = message;
+        $("toast").hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => ($("toast").hidden = true), 4000);
+      }
+      function persist() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(state));
+          $("storage-status").textContent = "Draft saved locally.";
+        } catch {
+          $("storage-status").textContent =
+            "Local storage unavailable. Export a copy to keep your feedback.";
+        }
+      }
+      function save() {
+        persist();
+        review();
+      }
+      function theme() {
+        document.documentElement.dataset.theme = state.theme;
+        $("theme").textContent =
+          state.theme === "dark" ? "Light mode" : "Dark mode";
+        for (const chart of charts.values())
+          chart.setOption(chartTheme(chart.getOption()));
+        renderDiagrams($("page-content"));
+      }
+      function show(id) {
+        const feedback = id === "feedback";
+        $("reading").hidden = feedback;
+        $("feedback").hidden = !feedback;
+        if (!feedback) {
+          page = plan.pages.find((item) => item.id === id) || plan.pages[0];
+          for (const chart of charts.values()) chart.dispose();
+          charts.clear();
+          $("page-title").textContent = page.title;
+          $("page-content").innerHTML = page.html;
+          restoreChoices();
+          enhance($("page-content"));
+          window.dispatchEvent(
+            new CustomEvent("plan:page", {
+              detail: { page, element: $("page-content") },
+            }),
+          );
+        }
+        for (const button of $("navigation").children) {
+          if (button.dataset.page === (feedback ? "feedback" : page.id))
+            button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        }
+        history.replaceState(null, "", "#" + (feedback ? "feedback" : page.id));
+        (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
+          preventScroll: true,
+        });
+        window.scrollTo(0, 0);
+        $("quote").hidden = true;
+        review();
+      }
+      function openNote(topic, anchor, quote = "", id = null) {
+        noteContext = { topic, anchor, quote };
+        editing = id;
+        $("note-anchor").textContent = anchor;
+        $("note-quote").textContent = quote;
+        $("note-quote").hidden = !quote;
+        $("note-text").value = id
+          ? state.notes.find((note) => note.id === id).text
+          : "";
+        $("note-title").textContent = id ? "Edit note" : "Add note";
+        $("note-form").querySelector('[type="submit"]').textContent = id
+          ? "Save changes"
+          : "Add to feedback";
+        $("note-dialog").showModal();
+        $("note-text").focus();
+        $("quote").hidden = true;
+      }
+      function noteCard(note) {
+        const box = document.createElement("div");
+        box.className = "note";
+        const title = document.createElement("h3");
+        title.textContent = note.anchor;
+        box.append(title);
+        if (note.quote) {
+          const quote = document.createElement("blockquote");
+          quote.textContent = note.quote;
+          box.append(quote);
+        }
+        const text = document.createElement("p");
+        text.textContent = note.text;
+        box.append(text);
+        const actions = document.createElement("div");
+        actions.className = "row";
+        for (const action of ["Edit", "Remove"]) {
+          const button = document.createElement("button");
+          button.className = "btn quiet";
+          button.textContent = action;
+          button.onclick = () => {
+            if (action === "Edit")
+              openNote(note.topic, note.anchor, note.quote, note.id);
+            else {
+              state.notes = state.notes.filter((item) => item.id !== note.id);
+              save();
+            }
+          };
+          actions.append(button);
+        }
+        box.append(actions);
+        return box;
+      }
+      function review() {
+        document
+          .querySelectorAll(".count")
+          .forEach((element) => (element.textContent = dirty()));
+        $("feedback-groups").replaceChildren();
+        for (const topic of plan.pages) {
+          const notes = state.notes.filter((note) => note.topic === topic.id),
+            choices = Object.entries(state.choices).filter(
+              ([, choice]) => choice.topic === topic.id,
+            );
+          if (!notes.length && !choices.length) continue;
+          const group = document.createElement("section");
+          group.className = "feedback-group";
+          const head = document.createElement("div");
+          head.className = "group-head";
+          const heading = document.createElement("h2");
+          heading.textContent = topic.title;
+          head.append(heading);
+          group.append(head);
+          for (const [id, choice] of choices) {
+            const row = document.createElement("p");
+            row.textContent = `${choice.label}: ${choice.value}`;
+            const clear = document.createElement("button");
+            clear.className = "btn quiet";
+            clear.textContent = "Clear choice";
+            clear.onclick = () => {
+              delete state.choices[id];
+              restoreChoices();
+              save();
+            };
+            row.append(clear);
+            group.append(row);
+          }
+          notes.forEach((note) => group.append(noteCard(note)));
+          $("feedback-groups").append(group);
+        }
+        $("overall-notes").replaceChildren(
+          ...state.notes
+            .filter((note) => note.topic === "overall")
+            .map(noteCard),
+        );
+        const unchanged = state.submitted?.snapshot === snapshot();
+        $("submit").disabled =
+          !dirty() || unchanged || !connected || !current();
+        $("submit").textContent = unchanged ? "Submitted" : "Submit feedback";
+        $("submit-status").textContent =
+          submissionError ||
+          (unchanged
+            ? "Feedback saved."
+            : dirty()
+              ? "Review your feedback before submitting."
+              : "No feedback added.");
+        status();
+      }
+      function feedbackText() {
+        const lines = [
+          `Feedback: ${plan.title}`,
+          `Artifact ${plan.artifactId}, revision ${plan.revision}`,
+          "Feedback only. No implementation approval.",
+        ];
+        for (const choice of Object.values(state.choices))
+          lines.push("", `${choice.label}: ${choice.value}`);
+        for (const note of state.notes)
+          lines.push(
+            "",
+            note.anchor,
+            ...(note.quote ? ["Selected passage: " + note.quote] : []),
+            note.text,
+          );
+        return lines.join("\n");
+      }
+      function groups() {
+        return { choices: state.choices, notes: state.notes };
+      }
+      function envelope(intent, text, extra = {}) {
+        return {
+          sessionId: session.sessionId,
+          id: crypto.randomUUID(),
+          artifactId: plan.artifactId,
+          revision: plan.revision,
+          intent,
+          groups: {},
+          text,
+          ...extra,
+        };
+      }
+      async function send(event) {
+        if (!connected)
+          throw Error("Reconnect to the local helper or export your feedback.");
+        const response = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(event),
+        });
+        const result = await response.json();
+        if (!response.ok) throw Error(result.error);
+        if (result.status.sessionId !== session.sessionId)
+          throw Error("Session identity mismatch.");
+        remote = result.status;
+        return result;
+      }
+      function status() {
+        const newer = remote?.current && !current();
+        const canAccept =
+          plan.kind === "plan" &&
+          connected &&
+          current() &&
+          !dirty() &&
+          ["ready", "updated"].includes(remote.stage);
+        $("accept").disabled = !canAccept;
+        $("accept").title = dirty()
+          ? "Submit feedback and review the revised plan before accepting."
+          : "";
+        if (!remote) return;
+        const stage = newer ? "updated" : remote.stage;
+        $("agent-status").hidden =
+          !newer &&
+          !state.submitted &&
+          !state.lastEvent &&
+          !["submitted", "working", "needs_reply", "complete"].includes(stage);
+        const titles = {
+          ready: "Ready for feedback",
+          submitted: "Waiting for the agent",
+          working: "The agent is working on your feedback",
+          needs_reply: "The agent has a question",
+          updated: "An updated artifact is ready",
+          complete:
+            remote.accepted?.mode === "implement"
+              ? "Plan accepted. Implementation requested."
+              : "Plan accepted and saved.",
+        };
+        $("status-title").textContent = titles[stage] || stage;
+        $("status-detail").textContent =
+          stage === "needs_reply"
+            ? remote.question?.text
+            : stage === "submitted"
+              ? "Your submission is saved."
+              : stage === "working" && remote.acknowledgedAt
+                ? "Acknowledged at " +
+                  new Date(remote.acknowledgedAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : stage === "updated"
+                  ? `${remote.current.title}, revision ${remote.current.revision}`
+                  : "";
+        $("spinner").hidden = !["submitted", "working"].includes(stage);
+        $("reply").hidden = stage !== "needs_reply" || newer;
+        $("update").hidden = !newer;
+        if (newer) $("update").href = remote.current.url;
+        $("final-plan").hidden = stage !== "complete";
+        $("plan-path").hidden = stage !== "complete";
+        if (stage === "complete") {
+          $("final-plan").href = remote.accepted.url;
+          $("plan-path").textContent = remote.accepted.path;
+        }
+        if (
+          state.submitted &&
+          remote.acknowledged.includes(state.submitted.id) &&
+          state.submitted.snapshot === snapshot()
+        )
+          $("submit-status").textContent = "Feedback received by the agent.";
+        if (newer) {
+          $("submit").disabled = true;
+          $("submit-status").textContent =
+            "Open the update to continue. This draft remains saved.";
+        }
+      }
+      async function poll() {
+        if (!session.sessionId || !/^https?:$/.test(location.protocol)) {
+          connected = false;
+          $("connection-status").textContent =
+            "Local viewing. Feedback can be exported; live submission requires the session URL.";
+          review();
+          return;
+        }
+        try {
+          const response = await fetch("/api/status");
+          if (!response.ok) throw Error();
+          const result = await response.json();
+          if (result.sessionId !== session.sessionId)
+            throw Error("Wrong session");
+          remote = result;
+          connected = true;
+          $("connection-status").textContent = "";
+          review();
+        } catch {
+          connected = false;
+          $("connection-status").textContent =
+            "Local helper disconnected. Your draft remains here; reconnect or export a copy.";
+          $("submit").disabled = true;
+          $("accept").disabled = true;
+          $("agent-status").hidden = false;
+          $("spinner").hidden = true;
+          $("status-title").textContent = "Connection unavailable";
+          $("status-detail").textContent =
+            "Resume this planning session in the agent conversation.";
+        }
+      }
+      function restoreChoices() {
+        document
+          .querySelectorAll("[data-choice] [data-value]")
+          .forEach((button) => {
+            const group = button.closest("[data-choice]");
+            button.setAttribute(
+              "aria-pressed",
+              String(
+                state.choices[page.id + "/" + group.dataset.choice]?.value ===
+                  button.dataset.value,
+              ),
+            );
+          });
+      }
+      $("note-form").onsubmit = (event) => {
+        event.preventDefault();
+        const text = $("note-text").value.trim();
+        if (!text) return;
+        const note = {
+          ...noteContext,
+          id: editing || crypto.randomUUID(),
+          text,
+          revision: plan.revision,
+        };
+        if (editing)
+          state.notes = state.notes.map((item) =>
+            item.id === editing ? note : item,
+          );
+        else state.notes.push(note);
+        save();
+        $("note-dialog").close();
+        notify("Added to feedback.");
+      };
+      $("submit").onclick = async () => {
+        submissionError = "";
+        const currentSnapshot = snapshot();
+        if (state.pending?.snapshot !== currentSnapshot)
+          state.pending = {
+            snapshot: currentSnapshot,
+            event: envelope("feedback-only", feedbackText(), {
+              groups: groups(),
+            }),
+          };
+        persist();
+        $("submit").disabled = true;
+        try {
+          const result = await send(state.pending.event);
+          state.submitted = { snapshot: currentSnapshot, id: result.id };
+          state.pending = null;
+          save();
+        } catch (error) {
+          submissionError = error.message;
+          $("submit").disabled = false;
+          $("submit-status").textContent = error.message;
+        }
+      };
+      $("export").onclick = () => {
+        const event =
+          state.pending?.event ||
+          envelope("feedback-only", feedbackText(), { groups: groups() });
+        const url = URL.createObjectURL(
+          new Blob([JSON.stringify(event, null, 2)], {
+            type: "application/json",
+          }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${plan.artifactId}-${plan.revision}-feedback.json`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      };
+      $("reply").onclick = () => {
+        question = remote.question;
+        questionEvent = null;
+        $("question-text").textContent = question.text;
+        $("question-reply").value = "";
+        $("question-error").textContent = "";
+        $("question-dialog").showModal();
+        $("question-reply").focus();
+      };
+      $("question-form").onsubmit = async (event) => {
+        event.preventDefault();
+        const text = $("question-reply").value.trim();
+        if (!text) return;
+        if (questionEvent?.text !== text)
+          questionEvent = envelope("clarification-reply", text, {
+            questionId: question.id,
+          });
+        $("send-reply").disabled = true;
+        try {
+          const result = await send(questionEvent);
+          state.lastEvent = result.id;
+          save();
+          $("question-dialog").close();
+        } catch (error) {
+          $("question-error").textContent = error.message;
+        } finally {
+          $("send-reply").disabled = false;
+        }
+      };
+      $("accept").onclick = () => {
+        $("accept-detail").textContent =
+          `${plan.title}, revision ${plan.revision}`;
+        $("accept-error").textContent = "";
+        $("accept-dialog").showModal();
+      };
+      document.querySelectorAll("[data-accept-mode]").forEach(
+        (button) =>
+          (button.onclick = async () => {
+            const mode = button.dataset.acceptMode;
+            if (acceptance?.mode !== mode)
+              acceptance = envelope(
+                "accept-plan",
+                `Accept ${plan.artifactId} revision ${plan.revision}. ${mode === "implement" ? "Start implementation of this plan." : "Save for later. Do not start implementation."}`,
+                { mode },
+              );
+            document
+              .querySelectorAll("[data-accept-mode]")
+              .forEach((item) => (item.disabled = true));
+            try {
+              const result = await send(acceptance);
+              state.lastEvent = result.id;
+              save();
+              $("accept-dialog").close();
+              show("feedback");
+            } catch (error) {
+              $("accept-error").textContent = error.message;
+            } finally {
+              document
+                .querySelectorAll("[data-accept-mode]")
+                .forEach((item) => (item.disabled = false));
+            }
+          }),
+      );
+      document.addEventListener("click", (event) => {
+        const close = event.target.closest("[data-close]");
+        if (close) $(close.dataset.close).close();
+        const navigation = event.target.closest("[data-page]");
+        if (navigation) show(navigation.dataset.page);
+        const comment = event.target.closest("[data-comment]");
+        if (comment) openNote(page.id, comment.dataset.comment || page.title);
+        const choice = event.target.closest("[data-choice] [data-value]");
+        if (choice) {
+          const group = choice.closest("[data-choice]"),
+            id = page.id + "/" + group.dataset.choice;
+          if (state.choices[id]?.value === choice.dataset.value)
+            delete state.choices[id];
+          else
+            state.choices[id] = {
+              topic: page.id,
+              label: group.dataset.label || group.dataset.choice,
+              value: choice.dataset.value,
+            };
+          restoreChoices();
+          save();
+        }
+      });
+      document.addEventListener("selectionchange", () => {
+        const selection = getSelection(),
+          parent = selection?.anchorNode?.parentElement;
+        selected = selection?.toString().trim() || "";
+        $("quote").hidden = !(
+          selected.length > 3 &&
+          parent?.closest("#page-content") &&
+          !document.querySelector("dialog[open]")
+        );
+      });
+      $("quote").onpointerdown = (event) => event.preventDefault();
+      $("quote").onclick = () => openNote(page.id, page.title, selected);
+      $("page-comment").onclick = () => openNote(page.id, page.title);
+      $("overall-note").onclick = () => openNote("overall", "Overall feedback");
+      $("review").onclick = $("page-review").onclick = () => show("feedback");
+      $("theme").onclick = () => {
+        state.theme = state.theme === "dark" ? "light" : "dark";
+        theme();
+        persist();
+      };
+
+      const libraries = {
+        shiki: "https://esm.sh/shiki@3.12.2",
+        mermaid:
+          "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
+        katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
+        katexCss:
+          "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
+        echarts:
+          "https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js",
+      };
+      const scripts = new Map();
+      let shikiTask,
+        mermaidTask,
+        diagramSequence = Promise.resolve();
+      const color = (name) =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue(name)
+          .trim();
+      function script(url, integrity, css = false) {
+        if (scripts.has(url)) return scripts.get(url);
+        const task = new Promise((resolve, reject) => {
+          const element = document.createElement(css ? "link" : "script");
+          if (css) {
+            element.rel = "stylesheet";
+            element.href = url;
+          } else element.src = url;
+          element.integrity = integrity;
+          element.crossOrigin = "anonymous";
+          element.onload = resolve;
+          element.onerror = () =>
+            reject(Error("Renderer unavailable; source preserved."));
+          document.head.append(element);
+        });
+        scripts.set(url, task);
+        return task;
+      }
+      function failed(element, error) {
+        if (
+          !element.isConnected ||
+          element.nextElementSibling?.classList.contains("renderer-error")
+        )
+          return;
+        const note = document.createElement("p");
+        note.className = "renderer-error";
+        note.textContent =
+          error.message || "Renderer unavailable; source preserved.";
+        element.after(note);
+      }
+      async function renderCode(element) {
+        const source = element.textContent;
+        try {
+          shikiTask ||= import(libraries.shiki);
+          const { codeToHtml } = await shikiTask;
+          const html = await codeToHtml(source, {
+            lang: element.dataset.language,
+            themes: { light: "github-light", dark: "github-dark" },
+            defaultColor: false,
+          });
+          if (element.isConnected) element.innerHTML = html;
+        } catch (error) {
+          failed(element, error);
+        }
+      }
+      function renderDiagrams(root) {
+        for (const element of root.querySelectorAll("[data-diagram]")) {
+          element.dataset.source ||= element.textContent;
+          diagramSequence = diagramSequence
+            .catch(() => {})
+            .then(async () => {
+              try {
+                if (!element.isConnected) return;
+                mermaidTask ||= import(libraries.mermaid);
+                const { default: mermaid } = await mermaidTask;
+                mermaid.initialize({
+                  startOnLoad: false,
+                  securityLevel: "strict",
+                  theme: "base",
+                  themeVariables: {
+                    primaryColor: color("--panel"),
+                    primaryTextColor: color("--ink"),
+                    primaryBorderColor: color("--muted"),
+                    lineColor: color("--muted"),
+                    fontFamily: "sans-serif",
+                  },
+                });
+                const result = await mermaid.render(
+                  "diagram-" + crypto.randomUUID(),
+                  element.dataset.source,
+                );
+                if (element.isConnected) element.innerHTML = result.svg;
+              } catch (error) {
+                failed(element, error);
+              }
+            });
+        }
+      }
+      async function renderMath(element) {
+        try {
+          await Promise.all([
+            script(
+              libraries.katex,
+              "sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6",
+            ),
+            script(
+              libraries.katexCss,
+              "sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP",
+              true,
+            ),
+          ]);
+          if (element.isConnected)
+            window.katex.render(element.textContent, element, {
+              throwOnError: true,
+              displayMode: element.dataset.math !== "inline",
+            });
+        } catch (error) {
+          failed(element, error);
+        }
+      }
+      function chartTheme(options) {
+        const result = {
+          backgroundColor: "transparent",
+          textStyle: { color: color("--ink") },
+          tooltip: {
+            backgroundColor: color("--panel"),
+            borderColor: color("--line"),
+            textStyle: { color: color("--ink") },
+          },
+        };
+        for (const key of ["xAxis", "yAxis"]) {
+          if (!options[key]) continue;
+          const axes = Array.isArray(options[key])
+            ? options[key]
+            : [options[key]];
+          result[key] = axes.map(() => ({
+            axisLabel: { color: color("--muted") },
+            axisLine: { lineStyle: { color: color("--line") } },
+            splitLine: { lineStyle: { color: color("--line") } },
+          }));
+        }
+        return result;
+      }
+      async function chart(element, options) {
+        await script(
+          libraries.echarts,
+          "sha384-F07Cpw5v8spSU0H113F33m2NQQ/o6GqPTnTjf45ssG4Q6q58ZwhxBiQtIaqvnSpR",
+        );
+        if (!element.isConnected) return null;
+        let instance = charts.get(element);
+        if (!instance) {
+          instance = window.echarts.init(element);
+          charts.set(element, instance);
+        }
+        instance.setOption({
+          backgroundColor: "transparent",
+          color: [color("--blue"), color("--muted")],
+          textStyle: { color: color("--ink") },
+          ...options,
+        });
+        instance.setOption(chartTheme(options));
+        return instance;
+      }
+      function enhance(root) {
+        root.querySelectorAll("[data-language]").forEach(renderCode);
+        root.querySelectorAll("[data-math]").forEach(renderMath);
+        renderDiagrams(root);
+        root.querySelectorAll("[data-chart]").forEach((element) => {
+          try {
+            const options = JSON.parse(element.textContent);
+            element.textContent = "";
+            chart(element, options).catch((error) => {
+              element.textContent = JSON.stringify(options, null, 2);
+              failed(element, error);
+            });
+          } catch (error) {
+            failed(element, error);
+          }
+        });
+      }
+      new ResizeObserver(() => {
+        for (const instance of charts.values()) instance.resize();
+      }).observe($("page-content"));
+      window.planUI = {
+        chart,
+        comment: (anchor, quote = "") => openNote(page.id, anchor, quote),
+        enhance,
+      };
+      document.title = plan.title;
+      $("artifact-title").textContent =
+        `${plan.title} / ${plan.kind === "plan" ? "Final plan" : "Exploration"}`;
+      $("revision").textContent = `Revision ${plan.revision}`;
+      $("accept").hidden = plan.kind !== "plan";
+      for (const item of [
+        ...plan.pages,
+        { id: "feedback", title: "Feedback" },
+      ]) {
+        const button = document.createElement("button");
+        button.dataset.page = item.id;
+        button.textContent = item.title;
+        $("navigation").append(button);
+      }
+      theme();
+      show(location.hash.slice(1));
+      poll();
+      setInterval(poll, 1500);
+    </script>
+  </body>
+</html>

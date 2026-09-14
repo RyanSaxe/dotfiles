@@ -222,7 +222,7 @@ repos:
         language: system
         entry: uv run -q --script ci/ai-harness-check.py
         pass_filenames: false
-        files: '^(ai-harness/|ci/ai-harness-check\.py$)'
+        files: '^(ai-harness/|ci/ai-harness-check\.py$|tests/plan-interactively/)'
 
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.
