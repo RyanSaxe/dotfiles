@@ -8,6 +8,10 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
+  assemble,
+  build,
+} from "../../ai-harness/skills/plan-interactively/scripts/build.mjs";
+import {
   artifactData,
   serve,
 } from "../../ai-harness/skills/plan-interactively/scripts/session.mjs";
@@ -21,10 +25,13 @@ const helper = path.join(
   root,
   "ai-harness/skills/plan-interactively/scripts/session.mjs",
 );
-const frame = await fs.readFile(
-  path.join(root, "ai-harness/skills/plan-interactively/assets/frame.html"),
-  "utf8",
-);
+const frame = await assemble({
+  artifactId: "example",
+  revision: "0",
+  kind: "exploration",
+  title: "Example",
+  pages: [{ id: "overview", title: "Overview", html: "" }],
+});
 function artifact(revision = "1", kind = "exploration") {
   return frame.replace(
     /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,
@@ -75,6 +82,119 @@ async function fixture(t) {
   });
   return { directory, server, connection, request, action, event };
 }
+
+test("split authoring sources build a standalone artifact without executing content", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-build-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const content = "<h1>Interface</h1><pre>literal </script> and $&</pre>";
+  await fs.writeFile(path.join(directory, "interface.html"), content);
+  await fs.writeFile(
+    path.join(directory, "custom.css"),
+    ".prototype { color: var(--attention); }",
+  );
+  await fs.writeFile(
+    path.join(directory, "custom.js"),
+    'window.addEventListener("plan:page", () => {});',
+  );
+  const source = path.join(directory, "source.json");
+  await fs.writeFile(
+    source,
+    JSON.stringify({
+      artifactId: "build",
+      revision: "1",
+      kind: "plan",
+      title: "Build",
+      css: "custom.css",
+      js: "custom.js",
+      pages: [{ id: "overview", title: "Overview", file: "interface.html" }],
+    }),
+  );
+  const html = await build(source);
+  assert.equal(artifactData(html).pages[0].html, content);
+  assert.equal(artifactData(html).pages[0].file, undefined);
+  assert.equal(artifactData(html).css, undefined);
+  assert(html.includes(".prototype { color: var(--attention); }"));
+  assert(html.includes('window.addEventListener("plan:page"'));
+  assert(!html.includes("<!-- FRAME_"));
+  assert(!html.includes('src="frame.js"'));
+  await assert.rejects(
+    assemble(artifactData(html), { js: 'const text = "</script>";' }),
+    /closing/,
+  );
+  const output = path.join(directory, "artifact.html");
+  const builder = path.join(path.dirname(helper), "build.mjs");
+  await exec(process.execPath, [builder, source, output]);
+  assert.equal(await fs.readFile(output, "utf8"), html);
+  await assert.rejects(
+    exec(process.execPath, [builder, source, output]),
+    /EEXIST/,
+  );
+});
+
+test("final review can reopen exploration and only accept the recomposed plan", async (t) => {
+  const a = await fixture(t);
+  await a.action("publish", { html: artifact("1", "plan") });
+  const feedback = a.event();
+  await a.request("/api/feedback", feedback);
+  await a.action("ack", { id: feedback.id });
+  assert.equal(
+    (await a.action("publish", { html: artifact("2", "exploration") })).code,
+    200,
+  );
+  assert.equal(
+    (
+      await a.request(
+        "/api/feedback",
+        a.event("accept-plan", "1", { mode: "save" }),
+      )
+    ).code,
+    409,
+  );
+  assert.equal(
+    (
+      await a.request(
+        "/api/feedback",
+        a.event("accept-plan", "2", { mode: "save" }),
+      )
+    ).code,
+    409,
+  );
+  const choice = a.event("feedback-only", "2", {
+    text: "Use per-item results.",
+  });
+  await a.request("/api/feedback", choice);
+  await a.action("ack", { id: choice.id });
+  await a.action("publish", { html: artifact("3", "plan") });
+  const acceptance = a.event("accept-plan", "3", { mode: "save" });
+  assert.equal((await a.request("/api/feedback", acceptance)).code, 200);
+  await a.action("ack", { id: acceptance.id });
+  assert.equal(
+    (await a.action("complete")).body.planPath,
+    path.join(a.directory, "artifacts/example.3.html"),
+  );
+  assert.equal(
+    artifactData(
+      await fs.readFile(
+        path.join(a.directory, "artifacts/example.1.html"),
+        "utf8",
+      ),
+    ).kind,
+    "plan",
+  );
+});
+
+test("capability check tests storage and loopback, cleans up, and fails on unusable storage", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-check-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const check = path.join(path.dirname(helper), "check.mjs");
+  const result = await exec(process.execPath, [check, directory]);
+  assert.equal(JSON.parse(result.stdout).ready, true);
+  assert.deepEqual(await fs.readdir(directory), []);
+  const file = path.join(directory, "not-a-directory");
+  await fs.writeFile(file, "preserve");
+  await assert.rejects(exec(process.execPath, [check, file]));
+  assert.equal(await fs.readFile(file, "utf8"), "preserve");
+});
 
 test("artifact parsing requires a real plan overview and preserves rich HTML", () => {
   assert.equal(

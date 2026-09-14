@@ -5,133 +5,96 @@ description: Plan work through short conversation, interactive browser proposals
 
 # Plan interactively
 
-Use this skill only on explicit invocation. Do not implement the proposed work
-while exploring or reviewing a plan. Final acceptance has two distinct outcomes:
-save for later, or explicit permission to begin implementing that exact plan.
+Develop the user's idea into a plan they understand and approve. Use conversation
+to uncover intent and interactive proposals to resolve meaningful choices. The
+final artifact must preserve those choices and let a human or agent carry out
+the work using only the plan and the project.
+
+Use this skill only on explicit invocation. Planning does not authorize
+implementation. Acceptance explicitly chooses between saving the plan and
+starting work on that exact revision.
 
 ![Planning flow](references/flow.svg)
 
-## Understand the intended work
+## Understand the work
 
-Read relevant project context, then gather the user's context. A short feature
-description is not enough by itself. Use short, specific turns to understand the
-problem, intended outcome, important behavior, constraints, and non-goals. Ask
-for an example when several interpretations remain plausible.
+Read relevant project context and gather the user's context in short, specific
+turns. Clarify the intended outcome, important behavior, and constraints. Ask for
+an example when interpretations differ. Do not repeat supplied context or run a
+fixed questionnaire.
 
-Move to the browser once you can propose meaningful alternatives grounded in
-that intent. Do not try to settle every design choice in the terminal or run a
-fixed questionnaire. If the user already supplied the context, avoid redundant
-questions. Summarize your understanding briefly when uncertainty still affects
-the proposal.
-
-## Start an isolated session
-
-Read [authoring.md](references/authoring.md) before creating the first artifact.
-Use the checked [frame](assets/frame.html), retaining its shared controls and
-library defaults. The [helper](scripts/session.mjs) needs Node 20+ and no installed
-packages. Resolve these paths relative to this skill, not the project directory.
-
-Run the helper through a long-running tool process:
-
-```sh
-node scripts/session.mjs start
-```
-
-Keep the returned session directory and URL in the active conversation. Every
-subsequent command requires `--session-dir PATH`. Do not use a shared current-
-session file. Keep generated artifacts and feedback outside project history.
-
-If a session already exists, inspect its status and queued feedback rather than
-creating a replacement. Resume its helper with `start --session-dir PATH`.
-A live owner prevents a second writer. After an abnormal shutdown, inspect the
-old owner before using `--recover-lock`; do not delete ownership files blindly.
+Use conversation for quick clarifications. Move to the browser when there are
+meaningful options to compare, behavior to demonstrate, or a proposal to review.
+Discussion order need not match implementation order.
 
 ## Propose and listen
 
-Build freely composed pages with concrete options and relevant recommendations.
-Use working prototypes, code interfaces, math, diagrams, or charts when they
-help the user judge the work. A page may resolve several related ambiguities.
-Discussion order need not match implementation order. Do not select an option
-on the user's behalf or reopen settled choices without a reason.
+Read [setup.md](references/setup.md) when first checking an environment,
+[authoring.md](references/authoring.md) before creating an artifact, and
+[session.md](references/session.md) before running the live review loop.
 
-Write a complete artifact, then publish it:
+You can write custom HTML, CSS, and JavaScript. The reusable frame provides
+navigation, themes, comments, and acceptance; it does not limit what you can
+build inside a page. Use working prototypes, code interfaces, math, diagrams,
+or charts when they help the user judge the choices. A page may address several
+related decisions. Do not force equal cards or turn every question into a page.
 
-```sh
-node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html
-node scripts/session.mjs wait --session-dir PATH --timeout 55
-```
+Recommend an option with a concrete reason where useful, but do not choose for
+the user. Keep prose brief and specific. Remove filler, redundant subtitles,
+and commentary about how you created the artifact. Inspect meaningful
+interactions in the browser before presenting them; disclose any verification
+you could not perform.
 
-Present the returned URL and keep the agent turn waiting. A timeout is not
-completion; wait again. A side question does not end the session: answer it,
-then resume the same wait. The helper saves feedback but cannot awaken an ended
-agent turn. If the conversation is interrupted, the next turn must resume the
-explicit session and read its queue.
+Keep the live session waiting after publishing. A timeout or side question does
+not finish the review: answer the question, then resume waiting on the same
+session. Read each submission before acknowledging it. Combine browser feedback
+with the conversation and reopen only decisions affected by new information.
 
-When an event arrives, read its `payload`, including intent and source revision,
-then acknowledge the event ID:
+## Compose a complete plan
 
-```sh
-node scripts/session.mjs ack --session-dir PATH --id SUBMISSION_ID
-```
+Once scope and choices are aligned, compose the actual final plan. Start with an
+overview linked to the work's steps and details. Keep the structure appropriate
+to the task, including parallel work only when it helps. Rich HTML content is
+as useful here as in exploration.
 
-A saved receipt is not an agent acknowledgement. Do not acknowledge unread
-feedback. Combine it with the conversation, revisit affected decisions, and
-either revise the proposal or ask a focused clarification.
+Carry forward accepted behavior, exact interfaces and visual specifications,
+constraints, and examples that matter. Do not summarize away decisions or rely
+on disposable prototypes or the planning conversation. A reader should see
+what to do, why consequential choices were made, and how to recognize completion.
 
-```sh
-node scripts/session.mjs question --session-dir PATH --text "QUESTION"
-```
+Resolve choices needed to implement the work before presenting the final plan.
+Do not hide unfinished planning in TBDs, undecided sections, or future work.
+Explicit non-goals are useful; genuine implementation-time discovery should have
+a bounded investigation and a clear way to judge its result.
 
-The browser offers a dedicated reply field. Continue waiting for its event.
-The user can also answer in the agent conversation; resolve that question with
-`working --session-dir PATH` before proceeding so late browser replies cannot
-replace the answer. Do not create a separate chat transport.
+Match validation and inspectable completion evidence to the work. Follow project
+requirements, including commit rules where applicable, without imposing a fixed
+commit sequence, evidence bundle, or universal planning template.
 
-Publish each revision under a new revision identifier. Preserve old snapshots
-and attach feedback to what the user actually saw. If asked to return to an older
-proposal, use it as the baseline for a new revision and explicitly reconsider
-later decisions. Do not delete later history or build a branch manager.
+## Review can reopen exploration
 
-## Compose the final plan
+Final-plan review is not an irreversible phase. Revise directly when feedback is
+clear, ask a short clarification when sufficient, or publish focused interactive
+options when a choice needs comparison or demonstration.
 
-When scope and choices are aligned, say that exploration is complete and compose
-the actual final plan. Only then expose its review link. Do not present a demo
-plan alongside exploration and leave the user to infer which is authoritative.
+For renewed exploration, identify the affected choice and link back to the plan
+under review. Keep unaffected decisions settled. The exploration artifact is
+not eligible for final acceptance. Once the choice is resolved, incorporate it
+and its consequences into a complete new final-plan revision for review.
 
-Use the same frame, theme control, comments, and feedback page. Start with an
-overview linked to implementation steps. Carry forward the detail a new agent
-needs: accepted behavior, exact interfaces and visual specifications, relevant
-examples, constraints, dependency order, and task-specific completion checks.
-Rich content remains available inside every step. Do not summarize away the
-decisions or rely on the conversation or disposable prototypes as the handoff.
+## Finish with explicit acceptance
 
-Match validation and review evidence to the work. Specify how a person can
-inspect completion when it matters, including useful PR artifacts where
-appropriate. Avoid a mandatory evidence bundle for every task.
+Final review uses the same feedback loop. Read the final artifact's plan-data
+without rendering it to check that the handoff stands alone. Resolve blocking
+feedback before requesting acceptance.
 
-Final-plan feedback uses the same loop. Resolve blocking questions and requested
-changes before acceptance. Preserve full semantic content in `plan-data` so an
-implementing agent can read the HTML without running its browser UI.
+Only an explicit acceptance event for the current final revision can finish
+planning. Follow the session reference to acknowledge and complete it:
 
-## Honor the acceptance choice
+- Save for later: return the durable plan path and stop.
+- Start implementation: read the accepted plan and proceed under the project's
+  instructions and existing permissions.
 
-An `accept-plan` event must explicitly contain `mode`:
-
-- `save`: acknowledge, complete planning, and return the durable plan path.
-  Do not begin implementation.
-- `implement`: acknowledge, complete planning, and read the accepted plan from
-  the returned path. Continue implementation under the project's instructions,
-  isolation requirements, and existing permissions. This does not authorize
-  unrelated actions or remove a need for approval of restricted operations.
-
-```sh
-node scripts/session.mjs complete --session-dir PATH
-```
-
-Check the returned `nextAction` and `planPath`. Do not infer execution permission
-from a feedback message, a recommendation, an acknowledgement, or mere plan
-acceptance without the explicit mode. The helper never executes plan content.
-
-Leave accepted artifacts and the acceptance record intact when the helper stops.
-For later changes, reopen review on a new revision; old acceptance does not
-approve modified content.
+Neither ordinary feedback nor accepting an exploration approves implementation.
+Preserve accepted artifacts. Any later revision needs its own review and
+acceptance.

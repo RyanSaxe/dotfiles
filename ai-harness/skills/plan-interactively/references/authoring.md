@@ -1,10 +1,42 @@
 # Author browser artifacts
 
-Copy `assets/frame.html` into the session directory and edit the copy. Do not
-modify the skill's shared frame for a particular planning task. Keep all required
-plan text and local presentation in the HTML; embed images or other essential
-assets rather than linking to disposable files. External renderers enhance the
-document but must not be the only representation of the work.
+Author pages as ordinary HTML files alongside a JSON manifest in the session
+directory. Add custom CSS and JavaScript files as needed. You have full freedom
+to compose components and interactions; the shared frame supplies navigation,
+themes, feedback, and acceptance, not a fixed content grammar.
+
+Build a standalone artifact with the dependency-free Node helper:
+
+```sh
+node scripts/build.mjs SOURCE.json ARTIFACT.html
+```
+
+The output must be a new filename. The helper combines `assets/frame.html`,
+`frame.css`, and `frame.js` with your content. Do not modify shared skill assets
+for a particular task. Essential images and other local resources must be
+embedded; the builder does not bundle linked files or JavaScript imports.
+External renderers must not be the only representation of the work.
+
+The source manifest uses the content contract below, with a page's `file`
+instead of `html` to read a separate HTML file. Optional top-level `css` and
+`js` name your custom files. All paths resolve relative to the manifest:
+
+```json
+{
+  "artifactId": "batch-prediction",
+  "revision": "1",
+  "kind": "exploration",
+  "title": "Batch prediction",
+  "css": "proposal.css",
+  "js": "proposal.js",
+  "pages": [
+    { "id": "interface", "title": "Interface", "file": "interface.html" }
+  ]
+}
+```
+
+Omit `css` or `js` when unnecessary. The builder embeds page contents in
+`plan-data`, so the final handoff does not depend on these source files.
 
 ## Content contract
 
@@ -30,9 +62,15 @@ Use `kind: "plan"` only for the actual final plan. Its first page has ID
 `overview`; the remaining pages describe implementation steps. IDs contain
 letters, digits, underscores, or hyphens; revisions also allow periods. Keep
 IDs stable for a continuing artifact, and use a new revision for every publish.
+Exploration and plan are artifact types, not irreversible phases. To reopen a
+choice during final review, publish a focused exploration with a descriptive
+title such as "Exploring batch behavior" and a link to the prior plan snapshot.
+Keep acceptance hidden by using `kind: "exploration"`. After alignment, publish
+a complete new `plan` revision, not an addendum requiring the old discussion.
 `feedback` is reserved for the frame's feedback view.
 
-Escape literal `<` as `\u003c` inside the JSON script when content could contain
+The builder escapes literal `<` as `\u003c` inside the JSON script. If editing
+assembled HTML directly, do the same when content could contain
 `</script>`. The page `html` is trusted agent-authored HTML and is not a Markdown
 string. User notes are rendered as text by the frame. Do not inject feedback
 into executable HTML or scripts.
@@ -56,7 +94,15 @@ actual work. Do not force equal-sized decision cards or one decision per page.
 Proposals should expose meaningful differences, with a recommendation and its
 reason where useful. Keep labels short and prose concrete. Avoid filler,
 redundant subtitles, self-reference, or discussion about how this artifact was
-made. Reserve red/green for semantic errors/success; blue is the general accent.
+made. Blue is the general accent. Green means success, red means danger or
+failure, and amber means attention. Each theme provides `--success`, `--danger`,
+and `--attention`, with `-bg` and `-border` variants. Do not color recommendations
+green or alternatives red merely to indicate preference. Include a visible
+label or icon so meaning does not depend on color alone:
+
+```html
+<p class="notice" data-tone="attention">Requires review: migration downtime.</p>
+```
 
 ## Choices and comments
 
@@ -122,40 +168,21 @@ Apache ECharts accepts an option object as the element's JSON text:
 </div>
 ```
 
-For task-specific interactions, add a script to the HTML outside `plan-data`.
-Listen for `plan:page` to initialize newly rendered content. Its detail contains
+For task-specific interactions, use the manifest's `js` file. It is embedded as
+a classic script before the frame's module, outside `plan-data`.
+Listen on `window` for `plan:page` to initialize newly rendered content. Its detail contains
 `page` and `element`. `window.planUI.chart(element, options)` returns the chart
 instance asynchronously, and `window.planUI.enhance(element)` renders rich
 content added after the initial page render. Register the listener before the
 frame's module executes. Scripts inside page HTML are not executed by
 `innerHTML`.
 
-## Session operations and limitations
-
-The helper uses an OS-assigned loopback port and a unique durable session
-directory. Resume with the directory, not an old port. `connection.json` is
-private to the agent; the browser needs only the session identity. Different
-sessions cannot share acknowledgements or submissions.
-
-`wait` returns the next unread event and does not acknowledge it. `ack` is
-idempotent. A question receives an ID; browser replies must name that still-open
-question. Resolving it in conversation with `working` invalidates late replies.
-Publication requires pending feedback to be read and the question resolved.
-
-The final acceptance dialog has explicit save and implement actions. There is
-no defaulted checkbox or implicit implementation mode. The helper persists the
-mode and returns it after `complete`; only the active agent can act on it.
-
-The helper runs in the foreground of its long-running tool process. A normal
-SIGTERM/SIGINT closes it and releases ownership without removing artifacts.
-After an abnormal shutdown, `start --recover-lock --session-dir PATH` requires
-both a dead recorded process and an unreachable old endpoint. Inspect uncertain
-ownership manually; do not start concurrent recovery commands.
-
-If the helper is unavailable, the page preserves saved draft notes and offers
-JSON export. Ask the user for the exported file and treat its contents as
-feedback, not as implementation permission. Do not claim it was acknowledged by
-the live protocol when it was read through that fallback.
+```js
+window.addEventListener("plan:page", ({ detail: { element } }) => {
+  const button = element.querySelector("[data-preview]");
+  if (button) button.onclick = () => button.classList.toggle("expanded");
+});
+```
 
 ## Before presenting
 
