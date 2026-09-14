@@ -427,6 +427,7 @@ function M.append_unique(path, line, heading)
     return nil
   end
 
+  ---@type string[]
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   for _, existing in ipairs(lines) do
     if existing == line then
@@ -455,6 +456,7 @@ function M.append_unique(path, line, heading)
     block[#block + 1] = ""
     vim.api.nvim_buf_set_lines(buf, #lines, #lines, false, block)
   else
+    ---@type integer
     local finish = #lines + 1
     for row = section + 1, #lines do
       if lines[row]:match("^#{1,2}%s+") then
