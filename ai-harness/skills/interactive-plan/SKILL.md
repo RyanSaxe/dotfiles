@@ -7,7 +7,7 @@ description: Plan work through conversation, rich interactive browser proposals,
 
 Work with the user to develop an implementation-ready plan. Use their request, project context, and prior decisions to identify what still needs discussion. Do not ask them to approve settled requirements again.
 
-Make that discussion concrete. Show the proposed design, behavior, code, or wording that the user needs to judge. Explain consequential tradeoffs and recommend an approach when you have a reason. Offer alternatives when they represent real choices, and leave room for the user to reject the framing or propose something else.
+Make that discussion concrete. Show the proposed design, behavior, code, decision or wording that the user needs to judge. Explain consequential tradeoffs and recommend an approach when you have a reason. Offer alternatives when they represent real choices, and leave room for the user to reject the framing or propose something else. But do not use unnecessarily long explanations or prose. Clarity is critical.
 
 Give the planning discussion a rich, carefully composed visual form. Make relationships, alternatives, and consequences easy to grasp by scanning and interacting. Keep the explanation needed to judge the proposal. Remove content that does not help the discussion; compressing it into a short label or decorative element does not make it useful. A text dump with buttons is not an acceptable result; neither is a polished demonstration that does not help the user shape the plan.
 
@@ -54,7 +54,7 @@ Inspect the actual page before presenting it. Can the user tell what is proposed
 what remains open, and how their response would change the plan? Check that the
 composition makes those judgments easier without hiding necessary explanation.
 Exercise meaningful interactions and renderers in the
-affected themes and smaller layouts. Disclose verification you could not perform.
+affected themes and smaller layouts.
 
 Open the first published proposal in the user's default browser and provide its
 link. Keep the same session for subsequent revisions.
