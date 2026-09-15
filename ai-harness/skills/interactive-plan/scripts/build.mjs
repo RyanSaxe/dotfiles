@@ -7,8 +7,8 @@ import { artifactData } from "./session.mjs";
 const assets = new URL("../assets/", import.meta.url);
 
 export async function assemble(data, { css = "", js = "" } = {}) {
-  const [shell, style, script] = await Promise.all(
-    ["frame.html", "frame.css", "frame.js"].map((name) =>
+  const [shell, style, script, notifications] = await Promise.all(
+    ["frame.html", "frame.css", "frame.js", "notifications.mjs"].map((name) =>
       fs.readFile(new URL(name, assets), "utf8"),
     ),
   );
@@ -24,7 +24,7 @@ export async function assemble(data, { css = "", js = "" } = {}) {
     .replace("<!-- CUSTOM_SCRIPT -->", () => `<script>\n${js}\n</script>`)
     .replace(
       "<!-- FRAME_SCRIPT -->",
-      () => `<script type="module">\n${script}\n</script>`,
+      () => `<script type="module">\n${notifications}\n${script}\n</script>`,
     )
     .replace(
       /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,

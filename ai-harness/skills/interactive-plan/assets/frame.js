@@ -1,6 +1,17 @@
 const $ = (id) => document.getElementById(id);
 const plan = JSON.parse($("plan-data").textContent);
 const session = JSON.parse($("session-config").textContent);
+const reviewAlerts = createReviewAlerts({
+  window,
+  button: $("notifications"),
+  sessionId: session.sessionId,
+  plan,
+  open: (href) => {
+    const url = new URL(href, location.href);
+    if (url.pathname === location.pathname) show(url.hash.slice(1));
+    else location.assign(url.href);
+  },
+});
 const agreements = plan.agreements || [];
 const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
 const pages = [
@@ -381,6 +392,7 @@ async function send(event) {
   return result;
 }
 function status() {
+  void reviewAlerts.update(connected ? remote : null);
   const newer = remote?.current && !current();
   const canAccept =
     plan.kind === "plan" &&

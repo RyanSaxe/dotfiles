@@ -41,6 +41,12 @@ network access from the terminal. A blocked CDN leaves source content available.
 If that fallback cannot communicate a choice adequately, use self-contained
 HTML/SVG or discuss the missing capability before proceeding.
 
+Desktop notifications are optional. Enable them in the live page and grant
+browser permission. Keep the tab and helper open; background polling may be
+delayed. New localhost ports may require permission again. Browser or OS settings
+can suppress delivery; the tab title also indicates pending reviews and questions.
+Notifications do not wake an ended agent turn or change the waiting protocol.
+
 ## Authoring checks
 
 Use the project's available HTML/CSS/JS formatter and JavaScript linter on the

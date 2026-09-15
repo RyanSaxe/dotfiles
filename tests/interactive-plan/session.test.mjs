@@ -8,6 +8,192 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
+  createReviewAlerts,
+  reviewAlert,
+} from "../../ai-harness/skills/interactive-plan/assets/notifications.mjs";
+
+function alertFixture({
+  storage = new Map(),
+  permission = "default",
+  supported = true,
+  blockedStorage = false,
+  locks,
+} = {}) {
+  const sent = [],
+    opened = [];
+  let requests = 0;
+  class Notification {
+    static permission = permission;
+    static async requestPermission() {
+      requests++;
+      return (this.permission = "granted");
+    }
+    constructor(title, options) {
+      this.title = title;
+      this.options = options;
+      sent.push(this);
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+  const document = Object.assign(new EventTarget(), {
+    hidden: true,
+    title: "",
+    hasFocus: () => false,
+  });
+  const host = Object.assign(new EventTarget(), {
+    document,
+    Notification: supported ? Notification : undefined,
+    isSecureContext: true,
+    location: { protocol: "http:", hash: "#overview" },
+    navigator: { locks },
+    focus() {},
+    localStorage: {
+      getItem(key) {
+        if (blockedStorage) throw Error("blocked");
+        return storage.get(key);
+      },
+      setItem(key, value) {
+        if (blockedStorage) throw Error("blocked");
+        storage.set(key, value);
+      },
+    },
+  });
+  const button = {};
+  const plan = { artifactId: "example", revision: "1", title: "Example plan" };
+  const alerts = createReviewAlerts({
+    window: host,
+    button,
+    sessionId: "test-session",
+    plan,
+    open: (url) => opened.push(url),
+  });
+  const status = {
+    stage: "updated",
+    current: {
+      artifactId: "example",
+      revision: "2",
+      url: "/artifacts/example.2.html",
+    },
+  };
+  return {
+    alerts,
+    host,
+    button,
+    sent,
+    opened,
+    status,
+    plan,
+    requests: () => requests,
+  };
+}
+
+test("desktop alerts require opt-in and deduplicate polling, reloads, and tabs", async () => {
+  const storage = new Map();
+  let queue = Promise.resolve();
+  const locks = { request: (_key, callback) => (queue = queue.then(callback)) };
+  const a = alertFixture({ storage, locks });
+  await a.alerts.update(a.status);
+  assert.equal(a.sent.length, 0);
+  assert.match(a.host.document.title, /new review/);
+  assert.equal(a.requests(), 0);
+  await a.button.onclick();
+  assert.equal(a.requests(), 1);
+  assert.equal(a.sent.length, 1);
+  await a.alerts.update(a.status);
+  const b = alertFixture({ storage, locks, permission: "granted" });
+  await b.alerts.update(b.status);
+  assert.equal(b.sent.length, 0);
+  const next = {
+    ...a.status,
+    current: {
+      ...a.status.current,
+      revision: "3",
+      url: "/artifacts/example.3.html",
+    },
+  };
+  await Promise.all([a.alerts.update(next), b.alerts.update(next)]);
+  assert.equal(a.sent.length + b.sent.length, 2);
+  a.sent[0].onclick();
+  assert.deepEqual(a.opened, [next.current.url]);
+  await a.button.onclick();
+  await a.alerts.update({
+    ...next,
+    current: { ...next.current, revision: "4" },
+  });
+  assert.equal(a.sent.length + b.sent.length, 2);
+});
+
+test("questions alert once and clear when the relevant feedback is viewed", async () => {
+  const a = alertFixture();
+  await a.button.onclick();
+  const status = {
+    ...a.status,
+    stage: "needs_reply",
+    current: {
+      ...a.status.current,
+      revision: "1",
+      url: "/artifacts/example.1.html",
+    },
+    question: { id: "question-1", text: "Private question content" },
+  };
+  await a.alerts.update(status);
+  assert.equal(a.sent.length, 1);
+  assert.equal(a.sent[0].options.body, a.plan.title);
+  a.sent[0].onclick();
+  assert.deepEqual(a.opened, ["/artifacts/example.1.html#feedback"]);
+  a.host.document.hidden = false;
+  a.host.document.hasFocus = () => true;
+  await a.alerts.update(status);
+  assert.match(a.host.document.title, /question/);
+  a.host.location.hash = "#feedback";
+  await a.alerts.update(status);
+  assert.equal(a.host.document.title, a.plan.title);
+  assert.equal(a.sent[0].closed, true);
+  for (const stage of ["submitted", "working", "complete"])
+    assert.equal(reviewAlert({ ...status, stage }, a.plan), null);
+});
+
+test("denied, unavailable, and failed notifications retain the title fallback", async () => {
+  for (const options of [{ permission: "denied" }, { supported: false }]) {
+    const a = alertFixture(options);
+    await a.alerts.update(a.status);
+    assert.equal(a.button.disabled, true);
+    assert.equal(a.sent.length, 0);
+    assert.match(a.host.document.title, /new review/);
+  }
+  const a = alertFixture({ blockedStorage: true });
+  await a.button.onclick();
+  await a.alerts.update(a.status);
+  await a.alerts.update(a.status);
+  assert.equal(a.sent.length, 1);
+  a.sent[0].onerror();
+  assert.equal(a.button.disabled, true);
+  assert.match(a.host.document.title, /new review/);
+});
+
+test("queued notification delivery rechecks focus and opt-out", async () => {
+  let deliver;
+  const a = alertFixture({
+    locks: {
+      request: async (_key, callback) => {
+        deliver = callback;
+      },
+    },
+  });
+  await a.button.onclick();
+  await a.alerts.update(a.status);
+  await a.button.onclick();
+  deliver();
+  assert.equal(a.sent.length, 0);
+  await a.button.onclick();
+  a.host.document.hidden = false;
+  a.host.document.hasFocus = () => true;
+  deliver();
+  assert.equal(a.sent.length, 0);
+});
+import {
   assemble,
   build,
 } from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
