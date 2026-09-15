@@ -183,6 +183,115 @@ test("final review can reopen exploration and only accept the recomposed plan", 
   );
 });
 
+test("agreement authoring preserves rich content and rejects ambiguous records", async (t) => {
+  const data = artifactData(artifact());
+  const entry = {
+    id: "errors",
+    title: "Per-item errors",
+    html: "<pre>Result[Prediction, Error]</pre>",
+    source: "User selected per-item errors",
+    href: "./example.1.html?target=errors#overview",
+  };
+  const parsed = artifactData(await assemble({ ...data, agreements: [entry] }));
+  assert.deepEqual(parsed.agreements, [entry]);
+  for (const agreements of [
+    [entry, entry],
+    [{ ...entry, id: "bad id" }],
+    [{ ...entry, state: "pending" }],
+    [{ ...entry, change: "old" }],
+    [{ ...entry, source: "" }],
+    [{ ...entry, href: "javascript:alert(1)" }],
+    [{ ...entry, href: "data:text/html,test" }],
+    null,
+  ])
+    await assert.rejects(assemble({ ...data, agreements }));
+  const legacy = {
+    ...data,
+    pages: [
+      ...data.pages,
+      { id: "agreed", title: "Agreed", html: "Previous decision" },
+    ],
+  };
+  assert.equal(artifactData(await assemble(legacy)).pages.length, 2);
+  await assert.rejects(assemble({ ...legacy, agreements: [] }));
+  const directory = await fs.mkdtemp(
+    path.join(os.tmpdir(), "agreement-build-"),
+  );
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.writeFile(path.join(directory, "decision.html"), entry.html);
+  const { html, ...metadata } = entry;
+  const source = path.join(directory, "source.json");
+  await fs.writeFile(
+    source,
+    JSON.stringify({
+      ...data,
+      agreements: [{ ...metadata, file: "decision.html" }],
+    }),
+  );
+  assert.equal(artifactData(await build(source)).agreements[0].html, html);
+});
+
+test("agreements survive topic changes and targeted feedback without rewriting snapshots", async (t) => {
+  const a = await fixture(t);
+  const entry = {
+    id: "errors",
+    title: "Per-item errors",
+    html: "<p>Keep each error.</p>",
+    source: "User's answer",
+  };
+  const states = ["agreed", "reopened", "agreed", "retired"];
+  for (const [index, state] of states.entries()) {
+    const revision = String(index + 1);
+    const data = {
+      ...artifactData(artifact(revision)),
+      pages: [
+        {
+          id: `topic-${revision}`,
+          title: `Topic ${revision}`,
+          html: "<p>Current proposal</p>",
+        },
+      ],
+      agreements: [{ ...entry, state }],
+    };
+    assert.equal(
+      (await a.action("publish", { html: await assemble(data) })).code,
+      200,
+    );
+    const event = a.event("feedback-only", revision, {
+      groups: {
+        notes: [
+          {
+            id: crypto.randomUUID(),
+            topic: "agreed",
+            agreementId: entry.id,
+            anchor: entry.title,
+            revision,
+            text: "Reconsider the error type.",
+          },
+        ],
+      },
+    });
+    assert.equal((await a.request("/api/feedback", event)).code, 200);
+    const received = await a.request("/agent/next");
+    assert.equal(
+      received.body.event.payload.groups.notes[0].agreementId,
+      entry.id,
+    );
+    assert.equal(received.body.event.payload.intent, "feedback-only");
+    await a.action("ack", { id: event.id });
+  }
+  for (const [index, state] of states.entries()) {
+    const snapshot = artifactData(
+      await fs.readFile(
+        path.join(a.directory, `artifacts/example.${index + 1}.html`),
+        "utf8",
+      ),
+    );
+    assert.equal(snapshot.agreements[0].state, state);
+    assert.equal(snapshot.agreements[0].id, entry.id);
+  }
+});
+
 test("capability check tests storage and loopback, cleans up, and fails on unusable storage", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-check-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));

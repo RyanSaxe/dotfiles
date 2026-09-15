@@ -62,12 +62,9 @@ Use `kind: "plan"` only for the actual final plan. Its first page has ID
 `overview`; the remaining pages describe implementation steps. IDs contain
 letters, digits, underscores, or hyphens; revisions also allow periods. Keep
 IDs stable for a continuing artifact, and use a new revision for every publish.
-Exploration and plan are artifact types, not irreversible phases. To reopen a
-choice during final review, publish a focused exploration with a descriptive
-title such as "Exploring batch behavior" and a link to the prior plan snapshot.
-Keep acceptance hidden by using `kind: "exploration"`. After alignment, publish
-a complete new `plan` revision, not an addendum requiring the old discussion.
-`feedback` is reserved for the frame's feedback view.
+Use `kind: "exploration"` when reopening choices; it disables acceptance.
+`feedback` is reserved. With structured agreements, `agreed` is also reserved.
+Legacy authored `agreed` pages remain usable when no structured record is present.
 
 The builder escapes literal `<` as `\u003c` inside the JSON script. If editing
 assembled HTML directly, do the same when content could contain
@@ -76,25 +73,72 @@ string. User notes are rendered as text by the frame. Do not inject feedback
 into executable HTML or scripts.
 
 Leave `session-config` in the source. The helper injects session identity when
-publishing. Never put the agent token into the page. Do not copy the prototype's
-fixed port, paths, session state, example content, or competing theme choices.
+publishing. Never put the agent token into the page.
+
+## Agreement record
+
+Add a top-level `agreements` array, independent of `pages`:
+
+```json
+{
+  "agreements": [
+    {
+      "id": "batch-errors",
+      "title": "Per-item failures",
+      "html": "<p>Return one result per input, including individual failures.</p>",
+      "source": "User selected per-item results in revision 2.",
+      "href": "./batch-prediction.2.html?target=failure-options#interface",
+      "change": "new"
+    }
+  ]
+}
+```
+
+Each entry requires a stable unique `id`, `title`, `html`, and `source` text.
+Use `file` instead of `html` to reuse an authored fragment. A short paragraph is
+enough for routine decisions; preserve exact code or visual details when needed.
+Do not regenerate settled entries or rebuild previews merely to fill the record.
+
+State defaults to `agreed`. After reading feedback, mark an affected entry
+`reopened` when another decision is needed. The frame displays “Revisiting”;
+retain the previous wording until resolved. Update the same ID when settled.
+Use `retired` with an explanation when a decision no longer applies; those
+entries appear under “No longer applies.” Topic changes alone do not retire
+agreements. The helper validates structure, not whether the user agreed.
+
+Optional `change: "new"` or `"updated"` marks this publication only. Remove old
+change markers on the next publication. A recommendation is not an agreement.
+Read browser submissions and conversation answers before editing the record.
+
+Optional `href` opens the immutable source revision in a new tab. Use relative
+or HTTP(S) URLs; executable schemes are rejected. Conversation-only decisions
+need no link. Give important proposal components stable element IDs. The frame
+supports `?target=ELEMENT_ID#PAGE_ID`, opens containing details, and focuses the
+target; missing targets and older snapshots retain page-level navigation.
+
+The frame renders the index, detail pane, and quiet Add note action. Entry notes
+carry `agreementId`, title, and revision through the existing draft and explicit
+submission flow. Comments do not change agreement state automatically. An empty
+record still has an Agreed page. Final plans incorporate decisions into their
+steps; source links and the record do not replace a self-contained handoff.
 
 ## Shared UI
 
 Retain the checked editor-inspired light/dark tokens, 235px desktop sidebar,
 thin blue active-item rule, standard theme control, and topic-based feedback.
-The sidebar shows the viewed revision, not operational status. Final plans use
-the same frame; only their content and navigation entries change.
+The sidebar separates proposal pages from Agreed and Feedback with a divider.
+It shows the viewed revision, not operational status. Review & submit opens
+Feedback without sending it. Receipt and agent status appear beside Submit.
+Final plans use the same frame. Do not create competing theme controls: the
+browser preference applies until an explicit choice, remembered in a host-only
+cookie across local ports. Feedback drafts remain revision- and session-scoped.
 
 The frame supplies `.panel`, `.two`, `.row`, `.btn`, `.section-head`,
 `.recommendation`, and ordinary headings, tables, code, and images. They are
 conveniences, not a required page grammar. Use freely composed HTML for the
 actual work. Do not force equal-sized decision cards or one decision per page.
 
-Proposals should expose meaningful differences, with a recommendation and its
-reason where useful. Keep labels short and prose concrete. Avoid filler,
-redundant subtitles, self-reference, or discussion about how this artifact was
-made. Blue is the general accent. Green means success, red means danger or
+Blue is the general accent. Green means success, red means danger or
 failure, and amber means attention. Each theme provides `--success`, `--danger`,
 and `--attention`, with `-bg` and `-border` variants. Do not color recommendations
 green or alternatives red merely to indicate preference. Include a visible

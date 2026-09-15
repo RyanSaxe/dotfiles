@@ -1,11 +1,33 @@
 const $ = (id) => document.getElementById(id);
 const plan = JSON.parse($("plan-data").textContent);
 const session = JSON.parse($("session-config").textContent);
+const agreements = plan.agreements || [];
+const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
+const pages = [
+  ...plan.pages,
+  ...(builtInAgreed ? [{ id: "agreed", title: "Agreed", html: "" }] : []),
+];
+let agreementId =
+  agreements.find((entry) => entry.state !== "retired")?.id ||
+  agreements[0]?.id;
+const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+let preferredTheme = null;
+try {
+  if (/^https?:$/.test(location.protocol)) {
+    const value = document.cookie
+      .split("; ")
+      .find((item) => item.startsWith("interactive-plan-theme="))
+      ?.split("=")[1];
+    if (["light", "dark"].includes(value)) preferredTheme = value;
+  }
+} catch {
+  /* Theme changes remain available without storage. */
+}
+let activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
 const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}:${plan.revision}`;
 let state = {
   notes: [],
   choices: {},
-  theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
   submitted: null,
   pending: null,
 };
@@ -15,6 +37,7 @@ try {
 } catch {
   /* The in-memory draft and export remain usable. */
 }
+delete state.theme;
 let page = plan.pages[0],
   remote = null,
   connected = false,
@@ -53,24 +76,25 @@ function save() {
   review();
 }
 function theme() {
-  document.documentElement.dataset.theme = state.theme;
-  $("theme").textContent = state.theme === "dark" ? "Light mode" : "Dark mode";
+  document.documentElement.dataset.theme = activeTheme;
+  $("theme").textContent = activeTheme === "dark" ? "Light mode" : "Dark mode";
   for (const chart of charts.values())
     chart.setOption(chartTheme(chart.getOption()));
   renderDiagrams($("page-content"));
 }
-function show(id) {
+function show(id, targetId = null) {
   const feedback = id === "feedback";
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
   if (!feedback) {
-    page = plan.pages.find((item) => item.id === id) || plan.pages[0];
+    page = pages.find((item) => item.id === id) || pages[0];
     for (const chart of charts.values()) chart.dispose();
     charts.clear();
     $("page-title").textContent = page.title;
     $("page-content").innerHTML = page.html;
+    if (page.id === "agreed" && builtInAgreed) renderAgreements();
     restoreChoices();
-    enhance($("page-content"));
+    if (!(page.id === "agreed" && builtInAgreed)) enhance($("page-content"));
     window.dispatchEvent(
       new CustomEvent("plan:page", {
         detail: { page, element: $("page-content") },
@@ -82,16 +106,33 @@ function show(id) {
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
-  history.replaceState(null, "", "#" + (feedback ? "feedback" : page.id));
+  const url = new URL(location.href);
+  url.hash = feedback ? "feedback" : page.id;
+  url.searchParams.delete("target");
+  if (targetId) url.searchParams.set("target", targetId);
+  history.replaceState(null, "", url);
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
   window.scrollTo(0, 0);
+  const target = targetId && $(targetId);
+  if (!feedback && target && $("page-content").contains(target)) {
+    for (let ancestor = target; ancestor; ancestor = ancestor.parentElement)
+      if (ancestor.tagName === "DETAILS") ancestor.open = true;
+    if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "center" });
+  }
   $("quote").hidden = true;
   review();
 }
-function openNote(topic, anchor, quote = "", id = null) {
-  noteContext = { topic, anchor, quote };
+function openNote(topic, anchor, quote = "", id = null, entryId = null) {
+  noteContext = {
+    topic,
+    anchor,
+    quote,
+    ...(entryId ? { agreementId: entryId } : {}),
+  };
   editing = id;
   $("note-anchor").textContent = anchor;
   $("note-quote").textContent = quote;
@@ -106,6 +147,97 @@ function openNote(topic, anchor, quote = "", id = null) {
   $("note-dialog").showModal();
   $("note-text").focus();
   $("quote").hidden = true;
+}
+function renderAgreements() {
+  const root = $("page-content");
+  if (!agreements.length) {
+    root.innerHTML = '<p class="muted">No agreements recorded yet.</p>';
+    return;
+  }
+  root.innerHTML =
+    '<div class="agreement-layout"><nav class="agreement-index" aria-label="Agreements"></nav><article class="agreement-detail"></article></div>';
+  const index = root.querySelector(".agreement-index");
+  const detail = root.querySelector(".agreement-detail");
+  const retired = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "No longer applies";
+  retired.append(summary);
+  const select = (entry) => {
+    agreementId = entry.id;
+    for (const chart of charts.values()) chart.dispose();
+    charts.clear();
+    for (const button of index.querySelectorAll("button")) {
+      if (button.dataset.agreement === entry.id)
+        button.setAttribute("aria-current", "true");
+      else button.removeAttribute("aria-current");
+    }
+    detail.replaceChildren();
+    const head = document.createElement("div");
+    head.className = "group-head";
+    const title = document.createElement("h2");
+    title.textContent = entry.title;
+    const note = document.createElement("button");
+    note.className = "btn quiet";
+    note.textContent = "Add note";
+    note.onclick = () => openNote("agreed", entry.title, "", null, entry.id);
+    head.append(title, note);
+    detail.append(head);
+    const label =
+      entry.state === "reopened"
+        ? "Revisiting"
+        : entry.state === "retired"
+          ? "No longer applies"
+          : entry.change === "new"
+            ? "New"
+            : entry.change === "updated"
+              ? "Updated"
+              : "";
+    if (label) {
+      const marker = document.createElement("p");
+      marker.className = "agreement-label";
+      marker.textContent = label;
+      detail.append(marker);
+    }
+    const content = document.createElement("div");
+    content.innerHTML = entry.html;
+    detail.append(content);
+    const source = document.createElement("details");
+    const heading = document.createElement("summary");
+    heading.textContent = "Source";
+    const text = document.createElement("p");
+    text.textContent = entry.source;
+    source.append(heading, text);
+    detail.append(source);
+    if (entry.href) {
+      const row = document.createElement("p");
+      row.className = "agreement-source small";
+      const link = document.createElement("a");
+      link.href = entry.href;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Open source ↗";
+      row.append(link);
+      const url = new URL(entry.href, location.href);
+      const label = document.createElement("span");
+      label.textContent = `${url.pathname.split("/").pop()}${url.hash}`;
+      row.append(label);
+      detail.append(row);
+    }
+    enhance(content);
+  };
+  for (const entry of agreements) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.agreement = entry.id;
+    button.textContent = entry.title;
+    button.onclick = () => select(entry);
+    (entry.state === "retired" ? retired : index).append(button);
+  }
+  if (retired.children.length > 1) index.append(retired);
+  const entry =
+    agreements.find((item) => item.id === agreementId) || agreements[0];
+  retired.open = entry.state === "retired";
+  select(entry);
 }
 function noteCard(note) {
   const box = document.createElement("div");
@@ -129,7 +261,13 @@ function noteCard(note) {
     button.textContent = action;
     button.onclick = () => {
       if (action === "Edit")
-        openNote(note.topic, note.anchor, note.quote, note.id);
+        openNote(
+          note.topic,
+          note.anchor,
+          note.quote,
+          note.id,
+          note.agreementId,
+        );
       else {
         state.notes = state.notes.filter((item) => item.id !== note.id);
         save();
@@ -141,11 +279,16 @@ function noteCard(note) {
   return box;
 }
 function review() {
-  document
-    .querySelectorAll(".count")
-    .forEach((element) => (element.textContent = dirty()));
+  const unchanged = state.submitted?.snapshot === snapshot();
+  const unsent = unchanged ? 0 : dirty();
+  document.querySelectorAll(".count").forEach((element) => {
+    element.textContent = unsent;
+    element.hidden = !unsent;
+  });
+  $("review").classList.toggle("primary", unsent > 0);
+  $("review").classList.toggle("quiet", !unsent);
   $("feedback-groups").replaceChildren();
-  for (const topic of plan.pages) {
+  for (const topic of pages) {
     const notes = state.notes.filter((note) => note.topic === topic.id),
       choices = Object.entries(state.choices).filter(
         ([, choice]) => choice.topic === topic.id,
@@ -179,7 +322,6 @@ function review() {
   $("overall-notes").replaceChildren(
     ...state.notes.filter((note) => note.topic === "overall").map(noteCard),
   );
-  const unchanged = state.submitted?.snapshot === snapshot();
   $("submit").disabled = !dirty() || unchanged || !connected || !current();
   $("submit").textContent = unchanged ? "Submitted" : "Submit feedback";
   $("submit-status").textContent =
@@ -383,6 +525,7 @@ $("submit").onclick = async () => {
     state.submitted = { snapshot: currentSnapshot, id: result.id };
     state.pending = null;
     save();
+    $("agent-status").scrollIntoView({ block: "nearest" });
   } catch (error) {
     submissionError = error.message;
     $("submit").disabled = false;
@@ -457,6 +600,7 @@ document.querySelectorAll("[data-accept-mode]").forEach(
         save();
         $("accept-dialog").close();
         show("feedback");
+        $("agent-status").scrollIntoView({ block: "nearest" });
       } catch (error) {
         $("accept-error").textContent = error.message;
       } finally {
@@ -472,7 +616,14 @@ document.addEventListener("click", (event) => {
   const navigation = event.target.closest("[data-page]");
   if (navigation) show(navigation.dataset.page);
   const comment = event.target.closest("[data-comment]");
-  if (comment) openNote(page.id, comment.dataset.comment || page.title);
+  if (comment)
+    openNote(
+      page.id,
+      comment.dataset.comment || page.title,
+      "",
+      null,
+      page.id === "agreed" && builtInAgreed ? agreementId : null,
+    );
   const choice = event.target.closest("[data-choice] [data-value]");
   if (choice) {
     const group = choice.closest("[data-choice]"),
@@ -500,15 +651,32 @@ document.addEventListener("selectionchange", () => {
   );
 });
 $("quote").onpointerdown = (event) => event.preventDefault();
-$("quote").onclick = () => openNote(page.id, page.title, selected);
+$("quote").onclick = () =>
+  openNote(
+    page.id,
+    page.title,
+    selected,
+    null,
+    page.id === "agreed" && builtInAgreed ? agreementId : null,
+  );
 $("page-comment").onclick = () => openNote(page.id, page.title);
 $("overall-note").onclick = () => openNote("overall", "Overall feedback");
 $("review").onclick = $("page-review").onclick = () => show("feedback");
 $("theme").onclick = () => {
-  state.theme = state.theme === "dark" ? "light" : "dark";
+  preferredTheme = activeTheme = activeTheme === "dark" ? "light" : "dark";
+  try {
+    if (/^https?:$/.test(location.protocol))
+      document.cookie = `interactive-plan-theme=${preferredTheme}; Path=/; SameSite=Strict; Max-Age=31536000`;
+  } catch {
+    /* Keep the explicit choice in memory when cookies are blocked. */
+  }
   theme();
-  persist();
 };
+systemTheme.addEventListener("change", () => {
+  if (preferredTheme) return;
+  activeTheme = systemTheme.matches ? "dark" : "light";
+  theme();
+});
 
 const libraries = {
   shiki: "https://esm.sh/shiki@3.12.2",
@@ -686,7 +854,14 @@ new ResizeObserver(() => {
 }).observe($("page-content"));
 window.planUI = {
   chart,
-  comment: (anchor, quote = "") => openNote(page.id, anchor, quote),
+  comment: (anchor, quote = "") =>
+    openNote(
+      page.id,
+      anchor,
+      quote,
+      null,
+      page.id === "agreed" && builtInAgreed ? agreementId : null,
+    ),
   enhance,
 };
 document.title = plan.title;
@@ -694,13 +869,23 @@ $("artifact-title").textContent =
   `${plan.title} / ${plan.kind === "plan" ? "Final plan" : "Exploration"}`;
 $("revision").textContent = `Revision ${plan.revision}`;
 $("accept").hidden = plan.kind !== "plan";
-for (const item of [...plan.pages, { id: "feedback", title: "Feedback" }]) {
+for (const item of [
+  ...pages.filter((item) => item.id !== "agreed"),
+  pages.find((item) => item.id === "agreed"),
+  { id: "feedback", title: "Feedback" },
+]) {
+  if (item.id === "agreed") {
+    const divider = document.createElement("div");
+    divider.className = "review-divider";
+    divider.setAttribute("role", "separator");
+    $("navigation").append(divider);
+  }
   const button = document.createElement("button");
   button.dataset.page = item.id;
   button.textContent = item.title;
   $("navigation").append(button);
 }
 theme();
-show(location.hash.slice(1));
+show(location.hash.slice(1), new URL(location.href).searchParams.get("target"));
 poll();
 setInterval(poll, 1500);

@@ -49,12 +49,53 @@ export function artifactData(html) {
     "At least one page is required",
   );
   const ids = new Set();
+  if (data.agreements !== undefined) {
+    requireValue(Array.isArray(data.agreements), "agreements must be an array");
+    const agreementIds = new Set();
+    for (const entry of data.agreements) {
+      requireValue(
+        entry &&
+          typeof entry.id === "string" &&
+          idPattern.test(entry.id) &&
+          !agreementIds.has(entry.id),
+        "Agreement IDs must be valid and unique",
+      );
+      agreementIds.add(entry.id);
+      requireValue(
+        ["title", "html", "source"].every(
+          (key) => typeof entry[key] === "string" && entry[key].trim(),
+        ),
+        "Agreements require title, html, and source",
+      );
+      requireValue(
+        entry.state === undefined ||
+          ["agreed", "reopened", "retired"].includes(entry.state),
+        "Invalid agreement state",
+      );
+      requireValue(
+        entry.change === undefined || ["new", "updated"].includes(entry.change),
+        "Invalid agreement change",
+      );
+      if (entry.href !== undefined) {
+        requireValue(
+          typeof entry.href === "string" && entry.href.trim(),
+          "Invalid agreement source URL",
+        );
+        const url = new URL(entry.href, "http://127.0.0.1/");
+        requireValue(
+          ["http:", "https:"].includes(url.protocol),
+          "Unsafe agreement source URL",
+        );
+      }
+    }
+  }
   for (const page of data.pages) {
     requireValue(
       idPattern.test(page.id || "") &&
         page.id !== "feedback" &&
+        !(page.id === "agreed" && data.agreements !== undefined) &&
         !ids.has(page.id),
-      "Page IDs must be unique; feedback is reserved",
+      "Page IDs must be unique; feedback and structured agreed are reserved",
     );
     requireValue(
       typeof page.title === "string" &&

@@ -10,9 +10,8 @@ to uncover intent and interactive proposals to resolve meaningful choices. The
 final artifact must preserve those choices and let a human or agent carry out
 the work using only the plan and the project.
 
-Use this skill only on explicit invocation. Planning does not authorize
-implementation. Acceptance explicitly chooses between saving the plan and
-starting work on that exact revision.
+Planning does not authorize implementation. Acceptance explicitly chooses
+between saving the plan and starting work on that exact revision.
 
 ![Planning flow](references/flow.svg)
 
@@ -50,32 +49,33 @@ not finish the review: answer the question, then resume waiting on the same
 session. Read each submission before acknowledging it. Combine browser feedback
 with the conversation and reopen only decisions affected by new information.
 
+Keep answered choices on the Agreed page, separate from active proposals.
+Record clear answers without asking for approval twice; clarify ambiguous ones.
+Preserve agreement IDs when topics change, and update only affected entries.
+The authoring reference defines the record and its correction controls.
+
 ## Compose a complete plan
 
-Once scope and choices are aligned, compose the actual final plan. Start with an
-overview linked to the work's steps and details. Keep the structure appropriate
-to the task, including parallel work only when it helps. Rich HTML content is
-as useful here as in exploration.
+Once scope and choices are aligned, compose a complete plan with an overview
+linked to its steps and details. Use rich HTML wherever it improves the handoff.
 
-Carry forward accepted behavior, exact interfaces and visual specifications,
-constraints, and examples that matter. Do not summarize away decisions or rely
-on disposable prototypes or the planning conversation. A reader should see
-what to do, why consequential choices were made, and how to recognize completion.
+Include accepted behavior, exact interfaces, visual specifications, constraints,
+and relevant examples in the steps. Explain consequential choices without
+requiring readers to reconstruct them from the record or earlier discussion.
 
 Resolve choices needed to implement the work before presenting the final plan.
 Do not hide unfinished planning in TBDs, undecided sections, or future work.
 Explicit non-goals are useful; genuine implementation-time discovery should have
 a bounded investigation and a clear way to judge its result.
 
-Match validation and inspectable completion evidence to the work. Follow project
-requirements, including commit rules where applicable, without imposing a fixed
-commit sequence, evidence bundle, or universal planning template.
+Specify how to verify the result and what evidence a reviewer needs to judge
+completion. Follow the project's requirements.
 
 ## Review can reopen exploration
 
 Final-plan review is not an irreversible phase. Revise directly when feedback is
-clear, ask a short clarification when sufficient, or publish focused interactive
-options when a choice needs comparison or demonstration.
+clear, ask a short clarification when sufficient, or publish focused selectable
+options when the user requests alternatives or a choice needs demonstration.
 
 For renewed exploration, identify the affected choice and link back to the plan
 under review. Keep unaffected decisions settled. The exploration artifact is
@@ -84,17 +84,12 @@ and its consequences into a complete new final-plan revision for review.
 
 ## Finish with explicit acceptance
 
-Final review uses the same feedback loop. Read the final artifact's plan-data
-without rendering it to check that the handoff stands alone. Resolve blocking
-feedback before requesting acceptance.
-
-Only an explicit acceptance event for the current final revision can finish
-planning. Follow the session reference to acknowledge and complete it:
+Read the final artifact's plan-data without rendering it to check that the
+handoff stands alone. Resolve blocking feedback, then keep waiting for explicit
+acceptance of that revision. Follow the session reference to complete it:
 
 - Save for later: return the durable plan path and stop.
 - Start implementation: read the accepted plan and proceed under the project's
   instructions and existing permissions.
 
-Neither ordinary feedback nor accepting an exploration approves implementation.
-Preserve accepted artifacts. Any later revision needs its own review and
-acceptance.
+Preserve accepted artifacts. Later revisions need their own acceptance.

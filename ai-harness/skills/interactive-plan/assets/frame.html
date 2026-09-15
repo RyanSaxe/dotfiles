@@ -9,7 +9,20 @@
   <body>
     <div class="app">
       <aside class="sidebar">
-        <div class="brand"><span>i/</span>interactive-plan</div>
+        <div class="brand">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <text
+              x="4"
+              y="36"
+              fill="currentColor"
+              font-family="Georgia,serif"
+              font-size="37"
+              letter-spacing="-3"
+            >
+              IP
+            </text></svg
+          >Interactive plan
+        </div>
         <div class="revision" id="revision"></div>
         <nav id="navigation" aria-label="Plan pages"></nav>
       </aside>
@@ -19,7 +32,7 @@
           <div class="row">
             <button class="btn quiet" id="theme">Dark mode</button
             ><button class="btn" id="review">
-              Feedback <span class="count">0</span></button
+              Review &amp; submit <span class="count" hidden>0</span></button
             ><button class="btn primary" id="accept" hidden disabled>
               Accept plan
             </button>
@@ -31,11 +44,19 @@
             <div id="page-content"></div>
             <div class="page-actions">
               <button class="btn" id="page-comment">Comment on this page</button
-              ><button class="btn" id="page-review">Review feedback →</button>
+              ><button class="btn" id="page-review">
+                Review &amp; submit →
+              </button>
             </div>
           </section>
           <section id="feedback" hidden>
             <h1 tabindex="-1">Review your feedback</h1>
+            <div id="feedback-groups"></div>
+            <div class="group-head">
+              <h2>Overall</h2>
+              <button class="btn quiet" id="overall-note">Add note</button>
+            </div>
+            <div id="overall-notes"></div>
             <div class="status" id="agent-status" role="status" hidden>
               <div class="row">
                 <span
@@ -56,12 +77,6 @@
               </div>
               <code id="plan-path" hidden></code>
             </div>
-            <div id="feedback-groups"></div>
-            <div class="group-head">
-              <h2>Overall</h2>
-              <button class="btn quiet" id="overall-note">Add note</button>
-            </div>
-            <div id="overall-notes"></div>
             <div class="submitbar">
               <div class="small" id="submit-status"></div>
               <div class="row">
