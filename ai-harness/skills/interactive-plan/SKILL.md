@@ -44,10 +44,20 @@ and commentary about how you created the artifact. Inspect meaningful
 interactions in the browser before presenting them; disclose any verification
 you could not perform.
 
-Keep the live session waiting after publishing. A timeout or side question does
-not finish the review: answer the question, then resume waiting on the same
-session. Read each submission before acknowledging it. Combine browser feedback
-with the conversation and reopen only decisions affected by new information.
+<important>
+
+While browser review is active, do not end your turn.
+Answer side questions in commentary, then resume waiting on the same session.
+A polling timeout is not completion. The helper saves submissions but cannot
+wake you after you end your turn.
+
+Stop waiting only after processing explicit acceptance or when the user
+pauses, cancels, or redirects the task.
+
+</important>
+
+Read each submission before acknowledging it. Combine browser feedback with
+the conversation and reopen only decisions affected by new information.
 
 Keep answered choices on the Agreed page, separate from active proposals.
 Record clear answers without asking for approval twice; clarify ambiguous ones.
