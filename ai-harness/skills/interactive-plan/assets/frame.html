@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Interactive plan</title>
+    <!-- FRAME_STYLE -->
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <text
+              x="4"
+              y="36"
+              fill="currentColor"
+              font-family="Georgia,serif"
+              font-size="37"
+              letter-spacing="-3"
+            >
+              IP
+            </text></svg
+          >Interactive plan
+        </div>
+        <div class="revision" id="revision"></div>
+        <nav id="navigation" aria-label="Plan pages"></nav>
+      </aside>
+      <main>
+        <header class="topbar">
+          <span class="small" id="artifact-title"></span>
+          <div class="row">
+            <button class="btn quiet" id="notifications">
+              Enable notifications
+            </button>
+            <button class="btn quiet" id="theme">Dark mode</button
+            ><button class="btn" id="review">
+              Review &amp; submit <span class="count" hidden>0</span></button
+            ><button class="btn primary" id="accept" hidden disabled>
+              Accept plan
+            </button>
+          </div>
+        </header>
+        <div class="content">
+          <section id="reading">
+            <h1 tabindex="-1" id="page-title"></h1>
+            <div id="page-content"></div>
+            <div class="page-actions">
+              <button class="btn" id="page-comment">Comment on this page</button
+              ><button class="btn" id="page-review">
+                Review &amp; submit →
+              </button>
+            </div>
+          </section>
+          <section id="feedback" hidden>
+            <h1 tabindex="-1">Review your feedback</h1>
+            <div id="feedback-groups"></div>
+            <div class="group-head">
+              <h2>Overall</h2>
+              <button class="btn quiet" id="overall-note">Add note</button>
+            </div>
+            <div id="overall-notes"></div>
+            <div class="status" id="agent-status" role="status" hidden>
+              <div class="row">
+                <span
+                  class="spinner"
+                  id="spinner"
+                  aria-hidden="true"
+                  hidden
+                ></span>
+                <div>
+                  <h2 id="status-title"></h2>
+                  <p class="small" id="status-detail"></p>
+                </div>
+              </div>
+              <div class="row">
+                <button class="btn" id="reply" hidden>Reply to question</button
+                ><a class="btn" id="update" hidden>View update →</a
+                ><a class="btn" id="final-plan" hidden>View accepted plan →</a>
+              </div>
+              <code id="plan-path" hidden></code>
+            </div>
+            <div class="submitbar">
+              <div class="small" id="submit-status"></div>
+              <div class="row">
+                <button class="btn quiet" id="export">Export copy</button
+                ><button class="btn primary" id="submit" disabled>
+                  Submit feedback
+                </button>
+              </div>
+            </div>
+            <p class="small" id="storage-status"></p>
+            <p class="small" id="connection-status"></p>
+          </section>
+        </div>
+      </main>
+    </div>
+    <dialog class="drawer" id="note-dialog" aria-labelledby="note-title">
+      <form id="note-form">
+        <div class="dialog-head">
+          <h2 id="note-title">Add note</h2>
+          <button
+            class="btn quiet"
+            type="button"
+            data-close="note-dialog"
+            aria-label="Close note"
+          >
+            ✕
+          </button>
+        </div>
+        <p class="small" id="note-anchor"></p>
+        <blockquote id="note-quote" hidden></blockquote>
+        <label for="note-text">Feedback</label
+        ><textarea id="note-text" required></textarea>
+        <div class="row">
+          <button type="submit" class="btn primary">Add to feedback</button
+          ><button type="button" class="btn" data-close="note-dialog">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      class="dialog"
+      id="question-dialog"
+      aria-labelledby="question-title"
+    >
+      <form id="question-form">
+        <h2 id="question-title">Reply to the agent</h2>
+        <p id="question-text"></p>
+        <label for="question-reply">Your reply</label
+        ><textarea id="question-reply" required></textarea>
+        <p class="small" id="question-error" role="status"></p>
+        <div class="row">
+          <button type="submit" class="btn primary" id="send-reply">
+            Send reply</button
+          ><button type="button" class="btn" data-close="question-dialog">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
+      <h2 id="accept-title">Accept this plan?</h2>
+      <p id="accept-detail"></p>
+      <p class="small">
+        Choose whether the waiting agent should begin implementation or save the
+        plan for later.
+      </p>
+      <p class="small" id="accept-error" role="status"></p>
+      <div class="actions">
+        <button class="btn primary" data-accept-mode="implement">
+          Accept and start implementation</button
+        ><button class="btn" data-accept-mode="save">
+          Accept and save for later</button
+        ><button class="btn quiet" data-close="accept-dialog">Cancel</button>
+      </div>
+    </dialog>
+    <button class="btn primary quote-button" id="quote" hidden>
+      Comment on selection
+    </button>
+    <div class="toast" id="toast" role="status" hidden></div>
+
+    <script type="application/json" id="session-config">
+      {}
+    </script>
+    <script type="application/json" id="plan-data">
+      {
+        "artifactId": "proposal",
+        "revision": "1",
+        "kind": "exploration",
+        "title": "Work proposal",
+        "pages": [
+          {
+            "id": "overview",
+            "title": "Work proposal",
+            "html": "<p>Describe the proposed work and its meaningful alternatives here.</p>"
+          }
+        ]
+      }
+    </script>
+    <!-- CUSTOM_SCRIPT -->
+    <!-- FRAME_SCRIPT -->
+  </body>
+</html>
