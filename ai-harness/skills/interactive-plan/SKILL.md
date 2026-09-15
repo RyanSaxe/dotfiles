@@ -1,132 +1,88 @@
 ---
 name: interactive-plan
-description: Plan work through conversation, rich interactive browser proposals, and a complete HTML handoff. Use only when the user explicitly invokes interactive-plan by name. Never select this skill automatically for an ordinary planning or implementation request.
+description: Develop and review implementation plans in an interactive browser session. Use only when the user explicitly invokes interactive-plan by name, never for ordinary planning requests.
 ---
 
 # Interactive plan
 
-Work with the user to develop an implementation-ready plan. Use their request, project context, and prior decisions to identify what still needs discussion. Do not ask them to approve settled requirements again.
+Work with the user toward an implementation-ready plan. Read the project and
+conversation to distinguish settled requirements from open decisions. Show the
+actual design, behavior, code, or wording they need to judge. Their responses
+must shape the plan, not merely approve a solution you have already chosen.
 
-Make that discussion concrete. Show the proposed design, behavior, code, decision or wording that the user needs to judge. Explain consequential tradeoffs and recommend an approach when you have a reason. Offer alternatives when they represent real choices, and leave room for the user to reject the framing or propose something else. But do not use unnecessarily long explanations or prose. Clarity is critical.
+## Make the discussion worth seeing
 
-Give the planning discussion a rich, carefully composed visual form. Make relationships, alternatives, and consequences easy to grasp by scanning and interacting. Keep the explanation needed to judge the proposal. Remove content that does not help the discussion; compressing it into a short label or decorative element does not make it useful. A text dump with buttons is not an acceptable result; neither is a polished demonstration that does not help the user shape the plan.
+Lead with the proposal and what needs judgment. Keep the evidence and
+consequences beside it, not behind a report the user must read first.
 
-Use each response to revise the plan and its affected decisions. Preserve what is settled, identify what remains unresolved, and continue until the user can approve a complete plan. Do not turn the exchange into a presentation of a solution you have already chosen.
+Offer alternatives only when each has a credible reason to be chosen. Explain
+your recommendation without weakening the other options to make it win. When
+behavior differs, show the difference on comparable inputs instead of describing
+styles in the abstract. Leave room for correction or a different proposal.
 
-Planning does not authorize implementation. Acceptance explicitly chooses between
-saving the plan and starting work on that exact revision.
+Compose rich, scannable pages around those judgments. Choose text, tables,
+diagrams, code, or working previews according to what they communicate. Keep
+necessary explanation; remove repetition, slogans, redundant headings, and
+instructions the interface already conveys. Turning irrelevant prose into a
+badge or graphic does not make it useful.
 
-## Compose the discussion
+A text dump with buttons is insufficient. So is a polished demonstration that
+does not help the user shape the plan. Make controls recognizable, their targets
+clear, and selection visible. Demonstration controls are not planning decisions
+unless their values change the proposed implementation.
 
-Choose the representation from the decision being discussed. Text, tables,
-diagrams, code, and working previews can each carry part of the explanation.
-Use the supplied renderers where appropriate and custom HTML, CSS, JavaScript,
-or SVG when needed. Do not add a visualization or interaction merely to make
-the page look interactive.
+The frame supplies navigation and review mechanics, not page templates. Compose
+each page freely, using its theme, clear typography, spacing, and alignment.
+Use the available renderers, including syntax highlighting for code. Do not
+substitute decorative effects for useful visual explanation.
 
-Put selection controls beside the material they select. Make the consequences
-of an option visible before asking the user to choose. A demonstration control
-is not a planning choice unless its value changes the proposed implementation.
-Support corrections and discussion when predefined alternatives would constrain
-the user's answer.
+## Propose and iterate
 
-Use clear typography, spacing, alignment, and emphasis. Follow the frame's color
-scheme and light/dark themes. Avoid decorative gradients, unrelated palettes, and
-distracting effects. Each plan should feel composed for this conversation.
-Use specific headings and labels; remove redundant subtitles, vague phrases,
-and prose about how to read or operate the page.
+Ask only for missing information that affects the plan. Move to the browser when
+there is concrete material to compare, correct, or approve.
 
-The shared frame provides navigation, orientation, and review mechanics. It does
-not prescribe page composition. Do not force equal cards or one decision per page.
+- Read [setup.md](references/setup.md) on first use in an environment or when a capability fails.
+- Read [authoring.md](references/authoring.md) before building an artifact.
+- Read [session.md](references/session.md) before starting or resuming live review.
 
-## Understand and propose
+Inspect the rendered page and exercise its meaningful interactions, renderers,
+themes, and narrower layouts. Can the user scan what is proposed, what remains
+open, and how their response would change it?
 
-Read relevant project context. Gather the user's intent, important behavior, and
-constraints in short, specific turns. Do not repeat supplied context or run a
-fixed questionnaire. Move to the browser when there are meaningful options to
-compare, behavior to demonstrate, or a proposal to review.
-
-Read [setup.md](references/setup.md) when first checking an environment,
-[authoring.md](references/authoring.md) before creating an artifact, and
-[session.md](references/session.md) before running the live review loop.
-
-Inspect the actual page before presenting it. Can the user tell what is proposed,
-what remains open, and how their response would change the plan? Check that the
-composition makes those judgments easier without hiding necessary explanation.
-Exercise meaningful interactions and renderers in the
-affected themes and smaller layouts.
-
-Open the first published proposal in the user's default browser and provide its
-link. Keep the same session for subsequent revisions.
+Open the first proposal in the user's default browser and provide its link.
+Keep the same session for revisions. Read submissions before acknowledging them;
+combine them with conversation feedback. Record clear answers without asking
+twice. Keep settled decisions on Agreed, preserve their IDs and exact sources,
+and reopen only affected decisions. Recommendations are not agreements.
 
 <important>
 
-While browser review is active, do not end your turn. Answer side questions in
-commentary, then resume waiting on the same session. A polling timeout is not
-completion; the helper cannot wake you after you end your turn.
-
-Stop waiting only after processing explicit acceptance or when the user pauses,
-cancels, or redirects the task.
+While browser review is active, keep the turn waiting on that session. Answer
+side questions, then resume waiting. A timeout is not completion; the helper
+cannot wake an ended turn. Stop only after explicit acceptance or when the user
+pauses, cancels, or redirects the task.
 
 </important>
 
-Read each submission before acknowledging it. Combine browser feedback with
-conversation context. Record clear answers without asking for approval twice;
-clarify ambiguous ones. Keep settled choices on Agreed, separate from active
-proposals. Preserve agreement IDs and reopen only affected decisions.
+## Deliver the agreed plan
 
-Use source references to retain exact browser comments and choices. A synthesized
-agreement can have several sources. Label conversation context honestly rather
-than inventing browser evidence. Sources support the interpretation; they do not
-establish agreement by themselves.
+Compose an overview linked to implementation steps. Include accepted behavior,
+interfaces, constraints, and task-specific verification. Resolve critical choices
+before final review; bound genuine implementation-time discovery with a way to
+judge its result.
 
-## Preserve the approved work
+Preserve approved wording, code, formulas, and interfaces exactly unless a later
+decision changes them. Keep approved designs viewable and interactions usable,
+with their source and essential resources embedded in the relevant step. Neither
+summaries, screenshots alone, nor history links replace the approved material.
+Distinguish binding requirements from illustrations and unfinished integration.
 
-When the user approves a visual design, prototype, interface, code fragment,
-formula, or other concrete material, preserve it for the final plan. Carry it into
-the relevant implementation step. Do not replace it with a summary, a screenshot
-alone, or a link to an earlier revision.
+Check that the final artifact and project suffice to implement the plan without
+earlier revisions or conversation. Inspect preserved material and extract its
+source from plan-data. If review reopens a decision, incorporate the resolution
+into a complete new final revision before acceptance.
 
-Keep approved code and interfaces verbatim unless a later decision changes them.
-Keep visual designs directly viewable and approved interactions usable. Embed
-their source and required local resources so a human or agent can recover the
-specification from the final artifact alone. The authoring reference describes
-self-contained prototypes and their source views.
-
-State which details are binding and which are illustrative. Describe remaining
-implementation work and accepted changes to a preserved prototype. Fix assembly
-drift or reopen the affected decision. Approval of a sketch does not decide
-unspecified behavior.
-
-## Compose and review the complete plan
-
-Once scope and choices are aligned, compose an overview linked to implementation
-steps. Preserve the same visual and writing quality throughout the final plan.
-Include accepted behavior, exact interfaces, viewable designs, constraints,
-necessary explanation, and task-specific verification requirements in the steps.
-The agreement record and history links do not replace this material.
-
-Resolve implementation-critical choices before final review. Do not hide
-unfinished planning in TBDs or future work. Bound genuine implementation-time
-discovery with a way to judge its result.
-
-Final review can reopen exploration. Revise directly when feedback is clear,
-clarify briefly when sufficient, or publish focused options when alternatives
-need demonstration. Identify the affected choice and link back to the plan.
-Exploration cannot be accepted as a final plan. Incorporate the resolution and
-its consequences into a complete new final revision.
-
-## Finish with explicit acceptance
-
-Inspect every preserved item in the final artifact and extract its source without
-earlier files or conversation. Read plan-data without rendering it. Confirm that
-the approved work, its binding requirements, and completion evidence are present
-together. Resolve blocking feedback and keep waiting for acceptance of that revision.
-
-Follow the session reference:
-
-- Save for later: return the durable plan path and stop.
-- Start implementation: read the accepted artifact and proceed under project
-  instructions and existing permissions.
-
-Preserve accepted artifacts. Later revisions require their own acceptance.
+Planning does not authorize implementation. Follow the session's explicit
+acceptance mode: save and return the durable path, or read the accepted artifact
+and begin implementation under project instructions and existing permissions.
+Preserve accepted artifacts; later revisions need their own acceptance.
