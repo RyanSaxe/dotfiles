@@ -1,4 +1,4 @@
-export function reviewAlert(status, plan) {
+export function reviewAlert(status) {
   if (!status?.current || status.stage === "complete") return null;
   const current = status.current;
   if (status.stage === "needs_reply" && status.question)
@@ -6,19 +6,14 @@ export function reviewAlert(status, plan) {
       id: `question:${status.question.id}`,
       title: "The agent has a question",
       url: `${current.url}#feedback`,
-      viewed:
-        current.artifactId === plan.artifactId &&
-        current.revision === plan.revision,
-      question: true,
+      createdAt: status.question.createdAt,
     };
   if (["ready", "updated"].includes(status.stage))
     return {
       id: `revision:${current.artifactId}:${current.revision}`,
       title: "A new review is ready",
       url: current.url,
-      viewed:
-        current.artifactId === plan.artifactId &&
-        current.revision === plan.revision,
+      createdAt: current.publishedAt,
     };
   return null;
 }
@@ -30,20 +25,18 @@ export function createReviewAlerts({
   plan,
   open,
 }) {
-  const document = host.document;
   const prefix = `interactive-plan:alerts:${sessionId}:`;
   const memory = new Map();
   let latest = null,
-    notification = null,
     requesting = false,
     failed = false;
-  const supported = () =>
+  const permission = () =>
     sessionId &&
     host.isSecureContext &&
     /^https?:$/.test(host.location.protocol) &&
-    typeof host.Notification === "function";
-  const permission = () =>
-    supported() ? host.Notification.permission : "unavailable";
+    typeof host.Notification === "function"
+      ? host.Notification.permission
+      : "unavailable";
   const read = (key) => {
     try {
       return host.localStorage.getItem(prefix + key) || memory.get(key);
@@ -56,82 +49,74 @@ export function createReviewAlerts({
     try {
       host.localStorage.setItem(prefix + key, value);
     } catch {
-      /* Memory and notification tags still limit duplicate alerts. */
+      /* Keep a usable preference when browser storage is unavailable. */
     }
   };
+  const serialize = (action) =>
+    host.navigator.locks
+      ? host.navigator.locks.request(prefix + "delivery", action)
+      : action();
   function controls() {
     const state = permission();
-    const enabled = read("enabled") === "yes";
     button.disabled =
-      requesting || state === "unavailable" || state === "denied" || failed;
+      requesting || ["unavailable", "denied"].includes(state) || failed;
     button.textContent =
-      state === "unavailable"
+      state === "unavailable" || failed
         ? "Notifications unavailable"
         : state === "denied"
           ? "Notifications blocked"
-          : failed
-            ? "Notifications unavailable"
-            : enabled && state === "granted"
-              ? "Disable notifications"
-              : "Enable notifications";
+          : read("enabled") === "yes" && state === "granted"
+            ? "Disable notifications"
+            : "Enable notifications";
     button.title =
       state === "denied"
-        ? "Allow notifications in your browser's site settings. The tab title still shows updates."
-        : failed || state === "unavailable"
-          ? "The tab title still shows updates. Desktop alerts require a supported browser and a live session."
-          : "Desktop alerts for new reviews and questions. Keep this tab open.";
+        ? "Allow notifications in your browser's site settings."
+        : failed
+          ? "Notification delivery failed. Check browser and OS settings."
+          : "Notifications for new reviews and questions. Keep this tab open.";
+  }
+  function enable() {
+    write("enabledAt", String(Date.now()));
+    const current = reviewAlert(latest);
+    if (current) write(current.id, "handled");
+    write("enabled", "yes");
   }
   async function update(status = latest) {
     latest = status;
-    controls();
-    const alert = reviewAlert(status, plan);
-    if (!alert) {
-      document.title = plan.title;
-      notification?.close();
-      notification = null;
-      return;
-    }
-    const focused = !document.hidden && document.hasFocus();
-    const viewed =
-      alert.viewed && (!alert.question || host.location.hash === "#feedback");
-    if (focused && viewed) write(alert.id, "seen");
-    document.title =
-      read(alert.id) === "seen" ? plan.title : `${alert.title} · ${plan.title}`;
-    if (read(alert.id) === "seen") {
-      notification?.close();
-      notification = null;
-      return;
-    }
-    if (
-      focused ||
-      permission() !== "granted" ||
-      read("enabled") !== "yes" ||
-      failed
-    )
-      return;
-    const deliver = () => {
+    const alert = reviewAlert(status);
+    host.document.title = alert ? `${alert.title} · ${plan.title}` : plan.title;
+    await serialize(() => {
       if (
-        read(alert.id) ||
-        reviewAlert(latest, plan)?.id !== alert.id ||
+        permission() === "granted" &&
+        read("enabled") !== "no" &&
+        !read("enabledAt")
+      )
+        enable();
+      if (
+        !alert ||
         permission() !== "granted" ||
         read("enabled") !== "yes" ||
-        failed ||
-        (!document.hidden && document.hasFocus())
+        failed
       )
         return;
+      if (read(alert.id) || reviewAlert(latest)?.id !== alert.id) return;
+      if (
+        alert.createdAt &&
+        Date.parse(alert.createdAt) <= Number(read("enabledAt"))
+      ) {
+        write(alert.id, "handled");
+        return;
+      }
       try {
-        notification?.close();
         const item = new host.Notification(alert.title, {
           body: plan.title,
-          tag: `${prefix}${alert.id}`,
+          tag: prefix + alert.id,
         });
-        notification = item;
-        write(alert.id, "sent");
+        write(alert.id, "handled");
         item.onclick = () => {
           item.close();
           host.focus();
-          const active = reviewAlert(latest, plan);
-          if (active) open(active.url);
+          open(alert.url);
         };
         item.onerror = () => {
           failed = true;
@@ -139,22 +124,13 @@ export function createReviewAlerts({
         };
       } catch {
         failed = true;
-        controls();
       }
-    };
-    // Serialize the storage check across tabs; tags provide a fallback without locks.
-    try {
-      if (host.navigator.locks)
-        await host.navigator.locks.request(prefix + "delivery", deliver);
-      else deliver();
-    } catch {
-      deliver();
-    }
+    });
+    controls();
   }
   button.onclick = async () => {
     if (read("enabled") === "yes" && permission() === "granted") {
-      write("enabled", "no");
-      notification?.close();
+      await serialize(() => write("enabled", "no"));
       controls();
       return;
     }
@@ -165,15 +141,13 @@ export function createReviewAlerts({
         permission() === "granted"
           ? "granted"
           : await host.Notification.requestPermission();
-      if (result === "granted") write("enabled", "yes");
+      if (result === "granted") await serialize(enable);
     } catch {
       failed = true;
     }
     requesting = false;
-    await update();
+    controls();
   };
-  host.addEventListener("focus", () => void update());
-  document.addEventListener("visibilitychange", () => void update());
   host.addEventListener("storage", (event) => {
     if (event.key?.startsWith(prefix)) void update();
   });

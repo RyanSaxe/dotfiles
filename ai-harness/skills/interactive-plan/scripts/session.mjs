@@ -62,11 +62,45 @@ export function artifactData(html) {
       );
       agreementIds.add(entry.id);
       requireValue(
-        ["title", "html", "source"].every(
+        ["title", "html"].every(
           (key) => typeof entry[key] === "string" && entry[key].trim(),
         ),
-        "Agreements require title, html, and source",
+        "Agreements require title and html",
       );
+      requireValue(
+        (typeof entry.source === "string" && entry.source.trim()) ||
+          (Array.isArray(entry.sourceRefs) && entry.sourceRefs.length > 0),
+        "Agreements require source text or sourceRefs",
+      );
+      if (entry.sourceRefs !== undefined) {
+        requireValue(
+          Array.isArray(entry.sourceRefs),
+          "sourceRefs must be an array",
+        );
+        for (const ref of entry.sourceRefs) {
+          requireValue(
+            ref && ["note", "choice", "conversation"].includes(ref.kind),
+            "Invalid source reference kind",
+          );
+          if (ref.kind === "conversation")
+            requireValue(
+              typeof ref.text === "string" && ref.text.trim(),
+              "Conversation source requires text",
+            );
+          else {
+            requireValue(
+              idPattern.test(ref.submissionId || ""),
+              "Invalid source submission ID",
+            );
+            requireValue(
+              typeof ref[ref.kind === "note" ? "noteId" : "choiceId"] ===
+                "string" &&
+                ref[ref.kind === "note" ? "noteId" : "choiceId"].length > 0,
+              "Source reference requires an item ID",
+            );
+          }
+        }
+      }
       requireValue(
         entry.state === undefined ||
           ["agreed", "reopened", "retired"].includes(entry.state),
@@ -89,6 +123,30 @@ export function artifactData(html) {
       }
     }
   }
+  const prototypeIds = new Set();
+  if (data.prototypes !== undefined) {
+    requireValue(Array.isArray(data.prototypes), "prototypes must be an array");
+    for (const prototype of data.prototypes) {
+      requireValue(
+        prototype &&
+          idPattern.test(prototype.id || "") &&
+          !prototypeIds.has(prototype.id),
+        "Prototype IDs must be valid and unique",
+      );
+      prototypeIds.add(prototype.id);
+      requireValue(
+        typeof prototype.title === "string" &&
+          prototype.title.trim() &&
+          typeof prototype.html === "string" &&
+          prototype.html.trim(),
+        "Prototypes require title and HTML",
+      );
+      requireValue(
+        Number.isFinite(prototype.height) && prototype.height > 0,
+        "Prototype height must be positive",
+      );
+    }
+  }
   for (const page of data.pages) {
     requireValue(
       idPattern.test(page.id || "") &&
@@ -104,6 +162,15 @@ export function artifactData(html) {
       "Pages require title and html",
     );
     ids.add(page.id);
+  }
+  for (const content of [...data.pages, ...(data.agreements || [])]) {
+    for (const match of content.html.matchAll(
+      /<[a-z][^>]*?\sdata-prototype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
+    ))
+      requireValue(
+        prototypeIds.has(match[1] ?? match[2] ?? match[3]),
+        "Unknown prototype reference",
+      );
   }
   requireValue(
     data.kind !== "plan" || data.pages[0].id === "overview",
@@ -361,7 +428,11 @@ export async function serve(directory, { recover = false } = {}) {
         return {
           status: await transition({
             stage: "needs_reply",
-            question: { id: crypto.randomUUID(), text: data.text },
+            question: {
+              id: crypto.randomUUID(),
+              text: data.text,
+              createdAt: timestamp(),
+            },
             accepted: null,
           }),
         };
@@ -378,6 +449,58 @@ export async function serve(directory, { recover = false } = {}) {
         );
         requireValue(typeof data.html === "string", "HTML is required");
         const artifact = artifactData(data.html);
+        const submissions = await events();
+        for (const entry of artifact.agreements || []) {
+          delete entry.sourceRecords;
+          if (!entry.sourceRefs) continue;
+          entry.sourceRecords = [];
+          for (const ref of entry.sourceRefs) {
+            if (ref.kind === "conversation") {
+              entry.sourceRecords.push({ kind: ref.kind, text: ref.text });
+              continue;
+            }
+            const event = submissions.find(
+              (item) => item.id === ref.submissionId,
+            );
+            requireValue(event, "Source submission not found");
+            const payload = event.payload;
+            const item =
+              ref.kind === "note"
+                ? payload.groups?.notes?.find((note) => note.id === ref.noteId)
+                : payload.groups?.choices?.[ref.choiceId];
+            requireValue(
+              item && typeof item.topic === "string",
+              "Source item not found",
+            );
+            const text = ref.kind === "note" ? item.text : item.value;
+            const label = ref.kind === "note" ? item.anchor : item.label;
+            requireValue(
+              typeof text === "string" && typeof label === "string",
+              "Source item has invalid content",
+            );
+            requireValue(
+              idPattern.test(payload.artifactId || "") &&
+                revisionPattern.test(payload.revision || ""),
+              "Invalid source artifact",
+            );
+            const target =
+              typeof item.target === "string" && idPattern.test(item.target)
+                ? item.target
+                : null;
+            const href = `./${payload.artifactId}.${payload.revision}.html${target ? "?target=" + encodeURIComponent(target) : ""}#${encodeURIComponent(item.topic)}`;
+            entry.sourceRecords.push({
+              kind: ref.kind,
+              submissionId: ref.submissionId,
+              text,
+              label,
+              topic: item.topic,
+              artifactId: payload.artifactId,
+              revision: payload.revision,
+              href,
+              ...(typeof item.quote === "string" ? { quote: item.quote } : {}),
+            });
+          }
+        }
         const name = `${artifact.artifactId}.${artifact.revision}.html`;
         const file = path.join(directory, "artifacts", name);
         requireValue(
@@ -395,7 +518,17 @@ export async function serve(directory, { recover = false } = {}) {
           configScript.test(data.html),
           "HTML requires a session-config JSON script",
         );
-        const html = data.html.replace(configScript, `$1${config}$2`);
+        const html = data.html
+          .replace(
+            configScript,
+            () =>
+              `<script type="application/json" id="session-config">${config}</script>`,
+          )
+          .replace(
+            /(<script\b(?=[^>]*\bid=["']plan-data["'])[^>]*>)[\s\S]*?(<\/script>)/i,
+            (_, start, end) =>
+              start + json(artifact).replaceAll("<", "\\u003c") + end,
+          );
         const temporary = file + ".tmp";
         await fs.writeFile(temporary, html, { mode: 0o600, flag: "wx" });
         await fs.rename(temporary, file);
@@ -407,6 +540,7 @@ export async function serve(directory, { recover = false } = {}) {
           path: file,
           url: "/artifacts/" + name,
           sha256: crypto.createHash("sha256").update(html).digest("hex"),
+          publishedAt: timestamp(),
         };
         return {
           status: await transition({

@@ -41,11 +41,20 @@ network access from the terminal. A blocked CDN leaves source content available.
 If that fallback cannot communicate a choice adequately, use self-contained
 HTML/SVG or discuss the missing capability before proceeding.
 
-Desktop notifications are optional. Enable them in the live page and grant
-browser permission. Keep the tab and helper open; background polling may be
-delayed. New localhost ports may require permission again. Browser or OS settings
-can suppress delivery; the tab title also indicates pending reviews and questions.
-Notifications do not wake an ended agent turn or change the waiting protocol.
+Target modern desktop browsers on macOS, Windows, and Linux. Detect capabilities
+rather than browser names. Mobile and remote access are outside this local
+workflow. Report the actual OS/browser combinations verified.
+
+Notifications enable automatically when browser permission is already granted,
+unless explicitly disabled in Settings. First-time permission requires the user
+to click Enable notifications. Enabling applies only to later events, not the
+current review or a backlog. Focus and viewing do not suppress notifications;
+repeated polling does not repeat an alert.
+
+Keep the tab and helper open; browser polling can be delayed. New localhost ports
+may require permission again. Browser or OS settings can still suppress delivery.
+Verify actual notification delivery when possible and report gaps. Notifications
+do not wake an ended agent turn or change the waiting protocol.
 
 ## Authoring checks
 

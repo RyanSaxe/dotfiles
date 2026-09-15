@@ -59,6 +59,8 @@ let page = plan.pages[0],
   questionEvent = null,
   acceptance = null,
   submissionError = "",
+  noteDraftKey = "",
+  renderedFeedback = null,
   toastTimer;
 const charts = new Map();
 const snapshot = () =>
@@ -88,7 +90,7 @@ function save() {
 }
 function theme() {
   document.documentElement.dataset.theme = activeTheme;
-  $("theme").textContent = activeTheme === "dark" ? "Light mode" : "Dark mode";
+  $("theme").value = preferredTheme || "system";
   for (const chart of charts.values())
     chart.setOption(chartTheme(chart.getOption()));
   renderDiagrams($("page-content"));
@@ -103,6 +105,11 @@ function show(id, targetId = null) {
     charts.clear();
     $("page-title").textContent = page.title;
     $("page-content").innerHTML = page.html;
+    $("page-content")
+      .querySelectorAll("[data-choice]")
+      .forEach((group, index) => {
+        group.id ||= `choice-${page.id}-${index}`;
+      });
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
     restoreChoices();
     if (!(page.id === "agreed" && builtInAgreed)) enhance($("page-content"));
@@ -145,12 +152,13 @@ function openNote(topic, anchor, quote = "", id = null, entryId = null) {
     ...(entryId ? { agreementId: entryId } : {}),
   };
   editing = id;
+  noteDraftKey = JSON.stringify([topic, anchor, quote, id, entryId]);
   $("note-anchor").textContent = anchor;
   $("note-quote").textContent = quote;
   $("note-quote").hidden = !quote;
-  $("note-text").value = id
-    ? state.notes.find((note) => note.id === id).text
-    : "";
+  $("note-text").value =
+    state.noteDrafts?.[noteDraftKey] ??
+    (id ? state.notes.find((note) => note.id === id).text : "");
   $("note-title").textContent = id ? "Edit note" : "Add note";
   $("note-form").querySelector('[type="submit"]').textContent = id
     ? "Save changes"
@@ -214,10 +222,35 @@ function renderAgreements() {
     detail.append(content);
     const source = document.createElement("details");
     const heading = document.createElement("summary");
-    heading.textContent = "Source";
+    heading.textContent = entry.sourceRecords?.length
+      ? `Sources · ${entry.sourceRecords.length}`
+      : "Source";
     const text = document.createElement("p");
-    text.textContent = entry.source;
-    source.append(heading, text);
+    text.textContent = entry.source || "";
+    source.append(heading);
+    if (entry.source) source.append(text);
+    for (const record of entry.sourceRecords || []) {
+      const box = document.createElement("div");
+      box.className = "source-record";
+      const label = document.createElement("p");
+      label.className = "small";
+      label.textContent =
+        record.kind === "conversation"
+          ? "Conversation · agent-provided context"
+          : `${record.kind === "note" ? "Comment" : "Choice"} · Revision ${record.revision} · ${record.label}`;
+      box.append(label);
+      if (record.quote) {
+        const quote = document.createElement("blockquote");
+        quote.textContent = record.quote;
+        box.append(quote);
+      }
+      const body = document.createElement("p");
+      body.textContent = record.text;
+      box.append(body);
+      if (record.href)
+        box.append(contextLink(record.href, "Open original page"));
+      source.append(box);
+    }
     detail.append(source);
     if (entry.href) {
       const row = document.createElement("p");
@@ -240,7 +273,31 @@ function renderAgreements() {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.agreement = entry.id;
-    button.textContent = entry.title;
+    const title = document.createElement("strong");
+    title.textContent = entry.title;
+    const preview = document.createElement("div");
+    preview.innerHTML = entry.html;
+    const summary = document.createElement("span");
+    summary.className = "agreement-summary";
+    summary.textContent = preview.textContent;
+    const meta = document.createElement("small");
+    meta.textContent = [
+      entry.state === "reopened"
+        ? "Revisiting"
+        : entry.state === "retired"
+          ? "No longer applies"
+          : entry.change === "new"
+            ? "New"
+            : entry.change === "updated"
+              ? "Updated"
+              : "",
+      entry.sourceRecords?.length
+        ? `${entry.sourceRecords.length} sources`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    button.append(title, summary, meta);
     button.onclick = () => select(entry);
     (entry.state === "retired" ? retired : index).append(button);
   }
@@ -250,28 +307,60 @@ function renderAgreements() {
   retired.open = entry.state === "retired";
   select(entry);
 }
+function contextLink(href, label = "View context") {
+  const link = document.createElement("a");
+  const url = new URL(href, location.href);
+  if (!["http:", "https:", "file:"].includes(url.protocol))
+    return document.createTextNode("");
+  link.href = href;
+  link.textContent = label;
+  link.className = "context-link";
+  if (url.origin === location.origin && url.pathname === location.pathname)
+    link.onclick = (event) => {
+      event.preventDefault();
+      show(
+        decodeURIComponent(url.hash.slice(1)),
+        url.searchParams.get("target"),
+      );
+    };
+  else {
+    link.target = "_blank";
+    link.rel = "noopener";
+  }
+  return link;
+}
+function itemLink(item) {
+  return `${item.target ? "?target=" + encodeURIComponent(item.target) : ""}#${encodeURIComponent(item.topic)}`;
+}
 function noteCard(note) {
   const box = document.createElement("div");
-  box.className = "note";
+  box.className = "note feedback-item";
+  const body = document.createElement("div");
   const title = document.createElement("h3");
   title.textContent = note.anchor;
-  box.append(title);
+  body.append(title);
+  const kind = document.createElement("span");
+  kind.className = "feedback-kind";
+  kind.textContent = "Comment";
+  box.append(kind, body);
   if (note.quote) {
     const quote = document.createElement("blockquote");
     quote.textContent = note.quote;
-    box.append(quote);
+    body.append(quote);
   }
   const text = document.createElement("p");
   text.textContent = note.text;
-  box.append(text);
+  body.append(text);
   const actions = document.createElement("div");
-  actions.className = "row";
-  for (const action of ["Edit", "Remove"]) {
+  actions.className = "feedback-item-actions";
+  for (const action of ["Add comment", "Edit", "Remove"]) {
     const button = document.createElement("button");
     button.className = "btn quiet";
     button.textContent = action;
     button.onclick = () => {
-      if (action === "Edit")
+      if (action === "Add comment")
+        openNote(note.topic, note.anchor, note.text, null, note.agreementId);
+      else if (action === "Edit")
         openNote(
           note.topic,
           note.anchor,
@@ -287,10 +376,12 @@ function noteCard(note) {
     actions.append(button);
   }
   box.append(actions);
+  if (note.topic !== "overall") body.append(contextLink(itemLink(note)));
   return box;
 }
 function review() {
-  const unchanged = state.submitted?.snapshot === snapshot();
+  const draft = snapshot();
+  const unchanged = state.submitted?.snapshot === draft;
   const unsent = unchanged ? 0 : dirty();
   document.querySelectorAll(".count").forEach((element) => {
     element.textContent = unsent;
@@ -298,41 +389,76 @@ function review() {
   });
   $("review").classList.toggle("primary", unsent > 0);
   $("review").classList.toggle("quiet", !unsent);
-  $("feedback-groups").replaceChildren();
-  for (const topic of pages) {
-    const notes = state.notes.filter((note) => note.topic === topic.id),
-      choices = Object.entries(state.choices).filter(
-        ([, choice]) => choice.topic === topic.id,
-      );
-    if (!notes.length && !choices.length) continue;
-    const group = document.createElement("section");
-    group.className = "feedback-group";
-    const head = document.createElement("div");
-    head.className = "group-head";
-    const heading = document.createElement("h2");
-    heading.textContent = topic.title;
-    head.append(heading);
-    group.append(head);
-    for (const [id, choice] of choices) {
-      const row = document.createElement("p");
-      row.textContent = `${choice.label}: ${choice.value}`;
-      const clear = document.createElement("button");
-      clear.className = "btn quiet";
-      clear.textContent = "Clear choice";
-      clear.onclick = () => {
-        delete state.choices[id];
-        restoreChoices();
-        save();
-      };
-      row.append(clear);
-      group.append(row);
+  if (renderedFeedback !== draft) {
+    $("feedback-groups").replaceChildren();
+    for (const topic of pages) {
+      const notes = state.notes.filter((note) => note.topic === topic.id),
+        choices = Object.entries(state.choices).filter(
+          ([, choice]) => choice.topic === topic.id,
+        );
+      const group = document.createElement("section");
+      group.className = "feedback-group";
+      const head = document.createElement("div");
+      head.className = "group-head";
+      const heading = document.createElement("h2");
+      heading.textContent = topic.title;
+      head.append(heading);
+      const add = document.createElement("button");
+      add.className = "btn quiet";
+      add.textContent = "Add comment";
+      add.onclick = () => openNote(topic.id, topic.title);
+      head.append(add);
+      group.append(head);
+      if (!notes.length && !choices.length) {
+        const empty = document.createElement("p");
+        empty.className = "small";
+        empty.textContent = "No feedback added.";
+        group.append(empty);
+      }
+      for (const [id, choice] of choices) {
+        const row = document.createElement("div");
+        row.className = "choice-review feedback-item";
+        const body = document.createElement("div");
+        const actions = document.createElement("div");
+        actions.className = "feedback-item-actions";
+        const kind = document.createElement("span");
+        kind.className = "feedback-kind";
+        kind.textContent = "Choice";
+        const title = document.createElement("h3");
+        title.textContent = choice.label;
+        const value = document.createElement("p");
+        value.textContent = choice.value;
+        body.append(
+          title,
+          value,
+          contextLink(itemLink(choice), "View options"),
+        );
+        const comment = document.createElement("button");
+        comment.className = "btn quiet";
+        comment.textContent = "Add comment";
+        comment.onclick = () =>
+          openNote(choice.topic, choice.label, choice.value);
+        actions.append(comment);
+        const clear = document.createElement("button");
+        clear.className = "btn quiet";
+        clear.textContent = "Clear choice";
+        clear.onclick = () => {
+          delete state.choices[id];
+          restoreChoices();
+          save();
+        };
+        actions.append(clear);
+        row.append(kind, body, actions);
+        group.append(row);
+      }
+      notes.forEach((note) => group.append(noteCard(note)));
+      $("feedback-groups").append(group);
     }
-    notes.forEach((note) => group.append(noteCard(note)));
-    $("feedback-groups").append(group);
+    $("overall-notes").replaceChildren(
+      ...state.notes.filter((note) => note.topic === "overall").map(noteCard),
+    );
+    renderedFeedback = draft;
   }
-  $("overall-notes").replaceChildren(
-    ...state.notes.filter((note) => note.topic === "overall").map(noteCard),
-  );
   $("submit").disabled = !dirty() || unchanged || !connected || !current();
   $("submit").textContent = unchanged ? "Submitted" : "Submit feedback";
   $("submit-status").textContent =
@@ -404,43 +530,41 @@ function status() {
   $("accept").title = dirty()
     ? "Submit feedback and review the revised plan before accepting."
     : "";
-  if (!remote) return;
-  const stage = newer ? "updated" : remote.stage;
-  $("agent-status").hidden =
-    !newer &&
-    !state.submitted &&
-    !state.lastEvent &&
-    !["submitted", "working", "needs_reply", "complete"].includes(stage);
+  $("agent-status").hidden = !session.sessionId;
+  if (!session.sessionId) return;
+  const stage = !connected ? "disconnected" : remote?.stage || "ready";
   const titles = {
     ready: "Ready for feedback",
     submitted: "Waiting for the agent",
-    working: "The agent is working on your feedback",
-    needs_reply: "The agent has a question",
-    updated: "An updated artifact is ready",
+    working: "Working",
+    needs_reply: "Question",
+    updated: newer ? "New revision" : "Ready for feedback",
+    disconnected: "Disconnected",
     complete:
-      remote.accepted?.mode === "implement"
-        ? "Plan accepted. Implementation requested."
-        : "Plan accepted and saved.",
+      remote?.accepted?.mode === "implement"
+        ? "Implementation requested"
+        : "Plan saved",
   };
-  $("status-title").textContent = titles[stage] || stage;
-  $("status-detail").textContent =
-    stage === "needs_reply"
-      ? remote.question?.text
-      : stage === "submitted"
-        ? "Your submission is saved."
-        : stage === "working" && remote.acknowledgedAt
-          ? "Acknowledged at " +
-            new Date(remote.acknowledgedAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : stage === "updated"
-            ? `${remote.current.title}, revision ${remote.current.revision}`
-            : "";
-  $("spinner").hidden = !["submitted", "working"].includes(stage);
+  const setText = (id, text) => {
+    if ($(id).textContent !== text) $(id).textContent = text;
+  };
+  setText("status-title", titles[stage] || stage);
+  setText(
+    "status-detail",
+    stage === "disconnected"
+      ? "The local helper is unreachable."
+      : stage === "needs_reply"
+        ? remote.question?.text || ""
+        : stage === "updated" && newer
+          ? `Revision ${remote.current.revision} is ready.`
+          : "",
+  );
+  $("spinner").hidden = stage !== "working";
   $("reply").hidden = stage !== "needs_reply" || newer;
-  $("update").hidden = !newer;
-  if (newer) $("update").href = remote.current.url;
+  $("update").hidden = !newer || !connected;
+  if (newer)
+    $("update").href =
+      remote.current.url + (stage === "needs_reply" ? "#feedback" : "");
   $("final-plan").hidden = stage !== "complete";
   $("plan-path").hidden = stage !== "complete";
   if (stage === "complete") {
@@ -449,7 +573,7 @@ function status() {
   }
   if (
     state.submitted &&
-    remote.acknowledged.includes(state.submitted.id) &&
+    remote?.acknowledged.includes(state.submitted.id) &&
     state.submitted.snapshot === snapshot()
   )
     $("submit-status").textContent = "Feedback received by the agent.";
@@ -482,11 +606,7 @@ async function poll() {
       "Local helper disconnected. Your draft remains here; reconnect or export a copy.";
     $("submit").disabled = true;
     $("accept").disabled = true;
-    $("agent-status").hidden = false;
-    $("spinner").hidden = true;
-    $("status-title").textContent = "Connection unavailable";
-    $("status-detail").textContent =
-      "Resume this planning session in the agent conversation.";
+    status();
   }
 }
 function restoreChoices() {
@@ -516,6 +636,7 @@ $("note-form").onsubmit = (event) => {
       item.id === editing ? note : item,
     );
   else state.notes.push(note);
+  if (state.noteDrafts) delete state.noteDrafts[noteDraftKey];
   save();
   $("note-dialog").close();
   notify("Added to feedback.");
@@ -563,7 +684,7 @@ $("reply").onclick = () => {
   question = remote.question;
   questionEvent = null;
   $("question-text").textContent = question.text;
-  $("question-reply").value = "";
+  $("question-reply").value = state.questionDrafts?.[question.id] || "";
   $("question-error").textContent = "";
   $("question-dialog").showModal();
   $("question-reply").focus();
@@ -580,6 +701,7 @@ $("question-form").onsubmit = async (event) => {
   try {
     const result = await send(questionEvent);
     state.lastEvent = result.id;
+    if (state.questionDrafts) delete state.questionDrafts[question.id];
     save();
     $("question-dialog").close();
   } catch (error) {
@@ -647,6 +769,7 @@ document.addEventListener("click", (event) => {
         topic: page.id,
         label: group.dataset.label || group.dataset.choice,
         value: choice.dataset.value,
+        target: group.id,
       };
     restoreChoices();
     save();
@@ -673,12 +796,36 @@ $("quote").onclick = () =>
   );
 $("page-comment").onclick = () => openNote(page.id, page.title);
 $("overall-note").onclick = () => openNote("overall", "Overall feedback");
+$("note-text").oninput = () => {
+  (state.noteDrafts ||= {})[noteDraftKey] = $("note-text").value;
+  persist();
+};
+$("question-reply").oninput = () => {
+  if (question) {
+    (state.questionDrafts ||= {})[question.id] = $("question-reply").value;
+    persist();
+  }
+};
+for (const dialog of document.querySelectorAll("dialog")) {
+  dialog.addEventListener("click", (event) => {
+    if (event.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom
+    )
+      dialog.close();
+  });
+}
 $("review").onclick = $("page-review").onclick = () => show("feedback");
-$("theme").onclick = () => {
-  preferredTheme = activeTheme = activeTheme === "dark" ? "light" : "dark";
+$("theme").onchange = () => {
+  preferredTheme = $("theme").value === "system" ? null : $("theme").value;
+  activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
   try {
     if (/^https?:$/.test(location.protocol))
-      document.cookie = `interactive-plan-theme=${preferredTheme}; Path=/; SameSite=Strict; Max-Age=31536000`;
+      document.cookie = `interactive-plan-theme=${preferredTheme || ""}; Path=/; SameSite=Strict; Max-Age=${preferredTheme ? 31536000 : 0}`;
   } catch {
     /* Keep the explicit choice in memory when cookies are blocked. */
   }
@@ -845,6 +992,36 @@ async function chart(element, options) {
   return instance;
 }
 function enhance(root) {
+  root.querySelectorAll("[data-prototype]").forEach((mount) => {
+    if (mount.querySelector("iframe")) return;
+    const prototype = plan.prototypes?.find(
+      (item) => item.id === mount.dataset.prototype,
+    );
+    if (!prototype) {
+      failed(mount, Error("Prototype unavailable."));
+      return;
+    }
+    const frame = document.createElement("iframe");
+    frame.title = prototype.title;
+    frame.className = "approved-prototype";
+    frame.setAttribute("sandbox", "allow-scripts allow-forms allow-popups");
+    frame.style.height = `${prototype.height}px`;
+    frame.srcdoc = prototype.html;
+    const details = document.createElement("details");
+    details.className = "prototype-source";
+    const summary = document.createElement("summary");
+    summary.textContent = "Source HTML, CSS, and JavaScript";
+    details.append(summary);
+    details.addEventListener("toggle", () => {
+      if (!details.open || details.querySelector("[data-language]")) return;
+      const source = document.createElement("div");
+      source.dataset.language = "html";
+      source.textContent = prototype.html;
+      details.append(source);
+      renderCode(source);
+    });
+    mount.append(frame, details);
+  });
   root.querySelectorAll("[data-language]").forEach(renderCode);
   root.querySelectorAll("[data-math]").forEach(renderMath);
   renderDiagrams(root);

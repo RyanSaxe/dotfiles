@@ -25,7 +25,14 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html
 node scripts/session.mjs wait --session-dir PATH --timeout 55
 ```
 
-Present the returned URL and keep the agent turn waiting. A timeout is not
+On the first publication, open the returned URL in the operating system's default
+browser and also present the link in chat. Use the environment's browser-opening
+tool or the platform mechanism: macOS `open`, Windows PowerShell `Start-Process`,
+or Linux `xdg-open`. Pass the URL as a quoted argument. Report a failed launch
+and keep the link available. Do not hard-code a browser or open another tab on
+each revision or poll.
+
+Keep the agent turn waiting. A timeout is not
 completion; wait again. A side question does not end the session: answer it,
 then resume the same wait. The helper saves feedback but cannot awaken an ended
 agent turn. If the conversation is interrupted, the next turn must resume the

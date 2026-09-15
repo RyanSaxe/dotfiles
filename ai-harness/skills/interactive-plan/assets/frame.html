@@ -25,16 +25,52 @@
         </div>
         <div class="revision" id="revision"></div>
         <nav id="navigation" aria-label="Plan pages"></nav>
+        <div class="sidebar-footer">
+          <div class="status" id="agent-status" role="status" hidden>
+            <div class="row">
+              <span
+                class="spinner"
+                id="spinner"
+                aria-hidden="true"
+                hidden
+              ></span>
+              <div>
+                <h2 id="status-title"></h2>
+                <p class="small" id="status-detail"></p>
+              </div>
+            </div>
+            <div class="row">
+              <button class="btn" id="reply" hidden>Reply to question</button
+              ><a class="btn" id="update" hidden>View update →</a
+              ><a class="btn" id="final-plan" hidden>View accepted plan →</a>
+            </div>
+            <code id="plan-path" hidden></code>
+          </div>
+
+          <div id="settings-menu" popover>
+            <h2>Settings</h2>
+            <label for="theme">Appearance</label>
+            <select id="theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <button class="btn" id="notifications">Enable notifications</button>
+          </div>
+        </div>
       </aside>
       <main>
         <header class="topbar">
           <span class="small" id="artifact-title"></span>
           <div class="row">
-            <button class="btn quiet" id="notifications">
-              Enable notifications
+            <button
+              class="btn quiet"
+              id="settings"
+              popovertarget="settings-menu"
+            >
+              Settings
             </button>
-            <button class="btn quiet" id="theme">Dark mode</button
-            ><button class="btn" id="review">
+            <button class="btn" id="review">
               Review &amp; submit <span class="count" hidden>0</span></button
             ><button class="btn primary" id="accept" hidden disabled>
               Accept plan
@@ -57,29 +93,11 @@
             <div id="feedback-groups"></div>
             <div class="group-head">
               <h2>Overall</h2>
-              <button class="btn quiet" id="overall-note">Add note</button>
+              <button class="btn quiet" id="overall-note">
+                Add overall comment
+              </button>
             </div>
             <div id="overall-notes"></div>
-            <div class="status" id="agent-status" role="status" hidden>
-              <div class="row">
-                <span
-                  class="spinner"
-                  id="spinner"
-                  aria-hidden="true"
-                  hidden
-                ></span>
-                <div>
-                  <h2 id="status-title"></h2>
-                  <p class="small" id="status-detail"></p>
-                </div>
-              </div>
-              <div class="row">
-                <button class="btn" id="reply" hidden>Reply to question</button
-                ><a class="btn" id="update" hidden>View update →</a
-                ><a class="btn" id="final-plan" hidden>View accepted plan →</a>
-              </div>
-              <code id="plan-path" hidden></code>
-            </div>
             <div class="submitbar">
               <div class="small" id="submit-status"></div>
               <div class="row">

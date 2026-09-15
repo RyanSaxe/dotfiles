@@ -89,18 +89,17 @@ function alertFixture({
   };
 }
 
-test("desktop alerts require opt-in and deduplicate polling, reloads, and tabs", async () => {
+test("enabling alerts skips the current review and deduplicates later events across tabs", async () => {
   const storage = new Map();
   let queue = Promise.resolve();
   const locks = { request: (_key, callback) => (queue = queue.then(callback)) };
   const a = alertFixture({ storage, locks });
   await a.alerts.update(a.status);
   assert.equal(a.sent.length, 0);
-  assert.match(a.host.document.title, /new review/);
   assert.equal(a.requests(), 0);
   await a.button.onclick();
   assert.equal(a.requests(), 1);
-  assert.equal(a.sent.length, 1);
+  assert.equal(a.sent.length, 0);
   await a.alerts.update(a.status);
   const b = alertFixture({ storage, locks, permission: "granted" });
   await b.alerts.update(b.status);
@@ -114,45 +113,78 @@ test("desktop alerts require opt-in and deduplicate polling, reloads, and tabs",
     },
   };
   await Promise.all([a.alerts.update(next), b.alerts.update(next)]);
-  assert.equal(a.sent.length + b.sent.length, 2);
+  assert.equal(a.sent.length + b.sent.length, 1);
+  await a.alerts.update({ ...next, stage: "working" });
   a.sent[0].onclick();
   assert.deepEqual(a.opened, [next.current.url]);
+  const reload = alertFixture({ storage, locks, permission: "granted" });
+  await reload.alerts.update(next);
+  assert.equal(reload.sent.length, 0);
+});
+
+test("granted permission enables automatically unless explicitly disabled; re-enabling skips backlog", async () => {
+  const storage = new Map();
+  const a = alertFixture({ storage, permission: "granted" });
+  await a.alerts.update(a.status);
+  assert.equal(a.button.textContent, "Disable notifications");
+  assert.equal(a.requests(), 0);
+  assert.equal(a.sent.length, 0);
+  const next = { ...a.status, current: { ...a.status.current, revision: "3" } };
+  await a.alerts.update(next);
+  assert.equal(a.sent.length, 1);
   await a.button.onclick();
-  await a.alerts.update({
+  const b = alertFixture({ storage, permission: "granted" });
+  await b.alerts.update({
     ...next,
     current: { ...next.current, revision: "4" },
   });
-  assert.equal(a.sent.length + b.sent.length, 2);
+  assert.equal(b.button.textContent, "Enable notifications");
+  assert.equal(b.sent.length, 0);
+  await b.button.onclick();
+  await b.alerts.update();
+  assert.equal(b.sent.length, 0);
+  await b.alerts.update({
+    ...next,
+    current: {
+      ...next.current,
+      revision: "5",
+      publishedAt: "2000-01-01T00:00:00Z",
+    },
+  });
+  assert.equal(b.sent.length, 0);
+  await b.alerts.update({
+    ...next,
+    current: {
+      ...next.current,
+      revision: "6",
+      publishedAt: "2099-01-01T00:00:00Z",
+    },
+  });
+  assert.equal(b.sent.length, 1);
 });
 
-test("questions alert once and clear when the relevant feedback is viewed", async () => {
+test("focus and viewing never suppress or close question notifications", async () => {
   const a = alertFixture();
   await a.button.onclick();
+  a.host.document.hidden = false;
+  a.host.document.hasFocus = () => true;
+  a.host.location.hash = "#feedback";
   const status = {
     ...a.status,
     stage: "needs_reply",
-    current: {
-      ...a.status.current,
-      revision: "1",
-      url: "/artifacts/example.1.html",
-    },
     question: { id: "question-1", text: "Private question content" },
   };
   await a.alerts.update(status);
+  await a.alerts.update(status);
   assert.equal(a.sent.length, 1);
   assert.equal(a.sent[0].options.body, a.plan.title);
+  assert.equal(a.sent[0].closed, undefined);
+  await a.alerts.update({ ...status, stage: "working" });
+  assert.equal(a.sent[0].closed, undefined);
   a.sent[0].onclick();
-  assert.deepEqual(a.opened, ["/artifacts/example.1.html#feedback"]);
-  a.host.document.hidden = false;
-  a.host.document.hasFocus = () => true;
-  await a.alerts.update(status);
-  assert.match(a.host.document.title, /question/);
-  a.host.location.hash = "#feedback";
-  await a.alerts.update(status);
-  assert.equal(a.host.document.title, a.plan.title);
-  assert.equal(a.sent[0].closed, true);
+  assert.deepEqual(a.opened, [status.current.url + "#feedback"]);
   for (const stage of ["submitted", "working", "complete"])
-    assert.equal(reviewAlert({ ...status, stage }, a.plan), null);
+    assert.equal(reviewAlert({ ...status, stage }), null);
 });
 
 test("denied, unavailable, and failed notifications retain the title fallback", async () => {
@@ -170,28 +202,8 @@ test("denied, unavailable, and failed notifications retain the title fallback", 
   assert.equal(a.sent.length, 1);
   a.sent[0].onerror();
   assert.equal(a.button.disabled, true);
+  assert.match(a.button.title, /delivery failed/);
   assert.match(a.host.document.title, /new review/);
-});
-
-test("queued notification delivery rechecks focus and opt-out", async () => {
-  let deliver;
-  const a = alertFixture({
-    locks: {
-      request: async (_key, callback) => {
-        deliver = callback;
-      },
-    },
-  });
-  await a.button.onclick();
-  await a.alerts.update(a.status);
-  await a.button.onclick();
-  deliver();
-  assert.equal(a.sent.length, 0);
-  await a.button.onclick();
-  a.host.document.hidden = false;
-  a.host.document.hasFocus = () => true;
-  deliver();
-  assert.equal(a.sent.length, 0);
 });
 import {
   assemble,
@@ -315,6 +327,144 @@ test("split authoring sources build a standalone artifact without executing cont
     exec(process.execPath, [builder, source, output]),
     /EEXIST/,
   );
+});
+
+test("preserved prototypes retain exact executable source without escaping into the frame", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-prototype-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const html =
+    '<!doctype html><button id="try">Try</button><script>document.querySelector("button").onclick = () => alert("$&");</script>';
+  await fs.writeFile(path.join(directory, "prototype.html"), html);
+  const data = {
+    ...artifactData(artifact()),
+    pages: [
+      {
+        id: "overview",
+        title: "Preview",
+        html: '<div data-prototype="demo"></div><code>data-prototype="ID"</code>',
+      },
+    ],
+    prototypes: [
+      {
+        id: "demo",
+        title: "Approved interaction",
+        file: "prototype.html",
+        height: 420,
+      },
+    ],
+  };
+  const source = path.join(directory, "source.json");
+  await fs.writeFile(source, JSON.stringify(data));
+  const result = await build(source);
+  const parsed = artifactData(result);
+  assert.equal(parsed.prototypes[0].html, html);
+  assert.equal(parsed.prototypes[0].file, undefined);
+  assert(!result.includes(html));
+  for (const prototypes of [
+    [],
+    [null],
+    [{ ...parsed.prototypes[0], height: 0 }],
+    [{ ...parsed.prototypes[0], html: "" }],
+    [parsed.prototypes[0], parsed.prototypes[0]],
+  ])
+    await assert.rejects(assemble({ ...parsed, prototypes }));
+  await fs.writeFile(
+    source,
+    JSON.stringify({ ...data, prototypes: [{ ...data.prototypes[0], html }] }),
+  );
+  await assert.rejects(build(source), /file.*html|html.*file/);
+});
+
+test("publication resolves exact mixed sources from saved feedback before hashing", async (t) => {
+  const a = await fixture(t);
+  await a.action("publish", { html: artifact() });
+  const feedback = a.event("feedback-only", "1", {
+    groups: {
+      notes: [
+        {
+          id: "note-1",
+          topic: "overview",
+          anchor: "Failure handling",
+          text: "Keep <strong>literal</strong> and </script> $&",
+          quote: "A failed item",
+          target: "failure",
+        },
+      ],
+      choices: {
+        "overview:errors": {
+          topic: "overview",
+          label: "Error policy",
+          value: "per-item",
+          target: "errors",
+        },
+      },
+    },
+  });
+  assert.equal((await a.request("/api/feedback", feedback)).code, 200);
+  await a.action("ack", { id: feedback.id });
+  const entry = {
+    id: "errors",
+    title: "Per-item errors",
+    html: "<p>Keep successful results.</p>",
+    sourceRefs: [
+      { kind: "note", submissionId: feedback.id, noteId: "note-1" },
+      {
+        kind: "choice",
+        submissionId: feedback.id,
+        choiceId: "overview:errors",
+      },
+      {
+        kind: "conversation",
+        text: "Driver also confirmed the return type in conversation.",
+      },
+    ],
+    sourceRecords: [{ kind: "note", text: "Forged source" }],
+  };
+  const data = { ...artifactData(artifact("2")), agreements: [entry] };
+  const result = await a.action("publish", { html: await assemble(data) });
+  assert.equal(result.code, 200);
+  const snapshot = await fs.readFile(
+    path.join(a.directory, "artifacts/example.2.html"),
+    "utf8",
+  );
+  const records = artifactData(snapshot).agreements[0].sourceRecords;
+  assert.equal(records.length, 3);
+  assert.equal(records[0].text, feedback.groups.notes[0].text);
+  assert.equal(records[0].quote, "A failed item");
+  assert.equal(records[0].href, "./example.1.html?target=failure#overview");
+  assert.equal(records[1].text, "per-item");
+  assert.equal(records[1].label, "Error policy");
+  assert.equal(records[1].href, "./example.1.html?target=errors#overview");
+  assert.deepEqual(records[2], entry.sourceRefs[2]);
+  assert(!snapshot.includes(feedback.groups.notes[0].text));
+  assert.equal(
+    result.body.status.current.sha256,
+    crypto.createHash("sha256").update(snapshot).digest("hex"),
+  );
+  for (const ref of [
+    { kind: "note", submissionId: "missing", noteId: "note-1" },
+    { kind: "note", submissionId: feedback.id, noteId: "missing" },
+    { kind: "choice", submissionId: feedback.id, choiceId: "missing" },
+  ]) {
+    const rejected = await a.action("publish", {
+      html: await assemble({
+        ...data,
+        revision: "3",
+        agreements: [{ ...entry, sourceRefs: [ref] }],
+      }),
+    });
+    assert.equal(rejected.code, 400);
+    assert.match(rejected.body.error, /Source .*not found/);
+  }
+  for (const sourceRefs of [
+    [],
+    [{ kind: "unknown" }],
+    [{ kind: "conversation", text: "" }],
+    [{ kind: "note", submissionId: feedback.id }],
+  ])
+    await assert.rejects(
+      assemble({ ...data, agreements: [{ ...entry, sourceRefs }] }),
+    );
 });
 
 test("final review can reopen exploration and only accept the recomposed plan", async (t) => {

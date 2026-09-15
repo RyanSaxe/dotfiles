@@ -50,6 +50,15 @@ export async function build(source) {
       return file ? { ...page, html: await read(file) } : page;
     }),
   );
+  if (data.prototypes) {
+    data.prototypes = await Promise.all(
+      data.prototypes.map(async ({ file, ...prototype }) => {
+        if (file && prototype.html !== undefined)
+          throw new Error("Use file or html for a prototype, not both");
+        return file ? { ...prototype, html: await read(file) } : prototype;
+      }),
+    );
+  }
   if (Array.isArray(data.agreements))
     data.agreements = await Promise.all(
       data.agreements.map(async ({ file, ...entry }) => {
