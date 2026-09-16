@@ -8,16 +8,28 @@ description: Develop and review implementation plans in an interactive browser s
 Develop an implementation-ready plan with the user. Read the project and
 conversation to distinguish settled requirements from open decisions. Show the
 design, behavior, code, or wording they need to judge, and use their responses
-to revise the proposal.
+to revise the proposal. You will very likely want to have a discussion with the
+user to get the necessary context before you can do a good job creating
+interactive HTML pages to iterate with them.
 
 ## Explore, then review the complete plan
 
-Use exploration to resolve open decisions. A proposal may cover only the part
-of the work that needs discussion.
+Once you have enough context, you enter an iterative and interactive phase
+called exploration. Eliminate ambiguity by aligning on choices. Anything from high
+level architecture to low level interfaces. Whatever is needed to move towards
+a strong and concrete plan. Importantly, this is about providing choices to the
+user for their selection or feedback. When providing choices, always present with
+your recommendation and reason.
 
-Once scope and implementation-critical decisions are settled, compose a complete
-plan for final review. It must include everything needed to implement the agreed
-work using the project and the plan alone.
+Exploration also resolves open decisions. So an exploration doesn't need to try
+and represent the whole plan at once. It can work through things iteratively
+while tracking what has already been aligned. This makes the interactive model
+of the user simple and engaging while still building towards the complete plan.
+
+Once scope and implementation-critical decisions are settled, you enter the second
+phase to compose a complete plan for final review. It must include everything needed
+to implement the agreed work using the project and the plan alone, as it will be
+handed to an engineer or agent to implement.
 
 Both phases can take several revisions. Apply clear corrections directly. When
 feedback reopens a choice that needs comparison, return to focused exploration.
