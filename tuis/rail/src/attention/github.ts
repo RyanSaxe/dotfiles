@@ -208,6 +208,11 @@ interface RawReactionGroup {
   viewerHasReacted?: boolean | null;
 }
 
+interface RawReactionNode {
+  id?: string | null;
+  reactionGroups?: RawReactionGroup[] | null;
+}
+
 interface RawComment {
   id?: string | null;
   author?: RawActor | null;
@@ -872,6 +877,67 @@ function commentFields(): string {
         reactionGroups {
           viewerHasReacted
         }`;
+}
+
+function buildCommentReactionQuery(commentIds: readonly string[]): string {
+  const nodes = commentIds
+    .map(
+      (id, index) => `    comment${index}: node(id: ${graphqlString(id)}) {
+      ... on IssueComment {
+        id
+        reactionGroups {
+          viewerHasReacted
+        }
+      }
+      ... on PullRequestReviewComment {
+        id
+        reactionGroups {
+          viewerHasReacted
+        }
+      }
+    }`,
+    )
+    .join("\n");
+  return `query {
+    viewer {
+      login
+    }
+    rateLimit {
+      cost
+      remaining
+      resetAt
+    }
+${nodes}
+  }`;
+}
+
+export async function fetchCommentReactionStates(
+  commentIds: readonly string[],
+  runQuery: GraphqlRunner = runGhGraphql,
+): Promise<{ reactedCommentIds: Set<string>; rateLimit: RateLimit | null }> {
+  const uniqueCommentIds = [...new Set(commentIds)];
+  if (uniqueCommentIds.length === 0) {
+    return { reactedCommentIds: new Set<string>(), rateLimit: null };
+  }
+
+  const data = parseGraphqlData(
+    await runQuery(buildCommentReactionQuery(uniqueCommentIds)),
+  );
+  viewerLogin(data);
+  const reactedCommentIds = new Set<string>();
+  for (const [index, commentId] of uniqueCommentIds.entries()) {
+    const node = data[`comment${index}`] as RawReactionNode | null | undefined;
+    if (
+      node?.id === commentId &&
+      node.reactionGroups?.some((group) => group.viewerHasReacted === true)
+    ) {
+      reactedCommentIds.add(commentId);
+    }
+  }
+  return {
+    reactedCommentIds,
+    rateLimit: parseRateLimit(data.rateLimit),
+  };
 }
 
 function buildDetailQuery(

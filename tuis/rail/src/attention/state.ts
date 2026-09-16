@@ -293,6 +293,54 @@ export function unacknowledgedItems(state: ObserverState): AttentionItem[] {
   );
 }
 
+function commentIdFromReason(reasonId: string): string | null {
+  const prefix = "comment:";
+  return reasonId.startsWith(prefix) ? reasonId.slice(prefix.length) : null;
+}
+
+function activityKeyFor(reasons: readonly { id: string }[]): string {
+  return reasons
+    .map((reason) => reason.id)
+    .sort()
+    .join("|");
+}
+
+// A reaction is a comment-level acknowledgement. Remove the comment and any
+// watched-target opening reason it settled, while leaving independent review
+// and CI reasons visible on the same row.
+export function acknowledgeReactedComments(
+  state: ObserverState,
+  reactedCommentIds: ReadonlySet<string>,
+): ObserverState {
+  if (reactedCommentIds.size === 0) return state;
+
+  const items = { ...state.items };
+  const acknowledged = { ...state.acknowledged };
+  for (const item of Object.values(state.items)) {
+    const reacted = item.reasons.some(
+      (reason) =>
+        reason.kind === "comment" &&
+        reactedCommentIds.has(commentIdFromReason(reason.id) ?? ""),
+    );
+    if (!reacted) continue;
+
+    const reasons = item.reasons.filter(
+      (reason) => reason.kind !== "comment" && reason.kind !== "opened",
+    );
+    if (reasons.length === 0) {
+      acknowledged[item.id] = item.activityKey;
+      continue;
+    }
+
+    items[item.id] = {
+      ...item,
+      reasons,
+      activityKey: activityKeyFor(reasons),
+    };
+  }
+  return { ...state, items, acknowledged };
+}
+
 // Items are target-level records. An acknowledgement survives a refresh when
 // every current reason was already part of the dismissed activity revision.
 export function reconcileAttention(

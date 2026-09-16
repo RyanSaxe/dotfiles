@@ -5,9 +5,10 @@ import { resolve } from "node:path";
 import { loadAttentionConfig } from "./config.js";
 import { applyCiTransition } from "./ci.js";
 import { attentionItem, classifyTarget } from "./classify.js";
-import { fetchGithubSync } from "./github.js";
+import { fetchCommentReactionStates, fetchGithubSync } from "./github.js";
 import {
   acknowledgeItem,
+  acknowledgeReactedComments,
   acquireRefreshLock,
   ATTENTION_STATE_DIR,
   commitGithubSync,
@@ -61,6 +62,18 @@ function itemLine(item: AttentionItem, acknowledged: boolean): string {
 
 function activeItems(state: ObserverState): AttentionItem[] {
   return Object.values(state.items).sort(itemSort);
+}
+
+function pendingCommentIds(state: ObserverState): string[] {
+  const ids = new Set<string>();
+  for (const item of unacknowledgedItems(state)) {
+    for (const reason of item.reasons) {
+      if (reason.kind !== "comment") continue;
+      const prefix = "comment:";
+      if (reason.id.startsWith(prefix)) ids.add(reason.id.slice(prefix.length));
+    }
+  }
+  return [...ids];
 }
 
 function parseRefreshOptions(args: string[]): {
@@ -146,6 +159,11 @@ async function refresh(args: string[]): Promise<void> {
       sync.refreshedTargetKeys,
       sync.fullReconciliation,
     );
+    const reactionCheck = await fetchCommentReactionStates(
+      pendingCommentIds(state),
+    );
+    state = acknowledgeReactedComments(state, reactionCheck.reactedCommentIds);
+    const observedRateLimit = reactionCheck.rateLimit ?? snapshot.rateLimit;
     state = commitGithubSync(
       markSuccess(
         {
@@ -154,16 +172,16 @@ async function refresh(args: string[]): Promise<void> {
           baselineAt,
           watchedSince,
         },
-        snapshot.rateLimit,
+        observedRateLimit,
         now,
       ),
       sync.processedThrough,
       sync.fullReconciliation,
     );
     const rateLimitRetry =
-      snapshot.rateLimit === null
+      observedRateLimit === null
         ? null
-        : retryAfterForRateLimit(snapshot.rateLimit, Date.parse(now));
+        : retryAfterForRateLimit(observedRateLimit, Date.parse(now));
     if (rateLimitRetry !== null) {
       state = { ...state, retryAfter: rateLimitRetry };
     }
