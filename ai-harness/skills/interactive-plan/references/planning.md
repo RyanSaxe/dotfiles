@@ -1,64 +1,90 @@
-# Planning judgment and component design
+# Planning quality
 
-## Choose the decisions
+## Exploration quality
+
+Exploration may address a narrow question, several connected choices, or a broad
+part of the proposed work. Keep related parts together when their interaction
+matters. Separate them when an unresolved dependency or too much material would
+make the proposal hard to assess.
 
 Resolve routine details from project evidence and settled requirements. Ask the
-user when their answer changes intended behavior, scope, an interface, or a
-consequential tradeoff. Resolve decisions that change later options first. Group
-choices whose combined effect matters; postpone details an earlier answer could
-invalidate.
+user about choices that change intended behavior, scope, an interface, or an
+important tradeoff. Address choices that affect later options before spending
+time on details those choices could invalidate.
 
-Recommend an approach and explain the consequence that favors it. Offer
-alternatives only when each has a credible reason to be chosen. Show different
-behavior on comparable inputs. Keep the evidence and consequences beside the
-proposal, and leave room to correct its framing or suggest another approach.
+When a topic contains a meaningful choice, present a small set of credible
+options, usually two to four. Recommend one and make the basis for that
+recommendation visible in the comparison. Let the user choose, combine, revise,
+or reject the options. Do not invent alternatives when only one direction is
+credible.
 
-## Reuse, adapt, or create components
+Treat components as first-class planning tools. Build with them from the start
+instead of writing a prose proposal and wrapping it in boxes afterward. Inspect
+the component index before composing a page and use supplied components
+frequently when they fit. Adapt them or create a new component when the content
+needs a different structure or interaction.
 
-Start with the judgment the user needs to make and the response that would
-change the plan. Choose the representation and interaction that make this
-relationship clear. Inspect relevant supplied components before deciding how
-to compose the page. Reuse their implementation when it fits, adapt it for the
-content, or design a new component when that would communicate better.
+Build each topic page around the proposal itself. Render or demonstrate the
+material when the browser can do so, and use prose for context or consequences
+that the page cannot show. Let the content determine the layout. Keep the
+recommendation, evidence, and feedback controls beside the material they affect.
+Do not lead the page with a generic explanation.
 
-Build around the actual material being reviewed. Keep related evidence,
-alternatives, and controls together. Make consequential differences visible
-before asking for a choice. Use the existing renderers within components when
-they explain code, relationships, formulas, or data. Do not add an interaction
-merely to make a page interactive.
+Keep component-specific guidance in the component index. Document a new
+component's purpose and implementation there; adding one should not require new
+workflow text in this file or `SKILL.md`.
 
-Make controls recognizable and their targets and selected states clear. Separate
-demonstration state from planning responses. Prefer clear labels, placement, and
-visible state to explanatory text about operating the interface. Add explanation
-when it conveys a consequence or behavior the controls cannot show.
+Use visual hierarchy and color to direct attention and make relationships clear.
+Do not make color the only carrier of meaning. Avoid decorative cards, labels,
+tags, and pills that merely repeat nearby text or name a section. Keep feedback
+controls beside their target and use the frame's existing submission flow.
 
-Use native HTML, CSS, and JavaScript with the frame's theme and feedback hooks.
-Keep keyboard focus usable and meaning independent of color. Check the authored
-source and use live review to correct interaction or rendering problems. Browser
-automation is optional. See [authoring.md](authoring.md) for integration contracts.
+Good exploration lets the user understand and correct the proposal without
+hiding how its parts affect one another. It does not need to cover the whole
+plan or divide the work into one choice at a time.
 
-The supplied components provide reusable interactions and styling. They are not
-a complete menu of what can be built. Keep task-specific sample arguments and
-finished page layouts out of the reusable guidance.
+## Review quality
 
-## Compose the complete plan
+Present the complete plan as an implementation handoff. Organize it around the
+changes an engineer will make, not the order in which the discussion happened.
 
-Begin with an overview that explains the intended outcome, scope, and how the
-changes fit together. Link it to implementation steps. Use an architecture
-diagram or other visual when it explains meaningful relationships; choose the
-form from the work rather than a fixed outline.
+Begin with an overview page that makes the intended outcome, scope, and
+relationships among the implementation steps clear. Link to each step. Use
+visual structure or a diagram when it communicates those relationships better
+than prose.
 
-Make each step a coherent change with its required behavior and verification.
-Include dependencies, exact interfaces, approved material, and constraints where
-they affect implementation. Use as many steps as the work needs. Separate
-binding requirements from illustrations and remaining integration work.
+Each step should state the behavior it must produce and how that behavior will
+be verified. Include dependencies, exact interfaces, approved material, and
+constraints where they affect implementation. Distinguish binding requirements
+from illustrations and unfinished integration work.
 
-Put verification beside the relevant work. State what must be demonstrated and
-through which interface. Distinguish automated checks from behavior that needs
-direct use. Add an overview summary when needed to explain how the combined
-result will be checked.
+Use components and visual structure to make the plan easier to navigate and
+inspect. Preserve approved wording, designs, and interactive behavior in the
+relevant step. Do not replace material the implementer needs with a summary,
+screenshot, or link to an earlier proposal.
 
-Resolve implementation-critical choices before final review. For details that
-require implementation-time investigation, state what to investigate and what
-result would be acceptable. The plan and project must suffice to implement and
-verify the work without relying on earlier proposals or conversation.
+Keep verification with the work it covers. Name what must be demonstrated and
+the interface through which it will be checked. Distinguish automated checks
+from behavior that requires direct use.
+
+Resolve implementation-critical unknowns during exploration by inspecting the
+project or reviewing the available directions with the user. If something
+genuinely cannot be known until implementation, explain why, state what must be
+investigated, and define an acceptable result.
+
+The plan and project must provide everything needed to implement and verify the
+agreed work without relying on earlier proposals or conversation. Match the
+detail to the work; do not expand routine mechanics merely to make the plan look
+comprehensive.
+
+## Revisions
+
+When revising material the user has already seen, show the new version against
+the version they reviewed. Use an exact diff for text or code. Keep visual
+before-and-after views comparable and identify what changed. A short explanation
+may give the reason for the revision, but it does not replace the comparison.
+
+Preserve earlier revisions so submitted feedback remains attached to what the
+user saw. Open the rendered artifact and use it before publication. See the
+[component index](../components/index.md) for supplied implementations and
+[authoring.md](authoring.md) for integration contracts.

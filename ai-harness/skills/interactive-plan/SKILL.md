@@ -12,50 +12,27 @@ to revise the proposal. You will very likely want to have a discussion with the
 user to get the necessary context before you can do a good job creating
 interactive HTML pages to iterate with them.
 
-## Explore, then review the complete plan
+## Explore, then review
 
-Once you have enough context, you enter an iterative and interactive phase
-called exploration. Eliminate ambiguity by aligning on choices. Anything from high
-level architecture to low level interfaces. Whatever is needed to move towards
-a strong and concrete plan. Importantly, this is about providing choices to the
-user for their selection or feedback. When providing choices, always present with
-your recommendation and reason.
+Planning has two phases: exploration and review.
 
-Exploration also resolves open decisions. So an exploration doesn't need to try
-and represent the whole plan at once. It can work through things iteratively
-while tracking what has already been aligned. This makes the interactive model
-of the user simple and engaging while still building towards the complete plan.
+During exploration, develop the proposal with the user and resolve the choices
+needed for a complete implementation plan. Exploration may cover a narrow
+question, several connected choices, or a broad part of the proposed work.
 
-Once scope and implementation-critical decisions are settled, you enter the second
-phase to compose a complete plan for final review. It must include everything needed
-to implement the agreed work using the project and the plan alone, as it will be
-handed to an engineer or agent to implement.
+During review, present the complete implementation plan. Scope and
+implementation-critical choices must be settled. The plan must include
+everything needed for an engineer or agent to implement and verify the agreed
+work using only the plan and project.
 
-Both phases can take several revisions. Apply clear corrections directly. When
-feedback reopens a choice that needs comparison, return to focused exploration.
-Carry the result into a complete new plan before acceptance. The
+Both phases may take several revisions. Apply clear corrections directly. When
+feedback reopens a choice that needs comparison, return to exploration. Carry
+the result into a complete new plan before acceptance. The
 [review flow](references/flow.svg) shows both phases and their shared review loop.
 
-Read [planning.md](references/planning.md) before developing proposals or
-composing the final plan. It covers decision judgment, component design, and
-what the plan must communicate.
-
-## Design the review
-
-Design components around what the user needs to understand and decide. Bring
-the proposal, relevant evidence, and response controls together. Use the
-existing renderers for code, diagrams, math, and charts.
-
-Read the [component index](components/index.md) and inspect relevant sources
-before composing a page. Reuse a component when it fits, adapt it when the
-content needs a different treatment, or create one when a new design would
-make the decision clearer. The supplied components are a starting point;
-they do not limit the interactions or layouts you can build.
-
-For each component, make clear what the user is judging, what each control
-changes, and whether it demonstrates behavior or records a planning response.
-Place choices and comments beside the material they refer to. Connect planning
-responses to the frame's existing draft and submission flow.
+Read [planning.md](references/planning.md) before developing exploration
+artifacts or composing the complete plan. It covers the content and visual
+quality of both phases.
 
 ## Run the session
 
