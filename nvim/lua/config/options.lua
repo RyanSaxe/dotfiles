@@ -30,6 +30,9 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0
 
+-- Keep Python continuation lines at one indentation level inside parentheses.
+vim.g.python_indent = { open_paren = "shiftwidth()" }
+
 -- No statusline: it would band the full width and stop the chrome
 -- surface short of the terminal floor. Mode rides the tab row,
 -- per-window facts ride the winbar.
