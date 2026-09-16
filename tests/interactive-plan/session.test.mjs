@@ -507,6 +507,72 @@ test("publication resolves exact mixed sources from saved feedback before hashin
     );
 });
 
+test("choice sources preserve readable labels and complete checklist snapshots", async (t) => {
+  const a = await fixture(t);
+  await a.action("publish", { html: artifact() });
+  const choices = {
+    "overview/policy": {
+      topic: "overview",
+      label: "Error policy",
+      value: "per-item",
+      valueLabel: "Keep successful results",
+      target: "policy",
+    },
+    "overview/scope": {
+      kind: "multiple",
+      topic: "overview",
+      label: "Scope",
+      target: "scope",
+      options: [
+        { value: "labels", label: "Readable <labels>", checked: true },
+        { value: "drafts", label: "Draft visibility", checked: false },
+      ],
+    },
+    "overview/empty": {
+      kind: "multiple",
+      topic: "overview",
+      label: "Optional work",
+      target: "optional",
+      options: [{ value: "extra", label: "Extra work", checked: false }],
+    },
+  };
+  const feedback = a.event("feedback-only", "1", { groups: { choices } });
+  assert.equal((await a.request("/api/feedback", feedback)).code, 200);
+  await a.action("ack", { id: feedback.id });
+  const data = {
+    ...artifactData(artifact("2")),
+    agreements: [
+      {
+        id: "scope",
+        title: "Scope",
+        html: "<p>Preserve the selected work.</p>",
+        sourceRefs: Object.keys(choices).map((choiceId) => ({
+          kind: "choice",
+          submissionId: feedback.id,
+          choiceId,
+        })),
+      },
+    ],
+  };
+  const published = await a.action("publish", { html: await assemble(data) });
+  assert.equal(published.code, 200);
+  const html = await fs.readFile(
+    path.join(a.directory, "artifacts/example.2.html"),
+    "utf8",
+  );
+  const sources = artifactData(html).agreements[0].sourceRecords;
+  assert.deepEqual(
+    sources.map((source) => source.choice),
+    Object.values(choices),
+  );
+  assert.deepEqual(
+    sources.map((source) => source.text),
+    ["Keep successful results", "Readable <labels>", "None selected"],
+  );
+  assert.equal(sources[1].href, "./example.1.html?target=scope#overview");
+  assert(!html.includes("Readable <labels>"));
+});
+
 test("final review can reopen exploration and only accept the recomposed plan", async (t) => {
   const a = await fixture(t);
   await a.action("publish", { html: artifact("1", "plan") });

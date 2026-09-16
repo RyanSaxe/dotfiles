@@ -6,12 +6,12 @@ Concatenate the selected styles and behaviors into the artifact's existing
 `css` and `js` inputs. There is no registration step. Custom components use the
 same workflow.
 
-| Directory                                      | Use                              | Content and interaction                                                                                                                                                            |
-| ---------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [comparison](comparison/markup.html)           | Two or three alternatives        | Repeat the option article. Put arbitrary rich HTML in its sections. Selection uses the existing `data-choice` and `data-value` buttons.                                            |
-| [before-after](before-after/markup.html)       | A proposed change                | Use the text/code viewer or the visual pair, not both by default. See the diff instructions below.                                                                                 |
-| [scope-checklist](scope-checklist/markup.html) | Independent inclusions           | Repeat the scope row with stable IDs and labels. The checkbox records Include or Defer through the existing draft. Untouched items remain unanswered. Include its behavior script. |
-| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes | Repeat the case section. Keep each ID in its contextual comment label. Revise opens the existing comment dialog.                                                                   |
+| Directory                                      | Use                              | Content and interaction                                                                                                                                                       |
+| ---------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [comparison](comparison/markup.html)           | Two or three alternatives        | Repeat the option article. Put arbitrary rich HTML in its sections. Selection uses the existing `data-choice` and `data-value` buttons.                                       |
+| [before-after](before-after/markup.html)       | A proposed change                | Use the text/code viewer or the visual pair, not both by default. See the diff instructions below.                                                                            |
+| [scope-checklist](scope-checklist/markup.html) | Independent inclusions           | Repeat the checkbox row with stable option IDs and readable labels. The frame records the whole list, including untouched and empty selections. No behavior script is needed. |
+| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes | Repeat the case section. Keep each ID in its contextual comment label. Revise opens the existing comment dialog.                                                              |
 
 ## Rich comparisons
 

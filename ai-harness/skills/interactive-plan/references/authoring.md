@@ -63,8 +63,9 @@ interfaces verbatim in language-marked elements when they do not need a prototyp
 
 Embed essential local images and resources. Do not depend on a temporary file or
 earlier server for the specification. External rendering must have an adequate
-source or visual fallback. Exercise the embedded version, then extract and open
-its source independently. Assembly must not silently redesign approved work.
+source or visual fallback. Extract the source and check that assembly preserves
+the approved work. Use live review to check the embedded version; browser
+automation is optional.
 
 ## Agreements and exact sources
 
@@ -83,11 +84,11 @@ previews the agreement text; the detail pane retains its full content.
 
 Each source reference has a `kind`:
 
-| kind         | Required fields        | Meaning                                                                      |
-| ------------ | ---------------------- | ---------------------------------------------------------------------------- |
-| note         | submissionId, noteId   | Exact saved comment and its original quote/context.                          |
-| choice       | submissionId, choiceId | Exact selected value and label; choiceId is the submission's choice-map key. |
-| conversation | text                   | Agent-provided conversation context, explicitly labeled.                     |
+| kind         | Required fields        | Meaning                                                                             |
+| ------------ | ---------------------- | ----------------------------------------------------------------------------------- |
+| note         | submissionId, noteId   | Exact saved comment and its original quote/context.                                 |
+| choice       | submissionId, choiceId | Exact choice data and readable labels; choiceId is the submission's choice-map key. |
+| conversation | text                   | Agent-provided conversation context, explicitly labeled.                            |
 
 Several references can support one agreement. The publisher resolves browser
 references from this session's saved submissions and embeds `sourceRecords`
@@ -98,6 +99,12 @@ Source records include exact text and context, with links to immutable original
 proposals. They remain readable offline. New choices carry stable target IDs;
 older submissions may link only to a page. Conversation references do not imply
 access to a transcript or require an invented browser link.
+
+Choice sources retain the submitted record in `choice`. Single choices carry
+`value` and `valueLabel`; legacy records display `value`. Checklists carry
+`kind: "multiple"` and the complete `options` array, with each option's `value`,
+`label`, and `checked` state. Source text displays selected labels, or
+"None selected" for an empty checklist.
 
 A valid source does not prove that the summary is correct. Read feedback and
 conversation context before changing the agreement. A recommendation is not an
@@ -129,7 +136,9 @@ focus usable.
 | Interface                            | Behavior                                                                                                                          |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | data-choice                          | Stable choice-group ID. Use data-label for a readable label.                                                                      |
-| data-value                           | Selectable value on a button inside the group.                                                                                    |
+| data-multiselect                     | Stable checklist-group ID. Use data-label for a readable question or group label.                                                 |
+| data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                            |
+| data-label on an option              | Readable option label, separate from its ID and action text. Buttons fall back to their text; checkboxes fall back to data-value. |
 | aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                  |
 | data-comment                         | Button action for a contextual note, using the attribute as its label.                                                            |
 | planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                  |
@@ -139,9 +148,22 @@ focus usable.
 | planUI.diff(element, input, options) | Render one Git file patch through Pierre. Input contains before, after, and patch strings; options.diffStyle is split or unified. |
 
 Choice clicks update the local draft. Only Submit feedback sends it. Keep control
-IDs and labels stable. The frame supplies missing choice target IDs for source
-links. Use native buttons for accessible selection; style and position them with
-the material being compared.
+IDs and labels stable. Group IDs must be unique within a page, across both kinds
+of choice. Option IDs must be unique within a group. The frame supplies missing
+group target IDs for source links. Use native buttons for single choices and
+native labeled checkboxes for checklists. Style and position them with the
+material being compared.
+
+Every authored checklist appears in Feedback, including lists on unvisited
+pages. Authored `checked` attributes set initial values; saved draft values take
+precedence. Changes persist across navigation and reload. An empty set means
+"None selected", not unanswered. Each checklist counts as one feedback item.
+Submit feedback sends every list's complete option set and checked state along
+with other choices and comments. Feedback links back to edit the list; it cannot
+remove a checklist from the submission. Single choices retain Clear choice.
+
+Put checklist markup in page HTML so the frame can discover it before the user
+visits the page. Use the same contracts in custom and supplied components.
 
 Register custom initialization on `plan:page`. The custom JS file executes before
 the frame module. Script elements inserted inside page HTML do not execute.
@@ -177,10 +199,11 @@ communicate an idea better.
 
 ## Before publication
 
-Use available formatting and lint tools on authored files. Inspect the page in
-the actual browser, including meaningful choices, comments, popups, renderers,
-themes, and narrower layouts. Check source fallback. Do not repeat an unrelated
-capability matrix for every prose edit.
+Build the artifact and inspect its source, including choice IDs and labels,
+feedback hooks, embedded resources, and renderer fallbacks. Use formatting and
+lint tools when already available; do not install tooling to author a plan unless
+asked. Browser automation is optional. Use live review to find and correct
+rendering and interaction problems.
 
 For final plans, inspect the preserved approved work and extract its source from
 plan-data. The plan and project must be enough to implement the work. Source

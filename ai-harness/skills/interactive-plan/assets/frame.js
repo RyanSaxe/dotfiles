@@ -112,11 +112,7 @@ function show(id, targetId = null) {
     clearDiffs();
     $("page-title").textContent = page.title;
     $("page-content").innerHTML = page.html;
-    $("page-content")
-      .querySelectorAll("[data-choice]")
-      .forEach((group, index) => {
-        group.id ||= `choice-${page.id}-${index}`;
-      });
+    choiceTargets($("page-content"), page.id);
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
     restoreChoices();
     if (!(page.id === "agreed" && builtInAgreed)) enhance($("page-content"));
@@ -435,7 +431,7 @@ function review() {
         const title = document.createElement("h3");
         title.textContent = choice.label;
         const value = document.createElement("p");
-        value.textContent = choice.value;
+        value.textContent = choiceText(choice);
         body.append(
           title,
           value,
@@ -445,7 +441,7 @@ function review() {
         comment.className = "btn quiet";
         comment.textContent = "Add comment";
         comment.onclick = () =>
-          openNote(choice.topic, choice.label, choice.value);
+          openNote(choice.topic, choice.label, choiceText(choice));
         actions.append(comment);
         const clear = document.createElement("button");
         clear.className = "btn quiet";
@@ -455,7 +451,7 @@ function review() {
           restoreChoices();
           save();
         };
-        actions.append(clear);
+        if (choice.kind !== "multiple") actions.append(clear);
         row.append(kind, body, actions);
         group.append(row);
       }
@@ -485,7 +481,7 @@ function feedbackText() {
     "Feedback only. No implementation approval.",
   ];
   for (const choice of Object.values(state.choices))
-    lines.push("", `${choice.label}: ${choice.value}`);
+    lines.push("", `${choice.label}: ${choiceText(choice)}`);
   for (const note of state.notes)
     lines.push(
       "",
@@ -617,6 +613,45 @@ async function poll() {
     status();
   }
 }
+function choiceTargets(root, topic) {
+  for (const type of ["choice", "multiselect"])
+    root.querySelectorAll(`[data-${type}]`).forEach((group, index) => {
+      group.id ||= `${type}-${topic}-${index}`;
+    });
+}
+function checklist(group, topic, previous) {
+  return {
+    kind: "multiple",
+    topic,
+    label: group.dataset.label || group.dataset.multiselect,
+    target: group.id,
+    options: Array.from(
+      group.querySelectorAll('input[type="checkbox"][data-value]'),
+      (input) => ({
+        value: input.dataset.value,
+        label: input.dataset.label || input.dataset.value,
+        checked:
+          previous?.options?.find(
+            (option) => option.value === input.dataset.value,
+          )?.checked ?? input.checked,
+      }),
+    ),
+  };
+}
+function initializeChecklists() {
+  for (const topic of plan.pages) {
+    const template = document.createElement("template");
+    template.innerHTML = topic.html;
+    choiceTargets(template.content, topic.id);
+    for (const group of template.content.querySelectorAll(
+      "[data-multiselect]",
+    )) {
+      const id = topic.id + "/" + group.dataset.multiselect;
+      state.choices[id] = checklist(group, topic.id, state.choices[id]);
+    }
+  }
+  persist();
+}
 function restoreChoices() {
   document.querySelectorAll("[data-choice] [data-value]").forEach((button) => {
     const group = button.closest("[data-choice]");
@@ -628,6 +663,15 @@ function restoreChoices() {
       ),
     );
   });
+  document
+    .querySelectorAll('[data-multiselect] input[type="checkbox"][data-value]')
+    .forEach((input) => {
+      const group = input.closest("[data-multiselect]");
+      const choice = state.choices[page.id + "/" + group.dataset.multiselect];
+      input.checked =
+        choice?.options.find((option) => option.value === input.dataset.value)
+          ?.checked ?? input.defaultChecked;
+    });
 }
 $("note-form").onsubmit = (event) => {
   event.preventDefault();
@@ -675,7 +719,7 @@ $("submit").onclick = async () => {
 };
 $("export").onclick = () => {
   const event =
-    state.pending?.event ||
+    (state.pending?.snapshot === snapshot() && state.pending.event) ||
     envelope("feedback-only", feedbackText(), { groups: groups() });
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(event, null, 2)], {
@@ -777,11 +821,27 @@ document.addEventListener("click", (event) => {
         topic: page.id,
         label: group.dataset.label || group.dataset.choice,
         value: choice.dataset.value,
+        valueLabel:
+          choice.dataset.label ||
+          choice.textContent.trim() ||
+          choice.dataset.value,
         target: group.id,
       };
     restoreChoices();
     save();
   }
+});
+document.addEventListener("change", (event) => {
+  const input = event.target.closest(
+    '[data-multiselect] input[type="checkbox"][data-value]',
+  );
+  if (!input) return;
+  const group = input.closest("[data-multiselect]");
+  state.choices[page.id + "/" + group.dataset.multiselect] = checklist(
+    group,
+    page.id,
+  );
+  save();
 });
 document.addEventListener("selectionchange", () => {
   const selection = getSelection(),
@@ -1119,6 +1179,7 @@ for (const item of [
   button.textContent = item.title;
   $("navigation").append(button);
 }
+initializeChecklists();
 theme();
 show(location.hash.slice(1), new URL(location.href).searchParams.get("target"));
 poll();

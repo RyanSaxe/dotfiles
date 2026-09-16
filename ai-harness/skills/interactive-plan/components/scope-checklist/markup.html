@@ -1,18 +1,17 @@
-<div class="scope-list">
-  <section
-    class="scope-row"
-    data-choice="SCOPE_ID"
-    data-label="Scope item label"
-  >
-    <div>
-      <h3>Scope item</h3>
-      <p>What including this item adds to the work.</p>
-    </div>
-    <div class="scope-actions">
-      <label><input type="checkbox" class="scope-check" /> Include</label>
-      <button hidden data-value="Include">Include</button>
-      <button hidden data-value="Defer">Defer</button>
-    </div>
-  </section>
+<div class="scope-list" data-multiselect="SCOPE_ID" data-label="Scope label">
+  <label class="scope-row">
+    <span>
+      <strong>Scope item</strong>
+      <span class="scope-description"
+        >What including this item adds to the work.</span
+      >
+    </span>
+    <input
+      type="checkbox"
+      class="scope-check"
+      data-value="ITEM_ID"
+      data-label="Scope item"
+    />
+  </label>
   <!-- Repeat the row for each independent scope item. -->
 </div>

@@ -5,31 +5,29 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 30px;
-  padding: 24px 0;
+  gap: 24px;
+  padding: 22px 0;
   border-bottom: 1px solid var(--line);
-}
-.scope-row h3 {
-  margin: 0 0 6px;
-  font-size: 18px;
-}
-.scope-row p {
-  margin: 0;
-  color: var(--muted);
-}
-.scope-actions {
-  flex-shrink: 0;
-}
-.scope-actions label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   cursor: pointer;
+}
+.scope-row strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+.scope-description {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
 }
 .scope-check {
   width: 19px;
   height: 19px;
+  flex-shrink: 0;
   accent-color: var(--blue);
+}
+.scope-check:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
 }
 @media (max-width: 700px) {
   .scope-row {

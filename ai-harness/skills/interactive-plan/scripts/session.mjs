@@ -6,6 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
+import { choiceText } from "../assets/choices.mjs";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/;
 const revisionPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$/;
@@ -472,7 +473,7 @@ export async function serve(directory, { recover = false } = {}) {
               item && typeof item.topic === "string",
               "Source item not found",
             );
-            const text = ref.kind === "note" ? item.text : item.value;
+            const text = ref.kind === "note" ? item.text : choiceText(item);
             const label = ref.kind === "note" ? item.anchor : item.label;
             requireValue(
               typeof text === "string" && typeof label === "string",
@@ -497,6 +498,7 @@ export async function serve(directory, { recover = false } = {}) {
               artifactId: payload.artifactId,
               revision: payload.revision,
               href,
+              ...(ref.kind === "choice" ? { choice: item } : {}),
               ...(typeof item.quote === "string" ? { quote: item.quote } : {}),
             });
           }
