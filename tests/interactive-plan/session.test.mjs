@@ -7,10 +7,50 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { compareFiles } from "../../ai-harness/skills/interactive-plan/components/before-after/diff.mjs";
 import {
   createReviewAlerts,
   reviewAlert,
 } from "../../ai-harness/skills/interactive-plan/assets/notifications.mjs";
+
+test("file comparison preserves exact sources and produces an applicable Git patch", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-diff-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const beforePath = path.join(directory, "before.txt");
+  const afterPath = path.join(directory, "after.txt");
+  const before = "α <tag>\nunchanged\n";
+  const after = "α <tag> changed\nunchanged\nno final newline";
+  await fs.writeFile(beforePath, before);
+  await fs.writeFile(afterPath, after);
+  const result = await compareFiles(beforePath, afterPath);
+  assert.equal(result.before, before);
+  assert.equal(result.after, after);
+  assert.ok(result.patch.length > 0);
+  const patchPath = path.join(directory, "change.patch");
+  await fs.writeFile(patchPath, result.patch);
+  await fs.unlink(afterPath);
+  const strip =
+    path.resolve(directory).split(path.sep).filter(Boolean).length + 1;
+  await promisify(execFile)("git", ["apply", `-p${strip}`, patchPath], {
+    cwd: directory,
+  });
+  assert.equal(await fs.readFile(afterPath, "utf8"), after);
+});
+
+test("file comparison distinguishes identical input from a missing input", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-diff-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const input = path.join(directory, "input.txt");
+  await fs.writeFile(input, "same\r\n");
+  const result = await compareFiles(input, input);
+  assert.equal(result.patch, "");
+  assert.equal(result.before, "same\r\n");
+  assert.equal(result.after, "same\r\n");
+  await assert.rejects(
+    compareFiles(input, path.join(directory, "missing.txt")),
+    { code: "ENOENT" },
+  );
+});
 
 function alertFixture({
   storage = new Map(),

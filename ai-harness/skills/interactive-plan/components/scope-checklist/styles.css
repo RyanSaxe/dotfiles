@@ -1,0 +1,39 @@
+.scope-list {
+  border-top: 2px solid var(--line);
+}
+.scope-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+.scope-row h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.scope-row p {
+  margin: 0;
+  color: var(--muted);
+}
+.scope-actions {
+  flex-shrink: 0;
+}
+.scope-actions label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.scope-check {
+  width: 19px;
+  height: 19px;
+  accent-color: var(--blue);
+}
+@media (max-width: 700px) {
+  .scope-row {
+    align-items: flex-start;
+    gap: 16px;
+  }
+}

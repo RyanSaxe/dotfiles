@@ -1,0 +1,110 @@
+.change-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.change-controls [aria-pressed="true"] {
+  border-color: var(--blue);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+.change-view {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.change-view diffs-container {
+  --diffs-font-size: 13px;
+  --diffs-line-height: 24px;
+}
+.change-source {
+  margin-top: 14px;
+}
+.change-source pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.change-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.change-pair > section {
+  min-width: 0;
+}
+.change-pair > section + section {
+  border-left: 1px solid var(--line);
+}
+.change-pair header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+.change-pair header span {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.change-content {
+  padding: 24px;
+}
+.change-content [data-diagram] {
+  display: grid;
+  place-items: center;
+}
+.change-content svg {
+  max-width: 100%;
+  height: auto;
+}
+.change-key {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  font-size: 13px;
+}
+.change-content .added {
+  --change-bg: var(--success-bg);
+  --change-border: var(--success-border);
+  --change-ink: var(--success);
+}
+.change-content .removed {
+  --change-bg: var(--danger-bg);
+  --change-border: var(--danger-border);
+  --change-ink: var(--danger);
+}
+.change-content .changed {
+  --change-bg: var(--attention-bg);
+  --change-border: var(--attention-border);
+  --change-ink: var(--attention);
+}
+.change-content :is(.added, .removed, .changed):not(.node) {
+  background: var(--change-bg);
+  border-color: var(--change-border);
+  color: var(--change-ink);
+}
+.change-content
+  .node:is(.added, .removed, .changed)
+  :is(rect, polygon, circle, ellipse) {
+  fill: var(--change-bg) !important;
+  stroke: var(--change-border) !important;
+}
+.change-content
+  .node:is(.added, .removed, .changed)
+  :is(.label, .nodeLabel, p) {
+  color: var(--change-ink) !important;
+}
+.change-content .node.removed :is(rect, polygon, circle, ellipse) {
+  stroke-dasharray: 5 3;
+}
+@media (max-width: 700px) {
+  .change-key {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

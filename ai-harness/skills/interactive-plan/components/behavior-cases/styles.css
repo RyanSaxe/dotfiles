@@ -1,0 +1,48 @@
+.behavior-cases {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.behavior-head,
+.behavior-case {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) 70px;
+  gap: 28px;
+  padding: 20px 24px;
+  align-items: start;
+}
+.behavior-head {
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 12px;
+}
+.behavior-case {
+  border-top: 1px solid var(--line);
+}
+.behavior-case h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.behavior-case > div {
+  color: var(--muted);
+}
+.behavior-case .btn {
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .behavior-head {
+    display: none;
+  }
+  .behavior-case {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 18px;
+  }
+  .behavior-case > div {
+    grid-column: 1;
+  }
+  .behavior-case .btn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}

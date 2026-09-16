@@ -126,16 +126,17 @@ focus usable.
 
 ## Choices, comments, and custom interactions
 
-| Interface                      | Behavior                                                               |
-| ------------------------------ | ---------------------------------------------------------------------- |
-| data-choice                    | Stable choice-group ID. Use data-label for a readable label.           |
-| data-value                     | Selectable value on a button inside the group.                         |
-| aria-pressed                   | Set by the frame to reflect the draft selection.                       |
-| data-comment                   | Button action for a contextual note, using the attribute as its label. |
-| planUI.comment(anchor, quote)  | Open a contextual comment from a custom control.                       |
-| plan:page                      | Window event after each page render; detail has page and element.      |
-| planUI.enhance(element)        | Render rich content added dynamically.                                 |
-| planUI.chart(element, options) | Return an ECharts instance asynchronously.                             |
+| Interface                            | Behavior                                                                                                                          |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| data-choice                          | Stable choice-group ID. Use data-label for a readable label.                                                                      |
+| data-value                           | Selectable value on a button inside the group.                                                                                    |
+| aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                  |
+| data-comment                         | Button action for a contextual note, using the attribute as its label.                                                            |
+| planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                  |
+| plan:page                            | Window event after each page render; detail has page and element.                                                                 |
+| planUI.enhance(element)              | Render rich content added dynamically.                                                                                            |
+| planUI.chart(element, options)       | Return an ECharts instance asynchronously.                                                                                        |
+| planUI.diff(element, input, options) | Render one Git file patch through Pierre. Input contains before, after, and patch strings; options.diffStyle is split or unified. |
 
 Choice clicks update the local draft. Only Submit feedback sends it. Keep control
 IDs and labels stable. The frame supplies missing choice target IDs for source
@@ -164,6 +165,8 @@ Use the renderer matching the content. Load only what the page needs.
 | Charts and mathematical demonstrations | data-chart with an ECharts option object as JSON text                 | ECharts  |
 
 Use the code renderer for source code instead of bare unhighlighted blocks.
+For before/after code, use the [diff component](../components/index.md).
+Its pinned viewer uses the frame's Shiki theme pair and follows Settings.
 Language grammars load on demand; unsupported languages retain source and report
 failure. Escape backslashes again when math is stored inside a JSON string.
 

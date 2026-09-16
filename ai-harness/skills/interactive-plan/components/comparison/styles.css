@@ -1,0 +1,68 @@
+.comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 0 24px;
+  --comparison-rows: 3;
+}
+.comparison-option {
+  display: grid;
+  grid-row: span var(--comparison-rows);
+  grid-template-rows: subgrid;
+  min-width: 0;
+  margin-bottom: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.comparison[data-layout="independent"] .comparison-option {
+  display: flex;
+  flex-direction: column;
+}
+.comparison-option > header {
+  padding: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.comparison-option h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+}
+.comparison-option > header p {
+  margin: 0;
+  color: var(--muted);
+}
+.comparison-content {
+  padding: 22px 24px;
+  min-width: 0;
+}
+.comparison-content > :last-child {
+  margin-bottom: 0;
+}
+.comparison-content [data-language] {
+  overflow: auto;
+}
+.comparison-content [data-diagram] {
+  display: grid;
+  place-items: center;
+}
+.comparison-content svg {
+  max-width: 100%;
+  height: auto;
+}
+.comparison-option > footer {
+  margin-top: auto;
+  padding: 18px 24px 22px;
+  border-top: 1px solid var(--line);
+}
+.comparison-pick {
+  width: 100%;
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.comparison-pick[aria-pressed="true"] {
+  background: var(--blue);
+  color: var(--bg);
+}
+.comparison-pick[aria-pressed="true"]::before {
+  content: "✓ ";
+}

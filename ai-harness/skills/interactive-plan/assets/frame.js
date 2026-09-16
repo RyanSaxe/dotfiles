@@ -63,6 +63,8 @@ let page = plan.pages[0],
   renderedFeedback = null,
   toastTimer;
 const charts = new Map();
+const diffs = new Map();
+const syntaxThemes = { light: "github-light", dark: "github-dark" };
 const snapshot = () =>
   JSON.stringify({ notes: state.notes, choices: state.choices });
 const dirty = () => state.notes.length + Object.keys(state.choices).length;
@@ -93,6 +95,10 @@ function theme() {
   $("theme").value = preferredTheme || "system";
   for (const chart of charts.values())
     chart.setOption(chartTheme(chart.getOption()));
+  for (const viewer of diffs.values()) {
+    viewer.setOptions({ ...viewer.options, theme: syntaxThemes[activeTheme] });
+    viewer.rerender();
+  }
   renderDiagrams($("page-content"));
 }
 function show(id, targetId = null) {
@@ -103,6 +109,7 @@ function show(id, targetId = null) {
     page = pages.find((item) => item.id === id) || pages[0];
     for (const chart of charts.values()) chart.dispose();
     charts.clear();
+    clearDiffs();
     $("page-title").textContent = page.title;
     $("page-content").innerHTML = page.html;
     $("page-content")
@@ -185,6 +192,7 @@ function renderAgreements() {
     agreementId = entry.id;
     for (const chart of charts.values()) chart.dispose();
     charts.clear();
+    clearDiffs();
     for (const button of index.querySelectorAll("button")) {
       if (button.dataset.agreement === entry.id)
         button.setAttribute("aria-current", "true");
@@ -839,6 +847,7 @@ systemTheme.addEventListener("change", () => {
 
 const libraries = {
   shiki: "https://esm.sh/shiki@3.12.2",
+  diffs: "https://esm.sh/@pierre/diffs@1.4.2?bundle",
   mermaid:
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
   katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
@@ -847,6 +856,7 @@ const libraries = {
 };
 const scripts = new Map();
 let shikiTask,
+  diffsTask,
   mermaidTask,
   diagramSequence = Promise.resolve();
 const color = (name) =>
@@ -887,7 +897,7 @@ async function renderCode(element) {
     const { codeToHtml } = await shikiTask;
     const html = await codeToHtml(source, {
       lang: element.dataset.language,
-      themes: { light: "github-light", dark: "github-dark" },
+      themes: syntaxThemes,
       defaultColor: false,
     });
     if (element.isConnected) element.innerHTML = html;
@@ -991,6 +1001,40 @@ async function chart(element, options) {
   instance.setOption(chartTheme(options));
   return instance;
 }
+function clearDiffs() {
+  for (const viewer of diffs.values()) viewer.cleanUp();
+  diffs.clear();
+}
+async function diff(element, input, { diffStyle = "split" } = {}) {
+  if (typeof input.patch !== "string") throw Error("A Git patch is required.");
+  if (!input.patch) {
+    element.textContent = "No changes.";
+    return null;
+  }
+  diffsTask ||= import(libraries.diffs);
+  const { FileDiff, parsePatchFiles } = await diffsTask;
+  if (!element.isConnected) return null;
+  let viewer = diffs.get(element);
+  if (viewer) {
+    viewer.setOptions({ ...viewer.options, diffStyle });
+    viewer.rerender();
+    return viewer;
+  }
+  const files = parsePatchFiles(input.patch).flatMap((patch) => patch.files);
+  if (files.length !== 1)
+    throw Error("Each diff component requires one file pair.");
+  viewer = new FileDiff({
+    theme: syntaxThemes[activeTheme],
+    diffStyle,
+    lineDiffType: "word-alt",
+    diffIndicators: "classic",
+    overflow: "wrap",
+  });
+  element.replaceChildren();
+  viewer.render({ fileDiff: files[0], containerWrapper: element });
+  diffs.set(element, viewer);
+  return viewer;
+}
 function enhance(root) {
   root.querySelectorAll("[data-prototype]").forEach((mount) => {
     if (mount.querySelector("iframe")) return;
@@ -1043,6 +1087,7 @@ new ResizeObserver(() => {
 }).observe($("page-content"));
 window.planUI = {
   chart,
+  diff,
   comment: (anchor, quote = "") =>
     openNote(
       page.id,

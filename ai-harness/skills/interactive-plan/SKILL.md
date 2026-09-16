@@ -20,11 +20,17 @@ your recommendation without weakening the other options to make it win. When
 behavior differs, show the difference on comparable inputs instead of describing
 styles in the abstract. Leave room for correction or a different proposal.
 
-Compose rich, scannable pages around those judgments. Choose text, tables,
-diagrams, code, or working previews according to what they communicate. Keep
-necessary explanation; remove repetition, slogans, redundant headings, and
-instructions the interface already conveys. Turning irrelevant prose into a
-badge or graphic does not make it useful.
+Design each page so the user can scan the proposal, compare its consequences,
+and respond. Use well-designed components to bring related content and controls
+together. Prefer them to long text blocks when they make the decision clearer.
+Keep the explanation the decision needs; avoid decoration and empty space that
+separate it from the proposal.
+
+Start with the supplied components when they fit. Adapt them or build your own
+when another design communicates the plan better. These editable implementations
+support page composition; they do not prescribe layouts, sample arguments, or
+the only components allowed. See the [component index](components/index.md) when
+choosing sources to reuse.
 
 A text dump with buttons is insufficient. So is a polished demonstration that
 does not help the user shape the plan. Make controls recognizable, their targets

@@ -1,0 +1,42 @@
+<section class="change-review">
+  <div class="change-controls" role="group" aria-label="Diff layout">
+    <button class="btn" data-diff-style="split" aria-pressed="true">
+      Side by side
+    </button>
+    <button class="btn" data-diff-style="unified" aria-pressed="false">
+      Unified
+    </button>
+  </div>
+  <textarea data-diff-input hidden>
+{"before":"","after":"","patch":""}</textarea>
+  <div class="change-view" aria-label="Before and proposed changes"></div>
+  <p class="renderer-error" data-diff-error hidden></p>
+  <details class="change-source">
+    <summary>Exact source and Git patch</summary>
+    <h3>Before</h3>
+    <pre data-diff-source="before"></pre>
+    <h3>Proposed</h3>
+    <pre data-diff-source="after"></pre>
+    <h3>Git patch</h3>
+    <pre data-diff-source="patch"></pre>
+  </details>
+</section>
+
+<!-- For diagrams or other visual changes, use this pair instead of the text viewer. -->
+<section class="change-pair">
+  <section>
+    <header>Before <span>− Removed or replaced</span></header>
+    <div class="change-content">
+      <!-- Before HTML or Mermaid with removed/changed classes. -->
+    </div>
+  </section>
+  <section>
+    <header>Proposed <span>+ Added or changed</span></header>
+    <div class="change-content">
+      <!-- Proposed HTML or Mermaid with added/changed classes. -->
+    </div>
+  </section>
+</section>
+<div class="change-key">
+  <span>− Describe what is removed</span><span>+ Describe what is added</span>
+</div>
