@@ -10,6 +10,9 @@
     <script type="application/json" id="session-config">
       {}
     </script>
+    <script type="application/json" id="session-data">
+      null
+    </script>
     <div class="app" id="app">
       <aside class="side" id="side">
         <div class="repo">
@@ -28,7 +31,8 @@
           <div class="status-line" id="progress-status"></div>
         </div>
         <div class="keys" id="keys">
-          <b>n</b> new question · <b>h l</b> page · <b>/</b> ask · <b>?</b> keys
+          <b>n</b> new question · <b>h l</b> page · <b>/</b> ask ·
+          <b>e</b> export · <b>?</b> keys
         </div>
         <div class="brand">
           <span>visual-review</span>
@@ -63,6 +67,7 @@
           <button id="previous" hidden></button>
           <button id="next" hidden></button>
         </div>
+        <p class="export-note" id="export-note" hidden></p>
         <form class="ask" id="ask-form">
           <div class="quote" id="ask-quote" hidden></div>
           <input

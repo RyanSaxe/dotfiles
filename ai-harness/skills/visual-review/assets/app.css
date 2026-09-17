@@ -854,3 +854,19 @@ dialog button {
   color: var(--blue);
   font: 11px var(--mono);
 }
+
+.export-note {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 0;
+  padding: 8px 0;
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+.export-note a {
+  color: var(--blue);
+}
+.export-warning {
+  color: var(--attention);
+}

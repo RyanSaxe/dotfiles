@@ -6,6 +6,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { describeEntry, searchPaths } from "../assets/repo-query.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const assets = path.join(here, "..", "assets");
@@ -334,37 +335,15 @@ export function createRepository({ root, git, cacheDir }) {
 
   async function paths(refInput, query, limit) {
     const ref = normalizeRef(refInput);
-    const sha = await resolve(ref);
-    const all = await index(sha);
-    const size = Math.min(Math.max(Number(limit) || 50, 1), 200);
-    const needle = String(query ?? "").toLowerCase();
-    if (!needle) return { ref, total: all.length, matches: all.slice(0, size) };
-    const matches = [];
-    let total = 0;
-    for (const candidate of all) {
-      if (!candidate.toLowerCase().includes(needle)) continue;
-      total += 1;
-      if (matches.length < size) matches.push(candidate);
-    }
-    return { ref, total, matches };
+    const all = await index(await resolve(ref));
+    return { ref, ...searchPaths(all, query, limit) };
   }
 
   async function entry(input, refInput) {
     const target = normalizePath(input ?? "");
     const ref = normalizeRef(refInput);
-    const sha = await resolve(ref);
-    const all = await index(sha);
-    if (!target) return { path: target, ref, exists: true, type: "directory" };
-    if (all.includes(target))
-      return { path: target, ref, exists: true, type: "file" };
-    const prefix = target + "/";
-    const directory = all.some((candidate) => candidate.startsWith(prefix));
-    return {
-      path: target,
-      ref,
-      exists: directory,
-      type: directory ? "directory" : null,
-    };
+    const all = await index(await resolve(ref));
+    return { path: target, ref, ...describeEntry(all, target) };
   }
 
   async function diff(baseInput, headInput, pathInput) {
@@ -393,7 +372,23 @@ export function createRepository({ root, git, cacheDir }) {
     return { base, head, path: target, patch };
   }
 
-  return { resolve, index, file, tree, paths, entry, diff, cacheFile };
+  /** Everything this session resolved and served, for the export to embed. */
+  async function served(cacheDirectory) {
+    const refs = {};
+    for (const [ref, task] of resolutions)
+      refs[ref] = await task.catch(() => null);
+    const cache = {};
+    for (const name of await fs.readdir(cacheDirectory).catch(() => [])) {
+      if (!name.endsWith(".json")) continue;
+      const entry = await read(path.join(cacheDirectory, name)).catch(
+        () => null,
+      );
+      if (entry) cache[entry.key] = entry.value;
+    }
+    return { refs, cache };
+  }
+
+  return { resolve, index, file, tree, paths, entry, diff, cacheFile, served };
 }
 
 /** Repository identity: where it is, what it is called, and which ref it opens on. */
@@ -423,6 +418,116 @@ export async function describeRepository(git, root) {
 }
 
 const pageIdPattern = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const EXPORT_WARNING_BYTES = 15 * 1024 * 1024;
+
+const escapeJson = (value) => json(value).replaceAll("<", "\\u003c");
+
+/**
+ * Build the whole session as one HTML file.
+ *
+ * It is the same shell, CSS, and JavaScript the live page runs, with the
+ * session's own answers embedded: the questions, every page's Markdown, and
+ * every file, tree, and diff the session served. Opened from disk it behaves
+ * as it did live, minus the things that need a helper.
+ *
+ * The agent token and the session directory are not part of what is embedded,
+ * so an exported file can be handed to anyone who may read the repository.
+ */
+export function buildExport({
+  shell,
+  state,
+  pages,
+  repo,
+  refs,
+  cache,
+  css = "",
+  moduleUrl = "",
+  secrets = [],
+}) {
+  const data = {
+    repo,
+    state: { ...state, stage: "exported", pending: 0, acknowledged: [] },
+    pages,
+    refs,
+    cache,
+  };
+  const serialized = json(data);
+  for (const secret of secrets)
+    requireValue(
+      secret && !serialized.includes(secret),
+      "Refusing to export a file that would carry the session's secrets",
+      500,
+    );
+  const withConfig = shell.replace(
+    /(<script\b(?=[^>]*\bid=["']session-config["'])[^>]*>)[\s\S]*?(<\/script>)/i,
+    (_, start, end) => start + escapeJson({ sessionId: null, repo }) + end,
+  );
+  const html = withConfig.replace(
+    /(<script\b(?=[^>]*\bid=["']session-data["'])[^>]*>)[\s\S]*?(<\/script>)/i,
+    (_, start, end) => start + escapeJson(data) + end,
+  );
+  requireValue(
+    html !== withConfig,
+    "The app shell needs a session-data script to export into",
+    500,
+  );
+  const standalone = html
+    .replace(
+      /<link\b[^>]*\bhref="\/assets\/app\.css"[^>]*>/i,
+      `<style>\n${css}\n</style>`,
+    )
+    .replace(/\bsrc="\/assets\/app\.js"/i, `src="${moduleUrl}"`);
+  requireValue(
+    !/["'(]\/assets\//.test(standalone),
+    "An export cannot reference the helper's assets; it opens from disk",
+    500,
+  );
+  return standalone;
+}
+
+/**
+ * Turn the module graph into one self-contained entry point.
+ *
+ * An exported file opens from disk, where /assets/app.js resolves to nothing,
+ * so every module is encoded as a data URL and each import is rewritten to
+ * point at the encoded dependency. Module semantics are unchanged, which is
+ * why the same code runs live and exported without a bundler.
+ */
+export async function inlineModules(entry, read) {
+  const encoded = new Map();
+  const visiting = new Set();
+  async function encode(file) {
+    if (encoded.has(file)) return encoded.get(file);
+    requireValue(!visiting.has(file), `Import cycle through ${file}`, 500);
+    visiting.add(file);
+    let source = await read(file);
+    const directory = path.dirname(file);
+    const specifiers = new Set(
+      [...source.matchAll(/from\s*"(\.[^"]*)"/g)].map((match) => match[1]),
+    );
+    for (const specifier of specifiers) {
+      const url = await encode(path.resolve(directory, specifier));
+      source = source.replaceAll(`from "${specifier}"`, `from "${url}"`);
+    }
+    visiting.delete(file);
+    const url =
+      "data:text/javascript;base64," +
+      Buffer.from(source, "utf8").toString("base64");
+    encoded.set(file, url);
+    return url;
+  }
+  return encode(entry);
+}
+
+/** `visual-review-<repo>-<date>.html`, safe on any filesystem. */
+export function exportName(repo, now = new Date()) {
+  const slug = String(repo?.name ?? "repository")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 60);
+  return `visual-review-${slug || "repository"}-${now.toISOString().slice(0, 10)}.html`;
+}
 
 /**
  * Parse `id=Title,id=Title` into the outline the agent declared.
@@ -855,7 +960,68 @@ export async function serve(
         await writeQuestion(question);
         return { state: await refresh(), pages: question.pages };
       }
+      if (data.action === "export") return exportSession(data.out);
       requireValue(false, `Unknown agent action: ${data.action}`);
+    }
+
+    /** Gather the session and write it as one file under export/. */
+    async function exportSession(target) {
+      const shell = await fs.readFile(path.join(assets, "app.html"), "utf8");
+      const markdown = {};
+      for (const question of state.questions)
+        for (const page of question.pages) {
+          if (page.status !== "written") continue;
+          markdown[`${question.id}/${page.id}`] = await fs.readFile(
+            path.join(questionDir(question.id), "pages", page.id + ".md"),
+            "utf8",
+          );
+        }
+      const { refs, cache } = await store.served(
+        path.join(directory, "repo-cache"),
+      );
+      const html = buildExport({
+        shell,
+        state,
+        pages: markdown,
+        repo: repository,
+        refs,
+        cache,
+        css: await fs.readFile(path.join(assets, "app.css"), "utf8"),
+        moduleUrl: await inlineModules(path.join(assets, "app.js"), (file) =>
+          fs.readFile(file, "utf8"),
+        ),
+        secrets: [token, directory],
+      });
+      const name = exportName(repository);
+      const file = target
+        ? path.resolve(target)
+        : path.join(directory, "export", name);
+      await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+      await fs.writeFile(file, html, { mode: 0o600 });
+      const bytes = Buffer.byteLength(html);
+      const largest = Object.entries(cache)
+        .filter(([key]) => key.startsWith("file:"))
+        .map(([key, value]) => [
+          key.split(":").slice(2).join(":"),
+          (value.content ?? "").length,
+        ])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      return {
+        state,
+        path: file,
+        name,
+        bytes,
+        url: "/export/" + name,
+        warning:
+          bytes > EXPORT_WARNING_BYTES
+            ? `This export is ${(bytes / 1024 / 1024).toFixed(1)} MB. Largest files: ${largest
+                .map(
+                  ([file_, size]) => `${file_} (${Math.round(size / 1024)} KB)`,
+                )
+                .join(", ")}`
+            : null,
+      };
     }
 
     async function pageMarkdown(questionId, pageId) {
@@ -936,6 +1102,19 @@ export async function serve(
             types[path.extname(name)] || "application/octet-stream",
           );
         }
+        if (req.method === "GET" && url.pathname.startsWith("/export/")) {
+          const name = url.pathname.slice(8);
+          requireValue(
+            /^[a-z0-9][a-z0-9.-]{0,127}\.html$/.test(name),
+            "Not found",
+            404,
+          );
+          return reply(
+            200,
+            await fs.readFile(path.join(directory, "export", name)),
+            "text/html; charset=utf-8",
+          );
+        }
         if (req.method === "GET" && url.pathname === "/api/page")
           return reply(
             200,
@@ -959,7 +1138,8 @@ export async function serve(
         if (req.method === "POST") {
           const agent = url.pathname === "/agent/action";
           requireValue(
-            agent || ["/api/ask", "/api/choose"].includes(url.pathname),
+            agent ||
+              ["/api/ask", "/api/choose", "/api/export"].includes(url.pathname),
             "Not found",
             404,
           );
@@ -997,7 +1177,9 @@ export async function serve(
                 ? act(data)
                 : url.pathname === "/api/ask"
                   ? ask(data)
-                  : choose(data),
+                  : url.pathname === "/api/choose"
+                    ? choose(data)
+                    : exportSession(),
             ),
           );
         }
@@ -1217,8 +1399,9 @@ export async function main(argv) {
     action.id = options.id;
     action.markdown = await fs.readFile(path.resolve(options.file), "utf8");
   }
+  if (command === "export") action.out = options.out;
   requireValue(
-    ["ack", "plan", "status", "page", "done"].includes(command),
+    ["ack", "plan", "status", "page", "done", "export"].includes(command),
     `Unknown command: ${command}`,
   );
   console.log(json(await request("/agent/action", action)));

@@ -8,6 +8,7 @@ import { targetKey } from "../grammar.mjs";
 import { failed, themeName, whenVisible } from "../libraries.mjs";
 import { loadPierre } from "../code.mjs";
 import { createMarkers } from "../notes.mjs";
+import { request } from "../transport.mjs";
 
 export function diff(mount, data, context) {
   mount.classList.add("diff-block");
@@ -66,7 +67,7 @@ export function diff(mount, data, context) {
         head: data.head,
         path: data.path,
       });
-      const response = await fetch(`/repo/diff?${query}`);
+      const response = await request(`/repo/diff?${query}`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       if (!result.patch.trim()) {

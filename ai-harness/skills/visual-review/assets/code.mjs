@@ -8,6 +8,7 @@
  */
 import { libraries, module_ } from "./libraries.mjs";
 import { createMarkers } from "./notes.mjs";
+import { request } from "./transport.mjs";
 
 const VIRTUALIZE_ABOVE = 3000;
 const themes = { light: "github-light", dark: "github-dark" };
@@ -23,7 +24,7 @@ export async function fileContents(path, ref) {
   if (!files.has(key)) {
     files.set(
       key,
-      fetch(
+      request(
         `/repo/file?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(ref)}`,
       )
         .then(async (response) => {

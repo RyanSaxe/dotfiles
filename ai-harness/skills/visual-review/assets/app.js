@@ -11,6 +11,7 @@ import {
   renderPageExtras,
 } from "./blocks/index.mjs";
 import { createNoteRegistry } from "./notes.mjs";
+import { isOffline, request, useEmbeddedData } from "./transport.mjs";
 import { defaultPage, neighbors, outlineModel } from "./outline.mjs";
 import {
   openFile,
@@ -25,7 +26,9 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const session = JSON.parse($("session-config").textContent);
-const repository = session.repo;
+const embedded = JSON.parse($("session-data")?.textContent || "null");
+if (embedded) useEmbeddedData(embedded);
+const repository = embedded?.repo ?? session.repo;
 
 let state = { questions: [], repo: repository, pending: 0 };
 let view = { questionId: null, pageId: null, collapsed: new Set() };
@@ -94,7 +97,8 @@ applyTheme();
 /* ------------------------------------------------------------- requests --- */
 
 async function ask(text, context) {
-  const response = await fetch("/api/ask", {
+  if (isOffline()) return;
+  const response = await request("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -109,7 +113,8 @@ async function ask(text, context) {
 }
 
 export async function choose(questionId, pageId, blockId, option) {
-  await fetch("/api/choose", {
+  if (isOffline()) return;
+  await request("/api/choose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -225,7 +230,7 @@ async function upgradeReferences(root, ref) {
       path: location.path,
       ref: location.ref ?? ref,
     });
-    const answer = await fetch(`/repo/exists?${query}`)
+    const answer = await request(`/repo/exists?${query}`)
       .then((response) => (response.ok ? response.json() : null))
       .catch(() => null);
     if (!answer?.exists || answer.type !== "file") {
@@ -260,7 +265,7 @@ async function syncNotes() {
       if (page.status !== "written") continue;
       const key = `${question.id}/${page.id}`;
       if (parsedPages.get(key) === page.revision) continue;
-      const markdown = await fetch(
+      const markdown = await request(
         `/api/page?question=${encodeURIComponent(question.id)}&id=${encodeURIComponent(page.id)}`,
       ).then((response) => (response.ok ? response.text() : null));
       if (markdown === null) continue;
@@ -317,7 +322,7 @@ async function paintPage() {
     ? $("page-content").scrollTop
     : 0;
 
-  const markdown = await fetch(
+  const markdown = await request(
     `/api/page?question=${encodeURIComponent(question.id)}&id=${encodeURIComponent(page.id)}`,
   ).then((response) => response.text());
   renderer ||= await createRenderer();
@@ -393,7 +398,7 @@ function closeCode() {
 /* --------------------------------------------------------- file browser --- */
 
 const readDirectory = (directory) =>
-  fetch(
+  request(
     `/repo/tree?path=${encodeURIComponent(directory)}&ref=${encodeURIComponent(repository.ref)}`,
   )
     .then((response) => response.json())
@@ -404,7 +409,7 @@ async function paintBrowser() {
   body.replaceChildren();
   const query = $("filter").value.trim();
   if (query) {
-    const found = await fetch(
+    const found = await request(
       `/repo/paths?q=${encodeURIComponent(query)}&limit=200&ref=${encodeURIComponent(repository.ref)}`,
     ).then((response) => response.json());
     browserEntries = found.matches.map((path) => ({
@@ -627,6 +632,9 @@ document.addEventListener("keydown", async (event) => {
       else blockInstance(currentTarget())?.step?.(delta);
       return;
     }
+    case "e":
+      event.preventDefault();
+      return exportSession();
     case "?":
       event.preventDefault();
       return $("help").showModal();
@@ -657,11 +665,46 @@ for (const [key, meaning] of keyMap) {
   $("help-keys").append(term, detail);
 }
 
+/**
+ * Write the session to one HTML file and hand the reader both the path on
+ * disk and a copy they can save from the browser.
+ */
+async function exportSession() {
+  if (isOffline()) return;
+  $("export-note").hidden = false;
+  $("export-note").textContent = "Writing the export…";
+  try {
+    const response = await request("/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.sessionId }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    $("export-note").replaceChildren();
+    const line = document.createElement("span");
+    line.textContent = `Exported to ${result.path}`;
+    const save = document.createElement("a");
+    save.href = result.url;
+    save.download = result.name;
+    save.textContent = "Save a copy";
+    $("export-note").append(line, save);
+    if (result.warning) {
+      const warning = document.createElement("span");
+      warning.className = "export-warning";
+      warning.textContent = result.warning;
+      $("export-note").append(warning);
+    }
+  } catch (error) {
+    $("export-note").textContent = error.message;
+  }
+}
+
 /* --------------------------------------------------------------- polling -- */
 
 async function poll() {
   try {
-    const response = await fetch("/api/state");
+    const response = await request("/api/state");
     if (!response.ok) throw new Error("unreachable");
     state = await response.json();
     $("offline").hidden = true;
@@ -698,4 +741,7 @@ window.addEventListener("vr:theme", () => {
 });
 
 poll();
-setInterval(poll, 1000);
+if (isOffline()) {
+  $("ask-form").hidden = true;
+  $("keys").textContent = "Exported session · h l page · f files · ? keys";
+} else setInterval(poll, 1000);
