@@ -1,30 +1,28 @@
-export function reviewAlert(status) {
-  if (!status?.current || status.stage === "complete") return null;
-  const current = status.current;
-  if (["ready", "updated"].includes(status.stage))
-    return {
-      id: `revision:${current.artifactId}:${current.revision}`,
-      title: "A new review is ready",
-      url: current.url,
-      createdAt: current.publishedAt,
-    };
-  return null;
+export function reviewAlert(entry) {
+  if (!entry?.needsYou || !entry.id || !entry.revision) return null;
+  const plan = entry.kind === "plan";
+  return {
+    id: `${plan ? "plan" : "revision"}:${entry.id}:${entry.revision}`,
+    sessionId: entry.id,
+    title: plan
+      ? "A final plan is ready"
+      : `Revision ${entry.revision} is ready`,
+    body: entry.title || "",
+    url: entry.url,
+    createdAt: entry.publishedAt,
+  };
 }
 
-export function createReviewAlerts({
-  window: host,
-  button,
-  sessionId,
-  plan,
-  open,
-}) {
-  const prefix = `interactive-plan:alerts:${sessionId}:`;
+// One permission and one enabled switch for the hub origin. Alerts are keyed
+// per session and revision so several tabs never announce the same event, and
+// the session shown in the focused tab is never announced.
+export function createReviewAlerts({ window: host, button, sessionId, open }) {
+  const prefix = "interactive-plan:alerts:";
   const memory = new Map();
-  let latest = null,
+  let latest = [],
     requesting = false,
     failed = false;
   const permission = () =>
-    sessionId &&
     host.isSecureContext &&
     /^https?:$/.test(host.location.protocol) &&
     typeof host.Notification === "function"
@@ -46,9 +44,14 @@ export function createReviewAlerts({
     }
   };
   const serialize = (action) =>
-    host.navigator.locks
+    host.navigator?.locks
       ? host.navigator.locks.request(prefix + "delivery", action)
       : action();
+  const focused = () => {
+    if (!sessionId) return;
+    if (host.document.hasFocus()) write("focused", sessionId);
+    else if (read("focused") === sessionId) write("focused", "");
+  };
   function controls() {
     const state = permission();
     button.disabled =
@@ -66,18 +69,18 @@ export function createReviewAlerts({
         ? "Allow notifications in your browser's site settings."
         : failed
           ? "Notification delivery failed. Check browser and OS settings."
-          : "Notifications for new reviews. Keep this tab open.";
+          : "Alerts when a revision or final plan is ready in any session.";
   }
   function enable() {
     write("enabledAt", String(Date.now()));
-    const current = reviewAlert(latest);
-    if (current) write(current.id, "handled");
+    for (const entry of latest) {
+      const alert = reviewAlert(entry);
+      if (alert) write(alert.id, "handled");
+    }
     write("enabled", "yes");
   }
-  async function update(status = latest) {
-    latest = status;
-    const alert = reviewAlert(status);
-    host.document.title = alert ? `${alert.title} · ${plan.title}` : plan.title;
+  async function update(entries = latest) {
+    latest = Array.isArray(entries) ? entries : [];
     await serialize(() => {
       if (
         permission() === "granted" &&
@@ -85,38 +88,37 @@ export function createReviewAlerts({
         !read("enabledAt")
       )
         enable();
-      if (
-        !alert ||
-        permission() !== "granted" ||
-        read("enabled") !== "yes" ||
-        failed
-      )
+      if (permission() !== "granted" || read("enabled") !== "yes" || failed)
         return;
-      if (read(alert.id) || reviewAlert(latest)?.id !== alert.id) return;
-      if (
-        alert.createdAt &&
-        Date.parse(alert.createdAt) <= Number(read("enabledAt"))
-      ) {
-        write(alert.id, "handled");
-        return;
-      }
-      try {
-        const item = new host.Notification(alert.title, {
-          body: plan.title,
-          tag: prefix + alert.id,
-        });
-        write(alert.id, "handled");
-        item.onclick = () => {
-          item.close();
-          host.focus();
-          open(alert.url);
-        };
-        item.onerror = () => {
+      for (const entry of latest) {
+        const alert = reviewAlert(entry);
+        if (!alert || read(alert.id)) continue;
+        if (
+          read("focused") === alert.sessionId ||
+          (alert.createdAt &&
+            Date.parse(alert.createdAt) <= Number(read("enabledAt")))
+        ) {
+          write(alert.id, "handled");
+          continue;
+        }
+        try {
+          const item = new host.Notification(alert.title, {
+            body: alert.body,
+            tag: prefix + alert.id,
+          });
+          write(alert.id, "handled");
+          item.onclick = () => {
+            item.close();
+            host.focus();
+            open(alert.url);
+          };
+          item.onerror = () => {
+            failed = true;
+            controls();
+          };
+        } catch {
           failed = true;
-          controls();
-        };
-      } catch {
-        failed = true;
+        }
       }
     });
     controls();
@@ -144,6 +146,9 @@ export function createReviewAlerts({
   host.addEventListener("storage", (event) => {
     if (event.key?.startsWith(prefix)) void update();
   });
+  host.addEventListener("focus", focused);
+  host.addEventListener("blur", focused);
+  focused();
   controls();
   return { update };
 }

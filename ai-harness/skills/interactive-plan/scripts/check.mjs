@@ -1,11 +1,39 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import http from "node:http";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
 let directory;
 const server = http.createServer((_, response) => response.end("ready"));
+const listen = (instance, port) =>
+  new Promise((resolve, reject) => {
+    instance.once("error", reject);
+    instance.listen(port, "127.0.0.1", resolve);
+  });
+async function portReport(port) {
+  const busy = await new Promise((resolve) => {
+    const socket = net.connect({ host: "127.0.0.1", port });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+  });
+  if (!busy) return { port, state: "free" };
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/hub`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    const info = await response.json();
+    if (info.hub === true)
+      return { port, state: "hub", version: info.version, live: info.live };
+  } catch {
+    /* Something other than a hub answers on the port. */
+  }
+  return { port, state: "busy" };
+}
 try {
   if (Number(process.versions.node.split(".")[0]) < 20)
     throw new Error("Node 20 or newer is required");
@@ -20,15 +48,16 @@ try {
   await fs.rename(path.join(directory, "draft"), path.join(directory, "saved"));
   if ((await fs.readFile(path.join(directory, "saved"), "utf8")) !== "ready")
     throw new Error("Session storage did not preserve the file");
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
+  await listen(server, 0);
   const response = await fetch(`http://127.0.0.1:${server.address().port}`, {
     signal: AbortSignal.timeout(5000),
   });
   if ((await response.text()) !== "ready")
     throw new Error("Loopback request failed");
+  const port =
+    process.env.INTERACTIVE_PLAN_PORT === undefined
+      ? 4747
+      : Number(process.env.INTERACTIVE_PLAN_PORT);
   console.log(
     JSON.stringify(
       {
@@ -36,6 +65,7 @@ try {
         node: process.versions.node,
         platform: process.platform,
         storage: base,
+        hub: port ? await portReport(port) : { port, state: "os-assigned" },
         browser: "Check available agent tools or ask for manual browser review",
         renderers: "Check required renderers in the actual browser",
       },

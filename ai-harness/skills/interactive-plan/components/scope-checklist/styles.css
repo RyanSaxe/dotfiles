@@ -1,37 +1,39 @@
 .scope-list {
-  border-top: 2px solid var(--line);
+  max-width: 640px;
+  margin: 12px 0 22px;
 }
 .scope-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 22px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
   cursor: pointer;
 }
+.scope-row:last-child {
+  border-bottom: 1px solid var(--line);
+}
 .scope-row strong {
-  font-size: 17px;
+  display: block;
+  font-size: 13.5px;
   font-weight: 600;
 }
 .scope-description {
   display: block;
-  margin-top: 4px;
+  margin-top: 1px;
   color: var(--muted);
+  font-size: 12.5px;
 }
 .scope-check {
-  width: 19px;
-  height: 19px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
   flex-shrink: 0;
-  accent-color: var(--blue);
-}
-.scope-check:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 3px;
+  accent-color: var(--accent);
 }
 @media (max-width: 700px) {
   .scope-row {
     align-items: flex-start;
-    gap: 16px;
   }
 }

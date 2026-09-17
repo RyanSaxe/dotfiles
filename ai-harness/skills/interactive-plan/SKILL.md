@@ -35,10 +35,13 @@ quality of both phases.
 
 ## Run the session
 
-Place each request for input beside the proposal it affects. The user answers
-through normal feedback or in the agent conversation. Do not open a separate
-question channel. Move to the browser when there is concrete material to
-compare, correct, or approve.
+Every live session is served by one local hub at one address. `start` returns
+at once with the session's URL; there is no long-running helper process to
+keep open. Place each request for input beside the proposal it affects, using
+the question component when the answer is prose. The user answers through
+normal feedback or in the agent conversation. Do not open a separate question
+channel. Move to the browser when there is concrete material to compare,
+correct, or approve.
 
 - Read [setup.md](references/setup.md) on first use in an environment or when a capability fails.
 - Read [authoring.md](references/authoring.md) before building an artifact.
@@ -48,7 +51,7 @@ Build the artifact and review its source before publication. Use the live
 browser session to find and correct rendering or interaction problems. Browser
 automation is optional; do not install it to author a plan unless asked. Open
 the first proposal in the user's default browser and provide its link. Keep
-the session for revisions.
+the session for revisions; the page refreshes itself when a revision lands.
 
 Read submissions before acknowledging them and combine them with conversation
 feedback. Record clear answers without asking twice. Reopen only affected

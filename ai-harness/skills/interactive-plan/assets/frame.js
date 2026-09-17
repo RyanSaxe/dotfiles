@@ -1,26 +1,45 @@
 const $ = (id) => document.getElementById(id);
 const plan = JSON.parse($("plan-data").textContent);
 const session = JSON.parse($("session-config").textContent);
-const reviewAlerts = createReviewAlerts({
-  window,
-  button: $("notifications"),
-  sessionId: session.sessionId,
-  plan,
-  open: (href) => {
-    const url = new URL(href, location.href);
-    if (url.pathname === location.pathname) show(url.hash.slice(1));
-    else location.assign(url.href);
-  },
-});
+const base = typeof session.base === "string" ? session.base : "";
+const online =
+  Boolean(session.sessionId) && /^https?:$/.test(location.protocol);
+const mode = session.preview
+  ? "preview"
+  : session.readonly
+    ? "readonly"
+    : "live";
+const editable = mode === "live";
+document.documentElement.dataset.mode = mode;
+const query = new URL(location.href).searchParams;
 const agreements = plan.agreements || [];
 const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
 const pages = [
   ...plan.pages,
   ...(builtInAgreed ? [{ id: "agreed", title: "Agreed", html: "" }] : []),
 ];
-let agreementId =
-  agreements.find((entry) => entry.state !== "retired")?.id ||
-  agreements[0]?.id;
+const kindLabel = plan.kind === "plan" ? "Final plan" : "Exploration";
+const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
+const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+function ago(value) {
+  const ms = Date.now() - Date.parse(value);
+  if (!Number.isFinite(ms)) return "";
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+function since(value) {
+  const ms = Date.now() - Date.parse(value);
+  if (!Number.isFinite(ms)) return "";
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 60) return `${Math.max(minutes, 1)} min`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours} h` : `${Math.round(hours / 24)} d`;
+}
+
 const systemTheme = matchMedia("(prefers-color-scheme: dark)");
 let preferredTheme = null;
 try {
@@ -35,40 +54,105 @@ try {
   /* Theme changes remain available without storage. */
 }
 let activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
-const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}:${plan.revision}`;
-let state = {
-  notes: [],
-  choices: {},
-  submitted: null,
-  pending: null,
+
+const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}`;
+const resumeKey = `interactive-plan:resume:${session.sessionId || "offline"}`;
+const prefsPrefix = `interactive-plan:prefs:${session.sessionId || "offline"}:`;
+let state = emptyDraft(plan.revision);
+if (editable)
+  try {
+    state = loadDraft(
+      JSON.parse(localStorage.getItem(storageKey)),
+      plan.revision,
+    );
+  } catch {
+    /* The in-memory draft and export remain usable. */
+  }
+const known = {
+  choices: new Set(),
+  lists: new Set(),
+  questions: new Set(),
+  text: new Map(),
 };
-try {
-  const saved = JSON.parse(localStorage.getItem(storageKey));
-  if (saved && Array.isArray(saved.notes) && saved.choices) state = saved;
-} catch {
-  /* The in-memory draft and export remain usable. */
+for (const topic of plan.pages) {
+  const template = document.createElement("template");
+  template.innerHTML = topic.html;
+  choiceTargets(template.content, topic.id);
+  for (const group of template.content.querySelectorAll("[data-choice]"))
+    known.choices.add(`${topic.id}/${group.dataset.choice}`);
+  for (const group of template.content.querySelectorAll("[data-multiselect]"))
+    known.lists.add(`${topic.id}/${group.dataset.multiselect}`);
+  for (const group of template.content.querySelectorAll("[data-question]"))
+    known.questions.add(`${topic.id}/${group.dataset.question}`);
+  known.text.set(topic.id, normalize(template.content.textContent));
 }
-delete state.theme;
+function stale(kind, key, item) {
+  if (kind === "note") {
+    if (item.topic === "overall") return false;
+    if (item.topic === "agreed" && builtInAgreed)
+      return Boolean(
+        item.agreementId &&
+        !agreements.some((entry) => entry.id === item.agreementId),
+      );
+    if (!known.text.has(item.topic)) return true;
+    return (
+      Boolean(item.quote) &&
+      !known.text.get(item.topic).includes(normalize(item.quote))
+    );
+  }
+  if (kind === "answer") return !known.questions.has(key);
+  if (kind === "list") return !known.lists.has(key);
+  return !known.choices.has(key);
+}
+
 let page = plan.pages[0],
   remote = null,
   connected = false,
+  sessions = [],
+  sessionOrder = [],
   editing = null,
   noteContext = null,
   selected = "",
-  acceptance = null,
+  selectedTarget = null,
   submissionError = "",
   noteDraftKey = "",
   renderedFeedback = null,
-  toastTimer;
+  toastTimer,
+  keyPrefix = "",
+  keyPrefixTimer,
+  answerTimer;
 const charts = new Map();
 const diffs = new Map();
+const sources = new WeakMap();
 const syntaxThemes = { light: "github-light", dark: "github-dark" };
-const snapshot = () =>
-  JSON.stringify({ notes: state.notes, choices: state.choices });
-const dirty = () => state.notes.length + Object.keys(state.choices).length;
 const current = () =>
   remote?.current?.artifactId === plan.artifactId &&
   remote?.current?.revision === plan.revision;
+const reviewAlerts = createReviewAlerts({
+  window,
+  button: $("notifications"),
+  sessionId: session.sessionId,
+  open: (href) => location.assign(new URL(href, location.href).href),
+});
+const prefs = {
+  get(key) {
+    try {
+      return localStorage.getItem(prefsPrefix + key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      if (value === null || value === undefined)
+        localStorage.removeItem(prefsPrefix + key);
+      else localStorage.setItem(prefsPrefix + key, String(value));
+    } catch {
+      /* Preferences are conveniences; nothing depends on them. */
+    }
+  },
+};
+
 function notify(message) {
   $("toast").textContent = message;
   $("toast").hidden = false;
@@ -76,9 +160,10 @@ function notify(message) {
   toastTimer = setTimeout(() => ($("toast").hidden = true), 4000);
 }
 function persist() {
+  if (!editable) return;
   try {
     localStorage.setItem(storageKey, JSON.stringify(state));
-    $("storage-status").textContent = "Draft saved locally.";
+    $("storage-status").textContent = "";
   } catch {
     $("storage-status").textContent =
       "Local storage unavailable. Export a copy to keep your feedback.";
@@ -99,28 +184,36 @@ function theme() {
   }
   renderDiagrams($("page-content"));
 }
-function show(id, targetId = null) {
-  const feedback = id === "feedback";
+function disposeRenderers() {
+  for (const chart of charts.values()) chart.dispose();
+  charts.clear();
+  clearDiffs();
+}
+function show(id, targetId = null, { keepScroll = false } = {}) {
+  const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
   if (!feedback) {
     page = pages.find((item) => item.id === id) || pages[0];
-    for (const chart of charts.values()) chart.dispose();
-    charts.clear();
-    clearDiffs();
+    disposeRenderers();
     $("page-title").textContent = page.title;
     $("page-content").innerHTML = page.html;
     choiceTargets($("page-content"), page.id);
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
-    restoreChoices();
-    if (!(page.id === "agreed" && builtInAgreed)) enhance($("page-content"));
+    else {
+      restoreChoices();
+      restoreAnswers();
+      markNotes();
+      enhance($("page-content"));
+    }
+    $("page-actions").hidden = page.id === "agreed" && builtInAgreed;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
         detail: { page, element: $("page-content") },
       }),
     );
   }
-  for (const button of $("navigation").children) {
+  for (const button of $("navigation").querySelectorAll("[data-page]")) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -133,7 +226,7 @@ function show(id, targetId = null) {
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
-  window.scrollTo(0, 0);
+  if (!keepScroll) window.scrollTo(0, 0);
   const target = targetId && $(targetId);
   if (!feedback && target && $("page-content").contains(target)) {
     for (let ancestor = target; ancestor; ancestor = ancestor.parentElement)
@@ -143,14 +236,129 @@ function show(id, targetId = null) {
     target.scrollIntoView({ block: "center" });
   }
   $("quote").hidden = true;
+  closeMenus();
+  if ($("pages-menu").querySelector("summary").offsetParent)
+    $("pages-menu").open = false;
   review();
 }
-function openNote(topic, anchor, quote = "", id = null, entryId = null) {
+
+/* Notes on the text */
+function findText(root, needle) {
+  const target = normalize(needle);
+  if (!target) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const map = [];
+  let text = "",
+    pendingSpace = false;
+  for (let node; (node = walker.nextNode());) {
+    if (node.parentElement?.closest("script, style, .note-marker")) continue;
+    const data = node.data;
+    for (let index = 0; index < data.length; index++) {
+      if (/\s/.test(data[index])) {
+        pendingSpace = text.length > 0;
+        continue;
+      }
+      if (pendingSpace) {
+        text += " ";
+        map.push(null);
+        pendingSpace = false;
+      }
+      text += data[index];
+      map.push({ node, offset: index });
+    }
+  }
+  const index = text.indexOf(target);
+  if (index < 0) return null;
+  const start = map[index];
+  const end = map[index + target.length - 1];
+  if (!start || !end) return null;
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset + 1);
+  return range;
+}
+function highlight(name, ranges) {
+  if (typeof CSS !== "undefined" && CSS.highlights) {
+    CSS.highlights.delete(name);
+    if (ranges.length) CSS.highlights.set(name, new Highlight(...ranges));
+    return;
+  }
+  for (const range of ranges) {
+    if (range.startContainer !== range.endContainer) continue;
+    const mark = document.createElement("mark");
+    mark.className = "note-mark";
+    try {
+      range.surroundContents(mark);
+    } catch {
+      /* Partial selections stay unmarked; the count line still reports them. */
+    }
+  }
+}
+const richContent =
+  "[data-language], [data-diagram], [data-math], [data-chart], [data-prototype]";
+function blockOf(node) {
+  for (
+    let element = node.parentElement;
+    element;
+    element = element.parentElement
+  ) {
+    if (element === $("page-content")) return null;
+    if (
+      /^(P|LI|SECTION|ARTICLE|DIV|H[1-6]|TABLE|FIGURE|BLOCKQUOTE)$/.test(
+        element.tagName,
+      )
+    )
+      return element;
+  }
+  return null;
+}
+function markNotes() {
+  $("page-content")
+    .querySelectorAll(".note-count")
+    .forEach((e) => e.remove());
+  const notes = state.notes.filter((note) => note.topic === page.id);
+  const ranges = [];
+  let last = null;
+  notes.forEach((note, index) => {
+    if (!note.quote) return;
+    const range = findText($("page-content"), note.quote);
+    if (!range || range.startContainer.parentElement?.closest(richContent))
+      return;
+    const marker = document.createElement("sup");
+    marker.className = "note-marker";
+    marker.textContent = String(index + 1);
+    marker.title = "Noted. Open Feedback to read it.";
+    const end = range.cloneRange();
+    end.collapse(false);
+    end.insertNode(marker);
+    ranges.push(range);
+    last = marker;
+  });
+  highlight("plan-note", ranges);
+  if (!notes.length) return;
+  const line = document.createElement("p");
+  line.className = "note-count";
+  line.textContent = `${plural(notes.length, "note")} on this page · open Feedback to read ${notes.length === 1 ? "it" : "them"}`;
+  const block = last && blockOf(last);
+  if (block) block.after(line);
+  else $("page-content").append(line);
+}
+
+function openNote(
+  topic,
+  anchor,
+  quote = "",
+  id = null,
+  entryId = null,
+  target = null,
+) {
+  if (!editable) return;
   noteContext = {
     topic,
     anchor,
     quote,
     ...(entryId ? { agreementId: entryId } : {}),
+    ...(target ? { target } : {}),
   };
   editing = id;
   noteDraftKey = JSON.stringify([topic, anchor, quote, id, entryId]);
@@ -168,319 +376,428 @@ function openNote(topic, anchor, quote = "", id = null, entryId = null) {
   $("note-text").focus();
   $("quote").hidden = true;
 }
+
+/* Agreed */
+function agreementLabel(entry) {
+  if (entry.state === "reopened") return ["Revisiting", "attention"];
+  if (entry.state === "retired") return ["No longer applies", "muted"];
+  if (entry.change === "new") return ["New", ""];
+  if (entry.change === "updated") return ["Updated", ""];
+  return null;
+}
+function describeRecord(record) {
+  const where =
+    pages.find((item) => item.id === record.topic)?.title || record.topic;
+  if (record.kind === "note") return `your note on ${where}`;
+  if (record.kind === "answer") return `your answer to “${record.label}”`;
+  return `your choice “${record.text}” for ${record.label}`;
+}
+function recordUrl(record, route) {
+  const params = new URLSearchParams();
+  if (record.target) params.set("target", record.target);
+  if (record.quote) params.set("quote", record.quote);
+  const search = params.toString();
+  return `${base}/${route}/${encodeURIComponent(record.revision)}${search ? "?" + search : ""}#${encodeURIComponent(record.topic)}`;
+}
+function tag(text, tone = "") {
+  const element = document.createElement("span");
+  element.className = `tag ${tone}`.trim();
+  element.textContent = text;
+  return element;
+}
+function linkButton(text, onclick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "link-btn";
+  button.textContent = text;
+  button.onclick = onclick;
+  return button;
+}
+function agreementCard(entry) {
+  const card = document.createElement("section");
+  card.className = "agreement-card";
+  card.id = "agreement-" + entry.id;
+  const body = document.createElement("div");
+  body.className = "agreement-body";
+  const title = document.createElement("h2");
+  title.textContent = entry.title;
+  const label = agreementLabel(entry);
+  if (label) title.append(tag(label[0], label[1]));
+  const noteCount = state.notes.filter(
+    (note) => note.agreementId === entry.id,
+  ).length;
+  if (noteCount) title.append(tag(plural(noteCount, "note"), "muted"));
+  const content = document.createElement("div");
+  content.innerHTML = entry.html;
+  body.append(title, content);
+  card.append(body);
+  const records = entry.sourceRecords || [];
+  const first = records.find((record) => record.kind !== "conversation");
+  const strip = document.createElement("div");
+  strip.className = "agreement-source";
+  const text = document.createElement("span");
+  text.textContent = first
+    ? `Agreed in revision ${first.revision} · ${describeRecord(first)}`
+    : records.length
+      ? "From the conversation"
+      : entry.source
+        ? "Source noted by the agent"
+        : "";
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const separator = () => {
+    const dot = document.createElement("span");
+    dot.textContent = "·";
+    return dot;
+  };
+  const preview = document.createElement("div");
+  preview.className = "agreement-preview";
+  preview.append(document.createElement("div"));
+  if (first && online) {
+    const toggle = linkButton("Preview", () => {
+      const open = preview.classList.toggle("open");
+      toggle.textContent = open ? "Hide preview" : "Preview";
+      if (open && !preview.querySelector("iframe")) {
+        const frame = document.createElement("iframe");
+        frame.title = `Revision ${first.revision}: ${describeRecord(first)}`;
+        frame.src = recordUrl(first, "preview");
+        preview.firstElementChild.append(frame);
+      }
+    });
+    actions.append(toggle, separator());
+  }
+  if (first) {
+    const open = document.createElement("a");
+    open.textContent = "Open";
+    if (online) open.href = recordUrl(first, "r");
+    else {
+      open.href = first.href;
+      open.target = "_blank";
+      open.rel = "noopener";
+    }
+    actions.append(open);
+  }
+  const details = document.createElement("div");
+  details.className = "agreement-sources";
+  details.hidden = true;
+  const extra = records.filter((record) => record !== first);
+  if (entry.source) {
+    const legacy = document.createElement("p");
+    legacy.textContent = entry.source;
+    details.append(legacy);
+  }
+  for (const record of extra) {
+    const box = document.createElement("div");
+    box.className = "record";
+    const meta = document.createElement("span");
+    meta.className = "small";
+    meta.textContent =
+      record.kind === "conversation"
+        ? "Conversation · agent-provided context"
+        : `Revision ${record.revision} · ${describeRecord(record)}`;
+    box.append(meta);
+    if (record.quote) {
+      const quote = document.createElement("blockquote");
+      quote.textContent = record.quote;
+      box.append(quote);
+    }
+    const line = document.createElement("span");
+    line.textContent = record.text;
+    box.append(line);
+    if (record.kind !== "conversation") {
+      const open = document.createElement("a");
+      open.className = "context-link";
+      open.textContent = " Open";
+      if (online) open.href = recordUrl(record, "r");
+      else {
+        open.href = record.href;
+        open.target = "_blank";
+        open.rel = "noopener";
+      }
+      box.append(open);
+    }
+    details.append(box);
+  }
+  if (entry.href) {
+    const link = document.createElement("a");
+    link.href = entry.href;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "Open source ↗";
+    details.append(link);
+  }
+  if (details.children.length) {
+    if (actions.children.length) actions.append(separator());
+    const count = extra.length + (entry.source ? 1 : 0) + (entry.href ? 1 : 0);
+    const more = linkButton(
+      first ? `${count} more` : count > 1 ? `${count} sources` : "Details",
+      () => {
+        details.hidden = !details.hidden;
+      },
+    );
+    actions.append(more);
+  }
+  if (editable) {
+    if (actions.children.length) actions.append(separator());
+    actions.append(
+      linkButton("Comment", () =>
+        openNote("agreed", entry.title, "", null, entry.id, card.id),
+      ),
+    );
+  }
+  strip.append(text, actions);
+  card.append(strip, details, preview);
+  return card;
+}
 function renderAgreements() {
   const root = $("page-content");
+  root.replaceChildren();
   if (!agreements.length) {
     root.innerHTML = '<p class="muted">No agreements recorded yet.</p>';
     return;
   }
-  root.innerHTML =
-    '<div class="agreement-layout"><nav class="agreement-index" aria-label="Agreements"></nav><article class="agreement-detail"></article></div>';
-  const index = root.querySelector(".agreement-index");
-  const detail = root.querySelector(".agreement-detail");
-  const retired = document.createElement("details");
-  const summary = document.createElement("summary");
-  summary.textContent = "No longer applies";
-  retired.append(summary);
-  const select = (entry) => {
-    agreementId = entry.id;
-    for (const chart of charts.values()) chart.dispose();
-    charts.clear();
-    clearDiffs();
-    for (const button of index.querySelectorAll("button")) {
-      if (button.dataset.agreement === entry.id)
-        button.setAttribute("aria-current", "true");
-      else button.removeAttribute("aria-current");
-    }
-    detail.replaceChildren();
-    const head = document.createElement("div");
-    head.className = "group-head";
-    const title = document.createElement("h2");
-    title.textContent = entry.title;
-    const note = document.createElement("button");
-    note.className = "btn quiet";
-    note.textContent = "Add note";
-    note.onclick = () => openNote("agreed", entry.title, "", null, entry.id);
-    head.append(title, note);
-    detail.append(head);
-    const label =
-      entry.state === "reopened"
-        ? "Revisiting"
-        : entry.state === "retired"
-          ? "No longer applies"
-          : entry.change === "new"
-            ? "New"
-            : entry.change === "updated"
-              ? "Updated"
-              : "";
-    if (label) {
-      const marker = document.createElement("p");
-      marker.className = "agreement-label";
-      marker.textContent = label;
-      detail.append(marker);
-    }
-    const content = document.createElement("div");
-    content.innerHTML = entry.html;
-    detail.append(content);
-    const source = document.createElement("details");
-    const heading = document.createElement("summary");
-    heading.textContent = entry.sourceRecords?.length
-      ? `Sources · ${entry.sourceRecords.length}`
-      : "Source";
-    const text = document.createElement("p");
-    text.textContent = entry.source || "";
-    source.append(heading);
-    if (entry.source) source.append(text);
-    for (const record of entry.sourceRecords || []) {
-      const box = document.createElement("div");
-      box.className = "source-record";
-      const label = document.createElement("p");
-      label.className = "small";
-      label.textContent =
-        record.kind === "conversation"
-          ? "Conversation · agent-provided context"
-          : `${record.kind === "note" ? "Comment" : "Choice"} · Revision ${record.revision} · ${record.label}`;
-      box.append(label);
-      if (record.quote) {
-        const quote = document.createElement("blockquote");
-        quote.textContent = record.quote;
-        box.append(quote);
-      }
-      const body = document.createElement("p");
-      body.textContent = record.text;
-      box.append(body);
-      if (record.href)
-        box.append(contextLink(record.href, "Open original page"));
-      source.append(box);
-    }
-    detail.append(source);
-    if (entry.href) {
-      const row = document.createElement("p");
-      row.className = "agreement-source small";
-      const link = document.createElement("a");
-      link.href = entry.href;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "Open source ↗";
-      row.append(link);
-      const url = new URL(entry.href, location.href);
-      const label = document.createElement("span");
-      label.textContent = `${url.pathname.split("/").pop()}${url.hash}`;
-      row.append(label);
-      detail.append(row);
-    }
-    enhance(content);
-  };
-  for (const entry of agreements) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.agreement = entry.id;
-    const title = document.createElement("strong");
-    title.textContent = entry.title;
-    const preview = document.createElement("div");
-    preview.innerHTML = entry.html;
-    const summary = document.createElement("span");
-    summary.className = "agreement-summary";
-    summary.textContent = preview.textContent;
-    const meta = document.createElement("small");
-    meta.textContent = [
-      entry.state === "reopened"
-        ? "Revisiting"
-        : entry.state === "retired"
-          ? "No longer applies"
-          : entry.change === "new"
-            ? "New"
-            : entry.change === "updated"
-              ? "Updated"
-              : "",
-      entry.sourceRecords?.length
-        ? `${entry.sourceRecords.length} sources`
-        : "",
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    button.append(title, summary, meta);
-    button.onclick = () => select(entry);
-    (entry.state === "retired" ? retired : index).append(button);
+  const lede = document.createElement("p");
+  lede.className = "muted";
+  lede.textContent =
+    "Decisions so far, each with where it was agreed. New since the last revision is marked.";
+  root.append(lede);
+  const active = agreements.filter((entry) => entry.state !== "retired");
+  const retired = agreements.filter((entry) => entry.state === "retired");
+  for (const entry of active) root.append(agreementCard(entry));
+  if (retired.length) {
+    const details = document.createElement("details");
+    details.className = "agreement-retired";
+    const summary = document.createElement("summary");
+    summary.textContent = `No longer applies · ${retired.length}`;
+    details.append(summary);
+    for (const entry of retired) details.append(agreementCard(entry));
+    root.append(details);
   }
-  if (retired.children.length > 1) index.append(retired);
-  const entry =
-    agreements.find((item) => item.id === agreementId) || agreements[0];
-  retired.open = entry.state === "retired";
-  select(entry);
+  enhance(root);
 }
-function contextLink(href, label = "View context") {
+
+/* Feedback */
+function contextLink(topic, target, text = "View") {
   const link = document.createElement("a");
-  const url = new URL(href, location.href);
-  if (!["http:", "https:", "file:"].includes(url.protocol))
-    return document.createTextNode("");
-  link.href = href;
-  link.textContent = label;
   link.className = "context-link";
-  if (url.origin === location.origin && url.pathname === location.pathname)
-    link.onclick = (event) => {
-      event.preventDefault();
-      show(
-        decodeURIComponent(url.hash.slice(1)),
-        url.searchParams.get("target"),
-      );
-    };
-  else {
-    link.target = "_blank";
-    link.rel = "noopener";
-  }
+  link.href = `${target ? "?target=" + encodeURIComponent(target) : ""}#${encodeURIComponent(topic)}`;
+  link.textContent = text;
+  link.onclick = (event) => {
+    event.preventDefault();
+    show(topic, target);
+  };
   return link;
 }
-function itemLink(item) {
-  return `${item.target ? "?target=" + encodeURIComponent(item.target) : ""}#${encodeURIComponent(item.topic)}`;
-}
-function noteCard(note) {
+function itemCard({ kind, key, item }) {
   const box = document.createElement("div");
-  box.className = "note feedback-item";
+  box.className = "feedback-item" + (item.sentIn ? " sent" : "");
   const body = document.createElement("div");
   const title = document.createElement("h3");
-  title.textContent = note.anchor;
+  title.textContent =
+    kind === "note"
+      ? item.anchor
+      : kind === "answer"
+        ? `Answer · ${item.label}`
+        : item.label;
+  if (item.sentIn) title.append(tag("Sent", "ok"));
+  const old = stale(kind, key, item);
+  if (old && item.revision && item.revision !== plan.revision)
+    title.append(tag(`from revision ${item.revision}`, "muted"));
   body.append(title);
-  const kind = document.createElement("span");
-  kind.className = "feedback-kind";
-  kind.textContent = "Comment";
-  box.append(kind, body);
-  if (note.quote) {
+  if (kind === "note" && item.quote) {
     const quote = document.createElement("blockquote");
-    quote.textContent = note.quote;
+    quote.textContent = item.quote;
     body.append(quote);
   }
   const text = document.createElement("p");
-  text.textContent = note.text;
+  text.textContent =
+    kind === "choice" || kind === "list" ? choiceText(item) : item.text;
   body.append(text);
+  const topicExists =
+    item.topic === "agreed" ? builtInAgreed : known.text.has(item.topic);
+  if (item.topic !== "overall" && topicExists)
+    body.append(
+      contextLink(
+        item.topic,
+        kind === "note" ? item.target : item.target,
+        kind === "note" ? "View" : "Edit on the page",
+      ),
+    );
+  box.append(body);
   const actions = document.createElement("div");
   actions.className = "feedback-item-actions";
-  for (const action of ["Add comment", "Edit", "Remove"]) {
+  const action = (label, onclick) => {
     const button = document.createElement("button");
+    button.type = "button";
     button.className = "btn quiet";
-    button.textContent = action;
-    button.onclick = () => {
-      if (action === "Add comment")
-        openNote(note.topic, note.anchor, note.text, null, note.agreementId);
-      else if (action === "Edit")
-        openNote(
-          note.topic,
-          note.anchor,
-          note.quote,
-          note.id,
-          note.agreementId,
-        );
-      else {
-        state.notes = state.notes.filter((item) => item.id !== note.id);
-        save();
-      }
-    };
+    button.textContent = label;
+    button.onclick = onclick;
     actions.append(button);
+  };
+  if (!item.sentIn) {
+    if (kind === "note") {
+      action("Edit", () =>
+        openNote(
+          item.topic,
+          item.anchor,
+          item.quote,
+          item.id,
+          item.agreementId,
+          item.target,
+        ),
+      );
+      action("Remove", () => {
+        state.notes = state.notes.filter((note) => note.id !== item.id);
+        save();
+        if (item.topic === page.id) show(page.id, null, { keepScroll: true });
+      });
+    } else if (kind === "choice") {
+      action("Add comment", () =>
+        openNote(
+          item.topic,
+          item.label,
+          choiceText(item),
+          null,
+          null,
+          item.target,
+        ),
+      );
+      action("Clear choice", () => {
+        delete state.choices[key];
+        restoreChoices();
+        save();
+      });
+    } else if (kind === "answer") {
+      action("Remove", () => {
+        delete state.answers[key];
+        restoreAnswers();
+        save();
+      });
+    }
   }
   box.append(actions);
-  if (note.topic !== "overall") body.append(contextLink(itemLink(note)));
   return box;
 }
-function review() {
-  const draft = snapshot();
-  const unchanged = state.submitted?.snapshot === draft;
-  const unsent = unchanged ? 0 : dirty();
-  document.querySelectorAll(".count").forEach((element) => {
-    element.textContent = unsent;
-    element.hidden = !unsent;
-  });
-  $("review").classList.toggle("primary", unsent > 0);
-  $("review").classList.toggle("quiet", !unsent);
-  if (renderedFeedback !== draft) {
-    $("feedback-groups").replaceChildren();
-    for (const topic of pages) {
-      const notes = state.notes.filter((note) => note.topic === topic.id),
-        choices = Object.entries(state.choices).filter(
-          ([, choice]) => choice.topic === topic.id,
-        );
-      const group = document.createElement("section");
-      group.className = "feedback-group";
-      const head = document.createElement("div");
-      head.className = "group-head";
-      const heading = document.createElement("h2");
-      heading.textContent = topic.title;
-      head.append(heading);
-      const add = document.createElement("button");
-      add.className = "btn quiet";
-      add.textContent = "Add comment";
-      add.onclick = () => openNote(topic.id, topic.title);
-      head.append(add);
-      group.append(head);
-      if (!notes.length && !choices.length) {
-        const empty = document.createElement("p");
-        empty.className = "small";
-        empty.textContent = "No feedback added.";
-        group.append(empty);
-      }
-      for (const [id, choice] of choices) {
-        const row = document.createElement("div");
-        row.className = "choice-review feedback-item";
-        const body = document.createElement("div");
-        const actions = document.createElement("div");
-        actions.className = "feedback-item-actions";
-        const kind = document.createElement("span");
-        kind.className = "feedback-kind";
-        kind.textContent = "Choice";
-        const title = document.createElement("h3");
-        title.textContent = choice.label;
-        const value = document.createElement("p");
-        value.textContent = choiceText(choice);
-        body.append(
-          title,
-          value,
-          contextLink(itemLink(choice), "View options"),
-        );
-        const comment = document.createElement("button");
-        comment.className = "btn quiet";
-        comment.textContent = "Add comment";
-        comment.onclick = () =>
-          openNote(choice.topic, choice.label, choiceText(choice));
-        actions.append(comment);
-        const clear = document.createElement("button");
-        clear.className = "btn quiet";
-        clear.textContent = "Clear choice";
-        clear.onclick = () => {
-          delete state.choices[id];
-          restoreChoices();
-          save();
-        };
-        if (choice.kind !== "multiple") actions.append(clear);
-        row.append(kind, body, actions);
-        group.append(row);
-      }
-      notes.forEach((note) => group.append(noteCard(note)));
-      $("feedback-groups").append(group);
-    }
-    $("overall-notes").replaceChildren(
-      ...state.notes.filter((note) => note.topic === "overall").map(noteCard),
+function renderFeedback() {
+  $("feedback-lede").textContent =
+    `Everything you marked on revision ${plan.revision}. Nothing is sent until you submit.`;
+  const items = [
+    ...Object.entries(state.choices).map(([key, item]) => ({
+      kind: item.kind === "multiple" ? "list" : "choice",
+      key,
+      item,
+      topic: item.topic,
+    })),
+    ...Object.entries(state.answers).map(([key, item]) => ({
+      kind: "answer",
+      key,
+      item,
+      topic: item.topic,
+    })),
+    ...state.notes.map((item) => ({
+      kind: "note",
+      key: item.id,
+      item,
+      topic: item.topic,
+    })),
+  ];
+  const groups = $("feedback-groups");
+  groups.replaceChildren();
+  const group = (heading, entries) => {
+    if (!entries.length) return;
+    const section = document.createElement("section");
+    section.className = "feedback-group";
+    const head = document.createElement("div");
+    head.className = "group-head";
+    const title = document.createElement("h2");
+    title.textContent = heading;
+    head.append(title);
+    section.append(head, ...entries.map(itemCard));
+    groups.append(section);
+  };
+  for (const topic of pages)
+    group(
+      topic.title,
+      items.filter((entry) => entry.topic === topic.id),
     );
-    renderedFeedback = draft;
+  const orphans = items.filter(
+    (entry) =>
+      entry.topic !== "overall" && !pages.some((p) => p.id === entry.topic),
+  );
+  for (const revision of new Set(orphans.map((entry) => entry.item.revision)))
+    group(
+      revision ? `From revision ${revision}` : "From an earlier revision",
+      orphans.filter((entry) => entry.item.revision === revision),
+    );
+  if (!items.some((entry) => entry.topic !== "overall")) {
+    const empty = document.createElement("p");
+    empty.className = "feedback-empty";
+    empty.textContent =
+      "Nothing marked yet. Choose options, tick checklists, or comment on the pages.";
+    groups.append(empty);
   }
-  $("submit").disabled = !dirty() || unchanged || !connected || !current();
-  $("submit").textContent = unchanged ? "Submitted" : "Submit feedback";
+  $("overall-notes").replaceChildren(
+    ...items.filter((entry) => entry.topic === "overall").map(itemCard),
+  );
+}
+function reviewButton(count) {
+  const button = $("review");
+  const working =
+    connected && current() && ["submitted", "working"].includes(remote.stage);
+  const canAccept =
+    plan.kind === "plan" &&
+    connected &&
+    current() &&
+    !count &&
+    ["ready", "updated"].includes(remote.stage);
+  delete button.dataset.action;
+  if (count) button.textContent = `Review ${plural(count, "comment")}`;
+  else if (canAccept) {
+    button.textContent = "Accept plan";
+    button.dataset.action = "accept";
+  } else if (working) button.textContent = "Feedback sent";
+  else button.textContent = "Nothing to review";
+  button.classList.toggle("primary", Boolean(count || canAccept));
+  button.classList.toggle("quiet", !(count || canAccept));
+}
+function review() {
+  const unsent = unsentItems(state);
+  reviewButton(unsent.count);
+  const rendered = JSON.stringify([
+    state.notes,
+    state.choices,
+    state.answers,
+    state.submitted,
+  ]);
+  if (renderedFeedback !== rendered) {
+    renderFeedback();
+    renderedFeedback = rendered;
+  }
+  $("submit").disabled = !unsent.count || !connected || !current() || !editable;
+  $("submit").textContent = unsent.count
+    ? `Submit ${plural(unsent.count, "comment")}`
+    : "Submit";
   $("submit-status").textContent =
     submissionError ||
-    (unchanged
-      ? "Feedback saved."
-      : dirty()
-        ? "Review your feedback before submitting."
-        : "No feedback added.");
+    (unsent.count
+      ? "Sent all at once. The agent replies with the next revision."
+      : state.submitted?.revision === plan.revision
+        ? `Sent ${ago(state.submitted.at)}.`
+        : "Nothing to send yet.");
   status();
 }
 function feedbackText() {
+  const { notes, choices, answers } = unsentItems(state);
   const lines = [
     `Feedback: ${plan.title}`,
     `Artifact ${plan.artifactId}, revision ${plan.revision}`,
     "Feedback only. No implementation approval.",
   ];
-  for (const choice of Object.values(state.choices))
+  for (const choice of Object.values(choices))
     lines.push("", `${choice.label}: ${choiceText(choice)}`);
-  for (const note of state.notes)
+  for (const answer of Object.values(answers))
+    lines.push("", `${answer.label}`, answer.text);
+  for (const note of notes)
     lines.push(
       "",
       note.anchor,
@@ -488,9 +805,6 @@ function feedbackText() {
       note.text,
     );
   return lines.join("\n");
-}
-function groups() {
-  return { choices: state.choices, notes: state.notes };
 }
 function envelope(intent, text, extra = {}) {
   return {
@@ -505,9 +819,8 @@ function envelope(intent, text, extra = {}) {
   };
 }
 async function send(event) {
-  if (!connected)
-    throw Error("Reconnect to the local helper or export your feedback.");
-  const response = await fetch("/api/feedback", {
+  if (!connected) throw Error("The hub is unreachable. Try again shortly.");
+  const response = await fetch(`${base}/api/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(event),
@@ -519,94 +832,214 @@ async function send(event) {
   remote = result.status;
   return result;
 }
+
+/* Status, sessions, revisions */
+function scheduleReload() {
+  if (
+    document.querySelector("dialog[open]") ||
+    ["TEXTAREA", "INPUT"].includes(document.activeElement?.tagName)
+  )
+    return;
+  try {
+    sessionStorage.setItem(
+      resumeKey,
+      JSON.stringify({
+        page: $("feedback").hidden ? page.id : "feedback",
+        scrollY: window.scrollY,
+      }),
+    );
+  } catch {
+    /* Reload without restoring the position. */
+  }
+  location.reload();
+}
 function status() {
-  void reviewAlerts.update(connected ? remote : null);
-  const newer = remote?.current && !current();
-  const canAccept =
-    plan.kind === "plan" &&
+  const stage = !connected ? "disconnected" : remote?.stage || "ready";
+  const newer = connected && remote?.current && !current();
+  const accepting =
+    state.acceptance && remote?.latestSubmissionId === state.acceptance.id;
+  const working =
+    editable &&
     connected &&
     current() &&
-    !dirty() &&
-    ["ready", "updated"].includes(remote.stage);
-  $("accept").disabled = !canAccept;
-  $("accept").title = dirty()
-    ? "Submit feedback and review the revised plan before accepting."
-    : "";
-  $("agent-status").hidden = !session.sessionId;
-  if (!session.sessionId) return;
-  const stage = !connected ? "disconnected" : remote?.stage || "ready";
-  const titles = {
-    ready: "Ready for feedback",
-    submitted: "Waiting for the agent",
-    working: "Working",
-    updated: newer ? "New revision" : "Ready for feedback",
-    disconnected: "Disconnected",
-    complete:
-      remote?.accepted?.mode === "implement"
-        ? "Implementation requested"
-        : "Plan saved",
-  };
-  const setText = (id, text) => {
-    if ($(id).textContent !== text) $(id).textContent = text;
-  };
-  setText("status-title", titles[stage] || stage);
-  setText(
-    "status-detail",
-    stage === "disconnected"
-      ? "The local helper is unreachable."
-      : stage === "updated" && newer
-        ? `Revision ${remote.current.revision} is ready.`
-        : "",
-  );
-  $("spinner").hidden = stage !== "working";
-  $("update").hidden = !newer || !connected;
-  if (newer) $("update").href = remote.current.url;
-  $("final-plan").hidden = stage !== "complete";
-  $("plan-path").hidden = stage !== "complete";
-  if (stage === "complete") {
-    $("final-plan").href = remote.accepted.url;
-    $("plan-path").textContent = remote.accepted.path;
+    ["submitted", "working"].includes(stage);
+  document.body.classList.toggle("is-working", working);
+  $("working").hidden = !working;
+  if (working) {
+    $("working-title").textContent = accepting
+      ? "Plan accepted"
+      : "Working on the next revision";
+    $("working-detail").textContent = accepting
+      ? "The agent is recording your acceptance."
+      : state.submitted?.revision === plan.revision
+        ? `Your ${plural(state.submitted.count, "comment")} were sent ${ago(state.submitted.at)}. This page refreshes when it is ready.`
+        : "This page refreshes when it is ready.";
   }
-  if (
-    state.submitted &&
-    remote?.acknowledged.includes(state.submitted.id) &&
-    state.submitted.snapshot === snapshot()
-  )
-    $("submit-status").textContent = "Feedback received by the agent.";
-  if (newer) {
-    $("submit").disabled = true;
-    $("submit-status").textContent =
-      "Open the update to continue. This draft remains saved.";
-  }
+  const complete = stage === "complete" && remote?.accepted;
+  $("accepted").hidden = !complete;
+  if (complete)
+    $("accepted").textContent =
+      remote.accepted.mode === "implement"
+        ? `Plan accepted. Implementation requested. Saved at ${remote.accepted.path}`
+        : `Plan accepted and saved at ${remote.accepted.path}`;
+  $("connection-status").textContent = !online
+    ? "Local viewing. Feedback can be exported; live submission requires the session URL."
+    : !connected
+      ? "The hub is unreachable. Your draft stays here and submits when it is back."
+      : remote?.disconnected
+        ? "The agent has not checked in for a while. Feedback still saves."
+        : "";
+  if (newer && mode === "live") scheduleReload();
 }
 async function poll() {
-  if (!session.sessionId || !/^https?:$/.test(location.protocol)) {
-    connected = false;
-    $("connection-status").textContent =
-      "Local viewing. Feedback can be exported; live submission requires the session URL.";
-    review();
-    return;
-  }
   try {
-    const response = await fetch("/api/status");
+    const response = await fetch(`${base}/api/status`);
     if (!response.ok) throw Error();
     const result = await response.json();
     if (result.sessionId !== session.sessionId) throw Error("Wrong session");
     remote = result;
     connected = true;
-    $("connection-status").textContent = "";
-    review();
   } catch {
     connected = false;
-    $("connection-status").textContent =
-      "Local helper disconnected. Your draft remains here; reconnect or export a copy.";
-    $("submit").disabled = true;
-    $("accept").disabled = true;
-    status();
+  }
+  renderRevisions();
+  review();
+}
+async function pollSessions() {
+  try {
+    const response = await fetch("/api/sessions");
+    if (!response.ok) throw Error();
+    sessions = (await response.json()).sessions || [];
+  } catch {
+    sessions = [];
+  }
+  renderSessions();
+  void reviewAlerts.update(sessions);
+}
+function stateWords(entry) {
+  if (entry.needsYou)
+    return entry.kind === "plan" ? "Ready to accept" : "Waiting for you";
+  if (["submitted", "working"].includes(entry.stage))
+    return `Working · ${since(entry.updatedAt)}`;
+  return "Live";
+}
+function renderSessions() {
+  const others = sessions.filter((entry) => entry.id !== session.sessionId);
+  const need = others.filter((entry) => entry.needsYou);
+  const workingList = others.filter((entry) => !entry.needsYou);
+  const mine = sessions.filter((entry) => entry.id === session.sessionId);
+  $("bell").hidden = !others.length;
+  $("bell-count").textContent = String(others.length);
+  $("bell").classList.toggle("need", need.length > 0);
+  $("bell").setAttribute(
+    "aria-label",
+    need.length
+      ? `${plural(others.length, "other session")}, ${need.length} need you`
+      : plural(others.length, "other session"),
+  );
+  document.title = (need.length ? `(${need.length}) ` : "") + plan.title;
+  if (!others.length) toggleSidecar(false);
+  sessionOrder = [...need, ...workingList, ...mine];
+  const list = $("sidecar-list");
+  list.replaceChildren();
+  for (const [heading, entries] of [
+    ["Need you", need],
+    ["Working", workingList],
+    ["This one", mine],
+  ]) {
+    if (!entries.length) continue;
+    const label = document.createElement("div");
+    label.className = "group";
+    label.textContent = heading;
+    list.append(label);
+    for (const entry of entries) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className =
+        "session-row" +
+        (entry.needsYou ? " need" : "") +
+        (entry.id === session.sessionId ? " current" : "");
+      const title = document.createElement("span");
+      title.textContent = entry.title;
+      const words = document.createElement("small");
+      words.textContent = stateWords(entry);
+      row.append(title, words);
+      row.onclick = () => {
+        if (entry.id === session.sessionId) toggleSidecar(false);
+        else location.assign(entry.url);
+      };
+      list.append(row);
+    }
   }
 }
+function renderRevisions() {
+  const entries = (
+    remote?.revisions?.length
+      ? remote.revisions
+      : [{ revision: plan.revision, publishedAt: null }]
+  )
+    .slice()
+    .reverse();
+  const latest = remote?.current?.revision ?? entries[0].revision;
+  const menu = $("revision-menu");
+  menu.replaceChildren();
+  const heading = document.createElement("div");
+  heading.className = "side-label";
+  heading.textContent = "Revisions";
+  menu.append(heading);
+  for (const entry of entries) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className =
+      "item" + (entry.revision === plan.revision ? " current" : "");
+    item.setAttribute("role", "menuitem");
+    const tick = document.createElement("span");
+    tick.className = "tick";
+    tick.textContent = entry.revision === plan.revision ? "✓" : "";
+    const label = document.createElement("span");
+    label.textContent = `Revision ${entry.revision}`;
+    const time = document.createElement("small");
+    time.textContent = entry.publishedAt ? ago(entry.publishedAt) : "";
+    item.append(tick, label, time);
+    item.onclick = () => {
+      toggleRevisionMenu(false);
+      if (entry.revision === plan.revision && mode === "live") return;
+      location.assign(
+        entry.revision === latest
+          ? `${base}/`
+          : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
+      );
+    };
+    menu.append(item);
+  }
+  $("revision-text").textContent =
+    `${kindLabel} · Revision ${plan.revision}${mode === "readonly" ? " · read-only" : ""}`;
+  $("revision-back").hidden = mode !== "readonly";
+  $("revision-back").href = `${base}/`;
+}
+function toggleRevisionMenu(open = $("revision-menu").hidden) {
+  $("revision-menu").hidden = !open;
+  $("revision").setAttribute("aria-expanded", String(open));
+  if (open) $("revision-menu").querySelector("button")?.focus();
+}
+function toggleSidecar(open = $("sidecar").hidden) {
+  if (open && $("bell").hidden) return;
+  $("sidecar").hidden = !open;
+  if (open) $("sidecar-close").focus();
+}
+function closeMenus() {
+  toggleRevisionMenu(false);
+  toggleSidecar(false);
+  try {
+    $("settings-menu").hidePopover();
+  } catch {
+    /* Already closed. */
+  }
+}
+
+/* Choices, checklists, answers */
 function choiceTargets(root, topic) {
-  for (const type of ["choice", "multiselect"])
+  for (const type of ["choice", "multiselect", "question"])
     root.querySelectorAll(`[data-${type}]`).forEach((group, index) => {
       group.id ||= `${type}-${topic}-${index}`;
     });
@@ -617,6 +1050,7 @@ function checklist(group, topic, previous) {
     topic,
     label: group.dataset.label || group.dataset.multiselect,
     target: group.id,
+    revision: plan.revision,
     options: Array.from(
       group.querySelectorAll('input[type="checkbox"][data-value]'),
       (input) => ({
@@ -639,7 +1073,11 @@ function initializeChecklists() {
       "[data-multiselect]",
     )) {
       const id = topic.id + "/" + group.dataset.multiselect;
-      state.choices[id] = checklist(group, topic.id, state.choices[id]);
+      const previous = state.choices[id];
+      state.choices[id] = {
+        ...checklist(group, topic.id, previous),
+        ...(previous?.sentIn ? { sentIn: previous.sentIn } : {}),
+      };
     }
   }
   persist();
@@ -665,6 +1103,15 @@ function restoreChoices() {
           ?.checked ?? input.defaultChecked;
     });
 }
+function restoreAnswers() {
+  document.querySelectorAll("[data-question] textarea").forEach((area) => {
+    const group = area.closest("[data-question]");
+    area.value =
+      state.answers[page.id + "/" + group.dataset.question]?.text ?? "";
+    area.readOnly = !editable;
+  });
+}
+
 $("note-form").onsubmit = (event) => {
   event.preventDefault();
   const text = $("note-text").value.trim();
@@ -684,25 +1131,26 @@ $("note-form").onsubmit = (event) => {
   save();
   $("note-dialog").close();
   notify("Added to feedback.");
+  if (note.topic === page.id && !$("reading").hidden)
+    show(page.id, null, { keepScroll: true });
 };
 $("submit").onclick = async () => {
   submissionError = "";
-  const currentSnapshot = snapshot();
-  if (state.pending?.snapshot !== currentSnapshot)
+  const groups = submissionGroups(state);
+  const snapshot = JSON.stringify(groups);
+  if (state.pending?.snapshot !== snapshot)
     state.pending = {
-      snapshot: currentSnapshot,
-      event: envelope("feedback-only", feedbackText(), {
-        groups: groups(),
-      }),
+      snapshot,
+      event: envelope("feedback-only", feedbackText(), { groups }),
     };
   persist();
   $("submit").disabled = true;
   try {
     const result = await send(state.pending.event);
-    state.submitted = { snapshot: currentSnapshot, id: result.id };
-    state.pending = null;
+    markSent(state, result.id, new Date().toISOString());
     save();
-    $("agent-status").scrollIntoView({ block: "nearest" });
+    notify("Feedback sent.");
+    show(page.id, null, { keepScroll: false });
   } catch (error) {
     submissionError = error.message;
     $("submit").disabled = false;
@@ -710,9 +1158,11 @@ $("submit").onclick = async () => {
   }
 };
 $("export").onclick = () => {
+  const groups = submissionGroups(state);
   const event =
-    (state.pending?.snapshot === snapshot() && state.pending.event) ||
-    envelope("feedback-only", feedbackText(), { groups: groups() });
+    (state.pending?.snapshot === JSON.stringify(groups) &&
+      state.pending.event) ||
+    envelope("feedback-only", feedbackText(), { groups });
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(event, null, 2)], {
       type: "application/json",
@@ -724,17 +1174,21 @@ $("export").onclick = () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
-$("accept").onclick = () => {
+function openAccept() {
   $("accept-detail").textContent = `${plan.title}, revision ${plan.revision}`;
   $("accept-error").textContent = "";
   $("accept-dialog").showModal();
+}
+$("review").onclick = () => {
+  if ($("review").dataset.action === "accept") openAccept();
+  else show("feedback");
 };
 document.querySelectorAll("[data-accept-mode]").forEach(
   (button) =>
     (button.onclick = async () => {
       const mode = button.dataset.acceptMode;
-      if (acceptance?.mode !== mode)
-        acceptance = envelope(
+      if (state.acceptance?.mode !== mode)
+        state.acceptance = envelope(
           "accept-plan",
           `Accept ${plan.artifactId} revision ${plan.revision}. ${mode === "implement" ? "Start implementation of this plan." : "Save for later. Do not start implementation."}`,
           { mode },
@@ -743,12 +1197,14 @@ document.querySelectorAll("[data-accept-mode]").forEach(
         .querySelectorAll("[data-accept-mode]")
         .forEach((item) => (item.disabled = true));
       try {
-        const result = await send(acceptance);
-        state.lastEvent = result.id;
+        await send(state.acceptance);
         save();
         $("accept-dialog").close();
-        show("feedback");
-        $("agent-status").scrollIntoView({ block: "nearest" });
+        notify(
+          mode === "implement"
+            ? "Accepted. Implementation requested."
+            : "Accepted and saved.",
+        );
       } catch (error) {
         $("accept-error").textContent = error.message;
       } finally {
@@ -763,17 +1219,33 @@ document.addEventListener("click", (event) => {
   if (close) $(close.dataset.close).close();
   const navigation = event.target.closest("[data-page]");
   if (navigation) show(navigation.dataset.page);
+  if (event.target.closest("#revision")) {
+    toggleRevisionMenu();
+    return;
+  }
+  if (event.target.closest("#bell")) {
+    toggleSidecar();
+    return;
+  }
+  if (event.target.closest("#sidecar-close")) {
+    toggleSidecar(false);
+    return;
+  }
+  if (!event.target.closest("#revision-menu")) toggleRevisionMenu(false);
+  if (!event.target.closest("#sidecar")) toggleSidecar(false);
+  if (!editable) return;
   const comment = event.target.closest("[data-comment]");
-  if (comment)
+  if (comment && $("page-content").contains(comment))
     openNote(
       page.id,
       comment.dataset.comment || page.title,
       "",
       null,
-      page.id === "agreed" && builtInAgreed ? agreementId : null,
+      null,
+      comment.closest("[id]")?.id || null,
     );
   const choice = event.target.closest("[data-choice] [data-value]");
-  if (choice) {
+  if (choice && $("page-content").contains(choice)) {
     const group = choice.closest("[data-choice]"),
       id = page.id + "/" + group.dataset.choice;
     if (state.choices[id]?.value === choice.dataset.value)
@@ -788,12 +1260,14 @@ document.addEventListener("click", (event) => {
           choice.textContent.trim() ||
           choice.dataset.value,
         target: group.id,
+        revision: plan.revision,
       };
     restoreChoices();
     save();
   }
 });
 document.addEventListener("change", (event) => {
+  if (!editable) return;
   const input = event.target.closest(
     '[data-multiselect] input[type="checkbox"][data-value]',
   );
@@ -805,11 +1279,31 @@ document.addEventListener("change", (event) => {
   );
   save();
 });
+document.addEventListener("input", (event) => {
+  if (!editable) return;
+  const area = event.target.closest("[data-question] textarea");
+  if (!area || !$("page-content").contains(area)) return;
+  const group = area.closest("[data-question]");
+  const key = page.id + "/" + group.dataset.question;
+  if (area.value.trim())
+    state.answers[key] = {
+      topic: page.id,
+      label: group.dataset.label || group.dataset.question,
+      text: area.value,
+      target: group.id,
+      revision: plan.revision,
+    };
+  else delete state.answers[key];
+  clearTimeout(answerTimer);
+  answerTimer = setTimeout(save, 300);
+});
 document.addEventListener("selectionchange", () => {
   const selection = getSelection(),
     parent = selection?.anchorNode?.parentElement;
   selected = selection?.toString().trim() || "";
+  selectedTarget = parent?.closest("#page-content [id]")?.id || null;
   $("quote").hidden = !(
+    editable &&
     selected.length > 3 &&
     parent?.closest("#page-content") &&
     !document.querySelector("dialog[open]")
@@ -817,13 +1311,7 @@ document.addEventListener("selectionchange", () => {
 });
 $("quote").onpointerdown = (event) => event.preventDefault();
 $("quote").onclick = () =>
-  openNote(
-    page.id,
-    page.title,
-    selected,
-    null,
-    page.id === "agreed" && builtInAgreed ? agreementId : null,
-  );
+  openNote(page.id, page.title, selected, null, null, selectedTarget);
 $("page-comment").onclick = () => openNote(page.id, page.title);
 $("overall-note").onclick = () => openNote("overall", "Overall feedback");
 $("note-text").oninput = () => {
@@ -843,7 +1331,6 @@ for (const dialog of document.querySelectorAll("dialog")) {
       dialog.close();
   });
 }
-$("review").onclick = $("page-review").onclick = () => show("feedback");
 $("theme").onchange = () => {
   preferredTheme = $("theme").value === "system" ? null : $("theme").value;
   activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
@@ -861,6 +1348,65 @@ systemTheme.addEventListener("change", () => {
   theme();
 });
 
+/* Keys */
+const interactiveSelector =
+  "[data-choice] [data-value], [data-multiselect] input, [data-question] textarea, [data-comment], .link-btn, [data-diff-style], summary";
+document.addEventListener("keydown", (event) => {
+  if (mode === "preview" || event.metaKey || event.ctrlKey || event.altKey)
+    return;
+  if (event.key === "Escape") {
+    closeMenus();
+    return;
+  }
+  if (event.target.closest("input, textarea, select, [contenteditable]"))
+    return;
+  if (document.querySelector("dialog[open]")) return;
+  const key = event.key;
+  if (keyPrefix === "g") {
+    keyPrefix = "";
+    if (key === "a") {
+      event.preventDefault();
+      show("agreed");
+    }
+    return;
+  }
+  if (key === "?") $("keys-dialog").showModal();
+  else if (/^[1-9]$/.test(key)) {
+    const entry = sessionOrder[Number(key) - 1];
+    if (entry && entry.id !== session.sessionId) location.assign(entry.url);
+  } else if (key === "]" || key === "[") {
+    const order = pages.map((item) => item.id);
+    const index = order.indexOf($("feedback").hidden ? page.id : "feedback");
+    const next = order[index + (key === "]" ? 1 : -1)];
+    if (next) show(next);
+  } else if (key === "j" || key === "k") {
+    const items = Array.from(
+      $("page-content").querySelectorAll(interactiveSelector),
+    ).filter((item) => item.offsetParent);
+    if (!items.length) return;
+    const index = items.indexOf(document.activeElement);
+    const next =
+      items[
+        index < 0
+          ? key === "j"
+            ? 0
+            : items.length - 1
+          : (index + (key === "j" ? 1 : -1) + items.length) % items.length
+      ];
+    next.focus({ preventScroll: true });
+    next.scrollIntoView({ block: "center" });
+  } else if (key === "c" && editable && !$("reading").hidden)
+    openNote(page.id, page.title);
+  else if (key === "r" && editable) show("feedback");
+  else if (key === "g") {
+    keyPrefix = "g";
+    clearTimeout(keyPrefixTimer);
+    keyPrefixTimer = setTimeout(() => (keyPrefix = ""), 1200);
+  } else return;
+  event.preventDefault();
+});
+
+/* Renderers and figures */
 const libraries = {
   shiki: "https://esm.sh/shiki@3.12.2",
   diffs: "https://esm.sh/@pierre/diffs@1.4.2?bundle",
@@ -906,8 +1452,54 @@ function failed(element, error) {
   note.textContent = error.message || "Renderer unavailable; source preserved.";
   element.after(note);
 }
+function figure(element, { title, meta, actions = [], caption, kind = "" }) {
+  if (element.parentElement?.classList.contains("figure-body"))
+    return element.parentElement.parentElement;
+  const wrapper = document.createElement("figure");
+  wrapper.className = `figure ${kind}`.trim();
+  if (title || meta || actions.length) {
+    const head = document.createElement("figcaption");
+    head.className = "figure-head";
+    const name = document.createElement("b");
+    name.textContent = title || "";
+    const side = document.createElement("span");
+    if (meta) side.append(meta);
+    side.append(...actions);
+    head.append(name, side);
+    wrapper.append(head);
+  }
+  const body = document.createElement("div");
+  body.className = "figure-body";
+  element.replaceWith(wrapper);
+  body.append(element);
+  wrapper.append(body);
+  if (caption) {
+    const line = document.createElement("div");
+    line.className = "figure-caption";
+    line.textContent = caption;
+    wrapper.append(line);
+  }
+  return wrapper;
+}
+function copyButton(read) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn";
+  button.textContent = "Copy";
+  button.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(read());
+      button.textContent = "Copied";
+      setTimeout(() => (button.textContent = "Copy"), 1500);
+    } catch {
+      notify("Copy is unavailable in this browser.");
+    }
+  };
+  return button;
+}
 async function renderCode(element) {
   const source = element.textContent;
+  sources.set(element, source);
   try {
     shikiTask ||= import(libraries.shiki);
     const { codeToHtml } = await shikiTask;
@@ -936,9 +1528,9 @@ function renderDiagrams(root) {
             securityLevel: "strict",
             theme: "base",
             themeVariables: {
-              primaryColor: color("--panel"),
+              primaryColor: color("--ground"),
               primaryTextColor: color("--ink"),
-              primaryBorderColor: color("--muted"),
+              primaryBorderColor: color("--line-strong"),
               lineColor: color("--muted"),
               fontFamily: "sans-serif",
             },
@@ -1010,7 +1602,7 @@ async function chart(element, options) {
   }
   instance.setOption({
     backgroundColor: "transparent",
-    color: [color("--blue"), color("--muted")],
+    color: [color("--accent"), color("--muted")],
     textStyle: { color: color("--ink") },
     ...options,
   });
@@ -1051,6 +1643,11 @@ async function diff(element, input, { diffStyle = "split" } = {}) {
   diffs.set(element, viewer);
   return viewer;
 }
+function prototypeUrl(prototype) {
+  if (online)
+    return `${base}/r/${encodeURIComponent(plan.revision)}/prototype/${encodeURIComponent(prototype.id)}`;
+  return URL.createObjectURL(new Blob([prototype.html], { type: "text/html" }));
+}
 function enhance(root) {
   root.querySelectorAll("[data-prototype]").forEach((mount) => {
     if (mount.querySelector("iframe")) return;
@@ -1080,15 +1677,60 @@ function enhance(root) {
       details.append(source);
       renderCode(source);
     });
-    mount.append(frame, details);
+    const open = document.createElement("a");
+    open.textContent = "Open full size";
+    open.target = "_blank";
+    open.rel = "noopener";
+    open.href = online ? prototypeUrl(prototype) : "#";
+    if (!online)
+      open.onclick = (event) => {
+        event.preventDefault();
+        window.open(prototypeUrl(prototype), "_blank", "noopener");
+      };
+    const source = linkButton("Source", () => {
+      details.open = !details.open;
+    });
+    mount.append(frame);
+    const wrapper = figure(mount, {
+      title: prototype.title,
+      actions: [source, document.createTextNode("·"), open],
+      kind: "prototype",
+    });
+    wrapper.append(details);
   });
-  root.querySelectorAll("[data-language]").forEach(renderCode);
+  root.querySelectorAll("[data-language]").forEach((element) => {
+    if (element.dataset.file !== undefined || element.dataset.caption) {
+      const meta = document.createElement("span");
+      meta.textContent = element.dataset.language;
+      figure(element, {
+        title: element.dataset.file,
+        meta,
+        actions: [
+          copyButton(() => sources.get(element) ?? element.textContent),
+        ],
+        caption: element.dataset.caption,
+        kind: "code",
+      });
+    }
+    renderCode(element);
+  });
   root.querySelectorAll("[data-math]").forEach(renderMath);
+  root
+    .querySelectorAll("[data-diagram][data-caption]")
+    .forEach((element) =>
+      figure(element, { caption: element.dataset.caption, kind: "diagram" }),
+    );
   renderDiagrams(root);
   root.querySelectorAll("[data-chart]").forEach((element) => {
     try {
       const options = JSON.parse(element.textContent);
       element.textContent = "";
+      if (element.dataset.title || element.dataset.caption)
+        figure(element, {
+          title: element.dataset.title,
+          caption: element.dataset.caption,
+          kind: "chart",
+        });
       chart(element, options).catch((error) => {
         element.textContent = JSON.stringify(options, null, 2);
         failed(element, error);
@@ -1105,38 +1747,62 @@ window.planUI = {
   chart,
   diff,
   comment: (anchor, quote = "") =>
-    openNote(
-      page.id,
-      anchor,
-      quote,
-      null,
-      page.id === "agreed" && builtInAgreed ? agreementId : null,
-    ),
+    openNote(page.id, anchor, quote, null, null, null),
   enhance,
+  prefs,
+  mode,
 };
+
+/* Start */
 document.title = plan.title;
-$("artifact-title").textContent =
-  `${plan.title} / ${plan.kind === "plan" ? "Final plan" : "Exploration"}`;
-$("revision").textContent = `Revision ${plan.revision}`;
-$("accept").hidden = plan.kind !== "plan";
+$("plan-title").textContent = plan.title;
 for (const item of [
   ...pages.filter((item) => item.id !== "agreed"),
   pages.find((item) => item.id === "agreed"),
-  { id: "feedback", title: "Feedback" },
+  ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
 ]) {
   if (item.id === "agreed") {
     const divider = document.createElement("div");
-    divider.className = "review-divider";
+    divider.className = "separator";
     divider.setAttribute("role", "separator");
     $("navigation").append(divider);
   }
   const button = document.createElement("button");
+  button.type = "button";
   button.dataset.page = item.id;
   button.textContent = item.title;
   $("navigation").append(button);
 }
-initializeChecklists();
+const narrow = matchMedia("(max-width: 720px)");
+const layoutMenu = () => {
+  $("pages-menu").open = !narrow.matches;
+};
+narrow.addEventListener("change", layoutMenu);
+layoutMenu();
+if (editable) initializeChecklists();
 theme();
-show(location.hash.slice(1), new URL(location.href).searchParams.get("target"));
-poll();
-setInterval(poll, 1500);
+renderRevisions();
+let resume = null;
+try {
+  resume = JSON.parse(sessionStorage.getItem(resumeKey));
+  sessionStorage.removeItem(resumeKey);
+} catch {
+  /* Start at the top. */
+}
+show(resume?.page || location.hash.slice(1), query.get("target"), {
+  keepScroll: Boolean(resume),
+});
+if (resume) setTimeout(() => window.scrollTo(0, resume.scrollY), 60);
+if (mode === "preview" && query.get("quote")) {
+  const range = findText($("page-content"), query.get("quote"));
+  if (range) {
+    highlight("plan-preview", [range]);
+    range.startContainer.parentElement?.scrollIntoView({ block: "center" });
+  }
+}
+if (online && mode !== "preview") {
+  poll();
+  setInterval(poll, 1500);
+  pollSessions();
+  setInterval(pollSessions, 5000);
+} else review();

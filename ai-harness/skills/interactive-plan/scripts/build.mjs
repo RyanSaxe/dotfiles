@@ -7,15 +7,17 @@ import { artifactData } from "./session.mjs";
 const assets = new URL("../assets/", import.meta.url);
 
 export async function assemble(data, { css = "", js = "" } = {}) {
-  const [shell, style, script, notifications, choices] = await Promise.all(
-    [
-      "frame.html",
-      "frame.css",
-      "frame.js",
-      "notifications.mjs",
-      "choices.mjs",
-    ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
-  );
+  const [shell, style, script, notifications, choices, draft] =
+    await Promise.all(
+      [
+        "frame.html",
+        "frame.css",
+        "frame.js",
+        "notifications.mjs",
+        "choices.mjs",
+        "draft.mjs",
+      ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
+    );
   if (/<\/style/i.test(css) || /<\/script/i.test(js))
     throw new Error(
       "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
@@ -29,7 +31,7 @@ export async function assemble(data, { css = "", js = "" } = {}) {
     .replace(
       "<!-- FRAME_SCRIPT -->",
       () =>
-        `<script type="module">\n${notifications}\n${choices}\n${script}\n</script>`,
+        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n</script>`,
     )
     .replace(
       /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,

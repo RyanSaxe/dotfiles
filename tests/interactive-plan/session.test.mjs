@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -13,6 +14,66 @@ import {
   createReviewAlerts,
   reviewAlert,
 } from "../../ai-harness/skills/interactive-plan/assets/notifications.mjs";
+import {
+  emptyDraft,
+  loadDraft,
+  markSent,
+  submissionGroups,
+  unsentItems,
+} from "../../ai-harness/skills/interactive-plan/assets/draft.mjs";
+import {
+  assemble,
+  build,
+} from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
+import {
+  artifactData,
+  settings,
+  startHub,
+  version,
+} from "../../ai-harness/skills/interactive-plan/scripts/session.mjs";
+
+const exec = promisify(execFile);
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const helper = path.join(
+  root,
+  "ai-harness/skills/interactive-plan/scripts/session.mjs",
+);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const exists = (file) =>
+  fs.access(file).then(
+    () => true,
+    () => false,
+  );
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code !== "ESRCH";
+  }
+};
+async function waitUntil(check, ms = 5000) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (await check()) return true;
+    await sleep(50);
+  }
+  return false;
+}
+async function killHub(config) {
+  try {
+    const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
+    process.kill(record.pid, "SIGTERM");
+    await waitUntil(() => !alive(record.pid), 3000);
+  } catch {
+    /* No hub record, or the hub already exited. */
+  }
+}
+const sessionConfig = (html) =>
+  JSON.parse(html.match(/id="session-config">([\s\S]*?)<\/script>/)[1]);
 
 test("choice tabs preview, select, clear, and support keyboard navigation", async () => {
   const listeners = {};
@@ -140,9 +201,7 @@ test("file comparison preserves exact sources and produces an applicable Git pat
   await fs.unlink(afterPath);
   const strip =
     path.resolve(directory).split(path.sep).filter(Boolean).length + 1;
-  await promisify(execFile)("git", ["apply", `-p${strip}`, patchPath], {
-    cwd: directory,
-  });
+  await exec("git", ["apply", `-p${strip}`, patchPath], { cwd: directory });
   assert.equal(await fs.readFile(afterPath, "utf8"), after);
 });
 
@@ -161,12 +220,76 @@ test("file comparison distinguishes identical input from a missing input", async
   );
 });
 
+test("drafts carry unsent items across revisions and drop what was sent", () => {
+  const draft = emptyDraft("1");
+  draft.notes.push({
+    id: "n1",
+    topic: "overview",
+    anchor: "A",
+    text: "one",
+    revision: "1",
+  });
+  draft.choices["overview/x"] = {
+    topic: "overview",
+    label: "X",
+    value: "a",
+    revision: "1",
+  };
+  draft.answers["overview/q"] = {
+    topic: "overview",
+    label: "Q",
+    text: "yes",
+    revision: "1",
+  };
+  assert.equal(unsentItems(draft).count, 3);
+  assert.deepEqual(Object.keys(submissionGroups(draft)), [
+    "choices",
+    "notes",
+    "answers",
+  ]);
+  markSent(draft, "sub-1", "2000-01-01T00:00:00Z");
+  assert.equal(unsentItems(draft).count, 0);
+  assert.equal(draft.submitted.count, 3);
+  assert.equal(draft.notes[0].sentIn, "sub-1");
+  draft.notes.push({
+    id: "n2",
+    topic: "overview",
+    anchor: "B",
+    text: "two",
+    revision: "1",
+  });
+  assert.equal(unsentItems(draft).count, 1);
+  const groups = submissionGroups(draft);
+  assert.deepEqual(
+    groups.notes.map((note) => note.id),
+    ["n2"],
+  );
+  assert.equal("sentIn" in groups.notes[0], false);
+  assert.equal("answers" in groups, false);
+  const same = loadDraft(JSON.parse(JSON.stringify(draft)), "1");
+  assert.equal(same.notes.length, 2);
+  assert.equal(same.submitted.id, "sub-1");
+  const next = loadDraft(JSON.parse(JSON.stringify(draft)), "2");
+  assert.deepEqual(
+    next.notes.map((note) => note.id),
+    ["n2"],
+  );
+  assert.deepEqual(next.choices, {});
+  assert.deepEqual(next.answers, {});
+  assert.equal(next.submitted, null);
+  assert.equal(next.revision, "2");
+  assert.deepEqual(loadDraft(null, "3"), emptyDraft("3"));
+  assert.deepEqual(loadDraft({ notes: "bad" }, "3"), emptyDraft("3"));
+});
+
 function alertFixture({
   storage = new Map(),
   permission = "default",
   supported = true,
   blockedStorage = false,
   locks,
+  sessionId = "s1",
+  focused = false,
 } = {}) {
   const sent = [],
     opened = [];
@@ -187,15 +310,15 @@ function alertFixture({
     }
   }
   const document = Object.assign(new EventTarget(), {
-    hidden: true,
+    hidden: !focused,
     title: "",
-    hasFocus: () => false,
+    hasFocus: () => focused,
   });
   const host = Object.assign(new EventTarget(), {
     document,
     Notification: supported ? Notification : undefined,
     isSecureContext: true,
-    location: { protocol: "http:", hash: "#overview" },
+    location: { protocol: "http:" },
     navigator: { locks },
     focus() {},
     localStorage: {
@@ -210,163 +333,144 @@ function alertFixture({
     },
   });
   const button = {};
-  const plan = { artifactId: "example", revision: "1", title: "Example plan" };
   const alerts = createReviewAlerts({
     window: host,
     button,
-    sessionId: "test-session",
-    plan,
+    sessionId,
     open: (url) => opened.push(url),
   });
-  const status = {
+  const entry = (id, revision, extra = {}) => ({
+    id,
+    title: `Plan ${id}`,
+    kind: "exploration",
+    revision,
     stage: "updated",
-    current: {
-      artifactId: "example",
-      revision: "2",
-      url: "/artifacts/example.2.html",
-    },
-  };
+    needsYou: true,
+    publishedAt: new Date().toISOString(),
+    url: `/s/${id}/`,
+    ...extra,
+  });
   return {
     alerts,
     host,
     button,
     sent,
     opened,
-    status,
-    plan,
+    entry,
     requests: () => requests,
   };
 }
+const later = () => new Date(Date.now() + 1000).toISOString();
 
-test("enabling alerts skips the current review and deduplicates later events across tabs", async () => {
+test("alerts announce other sessions once across tabs and never the focused session", async () => {
   const storage = new Map();
   let queue = Promise.resolve();
   const locks = { request: (_key, callback) => (queue = queue.then(callback)) };
-  const a = alertFixture({ storage, locks });
-  await a.alerts.update(a.status);
-  assert.equal(a.sent.length, 0);
-  assert.equal(a.requests(), 0);
+  const a = alertFixture({ storage, locks, sessionId: "s1", focused: true });
+  const b = alertFixture({
+    storage,
+    locks,
+    sessionId: "s2",
+    permission: "granted",
+  });
   await a.button.onclick();
   assert.equal(a.requests(), 1);
-  assert.equal(a.sent.length, 0);
-  await a.alerts.update(a.status);
-  const b = alertFixture({ storage, locks, permission: "granted" });
-  await b.alerts.update(b.status);
-  assert.equal(b.sent.length, 0);
-  const next = {
-    ...a.status,
-    current: {
-      ...a.status.current,
-      revision: "3",
-      url: "/artifacts/example.3.html",
-    },
-  };
-  await Promise.all([a.alerts.update(next), b.alerts.update(next)]);
+  const s1 = a.entry("s1", "2", { publishedAt: later() });
+  await Promise.all([a.alerts.update([s1]), b.alerts.update([s1])]);
+  assert.equal(a.sent.length + b.sent.length, 0);
+  const s3 = a.entry("s3", "1", { publishedAt: later() });
+  await Promise.all([a.alerts.update([s1, s3]), b.alerts.update([s1, s3])]);
   assert.equal(a.sent.length + b.sent.length, 1);
-  await a.alerts.update({ ...next, stage: "working" });
-  a.sent[0].onclick();
-  assert.deepEqual(a.opened, [next.current.url]);
-  const reload = alertFixture({ storage, locks, permission: "granted" });
-  await reload.alerts.update(next);
+  const item = a.sent[0] || b.sent[0];
+  assert.equal(item.title, "Revision 1 is ready");
+  assert.equal(item.options.body, "Plan s3");
+  item.onclick();
+  assert.deepEqual([...a.opened, ...b.opened], ["/s/s3/"]);
+  await a.alerts.update([s1, s3]);
+  assert.equal(a.sent.length + b.sent.length, 1);
+  const reload = alertFixture({
+    storage,
+    locks,
+    permission: "granted",
+    sessionId: "s2",
+  });
+  await reload.alerts.update([s1, s3]);
   assert.equal(reload.sent.length, 0);
+  const plan = a.entry("s4", "3", { kind: "plan", publishedAt: later() });
+  await b.alerts.update([plan]);
+  assert.equal(b.sent.at(-1).title, "A final plan is ready");
 });
 
 test("granted permission enables automatically unless explicitly disabled; re-enabling skips backlog", async () => {
   const storage = new Map();
   const a = alertFixture({ storage, permission: "granted" });
-  await a.alerts.update(a.status);
+  await a.alerts.update([a.entry("s2", "1")]);
   assert.equal(a.button.textContent, "Disable notifications");
   assert.equal(a.requests(), 0);
   assert.equal(a.sent.length, 0);
-  const next = { ...a.status, current: { ...a.status.current, revision: "3" } };
-  await a.alerts.update(next);
+  await a.alerts.update([a.entry("s2", "2", { publishedAt: later() })]);
   assert.equal(a.sent.length, 1);
   await a.button.onclick();
   const b = alertFixture({ storage, permission: "granted" });
-  await b.alerts.update({
-    ...next,
-    current: { ...next.current, revision: "4" },
-  });
+  const backlog = b.entry("s2", "3", { publishedAt: later() });
+  await b.alerts.update([backlog]);
   assert.equal(b.button.textContent, "Enable notifications");
   assert.equal(b.sent.length, 0);
   await b.button.onclick();
-  await b.alerts.update();
+  await b.alerts.update([backlog]);
   assert.equal(b.sent.length, 0);
-  await b.alerts.update({
-    ...next,
-    current: {
-      ...next.current,
-      revision: "5",
-      publishedAt: "2000-01-01T00:00:00Z",
-    },
-  });
+  await b.alerts.update([
+    b.entry("s2", "4", { publishedAt: "2000-01-01T00:00:00Z" }),
+  ]);
   assert.equal(b.sent.length, 0);
-  await b.alerts.update({
-    ...next,
-    current: {
-      ...next.current,
-      revision: "6",
-      publishedAt: "2099-01-01T00:00:00Z",
-    },
-  });
+  await b.alerts.update([
+    b.entry("s2", "5", { publishedAt: "2099-01-01T00:00:00Z" }),
+  ]);
   assert.equal(b.sent.length, 1);
 });
 
-test("alerts are limited to review-ready stages", async () => {
-  const a = alertFixture();
-  await a.button.onclick();
-  a.host.document.hidden = false;
-  a.host.document.hasFocus = () => true;
-  a.host.location.hash = "#feedback";
-  await a.alerts.update(a.status);
-  await a.alerts.update(a.status);
-  assert.equal(a.sent.length, 1);
-  assert.equal(a.sent[0].options.body, a.plan.title);
-  assert.equal(a.sent[0].closed, undefined);
-  await a.alerts.update({ ...a.status, stage: "working" });
-  assert.equal(a.sent[0].closed, undefined);
-  a.sent[0].onclick();
-  assert.deepEqual(a.opened, [a.status.current.url]);
-  for (const stage of ["submitted", "working", "complete"])
-    assert.equal(reviewAlert({ ...a.status, stage }), null);
+test("only sessions that need the user alert, with the final plan named", () => {
+  const entry = {
+    id: "s1",
+    title: "Plan",
+    kind: "plan",
+    revision: "3",
+    stage: "updated",
+    needsYou: true,
+    url: "/s/s1/",
+    publishedAt: "2026-01-01T00:00:00Z",
+  };
+  assert.deepEqual(reviewAlert(entry), {
+    id: "plan:s1:3",
+    sessionId: "s1",
+    title: "A final plan is ready",
+    body: "Plan",
+    url: "/s/s1/",
+    createdAt: "2026-01-01T00:00:00Z",
+  });
+  assert.equal(reviewAlert({ ...entry, needsYou: false }), null);
+  assert.equal(reviewAlert({ ...entry, id: "" }), null);
+  assert.equal(reviewAlert(null), null);
 });
 
-test("denied, unavailable, and failed notifications retain the title fallback", async () => {
+test("denied, unavailable, and failed notifications disable the control", async () => {
   for (const options of [{ permission: "denied" }, { supported: false }]) {
     const a = alertFixture(options);
-    await a.alerts.update(a.status);
+    await a.alerts.update([a.entry("s2", "1")]);
     assert.equal(a.button.disabled, true);
     assert.equal(a.sent.length, 0);
-    assert.match(a.host.document.title, /new review/);
   }
   const a = alertFixture({ blockedStorage: true });
   await a.button.onclick();
-  await a.alerts.update(a.status);
-  await a.alerts.update(a.status);
+  const entry = a.entry("s2", "1", { publishedAt: later() });
+  await a.alerts.update([entry]);
+  await a.alerts.update([entry]);
   assert.equal(a.sent.length, 1);
   a.sent[0].onerror();
   assert.equal(a.button.disabled, true);
   assert.match(a.button.title, /delivery failed/);
-  assert.match(a.host.document.title, /new review/);
 });
-import {
-  assemble,
-  build,
-} from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
-import {
-  artifactData,
-  serve,
-} from "../../ai-harness/skills/interactive-plan/scripts/session.mjs";
 
-const exec = promisify(execFile);
-const root = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../..",
-);
-const helper = path.join(
-  root,
-  "ai-harness/skills/interactive-plan/scripts/session.mjs",
-);
 const frame = await assemble({
   artifactId: "example",
   revision: "0",
@@ -380,49 +484,90 @@ function artifact(revision = "1", kind = "exploration") {
     `$1${JSON.stringify({ artifactId: "example", revision, kind, title: "Example work", pages: [{ id: "overview", title: "Overview", html: "<p>Preserve one result per input.</p>" }] })}$2`,
   );
 }
-async function fixture(t) {
-  const directory = await fs.mkdtemp(
-    path.join(os.tmpdir(), "plan-session-test-"),
-  );
-  const server = await serve(directory);
+async function hub(t, extra = {}) {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-hub-"));
+  const env = { XDG_STATE_HOME: home, INTERACTIVE_PLAN_PORT: "0", ...extra };
+  const config = { ...settings(env), log() {} };
+  const server = await startHub(config);
   t.after(async () => {
     await server.close();
-    await fs.rm(directory, { recursive: true, force: true });
+    await killHub(config);
+    await fs.rm(home, { recursive: true, force: true });
   });
-  const connection = JSON.parse(
-    await fs.readFile(path.join(directory, "connection.json"), "utf8"),
-  );
-  const request = async (route, data, headers = {}) => {
-    const response = await fetch(server.origin + route, {
-      method: data ? "POST" : "GET",
+  const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
+  async function session(name = crypto.randomUUID()) {
+    const directory = path.join(config.sessions, name);
+    const registered = await fetch(server.origin + "/agent/register", {
+      method: "POST",
       headers: {
+        authorization: `Bearer ${record.secret}`,
         "Content-Type": "application/json",
-        ...(route.startsWith("/agent/")
-          ? { authorization: `Bearer ${connection.token}` }
-          : { Origin: server.origin }),
-        ...headers,
       },
-      ...(data ? { body: JSON.stringify(data) } : {}),
+      body: JSON.stringify({ sessionDir: directory }),
     });
-    return { code: response.status, body: await response.json() };
-  };
-  const action = async (action, data = {}) =>
-    request("/agent/action", {
+    const info = await registered.json();
+    assert.equal(registered.status, 200, info.error);
+    const connection = JSON.parse(
+      await fs.readFile(path.join(directory, "connection.json"), "utf8"),
+    );
+    const id = info.sessionId;
+    const request = async (route, data, headers = {}) => {
+      const response = await fetch(server.origin + route, {
+        method: data ? "POST" : "GET",
+        redirect: "manual",
+        headers: {
+          "Content-Type": "application/json",
+          ...(route.startsWith("/agent/")
+            ? { authorization: `Bearer ${connection.token}` }
+            : { Origin: server.origin }),
+          ...headers,
+        },
+        ...(data ? { body: JSON.stringify(data) } : {}),
+      });
+      const text = await response.text();
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+      return { code: response.status, body, headers: response.headers };
+    };
+    const action = (action, data = {}) =>
+      request(`/agent/${id}/action`, { action, sessionId: id, ...data });
+    const event = (intent = "feedback-only", revision = "1", extra = {}) => ({
+      sessionId: id,
+      artifactId: "example",
+      revision,
+      intent,
+      id: crypto.randomUUID(),
+      groups: {},
+      text: "Keep the interface.",
+      ...extra,
+    });
+    return {
+      id,
+      base: `/s/${id}`,
+      directory,
+      info,
+      connection,
+      request,
       action,
-      sessionId: connection.sessionId,
-      ...data,
-    });
-  const event = (intent = "feedback-only", revision = "1", extra = {}) => ({
-    sessionId: connection.sessionId,
-    artifactId: "example",
-    revision,
-    intent,
-    id: crypto.randomUUID(),
-    groups: {},
-    text: "Keep the interface.",
-    ...extra,
-  });
-  return { directory, server, connection, request, action, event };
+      event,
+      feedback: (data, headers) =>
+        request(`/s/${id}/api/feedback`, data, headers),
+      status: () => request(`/s/${id}/api/status`),
+      next: (headers) => request(`/agent/${id}/next`, undefined, headers),
+    };
+  }
+  return {
+    home,
+    env: { ...process.env, ...env },
+    config,
+    server,
+    record,
+    session,
+  };
 }
 
 test("split authoring sources build a standalone artifact without executing content", async (t) => {
@@ -457,6 +602,7 @@ test("split authoring sources build a standalone artifact without executing cont
   assert.equal(artifactData(html).css, undefined);
   assert(html.includes(".prototype { color: var(--attention); }"));
   assert(html.includes('window.addEventListener("plan:page"'));
+  assert(html.includes("export function loadDraft"));
   assert(!html.includes("<!-- FRAME_"));
   assert(!html.includes('src="frame.js"'));
   await assert.rejects(
@@ -520,7 +666,8 @@ test("preserved prototypes retain exact executable source without escaping into 
 });
 
 test("publication resolves exact mixed sources from saved feedback before hashing", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   await a.action("publish", { html: artifact() });
   const feedback = a.event("feedback-only", "1", {
     groups: {
@@ -544,7 +691,7 @@ test("publication resolves exact mixed sources from saved feedback before hashin
       },
     },
   });
-  assert.equal((await a.request("/api/feedback", feedback)).code, 200);
+  assert.equal((await a.feedback(feedback)).code, 200);
   await a.action("ack", { id: feedback.id });
   const entry = {
     id: "errors",
@@ -575,6 +722,7 @@ test("publication resolves exact mixed sources from saved feedback before hashin
   assert.equal(records.length, 3);
   assert.equal(records[0].text, feedback.groups.notes[0].text);
   assert.equal(records[0].quote, "A failed item");
+  assert.equal(records[0].target, "failure");
   assert.equal(records[0].href, "./example.1.html?target=failure#overview");
   assert.equal(records[1].text, "per-item");
   assert.equal(records[1].label, "Error policy");
@@ -605,6 +753,7 @@ test("publication resolves exact mixed sources from saved feedback before hashin
     [{ kind: "unknown" }],
     [{ kind: "conversation", text: "" }],
     [{ kind: "note", submissionId: feedback.id }],
+    [{ kind: "answer", submissionId: feedback.id }],
   ])
     await assert.rejects(
       assemble({ ...data, agreements: [{ ...entry, sourceRefs }] }),
@@ -612,7 +761,8 @@ test("publication resolves exact mixed sources from saved feedback before hashin
 });
 
 test("choice sources preserve readable labels and complete checklist snapshots", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   await a.action("publish", { html: artifact() });
   const choices = {
     "overview/policy": {
@@ -641,7 +791,7 @@ test("choice sources preserve readable labels and complete checklist snapshots",
     },
   };
   const feedback = a.event("feedback-only", "1", { groups: { choices } });
-  assert.equal((await a.request("/api/feedback", feedback)).code, 200);
+  assert.equal((await a.feedback(feedback)).code, 200);
   await a.action("ack", { id: feedback.id });
   const data = {
     ...artifactData(artifact("2")),
@@ -677,42 +827,113 @@ test("choice sources preserve readable labels and complete checklist snapshots",
   assert(!html.includes("Readable <labels>"));
 });
 
+test("answers travel with feedback and resolve as agreement sources", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.action("publish", { html: artifact() });
+  for (const answers of [
+    [],
+    { "overview/q1": { label: "Sidebar?", topic: "overview" } },
+    { "overview/q1": { label: "Sidebar?", topic: "overview", text: "  " } },
+    { "overview/q1": null },
+  ]) {
+    const rejected = await a.feedback(
+      a.event("feedback-only", "1", { groups: { answers } }),
+    );
+    assert.equal(rejected.code, 400);
+  }
+  const feedback = a.event("feedback-only", "1", {
+    groups: {
+      answers: {
+        "overview/q1": {
+          label: "Sidebar?",
+          text: "Yes, keep the <sidebar>",
+          topic: "overview",
+          target: "question-overview-0",
+        },
+      },
+    },
+  });
+  assert.equal((await a.feedback(feedback)).code, 200);
+  const received = await a.next();
+  assert.deepEqual(
+    received.body.event.payload.groups.answers,
+    feedback.groups.answers,
+  );
+  await a.action("ack", { id: feedback.id });
+  const entry = {
+    id: "sidebar",
+    title: "Keep the sidebar",
+    html: "<p>Pages stay in the sidebar.</p>",
+    sourceRefs: [
+      { kind: "answer", submissionId: feedback.id, answerId: "overview/q1" },
+    ],
+  };
+  const published = await a.action("publish", {
+    html: await assemble({
+      ...artifactData(artifact("2")),
+      agreements: [entry],
+    }),
+  });
+  assert.equal(published.code, 200, published.body.error);
+  const html = await fs.readFile(
+    path.join(a.directory, "artifacts/example.2.html"),
+    "utf8",
+  );
+  const [record] = artifactData(html).agreements[0].sourceRecords;
+  assert.equal(record.kind, "answer");
+  assert.equal(record.text, "Yes, keep the <sidebar>");
+  assert.equal(record.label, "Sidebar?");
+  assert.equal(record.target, "question-overview-0");
+  assert.equal(
+    record.href,
+    "./example.1.html?target=question-overview-0#overview",
+  );
+  assert(!html.includes("Yes, keep the <sidebar>"));
+  const missing = await a.action("publish", {
+    html: await assemble({
+      ...artifactData(artifact("3")),
+      agreements: [
+        {
+          ...entry,
+          sourceRefs: [
+            { kind: "answer", submissionId: feedback.id, answerId: "nope" },
+          ],
+        },
+      ],
+    }),
+  });
+  assert.equal(missing.code, 400);
+  assert.match(missing.body.error, /Source item not found/);
+});
+
 test("final review can reopen exploration and only accept the recomposed plan", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   await a.action("publish", { html: artifact("1", "plan") });
   const feedback = a.event();
-  await a.request("/api/feedback", feedback);
+  await a.feedback(feedback);
   await a.action("ack", { id: feedback.id });
   assert.equal(
     (await a.action("publish", { html: artifact("2", "exploration") })).code,
     200,
   );
   assert.equal(
-    (
-      await a.request(
-        "/api/feedback",
-        a.event("accept-plan", "1", { mode: "save" }),
-      )
-    ).code,
+    (await a.feedback(a.event("accept-plan", "1", { mode: "save" }))).code,
     409,
   );
   assert.equal(
-    (
-      await a.request(
-        "/api/feedback",
-        a.event("accept-plan", "2", { mode: "save" }),
-      )
-    ).code,
+    (await a.feedback(a.event("accept-plan", "2", { mode: "save" }))).code,
     409,
   );
   const choice = a.event("feedback-only", "2", {
     text: "Use per-item results.",
   });
-  await a.request("/api/feedback", choice);
+  await a.feedback(choice);
   await a.action("ack", { id: choice.id });
   await a.action("publish", { html: artifact("3", "plan") });
   const acceptance = a.event("accept-plan", "3", { mode: "save" });
-  assert.equal((await a.request("/api/feedback", acceptance)).code, 200);
+  assert.equal((await a.feedback(acceptance)).code, 200);
   await a.action("ack", { id: acceptance.id });
   assert.equal(
     (await a.action("complete")).body.planPath,
@@ -778,7 +999,8 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
 });
 
 test("agreements survive topic changes and targeted feedback without rewriting snapshots", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   const entry = {
     id: "errors",
     title: "Per-item errors",
@@ -817,8 +1039,8 @@ test("agreements survive topic changes and targeted feedback without rewriting s
         ],
       },
     });
-    assert.equal((await a.request("/api/feedback", event)).code, 200);
-    const received = await a.request("/agent/next");
+    assert.equal((await a.feedback(event)).code, 200);
+    const received = await a.next();
     assert.equal(
       received.body.event.payload.groups.notes[0].agreementId,
       entry.id,
@@ -836,15 +1058,35 @@ test("agreements survive topic changes and targeted feedback without rewriting s
     assert.equal(snapshot.agreements[0].state, state);
     assert.equal(snapshot.agreements[0].id, entry.id);
   }
+  const status = (await a.status()).body;
+  assert.deepEqual(
+    status.revisions.map((item) => item.revision),
+    ["1", "2", "3", "4"],
+  );
+  assert.equal(status.revisions[0].url, `${a.base}/r/1`);
 });
 
-test("capability check tests storage and loopback, cleans up, and fails on unusable storage", async (t) => {
+test("capability check tests storage, loopback, and the hub port, then cleans up", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-check-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const check = path.join(path.dirname(helper), "check.mjs");
-  const result = await exec(process.execPath, [check, directory]);
-  assert.equal(JSON.parse(result.stdout).ready, true);
+  const result = await exec(process.execPath, [check, directory], {
+    env: { ...process.env, INTERACTIVE_PLAN_PORT: "0" },
+  });
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.ready, true);
+  assert.equal(report.hub.state, "os-assigned");
   assert.deepEqual(await fs.readdir(directory), []);
+  const h = await hub(t);
+  const live = JSON.parse(
+    (
+      await exec(process.execPath, [check, directory], {
+        env: { ...process.env, INTERACTIVE_PLAN_PORT: String(h.record.port) },
+      })
+    ).stdout,
+  );
+  assert.equal(live.hub.state, "hub");
+  assert.equal(live.hub.version, version);
   const file = path.join(directory, "not-a-directory");
   await fs.writeFile(file, "preserve");
   await assert.rejects(exec(process.execPath, [check, file]));
@@ -867,87 +1109,248 @@ test("artifact parsing requires a real plan overview and preserves rich HTML", (
   );
 });
 
-test("two sessions isolate ports, files, events, acknowledgements, and ownership", async (t) => {
-  const a = await fixture(t),
-    b = await fixture(t);
-  assert.notEqual(a.server.origin, b.server.origin);
-  assert.notEqual(a.connection.sessionId, b.connection.sessionId);
+test("two sessions on one hub isolate tokens, events, and acknowledgements", async (t) => {
+  const h = await hub(t);
+  const a = await h.session(),
+    b = await h.session();
+  assert.notEqual(a.id, b.id);
+  assert.notEqual(a.connection.token, b.connection.token);
+  assert.equal(a.connection.origin, h.server.origin);
+  assert.equal(a.info.url, `${h.server.origin}${a.base}/`);
   assert.equal((await a.action("publish", { html: artifact() })).code, 200);
   assert.equal((await b.action("publish", { html: artifact() })).code, 200);
   const event = a.event();
-  assert.equal((await b.request("/api/feedback", event)).code, 409);
-  assert.equal((await a.request("/api/feedback", event)).code, 200);
-  assert.equal((await b.request("/agent/next")).body.event, null);
+  assert.equal((await b.feedback(event)).code, 409);
+  assert.equal((await a.feedback(event)).code, 200);
+  assert.equal((await b.next()).body.event, null);
   assert.equal((await b.action("ack", { id: event.id })).code, 404);
   assert.equal((await a.action("ack", { id: event.id })).code, 200);
-  assert.deepEqual((await b.request("/api/status")).body.acknowledged, []);
-  await assert.rejects(serve(a.directory), /already owned/);
-  await assert.rejects(serve(a.directory, { recover: true }), /still running/);
+  assert.deepEqual((await b.status()).body.acknowledged, []);
   assert.equal(
-    (
-      await a.request("/api/feedback", a.event(), {
-        Origin: "http://example.com",
-      })
-    ).code,
+    (await a.feedback(a.event(), { Origin: "http://example.com" })).code,
     403,
   );
   assert.equal(
     (
-      await a.request("/agent/next", undefined, {
+      await a.next({
         authorization: `Bearer ${b.connection.token}`,
       })
     ).code,
     403,
   );
-  const html = await (await fetch(a.server.origin)).text();
-  assert(html.includes(a.connection.sessionId));
+  assert.equal(
+    (await a.request(`/agent/${a.id}/next`, undefined, { authorization: "" }))
+      .code,
+    403,
+  );
+  const html = (await a.request(`${a.base}/`)).body;
+  assert(html.includes(a.id));
   assert(!html.includes(a.connection.token));
+  assert(!html.includes(h.record.secret));
+  assert.equal((await a.request("/s/unknown/")).code, 404);
+  assert.equal(
+    (await a.request("/agent/register", { sessionDir: a.directory })).code,
+    403,
+  );
+  const listed = (await a.request("/api/sessions")).body.sessions;
+  assert.deepEqual(listed.map((item) => item.id).sort(), [a.id, b.id].sort());
+});
+
+test("the hub lists live sessions needs-you first and drops completed or disconnected ones", async (t) => {
+  const h = await hub(t, { INTERACTIVE_PLAN_DISCONNECT_SECONDS: "0.4" });
+  const a = await h.session(),
+    b = await h.session();
+  await h.session();
+  await a.action("publish", { html: artifact() });
+  await sleep(5);
+  await b.action("publish", { html: artifact() });
+  let list = (await a.request("/api/sessions")).body.sessions;
+  assert.deepEqual(
+    list.map((item) => item.id),
+    [a.id, b.id],
+  );
+  const feedback = b.event();
+  await b.feedback(feedback);
+  await b.action("ack", { id: feedback.id });
+  list = (await a.request("/api/sessions")).body.sessions;
+  assert.deepEqual(
+    list.map((item) => [item.id, item.needsYou, item.stage]),
+    [
+      [a.id, true, "updated"],
+      [b.id, false, "working"],
+    ],
+  );
+  await b.action("publish", { html: artifact("2") });
+  const first = a.event();
+  await a.feedback(first);
+  await a.action("ack", { id: first.id });
+  list = (await a.request("/api/sessions")).body.sessions;
+  assert.deepEqual(
+    list.map((item) => item.id),
+    [b.id, a.id],
+  );
+  assert.equal(list[0].revision, "2");
+  await sleep(450);
+  assert.deepEqual((await a.request("/api/sessions")).body.sessions, []);
+  assert.equal((await b.status()).body.disconnected, true);
+  assert.equal((await b.request(`${b.base}/`)).code, 200);
+  await b.next();
+  assert.deepEqual(
+    (await a.request("/api/sessions")).body.sessions.map((item) => item.id),
+    [b.id],
+  );
+  assert.equal((await b.status()).body.disconnected, false);
+});
+
+test("the root URL opens the session that most needs you, then the last viewed, else says so", async (t) => {
+  const h = await hub(t);
+  const open = async (cookie) => {
+    const response = await fetch(h.server.origin + "/", {
+      redirect: "manual",
+      headers: cookie ? { cookie } : {},
+    });
+    return {
+      code: response.status,
+      location: response.headers.get("location"),
+      text: await response.text(),
+    };
+  };
+  let result = await open();
+  assert.equal(result.code, 200);
+  assert.match(result.text, /No live sessions/);
+  const a = await h.session(),
+    b = await h.session();
+  await b.action("publish", { html: artifact() });
+  await sleep(5);
+  await a.action("publish", { html: artifact() });
+  result = await open();
+  assert.equal(result.code, 302);
+  assert.equal(result.location, `${b.base}/`);
+  for (const session of [a, b]) {
+    const event = session.event();
+    await session.feedback(event);
+    await session.action("ack", { id: event.id });
+  }
+  assert.equal(
+    (await open(`interactive-plan-last=${a.id}`)).location,
+    `${a.base}/`,
+  );
+  assert.equal(
+    (await open(`interactive-plan-last=nope`)).location,
+    `${b.base}/`,
+  );
+  const page = await fetch(h.server.origin + `${a.base}/`);
+  assert.match(
+    page.headers.get("set-cookie"),
+    new RegExp(`interactive-plan-last=${a.id}`),
+  );
+  const bare = await fetch(h.server.origin + a.base, { redirect: "manual" });
+  assert.equal(bare.headers.get("location"), `${a.base}/`);
+});
+
+test("revision routes inject read-only and preview flags and serve prototypes sandboxed", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  const data = {
+    ...artifactData(artifact()),
+    pages: [
+      {
+        id: "overview",
+        title: "Preview",
+        html: '<div data-prototype="demo"></div>',
+      },
+    ],
+    prototypes: [
+      {
+        id: "demo",
+        title: "Demo",
+        html: "<!doctype html><p>demo $&</p>",
+        height: 100,
+      },
+    ],
+  };
+  await a.action("publish", { html: await assemble(data) });
+  await a.action("publish", { html: artifact("2") });
+  const live = (await a.request(`${a.base}/`)).body;
+  assert.deepEqual(sessionConfig(live), { sessionId: a.id, base: a.base });
+  assert.equal(artifactData(live).revision, "2");
+  const readonly = await a.request(`${a.base}/r/1`);
+  assert.equal(readonly.code, 200);
+  assert.deepEqual(sessionConfig(readonly.body), {
+    sessionId: a.id,
+    base: a.base,
+    readonly: true,
+  });
+  assert.equal(artifactData(readonly.body).revision, "1");
+  assert.deepEqual(
+    sessionConfig((await a.request(`${a.base}/preview/1`)).body),
+    {
+      sessionId: a.id,
+      base: a.base,
+      preview: true,
+    },
+  );
+  assert.equal((await a.request(`${a.base}/r/9`)).code, 404);
+  const prototype = await a.request(`${a.base}/r/1/prototype/demo`);
+  assert.equal(prototype.code, 200);
+  assert.equal(prototype.body, data.prototypes[0].html);
+  assert.match(prototype.headers.get("content-security-policy"), /sandbox/);
+  assert.equal((await a.request(`${a.base}/r/1/prototype/nope`)).code, 404);
+  const stored = await fs.readFile(
+    path.join(a.directory, "artifacts/example.1.html"),
+    "utf8",
+  );
+  assert.deepEqual(sessionConfig(stored), { sessionId: a.id, base: a.base });
+  assert.deepEqual(h.record.hosts, ["127.0.0.1"]);
+  const forged = await new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        host: "127.0.0.1",
+        port: h.record.port,
+        path: `${a.base}/api/status`,
+        headers: { host: "10.0.0.1:" + h.record.port },
+      },
+      (response) => resolve(response.statusCode),
+    );
+    request.once("error", reject);
+    request.end();
+  });
+  assert.equal(forged, 403);
 });
 
 test("explicit feedback is retryable, remains unread until ack, and blocks premature publication", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   await a.action("publish", { html: artifact() });
   const event = a.event();
-  const receipt = await a.request("/api/feedback", event);
+  const receipt = await a.feedback(event);
   assert.equal(receipt.body.status.stage, "submitted");
   assert.deepEqual(receipt.body.status.acknowledged, []);
-  assert.equal((await a.request("/api/feedback", event)).code, 200);
-  assert.equal(
-    (await a.request("/api/feedback", { ...event, text: "Changed" })).code,
-    409,
-  );
+  assert.equal((await a.feedback(event)).code, 200);
+  assert.equal((await a.feedback({ ...event, text: "Changed" })).code, 409);
   assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
   const output = JSON.parse(
     (
-      await exec(process.execPath, [
-        helper,
-        "wait",
-        "--session-dir",
-        a.directory,
-        "--timeout",
-        "0.2",
-      ])
+      await exec(
+        process.execPath,
+        [helper, "wait", "--session-dir", a.directory, "--timeout", "0.2"],
+        { env: h.env },
+      )
     ).stdout,
   );
   assert.deepEqual(output.event.payload, event);
   await a.action("ack", { id: event.id });
-  const acked = (await a.request("/api/status")).body;
+  const acked = (await a.status()).body;
   await a.action("ack", { id: event.id });
-  assert.equal(
-    (await a.request("/api/status")).body.acknowledgedAt,
-    acked.acknowledgedAt,
-  );
+  assert.equal((await a.status()).body.acknowledgedAt, acked.acknowledgedAt);
   assert.equal(
     JSON.parse(
       (
-        await exec(process.execPath, [
-          helper,
-          "wait",
-          "--session-dir",
-          a.directory,
-          "--timeout",
-          "0.05",
-        ])
+        await exec(
+          process.execPath,
+          [helper, "wait", "--session-dir", a.directory, "--timeout", "0.05"],
+          { env: h.env },
+        )
       ).stdout,
     ).waiting,
     true,
@@ -964,20 +1367,30 @@ test("explicit feedback is retryable, remains unread until ack, and blocks prema
     ),
     original,
   );
-  assert.equal((await a.request("/api/feedback", a.event())).code, 409);
+  assert.equal((await a.feedback(a.event())).code, 409);
   assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
+  const status = JSON.parse(
+    (
+      await exec(
+        process.execPath,
+        [helper, "status", "--session-dir", a.directory],
+        { env: h.env },
+      )
+    ).stdout,
+  );
+  assert.equal(status.current.revision, "2");
 });
 
 test("question actions and reply intents are unsupported", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   await a.action("publish", { html: artifact() });
-  const status = (await a.request("/api/status")).body;
+  const status = (await a.status()).body;
   assert.equal(Object.hasOwn(status, "question"), false);
-  const browser = await (await fetch(a.server.origin)).text();
+  const browser = (await a.request(`${a.base}/`)).body;
   assert.doesNotMatch(browser, /question-dialog|question-form|send-reply/);
   assert.equal(
-    (await a.request("/api/feedback", a.event("clarification-reply", "1")))
-      .code,
+    (await a.feedback(a.event("clarification-reply", "1"))).code,
     400,
   );
   assert.equal(
@@ -987,38 +1400,36 @@ test("question actions and reply intents are unsupported", async (t) => {
 });
 
 test("queued rounds keep receipt order", async (t) => {
-  const a = await fixture(t);
+  const h = await hub(t);
+  const a = await h.session();
   await a.action("publish", { html: artifact() });
   const first = a.event(),
     second = a.event();
-  await a.request("/api/feedback", first);
-  await a.request("/api/feedback", second);
-  const unread = (await a.request("/agent/next")).body.event;
+  await a.feedback(first);
+  await a.feedback(second);
+  const unread = (await a.next()).body.event;
   assert.equal(unread.id, first.id);
   await a.action("ack", { id: first.id });
-  const next = (await a.request("/agent/next")).body.event;
+  const next = (await a.next()).body.event;
   assert.equal(next.id, second.id);
   assert.equal(next.sequence, unread.sequence + 1);
-  assert.equal((await a.request("/api/status")).body.stage, "working");
+  assert.equal((await a.status()).body.stage, "working");
 });
 
 for (const mode of ["save", "implement"])
   test(`acceptance records explicit ${mode} mode for the exact final plan`, async (t) => {
-    const a = await fixture(t);
+    const h = await hub(t);
+    const a = await h.session();
     await a.action("publish", { html: artifact() });
     assert.equal(
-      (await a.request("/api/feedback", a.event("accept-plan", "1", { mode })))
-        .code,
+      (await a.feedback(a.event("accept-plan", "1", { mode }))).code,
       409,
     );
     await a.action("publish", { html: artifact("2", "plan") });
-    assert.equal(
-      (await a.request("/api/feedback", a.event("accept-plan", "2"))).code,
-      400,
-    );
+    assert.equal((await a.feedback(a.event("accept-plan", "2"))).code, 400);
     assert.equal((await a.action("complete")).code, 409);
     const acceptance = a.event("accept-plan", "2", { mode });
-    assert.equal((await a.request("/api/feedback", acceptance)).code, 200);
+    assert.equal((await a.feedback(acceptance)).code, 200);
     assert.equal((await a.action("complete")).code, 409);
     await a.action("ack", { id: acceptance.id });
     const complete = (await a.action("complete")).body;
@@ -1038,62 +1449,99 @@ for (const mode of ["save", "implement"])
         .update(await fs.readFile(record.path))
         .digest("hex"),
     );
+    assert.deepEqual((await a.request("/api/sessions")).body.sessions, []);
     await a.action("publish", { html: artifact("3", "plan") });
     assert.equal((await a.action("complete")).code, 409);
-    assert.equal((await a.request("/api/status")).body.accepted, null);
+    assert.equal((await a.status()).body.accepted, null);
   });
 
-test("a crashed helper can explicitly recover its own queue without changing session identity", async (t) => {
-  const directory = await fs.mkdtemp(
-    path.join(os.tmpdir(), "plan-crash-test-"),
-  );
-  let child;
-  const start = async (recover = false) => {
-    child = spawn(
-      process.execPath,
-      [
-        helper,
-        "start",
-        "--session-dir",
-        directory,
-        ...(recover ? ["--recover-lock"] : []),
-      ],
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    const running = child;
-    await new Promise((resolve, reject) => {
-      running.stdout.once("data", resolve);
-      running.once("error", reject);
-      running.once("exit", (code) => reject(Error(`Helper exited ${code}`)));
-    });
-    return JSON.parse(
-      await fs.readFile(path.join(directory, "connection.json"), "utf8"),
-    );
+test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-idle-"));
+  const port = 30000 + Math.floor(Math.random() * 20000);
+  const env = {
+    ...process.env,
+    XDG_STATE_HOME: home,
+    INTERACTIVE_PLAN_PORT: String(port),
+    INTERACTIVE_PLAN_IDLE_SECONDS: "0.3",
+    INTERACTIVE_PLAN_DISCONNECT_SECONDS: "0.2",
   };
+  const config = settings(env);
   t.after(async () => {
-    if (child && child.exitCode === null && !child.killed) {
-      const stopped = new Promise((resolve) => child.once("exit", resolve));
-      child.kill("SIGTERM");
-      await stopped;
-    }
-    await fs.rm(directory, { recursive: true, force: true });
+    await killHub(config);
+    await fs.rm(home, { recursive: true, force: true });
   });
-  const original = await start();
-  const response = await fetch(original.origin + "/agent/action", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${original.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      action: "publish",
-      sessionId: original.sessionId,
-      html: artifact(),
+  const first = JSON.parse(
+    (await exec(process.execPath, [helper, "start"], { env })).stdout,
+  );
+  assert.equal(first.url, `http://127.0.0.1:${port}/s/${first.sessionId}/`);
+  assert(first.sessionDir.startsWith(config.sessions));
+  const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
+  assert.equal(record.port, port);
+  assert.equal(record.version, version);
+  assert.equal(await waitUntil(() => !alive(record.pid), 5000), true);
+  assert.equal(await exists(config.hubFile), false);
+  const second = JSON.parse(
+    (
+      await exec(
+        process.execPath,
+        [helper, "start", "--session-dir", first.sessionDir],
+        { env },
+      )
+    ).stdout,
+  );
+  assert.equal(second.sessionId, first.sessionId);
+  assert.equal(second.url, first.url);
+  const next = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
+  assert.notEqual(next.pid, record.pid);
+  assert.equal(next.port, port);
+  assert.match(
+    await fs.readFile(config.hubLog, "utf8"),
+    /no live sessions; exiting/,
+  );
+});
+
+test("start replaces a stale hub record, and helper commands reattach after a crash without losing the queue", async (t) => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-stale-"));
+  const env = {
+    ...process.env,
+    XDG_STATE_HOME: home,
+    INTERACTIVE_PLAN_PORT: "0",
+  };
+  const config = settings(env);
+  t.after(async () => {
+    await killHub(config);
+    await fs.rm(home, { recursive: true, force: true });
+  });
+  const dead = spawn(process.execPath, ["-e", ""]);
+  await new Promise((resolve) => dead.once("exit", resolve));
+  await fs.mkdir(config.hubDir, { recursive: true });
+  await fs.writeFile(
+    config.hubFile,
+    JSON.stringify({
+      pid: dead.pid,
+      port: 1,
+      hosts: ["127.0.0.1"],
+      version,
+      startedAt: "2000-01-01T00:00:00Z",
+      secret: "stale",
     }),
-  });
-  assert.equal(response.status, 200);
+  );
+  const started = JSON.parse(
+    (await exec(process.execPath, [helper, "start"], { env })).stdout,
+  );
+  const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
+  assert.notEqual(record.pid, dead.pid);
+  assert.notEqual(record.port, 1);
+  const file = path.join(home, "artifact.html");
+  await fs.writeFile(file, artifact());
+  await exec(
+    process.execPath,
+    [helper, "publish", "--session-dir", started.sessionDir, "--file", file],
+    { env },
+  );
+  const origin = `http://127.0.0.1:${record.port}`;
   const event = {
-    sessionId: original.sessionId,
+    sessionId: started.sessionId,
     artifactId: "example",
     revision: "1",
     intent: "feedback-only",
@@ -1101,28 +1549,36 @@ test("a crashed helper can explicitly recover its own queue without changing ses
     groups: {},
     text: "Survive a restart",
   };
-  await fetch(original.origin + "/api/feedback", {
+  const receipt = await fetch(`${origin}/s/${started.sessionId}/api/feedback`, {
     method: "POST",
-    headers: { Origin: original.origin, "Content-Type": "application/json" },
+    headers: { Origin: origin, "Content-Type": "application/json" },
     body: JSON.stringify(event),
   });
-  const stopped = new Promise((resolve) => child.once("exit", resolve));
-  child.kill("SIGKILL");
-  await stopped;
-  const resumed = await start(true);
-  assert.equal(resumed.sessionId, original.sessionId);
-  assert.notEqual(resumed.token, original.token);
-  const result = JSON.parse(
+  assert.equal(receipt.status, 200);
+  process.kill(record.pid, "SIGKILL");
+  assert.equal(await waitUntil(() => !alive(record.pid)), true);
+  const output = JSON.parse(
     (
-      await exec(process.execPath, [
-        helper,
-        "wait",
-        "--session-dir",
-        directory,
-        "--timeout",
-        "0.2",
-      ])
+      await exec(
+        process.execPath,
+        [
+          helper,
+          "wait",
+          "--session-dir",
+          started.sessionDir,
+          "--timeout",
+          "0.5",
+        ],
+        { env },
+      )
     ).stdout,
   );
-  assert.deepEqual(result.event.payload, event);
+  assert.deepEqual(output.event.payload, event);
+  const next = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
+  assert.notEqual(next.pid, record.pid);
+  const connection = JSON.parse(
+    await fs.readFile(path.join(started.sessionDir, "connection.json"), "utf8"),
+  );
+  assert.equal(connection.sessionId, started.sessionId);
+  assert.equal(connection.origin, `http://127.0.0.1:${next.port}`);
 });

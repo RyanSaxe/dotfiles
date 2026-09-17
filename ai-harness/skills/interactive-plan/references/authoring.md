@@ -16,7 +16,7 @@ author a plan.
 | artifactId | Stable artifact ID, using letters, digits, underscores, or hyphens.       |
 | revision   | New value for each publication; also allows periods.                      |
 | kind       | exploration for proposals; plan for the complete final handoff.           |
-| title      | Human-readable artifact title.                                            |
+| title      | Human-readable artifact title, shown once at the top of the sidebar.      |
 | pages      | Ordered records with unique id, title, and html, or file instead of html. |
 | css, js    | Optional paths to custom files, relative to the manifest.                 |
 | agreements | Optional structured agreement records.                                    |
@@ -24,7 +24,8 @@ author a plan.
 
 Final plans begin with page ID `overview`; remaining pages contain implementation
 steps. `feedback` is reserved; `agreed` is reserved when structured agreements
-are present. Preserve page IDs across revisions.
+are present. Preserve page IDs across revisions: unsent draft items carry over
+to the next revision by page ID and anchor.
 
 The embedded `plan-data` JSON contains page HTML, agreement records, and prototype
 source. Page HTML is trusted authored markup, not Markdown. User comments are
@@ -45,16 +46,18 @@ Each `prototypes` record has:
 | Field  | Contract                                                                 |
 | ------ | ------------------------------------------------------------------------ |
 | id     | Unique stable ID with the same character rules as page IDs.              |
-| title  | Accessible, descriptive title.                                           |
+| title  | Accessible, descriptive title, shown in the embed's header.              |
 | html   | Complete self-contained HTML document, including its styles and scripts. |
 | file   | Manifest-only alternative to html; resolved relative to the manifest.    |
 | height | Positive preview height in pixels.                                       |
 
 Put `data-prototype="ID"` on an element where that prototype belongs. The frame
-renders the document in a sandboxed iframe and offers its exact source with syntax
-highlighting. The same stored HTML supplies both views. It has no same-origin
-access to the review frame; its buttons must not submit real session feedback.
-Scripts, forms, and popup links are allowed within the sandbox.
+renders the document framed: a header with the title, a Source toggle that
+shows the exact source with syntax highlighting, and Open full size, which
+shows the prototype alone in a new tab from the same artifact. The document
+runs in a sandboxed iframe with no same-origin access to the review frame; its
+buttons must not submit real session feedback. Scripts, forms, and popup links
+are allowed within the sandbox.
 
 Preserve approved visuals and interactions in the relevant final-plan step,
 alongside binding requirements and any accepted changes. Clearly label
@@ -79,8 +82,13 @@ automation is optional.
 | source, href | Legacy source note and optional original-page link; still supported.                         |
 
 Supply nonempty sourceRefs or legacy source text. Do not recreate settled entries
-to fill the record. Remove old change markers on the next publication. The index
-previews the agreement text; the detail pane retains its full content.
+to fill the record. Remove old change markers on the next publication.
+
+Agreed renders each agreement as a card: the decision on top, then a strip
+naming the revision and the note, choice, or answer it came from, with Preview
+and Open. Preview expands that revision's page in preview mode, scrolled to
+the source and highlighted, inside the card. Open shows that revision
+read-only. Further sources are listed behind a count on the strip.
 
 Each source reference has a `kind`:
 
@@ -88,6 +96,7 @@ Each source reference has a `kind`:
 | ------------ | ---------------------- | ----------------------------------------------------------------------------------- |
 | note         | submissionId, noteId   | Exact saved comment and its original quote/context.                                 |
 | choice       | submissionId, choiceId | Exact choice data and readable labels; choiceId is the submission's choice-map key. |
+| answer       | submissionId, answerId | Exact answer to a question component; answerId is the submission's answers key.     |
 | conversation | text                   | Agent-provided conversation context, explicitly labeled.                            |
 
 Several references can support one agreement. The publisher resolves browser
@@ -95,10 +104,10 @@ references from this session's saved submissions and embeds `sourceRecords`
 before hashing the artifact. Do not author resolved records; publication replaces
 them. Missing submissions or items fail publication.
 
-Source records include exact text and context, with links to immutable original
-proposals. They remain readable offline. New choices carry stable target IDs;
-older submissions may link only to a page. Conversation references do not imply
-access to a transcript or require an invented browser link.
+Source records include exact text and context, the source revision, and the
+target element and quote used for Preview and Open. They remain readable
+offline. Conversation references do not imply access to a transcript or
+require an invented browser link.
 
 Choice sources retain the submitted record in `choice`. Single choices carry
 `value` and `valueLabel`; legacy records display `value`. Checklists carry
@@ -113,85 +122,80 @@ submission flow; they do not change state automatically.
 
 ## Frame and content
 
-Keep the shared navigation, orientation, Settings, status footer, and review
-controls. The page layout is yours to compose. Basic typography, tables, code,
-theme colors, focus, and selected-choice states are available. There are no
-generic card or column layouts to fill.
+The frame owns the sidebar (plan title, revision line and popover, pages,
+Agreed, Feedback, and the Review button), the bell for other live sessions,
+Settings (appearance and notifications), the Feedback page, the working state,
+and preview and read-only modes. The page layout is yours to compose. Basic
+typography, tables, code, theme colors, focus, and selected-choice states are
+available. There are no generic card or column layouts to fill.
 
-Blue is the general accent. Success, danger, and attention have theme tokens
-`--success`, `--danger`, and `--attention`, with background and border variants.
-Do not color preferred options green or alternatives red merely to express
-preference. Include labels so meaning does not rely on color.
+Tokens, with light and dark values: `--ground` (sidebar and panels behind
+content), `--panel` (content, cards, popovers), `--line` and `--line-strong`,
+`--ink`, `--muted`, `--accent` with `--accent-ink` and `--accent-soft`,
+`--attention` and `--attention-bg` (needs you), `--ok` and `--ok-bg` (sent,
+accepted), `--danger` and `--danger-bg` (removed), `--code`, and `--mark`
+(noted text). `--blue`, `--bg`, `--side`, `--soft`, and `--success` remain as
+aliases. Do not color preferred options green or alternatives red merely to
+express preference. Include labels so meaning does not rely on color.
 
-Appearance follows the system until explicitly selected, remembered across local
-ports. Drafts stay revision- and session-scoped. Status reports the helper's last
-declared state, not an agent heartbeat or invented task progress.
+Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
+titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
+6px for rows. Appearance follows the system until explicitly selected, and
+the choice is remembered for the hub origin.
 
 Frame popups dismiss on outside click or Escape without submitting or accepting.
 Follow that behavior in custom popups, preserve unsent text, and keep keyboard
-focus usable.
+focus usable. Single keys (listed under `?`) jump between sessions, pages, and
+interactive items; keep authored controls focusable so they take part.
 
-## Choices, comments, and custom interactions
+## Choices, comments, answers, and custom interactions
 
 | Interface                            | Behavior                                                                                                                          |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | data-choice                          | Stable choice-group ID. Use data-label for a readable label.                                                                      |
 | data-multiselect                     | Stable checklist-group ID. Use data-label for a readable question or group label.                                                 |
+| data-question                        | Stable question ID on a section with a textarea. Use data-label for the answer's label.                                           |
 | data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                            |
 | data-label on an option              | Readable option label, separate from its ID and action text. Buttons fall back to their text; checkboxes fall back to data-value. |
 | aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                  |
-| data-comment                         | Button action for a contextual note, using the attribute as its label.                                                            |
+| data-comment                         | Button action for a contextual note, using the attribute as its label; the nearest ancestor ID becomes the note's target.         |
 | planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                  |
 | plan:page                            | Window event after each page render; detail has page and element.                                                                 |
 | planUI.enhance(element)              | Render rich content added dynamically.                                                                                            |
 | planUI.chart(element, options)       | Return an ECharts instance asynchronously.                                                                                        |
 | planUI.diff(element, input, options) | Render one Git file patch through Pierre. Input contains before, after, and patch strings; options.diffStyle is split or unified. |
+| planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                       |
+| planUI.mode                          | live, readonly, or preview.                                                                                                       |
 
-Choice clicks update the local draft. Only Submit feedback sends it. Keep control
-IDs and labels stable. Group IDs must be unique within a page, across both kinds
-of choice. Option IDs must be unique within a group. The frame supplies missing
-group target IDs for source links. Use native buttons for single choices and
-native labeled checkboxes for checklists. Style and position them with the
-material being compared.
-
-For three to seven mutually exclusive options, use the top-tab choice component
-when each option has a proposal worth inspecting. Every tab must change the
-detail area. The tab list is the `data-choice` group and each tab is a
-`data-value` button. The frame's `aria-pressed` value is the authoritative draft
-selection; component behavior derives panel visibility and `aria-selected` from
-it instead of creating another state. On narrow screens, keep the tabs in one
-horizontally scrollable row.
-
-Choice-tab styles own the card shell, tab row, selected state, focus treatment,
-plain content canvas, and hidden panels. They do not style panel descendants or
-impose a content layout or fixed height. The page owns each panel's complete
-contents.
+Choice clicks, checklist changes, and typed answers update the local draft. Only
+Submit sends it. Keep control IDs and labels stable. Group IDs must be unique
+within a page, across all kinds. Option IDs must be unique within a group. The
+frame supplies missing group target IDs for source links. Use native buttons
+for single choices, native labeled checkboxes for checklists, and a textarea
+inside `data-question` for answers.
 
 Every authored checklist appears in Feedback, including lists on unvisited
 pages. Authored `checked` attributes set initial values; saved draft values take
-precedence. Changes persist across navigation and reload. An empty set means
-"None selected", not unanswered. Each checklist counts as one feedback item.
-Submit feedback sends every list's complete option set and checked state along
-with other choices and comments. Feedback links back to edit the list; it cannot
-remove a checklist from the submission. Single choices retain Clear choice.
-
-Put checklist markup in page HTML so the frame can discover it before the user
-visits the page. Use the same contracts in custom and supplied components.
+precedence. An empty set means "None selected", not unanswered. Each checklist
+counts as one feedback item. Put checklist markup in page HTML so the frame can
+discover it before the user visits the page.
 
 Register custom initialization on `plan:page`. The custom JS file executes before
 the frame module. Script elements inserted inside page HTML do not execute.
 Page-level and text-selection comments require no custom code.
 
-Feedback supports topic, item, and overall comments, edits, removal, context links,
-and explicit submission. Every topic has a section with an Add comment control,
-including topics without feedback. Settings is beside Review & submit in the
-header. Receipt and acknowledgement stay beside Submit.
-Put requests for input beside the affected proposal. Use `data-choice` when the
-answer is a selection or a contextual comment control when it needs prose. Both
-appear in Review through the existing draft. Do not build a second feedback or
-reply transport.
+Notes on selected text show as a numbered marker on the noted text and a count
+line under the last noted block; the note itself is read on Feedback. Feedback
+groups items by page, with edit and remove, an overall comment, and one Submit
+that sends everything unsent at once. Sent items stay listed as sent until the
+next revision; items whose page or text no longer exists are listed under the
+revision they came from. Submissions carry `groups.choices`, `groups.notes`,
+and, when present, `groups.answers` keyed `page/question` with `label`,
+`text`, and `topic`.
 
-## Renderers
+Do not build a second feedback or reply transport.
+
+## Renderers and figures
 
 Use the renderer matching the content. Load only what the page needs.
 
@@ -202,10 +206,12 @@ Use the renderer matching the content. Load only what the page needs.
 | Diagrams                               | data-diagram with Mermaid source as text                              | Mermaid  |
 | Charts and mathematical demonstrations | data-chart with an ECharts option object as JSON text                 | ECharts  |
 
-Use the code renderer for source code instead of bare unhighlighted blocks.
-For before/after code, use the [diff component](../components/index.md).
-Its pinned viewer uses the frame's Shiki theme pair and follows Settings.
-Language grammars load on demand; unsupported languages retain source and report
+Optional figure attributes: `data-file` on a code block adds a header with the
+file name, the language, and a Copy button; `data-caption` on code, diagrams,
+and charts adds a caption line; `data-title` on a chart adds a header. Use the
+code renderer for source code instead of bare unhighlighted blocks. For
+before/after code, use the [diff component](../components/index.md). Language
+grammars load on demand; unsupported languages retain source and report
 failure. Escape backslashes again when math is stored inside a JSON string.
 
 The frame owns pinned CDN locations and integrity values. ESM dependency graphs

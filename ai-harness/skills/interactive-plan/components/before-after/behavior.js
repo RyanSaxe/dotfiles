@@ -1,8 +1,27 @@
-window.addEventListener("plan:page", ({ detail: { element } }) => {
-  element.querySelectorAll(".change-review").forEach((root) => {
+window.addEventListener("plan:page", ({ detail: { element, page } }) => {
+  element.querySelectorAll(".change-review").forEach((root, index) => {
     const viewer = root.querySelector(".change-view");
     const error = root.querySelector("[data-diff-error]");
     const buttons = root.querySelectorAll("[data-diff-style]");
+    const controls = root.querySelector(".change-controls");
+    if (
+      root.dataset.file &&
+      controls &&
+      !controls.querySelector(".change-file")
+    ) {
+      const name = document.createElement("b");
+      name.className = "change-file";
+      name.textContent = root.dataset.file;
+      controls.prepend(name);
+    }
+    const prefs = window.planUI?.prefs;
+    const key = `diff:${page.id}/${root.id || index}`;
+    // Split needs room for two columns; below 900px the unified view reads
+    // better. A click on the toggle overrides and is remembered per diff.
+    const automatic = () =>
+      (root.closest("#page-content") || document.body).clientWidth >= 900
+        ? "split"
+        : "unified";
     let input;
     const fail = (reason) => {
       error.textContent = reason.message || "Diff renderer unavailable.";
@@ -16,7 +35,9 @@ window.addEventListener("plan:page", ({ detail: { element } }) => {
       fail(reason);
       return;
     }
+    let style = null;
     const render = async (diffStyle) => {
+      style = diffStyle;
       try {
         await window.planUI.diff(viewer, input, { diffStyle });
         for (const button of buttons)
@@ -29,7 +50,15 @@ window.addEventListener("plan:page", ({ detail: { element } }) => {
       }
     };
     for (const button of buttons)
-      button.onclick = () => render(button.dataset.diffStyle);
-    render("split");
+      button.onclick = () => {
+        prefs?.set(key, button.dataset.diffStyle);
+        render(button.dataset.diffStyle);
+      };
+    render(prefs?.get(key) || automatic());
+    new ResizeObserver(() => {
+      if (prefs?.get(key)) return;
+      const next = automatic();
+      if (next !== style) render(next);
+    }).observe(root);
   });
 });

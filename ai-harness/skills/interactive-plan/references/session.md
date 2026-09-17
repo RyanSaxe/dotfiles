@@ -3,7 +3,9 @@
 Resolve commands relative to the skill directory. Keep the explicit session
 directory in the conversation so an interrupted turn can resume it.
 
-Run the helper through a long-running tool process:
+One hub process on a fixed local port serves every live session. `start`
+spawns the hub when none is running, registers the session, prints
+`{sessionId, sessionDir, url}` as JSON, and exits:
 
 ```sh
 node scripts/session.mjs start
@@ -14,9 +16,9 @@ subsequent command requires `--session-dir PATH`. Do not use a shared current-
 session file. Keep generated artifacts and feedback outside project history.
 
 If a session already exists, inspect its status and queued feedback rather than
-creating a replacement. Resume its helper with `start --session-dir PATH`.
-A live owner prevents a second writer. After an abnormal shutdown, inspect the
-old owner before using `--recover-lock`; do not delete ownership files blindly.
+creating a replacement. `start --session-dir PATH` resumes it and prints the
+same URL. Helper commands reattach on their own when the hub has exited or
+restarted; nothing needs recovering by hand.
 
 Write a complete artifact, then publish it:
 
@@ -30,13 +32,14 @@ browser and also present the link in chat. Use the environment's browser-opening
 tool or the platform mechanism: macOS `open`, Windows PowerShell `Start-Process`,
 or Linux `xdg-open`. Pass the URL as a quoted argument. Report a failed launch
 and keep the link available. Do not hard-code a browser or open another tab on
-each revision or poll.
+each revision or poll. The page in the browser refreshes itself when a new
+revision lands and keeps the user's unsent draft.
 
-Keep the agent turn waiting. A timeout is not
-completion; wait again. A side question does not end the session: answer it,
-then resume the same wait. The helper saves feedback but cannot awaken an ended
-agent turn. If the conversation is interrupted, the next turn must resume the
-explicit session and read its queue.
+Keep the agent turn waiting. A timeout is not completion; wait again. A side
+question does not end the session: answer it, then resume the same wait. The
+helper saves feedback but cannot awaken an ended agent turn. If the
+conversation is interrupted, the next turn must resume the explicit session and
+read its queue.
 
 When an event arrives, read its `payload`, including intent and source revision,
 then acknowledge the event ID:
@@ -47,10 +50,11 @@ node scripts/session.mjs ack --session-dir PATH --id SUBMISSION_ID
 
 A saved receipt is not an agent acknowledgement. Do not acknowledge unread
 feedback. Combine it with the conversation and revisit affected decisions. If
-progress depends on user input, update the relevant proposal and state what
-feedback is needed. The user answers through contextual or overall feedback, or
-in the agent conversation. Do not create question events, reply fields, or
-reply notifications.
+progress depends on user input, put a question component beside the affected
+proposal and state what feedback is needed. The user answers through
+contextual or overall feedback, the question's answer field, or in the agent
+conversation. Do not create question events, reply fields, or reply
+notifications.
 
 Publish each revision under a new revision identifier. Preserve old snapshots
 and attach feedback to what the user actually saw. If asked to return to an older
@@ -76,32 +80,46 @@ Check the returned `nextAction` and `planPath`. Do not infer execution permissio
 from a feedback message, a recommendation, an acknowledgement, or mere plan
 acceptance without the explicit mode. The helper never executes plan content.
 
-Leave accepted artifacts and the acceptance record intact when the helper stops.
-For later changes, reopen review on a new revision; old acceptance does not
-approve modified content.
+Leave accepted artifacts and the acceptance record intact. For later changes,
+reopen review on a new revision; old acceptance does not approve modified
+content.
 
-## Session operations and limitations
+## Sessions, the hub, and their limits
 
-The helper uses an OS-assigned loopback port and a unique durable session
-directory. Resume with the directory, not an old port. `connection.json` is
-private to the agent; the browser needs only the session identity. Different
-sessions cannot share acknowledgements or submissions.
+A session is live from `start` until `complete`. Every agent request stamps
+`agentSeenAt`; after 15 minutes without one the session is reported as
+`disconnected` and leaves the browser's session list, while its pages still
+serve. After 15 minutes with no live session the hub exits and removes its
+record; the next `start` spawns a fresh one on the same port. Both timeouts
+are set by environment variables listed in [setup.md](setup.md).
+
+The hub keeps `hub/hub.json` (pid, port, hosts, code version, start time, and
+a local secret used only to register sessions) and `hub/hub.log` under
+`$XDG_STATE_HOME/interactive-plan/`. Sessions live under `sessions/<id>/` with
+`status.json`, `connection.json` (`sessionId`, hub `origin`, and the agent
+token), `artifacts/`, `feedback/`, and `acceptance.json` after acceptance.
+`connection.json` is private to the agent; the browser needs only the session
+identity. Different sessions cannot share acknowledgements or submissions.
+
+When `start` finds a hub running older or newer code it uses it as is and
+logs the mismatch; the hub restarts on the newer code only when no session is
+live.
+
+`status.json` records `title`, `kind`, `revisions`, and `agentSeenAt` next to
+the stage. `stage` is `ready`, `updated`, `submitted`, `working`, or
+`complete`; `disconnected` and `needsYou` are derived in responses, never
+stored.
 
 `wait` returns the next unread event and does not acknowledge it. `ack` is
 idempotent. Publication waits only for unread feedback and the normal artifact
-lifecycle.
+lifecycle. The final acceptance dialog has explicit save and implement
+actions; the helper persists the mode and returns it after `complete`.
 
-The final acceptance dialog has explicit save and implement actions. There is
-no defaulted checkbox or implicit implementation mode. The helper persists the
-mode and returns it after `complete`; only the active agent can act on it.
+To review from a phone, set `INTERACTIVE_PLAN_HOST` to the machine's Tailscale
+address before the hub starts; `start` then also prints `hostUrl`. The agent
+side is unchanged.
 
-The helper runs in the foreground of its long-running tool process. A normal
-SIGTERM/SIGINT closes it and releases ownership without removing artifacts.
-After an abnormal shutdown, `start --recover-lock --session-dir PATH` requires
-both a dead recorded process and an unreachable old endpoint. Inspect uncertain
-ownership manually; do not start concurrent recovery commands.
-
-If the helper is unavailable, the page preserves saved draft notes and offers
+If the hub is unavailable, the page preserves saved draft notes and offers
 JSON export. Ask the user for the exported file and treat its contents as
 feedback, not as implementation permission. Do not claim it was acknowledged by
 the live protocol when it was read through that fallback.

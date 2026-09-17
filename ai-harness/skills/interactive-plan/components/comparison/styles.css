@@ -1,7 +1,7 @@
 .comparison {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-  gap: 0 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 0 12px;
   --comparison-rows: 3;
 }
 .comparison-option {
@@ -9,9 +9,9 @@
   grid-row: span var(--comparison-rows);
   grid-template-rows: subgrid;
   min-width: 0;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--panel);
   overflow: hidden;
 }
@@ -19,20 +19,25 @@
   display: flex;
   flex-direction: column;
 }
+.comparison-option:has(.comparison-pick[aria-pressed="true"]) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .comparison-option > header {
-  padding: 24px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--line);
 }
 .comparison-option h2 {
-  margin: 0 0 10px;
-  font-size: 24px;
+  margin: 0 0 4px;
+  font-size: 15px;
 }
 .comparison-option > header p {
   margin: 0;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .comparison-content {
-  padding: 22px 24px;
+  padding: 14px 16px;
   min-width: 0;
 }
 .comparison-content > :last-child {
@@ -51,17 +56,17 @@
 }
 .comparison-option > footer {
   margin-top: auto;
-  padding: 18px 24px 22px;
+  padding: 12px 16px 14px;
   border-top: 1px solid var(--line);
 }
 .comparison-pick {
   width: 100%;
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .comparison-pick[aria-pressed="true"] {
-  background: var(--blue);
-  color: var(--bg);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .comparison-pick[aria-pressed="true"]::before {
   content: "✓ ";

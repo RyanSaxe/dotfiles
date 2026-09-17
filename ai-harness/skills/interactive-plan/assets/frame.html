@@ -7,102 +7,132 @@
     <!-- FRAME_STYLE -->
   </head>
   <body>
-    <div class="app">
-      <aside class="sidebar">
-        <div class="brand">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <text
-              x="4"
-              y="36"
-              fill="currentColor"
-              font-family="Georgia,serif"
-              font-size="37"
-              letter-spacing="-3"
-            >
-              IP
-            </text></svg
-          >Interactive plan
+    <div class="app" id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="plan-head">
+          <h1 class="plan-title" id="plan-title"></h1>
+          <button
+            class="revision-line"
+            id="revision"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <span id="revision-text"></span
+            ><i class="chevron" aria-hidden="true"></i>
+          </button>
+          <a class="revision-back" id="revision-back" hidden
+            >Back to the current revision</a
+          >
+          <div class="popover" id="revision-menu" role="menu" hidden></div>
         </div>
-        <div class="revision" id="revision"></div>
-        <nav id="navigation" aria-label="Plan pages"></nav>
-        <div class="sidebar-footer">
-          <div class="status" id="agent-status" role="status" hidden>
-            <div class="row">
-              <span
-                class="spinner"
-                id="spinner"
-                aria-hidden="true"
-                hidden
-              ></span>
-              <div>
-                <h2 id="status-title"></h2>
-                <p class="small" id="status-detail"></p>
-              </div>
-            </div>
-            <div class="row">
-              <a class="btn" id="update" hidden>View update →</a
-              ><a class="btn" id="final-plan" hidden>View accepted plan →</a>
-            </div>
-            <code id="plan-path" hidden></code>
+        <details class="pages-menu" id="pages-menu" open>
+          <summary class="btn quiet">Pages</summary>
+          <div class="side-label">Pages</div>
+          <nav id="navigation" aria-label="Plan pages"></nav>
+          <div class="side-cta">
+            <button class="btn quiet" id="review" type="button">
+              Nothing to review
+            </button>
           </div>
-
-          <div id="settings-menu" popover>
-            <h2>Settings</h2>
+        </details>
+      </aside>
+      <main>
+        <header class="topbar">
+          <button
+            class="bell"
+            id="bell"
+            type="button"
+            aria-haspopup="dialog"
+            aria-label="Other live sessions"
+            hidden
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10 21a2 2 0 0 0 4 0" />
+            </svg>
+            <b id="bell-count"></b>
+          </button>
+          <button
+            class="icon-btn"
+            id="settings"
+            type="button"
+            popovertarget="settings-menu"
+            aria-label="Settings"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+              />
+            </svg>
+          </button>
+          <div id="settings-menu" class="popover settings" popover>
+            <div class="side-label">Settings</div>
             <label for="theme">Appearance</label>
             <select id="theme">
               <option value="system">System</option>
               <option value="light">Light</option>
               <option value="dark">Dark</option>
             </select>
-            <button class="btn" id="notifications">Enable notifications</button>
-          </div>
-        </div>
-      </aside>
-      <main>
-        <header class="topbar">
-          <span class="small" id="artifact-title"></span>
-          <div class="row">
-            <button
-              class="btn quiet"
-              id="settings"
-              popovertarget="settings-menu"
-            >
-              Settings
+            <button class="btn" id="notifications" type="button">
+              Enable notifications
             </button>
-            <button class="btn" id="review">
-              Review &amp; submit <span class="count" hidden>0</span></button
-            ><button class="btn primary" id="accept" hidden disabled>
-              Accept plan
-            </button>
+            <p class="small">Keys: press <kbd>?</kbd> for the list.</p>
           </div>
         </header>
-        <div class="content">
+        <div class="content" id="content">
+          <p
+            class="notice accepted"
+            id="accepted"
+            data-tone="success"
+            hidden
+          ></p>
           <section id="reading">
             <h1 tabindex="-1" id="page-title"></h1>
             <div id="page-content"></div>
-            <div class="page-actions">
-              <button class="btn" id="page-comment">Comment on this page</button
-              ><button class="btn" id="page-review">
-                Review &amp; submit →
+            <div class="page-actions" id="page-actions">
+              <button class="btn quiet" id="page-comment" type="button">
+                Comment on this page
               </button>
             </div>
           </section>
           <section id="feedback" hidden>
-            <h1 tabindex="-1">Review your feedback</h1>
+            <h1 tabindex="-1">Feedback</h1>
+            <p class="muted" id="feedback-lede"></p>
             <div id="feedback-groups"></div>
-            <div class="group-head">
-              <h2>Overall</h2>
-              <button class="btn quiet" id="overall-note">
-                Add overall comment
-              </button>
-            </div>
-            <div id="overall-notes"></div>
+            <section class="feedback-group">
+              <div class="group-head">
+                <h2>Overall</h2>
+                <button class="btn quiet" id="overall-note" type="button">
+                  Add overall comment
+                </button>
+              </div>
+              <div id="overall-notes"></div>
+            </section>
             <div class="submitbar">
               <div class="small" id="submit-status"></div>
               <div class="row">
-                <button class="btn quiet" id="export">Export copy</button
-                ><button class="btn primary" id="submit" disabled>
-                  Submit feedback
+                <button class="btn quiet" id="export" type="button">
+                  Export copy</button
+                ><button class="btn primary" id="submit" type="button" disabled>
+                  Submit
                 </button>
               </div>
             </div>
@@ -110,6 +140,31 @@
             <p class="small" id="connection-status"></p>
           </section>
         </div>
+        <div class="working" id="working" hidden>
+          <div class="working-card" role="status">
+            <b id="working-title"></b><span id="working-detail"></span>
+          </div>
+        </div>
+        <aside
+          class="sidecar"
+          id="sidecar"
+          role="dialog"
+          aria-label="Live sessions"
+          hidden
+        >
+          <header>
+            <span>Live sessions</span>
+            <button
+              class="icon-btn"
+              id="sidecar-close"
+              type="button"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </header>
+          <div class="sidecar-list" id="sidecar-list"></div>
+        </aside>
       </main>
     </div>
     <dialog class="drawer" id="note-dialog" aria-labelledby="note-title">
@@ -117,7 +172,7 @@
         <div class="dialog-head">
           <h2 id="note-title">Add note</h2>
           <button
-            class="btn quiet"
+            class="icon-btn"
             type="button"
             data-close="note-dialog"
             aria-label="Close note"
@@ -146,14 +201,45 @@
       </p>
       <p class="small" id="accept-error" role="status"></p>
       <div class="actions">
-        <button class="btn primary" data-accept-mode="implement">
+        <button class="btn primary" type="button" data-accept-mode="implement">
           Accept and start implementation</button
-        ><button class="btn" data-accept-mode="save">
+        ><button class="btn" type="button" data-accept-mode="save">
           Accept and save for later</button
-        ><button class="btn quiet" data-close="accept-dialog">Cancel</button>
+        ><button class="btn quiet" type="button" data-close="accept-dialog">
+          Cancel
+        </button>
       </div>
     </dialog>
-    <button class="btn primary quote-button" id="quote" hidden>
+    <dialog class="dialog keys" id="keys-dialog" aria-labelledby="keys-title">
+      <div class="dialog-head">
+        <h2 id="keys-title">Keys</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="keys-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <dl class="key-list">
+        <dt><kbd>1</kbd>–<kbd>9</kbd></dt>
+        <dd>Jump to a session, in the order of the bell panel</dd>
+        <dt><kbd>]</kbd> <kbd>[</kbd></dt>
+        <dd>Next and previous page</dd>
+        <dt><kbd>j</kbd> <kbd>k</kbd></dt>
+        <dd>Next and previous interactive item on the page</dd>
+        <dt><kbd>c</kbd></dt>
+        <dd>Comment on this page</dd>
+        <dt><kbd>r</kbd></dt>
+        <dd>Review your feedback</dd>
+        <dt><kbd>g</kbd> then <kbd>a</kbd></dt>
+        <dd>Open Agreed</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>Close menus, panels, and dialogs</dd>
+      </dl>
+    </dialog>
+    <button class="btn primary quote-button" id="quote" type="button" hidden>
       Comment on selection
     </button>
     <div class="toast" id="toast" role="status" hidden></div>
