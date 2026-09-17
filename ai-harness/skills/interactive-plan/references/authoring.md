@@ -154,6 +154,19 @@ group target IDs for source links. Use native buttons for single choices and
 native labeled checkboxes for checklists. Style and position them with the
 material being compared.
 
+For three to seven mutually exclusive options, use the top-tab choice component
+when each option has a proposal worth inspecting. Every tab must change the
+detail area. The tab list is the `data-choice` group and each tab is a
+`data-value` button. The frame's `aria-pressed` value is the authoritative draft
+selection; component behavior derives panel visibility and `aria-selected` from
+it instead of creating another state. On narrow screens, keep the tabs in one
+horizontally scrollable row.
+
+Choice-tab styles own the card shell, tab row, selected state, focus treatment,
+plain content canvas, and hidden panels. They do not style panel descendants or
+impose a content layout or fixed height. The page owns each panel's complete
+contents.
+
 Every authored checklist appears in Feedback, including lists on unvisited
 pages. Authored `checked` attributes set initial values; saved draft values take
 precedence. Changes persist across navigation and reload. An empty set means
@@ -173,7 +186,10 @@ Feedback supports topic, item, and overall comments, edits, removal, context lin
 and explicit submission. Every topic has a section with an Add comment control,
 including topics without feedback. Settings is beside Review & submit in the
 header. Receipt and acknowledgement stay beside Submit.
-Do not build a second feedback transport.
+Put requests for input beside the affected proposal. Use `data-choice` when the
+answer is a selection or a contextual comment control when it needs prose. Both
+appear in Review through the existing draft. Do not build a second feedback or
+reply transport.
 
 ## Renderers
 

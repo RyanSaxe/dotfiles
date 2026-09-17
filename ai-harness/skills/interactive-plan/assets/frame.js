@@ -55,8 +55,6 @@ let page = plan.pages[0],
   editing = null,
   noteContext = null,
   selected = "",
-  question = null,
-  questionEvent = null,
   acceptance = null,
   submissionError = "",
   noteDraftKey = "",
@@ -541,7 +539,6 @@ function status() {
     ready: "Ready for feedback",
     submitted: "Waiting for the agent",
     working: "Working",
-    needs_reply: "Question",
     updated: newer ? "New revision" : "Ready for feedback",
     disconnected: "Disconnected",
     complete:
@@ -557,18 +554,13 @@ function status() {
     "status-detail",
     stage === "disconnected"
       ? "The local helper is unreachable."
-      : stage === "needs_reply"
-        ? remote.question?.text || ""
-        : stage === "updated" && newer
-          ? `Revision ${remote.current.revision} is ready.`
-          : "",
+      : stage === "updated" && newer
+        ? `Revision ${remote.current.revision} is ready.`
+        : "",
   );
   $("spinner").hidden = stage !== "working";
-  $("reply").hidden = stage !== "needs_reply" || newer;
   $("update").hidden = !newer || !connected;
-  if (newer)
-    $("update").href =
-      remote.current.url + (stage === "needs_reply" ? "#feedback" : "");
+  if (newer) $("update").href = remote.current.url;
   $("final-plan").hidden = stage !== "complete";
   $("plan-path").hidden = stage !== "complete";
   if (stage === "complete") {
@@ -732,36 +724,6 @@ $("export").onclick = () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
-$("reply").onclick = () => {
-  question = remote.question;
-  questionEvent = null;
-  $("question-text").textContent = question.text;
-  $("question-reply").value = state.questionDrafts?.[question.id] || "";
-  $("question-error").textContent = "";
-  $("question-dialog").showModal();
-  $("question-reply").focus();
-};
-$("question-form").onsubmit = async (event) => {
-  event.preventDefault();
-  const text = $("question-reply").value.trim();
-  if (!text) return;
-  if (questionEvent?.text !== text)
-    questionEvent = envelope("clarification-reply", text, {
-      questionId: question.id,
-    });
-  $("send-reply").disabled = true;
-  try {
-    const result = await send(questionEvent);
-    state.lastEvent = result.id;
-    if (state.questionDrafts) delete state.questionDrafts[question.id];
-    save();
-    $("question-dialog").close();
-  } catch (error) {
-    $("question-error").textContent = error.message;
-  } finally {
-    $("send-reply").disabled = false;
-  }
-};
 $("accept").onclick = () => {
   $("accept-detail").textContent = `${plan.title}, revision ${plan.revision}`;
   $("accept-error").textContent = "";
@@ -867,12 +829,6 @@ $("overall-note").onclick = () => openNote("overall", "Overall feedback");
 $("note-text").oninput = () => {
   (state.noteDrafts ||= {})[noteDraftKey] = $("note-text").value;
   persist();
-};
-$("question-reply").oninput = () => {
-  if (question) {
-    (state.questionDrafts ||= {})[question.id] = $("question-reply").value;
-    persist();
-  }
 };
 for (const dialog of document.querySelectorAll("dialog")) {
   dialog.addEventListener("click", (event) => {

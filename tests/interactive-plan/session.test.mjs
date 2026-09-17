@@ -7,11 +7,120 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import vm from "node:vm";
 import { compareFiles } from "../../ai-harness/skills/interactive-plan/components/before-after/diff.mjs";
 import {
   createReviewAlerts,
   reviewAlert,
 } from "../../ai-harness/skills/interactive-plan/assets/notifications.mjs";
+
+test("choice tabs preview, select, clear, and support keyboard navigation", async () => {
+  const listeners = {};
+  const tabs = Array.from({ length: 7 }, (_, index) => {
+    const attributes = new Map([["aria-pressed", "false"]]);
+    return {
+      dataset: { value: `option-${index}` },
+      focused: false,
+      getAttribute: (name) => attributes.get(name) ?? null,
+      setAttribute: (name, value) => attributes.set(name, value),
+      closest: () => tabs[index],
+      focus() {
+        this.focused = true;
+      },
+      click() {
+        listeners.click({ target: this });
+        const clearing = this.getAttribute("aria-pressed") === "true";
+        for (const tab of tabs) tab.setAttribute("aria-pressed", "false");
+        if (!clearing) this.setAttribute("aria-pressed", "true");
+      },
+    };
+  });
+  const panels = tabs.map((tab) => ({
+    dataset: { choicePanel: tab.dataset.value },
+    hidden: false,
+  }));
+  const root = {
+    dataset: {},
+    querySelectorAll(selector) {
+      return selector.includes("tabpanel") ? panels : tabs;
+    },
+    addEventListener(type, listener) {
+      listeners[type] = listener;
+    },
+  };
+  let render;
+  const source = await fs.readFile(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../ai-harness/skills/interactive-plan/components/choice-tabs/behavior.js",
+    ),
+    "utf8",
+  );
+  vm.runInNewContext(source, {
+    window: { addEventListener: (_type, listener) => (render = listener) },
+    MutationObserver: class {
+      observe() {}
+    },
+    queueMicrotask,
+  });
+  render({
+    detail: {
+      element: { querySelectorAll: () => [root] },
+    },
+  });
+
+  assert.equal(root.dataset.preview, "true");
+  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
+  assert.equal(panels.filter((panel) => !panel.hidden).length, 1);
+  tabs[4].click();
+  await Promise.resolve();
+  assert.equal(root.dataset.preview, "false");
+  assert.equal(tabs[4].getAttribute("aria-selected"), "true");
+  assert.equal(panels[4].hidden, false);
+  tabs[4].click();
+  await Promise.resolve();
+  assert.equal(root.dataset.preview, "true");
+  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
+
+  const press = (tab, key) => {
+    let prevented = false;
+    listeners.keydown({
+      target: tab,
+      key,
+      preventDefault: () => (prevented = true),
+    });
+    assert.equal(prevented, true);
+  };
+  press(tabs[0], "End");
+  await Promise.resolve();
+  assert.equal(tabs[6].focused, true);
+  assert.equal(tabs[6].getAttribute("aria-selected"), "true");
+  press(tabs[6], "ArrowRight");
+  await Promise.resolve();
+  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
+  press(tabs[0], "ArrowLeft");
+  await Promise.resolve();
+  assert.equal(tabs[6].getAttribute("aria-selected"), "true");
+  press(tabs[6], "Home");
+  await Promise.resolve();
+  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
+});
+
+test("choice tab styles leave panel contents under page control", async () => {
+  const directory = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../ai-harness/skills/interactive-plan/components/choice-tabs",
+  );
+  const [markup, styles] = await Promise.all([
+    fs.readFile(path.join(directory, "markup.html"), "utf8"),
+    fs.readFile(path.join(directory, "styles.css"), "utf8"),
+  ]);
+  assert.equal((markup.match(/role="tab"/g) || []).length, 3);
+  assert.equal((markup.match(/role="tabpanel"/g) || []).length, 3);
+  assert.doesNotMatch(styles, /\.choice-tabs-panel\s+[.#[:]/);
+  assert.match(styles, /overflow-x:\s*auto/);
+  assert.doesNotMatch(styles, /\.choice-tabs-panel[^}]*height\s*:/s);
+});
 
 test("file comparison preserves exact sources and produces an applicable Git patch", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-diff-"));
@@ -203,28 +312,23 @@ test("granted permission enables automatically unless explicitly disabled; re-en
   assert.equal(b.sent.length, 1);
 });
 
-test("focus and viewing never suppress or close question notifications", async () => {
+test("alerts are limited to review-ready stages", async () => {
   const a = alertFixture();
   await a.button.onclick();
   a.host.document.hidden = false;
   a.host.document.hasFocus = () => true;
   a.host.location.hash = "#feedback";
-  const status = {
-    ...a.status,
-    stage: "needs_reply",
-    question: { id: "question-1", text: "Private question content" },
-  };
-  await a.alerts.update(status);
-  await a.alerts.update(status);
+  await a.alerts.update(a.status);
+  await a.alerts.update(a.status);
   assert.equal(a.sent.length, 1);
   assert.equal(a.sent[0].options.body, a.plan.title);
   assert.equal(a.sent[0].closed, undefined);
-  await a.alerts.update({ ...status, stage: "working" });
+  await a.alerts.update({ ...a.status, stage: "working" });
   assert.equal(a.sent[0].closed, undefined);
   a.sent[0].onclick();
-  assert.deepEqual(a.opened, [status.current.url + "#feedback"]);
+  assert.deepEqual(a.opened, [a.status.current.url]);
   for (const stage of ["submitted", "working", "complete"])
-    assert.equal(reviewAlert({ ...status, stage }), null);
+    assert.equal(reviewAlert({ ...a.status, stage }), null);
 });
 
 test("denied, unavailable, and failed notifications retain the title fallback", async () => {
@@ -864,51 +968,27 @@ test("explicit feedback is retryable, remains unread until ack, and blocks prema
   assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
 });
 
-test("questions accept a bound browser reply or a terminal resolution, never a stale reply", async (t) => {
+test("question actions and reply intents are unsupported", async (t) => {
   const a = await fixture(t);
   await a.action("publish", { html: artifact() });
-  const first = (
-    await a.action("question", { text: "Which error representation?" })
-  ).body.status.question;
-  assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
-  await a.action("working");
+  const status = (await a.request("/api/status")).body;
+  assert.equal(Object.hasOwn(status, "question"), false);
+  const browser = await (await fetch(a.server.origin)).text();
+  assert.doesNotMatch(browser, /question-dialog|question-form|send-reply/);
   assert.equal(
-    (
-      await a.request(
-        "/api/feedback",
-        a.event("clarification-reply", "1", { questionId: first.id }),
-      )
-    ).code,
-    409,
-  );
-  const second = (await a.action("question", { text: "Typed errors?" })).body
-    .status.question;
-  const reply = a.event("clarification-reply", "1", {
-    questionId: second.id,
-    text: "Yes, typed errors.",
-  });
-  assert.equal((await a.request("/api/feedback", reply)).code, 200);
-  assert.equal((await a.request("/api/status")).body.question, null);
-  assert.equal(
-    (
-      await a.request(
-        "/api/feedback",
-        a.event("clarification-reply", "1", { questionId: second.id }),
-      )
-    ).code,
-    409,
+    (await a.request("/api/feedback", a.event("clarification-reply", "1")))
+      .code,
+    400,
   );
   assert.equal(
-    (await a.request("/agent/next")).body.event.payload.text,
-    "Yes, typed errors.",
+    (await a.action("question", { text: "Typed errors?" })).code,
+    400,
   );
 });
 
-test("queued rounds keep receipt order and unrelated feedback does not close a question", async (t) => {
+test("queued rounds keep receipt order", async (t) => {
   const a = await fixture(t);
   await a.action("publish", { html: artifact() });
-  const question = (await a.action("question", { text: "Which result type?" }))
-    .body.status.question;
   const first = a.event(),
     second = a.event();
   await a.request("/api/feedback", first);
@@ -919,11 +999,7 @@ test("queued rounds keep receipt order and unrelated feedback does not close a q
   const next = (await a.request("/agent/next")).body.event;
   assert.equal(next.id, second.id);
   assert.equal(next.sequence, unread.sequence + 1);
-  assert.equal((await a.request("/api/status")).body.stage, "needs_reply");
-  const reply = a.event("clarification-reply", "1", {
-    questionId: question.id,
-  });
-  assert.equal((await a.request("/api/feedback", reply)).code, 200);
+  assert.equal((await a.request("/api/status")).body.stage, "working");
 });
 
 for (const mode of ["save", "implement"])

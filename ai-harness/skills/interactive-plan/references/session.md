@@ -46,17 +46,11 @@ node scripts/session.mjs ack --session-dir PATH --id SUBMISSION_ID
 ```
 
 A saved receipt is not an agent acknowledgement. Do not acknowledge unread
-feedback. Combine it with the conversation, revisit affected decisions, and
-either revise the proposal or ask a focused clarification.
-
-```sh
-node scripts/session.mjs question --session-dir PATH --text "QUESTION"
-```
-
-The browser offers a dedicated reply field. Continue waiting for its event.
-The user can also answer in the agent conversation; resolve that question with
-`working --session-dir PATH` before proceeding so late browser replies cannot
-replace the answer. Do not create a separate chat transport.
+feedback. Combine it with the conversation and revisit affected decisions. If
+progress depends on user input, update the relevant proposal and state what
+feedback is needed. The user answers through contextual or overall feedback, or
+in the agent conversation. Do not create question events, reply fields, or
+reply notifications.
 
 Publish each revision under a new revision identifier. Preserve old snapshots
 and attach feedback to what the user actually saw. If asked to return to an older
@@ -94,9 +88,8 @@ private to the agent; the browser needs only the session identity. Different
 sessions cannot share acknowledgements or submissions.
 
 `wait` returns the next unread event and does not acknowledge it. `ack` is
-idempotent. A question receives an ID; browser replies must name that still-open
-question. Resolving it in conversation with `working` invalidates late replies.
-Publication requires pending feedback to be read and the question resolved.
+idempotent. Publication waits only for unread feedback and the normal artifact
+lifecycle.
 
 The final acceptance dialog has explicit save and implement actions. There is
 no defaulted checkbox or implicit implementation mode. The helper persists the

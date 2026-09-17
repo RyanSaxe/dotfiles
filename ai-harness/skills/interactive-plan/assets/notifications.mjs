@@ -1,13 +1,6 @@
 export function reviewAlert(status) {
   if (!status?.current || status.stage === "complete") return null;
   const current = status.current;
-  if (status.stage === "needs_reply" && status.question)
-    return {
-      id: `question:${status.question.id}`,
-      title: "The agent has a question",
-      url: `${current.url}#feedback`,
-      createdAt: status.question.createdAt,
-    };
   if (["ready", "updated"].includes(status.stage))
     return {
       id: `revision:${current.artifactId}:${current.revision}`,
@@ -73,7 +66,7 @@ export function createReviewAlerts({
         ? "Allow notifications in your browser's site settings."
         : failed
           ? "Notification delivery failed. Check browser and OS settings."
-          : "Notifications for new reviews and questions. Keep this tab open.";
+          : "Notifications for new reviews. Keep this tab open.";
   }
   function enable() {
     write("enabledAt", String(Date.now()));

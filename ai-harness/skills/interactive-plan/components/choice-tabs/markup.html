@@ -1,0 +1,80 @@
+<section
+  class="choice-tabs"
+  data-choice="DECISION_ID"
+  data-label="Decision label"
+>
+  <header class="choice-tabs-head">
+    <div>
+      <small>Decision</small>
+      <h2>Decision title</h2>
+    </div>
+    <span>Choose one</span>
+  </header>
+  <div class="choice-tabs-list" role="tablist" aria-label="Decision label">
+    <button
+      class="choice-tabs-tab"
+      id="DECISION_ID-tab-OPTION_A"
+      type="button"
+      role="tab"
+      aria-controls="DECISION_ID-panel-OPTION_A"
+      data-value="OPTION_A"
+      data-label="Option A"
+    >
+      Option A
+    </button>
+    <button
+      class="choice-tabs-tab"
+      id="DECISION_ID-tab-OPTION_B"
+      type="button"
+      role="tab"
+      aria-controls="DECISION_ID-panel-OPTION_B"
+      data-value="OPTION_B"
+      data-label="Option B"
+    >
+      Option B
+    </button>
+    <button
+      class="choice-tabs-tab"
+      id="DECISION_ID-tab-OPTION_C"
+      type="button"
+      role="tab"
+      aria-controls="DECISION_ID-panel-OPTION_C"
+      data-value="OPTION_C"
+      data-label="Option C"
+    >
+      Option C
+    </button>
+    <!-- Use three to seven tabs. Keep IDs, values, labels, and panels aligned. -->
+  </div>
+  <div class="choice-tabs-canvas">
+    <section
+      class="choice-tabs-panel"
+      id="DECISION_ID-panel-OPTION_A"
+      role="tabpanel"
+      aria-labelledby="DECISION_ID-tab-OPTION_A"
+      data-choice-panel="OPTION_A"
+    >
+      <!-- Insert the complete proposal, preview, or tradeoff for Option A. -->
+    </section>
+    <section
+      class="choice-tabs-panel"
+      id="DECISION_ID-panel-OPTION_B"
+      role="tabpanel"
+      aria-labelledby="DECISION_ID-tab-OPTION_B"
+      data-choice-panel="OPTION_B"
+      hidden
+    >
+      <!-- Insert the complete proposal, preview, or tradeoff for Option B. -->
+    </section>
+    <section
+      class="choice-tabs-panel"
+      id="DECISION_ID-panel-OPTION_C"
+      role="tabpanel"
+      aria-labelledby="DECISION_ID-tab-OPTION_C"
+      data-choice-panel="OPTION_C"
+      hidden
+    >
+      <!-- Insert the complete proposal, preview, or tradeoff for Option C. -->
+    </section>
+  </div>
+</section>

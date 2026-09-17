@@ -262,7 +262,6 @@ export async function serve(directory, { recover = false } = {}) {
           stage: "ready",
           current: null,
           acknowledged: [],
-          question: null,
           accepted: null,
           updatedAt: timestamp(),
         };
@@ -300,8 +299,7 @@ export async function serve(directory, { recover = false } = {}) {
         .filter((event) => !state.acknowledged.includes(event.id))
         .sort((a, b) => a.sequence - b.sequence);
     }
-    if ((await pending()).length)
-      await transition({ stage: state.question ? "needs_reply" : "submitted" });
+    if ((await pending()).length) await transition({ stage: "submitted" });
     const token = crypto.randomBytes(32).toString("hex");
     let origin;
     function sameArtifact(event) {
@@ -320,9 +318,7 @@ export async function serve(directory, { recover = false } = {}) {
         "Submission requires ID and text",
       );
       requireValue(
-        ["feedback-only", "clarification-reply", "accept-plan"].includes(
-          data.intent,
-        ),
+        ["feedback-only", "accept-plan"].includes(data.intent),
         "Invalid submission intent",
       );
       requireValue(
@@ -346,13 +342,6 @@ export async function serve(directory, { recover = false } = {}) {
         "Review the current artifact before submitting; export older drafts if needed",
         409,
       );
-      if (data.intent === "clarification-reply")
-        requireValue(
-          state.stage === "needs_reply" &&
-            data.questionId === state.question?.id,
-          "This question is no longer awaiting a reply",
-          409,
-        );
       if (data.intent === "accept-plan") {
         requireValue(
           ["save", "implement"].includes(data.mode),
@@ -362,7 +351,7 @@ export async function serve(directory, { recover = false } = {}) {
           state.current.kind === "plan" &&
             ["ready", "updated"].includes(state.stage) &&
             !(await pending()).length,
-          "Resolve feedback and questions before accepting the current final plan",
+          "Resolve feedback before accepting the current final plan",
           409,
         );
       }
@@ -374,15 +363,11 @@ export async function serve(directory, { recover = false } = {}) {
       });
       await transition({
         stage:
-          data.intent === "feedback-only" &&
-          (state.stage === "working" || state.question)
-            ? state.question
-              ? "needs_reply"
-              : "working"
+          data.intent === "feedback-only" && state.stage === "working"
+            ? "working"
             : "submitted",
         latestSubmissionId: data.id,
         accepted: null,
-        ...(data.intent === "clarification-reply" ? { question: null } : {}),
       });
       return { id: data.id, saved: true, status: state };
     }
@@ -395,7 +380,7 @@ export async function serve(directory, { recover = false } = {}) {
           path.join(directory, "feedback", data.id + ".json"),
         );
         const patch = {
-          stage: state.question ? "needs_reply" : "working",
+          stage: "working",
           acknowledged: [...state.acknowledged, data.id],
           acknowledgedAt: timestamp(),
           lastAcknowledgedId: data.id,
@@ -416,36 +401,12 @@ export async function serve(directory, { recover = false } = {}) {
         }
         return { status: await transition(patch), event };
       }
-      if (data.action === "question") {
-        requireValue(
-          state.current && typeof data.text === "string" && data.text.trim(),
-          "Publish an artifact and provide question text",
-        );
-        requireValue(
-          !(await pending()).length,
-          "Read pending feedback before asking another question",
-          409,
-        );
-        return {
-          status: await transition({
-            stage: "needs_reply",
-            question: {
-              id: crypto.randomUUID(),
-              text: data.text,
-              createdAt: timestamp(),
-            },
-            accepted: null,
-          }),
-        };
-      }
       if (data.action === "working")
-        return {
-          status: await transition({ stage: "working", question: null }),
-        };
+        return { status: await transition({ stage: "working" }) };
       if (data.action === "publish") {
         requireValue(
-          !state.question && !(await pending()).length,
-          "Resolve the question and read pending feedback before publishing",
+          !(await pending()).length,
+          "Read pending feedback before publishing",
           409,
         );
         requireValue(typeof data.html === "string", "HTML is required");
@@ -548,7 +509,6 @@ export async function serve(directory, { recover = false } = {}) {
           status: await transition({
             stage: "updated",
             current,
-            question: null,
             accepted: null,
           }),
           url: origin + current.url,
@@ -558,8 +518,7 @@ export async function serve(directory, { recover = false } = {}) {
         requireValue(
           state.accepted &&
             state.accepted.sha256 === state.current?.sha256 &&
-            !(await pending()).length &&
-            !state.question,
+            !(await pending()).length,
           "Acknowledge acceptance of the current plan before completing",
           409,
         );
@@ -570,7 +529,7 @@ export async function serve(directory, { recover = false } = {}) {
             state.accepted.mode === "implement" ? "implement" : "save",
         };
       }
-      throw new Error("Unknown agent action");
+      requireValue(false, "Unknown agent action");
     }
     server = http.createServer(async (req, res) => {
       const reply = (code, value, type = "application/json") => {
@@ -797,7 +756,6 @@ export async function main(argv) {
   }
   const action = { action: command };
   if (command === "ack") action.id = options.id;
-  if (command === "question") action.text = options.text;
   if (command === "publish") {
     requireValue(options.file, "publish requires --file HTML");
     action.html = await fs.readFile(path.resolve(options.file), "utf8");

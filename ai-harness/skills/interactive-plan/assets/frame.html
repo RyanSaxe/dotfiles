@@ -40,8 +40,7 @@
               </div>
             </div>
             <div class="row">
-              <button class="btn" id="reply" hidden>Reply to question</button
-              ><a class="btn" id="update" hidden>View update →</a
+              <a class="btn" id="update" hidden>View update →</a
               ><a class="btn" id="final-plan" hidden>View accepted plan →</a>
             </div>
             <code id="plan-path" hidden></code>
@@ -133,26 +132,6 @@
         <div class="row">
           <button type="submit" class="btn primary">Add to feedback</button
           ><button type="button" class="btn" data-close="note-dialog">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </dialog>
-    <dialog
-      class="dialog"
-      id="question-dialog"
-      aria-labelledby="question-title"
-    >
-      <form id="question-form">
-        <h2 id="question-title">Reply to the agent</h2>
-        <p id="question-text"></p>
-        <label for="question-reply">Your reply</label
-        ><textarea id="question-reply" required></textarea>
-        <p class="small" id="question-error" role="status"></p>
-        <div class="row">
-          <button type="submit" class="btn primary" id="send-reply">
-            Send reply</button
-          ><button type="button" class="btn" data-close="question-dialog">
             Cancel
           </button>
         </div>

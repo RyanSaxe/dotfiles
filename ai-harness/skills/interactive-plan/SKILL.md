@@ -5,20 +5,19 @@ description: Develop and review implementation plans in an interactive browser s
 
 # Interactive plan
 
-Develop an implementation-ready plan with the user. Read the project and
-conversation to distinguish settled requirements from open decisions. Show the
-design, behavior, code, or wording they need to judge, and use their responses
-to revise the proposal. You will very likely want to have a discussion with the
-user to get the necessary context before you can do a good job creating
-interactive HTML pages to iterate with them.
+Develop an implementation-ready plan with the user. During exploration, show
+the unresolved decisions and the material needed to settle them. Save the
+overview and implementation steps for the final plan. Keep settled decisions on
+Agreed with stable IDs and exact sources.
 
 ## Explore, then review
 
 Planning has two phases: exploration and review.
 
 During exploration, develop the proposal with the user and resolve the choices
-needed for a complete implementation plan. Exploration may cover a narrow
-question, several connected choices, or a broad part of the proposed work.
+needed for a complete implementation plan. Exploration pages contain decisions
+under review, not a generic overview or early implementation steps. Agreed is
+the running context for settled work; do not add a Brief or equivalent page.
 
 During review, present the complete implementation plan. Scope and
 implementation-critical choices must be settled. The plan must include
@@ -36,8 +35,10 @@ quality of both phases.
 
 ## Run the session
 
-Ask only for missing information that affects the plan. Move to the browser
-when there is concrete material to compare, correct, or approve.
+Place each request for input beside the proposal it affects. The user answers
+through normal feedback or in the agent conversation. Do not open a separate
+question channel. Move to the browser when there is concrete material to
+compare, correct, or approve.
 
 - Read [setup.md](references/setup.md) on first use in an environment or when a capability fails.
 - Read [authoring.md](references/authoring.md) before building an artifact.
@@ -50,9 +51,8 @@ the first proposal in the user's default browser and provide its link. Keep
 the session for revisions.
 
 Read submissions before acknowledging them and combine them with conversation
-feedback. Record clear answers without asking twice. Keep settled decisions on
-Agreed with stable IDs and exact sources. Reopen only affected decisions.
-Recommendations are not agreements. When a revision changes substantive
+feedback. Record clear answers without asking twice. Reopen only affected
+agreements. Recommendations are not agreements. When a revision changes substantive
 content, briefly explain the changes and link to them where that helps review.
 
 <important>

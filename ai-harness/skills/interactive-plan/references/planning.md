@@ -2,8 +2,13 @@
 
 ## Exploration quality
 
-Exploration may address a narrow question, several connected choices, or a broad
-part of the proposed work. Keep related parts together when their interaction
+Exploration pages settle open decisions. Do not add a generic overview page or
+draft implementation steps early. Keep settled decisions and their exact
+sources on Agreed, the only running context page. Do not add a Brief or an
+equivalent summary page.
+
+An exploration may address one decision, several connected choices, or a broad
+part of the proposal. Keep related parts together when their interaction
 matters. Separate them when an unresolved dependency or too much material would
 make the proposal hard to assess.
 
@@ -13,16 +18,21 @@ important tradeoff. Address choices that affect later options before spending
 time on details those choices could invalidate.
 
 When a topic contains a meaningful choice, present a small set of credible
-options, usually two to four. Recommend one and make the basis for that
-recommendation visible in the comparison. Let the user choose, combine, revise,
-or reject the options. Do not invent alternatives when only one direction is
-credible.
+options. Recommend one and make the basis for that recommendation visible in
+the comparison. Let the user choose, combine, revise, or reject the options. Do
+not invent alternatives when only one direction is credible.
+
+When alternatives differ, show the difference. Selecting an option must change
+the nearby proposal, behavior, diagram, wording, or tradeoff. For three to seven
+related options with rich material, use the top-tab choice component. Do not use
+a row of labeled text blocks as a visual comparison.
 
 Treat components as first-class planning tools. Build with them from the start
 instead of writing a prose proposal and wrapping it in boxes afterward. Inspect
-the component index before composing a page and use supplied components
-frequently when they fit. Adapt them or create a new component when the content
-needs a different structure or interaction.
+the component index before composing a page and choose supplied components by
+their purpose and contract. Adapt them or create a plan-local component when
+the material needs a different structure or interaction. Component references
+are fit guidance, not finished page designs to copy.
 
 Build each topic page around the proposal itself. Render or demonstrate the
 material when the browser can do so, and use prose for context or consequences
