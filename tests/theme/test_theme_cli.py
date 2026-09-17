@@ -260,6 +260,21 @@ def test_fsh_theme_is_generated_and_tracks_mode(tmp_path: Path) -> None:
     assert f"reserved-word    = {light_mauve}" in light_contents
 
 
+def test_shell_colors_export_terminal_mode_hint(tmp_path: Path) -> None:
+    home, config = make_home(tmp_path), make_config(tmp_path)
+
+    dark_result = run_theme(home, config, "apply")
+
+    assert dark_result.returncode == 0, dark_result.stderr
+    rendered = state_dir(home) / "generated/shell-colors.zsh"
+    assert "export COLORFGBG='15;0'" in rendered.read_text()
+
+    light_result = run_theme(home, config, "light")
+
+    assert light_result.returncode == 0, light_result.stderr
+    assert "export COLORFGBG='0;15'" in rendered.read_text()
+
+
 def test_accent_override_reaches_rendered_output(tmp_path: Path) -> None:
     home, config = make_home(tmp_path), make_config(tmp_path)
     stub_mascot_accents(home, MASCOT_ACCENTS_OK)
