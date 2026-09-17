@@ -1164,7 +1164,7 @@ export async function main(argv) {
     while (Date.now() < deadline) {
       const result = await request((id) => `/agent/${id}/next`);
       if (result.event) return console.log(json(result));
-      await sleep(Math.min(1000, deadline - Date.now()));
+      await sleep(Math.max(0, Math.min(1000, deadline - Date.now())));
     }
     return console.log(
       json({ waiting: true, sessionId: connection.sessionId }),
