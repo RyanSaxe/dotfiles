@@ -6,19 +6,16 @@
  * A file is fetched once and held. Only one instance exists at a time; opening
  * another file disposes the first.
  */
-export const pierre = "https://esm.sh/@pierre/diffs@1.4.2?bundle";
+import { libraries, module_ } from "./libraries.mjs";
+import { createMarkers } from "./notes.mjs";
 
 const VIRTUALIZE_ABOVE = 3000;
 const themes = { light: "github-light", dark: "github-dark" };
 
-let library;
 const files = new Map();
 const panes = new WeakMap();
 
-export async function loadPierre() {
-  library ||= await import(pierre);
-  return library;
-}
+export const loadPierre = () => module_(libraries.pierre);
 
 /** Committed contents for one path at one ref, fetched once per session. */
 export async function fileContents(path, ref) {
@@ -60,8 +57,17 @@ export function disposeCode(container) {
  * costs the rows on screen rather than the whole file.
  */
 export async function openFile(container, options) {
-  const { path, ref, line, end, theme, onCursor, onSelect, onPostRender } =
-    options;
+  const {
+    path,
+    ref,
+    line,
+    end,
+    theme,
+    notes = [],
+    navigate,
+    onCursor,
+    onSelect,
+  } = options;
   let contents;
   try {
     contents = await fileContents(path, ref);
@@ -79,6 +85,7 @@ export async function openFile(container, options) {
   if (existing?.key !== `${ref}:${path}`) {
     disposeCode(container);
     const lines = contents.content.split("\n").length;
+    let markers = null;
     const shared = {
       theme: themes[theme] ?? themes.light,
       // The pane draws its own header row with the path and ref.
@@ -90,7 +97,8 @@ export async function openFile(container, options) {
         onCursor?.(range?.start ?? null);
         onSelect?.(range);
       },
-      onPostRender: (node) => onPostRender?.(node, container),
+      renderAnnotation: (annotation) => markers?.renderAnnotation(annotation),
+      onPostRender: () => markers?.inject(),
     };
     let virtualizer = null;
     let view;
@@ -101,6 +109,7 @@ export async function openFile(container, options) {
     } else {
       view = new File(shared);
     }
+    markers = createMarkers({ view, container, notes, navigate });
     view.render({
       file: { name: path, contents: contents.content },
       containerWrapper: container,
@@ -111,6 +120,7 @@ export async function openFile(container, options) {
       path,
       ref,
       view,
+      markers,
       virtualizer,
       lines,
       cursor: 1,
@@ -172,6 +182,18 @@ export function cursorLocation(container) {
 
 export function paneFor(container) {
   return panes.get(container) ?? null;
+}
+
+/** ] and [ in the code pane step through the notes on the open file. */
+export function stepNote(container, delta) {
+  panes.get(container)?.markers?.step(delta);
+}
+
+export function setTheme(container, theme) {
+  const pane = panes.get(container);
+  if (!pane) return;
+  pane.view.setThemeType(theme === "dark" ? "dark" : "light");
+  pane.markers?.inject();
 }
 
 /**

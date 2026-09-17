@@ -527,3 +527,330 @@ dialog button {
   color: var(--attention);
   font-size: 12px;
 }
+
+/* Blocks. Each one is the look approved in the plan; none of them decorate. */
+.diagram {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow-x: auto;
+  text-align: center;
+}
+.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.diagram .node.has-location > :is(rect, polygon, circle, path) {
+  stroke: var(--blue);
+  stroke-dasharray: 3 2;
+}
+.compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 0 0 6px;
+}
+.compare-side h4 {
+  margin: 0 0 8px;
+  font: 11px var(--mono);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.compare-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 14px;
+  margin: 0 0 18px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.legend-key::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.legend-key.added::before {
+  background: var(--success);
+}
+.legend-key.removed::before {
+  background: var(--danger);
+}
+.legend-key.changed::before {
+  background: var(--attention);
+}
+.compare .node.added > :is(rect, polygon, circle) {
+  stroke: var(--success);
+  stroke-width: 2px;
+}
+.compare .node.removed > :is(rect, polygon, circle) {
+  stroke: var(--danger);
+  stroke-width: 2px;
+}
+.compare .node.changed > :is(rect, polygon, circle) {
+  stroke: var(--attention);
+  stroke-width: 2px;
+}
+
+/* Excerpt: the real lines, with notes in the margin beside them. */
+.excerpt {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.excerpt > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font: 11px var(--mono);
+}
+.excerpt-path {
+  color: var(--blue);
+}
+.excerpt-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  align-items: start;
+}
+.excerpt.narrow .excerpt-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.excerpt-code {
+  min-width: 0;
+  overflow-x: auto;
+  background: var(--code);
+}
+.excerpt-notes {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--line);
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.excerpt-notes li {
+  position: absolute;
+  display: flex;
+  gap: 7px;
+  width: 100%;
+  padding: 0 10px;
+  line-height: 1.45;
+}
+.excerpt.narrow .excerpt-notes {
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.excerpt.narrow .excerpt-notes li {
+  position: static;
+  padding: 3px 12px;
+}
+.note-number {
+  flex: none;
+  min-width: 18px;
+  font: 10px var(--mono);
+  color: var(--blue);
+  text-align: right;
+}
+
+/* Diff. */
+.diff-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.diff-block > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font: 11px var(--mono);
+}
+.diff-path {
+  font-weight: 600;
+}
+.diff-style {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.diff-style button {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.diff-style button[aria-pressed="true"] {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.diff-prose {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+.diff-body {
+  overflow-x: auto;
+}
+.diff-body.placeholder {
+  padding: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Walkthrough: a path through the code, one step at a time. */
+.walkthrough ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.walkthrough li {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 10px 8px 34px;
+  border-left: 2px solid var(--line);
+  cursor: pointer;
+}
+.walkthrough li::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: -11px;
+  top: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--bg);
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.walkthrough li.current {
+  border-left-color: var(--blue);
+}
+.walkthrough li.current::before {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.step-text {
+  flex: 1;
+}
+.step-where {
+  font: 11px var(--mono);
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+/* Choice. */
+.choice {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.choice h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.choice ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.choice button {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 5px;
+  text-align: left;
+}
+.choice button:hover:not(:disabled) {
+  background: var(--soft);
+}
+.choice button.picked {
+  color: var(--blue);
+  font-weight: 600;
+}
+.option-number {
+  flex: none;
+  min-width: 16px;
+  font: 11px var(--mono);
+  color: var(--blue);
+}
+.choice-asked {
+  margin: 8px 0 0;
+  font: 11px var(--mono);
+}
+
+/* Chart. */
+.chart-block h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.chart-canvas {
+  height: 240px;
+}
+
+/* Math. */
+.math[data-math="block"] {
+  display: block;
+  margin: 14px 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+/* Notes: a number in the gutter, the open one beneath its line. */
+.note-marker {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  color: var(--bg);
+  font: 700 9px var(--mono);
+  vertical-align: middle;
+}
+.note-card {
+  padding: 8px 12px;
+  border-left: 2px solid var(--blue);
+  background: var(--panel);
+  color: var(--ink);
+  font:
+    13px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+.note-from {
+  margin-top: 5px;
+  padding: 0;
+  color: var(--blue);
+  font: 11px var(--mono);
+}

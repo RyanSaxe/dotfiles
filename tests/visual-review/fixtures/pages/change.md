@@ -21,5 +21,5 @@ flowchart LR
 ```notes main..pr/7 src/client.py
 +2   The breaker check runs before the loop, so an open breaker
      fails fast instead of retrying five times.
--1   Every retryable failure used to reach the gateway.
+-2   Five attempts was the old ceiling.
 ```

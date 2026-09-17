@@ -1,0 +1,124 @@
+/**
+ * Diff: one file between two refs, or against a pull request head.
+ *
+ * Pierre's diff view, split or unified, with notes as markers in the gutter of
+ * the side they belong to.
+ */
+import { targetKey } from "../grammar.mjs";
+import { failed, themeName, whenVisible } from "../libraries.mjs";
+import { loadPierre } from "../code.mjs";
+import { createMarkers } from "../notes.mjs";
+
+export function diff(mount, data, context) {
+  mount.classList.add("diff-block");
+  let style = "split";
+  let view = null;
+  let markers = null;
+
+  const header = document.createElement("header");
+  const title = document.createElement("span");
+  title.className = "diff-path";
+  title.textContent = `${data.path}`;
+  const refs = document.createElement("span");
+  refs.className = "muted";
+  refs.textContent = `${data.base} → ${data.head}`;
+  const toggle = document.createElement("div");
+  toggle.className = "diff-style";
+  header.append(title, refs, toggle);
+
+  const prose = document.createElement("p");
+  prose.className = "diff-prose";
+  prose.textContent = data.prose;
+  const body = document.createElement("div");
+  body.className = "diff-body";
+  mount.replaceChildren(header, ...(data.prose ? [prose] : []), body);
+
+  for (const [value, label] of [
+    ["split", "Side by side"],
+    ["unified", "Unified"],
+  ]) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    button.setAttribute("aria-pressed", String(value === style));
+    button.onclick = () => {
+      style = value;
+      for (const other of toggle.children)
+        other.setAttribute("aria-pressed", String(other === button));
+      view?.setOptions({ ...view.options, diffStyle: style });
+      view?.rerender();
+    };
+    toggle.append(button);
+  }
+
+  const notes = context.registry.forTarget(
+    targetKey({
+      kind: "diff",
+      base: data.base,
+      head: data.head,
+      path: data.path,
+    }),
+  );
+
+  const stop = whenVisible(mount, async () => {
+    try {
+      const query = new URLSearchParams({
+        base: data.base,
+        head: data.head,
+        path: data.path,
+      });
+      const response = await fetch(`/repo/diff?${query}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      if (!result.patch.trim()) {
+        body.textContent = "No changes to this file between these refs.";
+        body.className = "diff-body placeholder";
+        return;
+      }
+      const { FileDiff, parsePatchFiles } = await loadPierre();
+      const files = parsePatchFiles(result.patch).flatMap(
+        (patch) => patch.files,
+      );
+      if (files.length !== 1) throw new Error("A diff block shows one file");
+      view = new FileDiff({
+        theme: themeName() === "dark" ? "github-dark" : "github-light",
+        // The block draws its own header with the path, the refs, and the
+        // split control.
+        disableFileHeader: true,
+        diffStyle: style,
+        lineDiffType: "word-alt",
+        diffIndicators: "classic",
+        overflow: "wrap",
+        renderAnnotation: (annotation) => markers.renderAnnotation(annotation),
+        onPostRender: () => markers.inject(),
+      });
+      markers = createMarkers({
+        view,
+        container: body,
+        notes,
+        navigate: context.navigate,
+      });
+      view.render({
+        fileDiff: files[0],
+        containerWrapper: body,
+        lineAnnotations: [],
+      });
+    } catch (error) {
+      failed(mount, error);
+    }
+  });
+
+  const retheme = () => {
+    view?.setThemeType(themeName() === "dark" ? "dark" : "light");
+    markers?.inject();
+  };
+  window.addEventListener("vr:theme", retheme);
+
+  return {
+    step: (delta) => markers?.step(delta),
+    dispose() {
+      stop();
+      window.removeEventListener("vr:theme", retheme);
+      view?.cleanUp();
+    },
+  };
+}

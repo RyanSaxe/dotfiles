@@ -4,7 +4,13 @@
  */
 import { formatLocation, parseLocation } from "./grammar.mjs";
 import { createRenderer } from "./markdown.mjs";
-import { renderBlock, disposeBlocks } from "./blocks/index.mjs";
+import {
+  blockInstance,
+  disposeBlocks,
+  renderBlock,
+  renderPageExtras,
+} from "./blocks/index.mjs";
+import { createNoteRegistry } from "./notes.mjs";
 import { defaultPage, neighbors, outlineModel } from "./outline.mjs";
 import {
   openFile,
@@ -13,6 +19,8 @@ import {
   moveCursor,
   extendSelection,
   cursorLocation,
+  setTheme,
+  stepNote,
 } from "./code.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -31,6 +39,8 @@ let browserCursor = 0;
 let expanded = new Set([""]);
 let filterTimer = null;
 let renderedRevision = null;
+const registry = createNoteRegistry();
+const parsedPages = new Map();
 
 const keyMap = [
   ["h l", "Previous and next page"],
@@ -236,6 +246,40 @@ async function upgradeReferences(root, ref) {
   }
 }
 
+/**
+ * Keep the note registry current across every page of the session.
+ *
+ * A note written beside an excerpt on one page becomes a marker on the whole
+ * file wherever it is opened, so the registry has to know about pages the
+ * reader has not visited. Each page is parsed once per revision.
+ */
+async function syncNotes() {
+  renderer ||= await createRenderer();
+  for (const question of state.questions) {
+    for (const page of question.pages) {
+      if (page.status !== "written") continue;
+      const key = `${question.id}/${page.id}`;
+      if (parsedPages.get(key) === page.revision) continue;
+      const markdown = await fetch(
+        `/api/page?question=${encodeURIComponent(question.id)}&id=${encodeURIComponent(page.id)}`,
+      ).then((response) => (response.ok ? response.text() : null));
+      if (markdown === null) continue;
+      const parsed = renderer.render(markdown);
+      registry.setPage(key, {
+        notes: parsed.notes,
+        blocks: parsed.blocks,
+        from: {
+          questionId: question.id,
+          pageId: page.id,
+          questionTitle: question.title,
+          pageTitle: page.title,
+        },
+      });
+      parsedPages.set(key, page.revision);
+    }
+  }
+}
+
 async function paintPage() {
   const question = state.questions.find(
     (entry) => entry.id === view.questionId,
@@ -270,7 +314,7 @@ async function paintPage() {
   const signature = `${question.id}/${page.id}/${page.revision ?? 0}`;
   if (signature === renderedRevision) return;
   const keepScroll = renderedRevision?.startsWith(`${question.id}/${page.id}/`)
-    ? $("page").scrollTop
+    ? $("page-content").scrollTop
     : 0;
 
   const markdown = await fetch(
@@ -287,19 +331,16 @@ async function paintPage() {
     ref: repository.ref,
     questionId: question.id,
     pageId: page.id,
-    notes: rendered.notes,
+    registry,
     open,
     choose,
+    navigate: (from) => show(from.questionId, from.pageId),
   };
   for (const mount of $("page-content").querySelectorAll("[data-block]"))
     renderBlock(mount, rendered.blocks[Number(mount.dataset.block)], context);
-  window.dispatchEvent(
-    new CustomEvent("vr:page", {
-      detail: { element: $("page-content"), context },
-    }),
-  );
+  await renderPageExtras($("page-content"), context);
   await upgradeReferences($("page-content"), repository.ref);
-  $("page").scrollTop = keepScroll;
+  $("page-content").scrollTop = keepScroll;
   pageCursor = -1;
 }
 
@@ -320,12 +361,21 @@ export async function open(text) {
   $("app").classList.add("with-code");
   $("code-path").textContent = location.path;
   $("code-ref").textContent = `@ ${location.ref ?? repository.ref}`;
+  const ref = location.ref ?? repository.ref;
+  // Notes may be written against an explicit ref or against the session's, so
+  // a file opened without one still finds the notes written with it.
+  const notes = [
+    ...registry.forTarget(`${location.path}@${location.ref ?? ""}`),
+    ...(location.ref ? [] : registry.forTarget(`${location.path}@${ref}`)),
+  ];
   await openFile($("code-body"), {
     path: location.path,
-    ref: location.ref ?? repository.ref,
+    ref,
     line: location.start,
     end: location.end,
     theme: activeTheme(),
+    notes,
+    navigate: (from) => show(from.questionId, from.pageId),
     onCursor: (line) => {
       $("code-cursor").textContent = line ? `${location.path}:${line}` : "";
     },
@@ -570,6 +620,13 @@ document.addEventListener("keydown", async (event) => {
         await navigator.clipboard?.writeText(formatLocation(location));
       return;
     }
+    case "]":
+    case "[": {
+      const delta = event.key === "]" ? 1 : -1;
+      if (focus === "code") stepNote($("code-body"), delta);
+      else blockInstance(currentTarget())?.step?.(delta);
+      return;
+    }
     case "?":
       event.preventDefault();
       return $("help").showModal();
@@ -630,10 +687,12 @@ async function poll() {
     }
   }
   paintOutline();
+  await syncNotes();
   await paintPage();
 }
 
 window.addEventListener("vr:theme", () => {
+  setTheme($("code-body"), activeTheme());
   renderedRevision = null;
   paintPage();
 });
