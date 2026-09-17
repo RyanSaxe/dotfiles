@@ -259,9 +259,24 @@ export function parseCompare(argument) {
 }
 
 /**
- * What the page may keep from the agent's raw HTML. Scripts, event handlers,
+ * The attributes the page itself emits. Sanitizing runs over the whole
+ * rendered page, so these have to be named explicitly or the renderer would
+ * strip its own mount points.
+ */
+export const pageAttributes = [
+  "data-block",
+  "data-block-name",
+  "data-reference",
+  "data-math",
+  "data-before",
+  "data-after",
+];
+
+/**
+ * What a page may keep from the agent's raw HTML. Scripts, event handlers,
  * framed documents, and forms are the parts that would turn a page of prose
- * into something that acts on its own.
+ * into something that acts on its own. Arbitrary data attributes are dropped
+ * so quoted repository content cannot dress itself up as a mount point.
  */
 export const sanitizerConfig = {
   FORBID_TAGS: [
@@ -275,5 +290,5 @@ export const sanitizerConfig = {
   ],
   FORBID_ATTR: ["srcdoc", "formaction", "ping"],
   ALLOW_DATA_ATTR: false,
-  ADD_ATTR: ["target", "rel"],
+  ADD_ATTR: ["target", "rel", ...pageAttributes],
 };

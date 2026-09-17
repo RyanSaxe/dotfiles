@@ -10,13 +10,94 @@
     <script type="application/json" id="session-config">
       {}
     </script>
-    <div class="app">
-      <header class="repo">
-        <span id="repo-name">Loading</span>
-        <span id="repo-ref" class="muted"></span>
-      </header>
-      <main id="main"></main>
+    <div class="app" id="app">
+      <aside class="side" id="side">
+        <div class="repo">
+          <div class="repo-name" id="repo-name">&nbsp;</div>
+          <div class="repo-meta" id="repo-meta">&nbsp;</div>
+        </div>
+        <nav
+          class="outline"
+          id="outline"
+          tabindex="-1"
+          aria-label="Answers"
+        ></nav>
+        <div class="progress" id="progress" hidden>
+          <div class="bar"><span id="progress-bar"></span></div>
+          <div id="progress-label"></div>
+          <div class="status-line" id="progress-status"></div>
+        </div>
+        <div class="keys" id="keys">
+          <b>n</b> new question · <b>h l</b> page · <b>/</b> ask · <b>?</b> keys
+        </div>
+        <div class="brand">
+          <span>visual-review</span>
+          <select id="theme" aria-label="Appearance">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+      </aside>
+      <section class="browser" id="browser" hidden aria-label="Files">
+        <header class="browser-head">
+          <input
+            id="filter"
+            type="search"
+            autocomplete="off"
+            placeholder="filter files…"
+          />
+        </header>
+        <div class="browser-body" id="browser-body" tabindex="-1"></div>
+        <footer class="browser-foot muted">
+          <span><b>j k</b> move · <b>Enter</b> open · <b>f</b> close</span>
+        </footer>
+      </section>
+
+      <main class="main" id="main" tabindex="-1">
+        <div class="crumb" id="crumb"></div>
+        <blockquote class="asked" id="asked" hidden></blockquote>
+        <h1 id="page-title"></h1>
+        <article class="page" id="page-content"></article>
+        <div class="pagenav">
+          <button id="previous" hidden></button>
+          <button id="next" hidden></button>
+        </div>
+        <form class="ask" id="ask-form">
+          <div class="quote" id="ask-quote" hidden></div>
+          <input
+            id="ask-input"
+            type="text"
+            autocomplete="off"
+            placeholder="Ask about this repository…"
+          />
+          <button type="submit">Ask</button>
+        </form>
+      </main>
+
+      <section class="code" id="code" hidden aria-label="Code">
+        <header class="code-head">
+          <span id="code-path"></span>
+          <span class="muted" id="code-ref"></span>
+        </header>
+        <div class="code-body" id="code-body" tabindex="-1"></div>
+        <footer class="code-foot">
+          <span id="code-cursor"></span>
+          <span class="muted"
+            ><b>o</b> open · <b>j k</b> line · <b>a</b> ask ·
+            <b>y</b> copy</span
+          >
+        </footer>
+      </section>
     </div>
+
+    <dialog id="help">
+      <h2>Keys</h2>
+      <dl id="help-keys"></dl>
+      <button id="help-close">Close</button>
+    </dialog>
+
+    <div class="offline" id="offline" hidden>The helper is unreachable.</div>
     <script type="module" src="/assets/app.js"></script>
   </body>
 </html>

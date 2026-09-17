@@ -409,7 +409,10 @@ export async function describeRepository(git, root) {
   const origin = await git(["remote", "get-url", "origin"], { cap: 4096 })
     .then((result) => result.stdout.toString("utf8").trim())
     .catch(() => "");
-  const slug = origin.match(/([^/:]+\/[^/]+?)(?:\.git)?$/);
+  // owner/repo, but only from a real remote URL. A local path remote would
+  // otherwise name the session after two directories that mean nothing.
+  const remote = /^(?:[a-z+]+:\/\/|[^/\s]+@[^/\s]+:)/i.test(origin);
+  const slug = remote ? origin.match(/([^/:]+\/[^/]+?)(?:\.git)?$/) : null;
   return {
     root,
     name: slug ? slug[1] : path.basename(root),
@@ -421,15 +424,24 @@ export async function describeRepository(git, root) {
 
 const pageIdPattern = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
-/** Parse `id=Title,id=Title` into the outline the agent declared. */
+/**
+ * Parse `id=Title,id=Title` into the outline the agent declared.
+ *
+ * The split happens only where a page id follows, so a title may contain a
+ * comma. "A charge, end to end" is an ordinary page title and separating on
+ * every comma would turn it into a parse error the agent cannot see coming.
+ */
 export function parsePages(spec) {
   const pages = String(spec ?? "")
-    .split(",")
+    .split(/,(?=[a-z0-9][a-z0-9-]*=)/)
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
       const separator = entry.indexOf("=");
-      requireValue(separator > 0, `Each page is id=Title: ${entry}`);
+      requireValue(
+        separator > 0,
+        `Each page is id=Title, separated by commas: ${entry}`,
+      );
       const id = entry.slice(0, separator).trim();
       const title = entry.slice(separator + 1).trim();
       requireValue(pageIdPattern.test(id), `Invalid page id: ${id}`);
@@ -859,8 +871,6 @@ export async function serve(
     const token = crypto.randomBytes(32).toString("hex");
     let origin;
 
-    const shell = await fs.readFile(path.join(assets, "app.html"), "utf8");
-
     server = http.createServer(async (req, res) => {
       const reply = (code, value, type = "application/json") => {
         res.writeHead(code, {
@@ -882,7 +892,13 @@ export async function serve(
         );
         const url = new URL(req.url, origin);
         const query = url.searchParams;
-        if (req.method === "GET" && url.pathname === "/")
+        if (req.method === "GET" && url.pathname === "/") {
+          // Read per request rather than at startup: the shell is served once
+          // per page load, and a cached copy only hides edits to it.
+          const shell = await fs.readFile(
+            path.join(assets, "app.html"),
+            "utf8",
+          );
           return reply(
             200,
             shell.replace(
@@ -897,15 +913,18 @@ export async function serve(
             ),
             "text/html; charset=utf-8",
           );
+        }
         if (req.method === "GET" && url.pathname === "/api/state")
           return reply(200, state);
         if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
           const name = url.pathname.slice(8);
           requireValue(
-            /^[a-z0-9][a-z0-9.-]{0,63}$/.test(name),
+            /^[a-z0-9][a-z0-9./-]{0,127}$/.test(name) && !name.includes(".."),
             "Not found",
             404,
           );
+          const file = path.resolve(assets, name);
+          requireValue(file.startsWith(assets + path.sep), "Not found", 404);
           const types = {
             ".css": "text/css; charset=utf-8",
             ".js": "text/javascript; charset=utf-8",
@@ -913,7 +932,7 @@ export async function serve(
           };
           return reply(
             200,
-            await fs.readFile(path.join(assets, name)),
+            await fs.readFile(file),
             types[path.extname(name)] || "application/octet-stream",
           );
         }
