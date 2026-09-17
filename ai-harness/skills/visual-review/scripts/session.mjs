@@ -419,6 +419,65 @@ export async function describeRepository(git, root) {
   };
 }
 
+const pageIdPattern = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/** Parse `id=Title,id=Title` into the outline the agent declared. */
+export function parsePages(spec) {
+  const pages = String(spec ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const separator = entry.indexOf("=");
+      requireValue(separator > 0, `Each page is id=Title: ${entry}`);
+      const id = entry.slice(0, separator).trim();
+      const title = entry.slice(separator + 1).trim();
+      requireValue(pageIdPattern.test(id), `Invalid page id: ${id}`);
+      requireValue(title.length > 0, `Page ${id} needs a title`);
+      return { id, title, status: "planned" };
+    });
+  requireValue(pages.length > 0, "A plan needs at least one page");
+  const ids = new Set();
+  for (const page of pages) {
+    requireValue(!ids.has(page.id), `Duplicate page id: ${page.id}`);
+    ids.add(page.id);
+  }
+  return pages;
+}
+
+/**
+ * Fold a new outline into the one the reader is already looking at. Replanning
+ * may reorder, retitle, and drop pages nobody has read, but a page that has
+ * been written stays: the reader may be on it, and a link to it may exist.
+ */
+export function mergePages(existing, incoming, append = false) {
+  if (append) {
+    const known = new Set(existing.map((page) => page.id));
+    for (const page of incoming)
+      requireValue(!known.has(page.id), `Page already planned: ${page.id}`);
+    return [...existing, ...incoming];
+  }
+  const written = existing.filter((page) => page.status === "written");
+  const byId = new Map(existing.map((page) => [page.id, page]));
+  const merged = incoming.map((page) => {
+    const before = byId.get(page.id);
+    return before?.status === "written"
+      ? { ...before, title: page.title }
+      : page;
+  });
+  const kept = new Set(merged.map((page) => page.id));
+  return [...merged, ...written.filter((page) => !kept.has(page.id))];
+}
+
+/** The question's status is a reading of its pages, not a field the agent sets. */
+export function questionStatus(question) {
+  if (question.completedAt) return "done";
+  if (!question.pages.length) return "asked";
+  return question.pages.some((page) => page.status === "written")
+    ? "writing"
+    : "planned";
+}
+
 async function acquireLock(directory, recover) {
   const lock = path.join(directory, ".owner");
   if (recover && (await exists(lock))) {
@@ -514,11 +573,20 @@ export async function serve(
           sessionId: crypto.randomUUID(),
           stage: "ready",
           questions: [],
+          acknowledged: [],
           pending: 0,
           updatedAt: timestamp(),
         };
-    requireValue(idPattern.test(state.sessionId), "Invalid session state");
+    requireValue(
+      idPattern.test(state.sessionId) && Array.isArray(state.acknowledged),
+      "Invalid session state",
+    );
     state = { ...state, repo: repository };
+    const transition = async (patch) => {
+      state = { ...state, ...patch, updatedAt: timestamp() };
+      await atomic(stateFile, state);
+      return state;
+    };
     await atomic(stateFile, state);
 
     const store = createRepository({
@@ -526,6 +594,268 @@ export async function serve(
       git,
       cacheDir: path.join(directory, "repo-cache"),
     });
+
+    // Every mutation runs alone, so two browser asks or an ask racing a page
+    // publish cannot interleave their reads and writes of the session state.
+    let serialized = Promise.resolve();
+    const exclusive = (action) => {
+      const result = serialized.then(action);
+      serialized = result.catch(() => {});
+      return result;
+    };
+    const eventsDir = path.join(directory, "events");
+    const questionsDir = path.join(directory, "questions");
+
+    async function allEvents() {
+      const names = (await fs.readdir(eventsDir)).filter((name) =>
+        name.endsWith(".json"),
+      );
+      const events = await Promise.all(
+        names.map((name) => read(path.join(eventsDir, name))),
+      );
+      return events.sort((a, b) => a.sequence - b.sequence);
+    }
+    let sequence = (await allEvents()).reduce(
+      (last, event) => Math.max(last, event.sequence),
+      0,
+    );
+    const unread = async () =>
+      (await allEvents()).filter(
+        (event) => !state.acknowledged.includes(event.id),
+      );
+
+    const questionDir = (id) => path.join(questionsDir, id);
+    const readQuestion = (id) =>
+      read(path.join(questionDir(id), "question.json"));
+    const writeQuestion = async (question) => {
+      await fs.mkdir(path.join(questionDir(question.id), "pages"), {
+        recursive: true,
+        mode: 0o700,
+      });
+      await atomic(
+        path.join(questionDir(question.id), "question.json"),
+        question,
+      );
+    };
+
+    /** Rebuild the polled state from the questions and events on disk. */
+    async function refresh() {
+      const ids = await fs.readdir(questionsDir).catch(() => []);
+      const questions = await Promise.all(ids.map(readQuestion));
+      questions.sort((a, b) => a.sequence - b.sequence);
+      return transition({
+        questions: questions.map((question) => ({
+          id: question.id,
+          title: question.title,
+          text: question.text,
+          status: questionStatus(question),
+          statusLine: question.statusLine ?? null,
+          askedAt: question.askedAt,
+          context: question.context ?? null,
+          followUps: question.followUps ?? [],
+          pages: question.pages,
+        })),
+        pending: (await unread()).length,
+        stage: questions.some((question) => !question.completedAt)
+          ? "working"
+          : "ready",
+      });
+    }
+
+    async function loadQuestion(id) {
+      requireValue(idPattern.test(id || ""), "A question id is required");
+      const question = await readQuestion(id).catch(() => null);
+      requireValue(question, `Unknown question: ${id}`, 404);
+      requireValue(
+        !question.completedAt,
+        `Question ${id} is already done`,
+        409,
+      );
+      return question;
+    }
+
+    /**
+     * Record a browser event. An ask without a question in its context opens a
+     * new question; one with a question extends the answer already being
+     * written, and the agent decides where it lands.
+     */
+    async function ask(payload) {
+      requireValue(idPattern.test(payload.id || ""), "An event id is required");
+      requireValue(
+        typeof payload.text === "string" && payload.text.trim(),
+        "A question needs text",
+      );
+      requireValue(
+        Buffer.byteLength(payload.text) <= 10_000,
+        "Question text is too long",
+        413,
+      );
+      const file = path.join(eventsDir, payload.id + ".json");
+      if (await exists(file)) return { id: payload.id, saved: true };
+      const context = payload.context ?? null;
+      if (context !== null) {
+        requireValue(
+          typeof context === "object" && !Array.isArray(context),
+          "Context must be an object",
+        );
+        if (context.file !== undefined) {
+          context.file = normalizePath(context.file);
+          context.ref = normalizeRef(context.ref ?? repository.ref);
+          requireValue(
+            Array.isArray(context.lines) &&
+              context.lines.length === 2 &&
+              context.lines.every(
+                (line) => Number.isInteger(line) && line > 0,
+              ) &&
+              context.lines[0] <= context.lines[1],
+            "Selected lines are a [start, end] pair",
+          );
+        }
+      }
+      const target = context?.questionId ?? null;
+      if (target) await loadQuestion(target);
+      const event = {
+        id: payload.id,
+        sequence: ++sequence,
+        kind: "ask",
+        receivedAt: timestamp(),
+        payload: { ...payload, context },
+      };
+      await atomic(file, event);
+      if (target) {
+        const question = await readQuestion(target);
+        question.followUps = [
+          ...(question.followUps ?? []),
+          {
+            id: payload.id,
+            text: payload.text,
+            context,
+            askedAt: event.receivedAt,
+          },
+        ];
+        await writeQuestion(question);
+      } else {
+        await writeQuestion({
+          id: payload.id,
+          sequence: event.sequence,
+          title: payload.text.slice(0, 80),
+          text: payload.text,
+          context,
+          askedAt: event.receivedAt,
+          statusLine: null,
+          pages: [],
+          followUps: [],
+          completedAt: null,
+        });
+      }
+      await refresh();
+      return { id: payload.id, saved: true };
+    }
+
+    /** A picked option reaches the agent as an ask naming the block it came from. */
+    async function choose(payload) {
+      requireValue(
+        typeof payload.option === "string" && payload.option.trim(),
+        "An option is required",
+      );
+      requireValue(
+        idPattern.test(payload.questionId || ""),
+        "A question is required",
+      );
+      return ask({
+        id: payload.id,
+        text: payload.option,
+        context: {
+          questionId: payload.questionId,
+          pageId: payload.pageId,
+          blockId: payload.blockId,
+        },
+      });
+    }
+
+    async function act(data) {
+      if (data.action === "ack") {
+        requireValue(idPattern.test(data.id || ""), "An event id is required");
+        if (state.acknowledged.includes(data.id)) return { state };
+        const event = await read(path.join(eventsDir, data.id + ".json"));
+        await transition({ acknowledged: [...state.acknowledged, event.id] });
+        return { state: await refresh(), event };
+      }
+      if (data.action === "plan") {
+        const question = await loadQuestion(data.question);
+        requireValue(
+          typeof data.title === "string" && data.title.trim(),
+          "A plan needs a title",
+        );
+        question.title = data.title.trim();
+        question.pages = mergePages(
+          question.pages,
+          parsePages(data.pages),
+          data.append === true,
+        );
+        await writeQuestion(question);
+        return { state: await refresh(), pages: question.pages };
+      }
+      if (data.action === "status") {
+        const question = await loadQuestion(data.question);
+        requireValue(
+          typeof data.text === "string",
+          "A status line is required",
+        );
+        question.statusLine = data.text.slice(0, 200) || null;
+        await writeQuestion(question);
+        return { state: await refresh() };
+      }
+      if (data.action === "page") {
+        const question = await loadQuestion(data.question);
+        const page = question.pages.find((entry) => entry.id === data.id);
+        requireValue(
+          page,
+          `Page ${data.id} is not in the plan for ${question.id}; plan it first`,
+        );
+        requireValue(
+          typeof data.markdown === "string",
+          "Page Markdown is required",
+        );
+        requireValue(
+          Buffer.byteLength(data.markdown) <= 1024 * 1024,
+          "A page is limited to 1 MB",
+          413,
+        );
+        await fs.writeFile(
+          path.join(questionDir(question.id), "pages", page.id + ".md"),
+          data.markdown,
+          { mode: 0o600 },
+        );
+        page.status = "written";
+        page.revision = (page.revision ?? 0) + 1;
+        page.updatedAt = timestamp();
+        await writeQuestion(question);
+        return { state: await refresh(), page };
+      }
+      if (data.action === "done") {
+        const question = await loadQuestion(data.question);
+        question.pages = question.pages.filter(
+          (page) => page.status === "written",
+        );
+        question.completedAt = timestamp();
+        question.statusLine = null;
+        await writeQuestion(question);
+        return { state: await refresh(), pages: question.pages };
+      }
+      requireValue(false, `Unknown agent action: ${data.action}`);
+    }
+
+    async function pageMarkdown(questionId, pageId) {
+      requireValue(idPattern.test(questionId || ""), "A question is required");
+      requireValue(pageIdPattern.test(pageId || ""), "A page is required");
+      return fs.readFile(
+        path.join(questionDir(questionId), "pages", pageId + ".md"),
+        "utf8",
+      );
+    }
+
+    await refresh();
     const token = crypto.randomBytes(32).toString("hex");
     let origin;
 
@@ -585,6 +915,71 @@ export async function serve(
             200,
             await fs.readFile(path.join(assets, name)),
             types[path.extname(name)] || "application/octet-stream",
+          );
+        }
+        if (req.method === "GET" && url.pathname === "/api/page")
+          return reply(
+            200,
+            await pageMarkdown(query.get("question"), query.get("id")),
+            "text/markdown; charset=utf-8",
+          );
+        if (req.method === "GET" && url.pathname === "/agent/next") {
+          requireValue(
+            req.headers.authorization === `Bearer ${token}`,
+            "Agent token required",
+            403,
+          );
+          return reply(
+            200,
+            await exclusive(async () => ({
+              state,
+              event: (await unread())[0] || null,
+            })),
+          );
+        }
+        if (req.method === "POST") {
+          const agent = url.pathname === "/agent/action";
+          requireValue(
+            agent || ["/api/ask", "/api/choose"].includes(url.pathname),
+            "Not found",
+            404,
+          );
+          requireValue(
+            agent
+              ? req.headers.authorization === `Bearer ${token}`
+              : req.headers.origin === origin,
+            "Unauthorized source",
+            403,
+          );
+          requireValue(
+            req.headers["content-type"] === "application/json",
+            "JSON required",
+            415,
+          );
+          let raw = "";
+          for await (const chunk of req) {
+            raw += chunk;
+            requireValue(
+              Buffer.byteLength(raw) <= (agent ? 4_000_000 : 250_000),
+              "Request too large",
+              413,
+            );
+          }
+          const data = JSON.parse(raw);
+          requireValue(
+            data.sessionId === state.sessionId,
+            "Wrong session",
+            409,
+          );
+          return reply(
+            200,
+            await exclusive(() =>
+              agent
+                ? act(data)
+                : url.pathname === "/api/ask"
+                  ? ask(data)
+                  : choose(data),
+            ),
           );
         }
         if (req.method === "GET" && url.pathname === "/repo/file")
@@ -687,13 +1082,15 @@ export async function serve(
   }
 }
 
+const flags = new Set(["recover-lock", "append"]);
+
 function argumentsFrom(argv) {
   const [command, ...rest] = argv;
   const options = {};
   for (let i = 0; i < rest.length; i++) {
     requireValue(rest[i].startsWith("--"), "Options must use --name value");
     const key = rest[i].slice(2);
-    if (key === "recover-lock") options[key] = true;
+    if (flags.has(key)) options[key] = true;
     else {
       requireValue(
         rest[i + 1] && !rest[i + 1].startsWith("--"),
@@ -734,13 +1131,78 @@ export async function main(argv) {
     /^http:\/\/127\.0\.0\.1:\d+$/.test(connection.origin),
     "Invalid connection origin",
   );
+  async function request(route, data) {
+    const response = await fetch(connection.origin + route, {
+      method: data ? "POST" : "GET",
+      headers: {
+        authorization: `Bearer ${connection.token}`,
+        ...(data ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(data
+        ? { body: JSON.stringify({ ...data, sessionId: connection.sessionId }) }
+        : {}),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const result = await response.json();
+    requireValue(
+      response.ok,
+      result.error || "Request failed",
+      response.status,
+    );
+    requireValue(
+      (result.state?.sessionId || result.sessionId) === connection.sessionId,
+      "Helper identity changed; resume the intended session",
+      409,
+    );
+    return result;
+  }
+
   if (command === "state") {
     const response = await fetch(connection.origin + "/api/state", {
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(15_000),
     });
     return console.log(json(await response.json()));
   }
-  requireValue(false, `Unknown command: ${command}`);
+  if (command === "wait") {
+    const seconds = Number(options.timeout || 55);
+    requireValue(
+      Number.isFinite(seconds) && seconds > 0 && seconds <= 3600,
+      "timeout must be between 0 and 3600 seconds",
+    );
+    const deadline = Date.now() + seconds * 1000;
+    while (Date.now() < deadline) {
+      const result = await request("/agent/next");
+      if (result.event) return console.log(json(result));
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(1000, deadline - Date.now())),
+      );
+    }
+    return console.log(
+      json({ waiting: true, sessionId: connection.sessionId }),
+    );
+  }
+
+  const action = { action: command };
+  if (command === "ack") action.id = options.id;
+  if (["plan", "status", "page", "done"].includes(command))
+    action.question = options.question;
+  if (command === "plan") {
+    action.title = options.title;
+    action.pages = options.pages;
+    action.append = options.append === true;
+  }
+  if (command === "status") action.text = options.text ?? "";
+  if (command === "page") {
+    requireValue(options.id, "page requires --id PID");
+    requireValue(options.file, "page requires --file PATH");
+    action.id = options.id;
+    action.markdown = await fs.readFile(path.resolve(options.file), "utf8");
+  }
+  requireValue(
+    ["ack", "plan", "status", "page", "done"].includes(command),
+    `Unknown command: ${command}`,
+  );
+  console.log(json(await request("/agent/action", action)));
 }
 
 if (
