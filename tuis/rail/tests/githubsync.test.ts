@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  fetchAttentionTargetStates,
   fetchGithubSync,
   type GraphqlRunner,
 } from "../src/attention/github.js";
 import {
+  clearAttentionTargets,
   commitGithubSync,
   emptyObserverState,
   FULL_RECONCILIATION_INTERVAL_MS,
@@ -394,6 +396,58 @@ function attentionItem(
     activityKey: reason.id,
   };
 }
+
+test("target revalidation reports closed targets as irrelevant", async () => {
+  const closed = attentionItem(
+    "pull_request:example/repo#1",
+    "example/repo",
+    1,
+    CHECKPOINT,
+  );
+  const queries: string[] = [];
+  const runner: GraphqlRunner = async (query) => {
+    queries.push(query);
+    return graphqlResponse({
+      rateLimit: RATE_LIMIT,
+      target0: { pullRequest: { state: "CLOSED" } },
+    });
+  };
+
+  const result = await fetchAttentionTargetStates([closed], runner);
+
+  assert.deepEqual([...result.irrelevantTargetIds], [closed.id]);
+  assert.deepEqual(result.rateLimit, RATE_LIMIT);
+  assert.ok(queries[0]?.includes("pullRequest(number: 1)"));
+});
+
+test("clearing an irrelevant target removes its acknowledgement and CI memory", () => {
+  const item = attentionItem(
+    "pull_request:example/repo#1",
+    "example/repo",
+    1,
+    CHECKPOINT,
+  );
+  const state = {
+    ...emptyObserverState(),
+    items: { [item.id]: item },
+    acknowledged: { [item.id]: item.activityKey },
+    ci: {
+      "example/repo#1": {
+        state: "FAILURE" as const,
+        headSha: "head-1",
+        red: true,
+        redEpoch: 1,
+        alerted: true,
+      },
+    },
+  };
+
+  const result = clearAttentionTargets(state, new Set([item.id]));
+
+  assert.deepEqual(result.items, {});
+  assert.deepEqual(result.acknowledged, {});
+  assert.deepEqual(result.ci, {});
+});
 
 test("incremental reconciliation replaces only refreshed targets and keeps other acknowledgements", () => {
   const changed = attentionItem(

@@ -5,12 +5,17 @@ import { resolve } from "node:path";
 import { loadAttentionConfig } from "./config.js";
 import { applyCiTransition } from "./ci.js";
 import { attentionItem, classifyTarget } from "./classify.js";
-import { fetchCommentReactionStates, fetchGithubSync } from "./github.js";
+import {
+  fetchAttentionTargetStates,
+  fetchCommentReactionStates,
+  fetchGithubSync,
+} from "./github.js";
 import {
   acknowledgeItem,
   acknowledgeReactedComments,
   acquireRefreshLock,
   ATTENTION_STATE_DIR,
+  clearAttentionTargets,
   commitGithubSync,
   loadObserverState,
   markFailure,
@@ -159,11 +164,16 @@ async function refresh(args: string[]): Promise<void> {
       sync.refreshedTargetKeys,
       sync.fullReconciliation,
     );
+    const targetCheck = await fetchAttentionTargetStates(
+      Object.values(state.items),
+    );
+    state = clearAttentionTargets(state, targetCheck.irrelevantTargetIds);
     const reactionCheck = await fetchCommentReactionStates(
       pendingCommentIds(state),
     );
     state = acknowledgeReactedComments(state, reactionCheck.reactedCommentIds);
-    const observedRateLimit = reactionCheck.rateLimit ?? snapshot.rateLimit;
+    const observedRateLimit =
+      reactionCheck.rateLimit ?? targetCheck.rateLimit ?? snapshot.rateLimit;
     state = commitGithubSync(
       markSuccess(
         {

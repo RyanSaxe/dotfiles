@@ -341,6 +341,27 @@ export function acknowledgeReactedComments(
   return { ...state, items, acknowledged };
 }
 
+export function clearAttentionTargets(
+  state: ObserverState,
+  targetIds: ReadonlySet<string>,
+): ObserverState {
+  if (targetIds.size === 0) return state;
+
+  const items = { ...state.items };
+  const acknowledged = { ...state.acknowledged };
+  const ci = { ...state.ci };
+  for (const id of targetIds) {
+    const item = items[id];
+    if (item === undefined) continue;
+    delete items[id];
+    delete acknowledged[id];
+    if (item.targetKind === "pull_request") {
+      delete ci[`${item.repository}#${item.number}`];
+    }
+  }
+  return { ...state, items, acknowledged, ci };
+}
+
 // Items are target-level records. An acknowledgement survives a refresh when
 // every current reason was already part of the dismissed activity revision.
 export function reconcileAttention(

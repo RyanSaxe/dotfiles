@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 
 import type {
   ActorKind,
+  AttentionItem,
   CiState,
   GitHubActor,
   GitHubComment,
@@ -211,6 +212,15 @@ interface RawReactionGroup {
 interface RawReactionNode {
   id?: string | null;
   reactionGroups?: RawReactionGroup[] | null;
+}
+
+interface RawTargetLifecycle {
+  state?: string | null;
+}
+
+interface RawRepositoryTarget {
+  issue?: RawTargetLifecycle | null;
+  pullRequest?: RawTargetLifecycle | null;
 }
 
 interface RawComment {
@@ -938,6 +948,97 @@ export async function fetchCommentReactionStates(
     reactedCommentIds,
     rateLimit: parseRateLimit(data.rateLimit),
   };
+}
+
+const TARGET_REVALIDATION_BATCH_SIZE = 50;
+
+function repositoryParts(repository: string): [string, string] {
+  const separator = repository.indexOf("/");
+  if (separator <= 0 || separator === repository.length - 1) {
+    throw new Error(`GitHub target has an invalid repository: ${repository}`);
+  }
+  return [repository.slice(0, separator), repository.slice(separator + 1)];
+}
+
+function buildTargetLifecycleQuery(
+  targets: readonly Pick<
+    AttentionItem,
+    "id" | "targetKind" | "repository" | "number"
+  >[],
+): string {
+  const nodes = targets
+    .map((target, index) => {
+      const [owner, name] = repositoryParts(target.repository);
+      const field =
+        target.targetKind === "issue"
+          ? `issue(number: ${target.number}) {
+        state
+      }`
+          : `pullRequest(number: ${target.number}) {
+        state
+      }`;
+      return `    target${index}: repository(owner: ${graphqlString(owner)}, name: ${graphqlString(name)}) {
+      ${field}
+    }`;
+    })
+    .join("\n");
+  return `query {
+    viewer {
+      login
+    }
+    rateLimit {
+      cost
+      remaining
+      resetAt
+    }
+${nodes}
+  }`;
+}
+
+export async function fetchAttentionTargetStates(
+  targets: readonly Pick<
+    AttentionItem,
+    "id" | "targetKind" | "repository" | "number"
+  >[],
+  runQuery: GraphqlRunner = runGhGraphql,
+): Promise<{ irrelevantTargetIds: Set<string>; rateLimit: RateLimit | null }> {
+  const uniqueTargets = [
+    ...new Map(targets.map((target) => [target.id, target])).values(),
+  ];
+  if (uniqueTargets.length === 0) {
+    return { irrelevantTargetIds: new Set<string>(), rateLimit: null };
+  }
+
+  const irrelevantTargetIds = new Set<string>();
+  let rateLimit: RateLimit | null = null;
+  for (const batch of chunk(uniqueTargets, TARGET_REVALIDATION_BATCH_SIZE)) {
+    const data = parseGraphqlData(
+      await runQuery(buildTargetLifecycleQuery(batch)),
+    );
+    viewerLogin(data);
+    rateLimit = parseRateLimit(data.rateLimit) ?? rateLimit;
+
+    for (const [index, target] of batch.entries()) {
+      const repository = data[`target${index}`] as
+        RawRepositoryTarget | null | undefined;
+      if (repository === undefined) {
+        throw new Error(`GitHub target ${target.id} was missing from response`);
+      }
+      const current =
+        target.targetKind === "issue"
+          ? repository?.issue
+          : repository?.pullRequest;
+      if (current === null || current === undefined) {
+        irrelevantTargetIds.add(target.id);
+        continue;
+      }
+      if (current.state !== "OPEN") {
+        irrelevantTargetIds.add(target.id);
+      }
+    }
+  }
+
+  return { irrelevantTargetIds, rateLimit };
 }
 
 function buildDetailQuery(
