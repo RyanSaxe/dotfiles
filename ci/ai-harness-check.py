@@ -34,6 +34,14 @@ SKILL_VALIDATOR = (
 )
 
 
+# Every check below spawns a child that may run git. A pre-commit run exports
+# GIT_DIR and friends pointing at the repository being committed, so a child
+# that inherits them acts on that repository instead of its own fixture.
+ENVIRONMENT = {
+    name: value for name, value in os.environ.items() if not name.startswith("GIT_")
+}
+
+
 class HarnessError(Exception):
     """A violated AI harness ownership or structure contract."""
 
@@ -91,7 +99,9 @@ def validate_skills() -> None:
 
     for skill_dir in skill_dirs:
         command = (*SKILL_VALIDATOR, str(skill_dir))
-        result = subprocess.run(command, capture_output=True, check=False, text=True)
+        result = subprocess.run(
+            command, capture_output=True, check=False, text=True, env=ENVIRONMENT
+        )
         if result.returncode:
             details = result.stderr.strip() or result.stdout.strip()
             raise HarnessError(f"{skill_dir.relative_to(REPO_ROOT)}: {details}")
@@ -146,7 +156,7 @@ def validate_statusline() -> None:
                 capture_output=True,
                 check=False,
                 text=True,
-                env={**os.environ, "XDG_STATE_HOME": state_home},
+                env={**ENVIRONMENT, "XDG_STATE_HOME": state_home},
             )
             if result.returncode:
                 raise HarnessError(
@@ -172,6 +182,7 @@ def validate_planning_sessions() -> None:
         capture_output=True,
         check=False,
         text=True,
+        env=ENVIRONMENT,
     )
     if result.returncode:
         raise HarnessError(
@@ -188,6 +199,7 @@ def validate_visual_review_sessions() -> None:
         capture_output=True,
         check=False,
         text=True,
+        env=ENVIRONMENT,
     )
     if result.returncode:
         raise HarnessError(
