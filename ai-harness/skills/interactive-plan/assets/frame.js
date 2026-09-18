@@ -631,6 +631,8 @@ function itemCard({ kind, key, item }) {
         ? `Answer · ${item.label}`
         : item.label;
   if (item.sentIn) title.append(tag("Sent", "ok"));
+  if (kind === "list" && item.sentIn && !item.touched)
+    title.append(tag("Default", "muted"));
   const old = stale(kind, key, item);
   if (old && item.revision && item.revision !== plan.revision)
     title.append(tag(`from revision ${item.revision}`, "muted"));
@@ -710,13 +712,19 @@ function itemCard({ kind, key, item }) {
   return box;
 }
 function renderFeedback() {
+  // An untouched, unsent list is not feedback yet; it appears once it went
+  // with a round, marked as a default.
   const items = [
-    ...Object.entries(state.choices).map(([key, item]) => ({
-      kind: item.kind === "multiple" ? "list" : "choice",
-      key,
-      item,
-      topic: item.topic,
-    })),
+    ...Object.entries(state.choices)
+      .filter(
+        ([, item]) => item.kind !== "multiple" || item.touched || item.sentIn,
+      )
+      .map(([key, item]) => ({
+        kind: item.kind === "multiple" ? "list" : "choice",
+        key,
+        item,
+        topic: item.topic,
+      })),
     ...Object.entries(state.answers).map(([key, item]) => ({
       kind: "answer",
       key,
@@ -881,6 +889,12 @@ function feedbackText() {
       ...(note.quote ? ["Selected passage: " + note.quote] : []),
       note.text,
     );
+  const defaults = Object.values(state.choices).filter(
+    (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
+  );
+  if (defaults.length) lines.push("", "Defaults, not confirmed:");
+  for (const choice of defaults)
+    lines.push(`${choice.label}: ${choiceText(choice)}`);
   return lines.join("\n");
 }
 function envelope(intent, text, extra = {}) {
@@ -1234,6 +1248,7 @@ function checklist(group, topic, previous) {
     label: group.dataset.label || group.dataset.multiselect,
     target: group.id,
     revision: plan.revision,
+    touched: previous?.touched === true,
     options: Array.from(
       group.querySelectorAll('input[type="checkbox"][data-value]'),
       (input) => ({
@@ -1452,10 +1467,10 @@ document.addEventListener("change", (event) => {
   );
   if (!input) return;
   const group = input.closest("[data-multiselect]");
-  state.choices[page.id + "/" + group.dataset.multiselect] = checklist(
-    group,
-    page.id,
-  );
+  state.choices[page.id + "/" + group.dataset.multiselect] = {
+    ...checklist(group, page.id),
+    touched: true,
+  };
   save();
 });
 document.addEventListener("input", (event) => {

@@ -41,9 +41,14 @@ export function loadDraft(saved, revision) {
   return draft;
 }
 
+// A checklist counts only once the reviewer touched it; an untouched list is
+// still sent with the round so the agent has its defaults.
+const counted = (choice) =>
+  !choice.sentIn && (choice.kind !== "multiple" || choice.touched === true);
+
 export function unsentItems(draft) {
   const notes = draft.notes.filter((note) => !note.sentIn);
-  const choices = filterValues(draft.choices, (choice) => !choice.sentIn);
+  const choices = filterValues(draft.choices, counted);
   const answers = filterValues(draft.answers, (answer) => !answer.sentIn);
   return {
     notes,
@@ -55,7 +60,8 @@ export function unsentItems(draft) {
 }
 
 export function submissionGroups(draft) {
-  const { notes, choices, answers } = unsentItems(draft);
+  const { notes, answers } = unsentItems(draft);
+  const choices = filterValues(draft.choices, (choice) => !choice.sentIn);
   const strip = ({ sentIn, ...item }) => item;
   return {
     choices: mapValues(choices, strip),

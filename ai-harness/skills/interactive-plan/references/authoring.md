@@ -166,11 +166,13 @@ unique within a page across all kinds, and option IDs within a group. Use
 native buttons for single choices, native labeled checkboxes for checklists,
 and a textarea inside `data-question` for answers.
 
-Every checklist appears in Feedback, including lists on pages the user has
-not visited, so put checklist markup in page HTML rather than adding it from
-script. Authored `checked` attributes set initial values; saved draft values
-take precedence. An empty set means "None selected", not unanswered, and each
-checklist counts as one feedback item.
+Every checklist travels with a submission, including lists on pages the user
+has not visited, so put checklist markup in page HTML rather than adding it
+from script. Authored `checked` attributes set initial values; saved draft
+values take precedence. A list counts as one unsent item once the user
+changed a box, even if put back; an untouched list is sent with
+`touched: false` and listed on Feedback as a default afterwards. An empty set
+means "None selected", not unanswered.
 
 Register custom initialization on `plan:page`. The custom JS file runs before
 the frame module. Script elements inside page HTML do not execute. Page-level
@@ -182,8 +184,10 @@ actions. Feedback groups items by page with edit and remove and holds the
 overall comment; Submit, at the foot of the sidebar, sends everything unsent
 at once. Sent items stay listed as sent until the next revision; items whose
 page or text no longer exists are listed under the revision they came from.
-Submissions carry `groups.choices`, `groups.notes`, and, when present,
-`groups.answers` keyed `page/question` with `label`, `text`, and `topic`.
+Submissions carry `groups.choices` (checklists with `touched`),
+`groups.notes`, and, when present, `groups.answers` keyed `page/question`
+with `label`, `text`, and `topic`; the text lists untouched checklists
+after "Defaults, not confirmed:".
 
 ## Renderers and figures
 
