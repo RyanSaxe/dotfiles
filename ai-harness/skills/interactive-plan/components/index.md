@@ -31,8 +31,10 @@ each option needs a diagram, code, chart, or prototype. Its
 each column would be at least 280px wide, and tabs otherwise; `columns` or
 `tabs` forces one. In tabs, the pick bar chooses the option on screen and the
 chosen tab carries a tick; the toggle at the top right overrides the layout
-and is remembered per decision in the browser. Remove a decision in the
-revision that records its choice on Agreed.
+and is remembered per decision in the browser. `data-width="bleed"` lets
+the options box span the content column's full width instead of the 820px
+reading column, for layout mocks. Remove a decision in the revision that
+records its choice on Agreed.
 
 ## Questions
 
