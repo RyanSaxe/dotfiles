@@ -156,3 +156,9 @@ Say in the final report that the groups must merge in order.
 
 A separate pull request for unrelated work is a branch from the base with
 only that work. Create it before the rebuild, as the Align phase describes.
+
+## Further reading
+
+The rules in this file follow the Linux kernel's
+[Submitting patches](https://www.kernel.org/doc/html/latest/process/submitting-patches.html)
+guide, sections "Separate your changes" and "Describe your changes".
