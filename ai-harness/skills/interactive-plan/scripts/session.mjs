@@ -268,6 +268,7 @@ async function loadSession(directory, config, origin) {
         current: null,
         acknowledged: [],
         accepted: null,
+        progress: null,
         updatedAt: timestamp(),
       };
   requireValue(
@@ -515,6 +516,7 @@ async function loadSession(directory, config, origin) {
       kind: current.kind,
       revisions,
       accepted: null,
+      progress: null,
     });
     return { status: view(), url: origin + current.url };
   }
@@ -531,6 +533,7 @@ async function loadSession(directory, config, origin) {
         acknowledged: [...state.acknowledged, data.id],
         acknowledgedAt: timestamp(),
         lastAcknowledgedId: data.id,
+        progress: null,
       };
       if (event.payload.intent === "accept-plan") {
         requireValue(
@@ -551,6 +554,55 @@ async function loadSession(directory, config, origin) {
     }
     if (data.action === "working") {
       await transition({ stage: "working" });
+      return { status: view() };
+    }
+    if (data.action === "progress") {
+      requireValue(
+        state.stage === "working",
+        "Acknowledge feedback before reporting progress",
+        409,
+      );
+      if (data.steps !== undefined) {
+        requireValue(
+          Array.isArray(data.steps) &&
+            data.steps.length > 0 &&
+            data.steps.length <= 12,
+          "progress requires 1 to 12 steps",
+        );
+        const titles = data.steps.map((title) =>
+          typeof title === "string" ? title.trim() : "",
+        );
+        requireValue(
+          titles.every((title) => title && title.length <= 80) &&
+            new Set(titles).size === titles.length,
+          "Step titles must be unique, non-empty, and at most 80 characters",
+        );
+        await transition({
+          progress: {
+            steps: titles.map((title) => ({ title, done: false })),
+            updatedAt: timestamp(),
+          },
+        });
+        return { status: view() };
+      }
+      requireValue(
+        typeof data.done === "string",
+        "progress requires steps or done",
+      );
+      requireValue(state.progress, "Declare steps before marking one done");
+      const title = data.done.trim();
+      requireValue(
+        state.progress.steps.some((step) => step.title === title),
+        "Unknown progress step",
+      );
+      await transition({
+        progress: {
+          steps: state.progress.steps.map((step) =>
+            step.title === title ? { ...step, done: true } : step,
+          ),
+          updatedAt: timestamp(),
+        },
+      });
       return { status: view() };
     }
     if (data.action === "publish") return publish(data.html);
@@ -576,6 +628,7 @@ async function loadSession(directory, config, origin) {
       ...state,
       agentSeenAt: seenText(),
       revisions: state.revisions || [],
+      progress: state.progress || null,
       disconnected: state.stage !== "complete" && !live(now),
       needsYou: needsYou(),
     };
@@ -1172,6 +1225,14 @@ export async function main(argv) {
   }
   const action = { action: command };
   if (command === "ack") action.id = options.id;
+  if (command === "progress") {
+    requireValue(
+      (options.steps === undefined) !== (options.done === undefined),
+      "progress requires exactly one of --steps or --done",
+    );
+    if (options.steps !== undefined) action.steps = options.steps.split("|");
+    else action.done = options.done;
+  }
   if (command === "publish") {
     requireValue(options.file, "publish requires --file HTML");
     action.html = await fs.readFile(path.resolve(options.file), "utf8");
