@@ -7,15 +7,15 @@ IDs; concatenate the styles and behaviors you use into the artifact's `css`
 and `js` files. There is no registration step, and a plan-local component
 follows the same workflow.
 
-| Directory                                      | Use                                        | Content and interaction                                                                                                                           |
-| ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [decision](decision/markup.html)               | Two to five text options                   | Radio-style rows; each row is the `data-value` button with a title, an optional Recommended tag, and one line of consequence.                     |
-| [visual-decision](visual-decision/markup.html) | Options that each need a visual            | Option articles with a header, one line, and a figure. Columns or tabs by width and option count, with a toggle. Include its styles and behavior. |
-| [question](question/markup.html)               | An open answer the agent needs             | A card with a stripe, the question, why it matters, and a textarea. The answer travels with feedback as `groups.answers`.                         |
-| [comparison](comparison/markup.html)           | Two or three options with matched sections | Repeat the option article; matching sections align across options. Selection uses the `data-choice` and `data-value` buttons.                     |
-| [before-after](before-after/markup.html)       | A proposed change                          | The text viewer for code, or the visual pair for diagrams; not both by default.                                                                   |
-| [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. The frame records the whole list, including untouched and empty selections.   |
-| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section. Keep each ID in its contextual comment label; Revise opens the comment dialog at that case.                              |
+| Directory                                      | Use                                        | Content and interaction                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [decision](decision/markup.html)               | Two to five text options                   | Radio-style rows; each row is the `data-value` button with a title, an optional Recommended tag, and one line of consequence.                    |
+| [visual-decision](visual-decision/markup.html) | Options that each need a visual            | Option articles with a header, one line, and a figure. Tabs by default, side by side on request, with a toggle. Include its styles and behavior. |
+| [question](question/markup.html)               | An open answer the agent needs             | A card with a stripe, the question, why it matters, and a textarea. The answer travels with feedback as `groups.answers`.                        |
+| [comparison](comparison/markup.html)           | Two or three options with matched sections | Repeat the option article; matching sections align across options. Selection uses the `data-choice` and `data-value` buttons.                    |
+| [before-after](before-after/markup.html)       | A proposed change                          | The text viewer for code, or the visual pair for diagrams; not both by default.                                                                  |
+| [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. The frame records the whole list, including untouched and empty selections.  |
+| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section. Keep each ID in its contextual comment label; Revise opens the comment dialog at that case.                             |
 
 Code, diagrams, and charts need no component: the frame renders them as
 figures from `data-file`, `data-caption`, and `data-title` (see
@@ -26,14 +26,16 @@ behavior.
 
 Use the decision when a title and one line are enough to judge each option;
 put the recommended option first with the tag. Use the visual decision when
-each option needs a diagram, code, chart, or prototype. Its
-`data-layout="auto"` shows columns when there are at most three options and
-each column would be at least 280px wide, and tabs otherwise; `columns` or
-`tabs` forces one. In tabs, the pick bar chooses the option on screen and the
-chosen tab carries a tick; the toggle at the top right overrides the layout
-and is remembered per decision in the browser. Give each option one line of
-consequence, concrete and specific to it. Remove a decision in the revision
-that records its choice on Agreed.
+each option needs a diagram, code, chart, or prototype. It shows tabs, one
+option at a time at full width, with the option's radio header at the top of
+the panel as the pick; the chosen tab carries a tick. `data-layout="columns"`
+asks for side by side, honored when every column would be at least 240px
+wide and falling back to tabs on a narrow window; use it for narrow material
+such as mocks. The toggle at the top right, Tabs · Side by side, overrides
+the layout and is remembered per decision in the browser. A figure inside an
+option shrinks to its column side by side and keeps its size in a tab. Give
+each option one line of consequence, concrete and specific to it. Remove a
+decision in the revision that records its choice on Agreed.
 
 ## Questions
 
