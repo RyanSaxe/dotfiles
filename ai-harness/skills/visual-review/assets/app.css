@@ -1,0 +1,1236 @@
+/* Tokens, type, and the shell follow the design accepted in the redesign plan. */
+:root {
+  color-scheme: light;
+  --ground: #f6f6f8;
+  --panel: #fff;
+  --line: #e3e4e8;
+  --line-strong: #cfd1d7;
+  --ink: #17191c;
+  --muted: #6b7079;
+  --accent: #3457d5;
+  --accent-ink: #fff;
+  --accent-soft: #eef1fc;
+  --attention: #b45309;
+  --attention-bg: #fff4e5;
+  --ok: #1f7a45;
+  --ok-bg: #e6f5ec;
+  --danger: #a12622;
+  --danger-bg: #fff0ee;
+  --code: #f3f4f6;
+  --mark: #fff3bf;
+  --shadow: 0 10px 30px #0002, 0 1px 3px #0001;
+  --sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font: 15px/1.6 var(--sans);
+  background: var(--ground);
+  color: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #121417;
+    --panel: #1a1d22;
+    --line: #2a2e35;
+    --line-strong: #3a3f48;
+    --ink: #e7e9ec;
+    --muted: #9aa1ab;
+    --accent: #8fa5ff;
+    --accent-ink: #0d1330;
+    --accent-soft: #1e2740;
+    --attention: #f0b25f;
+    --attention-bg: #3a2b14;
+    --ok: #7fd39a;
+    --ok-bg: #173023;
+    --danger: #ffaaa4;
+    --danger-bg: #402321;
+    --code: #15181c;
+    --mark: #4a3f14;
+    --shadow: 0 10px 30px #0006, 0 1px 3px #0004;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #121417;
+  --panel: #1a1d22;
+  --line: #2a2e35;
+  --line-strong: #3a3f48;
+  --ink: #e7e9ec;
+  --muted: #9aa1ab;
+  --accent: #8fa5ff;
+  --accent-ink: #0d1330;
+  --accent-soft: #1e2740;
+  --attention: #f0b25f;
+  --attention-bg: #3a2b14;
+  --ok: #7fd39a;
+  --ok-bg: #173023;
+  --danger: #ffaaa4;
+  --danger-bg: #402321;
+  --code: #15181c;
+  --mark: #4a3f14;
+  --shadow: 0 10px 30px #0006, 0 1px 3px #0004;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  /* Only the regions scroll; the frame is the viewport. */
+  overflow: hidden;
+}
+[hidden] {
+  display: none !important;
+}
+[popover]:not(:popover-open) {
+  display: none;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* Regions take focus for the keys; the cursor inside them shows where it is. */
+#main:focus-visible,
+#code-body:focus-visible,
+#thread-list:focus-visible {
+  outline: none;
+}
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12.5px;
+}
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel);
+  font: 11px/17px var(--sans);
+  text-align: center;
+  color: var(--ink);
+}
+.chip {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.chip.quiet {
+  background: var(--ground);
+  color: var(--muted);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.icon-btn:hover,
+.icon-btn[aria-pressed="true"] {
+  background: var(--ground);
+  color: var(--ink);
+}
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.spin {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+select {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+/* The shell: a top bar over the thread, the page, and the code pane. */
+.app {
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr);
+  height: 100%;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  white-space: nowrap;
+}
+.top > * {
+  flex-shrink: 0;
+}
+.top .grow {
+  flex: 1;
+}
+.top .repo {
+  font-weight: 650;
+}
+.top .repo span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.qbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.qbtn:hover,
+.qbtn[aria-pressed="true"] {
+  background: var(--ground);
+}
+.qbtn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.stepper .pg {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.stepper .pg.written {
+  color: var(--ink);
+}
+.stepper .pg.current {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.stepper .pg:not(.written):not(.writing) {
+  opacity: 0.5;
+}
+.stepper .pg:disabled {
+  cursor: default;
+}
+.settings {
+  position: fixed;
+  inset: 48px 16px auto auto;
+  margin: 0;
+  width: 240px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.settings label {
+  display: block;
+  margin: 4px 0 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.settings select {
+  width: 100%;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+  min-height: 0;
+  transition: grid-template-columns 0.2s ease;
+}
+.body.thread-open {
+  grid-template-columns: 320px minmax(0, 1fr) 0;
+}
+.body.beside {
+  grid-template-columns: 0 54fr 46fr;
+}
+.body.thread-open.beside {
+  grid-template-columns: 320px 54fr 46fr;
+}
+.body.wide {
+  grid-template-columns: 0 28fr 72fr;
+}
+.body.thread-open.wide {
+  grid-template-columns: 320px 28fr 72fr;
+}
+
+/* Thread: the questions and the composer. */
+.thread {
+  display: grid;
+  /* One track that never grows past the panel: a long context chip would
+     otherwise widen every row and cut the questions off. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.thread > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 650;
+}
+.thread .list {
+  overflow: auto;
+  padding: 8px;
+}
+.thread .msg {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border-radius: 9px;
+  margin-bottom: 4px;
+}
+.thread .msg:hover {
+  background: var(--ground);
+}
+.thread .msg.current {
+  background: var(--accent-soft);
+}
+.thread .msg[data-cursor] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.thread .msg .q {
+  font-size: 13.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.thread .msg .st {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.thread .msg.current .st {
+  color: var(--accent);
+}
+.thread .empty {
+  padding: 18px 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.compose {
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+.compose .ctx {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  min-height: 0;
+}
+.compose .ctx .chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compose .field {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--ground);
+}
+.compose textarea {
+  flex: 1;
+  min-height: 46px;
+  resize: vertical;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 13.5px;
+  line-height: 1.45;
+  outline: none;
+}
+.compose .btn {
+  padding: 5px 10px;
+}
+.compose .error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+.compose .exported {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The page. */
+.prose {
+  min-width: 0;
+  overflow: auto;
+  padding: 28px 40px 40px;
+  background: var(--panel);
+}
+.article {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.body.beside .article,
+.body.wide .article {
+  max-width: none;
+  margin: 0;
+}
+.body.wide .prose {
+  padding: 20px 22px;
+  font-size: 13.5px;
+}
+.body.wide .article h1 {
+  font-size: 20px;
+}
+/* Figures collapse to their heads; prose, walkthroughs, and choices stay. */
+.body.wide .article .figure > :not(.figure-head),
+.body.wide .article .figure-head :is(.open, .figure-toggle) {
+  display: none;
+}
+.body.wide .article .figure.headless .figure-head {
+  display: flex;
+}
+.body.wide .article .compare {
+  grid-template-columns: minmax(0, 1fr);
+}
+.crumb {
+  font-size: 13px;
+  color: var(--muted);
+}
+.crumb b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.asked {
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.article h1 {
+  margin: 6px 0 14px;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+  font-weight: 650;
+}
+.article .placeholder-title {
+  color: var(--muted);
+  font-weight: 500;
+}
+.page :is(h2, h3) {
+  margin: 26px 0 10px;
+  font-size: 16px;
+}
+.page p {
+  margin: 0 0 14px;
+}
+.page code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--code);
+  font: 13px var(--mono);
+}
+.page code.reference {
+  background: none;
+  padding: 0;
+}
+.page a.reference {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.page [data-cursor] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+.page table {
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+.page :is(th, td) {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.page th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.page blockquote {
+  margin: 0 0 14px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.page section.added {
+  margin: 20px 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--accent);
+}
+.page section.added h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.block,
+.block-source {
+  margin: 0 0 18px;
+}
+.block-source pre {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--code);
+  overflow-x: auto;
+  font: 12.5px/1.65 var(--mono);
+}
+.renderer-error {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.notes-summary {
+  font-size: 13px;
+  color: var(--muted);
+}
+.pagenav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.pagenav button {
+  color: var(--accent);
+}
+.export-note {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.export-note a {
+  white-space: nowrap;
+}
+.export-warning {
+  color: var(--attention);
+}
+
+/* Code pane. */
+.codepane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--code);
+}
+.codepane > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.codepane > header b {
+  font-weight: 600;
+}
+.codepane > header .muted {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.code-body {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.code-body .placeholder {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+/* Fold bars name what they hide; the file's own rows sit between them. */
+.code-body .fold {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px 6px 20px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+  color: var(--muted);
+  font: 12.5px var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.code-body .fold::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: currentcolor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+.code-body .fold-above {
+  border-top: 0;
+}
+.code-body .fold-below {
+  border-bottom: 0;
+}
+.code-body .fold b {
+  color: var(--accent);
+  font-weight: 500;
+}
+.code-body .fold:hover b,
+.code-body .fold:focus-visible b {
+  text-decoration: underline;
+}
+
+/* Quick open. */
+.palette {
+  width: min(560px, 92vw);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.palette::backdrop {
+  background: rgb(0 0 0 / 25%);
+}
+.palette .in {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.palette input {
+  flex: 1;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 15px;
+  outline: none;
+}
+.palette .res {
+  max-height: 50vh;
+  overflow: auto;
+  padding: 6px;
+}
+.palette .res button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13.5px;
+}
+.palette .res button[data-cursor] {
+  background: var(--accent-soft);
+}
+.palette .res .dir {
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette .res mark {
+  background: var(--mark);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.palette .foot {
+  display: flex;
+  gap: 14px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.palette .foot .count {
+  margin-left: auto;
+}
+
+/* Help. */
+dialog.help {
+  padding: 22px 26px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop {
+  background: rgb(0 0 0 / 25%);
+}
+dialog.help h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+.key-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0 0 16px;
+  font-size: 13.5px;
+}
+.key-list dt {
+  white-space: nowrap;
+}
+.key-list dd {
+  margin: 0;
+}
+
+.offline {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--attention);
+  border-radius: 7px;
+  background: var(--attention-bg);
+  color: var(--attention);
+  font-size: 12.5px;
+}
+
+/* Below 1100px the top bar drops the ref line and tightens the stepper. */
+@media (max-width: 1100px) {
+  .top {
+    gap: 10px;
+    padding: 0 14px;
+  }
+  .top .repo span {
+    display: none;
+  }
+  .top .repo {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stepper .pg {
+    padding: 0 6px;
+  }
+}
+
+/* Narrow screens: the thread becomes a sheet, the pane takes the width. */
+@media (max-width: 720px) {
+  .top {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .top .repo span {
+    display: none;
+  }
+  .top .repo {
+    max-width: 140px;
+  }
+  /* Only the current page fits; ] and [ still move. */
+  .stepper .pg:not(.current) {
+    display: none;
+  }
+  .qbtn span {
+    display: none;
+  }
+  .body.thread-open {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+  .thread {
+    position: fixed;
+    inset: 54px 0 0 0;
+    z-index: 5;
+    border-right: 0;
+  }
+  .body:not(.thread-open) .thread {
+    display: none;
+  }
+  .body.beside,
+  .body.wide {
+    grid-template-columns: 0 0 minmax(0, 1fr);
+  }
+  .body.beside .prose,
+  .body.wide .prose {
+    display: none;
+  }
+  .prose {
+    padding: 20px 18px 30px;
+  }
+}
+
+/* Figures: one shell for every block that shows a file, a diff, a chart, or
+   a diagram. */
+.figure {
+  margin: 18px 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.figure-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+  font-size: 13px;
+  color: var(--muted);
+}
+.figure-head b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.figure-head .open {
+  flex: none;
+  color: var(--accent);
+  font-weight: 500;
+}
+.figure.headless .figure-head {
+  display: none;
+}
+.figure-caption {
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+.figure-body {
+  min-width: 0;
+}
+/* A body waiting on its renderer keeps the shell's shape. */
+.figure-body:empty {
+  min-height: 56px;
+}
+.figure-body.placeholder {
+  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.figure-toggle {
+  display: flex;
+  gap: 4px;
+}
+.figure-toggle button {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--muted);
+}
+.figure-toggle button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Diagram, and two of them before and after. */
+.diagram {
+  padding: 16px;
+  overflow-x: auto;
+  text-align: center;
+}
+.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+/* Mermaid scopes its own node styles to the diagram's id, which outweighs
+   any page selector, so the page's overrides carry !important. */
+.diagram .node.has-location > :is(rect, polygon, circle, path) {
+  fill: var(--accent-soft) !important;
+  stroke: var(--accent) !important;
+}
+.diagram .node.has-location :is(.nodeLabel, text) {
+  color: var(--accent) !important;
+  fill: var(--accent) !important;
+}
+.compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 18px 0 20px;
+}
+.compare .figure {
+  margin: 0;
+}
+.compare-side h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.compare-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.legend-key::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.legend-key.added::before {
+  background: var(--ok);
+}
+.legend-key.removed::before {
+  background: var(--danger);
+}
+.legend-key.changed::before {
+  background: var(--attention);
+}
+.compare .node.added > :is(rect, polygon, circle) {
+  stroke: var(--ok) !important;
+  stroke-width: 2px !important;
+}
+.compare .node.removed > :is(rect, polygon, circle) {
+  stroke: var(--danger) !important;
+  stroke-width: 2px !important;
+}
+.compare .node.changed > :is(rect, polygon, circle) {
+  stroke: var(--attention) !important;
+  stroke-width: 2px !important;
+}
+
+/* Excerpt: the real lines, with notes in the margin beside them. */
+.figure-body.with-notes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: start;
+}
+.figure-body.with-notes.stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+.excerpt-code {
+  min-width: 0;
+  overflow-x: auto;
+  background: var(--code);
+}
+.figure-notes {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--line);
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+.figure-notes li {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 12px;
+  line-height: 1.45;
+}
+.figure-notes .n {
+  flex: none;
+  min-width: 26px;
+  padding-top: 2px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+  text-align: right;
+}
+.stack .figure-notes {
+  padding: 6px 0;
+  border-left: 0;
+  border-top: 1px solid var(--line);
+}
+.stack .figure-notes li {
+  position: static;
+}
+
+/* Diff. */
+.diff-body {
+  overflow-x: auto;
+}
+
+/* Walkthrough: a path through the code, one step at a time. */
+.walkthrough ol {
+  margin: 18px 0 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.walkthrough li {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 10px 8px 34px;
+  border-left: 2px solid var(--line);
+  cursor: pointer;
+}
+.walkthrough li::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: -11px;
+  top: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--panel);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.walkthrough li.current {
+  border-left-color: var(--accent);
+}
+.walkthrough li.current::before {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.step-text {
+  flex: 1;
+}
+.step-where {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* Choice: numbered rows; the picked one stays marked. */
+.choice {
+  margin: 18px 0 20px;
+}
+.choice h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+.choice ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.choice button {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.choice button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--ground);
+}
+.choice button.picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  opacity: 1;
+}
+.option-number {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.picked .option-number {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.option-label {
+  flex: 1;
+}
+.choice-asked {
+  font-size: 12.5px;
+  color: var(--accent);
+}
+
+/* Chart. */
+.chart-canvas {
+  height: 240px;
+  padding: 8px 8px 0;
+}
+
+/* Math. */
+.math[data-math="block"] {
+  display: block;
+  margin: 14px 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+/* Notes: the open one beneath its line. The markers live in Pierre's shadow
+   root and take their style from notes.mjs. */
+.note-card {
+  padding: 8px 12px;
+  border-left: 2px solid var(--accent);
+  background: var(--panel);
+  color: var(--ink);
+  font: 13px/1.5 var(--sans);
+}
+.note-from {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 12px;
+}

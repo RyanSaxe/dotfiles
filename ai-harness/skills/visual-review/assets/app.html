@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Visual review</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <script type="application/json" id="session-config">
+      {}
+    </script>
+    <script type="application/json" id="session-data">
+      null
+    </script>
+    <div class="app" id="app">
+      <header class="top">
+        <span class="repo"
+          ><b id="repo-name"></b> <span id="repo-ref"></span
+        ></span>
+        <button
+          class="qbtn"
+          id="thread-toggle"
+          type="button"
+          aria-pressed="false"
+          title="Questions (t)"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h16v11H8l-4 4z" />
+          </svg>
+          <span id="question-count">Questions</span>
+        </button>
+        <nav class="stepper" id="stepper" aria-label="Pages"></nav>
+        <span class="grow"></span>
+        <button
+          class="icon-btn"
+          id="open-files"
+          type="button"
+          title="Open a file (f)"
+          aria-label="Open a file"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+            />
+          </svg>
+        </button>
+        <button
+          class="icon-btn"
+          id="open-help"
+          type="button"
+          title="Keys (?)"
+          aria-label="Keys"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.2" />
+            <path d="M12 17h.01" />
+          </svg>
+        </button>
+        <button
+          class="icon-btn"
+          id="open-settings"
+          type="button"
+          popovertarget="settings-menu"
+          title="Settings"
+          aria-label="Settings"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+            />
+          </svg>
+        </button>
+        <div id="settings-menu" class="settings" popover>
+          <label for="theme">Appearance</label>
+          <select id="theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="body" id="body">
+        <aside class="thread" id="thread" aria-label="Questions">
+          <header>
+            <span>Questions</span>
+            <button
+              class="icon-btn"
+              id="thread-close"
+              type="button"
+              aria-label="Close"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </header>
+          <div class="list" id="thread-list" tabindex="-1"></div>
+          <form class="compose" id="ask-form">
+            <div class="ctx" id="ask-context"></div>
+            <div class="field">
+              <textarea
+                id="ask-input"
+                rows="2"
+                placeholder="Ask about this repository…"
+                aria-label="Your question"
+              ></textarea>
+              <button class="btn primary" type="submit">Ask</button>
+            </div>
+            <p class="error" id="ask-error" hidden></p>
+          </form>
+          <p class="compose exported" id="exported-note" hidden></p>
+        </aside>
+
+        <main class="prose" id="main" tabindex="-1">
+          <div class="article">
+            <div class="crumb" id="crumb"></div>
+            <blockquote class="asked" id="asked" hidden></blockquote>
+            <h1 id="page-title"></h1>
+            <article class="page" id="page-content"></article>
+            <div class="pagenav">
+              <button id="previous" type="button" hidden></button>
+              <button id="next" type="button" hidden></button>
+            </div>
+            <p class="export-note" id="export-note" hidden></p>
+          </div>
+        </main>
+
+        <section class="codepane" id="code" aria-label="Code">
+          <header>
+            <b id="code-path"></b>
+            <span class="muted" id="code-meta"></span>
+            <button
+              class="icon-btn"
+              id="code-widen"
+              type="button"
+              title="Wider (w)"
+              aria-label="Wider"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4" />
+              </svg>
+            </button>
+            <button
+              class="icon-btn"
+              id="code-close"
+              type="button"
+              title="Close (Esc)"
+              aria-label="Close"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </header>
+          <div class="code-body" id="code-body" tabindex="-1"></div>
+        </section>
+      </div>
+    </div>
+
+    <dialog class="palette" id="palette" aria-label="Open a file">
+      <div class="in">
+        <span class="muted">Open</span>
+        <input
+          id="palette-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="type part of a file name"
+        />
+      </div>
+      <div class="res" id="palette-results"></div>
+      <div class="foot">
+        <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+        <span><kbd>Enter</kbd> open</span>
+        <span><kbd>Esc</kbd> close</span>
+        <span class="count" id="palette-count"></span>
+      </div>
+    </dialog>
+
+    <dialog class="help" id="help" aria-labelledby="help-title">
+      <h2 id="help-title">Keys</h2>
+      <dl class="key-list" id="help-keys"></dl>
+      <button class="btn" id="help-close" type="button">Close</button>
+    </dialog>
+
+    <div class="offline" id="offline" hidden>The helper is unreachable.</div>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>
