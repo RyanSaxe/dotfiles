@@ -45,7 +45,8 @@ link in chat.
 Read each submission before acknowledging it and combine it with feedback
 from the conversation. Right after `ack`, declare the steps of the revision
 with `progress --steps` and mark each with `--done` as you finish it: the
-reviewer's page shows them. Record clear answers once. Reopen only affected
+reviewer's page shows them, with reading, checking, and publishing already
+around them. Record clear answers once. Reopen only affected
 agreements; recommendations are not agreements. When a revision changes
 substantive content, say what changed and link to it.
 

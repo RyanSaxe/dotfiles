@@ -24,9 +24,10 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html
 node scripts/session.mjs wait --session-dir PATH --timeout 55
 ```
 
-`publish` copies the file into the session's `artifacts/` directory under
-its own name and refuses a name that already exists there, so build
-elsewhere, such as `src/out/`. When checking a revision with browser
+`publish` stores the artifact as `<artifactId>.<revision>.html` in the
+session's `artifacts/` directory, from the values embedded in the artifact,
+and refuses a revision that already exists, so build elsewhere, such as
+`src/out/`. When checking a revision with browser
 automation, a sandboxed prototype embed captures as a blank iframe; check
 it through Open full size or by serving its file directly.
 
@@ -83,7 +84,9 @@ node scripts/session.mjs progress --session-dir PATH --done "Update Agreed"
 
 The reviewer's working card lists the steps and ticks them, with the hub's
 own bookends around them: reading the feedback, working out the steps,
-checking and polishing, publishing. `--steps` takes one to twelve titles
+checking and polishing, publishing. Declare only the work between reading
+and checking; a declared "check" or "publish" step shows twice. `--steps`
+takes one to twelve titles
 split on `|`, unique and at most 80 characters; declaring again replaces
 the list. `--done` names a declared step and is a no-op when repeated;
 an unknown title is an error. Both need an acknowledged round (409 before
@@ -137,10 +140,14 @@ agent token, private to the agent), `artifacts/`, `feedback/`, and
 submissions.
 
 `status.json` records `title`, `kind`, `revisions`, `progress`, and
-`agentSeenAt` beside the stage. `stage` is `ready`, `updated`, `submitted`, `working`, or
-`complete`; `disconnected` and `needsYou` are derived in responses. `wait`
-returns the next unread event without acknowledging it; `ack` is idempotent;
-`publish` waits only for unread feedback.
+`agentSeenAt` beside the stage. `stage` is `ready`, `updated`, `submitted`,
+`working`, or `complete`: a submission moves it to `submitted`, `ack` to
+`working`, `publish` to `updated`, `complete` to `complete`. `disconnected`
+and `needsYou` are derived in responses; `needsYou` is true when a published
+revision is waiting on the reviewer (stage `ready` or `updated`), which is
+what the browser's bell counts. `wait` returns the next unread event without
+acknowledging it; `ack` is idempotent; `publish` refuses while a submission
+is unread.
 
 When `start` finds a hub on older or newer code it uses it and logs the
 mismatch; the hub restarts on the newer code once no session is live.
