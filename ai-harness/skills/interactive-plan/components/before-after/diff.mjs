@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,10 +38,21 @@ export async function compareFiles(beforePath, afterPath) {
   return { before, after, patch };
 }
 
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+// Compare real paths: the skill is installed through a symlink, and a guard
+// on the spelling alone exits without running anything.
+const invoked = (() => {
+  try {
+    return (
+      Boolean(process.argv[1]) &&
+      realpathSync(path.resolve(process.argv[1])) ===
+        realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+})();
+
+if (invoked) {
   try {
     const [before, after, output, ...extra] = process.argv.slice(2);
     if (!before || !after || !output || extra.length)
