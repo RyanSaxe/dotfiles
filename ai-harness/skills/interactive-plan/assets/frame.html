@@ -107,6 +107,7 @@
           <section id="reading">
             <h1 tabindex="-1" id="page-title"></h1>
             <div id="page-content"></div>
+            <p class="note-count" id="note-count" hidden></p>
             <div class="page-actions" id="page-actions">
               <button class="btn quiet" id="page-comment" type="button">
                 Comment on this page
@@ -115,7 +116,6 @@
           </section>
           <section id="feedback" hidden>
             <h1 tabindex="-1">Feedback</h1>
-            <p class="muted" id="feedback-lede"></p>
             <div id="feedback-groups"></div>
             <section class="feedback-group">
               <div class="group-head">
@@ -242,6 +242,7 @@
     <button class="btn primary quote-button" id="quote" type="button" hidden>
       Comment on selection
     </button>
+    <div class="note-tip" id="note-tip" hidden></div>
     <div class="toast" id="toast" role="status" hidden></div>
 
     <script type="application/json" id="session-config">

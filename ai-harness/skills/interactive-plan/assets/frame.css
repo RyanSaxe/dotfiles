@@ -549,7 +549,7 @@ select {
   border-radius: 6px;
 }
 .content {
-  max-width: 900px;
+  max-width: 820px;
   margin: 0 auto;
   padding: 4px 40px 90px;
   width: 100%;
@@ -558,12 +558,6 @@ select {
 }
 body.is-working .content {
   opacity: 0.33;
-}
-#page-content > p,
-#page-content > ul,
-#page-content > ol,
-.lede {
-  max-width: 68ch;
 }
 #page-content p,
 #page-content li {
@@ -700,21 +694,33 @@ mark.note-mark {
   padding: 0 1px;
   border-radius: 2px;
 }
-.note-marker {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--accent-ink);
-  background: var(--accent);
-  padding: 0 4px;
-  border-radius: 999px;
-  margin-left: 2px;
-  vertical-align: super;
-  line-height: 1.4;
-  user-select: none;
-}
 .note-count {
+  margin: 28px 0 0;
   font-size: 12px;
   color: var(--muted);
+}
+.note-tip {
+  position: absolute;
+  z-index: 9;
+  max-width: 340px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.note-tip p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.note-tip p + p {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
 }
 
 /* Feedback page */
@@ -1059,7 +1065,10 @@ svg {
   display: block;
   width: 100%;
   border: 0;
-  background: var(--panel);
+  background: transparent;
+}
+.prototype-source:not([open]) {
+  display: none;
 }
 .prototype-source {
   border-top: 1px solid var(--line);
@@ -1211,7 +1220,6 @@ dialog::backdrop {
 :root[data-mode="readonly"] #quote,
 :root[data-mode="readonly"] .side-cta,
 :root[data-mode="readonly"] [data-comment],
-:root[data-mode="readonly"] .note-marker,
 :root[data-mode="readonly"] .note-count {
   display: none !important;
 }

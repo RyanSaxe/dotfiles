@@ -251,7 +251,7 @@ function findText(root, needle) {
   let text = "",
     pendingSpace = false;
   for (let node; (node = walker.nextNode());) {
-    if (node.parentElement?.closest("script, style, .note-marker")) continue;
+    if (node.parentElement?.closest("script, style")) continue;
     const data = node.data;
     for (let index = 0; index < data.length; index++) {
       if (/\s/.test(data[index])) {
@@ -296,53 +296,98 @@ function highlight(name, ranges) {
 }
 const richContent =
   "[data-language], [data-diagram], [data-math], [data-chart], [data-prototype]";
-function blockOf(node) {
-  for (
-    let element = node.parentElement;
-    element;
-    element = element.parentElement
-  ) {
-    if (element === $("page-content")) return null;
-    if (
-      /^(P|LI|SECTION|ARTICLE|DIV|H[1-6]|TABLE|FIGURE|BLOCKQUOTE)$/.test(
-        element.tagName,
-      )
-    )
-      return element;
-  }
-  return null;
-}
+let noteRanges = [];
 function markNotes() {
-  $("page-content")
-    .querySelectorAll(".note-count")
-    .forEach((e) => e.remove());
   const notes = state.notes.filter((note) => note.topic === page.id);
-  const ranges = [];
-  let last = null;
-  notes.forEach((note, index) => {
-    if (!note.quote) return;
+  noteRanges = [];
+  for (const note of notes) {
+    if (!note.quote) continue;
     const range = findText($("page-content"), note.quote);
     if (!range || range.startContainer.parentElement?.closest(richContent))
-      return;
-    const marker = document.createElement("sup");
-    marker.className = "note-marker";
-    marker.textContent = String(index + 1);
-    marker.title = "Noted. Open Feedback to read it.";
-    const end = range.cloneRange();
-    end.collapse(false);
-    end.insertNode(marker);
-    ranges.push(range);
-    last = marker;
-  });
-  highlight("plan-note", ranges);
-  if (!notes.length) return;
-  const line = document.createElement("p");
-  line.className = "note-count";
-  line.textContent = `${plural(notes.length, "note")} on this page · open Feedback to read ${notes.length === 1 ? "it" : "them"}`;
-  const block = last && blockOf(last);
-  if (block) block.after(line);
-  else $("page-content").append(line);
+      continue;
+    noteRanges.push({ note, range });
+  }
+  highlight(
+    "plan-note",
+    noteRanges.map((item) => item.range),
+  );
+  $("note-count").hidden = !notes.length;
+  $("note-count").textContent = notes.length
+    ? `${plural(notes.length, "note")} on this page`
+    : "";
 }
+// Highlights have no element to hover, so the pointer is hit-tested against
+// the note ranges; overlapping notes all show in one tip.
+function notesAt(x, y) {
+  let node, offset;
+  if (document.caretPositionFromPoint) {
+    const position = document.caretPositionFromPoint(x, y);
+    if (!position) return [];
+    node = position.offsetNode;
+    offset = position.offset;
+  } else if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(x, y);
+    if (!range) return [];
+    node = range.startContainer;
+    offset = range.startOffset;
+  } else return [];
+  return noteRanges
+    .filter(({ range }) => {
+      try {
+        return range.isPointInRange(node, offset);
+      } catch {
+        return false;
+      }
+    })
+    .map((item) => item.note);
+}
+let tipNotes = "";
+function showTip(event) {
+  const notes = noteRanges.length ? notesAt(event.clientX, event.clientY) : [];
+  const key = notes.map((note) => note.id).join();
+  const tip = $("note-tip");
+  if (!notes.length) {
+    tip.hidden = true;
+    tipNotes = "";
+    $("page-content").style.cursor = "";
+    return;
+  }
+  if (key !== tipNotes) {
+    tip.replaceChildren(
+      ...notes.map((note) => {
+        const line = document.createElement("p");
+        line.textContent = note.text;
+        return line;
+      }),
+    );
+    tipNotes = key;
+  }
+  tip.hidden = false;
+  $("page-content").style.cursor = "pointer";
+  const width = tip.offsetWidth;
+  tip.style.left = `${Math.min(event.pageX + 14, window.scrollX + innerWidth - width - 12)}px`;
+  tip.style.top = `${event.pageY + 18}px`;
+}
+$("page-content").addEventListener("mousemove", showTip);
+$("page-content").addEventListener("mouseleave", () => {
+  $("note-tip").hidden = true;
+  tipNotes = "";
+});
+$("page-content").addEventListener("click", (event) => {
+  if (!editable || event.target.closest("button, a, input, textarea, summary"))
+    return;
+  const notes = notesAt(event.clientX, event.clientY);
+  if (notes.length === 1)
+    openNote(
+      notes[0].topic,
+      notes[0].anchor,
+      notes[0].quote,
+      notes[0].id,
+      notes[0].agreementId,
+      notes[0].target,
+    );
+  else if (notes.length > 1) show("feedback");
+});
 
 function openNote(
   topic,
@@ -556,11 +601,6 @@ function renderAgreements() {
     root.innerHTML = '<p class="muted">No agreements recorded yet.</p>';
     return;
   }
-  const lede = document.createElement("p");
-  lede.className = "muted";
-  lede.textContent =
-    "Decisions so far, each with where it was agreed. New since the last revision is marked.";
-  root.append(lede);
   const active = agreements.filter((entry) => entry.state !== "retired");
   const retired = agreements.filter((entry) => entry.state === "retired");
   for (const entry of active) root.append(agreementCard(entry));
@@ -679,8 +719,6 @@ function itemCard({ kind, key, item }) {
   return box;
 }
 function renderFeedback() {
-  $("feedback-lede").textContent =
-    `Everything you marked on revision ${plan.revision}. Nothing is sent until you submit.`;
   const items = [
     ...Object.entries(state.choices).map(([key, item]) => ({
       kind: item.kind === "multiple" ? "list" : "choice",
@@ -732,8 +770,7 @@ function renderFeedback() {
   if (!items.some((entry) => entry.topic !== "overall")) {
     const empty = document.createElement("p");
     empty.className = "feedback-empty";
-    empty.textContent =
-      "Nothing marked yet. Choose options, tick checklists, or comment on the pages.";
+    empty.textContent = "Nothing marked yet.";
     groups.append(empty);
   }
   $("overall-notes").replaceChildren(
@@ -779,11 +816,9 @@ function review() {
     : "Submit";
   $("submit-status").textContent =
     submissionError ||
-    (unsent.count
-      ? "Sent all at once. The agent replies with the next revision."
-      : state.submitted?.revision === plan.revision
-        ? `Sent ${ago(state.submitted.at)}.`
-        : "Nothing to send yet.");
+    (!unsent.count && state.submitted?.revision === plan.revision
+      ? `Sent ${ago(state.submitted.at)}.`
+      : "");
   status();
 }
 function feedbackText() {
@@ -1662,6 +1697,7 @@ function enhance(root) {
     frame.title = prototype.title;
     frame.className = "approved-prototype";
     frame.setAttribute("sandbox", "allow-scripts allow-forms allow-popups");
+    frame.setAttribute("allowtransparency", "true");
     frame.style.height = `${prototype.height}px`;
     frame.srcdoc = prototype.html;
     const details = document.createElement("details");
