@@ -543,7 +543,11 @@ main {
   background: var(--attention);
   color: #fff;
 }
+/* A popover sits in the top layer, where absolute means the top of the
+   document; fixed keeps the menu under the gear however far the page is
+   scrolled. */
 .settings {
+  position: fixed;
   inset: 44px 16px auto auto;
   margin: 0;
   width: 240px;
