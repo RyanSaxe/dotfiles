@@ -1,230 +1,53 @@
 <section class="decision" data-choice="retry" data-label="Retry policy">
   <h3>How should the payment client retry a failed charge?</h3>
-  <button
-    class="decision-option"
-    type="button"
-    data-value="breaker"
-    data-label="Circuit breaker"
-  >
-    <b>Circuit breaker <span class="tag">Recommended</span></b>
-    <p>
-      Five failures open the breaker for thirty seconds; the checkout sees one
-      fast error instead of five slow ones.
-    </p>
-  </button>
-  <button
-    class="decision-option"
-    type="button"
-    data-value="backoff"
-    data-label="Exponential backoff"
-  >
-    <b>Exponential backoff</b>
-    <p>
-      Retries up to five times over about a minute; a gateway outage keeps the
-      request open the whole time.
-    </p>
-  </button>
-  <button
-    class="decision-option"
-    type="button"
-    data-value="none"
-    data-label="No retries"
-  >
-    <b>No retries</b>
-    <p>
-      Every gateway blip becomes a failed checkout the customer has to redo.
-    </p>
-  </button>
-  <button
-    class="decision-option"
-    type="button"
-    data-value="queue"
-    data-label="Queue and confirm later"
-  >
-    <b>Queue and confirm later</b>
-    <p>
-      The order completes before the charge; refunds and declined cards become a
-      separate reconciliation job.
-    </p>
-  </button>
+  <button class="decision-option" type="button" data-value="breaker" data-label="Circuit breaker"><b>Circuit breaker <span class="tag">Recommended</span></b><p>Five failures open the breaker for thirty seconds; the checkout sees one fast error instead of five slow ones.</p></button>
+  <button class="decision-option" type="button" data-value="backoff" data-label="Exponential backoff"><b>Exponential backoff</b><p>Retries up to five times over about a minute; a gateway outage keeps the request open the whole time.</p></button>
+  <button class="decision-option" type="button" data-value="none" data-label="No retries"><b>No retries</b><p>Every gateway blip becomes a failed checkout the customer has to redo.</p></button>
+  <button class="decision-option" type="button" data-value="queue" data-label="Queue and confirm later"><b>Queue and confirm later</b><p>The order completes before the charge; refunds and declined cards become a separate reconciliation job.</p></button>
 </section>
-<section
-  class="visual-decision"
-  data-choice="topology"
-  data-label="Service topology"
->
+<section class="visual-decision" data-choice="topology" data-label="Service topology">
   <h3>Where does the breaker live?</h3>
-  <article class="visual-option" data-value="client" data-label="In the client">
-    <header>In the client <span class="tag">Recommended</span></header>
-    <p>One breaker per process; state is lost on restart.</p>
-    <figure>
-      <div data-diagram>
-        flowchart LR C["Checkout"] --> P["PaymentClient"] --> B["Breaker"] -->
-        G["Gateway"] --> L["Ledger"] --> N["Notifier"]
-      </div>
-    </figure>
-  </article>
-  <article
-    class="visual-option"
-    data-value="sidecar"
-    data-label="Sidecar proxy"
-  >
-    <header>Sidecar proxy</header>
-    <p>Shared across processes on a host; another moving part to deploy.</p>
-    <figure>
-      <div data-diagram>
-        flowchart LR C["Checkout"] --> P["PaymentClient"] --> S["Envoy sidecar"]
-        --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]
-      </div>
-    </figure>
-  </article>
-  <article
-    class="visual-option"
-    data-value="gateway"
-    data-label="At the gateway"
-  >
-    <header>At the gateway</header>
-    <p>Central state; every service pays the extra hop.</p>
-    <figure>
-      <div data-diagram>
-        flowchart LR C["Checkout"] --> P["PaymentClient"] --> A["API gateway +
-        breaker"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]
-      </div>
-    </figure>
-  </article>
+  <article class="visual-option" data-value="client" data-label="In the client"><header>In the client <span class="tag">Recommended</span></header><p>One breaker per process; state is lost on restart.</p><figure><div data-diagram>flowchart LR
+  C["Checkout"] --> P["PaymentClient"] --> B["Breaker"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
+  <article class="visual-option" data-value="sidecar" data-label="Sidecar proxy"><header>Sidecar proxy</header><p>Shared across processes on a host; another moving part to deploy.</p><figure><div data-diagram>flowchart LR
+  C["Checkout"] --> P["PaymentClient"] --> S["Envoy sidecar"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
+  <article class="visual-option" data-value="gateway" data-label="At the gateway"><header>At the gateway</header><p>Central state; every service pays the extra hop.</p><figure><div data-diagram>flowchart LR
+  C["Checkout"] --> P["PaymentClient"] --> A["API gateway + breaker"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
 </section>
-<section
-  class="visual-decision"
-  data-choice="handler"
-  data-label="Handler shape"
->
+<section class="visual-decision" data-choice="handler" data-label="Handler shape">
   <h3>What does the charge handler look like?</h3>
-  <article class="visual-option" data-value="a" data-label="Async function">
-    <header>Async function <span class="tag">Recommended</span></header>
-    <p>Matches the rest of the module.</p>
-    <figure>
-      <div data-language="typescript" data-file="src/charge.ts">
-        export async function charge(request: ChargeRequest):
-        Promise&lt;ChargeResult&gt; { const result = await breaker.run(() =&gt;
-        client.charge(request)); if (!result.ok) throw new PaymentError(result);
-        return result; }
-      </div>
-    </figure>
-  </article>
-  <article class="visual-option" data-value="b" data-label="Class with run()">
-    <header>Class with run()</header>
-    <p>Holds the breaker as state.</p>
-    <figure>
-      <div data-language="typescript">
-        export class ChargeHandler { constructor(private breaker:
-        CircuitBreaker, private client: PaymentClient) {} async run(request:
-        ChargeRequest) { return this.breaker.run(() =&gt;
-        this.client.charge(request)); } }
-      </div>
-    </figure>
-  </article>
-  <article class="visual-option" data-value="c" data-label="Middleware">
-    <header>Middleware</header>
-    <p>Applies to every route, not just charge.</p>
-    <figure>
-      <div data-language="typescript">
-        app.use(withBreaker(breaker)); app.post("/charge", async (req, res)
-        =&gt; { res.json(await client.charge(req.body)); });
-      </div>
-    </figure>
-  </article>
-  <article class="visual-option" data-value="d" data-label="Generator">
-    <header>Generator</header>
-    <p>Streams partial results; nothing consumes them.</p>
-    <figure>
-      <div data-language="typescript">
-        export async function* charge(request: ChargeRequest) { yield { stage:
-        "start" }; yield { stage: "done", result: await client.charge(request)
-        }; }
-      </div>
-    </figure>
-  </article>
-  <article class="visual-option" data-value="e" data-label="Queue worker">
-    <header>Queue worker</header>
-    <p>Decouples the request; adds a queue.</p>
-    <figure>
-      <div data-language="typescript">
-        worker.process("charge", async (job) =&gt; { await
-        client.charge(job.data); });
-      </div>
-    </figure>
-  </article>
+  <article class="visual-option" data-value="a" data-label="Async function"><header>Async function <span class="tag">Recommended</span></header><p>Matches the rest of the module.</p><figure><div data-language="typescript" data-file="src/charge.ts">export async function charge(request: ChargeRequest): Promise&lt;ChargeResult&gt; {
+  const result = await breaker.run(() =&gt; client.charge(request));
+  if (!result.ok) throw new PaymentError(result);
+  return result;
+}</div></figure></article>
+  <article class="visual-option" data-value="b" data-label="Class with run()"><header>Class with run()</header><p>Holds the breaker as state.</p><figure><div data-language="typescript">export class ChargeHandler {
+  constructor(private breaker: CircuitBreaker, private client: PaymentClient) {}
+  async run(request: ChargeRequest) {
+    return this.breaker.run(() =&gt; this.client.charge(request));
+  }
+}</div></figure></article>
+  <article class="visual-option" data-value="c" data-label="Middleware"><header>Middleware</header><p>Applies to every route, not just charge.</p><figure><div data-language="typescript">app.use(withBreaker(breaker));
+app.post("/charge", async (req, res) =&gt; {
+  res.json(await client.charge(req.body));
+});</div></figure></article>
+  <article class="visual-option" data-value="d" data-label="Generator"><header>Generator</header><p>Streams partial results; nothing consumes them.</p><figure><div data-language="typescript">export async function* charge(request: ChargeRequest) {
+  yield { stage: "start" };
+  yield { stage: "done", result: await client.charge(request) };
+}</div></figure></article>
+  <article class="visual-option" data-value="e" data-label="Queue worker"><header>Queue worker</header><p>Decouples the request; adds a queue.</p><figure><div data-language="typescript">worker.process("charge", async (job) =&gt; {
+  await client.charge(job.data);
+});</div></figure></article>
 </section>
-<section
-  class="visual-decision"
-  data-choice="badge"
-  data-label="Breaker badge"
-  data-layout="columns"
->
+<section class="visual-decision" data-choice="badge" data-label="Breaker badge" data-layout="columns">
   <h3>Which badge shows the breaker state?</h3>
-  <article class="visual-option" data-value="pill" data-label="Pill">
-    <header>Pill <span class="tag">Recommended</span></header>
-    <p>Reads at a glance in the header.</p>
-    <figure>
-      <div style="padding: 14px; text-align: center">
-        <span
-          style="
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 999px;
-            background: var(--ok-bg);
-            color: var(--ok);
-            font-weight: 600;
-          "
-          >closed</span
-        >
-      </div>
-    </figure>
-  </article>
-  <article class="visual-option" data-value="dot" data-label="Dot">
-    <header>Dot</header>
-    <p>Smallest; needs a hover to name the state.</p>
-    <figure>
-      <div style="padding: 14px; text-align: center">
-        <span
-          style="
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--ok);
-            vertical-align: middle;
-          "
-        ></span>
-        <span style="color: var(--muted)">gateway</span>
-      </div>
-    </figure>
-  </article>
-  <article class="visual-option" data-value="row" data-label="Status row">
-    <header>Status row</header>
-    <p>Names every breaker; takes a line each.</p>
-    <figure>
-      <div style="padding: 10px 14px; font-size: 12.5px">
-        <div>gateway <b style="color: var(--ok)">closed</b></div>
-        <div>ledger <b style="color: var(--attention)">half-open</b></div>
-      </div>
-    </figure>
-  </article>
+  <article class="visual-option" data-value="pill" data-label="Pill"><header>Pill <span class="tag">Recommended</span></header><p>Reads at a glance in the header.</p><figure><div style="padding:14px;text-align:center"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font-weight:600">closed</span></div></figure></article>
+  <article class="visual-option" data-value="dot" data-label="Dot"><header>Dot</header><p>Smallest; needs a hover to name the state.</p><figure><div style="padding:14px;text-align:center"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--ok);vertical-align:middle"></span> <span style="color:var(--muted)">gateway</span></div></figure></article>
+  <article class="visual-option" data-value="row" data-label="Status row"><header>Status row</header><p>Names every breaker; takes a line each.</p><figure><div style="padding:10px 14px;font-size:12.5px"><div>gateway <b style="color:var(--ok)">closed</b></div><div>ledger <b style="color:var(--attention)">half-open</b></div></div></figure></article>
 </section>
-<section
-  class="question"
-  data-question="threshold"
-  data-label="Breaker threshold"
->
+<section class="question" data-question="threshold" data-label="Breaker threshold">
   <span class="tag">Question</span>
   <h3>How many consecutive failures should open the breaker?</h3>
-  <p class="question-why">
-    The number sets how long a gateway outage keeps failing checkouts before the
-    fast error kicks in.
-  </p>
-  <textarea
-    rows="3"
-    placeholder="Type your answer…"
-    aria-label="Your answer"
-  ></textarea>
+  <p class="question-why">The number sets how long a gateway outage keeps failing checkouts before the fast error kicks in.</p>
+  <textarea rows="3" placeholder="Type your answer…" aria-label="Your answer"></textarea>
 </section>
