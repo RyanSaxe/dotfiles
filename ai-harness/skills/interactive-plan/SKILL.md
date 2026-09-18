@@ -53,10 +53,15 @@ plan unless asked.
 
 <important>
 
-While browser review is active, keep the turn waiting on that session. Answer
-side questions, then resume waiting. A timeout is not completion; the helper
-cannot wake an ended turn. Stop only after explicit acceptance or when the user
-pauses, cancels, or redirects the task.
+While browser review is active, every turn ends with a `wait` in flight or
+with `complete`. A timeout is not completion: wait again. A side question in
+the conversation does not end the session: answer it, then call `wait` again
+in the same turn. An interrupted or rejected `wait` is the user asking for
+attention, not cancelling the review: answer, then wait again. The helper
+cannot wake an ended turn and the user cannot see that polling stopped, so a
+turn that ends without a wait leaves the session silently dead. Stop only
+after explicit acceptance, or when the user says in words to stop or
+redirects the task, and say in the reply that polling has stopped.
 
 </important>
 

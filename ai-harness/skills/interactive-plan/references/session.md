@@ -36,9 +36,15 @@ with the URL quoted) and give the link in chat. Report a failed launch and
 keep the link available. Do not open another tab on later revisions: the page
 refreshes itself when a revision lands and keeps the user's unsent draft.
 
-Keep the agent turn waiting. A timeout is not completion; wait again. A side
-question does not end the session: answer it, then resume the same wait. The
-helper saves feedback but cannot wake an ended turn.
+Keep the agent turn waiting. The loop is `wait`, read the event, `ack`,
+publish when a revision is due, `wait` again; every turn ends with a `wait`
+in flight or with `complete`. A timeout returns `{"waiting": true}` and is
+not completion: call `wait` again. A side question does not end the session:
+answer it, then call `wait` again in the same turn. An interrupted or
+rejected `wait` is the user asking for attention, not cancelling the review:
+answer, then wait again. The helper saves feedback but cannot wake an ended
+turn, and the user cannot see that polling stopped. If the user says in
+words to stop, say in the reply that polling has stopped.
 
 Publishing is not completion either. A revision published in reply to
 feedback returns to `wait`; only `complete`, after an acknowledged
