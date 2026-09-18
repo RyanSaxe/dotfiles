@@ -53,8 +53,8 @@ formatting, or generated output that is not part of the behavior. Say why
 in the commit that removes it.
 
 When the change is documentation or configuration and the project has no
-test for it, the project's validators are its tests; say in the body which
-ones ran.
+test for it, the project's validators are its tests, and CI shows their
+result; the body says how the document was used instead.
 
 Never delete, skip, or weaken a failing test to make the checks pass. A
 failing test means a bug in the change or in the test; fix whichever it is.
@@ -77,8 +77,9 @@ this branch, with the project's checks and by using the change. Fixtures
 the pull request adds count. A run on another repository counts only when
 the pull request is about that repository.
 
-Write the command and its result, what you did and what happened, the
-screenshot and what it shows. Keep what you observed separate from what you
-inferred. When the result is visual, take a screenshot; saying you opened
+Write what you did and what happened, the screenshot and what it shows,
+and the tests added with what each asserts. Do not write that the project's
+checks or the tests pass; CI runs them and shows the result on the pull
+request. Keep what you observed separate from what you inferred. When the result is visual, take a screenshot; saying you opened
 the UI proves little. Do not write "not checked" lines: verify it now or
 leave it out.

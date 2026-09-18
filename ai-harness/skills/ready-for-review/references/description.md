@@ -24,10 +24,12 @@ verify in it. The table tells the reviewer to read commit by commit. A cell
 may hold an example or a code block when that shows the work better than a
 sentence.
 
-**Checked.** What was checked: the tests added and the command that runs
-them, what you did with the change and what happened, the fixtures this
-pull request adds. Put screenshots here, each with a one-line caption, when
-the result is visual. Only include checks run in this repository on this
+**Checked.** What was checked: the tests this pull request adds and what
+each asserts, what you did with the change and what happened, the fixtures
+this pull request adds. When the result is visual, the screenshots are the
+check: put them here, each with a one-line caption. Do not say that the
+project's checks or the tests pass; CI runs them and shows the result on
+the pull request. Only include checks run in this repository on this
 branch. A check run on another repository belongs here only when the pull
 request is about that repository.
 
@@ -56,7 +58,7 @@ Before this change the pane opened at line 1 and the reader scrolled to the cite
 
 ## Checked
 
-- 12 tests added, one file per commit; `node --test tests/visual-review` passes on every commit.
+- 12 tests added, one file per commit, run by `node --test tests/visual-review`: the first visible line for a 345–357 reference, the fold bar's name in Python, JavaScript, and a file with no definitions, the cursor line after a fold expands, a marker on a folded line, and the chip's `{path, ref, start, end}`.
 - Opened `src/session.py:345-357` from a page, expanded both folds to the ends of the file, and opened a 20,000-line file at lines 10001–10010. Both files come from the `play.mjs` fixture in this pull request.
 
 ![The pane at lines 345–357 with both fold bars](pane.png)
@@ -69,7 +71,8 @@ Before this change the pane opened at line 1 and the reader scrolled to the cite
   inline in a shell command.
 - Every claim says what was run or used. "Tested locally" is not a claim.
 - Reference each image in the body as a Markdown image with its local path,
-  then pass the same path to `--attach '<path>#<alt text>'`; gh uploads it
-  and rewrites the reference.
+  then pass the same path to `--attach '<path>#<alt text>'` on
+  `gh pr create` or `gh pr edit`; gh uploads it and rewrites the reference.
+  A referenced image that is not attached renders broken.
 - Add a review comment of your own only as a last resort, for one hunk whose
   reason fits neither in the code nor in the commit message.
