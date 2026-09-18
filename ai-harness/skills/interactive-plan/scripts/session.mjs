@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
@@ -1178,7 +1178,19 @@ export async function main(argv) {
   }
   console.log(json(await request((id) => `/agent/${id}/action`, action)));
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === here) {
+// Compare real paths: through the ~/.config symlink the two differ, and a
+// guard on the spelling alone exits without running anything.
+const invoked = (() => {
+  try {
+    return (
+      process.argv[1] &&
+      realpathSync(path.resolve(process.argv[1])) === realpathSync(here)
+    );
+  } catch {
+    return false;
+  }
+})();
+if (invoked) {
   main(process.argv.slice(2)).catch((error) => {
     console.error(`interactive-plan: ${error.message}`);
     process.exitCode = 1;

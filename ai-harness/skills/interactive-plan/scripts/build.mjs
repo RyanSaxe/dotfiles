@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,10 +78,20 @@ export async function build(source) {
   return assemble(data, { css, js });
 }
 
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+/** Whether this file is the one Node was asked to run, symlinks resolved. */
+function isMain(argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  try {
+    return (
+      realpathSync(path.resolve(argv1)) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMain()) {
   try {
     const [source, output, ...extra] = process.argv.slice(2);
     if (!source || !output || extra.length)

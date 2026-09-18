@@ -508,6 +508,22 @@ test("split authoring sources build a standalone artifact without executing cont
     exec(process.execPath, [builder, source, output]),
     /EEXIST/,
   );
+
+  // The skill is installed through a symlink; the builder must still know
+  // it is the script being run.
+  const link = path.join(directory, "skill");
+  await fs.symlink(path.dirname(path.dirname(helper)), link);
+  const linked = path.join(directory, "linked.html");
+  await exec(process.execPath, [
+    path.join(link, "scripts", "build.mjs"),
+    source,
+    linked,
+  ]);
+  assert.equal(await fs.readFile(linked, "utf8"), html);
+  await assert.rejects(
+    exec(process.execPath, [path.join(link, "scripts", "build.mjs")]),
+    /Usage/,
+  );
 });
 
 test("preserved prototypes retain exact executable source without escaping into the frame", async (t) => {
