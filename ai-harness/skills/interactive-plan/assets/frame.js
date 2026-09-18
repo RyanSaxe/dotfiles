@@ -118,8 +118,6 @@ let page = plan.pages[0],
   noteDraftKey = "",
   renderedFeedback = null,
   toastTimer,
-  keyPrefix = "",
-  keyPrefixTimer,
   answerTimer;
 const charts = new Map();
 const diffs = new Map();
@@ -1014,13 +1012,16 @@ function renderSessions() {
   const need = others.filter((entry) => entry.needsYou);
   const workingList = others.filter((entry) => !entry.needsYou);
   const mine = sessions.filter((entry) => entry.id === session.sessionId);
+  // The number means attention: other sessions waiting on you. With none, the
+  // bell stays as a plain way into the session list.
   $("bell").hidden = !others.length;
-  $("bell-count").textContent = String(others.length);
+  $("bell-count").textContent = String(need.length);
+  $("bell-count").hidden = !need.length;
   $("bell").classList.toggle("need", need.length > 0);
   $("bell").setAttribute(
     "aria-label",
     need.length
-      ? `${plural(others.length, "other session")}, ${need.length} need you`
+      ? `${plural(need.length, "session")} need you, ${plural(others.length, "other session")} live`
       : plural(others.length, "other session"),
   );
   document.title = (need.length ? `(${need.length}) ` : "") + plan.title;
@@ -1297,6 +1298,9 @@ document.querySelectorAll("[data-accept-mode]").forEach(
       }
     }),
 );
+// A click inside an embedded frame never reaches this document, but it does
+// move focus, so menus close on blur as well as on outside clicks.
+window.addEventListener("blur", closeMenus);
 document.addEventListener("click", (event) => {
   const close = event.target.closest("[data-close]");
   if (close) $(close.dataset.close).close();
@@ -1448,14 +1452,6 @@ document.addEventListener("keydown", (event) => {
     return;
   if (document.querySelector("dialog[open]")) return;
   const key = event.key;
-  if (keyPrefix === "g") {
-    keyPrefix = "";
-    if (key === "a") {
-      event.preventDefault();
-      show("agreed");
-    }
-    return;
-  }
   if (key === "?") $("keys-dialog").showModal();
   else if (/^[1-9]$/.test(key)) {
     const entry = sessionOrder[Number(key) - 1];
@@ -1484,11 +1480,8 @@ document.addEventListener("keydown", (event) => {
   } else if (key === "c" && editable && !$("reading").hidden)
     openNote(page.id, page.title);
   else if (key === "r" && editable) show("feedback");
-  else if (key === "g") {
-    keyPrefix = "g";
-    clearTimeout(keyPrefixTimer);
-    keyPrefixTimer = setTimeout(() => (keyPrefix = ""), 1200);
-  } else return;
+  else if (key === "a") show("agreed");
+  else return;
   event.preventDefault();
 });
 
