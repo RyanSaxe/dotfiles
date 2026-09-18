@@ -26,6 +26,11 @@ comparison. Use the decision component when a title and one line are enough
 to judge each option, and the visual decision when each option needs a
 diagram, code, chart, or prototype.
 
+A page starts at the decision. No lede, no sentence of rationale, no
+restatement of the question; at most one line of context about what a mock
+shows. Each option carries one line of consequence. A sentence that could
+sit unchanged on another plan says nothing about this one.
+
 Build each page around the proposal itself. Render or demonstrate the
 material when the browser can, and use prose for context or consequences the
 page cannot show. Let the content determine the layout, keep the

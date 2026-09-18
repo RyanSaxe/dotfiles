@@ -33,8 +33,9 @@ each column would be at least 280px wide, and tabs otherwise; `columns` or
 chosen tab carries a tick; the toggle at the top right overrides the layout
 and is remembered per decision in the browser. `data-width="bleed"` lets
 the options box span the content column's full width instead of the 820px
-reading column, for layout mocks. Remove a decision in the revision that
-records its choice on Agreed.
+reading column, for layout mocks. Give each option one line of
+consequence, concrete and specific to it. Remove a decision in the revision
+that records its choice on Agreed.
 
 ## Questions
 
