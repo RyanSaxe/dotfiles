@@ -1,14 +1,6 @@
 .visual-decision {
   margin: 16px 0 24px;
 }
-/* A layout mock needs the room the reading column does not give it: bleed
-   takes the content column's full width, past the 820px column. */
-@media (min-width: 721px) {
-  .visual-decision[data-width="bleed"] {
-    width: calc(100% + 96px);
-    margin-left: -56px;
-  }
-}
 .vd-head {
   display: flex;
   justify-content: space-between;
