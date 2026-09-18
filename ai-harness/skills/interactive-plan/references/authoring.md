@@ -7,9 +7,11 @@ CSS and JavaScript as needed, and build one artifact from them:
 node scripts/build.mjs SOURCE.json ARTIFACT.html
 ```
 
-The output filename must be new. The builder embeds the frame and the authored
-content into one HTML file; it does not bundle imports or linked files, so
-embed every local resource the plan needs. Do not modify shared skill assets
+The output filename must be new. Build into a directory of your own under
+the session directory, such as `src/out/`; the publisher owns `artifacts/`
+and refuses a name that already exists there. The builder embeds the frame
+and the authored content into one HTML file; it does not bundle imports or
+linked files, so embed every local resource the plan needs. Do not modify shared skill assets
 for a particular plan, and do not install packages to author one.
 
 ## Manifest
@@ -58,6 +60,17 @@ same-origin access to the review frame, so its controls cannot submit real
 feedback; scripts, forms, and popup links work inside the sandbox. The embed
 is transparent: the document paints its own ground and should follow the
 viewer's theme with a `prefers-color-scheme` rule.
+
+An embed is about 780px wide. A component mock renders at its natural width
+and reads as it is. A layout mock designed wider than the embed collapses
+unless it scales: give it a stage at the design width (1120 works for a
+three-column layout) with `transform: scale(min(1, innerWidth / 1120))`,
+a control to switch to 100%, and rely on Open full size as the way to see
+it real.
+
+Browser automation cannot capture a sandboxed embed: a screenshot of the
+review page shows the frame around a blank iframe. Verify a prototype
+through Open full size, or serve its file directly.
 
 ## Agreements
 

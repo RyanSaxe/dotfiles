@@ -24,6 +24,12 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html
 node scripts/session.mjs wait --session-dir PATH --timeout 55
 ```
 
+`publish` copies the file into the session's `artifacts/` directory under
+its own name and refuses a name that already exists there, so build
+elsewhere, such as `src/out/`. When checking a revision with browser
+automation, a sandboxed prototype embed captures as a blank iframe; check
+it through Open full size or by serving its file directly.
+
 On the first publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,
 with the URL quoted) and give the link in chat. Report a failed launch and
