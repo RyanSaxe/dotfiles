@@ -111,10 +111,12 @@ their own.
 ## Frame and content
 
 The frame owns the sidebar (title, revision line and popover, pages, Agreed,
-and Feedback with a count of unsent items), the previous and next links at
-the end of each page, the bell for other live sessions, Settings (appearance
-and notifications), the Feedback page, the working state, and the preview and
-read-only modes. The page layout is yours. Basic typography, tables, code,
+Feedback with a count of unsent items, and Submit at the foot, which reads
+when the last round went or becomes Accept plan on an acceptable final plan),
+the previous and next links at the end of each page, the bell for other live
+sessions, Settings (appearance and notifications), the Feedback page, the
+working card (the round's steps, ticked as the agent reports them), and the
+preview and read-only modes. The page layout is yours. Basic typography, tables, code,
 theme colors, focus, and selected-choice states are provided; there are no
 generic card or column layouts to fill.
 
@@ -123,10 +125,9 @@ frame, panels, and figure grounds), `--panel` (the frame, cards, popovers),
 `--line` and `--line-strong`, `--ink`, `--muted`, `--accent` with
 `--accent-ink` and `--accent-soft`, `--attention` and `--attention-bg` (needs
 you), `--ok` and `--ok-bg` (sent, accepted), `--danger` and `--danger-bg`
-(removed), `--code`, and `--mark` (noted text). `--blue`, `--bg`, `--side`,
-`--soft`, and `--success` remain as aliases. Do not color preferred options
-green or alternatives red to express preference, and include labels so meaning
-never rests on color alone.
+(removed), `--code`, and `--mark` (noted text). Do not color preferred
+options green or alternatives red to express preference, and include labels so
+meaning never rests on color alone.
 
 Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
 titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
@@ -135,8 +136,9 @@ column is at most 820px.
 
 Frame popups close on an outside click or Escape without submitting anything.
 Custom popups should do the same and keep unsent text. Single keys, listed
-under `?`, move between sessions, pages, and interactive items; keep authored
-controls focusable so they take part.
+under `?`, move between sessions, pages, and interactive items, and `s`
+focuses Submit so Enter sends; keep authored controls focusable so they take
+part.
 
 ## Choices, comments, and answers
 
@@ -163,11 +165,13 @@ unique within a page across all kinds, and option IDs within a group. Use
 native buttons for single choices, native labeled checkboxes for checklists,
 and a textarea inside `data-question` for answers.
 
-Every checklist appears in Feedback, including lists on pages the user has
-not visited, so put checklist markup in page HTML rather than adding it from
-script. Authored `checked` attributes set initial values; saved draft values
-take precedence. An empty set means "None selected", not unanswered, and each
-checklist counts as one feedback item.
+Every checklist travels with a submission, including lists on pages the user
+has not visited, so put checklist markup in page HTML rather than adding it
+from script. Authored `checked` attributes set initial values; saved draft
+values take precedence. A list counts as one unsent item once the user
+changed a box, even if put back; an untouched list is sent with
+`touched: false` and listed on Feedback as a default afterwards. An empty set
+means "None selected", not unanswered.
 
 Register custom initialization on `plan:page`. The custom JS file runs before
 the frame module. Script elements inside page HTML do not execute. Page-level
@@ -175,13 +179,14 @@ and text-selection comments need no custom code.
 
 Noted text is highlighted; hovering it shows the note, and clicking opens the
 note to edit. The count of notes on a page sits at the bottom, above the page
-actions. Feedback groups items by page with edit and remove, holds the overall
-comment, and has one Submit that sends everything unsent at once; on an
-acceptable final plan, Accept plan sits beside it. Sent items stay listed as
-sent until the next revision; items whose page or text no longer exists are
-listed under the revision they came from. Submissions carry `groups.choices`,
+actions. Feedback groups items by page with edit and remove and holds the
+overall comment; Submit, at the foot of the sidebar, sends everything unsent
+at once. Sent items stay listed as sent until the next revision; items whose
+page or text no longer exists are listed under the revision they came from.
+Submissions carry `groups.choices` (checklists with `touched`),
 `groups.notes`, and, when present, `groups.answers` keyed `page/question`
-with `label`, `text`, and `topic`.
+with `label`, `text`, and `topic`; the text lists untouched checklists
+after "Defaults, not confirmed:".
 
 ## Renderers and figures
 
@@ -196,7 +201,11 @@ Use the renderer that matches the content. Load only what the page needs.
 
 `data-file` on a code block adds a header with the file name, the language,
 and a Copy button; `data-caption` on code, diagrams, and charts adds a caption
-line; `data-title` on a chart adds a header. Use the code renderer for source
+line; `data-title` on a chart adds a header. A diagram renders at its drawn
+size and scrolls sideways when wider than the column, shrinks to its column
+inside a side-by-side layout, and opens full size on a click; flowcharts use
+rank spacing 36, node spacing 28, and a title margin of 8. The component
+index's Diagrams section says what keeps one legible. Use the code renderer for source
 code, never a bare block, and the [diff component](../components/index.md)
 for before and after. Language grammars load on demand; unsupported languages
 keep their source and report the failure. Escape backslashes again when math

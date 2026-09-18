@@ -37,8 +37,8 @@ keep the link available. Do not open another tab on later revisions: the page
 refreshes itself when a revision lands and keeps the user's unsent draft.
 
 Keep the agent turn waiting. The loop is `wait`, read the event, `ack`,
-publish when a revision is due, `wait` again; every turn ends with a `wait`
-in flight or with `complete`. A timeout returns `{"waiting": true}` and is
+`progress`, publish when a revision is due, `wait` again; every turn ends
+with a `wait` in flight or with `complete`. A timeout returns `{"waiting": true}` and is
 not completion: call `wait` again. A side question does not end the session:
 answer it, then call `wait` again in the same turn. An interrupted or
 rejected `wait` is the user asking for attention, not cancelling the review:
@@ -55,6 +55,10 @@ session before doing anything else: read `status`, take the next unread
 event with `wait`, acknowledge only events you have read, and return to the
 loop. Do not start a replacement session.
 
+```sh
+node scripts/session.mjs status --session-dir PATH
+```
+
 A failed request to the hub is not completion: check that the hub is alive,
 retry the same session, and inspect the recorded owner before any recovery.
 Never delete ownership files blindly.
@@ -67,7 +71,26 @@ node scripts/session.mjs ack --session-dir PATH --id SUBMISSION_ID
 ```
 
 A saved receipt is not an acknowledgement; do not acknowledge unread
-feedback. If progress depends on the user, put a question or decision on the
+feedback.
+
+Right after `ack`, before any other work, declare the steps the revision
+will take, then mark each one as it finishes:
+
+```sh
+node scripts/session.mjs progress --session-dir PATH --steps "Update Agreed|Write: Progress|Write: Submit"
+node scripts/session.mjs progress --session-dir PATH --done "Update Agreed"
+```
+
+The reviewer's working card lists the steps and ticks them, with the hub's
+own bookends around them: reading the feedback, working out the steps,
+checking and polishing, publishing. `--steps` takes one to twelve titles
+split on `|`, unique and at most 80 characters; declaring again replaces
+the list. `--done` names a declared step and is a no-op when repeated;
+an unknown title is an error. Both need an acknowledged round (409 before
+`ack`), and `publish` clears the list. Every `progress` call counts as a
+check-in, so an agent that reports stays live.
+
+If the next revision depends on the user, put a question or decision on the
 page beside the affected proposal. The user answers through feedback or in the
 conversation; there is no question event, reply field, or reply notification,
 and none should be built.
@@ -113,8 +136,8 @@ agent token, private to the agent), `artifacts/`, `feedback/`, and
 `acceptance.json` after acceptance. Sessions never share acknowledgements or
 submissions.
 
-`status.json` records `title`, `kind`, `revisions`, and `agentSeenAt` beside
-the stage. `stage` is `ready`, `updated`, `submitted`, `working`, or
+`status.json` records `title`, `kind`, `revisions`, `progress`, and
+`agentSeenAt` beside the stage. `stage` is `ready`, `updated`, `submitted`, `working`, or
 `complete`; `disconnected` and `needsYou` are derived in responses. `wait`
 returns the next unread event without acknowledging it; `ack` is idempotent;
 `publish` waits only for unread feedback.

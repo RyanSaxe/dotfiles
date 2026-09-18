@@ -117,7 +117,6 @@ let page = plan.pages[0],
   submissionError = "",
   noteDraftKey = "",
   renderedFeedback = null,
-  toastTimer,
   answerTimer;
 const charts = new Map();
 const diffs = new Map();
@@ -151,12 +150,6 @@ const prefs = {
   },
 };
 
-function notify(message) {
-  $("toast").textContent = message;
-  $("toast").hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => ($("toast").hidden = true), 4000);
-}
 function persist() {
   if (!editable) return;
   try {
@@ -187,7 +180,10 @@ function disposeRenderers() {
   charts.clear();
   clearDiffs();
 }
-function show(id, targetId = null, { keepScroll = false } = {}) {
+// Page changes push history so the back button and a pasted hash both work;
+// re-rendering the same page, restoring after a reload, and popstate itself
+// leave history alone.
+function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
@@ -220,7 +216,8 @@ function show(id, targetId = null, { keepScroll = false } = {}) {
   url.hash = feedback ? "feedback" : page.id;
   url.searchParams.delete("target");
   if (targetId) url.searchParams.set("target", targetId);
-  history.replaceState(null, "", url);
+  if (push && url.href !== location.href) history.pushState(null, "", url);
+  else history.replaceState(null, "", url);
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
@@ -370,6 +367,17 @@ $("page-content").addEventListener("mousemove", showTip);
 $("page-content").addEventListener("mouseleave", () => {
   $("note-tip").hidden = true;
   tipNotes = "";
+});
+// Any rendered diagram opens full size; the dialog closes on Escape or a
+// click outside like the other dialogs.
+$("page-content").addEventListener("click", (event) => {
+  const svg = event.target.closest("[data-diagram] svg");
+  if (!svg || event.target.closest("a")) return;
+  const clone = svg.cloneNode(true);
+  clone.style.width = `${svg.viewBox.baseVal.width}px`;
+  clone.removeAttribute("width");
+  $("diagram-dialog").replaceChildren(clone);
+  $("diagram-dialog").showModal();
 });
 $("page-content").addEventListener("click", (event) => {
   if (!editable || event.target.closest("button, a, input, textarea, summary"))
@@ -638,6 +646,8 @@ function itemCard({ kind, key, item }) {
         ? `Answer · ${item.label}`
         : item.label;
   if (item.sentIn) title.append(tag("Sent", "ok"));
+  if (kind === "list" && item.sentIn && !item.touched)
+    title.append(tag("Default", "muted"));
   const old = stale(kind, key, item);
   if (old && item.revision && item.revision !== plan.revision)
     title.append(tag(`from revision ${item.revision}`, "muted"));
@@ -717,13 +727,19 @@ function itemCard({ kind, key, item }) {
   return box;
 }
 function renderFeedback() {
+  // An untouched, unsent list is not feedback yet; it appears once it went
+  // with a round, marked as a default.
   const items = [
-    ...Object.entries(state.choices).map(([key, item]) => ({
-      kind: item.kind === "multiple" ? "list" : "choice",
-      key,
-      item,
-      topic: item.topic,
-    })),
+    ...Object.entries(state.choices)
+      .filter(
+        ([, item]) => item.kind !== "multiple" || item.touched || item.sentIn,
+      )
+      .map(([key, item]) => ({
+        kind: item.kind === "multiple" ? "list" : "choice",
+        key,
+        item,
+        topic: item.topic,
+      })),
     ...Object.entries(state.answers).map(([key, item]) => ({
       kind: "answer",
       key,
@@ -859,15 +875,15 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
-  $("submit").disabled = !unsent.count || !connected || !current() || !editable;
-  $("submit").textContent = unsent.count
-    ? `Submit ${plural(unsent.count, "comment")}`
-    : "Submit";
+  const sendable = connected && current() && editable;
+  const sent = !unsent.count && state.submitted?.revision === plan.revision;
+  $("submit").disabled = !unsent.count || !sendable;
+  $("submit").textContent = unsent.count ? `Submit ${unsent.count}` : "Submit";
+  // Accept plan takes the slot on an acceptable final plan; a sent round with
+  // nothing new shows when it went instead of a disabled button.
+  $("submit").hidden = !$("accept").hidden || (sent && !submissionError);
   $("submit-status").textContent =
-    submissionError ||
-    (!unsent.count && state.submitted?.revision === plan.revision
-      ? `Sent ${ago(state.submitted.at)}.`
-      : "");
+    submissionError || (sent ? `Sent ${ago(state.submitted.at)}` : "");
   status();
 }
 function feedbackText() {
@@ -888,6 +904,12 @@ function feedbackText() {
       ...(note.quote ? ["Selected passage: " + note.quote] : []),
       note.text,
     );
+  const defaults = Object.values(state.choices).filter(
+    (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
+  );
+  if (defaults.length) lines.push("", "Defaults, not confirmed:");
+  for (const choice of defaults)
+    lines.push(`${choice.label}: ${choiceText(choice)}`);
   return lines.join("\n");
 }
 function envelope(intent, text, extra = {}) {
@@ -937,6 +959,118 @@ function scheduleReload() {
   }
   location.reload();
 }
+// Under a minute reads "just now"; after that the bare duration, as the card
+// shows it beside the title.
+function elapsed(value) {
+  const ms = Date.now() - Date.parse(value);
+  return Number.isFinite(ms) && ms < 60000 ? "just now" : since(value);
+}
+// The bookends are derived here, not stored: the hub only keeps the steps the
+// agent declared. Rows carry "done", "now", "wait", or nothing.
+function workingModel(accepting) {
+  if (accepting)
+    return {
+      title: "Plan accepted",
+      since: state.acceptance?.at || remote.updatedAt,
+      bar: false,
+      rows: [{ text: "Recording your acceptance", state: "now" }],
+    };
+  const sent = state.submitted?.revision === plan.revision;
+  const read = sent
+    ? plural(state.submitted.count, "comment")
+    : "your feedback";
+  const next = /^\d+$/.test(plan.revision)
+    ? `revision ${Number(plan.revision) + 1}`
+    : "the next revision";
+  const publish = { text: `Publish ${next}`, state: "" };
+  if (remote.stage === "submitted")
+    return {
+      title: "Sent",
+      since: sent ? state.submitted.at : remote.updatedAt,
+      bar: true,
+      rows: [
+        { text: `Waiting for the agent to read ${read}`, state: "wait" },
+        { text: "Work out the steps", state: "" },
+        { text: "Check and polish", state: "" },
+        publish,
+      ],
+    };
+  const steps = remote.progress?.steps;
+  const done = { text: `Read ${read}`, state: "done" };
+  const title = `Working on ${next}`;
+  const since = remote.acknowledgedAt || remote.updatedAt;
+  if (!steps)
+    return {
+      title,
+      since,
+      bar: true,
+      rows: [
+        done,
+        { text: "Working out the steps", state: "now" },
+        { text: "Check and polish", state: "" },
+        publish,
+      ],
+    };
+  const current = steps.findIndex((step) => !step.done);
+  return {
+    title,
+    since,
+    bar: true,
+    rows: [
+      done,
+      ...steps.map((step, index) => ({
+        text: step.title,
+        state: step.done ? "done" : index === current ? "now" : "",
+      })),
+      { text: "Check and polish", state: current < 0 ? "now" : "" },
+      publish,
+    ],
+  };
+}
+function renderWorking(model) {
+  $("working-title").textContent = model.title;
+  $("working-time").textContent = model.since ? elapsed(model.since) : "";
+  const silent = remote?.disconnected && remote.agentSeenAt;
+  $("working-note").hidden = !silent;
+  if (silent)
+    $("working-note").textContent =
+      `The agent has not checked in for ${since(remote.agentSeenAt)}.`;
+  const bar = $("working-bar");
+  const list = $("working-steps");
+  bar.hidden = !model.bar;
+  while (bar.children.length > model.rows.length) bar.lastElementChild.remove();
+  while (list.children.length > model.rows.length)
+    list.lastElementChild.remove();
+  while (bar.children.length < model.rows.length)
+    bar.append(document.createElement("i"));
+  // Rows added after the first render slide in; the class leaves with the
+  // animation so later polls compare plain state classes.
+  const grown = list.children.length > 0;
+  while (list.children.length < model.rows.length) {
+    const row = document.createElement("li");
+    if (grown) {
+      row.classList.add("enter");
+      row.addEventListener(
+        "animationend",
+        () => row.classList.remove("enter"),
+        {
+          once: true,
+        },
+      );
+    }
+    list.append(row);
+  }
+  model.rows.forEach((row, index) => {
+    const segment = bar.children[index];
+    const item = list.children[index];
+    const state = row.state === "wait" ? "" : row.state;
+    if (segment.className !== state) segment.className = state;
+    const entering = item.classList.contains("enter");
+    const className = entering ? `${row.state} enter`.trim() : row.state;
+    if (item.className !== className) item.className = className;
+    if (item.textContent !== row.text) item.textContent = row.text;
+  });
+}
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
   const newer = connected && remote?.current && !current();
@@ -949,16 +1083,7 @@ function status() {
     ["submitted", "working"].includes(stage);
   document.body.classList.toggle("is-working", working);
   $("working").hidden = !working;
-  if (working) {
-    $("working-title").textContent = accepting
-      ? "Plan accepted"
-      : "Working on the next revision";
-    $("working-detail").textContent = accepting
-      ? "The agent is recording your acceptance."
-      : state.submitted?.revision === plan.revision
-        ? `Your ${plural(state.submitted.count, "comment")} were sent ${ago(state.submitted.at)}. This page refreshes when it is ready.`
-        : "This page refreshes when it is ready.";
-  }
+  if (working) renderWorking(workingModel(accepting));
   const complete = stage === "complete" && remote?.accepted;
   $("accepted").hidden = !complete;
   if (complete)
@@ -1138,6 +1263,7 @@ function checklist(group, topic, previous) {
     label: group.dataset.label || group.dataset.multiselect,
     target: group.id,
     revision: plan.revision,
+    touched: previous?.touched === true,
     options: Array.from(
       group.querySelectorAll('input[type="checkbox"][data-value]'),
       (input) => ({
@@ -1217,7 +1343,6 @@ $("note-form").onsubmit = (event) => {
   if (state.noteDrafts) delete state.noteDrafts[noteDraftKey];
   save();
   $("note-dialog").close();
-  notify("Added to feedback.");
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
@@ -1236,7 +1361,6 @@ $("submit").onclick = async () => {
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
     save();
-    notify("Feedback sent.");
     show(page.id, null, { keepScroll: false });
   } catch (error) {
     submissionError = error.message;
@@ -1284,11 +1408,6 @@ document.querySelectorAll("[data-accept-mode]").forEach(
         await send(state.acceptance);
         save();
         $("accept-dialog").close();
-        notify(
-          mode === "implement"
-            ? "Accepted. Implementation requested."
-            : "Accepted and saved.",
-        );
       } catch (error) {
         $("accept-error").textContent = error.message;
       } finally {
@@ -1363,10 +1482,10 @@ document.addEventListener("change", (event) => {
   );
   if (!input) return;
   const group = input.closest("[data-multiselect]");
-  state.choices[page.id + "/" + group.dataset.multiselect] = checklist(
-    group,
-    page.id,
-  );
+  state.choices[page.id + "/" + group.dataset.multiselect] = {
+    ...checklist(group, page.id),
+    touched: true,
+  };
   save();
 });
 document.addEventListener("input", (event) => {
@@ -1480,7 +1599,11 @@ document.addEventListener("keydown", (event) => {
   } else if (key === "c" && editable && !$("reading").hidden)
     openNote(page.id, page.title);
   else if (key === "r" && editable) show("feedback");
-  else if (key === "a") show("agreed");
+  else if (key === "s" && editable) {
+    const target = $("accept").hidden ? $("submit") : $("accept");
+    if (target.hidden || target.disabled) return;
+    target.focus();
+  } else if (key === "a") show("agreed");
   else return;
   event.preventDefault();
 });
@@ -1571,7 +1694,8 @@ function copyButton(read) {
       button.textContent = "Copied";
       setTimeout(() => (button.textContent = "Copy"), 1500);
     } catch {
-      notify("Copy is unavailable in this browser.");
+      button.textContent = "Copy failed";
+      setTimeout(() => (button.textContent = "Copy"), 1500);
     }
   };
   return button;
@@ -1613,12 +1737,21 @@ function renderDiagrams(root) {
               lineColor: color("--muted"),
               fontFamily: "sans-serif",
             },
+            flowchart: {
+              nodeSpacing: 28,
+              rankSpacing: 36,
+              padding: 12,
+              subGraphTitleMargin: { top: 8, bottom: 8 },
+            },
           });
           const result = await mermaid.render(
             "diagram-" + crypto.randomUUID(),
             element.dataset.source,
           );
-          if (element.isConnected) element.innerHTML = result.svg;
+          if (!element.isConnected) return;
+          element.innerHTML = result.svg;
+          const width = element.querySelector("svg")?.viewBox?.baseVal?.width;
+          if (width) element.style.setProperty("--diagram-width", `${width}px`);
         } catch (error) {
           failed(element, error);
         }
@@ -1710,12 +1843,15 @@ async function diff(element, input, { diffStyle = "split" } = {}) {
   const files = parsePatchFiles(input.patch).flatMap((patch) => patch.files);
   if (files.length !== 1)
     throw Error("Each diff component requires one file pair.");
+  // The bar above the viewer names the file; the viewer's own header would
+  // repeat it with the path the patch was made from.
   viewer = new FileDiff({
     theme: syntaxThemes[activeTheme],
     diffStyle,
     lineDiffType: "word-alt",
     diffIndicators: "classic",
     overflow: "wrap",
+    disableFileHeader: true,
   });
   element.replaceChildren();
   viewer.render({ fileDiff: files[0], containerWrapper: element });
@@ -1871,6 +2007,13 @@ try {
 }
 show(resume?.page || location.hash.slice(1), query.get("target"), {
   keepScroll: Boolean(resume),
+  push: false,
+});
+window.addEventListener("popstate", () => {
+  const url = new URL(location.href);
+  show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {
+    push: false,
+  });
 });
 if (resume) setTimeout(() => window.scrollTo(0, resume.scrollY), 60);
 if (mode === "preview" && query.get("quote")) {

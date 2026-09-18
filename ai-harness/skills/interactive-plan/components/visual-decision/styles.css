@@ -94,6 +94,12 @@
 .visual-option > figure [data-language] {
   border-radius: 0;
 }
+/* A figure inside an option draws no second frame in either layout. */
+.visual-option > figure > .figure {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
 .vd-tablist {
   display: flex;
   gap: 2px;
@@ -118,27 +124,17 @@
   content: "✓ ";
   color: var(--accent);
 }
-.vd-pickbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--line);
-  font-size: 12.5px;
-}
-.vd-choose[aria-pressed="true"]::before {
-  content: "✓ ";
-}
 .visual-decision[data-mode="tabs"] .vd-box {
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
   background: var(--panel);
 }
+/* In tabs the option's radio header is the pick, at the top of the panel;
+   the tab carries the tick. */
 .visual-decision[data-mode="tabs"] .vd-columns {
   display: block;
-  padding: 12px;
+  padding: 0;
 }
 .visual-decision[data-mode="tabs"] .visual-option {
   border: 0;
@@ -146,16 +142,17 @@
   box-shadow: none;
 }
 .visual-decision[data-mode="tabs"] .vd-pick {
-  display: none;
+  padding: 12px 14px 2px;
 }
 .visual-decision[data-mode="tabs"] .visual-option > p {
-  padding: 0;
+  padding: 0 14px 10px;
 }
 .visual-decision[data-mode="tabs"] .visual-option > figure {
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--ground);
 }
-.visual-decision[data-mode="columns"] .vd-tablist,
-.visual-decision[data-mode="columns"] .vd-pickbar {
+.visual-decision[data-mode="columns"] .vd-tablist {
   display: none;
 }

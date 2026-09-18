@@ -1,5 +1,7 @@
 (() => {
-  const minimumColumn = 280;
+  // Three columns at the reading width are about 260px; narrow material such
+  // as mocks fits, wide material does not and asks for tabs instead.
+  const minimumColumn = 240;
   function initialize(section) {
     if (section.dataset.ready) return;
     section.dataset.ready = "true";
@@ -18,8 +20,8 @@
     layout.setAttribute("role", "group");
     layout.setAttribute("aria-label", "Layout");
     for (const [value, label] of [
-      ["columns", "Columns"],
       ["tabs", "Tabs"],
+      ["columns", "Side by side"],
     ]) {
       const button = document.createElement("button");
       button.type = "button";
@@ -74,23 +76,9 @@
       tabs.append(tab);
       tabFor.set(article.dataset.option, tab);
     }
-    const pickbar = document.createElement("div");
-    pickbar.className = "vd-pickbar";
-    const hint = document.createElement("span");
-    hint.className = "muted";
-    const recommended = options.find((article) =>
-      article.querySelector(".tag"),
-    );
-    hint.textContent = recommended
-      ? `Recommended: ${recommended.querySelector(".vd-pick").dataset.label}`
-      : "";
-    const choose = document.createElement("button");
-    choose.type = "button";
-    choose.className = "btn primary vd-choose";
-    pickbar.append(hint, choose);
     const box = document.createElement("div");
     box.className = "vd-box";
-    box.append(tabs, columns, pickbar);
+    box.append(tabs, columns);
     section.append(box);
     let active = options[0].dataset.option;
     let viewed = false;
@@ -112,29 +100,19 @@
         tab.tabIndex = selected ? 0 : -1;
         tab.classList.toggle("chosen", value === picked);
       }
-      const current = options
-        .find((article) => article.dataset.option === active)
-        .querySelector(".vd-pick");
-      choose.dataset.value = active;
-      choose.dataset.label = current.dataset.label;
-      // Only write a changed value: the observer below watches aria-pressed and
-      // would otherwise re-enter sync forever.
-      const pressed = String(picked === active);
-      if (choose.getAttribute("aria-pressed") !== pressed)
-        choose.setAttribute("aria-pressed", pressed);
-      choose.textContent =
-        picked === active ? "Chosen" : "Choose the one on screen";
       for (const button of layout.querySelectorAll("[data-vd-layout]"))
         button.classList.toggle("current", button.dataset.vdLayout === mode);
     }
+    // Tabs unless the author or the reviewer asked for side by side, and
+    // only then when every column would be wide enough; a narrow window
+    // falls back to tabs and comes back when there is room again.
     function applyLayout() {
-      let mode = prefs?.get(key) || section.dataset.layout || "auto";
-      if (mode === "auto")
-        mode =
-          options.length <= 3 &&
-          section.clientWidth / options.length >= minimumColumn
-            ? "columns"
-            : "tabs";
+      let mode = prefs?.get(key) || section.dataset.layout || "tabs";
+      if (
+        mode !== "columns" ||
+        section.clientWidth / options.length < minimumColumn
+      )
+        mode = "tabs";
       section.dataset.mode = mode;
       sync();
     }

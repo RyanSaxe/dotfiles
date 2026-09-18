@@ -21,14 +21,6 @@
   --code: #f1f2f4;
   --mark: #fff3bf;
   --shadow: 0 10px 30px #0002, 0 1px 3px #0001;
-  /* Aliases kept for authored pages and components. */
-  --bg: var(--panel);
-  --side: var(--ground);
-  --blue: var(--accent);
-  --soft: var(--accent-soft);
-  --success: var(--ok);
-  --success-bg: var(--ok-bg);
-  --success-border: var(--ok-border);
   font:
     14px/1.55 -apple-system,
     BlinkMacSystemFont,
@@ -456,6 +448,26 @@ kbd {
   border-top: 1px solid var(--line);
   margin: 8px 0;
 }
+/* Submit sits at the foot of the sidebar so every page can send; with
+   nothing unsent the row reads when the last round went. */
+.side-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+.side-foot .small {
+  margin-right: auto;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+.side-foot .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
 .sidebar nav button .count {
   display: inline-block;
   min-width: 18px;
@@ -569,16 +581,15 @@ select {
   min-width: 0;
   transition: opacity 0.2s ease;
 }
+#page-content {
+  container: page / inline-size;
+}
 body.is-working .content {
   opacity: 0.33;
 }
 #page-content p,
 #page-content li {
   font-size: 14px;
-}
-.lede {
-  font-size: 15.5px;
-  color: var(--muted);
 }
 .page-actions {
   display: flex;
@@ -630,22 +641,134 @@ body.is-working .content {
 }
 .working-card {
   pointer-events: auto;
-  max-width: 360px;
-  padding: 14px 18px;
+  width: min(380px, 100%);
+  padding: 14px 18px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.working-card .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.working-card .head b {
+  font-size: 15px;
+}
+.working-card .head small {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.working-note {
+  margin: -4px 0 8px;
+  color: var(--attention);
+  font-size: 12.5px;
+}
+/* The card patches in place: one segment and one row per step, classes
+   toggled on a poll, so nothing is rebuilt while the agent works. */
+.working-card .bar {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 3px;
+  height: 5px;
+  margin-bottom: 12px;
+}
+.working-card .bar i {
+  border-radius: 3px;
+  background: var(--line);
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+.working-card .bar i.done {
+  background: var(--accent);
+}
+.working-card .bar i.now {
+  background: var(--accent);
+  opacity: 0.45;
+}
+.working-card .steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.working-card .steps li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+.working-card .steps li::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  box-sizing: border-box;
+  justify-self: center;
+}
+.working-card .steps li.done {
+  color: var(--ink);
+}
+.working-card .steps li.done::before {
+  content: "✓";
+  border: 0;
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 14px;
   text-align: center;
 }
-.working-card b {
-  display: block;
-  font-size: 15px;
-  margin-bottom: 4px;
+.working-card .steps li.now,
+.working-card .steps li.wait {
+  color: var(--ink);
+  font-weight: 600;
 }
-.working-card span {
+.working-card .steps li.now::before {
+  border-color: var(--accent);
+  border-width: 3.5px;
+  animation: working-pulse 1.2s ease-in-out infinite;
+}
+.working-card .steps li.wait::before {
+  border-color: var(--attention);
+  border-width: 3.5px;
+  animation: working-pulse 1.2s ease-in-out infinite;
+}
+.working-card .steps li.enter {
+  animation: working-enter 0.2s ease;
+}
+@keyframes working-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes working-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.working-card .foot {
+  margin: 10px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .working-card .bar i {
+    transition: none;
+  }
+  .working-card .steps li::before,
+  .working-card .steps li.enter {
+    animation: none;
+  }
 }
 
 /* Sessions panel */
@@ -834,17 +957,11 @@ blockquote {
   color: var(--muted);
   font-size: 12.5px;
 }
-.submitbar {
-  position: sticky;
-  bottom: 0;
+.feedback-end {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  justify-content: flex-end;
   border-top: 1px solid var(--line);
-  padding: 14px 0;
-  background: var(--panel);
+  padding: 14px 0 6px;
 }
 
 /* Agreed */
@@ -1022,17 +1139,46 @@ img,
 svg {
   max-width: 100%;
 }
-[data-math],
-[data-diagram] {
+[data-math] {
   overflow: auto;
 }
+/* A diagram keeps its drawn size and scrolls sideways; inside a side-by-side
+   container it shrinks to its column instead. Either way a click enlarges it.
+   Mermaid writes its own max-width inline, hence the priorities. */
 [data-diagram] {
-  display: grid;
-  place-items: center;
+  display: block;
+  overflow-x: auto;
   padding: 8px 0;
+  text-align: center;
 }
 [data-diagram] svg {
+  display: inline-block;
+  vertical-align: top;
   height: auto;
+  width: var(--diagram-width, auto);
+  max-width: none !important;
+  cursor: zoom-in;
+}
+:is(.visual-decision[data-mode="columns"], .comparison, .change-pair)
+  [data-diagram]
+  svg {
+  width: 100%;
+  max-width: var(--diagram-width, 100%) !important;
+}
+.lightbox {
+  width: min(96vw, 1600px);
+  max-height: 92vh;
+  margin: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: auto;
+}
+.lightbox svg {
+  display: block;
+  height: auto;
+  max-width: none;
 }
 [data-chart] {
   height: 300px;
@@ -1048,6 +1194,29 @@ svg {
   border-radius: 8px;
   overflow: hidden;
   background: var(--panel);
+}
+/* A figure that ends a card meets the card's edge: the container keeps no
+   padding under it and the figure no margin, so no band of the container's
+   background shows below a code block, diagram, or chart. */
+:is(
+  .visual-option,
+  .vd-columns,
+  .comparison-content,
+  .change-content,
+  .behavior-case > div
+):has(
+  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child
+) {
+  padding-bottom: 0;
+}
+:is(.comparison-content, .change-content, .behavior-case > div)
+  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child {
+  margin-bottom: 0;
+}
+:is(.visual-option > figure, .comparison-content, .change-content) > .figure {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
 }
 .figure-head {
   display: flex;
@@ -1210,19 +1379,6 @@ dialog::backdrop {
   right: 22px;
   z-index: 5;
 }
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 90vw;
-  padding: 9px 14px;
-  border-radius: 7px;
-  color: var(--panel);
-  background: var(--ink);
-  z-index: 8;
-  font-size: 12.5px;
-}
 .context-link {
   font-size: 12px;
 }
@@ -1254,6 +1410,7 @@ dialog::backdrop {
   font-size: 17px;
 }
 :root[data-mode="readonly"] .page-actions,
+:root[data-mode="readonly"] .side-foot,
 :root[data-mode="readonly"] #quote,
 :root[data-mode="readonly"] [data-comment],
 :root[data-mode="readonly"] .note-count {
@@ -1306,6 +1463,11 @@ dialog::backdrop {
   .sidebar nav {
     padding: 0;
     max-height: 50vh;
+  }
+  .side-foot {
+    margin: 0;
+    padding: 0 12px 10px;
+    border-top: 0;
   }
   .topbar {
     position: fixed;
