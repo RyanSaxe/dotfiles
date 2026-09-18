@@ -38,8 +38,20 @@ refreshes itself when a revision lands and keeps the user's unsent draft.
 
 Keep the agent turn waiting. A timeout is not completion; wait again. A side
 question does not end the session: answer it, then resume the same wait. The
-helper saves feedback but cannot wake an ended turn; after an interruption,
-the next turn resumes the session directory and reads its queue.
+helper saves feedback but cannot wake an ended turn.
+
+Publishing is not completion either. A revision published in reply to
+feedback returns to `wait`; only `complete`, after an acknowledged
+acceptance, ends the session.
+
+If a tool call or a turn is interrupted, the next turn resumes the same
+session before doing anything else: read `status`, take the next unread
+event with `wait`, acknowledge only events you have read, and return to the
+loop. Do not start a replacement session.
+
+A failed request to the hub is not completion: check that the hub is alive,
+retry the same session, and inspect the recorded owner before any recovery.
+Never delete ownership files blindly.
 
 When an event arrives, read its `payload`, including intent and source
 revision, then acknowledge the event ID:
