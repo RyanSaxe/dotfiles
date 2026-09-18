@@ -168,12 +168,18 @@ function theme() {
   document.documentElement.dataset.theme = activeTheme;
   $("theme").value = preferredTheme || "system";
   for (const chart of charts.values())
-    chart.setOption(chartTheme(chart.getOption()));
+    chart.setOption({
+      color: [color("--accent"), color("--muted")],
+      ...chartTheme(chart.getOption()),
+    });
   for (const viewer of diffs.values()) {
     viewer.setOptions({ ...viewer.options, theme: syntaxThemes[activeTheme] });
     viewer.rerender();
   }
   renderDiagrams($("page-content"));
+  // A preview page reads the theme cookie when it loads.
+  for (const frame of document.querySelectorAll(".agreement-preview iframe"))
+    frame.contentWindow?.location.reload();
 }
 function disposeRenderers() {
   for (const chart of charts.values()) chart.dispose();
