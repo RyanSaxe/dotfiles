@@ -296,6 +296,46 @@ test("routes a follow-up to the question it came from", async (t) => {
   assert.equal(choice.payload.context.blockId, "block-2");
 });
 
+test("a follow-up reopens the question it belongs to", async (t) => {
+  const helper = await open(t);
+  await helper.browser("/api/ask", { id: "ask1", text: "How does it work?" });
+  await helper.agent({
+    action: "plan",
+    question: "ask1",
+    title: "How it works",
+    pages: "overview=Overview",
+  });
+  await helper.agent({
+    action: "page",
+    question: "ask1",
+    id: "overview",
+    markdown: "# Overview\n",
+  });
+  await helper.agent({ action: "done", question: "ask1" });
+  assert.equal(question(await helper.state(), "ask1").status, "done");
+
+  // Finishing the pages does not end the conversation about them.
+  const later = await helper.browser("/api/ask", {
+    id: "ask2",
+    text: "Why that way?",
+    context: { questionId: "ask1", pageId: "overview" },
+  });
+  assert.equal(later.status, 200);
+  const state = await helper.state();
+  assert.equal(state.questions.length, 1);
+  assert.equal(question(state, "ask1").status, "writing");
+  assert.equal(question(state, "ask1").followUps.length, 1);
+
+  const extended = await helper.agent({
+    action: "plan",
+    question: "ask1",
+    title: "How it works",
+    pages: "why=Why that way",
+    append: true,
+  });
+  assert.equal(extended.status, 200);
+});
+
 test("refuses events from the wrong source, session, or shape", async (t) => {
   const helper = await open(t);
 

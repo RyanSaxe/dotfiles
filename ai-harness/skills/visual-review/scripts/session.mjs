@@ -458,7 +458,21 @@ export function buildExport({
       "Refusing to export a file that would carry the session's secrets",
       500,
     );
-  const withConfig = shell.replace(
+  // Inline the stylesheet and the module graph before the session data goes
+  // in, so the check for leftover asset references reads the page's own
+  // markup rather than repository content that happens to mention a path.
+  const standalone = shell
+    .replace(
+      /<link\b[^>]*\bhref="\/assets\/app\.css"[^>]*>/i,
+      () => `<style>\n${css}\n</style>`,
+    )
+    .replace(/\bsrc="\/assets\/app\.js"/i, () => `src="${moduleUrl}"`);
+  requireValue(
+    !/["'(]\/assets\//.test(standalone),
+    "An export cannot reference the helper's assets; it opens from disk",
+    500,
+  );
+  const withConfig = standalone.replace(
     /(<script\b(?=[^>]*\bid=["']session-config["'])[^>]*>)[\s\S]*?(<\/script>)/i,
     (_, start, end) => start + escapeJson({ sessionId: null, repo }) + end,
   );
@@ -471,18 +485,7 @@ export function buildExport({
     "The app shell needs a session-data script to export into",
     500,
   );
-  const standalone = html
-    .replace(
-      /<link\b[^>]*\bhref="\/assets\/app\.css"[^>]*>/i,
-      `<style>\n${css}\n</style>`,
-    )
-    .replace(/\bsrc="\/assets\/app\.js"/i, `src="${moduleUrl}"`);
-  requireValue(
-    !/["'(]\/assets\//.test(standalone),
-    "An export cannot reference the helper's assets; it opens from disk",
-    500,
-  );
-  return standalone;
+  return html;
 }
 
 /**
@@ -664,13 +667,22 @@ export async function serve(
   { repo = process.cwd(), recover = false } = {},
 ) {
   const probe = createGit(repo);
-  const root = (
-    await probe(["rev-parse", "--show-toplevel"], { cap: 4096 }).catch(() => {
-      throw new Error("Run visual-review from inside a git repository");
-    })
-  ).stdout
-    .toString("utf8")
-    .trim();
+  // Everything served comes from a commit, so a bare repository works as well
+  // as a checkout. Only --show-toplevel needs a work tree; when there is none,
+  // the git directory itself is the root.
+  const top = await probe(["rev-parse", "--show-toplevel"], {
+    cap: 4096,
+  }).catch(() => null);
+  const located = top?.stdout.length
+    ? top
+    : await probe(["rev-parse", "--absolute-git-dir"], { cap: 4096 }).catch(
+        (error) => {
+          throw new Error(
+            error.stderr || "Run visual-review from inside a git repository",
+          );
+        },
+      );
+  const root = located.stdout.toString("utf8").trim();
   const git = createGit(root);
   const repository = await describeRepository(git, root);
 
@@ -783,11 +795,6 @@ export async function serve(
       requireValue(idPattern.test(id || ""), "A question id is required");
       const question = await readQuestion(id).catch(() => null);
       requireValue(question, `Unknown question: ${id}`, 404);
-      requireValue(
-        !question.completedAt,
-        `Question ${id} is already done`,
-        409,
-      );
       return question;
     }
 
@@ -850,6 +857,10 @@ export async function serve(
             askedAt: event.receivedAt,
           },
         ];
+        // Finishing the pages does not end the conversation about them. A
+        // follow-up reopens its question so the agent can extend the answer
+        // and the outline shows it working again.
+        question.completedAt = null;
         await writeQuestion(question);
       } else {
         await writeQuestion({
@@ -1375,7 +1386,7 @@ export async function main(argv) {
       const result = await request("/agent/next");
       if (result.event) return console.log(json(result));
       await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(1000, deadline - Date.now())),
+        setTimeout(resolve, Math.max(0, Math.min(1000, deadline - Date.now()))),
       );
     }
     return console.log(

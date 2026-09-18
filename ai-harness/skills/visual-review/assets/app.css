@@ -49,6 +49,8 @@
 }
 body {
   margin: 0;
+  /* Only the panes scroll; the frame itself is the viewport. */
+  overflow: hidden;
 }
 [hidden] {
   display: none !important;
@@ -76,6 +78,9 @@ button {
 .app {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
+  /* One row, the height of the viewport, whose children may shrink. Without
+     it the implicit row sizes to its content and the panes stop scrolling. */
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
 }
 .app.with-code {
@@ -422,6 +427,7 @@ button {
   border-top: 1px solid var(--line);
 }
 .code-body {
+  min-width: 0;
   min-height: 0;
   overflow: auto;
 }

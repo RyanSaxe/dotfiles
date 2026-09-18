@@ -76,6 +76,31 @@ test("escapes the embedded JSON so it cannot close its own script", () => {
   );
 });
 
+test("keeps repository content that mentions an asset path", () => {
+  const shell =
+    '<link rel="stylesheet" href="/assets/app.css" />' +
+    '<script type="module" src="/assets/app.js"></script>' +
+    '<script id="session-config">{}</script><script id="session-data">null</script>';
+  const html = buildExport({
+    shell,
+    state: { sessionId: "s", questions: [] },
+    // A repository may legitimately contain the string the check looks for.
+    pages: { "q/a": 'import x from "../assets/choices.mjs";' },
+    repo: { name: "r", ref: "main" },
+    refs: {},
+    cache: {},
+    css: "body{}",
+    moduleUrl: "data:text/javascript;base64,AA==",
+  });
+  assert.ok(!html.includes('href="/assets/app.css"'));
+  assert.ok(!html.includes('src="/assets/app.js"'));
+  assert.match(
+    embedded(html).pages["q/a"],
+    /assets\/choices\.mjs/,
+    "the page's own references are replaced; quoted code is left alone",
+  );
+});
+
 test("carries the whole session and everything it served", async (t) => {
   const repo = await createSampleRepository();
   const sessionDir = await temporaryDirectory("session");

@@ -517,6 +517,18 @@ $("ask-form").onsubmit = async (event) => {
 
 /* ------------------------------------------------------------- keyboard --- */
 
+// Clicking in a region makes it the one the keys act on. Without this the
+// cursor is in one pane and j, k, and a are answering in another.
+for (const [id, region] of [
+  ["outline", "outline"],
+  ["main", "page"],
+  ["code", "code"],
+  ["browser", "browser"],
+])
+  $(id).addEventListener("pointerdown", () => {
+    focus = region;
+  });
+
 const typing = () =>
   document.activeElement &&
   ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
@@ -535,7 +547,10 @@ document.addEventListener("keydown", async (event) => {
   if (typing() || event.metaKey || event.ctrlKey || event.altKey) return;
 
   const regions = ["outline", "page", ...($("code").hidden ? [] : ["code"])];
-  switch (event.key) {
+  // Shift+J reaches some clients as "J" and others as "j" with shiftKey set,
+  // so the modifier decides rather than the letter's case.
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  switch (key) {
     case "Tab": {
       event.preventDefault();
       const at = regions.indexOf(focus);
@@ -552,14 +567,18 @@ document.addEventListener("keydown", async (event) => {
     case "h":
     case "l": {
       const { previous, next } = neighbors(state, view.questionId, view.pageId);
-      const target = event.key === "h" ? previous : next;
+      const target = key === "h" ? previous : next;
       if (target) show(view.questionId, target.id);
       return;
     }
     case "j":
     case "k": {
-      const delta = event.key === "j" ? 1 : -1;
+      const delta = key === "j" ? 1 : -1;
       event.preventDefault();
+      if (event.shiftKey) {
+        if (focus === "code") extendSelection($("code-body"), delta);
+        return;
+      }
       if (focus === "browser") {
         browserCursor = Math.max(
           0,
@@ -576,11 +595,6 @@ document.addEventListener("keydown", async (event) => {
       }
       return;
     }
-    case "J":
-    case "K":
-      if (focus === "code")
-        extendSelection($("code-body"), event.key === "J" ? 1 : -1);
-      return;
     case "Enter":
       if (focus === "browser") return activateBrowserEntry();
       if (focus === "page") return currentTarget()?.click();
@@ -627,7 +641,7 @@ document.addEventListener("keydown", async (event) => {
     }
     case "]":
     case "[": {
-      const delta = event.key === "]" ? 1 : -1;
+      const delta = key === "]" ? 1 : -1;
       if (focus === "code") stepNote($("code-body"), delta);
       else blockInstance(currentTarget())?.step?.(delta);
       return;
@@ -639,9 +653,9 @@ document.addEventListener("keydown", async (event) => {
       event.preventDefault();
       return $("help").showModal();
     default:
-      if (/^[1-9]$/.test(event.key)) {
+      if (/^[1-9]$/.test(key)) {
         const option = $("page-content").querySelector(
-          `[data-option="${event.key}"]`,
+          `[data-option="${key}"]`,
         );
         option?.click();
       }

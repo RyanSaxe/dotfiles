@@ -99,7 +99,10 @@ export async function openFile(container, options) {
         onSelect?.(range);
       },
       renderAnnotation: (annotation) => markers?.renderAnnotation(annotation),
-      onPostRender: () => markers?.inject(),
+      onPostRender: () => {
+        markers?.inject();
+        scrollToWanted(container);
+      },
     };
     let virtualizer = null;
     let view;
@@ -144,11 +147,29 @@ function setCursor(container, start, end = start) {
   pane.cursor = first;
   pane.selection = { start: first, end: last };
   pane.view.setSelectedLines({ start: first, end: last });
-  container
+  pane.wanted = first;
+  scrollToWanted(container);
+}
+
+/**
+ * Put the wanted line in the middle of the pane.
+ *
+ * Scrolls the pane rather than calling scrollIntoView, which walks up to the
+ * nearest scrollable ancestor and drags the whole frame. Pierre renders its
+ * rows asynchronously, so this runs again after each render until the row it
+ * wants exists.
+ */
+function scrollToWanted(container) {
+  const pane = panes.get(container);
+  if (!pane?.wanted) return;
+  const row = container
     .querySelector("diffs-container")
-    ?.shadowRoot?.querySelector(`[data-column-number="${first}"]`)
-    ?.scrollIntoView({ block: "center" });
-  pane.onCursor?.(first);
+    ?.shadowRoot?.querySelector(`[data-column-number="${pane.wanted}"]`);
+  if (!row) return;
+  const offset =
+    row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  container.scrollTop += offset - container.clientHeight / 2;
+  pane.wanted = null;
 }
 
 export function moveCursor(container, delta) {
