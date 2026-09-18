@@ -32,14 +32,16 @@ judge. `data-layout="auto"` shows columns when there are at most three options
 and each column would be at least 280px wide, tabs otherwise; `columns` or
 `tabs` forces one. In tabs, the pick bar chooses the option on screen, and the
 chosen tab carries a tick. The toggle at the top right overrides the layout and
-is remembered per decision in the browser.
+is remembered per decision in the browser. Remove a decision in the revision that
+records its choice on Agreed.
 
 ## Questions
 
 Use a question when the answer is prose rather than a selection. Keep the
 question to one sentence and say what the answer decides. Empty answers are
 not sent. Answers appear on Feedback as their own items and can be cited as
-agreement sources with kind `answer`.
+agreement sources with kind `answer`. Remove the question in the revision that records
+the answer on Agreed; a question that stays gets answered again.
 
 ## Rich exclusive choices
 

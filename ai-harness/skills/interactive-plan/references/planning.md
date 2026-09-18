@@ -94,6 +94,12 @@ the version they reviewed. Use an exact diff for text or code. Keep visual
 before-and-after views comparable and identify what changed. A short explanation
 may give the reason for the revision, but it does not replace the comparison.
 
+When a revision records an answer or choice on Agreed, remove that question
+or decision from the page in the same revision. Sent items leave the draft when
+the next revision lands, so a control that stays looks unanswered and gets
+answered again. If the topic is still open, ask the next question, never the
+same one.
+
 Preserve earlier revisions so submitted feedback remains attached to what the
 user saw. Open the rendered artifact and use it before publication. See the
 [component index](../components/index.md) for supplied implementations and
