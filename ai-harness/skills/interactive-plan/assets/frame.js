@@ -777,29 +777,80 @@ function renderFeedback() {
     ...items.filter((entry) => entry.topic === "overall").map(itemCard),
   );
 }
-function reviewButton(count) {
-  const button = $("review");
-  const working =
-    connected && current() && ["submitted", "working"].includes(remote.stage);
-  const canAccept =
+function badge(count) {
+  const item = $("navigation").querySelector('[data-page="feedback"]');
+  if (!item) return;
+  let mark = item.querySelector(".count");
+  if (!count) {
+    mark?.remove();
+    return;
+  }
+  if (!mark) {
+    mark = document.createElement("b");
+    mark.className = "count";
+    item.append(mark);
+  }
+  mark.textContent = String(count);
+}
+function canAccept(unsentCount) {
+  return (
     plan.kind === "plan" &&
     connected &&
     current() &&
-    !count &&
-    ["ready", "updated"].includes(remote.stage);
-  delete button.dataset.action;
-  if (count) button.textContent = `Review ${plural(count, "comment")}`;
-  else if (canAccept) {
-    button.textContent = "Accept plan";
-    button.dataset.action = "accept";
-  } else if (working) button.textContent = "Feedback sent";
-  else button.textContent = "Nothing to review";
-  button.classList.toggle("primary", Boolean(count || canAccept));
-  button.classList.toggle("quiet", !(count || canAccept));
+    !unsentCount &&
+    ["ready", "updated"].includes(remote.stage)
+  );
+}
+// Every page ends with where you came from and where to go next; the last
+// page leads to review, and the Feedback page leads back.
+function renderFooter(feedback) {
+  const order = [
+    ...pages,
+    ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
+  ];
+  const index = order.findIndex(
+    (item) => item.id === (feedback ? "feedback" : page.id),
+  );
+  const previous = order[index - 1];
+  const next = order[index + 1];
+  const link = (element, item, text) => {
+    element.hidden = !item;
+    if (!item) return;
+    element.textContent = text;
+    element.dataset.page = item.id;
+    element.href = "#" + item.id;
+  };
+  if (feedback) {
+    link(
+      $("feedback-back"),
+      previous,
+      previous ? `← Back to ${previous.title}` : "",
+    );
+    return;
+  }
+  link(
+    $("footer-previous"),
+    previous,
+    previous ? `← Previous: ${previous.title}` : "",
+  );
+  const acceptable = canAccept(unsentItems(state).count);
+  link(
+    $("footer-next"),
+    next,
+    !next
+      ? ""
+      : next.id === "feedback"
+        ? acceptable
+          ? "Review and accept →"
+          : "Review your feedback →"
+        : `Next: ${next.title} →`,
+  );
 }
 function review() {
   const unsent = unsentItems(state);
-  reviewButton(unsent.count);
+  badge(unsent.count);
+  $("accept").hidden = !canAccept(unsent.count);
+  renderFooter(!$("feedback").hidden);
   const rendered = JSON.stringify([
     state.notes,
     state.choices,
@@ -1214,10 +1265,7 @@ function openAccept() {
   $("accept-error").textContent = "";
   $("accept-dialog").showModal();
 }
-$("review").onclick = () => {
-  if ($("review").dataset.action === "accept") openAccept();
-  else show("feedback");
-};
+$("accept").onclick = openAccept;
 document.querySelectorAll("[data-accept-mode]").forEach(
   (button) =>
     (button.onclick = async () => {
@@ -1253,7 +1301,10 @@ document.addEventListener("click", (event) => {
   const close = event.target.closest("[data-close]");
   if (close) $(close.dataset.close).close();
   const navigation = event.target.closest("[data-page]");
-  if (navigation) show(navigation.dataset.page);
+  if (navigation) {
+    event.preventDefault();
+    show(navigation.dataset.page);
+  }
   if (event.target.closest("#revision")) {
     toggleRevisionMenu();
     return;

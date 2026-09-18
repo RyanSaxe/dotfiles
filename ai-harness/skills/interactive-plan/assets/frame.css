@@ -450,13 +450,19 @@ kbd {
   border-top: 1px solid var(--line);
   margin: 8px 0;
 }
-.side-cta {
-  padding: 12px;
-  border-top: 1px solid var(--line);
-}
-.side-cta .btn {
-  width: 100%;
-  padding: 8px 12px;
+.sidebar nav button .count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  vertical-align: 1px;
 }
 main {
   position: relative;
@@ -550,8 +556,8 @@ select {
 }
 .content {
   max-width: 820px;
-  margin: 0 auto;
-  padding: 4px 40px 90px;
+  margin: 0 0 0 56px;
+  padding: 4px 40px 90px 0;
   width: 100%;
   min-width: 0;
   transition: opacity 0.2s ease;
@@ -574,6 +580,26 @@ body.is-working .content {
   margin-top: 36px;
   padding-top: 14px;
 }
+.page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.page-footer a {
+  cursor: pointer;
+  text-decoration: none;
+}
+.page-footer a:hover {
+  text-decoration: underline;
+}
+#footer-next {
+  margin-left: auto;
+  text-align: right;
+}
 .accepted {
   margin: 10px 0 16px;
   overflow-wrap: anywhere;
@@ -587,6 +613,9 @@ body.is-working .content {
   position: fixed;
   inset: 0 0 0 224px;
   display: grid;
+  grid-template-columns: minmax(0, 820px);
+  justify-content: start;
+  padding-left: 56px;
   place-items: center;
   padding: 24px;
   pointer-events: none;
@@ -1201,6 +1230,7 @@ dialog::backdrop {
 :root[data-mode="preview"] .sidebar,
 :root[data-mode="preview"] .topbar,
 :root[data-mode="preview"] .page-actions,
+:root[data-mode="preview"] .page-footer,
 :root[data-mode="preview"] #quote,
 :root[data-mode="preview"] .working,
 :root[data-mode="preview"] .sidecar {
@@ -1218,7 +1248,6 @@ dialog::backdrop {
 }
 :root[data-mode="readonly"] .page-actions,
 :root[data-mode="readonly"] #quote,
-:root[data-mode="readonly"] .side-cta,
 :root[data-mode="readonly"] [data-comment],
 :root[data-mode="readonly"] .note-count {
   display: none !important;
@@ -1266,10 +1295,6 @@ dialog::backdrop {
     padding: 0;
     max-height: 50vh;
   }
-  .side-cta {
-    border-top: 0;
-    padding: 8px 0 0;
-  }
   .topbar {
     position: fixed;
     top: 6px;
@@ -1278,10 +1303,13 @@ dialog::backdrop {
     z-index: 6;
   }
   .content {
+    margin: 0;
     padding: 14px 18px 70px;
   }
   .working {
     inset: 0;
+    padding-left: 0;
+    grid-template-columns: minmax(0, 1fr);
   }
   .sidecar {
     width: 100vw;

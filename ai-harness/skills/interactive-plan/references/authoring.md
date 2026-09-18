@@ -123,7 +123,8 @@ submission flow; they do not change state automatically.
 ## Frame and content
 
 The frame owns the sidebar (plan title, revision line and popover, pages,
-Agreed, Feedback, and the Review button), the bell for other live sessions,
+Agreed, and Feedback with a count of unsent items), the previous and next
+links at the end of each page, the bell for other live sessions,
 Settings (appearance and notifications), the Feedback page, the working state,
 and preview and read-only modes. The page layout is yours to compose. Basic
 typography, tables, code, theme colors, focus, and selected-choice states are

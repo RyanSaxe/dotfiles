@@ -30,11 +30,6 @@
           <summary class="btn quiet">Pages</summary>
           <div class="side-label">Pages</div>
           <nav id="navigation" aria-label="Plan pages"></nav>
-          <div class="side-cta">
-            <button class="btn quiet" id="review" type="button">
-              Nothing to review
-            </button>
-          </div>
         </details>
       </aside>
       <main>
@@ -113,6 +108,10 @@
                 Comment on this page
               </button>
             </div>
+            <nav class="page-footer" aria-label="Previous and next">
+              <a id="footer-previous" hidden></a>
+              <a id="footer-next" hidden></a>
+            </nav>
           </section>
           <section id="feedback" hidden>
             <h1 tabindex="-1">Feedback</h1>
@@ -132,12 +131,17 @@
                 <button class="btn quiet" id="export" type="button">
                   Export copy</button
                 ><button class="btn primary" id="submit" type="button" disabled>
-                  Submit
+                  Submit</button
+                ><button class="btn primary" id="accept" type="button" hidden>
+                  Accept plan
                 </button>
               </div>
             </div>
             <p class="small" id="storage-status"></p>
             <p class="small" id="connection-status"></p>
+            <nav class="page-footer" aria-label="Back">
+              <a id="feedback-back" hidden></a>
+            </nav>
           </section>
         </div>
         <div class="working" id="working" hidden>
