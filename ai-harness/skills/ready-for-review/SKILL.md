@@ -193,8 +193,10 @@ One pull request: rebase onto the current base, push, and open as a draft:
 For an existing pull request that is a draft with no review comments:
 rebase onto the base, push the rebuilt series with
 `git push --force-with-lease`, and update the body with
-`gh pr edit --body-file <file>`. If it has review comments, add commits on
-top, push without force, and update the body the same way.
+`gh pr edit --body-file <file> [--attach '<image>#<alt>']`. If it has
+review comments, add commits on top, push without force, and update the
+body the same way. Pass every image the body references with `--attach`,
+on create and on edit alike; a local path alone renders as a broken image.
 
 Several pull requests, in this order:
 
