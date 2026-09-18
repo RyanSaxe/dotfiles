@@ -21,14 +21,6 @@
   --code: #f1f2f4;
   --mark: #fff3bf;
   --shadow: 0 10px 30px #0002, 0 1px 3px #0001;
-  /* Aliases kept for authored pages and components. */
-  --bg: var(--panel);
-  --side: var(--ground);
-  --blue: var(--accent);
-  --soft: var(--accent-soft);
-  --success: var(--ok);
-  --success-bg: var(--ok-bg);
-  --success-border: var(--ok-border);
   font:
     14px/1.55 -apple-system,
     BlinkMacSystemFont,
@@ -589,16 +581,15 @@ select {
   min-width: 0;
   transition: opacity 0.2s ease;
 }
+#page-content {
+  container: page / inline-size;
+}
 body.is-working .content {
   opacity: 0.33;
 }
 #page-content p,
 #page-content li {
   font-size: 14px;
-}
-.lede {
-  font-size: 15.5px;
-  color: var(--muted);
 }
 .page-actions {
   display: flex;
@@ -1203,6 +1194,29 @@ svg {
   border-radius: 8px;
   overflow: hidden;
   background: var(--panel);
+}
+/* A figure that ends a card meets the card's edge: the container keeps no
+   padding under it and the figure no margin, so no band of the container's
+   background shows below a code block, diagram, or chart. */
+:is(
+  .visual-option,
+  .vd-columns,
+  .comparison-content,
+  .change-content,
+  .behavior-case > div
+):has(
+  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child
+) {
+  padding-bottom: 0;
+}
+:is(.comparison-content, .change-content, .behavior-case > div)
+  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child {
+  margin-bottom: 0;
+}
+:is(.visual-option > figure, .comparison-content, .change-content) > .figure {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
 }
 .figure-head {
   display: flex;

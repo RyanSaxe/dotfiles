@@ -125,10 +125,9 @@ frame, panels, and figure grounds), `--panel` (the frame, cards, popovers),
 `--line` and `--line-strong`, `--ink`, `--muted`, `--accent` with
 `--accent-ink` and `--accent-soft`, `--attention` and `--attention-bg` (needs
 you), `--ok` and `--ok-bg` (sent, accepted), `--danger` and `--danger-bg`
-(removed), `--code`, and `--mark` (noted text). `--blue`, `--bg`, `--side`,
-`--soft`, and `--success` remain as aliases. Do not color preferred options
-green or alternatives red to express preference, and include labels so meaning
-never rests on color alone.
+(removed), `--code`, and `--mark` (noted text). Do not color preferred
+options green or alternatives red to express preference, and include labels so
+meaning never rests on color alone.
 
 Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
 titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,

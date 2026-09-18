@@ -1,8 +1,22 @@
 .comparison {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 12px;
   --comparison-rows: 3;
+}
+/* No orphan card: two options side by side when the column has room,
+   three across when it has room for three, four or more in pairs; an odd
+   count above three stacks rather than leave one alone. */
+@container page (min-width: 640px) {
+  .comparison:has(> :nth-child(2):last-child),
+  .comparison:has(> :nth-child(4)):not(:has(> :nth-child(odd):last-child)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container page (min-width: 760px) {
+  .comparison:has(> :nth-child(3):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 .comparison-option {
   display: grid;

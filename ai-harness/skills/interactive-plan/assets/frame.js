@@ -180,7 +180,10 @@ function disposeRenderers() {
   charts.clear();
   clearDiffs();
 }
-function show(id, targetId = null, { keepScroll = false } = {}) {
+// Page changes push history so the back button and a pasted hash both work;
+// re-rendering the same page, restoring after a reload, and popstate itself
+// leave history alone.
+function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
@@ -213,7 +216,8 @@ function show(id, targetId = null, { keepScroll = false } = {}) {
   url.hash = feedback ? "feedback" : page.id;
   url.searchParams.delete("target");
   if (targetId) url.searchParams.set("target", targetId);
-  history.replaceState(null, "", url);
+  if (push && url.href !== location.href) history.pushState(null, "", url);
+  else history.replaceState(null, "", url);
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
@@ -1839,12 +1843,15 @@ async function diff(element, input, { diffStyle = "split" } = {}) {
   const files = parsePatchFiles(input.patch).flatMap((patch) => patch.files);
   if (files.length !== 1)
     throw Error("Each diff component requires one file pair.");
+  // The bar above the viewer names the file; the viewer's own header would
+  // repeat it with the path the patch was made from.
   viewer = new FileDiff({
     theme: syntaxThemes[activeTheme],
     diffStyle,
     lineDiffType: "word-alt",
     diffIndicators: "classic",
     overflow: "wrap",
+    disableFileHeader: true,
   });
   element.replaceChildren();
   viewer.render({ fileDiff: files[0], containerWrapper: element });
@@ -2000,6 +2007,13 @@ try {
 }
 show(resume?.page || location.hash.slice(1), query.get("target"), {
   keepScroll: Boolean(resume),
+  push: false,
+});
+window.addEventListener("popstate", () => {
+  const url = new URL(location.href);
+  show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {
+    push: false,
+  });
 });
 if (resume) setTimeout(() => window.scrollTo(0, resume.scrollY), 60);
 if (mode === "preview" && query.get("quote")) {
