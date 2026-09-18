@@ -57,10 +57,12 @@ material, and constraints, and how the behavior will be verified. Distinguish
 binding requirements from illustrations and unfinished integration, and
 automated checks from behavior that needs direct use.
 
-Preserve approved wording, code, formulas, interfaces, designs, and
-interactive behavior in the relevant step, exactly, unless a later decision
-changed them. Keep approved designs viewable and interactions usable with
-their source embedded; a summary, a screenshot, or a link to an earlier
+Carry approved wording, code, interfaces, mocks, and prototypes into the
+relevant step from the latest revision that showed them, not from the
+revision where they were agreed: a mock often changes after the choice that
+approved it. Before publishing, open the last revision that rendered each one
+and check that the step matches it. Keep approved designs viewable and
+interactions usable with their source embedded; a summary, a screenshot, or a link to an earlier
 proposal cannot replace the material itself. Before publishing, extract the
 preserved source from `plan-data` and check that the plan and the project are
 enough to implement and verify the work without earlier revisions or the

@@ -103,6 +103,11 @@ Open. Preview expands that revision's page inside the card, scrolled to the
 source and highlighted; Open shows the revision read-only. Further sources
 sit behind a count on the strip.
 
+The card's strip, Preview, and Open show the first browser source in
+`sourceRefs`. If agreed material changes in a later revision, update the
+agreement: mark it `change: updated`, rewrite its text, and list the newest
+source first. Otherwise Preview keeps opening the old version.
+
 A valid source does not make the summary correct: read the feedback and the
 conversation before writing or changing an agreement. Comments the user
 leaves on a card carry the agreement's ID with them and change nothing on
