@@ -8,7 +8,6 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import vm from "node:vm";
 import { compareFiles } from "../../ai-harness/skills/interactive-plan/components/before-after/diff.mjs";
 import {
   createReviewAlerts,
@@ -74,114 +73,6 @@ async function killHub(config) {
 }
 const sessionConfig = (html) =>
   JSON.parse(html.match(/id="session-config">([\s\S]*?)<\/script>/)[1]);
-
-test("choice tabs preview, select, clear, and support keyboard navigation", async () => {
-  const listeners = {};
-  const tabs = Array.from({ length: 7 }, (_, index) => {
-    const attributes = new Map([["aria-pressed", "false"]]);
-    return {
-      dataset: { value: `option-${index}` },
-      focused: false,
-      getAttribute: (name) => attributes.get(name) ?? null,
-      setAttribute: (name, value) => attributes.set(name, value),
-      closest: () => tabs[index],
-      focus() {
-        this.focused = true;
-      },
-      click() {
-        listeners.click({ target: this });
-        const clearing = this.getAttribute("aria-pressed") === "true";
-        for (const tab of tabs) tab.setAttribute("aria-pressed", "false");
-        if (!clearing) this.setAttribute("aria-pressed", "true");
-      },
-    };
-  });
-  const panels = tabs.map((tab) => ({
-    dataset: { choicePanel: tab.dataset.value },
-    hidden: false,
-  }));
-  const root = {
-    dataset: {},
-    querySelectorAll(selector) {
-      return selector.includes("tabpanel") ? panels : tabs;
-    },
-    addEventListener(type, listener) {
-      listeners[type] = listener;
-    },
-  };
-  let render;
-  const source = await fs.readFile(
-    path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "../../ai-harness/skills/interactive-plan/components/choice-tabs/behavior.js",
-    ),
-    "utf8",
-  );
-  vm.runInNewContext(source, {
-    window: { addEventListener: (_type, listener) => (render = listener) },
-    MutationObserver: class {
-      observe() {}
-    },
-    queueMicrotask,
-  });
-  render({
-    detail: {
-      element: { querySelectorAll: () => [root] },
-    },
-  });
-
-  assert.equal(root.dataset.preview, "true");
-  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
-  assert.equal(panels.filter((panel) => !panel.hidden).length, 1);
-  tabs[4].click();
-  await Promise.resolve();
-  assert.equal(root.dataset.preview, "false");
-  assert.equal(tabs[4].getAttribute("aria-selected"), "true");
-  assert.equal(panels[4].hidden, false);
-  tabs[4].click();
-  await Promise.resolve();
-  assert.equal(root.dataset.preview, "true");
-  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
-
-  const press = (tab, key) => {
-    let prevented = false;
-    listeners.keydown({
-      target: tab,
-      key,
-      preventDefault: () => (prevented = true),
-    });
-    assert.equal(prevented, true);
-  };
-  press(tabs[0], "End");
-  await Promise.resolve();
-  assert.equal(tabs[6].focused, true);
-  assert.equal(tabs[6].getAttribute("aria-selected"), "true");
-  press(tabs[6], "ArrowRight");
-  await Promise.resolve();
-  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
-  press(tabs[0], "ArrowLeft");
-  await Promise.resolve();
-  assert.equal(tabs[6].getAttribute("aria-selected"), "true");
-  press(tabs[6], "Home");
-  await Promise.resolve();
-  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
-});
-
-test("choice tab styles leave panel contents under page control", async () => {
-  const directory = path.join(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "../../ai-harness/skills/interactive-plan/components/choice-tabs",
-  );
-  const [markup, styles] = await Promise.all([
-    fs.readFile(path.join(directory, "markup.html"), "utf8"),
-    fs.readFile(path.join(directory, "styles.css"), "utf8"),
-  ]);
-  assert.equal((markup.match(/role="tab"/g) || []).length, 3);
-  assert.equal((markup.match(/role="tabpanel"/g) || []).length, 3);
-  assert.doesNotMatch(styles, /\.choice-tabs-panel\s+[.#[:]/);
-  assert.match(styles, /overflow-x:\s*auto/);
-  assert.doesNotMatch(styles, /\.choice-tabs-panel[^}]*height\s*:/s);
-});
 
 test("file comparison preserves exact sources and produces an applicable Git patch", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-diff-"));

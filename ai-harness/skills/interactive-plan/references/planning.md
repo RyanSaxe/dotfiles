@@ -1,106 +1,83 @@
 # Planning quality
 
-## Exploration quality
+## Exploration
 
-Exploration pages settle open decisions. Do not add a generic overview page or
-draft implementation steps early. Keep settled decisions and their exact
-sources on Agreed, the only running context page. Do not add a Brief or an
-equivalent summary page.
+Exploration pages settle open decisions. Do not add an overview page, early
+implementation steps, or a summary page. Agreed is the only running context;
+it holds settled decisions with their exact sources.
 
 An exploration may address one decision, several connected choices, or a broad
 part of the proposal. Keep related parts together when their interaction
-matters. Separate them when an unresolved dependency or too much material would
-make the proposal hard to assess.
+matters; separate them when an unresolved dependency or too much material
+would make the proposal hard to assess. Address choices that affect later
+options before spending time on details those choices could invalidate.
 
-Resolve routine details from project evidence and settled requirements. Ask the
-user about choices that change intended behavior, scope, an interface, or an
-important tradeoff. Address choices that affect later options before spending
-time on details those choices could invalidate.
+Resolve routine details from project evidence and settled requirements. Ask
+the user about choices that change intended behavior, scope, an interface, or
+an important tradeoff, and ask on the page: a decision for a selection, a
+question for prose, always beside the proposal it affects.
 
 When a topic contains a meaningful choice, present a small set of credible
-options. Recommend one and make the basis for that recommendation visible in
-the comparison. Let the user choose, combine, revise, or reject the options. Do
-not invent alternatives when only one direction is credible.
+options, recommend one, and make the basis for the recommendation visible in
+the comparison. Do not invent alternatives when only one direction is
+credible. Selecting an option must change the nearby proposal, behavior,
+diagram, wording, or tradeoff; a row of labeled text blocks is not a
+comparison. Use the decision component when a title and one line are enough
+to judge each option, and the visual decision when each option needs a
+diagram, code, chart, or prototype.
 
-When alternatives differ, show the difference. Selecting an option must change
-the nearby proposal, behavior, diagram, wording, or tradeoff. For three to seven
-related options with rich material, use the top-tab choice component. Do not use
-a row of labeled text blocks as a visual comparison.
+Build each page around the proposal itself. Render or demonstrate the
+material when the browser can, and use prose for context or consequences the
+page cannot show. Let the content determine the layout, keep the
+recommendation, evidence, and feedback controls beside the material they
+affect, and do not lead with a generic explanation. Choose supplied
+components by purpose from the [component index](../components/index.md),
+adapt them, or build a plan-local one when the material needs a different
+structure. Component guidance lives in the index, not here.
 
-Treat components as first-class planning tools. Build with them from the start
-instead of writing a prose proposal and wrapping it in boxes afterward. Inspect
-the component index before composing a page and choose supplied components by
-their purpose and contract. Adapt them or create a plan-local component when
-the material needs a different structure or interaction. Component references
-are fit guidance, not finished page designs to copy.
+Use visual hierarchy and color to direct attention, never as the only carrier
+of meaning. Avoid decorative cards, labels, tags, and pills that repeat nearby
+text or name a section.
 
-Build each topic page around the proposal itself. Render or demonstrate the
-material when the browser can do so, and use prose for context or consequences
-that the page cannot show. Let the content determine the layout. Keep the
-recommendation, evidence, and feedback controls beside the material they affect.
-Do not lead the page with a generic explanation.
+## Review
 
-Keep component-specific guidance in the component index. Document a new
-component's purpose and implementation there; adding one should not require new
-workflow text in this file or `SKILL.md`.
+Present the complete plan as an implementation handoff, organized around the
+changes an engineer will make, not the order of the discussion.
 
-Use visual hierarchy and color to direct attention and make relationships clear.
-Do not make color the only carrier of meaning. Avoid decorative cards, labels,
-tags, and pills that merely repeat nearby text or name a section. Keep feedback
-controls beside their target and use the frame's existing submission flow.
+Begin with an overview page that makes the outcome, the scope, and the
+relationships among the steps clear, and link to each step; use a diagram
+when it shows those relationships better than prose. Each step states the
+behavior it must produce, its dependencies, exact interfaces, approved
+material, and constraints, and how the behavior will be verified. Distinguish
+binding requirements from illustrations and unfinished integration, and
+automated checks from behavior that needs direct use.
 
-Good exploration lets the user understand and correct the proposal without
-hiding how its parts affect one another. It does not need to cover the whole
-plan or divide the work into one choice at a time.
+Preserve approved wording, code, formulas, interfaces, designs, and
+interactive behavior in the relevant step, exactly, unless a later decision
+changed them. Keep approved designs viewable and interactions usable with
+their source embedded; a summary, a screenshot, or a link to an earlier
+proposal cannot replace the material itself. Before publishing, extract the
+preserved source from `plan-data` and check that the plan and the project are
+enough to implement and verify the work without earlier revisions or the
+conversation.
 
-## Review quality
-
-Present the complete plan as an implementation handoff. Organize it around the
-changes an engineer will make, not the order in which the discussion happened.
-
-Begin with an overview page that makes the intended outcome, scope, and
-relationships among the implementation steps clear. Link to each step. Use
-visual structure or a diagram when it communicates those relationships better
-than prose.
-
-Each step should state the behavior it must produce and how that behavior will
-be verified. Include dependencies, exact interfaces, approved material, and
-constraints where they affect implementation. Distinguish binding requirements
-from illustrations and unfinished integration work.
-
-Use components and visual structure to make the plan easier to navigate and
-inspect. Preserve approved wording, designs, and interactive behavior in the
-relevant step. Do not replace material the implementer needs with a summary,
-screenshot, or link to an earlier proposal.
-
-Keep verification with the work it covers. Name what must be demonstrated and
-the interface through which it will be checked. Distinguish automated checks
-from behavior that requires direct use.
-
-Resolve implementation-critical unknowns during exploration by inspecting the
-project or reviewing the available directions with the user. If something
-genuinely cannot be known until implementation, explain why, state what must be
-investigated, and define an acceptable result.
-
-The plan and project must provide everything needed to implement and verify the
-agreed work without relying on earlier proposals or conversation. Match the
-detail to the work; do not expand routine mechanics merely to make the plan look
-comprehensive.
+Resolve implementation-critical unknowns during exploration. If something
+genuinely cannot be known until implementation, say why, what must be
+investigated, and what result is acceptable. Match the detail to the work; do
+not expand routine mechanics to make the plan look thorough.
 
 ## Revisions
 
-When revising material the user has already seen, show the new version against
-the version they reviewed. Use an exact diff for text or code. Keep visual
-before-and-after views comparable and identify what changed. A short explanation
-may give the reason for the revision, but it does not replace the comparison.
+Show revised material against the version the user reviewed: an exact diff
+for text or code, comparable before-and-after views for visuals, with what
+changed identified. A short reason may accompany the comparison but does not
+replace it.
 
-When a revision records an answer or choice on Agreed, remove that question
-or decision from the page in the same revision. Sent items leave the draft when
+When a revision records an answer or choice on Agreed, remove that question or
+decision from the page in the same revision. Sent items leave the draft when
 the next revision lands, so a control that stays looks unanswered and gets
 answered again. If the topic is still open, ask the next question, never the
 same one.
 
-Preserve earlier revisions so submitted feedback remains attached to what the
-user saw. Open the rendered artifact and use it before publication. See the
-[component index](../components/index.md) for supplied implementations and
-[authoring.md](authoring.md) for integration contracts.
+Preserve earlier revisions so submitted feedback stays attached to what the
+user saw. Open the rendered artifact and use it before publishing.

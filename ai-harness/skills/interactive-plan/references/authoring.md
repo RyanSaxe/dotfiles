@@ -1,15 +1,18 @@
 # Author browser artifacts
 
-Author HTML pages and a JSON manifest in the session directory. Add custom CSS
-and JavaScript as needed. Build with
-`node scripts/build.mjs SOURCE.json ARTIFACT.html`; the output filename must be new.
+Author HTML pages and a JSON manifest in the session directory, with custom
+CSS and JavaScript as needed, and build one artifact from them:
 
-The builder embeds the frame and authored content into one HTML artifact. Do not
-modify shared skill assets for a particular plan. Embed required local resources;
-the builder does not bundle imports or linked files. Do not install packages to
-author a plan.
+```sh
+node scripts/build.mjs SOURCE.json ARTIFACT.html
+```
 
-## Manifest and handoff
+The output filename must be new. The builder embeds the frame and the authored
+content into one HTML file; it does not bundle imports or linked files, so
+embed every local resource the plan needs. Do not modify shared skill assets
+for a particular plan, and do not install packages to author one.
+
+## Manifest
 
 | Field      | Contract                                                                  |
 | ---------- | ------------------------------------------------------------------------- |
@@ -22,26 +25,22 @@ author a plan.
 | agreements | Optional structured agreement records.                                    |
 | prototypes | Optional preserved, self-contained interactive documents.                 |
 
-Final plans begin with page ID `overview`; remaining pages contain implementation
-steps. `feedback` is reserved; `agreed` is reserved when structured agreements
-are present. Preserve page IDs across revisions: unsent draft items carry over
-to the next revision by page ID and anchor.
+Final plans begin with page ID `overview`; the remaining pages are the
+implementation steps. `feedback` is reserved; `agreed` is reserved when
+agreements are present. Preserve page IDs across revisions: unsent draft items
+carry over to the next revision by page ID and anchor.
 
-The embedded `plan-data` JSON contains page HTML, agreement records, and prototype
-source. Page HTML is trusted authored markup, not Markdown. User comments are
-plain text. Never inject user feedback into executable HTML or JavaScript.
+The embedded `plan-data` JSON holds page HTML, agreement records, and
+prototype source. Page HTML is trusted authored markup, not Markdown. User
+comments are plain text; never inject them into executable HTML or
+JavaScript. The builder escapes literal less-than characters in embedded JSON;
+keep that escaping when editing an assembled artifact. Leave `session-config`
+for the publisher to fill, and never put the agent token in the page.
 
-The builder escapes literal less-than characters in embedded JSON. Keep that
-escaping when editing assembled artifacts. Leave `session-config` for the
-publisher to fill; never put the agent token in the page.
+## Prototypes
 
-Custom CSS and JS files are embedded separately from plan-data. If an approved
-interaction is part of the specification, preserve a complete prototype document
-rather than expecting a reader to reconstruct its source from the outer frame.
-
-## Preserved prototypes
-
-Each `prototypes` record has:
+A prototype preserves an approved interaction verbatim, so the implementer
+sees the behavior instead of a description of it.
 
 | Field  | Contract                                                                 |
 | ------ | ------------------------------------------------------------------------ |
@@ -51,105 +50,82 @@ Each `prototypes` record has:
 | file   | Manifest-only alternative to html; resolved relative to the manifest.    |
 | height | Positive preview height in pixels.                                       |
 
-Put `data-prototype="ID"` on an element where that prototype belongs. The frame
-renders the document framed: a header with the title, a Source toggle that
-shows the exact source with syntax highlighting, and Open full size, which
-shows the prototype alone in a new tab from the same artifact. The document
-runs in a sandboxed iframe with no same-origin access to the review frame; its
-buttons must not submit real session feedback. Scripts, forms, and popup links
-are allowed within the sandbox.
+Put `data-prototype="ID"` on an element where the prototype belongs. The frame
+renders it framed: a header with the title, a Source toggle that shows the
+exact source with syntax highlighting, and Open full size, which shows the
+document alone in a new tab. The document runs in a sandboxed iframe with no
+same-origin access to the review frame, so its controls cannot submit real
+feedback; scripts, forms, and popup links work inside the sandbox. The embed
+is transparent: the document paints its own ground and should follow the
+viewer's theme with a `prefers-color-scheme` rule.
 
-Preserve approved visuals and interactions in the relevant final-plan step,
-alongside binding requirements and any accepted changes. Clearly label
-illustrative content and unfinished integration work. Keep accepted code and
-interfaces verbatim in language-marked elements when they do not need a prototype.
+## Agreements
 
-Embed essential local images and resources. Do not depend on a temporary file or
-earlier server for the specification. External rendering must have an adequate
-source or visual fallback. Extract the source and check that assembly preserves
-the approved work. Use live review to check the embedded version; browser
-automation is optional.
+| Field       | Contract                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| id          | Unique stable agreement ID, preserved when the topic changes.                                |
+| title, html | Concise title and the actual agreement, with exact details as needed.                        |
+| state       | agreed by default; reopened retains prior wording until resolved; retired includes a reason. |
+| change      | Optional new or updated marker for this publication only.                                    |
+| sourceRefs  | One or more references to the material that supports the agreement.                          |
 
-## Agreements and exact sources
+Each reference has a `kind`:
 
-| Field        | Contract                                                                                     |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| id           | Unique stable agreement ID, preserved when the topic changes.                                |
-| title, html  | Concise title and the actual agreement, with exact details as needed.                        |
-| state        | agreed by default; reopened retains prior wording until resolved; retired includes a reason. |
-| change       | Optional new or updated marker for this publication only.                                    |
-| sourceRefs   | References to the submitted material supporting the agreement.                               |
-| source, href | Legacy source note and optional original-page link; still supported.                         |
+| kind         | Required fields        | Meaning                                                                           |
+| ------------ | ---------------------- | --------------------------------------------------------------------------------- |
+| note         | submissionId, noteId   | A saved comment, with its quote and target.                                       |
+| choice       | submissionId, choiceId | A saved choice; choiceId is the submission's choice-map key.                      |
+| answer       | submissionId, answerId | A saved answer to a question component; answerId is the submission's answers key. |
+| conversation | text                   | Context from the agent conversation, labeled as such.                             |
 
-Supply nonempty sourceRefs or legacy source text. Do not recreate settled entries
-to fill the record. Remove old change markers on the next publication.
+Publication resolves browser references from this session's saved
+submissions, embeds the exact text and location as `sourceRecords`, and fails
+when a submission or item is missing. Do not author `sourceRecords`. Remove
+old `change` markers on the next publication, and do not recreate settled
+entries to fill the record.
 
-Agreed renders each agreement as a card: the decision on top, then a strip
-naming the revision and the note, choice, or answer it came from, with Preview
-and Open. Preview expands that revision's page in preview mode, scrolled to
-the source and highlighted, inside the card. Open shows that revision
-read-only. Further sources are listed behind a count on the strip.
+Agreed renders each agreement as a card: the decision, then a strip naming
+the revision and the note, choice, or answer it came from, with Preview and
+Open. Preview expands that revision's page inside the card, scrolled to the
+source and highlighted; Open shows the revision read-only. Further sources
+sit behind a count on the strip.
 
-Each source reference has a `kind`:
-
-| kind         | Required fields        | Meaning                                                                             |
-| ------------ | ---------------------- | ----------------------------------------------------------------------------------- |
-| note         | submissionId, noteId   | Exact saved comment and its original quote/context.                                 |
-| choice       | submissionId, choiceId | Exact choice data and readable labels; choiceId is the submission's choice-map key. |
-| answer       | submissionId, answerId | Exact answer to a question component; answerId is the submission's answers key.     |
-| conversation | text                   | Agent-provided conversation context, explicitly labeled.                            |
-
-Several references can support one agreement. The publisher resolves browser
-references from this session's saved submissions and embeds `sourceRecords`
-before hashing the artifact. Do not author resolved records; publication replaces
-them. Missing submissions or items fail publication.
-
-Source records include exact text and context, the source revision, and the
-target element and quote used for Preview and Open. They remain readable
-offline. Conversation references do not imply access to a transcript or
-require an invented browser link.
-
-Choice sources retain the submitted record in `choice`. Single choices carry
-`value` and `valueLabel`; legacy records display `value`. Checklists carry
-`kind: "multiple"` and the complete `options` array, with each option's `value`,
-`label`, and `checked` state. Source text displays selected labels, or
-"None selected" for an empty checklist.
-
-A valid source does not prove that the summary is correct. Read feedback and
-conversation context before changing the agreement. A recommendation is not an
-agreement. Entry notes carry agreement identity through the normal draft and
-submission flow; they do not change state automatically.
+A valid source does not make the summary correct: read the feedback and the
+conversation before writing or changing an agreement. Comments the user
+leaves on a card carry the agreement's ID with them and change nothing on
+their own.
 
 ## Frame and content
 
-The frame owns the sidebar (plan title, revision line and popover, pages,
-Agreed, and Feedback with a count of unsent items), the previous and next
-links at the end of each page, the bell for other live sessions,
-Settings (appearance and notifications), the Feedback page, the working state,
-and preview and read-only modes. The page layout is yours to compose. Basic
-typography, tables, code, theme colors, focus, and selected-choice states are
-available. There are no generic card or column layouts to fill.
+The frame owns the sidebar (title, revision line and popover, pages, Agreed,
+and Feedback with a count of unsent items), the previous and next links at
+the end of each page, the bell for other live sessions, Settings (appearance
+and notifications), the Feedback page, the working state, and the preview and
+read-only modes. The page layout is yours. Basic typography, tables, code,
+theme colors, focus, and selected-choice states are provided; there are no
+generic card or column layouts to fill.
 
-Tokens, with light and dark values: `--ground` (sidebar and panels behind
-content), `--panel` (content, cards, popovers), `--line` and `--line-strong`,
-`--ink`, `--muted`, `--accent` with `--accent-ink` and `--accent-soft`,
-`--attention` and `--attention-bg` (needs you), `--ok` and `--ok-bg` (sent,
-accepted), `--danger` and `--danger-bg` (removed), `--code`, and `--mark`
-(noted text). `--blue`, `--bg`, `--side`, `--soft`, and `--success` remain as
-aliases. Do not color preferred options green or alternatives red merely to
-express preference. Include labels so meaning does not rely on color.
+Tokens, each with a light and a dark value: `--ground` (the page behind the
+frame, panels, and figure grounds), `--panel` (the frame, cards, popovers),
+`--line` and `--line-strong`, `--ink`, `--muted`, `--accent` with
+`--accent-ink` and `--accent-soft`, `--attention` and `--attention-bg` (needs
+you), `--ok` and `--ok-bg` (sent, accepted), `--danger` and `--danger-bg`
+(removed), `--code`, and `--mark` (noted text). `--blue`, `--bg`, `--side`,
+`--soft`, and `--success` remain as aliases. Do not color preferred options
+green or alternatives red to express preference, and include labels so meaning
+never rests on color alone.
 
 Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
 titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
-6px for rows. Appearance follows the system until explicitly selected, and
-the choice is remembered for the hub origin.
+6px for rows. The frame is at most 1160px wide and centered; the reading
+column is at most 820px.
 
-Frame popups dismiss on outside click or Escape without submitting or accepting.
-Follow that behavior in custom popups, preserve unsent text, and keep keyboard
-focus usable. Single keys (listed under `?`) jump between sessions, pages, and
-interactive items; keep authored controls focusable so they take part.
+Frame popups close on an outside click or Escape without submitting anything.
+Custom popups should do the same and keep unsent text. Single keys, listed
+under `?`, move between sessions, pages, and interactive items; keep authored
+controls focusable so they take part.
 
-## Choices, comments, answers, and custom interactions
+## Choices, comments, and answers
 
 | Interface                            | Behavior                                                                                                                          |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -168,37 +144,35 @@ interactive items; keep authored controls focusable so they take part.
 | planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                       |
 | planUI.mode                          | live, readonly, or preview.                                                                                                       |
 
-Choice clicks, checklist changes, and typed answers update the local draft. Only
-Submit sends it. Keep control IDs and labels stable. Group IDs must be unique
-within a page, across all kinds. Option IDs must be unique within a group. The
-frame supplies missing group target IDs for source links. Use native buttons
-for single choices, native labeled checkboxes for checklists, and a textarea
-inside `data-question` for answers.
+Choice clicks, checklist changes, and typed answers update the local draft;
+only Submit sends it. Keep control IDs and labels stable. Group IDs must be
+unique within a page across all kinds, and option IDs within a group. Use
+native buttons for single choices, native labeled checkboxes for checklists,
+and a textarea inside `data-question` for answers.
 
-Every authored checklist appears in Feedback, including lists on unvisited
-pages. Authored `checked` attributes set initial values; saved draft values take
-precedence. An empty set means "None selected", not unanswered. Each checklist
-counts as one feedback item. Put checklist markup in page HTML so the frame can
-discover it before the user visits the page.
+Every checklist appears in Feedback, including lists on pages the user has
+not visited, so put checklist markup in page HTML rather than adding it from
+script. Authored `checked` attributes set initial values; saved draft values
+take precedence. An empty set means "None selected", not unanswered, and each
+checklist counts as one feedback item.
 
-Register custom initialization on `plan:page`. The custom JS file executes before
-the frame module. Script elements inserted inside page HTML do not execute.
-Page-level and text-selection comments require no custom code.
+Register custom initialization on `plan:page`. The custom JS file runs before
+the frame module. Script elements inside page HTML do not execute. Page-level
+and text-selection comments need no custom code.
 
-Notes on selected text show as a numbered marker on the noted text and a count
-line under the last noted block; the note itself is read on Feedback. Feedback
-groups items by page, with edit and remove, an overall comment, and one Submit
-that sends everything unsent at once. Sent items stay listed as sent until the
-next revision; items whose page or text no longer exists are listed under the
-revision they came from. Submissions carry `groups.choices`, `groups.notes`,
-and, when present, `groups.answers` keyed `page/question` with `label`,
-`text`, and `topic`.
-
-Do not build a second feedback or reply transport.
+Noted text is highlighted; hovering it shows the note, and clicking opens the
+note to edit. The count of notes on a page sits at the bottom, above the page
+actions. Feedback groups items by page with edit and remove, holds the overall
+comment, and has one Submit that sends everything unsent at once; on an
+acceptable final plan, Accept plan sits beside it. Sent items stay listed as
+sent until the next revision; items whose page or text no longer exists are
+listed under the revision they came from. Submissions carry `groups.choices`,
+`groups.notes`, and, when present, `groups.answers` keyed `page/question`
+with `label`, `text`, and `topic`.
 
 ## Renderers and figures
 
-Use the renderer matching the content. Load only what the page needs.
+Use the renderer that matches the content. Load only what the page needs.
 
 | Content                                | Markup contract                                                       | Renderer |
 | -------------------------------------- | --------------------------------------------------------------------- | -------- |
@@ -207,27 +181,21 @@ Use the renderer matching the content. Load only what the page needs.
 | Diagrams                               | data-diagram with Mermaid source as text                              | Mermaid  |
 | Charts and mathematical demonstrations | data-chart with an ECharts option object as JSON text                 | ECharts  |
 
-Optional figure attributes: `data-file` on a code block adds a header with the
-file name, the language, and a Copy button; `data-caption` on code, diagrams,
-and charts adds a caption line; `data-title` on a chart adds a header. Use the
-code renderer for source code instead of bare unhighlighted blocks. For
-before/after code, use the [diff component](../components/index.md). Language
-grammars load on demand; unsupported languages retain source and report
-failure. Escape backslashes again when math is stored inside a JSON string.
+`data-file` on a code block adds a header with the file name, the language,
+and a Copy button; `data-caption` on code, diagrams, and charts adds a caption
+line; `data-title` on a chart adds a header. Use the code renderer for source
+code, never a bare block, and the [diff component](../components/index.md)
+for before and after. Language grammars load on demand; unsupported languages
+keep their source and report the failure. Escape backslashes again when math
+is stored inside a JSON string.
 
-The frame owns pinned CDN locations and integrity values. ESM dependency graphs
-are not fully integrity-verified by version pinning. CDN rendering needs a
-connection. Native SVG and custom components remain available when they
+The frame owns the pinned CDN locations and integrity values; rendering needs
+a connection. Native SVG and custom components remain available when they
 communicate an idea better.
 
 ## Before publication
 
-Build the artifact and inspect its source, including choice IDs and labels,
-feedback hooks, embedded resources, and renderer fallbacks. Use formatting and
-lint tools when already available; do not install tooling to author a plan unless
-asked. Browser automation is optional. Use live review to find and correct
-rendering and interaction problems.
-
-For final plans, inspect the preserved approved work and extract its source from
-plan-data. The plan and project must be enough to implement the work. Source
-records and links to old proposals cannot replace the approved material itself.
+Build the artifact and inspect its source: choice IDs and labels, feedback
+hooks, embedded resources, renderer fallbacks. Use formatting and lint tools
+when they are already available; do not install tooling to author a plan
+unless asked.
