@@ -111,10 +111,12 @@ their own.
 ## Frame and content
 
 The frame owns the sidebar (title, revision line and popover, pages, Agreed,
-and Feedback with a count of unsent items), the previous and next links at
-the end of each page, the bell for other live sessions, Settings (appearance
-and notifications), the Feedback page, the working state, and the preview and
-read-only modes. The page layout is yours. Basic typography, tables, code,
+Feedback with a count of unsent items, and Submit at the foot, which reads
+when the last round went or becomes Accept plan on an acceptable final plan),
+the previous and next links at the end of each page, the bell for other live
+sessions, Settings (appearance and notifications), the Feedback page, the
+working card (the round's steps, ticked as the agent reports them), and the
+preview and read-only modes. The page layout is yours. Basic typography, tables, code,
 theme colors, focus, and selected-choice states are provided; there are no
 generic card or column layouts to fill.
 
@@ -135,8 +137,9 @@ column is at most 820px.
 
 Frame popups close on an outside click or Escape without submitting anything.
 Custom popups should do the same and keep unsent text. Single keys, listed
-under `?`, move between sessions, pages, and interactive items; keep authored
-controls focusable so they take part.
+under `?`, move between sessions, pages, and interactive items, and `s`
+focuses Submit so Enter sends; keep authored controls focusable so they take
+part.
 
 ## Choices, comments, and answers
 
@@ -175,13 +178,12 @@ and text-selection comments need no custom code.
 
 Noted text is highlighted; hovering it shows the note, and clicking opens the
 note to edit. The count of notes on a page sits at the bottom, above the page
-actions. Feedback groups items by page with edit and remove, holds the overall
-comment, and has one Submit that sends everything unsent at once; on an
-acceptable final plan, Accept plan sits beside it. Sent items stay listed as
-sent until the next revision; items whose page or text no longer exists are
-listed under the revision they came from. Submissions carry `groups.choices`,
-`groups.notes`, and, when present, `groups.answers` keyed `page/question`
-with `label`, `text`, and `topic`.
+actions. Feedback groups items by page with edit and remove and holds the
+overall comment; Submit, at the foot of the sidebar, sends everything unsent
+at once. Sent items stay listed as sent until the next revision; items whose
+page or text no longer exists are listed under the revision they came from.
+Submissions carry `groups.choices`, `groups.notes`, and, when present,
+`groups.answers` keyed `page/question` with `label`, `text`, and `topic`.
 
 ## Renderers and figures
 

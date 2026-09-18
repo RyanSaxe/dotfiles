@@ -456,6 +456,26 @@ kbd {
   border-top: 1px solid var(--line);
   margin: 8px 0;
 }
+/* Submit sits at the foot of the sidebar so every page can send; with
+   nothing unsent the row reads when the last round went. */
+.side-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+.side-foot .small {
+  margin-right: auto;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+.side-foot .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
 .sidebar nav button .count {
   display: inline-block;
   min-width: 18px;
@@ -946,17 +966,11 @@ blockquote {
   color: var(--muted);
   font-size: 12.5px;
 }
-.submitbar {
-  position: sticky;
-  bottom: 0;
+.feedback-end {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  justify-content: flex-end;
   border-top: 1px solid var(--line);
-  padding: 14px 0;
-  background: var(--panel);
+  padding: 14px 0 6px;
 }
 
 /* Agreed */
@@ -1353,6 +1367,7 @@ dialog::backdrop {
   font-size: 17px;
 }
 :root[data-mode="readonly"] .page-actions,
+:root[data-mode="readonly"] .side-foot,
 :root[data-mode="readonly"] #quote,
 :root[data-mode="readonly"] [data-comment],
 :root[data-mode="readonly"] .note-count {
@@ -1405,6 +1420,11 @@ dialog::backdrop {
   .sidebar nav {
     padding: 0;
     max-height: 50vh;
+  }
+  .side-foot {
+    margin: 0;
+    padding: 0 12px 10px;
+    border-top: 0;
   }
   .topbar {
     position: fixed;

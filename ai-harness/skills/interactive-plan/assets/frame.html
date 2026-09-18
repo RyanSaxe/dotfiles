@@ -31,6 +31,14 @@
           <div class="side-label">Pages</div>
           <nav id="navigation" aria-label="Plan pages"></nav>
         </details>
+        <div class="side-foot" id="side-foot">
+          <span class="small" id="submit-status"></span>
+          <button class="btn primary" id="submit" type="button" disabled>
+            Submit</button
+          ><button class="btn primary" id="accept" type="button" hidden>
+            Accept plan
+          </button>
+        </div>
       </aside>
       <main>
         <header class="topbar">
@@ -125,17 +133,10 @@
               </div>
               <div id="overall-notes"></div>
             </section>
-            <div class="submitbar">
-              <div class="small" id="submit-status"></div>
-              <div class="row">
-                <button class="btn quiet" id="export" type="button">
-                  Export copy</button
-                ><button class="btn primary" id="submit" type="button" disabled>
-                  Submit</button
-                ><button class="btn primary" id="accept" type="button" hidden>
-                  Accept plan
-                </button>
-              </div>
+            <div class="feedback-end">
+              <button class="btn quiet" id="export" type="button">
+                Export copy
+              </button>
             </div>
             <p class="small" id="storage-status"></p>
             <p class="small" id="connection-status"></p>
@@ -243,6 +244,8 @@
         <dd>Comment on this page</dd>
         <dt><kbd>r</kbd></dt>
         <dd>Review your feedback</dd>
+        <dt><kbd>s</kbd></dt>
+        <dd>Focus Submit; Enter sends</dd>
         <dt><kbd>a</kbd></dt>
         <dd>Open Agreed</dd>
         <dt><kbd>Esc</kbd></dt>

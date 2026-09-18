@@ -852,15 +852,15 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
-  $("submit").disabled = !unsent.count || !connected || !current() || !editable;
-  $("submit").textContent = unsent.count
-    ? `Submit ${plural(unsent.count, "comment")}`
-    : "Submit";
+  const sendable = connected && current() && editable;
+  const sent = !unsent.count && state.submitted?.revision === plan.revision;
+  $("submit").disabled = !unsent.count || !sendable;
+  $("submit").textContent = unsent.count ? `Submit ${unsent.count}` : "Submit";
+  // Accept plan takes the slot on an acceptable final plan; a sent round with
+  // nothing new shows when it went instead of a disabled button.
+  $("submit").hidden = !$("accept").hidden || (sent && !submissionError);
   $("submit-status").textContent =
-    submissionError ||
-    (!unsent.count && state.submitted?.revision === plan.revision
-      ? `Sent ${ago(state.submitted.at)}.`
-      : "");
+    submissionError || (sent ? `Sent ${ago(state.submitted.at)}` : "");
   status();
 }
 function feedbackText() {
@@ -1569,7 +1569,11 @@ document.addEventListener("keydown", (event) => {
   } else if (key === "c" && editable && !$("reading").hidden)
     openNote(page.id, page.title);
   else if (key === "r" && editable) show("feedback");
-  else if (key === "a") show("agreed");
+  else if (key === "s" && editable) {
+    const target = $("accept").hidden ? $("submit") : $("accept");
+    if (target.hidden || target.disabled) return;
+    target.focus();
+  } else if (key === "a") show("agreed");
   else return;
   event.preventDefault();
 });
