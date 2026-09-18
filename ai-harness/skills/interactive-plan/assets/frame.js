@@ -364,6 +364,17 @@ $("page-content").addEventListener("mouseleave", () => {
   $("note-tip").hidden = true;
   tipNotes = "";
 });
+// Any rendered diagram opens full size; the dialog closes on Escape or a
+// click outside like the other dialogs.
+$("page-content").addEventListener("click", (event) => {
+  const svg = event.target.closest("[data-diagram] svg");
+  if (!svg || event.target.closest("a")) return;
+  const clone = svg.cloneNode(true);
+  clone.style.width = `${svg.viewBox.baseVal.width}px`;
+  clone.removeAttribute("width");
+  $("diagram-dialog").replaceChildren(clone);
+  $("diagram-dialog").showModal();
+});
 $("page-content").addEventListener("click", (event) => {
   if (!editable || event.target.closest("button, a, input, textarea, summary"))
     return;
@@ -1722,12 +1733,21 @@ function renderDiagrams(root) {
               lineColor: color("--muted"),
               fontFamily: "sans-serif",
             },
+            flowchart: {
+              nodeSpacing: 28,
+              rankSpacing: 36,
+              padding: 12,
+              subGraphTitleMargin: { top: 8, bottom: 8 },
+            },
           });
           const result = await mermaid.render(
             "diagram-" + crypto.randomUUID(),
             element.dataset.source,
           );
-          if (element.isConnected) element.innerHTML = result.svg;
+          if (!element.isConnected) return;
+          element.innerHTML = result.svg;
+          const width = element.querySelector("svg")?.viewBox?.baseVal?.width;
+          if (width) element.style.setProperty("--diagram-width", `${width}px`);
         } catch (error) {
           failed(element, error);
         }

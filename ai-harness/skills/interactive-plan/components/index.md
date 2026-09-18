@@ -74,3 +74,49 @@ in the legend. Apply `added`, `removed`, or `changed` classes to changed
 content or Mermaid nodes; the component supplies theme-aware colors, so do not
 set fixed colors in Mermaid `classDef` declarations. These annotations express
 the author's meaning, not an inferred diff.
+
+## Diagrams
+
+These pairs show what goes wrong, not what to draw. The frame renders every
+diagram at its drawn size, scrolling sideways when it is wider than the
+column, and a click opens it full size; inside a side-by-side layout it
+shrinks to its column instead.
+
+1. **Choose the form for the idea, then draw it clean.** Mermaid is the
+   default, and a loop drawn as a flowchart is right when the loop is the
+   structure; a sequence when the order of waits is the point; a state
+   diagram for modes. When Mermaid cannot say it cleanly, draw the SVG: the
+   skill's own review loop ([flow.svg](../references/flow.svg)) is one, and
+   it follows the frame's theme through the tokens.
+2. **Link to a group, never into it from above.** An edge into a subgraph's
+   first node passes through its title. Point the edge at the group, or lay
+   the flow left to right.
+3. **A long chain: top to bottom, groups, or a line that scrolls.** Ten hops
+   in a line read at natural size by scrolling, which is fine when the order
+   is the whole point. Grouped, the same flow fits the column and names its
+   parts.
+4. **The frame's spacing is rank 36, node 28, title margin 8.** Mermaid's 50
+   and 50 costs a screen per four nodes; these keep titles clear of edges.
+5. **One to three words in a node; the rest in the caption.** Long labels
+   widen every node in the rank and push the chain past the column. The
+   caption line under the figure carries the sentence.
+
+The fixture under `scripts/fixture/` renders each pair.
+
+```text
+2, avoid    flowchart TB · E["Pricing"] --> F · subgraph pay [Payments]
+            F["PaymentClient"] --> G["Breaker"] --> H["Gateway"] · end · H --> I["Ledger"]
+2, prefer   flowchart TB · E["Pricing"] --> pay · subgraph pay [Payments]
+            F["PaymentClient"] --> G["Breaker"] --> H["Gateway"] · end · pay --> I["Ledger"]
+3, a line   flowchart LR · Browser --> Edge --> Checkout API --> Cart service --> Pricing
+            --> PaymentClient --> Breaker --> Gateway --> Ledger --> Notifier
+3, grouped  flowchart TB · subgraph front [Front] direction LR · Browser --> Edge · end
+            · subgraph core [Core] direction LR · Checkout API --> Cart service --> Pricing · end
+            · subgraph pay [Payments] direction LR · PaymentClient --> Breaker --> Gateway · end
+            · front --> core --> pay --> Ledger --> Notifier
+5, avoid    flowchart LR · A["Checkout API validates the cart and prices"]
+            --> B["PaymentClient with a five-failure breaker"] --> C["Gateway, 8 s timeout"]
+5, prefer   flowchart LR · A["Checkout API"] --> B["PaymentClient"] --> C["Gateway"]
+            caption: Checkout validates and prices; the client trips after five failures;
+            the gateway times out at 8 s.
+```

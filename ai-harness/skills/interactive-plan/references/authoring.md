@@ -202,7 +202,11 @@ Use the renderer that matches the content. Load only what the page needs.
 
 `data-file` on a code block adds a header with the file name, the language,
 and a Copy button; `data-caption` on code, diagrams, and charts adds a caption
-line; `data-title` on a chart adds a header. Use the code renderer for source
+line; `data-title` on a chart adds a header. A diagram renders at its drawn
+size and scrolls sideways when wider than the column, shrinks to its column
+inside a side-by-side layout, and opens full size on a click; flowcharts use
+rank spacing 36, node spacing 28, and a title margin of 8. The component
+index's Diagrams section says what keeps one legible. Use the code renderer for source
 code, never a bare block, and the [diff component](../components/index.md)
 for before and after. Language grammars load on demand; unsupported languages
 keep their source and report the failure. Escape backslashes again when math

@@ -1148,17 +1148,46 @@ img,
 svg {
   max-width: 100%;
 }
-[data-math],
-[data-diagram] {
+[data-math] {
   overflow: auto;
 }
+/* A diagram keeps its drawn size and scrolls sideways; inside a side-by-side
+   container it shrinks to its column instead. Either way a click enlarges it.
+   Mermaid writes its own max-width inline, hence the priorities. */
 [data-diagram] {
-  display: grid;
-  place-items: center;
+  display: block;
+  overflow-x: auto;
   padding: 8px 0;
+  text-align: center;
 }
 [data-diagram] svg {
+  display: inline-block;
+  vertical-align: top;
   height: auto;
+  width: var(--diagram-width, auto);
+  max-width: none !important;
+  cursor: zoom-in;
+}
+:is(.visual-decision[data-mode="columns"], .comparison, .change-pair)
+  [data-diagram]
+  svg {
+  width: 100%;
+  max-width: var(--diagram-width, 100%) !important;
+}
+.lightbox {
+  width: min(96vw, 1600px);
+  max-height: 92vh;
+  margin: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: auto;
+}
+.lightbox svg {
+  display: block;
+  height: auto;
+  max-width: none;
 }
 [data-chart] {
   height: 300px;
