@@ -117,7 +117,6 @@ let page = plan.pages[0],
   submissionError = "",
   noteDraftKey = "",
   renderedFeedback = null,
-  toastTimer,
   answerTimer;
 const charts = new Map();
 const diffs = new Map();
@@ -151,12 +150,6 @@ const prefs = {
   },
 };
 
-function notify(message) {
-  $("toast").textContent = message;
-  $("toast").hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => ($("toast").hidden = true), 4000);
-}
 function persist() {
   if (!editable) return;
   try {
@@ -937,6 +930,118 @@ function scheduleReload() {
   }
   location.reload();
 }
+// Under a minute reads "just now"; after that the bare duration, as the card
+// shows it beside the title.
+function elapsed(value) {
+  const ms = Date.now() - Date.parse(value);
+  return Number.isFinite(ms) && ms < 60000 ? "just now" : since(value);
+}
+// The bookends are derived here, not stored: the hub only keeps the steps the
+// agent declared. Rows carry "done", "now", "wait", or nothing.
+function workingModel(accepting) {
+  if (accepting)
+    return {
+      title: "Plan accepted",
+      since: state.acceptance?.at || remote.updatedAt,
+      bar: false,
+      rows: [{ text: "Recording your acceptance", state: "now" }],
+    };
+  const sent = state.submitted?.revision === plan.revision;
+  const read = sent
+    ? plural(state.submitted.count, "comment")
+    : "your feedback";
+  const next = /^\d+$/.test(plan.revision)
+    ? `revision ${Number(plan.revision) + 1}`
+    : "the next revision";
+  const publish = { text: `Publish ${next}`, state: "" };
+  if (remote.stage === "submitted")
+    return {
+      title: "Sent",
+      since: sent ? state.submitted.at : remote.updatedAt,
+      bar: true,
+      rows: [
+        { text: `Waiting for the agent to read ${read}`, state: "wait" },
+        { text: "Work out the steps", state: "" },
+        { text: "Check and polish", state: "" },
+        publish,
+      ],
+    };
+  const steps = remote.progress?.steps;
+  const done = { text: `Read ${read}`, state: "done" };
+  const title = `Working on ${next}`;
+  const since = remote.acknowledgedAt || remote.updatedAt;
+  if (!steps)
+    return {
+      title,
+      since,
+      bar: true,
+      rows: [
+        done,
+        { text: "Working out the steps", state: "now" },
+        { text: "Check and polish", state: "" },
+        publish,
+      ],
+    };
+  const current = steps.findIndex((step) => !step.done);
+  return {
+    title,
+    since,
+    bar: true,
+    rows: [
+      done,
+      ...steps.map((step, index) => ({
+        text: step.title,
+        state: step.done ? "done" : index === current ? "now" : "",
+      })),
+      { text: "Check and polish", state: current < 0 ? "now" : "" },
+      publish,
+    ],
+  };
+}
+function renderWorking(model) {
+  $("working-title").textContent = model.title;
+  $("working-time").textContent = model.since ? elapsed(model.since) : "";
+  const silent = remote?.disconnected && remote.agentSeenAt;
+  $("working-note").hidden = !silent;
+  if (silent)
+    $("working-note").textContent =
+      `The agent has not checked in for ${since(remote.agentSeenAt)}.`;
+  const bar = $("working-bar");
+  const list = $("working-steps");
+  bar.hidden = !model.bar;
+  while (bar.children.length > model.rows.length) bar.lastElementChild.remove();
+  while (list.children.length > model.rows.length)
+    list.lastElementChild.remove();
+  while (bar.children.length < model.rows.length)
+    bar.append(document.createElement("i"));
+  // Rows added after the first render slide in; the class leaves with the
+  // animation so later polls compare plain state classes.
+  const grown = list.children.length > 0;
+  while (list.children.length < model.rows.length) {
+    const row = document.createElement("li");
+    if (grown) {
+      row.classList.add("enter");
+      row.addEventListener(
+        "animationend",
+        () => row.classList.remove("enter"),
+        {
+          once: true,
+        },
+      );
+    }
+    list.append(row);
+  }
+  model.rows.forEach((row, index) => {
+    const segment = bar.children[index];
+    const item = list.children[index];
+    const state = row.state === "wait" ? "" : row.state;
+    if (segment.className !== state) segment.className = state;
+    const entering = item.classList.contains("enter");
+    const className = entering ? `${row.state} enter`.trim() : row.state;
+    if (item.className !== className) item.className = className;
+    if (item.textContent !== row.text) item.textContent = row.text;
+  });
+}
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
   const newer = connected && remote?.current && !current();
@@ -949,16 +1054,7 @@ function status() {
     ["submitted", "working"].includes(stage);
   document.body.classList.toggle("is-working", working);
   $("working").hidden = !working;
-  if (working) {
-    $("working-title").textContent = accepting
-      ? "Plan accepted"
-      : "Working on the next revision";
-    $("working-detail").textContent = accepting
-      ? "The agent is recording your acceptance."
-      : state.submitted?.revision === plan.revision
-        ? `Your ${plural(state.submitted.count, "comment")} were sent ${ago(state.submitted.at)}. This page refreshes when it is ready.`
-        : "This page refreshes when it is ready.";
-  }
+  if (working) renderWorking(workingModel(accepting));
   const complete = stage === "complete" && remote?.accepted;
   $("accepted").hidden = !complete;
   if (complete)
@@ -1217,7 +1313,6 @@ $("note-form").onsubmit = (event) => {
   if (state.noteDrafts) delete state.noteDrafts[noteDraftKey];
   save();
   $("note-dialog").close();
-  notify("Added to feedback.");
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
@@ -1236,7 +1331,6 @@ $("submit").onclick = async () => {
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
     save();
-    notify("Feedback sent.");
     show(page.id, null, { keepScroll: false });
   } catch (error) {
     submissionError = error.message;
@@ -1284,11 +1378,6 @@ document.querySelectorAll("[data-accept-mode]").forEach(
         await send(state.acceptance);
         save();
         $("accept-dialog").close();
-        notify(
-          mode === "implement"
-            ? "Accepted. Implementation requested."
-            : "Accepted and saved.",
-        );
       } catch (error) {
         $("accept-error").textContent = error.message;
       } finally {
@@ -1571,7 +1660,8 @@ function copyButton(read) {
       button.textContent = "Copied";
       setTimeout(() => (button.textContent = "Copy"), 1500);
     } catch {
-      notify("Copy is unavailable in this browser.");
+      button.textContent = "Copy failed";
+      setTimeout(() => (button.textContent = "Copy"), 1500);
     }
   };
   return button;

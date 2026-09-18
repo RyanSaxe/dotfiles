@@ -630,22 +630,134 @@ body.is-working .content {
 }
 .working-card {
   pointer-events: auto;
-  max-width: 360px;
-  padding: 14px 18px;
+  width: min(380px, 100%);
+  padding: 14px 18px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.working-card .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.working-card .head b {
+  font-size: 15px;
+}
+.working-card .head small {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.working-note {
+  margin: -4px 0 8px;
+  color: var(--attention);
+  font-size: 12.5px;
+}
+/* The card patches in place: one segment and one row per step, classes
+   toggled on a poll, so nothing is rebuilt while the agent works. */
+.working-card .bar {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 3px;
+  height: 5px;
+  margin-bottom: 12px;
+}
+.working-card .bar i {
+  border-radius: 3px;
+  background: var(--line);
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+.working-card .bar i.done {
+  background: var(--accent);
+}
+.working-card .bar i.now {
+  background: var(--accent);
+  opacity: 0.45;
+}
+.working-card .steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.working-card .steps li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+.working-card .steps li::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  box-sizing: border-box;
+  justify-self: center;
+}
+.working-card .steps li.done {
+  color: var(--ink);
+}
+.working-card .steps li.done::before {
+  content: "✓";
+  border: 0;
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 14px;
   text-align: center;
 }
-.working-card b {
-  display: block;
-  font-size: 15px;
-  margin-bottom: 4px;
+.working-card .steps li.now,
+.working-card .steps li.wait {
+  color: var(--ink);
+  font-weight: 600;
 }
-.working-card span {
+.working-card .steps li.now::before {
+  border-color: var(--accent);
+  border-width: 3.5px;
+  animation: working-pulse 1.2s ease-in-out infinite;
+}
+.working-card .steps li.wait::before {
+  border-color: var(--attention);
+  border-width: 3.5px;
+  animation: working-pulse 1.2s ease-in-out infinite;
+}
+.working-card .steps li.enter {
+  animation: working-enter 0.2s ease;
+}
+@keyframes working-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes working-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.working-card .foot {
+  margin: 10px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .working-card .bar i {
+    transition: none;
+  }
+  .working-card .steps li::before,
+  .working-card .steps li.enter {
+    animation: none;
+  }
 }
 
 /* Sessions panel */
@@ -1209,19 +1321,6 @@ dialog::backdrop {
   bottom: 22px;
   right: 22px;
   z-index: 5;
-}
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 90vw;
-  padding: 9px 14px;
-  border-radius: 7px;
-  color: var(--panel);
-  background: var(--ink);
-  z-index: 8;
-  font-size: 12.5px;
 }
 .context-link {
   font-size: 12px;

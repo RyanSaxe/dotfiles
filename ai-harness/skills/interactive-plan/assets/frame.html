@@ -146,7 +146,13 @@
         </div>
         <div class="working" id="working" hidden>
           <div class="working-card" role="status">
-            <b id="working-title"></b><span id="working-detail"></span>
+            <div class="head">
+              <b id="working-title"></b><small id="working-time"></small>
+            </div>
+            <p class="working-note" id="working-note" hidden></p>
+            <div class="bar" id="working-bar"></div>
+            <ul class="steps" id="working-steps"></ul>
+            <p class="foot">This page refreshes when it is ready.</p>
           </div>
         </div>
         <aside
@@ -247,7 +253,6 @@
       Comment on selection
     </button>
     <div class="note-tip" id="note-tip" hidden></div>
-    <div class="toast" id="toast" role="status" hidden></div>
 
     <script type="application/json" id="session-config">
       {}
