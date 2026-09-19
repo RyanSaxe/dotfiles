@@ -217,7 +217,23 @@ function openLightbox(svg) {
     "--diagram-width",
     svg.closest("[data-diagram]").style.getPropertyValue("--diagram-width"),
   );
-  dialog.replaceChildren(svg.cloneNode(true));
+  const clone = svg.cloneNode(true);
+  // A linked node still opens its page from here, through the dialog rather
+  // than through focus: showModal would otherwise land on the first node and
+  // ring it for no reason.
+  for (const node of clone.querySelectorAll(".node.linked")) {
+    node.removeAttribute("tabindex");
+    node.removeAttribute("role");
+  }
+  dialog.replaceChildren(clone);
+  dialog.onclick = (event) => {
+    const id = event.target
+      .closest(".node.linked")
+      ?.id.match(/^flowchart-(.+)-\d+$/)?.[1];
+    if (!id) return;
+    dialog.close();
+    show(id);
+  };
   dialog.showModal();
 }
 
@@ -288,6 +304,9 @@ async function renderMath(element) {
 }
 
 /* Charts */
+// Series take the tokens in this order; a chart with one series is the accent.
+const chartPalette = () =>
+  ["--accent", "--mark", "--add", "--cut", "--muted"].map(color);
 function chartTheme(options) {
   const result = {
     backgroundColor: "transparent",
@@ -323,7 +342,7 @@ async function chart(element, options) {
   instance.setOption(
     {
       backgroundColor: "transparent",
-      color: [color("--accent"), color("--muted")],
+      color: chartPalette(),
       textStyle: { color: color("--ink") },
       ...options,
     },
@@ -641,7 +660,7 @@ function theme() {
   $("theme").value = preferredTheme || "system";
   for (const instance of charts.values())
     instance.setOption({
-      color: [color("--accent"), color("--muted")],
+      color: chartPalette(),
       ...chartTheme(instance.getOption()),
     });
   for (const viewer of diffs.values()) {

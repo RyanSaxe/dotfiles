@@ -528,11 +528,11 @@ svg {
 [data-math] [data-lines].on {
   background: var(--accent-soft);
 }
-/* A diagram keeps its drawn size and scrolls sideways; a click enlarges it.
-   Mermaid writes its own max-width inline, hence the priorities. */
+/* A diagram is drawn at its own size and scaled down to the column when it
+   is wider; a click opens it at its drawn size. Mermaid writes its own
+   max-width inline, hence the priority. */
 [data-diagram] {
   display: block;
-  overflow-x: auto;
   padding: 8px 0;
   text-align: center;
 }
@@ -541,7 +541,7 @@ svg {
   vertical-align: top;
   height: auto;
   width: var(--diagram-width, auto);
-  max-width: none !important;
+  max-width: 100% !important;
   cursor: zoom-in;
 }
 .lightbox {
