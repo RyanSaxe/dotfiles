@@ -83,6 +83,55 @@ Sequence and gantt diagrams use Mermaid's own layout and still take the
 theme. Keep labels to a few words and put the sentence in the caption; a
 long label widens every node in its rank.
 
+## Code
+
+```html
+<figure
+  class="excerpt"
+  data-file="scripts/session.mjs"
+  data-lines="559-564"
+  data-language="javascript"
+>
+  <ol class="notes">
+    <li data-line="564" data-span="560-564">
+      <b>Ordering</b>
+      A 409, not a 400. The request is well formed; the state is wrong.
+    </li>
+  </ol>
+</figure>
+```
+
+The lines are read from the repository at `ref` by the build; do not type
+them. A file that does not exist at that commit, or a range past its end,
+fails the build. `data-line` is the line a note attaches to, which is the
+last line of what it describes; `data-span` is an optional range to tint.
+Both must fall inside `data-lines`, or the build refuses the page. Notes
+are interleaved after their line at full width. The header carries the
+file and the range; Shiki highlights the lines in the reader's theme, so
+`data-language` is a Shiki language id: `javascript`, `python`, `sh`,
+`markdown`, `json`.
+
+For a block of code that is not from the repository, the source goes in
+the page as HTML-escaped text:
+
+```text
+<div data-language="sh" data-file="what was run">
+git show a286050:scripts/session.mjs &gt; before.mjs
+</div>
+```
+
+## Mathematics
+
+```text
+<p>The loss is scaled by <span data-math="inline">\alpha</span>.</p>
+<div data-math="display">\mathrm{FL}(p_t) = -\,\alpha\,(1-p_t)^{\htmlData{lines=17 19}{\gamma}}\,\log(p_t)</div>
+```
+
+KaTeX, inline or display. Most maths is just maths and needs nothing
+more. Where a symbol should find its code, wrap it in
+`\htmlData{lines=17 19}{…}` with the line numbers separated by spaces;
+pressing the symbol lights those lines in every excerpt on the page.
+
 ## A stylesheet of your own
 
 The shipped stylesheet is what every document uses. A subject that

@@ -28,6 +28,8 @@ const libraries = {
   mermaid:
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
   elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
+  katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
+  katexCss: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
 };
 const scripts = new Map();
 let shikiTask, mermaidTask;
@@ -215,6 +217,120 @@ function openLightbox(svg) {
   dialog.showModal();
 }
 
+/* Mathematics */
+function wireSymbols(element) {
+  for (const symbol of element.querySelectorAll("[data-lines]")) {
+    const lines = new Set(
+      symbol.dataset.lines
+        .split(/[\s,]+/)
+        .map(Number)
+        .filter(Number.isFinite),
+    );
+    symbol.tabIndex = 0;
+    symbol.setAttribute("role", "button");
+    // A symbol lights its rows in the accent, apart from the amber a note
+    // gives a span, so a press always shows even on an annotated line.
+    const toggle = () => {
+      const on = !symbol.classList.contains("on");
+      for (const other of $("page-content").querySelectorAll("[data-lines].on"))
+        other.classList.remove("on");
+      for (const row of $("page-content").querySelectorAll(
+        ".excerpt-code .row.sym",
+      ))
+        row.classList.remove("sym");
+      if (!on) return;
+      symbol.classList.add("on");
+      for (const row of $("page-content").querySelectorAll(
+        ".excerpt-code .row",
+      ))
+        if (lines.has(Number(row.dataset.line))) row.classList.add("sym");
+    };
+    symbol.addEventListener("click", toggle);
+    symbol.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggle();
+      }
+    });
+  }
+}
+async function renderMath(element) {
+  try {
+    await Promise.all([
+      script(
+        libraries.katex,
+        "sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FQ0oxwDF3BGKtDXcEc+T1b2N+teh/OJfpU0jr6",
+      ),
+      script(
+        libraries.katexCss,
+        "sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP",
+        true,
+      ),
+    ]);
+    if (!element.isConnected) return;
+    element.dataset.source ||= element.textContent;
+    // trust lets \htmlData put an identity on a symbol, which is how a
+    // symbol finds the lines that compute it.
+    window.katex.render(element.dataset.source, element, {
+      throwOnError: true,
+      displayMode: element.dataset.math !== "inline",
+      trust: true,
+      strict: false,
+    });
+    wireSymbols(element);
+  } catch (error) {
+    failed(element, error);
+  }
+}
+
+/* The annotated code block: rows the build read, notes the agent wrote. */
+async function renderExcerpt(root) {
+  if (root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const code = root.querySelector(".excerpt-code");
+  if (!code) {
+    failed(root, Error("The excerpt has no lines; was the document built?"));
+    return;
+  }
+  const head = document.createElement("figcaption");
+  head.className = "figure-head";
+  const name = document.createElement("b");
+  name.textContent = root.dataset.file || "";
+  const meta = document.createElement("span");
+  meta.textContent = `lines ${root.dataset.lines} · ${root.dataset.language}`;
+  head.append(name, meta);
+  root.prepend(head);
+  const rows = new Map();
+  for (const row of code.querySelectorAll(".row"))
+    rows.set(Number(row.dataset.line), row);
+  for (const note of root.querySelectorAll(":scope > .notes > li")) {
+    const row = rows.get(Number(note.dataset.line));
+    const span = note.dataset.span?.match(/^(\d+)-(\d+)$/);
+    if (span)
+      for (let n = Number(span[1]); n <= Number(span[2]); n += 1)
+        rows.get(n)?.classList.add("lit");
+    const inline = document.createElement("p");
+    inline.className = "note-inline";
+    inline.append(...note.childNodes);
+    if (row) row.after(inline);
+    else code.append(inline);
+  }
+  const targets = [...code.querySelectorAll(".src")];
+  try {
+    const html = await highlighted(
+      targets.map((target) => target.textContent).join("\n"),
+      code.dataset.lang,
+    );
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const lines = [...parsed.querySelectorAll("pre code .line")];
+    lines.forEach((line, index) => {
+      if (targets[index]) targets[index].innerHTML = line.innerHTML;
+    });
+  } catch {
+    /* The lines still read. */
+  }
+}
+
 function enhance(root) {
   // An excerpt carries data-language for its rows; the figure itself is not
   // a code block and must not be rendered as one.
@@ -235,12 +351,14 @@ function enhance(root) {
     element.dataset.source ||= element.textContent;
     renderCode(element);
   });
+  root.querySelectorAll("[data-math]").forEach(renderMath);
   root
     .querySelectorAll("[data-diagram][data-caption]")
     .forEach((element) =>
       figure(element, { caption: element.dataset.caption, kind: "diagram" }),
     );
   renderDiagrams(root);
+  root.querySelectorAll(".excerpt").forEach(renderExcerpt);
 }
 
 /* Pages */
@@ -359,7 +477,7 @@ for (const dialog of document.querySelectorAll("dialog")) {
   });
 }
 const interactiveSelector =
-  "a[href], button, input, select, .node.linked, summary";
+  "a[href], button, input, select, [data-lines], .node.linked, summary";
 document.addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   if (event.key === "Escape") {

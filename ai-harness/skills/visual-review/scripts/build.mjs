@@ -8,12 +8,41 @@ import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { attribute, check, resolveRef } from "./check.mjs";
+import { attribute, check, excerpts, fileAt, resolveRef } from "./check.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
 
 const escape = (text) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Rows for an excerpt, from the file as it is at the commit. */
+export function excerptRows(text, first, last) {
+  const all = text.split("\n");
+  const rows = [];
+  for (let number = first; number <= last; number += 1)
+    rows.push(
+      `<div class="row" data-line="${number}"><span class="num">${number}</span><span class="src">${escape(all[number - 1] ?? "")}</span></div>`,
+    );
+  return rows.join("\n");
+}
+
+/**
+ * Put the repository's lines into every excerpt on a page. The agent wrote
+ * the figure, its attributes and its notes; the code between them is ours.
+ */
+export async function fillExcerpts(html, commit, cwd) {
+  let out = "";
+  let cursor = 0;
+  for (const excerpt of excerpts(html)) {
+    const [first, last] = excerpt.lines.split("-").map(Number);
+    const text = await fileAt(commit, excerpt.file, cwd);
+    const open = excerpt.index + excerpt.tag.length;
+    out += html.slice(cursor, open);
+    out += `\n<div class="excerpt-code" data-lang="${escape(excerpt.language)}">\n${excerptRows(text, first, last)}\n</div>`;
+    cursor = open;
+  }
+  return out + html.slice(cursor);
+}
 
 /**
  * A diagram written as a file arrives in the page as text. Mermaid source is
@@ -111,6 +140,8 @@ export async function build(source) {
   const frameCss = await fs.readFile(new URL("frame.css", assets), "utf8");
   const problems = await check(document, { css, frameCss, cwd });
   if (problems.length) throw notBuilt(problems);
+  for (const page of document.pages)
+    page.html = await fillExcerpts(page.html, document.commit, cwd);
   document.builtAt = new Date().toISOString();
   return assemble(document, { css });
 }

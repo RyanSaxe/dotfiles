@@ -9,6 +9,8 @@ import test from "node:test";
 import {
   assemble,
   build,
+  excerptRows,
+  fillExcerpts,
 } from "../../ai-harness/skills/visual-review/scripts/build.mjs";
 import {
   check,
@@ -64,7 +66,10 @@ async function repository(t, overrides = {}) {
     {
       id: "loss",
       title: "The loss",
-      html: "<p>Two lines matter.</p>",
+      html:
+        "<p>Two lines matter.</p>" +
+        '<figure class="excerpt" data-file="src/focal.js" data-lines="2-3" data-language="javascript">' +
+        '<ol class="notes"><li data-line="3" data-span="2-3"><b>Why</b> The focus term.</li></ol></figure>',
     },
     { id: "gamma", title: "Gamma", html: "<p>The default.</p>", depth: 1 },
   ];
@@ -95,6 +100,13 @@ test("a build is one file holding every page, with the excerpt's lines read from
   const html = await build(source);
   assert.match(html, /Two lines matter\./);
   assert.match(html, /The default\./);
+  // The rows are the file's lines at the commit, numbered as the file numbers them.
+  assert.match(
+    html,
+    /data-line=\\"2\\"[^]*?const focus = \(1 - p\) \*\* gamma;/,
+  );
+  assert.match(html, /data-line=\\"3\\"[^]*?return -focus \* Math\.log\(p\);/);
+  assert.doesNotMatch(html, /data-line=\\"4\\"/);
   assert.match(html, /"commit":"[0-9a-f]{40}"/);
   assert.match(html, /"ref":"HEAD"/);
   assert.match(html, /<title>Focal loss<\/title>/);
@@ -114,6 +126,22 @@ test("the command rebuilds over its own output and refuses a file it did not wri
     /not a document this builder wrote/,
   );
   assert.equal(await fs.readFile(other, "utf8"), "<p>mine</p>");
+});
+
+test("a note outside its excerpt fails the build", async (t) => {
+  const note = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<figure class="excerpt" data-file="src/focal.js" data-lines="2-3" data-language="javascript"><ol class="notes"><li data-line="9">x</li></ol></figure>',
+      },
+    ],
+  });
+  await assert.rejects(
+    build(note.source),
+    /note on line 9 is outside lines 2-3/,
+  );
 });
 
 test("a diagram file that is not there is refused in the build's own form", async (t) => {
@@ -140,6 +168,35 @@ test("a build outside any repository says so", async (t) => {
   await assert.rejects(
     build(nowhere.source),
     /not built:\n {2}.*nowhere is not inside a repository/,
+  );
+});
+
+test("lines past the end of the file, and a file the commit does not have, fail the build", async (t) => {
+  const past = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<figure class="excerpt" data-file="src/focal.js" data-lines="5-9" data-language="javascript"></figure>',
+      },
+    ],
+  });
+  await assert.rejects(
+    build(past.source),
+    /run past the end of the file \(6 lines\)/,
+  );
+  const missing = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<figure class="excerpt" data-file="src/nope.js" data-lines="1-2" data-language="javascript"></figure>',
+      },
+    ],
+  });
+  await assert.rejects(
+    build(missing.source),
+    /src\/nope\.js does not exist at/,
   );
 });
 
@@ -183,7 +240,12 @@ test("the frame carries nothing that collects feedback or talks to a hub", async
     "data-choice",
   ])
     assert.ok(!html.includes(word), `frame contains ${word}`);
-  for (const pin of ["mermaid@11.12.0", "layout-elk@0.2.3", "shiki@3.12.2"])
+  for (const pin of [
+    "mermaid@11.12.0",
+    "layout-elk@0.2.3",
+    "shiki@3.12.2",
+    "katex@0.16.22",
+  ])
     assert.ok(html.includes(pin), `frame does not pin ${pin}`);
 });
 
@@ -196,6 +258,13 @@ test("diagram facts: node ids come from declarations and edges, classes from lab
   assert.deepEqual(facts.marks, [{ ids: ["a", "b"], name: "marked" }]);
   assert.ok(styledClasses(frameCss).has("marked"));
   assert.ok(styledClasses(frameCss).has("delta"));
+});
+
+test("excerpt rows escape the code they carry and number from the requested line", () => {
+  const rows = excerptRows("a < b\n<script>\nc\n", 2, 3);
+  assert.match(rows, /data-line="2"[^]*?&lt;script&gt;/);
+  assert.match(rows, /data-line="3"[^]*?>c</);
+  assert.doesNotMatch(rows, /data-line="1"/);
 });
 
 test("check reports every problem at once rather than the first", async (t) => {
@@ -215,6 +284,13 @@ test("check reports every problem at once rather than the first", async (t) => {
   assert.ok(problems.some((p) => /documentId/.test(p)));
   assert.ok(problems.some((p) => /title is required/.test(p)));
   assert.ok(problems.some((p) => /used twice/.test(p)));
+});
+
+test("fillExcerpts leaves a page without excerpts untouched", async (t) => {
+  const { repo } = await repository(t);
+  const { stdout } = await exec("git", ["rev-parse", "HEAD"], { cwd: repo });
+  const html = "<p>nothing to fill</p>";
+  assert.equal(await fillExcerpts(html, stdout.trim(), repo), html);
 });
 
 test("a diagram named by data-file arrives in the page as text; raw label markup inline fails the build", async (t) => {

@@ -477,11 +477,13 @@ td code {
   border-radius: 0;
 }
 .shiki,
-.shiki span {
+.shiki span,
+.excerpt-code span[style] {
   color: var(--shiki-light) !important;
 }
 :root[data-theme="dark"] .shiki,
-:root[data-theme="dark"] .shiki span {
+:root[data-theme="dark"] .shiki span,
+:root[data-theme="dark"] .excerpt-code span[style] {
   color: var(--shiki-dark) !important;
 }
 table {
@@ -507,6 +509,24 @@ th {
 img,
 svg {
   max-width: 100%;
+}
+[data-math] {
+  overflow: auto;
+}
+[data-math="inline"] {
+  display: inline;
+  overflow: visible;
+}
+/* A symbol that names lines of code is a control, and looks like one. */
+[data-math] [data-lines] {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 2px;
+  box-shadow: inset 0 -2px 0 var(--accent-soft);
+}
+[data-math] [data-lines]:hover,
+[data-math] [data-lines].on {
+  background: var(--accent-soft);
 }
 /* A diagram keeps its drawn size and scrolls sideways; a click enlarges it.
    Mermaid writes its own max-width inline, hence the priorities. */
@@ -694,6 +714,74 @@ svg {
   margin-top: 2px;
   font-size: 10px;
   color: var(--cut) !important;
+}
+
+/* The annotated code block: rows the build read from the repository, notes
+   the agent wrote, interleaved. */
+.excerpt {
+  margin: 14px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.excerpt > .notes {
+  display: none;
+}
+.excerpt-code {
+  background: var(--code);
+  overflow-x: auto;
+  font:
+    12px/1.65 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.excerpt-code .row {
+  display: flex;
+}
+.excerpt-code .row.lit {
+  background: var(--mark-soft);
+}
+.excerpt-code .row.sym {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.excerpt-code .num {
+  flex: 0 0 46px;
+  padding-right: 10px;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.7;
+  user-select: none;
+}
+.excerpt-code .src {
+  white-space: pre;
+  padding-right: 14px;
+}
+.note-inline {
+  margin: 0;
+  padding: 8px 14px 8px 46px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font:
+    12.5px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--ink);
+}
+.note-inline b {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mark);
+  margin-bottom: 2px;
 }
 
 /* Dialogs */

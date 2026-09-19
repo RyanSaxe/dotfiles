@@ -14,6 +14,7 @@ for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"])
   delete env[key];
 
 export const idPattern = /^[A-Za-z0-9_-]+$/;
+const linesPattern = /^(\d+)-(\d+)$/;
 // A colour literal in a document stylesheet survives one theme and vanishes
 // in the other; only tokens are allowed.
 const colourLiteral =
@@ -22,6 +23,28 @@ const colourLiteral =
 export const attribute = (tag, name) =>
   tag.match(new RegExp(`\\b${name}=(?:"([^"]*)"|'([^']*)')`))?.[1] ??
   tag.match(new RegExp(`\\b${name}=(?:"([^"]*)"|'([^']*)')`))?.[2];
+
+const figureTag = (kind) =>
+  new RegExp(
+    `<figure\\b[^>]*\\bclass=(?:"[^"]*\\b${kind}\\b[^"]*"|'[^']*\\b${kind}\\b[^']*')[^>]*>`,
+    "g",
+  );
+
+/** Each excerpt figure's opening tag, what it asks for, and its body. */
+export function excerpts(html) {
+  const found = [];
+  for (const match of html.matchAll(figureTag("excerpt"))) {
+    const tag = match[0];
+    const file = attribute(tag, "data-file");
+    const lines = attribute(tag, "data-lines");
+    const language = attribute(tag, "data-language");
+    const open = match.index + tag.length;
+    const close = html.indexOf("</figure>", open);
+    const body = html.slice(open, close < 0 ? undefined : close);
+    found.push({ tag, index: match.index, file, lines, language, body });
+  }
+  return found;
+}
 
 /** Node ids and label classes in a Mermaid source. */
 export function diagramFacts(source) {
@@ -97,6 +120,20 @@ export async function resolveRef(ref, cwd) {
   }
 }
 
+export async function fileAt(commit, file, cwd) {
+  try {
+    const { stdout } = await run("git", ["show", `${commit}:${file}`], {
+      cwd,
+      env,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return stdout;
+  } catch (error) {
+    throw Error(`${file} does not exist at ${commit.slice(0, 7)}`);
+  }
+}
+
 /**
  * Check a loaded description. `document` is the parsed JSON with page HTML
  * already read in; `css` is the document's own stylesheet or an empty
@@ -128,6 +165,7 @@ export async function check(document, { css = "", frameCss, cwd }) {
       say(`page ${page.id} depth must be 0 or 1`);
   }
 
+  const commit = document.commit;
   const styled = new Set([...styledClasses(frameCss), ...styledClasses(css)]);
 
   const sources = [];
@@ -162,5 +200,50 @@ export async function check(document, { css = "", frameCss, cwd }) {
   if (css && colourLiteral.test(css))
     say("the document stylesheet sets a colour that is not a token");
 
+  for (const page of document.pages) {
+    for (const excerpt of excerpts(page.html || "")) {
+      const spot = `page ${page.id}, excerpt ${excerpt.file || "(no file)"}`;
+      if (!excerpt.file) {
+        say(`${spot}: data-file is required`);
+        continue;
+      }
+      if (!excerpt.language) say(`${spot}: data-language is required`);
+      const range = (excerpt.lines || "").match(linesPattern);
+      if (!range) {
+        say(`${spot}: data-lines must be first-last`);
+        continue;
+      }
+      const [first, last] = [Number(range[1]), Number(range[2])];
+      if (first < 1 || last < first) {
+        say(`${spot}: data-lines ${excerpt.lines} is not a range`);
+        continue;
+      }
+      for (const note of excerpt.body.matchAll(/<li\b[^>]*>/g)) {
+        const line = Number(attribute(note[0], "data-line"));
+        const span = attribute(note[0], "data-span")?.match(linesPattern);
+        if (line && (line < first || line > last))
+          say(
+            `${spot}: a note on line ${line} is outside lines ${excerpt.lines}`,
+          );
+        if (span && (Number(span[1]) < first || Number(span[2]) > last))
+          say(
+            `${spot}: a note's span ${span[0]} is outside lines ${excerpt.lines}`,
+          );
+      }
+      if (!commit) continue;
+      let text;
+      try {
+        text = await fileAt(commit, excerpt.file, cwd);
+      } catch (error) {
+        say(`${spot}: ${error.message}`);
+        continue;
+      }
+      const count = text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+      if (last > count)
+        say(
+          `${spot}: lines ${excerpt.lines} run past the end of the file (${count} lines)`,
+        );
+    }
+  }
   return problems;
 }
