@@ -1017,18 +1017,21 @@ function workingModel(accepting) {
         publish,
       ],
     };
-  const current = steps.findIndex((step) => !step.done);
+  // Steps are a set: each row shows its own state, and several can be
+  // active at once.
+  const finished = steps.every((step) => step.state === "done");
   return {
     title,
     since,
     bar: true,
     rows: [
       done,
-      ...steps.map((step, index) => ({
+      ...steps.map((step) => ({
         text: step.title,
-        state: step.done ? "done" : index === current ? "now" : "",
+        state:
+          step.state === "done" ? "done" : step.state === "active" ? "now" : "",
       })),
-      { text: "Check and polish", state: current < 0 ? "now" : "" },
+      { text: "Check and polish", state: finished ? "now" : "" },
       publish,
     ],
   };

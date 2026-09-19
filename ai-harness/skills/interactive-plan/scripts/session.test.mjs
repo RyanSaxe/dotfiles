@@ -77,26 +77,38 @@ test("progress needs an acknowledged round", async () => {
   assert.equal((await status()).progress, null);
 });
 
-test("declared steps and done marks round-trip through status", async () => {
+test("declared steps, start, and done marks round-trip through status", async () => {
   assert.ok((await act({ action: "ack", id: "evt1" })).ok);
   assert.equal((await status()).progress, null);
   const declared = await act({
     action: "progress",
-    steps: [" Update Agreed ", "Write: P"],
+    steps: [" Update Agreed ", "Write: P", "Write: Q"],
   });
   assert.ok(declared.ok, JSON.stringify(declared.body));
   assert.deepEqual((await status()).progress.steps, [
-    { title: "Update Agreed", done: false },
-    { title: "Write: P", done: false },
+    { title: "Update Agreed", state: "pending" },
+    { title: "Write: P", state: "pending" },
+    { title: "Write: Q", state: "pending" },
   ]);
-  assert.ok((await act({ action: "progress", done: "Update Agreed" })).ok);
-  assert.deepEqual(
-    (await status()).progress.steps.map((step) => step.done),
-    [true, false],
+  const states = async () =>
+    (await status()).progress.steps.map((step) => step.state);
+  assert.ok(
+    (await act({ action: "progress", start: ["Write: P", "Write: Q"] })).ok,
   );
+  assert.deepEqual(await states(), ["pending", "active", "active"]);
+  assert.ok((await act({ action: "progress", done: "Write: Q" })).ok);
+  assert.deepEqual(await states(), ["pending", "active", "done"]);
+  assert.ok((await act({ action: "progress", start: ["Write: Q"] })).ok);
+  assert.deepEqual(await states(), ["pending", "active", "active"]);
   const unknown = await act({ action: "progress", done: "Nope" });
   assert.equal(unknown.status, 400);
   assert.equal(unknown.body.error, "Unknown progress step");
+  assert.equal(
+    (await act({ action: "progress", start: ["Write: P", "Nope"] })).status,
+    400,
+  );
+  assert.ok((await act({ action: "progress", steps: ["Again"] })).ok);
+  assert.deepEqual(await states(), ["pending"]);
 });
 
 test("invalid declarations are rejected", async () => {
@@ -110,6 +122,10 @@ test("invalid declarations are rejected", async () => {
     400,
   );
   assert.equal((await act({ action: "progress" })).status, 400);
+  assert.equal(
+    (await act({ action: "progress", steps: ["A"], done: "A" })).status,
+    400,
+  );
 });
 
 test("publish clears progress", async () => {
