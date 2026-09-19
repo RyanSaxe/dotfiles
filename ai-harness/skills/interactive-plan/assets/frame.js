@@ -120,6 +120,14 @@ let page = plan.pages[0],
   answerTimer;
 const charts = new Map();
 const diffs = new Map();
+// In-flight renderers, so a page re-render can restore the scroll position
+// once the content has its height back.
+const renders = new Set();
+function track(task) {
+  renders.add(task);
+  task.finally(() => renders.delete(task)).catch(() => {});
+  return task;
+}
 const sources = new WeakMap();
 const syntaxThemes = { light: "github-light", dark: "github-dark" };
 const current = () =>
@@ -190,6 +198,7 @@ function disposeRenderers() {
 // re-rendering the same page, restoring after a reload, and popstate itself
 // leave history alone.
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
+  const scrollY = window.scrollY;
   const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
@@ -228,6 +237,12 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     preventScroll: true,
   });
   if (!keepScroll) window.scrollTo(0, 0);
+  else if (!targetId) {
+    // Replacing the page shortens it until the renderers finish, and the
+    // browser clamps the scroll position meanwhile; restore it after they do.
+    window.scrollTo(0, scrollY);
+    Promise.allSettled([...renders]).then(() => window.scrollTo(0, scrollY));
+  }
   const target = targetId && $(targetId);
   if (!feedback && target && $("page-content").contains(target)) {
     for (let ancestor = target; ancestor; ancestor = ancestor.parentElement)
@@ -1017,18 +1032,21 @@ function workingModel(accepting) {
         publish,
       ],
     };
-  const current = steps.findIndex((step) => !step.done);
+  // Steps are a set: each row shows its own state, and several can be
+  // active at once.
+  const finished = steps.every((step) => step.state === "done");
   return {
     title,
     since,
     bar: true,
     rows: [
       done,
-      ...steps.map((step, index) => ({
+      ...steps.map((step) => ({
         text: step.title,
-        state: step.done ? "done" : index === current ? "now" : "",
+        state:
+          step.state === "done" ? "done" : step.state === "active" ? "now" : "",
       })),
-      { text: "Check and polish", state: current < 0 ? "now" : "" },
+      { text: "Check and polish", state: finished ? "now" : "" },
       publish,
     ],
   };
@@ -1367,7 +1385,7 @@ $("submit").onclick = async () => {
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
     save();
-    show(page.id, null, { keepScroll: false });
+    show(page.id, null, { keepScroll: true });
   } catch (error) {
     submissionError = error.message;
     $("submit").disabled = false;
@@ -1831,7 +1849,10 @@ function clearDiffs() {
   for (const viewer of diffs.values()) viewer.cleanUp();
   diffs.clear();
 }
-async function diff(element, input, { diffStyle = "split" } = {}) {
+function diff(element, input, options) {
+  return track(renderDiff(element, input, options));
+}
+async function renderDiff(element, input, { diffStyle = "split" } = {}) {
   if (typeof input.patch !== "string") throw Error("A Git patch is required.");
   if (!input.patch) {
     element.textContent = "No changes.";
@@ -1934,15 +1955,18 @@ function enhance(root) {
         kind: "code",
       });
     }
-    renderCode(element);
+    track(renderCode(element));
   });
-  root.querySelectorAll("[data-math]").forEach(renderMath);
+  root
+    .querySelectorAll("[data-math]")
+    .forEach((element) => track(renderMath(element)));
   root
     .querySelectorAll("[data-diagram][data-caption]")
     .forEach((element) =>
       figure(element, { caption: element.dataset.caption, kind: "diagram" }),
     );
   renderDiagrams(root);
+  track(diagramSequence);
   root.querySelectorAll("[data-chart]").forEach((element) => {
     try {
       const options = JSON.parse(element.textContent);
@@ -1953,7 +1977,7 @@ function enhance(root) {
           caption: element.dataset.caption,
           kind: "chart",
         });
-      chart(element, options).catch((error) => {
+      track(chart(element, options)).catch((error) => {
         element.textContent = JSON.stringify(options, null, 2);
         failed(element, error);
       });

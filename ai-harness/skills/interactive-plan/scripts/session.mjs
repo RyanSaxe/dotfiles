@@ -562,6 +562,13 @@ async function loadSession(directory, config, origin) {
         "Acknowledge feedback before reporting progress",
         409,
       );
+      const given = ["steps", "start", "done"].filter(
+        (key) => data[key] !== undefined,
+      );
+      requireValue(
+        given.length === 1,
+        "progress requires exactly one of steps, start, or done",
+      );
       if (data.steps !== undefined) {
         requireValue(
           Array.isArray(data.steps) &&
@@ -579,26 +586,34 @@ async function loadSession(directory, config, origin) {
         );
         await transition({
           progress: {
-            steps: titles.map((title) => ({ title, done: false })),
+            steps: titles.map((title) => ({ title, state: "pending" })),
             updatedAt: timestamp(),
           },
         });
         return { status: view() };
       }
+      requireValue(state.progress, "Declare steps before marking one");
+      // Steps are a set: several can be active at once, in any order.
+      const named = data.start !== undefined ? data.start : [data.done];
       requireValue(
-        typeof data.done === "string",
-        "progress requires steps or done",
+        Array.isArray(named) &&
+          named.length > 0 &&
+          named.every((title) => typeof title === "string"),
+        data.start !== undefined
+          ? "progress start requires step titles"
+          : "progress done requires a step title",
       );
-      requireValue(state.progress, "Declare steps before marking one done");
-      const title = data.done.trim();
-      requireValue(
-        state.progress.steps.some((step) => step.title === title),
-        "Unknown progress step",
-      );
+      const titles = named.map((title) => title.trim());
+      for (const title of titles)
+        requireValue(
+          state.progress.steps.some((step) => step.title === title),
+          "Unknown progress step",
+        );
+      const next = data.start !== undefined ? "active" : "done";
       await transition({
         progress: {
           steps: state.progress.steps.map((step) =>
-            step.title === title ? { ...step, done: true } : step,
+            titles.includes(step.title) ? { ...step, state: next } : step,
           ),
           updatedAt: timestamp(),
         },
@@ -1226,11 +1241,16 @@ export async function main(argv) {
   const action = { action: command };
   if (command === "ack") action.id = options.id;
   if (command === "progress") {
+    const given = ["steps", "start", "done"].filter(
+      (key) => options[key] !== undefined,
+    );
     requireValue(
-      (options.steps === undefined) !== (options.done === undefined),
-      "progress requires exactly one of --steps or --done",
+      given.length === 1,
+      "progress requires exactly one of --steps, --start, or --done",
     );
     if (options.steps !== undefined) action.steps = options.steps.split("|");
+    else if (options.start !== undefined)
+      action.start = options.start.split("|");
     else action.done = options.done;
   }
   if (command === "publish") {

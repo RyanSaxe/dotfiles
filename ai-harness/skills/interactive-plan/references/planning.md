@@ -14,11 +14,12 @@ much material would make the proposal hard to assess. Settle the choices
 that affect later options before spending time on details those choices
 could invalidate.
 
-Resolve routine details from project evidence and settled requirements. Ask
-the user about choices that change intended behavior, scope, an interface,
-or an important tradeoff. Ask on the page, next to the proposal the choice
-affects: a decision component for a selection, a question component for
-prose.
+Resolve routine details from project evidence and settled requirements.
+Close every other open point on the page, next to the proposal it affects,
+and close it with options wherever the plan can propose them: a decision
+component for a selection, a visual decision when each option needs
+material, and a question component only when the missing input is context
+the user has and the plan cannot get elsewhere.
 
 When a topic contains a meaningful choice, present a small set of credible
 options, recommend one, and show the basis for the recommendation in the
@@ -46,6 +47,25 @@ structure. The index holds the guidance for each component.
 Use visual hierarchy and color to direct attention, never as the only
 carrier of meaning. Do not add decorative cards, labels, tags, or pills that
 repeat nearby text or name a section.
+
+## Agreed
+
+The final plan is assembled from Agreed: a decision that is not on Agreed
+is not settled and cannot bind a step. Every revision begins by reading
+the feedback for what it did to Agreed. Each choice, answer, or comment
+settles a record, reopens one, retires one, or leaves the point for the
+next revision to close; decide which, and record a clear answer once, with
+its source. Reopen only the agreements the feedback affects. A
+recommendation is not an agreement.
+
+## Finishing
+
+Each revision closes open points and moves the plan toward review. When the
+user asks you to decide, decide, record the choice on Agreed, and go on.
+When the user asks for a certainty the project cannot give before
+implementation, say what implementation will find out, how, and what
+result is acceptable, then present the plan. Two revisions in a row that
+close nothing mean the plan is ready to present with its open items named.
 
 ## Review
 
@@ -82,7 +102,8 @@ routine mechanics to make the plan look thorough.
 Show revised material against the version the user reviewed: an exact diff
 for text or code, and comparable before-and-after views for visuals, with
 the change identified. A short reason may go with the comparison but does
-not replace it.
+not replace it. When a revision changes substantive content, the reply in
+the chat says what changed and links to it.
 
 When a revision records an answer or a choice on Agreed, remove that
 question or decision from the page in the same revision. Sent items leave
@@ -115,3 +136,6 @@ Check every sentence on every page against this list before publishing.
    another plan says nothing about this one. Cut it.
 8. A reader who has never seen the project could restate it as a fact
    about the plan. If they could not, rewrite it.
+9. It appears once. A subheading, a label, or the first sentence under a
+   heading does not repeat the heading, and every sentence tells the reader
+   something they need in order to decide.
