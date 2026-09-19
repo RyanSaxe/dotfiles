@@ -416,6 +416,34 @@ function M.editable(path)
   return true
 end
 
+--- The row of the next heading after a section, or one past the last line.
+---@param lines string[]
+---@param section integer
+---@return integer
+local function next_heading(lines, section)
+  for row = section + 1, #lines do
+    if lines[row]:match("^#{1,2}%s+") then
+      return row
+    end
+  end
+  return #lines + 1
+end
+
+--- The row just past a section's last non-blank line. Searches with early
+--- returns, so nothing here is a value reassigned in a loop that the
+--- typechecker has to infer.
+---@param lines string[]
+---@param section integer
+---@return integer
+local function section_end(lines, section)
+  for row = next_heading(lines, section) - 1, section + 1, -1 do
+    if vim.trim(lines[row]) ~= "" then
+      return row + 1
+    end
+  end
+  return section + 1
+end
+
 ---@param path string
 ---@param line string
 ---@param heading string
@@ -456,18 +484,7 @@ function M.append_unique(path, line, heading)
     block[#block + 1] = ""
     vim.api.nvim_buf_set_lines(buf, #lines, #lines, false, block)
   else
-    ---@type integer
-    local finish = #lines + 1
-    for row = section + 1, #lines do
-      if lines[row]:match("^#{1,2}%s+") then
-        finish = row
-        break
-      end
-    end
-    ---@cast finish integer
-    while finish > section + 1 and vim.trim(lines[finish - 1]) == "" do
-      finish = finish - 1
-    end
+    local finish = section_end(lines, section)
     ---@type string[]
     local block = {}
     if finish == section + 1 or lines[finish - 1] == heading then

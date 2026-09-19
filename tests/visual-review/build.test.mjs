@@ -43,19 +43,22 @@ async function repository(t, overrides = {}) {
   const repo = path.join(root, "repo");
   await fs.mkdir(path.join(repo, "src"), { recursive: true });
   await fs.writeFile(path.join(repo, "src/focal.js"), SOURCE + "\n");
-  // The fixture's commits must land in the fixture. A hook or a rebase
-  // exports GIT_DIR to the checks it runs, which would point these commands
-  // at the repository running the suite; and they are not gated work, so
-  // they bypass whatever hooks that repository's config names.
-  const env = { ...process.env };
-  for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"])
-    delete env[key];
+  // The fixture's commits must land in the fixture. Git hands GIT_DIR,
+  // GIT_WORK_TREE and GIT_INDEX_FILE to hooks and to the commands a rebase
+  // runs, and they override cwd: strip every GIT_* variable, and check which
+  // repository git ended up in before writing anything. The commits are not
+  // gated work, so they bypass whatever hooks that repository names.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+  );
   const git = (...args) =>
     exec("git", ["-c", "core.hooksPath=/dev/null", ...args], {
       cwd: repo,
       env,
     });
   await git("init", "-q");
+  const { stdout: top } = await git("rev-parse", "--show-toplevel");
+  assert.equal(await fs.realpath(top.trim()), await fs.realpath(repo));
   await git("config", "user.email", "t@example.com");
   await git("config", "user.name", "t");
   await git("add", ".");
@@ -92,7 +95,7 @@ async function repository(t, overrides = {}) {
   }
   const source = path.join(docs, "document.json");
   await fs.writeFile(source, JSON.stringify(description));
-  return { root, repo, docs, source };
+  return { root, repo, docs, source, git };
 }
 
 test("a build is one file holding every page, with the excerpt's lines read from the repository", async (t) => {
@@ -354,8 +357,8 @@ test("check reports every problem at once rather than the first", async (t) => {
 });
 
 test("fillExcerpts leaves a page without excerpts untouched", async (t) => {
-  const { repo } = await repository(t);
-  const { stdout } = await exec("git", ["rev-parse", "HEAD"], { cwd: repo });
+  const { repo, git } = await repository(t);
+  const { stdout } = await git("rev-parse", "HEAD");
   const html = "<p>nothing to fill</p>";
   assert.equal(await fillExcerpts(html, stdout.trim(), repo), html);
 });
