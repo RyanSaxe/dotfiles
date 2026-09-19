@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Visual review</title>
+    <!-- FRAME_STYLE -->
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="doc-head">
+          <h1 class="doc-title" id="doc-title"></h1>
+          <p class="doc-subtitle" id="doc-subtitle"></p>
+          <p class="doc-ref" id="doc-ref"></p>
+        </div>
+        <details class="pages-menu" id="pages-menu" open>
+          <summary class="btn quiet">Pages</summary>
+          <div class="side-label">Pages</div>
+          <nav id="navigation" aria-label="Pages"></nav>
+        </details>
+      </aside>
+      <main>
+        <header class="topbar">
+          <button
+            class="icon-btn"
+            id="settings"
+            type="button"
+            popovertarget="settings-menu"
+            aria-label="Settings"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+              />
+            </svg>
+          </button>
+          <div id="settings-menu" class="popover settings" popover>
+            <div class="side-label">Settings</div>
+            <label for="theme">Appearance</label>
+            <select id="theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <p class="small">Keys: press <kbd>?</kbd> for the list.</p>
+          </div>
+        </header>
+        <div class="content" id="content">
+          <section id="reading">
+            <h1 tabindex="-1" id="page-title"></h1>
+            <p class="lede" id="lede" hidden></p>
+            <div id="opening" hidden></div>
+            <div id="page-content"></div>
+            <nav class="page-footer" aria-label="Previous and next">
+              <a id="footer-previous" hidden></a>
+              <a id="footer-next" hidden></a>
+            </nav>
+          </section>
+        </div>
+      </main>
+    </div>
+    <dialog class="dialog keys" id="keys-dialog" aria-labelledby="keys-title">
+      <div class="dialog-head">
+        <h2 id="keys-title">Keys</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="keys-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <dl class="key-list">
+        <dt><kbd>]</kbd> <kbd>[</kbd></dt>
+        <dd>Next and previous page</dd>
+        <dt><kbd>j</kbd> <kbd>k</kbd></dt>
+        <dd>Next and previous control or link on the page</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>Close menus and dialogs</dd>
+      </dl>
+    </dialog>
+
+    <script type="application/json" id="document-data">
+      {
+        "documentId": "document",
+        "title": "Visual review",
+        "pages": [
+          {
+            "id": "start",
+            "title": "Start",
+            "html": "<p>Describe the subject here.</p>"
+          }
+        ]
+      }
+    </script>
+    <!-- FRAME_SCRIPT -->
+  </body>
+</html>
