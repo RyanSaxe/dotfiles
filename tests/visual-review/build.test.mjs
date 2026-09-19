@@ -240,6 +240,31 @@ test("lines past the end of the file, and a file the commit does not have, fail 
   );
 });
 
+test("a figure script that names fetch, storage, document or window fails the build", async (t) => {
+  for (const word of ["fetch", "localStorage", "document", "window"]) {
+    const { source } = await repository(t, {
+      pages: [
+        {
+          id: "a",
+          title: "A",
+          html: `<figure class="figure" data-figure="x"><script type="text/plain" data-script>${word}.anything();</script></figure>`,
+        },
+      ],
+    });
+    await assert.rejects(build(source), new RegExp(`names ${word}`));
+  }
+  const fine = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<figure class="figure" data-figure="x"><div data-chart></div><script type="text/plain" data-script>draw.chart({ series: [] });</script></figure>',
+      },
+    ],
+  });
+  await build(fine.source);
+});
+
 test("a label class nothing styles, and a mark on a node that does not exist, fail the build; an invented class with its own stylesheet does not", async (t) => {
   const unstyled = await repository(t, {
     opens:
@@ -286,6 +311,7 @@ test("the frame carries nothing that collects feedback or talks to a hub", async
     "shiki@3.12.2",
     "@pierre/diffs@1.4.2",
     "katex@0.16.22",
+    "echarts@6.0.0",
   ])
     assert.ok(html.includes(pin), `frame does not pin ${pin}`);
 });

@@ -31,8 +31,10 @@ const libraries = {
   elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
   katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
   katexCss: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
+  echarts: "https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js",
 };
 const scripts = new Map();
+const charts = new Map();
 const diffs = new Map();
 let shikiTask, diffsTask, mermaidTask;
 let diagramSequence = Promise.resolve();
@@ -285,6 +287,52 @@ async function renderMath(element) {
   }
 }
 
+/* Charts */
+function chartTheme(options) {
+  const result = {
+    backgroundColor: "transparent",
+    textStyle: { color: color("--ink") },
+    tooltip: {
+      backgroundColor: color("--panel"),
+      borderColor: color("--line"),
+      textStyle: { color: color("--ink") },
+    },
+  };
+  for (const key of ["xAxis", "yAxis"]) {
+    if (!options[key]) continue;
+    const axes = Array.isArray(options[key]) ? options[key] : [options[key]];
+    result[key] = axes.map(() => ({
+      axisLabel: { color: color("--muted") },
+      axisLine: { lineStyle: { color: color("--line") } },
+      splitLine: { lineStyle: { color: color("--line") } },
+    }));
+  }
+  return result;
+}
+async function chart(element, options) {
+  await script(
+    libraries.echarts,
+    "sha384-F07Cpw5v8spSU0H113F33m2NQQ/o6GqPTnTjf45ssG4Q6q58ZwhxBiQtIaqvnSpR",
+  );
+  if (!element.isConnected) return null;
+  let instance = charts.get(element);
+  if (!instance) {
+    instance = window.echarts.init(element, null, { renderer: "svg" });
+    charts.set(element, instance);
+  }
+  instance.setOption(
+    {
+      backgroundColor: "transparent",
+      color: [color("--accent"), color("--muted")],
+      textStyle: { color: color("--ink") },
+      ...options,
+    },
+    true,
+  );
+  instance.setOption(chartTheme(options));
+  return instance;
+}
+
 /* Diffs: the Pierre viewer, the one way a change is shown. */
 async function diff(element, input, { diffStyle = "split" } = {}) {
   if (typeof input.patch !== "string") throw Error("A Git patch is required.");
@@ -411,6 +459,59 @@ async function renderExcerpt(root) {
   }
 }
 
+/* A figure a reader can move. */
+function renderControls(root) {
+  if (root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const body = root.querySelector("script[data-script]")?.textContent;
+  if (!body) return;
+  const inputs = [...root.querySelectorAll("[data-control]")];
+  const draw = {
+    chart: (options) => {
+      const target = root.querySelector("[data-chart]");
+      if (!target)
+        throw Error("draw.chart needs a [data-chart] in the figure.");
+      return chart(target, options);
+    },
+    text: (selector, text) => {
+      const target = root.querySelector(selector);
+      if (target) target.textContent = text;
+    },
+  };
+  let run;
+  try {
+    run = new Function("figure", "controls", "draw", body);
+  } catch (error) {
+    failed(root, error);
+    return;
+  }
+  const controls = () =>
+    Object.fromEntries(
+      inputs.map((input) => [
+        input.dataset.control,
+        input.type === "checkbox"
+          ? input.checked
+          : Number.isNaN(Number(input.value))
+            ? input.value
+            : Number(input.value),
+      ]),
+    );
+  const render = () => {
+    for (const input of inputs) {
+      const output = input.parentElement?.querySelector("output");
+      if (output) output.textContent = input.value;
+    }
+    try {
+      const result = run(root, controls(), draw);
+      if (result?.catch) result.catch((error) => failed(root, error));
+    } catch (error) {
+      failed(root, error);
+    }
+  };
+  for (const input of inputs) input.addEventListener("input", render);
+  render();
+}
+
 function enhance(root) {
   // An excerpt carries data-language for its rows; the figure itself is not
   // a code block and must not be rendered as one.
@@ -438,13 +539,35 @@ function enhance(root) {
       figure(element, { caption: element.dataset.caption, kind: "diagram" }),
     );
   renderDiagrams(root);
+  root.querySelectorAll("[data-chart]").forEach((element) => {
+    if (element.closest("[data-figure]")) return;
+    try {
+      const options = JSON.parse(element.textContent);
+      element.textContent = "";
+      if (element.dataset.title || element.dataset.caption)
+        figure(element, {
+          title: element.dataset.title,
+          caption: element.dataset.caption,
+          kind: "chart",
+        });
+      chart(element, options).catch((error) => failed(element, error));
+    } catch (error) {
+      failed(element, error);
+    }
+  });
   root.querySelectorAll(".excerpt").forEach(renderExcerpt);
   root.querySelectorAll(".change").forEach(renderChange);
+  root.querySelectorAll("[data-figure]").forEach(renderControls);
 }
 function disposeRenderers() {
+  for (const instance of charts.values()) instance.dispose();
+  charts.clear();
   for (const viewer of diffs.values()) viewer.cleanUp();
   diffs.clear();
 }
+new ResizeObserver(() => {
+  for (const instance of charts.values()) instance.resize();
+}).observe($("page-content"));
 
 /* Pages */
 let page = pages[0];
@@ -516,6 +639,11 @@ function show(id, { push = true } = {}) {
 function theme() {
   document.documentElement.dataset.theme = activeTheme;
   $("theme").value = preferredTheme || "system";
+  for (const instance of charts.values())
+    instance.setOption({
+      color: [color("--accent"), color("--muted")],
+      ...chartTheme(instance.getOption()),
+    });
   for (const viewer of diffs.values()) {
     viewer.setOptions({ ...viewer.options, theme: syntaxThemes[activeTheme] });
     viewer.rerender();

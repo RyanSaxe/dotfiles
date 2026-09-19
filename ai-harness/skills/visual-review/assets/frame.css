@@ -561,6 +561,10 @@ svg {
   width: var(--diagram-width, auto);
   max-width: none;
 }
+[data-chart] {
+  height: 300px;
+  min-width: 0;
+}
 .renderer-error {
   color: var(--muted);
   font-size: 12px;
@@ -604,6 +608,9 @@ svg {
 }
 .figure-body > [data-diagram] {
   padding: 12px;
+}
+.figure-body > [data-chart] {
+  padding: 8px;
 }
 .figure-caption {
   padding: 8px 12px 10px;
@@ -804,6 +811,37 @@ svg {
   padding: 12px;
   color: var(--muted);
   font-size: 11.5px;
+}
+
+/* A figure a reader can move. */
+.controls {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--ground);
+  font-size: 12px;
+}
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.controls output {
+  min-width: 34px;
+  font:
+    11.5px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  color: var(--accent);
+}
+input[type="range"] {
+  accent-color: var(--accent);
+  width: 150px;
 }
 
 /* Dialogs */

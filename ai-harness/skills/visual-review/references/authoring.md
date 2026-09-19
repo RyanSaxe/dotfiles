@@ -146,6 +146,22 @@ JSON. The frame renders it in the Pierre viewer with a side-by-side and
 unified toggle in the header, on the document's tokens. Every change a
 document shows goes through the viewer.
 
+## Charts
+
+```html
+<div
+  data-chart
+  data-title="Latency, before and after"
+  data-caption="p50 over a week."
+>
+  { "xAxis": { "type": "category", "data": ["Mon", "Tue"] }, "yAxis": { "type":
+  "value" }, "series": [{ "type": "line", "data": [12, 9] }] }
+</div>
+```
+
+An ECharts option object as JSON text. The frame supplies the background,
+the text colour and the axis colours from the tokens.
+
 ## Mathematics
 
 ```text
@@ -157,6 +173,48 @@ KaTeX, inline or display. Most maths is just maths and needs nothing
 more. Where a symbol should find its code, wrap it in
 `\htmlData{lines=17 19}{…}` with the line numbers separated by spaces;
 pressing the symbol lights those lines in every excerpt on the page.
+
+## Controls
+
+```html
+<figure class="figure" data-figure="focal">
+  <div data-chart></div>
+  <div class="controls">
+    <label
+      >focusing
+      <input
+        type="range"
+        data-control="gamma"
+        min="0"
+        max="5"
+        step="0.1"
+        value="2" />
+      <output></output
+    ></label>
+  </div>
+  <script type="text/plain" data-script>
+    const xs = Array.from({ length: 99 }, (_, i) => (i + 1) / 100);
+    draw.chart({
+      xAxis: { type: "category", data: xs.map((x) => x.toFixed(2)) },
+      yAxis: { type: "value" },
+      series: [{ type: "line", showSymbol: false,
+        data: xs.map((p) => -((1 - p) ** controls.gamma) * Math.log(p)) }],
+    });
+  </script>
+</figure>
+```
+
+A control is an input with `data-control="name"` inside the figure. When
+one changes, the figure's script runs again with `controls` holding every
+control's value by name, `figure` being the figure element, and `draw`
+offering `draw.chart(options)` for a `[data-chart]` inside the figure and
+`draw.text(selector, string)` for anything else. An `output` next to an
+input shows its value.
+
+The script is called with those three things and nothing else. It may not
+name `fetch`, `XMLHttpRequest`, `localStorage`, `sessionStorage`,
+`indexedDB`, `document` or `window`; the build refuses a document whose
+script does. Most figures have no controls.
 
 ## A stylesheet of your own
 

@@ -15,6 +15,18 @@ for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"])
 
 export const idPattern = /^[A-Za-z0-9_-]+$/;
 const linesPattern = /^(\d+)-(\d+)$/;
+// What a document script may not name. The rest of the contract holds by
+// construction: a script is called with its figure and its controls and is
+// given nothing else, so there is nothing else to reach for.
+const forbidden = [
+  "fetch",
+  "XMLHttpRequest",
+  "localStorage",
+  "sessionStorage",
+  "indexedDB",
+  "document",
+  "window",
+];
 // A colour literal in a document stylesheet survives one theme and vanishes
 // in the other; only tokens are allowed.
 const colourLiteral =
@@ -227,6 +239,14 @@ export async function check(document, { css = "", frameCss, cwd }) {
     say("the document stylesheet sets a colour that is not a token");
 
   for (const page of document.pages) {
+    for (const found of (page.html || "").matchAll(
+      /<script\b[^>]*\bdata-script\b[^>]*>([\s\S]*?)<\/script>/g,
+    )) {
+      const body = found[1];
+      for (const word of forbidden)
+        if (new RegExp(`\\b${word}\\b`).test(body))
+          say(`page ${page.id}: a figure script names ${word}`);
+    }
     for (const excerpt of excerpts(page.html || "")) {
       const spot = `page ${page.id}, excerpt ${excerpt.file || "(no file)"}`;
       if (!excerpt.file) {
