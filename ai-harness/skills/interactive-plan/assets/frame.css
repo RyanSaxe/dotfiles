@@ -1170,7 +1170,8 @@ svg {
   max-width: var(--diagram-width, 100%) !important;
 }
 .lightbox {
-  width: min(96vw, 1600px);
+  width: fit-content;
+  max-width: min(96vw, 1600px);
   max-height: 92vh;
   margin: auto;
   padding: 12px;

@@ -1,11 +1,11 @@
 # Components
 
-Each directory holds `markup.html`, `styles.css`, and `behavior.js` where one
-is needed. Choose a component for the structure of the decision, not its
-sample content. Copy the markup into a page and replace its content slots and
-IDs; concatenate the styles and behaviors you use into the artifact's `css`
-and `js` files. There is no registration step, and a plan-local component
-follows the same workflow.
+Each directory holds `markup.html`, and `styles.css` and `behavior.js`
+where the component needs them. Choose a component for the structure of
+the decision, not for its sample content. Copy the markup into a page and
+replace its content and IDs. Concatenate the styles and behaviors you use
+into the artifact's `css` and `js` files. There is no registration step.
+A plan-local component works the same way.
 
 | Directory                                      | Use                                        | Content and interaction                                                                                                                          |
 | ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -17,41 +17,44 @@ follows the same workflow.
 | [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. The frame records the whole list, including untouched and empty selections.  |
 | [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section. Keep each ID in its contextual comment label; Revise opens the comment dialog at that case.                             |
 
-Code, diagrams, and charts need no component: the frame renders them as
-figures from `data-file`, `data-caption`, and `data-title` (see
-[authoring.md](../references/authoring.md)). Notes on the text are frame
+Code, diagrams, and charts need no component. The frame renders them as
+figures from `data-file`, `data-caption`, and `data-title`; see
+[authoring.md](../references/authoring.md). Notes on the text are frame
 behavior.
 
 ## Decisions
 
-Use the decision when a title and one line are enough to judge each option;
-put the recommended option first with the tag. Use the visual decision when
-each option needs a diagram, code, chart, or prototype. It shows tabs, one
-option at a time at full width, with the option's radio header at the top of
-the panel as the pick; the chosen tab carries a tick. `data-layout="columns"`
-asks for side by side, honored when every column would be at least 240px
-wide and falling back to tabs on a narrow window; use it for narrow material
-such as mocks. The toggle at the top right, Tabs · Side by side, overrides
-the layout and is remembered per decision in the browser. A figure inside an
-option shrinks to its column side by side and keeps its size in a tab. Give
-each option one line of consequence, concrete and specific to it. Remove a
-decision in the revision that records its choice on Agreed.
+Use the decision component when a title and one line are enough to judge
+each option. Put the recommended option first, with the tag. Use the visual
+decision when each option needs a diagram, code, a chart, or a prototype.
+It shows tabs, one option at a time at full width, with the option's radio
+header at the top of the panel as the pick, and the chosen tab carries a
+tick. `data-layout="columns"` asks for side by side. The frame honors it
+when every column would be at least 240px wide and falls back to tabs on a
+narrow window; use it for narrow material such as mocks. The toggle at the
+top right, Tabs · Side by side, overrides the layout and is remembered per
+decision in the browser. A figure inside an option shrinks to its column
+side by side and keeps its size in a tab. Give each option one line of
+consequence that is specific to it. Remove a decision in the revision that
+records its choice on Agreed.
 
 ## Questions
 
-Use a question when the answer is prose rather than a selection. Keep it to
-one sentence and say what the answer decides. Empty answers are not sent;
-answers appear on Feedback as their own items and can be cited as agreement
-sources with kind `answer`. Remove the question in the revision that records
-the answer on Agreed; a question that stays gets answered again.
+Use a question when the answer is prose, not a selection. Keep it to one
+sentence and say what the answer decides. Empty answers are not sent.
+Answers appear on Feedback as their own items and can be cited as
+agreement sources with kind `answer`. Remove the question in the revision
+that records the answer on Agreed; a question that stays gets answered
+again.
 
 ## Matched sections
 
 The comparison aligns matching sections across options. Set
 `--comparison-rows` to the number of direct children per option, including
-header and footer, or use `data-layout="independent"` when the options have
-different structures. Columns stack when they no longer fit. Keep selection
-separate from links, charts, and other interactive content inside an option.
+the header and the footer, or use `data-layout="independent"` when the
+options have different structures. Columns stack when they no longer fit.
+Keep the selection button separate from links, charts, and other
+interactive content inside an option.
 
 ## Before and after
 
@@ -61,47 +64,48 @@ For text or code, generate the input with Git:
 node components/before-after/diff.mjs BEFORE AFTER OUTPUT.json
 ```
 
-HTML-escape that JSON into the markup's `textarea[data-diff-input]`, and put
-the file name in `data-file` on the section, where it shows in the bar with
-the layout toggle. The helper preserves both UTF-8 sources and a unified Git
-patch, requires Git, and refuses to overwrite an existing output. Include
-`behavior.js` and `styles.css`; the frame loads the pinned Pierre viewer only
-when needed. The viewer is split when the content column is at least 900px
-wide and unified below that; the toggle overrides per diff and is remembered.
-It uses the frame's Shiki themes and needs a connection; failures are reported
-and the exact sources and patch remain in the artifact.
+HTML-escape that JSON into the markup's `textarea[data-diff-input]`, and
+put the file name in `data-file` on the section; it shows in the bar next
+to the layout toggle. The helper writes both UTF-8 sources and a unified
+Git patch, requires Git, and refuses to overwrite an existing output.
+Include `behavior.js` and `styles.css`; the frame loads the pinned Pierre
+viewer only when a page needs it. The viewer is split when the content
+column is at least 900px wide and unified below that; the toggle overrides
+that per diff and is remembered. It uses the frame's Shiki themes and needs
+a network connection. A failure is reported, and the exact sources and the
+patch stay in the artifact.
 
-For visual changes, fill the before and proposed slots and explain the change
-in the legend. Apply `added`, `removed`, or `changed` classes to changed
-content or Mermaid nodes; the component supplies theme-aware colors, so do not
-set fixed colors in Mermaid `classDef` declarations. These annotations express
-the author's meaning, not an inferred diff.
+For visual changes, fill the before and proposed slots and explain the
+change in the legend. Put the `added`, `removed`, or `changed` class on
+changed content or Mermaid nodes. The component supplies colors for both
+themes, so do not set fixed colors in Mermaid `classDef` declarations.
+These classes state what the author means, not a computed diff.
 
 ## Diagrams
 
-These pairs show what goes wrong, not what to draw. The frame renders every
-diagram at its drawn size, scrolling sideways when it is wider than the
-column, and a click opens it full size; inside a side-by-side layout it
-shrinks to its column instead.
+The pairs below show common mistakes and their fixes. The frame renders
+every diagram at its drawn size and scrolls sideways when it is wider than
+the column; a click opens it full size. Inside a side-by-side layout, a
+diagram shrinks to its column instead.
 
-1. **Choose the form for the idea, then draw it clean.** Mermaid is the
-   default, and a loop drawn as a flowchart is right when the loop is the
-   structure; a sequence when the order of waits is the point; a state
-   diagram for modes. When Mermaid cannot say it cleanly, draw the SVG: the
-   skill's own review loop ([flow.svg](../references/flow.svg)) is one, and
-   it follows the frame's theme through the tokens.
-2. **Link to a group, never into it from above.** An edge into a subgraph's
-   first node passes through its title. Point the edge at the group, or lay
-   the flow left to right.
-3. **A long chain: top to bottom, groups, or a line that scrolls.** Ten hops
-   in a line read at natural size by scrolling, which is fine when the order
-   is the whole point. Grouped, the same flow fits the column and names its
-   parts.
-4. **The frame's spacing is rank 36, node 28, title margin 8.** Mermaid's 50
-   and 50 costs a screen per four nodes; these keep titles clear of edges.
-5. **One to three words in a node; the rest in the caption.** Long labels
-   widen every node in the rank and push the chain past the column. The
-   caption line under the figure carries the sentence.
+1. **The form.** Mermaid is the default. Draw a loop as a flowchart when
+   the loop is the structure, a sequence diagram when the order of waits is
+   the point, and a state diagram for modes. When Mermaid cannot draw the
+   idea cleanly, draw the SVG by hand; the skill's own review loop
+   ([flow.svg](../references/flow.svg)) is one, and it follows the frame's
+   theme through the tokens.
+2. **Edges into a group.** An edge into a subgraph's first node passes
+   through the subgraph's title. Point the edge at the group, or lay the
+   flow out left to right.
+3. **Long chains.** Ten hops in a line read at natural size by scrolling,
+   which is fine when the order is the whole point. Grouped, the same flow
+   fits the column and names its parts.
+4. **Spacing.** The frame sets rank spacing 36, node spacing 28, and a
+   title margin of 8. Mermaid's defaults of 50 and 50 cost a screen per
+   four nodes; the frame's values keep titles clear of edges.
+5. **Labels.** Put one to three words in a node and the rest in the
+   caption. Long labels widen every node in the rank and push the chain
+   past the column. The caption line under the figure carries the sentence.
 
 The fixture under `scripts/fixture/` renders each pair.
 

@@ -1,14 +1,15 @@
 # Check the environment
 
 The helpers require Node 20 or newer and no installed npm packages. Check
-`node --version` once per environment. If it is unavailable or too old, explain
-the requirement and ask how the user wants to provide it.
+`node --version` once per environment. If Node is unavailable or too old,
+explain the requirement and ask how the user wants to provide it.
 
-Before the first session, run `node scripts/check.mjs` from the skill directory.
-It checks writable session storage, a local HTTP endpoint, and the hub port:
-`free`, `hub` (with the running hub's code version and live session count), or
-`busy` (another program owns the port). An optional path checks another storage
-location; use that location for the session too.
+Before the first session, run `node scripts/check.mjs` from the skill
+directory. It checks that session storage is writable, that a local HTTP
+endpoint works, and what holds the hub port: `free`, `hub` (with the running
+hub's code version and live session count), or `busy` (another program owns
+the port). An optional path argument checks a different storage location;
+if you pass one, use that location for the session too.
 
 Environment variables, all optional:
 

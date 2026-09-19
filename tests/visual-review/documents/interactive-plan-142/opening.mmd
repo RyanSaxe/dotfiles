@@ -1,0 +1,15 @@
+flowchart LR
+  subgraph server [Server]
+    hub["<span class='title'>the hub</span><span class='path'>session.mjs</span><span class='delta add'>+61</span>"]
+  end
+  subgraph browser [Browser]
+    draft["<span class='title'>the draft</span><span class='path'>draft.mjs</span><span class='delta add'>+8</span><span class='delta cut'>−2</span>"]
+    card["<span class='title'>the working card</span><span class='path'>frame.js · frame.css</span><span class='delta add'>+424</span><span class='delta cut'>−106</span>"]
+    feedback["<span class='title'>feedback</span><span class='path'>unchanged</span>"]
+  end
+  fixture["<span class='title'>the fixture</span><span class='path'>scripts/fixture</span><span class='delta add'>+919</span>"]
+  hub --> draft
+  draft --> card
+  draft --> feedback
+  fixture --> card
+  class hub,draft,card,fixture marked
