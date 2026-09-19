@@ -1,10 +1,10 @@
 <p>
-  The hub puts its own bookends around the agent's steps, so the card reads
-  as one sequence rather than a list that starts mid-thought. The reader
-  sees the round from the moment the feedback is read to the moment the
-  revision lands.
+  The hub adds its own first and last steps around the agent's, so the card
+  reads as one sequence instead of a list that starts in the middle. The
+  reader sees the round from the moment the feedback is read to the moment
+  the revision lands.
 </p>
-<div data-diagram data-caption="The order the reader experiences, not the order the code runs.">
+<div data-diagram data-caption="The order the reader sees, which is not the order the code runs in.">
 sequenceDiagram
   participant A as agent
   participant H as hub
@@ -19,7 +19,7 @@ sequenceDiagram
   H-->>P: revision lands
 </div>
 <p>
-  The page polls the same status it always did. The card is one more thing
-  in it, and the frame patches it in place: one segment and one row per
-  step, so a tick does not redraw the card.
+  The page polls the same status endpoint it always did. The card is one
+  more field in the response, and the frame updates it in place, one
+  segment and one row per step, so a tick does not redraw the card.
 </p>

@@ -2,20 +2,20 @@
   "documentId": "interactive-plan-142",
   "title": "A progress card, from the terminal to the page",
   "subtitle": "8 commits · 23 files · +1,790 −215",
-  "lede": "#142 gives the agent a way to say what it is doing between acknowledging feedback and publishing the next revision, and gives the reader a card that ticks. Four parts moved; one did not.",
+  "lede": "#142 lets the agent report what it is doing between acknowledging feedback and publishing the next revision, and shows the reader a card with the steps ticking off. Four parts changed; one did not.",
   "ref": "a286050",
   "repository": "../../../..",
   "opens": "opening.mmd",
-  "opensCaption": "Amber is what the change touched. A node with a blue edge on hover opens its page.",
+  "opensCaption": "Amber marks the parts the change touched. Clicking a node opens its page.",
   "pages": [
     {
       "id": "start",
-      "title": "The change, drawn",
+      "title": "The change",
       "file": "p-start.html"
     },
     {
       "id": "hub",
-      "title": "The hub's new refusal",
+      "title": "The hub's new check",
       "file": "p-hub.html"
     },
     {
@@ -26,7 +26,7 @@
     },
     {
       "id": "card",
-      "title": "The card the reader sees",
+      "title": "The card",
       "file": "p-card.html"
     },
     {

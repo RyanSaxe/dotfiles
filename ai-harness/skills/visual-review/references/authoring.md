@@ -1,19 +1,19 @@
 # Author a document
 
-A document is a description, one HTML file per page, and optionally a
-Mermaid source it opens with. One command turns them into one HTML file.
+A document is a description file, one HTML file per page, and optionally a
+Mermaid file for the opening diagram. One command turns them into one HTML
+file.
 
 ```sh
 node SKILL/scripts/build.mjs WORK/document.json WORK/out/NAME.html
 ```
 
-Build into a directory of your own. The builder embeds the frame, the
-shipped stylesheet, every page, every diagram and change named by a file,
-and the opening diagram into one file, and overwrites only a file it wrote.
-It does not bundle imports or follow links, so anything else a page needs
-must be in the page. The file needs the network when it opens: Mermaid,
-ELK, Shiki, the Pierre viewer, KaTeX and ECharts load from
-cdn.jsdelivr.net and esm.sh.
+Build into a directory of your own. The builder puts the frame, the
+stylesheet, every page, every diagram and change named by a file, and the
+opening diagram into one file. It overwrites only a file it built. It does
+not bundle imports or follow links, so anything else a page needs must be
+in the page. The file needs the network when it opens: Mermaid, ELK, Shiki,
+the Pierre viewer, KaTeX and ECharts load from cdn.jsdelivr.net and esm.sh.
 
 ## The description
 
@@ -26,7 +26,7 @@ cdn.jsdelivr.net and esm.sh.
   "ref": "a286050",
   "opens": "opening.mmd",
   "pages": [
-    { "id": "hub", "title": "The hub's new refusal", "file": "p-hub.html" },
+    { "id": "hub", "title": "The hub's new check", "file": "p-hub.html" },
     {
       "id": "draft",
       "title": "What counts as unsent",
@@ -40,16 +40,17 @@ cdn.jsdelivr.net and esm.sh.
 | Field                 | Contract                                                                                                                                                                                                                 |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | documentId            | Letters, digits, underscores, hyphens.                                                                                                                                                                                   |
-| title, subtitle, lede | Text. The subtitle carries the shape of the subject; the lede is one paragraph and appears under the title on the first page.                                                                                            |
-| ref                   | The commit every excerpt is read from, through `git show ref:path`. Defaults to `HEAD`. For a pull request, the head of its branch.                                                                                      |
+| title, subtitle, lede | Text. The subtitle gives the size or shape of the subject. The lede is one paragraph and appears under the title on the first page.                                                                                      |
+| ref                   | The commit every excerpt is read from, through `git show ref:path`. Defaults to `HEAD`. For a pull request, use the head of its branch.                                                                                  |
 | repository            | Optional path to the repository, relative to the description. Defaults to the directory the build runs in.                                                                                                               |
-| opens                 | Optional Mermaid source file. It renders on the first page, under the lede. A document without one opens on its first page's content.                                                                                    |
+| opens                 | Optional Mermaid file. It renders on the first page, under the lede. A document without one opens on its first page's content.                                                                                           |
+| opensCaption          | Optional caption under the opening diagram.                                                                                                                                                                              |
 | pages                 | Ordered records with a unique id, a title, a file of trusted authored HTML, and an optional `depth`. Reading order is list order; `depth: 1` indents the page under the one before it in the rail. No limit on how many. |
-| css                   | Optional stylesheet for this document only. Not the normal way to work; see the last section.                                                                                                                            |
+| css                   | Optional stylesheet for this document only. See the last section.                                                                                                                                                        |
 
-Page HTML is trusted authored markup, not Markdown. A page lands in the
-frame through `innerHTML`, so a script element in a page never runs; the
-one kind that runs is described under Controls.
+Page HTML is trusted markup written by the agent, not Markdown. A page is
+inserted into the frame through `innerHTML`, so a script element in a page
+never runs. The one kind of script that runs is described under Controls.
 
 ## Diagrams
 
@@ -57,7 +58,7 @@ one kind that runs is described under Controls.
 <div
   data-diagram
   data-file="round.mmd"
-  data-caption="Amber is what the change touched."
+  data-caption="Amber marks the parts the change touched."
 ></div>
 ```
 
@@ -69,18 +70,24 @@ flowchart LR
   class hub,card marked
 ```
 
-Any Mermaid diagram, drawn by ELK on the shipped stylesheet. A flowchart
-label may hold spans; the classes the stylesheet paints are `title`,
-`path`, `delta add`, `delta cut`, `badge`, and `note`, and `marked` on a
-node through `class a,b marked` means the subject touched it. A node whose
-id matches a page id opens that page on click, in any diagram. A caption
-on `data-caption` frames the figure; a click on any diagram opens it full
-size.
+A page can hold any Mermaid diagram. ELK lays it out and the shipped
+stylesheet colours it. A flowchart label can contain spans with these
+classes: `title`, `path`, `delta add`, `delta cut`, `badge`, `note`. The
+line `class a,b marked` colours nodes a and b amber, which means the
+subject touched them. In any diagram, clicking a node whose id matches a
+page id opens that page. `data-caption` puts a caption under the figure.
+Clicking a diagram opens it at its drawn size in a lightbox; a diagram
+wider than the column is scaled down to fit until then.
 
-Write a diagram in its own `.mmd` file and name it with `data-file`; the build puts it into the page as text. A diagram written inline in the page is also text, so its label markup has to be escaped (`&lt;span class='title'&gt;`); a raw span inline fails the build, because the page would parse it as HTML and Mermaid would never see it. The opening diagram is the same kind of file, named by `opens`.
+Write a diagram in its own `.mmd` file and name it with `data-file`. The
+build copies the file into the page as escaped text. A diagram written
+directly in the page is parsed as HTML before Mermaid sees it, so its label
+markup would have to be escaped by hand (`&lt;span class='title'&gt;`), and
+the build fails on a raw span inside an inline diagram. The opening diagram
+is the same kind of file, named by `opens`.
 
-Sequence and gantt diagrams use Mermaid's own layout and still take the
-theme. Keep labels to a few words and put the sentence in the caption; a
+Sequence and gantt diagrams use Mermaid's own layout and take the theme.
+Keep their labels to a few words and put the sentence in the caption; a
 long label widens every node in its rank.
 
 ## Code
@@ -94,25 +101,25 @@ long label widens every node in its rank.
 >
   <ol class="notes">
     <li data-line="564" data-span="560-564">
-      <b>Ordering</b>
-      A 409, not a 400. The request is well formed; the state is wrong.
+      <b>Why 409</b>
+      The request is well formed, so this is not a 400. The state is wrong.
     </li>
   </ol>
 </figure>
 ```
 
-The lines are read from the repository at `ref` by the build; do not type
-them. A file that does not exist at that commit, or a range past its end,
-fails the build. `data-line` is the line a note attaches to, which is the
-last line of what it describes; `data-span` is an optional range to tint.
-Both must fall inside `data-lines`, or the build refuses the page. Notes
-are interleaved after their line at full width. The header carries the
-file and the range; Shiki highlights the lines in the reader's theme, so
-`data-language` is a Shiki language id: `javascript`, `python`, `sh`,
-`markdown`, `json`.
+The build reads the lines from the repository at `ref`; do not type them
+into the page. The build fails if the file does not exist at that commit
+or the range runs past its end. `data-line` is the line a note attaches
+to, which is the last line of the code it describes. `data-span` is an
+optional range of lines to tint. Both must fall inside `data-lines`, or the
+build fails. Notes appear after their line, at full width. The header shows
+the file and the range. Shiki highlights the lines in the reader's theme,
+so `data-language` must be a Shiki language id: `javascript`, `python`,
+`sh`, `markdown`, `json`.
 
-For a block of code that is not from the repository, the source goes in
-the page as HTML-escaped text:
+For a block of code that is not from the repository, put the source in the
+page as HTML-escaped text:
 
 ```text
 <div data-language="sh" data-file="what was run">
@@ -136,15 +143,16 @@ node SKILL/components/diff/diff.mjs before.mjs after.mjs change.json
 ></figure>
 ```
 
-The helper takes the two versions as files and writes JSON holding both
-and a Git patch. Name that file with `data-change` and the build puts it
-into the figure; `data-file` is what the header shows. Written inline
-instead, the JSON goes HTML-escaped into
-`<textarea data-diff-input hidden>` with `<div class="change-view"></div>`
-beside it. Either way the build refuses a change whose input is not that
-JSON. The frame renders it in the Pierre viewer with a side-by-side and
-unified toggle in the header, on the document's tokens. Every change a
-document shows goes through the viewer.
+The helper takes the two versions of the file and writes a JSON file
+holding both and a git patch. Name that file with `data-change` and the
+build puts it into the figure. `data-file` is the path the header shows.
+The JSON can also be written into the page by hand: HTML-escape it into
+`<textarea data-diff-input hidden>` and put `<div class="change-view"></div>`
+next to it. Either way, the build fails on a change whose input is not
+JSON with `before`, `after` and `patch`. The frame renders the change in
+the Pierre viewer, with a side-by-side and unified toggle in the header,
+in the document's colours. Every change a document shows goes through the
+viewer.
 
 ## Charts
 
@@ -159,8 +167,10 @@ document shows goes through the viewer.
 </div>
 ```
 
-An ECharts option object as JSON text. The frame supplies the background,
-the text colour and the axis colours from the tokens.
+The content is an ECharts option object as JSON. The frame sets the
+background, the text colour and the axis colours from the tokens, and
+gives the series the tokens in this order: accent, amber, green, red,
+grey.
 
 ## Mathematics
 
@@ -169,10 +179,10 @@ the text colour and the axis colours from the tokens.
 <div data-math="display">\mathrm{FL}(p_t) = -\,\alpha\,(1-p_t)^{\htmlData{lines=17 19}{\gamma}}\,\log(p_t)</div>
 ```
 
-KaTeX, inline or display. Most maths is just maths and needs nothing
-more. Where a symbol should find its code, wrap it in
-`\htmlData{lines=17 19}{…}` with the line numbers separated by spaces;
-pressing the symbol lights those lines in every excerpt on the page.
+KaTeX renders the content, inline or display. To make a symbol point at
+its code, wrap it in `\htmlData{lines=17 19}{…}` with the line numbers
+separated by spaces. Pressing the symbol highlights those lines in every
+excerpt on the page. Most equations need no such link.
 
 ## Controls
 
@@ -205,32 +215,32 @@ pressing the symbol lights those lines in every excerpt on the page.
 ```
 
 A control is an input with `data-control="name"` inside the figure. When
-one changes, the figure's script runs again with `controls` holding every
-control's value by name, `figure` being the figure element, and `draw`
-offering `draw.chart(options)` for a `[data-chart]` inside the figure and
-`draw.text(selector, string)` for anything else. An `output` next to an
-input shows its value.
+a control changes, the figure's script runs again with three arguments:
+`controls`, an object with every control's value by name; `figure`, the
+figure element; and `draw`, which has `draw.chart(options)` for a
+`[data-chart]` inside the figure and `draw.text(selector, string)` for any
+other element. An `output` element next to an input shows the input's
+value.
 
-The script is called with those three things and nothing else. It may not
-name `fetch`, `XMLHttpRequest`, `localStorage`, `sessionStorage`,
-`indexedDB`, `document` or `window`; the build refuses a document whose
-script does. Most figures have no controls.
+The script receives those three arguments and nothing else. It may not use
+`fetch`, `XMLHttpRequest`, `localStorage`, `sessionStorage`, `indexedDB`,
+`document` or `window`; the build fails on a script that names any of
+them. Most figures have no controls.
 
-## A stylesheet of your own
+## A document's own stylesheet
 
-The shipped stylesheet is what every document uses. A subject that
-genuinely needs a piece the stylesheet does not have sets `css` in the
-description. Two constraints, both found by breaking them:
+Every document uses the shipped stylesheet. A document that needs a rule
+the stylesheet does not have sets `css` in the description. Two things
+about the stylesheet affect such rules:
 
-1. Rules for the inside of a diagram label are unscoped. Mermaid measures
-   a label in a detached element outside the diagram, so a rule scoped to
-   the diagram is invisible to the measuring pass and the box comes out too
-   small for what it holds.
+1. Rules for the inside of a diagram label are not scoped to the diagram.
+   Mermaid measures a label in a detached element outside the diagram, so
+   a rule scoped to the diagram does not apply during measuring, and the
+   node comes out too small for its label.
 2. Colouring part of a label needs `!important`, because Mermaid sets a
-   colour on the label itself. Padding, radius, font and layout win without
-   help.
+   colour on the label itself. Padding, radius, font and layout do not.
 
-Every colour in a document stylesheet is a token: `--ground`, `--panel`,
-`--line`, `--line-strong`, `--ink`, `--muted`, `--accent`,
+Every colour in a document stylesheet must be a token: `--ground`,
+`--panel`, `--line`, `--line-strong`, `--ink`, `--muted`, `--accent`,
 `--accent-soft`, `--code`, `--mark`, `--mark-soft`, `--add`, `--add-soft`,
-`--cut`, `--cut-soft`. A literal colour fails the build.
+`--cut`, `--cut-soft`. The build fails on a literal colour.

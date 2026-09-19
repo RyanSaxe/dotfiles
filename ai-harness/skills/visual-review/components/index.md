@@ -1,10 +1,9 @@
 # Components
 
-Each directory holds a `markup.html` to copy into a page and, where one
-exists, a helper. The markup contracts are in
-[authoring.md](../references/authoring.md); these are the same contracts
-as files an agent can copy. Styles ship in the frame, so there is nothing
-to include and no registration step.
+Each directory holds a `markup.html` to copy into a page, and a helper
+script where one exists. [authoring.md](../references/authoring.md)
+documents the same markup. The frame's stylesheet already styles all of
+it; nothing needs to be included or registered.
 
 | Directory                            | Use                                                                          |
 | ------------------------------------ | ---------------------------------------------------------------------------- |

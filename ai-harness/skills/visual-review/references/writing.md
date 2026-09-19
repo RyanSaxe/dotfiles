@@ -1,59 +1,65 @@
-# What a good document says
+# Writing the prose
 
-The reader may never have opened this repository. Everything on the page
-is for them, not for the code's author and not for a reviewer.
+The reader may never have opened this repository. Write for them, not for
+the code's author and not for a reviewer.
 
-## Start with what moved, or what is there
+## What each part says
 
-The lede is one paragraph that says what the subject is and what changed
+The lede is one paragraph. It says what the subject is and what changed,
 or what it is made of. A reader who stops after the lede and the opening
-figure should be able to say what the subject does. If they cannot, the
-lede is not finished.
+figure should be able to say what the subject does.
 
-## Name parts by what they do
+A node, a heading and a page title name a part by what it does, not by its
+file. "The hub" tells a stranger something; "session.mjs" does not until
+they have read it. Put the file path on the second line of the node.
 
-A node, a heading and a page are named for the job a part does, not for
-where its file lives. "The hub" and "the working card" tell a stranger
-something. "session.mjs" tells them nothing until they have read it, and
-the point of the document is that they have not. The file path goes on the
-second line of the node, not in its name.
+A note attaches to the last line of the code it explains. It says what the
+code does and why, in one or two sentences. It does not restate the line
+under it.
 
-## Quote the code; do not retype it
+A caption says what the figure shows and, when one matters, the number.
 
-An excerpt is read from the repository by the build. Point it at the file
-and the lines and write the notes; the lines arrive on their own. A note
-attaches to the last line of what it explains, says why the code is the way
-it is, and stops. A note that paraphrases the line under it is noise.
+Amber on a node means the subject touched it. In a pull request that is
+what changed. In a document about one subsystem it is the parts the
+question is about. If there is nothing to mark, mark nothing. Do not use
+amber for anything else.
 
-## Mark what the subject touched and nothing else
+## Which figure to use
 
-Amber means the subject touched this. In a pull request it is what
-changed. In a question about one subsystem it is the parts the question is
-about. In a repository with nothing to mark, nothing is marked and the
-diagram is the system on its own. A mark that means something else in one
-document and something different in the next has stopped meaning anything.
+A flow is a flowchart. A conversation between parts is a sequence diagram.
+A set of modes is a state diagram. A quantity that changes with a parameter
+is a chart; add a control when seeing it move is the explanation. A formula
+is an equation, usually inline and usually without a control. Prose gives
+reasons and consequences; it does not describe what a figure already shows.
 
-## Choose the material for the idea
+## Pages
 
-A flow is a flowchart. A conversation between parts is a sequence. A set
-of modes is a state diagram. A thing that varies with a parameter is a
-chart, and if seeing it move is the explanation, give it a control. A
-formula is an equation, usually inline, usually with nothing to drag. Prose
-carries the reasons and the consequences; it does not describe what a
-figure already shows.
+A page holds one thing a reader can take in at once. A pull request may
+need three pages; a subsystem with a model in it may need a dozen, nested
+one level deep. A node in a diagram whose id matches a page id opens that
+page. Do not put everything on one page because there is little of it, and
+do not split a page because it looks long.
 
-## Break a complicated subject into pages
+## Sentences
 
-A page holds one thing a reader can take in at once. A pull request may be
-three pages; a subsystem with a model in it may be a dozen, nested one
-level. A node in a diagram that names a page opens it, so a reader moves
-from the drawing into the part they want. Do not put everything on one
-page because there is not much of it; do not split a page because it looks
-long.
+Check every sentence against this list before the build.
 
-## Say nothing you would say about any repository
-
-A sentence that could sit unchanged in a document about a different
-codebase says nothing about this one. Cut it. The same for a heading that
-names a section instead of saying what is in it, and for a caption that
-repeats the prose above the figure.
+1. It has a subject and a verb, and it states what a thing is or does. A
+   fragment standing in for a claim ("One form.") is not a sentence.
+2. It holds one idea. Two half-thoughts joined by a semicolon are two
+   sentences.
+3. It states the fact instead of hinting at it. "The command overwrites;
+   but only a file it wrote" hints. "The command checks first that the
+   file is one it built" states.
+4. It uses the real name: the function, the file, the command, the number.
+   Not "the mark of a built document" but "a script element with id
+   `document-data`".
+5. A heading or a note title is a label ("Edge labels", "Errors before the
+   checks"), not a claim.
+6. It has no flourish: no inverted word order, no aphorism, no "found by
+   breaking them", no "the way X does".
+7. It says something about this repository. A sentence that could appear
+   unchanged in a document about another codebase says nothing about this
+   one. Cut it.
+8. A reader who has never opened the repository could restate it as a fact
+   about the code. If they could not, rewrite it.
