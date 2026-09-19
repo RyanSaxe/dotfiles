@@ -78,23 +78,25 @@ A saved receipt is not an acknowledgement. Do not acknowledge feedback you
 have not read.
 
 Right after `ack`, before any other work, declare the steps the revision
-will take, then mark each one as it finishes:
+will take, then name each one as you begin it and mark it as it finishes:
 
 ```sh
 node scripts/session.mjs progress --session-dir PATH --steps "Update Agreed|Write: Progress|Write: Submit"
-node scripts/session.mjs progress --session-dir PATH --done "Update Agreed"
+node scripts/session.mjs progress --session-dir PATH --start "Write: Progress|Write: Submit"
+node scripts/session.mjs progress --session-dir PATH --done "Write: Submit"
 ```
 
-The reviewer's working card lists the steps and ticks them, with the hub's
-own steps around them: reading the feedback, working out the steps,
-checking and polishing, publishing. Declare only the work between reading
-and checking; a declared "check" or "publish" step would show twice.
-`--steps` takes one to twelve titles split on `|`, unique and at most 80
-characters; declaring again replaces the list. `--done` names a declared
-step and does nothing when repeated; an unknown title is an error. Both
-need an acknowledged round (409 before `ack`), and `publish` clears the
-list. Every `progress` call counts as a check-in, so an agent that reports
-its steps stays live.
+Steps are a set, not a sequence. The reviewer's working card shows every
+step with its state, with the hub's own steps around them: reading the
+feedback, working out the steps, checking and polishing, publishing.
+Declare only the work between reading and checking; a declared "check" or
+"publish" step would show twice. `--steps` takes one to twelve titles
+split on `|`, unique and at most 80 characters; declaring again replaces
+the list. `--start` names the steps you begin, split on `|`, and `--done`
+marks one finished; an unknown title is an error. Both need an
+acknowledged round (409 before `ack`), and `publish` clears the list.
+Every `progress` call counts as a check-in, so an agent that reports its
+steps stays live.
 
 If the next revision depends on the user, put a question or decision on the
 page next to the affected proposal. The user answers through feedback or in

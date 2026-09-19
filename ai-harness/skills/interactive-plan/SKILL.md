@@ -26,10 +26,12 @@ before acceptance. The [review flow](references/flow.svg) shows the loop.
 ## What to read
 
 - [planning.md](references/planning.md): what goes on the pages in each
-  phase, how to revise, and the sentence check. Read it before authoring.
+  phase, how Agreed is kept, how to revise, how a plan reaches review, and
+  the sentence check. Read it before authoring.
 - [authoring.md](references/authoring.md) and the
-  [component index](components/index.md): the artifact contracts and the
-  supplied components. Read them before building.
+  [component index](components/index.md): the artifact contracts, what a
+  revision may change, and the supplied components. Read them before
+  building.
 - [session.md](references/session.md): the helper, the hub, and acceptance.
   Read it before starting or resuming a live review.
 - [setup.md](references/setup.md): on first use in an environment, or when
@@ -45,13 +47,9 @@ and give the link in chat.
 
 Read each submission before acknowledging it, and combine it with feedback
 from the conversation. Right after `ack`, declare the steps of the revision
-with `progress --steps` and mark each one with `--done` as you finish it.
-The reviewer's page shows them, with reading, checking and publishing
-already around them. Record a clear answer once. Reopen only the agreements
-the feedback affects; a recommendation is not an agreement. When a revision
-changes substantive content, say what changed and link to it. Before
-publishing, check every sentence on the pages against the list at the end
-of planning.md.
+with `progress --steps`, name each one with `--start` as you begin it, and
+mark it with `--done` as you finish it. The reviewer's page shows them,
+with reading, checking and publishing already around them.
 
 Browser automation is optional. Use the live page to find and fix rendering
 and interaction problems. Do not install automation to author a plan unless
