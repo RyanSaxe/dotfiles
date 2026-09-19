@@ -10,3 +10,4 @@ to include and no registration step.
 | ------------------------------------ | ---------------------------------------------------------------------------- |
 | [diagram](diagram/markup.html)       | Any Mermaid diagram with labels that carry markup and nodes that open pages. |
 | [code-block](code-block/markup.html) | Real lines from the repository at the document's ref, notes interleaved.     |
+| [diff](diff/markup.html)             | A change to one file in the Pierre viewer; `diff.mjs` makes its input.       |

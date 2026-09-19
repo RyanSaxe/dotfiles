@@ -144,6 +144,46 @@ test("a note outside its excerpt fails the build", async (t) => {
   );
 });
 
+test("a change whose input is not the helper's JSON fails the build", async (t) => {
+  const bogus = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<figure class="change" data-file="x.js"><textarea data-diff-input hidden>not json</textarea><div class="change-view"></div></figure>',
+      },
+    ],
+  });
+  await assert.rejects(
+    build(bogus.source),
+    /change x\.js: the input is not JSON with before, after and patch/,
+  );
+});
+
+test("a change named by data-change arrives escaped in the viewer's textarea", async (t) => {
+  const { source, docs } = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<figure class="change" data-file="x.js" data-change="change.json"></figure>',
+      },
+    ],
+  });
+  await fs.writeFile(
+    path.join(docs, "change.json"),
+    JSON.stringify({
+      before: "a < b",
+      after: "a > b",
+      patch: "-a < b\n+a > b",
+    }),
+  );
+  const html = await build(source);
+  // Page HTML sits in the document's JSON, so the markup is JSON-encoded here.
+  assert.match(html, /data-diff-input hidden>\{\\"before\\":\\"a &lt; b\\"/);
+  assert.match(html, /class=\\"change-view\\"/);
+});
+
 test("a diagram file that is not there is refused in the build's own form", async (t) => {
   const missing = await repository(t, {
     pages: [
@@ -244,6 +284,7 @@ test("the frame carries nothing that collects feedback or talks to a hub", async
     "mermaid@11.12.0",
     "layout-elk@0.2.3",
     "shiki@3.12.2",
+    "@pierre/diffs@1.4.2",
     "katex@0.16.22",
   ])
     assert.ok(html.includes(pin), `frame does not pin ${pin}`);

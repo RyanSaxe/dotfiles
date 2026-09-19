@@ -120,6 +120,32 @@ git show a286050:scripts/session.mjs &gt; before.mjs
 </div>
 ```
 
+## Diffs
+
+```sh
+git show BASE:assets/draft.mjs > before.mjs
+git show HEAD:assets/draft.mjs > after.mjs
+node SKILL/components/diff/diff.mjs before.mjs after.mjs change.json
+```
+
+```html
+<figure
+  class="change"
+  data-file="assets/draft.mjs"
+  data-change="change.json"
+></figure>
+```
+
+The helper takes the two versions as files and writes JSON holding both
+and a Git patch. Name that file with `data-change` and the build puts it
+into the figure; `data-file` is what the header shows. Written inline
+instead, the JSON goes HTML-escaped into
+`<textarea data-diff-input hidden>` with `<div class="change-view"></div>`
+beside it. Either way the build refuses a change whose input is not that
+JSON. The frame renders it in the Pierre viewer with a side-by-side and
+unified toggle in the header, on the document's tokens. Every change a
+document shows goes through the viewer.
+
 ## Mathematics
 
 ```text

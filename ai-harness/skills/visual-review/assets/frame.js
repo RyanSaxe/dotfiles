@@ -25,6 +25,7 @@ const color = (name) =>
 /* Renderers and figures */
 const libraries = {
   shiki: "https://esm.sh/shiki@3.12.2",
+  diffs: "https://esm.sh/@pierre/diffs@1.4.2?bundle",
   mermaid:
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
   elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
@@ -32,7 +33,8 @@ const libraries = {
   katexCss: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
 };
 const scripts = new Map();
-let shikiTask, mermaidTask;
+const diffs = new Map();
+let shikiTask, diffsTask, mermaidTask;
 let diagramSequence = Promise.resolve();
 
 function script(url, integrity, css = false) {
@@ -283,6 +285,84 @@ async function renderMath(element) {
   }
 }
 
+/* Diffs: the Pierre viewer, the one way a change is shown. */
+async function diff(element, input, { diffStyle = "split" } = {}) {
+  if (typeof input.patch !== "string") throw Error("A Git patch is required.");
+  if (!input.patch) {
+    element.textContent = "No changes.";
+    return null;
+  }
+  diffsTask ||= import(libraries.diffs);
+  const { FileDiff, parsePatchFiles } = await diffsTask;
+  if (!element.isConnected) return null;
+  let viewer = diffs.get(element);
+  if (viewer) {
+    viewer.setOptions({ ...viewer.options, diffStyle });
+    viewer.rerender();
+    return viewer;
+  }
+  const files = parsePatchFiles(input.patch).flatMap((patch) => patch.files);
+  if (files.length !== 1) throw Error("A change shows one file.");
+  viewer = new FileDiff({
+    theme: syntaxThemes[activeTheme],
+    diffStyle,
+    lineDiffType: "word-alt",
+    diffIndicators: "classic",
+    overflow: "wrap",
+    disableFileHeader: true,
+  });
+  element.replaceChildren();
+  viewer.render({ fileDiff: files[0], containerWrapper: element });
+  diffs.set(element, viewer);
+  return viewer;
+}
+function renderChange(root) {
+  const input = root.querySelector("[data-diff-input]");
+  const view = root.querySelector(".change-view");
+  if (!input || !view || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  let parsed;
+  try {
+    parsed = JSON.parse(input.value || input.textContent);
+  } catch (error) {
+    failed(view, Error("The change's input is not JSON."));
+    return;
+  }
+  const head = document.createElement("figcaption");
+  head.className = "figure-head";
+  const name = document.createElement("b");
+  name.textContent = root.dataset.file || "";
+  const side = document.createElement("span");
+  const toggle = document.createElement("span");
+  toggle.setAttribute("role", "group");
+  toggle.setAttribute("aria-label", "Diff layout");
+  let diffStyle = window.innerWidth >= 900 ? "split" : "unified";
+  const buttons = [];
+  for (const [value, label] of [
+    ["split", "Side by side"],
+    ["unified", "Unified"],
+  ]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn";
+    button.dataset.diffStyle = value;
+    button.textContent = label;
+    button.setAttribute("aria-pressed", String(value === diffStyle));
+    button.onclick = () => {
+      diffStyle = value;
+      for (const other of buttons)
+        other.setAttribute("aria-pressed", String(other === button));
+      diff(view, parsed, { diffStyle }).catch((error) => failed(view, error));
+    };
+    buttons.push(button);
+    toggle.append(button);
+  }
+  side.append(toggle);
+  head.append(name, side);
+  root.prepend(head);
+  diff(view, parsed, { diffStyle }).catch((error) => failed(view, error));
+}
+
 /* The annotated code block: rows the build read, notes the agent wrote. */
 async function renderExcerpt(root) {
   if (root.dataset.ready) return;
@@ -359,6 +439,11 @@ function enhance(root) {
     );
   renderDiagrams(root);
   root.querySelectorAll(".excerpt").forEach(renderExcerpt);
+  root.querySelectorAll(".change").forEach(renderChange);
+}
+function disposeRenderers() {
+  for (const viewer of diffs.values()) viewer.cleanUp();
+  diffs.clear();
 }
 
 /* Pages */
@@ -395,6 +480,7 @@ function renderFooter() {
 function show(id, { push = true } = {}) {
   page = pages.find((item) => item.id === id) || pages[0];
   const first = page === pages[0];
+  disposeRenderers();
   $("page-title").textContent = first ? doc.title : page.title;
   $("lede").hidden = !(first && doc.lede);
   $("lede").textContent = first && doc.lede ? doc.lede : "";
@@ -430,6 +516,10 @@ function show(id, { push = true } = {}) {
 function theme() {
   document.documentElement.dataset.theme = activeTheme;
   $("theme").value = preferredTheme || "system";
+  for (const viewer of diffs.values()) {
+    viewer.setOptions({ ...viewer.options, theme: syntaxThemes[activeTheme] });
+    viewer.rerender();
+  }
   renderDiagrams($("opening"));
   renderDiagrams($("page-content"));
 }
@@ -477,7 +567,7 @@ for (const dialog of document.querySelectorAll("dialog")) {
   });
 }
 const interactiveSelector =
-  "a[href], button, input, select, [data-lines], .node.linked, summary";
+  "a[href], button, input, select, [data-lines], .node.linked, [data-diff-style], summary";
 document.addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   if (event.key === "Escape") {

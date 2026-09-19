@@ -46,6 +46,32 @@ export function excerpts(html) {
   return found;
 }
 
+const unescape = (text) =>
+  text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+
+/** Whether a change figure's textarea holds what the viewer reads. */
+function changeInput(body) {
+  const input = body.match(
+    /<textarea\b[^>]*\bdata-diff-input\b[^>]*>([\s\S]*?)<\/textarea>/,
+  );
+  if (!input) return null;
+  try {
+    const parsed = JSON.parse(unescape(input[1]));
+    return ["before", "after", "patch"].every(
+      (key) => typeof parsed[key] === "string",
+    )
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Node ids and label classes in a Mermaid source. */
 export function diagramFacts(source) {
   const nodes = new Set();
@@ -242,6 +268,16 @@ export async function check(document, { css = "", frameCss, cwd }) {
       if (last > count)
         say(
           `${spot}: lines ${excerpt.lines} run past the end of the file (${count} lines)`,
+        );
+    }
+    for (const match of (page.html || "").matchAll(figureTag("change"))) {
+      const spot = `page ${page.id}, change ${attribute(match[0], "data-file") || "(no file)"}`;
+      const open = match.index + match[0].length;
+      const close = page.html.indexOf("</figure>", open);
+      const body = page.html.slice(open, close < 0 ? undefined : close);
+      if (!changeInput(body))
+        say(
+          `${spot}: the input is not JSON with before, after and patch; components/diff/diff.mjs writes it, named by data-change`,
         );
     }
   }

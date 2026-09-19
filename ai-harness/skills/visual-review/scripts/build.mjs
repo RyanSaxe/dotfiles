@@ -64,6 +64,27 @@ export async function inlineDiagrams(html, read) {
   return out + html.slice(cursor);
 }
 
+/**
+ * A change named by data-change arrives the same way: its JSON escaped into
+ * the textarea the viewer reads, with the view beside it.
+ */
+export async function inlineChanges(html, read) {
+  let out = "";
+  let cursor = 0;
+  const tags = html.matchAll(
+    /<figure\b(?=[^>]*\bclass=(?:"[^"]*\bchange\b[^"]*"|'[^']*\bchange\b[^']*'))(?=[^>]*\bdata-change=)[^>]*>/g,
+  );
+  for (const match of tags) {
+    const file = attribute(match[0], "data-change");
+    const open = match.index + match[0].length;
+    out +=
+      html.slice(cursor, open) +
+      `\n<textarea data-diff-input hidden>${escape(await read(file))}</textarea>\n<div class="change-view"></div>\n`;
+    cursor = open;
+  }
+  return out + html.slice(cursor);
+}
+
 export async function assemble(document, { css = "" } = {}) {
   const [shell, style, script] = await Promise.all(
     ["frame.html", "frame.css", "frame.js"].map((name) =>
@@ -118,7 +139,10 @@ export async function load(source) {
       if (file && page.html !== undefined)
         throw Error(`Page ${page.id}: use file or html, not both`);
       const html = file ? await read(file) : page.html;
-      return { ...page, html: await inlineDiagrams(html, read) };
+      return {
+        ...page,
+        html: await inlineChanges(await inlineDiagrams(html, read), read),
+      };
     }),
   );
   return { document, css, cwd };
