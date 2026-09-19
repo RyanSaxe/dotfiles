@@ -1054,11 +1054,13 @@ function workingModel(accepting) {
 function renderWorking(model) {
   $("working-title").textContent = model.title;
   $("working-time").textContent = model.since ? elapsed(model.since) : "";
-  const silent = remote?.disconnected && remote.agentSeenAt;
-  $("working-note").hidden = !silent;
-  if (silent)
-    $("working-note").textContent =
-      `The agent has not checked in for ${since(remote.agentSeenAt)}.`;
+  const note = remote?.paused
+    ? `The agent stopped at your request (${remote.paused.reason}). Send it a message in the chat to resume.`
+    : remote?.wake?.last?.ok === false
+      ? `The agent could not be woken (${remote.wake.last.reason}). Send it a message in the chat.`
+      : "";
+  $("working-note").hidden = !note;
+  if (note) $("working-note").textContent = note;
   const bar = $("working-bar");
   const list = $("working-steps");
   bar.hidden = !model.bar;
@@ -1119,9 +1121,7 @@ function status() {
     ? "Local viewing. Feedback can be exported; live submission requires the session URL."
     : !connected
       ? "The hub is unreachable. Your draft stays here and submits when it is back."
-      : remote?.disconnected
-        ? "The agent has not checked in for a while. Feedback still saves."
-        : "";
+      : "";
   if (newer && mode === "live") scheduleReload();
 }
 async function poll() {
@@ -1152,6 +1152,7 @@ async function pollSessions() {
 function stateWords(entry) {
   if (entry.needsYou)
     return entry.kind === "plan" ? "Ready to accept" : "Waiting for you";
+  if (entry.paused) return "Paused";
   if (["submitted", "working"].includes(entry.stage))
     return `Working · ${since(entry.updatedAt)}`;
   return "Live";
