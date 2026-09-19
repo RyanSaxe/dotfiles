@@ -32,8 +32,8 @@ before acceptance. The [review flow](references/flow.svg) shows the loop.
   [component index](components/index.md): the artifact contracts, what a
   revision may change, and the supplied components. Read them before
   building.
-- [session.md](references/session.md): the helper, the hub, and acceptance.
-  Read it before starting or resuming a live review.
+- [session.md](references/session.md): the helper, the hub, the wake paths,
+  and acceptance. Read it before starting or resuming a live review.
 - [setup.md](references/setup.md): on first use in an environment, or when
   something fails.
 
@@ -45,28 +45,20 @@ affects. Move to the browser once there is concrete material to compare,
 correct, or approve. Open the first proposal in the user's default browser
 and give the link in chat.
 
-Read each submission before acknowledging it, and combine it with feedback
-from the conversation. Right after `ack`, declare the steps of the revision
-with `progress --steps`, name each one with `--start` as you begin it, and
-mark it with `--done` as you finish it. The reviewer's page shows them,
-with reading, checking and publishing already around them.
-
 Browser automation is optional. Use the live page to find and fix rendering
 and interaction problems. Do not install automation to author a plan unless
 asked.
 
 <important>
 
-While browser review is active, every turn ends with a `wait` in flight or
-with `complete`. A timeout is not completion: wait again. A side question in
-the conversation does not end the session: answer it, then call `wait`
-again in the same turn. An interrupted or rejected `wait` means the user
-wants attention, not that the review is cancelled: answer, then wait again.
-The helper cannot wake an ended turn, and the user cannot see that polling
-stopped, so a turn that ends without a wait leaves the session dead without
-anyone knowing. Stop only after explicit acceptance, or when the user says
-in words to stop or redirects the task, and say in the reply that polling
-has stopped.
+While browser review is active, a turn ends after `publish` or after
+`pause`. The hub wakes you when a submission lands, acceptance included,
+and nothing else does. `complete` ends the review, and the accepted mode
+says what follows. When `start` refuses because the session cannot be
+woken, give the user the instruction it prints and stop until the session
+is restarted. Stop a review before acceptance only when the user says in
+words to stop, and then run `pause`, so the page says that the agent
+stopped and how to resume it.
 
 </important>
 

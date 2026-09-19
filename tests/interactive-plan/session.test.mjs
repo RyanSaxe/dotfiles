@@ -54,6 +54,20 @@ const alive = (pid) => {
     return error.code !== "ESRCH";
   }
 };
+// The helper's start detects the harness from the environment. A dummy inbox
+// socket makes every wake fail harmlessly instead of reaching a real session.
+function cliEnv(home, extra = {}) {
+  const env = {
+    ...process.env,
+    XDG_STATE_HOME: home,
+    CLAUDE_CODE_MESSAGING_SOCKET: path.join(home, "none.sock"),
+    CLAUDE_CODE_MESSAGING_TOKEN: "test",
+    ...extra,
+  };
+  delete env.CODEX_THREAD_ID;
+  delete env.COPILOT_AGENT_SESSION_ID;
+  return env;
+}
 async function waitUntil(check, ms = 5000) {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
@@ -378,7 +392,7 @@ function artifact(revision = "1", kind = "exploration") {
 async function hub(t, extra = {}) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-hub-"));
   const env = { XDG_STATE_HOME: home, INTERACTIVE_PLAN_PORT: "0", ...extra };
-  const config = { ...settings(env), log() {} };
+  const config = { ...settings(env), log() {}, async wake() {} };
   const server = await startHub(config);
   t.after(async () => {
     await server.close();
@@ -394,7 +408,10 @@ async function hub(t, extra = {}) {
         authorization: `Bearer ${record.secret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ sessionDir: directory }),
+      body: JSON.stringify({
+        sessionDir: directory,
+        wake: { harness: "codex", thread: `thread-${name}` },
+      }),
     });
     const info = await registered.json();
     assert.equal(registered.status, 200, info.error);
@@ -1063,8 +1080,8 @@ test("two sessions on one hub isolate tokens, events, and acknowledgements", asy
   assert.deepEqual(listed.map((item) => item.id).sort(), [a.id, b.id].sort());
 });
 
-test("the hub lists live sessions needs-you first and drops completed or disconnected ones", async (t) => {
-  const h = await hub(t, { INTERACTIVE_PLAN_DISCONNECT_SECONDS: "0.4" });
+test("the hub lists open sessions needs-you first, and a paused one stays listed as paused", async (t) => {
+  const h = await hub(t);
   const a = await h.session(),
     b = await h.session();
   await h.session();
@@ -1097,16 +1114,33 @@ test("the hub lists live sessions needs-you first and drops completed or disconn
     [b.id, a.id],
   );
   assert.equal(list[0].revision, "2");
-  await sleep(450);
-  assert.deepEqual((await a.request("/api/sessions")).body.sessions, []);
-  assert.equal((await b.status()).body.disconnected, true);
-  assert.equal((await b.request(`${b.base}/`)).code, 200);
-  await b.next();
-  assert.deepEqual(
-    (await a.request("/api/sessions")).body.sessions.map((item) => item.id),
-    [b.id],
+  assert.equal(
+    (await b.action("pause", { reason: "asked to stop" })).code,
+    200,
   );
-  assert.equal((await b.status()).body.disconnected, false);
+  assert.equal((await b.status()).body.paused.reason, "asked to stop");
+  list = (await a.request("/api/sessions")).body.sessions;
+  assert.deepEqual(
+    list.map((item) => [item.id, item.paused]),
+    [
+      [b.id, true],
+      [a.id, false],
+    ],
+  );
+  assert.equal((await b.request(`${b.base}/`)).code, 200);
+  const again = await fetch(h.server.origin + "/agent/register", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${h.record.secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionDir: b.directory,
+      wake: { harness: "codex", thread: "thread-again" },
+    }),
+  });
+  assert.equal(again.status, 200);
+  assert.equal((await b.status()).body.paused, null);
 });
 
 test("the root URL opens the session that most needs you, then the last viewed, else says so", async (t) => {
@@ -1365,13 +1399,10 @@ for (const mode of ["save", "implement"])
 test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-idle-"));
   const port = 30000 + Math.floor(Math.random() * 20000);
-  const env = {
-    ...process.env,
-    XDG_STATE_HOME: home,
+  const env = cliEnv(home, {
     INTERACTIVE_PLAN_PORT: String(port),
     INTERACTIVE_PLAN_IDLE_SECONDS: "0.3",
-    INTERACTIVE_PLAN_DISCONNECT_SECONDS: "0.2",
-  };
+  });
   const config = settings(env);
   t.after(async () => {
     await killHub(config);
@@ -1382,9 +1413,17 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
   assert.equal(first.url, `http://127.0.0.1:${port}/s/${first.sessionId}/`);
   assert(first.sessionDir.startsWith(config.sessions));
+  assert.deepEqual(first.wake, { harness: "claude-code" });
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.equal(record.port, port);
   assert.equal(record.version, version);
+  // A session stays live until it completes or pauses, so the hub exits only
+  // once this one is paused.
+  await exec(
+    process.execPath,
+    [helper, "pause", "--session-dir", first.sessionDir, "--reason", "idle"],
+    { env },
+  );
   assert.equal(await waitUntil(() => !alive(record.pid), 5000), true);
   assert.equal(await exists(config.hubFile), false);
   const second = JSON.parse(
@@ -1409,11 +1448,7 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
 
 test("start replaces a stale hub record, and helper commands reattach after a crash without losing the queue", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-stale-"));
-  const env = {
-    ...process.env,
-    XDG_STATE_HOME: home,
-    INTERACTIVE_PLAN_PORT: "0",
-  };
+  const env = cliEnv(home, { INTERACTIVE_PLAN_PORT: "0" });
   const config = settings(env);
   t.after(async () => {
     await killHub(config);

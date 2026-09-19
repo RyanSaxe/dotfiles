@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import crypto from "node:crypto";
-import { readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
@@ -75,7 +75,6 @@ export function settings(env = process.env) {
     hubLog: path.join(root, "hub", "hub.log"),
     port,
     host: env.INTERACTIVE_PLAN_HOST || null,
-    disconnectMs: seconds("INTERACTIVE_PLAN_DISCONNECT_SECONDS", 900) * 1000,
     idleMs: seconds("INTERACTIVE_PLAN_IDLE_SECONDS", 900) * 1000,
   };
 }
@@ -288,18 +287,12 @@ async function loadSession(directory, config, origin) {
   token ||= crypto.randomBytes(32).toString("hex");
   const base = `/s/${state.sessionId}`;
   const exclusive = serializer();
-  let agentSeenAt = Date.parse(state.agentSeenAt || "") || 0;
-  let seenWrittenAt = agentSeenAt;
-  const seenText = () =>
-    agentSeenAt ? new Date(agentSeenAt).toISOString() : null;
+  // The wake target holds a token or a socket path, so it lives in its own
+  // agent-private file and never in a browser response.
+  const wakeFile = path.join(directory, "wake.json");
+  let wake = (await exists(wakeFile)) ? await read(wakeFile) : null;
   const transition = async (patch) => {
-    state = {
-      ...state,
-      ...patch,
-      agentSeenAt: seenText(),
-      updatedAt: timestamp(),
-    };
-    seenWrittenAt = agentSeenAt;
+    state = { ...state, ...patch, updatedAt: timestamp() };
     await atomic(stateFile, state);
     return state;
   };
@@ -328,8 +321,20 @@ async function loadSession(directory, config, origin) {
     event.revision === state.current.revision;
   const needsYou = () =>
     Boolean(state.current) && ["ready", "updated"].includes(state.stage);
-  const live = (now) =>
-    state.stage !== "complete" && now - agentSeenAt < config.disconnectMs;
+  const active = () => state.stage !== "complete" && !state.paused;
+  // Runs after the submission is saved, outside the browser's request, so a
+  // slow or failing harness never delays the reviewer's Sent state.
+  async function wakeAgent(revision) {
+    const line = `interactive-plan: feedback arrived on session ${directory} (revision ${revision}). Run: node ${here} wait --session-dir ${directory}`;
+    let last;
+    try {
+      await (config.wake || wakeRunner)(wake, line);
+      last = { at: timestamp(), ok: true };
+    } catch (error) {
+      last = { at: timestamp(), ok: false, reason: error.message };
+    }
+    await transition({ wake: { harness: wake.harness, last } });
+  }
   async function submit(data) {
     requireValue(data.sessionId === state.sessionId, "Wrong session", 409);
     requireValue(
@@ -407,6 +412,8 @@ async function loadSession(directory, config, origin) {
       latestSubmissionId: data.id,
       accepted: null,
     });
+    if (wake && !state.paused)
+      setTimeout(() => exclusive(() => wakeAgent(data.revision)), 0);
     return { id: data.id, saved: true, status: view() };
   }
   async function publish(html) {
@@ -620,6 +627,16 @@ async function loadSession(directory, config, origin) {
       });
       return { status: view() };
     }
+    if (data.action === "pause") {
+      requireValue(
+        typeof data.reason === "string" && data.reason.trim(),
+        "pause requires a reason",
+      );
+      await transition({
+        paused: { at: timestamp(), reason: data.reason.trim() },
+      });
+      return { status: view() };
+    }
     if (data.action === "publish") return publish(data.html);
     if (data.action === "complete") {
       requireValue(
@@ -638,17 +655,17 @@ async function loadSession(directory, config, origin) {
     }
     requireValue(false, "Unknown agent action");
   }
-  function view(now = Date.now()) {
+  function view() {
     return {
       ...state,
-      agentSeenAt: seenText(),
       revisions: state.revisions || [],
       progress: state.progress || null,
-      disconnected: state.stage !== "complete" && !live(now),
+      wake: state.wake || null,
+      paused: state.paused || null,
       needsYou: needsYou(),
     };
   }
-  function listing(now = Date.now()) {
+  function listing() {
     if (!state.current) return null;
     return {
       id: state.sessionId,
@@ -657,23 +674,19 @@ async function loadSession(directory, config, origin) {
       revision: state.current.revision,
       stage: state.stage,
       needsYou: needsYou(),
-      agentSeenAt: seenText(),
+      paused: Boolean(state.paused),
       publishedAt: state.current.publishedAt,
       updatedAt: state.updatedAt,
       url: base + "/",
-      live: live(now),
     };
   }
-  async function persistSeen(force = false) {
-    if (agentSeenAt === seenWrittenAt) return;
-    if (!force && agentSeenAt - seenWrittenAt < 30_000) return;
-    state = { ...state, agentSeenAt: seenText() };
-    seenWrittenAt = agentSeenAt;
-    await atomic(stateFile, state);
-  }
-  function touch() {
-    agentSeenAt = Date.now();
-    return exclusive(() => persistSeen());
+  async function setWake(target) {
+    await atomic(wakeFile, target);
+    wake = target;
+    await transition({
+      wake: { harness: target.harness, last: state.wake?.last || null },
+      paused: null,
+    });
   }
   function revisionEntry(revision) {
     const entry = (state.revisions || []).find(
@@ -707,9 +720,8 @@ async function loadSession(directory, config, origin) {
     act,
     view,
     listing,
-    live,
-    touch,
-    persistSeen,
+    active,
+    setWake,
     revisionEntry,
   };
 }
@@ -726,6 +738,162 @@ async function readBody(req, limit) {
     requireValue(Buffer.byteLength(raw) <= limit, "Request too large", 413);
   }
   return JSON.parse(raw);
+}
+
+const harnesses = { claude: "claude-code", codex: "codex", copilot: "copilot" };
+// The nearest harness among the ancestors decides which session start belongs
+// to, because a harness started inside another inherits the outer one's
+// variables. Names are the executables: claude, codex, copilot.
+function ancestors(pid = process.ppid) {
+  const chain = [];
+  for (let current = pid; current > 1;) {
+    let line;
+    try {
+      line = execFileSync("ps", ["-o", "ppid=,comm=", "-p", String(current)], {
+        encoding: "utf8",
+      }).trim();
+    } catch {
+      break;
+    }
+    const match = /^(\d+)\s+(.*)$/.exec(line);
+    if (!match) break;
+    chain.push({ pid: current, command: path.basename(match[2].trim()) });
+    current = Number(match[1]);
+  }
+  return chain;
+}
+function listeningPort(pid) {
+  try {
+    const out = execFileSync(
+      "lsof",
+      ["-a", "-p", String(pid), "-iTCP", "-sTCP:LISTEN", "-nP", "-Fn"],
+      { encoding: "utf8" },
+    );
+    const match = /^n127\.0\.0\.1:(\d+)$/m.exec(out);
+    return match ? Number(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+function copilotSdk(env) {
+  const roots = [
+    env.COPILOT_PKG_CACHE_HOME,
+    path.join(os.homedir(), "Library", "Caches", "copilot"),
+    env.XDG_CACHE_HOME && path.join(env.XDG_CACHE_HOME, "copilot"),
+    path.join(os.homedir(), ".cache", "copilot"),
+  ].filter(Boolean);
+  const tried = roots.map((root) =>
+    path.join(
+      root,
+      "pkg",
+      `${process.platform}-${process.arch}`,
+      env.COPILOT_CLI_BINARY_VERSION || "",
+      "copilot-sdk",
+      "index.js",
+    ),
+  );
+  return {
+    sdk: tried.find((candidate) => existsSync(candidate)) || null,
+    tried,
+  };
+}
+export function detectWake(
+  env = process.env,
+  tools = { ancestors, listeningPort, copilotSdk },
+) {
+  const chain = tools.ancestors();
+  const nearest = chain.find((entry) => harnesses[entry.command]);
+  const harness = nearest
+    ? harnesses[nearest.command]
+    : env.COPILOT_AGENT_SESSION_ID
+      ? "copilot"
+      : env.CODEX_THREAD_ID
+        ? "codex"
+        : env.CLAUDE_CODE_MESSAGING_SOCKET
+          ? "claude-code"
+          : null;
+  requireValue(
+    harness,
+    "no wake path. This needs Claude Code, Codex, or Copilot, and none of their session variables is set.",
+  );
+  if (harness === "claude-code") {
+    const socket = env.CLAUDE_CODE_MESSAGING_SOCKET;
+    const token = env.CLAUDE_CODE_MESSAGING_TOKEN;
+    requireValue(
+      socket && token,
+      "this Claude Code session exposes no inbox socket, so it cannot be woken.",
+    );
+    return { harness, socket, token };
+  }
+  if (harness === "codex") {
+    requireValue(
+      env.CODEX_THREAD_ID,
+      "this Codex session exports no CODEX_THREAD_ID, so it cannot be woken.",
+    );
+    return { harness, thread: env.CODEX_THREAD_ID };
+  }
+  const sessionId = env.COPILOT_AGENT_SESSION_ID;
+  requireValue(
+    sessionId,
+    "this Copilot session exports no COPILOT_AGENT_SESSION_ID, so it cannot be woken.",
+  );
+  const port = nearest ? tools.listeningPort(nearest.pid) : null;
+  requireValue(
+    port,
+    `this Copilot session cannot be woken. Restart it with \`copilot --ui-server --resume ${sessionId}\` and run start again.`,
+  );
+  const { sdk, tried } = tools.copilotSdk(env);
+  requireValue(
+    sdk,
+    `the Copilot SDK was not found at ${tried.join(", ")}, so this session cannot be woken.`,
+  );
+  return { harness, sessionId, port, sdk };
+}
+const wakeCopilotScript = path.join(path.dirname(here), "wake-copilot.mjs");
+function run(file, args) {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, { timeout: 30_000 }, (error, stdout, stderr) => {
+      if (error) reject(new Error((stderr || error.message).trim()));
+      else resolve();
+    });
+  });
+}
+function wakeClaude({ socket, token }, line) {
+  return new Promise((resolve, reject) => {
+    const client = net.connect(socket);
+    client.setTimeout(5000, () => client.destroy(new Error("timed out")));
+    client.on("error", reject);
+    client.on("close", resolve);
+    client.end(
+      JSON.stringify({ type: "auth", token }) +
+        "\n" +
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: line },
+        }) +
+        "\n",
+    );
+  });
+}
+export function wakeRunner(target, line) {
+  if (target.harness === "claude-code") return wakeClaude(target, line);
+  if (target.harness === "codex")
+    return run("codex", [
+      "queue",
+      "--thread",
+      target.thread,
+      "--message",
+      line,
+    ]);
+  if (target.harness === "copilot")
+    return run(process.execPath, [
+      wakeCopilotScript,
+      target.sdk,
+      String(target.port),
+      target.sessionId,
+      line,
+    ]);
+  return Promise.reject(new Error(`unknown harness ${target.harness}`));
 }
 
 export async function startHub(config = settings()) {
@@ -750,11 +918,14 @@ export async function startHub(config = settings()) {
     }
     return session;
   }
-  const live = (now = Date.now()) =>
-    [...registry.values()].filter((session) => session.live(now));
-  const listed = (now = Date.now()) =>
-    live(now)
-      .map((session) => session.listing(now))
+  const open = () =>
+    [...registry.values()].filter(
+      (session) => session.state.stage !== "complete",
+    );
+  const active = () => open().filter((session) => session.active());
+  const listed = () =>
+    open()
+      .map((session) => session.listing())
       .filter(Boolean)
       .sort(
         (a, b) =>
@@ -800,7 +971,7 @@ export async function startHub(config = settings()) {
           pid: process.pid,
           port: origin && Number(new URL(origin).port),
           startedAt,
-          live: live().length,
+          live: active().length,
         });
       if (method === "GET" && url.pathname === "/api/sessions")
         return reply(200, { sessions: listed() });
@@ -832,18 +1003,26 @@ export async function startHub(config = settings()) {
             path.isAbsolute(data.sessionDir),
           "sessionDir must be an absolute path",
         );
+        requireValue(
+          data.wake &&
+            typeof data.wake === "object" &&
+            Object.values(harnesses).includes(data.wake.harness),
+          "wake must name a harness: claude-code, codex, or copilot",
+        );
         const directory = path.resolve(data.sessionDir);
         const session = await register(() => adopt(directory));
-        await session.touch();
+        await session.exclusive(() => session.setWake(data.wake));
         await atomic(path.join(directory, "connection.json"), {
           sessionId: session.id,
           origin,
           token: session.token,
+          wake: { harness: data.wake.harness },
         });
         return reply(200, {
           sessionId: session.id,
           sessionDir: directory,
           url: origin + session.base + "/",
+          wake: { harness: data.wake.harness },
           ...(hostOrigin ? { hostUrl: hostOrigin + session.base + "/" } : {}),
         });
       }
@@ -855,7 +1034,6 @@ export async function startHub(config = settings()) {
           "Agent token required",
           403,
         );
-        await session.touch();
         if (method === "GET" && parts[2] === "next")
           return reply(
             200,
@@ -994,8 +1172,6 @@ export async function startHub(config = settings()) {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
-    for (const session of registry.values())
-      await session.exclusive(() => session.persistSeen(true));
     try {
       if ((await read(config.hubFile)).pid === process.pid)
         await fs.rm(config.hubFile, { force: true });
@@ -1006,14 +1182,12 @@ export async function startHub(config = settings()) {
   timer = setInterval(
     async () => {
       const now = Date.now();
-      if (live(now).length) lastLiveAt = now;
+      if (active().length) lastLiveAt = now;
       else if (now - lastLiveAt > config.idleMs) {
         log("no live sessions; exiting");
         await close();
         process.exit(0);
       }
-      for (const session of registry.values())
-        void session.exclusive(() => session.persistSeen());
     },
     Math.min(5000, Math.max(50, config.idleMs / 4)),
   );
@@ -1112,7 +1286,11 @@ export async function ensureHub(config = settings()) {
   }
   return { ...info, origin: `http://127.0.0.1:${info.port}` };
 }
-export async function attach(directory, config = settings()) {
+export async function attach(
+  directory,
+  config = settings(),
+  wake = detectWake(),
+) {
   const hub = await ensureHub(config);
   const record = await readRecord(config);
   requireValue(
@@ -1125,7 +1303,7 @@ export async function attach(directory, config = settings()) {
       authorization: `Bearer ${record.secret}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ sessionDir: directory }),
+    body: JSON.stringify({ sessionDir: directory, wake }),
     signal: AbortSignal.timeout(15000),
   });
   const result = await response.json();
@@ -1240,6 +1418,7 @@ export async function main(argv) {
   }
   const action = { action: command };
   if (command === "ack") action.id = options.id;
+  if (command === "pause") action.reason = options.reason;
   if (command === "progress") {
     const given = ["steps", "start", "done"].filter(
       (key) => options[key] !== undefined,

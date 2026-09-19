@@ -4,9 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { assemble } from "./build.mjs";
-import { settings, startHub } from "./session.mjs";
+import { detectWake, settings, startHub } from "./session.mjs";
 
 let hub, sessionId, sessionDir, token;
+const wakes = [];
+let wakeFails = false;
 const artifact = (revision) =>
   assemble({
     artifactId: "t",
@@ -41,14 +43,19 @@ before(async () => {
   const config = {
     ...settings({ XDG_STATE_HOME: home, INTERACTIVE_PLAN_PORT: "0" }),
     log() {},
+    async wake(target, line) {
+      wakes.push({ target, line });
+      if (wakeFails) throw new Error("thread gone");
+    },
   };
   hub = await startHub(config);
   sessionDir = path.join(home, "session");
   const registered = await post(
     "/agent/register",
-    { sessionDir },
+    { sessionDir, wake: { harness: "codex", thread: "thread-1" } },
     { authorization: `Bearer ${hub.secret}` },
   );
+  assert.deepEqual(registered.body.wake, { harness: "codex" });
   sessionId = registered.body.sessionId;
   token = JSON.parse(
     await fs.readFile(path.join(sessionDir, "connection.json"), "utf8"),
@@ -133,4 +140,168 @@ test("publish clears progress", async () => {
   const view = await status();
   assert.equal(view.stage, "updated");
   assert.equal(view.progress, null);
+});
+
+const feedback = (id) =>
+  post(
+    `/s/${sessionId}/api/feedback`,
+    {
+      sessionId,
+      id,
+      artifactId: "t",
+      revision: "2",
+      intent: "feedback-only",
+      groups: { choices: {}, notes: [] },
+      text: "hi",
+    },
+    { origin: hub.origin },
+  );
+// The before hook's submission already woke the agent once, so each test
+// waits for its own wake by count and for its result to reach the status.
+const settled = async (count) => {
+  for (let i = 0; i < 50; i++) {
+    const view = await status();
+    if (wakes.length === count && view.wake?.last?.at !== settled.seen) {
+      settled.seen = view.wake.last.at;
+      return view;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("the wake was never recorded");
+};
+
+test("registration stores the wake target for the agent only", async () => {
+  const connection = JSON.parse(
+    await fs.readFile(path.join(sessionDir, "connection.json"), "utf8"),
+  );
+  assert.deepEqual(connection.wake, { harness: "codex" });
+  const stored = JSON.parse(
+    await fs.readFile(path.join(sessionDir, "wake.json"), "utf8"),
+  );
+  assert.deepEqual(stored, { harness: "codex", thread: "thread-1" });
+  const view = await status();
+  assert.equal(view.wake.harness, "codex");
+  assert.equal(JSON.stringify(view).includes("thread-1"), false);
+  const refused = await post(
+    "/agent/register",
+    { sessionDir, wake: { harness: "vim" } },
+    { authorization: `Bearer ${hub.secret}` },
+  );
+  assert.equal(refused.status, 400);
+});
+
+test("a submission wakes the agent with the line that names the session", async () => {
+  assert.equal(wakes.length, 1);
+  assert.ok((await feedback("evt2")).ok);
+  const view = await settled(2);
+  assert.deepEqual(wakes[1].target, { harness: "codex", thread: "thread-1" });
+  assert.match(
+    wakes[1].line,
+    new RegExp(
+      `^interactive-plan: feedback arrived on session ${sessionDir} \\(revision 2\\)\\. Run: node .*session\\.mjs wait --session-dir ${sessionDir}$`,
+    ),
+  );
+  assert.equal(view.wake.last.ok, true);
+  assert.ok((await act({ action: "ack", id: "evt2" })).ok);
+});
+
+test("a failed wake is recorded and the submission stays readable", async () => {
+  wakeFails = true;
+  assert.ok((await feedback("evt3")).ok);
+  const view = await settled(3);
+  wakeFails = false;
+  assert.equal(view.wake.last.ok, false);
+  assert.equal(view.wake.last.reason, "thread gone");
+  const next = await fetch(`${hub.origin}/agent/${sessionId}/next`, {
+    headers: { authorization: `Bearer ${token}` },
+  }).then((response) => response.json());
+  assert.equal(next.event.id, "evt3");
+  assert.ok((await act({ action: "ack", id: "evt3" })).ok);
+});
+
+test("a paused session is not woken until it registers again", async () => {
+  const count = wakes.length;
+  assert.equal((await act({ action: "pause" })).status, 400);
+  assert.ok((await act({ action: "pause", reason: "asked to stop" })).ok);
+  assert.equal((await status()).paused.reason, "asked to stop");
+  assert.ok((await feedback("evt4")).ok);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(wakes.length, count);
+  assert.equal(
+    (await fetch(`${hub.origin}/api/sessions`).then((r) => r.json()))
+      .sessions[0].paused,
+    true,
+  );
+  const again = await post(
+    "/agent/register",
+    { sessionDir, wake: { harness: "codex", thread: "thread-1" } },
+    { authorization: `Bearer ${hub.secret}` },
+  );
+  assert.ok(again.ok);
+  assert.equal((await status()).paused, null);
+  assert.ok((await act({ action: "ack", id: "evt4" })).ok);
+});
+
+const tools = (chain, port = 4321, sdk = "/sdk/index.js") => ({
+  ancestors: () => chain,
+  listeningPort: () => port,
+  copilotSdk: () => ({ sdk, tried: ["/a/index.js"] }),
+});
+const claude = {
+  CLAUDE_CODE_MESSAGING_SOCKET: "/tmp/cc-socks/1.sock",
+  CLAUDE_CODE_MESSAGING_TOKEN: "tok",
+};
+
+test("the nearest harness ancestor decides the wake target", () => {
+  const env = { ...claude, CODEX_THREAD_ID: "outer" };
+  assert.deepEqual(
+    detectWake(
+      env,
+      tools([
+        { pid: 2, command: "zsh" },
+        { pid: 3, command: "claude" },
+        { pid: 4, command: "codex" },
+      ]),
+    ),
+    {
+      harness: "claude-code",
+      socket: claude.CLAUDE_CODE_MESSAGING_SOCKET,
+      token: "tok",
+    },
+  );
+  assert.deepEqual(
+    detectWake({ CODEX_THREAD_ID: "t" }, tools([{ pid: 3, command: "codex" }])),
+    { harness: "codex", thread: "t" },
+  );
+  assert.deepEqual(
+    detectWake(
+      { COPILOT_AGENT_SESSION_ID: "s" },
+      tools([{ pid: 3, command: "copilot" }]),
+    ),
+    { harness: "copilot", sessionId: "s", port: 4321, sdk: "/sdk/index.js" },
+  );
+  assert.deepEqual(
+    detectWake({ CODEX_THREAD_ID: "t" }, tools([{ pid: 2, command: "sh" }])),
+    { harness: "codex", thread: "t" },
+  );
+});
+
+test("start refuses without a wake path and says what to do", () => {
+  assert.throws(() => detectWake({}, tools([])), /no wake path/);
+  assert.throws(
+    () =>
+      detectWake(
+        { COPILOT_AGENT_SESSION_ID: "s" },
+        tools([{ pid: 3, command: "copilot" }], null),
+      ),
+    /copilot --ui-server --resume s/,
+  );
+  assert.throws(
+    () =>
+      detectWake(
+        { COPILOT_AGENT_SESSION_ID: "s" },
+        tools([{ pid: 3, command: "copilot" }], 4321, null),
+      ),
+    /SDK was not found at \/a\/index\.js/,
+  );
 });
