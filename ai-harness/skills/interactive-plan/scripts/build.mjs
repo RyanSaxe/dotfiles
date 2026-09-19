@@ -26,7 +26,9 @@ export async function assemble(data, { css = "", js = "" } = {}) {
   const html = shell
     .replace(
       "<!-- FRAME_STYLE -->",
-      () => `<style>\n${style}\n${css}\n</style>`,
+      // Plan CSS is scoped to the page's content, so a rule for body, :root,
+      // or h1 cannot restyle the frame.
+      () => `<style>\n${style}\n@scope (#page-content) {\n${css}\n}\n</style>`,
     )
     .replace("<!-- CUSTOM_SCRIPT -->", () => `<script>\n${js}\n</script>`)
     .replace(

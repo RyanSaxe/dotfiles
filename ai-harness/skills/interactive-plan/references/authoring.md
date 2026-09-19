@@ -12,8 +12,13 @@ under the session directory, such as `src/out/`; the publisher owns
 `artifacts/` and refuses a name that already exists there. The builder puts
 the frame and the authored content into one HTML file. It does not bundle
 imports or linked files, so embed every local resource the plan needs. Do
-not modify the shared skill assets for one plan, and do not install
-packages to author one.
+not install packages to author a plan.
+
+A revision changes the plan's pages, its own CSS and JavaScript, its
+prototypes, and Agreed, and a request to redesign the look means those. The
+frame, the components in the skill, the helper, and the hub belong to the
+skill; when feedback asks for a change to one of them, say so in the chat
+and plan it as skill work.
 
 ## Manifest
 
@@ -128,9 +133,13 @@ Agreed, Feedback with a count of unsent items, and Submit at the foot,
 which shows when the last round was sent and becomes Accept plan on a final
 plan that can be accepted. The page layout is yours. The frame provides
 basic typography, tables, code, theme colors, focus, and selected-choice
-states; it provides no generic card or column layouts.
+states; it provides no generic card or column layouts. The builder wraps
+the plan's CSS in `@scope (#page-content)`, so a rule for `body`, `:root`,
+or `h1` reaches only the page's content.
 
-Tokens, each with a light and a dark value: `--ground` (the page behind the
+The tokens and the type below are the design language of every plan: style
+the components a plan makes with them and do not redefine them. Tokens, each
+with a light and a dark value: `--ground` (the page behind the
 frame, panels, and figure grounds), `--panel` (the frame, cards, popovers),
 `--line` and `--line-strong`, `--ink`, `--muted`, `--accent` with
 `--accent-ink` and `--accent-soft`, `--attention` and `--attention-bg`
