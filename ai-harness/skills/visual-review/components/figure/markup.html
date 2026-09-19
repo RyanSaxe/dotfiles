@@ -1,0 +1,26 @@
+<!-- A chart on its own. -->
+<div data-chart data-title="Latency, before and after" data-caption="p50 over a week.">
+{ "xAxis": { "type": "category", "data": ["Mon", "Tue", "Wed"] },
+  "yAxis": { "type": "value" },
+  "series": [{ "type": "line", "data": [12, 9, 7] }] }
+</div>
+
+<!-- An equation on its own, with one symbol that finds its code. -->
+<div data-math="display">\mathrm{FL}(p_t) = -\,\alpha\,(1-p_t)^{\htmlData{lines=17 19}{\gamma}}\,\log(p_t)</div>
+
+<!-- A figure a reader can move. -->
+<figure class="figure" data-figure="focal">
+  <div data-chart></div>
+  <div class="controls">
+    <label>focusing <input type="range" data-control="gamma" min="0" max="5" step="0.1" value="2" /> <output></output></label>
+  </div>
+  <script type="text/plain" data-script>
+    const xs = Array.from({ length: 99 }, (_, i) => (i + 1) / 100);
+    draw.chart({
+      xAxis: { type: "category", data: xs.map((x) => x.toFixed(2)) },
+      yAxis: { type: "value" },
+      series: [{ type: "line", showSymbol: false,
+        data: xs.map((p) => -((1 - p) ** controls.gamma) * Math.log(p)) }],
+    });
+  </script>
+</figure>

@@ -1,0 +1,3 @@
+# Codex CLI reads this file. Other harnesses ignore it.
+policy:
+  allow_implicit_invocation: true

@@ -139,28 +139,11 @@ Passing tests and CI establish useful facts but do not, by themselves, prove
 that a feature works. Verify through the interface where the user encounters
 the change, with effort proportional to its risk, novelty, and consequence.
 
-`prek` runs the same checks as the commit gate and CI, so it is the
-authority on whether a change passes. Iterate with a targeted run and finish
-with the full one:
-
-```sh
-prek run --files path/to/changed.lua another/file.ts
-prek run --all-files
-```
-
-That covers formatting, linting, types, shell, and the Lua typecheck. The Lua
-half is `ci/luals-check.lua`, which drives the same lua-language-server the
-editor runs, with every installed plugin supplied as a typed library — so it
-sees what your editor would show in a file you never opened. Run it alone when
-only Lua changed:
-
-```sh
-nvim -l ci/luals-check.lua
-```
-
-None of this proves a feature works. In-editor behavior, rendering, and
-keybindings need the real interface, so open Neovim and use the thing you
-changed.
+Run the project's own checks, the ones its commit gate and CI run, and
+treat them as the authority on whether a change passes; the project's
+instructions say what they are. None of this proves a feature works.
+Behavior, rendering, and keybindings need the real interface, so open the
+program and use the thing you changed.
 
 <important>
 

@@ -1,0 +1,166 @@
+metric	run	ms
+window-select cmd	0	4.30
+window-select cmd	1	3.99
+window-select cmd	2	4.17
+window-select cmd	3	4.17
+window-select cmd	4	4.21
+window-select cmd	5	4.09
+window-select cmd	6	4.06
+window-select cmd	7	4.32
+window-select cmd	8	4.54
+window-select cmd	9	4.27
+window-select cmd	10	4.92
+window-select cmd	11	4.84
+window-select cmd	12	3.79
+window-select cmd	13	3.88
+window-select cmd	14	4.18
+window-select drain	0	7.98
+window-select drain	1	7.80
+window-select drain	2	9.40
+window-select drain	3	8.00
+window-select drain	4	8.44
+window-select drain	5	7.71
+window-select drain	6	7.39
+window-select drain	7	8.16
+window-select drain	8	8.24
+window-select drain	9	8.00
+window-select drain	10	8.61
+window-select drain	11	8.55
+window-select drain	12	7.48
+window-select drain	13	7.50
+window-select drain	14	7.87
+alt+L end-to-end	0	52.39
+alt+L end-to-end	1	53.33
+alt+L end-to-end	2	50.46
+alt+L end-to-end	3	51.78
+alt+L end-to-end	4	51.26
+alt+L end-to-end	5	51.82
+alt+L end-to-end	6	51.33
+alt+L end-to-end	7	51.90
+alt+L end-to-end	8	55.03
+alt+L end-to-end	9	50.67
+alt+L end-to-end	10	50.57
+alt+L end-to-end	11	52.12
+alt+L end-to-end	12	54.51
+alt+L end-to-end	13	53.16
+alt+L end-to-end	14	52.36
+element jump	0	52.11
+element jump	1	50.52
+element jump	2	51.86
+element jump	3	50.84
+element jump	4	51.84
+element jump	5	49.81
+element jump	6	53.04
+element jump	7	51.30
+element jump	8	52.00
+element jump	9	51.63
+element jump	10	52.56
+element jump	11	50.75
+element jump	12	50.53
+element jump	13	49.73
+element jump	14	51.82
+tab write -> repaint (tasks)	0	57.88
+tab write -> repaint (tasks)	1	53.25
+tab write -> repaint (tasks)	2	55.58
+tab write -> repaint (tasks)	3	42.10
+tab write -> repaint (tasks)	4	48.11
+tab write -> repaint (tasks)	5	48.73
+tab write -> repaint (tasks)	6	41.99
+tab write -> repaint (tasks)	7	33.59
+tab write -> repaint (tasks)	8	57.22
+tab write -> repaint (tasks)	9	55.20
+tab write -> repaint (tasks)	10	59.74
+tab write -> repaint (tasks)	11	57.06
+tab write -> repaint (tasks)	12	58.07
+tab write -> repaint (tasks)	13	59.06
+tab write -> repaint (tasks)	14	62.64
+tab write -> repaint (reviews)	0	51.58
+tab write -> repaint (reviews)	1	54.98
+tab write -> repaint (reviews)	2	37.91
+tab write -> repaint (reviews)	3	56.13
+tab write -> repaint (reviews)	4	40.15
+tab write -> repaint (reviews)	5	53.32
+tab write -> repaint (reviews)	6	56.43
+tab write -> repaint (reviews)	7	55.69
+tab write -> repaint (reviews)	8	60.23
+tab write -> repaint (reviews)	9	49.36
+tab write -> repaint (reviews)	10	54.19
+tab write -> repaint (reviews)	11	90.82
+tab write -> repaint (reviews)	12	57.51
+tab write -> repaint (reviews)	13	59.01
+tab write -> repaint (reviews)	14	52.73
+popup shell start (warm)	0	14.20
+popup shell start (warm)	1	14.24
+popup shell start (warm)	2	14.32
+popup shell start (warm)	3	14.68
+popup shell start (warm)	4	21.51
+popup shell start (warm)	5	15.15
+popup shell start (warm)	6	14.51
+popup shell start (warm)	7	13.96
+popup shell start (warm)	8	14.09
+popup shell start (warm)	9	13.41
+popup shell start (warm)	10	13.26
+popup shell start (warm)	11	14.37
+popup shell start (warm)	12	13.52
+popup shell start (warm)	13	13.34
+popup shell start (warm)	14	14.54
+popup shell start (cold)	0	13.40
+popup shell start (cold)	1	13.26
+popup shell start (cold)	2	13.35
+popup shell start (cold)	3	13.39
+popup shell start (cold)	4	13.27
+popup shell start (cold)	5	13.27
+popup shell start (cold)	6	12.95
+popup shell start (cold)	7	13.18
+popup shell start (cold)	8	12.94
+popup shell start (cold)	9	13.22
+popup shell start (cold)	10	13.17
+popup shell start (cold)	11	14.28
+popup shell start (cold)	12	13.62
+popup shell start (cold)	13	13.56
+popup shell start (cold)	14	14.08
+prompt collector	0	15.19
+prompt collector	1	14.96
+prompt collector	2	14.61
+prompt collector	3	15.35
+prompt collector	4	14.68
+prompt collector	5	15.78
+prompt collector	6	15.58
+prompt collector	7	15.49
+prompt collector	8	14.72
+prompt collector	9	15.27
+prompt collector	10	15.77
+prompt collector	11	15.85
+prompt collector	12	15.94
+prompt collector	13	15.59
+prompt collector	14	16.15
+mascot sync (noop)	0	11.32
+mascot sync (noop)	1	11.08
+mascot sync (noop)	2	12.93
+mascot sync (noop)	3	13.86
+mascot sync (noop)	4	11.26
+mascot sync (noop)	5	11.36
+mascot sync (noop)	6	11.43
+mascot sync (noop)	7	11.35
+mascot sync (noop)	8	12.09
+mascot sync (noop)	9	11.89
+mascot sync (noop)	10	11.50
+mascot sync (noop)	11	11.35
+mascot sync (noop)	12	10.82
+mascot sync (noop)	13	10.65
+mascot sync (noop)	14	10.41
+mascot sync (flip)	0	233.38
+mascot sync (flip)	1	84.25
+mascot sync (flip)	2	83.33
+mascot sync (flip)	3	79.67
+mascot sync (flip)	4	81.28
+mascot sync (flip)	5	82.62
+mascot sync (flip)	6	79.73
+mascot sync (flip)	7	81.74
+mascot sync (flip)	8	82.19
+mascot sync (flip)	9	81.04
+mascot sync (flip)	10	82.77
+mascot sync (flip)	11	82.31
+mascot sync (flip)	12	79.93
+mascot sync (flip)	13	82.59
+mascot sync (flip)	14	83.23

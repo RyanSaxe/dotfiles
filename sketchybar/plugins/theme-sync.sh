@@ -11,11 +11,16 @@ CACHE="$HOME/.cache/sketchybar-colors-mtime"
 
 [[ -f "$COLORS_FILE" ]] || exit 0
 
-MTIME=$(stat -f %m "$COLORS_FILE" 2>/dev/null || stat -c %Y "$COLORS_FILE" 2>/dev/null)
+zmodload -F zsh/stat b:zstat
+MTIME=$(zstat +mtime "$COLORS_FILE" 2>/dev/null)
 SEEN=""
 [[ -f "$CACHE" ]] && SEEN=$(<"$CACHE")
 
-[[ "$MTIME" == "$SEEN" ]] && exit 0
+# A theme_changed event is authoritative even when the colors file kept
+# the same mtime (a render can leave identical bytes untouched).
+if [[ "$SENDER" != "theme_changed" && "$MTIME" == "$SEEN" ]]; then
+  exit 0
+fi
 
 sketchybar --bar color="$BAR_COLOR" border_color="$BORDER_COLOR" \
   --default icon.color="$ICON_COLOR" label.color="$LABEL_COLOR" \

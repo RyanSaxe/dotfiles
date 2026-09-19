@@ -1,22 +1,21 @@
 # Rendered by `theme` — do not edit; change the template or tokens instead.
 # Sourced by tmux.conf at load, and re-sourced by `theme` on every render:
 # all tmux styles reference these @variables, so a theme or mascot switch
-# recolors the running server with no restart. The tmux border is outer chrome;
-# messages and copy-mode furniture stay on the inner surface.
-set -g @bg "{{inner_bg}}"
-set -g @crust "{{outer_crust}}"
-set -g @bg_alt "{{inner_bg_alt}}"
-set -g @fg "{{inner_fg}}"
-set -g @surface "{{inner_bg_highlight}}"
-set -g @border "{{inner_border}}"
-set -g @dim "{{inner_fg_faint}}"
-set -g @accent "{{inner_accent}}"
-set -g @notify "{{inner_notify}}"
-set -g @warn "{{inner_warn}}"
-set -g @info "{{inner_info}}"
+# recolors the running server with no restart.
+set -g @bg "{{bg}}"
+set -g @crust "{{crust}}"
+set -g @bg_alt "{{bg_alt}}"
+set -g @fg "{{fg}}"
+set -g @surface "{{bg_highlight}}"
+set -g @border "{{border}}"
+set -g @dim "{{fg_faint}}"
+set -g @accent "{{accent}}"
+set -g @notify "{{notify}}"
+set -g @warn "{{warn}}"
+set -g @info "{{info}}"
 
 # Agent status glyph colors (see workmux config.yaml status_icons), from
 # the status_* tokens shared with the rail.
-set -g @status_working "{{inner_status_working}}"
-set -g @status_waiting "{{inner_status_waiting}}"
-set -g @status_done "{{inner_status_done}}"
+set -g @status_working "{{status_working}}"
+set -g @status_waiting "{{status_waiting}}"
+set -g @status_done "{{status_done}}"

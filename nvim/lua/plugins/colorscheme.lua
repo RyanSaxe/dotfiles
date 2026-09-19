@@ -1,5 +1,5 @@
 -- Catppuccin is the floor; lua/theme applies the generated tokens and
--- the semantic layer on top, following the theme system's INNER mode.
+-- the semantic layer on top, following the theme system's mode.
 return {
   {
     "catppuccin/nvim",

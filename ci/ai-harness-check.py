@@ -163,12 +163,46 @@ def validate_statusline() -> None:
         raise HarnessError(f"statusline omitted expected context: {outputs[0]!r}")
 
 
+def validate_planning_sessions() -> None:
+    node = shutil.which("node")
+    if node is None:
+        raise HarnessError("node is required to check interactive planning sessions")
+    result = subprocess.run(
+        [node, "--test", str(REPO_ROOT / "tests/interactive-plan/session.test.mjs")],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode:
+        raise HarnessError(
+            f"planning sessions failed: {result.stdout}\n{result.stderr}"
+        )
+
+
+def validate_documents() -> None:
+    node = shutil.which("node")
+    if node is None:
+        raise HarnessError("node is required to check visual-review documents")
+    result = subprocess.run(
+        [node, "--test", str(REPO_ROOT / "tests/visual-review/build.test.mjs")],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode:
+        raise HarnessError(
+            f"visual-review documents failed: {result.stdout}\n{result.stderr}"
+        )
+
+
 def main() -> int:
     checks = (
         validate_manifests,
         validate_skills,
         validate_settings,
         validate_statusline,
+        validate_planning_sessions,
+        validate_documents,
     )
     try:
         for check in checks:

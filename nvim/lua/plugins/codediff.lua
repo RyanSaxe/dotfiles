@@ -167,6 +167,7 @@ return {
     ---@param opts table CodeDiff setup opts from this spec
     config = function(_, opts)
       require("codediff").setup(opts)
+      require("codediff_review").setup()
     end,
   },
 }

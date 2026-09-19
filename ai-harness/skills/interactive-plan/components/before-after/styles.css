@@ -1,0 +1,150 @@
+.change-review {
+  margin: 12px 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.change-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 12px;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.change-controls .change-file {
+  color: var(--ink);
+  font-weight: 600;
+  margin-right: auto;
+  overflow-wrap: anywhere;
+}
+.change-controls .btn {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+.change-controls [aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.change-view {
+  overflow: hidden;
+  background: var(--code);
+}
+.change-view diffs-container {
+  --diffs-font-size: 12.5px;
+  --diffs-line-height: 22px;
+}
+.change-review .renderer-error {
+  padding: 8px 12px;
+}
+.change-source {
+  border-top: 1px solid var(--line);
+  padding: 8px 12px 10px;
+}
+.change-source summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.change-source h3 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+}
+.change-source pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.change-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  margin: 12px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.change-pair > section {
+  min-width: 0;
+}
+.change-pair > section + section {
+  border-left: 1px solid var(--line);
+}
+.change-pair header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.change-pair header span {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.change-content {
+  padding: 12px;
+}
+.change-content [data-diagram] {
+  display: grid;
+  place-items: center;
+}
+.change-content svg {
+  max-width: 100%;
+  height: auto;
+}
+.change-key {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 2px 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.change-content .added {
+  --change-bg: var(--ok-bg);
+  --change-border: var(--ok-border);
+  --change-ink: var(--ok);
+}
+.change-content .removed {
+  --change-bg: var(--danger-bg);
+  --change-border: var(--danger-border);
+  --change-ink: var(--danger);
+}
+.change-content .changed {
+  --change-bg: var(--attention-bg);
+  --change-border: var(--attention-border);
+  --change-ink: var(--attention);
+}
+.change-content :is(.added, .removed, .changed):not(.node) {
+  background: var(--change-bg);
+  border-color: var(--change-border);
+  color: var(--change-ink);
+}
+.change-content
+  .node:is(.added, .removed, .changed)
+  :is(rect, polygon, circle, ellipse) {
+  fill: var(--change-bg) !important;
+  stroke: var(--change-border) !important;
+}
+.change-content
+  .node:is(.added, .removed, .changed)
+  :is(.label, .nodeLabel, p) {
+  color: var(--change-ink) !important;
+}
+.change-content .node.removed :is(rect, polygon, circle, ellipse) {
+  stroke-dasharray: 5 3;
+}
+@media (max-width: 700px) {
+  .change-key {
+    flex-direction: column;
+    gap: 6px;
+  }
+}

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Interactive plan</title>
+    <!-- FRAME_STYLE -->
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="plan-head">
+          <h1 class="plan-title" id="plan-title"></h1>
+          <button
+            class="revision-line"
+            id="revision"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <span id="revision-text"></span
+            ><i class="chevron" aria-hidden="true"></i>
+          </button>
+          <a class="revision-back" id="revision-back" hidden
+            >Back to the current revision</a
+          >
+          <div class="popover" id="revision-menu" role="menu" hidden></div>
+        </div>
+        <details class="pages-menu" id="pages-menu" open>
+          <summary class="btn quiet">Pages</summary>
+          <div class="side-label">Pages</div>
+          <nav id="navigation" aria-label="Plan pages"></nav>
+        </details>
+        <div class="side-foot" id="side-foot">
+          <span class="small" id="submit-status"></span>
+          <button class="btn primary" id="submit" type="button" disabled>
+            Submit</button
+          ><button class="btn primary" id="accept" type="button" hidden>
+            Accept plan
+          </button>
+        </div>
+      </aside>
+      <main>
+        <header class="topbar">
+          <button
+            class="bell"
+            id="bell"
+            type="button"
+            aria-haspopup="dialog"
+            aria-label="Other live sessions"
+            hidden
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10 21a2 2 0 0 0 4 0" />
+            </svg>
+            <b id="bell-count"></b>
+          </button>
+          <button
+            class="icon-btn"
+            id="settings"
+            type="button"
+            popovertarget="settings-menu"
+            aria-label="Settings"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+              />
+            </svg>
+          </button>
+          <div id="settings-menu" class="popover settings" popover>
+            <div class="side-label">Settings</div>
+            <label for="theme">Appearance</label>
+            <select id="theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <button class="btn" id="notifications" type="button">
+              Enable notifications
+            </button>
+            <p class="small">Keys: press <kbd>?</kbd> for the list.</p>
+          </div>
+        </header>
+        <div class="content" id="content">
+          <p
+            class="notice accepted"
+            id="accepted"
+            data-tone="success"
+            hidden
+          ></p>
+          <section id="reading">
+            <h1 tabindex="-1" id="page-title"></h1>
+            <div id="page-content"></div>
+            <p class="note-count" id="note-count" hidden></p>
+            <div class="page-actions" id="page-actions">
+              <button class="btn quiet" id="page-comment" type="button">
+                Comment on this page
+              </button>
+            </div>
+            <nav class="page-footer" aria-label="Previous and next">
+              <a id="footer-previous" hidden></a>
+              <a id="footer-next" hidden></a>
+            </nav>
+          </section>
+          <section id="feedback" hidden>
+            <h1 tabindex="-1">Feedback</h1>
+            <div id="feedback-groups"></div>
+            <section class="feedback-group">
+              <div class="group-head">
+                <h2>Overall</h2>
+                <button class="btn quiet" id="overall-note" type="button">
+                  Add overall comment
+                </button>
+              </div>
+              <div id="overall-notes"></div>
+            </section>
+            <div class="feedback-end">
+              <button class="btn quiet" id="export" type="button">
+                Export copy
+              </button>
+            </div>
+            <p class="small" id="storage-status"></p>
+            <p class="small" id="connection-status"></p>
+            <nav class="page-footer" aria-label="Back">
+              <a id="feedback-back" hidden></a>
+            </nav>
+          </section>
+        </div>
+        <div class="working" id="working" hidden>
+          <div class="working-card" role="status">
+            <div class="head">
+              <b id="working-title"></b><small id="working-time"></small>
+            </div>
+            <p class="working-note" id="working-note" hidden></p>
+            <div class="bar" id="working-bar"></div>
+            <ul class="steps" id="working-steps"></ul>
+            <p class="foot">This page refreshes when it is ready.</p>
+          </div>
+        </div>
+        <aside
+          class="sidecar"
+          id="sidecar"
+          role="dialog"
+          aria-label="Live sessions"
+          hidden
+        >
+          <header>
+            <span>Live sessions</span>
+            <button
+              class="icon-btn"
+              id="sidecar-close"
+              type="button"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </header>
+          <div class="sidecar-list" id="sidecar-list"></div>
+        </aside>
+      </main>
+    </div>
+    <dialog class="drawer" id="note-dialog" aria-labelledby="note-title">
+      <form id="note-form">
+        <div class="dialog-head">
+          <h2 id="note-title">Add note</h2>
+          <button
+            class="icon-btn"
+            type="button"
+            data-close="note-dialog"
+            aria-label="Close note"
+          >
+            ✕
+          </button>
+        </div>
+        <p class="small" id="note-anchor"></p>
+        <blockquote id="note-quote" hidden></blockquote>
+        <label for="note-text">Feedback</label
+        ><textarea id="note-text" required></textarea>
+        <div class="row">
+          <button type="submit" class="btn primary">Add to feedback</button
+          ><button type="button" class="btn" data-close="note-dialog">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
+      <h2 id="accept-title">Accept this plan?</h2>
+      <p id="accept-detail"></p>
+      <p class="small">
+        Choose whether the waiting agent should begin implementation or save the
+        plan for later.
+      </p>
+      <p class="small" id="accept-error" role="status"></p>
+      <div class="actions">
+        <button class="btn primary" type="button" data-accept-mode="implement">
+          Accept and start implementation</button
+        ><button class="btn" type="button" data-accept-mode="save">
+          Accept and save for later</button
+        ><button class="btn quiet" type="button" data-close="accept-dialog">
+          Cancel
+        </button>
+      </div>
+    </dialog>
+    <dialog class="dialog keys" id="keys-dialog" aria-labelledby="keys-title">
+      <div class="dialog-head">
+        <h2 id="keys-title">Keys</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="keys-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <dl class="key-list">
+        <dt><kbd>1</kbd>–<kbd>9</kbd></dt>
+        <dd>Jump to a session, in the order of the bell panel</dd>
+        <dt><kbd>]</kbd> <kbd>[</kbd></dt>
+        <dd>Next and previous page</dd>
+        <dt><kbd>j</kbd> <kbd>k</kbd></dt>
+        <dd>Next and previous interactive item on the page</dd>
+        <dt><kbd>c</kbd></dt>
+        <dd>Comment on this page</dd>
+        <dt><kbd>r</kbd></dt>
+        <dd>Review your feedback</dd>
+        <dt><kbd>s</kbd></dt>
+        <dd>Focus Submit; Enter sends</dd>
+        <dt><kbd>a</kbd></dt>
+        <dd>Open Agreed</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>Close menus, panels, and dialogs</dd>
+      </dl>
+    </dialog>
+    <dialog
+      class="lightbox"
+      id="diagram-dialog"
+      aria-label="Diagram, full size"
+    ></dialog>
+    <button class="btn primary quote-button" id="quote" type="button" hidden>
+      Comment on selection
+    </button>
+    <div class="note-tip" id="note-tip" hidden></div>
+
+    <script type="application/json" id="session-config">
+      {}
+    </script>
+    <script type="application/json" id="plan-data">
+      {
+        "artifactId": "proposal",
+        "revision": "1",
+        "kind": "exploration",
+        "title": "Work proposal",
+        "pages": [
+          {
+            "id": "overview",
+            "title": "Work proposal",
+            "html": "<p>Describe the proposed work and its meaningful alternatives here.</p>"
+          }
+        ]
+      }
+    </script>
+    <!-- CUSTOM_SCRIPT -->
+    <!-- FRAME_SCRIPT -->
+  </body>
+</html>

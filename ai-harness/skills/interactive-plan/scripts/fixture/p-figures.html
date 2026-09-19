@@ -1,0 +1,148 @@
+<h2>Text diff</h2>
+<section class="change-review" data-file="src/charge.ts">
+  <div class="change-controls" role="group" aria-label="Diff layout"><button class="btn" data-diff-style="split" aria-pressed="true">Side by side</button><button class="btn" data-diff-style="unified" aria-pressed="false">Unified</button></div>
+  <textarea data-diff-input hidden>{
+  "before": "export async function charge(request) {\n  const client = new PaymentClient(config);\n  const result = await client.charge(request);\n  if (!result.ok) throw new PaymentError(result);\n  return result;\n}\n",
+  "after": "export async function charge(request) {\n  const client = new PaymentClient(config);\n  const breaker = new CircuitBreaker({ threshold: 5, cooldown: 30_000 });\n  const result = await breaker.run(() =&gt; client.charge(request));\n  if (!result.ok) throw new PaymentError(result);\n  log.info(\"charge\", { id: request.id, ok: result.ok });\n  return result;\n}\n",
+  "patch": "diff --git a/private/tmp/claude-501/-Users-ryansaxe-generic-dotfiles/0c30ee81-b00f-43e6-9e43-38f6083d1403/scratchpad/fixture/before.txt b/private/tmp/claude-501/-Users-ryansaxe-generic-dotfiles/0c30ee81-b00f-43e6-9e43-38f6083d1403/scratchpad/fixture/after.txt\nindex 1db3188..41f0769 100644\n--- a/private/tmp/claude-501/-Users-ryansaxe-generic-dotfiles/0c30ee81-b00f-43e6-9e43-38f6083d1403/scratchpad/fixture/before.txt\n+++ b/private/tmp/claude-501/-Users-ryansaxe-generic-dotfiles/0c30ee81-b00f-43e6-9e43-38f6083d1403/scratchpad/fixture/after.txt\n@@ -1,6 +1,8 @@\n export async function charge(request) {\n   const client = new PaymentClient(config);\n-  const result = await client.charge(request);\n+  const breaker = new CircuitBreaker({ threshold: 5, cooldown: 30_000 });\n+  const result = await breaker.run(() =&gt; client.charge(request));\n   if (!result.ok) throw new PaymentError(result);\n+  log.info(\"charge\", { id: request.id, ok: result.ok });\n   return result;\n }\n"
+}</textarea>
+  <div class="change-view" aria-label="Before and proposed changes"></div>
+  <p class="renderer-error" data-diff-error hidden></p>
+  <details class="change-source"><summary>Exact source and Git patch</summary><h3>Before</h3><pre data-diff-source="before"></pre><h3>Proposed</h3><pre data-diff-source="after"></pre><h3>Git patch</h3><pre data-diff-source="patch"></pre></details>
+</section>
+<h2>Visual change pair</h2>
+<section class="change-pair">
+  <section><header>Before <span>− Removed or replaced</span></header><div class="change-content"><div data-diagram>flowchart LR
+  C["Checkout"] --> P["PaymentClient"] --> G["Gateway"]
+  class P changed</div></div></section>
+  <section><header>Proposed <span>+ Added or changed</span></header><div class="change-content"><div data-diagram>flowchart LR
+  C["Checkout"] --> P["PaymentClient"] --> B["Breaker"] --> G["Gateway"]
+  class B added</div></div></section>
+</section>
+<div class="change-key"><span>− The client called the gateway directly</span><span>+ The breaker sits between them</span></div>
+<h2>The guide's pairs</h2>
+<h2>Link to a group, never into it from above</h2>
+<section class="change-pair">
+  <section><header>Avoid <span>edge into the first node</span></header><div class="change-content"><div data-diagram>flowchart TB
+  E["Pricing"] --> F
+  subgraph pay [Payments]
+    F["PaymentClient"] --> G["Breaker"] --> H["Gateway"]
+  end
+  H --> I["Ledger"]</div></div></section>
+  <section><header>Prefer <span>edge to the group</span></header><div class="change-content"><div data-diagram>flowchart TB
+  E["Pricing"] --> pay
+  subgraph pay [Payments]
+    F["PaymentClient"] --> G["Breaker"] --> H["Gateway"]
+  end
+  pay --> I["Ledger"]</div></div></section>
+</section>
+<h2>A long chain: top to bottom, groups, or a line that scrolls</h2>
+<section class="change-pair">
+  <section><header>Avoid <span>ten hops in a line</span></header><div class="change-content"><div data-diagram>flowchart LR
+  A["Browser"] --> B["Edge"] --> C["Checkout API"] --> D["Cart service"] --> E["Pricing"] --> F["PaymentClient"] --> G["Breaker"] --> H["Gateway"] --> I["Ledger"] --> J["Notifier"]</div></div></section>
+  <section><header>Prefer <span>three groups, linked as groups</span></header><div class="change-content"><div data-diagram>flowchart TB
+  subgraph front [Front]
+    direction LR
+    A["Browser"] --> B["Edge"]
+  end
+  subgraph core [Core]
+    direction LR
+    C["Checkout API"] --> D["Cart service"] --> E["Pricing"]
+  end
+  subgraph pay [Payments]
+    direction LR
+    F["PaymentClient"] --> G["Breaker"] --> H["Gateway"]
+  end
+  front --> core --> pay --> I["Ledger"] --> J["Notifier"]</div></div></section>
+</section>
+<h2>One to three words in a node; the rest in the caption</h2>
+<section class="change-pair">
+  <section><header>Avoid <span>long labels</span></header><div class="change-content"><div data-diagram>flowchart LR
+  A["Checkout API validates the cart and prices"] --> B["PaymentClient with a five-failure breaker"] --> C["Gateway, 8 s timeout"]</div></div></section>
+  <section><header>Prefer <span>short labels, caption below</span></header><div class="change-content"><div data-diagram>flowchart LR
+  A["Checkout API"] --> B["PaymentClient"] --> C["Gateway"]</div></div></section>
+</section>
+<h2>Choose the form for the idea: the hand-drawn review loop</h2>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -55 1040 535" role="img" aria-labelledby="flowTitle flowDesc"><title id="flowTitle">Interactive planning with a shared review loop</title><desc id="flowDesc">Explicitly invoke the skill and clarify in conversation. Explore open decisions, then review the complete implementation plan. Final review can reopen focused exploration before returning to a complete revised plan. Both browser phases use inspect and comment, submit, agent acknowledgement, and revision, with clarification when needed. Accept the exact final plan revision for handoff, choosing to save it or explicitly start implementation.</desc><rect y="-55" width="1040" height="535" fill="var(--panel,#ffffff)"/><defs><marker id="flowArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="var(--muted,#666)"/></marker></defs><style>.flow-box{fill:var(--panel,#fff);stroke:var(--line,#ccc);stroke-width:1.5}.flow-label{fill:var(--ink,#242424);font:600 16px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;text-anchor:middle}.flow-sub{fill:var(--muted,#616161);font:13px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;text-anchor:middle}.flow-line{fill:none;stroke:var(--muted,#666);stroke-width:1.5;marker-end:url(#flowArrow)}.flow-link{fill:none;stroke:var(--accent,#005fb8);stroke-width:1.5;stroke-dasharray:5 5}</style>
+<path class="flow-line" d="M653 15 V-10 H385 V7" stroke-dasharray="5 5"/><text class="flow-sub" x="520" y="-27">Reopen a decision</text>
+<rect class="flow-box" x="10" y="15" width="215" height="95" rx="5"/><text class="flow-label" x="117" y="43">Clarify the idea</text><text class="flow-sub" x="117" y="67">Explicit skill invocation</text><text class="flow-sub" x="117" y="87">Agent conversation</text>
+<rect class="flow-box" x="278" y="15" width="215" height="95" rx="5" style="stroke:var(--accent,#005fb8)"/><text class="flow-label" x="385" y="48">Explore proposals</text><text class="flow-sub" x="385" y="76">Compare concrete options</text>
+<rect class="flow-box" x="546" y="15" width="215" height="95" rx="5" style="stroke:var(--accent,#005fb8)"/><text class="flow-label" x="653" y="48">Review the complete plan</text><text class="flow-sub" x="653" y="76">Inspect the composed steps</text>
+<rect class="flow-box" x="814" y="15" width="215" height="95" rx="5"/><text class="flow-label" x="921" y="43">Accept the plan</text><text class="flow-sub" x="921" y="67">Save for later</text><text class="flow-sub" x="921" y="87">or start implementation</text>
+<path class="flow-line" d="M225 62 H270"/><path class="flow-line" d="M493 62 H538"/><path class="flow-line" d="M761 62 H806"/>
+<path class="flow-link" d="M385 110 V155 H465 V185 M653 110 V155 H575 V185"/>
+<rect x="10" y="185" width="1019" height="275" rx="6" fill="var(--ground,#f8f8f8)" stroke="var(--line,#ccc)"/>
+<text class="flow-label" x="520" y="218">The same browser review loop</text>
+<rect class="flow-box" x="40" y="250" width="190" height="65" rx="4"/><text class="flow-label" x="135" y="289">Inspect &amp; comment</text>
+<rect class="flow-box" x="290" y="250" width="190" height="65" rx="4"/><text class="flow-label" x="385" y="277">Submit feedback</text><text class="flow-sub" x="385" y="299">Save an explicit round</text>
+<rect class="flow-box" x="540" y="250" width="190" height="65" rx="4"/><text class="flow-label" x="635" y="277">Agent reads</text><text class="flow-sub" x="635" y="299">Acknowledge receipt</text>
+<rect class="flow-box" x="790" y="250" width="209" height="65" rx="4"/><text class="flow-label" x="894" y="277">Revise &amp; publish</text><text class="flow-sub" x="894" y="299">Offer the next revision</text>
+<path class="flow-line" d="M230 282 H282"/><path class="flow-line" d="M480 282 H532"/><path class="flow-line" d="M730 282 H782"/>
+<path class="flow-line" d="M895 315 V428 H135 V323"/>
+<rect class="flow-box" x="540" y="353" width="190" height="46" rx="4"/><text class="flow-sub" x="635" y="381">Clarifying questions</text>
+<path class="flow-line" d="M605 315 V345" stroke-dasharray="4 5"/><path class="flow-line" d="M665 353 V323" stroke-dasharray="4 5"/>
+<text class="flow-sub" x="305" y="419">Continue until aligned</text></svg>
+
+<h2>Long flow, left to right</h2>
+<div data-diagram data-caption="The charge path today: ten hops, one line.">flowchart LR
+  A["Browser"] --> B["Edge"] --> C["Checkout API"] --> D["Cart service"] --> E["Pricing"] --> F["PaymentClient"] --> G["Breaker"] --> H["Gateway"] --> I["Ledger"] --> J["Notifier"]</div>
+<h2>Same flow, top to bottom with subgraphs</h2>
+<div data-diagram>flowchart TB
+  subgraph front [Front]
+    A["Browser"] --> B["Edge"]
+  end
+  subgraph core [Core]
+    C["Checkout API"] --> D["Cart service"] --> E["Pricing"]
+  end
+  subgraph pay [Payments]
+    F["PaymentClient"] --> G["Breaker"] --> H["Gateway"]
+  end
+  B --> C
+  E --> F
+  H --> I["Ledger"] --> J["Notifier"]</div>
+<h2>Sequence</h2>
+<div data-diagram>sequenceDiagram
+  participant K as Checkout
+  participant P as PaymentClient
+  participant B as Breaker
+  participant G as Gateway
+  K->>P: charge(request)
+  P->>B: run()
+  alt closed
+    B->>G: POST /charge
+    G-->>B: 200
+    B-->>P: result
+  else open
+    B-->>P: PaymentError(breaker_open)
+  end
+  P-->>K: result</div>
+<h2>Code figure</h2>
+<div data-language="typescript" data-file="src/breaker.ts" data-caption="The whole breaker is forty lines; this is the state machine.">export class CircuitBreaker {
+  private failures = 0;
+  private openedAt: number | null = null;
+  constructor(private options: { threshold: number; cooldown: number }) {}
+  async run&lt;T&gt;(task: () =&gt; Promise&lt;T&gt;): Promise&lt;T&gt; {
+    if (this.openedAt &amp;&amp; Date.now() - this.openedAt &lt; this.options.cooldown)
+      throw new PaymentError({ code: "breaker_open" });
+    try {
+      const result = await task();
+      this.failures = 0;
+      this.openedAt = null;
+      return result;
+    } catch (error) {
+      if (++this.failures &gt;= this.options.threshold) this.openedAt = Date.now();
+      throw error;
+    }
+  }
+}</div>
+<h2>Bare code block</h2>
+<div data-language="bash">k6 run --vus 50 --duration 2m load/breaker.js</div>
+<h2>Math</h2>
+<p>The expected added latency per request while the breaker is closed is <span data-math="inline">\mathbb{E}[\Delta] = p_f \cdot t_{timeout}</span>.</p>
+<div data-math="display">P(\text{open}) = 1 - \sum_{k=0}^{n-1} \binom{N}{k} p_f^k (1-p_f)^{N-k}</div>
+<h2>Chart</h2>
+<div data-chart data-title="Checkout latency, p95 by hour" data-caption="The breaker caps the outage hours at the timeout instead of the gateway's 60 s.">{"xAxis":{"type":"category","data":["00","02","04","06","08","10","12","14","16","18","20","22"]},"yAxis":{"type":"value","name":"ms"},"series":[{"name":"Today","type":"line","data":[420,410,430,900,4100,60000,58000,3900,470,440,430,420]},{"name":"With breaker","type":"line","data":[420,410,430,900,4100,8000,8000,3900,470,440,430,420]}],"legend":{"show":true}}</div>
+<h2>Table</h2>
+<table><thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead><tbody><tr><td>threshold</td><td>5</td><td>Below the gateway's own rate limit of 10 per second per key.</td></tr><tr><td>cooldown</td><td>30 s</td><td>The gateway's documented failover time is 20 s.</td></tr><tr><td>timeout</td><td>8 s</td><td>p99 of successful charges is 3.1 s.</td></tr></tbody></table>
+<h2>Prototype</h2>
+<div data-prototype="breaker-ui"></div>

@@ -151,11 +151,12 @@ cmd-alt-tab = 'workspace-back-and-forth'
 cmd-alt-shift-r = 'reload-config'
 
 # Jump to the highest-priority agent needing attention from anywhere: land on
-# the code workspace, focus the terminal, and let the rail select the same
-# stabilized, pane-ID keyed attention set it publishes to the sidebar.
+# the code workspace, focus the terminal there by window (focus-terminal.sh
+# says why not by app), and let the rail select the same stabilized, pane-ID
+# keyed attention set it publishes to the sidebar.
 cmd-alt-a = [
   'workspace code',
-  'exec-and-forget open -a Ghostty && $HOME/.local/bin/rail jump-attention',
+  'exec-and-forget $HOME/.config/aerospace/focus-terminal.sh && $HOME/.local/bin/rail jump-attention',
 ]
 
 # The review half of the same idea: land on the terminal and open the Reviews
@@ -163,5 +164,5 @@ cmd-alt-a = [
 # is the visible half of this chord, and clicking it runs the same command.
 cmd-alt-r = [
   'workspace code',
-  'exec-and-forget open -a Ghostty && $HOME/.local/bin/rail dashboard-popup',
+  'exec-and-forget $HOME/.config/aerospace/focus-terminal.sh && $HOME/.local/bin/rail dashboard-popup',
 ]

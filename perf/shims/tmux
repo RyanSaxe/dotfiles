@@ -1,0 +1,9 @@
+#!/bin/sh
+# Route every PATH-resolved tmux call inside the harness environment to the
+# isolated perf socket. Scripts that prepend /opt/homebrew/bin bypass this
+# shim but still land on the perf server through the $TMUX variable the
+# harness exports; TMUX_TMPDIR is the last-resort fence for anything that
+# dodges both.
+set -eu
+exec "${PERF_REAL_TMUX:?perf harness did not export PERF_REAL_TMUX}" \
+  -L "${PERF_TMUX_SOCK:?perf harness did not export PERF_TMUX_SOCK}" "$@"

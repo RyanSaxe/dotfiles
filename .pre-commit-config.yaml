@@ -7,8 +7,7 @@
 # commit.
 #
 # Editor parity: nvim resolves project-local tools first (.venv/bin via
-# venv.zsh, node_modules/.bin via conform), then globals. See
-# docs/v2-plan.md#toolchain.
+# venv.zsh, node_modules/.bin via conform), then globals.
 
 fail_fast: false
 
@@ -49,7 +48,7 @@ repos:
 
   # ---------------------------------------------------------------- Shell
   # POSIX sh only — zsh interactive config is deliberately unlinted
-  # (shellcheck has no zsh dialect; see docs/v2-plan.md#shell-language-split).
+  # (shellcheck has no zsh dialect).
   # sketchybar's plugins and the workmux helpers are zsh too
   # (shebang, not extension), same reason.
   # zsh/ is excluded per-file, not as a tree: prompt-segments.sh lives there
@@ -80,7 +79,8 @@ repos:
         types_or: [html, css, javascript, ts, json, yaml, markdown]
         # lazy.nvim owns its lockfile's formatting and rewrites it on
         # every sync; reformatting it here is perpetual churn.
-        exclude: lazy-lock\.json$
+        # Fixture pages carry Mermaid and JSON as text; reflowing them breaks both.
+        exclude: 'lazy-lock\.json$|ai-harness/skills/interactive-plan/scripts/fixture/.*\.html$|ai-harness/skills/visual-review/components/.*\.html$|tests/visual-review/documents/.*\.html$'
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.49.1
@@ -223,7 +223,7 @@ repos:
         language: system
         entry: uv run -q --script ci/ai-harness-check.py
         pass_filenames: false
-        files: '^(ai-harness/|ci/ai-harness-check\.py$)'
+        files: '^(ai-harness/|ci/ai-harness-check\.py$|tests/interactive-plan/|tests/visual-review/)'
 
       # Theme unit tests. uv resolves the environment, so this runs
       # identically locally and in CI.

@@ -4,23 +4,19 @@
 
 if (( CURRENT == 2 )); then
   local -a subcommands=(
-    'dark:switch both layers to catppuccin mocha'
-    'light:switch both layers to catppuccin latte'
+    'dark:switch to the dark palette'
+    'light:switch to the light palette'
     'toggle:flip between dark and light'
-    'inner:change the terminal and content layer'
-    'outer:change the chrome and rail layer'
-    'both:change both layers (toggle flips from the inner mode)'
-    'apply:re-render the current layer modes'
+    'apply:re-render the persisted mode'
     'status:print mode and mascot accents'
     'mascot:accent colors and sprite from a mascot'
   )
   _describe 'theme command' subcommands
-elif [[ $words[2] == (inner|outer|both) ]]; then
+elif [[ $words[2] == apply ]]; then
   if (( CURRENT == 3 )); then
     local -a modes=(
-      'toggle:flip this layer'
-      'light:use the Latte palette'
-      'dark:use the Mocha palette'
+      'dark:render and persist dark without touching macOS appearance'
+      'light:render and persist light without touching macOS appearance'
     )
     _describe 'theme mode' modes
   fi

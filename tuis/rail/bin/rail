@@ -2,7 +2,6 @@
 # Rail control: the in-terminal sidebar (tuis/rail).
 #
 #   rail on|off|toggle   enable/disable the rail everywhere
-#   rail jump <letter>   jump to the agent behind a hint letter
 #   rail jump-attention   jump to the rail's highest-priority pending agent
 #   rail page up|down    page the rail body when it overflows
 #   rail tab agents|reviews|tasks
@@ -14,65 +13,130 @@
 #                       entry points that live outside tmux
 #   rail dashboard reviews|tasks
 #                       open the table + preview dashboard for a rail tab
-#   rail review-dashboard
-#                       compatibility alias for the Reviews dashboard
 #   rail ensure-daemon   start the render daemon if it isn't running
 #   rail status          daemon + pane count + enabled flag
 #
 # The daemon is the ONLY thing that creates rail panes: while the enabled
 # flag is set it reconciles every window within a tick. A second spawner
 # (hooks, this script) would race it and duplicate panes, so none exists.
+#
+# Keypress-path commands (tab/page/on/off/toggle and the agents-tab
+# element) touch only the state dir: no symlink walk, no .env, no build
+# check, no Node. Everything repo-shaped is resolved lazily by the
+# functions below, so only the commands that need it pay for it.
+#
+# Node entrypoints run from esbuild bundles in dist/ (a ~30ms node boot);
+# RAIL_RUN=tsx flips every one of them back to `npx tsx src/…` for
+# running uncompiled sources or A/B-ing the build pipeline.
 set -eu
 
-PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-
-# Resolve the repo through this script's own symlink. macOS's
-# readlink has no -f flag, so keep this portable across macOS and Linux.
-SCRIPT_PATH="$0"
-while [ -L "$SCRIPT_PATH" ]; do
-  SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
-  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
-  case "$LINK_TARGET" in
-  /*) SCRIPT_PATH="$LINK_TARGET" ;;
-  *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
-  esac
-done
-SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
-REPO_ROOT="${SCRIPT_PATH%/tuis/rail/bin/rail}"
-RAIL_DIR="$REPO_ROOT/tuis/rail"
+# Appended, not prepended: run-shell hands over a minimal PATH that lacks
+# homebrew, so these must be reachable — but a caller that deliberately
+# shadows a tool earlier in PATH (the perf harness shims workmux/vault)
+# must win. Nothing rail needs exists in BOTH an earlier dir and here.
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"
 ENABLED_FLAG="$STATE/enabled"
 PID_FILE="$STATE/daemon.pid"
-LOG_FILE="$STATE/daemon.log"
+# The log lives OUTSIDE $STATE: the daemon fs.watch()es its state dir, so
+# a log in there turned every stderr line into a watch event that re-fired
+# the daemon's own watcher.
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail-logs"
+LOG_FILE="$LOG_DIR/daemon.log"
 
 mkdir -p "$STATE"
 
-# The phone channel lives in the repo's untracked .env. Load it here because
-# the daemon is usually spawned by tmux's run-shell, which hands over the
-# SERVER's environment — frozen at whenever the server started — so an .env
-# added later would otherwise never reach it.
-if [ -f "$REPO_ROOT/.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . "$REPO_ROOT/.env"
-  set +a
-fi
+# Resolve the repo through this script's own symlink. macOS's readlink has
+# no -f flag, so keep this portable across macOS and Linux. A function so
+# the keypress paths never pay for the walk.
+resolve_rail_dir() {
+  [ -n "${RAIL_DIR:-}" ] && return 0
+  SCRIPT_PATH="$0"
+  while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(CDPATH='' cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+    case "$LINK_TARGET" in
+    /*) SCRIPT_PATH="$LINK_TARGET" ;;
+    *) SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
+    esac
+  done
+  REPO_ROOT="${SCRIPT_PATH%/tuis/rail/bin/rail}"
+  RAIL_DIR="$REPO_ROOT/tuis/rail"
+}
+
+# The phone channel lives in the repo's untracked .env. Load it before
+# spawning the daemon because the daemon is usually spawned by tmux's
+# run-shell, which hands over the SERVER's environment — frozen at whenever
+# the server started — so an .env added later would otherwise never reach it.
+load_env() {
+  if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "$REPO_ROOT/.env"
+    set +a
+  fi
+}
 
 # A pid being alive is not enough: a daemon that died ungracefully leaves
 # its pidfile behind, and the pid can be reused by an unrelated process —
 # trusting it froze rails with no self-recovery. The recorded pid counts
-# as running only if its command line is still a rail daemon.
+# as running only if its command line is still a rail daemon. The pattern
+# matches both runtimes: `…/tuis/rail/dist/daemon.mjs` (bundled) and the
+# tsx loader's `…/tuis/rail/node_modules/tsx/… src/daemon.ts` — the same
+# pattern the daemon's own pidfile takeover check uses (src/daemon.ts).
 daemon_running() {
   [ -f "$PID_FILE" ] || return 1
   pid="$(cat "$PID_FILE")"
   kill -0 "$pid" 2>/dev/null || return 1
-  ps -o command= -p "$pid" 2>/dev/null | grep -q 'daemon\.ts'
+  ps -o command= -p "$pid" 2>/dev/null | grep -qE 'rail.*daemon\.(ts|mjs)'
+}
+
+# Rebuild the dist bundles when any source is newer than the build stamp
+# (~5ms probe), so edit-and-press keeps working without a manual build.
+ensure_built() {
+  stamp="$RAIL_DIR/dist/.stamp"
+  if [ ! -f "$stamp" ] ||
+    [ -n "$(find "$RAIL_DIR/src" -newer "$stamp" -print -quit)" ]; then
+    (cd "$RAIL_DIR" && npm run --silent build)
+  fi
+}
+
+# Exec a Node entrypoint: `run_entry <basename> [args…]` runs
+# dist/<basename>.mjs, or src/<basename>.ts under RAIL_RUN=tsx.
+run_entry() {
+  resolve_rail_dir
+  entry="$1"
+  shift
+  cd "$RAIL_DIR"
+  if [ "${RAIL_RUN:-}" = tsx ]; then
+    exec npx tsx "src/$entry.ts" "$@"
+  fi
+  ensure_built
+  exec node "$RAIL_DIR/dist/$entry.mjs" "$@"
 }
 
 ensure_daemon() {
   daemon_running && return 0
-  (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
+  resolve_rail_dir
+  load_env
+  mkdir -p "$LOG_DIR"
+  # One generation of rotation, at spawn: the daemon appends to this fd
+  # for its whole life, so a size gate anywhere else would never trim it.
+  if [ -f "$LOG_FILE" ] && [ "$(wc -c <"$LOG_FILE")" -gt 1048576 ]; then
+    # Racing ensure_daemons can both pass the size gate; the loser's mv
+    # must not abort the whole script under set -eu.
+    mv "$LOG_FILE" "$LOG_FILE.1" 2>/dev/null || true
+  fi
+  if [ "${RAIL_RUN:-}" = tsx ]; then
+    (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
+  else
+    ensure_built
+    # Absolute entry path on purpose: daemon_running above matches the
+    # command line against rail.*daemon.(ts|mjs), and a relative argv
+    # would carry neither.
+    (cd "$RAIL_DIR" && nohup node "$RAIL_DIR/dist/daemon.mjs" >>"$LOG_FILE" 2>&1 &)
+  fi
 }
 
 kill_rail_panes() {
@@ -100,27 +164,8 @@ toggle)
     "$0" on
   fi
   ;;
-jump)
-  # Jump to the agent behind a hint key (alt+space <digit> in tmux). Digits
-  # are viewer-relative — 1 is the top elsewhere row of the CALLING
-  # session's rail — and the literal key `a` is the globally most-urgent
-  # agent, current session included. The daemon keeps hints.tsv current:
-  # viewing_session <tab> key <tab> target_session <tab> pane_id.
-  digit="${2:?usage: rail jump <digit|a>}"
-  viewing="$(tmux display-message -p '#{session_name}')"
-  # Literal field comparison, not grep: a session name with regex
-  # metacharacters (c++, foo[bar]) must still match its own hint rows.
-  hint_line="$(awk -F'\t' -v s="$viewing" -v k="$digit" \
-    '$1 == s && $2 == k { print; exit }' "$STATE/hints.tsv" 2>/dev/null || true)"
-  [ -n "$hint_line" ] || exit 0
-  session="$(printf '%s' "$hint_line" | cut -f3)"
-  pane="$(printf '%s' "$hint_line" | cut -f4)"
-  # The shared jump primitive switches AND syncs the mascot accent.
-  "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
-  ;;
 jump-attention)
-  cd "$RAIL_DIR"
-  exec npx tsx src/jump-attention.ts
+  run_entry jump-attention
   ;;
 ensure-daemon)
   ensure_daemon
@@ -165,8 +210,38 @@ element)
     exit 1
     ;;
   esac
-  cd "$RAIL_DIR"
-  exec npx tsx src/tab-element.ts "$number"
+  # The agents tab resolves in pure shell: an element press is on the
+  # keypress path, and even the bundled Node boot would be paid before
+  # the jump. Tab normalization mirrors loadRailTab (src/tabs.ts):
+  # missing/unreadable/unknown -> agents, legacy "review" -> reviews.
+  tab="$(cat "$STATE/tab" 2>/dev/null || true)"
+  case "$tab" in
+  review) tab=reviews ;;
+  agents | reviews | tasks) ;;
+  *) tab=agents ;;
+  esac
+  if [ "$tab" = agents ]; then
+    # Digits are viewer-relative — 1 is the top elsewhere row of the
+    # CALLING session's rail. The daemon keeps hints.tsv current:
+    # viewing_session <tab> key <tab> target_session <tab> pane_id.
+    viewing="$(tmux display-message -p '#{session_name}')"
+    # Literal field comparison, not grep: a session name with regex
+    # metacharacters (c++, foo[bar]) must still match its own hint rows.
+    hint_line="$(awk -F'\t' -v s="$viewing" -v k="$number" \
+      '$1 == s && $2 == k { print; exit }' "$STATE/hints.tsv" 2>/dev/null || true)"
+    if [ -z "$hint_line" ]; then
+      # A keystroke that found nothing is not worth a modal run-shell
+      # overlay — say it in the status line and exit clean, exactly as
+      # the Node path's miss does.
+      tmux display-message "rail: no agent element $number"
+      exit 0
+    fi
+    session="$(printf '%s' "$hint_line" | cut -f3)"
+    pane="$(printf '%s' "$hint_line" | cut -f4)"
+    # The shared jump primitive switches AND syncs the mascot accent.
+    exec "$HOME/.config/tmux/scripts/goto-pane.sh" "$session" "$pane" "$pane"
+  fi
+  run_entry tab-element "$number"
   ;;
 dashboard)
   surface="${2:-reviews}"
@@ -177,8 +252,7 @@ dashboard)
     exit 1
     ;;
   esac
-  cd "$RAIL_DIR"
-  exec npx tsx src/review-dashboard.ts "$surface"
+  run_entry review-dashboard "$surface"
   ;;
 dashboard-popup)
   # Open the Reviews dashboard from outside tmux — the menu bar letter and
@@ -187,10 +261,6 @@ dashboard-popup)
   # both entry points focus the terminal first.
   exec tmux display-popup -h 80% -w 90% -E \
     "TMUX_POPUP=1 $HOME/.local/bin/rail dashboard reviews"
-  ;;
-review-dashboard)
-  cd "$RAIL_DIR"
-  exec npx tsx src/review-dashboard.ts reviews
   ;;
 status)
   if daemon_running; then
@@ -201,6 +271,10 @@ status)
   if [ -f "$ENABLED_FLAG" ]; then echo "rail: enabled"; else echo "rail: disabled"; fi
   echo "tab: $(cat "$STATE/tab" 2>/dev/null || echo agents)"
   echo "panes: $(tmux list-panes -a -F '#{@rail}' 2>/dev/null | grep -c 1 || true)"
+  # The one diagnostic that needs the repo: resolved here, lazily, so the
+  # phone line stays truthful without taxing any keypress path.
+  resolve_rail_dir
+  load_env
   if [ -n "${AI_HARNESS_NTFY_URL:-}${AGENT_NOTIFICATION_ID:-}" ]; then
     echo "phone: configured"
   else
@@ -208,7 +282,7 @@ status)
   fi
   ;;
 *)
-  echo "usage: rail on|off|toggle|jump <letter>|jump-attention|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|review-dashboard|ensure-daemon|status" >&2
+  echo "usage: rail on|off|toggle|jump-attention|page up|down|tab agents|reviews|tasks|element <number>|dashboard reviews|tasks|dashboard-popup|ensure-daemon|status" >&2
   exit 1
   ;;
 esac

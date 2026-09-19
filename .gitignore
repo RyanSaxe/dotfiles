@@ -23,5 +23,8 @@ __pycache__/
 .ruff_cache/
 node_modules/
 
+# Build products — esbuild bundles rebuilt by install.sh and on demand
+tuis/rail/dist/
+
 # Logs
 *.log
