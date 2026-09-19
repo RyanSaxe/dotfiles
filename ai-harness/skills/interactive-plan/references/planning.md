@@ -7,12 +7,12 @@ implementation steps, or a summary page. Agreed is the only running
 context. It holds the settled decisions, each with a link to the exact
 place it came from.
 
-An exploration may address one decision, several connected choices, or a
-broad part of the proposal. Keep related parts together when their
-interaction matters. Separate them when an unresolved dependency or too
-much material would make the proposal hard to assess. Settle the choices
-that affect later options before spending time on details those choices
-could invalidate.
+A revision puts every open point on the page at once, one page per topic,
+so the reviewer settles them in one round. Keep related choices on one
+page when their interaction matters, and give an unrelated one its own
+page. Hold back only a choice whose options depend on an answer the
+reviewer has not given yet. A revision with one question on one page is a
+sign that the plan has not been explored enough to ask the rest.
 
 Resolve routine details from project evidence and settled requirements.
 Close every other open point on the page, next to the proposal it affects,
