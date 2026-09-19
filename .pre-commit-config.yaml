@@ -80,7 +80,7 @@ repos:
         # lazy.nvim owns its lockfile's formatting and rewrites it on
         # every sync; reformatting it here is perpetual churn.
         # Fixture pages carry Mermaid and JSON as text; reflowing them breaks both.
-        exclude: 'lazy-lock\.json$|ai-harness/skills/interactive-plan/scripts/fixture/.*\.html$|ai-harness/skills/visual-review/components/.*\.html$'
+        exclude: 'lazy-lock\.json$|ai-harness/skills/interactive-plan/scripts/fixture/.*\.html$|ai-harness/skills/visual-review/components/.*\.html$|tests/visual-review/documents/.*\.html$'
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.49.1

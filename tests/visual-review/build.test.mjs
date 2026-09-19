@@ -360,6 +360,19 @@ test("fillExcerpts leaves a page without excerpts untouched", async (t) => {
   assert.equal(await fillExcerpts(html, stdout.trim(), repo), html);
 });
 
+test("the #142 document builds against the commit it explains", async (t) => {
+  const source = fileURLToPath(
+    new URL("./documents/interactive-plan-142/document.json", import.meta.url),
+  );
+  const html = await build(source);
+  // The excerpt quotes the hub's refusal as it is at the merge commit.
+  assert.match(html, /Acknowledge feedback before reporting progress/);
+  assert.match(html, /"commit":"a286050[0-9a-f]{33}"/);
+  for (const id of ["start", "hub", "draft", "card", "fixture"])
+    assert.match(html, new RegExp(`"id":"${id}"`));
+  t.diagnostic(`built ${html.length} bytes`);
+});
+
 test("a diagram named by data-file arrives in the page as text; raw label markup inline fails the build", async (t) => {
   const filed = await repository(t, {
     pages: [

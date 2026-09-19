@@ -1,0 +1,25 @@
+<p>
+  The hub puts its own bookends around the agent's steps, so the card reads
+  as one sequence rather than a list that starts mid-thought. The reader
+  sees the round from the moment the feedback is read to the moment the
+  revision lands.
+</p>
+<div data-diagram data-caption="The order the reader experiences, not the order the code runs.">
+sequenceDiagram
+  participant A as agent
+  participant H as hub
+  participant P as page
+  A->>H: ack the round
+  A->>H: progress --steps
+  H-->>P: reading the feedback
+  H-->>P: the three steps
+  A->>H: progress --done
+  H-->>P: first step ticked
+  A->>H: publish
+  H-->>P: revision lands
+</div>
+<p>
+  The page polls the same status it always did. The card is one more thing
+  in it, and the frame patches it in place: one segment and one row per
+  step, so a tick does not redraw the card.
+</p>
