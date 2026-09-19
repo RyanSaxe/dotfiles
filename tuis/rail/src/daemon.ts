@@ -17,8 +17,13 @@
 // writes. RAIL_NO_CONTROL=1 disables the control client entirely; every
 // snapshot then rides the exec fallback on the backstop cadence.
 //
-// The daemon also enforces the rail's invariants every refresh
-// (self-heal): rails are exactly RAIL_WIDTH wide, hold no scrollback,
+// The daemon enforces the rail's invariants on full refreshes. Navigation
+// refreshes still take a fresh snapshot for focus/ack state, but defer that
+// repair work and visible paint completion so a keypress is not held behind
+// unrelated rails.
+//
+// On full refreshes, self-heal enforces the rail's invariants: rails are
+// exactly RAIL_WIDTH wide, hold no scrollback,
 // are never in copy-mode, are never the selected pane, exist in every
 // window while enabled (alt+g is the ONLY gate — no width policy), exist
 // nowhere while disabled, and never survive alone in a window.
@@ -41,6 +46,7 @@ import {
   tmux,
   windowsOf,
   type Agent,
+  type ClientFacts,
   type Pane,
   type SnapshotRunner,
 } from "./data.js";
@@ -63,6 +69,10 @@ import { mascotFor } from "./mascot.js";
 import { GUTTER_COLS, renderRail } from "./render.js";
 import { makeRefreshScheduler } from "./scheduler.js";
 import { fillOrder, makePaintScheduler } from "./paint.js";
+import {
+  controlRefreshKind,
+  type ControlRefreshKind,
+} from "./refresh-policy.js";
 import { spriteId, transmitSprite, writeTtyAsync } from "./sprite.js";
 import {
   loadStableStatuses,
@@ -343,28 +353,6 @@ function maybeTransmit(pane: Pane, spritePath: string, id: number): void {
 
 const CONTROL_DISABLED = process.env.RAIL_NO_CONTROL === "1";
 
-// Control-mode notifications after which something the rail renders (or
-// self-heals) may have changed. They are wake signals only — the
-// snapshot read stays the source of truth, which is why the whole
-// structural family maps to the same request.
-const CONTROL_REFRESH_EVENTS: ReadonlySet<string> = new Set([
-  "%client-attached",
-  "%client-detached",
-  "%client-session-changed",
-  "%layout-change",
-  "%pane-mode-changed",
-  "%session-changed",
-  "%session-renamed",
-  "%session-window-changed",
-  "%sessions-changed",
-  "%unlinked-window-add",
-  "%unlinked-window-close",
-  "%unlinked-window-renamed",
-  "%window-add",
-  "%window-close",
-  "%window-pane-changed",
-  "%window-renamed",
-]);
 // Expected chatter with nothing to repaint. (%exit never arrives here —
 // the control client consumes it as a disconnect.)
 const CONTROL_IGNORED_EVENTS: ReadonlySet<string> = new Set([
@@ -413,6 +401,17 @@ const scheduler = makeRefreshScheduler(guardedRefresh, {
   startPaused: true,
 });
 
+let fullRefreshPending = false;
+
+function requestFullRefresh(reason: string): void {
+  fullRefreshPending = true;
+  scheduler.request(reason);
+}
+
+function requestNavigationRefresh(reason: string): void {
+  scheduler.request(reason);
+}
+
 // Slow sources own their own wall-clock cadence; refreshes read the
 // cached values and never wait on an exec. Change detection compares
 // CONTENT (not file mtimes or object identity), so workmux heartbeat
@@ -436,7 +435,7 @@ const workmuxPoller = makePoller<Agent[]>({
   intervalMs: () => WORKMUX_POLL_MS,
   load: () => timed("workmux", collectAgents()),
   changed: (previous, next) => agentsKey(previous) !== agentsKey(next),
-  onChange: () => scheduler.request("workmux"),
+  onChange: () => requestFullRefresh("workmux"),
 });
 
 const vaultPoller = makePoller<TaskSnapshot>({
@@ -446,7 +445,7 @@ const vaultPoller = makePoller<TaskSnapshot>({
   load: () => timed("vault", loadTaskSnapshot()),
   changed: (previous, next) =>
     JSON.stringify(previous) !== JSON.stringify(next),
-  onChange: () => scheduler.request("vault"),
+  onChange: () => requestFullRefresh("vault"),
 });
 
 // Presence is the only host fact anything renders or routes on; probing
@@ -462,7 +461,7 @@ const hostPoller = makePoller<HostFacts>({
   intervalMs: () => HOST_POLL_MS,
   load: () => timed("ioreg", collectHostFacts()),
   changed: (previous, next) => presenceOf(previous) !== presenceOf(next),
-  onChange: () => scheduler.request("presence"),
+  onChange: () => requestFullRefresh("presence"),
 });
 
 // prefix-held, the tab key-table, and client focus are the live bits the
@@ -479,21 +478,54 @@ const clientPoller = makePoller<string>({
       clientModeSignature,
     ),
   changed: (previous, next) => previous !== next,
-  onChange: () => scheduler.request("client"),
+  onChange: () => requestFullRefresh("client"),
 });
 
 // The refresh body, reading the pollers' caches: one snapshot, one heal,
 // one render pass. Every wake source funnels here through the scheduler.
 async function refreshAndRender(): Promise<void> {
   const started = Date.now();
-  const activeTab = loadRailTab();
-  const agents = workmuxPoller.value() ?? [];
-  const taskSnapshot = vaultPoller.value() ?? emptyTaskSnapshot();
-  const hostFacts = hostPoller.value() ?? { inputIdleSecs: null };
   const { panes, clientFacts } = await timed(
     "snapshot",
     collectSnapshot(controlRunner()),
   );
+  const enabled = existsSync(ENABLED_FLAG);
+  const skip = await timed("selfHeal", selfHeal(panes, enabled));
+  await renderSnapshot(panes, clientFacts, skip, enabled);
+  recordRefresh(refreshCounter, Date.now() - started);
+}
+
+// Navigation changes only alter which existing rail is person-facing and
+// which session/window gets the focus styling. The snapshot is still the
+// source of truth, but navigation must not run the invariant-repair pass or
+// wait for visible tty paints before returning to the event loop.
+async function refreshNavigationAndRender(): Promise<void> {
+  const started = Date.now();
+  const { panes, clientFacts } = await timed(
+    "snapshot",
+    collectSnapshot(controlRunner()),
+  );
+  await renderSnapshot(
+    panes,
+    clientFacts,
+    new Set(),
+    existsSync(ENABLED_FLAG),
+    false,
+  );
+  recordRefresh(refreshCounter, Date.now() - started);
+}
+
+async function renderSnapshot(
+  panes: Pane[],
+  clientFacts: ClientFacts,
+  skip: Set<string>,
+  enabled: boolean,
+  waitForVisiblePaint = true,
+): Promise<void> {
+  const activeTab = loadRailTab();
+  const agents = workmuxPoller.value() ?? [];
+  const taskSnapshot = vaultPoller.value() ?? emptyTaskSnapshot();
+  const hostFacts = hostPoller.value() ?? { inputIdleSecs: null };
   const { modeSessions, nonKittySessions } = clientFacts;
   // Every frame is a color: with no rendered theme there is nothing sane to
   // paint, and rethrowing per refresh would spin forever with no
@@ -522,9 +554,6 @@ async function refreshAndRender(): Promise<void> {
     }
     appliedBg = bg;
   }
-  const enabled = existsSync(ENABLED_FLAG);
-  const skip = await timed("selfHeal", selfHeal(panes, enabled));
-
   const stableBefore = stableStatusesKey(stableStatuses);
   const settled = stabilizeAgents(agents, stableStatuses, Date.now() / 1000);
   if (stableStatusesKey(stableStatuses) !== stableBefore) {
@@ -645,7 +674,9 @@ async function refreshAndRender(): Promise<void> {
   // The person-facing panes gate the refresh (wall-time ~= one pane);
   // everything off-screen drains behind them in likely-to-jump order.
   painter.fill(fillOrder(hiddenTargets));
-  await painter.paintVisible(visibleTargets);
+  const visiblePaint = painter.paintVisible(visibleTargets);
+  if (waitForVisiblePaint) await visiblePaint;
+  else void visiblePaint;
 
   // Forget panes that no longer exist so their ids can't shadow reused ones.
   const alive = new Set(panes.map((pane) => pane.paneId));
@@ -661,7 +692,6 @@ async function refreshAndRender(): Promise<void> {
   lastEnabled = enabled;
   lastClientCount = clientFacts.clientCount;
   refreshCounter += 1;
-  recordRefresh(refreshCounter, Date.now() - started);
 }
 
 // The scheduler's runner: failures stay inside (a rejected run must not
@@ -669,7 +699,9 @@ async function refreshAndRender(): Promise<void> {
 // exec path end the daemon exactly like the control client's onGone.
 async function guardedRefresh(): Promise<void> {
   try {
-    await refreshAndRender();
+    const full = fullRefreshPending;
+    fullRefreshPending = false;
+    await (full ? refreshAndRender() : refreshNavigationAndRender());
     noServerFails = 0;
   } catch (error) {
     logLine(`refresh failed: ${String(error)}`);
@@ -763,7 +795,7 @@ async function main(): Promise<void> {
         if (tuisColorsTouched) pushed.clear();
         tuisColorsTouched = false;
         run(THEME_SYNC, []).catch(() => {});
-        scheduler.request("theme");
+        requestFullRefresh("theme");
       }, 30);
     });
   } catch {
@@ -777,7 +809,7 @@ async function main(): Promise<void> {
   // path, this watch just makes the refresh land within a beat.
   try {
     watch(ATTENTION_STATE_DIR, () => {
-      scheduler.request("attention");
+      requestFullRefresh("attention");
     });
   } catch {
     // No observer on this machine yet; the reconcile backstop covers it.
@@ -792,15 +824,18 @@ async function main(): Promise<void> {
     const wake = stateFileWake(filename, lastTab, currentTab);
     lastTab = currentTab;
     if (wake.vaultTriggerMs !== null) vaultPoller.trigger(wake.vaultTriggerMs);
-    if (wake.refreshReason !== null) scheduler.request(wake.refreshReason);
+    if (wake.refreshReason !== null) requestFullRefresh(wake.refreshReason);
   });
 
   if (!CONTROL_DISABLED) {
     control = startControlClient({
       events: {
         onNotification(name) {
-          if (CONTROL_REFRESH_EVENTS.has(name)) {
-            scheduler.request(name);
+          const kind: ControlRefreshKind = controlRefreshKind(name);
+          if (kind === "full") {
+            requestFullRefresh(name);
+          } else if (kind === "navigation") {
+            requestNavigationRefresh(name);
           } else if (
             !CONTROL_IGNORED_EVENTS.has(name) &&
             !unknownControlEvents.has(name)
@@ -814,11 +849,11 @@ async function main(): Promise<void> {
         },
         onConnect() {
           controlUp = true;
-          scheduler.request("control-connect");
+          requestFullRefresh("control-connect");
         },
         onDisconnect() {
           controlUp = false;
-          scheduler.request("control-disconnect");
+          requestFullRefresh("control-disconnect");
         },
         onGone() {
           void exitServerGone();
@@ -835,7 +870,7 @@ async function main(): Promise<void> {
     hostPoller.start(),
     clientPoller.start(),
   ]);
-  scheduler.request("boot");
+  requestFullRefresh("boot");
   // Every slow source has loaded once: lift the gate so the boot refresh
   // (and anything the control client queued while connecting) fires now,
   // over populated state.
@@ -848,7 +883,7 @@ async function main(): Promise<void> {
     const ms =
       !lastEnabled && lastClientCount === 0 ? IDLE_RECONCILE_MS : RECONCILE_MS;
     setTimeout(() => {
-      scheduler.request("reconcile");
+      requestFullRefresh("reconcile");
       armReconcile();
     }, ms);
   }

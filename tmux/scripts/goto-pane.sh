@@ -20,8 +20,11 @@ if [ "${1:-}" = back ]; then
   # hook can reap dead panes from history (pane-exited formats the
   # SURVIVING pane, never the dying one), so stale entries are dropped
   # here, silently: a keystroke that found nothing is not worth a modal.
-  origin="$(tmux display-message -p '#{pane_id}|#{?#{@rail},rail,content}|#{pane_floating}' 2>/dev/null)"
-  prev="$(tmux show-options -gqv @TMUX_PREV_PANE)"
+  origin_state="$(tmux display-message -p \
+    '#{pane_id}|#{?#{@rail},rail,content}|#{pane_floating}|#{@TMUX_PREV_PANE}' \
+    2>/dev/null)"
+  origin="${origin_state%|*}"
+  prev="${origin_state##*|}"
   [ -n "$prev" ] || exit 0
   case "$prev" in
   %*) ;;
@@ -52,12 +55,14 @@ if [ "${1:-}" = back ]; then
   window="$prev"
   pane="$prev"
   quiet=quiet
+  history_target=1
 else
   session="$1"
   window="$2"
   pane="$3"
   quiet="${4:-}"
   origin=""
+  history_target=0
 fi
 
 notify() {
@@ -73,16 +78,19 @@ target_failed() {
   exit 0
 }
 
-# Validate the whole target before moving anything: the jump chain below
-# stops at its first failing command, so a dead target must fail HERE to
-# be a clean no-op instead of a half-jump. Emptiness is the pane
-# aliveness test: display-message exits 0 for a dead target, printing
-# nothing.
-if ! tmux has-session -t "=$session" 2>/dev/null; then
-  target_failed "goto-pane: session '$session' is gone"
-fi
-if [ -z "$(tmux display-message -p -t "$pane" '#{pane_id}' 2>/dev/null)" ]; then
-  target_failed "goto-pane: target pane is gone"
+# Validate an explicit target before moving anything: the jump chain below
+# stops at its first failing command, so a dead target must fail HERE to be
+# a clean no-op instead of a half-jump. In back mode, prev_info already did
+# the same pane-id/session/role validation, so repeating it only adds tmux
+# round trips. Emptiness is the pane aliveness test: display-message exits 0
+# for a dead target, printing nothing.
+if [ "$history_target" != 1 ]; then
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    target_failed "goto-pane: session '$session' is gone"
+  fi
+  if [ -z "$(tmux display-message -p -t "$pane" '#{pane_id}' 2>/dev/null)" ]; then
+    target_failed "goto-pane: target pane is gone"
+  fi
 fi
 
 # Capture the client's REAL pane before anything moves (no -t: callers
@@ -129,5 +137,10 @@ else
     set-option -g @TMUX_CURR_PANE "$pane" \; \
     set-option -gu @TMUX_HIST_LOCK
 fi
+
+# The successful history chain already released the lock. Keeping the trap
+# would issue a second tmux request on every jump, after the pane is already
+# focused; leave it armed only for failure paths.
+trap - EXIT
 
 ("$HOME/.local/bin/theme" mascot sync "$session" >/dev/null 2>&1 &)
