@@ -508,6 +508,39 @@ img,
 svg {
   max-width: 100%;
 }
+/* A diagram keeps its drawn size and scrolls sideways; a click enlarges it.
+   Mermaid writes its own max-width inline, hence the priorities. */
+[data-diagram] {
+  display: block;
+  overflow-x: auto;
+  padding: 8px 0;
+  text-align: center;
+}
+[data-diagram] svg {
+  display: inline-block;
+  vertical-align: top;
+  height: auto;
+  width: var(--diagram-width, auto);
+  max-width: none !important;
+  cursor: zoom-in;
+}
+.lightbox {
+  width: fit-content;
+  max-width: min(96vw, 1600px);
+  max-height: 92vh;
+  margin: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: auto;
+}
+.lightbox svg {
+  display: block;
+  height: auto;
+  width: var(--diagram-width, auto);
+  max-width: none;
+}
 .renderer-error {
   color: var(--muted);
   font-size: 12px;
@@ -549,6 +582,9 @@ svg {
 .figure-body > .shiki {
   border-radius: 0;
 }
+.figure-body > [data-diagram] {
+  padding: 12px;
+}
 .figure-caption {
   padding: 8px 12px 10px;
   border-top: 1px solid var(--line);
@@ -557,6 +593,107 @@ svg {
 }
 .figure-caption b {
   color: var(--ink);
+}
+
+/* Diagrams: the house style, on Mermaid's output. Colours come from the
+   tokens; the diagram source names classes and nothing else. */
+:is([data-diagram], .lightbox) .node rect,
+:is([data-diagram], .lightbox) .node polygon {
+  rx: 10px;
+  ry: 10px;
+}
+:is([data-diagram], .lightbox) .node.marked > rect,
+:is([data-diagram], .lightbox) .node.marked > polygon {
+  fill: var(--mark-soft) !important;
+  stroke: var(--mark) !important;
+  stroke-width: 1.8px !important;
+}
+:is([data-diagram], .lightbox) .node.linked {
+  cursor: pointer;
+}
+:is([data-diagram], .lightbox) .node.linked:hover > rect,
+:is([data-diagram], .lightbox) .node.linked:hover > polygon {
+  stroke: var(--accent) !important;
+}
+:is([data-diagram], .lightbox) .cluster rect {
+  fill: none !important;
+  stroke: var(--line) !important;
+  stroke-dasharray: 4 4;
+  rx: 12px;
+  ry: 12px;
+}
+:is([data-diagram], .lightbox) .cluster .nodeLabel {
+  font-size: 10px;
+  color: var(--muted);
+}
+:is([data-diagram], .lightbox) .flowchart-link,
+:is([data-diagram], .lightbox) .edgePath path {
+  stroke: var(--line-strong) !important;
+}
+:is([data-diagram], .lightbox) marker path {
+  fill: var(--line-strong) !important;
+  stroke: var(--line-strong) !important;
+}
+:is([data-diagram], .lightbox) .edgeLabel p {
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--panel) !important;
+}
+/* The label vocabulary is unscoped on purpose. Mermaid measures a label in a
+   detached element outside the diagram, so a rule scoped to the diagram is
+   invisible to the measuring pass and the box comes out too small for what
+   it holds. Colour needs !important because Mermaid colours the label
+   itself; size and spacing do not. */
+.title {
+  display: block;
+  font-weight: 600;
+}
+.path {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--muted) !important;
+  font:
+    10px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.delta {
+  margin-left: 6px;
+  font:
+    10px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.delta.add {
+  color: var(--add) !important;
+}
+.delta.cut {
+  color: var(--cut) !important;
+}
+.badge {
+  display: inline-block;
+  min-width: 17px;
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent) !important;
+  font:
+    600 10px/17px -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  text-align: center;
+}
+.note {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--cut) !important;
 }
 
 /* Dialogs */

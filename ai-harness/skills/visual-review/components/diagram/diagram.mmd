@@ -1,0 +1,11 @@
+flowchart LR
+  subgraph server [Server]
+    hub["<span class='title'>the hub</span><span class='path'>session.mjs</span><span class='delta add'>+61</span>"]
+  end
+  subgraph browser [Browser]
+    card["<span class='title'>the working card</span><span class='path'>steps, ticked</span><span class='badge'>3</span>"]
+    old["<span class='title'>the old spinner</span><span class='note'>removed by this change</span>"]
+  end
+  hub --> card
+  card -- replaces --> old
+  class hub,card marked

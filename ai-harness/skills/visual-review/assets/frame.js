@@ -25,9 +25,13 @@ const color = (name) =>
 /* Renderers and figures */
 const libraries = {
   shiki: "https://esm.sh/shiki@3.12.2",
+  mermaid:
+    "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
+  elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
 };
 const scripts = new Map();
-let shikiTask;
+let shikiTask, mermaidTask;
+let diagramSequence = Promise.resolve();
 
 function script(url, integrity, css = false) {
   if (scripts.has(url)) return scripts.get(url);
@@ -122,6 +126,95 @@ async function renderCode(element) {
   }
 }
 
+/* Diagrams: Mermaid laid out by ELK, painted by the stylesheet. */
+async function loadMermaid() {
+  mermaidTask ||= (async () => {
+    const [{ default: mermaid }, elk] = await Promise.all([
+      import(libraries.mermaid),
+      import(libraries.elk),
+    ]);
+    // mermaid 11.12.0 accepts layout: "elk" and silently keeps its own
+    // layout unless the loaders are registered.
+    mermaid.registerLayoutLoaders(elk.default ?? elk);
+    return mermaid;
+  })();
+  return mermaidTask;
+}
+function linkNodes(element) {
+  for (const node of element.querySelectorAll(".node")) {
+    const id = node.id.match(/^flowchart-(.+)-\d+$/)?.[1];
+    if (!id || !pageIds.has(id)) continue;
+    node.classList.add("linked");
+    node.setAttribute("role", "link");
+    node.tabIndex = 0;
+    const open = () => show(id);
+    node.addEventListener("click", open);
+    node.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    });
+  }
+}
+function renderDiagrams(root) {
+  for (const element of root.querySelectorAll("[data-diagram]")) {
+    element.dataset.source ||= element.textContent;
+    diagramSequence = diagramSequence
+      .catch(() => {})
+      .then(async () => {
+        try {
+          if (!element.isConnected) return;
+          const mermaid = await loadMermaid();
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            theme: "base",
+            themeVariables: {
+              primaryColor: color("--panel"),
+              primaryTextColor: color("--ink"),
+              primaryBorderColor: color("--line-strong"),
+              lineColor: color("--muted"),
+              secondaryColor: color("--panel"),
+              tertiaryColor: color("--ground"),
+              clusterBkg: "transparent",
+              clusterBorder: color("--line"),
+              fontFamily: "ui-sans-serif, system-ui, sans-serif",
+            },
+            layout: "elk",
+            flowchart: {
+              rankSpacing: 38,
+              nodeSpacing: 28,
+              titleTopMargin: 8,
+              htmlLabels: true,
+            },
+          });
+          const result = await mermaid.render(
+            "diagram-" + crypto.randomUUID(),
+            element.dataset.source,
+          );
+          if (!element.isConnected) return;
+          element.innerHTML = result.svg;
+          const width = element.querySelector("svg")?.viewBox?.baseVal?.width;
+          if (width) element.style.setProperty("--diagram-width", `${width}px`);
+          linkNodes(element);
+        } catch (error) {
+          failed(element, error);
+        }
+      });
+  }
+}
+function openLightbox(svg) {
+  const dialog = $("diagram-dialog");
+  // The clone is drawn at the size the page drew it; the box hugs it.
+  dialog.style.setProperty(
+    "--diagram-width",
+    svg.closest("[data-diagram]").style.getPropertyValue("--diagram-width"),
+  );
+  dialog.replaceChildren(svg.cloneNode(true));
+  dialog.showModal();
+}
+
 function enhance(root) {
   // An excerpt carries data-language for its rows; the figure itself is not
   // a code block and must not be rendered as one.
@@ -142,6 +235,12 @@ function enhance(root) {
     element.dataset.source ||= element.textContent;
     renderCode(element);
   });
+  root
+    .querySelectorAll("[data-diagram][data-caption]")
+    .forEach((element) =>
+      figure(element, { caption: element.dataset.caption, kind: "diagram" }),
+    );
+  renderDiagrams(root);
 }
 
 /* Pages */
@@ -181,6 +280,16 @@ function show(id, { push = true } = {}) {
   $("page-title").textContent = first ? doc.title : page.title;
   $("lede").hidden = !(first && doc.lede);
   $("lede").textContent = first && doc.lede ? doc.lede : "";
+  $("opening").hidden = !(first && doc.opens);
+  $("opening").replaceChildren();
+  if (first && doc.opens) {
+    const holder = document.createElement("div");
+    holder.dataset.diagram = "";
+    if (doc.opensCaption) holder.dataset.caption = doc.opensCaption;
+    holder.textContent = doc.opens;
+    $("opening").append(holder);
+    enhance($("opening"));
+  }
   $("page-content").innerHTML = page.html;
   enhance($("page-content"));
   for (const button of $("navigation").querySelectorAll("[data-page]")) {
@@ -203,6 +312,8 @@ function show(id, { push = true } = {}) {
 function theme() {
   document.documentElement.dataset.theme = activeTheme;
   $("theme").value = preferredTheme || "system";
+  renderDiagrams($("opening"));
+  renderDiagrams($("page-content"));
 }
 $("theme").onchange = () => {
   preferredTheme = $("theme").value === "system" ? null : $("theme").value;
@@ -231,6 +342,8 @@ document.addEventListener("click", (event) => {
     show(navigation.dataset.page);
     return;
   }
+  const svg = event.target.closest("[data-diagram] svg");
+  if (svg && !event.target.closest(".node.linked")) openLightbox(svg);
 });
 for (const dialog of document.querySelectorAll("dialog")) {
   dialog.addEventListener("click", (event) => {
@@ -245,7 +358,8 @@ for (const dialog of document.querySelectorAll("dialog")) {
       dialog.close();
   });
 }
-const interactiveSelector = "a[href], button, input, select, summary";
+const interactiveSelector =
+  "a[href], button, input, select, .node.linked, summary";
 document.addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   if (event.key === "Escape") {

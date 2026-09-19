@@ -10,7 +10,11 @@ import {
   assemble,
   build,
 } from "../../ai-harness/skills/visual-review/scripts/build.mjs";
-import { check } from "../../ai-harness/skills/visual-review/scripts/check.mjs";
+import {
+  check,
+  diagramFacts,
+  styledClasses,
+} from "../../ai-harness/skills/visual-review/scripts/check.mjs";
 
 const exec = promisify(execFile);
 const skill = fileURLToPath(
@@ -73,6 +77,14 @@ async function repository(t, overrides = {}) {
     pages,
     ...overrides.description,
   };
+  if (overrides.opens !== undefined) {
+    await fs.writeFile(path.join(docs, "opens.mmd"), overrides.opens);
+    description.opens = "opens.mmd";
+  }
+  if (overrides.css !== undefined) {
+    await fs.writeFile(path.join(docs, "doc.css"), overrides.css);
+    description.css = "doc.css";
+  }
   const source = path.join(docs, "document.json");
   await fs.writeFile(source, JSON.stringify(description));
   return { root, repo, docs, source };
@@ -104,6 +116,22 @@ test("the command rebuilds over its own output and refuses a file it did not wri
   assert.equal(await fs.readFile(other, "utf8"), "<p>mine</p>");
 });
 
+test("a diagram file that is not there is refused in the build's own form", async (t) => {
+  const missing = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<div data-diagram data-file="gone.mmd"></div>',
+      },
+    ],
+  });
+  await assert.rejects(
+    build(missing.source),
+    /^Error: The document was not built:\n {2}gone\.mmd is not beside the description$/,
+  );
+});
+
 test("a build outside any repository says so", async (t) => {
   const nowhere = await repository(t, {
     description: { repository: "../nowhere" },
@@ -113,6 +141,31 @@ test("a build outside any repository says so", async (t) => {
     build(nowhere.source),
     /not built:\n {2}.*nowhere is not inside a repository/,
   );
+});
+
+test("a label class nothing styles, and a mark on a node that does not exist, fail the build; an invented class with its own stylesheet does not", async (t) => {
+  const unstyled = await repository(t, {
+    opens:
+      "flowchart LR\n  a[\"<span class='titel'>x</span>\"] --> b\n  class a marked\n",
+  });
+  await assert.rejects(
+    build(unstyled.source),
+    /label class "titel" is styled by nothing/,
+  );
+  const ghost = await repository(t, {
+    opens: "flowchart LR\n  a --> b\n  class a,c marked\n",
+  });
+  await assert.rejects(build(ghost.source), /"c" is marked but is not a node/);
+  const invented = await repository(t, {
+    opens: "flowchart LR\n  a[\"<span class='owner'>x</span>\"] --> b\n",
+    css: ".owner { color: var(--accent) !important; }",
+  });
+  await build(invented.source);
+});
+
+test("a document stylesheet with a colour that is not a token fails the build", async (t) => {
+  const { source } = await repository(t, { css: ".x { color: #ff0000; }" });
+  await assert.rejects(build(source), /colour that is not a token/);
 });
 
 test("the frame carries nothing that collects feedback or talks to a hub", async () => {
@@ -130,8 +183,19 @@ test("the frame carries nothing that collects feedback or talks to a hub", async
     "data-choice",
   ])
     assert.ok(!html.includes(word), `frame contains ${word}`);
-  for (const pin of ["shiki@3.12.2"])
+  for (const pin of ["mermaid@11.12.0", "layout-elk@0.2.3", "shiki@3.12.2"])
     assert.ok(html.includes(pin), `frame does not pin ${pin}`);
+});
+
+test("diagram facts: node ids come from declarations and edges, classes from labels and marks", () => {
+  const facts = diagramFacts(
+    "flowchart LR\n  subgraph s [S]\n    a[\"<span class='title'>A</span><span class='path'>p</span>\"] --> b\n  end\n  b -- polled --> c((C))\n  d\n  class a,b marked\n",
+  );
+  assert.deepEqual([...facts.nodes].sort(), ["a", "b", "c", "d", "s"]);
+  assert.deepEqual([...facts.classes].sort(), ["path", "title"]);
+  assert.deepEqual(facts.marks, [{ ids: ["a", "b"], name: "marked" }]);
+  assert.ok(styledClasses(frameCss).has("marked"));
+  assert.ok(styledClasses(frameCss).has("delta"));
 });
 
 test("check reports every problem at once rather than the first", async (t) => {
@@ -151,4 +215,33 @@ test("check reports every problem at once rather than the first", async (t) => {
   assert.ok(problems.some((p) => /documentId/.test(p)));
   assert.ok(problems.some((p) => /title is required/.test(p)));
   assert.ok(problems.some((p) => /used twice/.test(p)));
+});
+
+test("a diagram named by data-file arrives in the page as text; raw label markup inline fails the build", async (t) => {
+  const filed = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: '<div data-diagram data-file="d.mmd"></div>',
+      },
+    ],
+  });
+  await fs.writeFile(
+    path.join(filed.docs, "d.mmd"),
+    "flowchart LR\n  a[\"<span class='title'>A</span>\"] --> b\n",
+  );
+  const html = await build(filed.source);
+  // Escaped in the page, so Mermaid reads the span as part of its source.
+  assert.match(html, /&lt;span class='title'&gt;A&lt;\/span&gt;/);
+  const inline = await repository(t, {
+    pages: [
+      {
+        id: "a",
+        title: "A",
+        html: "<div data-diagram>flowchart LR\n  a[\"<span class='title'>A</span>\"] --> b\n</div>",
+      },
+    ],
+  });
+  await assert.rejects(build(inline.source), /raw markup/);
 });

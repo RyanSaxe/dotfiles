@@ -8,12 +8,32 @@ import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { check, resolveRef } from "./check.mjs";
+import { attribute, check, resolveRef } from "./check.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
 
 const escape = (text) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * A diagram written as a file arrives in the page as text. Mermaid source is
+ * text inside the page, so label markup has to be escaped; written inline,
+ * the spans would parse as HTML and drop out of the source.
+ */
+export async function inlineDiagrams(html, read) {
+  let out = "";
+  let cursor = 0;
+  const tags = html.matchAll(
+    /<div\b(?=[^>]*\bdata-diagram\b)(?=[^>]*\bdata-file=)[^>]*>/g,
+  );
+  for (const match of tags) {
+    const file = attribute(match[0], "data-file");
+    const open = match.index + match[0].length;
+    out += html.slice(cursor, open) + "\n" + escape(await read(file)) + "\n";
+    cursor = open;
+  }
+  return out + html.slice(cursor);
+}
 
 export async function assemble(document, { css = "" } = {}) {
   const [shell, style, script] = await Promise.all(
@@ -69,7 +89,7 @@ export async function load(source) {
       if (file && page.html !== undefined)
         throw Error(`Page ${page.id}: use file or html, not both`);
       const html = file ? await read(file) : page.html;
-      return { ...page, html };
+      return { ...page, html: await inlineDiagrams(html, read) };
     }),
   );
   return { document, css, cwd };
