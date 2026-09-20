@@ -1475,12 +1475,6 @@ test("the CLI marks steps in one call, keeps the source with a publication, and 
     run("publish", "--file", path.join(work, "art.html"), "--source", work),
     /already exists/,
   );
-  await assert.rejects(
-    exec(process.execPath, [helper, "status", "--session-dir", a.directory], {
-      env: { ...h.env, CODEX_SANDBOX_NETWORK_DISABLED: "1" },
-    }),
-    /outside the sandbox/,
-  );
   const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "plan-codex-"));
   t.after(() => fs.rm(codexHome, { recursive: true, force: true }));
   const check = path.join(path.dirname(helper), "check.mjs");

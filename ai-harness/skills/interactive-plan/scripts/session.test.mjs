@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { assemble } from "./build.mjs";
-import { detectWake, settings, startHub } from "./session.mjs";
+import { detectWake, settings, startHub, withSandboxHint } from "./session.mjs";
 
 let hub, sessionId, sessionDir, token;
 const wakes = [];
@@ -182,6 +182,19 @@ test("publish records a source inside the session and refuses one outside", asyn
   });
   assert.ok(kept.ok, JSON.stringify(kept.body));
   assert.equal((await status()).current.source, inside);
+});
+
+test("the sandbox hint follows a refusal, not the environment alone", () => {
+  const env = { CODEX_SANDBOX: "seatbelt" };
+  assert.match(
+    withSandboxHint("connect EPERM 127.0.0.1:4747", env),
+    /outside the sandbox/,
+  );
+  assert.equal(withSandboxHint("Unknown session", env), "Unknown session");
+  assert.equal(
+    withSandboxHint("connect EPERM 127.0.0.1:4747", {}),
+    "connect EPERM 127.0.0.1:4747",
+  );
 });
 
 test("publish clears progress", async () => {

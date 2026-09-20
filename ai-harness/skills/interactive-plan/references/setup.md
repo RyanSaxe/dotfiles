@@ -16,12 +16,15 @@ sandbox that blocks either needs an allowance for the skill's scripts, not
 a different state directory: a session under a temp directory is invisible
 to other sessions and to the hub on the fixed port.
 
-- Codex: the sandbox blocks both, and every helper command would need an
-  escalation prompt. `node scripts/check.mjs --codex-rules`, run once
-  outside the sandbox, writes `~/.codex/rules/interactive-plan.rules`, a
-  file of the skill's own with allow rules for `node` and the skill's three
-  scripts; after that they run outside the sandbox without a prompt. The
-  check reports whether the file is present.
+- Codex: the sandbox blocks both, so a helper command fails once, names
+  the sandbox, and then runs again escalated, which Codex's approval
+  reviewer may grant without a prompt. `node scripts/check.mjs --codex-rules`,
+  run once outside the sandbox, writes `~/.codex/rules/interactive-plan.rules`,
+  a file of the skill's own with allow rules for `node` and the skill's
+  three scripts; a command that matches one runs outside the sandbox on
+  the first try, with nothing to approve. Codex reads the file when it
+  starts, so a session that wrote it keeps paying the retry until the
+  next one. The check reports whether the file is present.
 - Claude Code: nothing in auto mode; otherwise allow the helper's `node`
   command in the permission settings.
 - Copilot: nothing beyond the allow flags the session already needs.
