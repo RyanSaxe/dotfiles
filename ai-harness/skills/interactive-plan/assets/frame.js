@@ -30,7 +30,6 @@ function uuid() {
   const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0"));
   return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
-const kindLabel = plan.kind === "plan" ? "Final plan" : "Exploration";
 const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 function ago(value) {
@@ -239,9 +238,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       }),
     );
   }
-  for (const button of document.querySelectorAll(
-    "#navigation [data-page], #review-link, #review-link-bar",
-  )) {
+  for (const button of document.querySelectorAll("#navigation [data-page]")) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -832,13 +829,11 @@ function renderFeedback() {
   );
 }
 function badge(count) {
-  const link = $("review-link");
-  link.hidden = !count || !editable;
-  link.textContent = `Review (${count}) →`;
-  $("menu-count").hidden = !count || !editable;
-  $("menu-count").textContent = count;
-  $("review-link-bar").hidden = link.hidden;
-  $("review-link-bar").textContent = link.textContent;
+  const row = $("review-row");
+  if (!row) return;
+  const mark = row.querySelector(".count");
+  mark.textContent = count || "";
+  mark.hidden = !count;
 }
 /* On a narrow screen the sidebar is a drawer behind the menu button. */
 function openDrawer() {
@@ -924,17 +919,13 @@ function review() {
     renderedFeedback = rendered;
   }
   const sendable = connected && current() && editable;
-  const sent = !unsent.count && state.submitted?.revision === plan.revision;
   $("submit").disabled = !unsent.count || !sendable;
-  // Accept plan takes the slot on an acceptable final plan; a sent round with
-  // nothing new shows when it went instead of a disabled button.
-  $("submit").hidden = !$("accept").hidden || (sent && !submissionError);
-  $("submit-status").textContent =
-    submissionError || (sent ? `Sent ${ago(state.submitted.at)}` : "");
-  $("submit-bar").disabled = $("submit").disabled;
-  $("submit-bar").hidden = $("submit").hidden;
-  $("accept-bar").hidden = $("accept").hidden;
-  $("submit-status-bar").textContent = $("submit-status").textContent;
+  // Accept plan takes the slot on an acceptable final plan. A sent round with
+  // nothing new leaves Submit in place and disabled, so the header keeps its
+  // shape between rounds; the working card reports how long the agent has been
+  // at it.
+  $("submit").hidden = !$("accept").hidden;
+  $("submit-status").textContent = submissionError;
   status();
 }
 function feedbackText() {
@@ -1236,17 +1227,22 @@ function blockHeading(block) {
   );
   return text.length > 60 ? text.slice(0, 57) + "…" : text;
 }
+let blockControls = null;
+// The control sits in the column's gutter, so it hangs outside the block it
+// belongs to. Most blocks clip their overflow to hold a rounded corner, which
+// would hide it, so it is a child of the column and follows the block's top.
 function addBlockControls(root, current) {
+  blockControls?.disconnect();
+  const pairs = [];
   let index = 0;
   for (const block of [...root.children]) {
     index++;
     if (blockSkip.has(block.tagName) || !normalize(block.textContent)) continue;
     if (!block.id) block.id = `block-${index}`;
-    if (getComputedStyle(block).position === "static")
-      block.classList.add("has-block-comment");
     const button = document.createElement("button");
     button.type = "button";
     button.className = "block-comment";
+    button.dataset.for = block.id;
     button.setAttribute("aria-label", "Comment on this block");
     button.innerHTML = blockIcon;
     button.onclick = (event) => {
@@ -1254,8 +1250,19 @@ function addBlockControls(root, current) {
       const heading = blockHeading(block);
       openNote(current.id, heading, heading, null, null, block.id);
     };
-    block.append(button);
+    root.append(button);
+    pairs.push([button, block]);
   }
+  const place = () => {
+    for (const [button, block] of pairs)
+      button.style.top = `${block.offsetTop}px`;
+  };
+  place();
+  // Shiki, Mermaid, charts and diffs all change a block's height after the
+  // page renders, and each one moves every control below it.
+  blockControls = new ResizeObserver(place);
+  blockControls.observe(root);
+  for (const [, block] of pairs) blockControls.observe(block);
 }
 function renderSessions() {
   const others = sessions.filter((entry) => entry.id !== session.sessionId);
@@ -1323,46 +1330,55 @@ function renderRevisions() {
     .slice()
     .reverse();
   const latest = remote?.current?.revision ?? entries[0].revision;
-  const menu = $("revision-menu");
-  menu.replaceChildren();
-  const heading = document.createElement("div");
-  heading.className = "side-label";
-  heading.textContent = "Revisions";
-  menu.append(heading);
+  const list = $("revision-list");
+  list.replaceChildren();
   for (const entry of entries) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className =
-      "item" + (entry.revision === plan.revision ? " current" : "");
-    item.setAttribute("role", "menuitem");
+    const here = entry.revision === plan.revision;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "rev-row" + (here ? " current" : "");
     const tick = document.createElement("span");
     tick.className = "tick";
-    tick.textContent = entry.revision === plan.revision ? "✓" : "";
+    tick.textContent = here ? "✓" : "";
     const label = document.createElement("span");
     label.textContent = `Revision ${entry.revision}`;
+    // The plan's name lives here, because the frame shows it nowhere else.
+    if (here) {
+      const name = document.createElement("small");
+      name.textContent = plan.title;
+      label.append(document.createElement("br"), name);
+    }
     const time = document.createElement("small");
     time.textContent = entry.publishedAt ? ago(entry.publishedAt) : "";
-    item.append(tick, label, time);
-    item.onclick = () => {
+    row.append(tick, label, time);
+    row.onclick = () => {
       toggleRevisionMenu(false);
-      if (entry.revision === plan.revision && mode === "live") return;
+      if (here && mode === "live") return;
       location.assign(
         entry.revision === latest
           ? `${base}/`
           : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
       );
     };
-    menu.append(item);
+    list.append(row);
   }
-  $("revision-text").textContent =
-    `${kindLabel} · Revision ${plan.revision}${mode === "readonly" ? " · read-only" : ""}`;
-  $("revision-back").hidden = mode !== "readonly";
+  // An older revision is read-only, and the clock alone does not say which
+  // one you are on, so a strip under the header names it.
+  const older = mode === "readonly";
+  $("older-strip").hidden = !older;
+  $("revision").classList.toggle("older", older);
+  $("older-text").textContent = older
+    ? `You are reading revision ${plan.revision} of ${latest}`
+    : "";
   $("revision-back").href = `${base}/`;
+  $("revision").setAttribute(
+    "aria-label",
+    `Revisions, on revision ${plan.revision}`,
+  );
 }
-function toggleRevisionMenu(open = $("revision-menu").hidden) {
-  $("revision-menu").hidden = !open;
-  $("revision").setAttribute("aria-expanded", String(open));
-  if (open) $("revision-menu").querySelector("button")?.focus();
+function toggleRevisionMenu(open = !$("revision-dialog").open) {
+  if (open) $("revision-dialog").showModal();
+  else if ($("revision-dialog").open) $("revision-dialog").close();
 }
 function toggleSidecar(open = !$("sessions-dialog").open) {
   if (open && $("bell").hidden) return;
@@ -1473,8 +1489,6 @@ $("note-form").onsubmit = (event) => {
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
-$("submit-bar").onclick = () => $("submit").click();
-$("accept-bar").onclick = () => $("accept").click();
 $("submit").onclick = async () => {
   submissionError = "";
   const groups = submissionGroups(state);
@@ -1569,7 +1583,6 @@ document.addEventListener("click", (event) => {
     toggleSidecar(false);
     return;
   }
-  if (!event.target.closest("#revision-menu")) toggleRevisionMenu(false);
   if (event.target.closest("#sidebar-close")) {
     closeDrawer();
     return;
@@ -1736,10 +1749,7 @@ document.addEventListener("keydown", (event) => {
     openNote(page.id, page.title);
   else if (key === "r" && editable) show("feedback");
   else if (key === "s" && editable) {
-    const bar = $("foot-bar").offsetParent !== null;
-    const target = $("accept").hidden
-      ? $(bar ? "submit-bar" : "submit")
-      : $(bar ? "accept-bar" : "accept");
+    const target = $("accept").hidden ? $("submit") : $("accept");
     if (target.hidden || target.disabled) return;
     target.focus();
   } else if (key === "a") show("agreed");
@@ -2116,8 +2126,14 @@ window.planUI = {
 
 /* Start */
 document.title = plan.title;
-$("plan-title").textContent = plan.title;
-// Agreed so far reads before the pages; the review link sits in the foot.
+// Agreed so far reads before the pages, Review comments after them, each
+// behind a separator, and the drawer shows the same list as the sidebar.
+function separator() {
+  const divider = document.createElement("div");
+  divider.className = "separator";
+  divider.setAttribute("role", "separator");
+  return divider;
+}
 for (const item of [
   pages.find((item) => item.id === "agreed"),
   ...pages.filter((item) => item.id !== "agreed"),
@@ -2127,12 +2143,20 @@ for (const item of [
   button.dataset.page = item.id;
   button.textContent = item.title;
   $("navigation").append(button);
-  if (item.id === "agreed") {
-    const divider = document.createElement("div");
-    divider.className = "separator";
-    divider.setAttribute("role", "separator");
-    $("navigation").append(divider);
-  }
+  if (item.id === "agreed") $("navigation").append(separator());
+}
+if (editable) {
+  const review = document.createElement("button");
+  review.type = "button";
+  review.id = "review-row";
+  review.dataset.page = "feedback";
+  const label = document.createElement("span");
+  label.textContent = "Review comments";
+  const count = document.createElement("b");
+  count.className = "count";
+  count.hidden = true;
+  review.append(label, count);
+  $("navigation").append(separator(), review);
 }
 $("menu-button").addEventListener("click", () =>
   $("sidebar").dataset.open === "true" ? closeDrawer() : openDrawer(),
