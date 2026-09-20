@@ -2,14 +2,21 @@
 
 ## Frame and content
 
-The frame owns the sidebar, the previous and next links at the end of each
-page, the bell for other live sessions, Settings (appearance and
+The frame owns the header, the sidebar, the previous and next links at the
+end of each page, the bell for other live sessions, Settings (appearance and
 notifications), the Feedback page, the working card (the round's steps,
 ticked as the agent reports them), and the preview and read-only modes. The
-sidebar holds the title, the revision line and its popover, the pages,
-Agreed, Feedback with a count of unsent items, and Submit at the foot,
-which shows when the last round was sent and becomes Accept plan on a final
-plan that can be accepted. The page layout is yours. The frame provides
+header runs across the whole frame at every width and holds the revision
+clock, Settings and the bell at the left, and Submit at the right, which
+becomes Accept plan on a final plan that can be accepted and goes disabled
+once a round is sent. The clock opens a dialog listing every revision,
+newest first, with the current one ticked; choosing another one opens it.
+Below 720px the header gains a menu button that slides the sidebar in as a
+full-screen drawer. The sidebar sits below the header and holds Agreed, the
+pages, and Review comments, which opens the Feedback page and carries the
+count of unsent items. The plan's title is not in the frame: the browser tab carries
+it, and the revision dialog shows it under the current revision. The page
+layout is yours. The frame provides
 basic typography, tables, code, theme colors, focus, and selected-choice
 states; it provides no generic card or column layouts. The builder wraps
 the plan's CSS in `@scope (#page-content)`, so a rule for `body`, `:root`,
@@ -28,11 +35,15 @@ labels so that meaning never rests on color alone.
 
 Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
 titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
-6px for rows. The frame is at most 1160px wide and centered; the reading
-column is at most 820px.
+6px for rows. The frame is at most 1160px wide and centered, and the reading
+column is at most 780px of text.
 
-Frame popups close on an outside click or Escape without submitting
-anything. Custom popups should do the same and keep unsent text. Single
+The frame is exactly as tall as the visible window and the page scrolls
+inside it, so the window itself never scrolls and no content passes under
+the header. Reading an older revision draws a strip under the header that
+names it and links back to the current one. Frame dialogs close on Escape
+or their ✕ without submitting anything, and each takes the focus on its own
+heading so no control is left ringed. Custom popups should do the same and keep unsent text. Single
 keys, listed under `?`, move between sessions, pages, and interactive
 items, and `s` focuses Submit so that Enter sends. Keep authored controls
 focusable so the keys reach them.
@@ -78,7 +89,7 @@ Page-level and text-selection comments need no custom code.
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom, above
 the page actions. The Feedback page groups items by page, with edit and
-remove, and holds the overall comment. Submit, at the foot of the sidebar,
+remove, and holds the overall comment. Submit, at the right of the header,
 sends everything unsent at once. Sent items stay listed as sent until the
 next revision; items whose page or text no longer exists are listed under
 the revision they came from. A submission carries `groups.choices`
