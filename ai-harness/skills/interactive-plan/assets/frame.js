@@ -16,7 +16,9 @@ const agreements = plan.agreements || [];
 const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
 const pages = [
   ...plan.pages,
-  ...(builtInAgreed ? [{ id: "agreed", title: "Agreed", html: "" }] : []),
+  ...(builtInAgreed
+    ? [{ id: "agreed", title: "Agreed so far", html: "" }]
+    : []),
 ];
 const kindLabel = plan.kind === "plan" ? "Final plan" : "Exploration";
 const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
@@ -222,7 +224,9 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       }),
     );
   }
-  for (const button of $("navigation").querySelectorAll("[data-page]")) {
+  for (const button of document.querySelectorAll(
+    "#navigation [data-page], #review-link",
+  )) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -813,19 +817,9 @@ function renderFeedback() {
   );
 }
 function badge(count) {
-  const item = $("navigation").querySelector('[data-page="feedback"]');
-  if (!item) return;
-  let mark = item.querySelector(".count");
-  if (!count) {
-    mark?.remove();
-    return;
-  }
-  if (!mark) {
-    mark = document.createElement("b");
-    mark.className = "count";
-    item.append(mark);
-  }
-  mark.textContent = String(count);
+  const link = $("review-link");
+  link.hidden = !count || !editable;
+  link.textContent = `Review (${count}) →`;
 }
 function canAccept(unsentCount) {
   return (
@@ -840,14 +834,17 @@ function canAccept(unsentCount) {
 // page leads to review, and the Feedback page leads back.
 function renderFooter(feedback) {
   const order = [
-    ...pages,
+    ...pages.filter((item) => item.id !== "agreed"),
     ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
   ];
+  // Agreed so far is outside the reading order: it leads back to the last
+  // page and on to the review.
   const index = order.findIndex(
     (item) => item.id === (feedback ? "feedback" : page.id),
   );
-  const previous = order[index - 1];
-  const next = order[index + 1];
+  const agreed = !feedback && page.id === "agreed";
+  const previous = agreed ? order[order.length - 2] : order[index - 1];
+  const next = agreed ? order[order.length - 1] : order[index + 1];
   const link = (element, item, text) => {
     element.hidden = !item;
     if (!item) return;
@@ -899,7 +896,6 @@ function review() {
   const sendable = connected && current() && editable;
   const sent = !unsent.count && state.submitted?.revision === plan.revision;
   $("submit").disabled = !unsent.count || !sendable;
-  $("submit").textContent = unsent.count ? `Submit ${unsent.count}` : "Submit";
   // Accept plan takes the slot on an acceptable final plan; a sent round with
   // nothing new shows when it went instead of a disabled button.
   $("submit").hidden = !$("accept").hidden || (sent && !submissionError);
@@ -1054,6 +1050,15 @@ function workingModel(accepting) {
 function renderWorking(model) {
   $("working-title").textContent = model.title;
   $("working-time").textContent = model.since ? elapsed(model.since) : "";
+  // A step the agent started and never reported on looks like work; after
+  // two minutes without a report the card says so.
+  const report = remote?.progress?.updatedAt || remote?.acknowledgedAt;
+  const stale =
+    remote?.stage === "working" &&
+    report &&
+    Date.now() - Date.parse(report) >= 120000;
+  $("working-report").hidden = !stale;
+  if (stale) $("working-report").textContent = `Last report ${ago(report)}`;
   const note = remote?.paused
     ? `The agent stopped at your request (${remote.paused.reason}). Send it a message in the chat to resume.`
     : remote?.wake?.last?.ok === false
@@ -2003,22 +2008,22 @@ window.planUI = {
 /* Start */
 document.title = plan.title;
 $("plan-title").textContent = plan.title;
+// Agreed so far reads before the pages; the review link sits in the foot.
 for (const item of [
-  ...pages.filter((item) => item.id !== "agreed"),
   pages.find((item) => item.id === "agreed"),
-  ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
+  ...pages.filter((item) => item.id !== "agreed"),
 ]) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.page = item.id;
+  button.textContent = item.title;
+  $("navigation").append(button);
   if (item.id === "agreed") {
     const divider = document.createElement("div");
     divider.className = "separator";
     divider.setAttribute("role", "separator");
     $("navigation").append(divider);
   }
-  const button = document.createElement("button");
-  button.type = "button";
-  button.dataset.page = item.id;
-  button.textContent = item.title;
-  $("navigation").append(button);
 }
 const narrow = matchMedia("(max-width: 720px)");
 const layoutMenu = () => {
