@@ -40,15 +40,17 @@ accepts any local client when `COPILOT_CONNECTION_TOKEN` is unset.
 Write a complete artifact, publish it, and end the turn:
 
 ```sh
-node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html
+node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html --source DIR
 ```
 
 `publish` stores the artifact as `<artifactId>.<revision>.html` in the
 session's `artifacts/` directory, using the values embedded in the
-artifact, and refuses a revision that already exists, so build somewhere
-else, such as `src/out/`. Keep old revisions so that feedback stays
-attached to what the user saw; to return to an older proposal, use it as
-the baseline for a new revision.
+artifact, and refuses a revision that already exists, so build in the temp
+directory. `--source DIR` copies the directory the artifact was built from
+to `src/<revision>/` in the session before publishing, and `status.current.source`
+names it afterwards. Keep old revisions so that feedback stays attached to
+what the user saw; to return to an older proposal, use it as the baseline
+for a new revision.
 
 On the first publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,

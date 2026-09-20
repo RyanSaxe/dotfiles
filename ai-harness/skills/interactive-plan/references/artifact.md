@@ -1,15 +1,18 @@
 # The artifact
 
-Write HTML pages and a JSON manifest in the session directory, with custom
-CSS and JavaScript when a page needs them, and build one artifact from them:
+Write HTML pages and a JSON manifest in a directory of your own under the
+system temp directory, with custom CSS and JavaScript when a page needs
+them, and build one artifact from them there:
 
 ```sh
 node scripts/build.mjs SOURCE.json ARTIFACT.html
 ```
 
-The output filename must not exist yet. Build into a directory of your own
-under the session directory, such as `src/out/`; the publisher owns
-`artifacts/` and refuses a name that already exists there. The builder puts
+The output filename must not exist yet. The temp directory is scratch: a
+sandbox can always write it, and `publish --source DIR` keeps a copy of it
+as `src/<revision>/` inside the session, which is where the next round
+starts. The publisher owns `artifacts/` and refuses a revision that already
+exists there. The builder puts
 the frame and the authored content into one HTML file. It does not bundle
 imports or linked files, so embed every local resource the plan needs. Do
 not install packages to author a plan.
