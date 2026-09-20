@@ -35,7 +35,7 @@ restarted.
 Copilot listens only when started with `--ui-server`. Its embedded server
 accepts any local client when `COPILOT_CONNECTION_TOKEN` is unset.
 
-## The loop
+## Publishing
 
 Write a complete artifact, publish it, and end the turn:
 
@@ -46,9 +46,9 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html
 `publish` stores the artifact as `<artifactId>.<revision>.html` in the
 session's `artifacts/` directory, using the values embedded in the
 artifact, and refuses a revision that already exists, so build somewhere
-else, such as `src/out/`. When you check a revision with browser
-automation, a sandboxed prototype embed captures as a blank iframe; check it
-through Open full size or by serving its file directly.
+else, such as `src/out/`. Keep old revisions so that feedback stays
+attached to what the user saw; to return to an older proposal, use it as
+the baseline for a new revision.
 
 On the first publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,
@@ -57,60 +57,29 @@ and keep the link available. Do not open another tab on later revisions:
 the page refreshes itself when a revision lands and keeps the user's unsent
 draft.
 
-When a submission lands, the hub wakes the agent with one line naming the
-session directory. Read the event, acknowledge it, declare the revision's
-steps, revise, publish, and end the turn again:
+The pages carry every question. There is no question event, reply field or
+reply notification, and none should be built.
 
-```sh
-node scripts/session.mjs wait --session-dir PATH
-node scripts/session.mjs ack --session-dir PATH --id SUBMISSION_ID
-node scripts/session.mjs progress --session-dir PATH --steps "Update Agreed|Write: Progress|Write: Submit"
-node scripts/session.mjs progress --session-dir PATH --start "Update Agreed"
-node scripts/session.mjs progress --session-dir PATH --done "Update Agreed"
-```
+## Resuming
 
-`wait` returns the next unread event without acknowledging it, and
-`{"waiting": true}` when there is none. Read the event's `payload`,
-including the intent and the source revision, before `ack`; a saved receipt
-is not an acknowledgement. If a turn is interrupted, the next turn runs
-`status` and reads any unread event before doing anything else; do not
-start a replacement session.
+If a turn is interrupted, the next turn runs `status` and reads any unread
+event with `read` before doing anything else; do not start a replacement
+session. A failed request to the hub is not completion: check that the hub
+is alive, retry the same session, and inspect the recorded owner before any
+recovery. Never delete ownership files without reading them.
 
 ```sh
 node scripts/session.mjs status --session-dir PATH
 ```
 
-Steps are a set, not a sequence. `--steps` takes one to twelve titles split
-on `|`, unique and at most 80 characters, and declaring again replaces the
-list. `--start` names the steps you begin, split on `|`, and `--done` marks
-one finished; an unknown title is an error.
-The reviewer's working card shows every step with its state, with the hub's
-own steps around them: reading the feedback, working out the steps,
-checking and polishing, publishing. Declare only the work between reading
-and checking. `publish` clears the list.
-
 When the user says in words to stop, run `pause`; the page says that the
 agent stopped and that a message in the chat resumes the session. The hub
-saves a submission to a paused session without waking anyone, and `wait`
+saves a submission to a paused session without waking anyone, and `read`
 returns it once `start --session-dir PATH` has resumed the session:
 
 ```sh
 node scripts/session.mjs pause --session-dir PATH --reason "asked to stop"
 ```
-
-A failed request to the hub is not completion. Check that the hub is alive,
-retry the same session, and inspect the recorded owner before any
-recovery. Never delete ownership files without reading them.
-
-If the next revision depends on the user, put a decision or question on the
-page next to the affected proposal. The user answers through feedback or in
-the conversation. There is no question event, reply field, or reply
-notification, and none should be built.
-
-Publish each revision under a new revision identifier. Keep old snapshots
-so that feedback stays attached to what the user saw. To return to an older
-proposal, use it as the baseline for a new revision and reconsider the
-later decisions explicitly; do not delete later history.
 
 ## Acceptance
 
@@ -154,13 +123,13 @@ acknowledgements or submissions.
 `status.json` records `title`, `kind`, `revisions`, `progress`, `wake`, and
 `paused` next to the stage; `pause` sets `paused` and leaves the stage as
 it was. `stage` is `ready`, `updated`, `submitted`,
-`working`, or `complete`: a submission moves it to `submitted`, `ack` to
+`working`, or `complete`: a submission moves it to `submitted`, `read` to
 `working`, `publish` to `updated`, `complete` to `complete`. `wake` is
 `ok`, or `failed` with the reason, after the last submission; the browser
-shows a failed wake and asks for a message in the chat. `needsYou` is
+shows a failed wake and asks for a message in the chat; an agent that is
+already working changes nothing on seeing it. `needsYou` is
 derived in responses and is true when a published revision is waiting on
-the reviewer, which is what the browser's bell counts. `ack` is idempotent;
-`publish` refuses while a submission is unread.
+the reviewer, which is what the browser's bell counts. `publish` refuses while a submission is unread.
 
 When `start` finds a hub on older or newer code, it uses it and logs the
 mismatch; the hub restarts on the newer code once no session is live.
