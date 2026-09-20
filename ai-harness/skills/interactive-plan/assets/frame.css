@@ -565,30 +565,6 @@ main {
 /* A popover sits in the top layer, where absolute means the top of the
    document; fixed keeps the menu under the gear however far the page is
    scrolled. */
-.settings {
-  position: fixed;
-  inset: 44px 16px auto auto;
-  margin: 0;
-  width: 240px;
-  padding: 8px 12px 12px;
-}
-.settings label {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin: 6px 0 4px;
-}
-.settings select {
-  display: block;
-  width: 100%;
-  margin-bottom: 10px;
-}
-.settings .btn {
-  width: 100%;
-}
-.settings p {
-  margin: 10px 0 0;
-}
 select {
   padding: 6px 8px;
   color: var(--ink);
@@ -795,74 +771,6 @@ body.is-working .content {
 }
 
 /* Sessions panel */
-.sidecar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 300px;
-  max-width: 100vw;
-  z-index: 7;
-  background: var(--panel);
-  border-left: 1px solid var(--line);
-  box-shadow: -10px 0 30px #0002;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-.sidecar > header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.sidecar-list {
-  padding: 8px;
-  overflow: auto;
-  display: grid;
-  gap: 1px;
-  align-content: start;
-}
-.sidecar-list .group {
-  padding: 8px 10px 2px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.session-row {
-  display: grid;
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 6px;
-}
-.session-row:hover {
-  background: var(--ground);
-}
-.session-row span {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.session-row small {
-  font-size: 11.5px;
-  color: var(--muted);
-}
-.session-row.need small {
-  color: var(--attention);
-}
-.session-row.current {
-  background: var(--ground);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
 
 /* Notes on the text */
 ::highlight(plan-note),
@@ -1336,22 +1244,6 @@ dialog {
 dialog::backdrop {
   background: #0005;
 }
-.drawer {
-  position: fixed;
-  inset: 0 0 0 auto;
-  height: 100dvh;
-  max-height: none;
-  width: 420px;
-  max-width: 100vw;
-  margin: 0;
-  padding: 22px 24px;
-  border: 0;
-  border-left: 1px solid var(--line);
-}
-.drawer label {
-  font-size: 12px;
-  color: var(--muted);
-}
 .dialog-head {
   display: flex;
   justify-content: space-between;
@@ -1420,7 +1312,7 @@ dialog::backdrop {
 :root[data-mode="preview"] .page-footer,
 :root[data-mode="preview"] #quote,
 :root[data-mode="preview"] .working,
-:root[data-mode="preview"] .sidecar {
+:root[data-mode="preview"] .foot-bar {
   display: none !important;
 }
 :root[data-mode="preview"] main {
@@ -1435,6 +1327,7 @@ dialog::backdrop {
 }
 :root[data-mode="readonly"] .page-actions,
 :root[data-mode="readonly"] .side-foot,
+:root[data-mode="readonly"] .foot-bar,
 :root[data-mode="readonly"] #quote,
 :root[data-mode="readonly"] [data-comment],
 :root[data-mode="readonly"] .note-count {
@@ -1446,87 +1339,245 @@ dialog::backdrop {
   pointer-events: none;
 }
 
-/* The menu button and the backdrop exist for narrow screens only. */
-.menu-button {
+/* Dialogs share one treatment; a long body scrolls inside. */
+.dialog {
+  overflow: auto;
+}
+.dialog .actions-right {
+  display: flex;
+  justify-content: flex-end;
+}
+.dialog.note #note-anchor {
+  margin: 0 0 6px;
+}
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.settings-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.settings-row .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.segmented button {
+  padding: 4px 10px;
+  border-left: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 12px;
+}
+.segmented button:first-child {
+  border-left: 0;
+}
+.segmented button[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+.session-list {
+  display: grid;
+  gap: 1px;
+  margin: 0 -8px;
+}
+.session-list .session-gap {
+  height: 6px;
+}
+.session-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.session-row:hover {
+  background: var(--ground);
+}
+.session-row.current {
+  background: var(--accent-soft);
+}
+.session-row .title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-row .words {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-row .words em {
+  font-style: normal;
+  font-weight: 600;
+}
+.session-row.need .words em {
+  color: var(--attention);
+}
+.session-row.current .words em {
+  color: var(--ink);
+}
+.session-row.done .title {
+  font-weight: 500;
+  color: var(--muted);
+}
+.icon-btn.menu {
+  display: none;
+  position: relative;
+}
+.icon-btn.menu svg {
+  width: 18px;
+  height: 18px;
+}
+.icon-btn.menu b {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.sidebar-close,
+.foot-bar {
   display: none;
 }
-.backdrop {
+/* A comment control on every block: on the block's top edge so it never
+   covers a control inside, shown on hover where hover exists. */
+.has-block-comment {
+  position: relative;
+}
+.block-comment {
+  position: absolute;
+  top: -12px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.block-comment svg {
+  width: 13px;
+  height: 13px;
+}
+.has-block-comment:hover > .block-comment,
+.block-comment:focus-visible {
+  opacity: 1;
+}
+.block-comment:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+@media (hover: none) {
+  .block-comment {
+    opacity: 0.45;
+  }
+  .block-comment:active {
+    opacity: 1;
+  }
+}
+:root[data-mode="preview"] .content {
+  margin: 0;
+}
+:root[data-mode="preview"] .block-comment,
+:root[data-mode="readonly"] .block-comment {
   display: none;
 }
 
-/* Narrow screens: the sidebar is a drawer behind a menu button. */
+/* Narrow screens: a full-screen drawer behind the menu button, and Review
+   and Submit in a bar under the thumb. */
 @media (max-width: 720px) {
   .app {
     display: block;
     max-width: none;
   }
-  .menu-button {
+  .icon-btn.menu {
     display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    position: fixed;
-    top: 6px;
-    left: 8px;
-    z-index: 6;
-    padding: 6px 9px;
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    background: var(--panel);
-    color: var(--ink);
-  }
-  .menu-button > i {
-    display: block;
-    width: 16px;
-    height: 2px;
-    background: currentColor;
-    box-shadow:
-      0 -5px 0 currentColor,
-      0 5px 0 currentColor;
-  }
-  .menu-button .count {
-    display: inline-block;
-    min-width: 18px;
-    padding: 0 5px;
-    border-radius: 999px;
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-size: 10.5px;
-    font-weight: 700;
-    text-align: center;
-  }
-  .backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 29;
-    background: rgb(0 0 0 / 0.35);
-  }
-  .backdrop[hidden] {
-    display: none;
   }
   .sidebar {
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    inset: 0;
     z-index: 30;
-    width: min(320px, 86vw);
-    height: 100vh;
-    border-left: 0;
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
     transform: translateX(-100%);
     transition: transform 0.18s ease;
   }
   .sidebar[data-open="true"] {
     transform: none;
   }
-  main {
-    border-right: 0;
-  }
   .plan-head {
-    padding: 14px 16px 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    padding: 12px 12px 8px 16px;
+  }
+  .plan-head .revision-line,
+  .plan-head .revision-back,
+  .plan-head .popover {
+    grid-column: 1;
+  }
+  .sidebar-close {
+    display: inline-flex;
+    grid-row: 1;
+    grid-column: 2;
   }
   .plan-title {
     font-size: 14px;
+  }
+  .side-foot {
+    display: none;
+  }
+  .foot-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .foot-bar .small {
+    margin-right: auto;
+  }
+  main {
+    border-right: 0;
   }
   .topbar {
     position: fixed;
@@ -1537,21 +1588,24 @@ dialog::backdrop {
   }
   .content {
     margin: 0;
-    padding: 50px 18px 70px;
+    padding: 50px 18px 84px;
   }
   .working {
     left: 0;
     width: 100%;
   }
-  .sidecar {
-    width: 100vw;
-  }
   table {
     display: block;
     overflow: auto;
   }
-  .drawer {
-    width: 100%;
+  .dialog {
+    width: 92vw;
+  }
+  /* iOS zooms into a field under 16px. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
   .feedback-item {
     grid-template-columns: 1fr;
