@@ -1497,6 +1497,29 @@ test("the CLI marks steps in one call, keeps the source with a publication, and 
   assert.equal(report.codex.present, true);
 });
 
+test("a moved session still serves its current and earlier revisions", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.action("publish", { html: artifact("1") });
+  await a.action("publish", { html: artifact("2") });
+  const moved = a.directory + "-moved";
+  await fs.rename(a.directory, moved);
+  const registered = await fetch(h.server.origin + "/agent/register", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${h.record.secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionDir: moved,
+      wake: { harness: "codex", thread: "thread-moved" },
+    }),
+  });
+  assert.equal(registered.status, 200);
+  assert.equal((await a.request(`${a.base}/`)).code, 200);
+  assert.equal((await a.request(`${a.base}/r/1`)).code, 200);
+});
+
 test("start replaces a stale hub record, and helper commands reattach after a crash without losing the queue", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-stale-"));
   const env = cliEnv(home, { INTERACTIVE_PLAN_PORT: "0" });
