@@ -19,7 +19,7 @@ A plan-local component works the same way.
 
 Code, diagrams, and charts need no component. The frame renders them as
 figures from `data-file`, `data-caption`, and `data-title`; see
-[authoring.md](../references/authoring.md). Notes on the text are frame
+[frame.md](../references/frame.md). Notes on the text are frame
 behavior.
 
 ## Decisions

@@ -6,62 +6,47 @@ description: Develop and review implementation plans in an interactive browser s
 # Interactive plan
 
 interactive-plan develops an implementation-ready plan with the user in the
-browser. The agent shows the decisions and the material needed to judge
-them, takes feedback, and revises until the user accepts.
+browser. The agent puts the open decisions and the material needed to judge
+them on pages, the user answers by choosing options and by commenting on
+any text or component, and the agent revises until the user accepts.
 
-## Two phases
+Exploration settles the decisions, one page per topic, with the Agreed page
+holding what is settled and where each agreement came from. Review presents
+the complete plan: an overview page and one page per implementation step,
+enough to implement and verify the work from the plan and the project
+alone. Feedback that reopens a settled choice goes back to exploration
+before a new complete plan is presented.
 
-Exploration settles the open decisions. Its pages hold the choices under
-review and the material needed to make them. The Agreed page holds what is
-settled, with a link to the exact place each agreement came from. Review
-presents the complete plan: an overview page linked to implementation
-steps that an engineer or agent can implement and verify using only the
-plan and the project.
+## Files
 
-Both phases take as many revisions as they need. Apply clear corrections
-directly. When feedback reopens a choice that needs comparison, return to
-exploration, settle it, and carry the result into a complete new plan
-before acceptance. The [review flow](references/flow.svg) shows the loop.
-
-## What to read
-
-- [planning.md](references/planning.md): what goes on the pages in each
-  phase, how Agreed is kept, how to revise, how a plan reaches review, and
-  the sentence check. Read it before authoring.
-- [authoring.md](references/authoring.md) and the
-  [component index](components/index.md): the artifact contracts, what a
-  revision may change, and the supplied components. Read them before
-  building.
-- [session.md](references/session.md): the helper, the hub, the wake paths,
-  and acceptance. Read it before starting or resuming a live review.
+- [round.md](references/round.md): what every revision does, in order. The
+  hub's wake message names it.
+- [quality.md](references/quality.md): what makes a page and a plan good.
+  Read it before the first revision.
+- [writing.md](references/writing.md): the sentence list every page passes.
+- [session.md](references/session.md): starting, resuming and accepting a
+  session, and the hub. Read it before `start`.
+- [artifact.md](references/artifact.md), [agreements.md](references/agreements.md),
+  [frame.md](references/frame.md), [prototypes.md](references/prototypes.md)
+  and the [component index](components/index.md): the contracts. Look one
+  up while building.
 - [setup.md](references/setup.md): on first use in an environment, or when
   something fails.
 
-## Run the session
+## Opening
 
-Ask in conversation only for information that is missing and affects the
-plan. Put every other request for input on a page, next to the proposal it
-affects. Move to the browser once there is concrete material to compare,
-correct, or approve. Open the first proposal in the user's default browser
-and give the link in chat.
+The session begins in the conversation. Before the first revision, get the
+context the plan needs: what the user wants, what they already know they
+want and do not want, what the project shows, and what is uncertain. That
+is a back and forth, not a list of questions. Move to the browser once
+there is material to compare or approve, open the first revision in the
+user's default browser, and give the link in chat. From then on, anything
+the plan needs from the user is asked on a page.
 
-Browser automation is optional. Use the live page to find and fix rendering
-and interaction problems. Do not install automation to author a plan unless
-asked.
-
-<important>
-
-While browser review is active, a turn ends after `publish` or after
-`pause`. The hub wakes you when a submission lands, acceptance included,
-and nothing else does. `complete` ends the review, and the accepted mode
-says what follows. When `start` refuses because the session cannot be
-woken, give the user the instruction it prints and stop until the session
-is restarted. Stop a review before acceptance only when the user says in
-words to stop, and then run `pause`, so the page says that the agent
-stopped and how to resume it.
-
-</important>
+A turn ends after `publish` or `pause`; the hub starts the next one when a
+submission lands, acceptance included, and `complete` ends the review. When
+`start` refuses because the session cannot be woken, give the user the
+instruction it prints and stop until the session is restarted.
 
 Acceptance names a mode, save or implement. Follow that mode and the
-project's permissions. Accepted artifacts stay as they are. Later revisions
-need their own acceptance.
+project's permissions. Accepted artifacts stay as they are.

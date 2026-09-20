@@ -12,6 +12,7 @@ import { isDeepStrictEqual } from "node:util";
 import { choiceText } from "../assets/choices.mjs";
 
 const here = fileURLToPath(import.meta.url);
+const round = path.resolve(path.dirname(here), "../references/round.md");
 export const version = crypto
   .createHash("sha256")
   .update(readFileSync(here))
@@ -325,7 +326,7 @@ async function loadSession(directory, config, origin) {
   // Runs after the submission is saved, outside the browser's request, so a
   // slow or failing harness never delays the reviewer's Sent state.
   async function wakeAgent(revision) {
-    const line = `interactive-plan: feedback arrived on session ${directory} (revision ${revision}). Run: node ${here} wait --session-dir ${directory}`;
+    const line = `interactive-plan: feedback arrived on session ${directory} (revision ${revision}). Run: node ${here} read --session-dir ${directory}, then follow ${round}`;
     let last;
     try {
       await (config.wake || wakeRunner)(wake, line);
@@ -529,17 +530,23 @@ async function loadSession(directory, config, origin) {
   }
   async function act(data) {
     requireValue(data.sessionId === state.sessionId, "Wrong session", 409);
-    if (data.action === "ack") {
-      requireValue(idPattern.test(data.id || ""), "Submission ID required");
-      if (state.acknowledged.includes(data.id)) return { status: view() };
-      const event = await read(
-        path.join(directory, "feedback", data.id + ".json"),
-      );
+    if (data.action === "read") {
+      // With an id, read returns that submission again and changes nothing,
+      // for a turn that resumes after an interruption.
+      if (data.id !== undefined) {
+        requireValue(idPattern.test(data.id || ""), "Submission ID required");
+        const event = await read(
+          path.join(directory, "feedback", data.id + ".json"),
+        );
+        return { status: view(), event };
+      }
+      const [event] = await pending();
+      if (!event) return { status: view(), event: null };
       const patch = {
         stage: "working",
-        acknowledged: [...state.acknowledged, data.id],
+        acknowledged: [...state.acknowledged, event.id],
         acknowledgedAt: timestamp(),
-        lastAcknowledgedId: data.id,
+        lastAcknowledgedId: event.id,
         progress: null,
       };
       if (event.payload.intent === "accept-plan") {
@@ -566,7 +573,7 @@ async function loadSession(directory, config, origin) {
     if (data.action === "progress") {
       requireValue(
         state.stage === "working",
-        "Acknowledge feedback before reporting progress",
+        "Read the submission before reporting progress",
         409,
       );
       const given = ["steps", "start", "done"].filter(
@@ -1400,24 +1407,8 @@ export async function main(argv) {
   }
   if (command === "status")
     return console.log(json(await request((id) => `/s/${id}/api/status`)));
-  if (command === "wait") {
-    const seconds = Number(options.timeout || 55);
-    requireValue(
-      Number.isFinite(seconds) && seconds > 0 && seconds <= 3600,
-      "timeout must be between 0 and 3600 seconds",
-    );
-    const deadline = Date.now() + seconds * 1000;
-    while (Date.now() < deadline) {
-      const result = await request((id) => `/agent/${id}/next`);
-      if (result.event) return console.log(json(result));
-      await sleep(Math.max(0, Math.min(1000, deadline - Date.now())));
-    }
-    return console.log(
-      json({ waiting: true, sessionId: connection.sessionId }),
-    );
-  }
   const action = { action: command };
-  if (command === "ack") action.id = options.id;
+  if (command === "read") action.id = options.id;
   if (command === "pause") action.reason = options.reason;
   if (command === "progress") {
     const given = ["steps", "start", "done"].filter(
