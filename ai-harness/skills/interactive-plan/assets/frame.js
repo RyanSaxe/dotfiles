@@ -20,6 +20,16 @@ const pages = [
     ? [{ id: "agreed", title: "Agreed so far", html: "" }]
     : []),
 ];
+// crypto.randomUUID exists only in a secure context; over plain http on a
+// Tailscale address, which is how a phone reaches the hub, it is undefined.
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
 const kindLabel = plan.kind === "plan" ? "Final plan" : "Exploration";
 const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -946,7 +956,7 @@ function feedbackText() {
 function envelope(intent, text, extra = {}) {
   return {
     sessionId: session.sessionId,
-    id: crypto.randomUUID(),
+    id: uuid(),
     artifactId: plan.artifactId,
     revision: plan.revision,
     intent,
@@ -1382,7 +1392,7 @@ $("note-form").onsubmit = (event) => {
   if (!text) return;
   const note = {
     ...noteContext,
-    id: editing || crypto.randomUUID(),
+    id: editing || uuid(),
     text,
     revision: plan.revision,
   };
@@ -1796,7 +1806,7 @@ function renderDiagrams(root) {
             },
           });
           const result = await mermaid.render(
-            "diagram-" + crypto.randomUUID(),
+            "diagram-" + uuid(),
             element.dataset.source,
           );
           if (!element.isConnected) return;
