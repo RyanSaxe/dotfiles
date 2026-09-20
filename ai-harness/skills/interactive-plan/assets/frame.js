@@ -963,16 +963,12 @@ function scheduleReload() {
     ["TEXTAREA", "INPUT"].includes(document.activeElement?.tagName)
   )
     return;
+  // A new revision opens at the top of its first page; the unsent draft is
+  // stored separately and carries over on its own.
   try {
-    sessionStorage.setItem(
-      resumeKey,
-      JSON.stringify({
-        page: $("feedback").hidden ? page.id : "feedback",
-        scrollY: window.scrollY,
-      }),
-    );
+    sessionStorage.setItem(resumeKey, JSON.stringify({ first: true }));
   } catch {
-    /* Reload without restoring the position. */
+    /* Reload without the marker. */
   }
   location.reload();
 }
@@ -2041,17 +2037,23 @@ try {
 } catch {
   /* Start at the top. */
 }
-show(resume?.page || location.hash.slice(1), query.get("target"), {
-  keepScroll: Boolean(resume),
-  push: false,
-});
+show(
+  resume?.first ? pages[0].id : location.hash.slice(1),
+  query.get("target"),
+  {
+    keepScroll: false,
+    push: false,
+  },
+);
+// The browser restores the old scroll position after the reload; a new
+// revision starts at the top.
+if (resume?.first) setTimeout(() => window.scrollTo(0, 0), 60);
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
   show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {
     push: false,
   });
 });
-if (resume) setTimeout(() => window.scrollTo(0, resume.scrollY), 60);
 if (mode === "preview" && query.get("quote")) {
   const range = findText($("page-content"), query.get("quote"));
   if (range) {
