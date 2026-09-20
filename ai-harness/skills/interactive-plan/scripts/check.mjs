@@ -4,6 +4,38 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Codex runs shell commands in a sandbox with no sockets and no writes
+// outside the workspace. An allow rule for the skill's scripts, in a file
+// of the skill's own, runs them outside the sandbox without a prompt.
+const skill = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+const rulesFile = path.join(codexHome, "rules", "interactive-plan.rules");
+const rules =
+  ["scripts/session.mjs", "scripts/build.mjs", "scripts/check.mjs"]
+    .map(
+      (script) =>
+        `prefix_rule(pattern=["node", ${JSON.stringify(path.join(skill, script))}], decision="allow", justification="interactive-plan: the helper talks to its local hub and writes the session under the state directory")`,
+    )
+    .join("\n") + "\n";
+const rulesPresent = () =>
+  fs
+    .readFile(rulesFile, "utf8")
+    .then((text) => text === rules)
+    .catch(() => false);
+if (process.argv[2] === "--codex-rules") {
+  await fs.mkdir(path.dirname(rulesFile), { recursive: true });
+  await fs.writeFile(rulesFile, rules, { mode: 0o600 });
+  console.log(JSON.stringify({ rules: rulesFile, written: true }, null, 2));
+  process.exit(0);
+}
+const codex =
+  Boolean(process.env.CODEX_SANDBOX) ||
+  (await fs.stat(codexHome).then(
+    () => true,
+    () => false,
+  ));
 
 let directory;
 const server = http.createServer((_, response) => response.end("ready"));
@@ -68,13 +100,26 @@ try {
         hub: port ? await portReport(port) : { port, state: "os-assigned" },
         browser: "Check available agent tools or ask for manual browser review",
         renderers: "Check required renderers in the actual browser",
+        ...(codex
+          ? {
+              codex: {
+                rules: rulesFile,
+                present: await rulesPresent(),
+                write: "node scripts/check.mjs --codex-rules",
+              },
+            }
+          : {}),
       },
       null,
       2,
     ),
   );
 } catch (error) {
-  console.error(error.message);
+  if (process.env.CODEX_SANDBOX_NETWORK_DISABLED === "1")
+    console.error(
+      `the Codex sandbox blocks the hub's socket and its state directory. Run outside the sandbox (escalated): node scripts/check.mjs --codex-rules, which writes ${rulesFile} so no later command asks. Then run the check again.`,
+    );
+  else console.error(error.message);
   process.exitCode = 1;
 } finally {
   server.closeAllConnections();

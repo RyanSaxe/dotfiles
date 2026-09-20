@@ -119,6 +119,26 @@ test("declared steps, start, and done marks round-trip through status", async ()
   assert.deepEqual(await states(), ["pending", "active", "done"]);
   assert.ok((await act({ action: "progress", start: ["Write: Q"] })).ok);
   assert.deepEqual(await states(), ["pending", "active", "active"]);
+  // One call finishes some steps and starts others.
+  assert.ok(
+    (
+      await act({
+        action: "progress",
+        done: ["Write: P"],
+        start: ["Update Agreed"],
+      })
+    ).ok,
+  );
+  assert.deepEqual(await states(), ["active", "done", "active"]);
+  assert.equal(
+    (await act({ action: "progress", done: ["Write: Q"], start: ["Write: Q"] }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await act({ action: "progress", steps: ["A"], start: ["A"] })).status,
+    400,
+  );
   const unknown = await act({ action: "progress", done: "Nope" });
   assert.equal(unknown.status, 400);
   assert.equal(unknown.body.error, "Unknown progress step");
@@ -145,6 +165,23 @@ test("invalid declarations are rejected", async () => {
     (await act({ action: "progress", steps: ["A"], done: "A" })).status,
     400,
   );
+});
+
+test("publish records a source inside the session and refuses one outside", async () => {
+  const outside = await act({
+    action: "publish",
+    html: await artifact("1b"),
+    source: "/elsewhere/src/1b",
+  });
+  assert.equal(outside.status, 400);
+  const inside = path.join(sessionDir, "src", "1b");
+  const kept = await act({
+    action: "publish",
+    html: await artifact("1b"),
+    source: inside,
+  });
+  assert.ok(kept.ok, JSON.stringify(kept.body));
+  assert.equal((await status()).current.source, inside);
 });
 
 test("publish clears progress", async () => {

@@ -1069,6 +1069,16 @@ function renderWorking(model) {
     Date.now() - Date.parse(report) >= 120000;
   $("working-report").hidden = !stale;
   if (stale) $("working-report").textContent = `Last report ${ago(report)}`;
+  // Declared steps with none active and some pending: the agent is between
+  // reports, and the card says so instead of looking idle.
+  const steps = remote?.progress?.steps;
+  $("working-between").hidden =
+    stale ||
+    remote?.stage !== "working" ||
+    !Array.isArray(steps) ||
+    steps.length === 0 ||
+    steps.some((step) => step.state === "active") ||
+    steps.every((step) => step.state === "done");
   const note = remote?.paused
     ? `The agent stopped at your request (${remote.paused.reason}). Send it a message in the chat to resume.`
     : remote?.wake?.last?.ok === false

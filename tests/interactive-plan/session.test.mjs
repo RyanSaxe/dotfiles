@@ -1439,6 +1439,70 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
 });
 
+test("the CLI marks steps in one call, keeps the source with a publication, and refuses to run inside a sandbox without network", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.action("publish", { html: artifact() });
+  await a.feedback(a.event());
+  await a.action("read");
+  const run = (...args) =>
+    exec(process.execPath, [helper, ...args, "--session-dir", a.directory], {
+      env: h.env,
+    });
+  await run("progress", "--steps", "Update Agreed|Page A|Page B");
+  await run("progress", "--start", "Update Agreed");
+  await run("progress", "--done", "Update Agreed", "--start", "Page A|Page B");
+  assert.deepEqual(
+    (await a.status()).body.progress.steps.map((step) => step.state),
+    ["done", "active", "active"],
+  );
+  await assert.rejects(
+    run("progress", "--steps", "X", "--start", "X"),
+    /steps alone/,
+  );
+  const work = await fs.mkdtemp(path.join(os.tmpdir(), "plan-source-"));
+  t.after(() => fs.rm(work, { recursive: true, force: true }));
+  await fs.writeFile(path.join(work, "page.html"), "<p>two</p>");
+  await fs.writeFile(path.join(work, "art.html"), artifact("2"));
+  await run("publish", "--file", path.join(work, "art.html"), "--source", work);
+  const kept = path.join(a.directory, "src", "2");
+  assert.equal((await a.status()).body.current.source, kept);
+  assert.equal(
+    await fs.readFile(path.join(kept, "page.html"), "utf8"),
+    "<p>two</p>",
+  );
+  await assert.rejects(
+    run("publish", "--file", path.join(work, "art.html"), "--source", work),
+    /already exists/,
+  );
+  await assert.rejects(
+    exec(process.execPath, [helper, "status", "--session-dir", a.directory], {
+      env: { ...h.env, CODEX_SANDBOX_NETWORK_DISABLED: "1" },
+    }),
+    /outside the sandbox/,
+  );
+  const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "plan-codex-"));
+  t.after(() => fs.rm(codexHome, { recursive: true, force: true }));
+  const check = path.join(path.dirname(helper), "check.mjs");
+  await exec(process.execPath, [check, "--codex-rules"], {
+    env: { ...h.env, CODEX_HOME: codexHome },
+  });
+  const rules = await fs.readFile(
+    path.join(codexHome, "rules", "interactive-plan.rules"),
+    "utf8",
+  );
+  assert.equal(rules.match(/^prefix_rule\(pattern=\["node", /gm).length, 3);
+  assert.ok(rules.includes(helper));
+  const report = JSON.parse(
+    (
+      await exec(process.execPath, [check, a.directory], {
+        env: { ...h.env, CODEX_HOME: codexHome, CODEX_SANDBOX: "seatbelt" },
+      })
+    ).stdout,
+  );
+  assert.equal(report.codex.present, true);
+});
+
 test("start replaces a stale hub record, and helper commands reattach after a crash without losing the queue", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-stale-"));
   const env = cliEnv(home, { INTERACTIVE_PLAN_PORT: "0" });

@@ -477,6 +477,11 @@ kbd {
 .side-foot .review-link:focus-visible {
   text-decoration: underline;
 }
+.working-card .working-between {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 .working-card .working-report {
   margin: 2px 0 0;
   font-size: 12px;
