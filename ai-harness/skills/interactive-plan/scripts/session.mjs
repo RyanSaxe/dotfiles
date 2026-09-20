@@ -1083,9 +1083,18 @@ export async function startHub(config = settings()) {
         if (method === "GET" && rest.length === 1 && rest[0] === "") {
           if (!session.state.current)
             return reply(200, "No artifact published yet.", "text/plain");
-          return html(await artifactPage(session, session.state.current), {
-            "Set-Cookie": `interactive-plan-last=${session.id}; Path=/; SameSite=Strict; Max-Age=2592000`,
-          });
+          // Resolved under the session's directory, so a moved session
+          // still serves its current revision.
+          return html(
+            await artifactPage(
+              session,
+              session.revisionEntry(session.state.current.revision) ||
+                session.state.current,
+            ),
+            {
+              "Set-Cookie": `interactive-plan-last=${session.id}; Path=/; SameSite=Strict; Max-Age=2592000`,
+            },
+          );
         }
         if (method === "GET" && rest[0] === "r" && rest.length === 2)
           return html(

@@ -186,7 +186,11 @@ function save() {
 }
 function theme() {
   document.documentElement.dataset.theme = activeTheme;
-  $("theme").value = preferredTheme || "system";
+  for (const button of $("theme").querySelectorAll("[data-theme]"))
+    button.setAttribute(
+      "aria-checked",
+      String(button.dataset.theme === (preferredTheme || "system")),
+    );
   for (const chart of charts.values())
     chart.setOption({
       color: [color("--accent"), color("--muted")],
@@ -226,6 +230,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       restoreAnswers();
       markNotes();
       enhance($("page-content"));
+      if (editable) addBlockControls($("page-content"), page);
     }
     $("page-actions").hidden = page.id === "agreed" && builtInAgreed;
     window.dispatchEvent(
@@ -235,7 +240,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     );
   }
   for (const button of document.querySelectorAll(
-    "#navigation [data-page], #review-link",
+    "#navigation [data-page], #review-link, #review-link-bar",
   )) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
@@ -446,7 +451,9 @@ function openNote(
   };
   editing = id;
   noteDraftKey = JSON.stringify([topic, anchor, quote, id, entryId]);
-  $("note-anchor").textContent = anchor;
+  const pageTitle = pages.find((item) => item.id === topic)?.title || anchor;
+  $("note-anchor").textContent =
+    anchor && anchor !== pageTitle ? `${pageTitle} › ${anchor}` : pageTitle;
   $("note-quote").textContent = quote;
   $("note-quote").hidden = !quote;
   $("note-text").value =
@@ -830,18 +837,18 @@ function badge(count) {
   link.textContent = `Review (${count}) →`;
   $("menu-count").hidden = !count || !editable;
   $("menu-count").textContent = count;
+  $("review-link-bar").hidden = link.hidden;
+  $("review-link-bar").textContent = link.textContent;
 }
 /* On a narrow screen the sidebar is a drawer behind the menu button. */
 function openDrawer() {
   $("sidebar").dataset.open = "true";
-  $("sidebar-backdrop").hidden = false;
   $("menu-button").setAttribute("aria-expanded", "true");
   $("navigation").querySelector("[aria-current]")?.focus();
 }
 function closeDrawer() {
   if ($("sidebar").dataset.open !== "true") return;
   delete $("sidebar").dataset.open;
-  $("sidebar-backdrop").hidden = true;
   $("menu-button").setAttribute("aria-expanded", "false");
   $("menu-button").focus();
 }
@@ -857,18 +864,17 @@ function canAccept(unsentCount) {
 // Every page ends with where you came from and where to go next; the last
 // page leads to review, and the Feedback page leads back.
 function renderFooter(feedback) {
+  // Agreed so far leads the order, as it leads the sidebar.
   const order = [
+    ...pages.filter((item) => item.id === "agreed"),
     ...pages.filter((item) => item.id !== "agreed"),
     ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
   ];
-  // Agreed so far is outside the reading order: it leads back to the last
-  // page and on to the review.
   const index = order.findIndex(
     (item) => item.id === (feedback ? "feedback" : page.id),
   );
-  const agreed = !feedback && page.id === "agreed";
-  const previous = agreed ? order[order.length - 2] : order[index - 1];
-  const next = agreed ? order[order.length - 1] : order[index + 1];
+  const previous = order[index - 1];
+  const next = order[index + 1];
   const link = (element, item, text) => {
     element.hidden = !item;
     if (!item) return;
@@ -925,6 +931,10 @@ function review() {
   $("submit").hidden = !$("accept").hidden || (sent && !submissionError);
   $("submit-status").textContent =
     submissionError || (sent ? `Sent ${ago(state.submitted.at)}` : "");
+  $("submit-bar").disabled = $("submit").disabled;
+  $("submit-bar").hidden = $("submit").hidden;
+  $("accept-bar").hidden = $("accept").hidden;
+  $("submit-status-bar").textContent = $("submit-status").textContent;
   status();
 }
 function feedbackText() {
@@ -1192,6 +1202,61 @@ function stateWords(entry) {
     return `Working · ${since(entry.updatedAt)}`;
   return "Live";
 }
+// Every direct child of the page content is a block and gets a comment
+// control, whatever it is; paragraphs, headings and lists are the exception,
+// since their text is what selection comments are for.
+const blockSkip = new Set([
+  "P",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "UL",
+  "OL",
+  "HR",
+  "BR",
+  "SCRIPT",
+  "STYLE",
+  "TEMPLATE",
+]);
+const blockIcon =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.2-4.3A8 8 0 1 1 21 12z"/></svg>';
+function blockHeading(block) {
+  const titled = block.matches("[data-title], [data-caption]")
+    ? block
+    : block.querySelector("[data-title], [data-caption]");
+  const named = block.querySelector("h1, h2, h3, h4, h5, h6, figcaption");
+  const text = normalize(
+    named?.textContent ||
+      titled?.dataset.title ||
+      titled?.dataset.caption ||
+      block.textContent,
+  );
+  return text.length > 60 ? text.slice(0, 57) + "…" : text;
+}
+function addBlockControls(root, current) {
+  let index = 0;
+  for (const block of [...root.children]) {
+    index++;
+    if (blockSkip.has(block.tagName) || !normalize(block.textContent)) continue;
+    if (!block.id) block.id = `block-${index}`;
+    if (getComputedStyle(block).position === "static")
+      block.classList.add("has-block-comment");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "block-comment";
+    button.setAttribute("aria-label", "Comment on this block");
+    button.innerHTML = blockIcon;
+    button.onclick = (event) => {
+      event.stopPropagation();
+      const heading = blockHeading(block);
+      openNote(current.id, heading, heading, null, null, block.id);
+    };
+    block.append(button);
+  }
+}
 function renderSessions() {
   const others = sessions.filter((entry) => entry.id !== session.sessionId);
   const need = others.filter((entry) => entry.needsYou);
@@ -1214,34 +1279,39 @@ function renderSessions() {
   sessionOrder = [...need, ...workingList, ...mine];
   const list = $("sidecar-list");
   list.replaceChildren();
-  for (const [heading, entries] of [
-    ["Need you", need],
-    ["Working", workingList],
-    ["This one", mine],
-  ]) {
-    if (!entries.length) continue;
-    const label = document.createElement("div");
-    label.className = "group";
-    label.textContent = heading;
-    list.append(label);
-    for (const entry of entries) {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className =
-        "session-row" +
-        (entry.needsYou ? " need" : "") +
-        (entry.id === session.sessionId ? " current" : "");
-      const title = document.createElement("span");
-      title.textContent = entry.title;
-      const words = document.createElement("small");
-      words.textContent = stateWords(entry);
-      row.append(title, words);
-      row.onclick = () => {
-        if (entry.id === session.sessionId) toggleSidecar(false);
-        else location.assign(entry.url);
-      };
-      list.append(row);
+  // Status first, two lines, nothing on the right: the sessions waiting on
+  // you, a gap, then the rest, with this tab tinted.
+  for (const [index, entry] of sessionOrder.entries()) {
+    if (index === need.length && need.length && index < sessionOrder.length) {
+      const gap = document.createElement("div");
+      gap.className = "session-gap";
+      list.append(gap);
     }
+    const current = entry.id === session.sessionId;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className =
+      "session-row" +
+      (entry.needsYou ? " need" : "") +
+      (current ? " current" : "") +
+      (entry.stage === "complete" ? " done" : "");
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = entry.title;
+    const words = document.createElement("span");
+    words.className = "words";
+    const state = document.createElement("em");
+    state.textContent = current ? "This tab" : stateWords(entry);
+    words.append(
+      state,
+      ` · ${entry.kind === "plan" ? "final plan" : "exploration"} · revision ${entry.revision} · ${ago(entry.updatedAt)}`,
+    );
+    row.append(title, words);
+    row.onclick = () => {
+      if (current) toggleSidecar(false);
+      else location.assign(entry.url);
+    };
+    list.append(row);
   }
 }
 function renderRevisions() {
@@ -1294,20 +1364,16 @@ function toggleRevisionMenu(open = $("revision-menu").hidden) {
   $("revision").setAttribute("aria-expanded", String(open));
   if (open) $("revision-menu").querySelector("button")?.focus();
 }
-function toggleSidecar(open = $("sidecar").hidden) {
+function toggleSidecar(open = !$("sessions-dialog").open) {
   if (open && $("bell").hidden) return;
-  $("sidecar").hidden = !open;
-  if (open) $("sidecar-close").focus();
+  if (open) $("sessions-dialog").showModal();
+  else if ($("sessions-dialog").open) $("sessions-dialog").close();
 }
 function closeMenus() {
   closeDrawer();
   toggleRevisionMenu(false);
   toggleSidecar(false);
-  try {
-    $("settings-menu").hidePopover();
-  } catch {
-    /* Already closed. */
-  }
+  if ($("settings-dialog").open) $("settings-dialog").close();
 }
 
 /* Choices, checklists, answers */
@@ -1407,6 +1473,8 @@ $("note-form").onsubmit = (event) => {
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
+$("submit-bar").onclick = () => $("submit").click();
+$("accept-bar").onclick = () => $("accept").click();
 $("submit").onclick = async () => {
   submissionError = "";
   const groups = submissionGroups(state);
@@ -1502,7 +1570,10 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (!event.target.closest("#revision-menu")) toggleRevisionMenu(false);
-  if (!event.target.closest("#sidecar")) toggleSidecar(false);
+  if (event.target.closest("#sidebar-close")) {
+    closeDrawer();
+    return;
+  }
   if (!editable) return;
   const comment = event.target.closest("[data-comment]");
   if (comment && $("page-content").contains(comment))
@@ -1601,8 +1672,12 @@ for (const dialog of document.querySelectorAll("dialog")) {
       dialog.close();
   });
 }
-$("theme").onchange = () => {
-  preferredTheme = $("theme").value === "system" ? null : $("theme").value;
+$("settings").onclick = () => $("settings-dialog").showModal();
+$("theme").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-theme]");
+  if (!button) return;
+  preferredTheme =
+    button.dataset.theme === "system" ? null : button.dataset.theme;
   activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
   try {
     if (/^https?:$/.test(location.protocol))
@@ -1611,7 +1686,7 @@ $("theme").onchange = () => {
     /* Keep the explicit choice in memory when cookies are blocked. */
   }
   theme();
-};
+});
 systemTheme.addEventListener("change", () => {
   if (preferredTheme) return;
   activeTheme = systemTheme.matches ? "dark" : "light";
@@ -1661,7 +1736,10 @@ document.addEventListener("keydown", (event) => {
     openNote(page.id, page.title);
   else if (key === "r" && editable) show("feedback");
   else if (key === "s" && editable) {
-    const target = $("accept").hidden ? $("submit") : $("accept");
+    const bar = $("foot-bar").offsetParent !== null;
+    const target = $("accept").hidden
+      ? $(bar ? "submit-bar" : "submit")
+      : $(bar ? "accept-bar" : "accept");
     if (target.hidden || target.disabled) return;
     target.focus();
   } else if (key === "a") show("agreed");
@@ -2059,7 +2137,6 @@ for (const item of [
 $("menu-button").addEventListener("click", () =>
   $("sidebar").dataset.open === "true" ? closeDrawer() : openDrawer(),
 );
-$("sidebar-backdrop").addEventListener("click", closeDrawer);
 matchMedia("(max-width: 720px)").addEventListener("change", (event) => {
   if (!event.matches) closeDrawer();
 });

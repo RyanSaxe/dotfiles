@@ -15,8 +15,10 @@ each component is for.
 
 Build each page around the proposal. Where the browser can show the
 material, rendered, drawn or demonstrated, show it, and use prose for the
-context and consequences the page cannot show. Resolve routine details
-from the project and the settled requirements instead of asking.
+context and consequences the page cannot show. A plan's CSS and script
+leave the frame's code blocks, diagrams and diffs as they are, and a
+component is as wide as the reading column. Resolve routine details from
+the project and the settled requirements instead of asking.
 
 The user comments on any text or component without being asked, so a page
 does not ask what the user thinks of it. A question asks for context the
