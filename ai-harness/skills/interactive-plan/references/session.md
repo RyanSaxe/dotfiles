@@ -52,8 +52,9 @@ the baseline for a new revision.
 
 On the first publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,
-with the URL quoted) and give the link in chat. If the launch fails, say so
-and keep the link available. Do not open another tab on later revisions:
+with the URL quoted) and give the link in chat, with `hostUrl` beside it
+when `start` printed one. If the launch fails, say so and keep the link
+available. Do not open another tab on later revisions:
 the page refreshes itself when a revision lands and keeps the user's unsent
 draft.
 
@@ -135,8 +136,9 @@ When `start` finds a hub on older or newer code, it uses it and logs the
 mismatch; the hub restarts on the newer code once no session is live.
 
 To review from a phone, set `INTERACTIVE_PLAN_HOST` to the machine's
-Tailscale address before the hub starts; `start` then also prints
-`hostUrl`.
+Tailscale address in the shell environment before the hub starts; `start`
+then also prints `hostUrl`. A hub that is already running keeps the
+addresses it started with.
 
 If the hub is unavailable, the page keeps the saved draft and offers a JSON
 export. Treat an exported file as feedback, never as implementation
