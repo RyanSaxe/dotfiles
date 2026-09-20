@@ -129,7 +129,7 @@
             aria-labelledby="settings-title"
           >
             <div class="dialog-head">
-              <h2 id="settings-title">Settings</h2>
+              <h2 id="settings-title" tabindex="-1" autofocus>Settings</h2>
               <button
                 class="icon-btn"
                 type="button"
@@ -235,7 +235,7 @@
             aria-labelledby="sessions-title"
           >
             <div class="dialog-head">
-              <h2 id="sessions-title">Live sessions</h2>
+              <h2 id="sessions-title" tabindex="-1" autofocus>Live sessions</h2>
               <button
                 class="icon-btn"
                 id="sidecar-close"
@@ -274,20 +274,28 @@
       </form>
     </dialog>
     <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
-      <h2 id="accept-title">Accept this plan?</h2>
+      <div class="dialog-head">
+        <h2 id="accept-title" tabindex="-1" autofocus>Accept this plan?</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="accept-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
       <p id="accept-detail"></p>
       <p class="small">
-        Choose whether the waiting agent should begin implementation or save the
-        plan for later.
+        Starting implementation hands the plan to the waiting agent. Saving
+        keeps it for later and the agent stops.
       </p>
       <p class="small" id="accept-error" role="status"></p>
       <div class="actions">
-        <button class="btn primary" type="button" data-accept-mode="implement">
-          Accept and start implementation</button
-        ><button class="btn" type="button" data-accept-mode="save">
-          Accept and save for later</button
-        ><button class="btn quiet" type="button" data-close="accept-dialog">
-          Cancel
+        <button class="btn" type="button" data-accept-mode="save">
+          Save for later</button
+        ><button class="btn primary" type="button" data-accept-mode="implement">
+          Start implementation
         </button>
       </div>
     </dialog>
@@ -297,7 +305,7 @@
       aria-labelledby="revision-title"
     >
       <div class="dialog-head">
-        <h2 id="revision-title">Revisions</h2>
+        <h2 id="revision-title" tabindex="-1" autofocus>Revisions</h2>
         <button
           class="icon-btn"
           type="button"
@@ -311,7 +319,7 @@
     </dialog>
     <dialog class="dialog keys" id="keys-dialog" aria-labelledby="keys-title">
       <div class="dialog-head">
-        <h2 id="keys-title">Keys</h2>
+        <h2 id="keys-title" tabindex="-1" autofocus>Keys</h2>
         <button
           class="icon-btn"
           type="button"

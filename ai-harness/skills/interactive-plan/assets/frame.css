@@ -264,9 +264,11 @@ kbd {
   color: var(--accent);
   background: var(--accent-soft);
 }
-.btn.quiet:hover {
-  color: var(--ink);
-  background: var(--ground);
+@media (hover: hover) {
+  .btn.quiet:hover {
+    color: var(--ink);
+    background: var(--ground);
+  }
 }
 .icon-btn {
   display: inline-flex;
@@ -278,9 +280,11 @@ kbd {
   color: var(--muted);
   font-size: 14px;
 }
-.icon-btn:hover {
-  background: var(--ground);
-  color: var(--ink);
+@media (hover: hover) {
+  .icon-btn:hover {
+    background: var(--ground);
+    color: var(--ink);
+  }
 }
 .icon-btn svg {
   width: 18px;
@@ -290,9 +294,11 @@ kbd {
   color: var(--accent);
   font-size: inherit;
 }
-.link-btn:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+@media (hover: hover) {
+  .link-btn:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 
 /* Shell */
@@ -434,8 +440,10 @@ main {
   border-radius: 8px;
   color: var(--muted);
 }
-.bell:hover {
-  background: var(--ground);
+@media (hover: hover) {
+  .bell:hover {
+    background: var(--ground);
+  }
 }
 .bell svg {
   width: 18px;
@@ -512,8 +520,10 @@ body.is-working .content {
   cursor: pointer;
   text-decoration: none;
 }
-.page-footer a:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .page-footer a:hover {
+    text-decoration: underline;
+  }
 }
 #footer-next {
   margin-left: auto;
@@ -1173,9 +1183,17 @@ dialog::backdrop {
   font-size: 16px;
 }
 .dialog .actions {
-  display: grid;
+  display: flex;
+  justify-content: space-between;
   gap: 8px;
   margin-top: 18px;
+}
+.dialog .actions .btn {
+  width: auto;
+}
+.dialog-head h2:focus,
+.dialog-head h2:focus-visible {
+  outline: 0;
 }
 .rev-list {
   display: grid;
@@ -1335,8 +1353,10 @@ dialog::backdrop {
   border-radius: 8px;
   text-align: left;
 }
-.session-row:hover {
-  background: var(--ground);
+@media (hover: hover) {
+  .session-row:hover {
+    background: var(--ground);
+  }
 }
 .session-row.current {
   background: var(--accent-soft);
