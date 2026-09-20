@@ -36,7 +36,7 @@ labels so that meaning never rests on color alone.
 Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
 titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
 6px for rows. The frame is at most 1160px wide and centered, and the reading
-column is at most 780px of text.
+column is at most 780px of text with a comment gutter on its right.
 
 The frame is exactly as tall as the visible window and the page scrolls
 inside it, so the window itself never scrolls and no content passes under
@@ -84,7 +84,10 @@ default afterwards. An empty set means "None selected", not unanswered.
 
 Register custom initialization on `plan:page`. The custom JS file runs
 before the frame module. Script elements inside page HTML do not execute.
-Page-level and text-selection comments need no custom code.
+Page-level and text-selection comments need no custom code, and neither
+does the comment control the frame puts in the gutter beside every block
+that is not a paragraph, heading or list: a code block, a table, a figure,
+a component. It is drawn at every width, and darkens under a pointer.
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom, above

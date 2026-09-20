@@ -1227,17 +1227,22 @@ function blockHeading(block) {
   );
   return text.length > 60 ? text.slice(0, 57) + "…" : text;
 }
+let blockControls = null;
+// The control sits in the column's gutter, so it hangs outside the block it
+// belongs to. Most blocks clip their overflow to hold a rounded corner, which
+// would hide it, so it is a child of the column and follows the block's top.
 function addBlockControls(root, current) {
+  blockControls?.disconnect();
+  const pairs = [];
   let index = 0;
   for (const block of [...root.children]) {
     index++;
     if (blockSkip.has(block.tagName) || !normalize(block.textContent)) continue;
     if (!block.id) block.id = `block-${index}`;
-    if (getComputedStyle(block).position === "static")
-      block.classList.add("has-block-comment");
     const button = document.createElement("button");
     button.type = "button";
     button.className = "block-comment";
+    button.dataset.for = block.id;
     button.setAttribute("aria-label", "Comment on this block");
     button.innerHTML = blockIcon;
     button.onclick = (event) => {
@@ -1245,8 +1250,19 @@ function addBlockControls(root, current) {
       const heading = blockHeading(block);
       openNote(current.id, heading, heading, null, null, block.id);
     };
-    block.append(button);
+    root.append(button);
+    pairs.push([button, block]);
   }
+  const place = () => {
+    for (const [button, block] of pairs)
+      button.style.top = `${block.offsetTop}px`;
+  };
+  place();
+  // Shiki, Mermaid, charts and diffs all change a block's height after the
+  // page renders, and each one moves every control below it.
+  blockControls = new ResizeObserver(place);
+  blockControls.observe(root);
+  for (const [, block] of pairs) blockControls.observe(block);
 }
 function renderSessions() {
   const others = sessions.filter((entry) => entry.id !== session.sessionId);
