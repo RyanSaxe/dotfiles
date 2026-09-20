@@ -417,13 +417,19 @@ async function loadSession(directory, config, origin) {
       setTimeout(() => exclusive(() => wakeAgent(data.revision)), 0);
     return { id: data.id, saved: true, status: view() };
   }
-  async function publish(html) {
+  async function publish(html, source) {
     requireValue(
       !(await pending()).length,
       "Read pending feedback before publishing",
       409,
     );
     requireValue(typeof html === "string", "HTML is required");
+    requireValue(
+      source === undefined ||
+        (typeof source === "string" &&
+          path.resolve(source).startsWith(directory + path.sep)),
+      "Source must be a directory inside the session directory",
+    );
     const artifact = artifactData(html);
     const submissions = await events();
     for (const entry of artifact.agreements || []) {
@@ -505,6 +511,7 @@ async function loadSession(directory, config, origin) {
       url: base + "/",
       sha256: crypto.createHash("sha256").update(stored).digest("hex"),
       publishedAt: timestamp(),
+      source: source || null,
     };
     const revisions = [
       ...(state.revisions || []),
@@ -580,8 +587,8 @@ async function loadSession(directory, config, origin) {
         (key) => data[key] !== undefined,
       );
       requireValue(
-        given.length === 1,
-        "progress requires exactly one of steps, start, or done",
+        given.length > 0 && (data.steps === undefined || given.length === 1),
+        "progress takes steps alone, or start and done in one call",
       );
       if (data.steps !== undefined) {
         requireValue(
@@ -607,27 +614,37 @@ async function loadSession(directory, config, origin) {
         return { status: view() };
       }
       requireValue(state.progress, "Declare steps before marking one");
-      // Steps are a set: several can be active at once, in any order.
-      const named = data.start !== undefined ? data.start : [data.done];
-      requireValue(
-        Array.isArray(named) &&
-          named.length > 0 &&
-          named.every((title) => typeof title === "string"),
-        data.start !== undefined
-          ? "progress start requires step titles"
-          : "progress done requires a step title",
-      );
-      const titles = named.map((title) => title.trim());
-      for (const title of titles)
+      // Steps are a set: several can be active at once, in any order, and
+      // one call can finish some and start others.
+      const marks = new Map();
+      for (const [key, next] of [
+        ["done", "done"],
+        ["start", "active"],
+      ]) {
+        if (data[key] === undefined) continue;
+        const named = Array.isArray(data[key]) ? data[key] : [data[key]];
         requireValue(
-          state.progress.steps.some((step) => step.title === title),
-          "Unknown progress step",
+          named.length > 0 && named.every((title) => typeof title === "string"),
+          `progress ${key} requires step titles`,
         );
-      const next = data.start !== undefined ? "active" : "done";
+        for (const title of named.map((item) => item.trim())) {
+          requireValue(
+            state.progress.steps.some((step) => step.title === title),
+            "Unknown progress step",
+          );
+          requireValue(
+            !marks.has(title),
+            "A step cannot be started and finished in one call",
+          );
+          marks.set(title, next);
+        }
+      }
       await transition({
         progress: {
           steps: state.progress.steps.map((step) =>
-            titles.includes(step.title) ? { ...step, state: next } : step,
+            marks.has(step.title)
+              ? { ...step, state: marks.get(step.title) }
+              : step,
           ),
           updatedAt: timestamp(),
         },
@@ -644,7 +661,7 @@ async function loadSession(directory, config, origin) {
       });
       return { status: view() };
     }
-    if (data.action === "publish") return publish(data.html);
+    if (data.action === "publish") return publish(data.html, data.source);
     if (data.action === "complete") {
       requireValue(
         state.accepted &&
@@ -1318,6 +1335,24 @@ export async function attach(
   return result;
 }
 
+// The source a revision was built from is kept beside the artifacts, so the
+// next round starts from it after the temp directory is gone.
+async function keepSource(sessionDir, source, html) {
+  const { revision } = artifactData(html);
+  const target = path.join(path.resolve(sessionDir), "src", revision);
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  try {
+    await fs.mkdir(target);
+  } catch (error) {
+    requireValue(
+      error.code !== "EEXIST",
+      `Source for revision ${revision} already exists at ${target}`,
+    );
+    throw error;
+  }
+  await fs.cp(path.resolve(source), target, { recursive: true });
+  return target;
+}
 function argumentsFrom(argv) {
   const [command, ...rest] = argv;
   const options = {};
@@ -1338,6 +1373,10 @@ export async function main(argv) {
     "Node 20 or newer is required",
   );
   const { command, options } = argumentsFrom(argv);
+  requireValue(
+    process.env.CODEX_SANDBOX_NETWORK_DISABLED !== "1",
+    "this command needs the host network and the session directory: run it outside the sandbox (escalated); `node scripts/check.mjs --codex-rules` writes an allow rule so Codex never asks again",
+  );
   const config = settings();
   if (command === "hub") {
     const hub = await startHub(config);
@@ -1415,19 +1454,30 @@ export async function main(argv) {
       (key) => options[key] !== undefined,
     );
     requireValue(
-      given.length === 1,
-      "progress requires exactly one of --steps, --start, or --done",
+      given.length > 0 && (options.steps === undefined || given.length === 1),
+      "progress takes --steps alone, or --start and --done in one call",
     );
-    if (options.steps !== undefined) action.steps = options.steps.split("|");
-    else if (options.start !== undefined)
-      action.start = options.start.split("|");
-    else action.done = options.done;
+    for (const key of given) action[key] = options[key].split("|");
   }
+  let kept = null;
   if (command === "publish") {
     requireValue(options.file, "publish requires --file HTML");
     action.html = await fs.readFile(path.resolve(options.file), "utf8");
+    if (options.source) {
+      kept = await keepSource(
+        options["session-dir"],
+        options.source,
+        action.html,
+      );
+      action.source = kept;
+    }
   }
-  console.log(json(await request((id) => `/agent/${id}/action`, action)));
+  try {
+    console.log(json(await request((id) => `/agent/${id}/action`, action)));
+  } catch (error) {
+    if (kept) await fs.rm(kept, { recursive: true, force: true });
+    throw error;
+  }
 }
 // Compare real paths: through the ~/.config symlink the two differ, and a
 // guard on the spelling alone exits without running anything.
