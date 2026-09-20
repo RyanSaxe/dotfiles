@@ -84,8 +84,20 @@ test("progress needs an acknowledged round", async () => {
   assert.equal((await status()).progress, null);
 });
 
+test("read returns the oldest unread submission once and marks it read", async () => {
+  const first = await act({ action: "read" });
+  assert.ok(first.ok, JSON.stringify(first.body));
+  assert.equal(first.body.event.id, "evt1");
+  assert.equal(first.body.status.stage, "working");
+  const acked = (await status()).acknowledgedAt;
+  assert.equal((await act({ action: "read" })).body.event, null);
+  const again = await act({ action: "read", id: "evt1" });
+  assert.equal(again.body.event.id, "evt1");
+  assert.equal((await status()).acknowledgedAt, acked);
+  assert.equal((await act({ action: "read", id: "nope" })).status, 404);
+});
+
 test("declared steps, start, and done marks round-trip through status", async () => {
-  assert.ok((await act({ action: "ack", id: "evt1" })).ok);
   assert.equal((await status()).progress, null);
   const declared = await act({
     action: "progress",
@@ -198,11 +210,11 @@ test("a submission wakes the agent with the line that names the session", async 
   assert.match(
     wakes[1].line,
     new RegExp(
-      `^interactive-plan: feedback arrived on session ${sessionDir} \\(revision 2\\)\\. Run: node .*session\\.mjs wait --session-dir ${sessionDir}$`,
+      `^interactive-plan: feedback arrived on session ${sessionDir} \\(revision 2\\)\\. Run: node .*session\\.mjs read --session-dir ${sessionDir}, then follow .*/references/round\\.md$`,
     ),
   );
   assert.equal(view.wake.last.ok, true);
-  assert.ok((await act({ action: "ack", id: "evt2" })).ok);
+  assert.equal((await act({ action: "read" })).body.event.id, "evt2");
 });
 
 test("a failed wake is recorded and the submission stays readable", async () => {
@@ -216,7 +228,7 @@ test("a failed wake is recorded and the submission stays readable", async () => 
     headers: { authorization: `Bearer ${token}` },
   }).then((response) => response.json());
   assert.equal(next.event.id, "evt3");
-  assert.ok((await act({ action: "ack", id: "evt3" })).ok);
+  assert.equal((await act({ action: "read" })).body.event.id, "evt3");
 });
 
 test("a paused session is not woken until it registers again", async () => {
@@ -239,7 +251,7 @@ test("a paused session is not woken until it registers again", async () => {
   );
   assert.ok(again.ok);
   assert.equal((await status()).paused, null);
-  assert.ok((await act({ action: "ack", id: "evt4" })).ok);
+  assert.equal((await act({ action: "read" })).body.event.id, "evt4");
 });
 
 const tools = (chain, port = 4321, sdk = "/sdk/index.js") => ({

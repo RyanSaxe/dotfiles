@@ -481,7 +481,8 @@ async function hub(t, extra = {}) {
 test("split authoring sources build a standalone artifact without executing content", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-build-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const content = "<h1>Interface</h1><pre>literal </script> and $&</pre>";
+  const content =
+    '<h1>Interface</h1><pre data-language="text">literal </script> and $&</pre>';
   await fs.writeFile(path.join(directory, "interface.html"), content);
   await fs.writeFile(
     path.join(directory, "custom.css"),
@@ -616,7 +617,7 @@ test("publication resolves exact mixed sources from saved feedback before hashin
     },
   });
   assert.equal((await a.feedback(feedback)).code, 200);
-  await a.action("ack", { id: feedback.id });
+  await a.action("read");
   const entry = {
     id: "errors",
     title: "Per-item errors",
@@ -716,7 +717,7 @@ test("choice sources preserve readable labels and complete checklist snapshots",
   };
   const feedback = a.event("feedback-only", "1", { groups: { choices } });
   assert.equal((await a.feedback(feedback)).code, 200);
-  await a.action("ack", { id: feedback.id });
+  await a.action("read");
   const data = {
     ...artifactData(artifact("2")),
     agreements: [
@@ -784,7 +785,7 @@ test("answers travel with feedback and resolve as agreement sources", async (t) 
     received.body.event.payload.groups.answers,
     feedback.groups.answers,
   );
-  await a.action("ack", { id: feedback.id });
+  await a.action("read");
   const entry = {
     id: "sidebar",
     title: "Keep the sidebar",
@@ -837,7 +838,7 @@ test("final review can reopen exploration and only accept the recomposed plan", 
   await a.action("publish", { html: artifact("1", "plan") });
   const feedback = a.event();
   await a.feedback(feedback);
-  await a.action("ack", { id: feedback.id });
+  await a.action("read");
   assert.equal(
     (await a.action("publish", { html: artifact("2", "exploration") })).code,
     200,
@@ -854,11 +855,11 @@ test("final review can reopen exploration and only accept the recomposed plan", 
     text: "Use per-item results.",
   });
   await a.feedback(choice);
-  await a.action("ack", { id: choice.id });
+  await a.action("read");
   await a.action("publish", { html: artifact("3", "plan") });
   const acceptance = a.event("accept-plan", "3", { mode: "save" });
   assert.equal((await a.feedback(acceptance)).code, 200);
-  await a.action("ack", { id: acceptance.id });
+  await a.action("read");
   assert.equal(
     (await a.action("complete")).body.planPath,
     path.join(a.directory, "artifacts/example.3.html"),
@@ -970,7 +971,7 @@ test("agreements survive topic changes and targeted feedback without rewriting s
       entry.id,
     );
     assert.equal(received.body.event.payload.intent, "feedback-only");
-    await a.action("ack", { id: event.id });
+    await a.action("read");
   }
   for (const [index, state] of states.entries()) {
     const snapshot = artifactData(
@@ -1047,8 +1048,8 @@ test("two sessions on one hub isolate tokens, events, and acknowledgements", asy
   assert.equal((await b.feedback(event)).code, 409);
   assert.equal((await a.feedback(event)).code, 200);
   assert.equal((await b.next()).body.event, null);
-  assert.equal((await b.action("ack", { id: event.id })).code, 404);
-  assert.equal((await a.action("ack", { id: event.id })).code, 200);
+  assert.equal((await b.action("read", { id: event.id })).code, 404);
+  assert.equal((await a.action("read")).body.event.id, event.id);
   assert.deepEqual((await b.status()).body.acknowledged, []);
   assert.equal(
     (await a.feedback(a.event(), { Origin: "http://example.com" })).code,
@@ -1095,7 +1096,7 @@ test("the hub lists open sessions needs-you first, and a paused one stays listed
   );
   const feedback = b.event();
   await b.feedback(feedback);
-  await b.action("ack", { id: feedback.id });
+  await b.action("read");
   list = (await a.request("/api/sessions")).body.sessions;
   assert.deepEqual(
     list.map((item) => [item.id, item.needsYou, item.stage]),
@@ -1107,7 +1108,7 @@ test("the hub lists open sessions needs-you first, and a paused one stays listed
   await b.action("publish", { html: artifact("2") });
   const first = a.event();
   await a.feedback(first);
-  await a.action("ack", { id: first.id });
+  await a.action("read");
   list = (await a.request("/api/sessions")).body.sessions;
   assert.deepEqual(
     list.map((item) => item.id),
@@ -1170,7 +1171,7 @@ test("the root URL opens the session that most needs you, then the last viewed, 
   for (const session of [a, b]) {
     const event = session.event();
     await session.feedback(event);
-    await session.action("ack", { id: event.id });
+    await session.action("read");
   }
   assert.equal(
     (await open(`interactive-plan-last=${a.id}`)).location,
@@ -1259,7 +1260,7 @@ test("revision routes inject read-only and preview flags and serve prototypes sa
   assert.equal(forged, 403);
 });
 
-test("explicit feedback is retryable, remains unread until ack, and blocks premature publication", async (t) => {
+test("explicit feedback is retryable, remains unread until read, and blocks premature publication", async (t) => {
   const h = await hub(t);
   const a = await h.session();
   await a.action("publish", { html: artifact() });
@@ -1270,32 +1271,24 @@ test("explicit feedback is retryable, remains unread until ack, and blocks prema
   assert.equal((await a.feedback(event)).code, 200);
   assert.equal((await a.feedback({ ...event, text: "Changed" })).code, 409);
   assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
-  const output = JSON.parse(
-    (
-      await exec(
-        process.execPath,
-        [helper, "wait", "--session-dir", a.directory, "--timeout", "0.2"],
-        { env: h.env },
-      )
-    ).stdout,
-  );
-  assert.deepEqual(output.event.payload, event);
-  await a.action("ack", { id: event.id });
-  const acked = (await a.status()).body;
-  await a.action("ack", { id: event.id });
-  assert.equal((await a.status()).body.acknowledgedAt, acked.acknowledgedAt);
-  assert.equal(
+  const cli = async (...args) =>
     JSON.parse(
       (
         await exec(
           process.execPath,
-          [helper, "wait", "--session-dir", a.directory, "--timeout", "0.05"],
+          [helper, "read", "--session-dir", a.directory, ...args],
           { env: h.env },
         )
       ).stdout,
-    ).waiting,
-    true,
-  );
+    );
+  const output = await cli();
+  assert.deepEqual(output.event.payload, event);
+  assert.equal(output.status.stage, "working");
+  const acked = (await a.status()).body;
+  assert.equal((await cli()).event, null);
+  const again = await cli("--id", event.id);
+  assert.deepEqual(again.event.payload, event);
+  assert.equal((await a.status()).body.acknowledgedAt, acked.acknowledgedAt);
   const original = await fs.readFile(
     path.join(a.directory, "artifacts/example.1.html"),
     "utf8",
@@ -1350,7 +1343,7 @@ test("queued rounds keep receipt order", async (t) => {
   await a.feedback(second);
   const unread = (await a.next()).body.event;
   assert.equal(unread.id, first.id);
-  await a.action("ack", { id: first.id });
+  await a.action("read");
   const next = (await a.next()).body.event;
   assert.equal(next.id, second.id);
   assert.equal(next.sequence, unread.sequence + 1);
@@ -1372,7 +1365,7 @@ for (const mode of ["save", "implement"])
     const acceptance = a.event("accept-plan", "2", { mode });
     assert.equal((await a.feedback(acceptance)).code, 200);
     assert.equal((await a.action("complete")).code, 409);
-    await a.action("ack", { id: acceptance.id });
+    await a.action("read");
     const complete = (await a.action("complete")).body;
     assert.equal(complete.nextAction, mode);
     assert.equal(
@@ -1503,14 +1496,7 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
     (
       await exec(
         process.execPath,
-        [
-          helper,
-          "wait",
-          "--session-dir",
-          started.sessionDir,
-          "--timeout",
-          "0.5",
-        ],
+        [helper, "read", "--session-dir", started.sessionDir],
         { env },
       )
     ).stdout,
