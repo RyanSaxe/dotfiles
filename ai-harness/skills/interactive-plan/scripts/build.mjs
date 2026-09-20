@@ -7,7 +7,116 @@ import { artifactData } from "./session.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
 
+const attribute = (tag, name) => {
+  const match = tag.match(new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`));
+  return match ? (match[1] ?? match[2]) : undefined;
+};
+const controlKinds = ["data-choice", "data-multiselect", "data-question"];
+
+/** Structural problems in the assembled pages and the plan's script. */
+export function problems(data, js = "") {
+  const list = [];
+  const pageIds = new Set();
+  for (const page of data.pages) {
+    if (pageIds.has(page.id)) list.push(`page "${page.id}" appears twice`);
+    pageIds.add(page.id);
+  }
+  const targets = new Set([...pageIds, "agreed", "feedback"]);
+  const prototypes = new Set((data.prototypes || []).map((item) => item.id));
+  for (const page of data.pages) {
+    const html = page.html || "";
+    const at = `page "${page.id}"`;
+    const tags = html.match(/<[a-zA-Z][^>]*>/g) || [];
+    const controls = new Set();
+    for (const tag of tags) {
+      for (const kind of controlKinds) {
+        const id = attribute(tag, kind);
+        if (id === undefined) continue;
+        if (controls.has(id)) list.push(`${at}: control "${id}" appears twice`);
+        controls.add(id);
+        if (!attribute(tag, "data-label"))
+          list.push(`${at}: control "${id}" has no data-label`);
+      }
+      if (/^<pre\b/i.test(tag) || /^<div\b/i.test(tag)) {
+        const named = attribute(tag, "data-file") !== undefined;
+        const source = attribute(tag, "data-diff-source") !== undefined;
+        if (
+          (/^<pre\b/i.test(tag) || named) &&
+          !source &&
+          !attribute(tag, "data-language")
+        )
+          list.push(`${at}: a code block has no data-language`);
+      }
+      const link = attribute(tag, "href");
+      if (link?.startsWith("#") && !targets.has(link.slice(1)))
+        if (!new RegExp(`\\sid="${link.slice(1)}"`).test(html))
+          list.push(`${at}: link "${link}" names no page`);
+      const prototype = attribute(tag, "data-prototype");
+      if (prototype !== undefined && !prototypes.has(prototype))
+        list.push(`${at}: prototype "${prototype}" does not exist`);
+    }
+    // Each control's options run from its tag to the next control's tag.
+    const parts = html.split(
+      /(?=<[a-zA-Z][^>]*\sdata-(?:choice|multiselect|question)=)/,
+    );
+    for (const part of parts) {
+      const tag = part.match(/^<[a-zA-Z][^>]*>/)?.[0];
+      if (!tag) continue;
+      const kind = controlKinds.find(
+        (name) => attribute(tag, name) !== undefined,
+      );
+      const id = attribute(tag, kind);
+      const options =
+        part.match(/<[a-zA-Z][^>]*\sdata-value(?:=|\s|>)[^>]*>/g) || [];
+      for (const option of options)
+        if (!attribute(option, "data-value"))
+          list.push(`${at}: an option in "${id}" has no data-value`);
+      if (kind === "data-choice" && options.length < 2)
+        list.push(
+          `${at}: decision "${id}" has ${options.length} option${options.length === 1 ? "" : "s"}`,
+        );
+      if (kind === "data-question" && !/<textarea\b/i.test(part))
+        list.push(`${at}: question "${id}" has no textarea`);
+    }
+    for (const input of html.match(
+      /<textarea[^>]*\sdata-diff-input[^>]*>([\s\S]*?)<\/textarea>/gi,
+    ) || []) {
+      const text = input
+        .replace(/^<textarea[^>]*>/i, "")
+        .replace(/<\/textarea>$/i, "");
+      let parsed;
+      try {
+        parsed = JSON.parse(
+          text
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&amp;/g, "&"),
+        );
+      } catch {}
+      if (
+        !["before", "after", "patch"].every(
+          (key) => typeof parsed?.[key] === "string",
+        )
+      )
+        list.push(
+          `${at}: a diff input is not JSON with before, after and patch`,
+        );
+    }
+  }
+  // Reading the body's width is fine; writing to the frame's root elements
+  // restyles the whole app.
+  const mutation =
+    /document\.(body|documentElement)\.(style|className|classList|dataset|innerHTML|setAttribute|append|prepend|insertAdjacent|replaceChildren|remove)\b/;
+  js.split("\n").forEach((line, index) => {
+    const hit = line.match(mutation);
+    if (hit) list.push(`plan.js line ${index + 1} restyles document.${hit[1]}`);
+  });
+  return list;
+}
+
 export async function assemble(data, { css = "", js = "" } = {}) {
+  const found = problems(data, js);
+  if (found.length) throw new Error(found.join("\n"));
   const [shell, style, script, notifications, choices, draft] =
     await Promise.all(
       [
