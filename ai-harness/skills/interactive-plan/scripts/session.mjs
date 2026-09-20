@@ -1281,7 +1281,12 @@ async function spawnHub(config) {
     if (record?.pid === child.pid) return hubInfo(record.port);
     return config.port ? hubInfo(config.port) : null;
   }, 15_000);
-  requireValue(started, `The hub did not start; see ${config.hubLog}`);
+  requireValue(
+    started,
+    process.env.CODEX_SANDBOX
+      ? `The hub did not start inside the sandbox (its log is ${config.hubLog}): ${sandboxAdvice()}`
+      : `The hub did not start; see ${config.hubLog}`,
+  );
   return started;
 }
 export async function ensureHub(config = settings()) {
@@ -1353,6 +1358,14 @@ async function keepSource(sessionDir, source, html) {
   await fs.cp(path.resolve(source), target, { recursive: true });
   return target;
 }
+// Codex sets CODEX_SANDBOX for every command, bypassed or not, so only a
+// real refusal from the sandbox earns the advice.
+const sandboxAdvice = () =>
+  `run this command outside the sandbox (escalated), and run \`node ${path.join(path.dirname(here), "check.mjs")} --codex-rules\` once so an allow rule keeps Codex from asking again`;
+export function withSandboxHint(message, env = process.env) {
+  if (!env.CODEX_SANDBOX || !/\bEPERM\b/.test(message)) return message;
+  return `${message}. The sandbox blocked it: ${sandboxAdvice()}`;
+}
 function argumentsFrom(argv) {
   const [command, ...rest] = argv;
   const options = {};
@@ -1373,10 +1386,6 @@ export async function main(argv) {
     "Node 20 or newer is required",
   );
   const { command, options } = argumentsFrom(argv);
-  requireValue(
-    process.env.CODEX_SANDBOX_NETWORK_DISABLED !== "1",
-    "this command needs the host network and the session directory: run it outside the sandbox (escalated); `node scripts/check.mjs --codex-rules` writes an allow rule so Codex never asks again",
-  );
   const config = settings();
   if (command === "hub") {
     const hub = await startHub(config);
@@ -1493,7 +1502,7 @@ const invoked = (() => {
 })();
 if (invoked) {
   main(process.argv.slice(2)).catch((error) => {
-    console.error(`interactive-plan: ${error.message}`);
+    console.error(`interactive-plan: ${withSandboxHint(error.message)}`);
     process.exitCode = 1;
   });
 }

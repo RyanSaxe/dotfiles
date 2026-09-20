@@ -25,8 +25,17 @@ const rulesPresent = () =>
     .then((text) => text === rules)
     .catch(() => false);
 if (process.argv[2] === "--codex-rules") {
-  await fs.mkdir(path.dirname(rulesFile), { recursive: true });
-  await fs.writeFile(rulesFile, rules, { mode: 0o600 });
+  try {
+    await fs.mkdir(path.dirname(rulesFile), { recursive: true });
+    await fs.writeFile(rulesFile, rules, { mode: 0o600 });
+  } catch (error) {
+    console.error(
+      error.code === "EPERM" && process.env.CODEX_SANDBOX
+        ? `writing ${rulesFile} is itself outside the sandbox: run this command escalated, once`
+        : error.message,
+    );
+    process.exit(1);
+  }
   console.log(JSON.stringify({ rules: rulesFile, written: true }, null, 2));
   process.exit(0);
 }
@@ -115,7 +124,7 @@ try {
     ),
   );
 } catch (error) {
-  if (process.env.CODEX_SANDBOX_NETWORK_DISABLED === "1")
+  if (error.code === "EPERM" && process.env.CODEX_SANDBOX)
     console.error(
       `the Codex sandbox blocks the hub's socket and its state directory. Run outside the sandbox (escalated): node scripts/check.mjs --codex-rules, which writes ${rulesFile} so no later command asks. Then run the check again.`,
     );
