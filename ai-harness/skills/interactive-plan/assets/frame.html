@@ -8,6 +8,17 @@
   </head>
   <body>
     <div class="app" id="app">
+      <button
+        class="menu-button"
+        id="menu-button"
+        type="button"
+        aria-label="Pages and review"
+        aria-controls="sidebar"
+        aria-expanded="false"
+      >
+        <i aria-hidden="true"></i><b class="count" id="menu-count" hidden></b>
+      </button>
+      <div class="backdrop" id="sidebar-backdrop" hidden></div>
       <aside class="sidebar" id="sidebar">
         <div class="plan-head">
           <h1 class="plan-title" id="plan-title"></h1>

@@ -257,8 +257,6 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   }
   $("quote").hidden = true;
   closeMenus();
-  if ($("pages-menu").querySelector("summary").offsetParent)
-    $("pages-menu").open = false;
   review();
 }
 
@@ -820,6 +818,22 @@ function badge(count) {
   const link = $("review-link");
   link.hidden = !count || !editable;
   link.textContent = `Review (${count}) →`;
+  $("menu-count").hidden = !count || !editable;
+  $("menu-count").textContent = count;
+}
+/* On a narrow screen the sidebar is a drawer behind the menu button. */
+function openDrawer() {
+  $("sidebar").dataset.open = "true";
+  $("sidebar-backdrop").hidden = false;
+  $("menu-button").setAttribute("aria-expanded", "true");
+  $("navigation").querySelector("[aria-current]")?.focus();
+}
+function closeDrawer() {
+  if ($("sidebar").dataset.open !== "true") return;
+  delete $("sidebar").dataset.open;
+  $("sidebar-backdrop").hidden = true;
+  $("menu-button").setAttribute("aria-expanded", "false");
+  $("menu-button").focus();
 }
 function canAccept(unsentCount) {
   return (
@@ -1266,6 +1280,7 @@ function toggleSidecar(open = $("sidecar").hidden) {
   if (open) $("sidecar-close").focus();
 }
 function closeMenus() {
+  closeDrawer();
   toggleRevisionMenu(false);
   toggleSidecar(false);
   try {
@@ -2021,12 +2036,13 @@ for (const item of [
     $("navigation").append(divider);
   }
 }
-const narrow = matchMedia("(max-width: 720px)");
-const layoutMenu = () => {
-  $("pages-menu").open = !narrow.matches;
-};
-narrow.addEventListener("change", layoutMenu);
-layoutMenu();
+$("menu-button").addEventListener("click", () =>
+  $("sidebar").dataset.open === "true" ? closeDrawer() : openDrawer(),
+);
+$("sidebar-backdrop").addEventListener("click", closeDrawer);
+matchMedia("(max-width: 720px)").addEventListener("change", (event) => {
+  if (!event.matches) closeDrawer();
+});
 if (editable) initializeChecklists();
 theme();
 renderRevisions();
