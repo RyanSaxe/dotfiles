@@ -1265,7 +1265,28 @@ const blockSkip = new Set([
   "STYLE",
   "TEMPLATE",
 ]);
+// The nearest heading before the block, which is how a reader would say
+// where it is. A page cannot repeat its own title in one, the build refuses
+// that, so this can no longer echo the page name back.
+function headingAbove(block) {
+  let previous = block.previousElementSibling;
+  while (previous && !/^H[1-6]$/.test(previous.tagName))
+    previous = previous.previousElementSibling;
+  return previous;
+}
+const sentence = (kind) =>
+  kind.replace(/^(this|these) /, "").replace(/^./, (c) => c.toUpperCase());
 function blockHeading(block) {
+  const name = blockName(block);
+  /* Two blocks under one heading, or two of a kind with no heading at all,
+     take the same name, and Feedback lists them with nothing else to tell
+     them apart. Number them only when they collide. */
+  const peers = [...block.parentElement.children].filter(
+    (other) => !blockSkip.has(other.tagName) && blockName(other) === name,
+  );
+  return peers.length < 2 ? name : `${name} ${peers.indexOf(block) + 1}`;
+}
+function blockName(block) {
   const read = (node) => normalize(node?.textContent);
   /* What the block gives for a name, in the order a reader would pick: its
      own heading, the title an author set, the title the frame drew for a
@@ -1285,8 +1306,12 @@ function blockHeading(block) {
     normalize(titled?.dataset.file) ||
     read(block.querySelector(".figure-head b")) ||
     normalize(titled?.dataset.caption) ||
-    read(block.querySelector(".figure-caption"));
-  if (!name) return "";
+    read(block.querySelector(".figure-caption")) ||
+    /* Feedback lists every note together and the agent reads them as text,
+       and in neither place is the block on screen to look at. A block that
+       names nothing takes the heading it sits under, then what it is. */
+    read(headingAbove(block)) ||
+    sentence(blockKind(block));
   return name.length > 60 ? name.slice(0, 57) + "…" : name;
 }
 function renderSessions() {
