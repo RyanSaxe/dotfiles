@@ -689,6 +689,9 @@ function itemCard({ kind, key, item }) {
       : kind === "answer"
         ? `Answer · ${item.label}`
         : item.label;
+  // A note on a block that names nothing has no heading to show, and an
+  // empty h3 draws a blank line above the note's own words.
+  title.hidden = kind === "note" && !item.anchor;
   if (item.sentIn) title.append(tag("Sent", "ok"));
   if (kind === "list" && item.sentIn && !item.touched)
     title.append(tag("Default", "muted"));
@@ -958,7 +961,9 @@ function feedbackText() {
   for (const note of notes)
     lines.push(
       "",
-      note.anchor,
+      note.anchor ||
+        pages.find((item) => item.id === note.topic)?.title ||
+        "Overall",
       ...(note.quote ? ["Selected passage: " + note.quote] : []),
       note.text,
     );
