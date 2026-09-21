@@ -19,6 +19,16 @@ export function emptyDraft(revision) {
   };
 }
 
+// The remembered reading place is keyed by session, not revision. A record
+// written under an earlier revision, or one naming a page this revision no
+// longer has, would land the reader somewhere arbitrary, so it is dropped.
+export function usablePlace(saved, revision, pageIds) {
+  if (!record(saved) || saved.revision !== revision) return null;
+  if (!pageIds.includes(saved.page)) return null;
+  const top = Number(saved.top);
+  return { page: saved.page, top: Number.isFinite(top) && top > 0 ? top : 0 };
+}
+
 // Drafts are keyed by session and artifact, not revision. When a new revision
 // lands, items that were already sent are dropped and unsent items carry over.
 export function loadDraft(saved, revision) {

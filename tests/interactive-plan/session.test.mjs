@@ -19,6 +19,7 @@ import {
   markSent,
   submissionGroups,
   unsentItems,
+  usablePlace,
 } from "../../ai-harness/skills/interactive-plan/assets/draft.mjs";
 import {
   assemble,
@@ -87,6 +88,21 @@ async function killHub(config) {
 }
 const sessionConfig = (html) =>
   JSON.parse(html.match(/id="session-config">([\s\S]*?)<\/script>/)[1]);
+
+test("a remembered place survives its own revision and nothing else", () => {
+  const pages = ["overview", "steps", "feedback"];
+  const place = { revision: "2", page: "steps", top: 640 };
+  assert.deepEqual(usablePlace(place, "2", pages), { page: "steps", top: 640 });
+  // A new revision reopens at the top of the first page.
+  assert.equal(usablePlace(place, "3", pages), null);
+  // A page the revision dropped would land the reader nowhere.
+  assert.equal(usablePlace(place, "2", ["overview", "feedback"]), null);
+  assert.equal(usablePlace(null, "2", pages), null);
+  assert.deepEqual(
+    usablePlace({ revision: "2", page: "overview", top: "x" }, "2", pages),
+    { page: "overview", top: 0 },
+  );
+});
 
 test("file comparison preserves exact sources and produces an applicable Git patch", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-diff-"));
@@ -481,8 +497,9 @@ async function hub(t, extra = {}) {
 test("split authoring sources build a standalone artifact without executing content", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-build-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  // The frame draws the page title, so the page's own heading is an h2.
   const content =
-    '<h1>Interface</h1><pre data-language="text">literal </script> and $&</pre>';
+    '<h2>Interface</h2><pre data-language="text">literal </script> and $&</pre>';
   await fs.writeFile(path.join(directory, "interface.html"), content);
   await fs.writeFile(
     path.join(directory, "custom.css"),

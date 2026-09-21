@@ -70,6 +70,7 @@ let activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
 
 const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}`;
 const resumeKey = `interactive-plan:resume:${session.sessionId || "offline"}`;
+const placeKey = `interactive-plan:place:${session.sessionId || "offline"}`;
 const prefsPrefix = `interactive-plan:prefs:${session.sessionId || "offline"}:`;
 let state = emptyDraft(plan.revision);
 if (editable)
@@ -219,6 +220,29 @@ const scroller = () =>
   [document.querySelector("main"), document.querySelector(".app-body")].find(
     (el) => /auto|scroll/.test(getComputedStyle(el).overflowY),
   );
+/* Where you were, so the bell's jump to another session and back lands on the
+   page you left. The revision is stored with it: a new revision does not
+   match and the record is ignored, which is what starts you at the top of the
+   first page. */
+let placeTimer = 0;
+function rememberPlace() {
+  clearTimeout(placeTimer);
+  placeTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(
+        placeKey,
+        JSON.stringify({
+          revision: plan.revision,
+          page: $("reading").hidden ? "feedback" : page.id,
+          top: Math.round(scroller().scrollTop),
+        }),
+      );
+    } catch {
+      /* Returning to the same place is a convenience, not a requirement. */
+    }
+  }, 250);
+}
+document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && editable;
@@ -230,6 +254,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     $("page-title").textContent = page.title;
     chooseBlock(null);
     $("page-content").innerHTML = page.html;
+    blockTargets($("page-content"), page.id);
     choiceTargets($("page-content"), page.id);
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
     else {
@@ -243,6 +268,9 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
         detail: { page, element: $("page-content") },
       }),
     );
+    // Shiki, Mermaid and the charts all change a block's height after the
+    // page renders, so the marks are placed again once they settle.
+    Promise.allSettled([...renders]).then(placeMarks);
   }
   closeDrawer();
   for (const button of document.querySelectorAll("#navigation [data-page]")) {
@@ -266,6 +294,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     scroller().scrollTo(0, top);
     Promise.allSettled([...renders]).then(() => scroller().scrollTo(0, top));
   }
+  rememberPlace();
   const target = targetId && $(targetId);
   if (!feedback && target && $("page-content").contains(target)) {
     for (let ancestor = target; ancestor; ancestor = ancestor.parentElement)
@@ -348,6 +377,7 @@ function markNotes() {
     "plan-note",
     noteRanges.map((item) => item.range),
   );
+  placeNoteBars();
   $("note-count").hidden = !notes.length;
   $("note-count").textContent = notes.length
     ? `${plural(notes.length, "note")} on this page`
@@ -689,6 +719,9 @@ function itemCard({ kind, key, item }) {
       : kind === "answer"
         ? `Answer · ${item.label}`
         : item.label;
+  // A note on a block that names nothing has no heading to show, and an
+  // empty h3 draws a blank line above the note's own words.
+  title.hidden = kind === "note" && !item.anchor;
   if (item.sentIn) title.append(tag("Sent", "ok"));
   if (kind === "list" && item.sentIn && !item.touched)
     title.append(tag("Default", "muted"));
@@ -958,7 +991,9 @@ function feedbackText() {
   for (const note of notes)
     lines.push(
       "",
-      note.anchor,
+      note.anchor ||
+        pages.find((item) => item.id === note.topic)?.title ||
+        "Overall",
       ...(note.quote ? ["Selected passage: " + note.quote] : []),
       note.text,
     );
@@ -1230,18 +1265,54 @@ const blockSkip = new Set([
   "STYLE",
   "TEMPLATE",
 ]);
+// The nearest heading before the block, which is how a reader would say
+// where it is. A page cannot repeat its own title in one, the build refuses
+// that, so this can no longer echo the page name back.
+function headingAbove(block) {
+  let previous = block.previousElementSibling;
+  while (previous && !/^H[1-6]$/.test(previous.tagName))
+    previous = previous.previousElementSibling;
+  return previous;
+}
+const sentence = (kind) =>
+  kind.replace(/^(this|these) /, "").replace(/^./, (c) => c.toUpperCase());
 function blockHeading(block) {
-  const titled = block.matches("[data-title], [data-caption]")
-    ? block
-    : block.querySelector("[data-title], [data-caption]");
-  const named = block.querySelector("h1, h2, h3, h4, h5, h6, figcaption");
-  const text = normalize(
-    named?.textContent ||
-      titled?.dataset.title ||
-      titled?.dataset.caption ||
-      block.textContent,
+  const name = blockName(block);
+  /* Two blocks under one heading, or two of a kind with no heading at all,
+     take the same name, and Feedback lists them with nothing else to tell
+     them apart. Number them only when they collide. */
+  const peers = [...block.parentElement.children].filter(
+    (other) => !blockSkip.has(other.tagName) && blockName(other) === name,
   );
-  return text.length > 60 ? text.slice(0, 57) + "…" : text;
+  return peers.length < 2 ? name : `${name} ${peers.indexOf(block) + 1}`;
+}
+function blockName(block) {
+  const read = (node) => normalize(node?.textContent);
+  /* What the block gives for a name, in the order a reader would pick: its
+     own heading, the title an author set, the title the frame drew for a
+     figure, then the caption. Never the block's text, which is a table's
+     cells, a renderer's injected stylesheet and its buttons. A block that
+     gives no name returns none, and the note is filed under its page. */
+  const named = "[data-title], [data-caption], [data-file]";
+  const titled = block.matches(named) ? block : block.querySelector(named);
+  /* A heading inside a closed details is a section of the block's source,
+     not a name for it: the diff's own "Before" and "Git patch" live there. */
+  const heading = [...block.querySelectorAll("h1, h2, h3, h4, h5, h6")].find(
+    (node) => !node.closest("details"),
+  );
+  const name =
+    read(heading) ||
+    normalize(titled?.dataset.title) ||
+    normalize(titled?.dataset.file) ||
+    read(block.querySelector(".figure-head b")) ||
+    normalize(titled?.dataset.caption) ||
+    read(block.querySelector(".figure-caption")) ||
+    /* Feedback lists every note together and the agent reads them as text,
+       and in neither place is the block on screen to look at. A block that
+       names nothing takes the heading it sits under, then what it is. */
+    read(headingAbove(block)) ||
+    sentence(blockKind(block));
+  return name.length > 60 ? name.slice(0, 57) + "…" : name;
 }
 function renderSessions() {
   const others = sessions.filter((entry) => entry.id !== session.sessionId);
@@ -1394,6 +1465,12 @@ function closeMenus() {
 }
 
 /* Choices, checklists, answers */
+// A note on a block carries the block's ID so Feedback can jump back to it.
+function blockTargets(root, topic) {
+  [...root.children].forEach((block, index) => {
+    if (!blockSkip.has(block.tagName)) block.id ||= `block-${topic}-${index}`;
+  });
+}
 function choiceTargets(root, topic) {
   for (const type of ["choice", "multiselect", "question"])
     root.querySelectorAll(`[data-${type}]`).forEach((group, index) => {
@@ -1667,23 +1744,54 @@ function chooseBlock(block) {
   placeBar();
   commentTarget();
 }
+/* A note that quotes nothing leaves no highlight to find it by, so the block
+   it belongs to keeps a quiet bar in the same padding the chosen one uses.
+   Accent means chosen now; muted means this block has notes. */
+function placeNoteBars() {
+  const host = $("note-bars");
+  host.replaceChildren();
+  if ($("reading").hidden) return;
+  const blocks = new Set();
+  for (const note of state.notes) {
+    if (note.topic !== page.id || note.quote || !note.target) continue;
+    const block = document
+      .getElementById(note.target)
+      ?.closest("#page-content > *");
+    if (block) blocks.add(block);
+  }
+  const hostTop = $("reading").getBoundingClientRect().top;
+  for (const block of blocks) {
+    const box = block.getBoundingClientRect();
+    const bar = document.createElement("div");
+    bar.className = "note-bar";
+    bar.style.top = `${Math.round(box.top - hostTop)}px`;
+    bar.style.height = `${Math.round(box.height)}px`;
+    host.append(bar);
+  }
+}
+function placeMarks() {
+  placeBar();
+  placeNoteBars();
+}
 /* A tab switch, an image, or a new window width moves the block under the
    bar, and each of those changes the page's own size. */
-new ResizeObserver(placeBar).observe($("page-content"));
+new ResizeObserver(placeMarks).observe($("page-content"));
 /* The button names what kind of thing it will comment on; the note itself
    still records the block's own heading. */
 function blockKind(block) {
   const has = (selector) =>
     block.matches(selector) || block.querySelector(selector) !== null;
+  /* A component names itself, so the frame never learns a component's class.
+     Everything below is an attribute any component may use. */
+  const declared = block.closest("[data-kind]")?.dataset.kind;
+  if (declared) return `this ${declared}`;
   /* What the block is comes before what it holds, so a decision whose options
      are diagrams is still a decision. A figure is last because every diagram
      and chart contains one. */
   if (has("[data-choice]")) return "this decision";
   if (has("[data-question]")) return "this question";
   if (has("[data-multiselect]")) return "this checklist";
-  if (has(".behavior-cases")) return "these cases";
   if (has("table")) return "this table";
-  if (has("[data-diff-input], .change-view")) return "this diff";
   if (has("[data-language], .shiki")) return "this code";
   if (has("[data-diagram]")) return "this diagram";
   if (has("[data-chart]")) return "this chart";
@@ -1730,8 +1838,9 @@ function commentOnTarget() {
   if (selected.length > 3)
     openNote(page.id, page.title, selected, null, null, selectedTarget);
   else if (chosen) {
-    const heading = blockHeading(chosen);
-    openNote(page.id, heading, heading, null, null, chosen.id);
+    /* No quote: the note is about the block, and a quote would be searched
+       for in the page and highlighted, marking the block's opening words. */
+    openNote(page.id, blockHeading(chosen), "", null, null, chosen.id);
   } else openNote(page.id, page.title);
   chooseBlock(null);
 }
@@ -2245,8 +2354,19 @@ try {
 } catch {
   /* Start at the top. */
 }
+let place = null;
+try {
+  place = usablePlace(
+    JSON.parse(localStorage.getItem(placeKey)),
+    plan.revision,
+    [...pages.map((item) => item.id), ...(editable ? ["feedback"] : [])],
+  );
+} catch {
+  /* Start at the top. */
+}
+const opened = location.hash.slice(1) || query.get("target");
 show(
-  resume?.first ? pages[0].id : location.hash.slice(1),
+  resume?.first ? pages[0].id : location.hash.slice(1) || place?.page || "",
   query.get("target"),
   {
     keepScroll: false,
@@ -2256,6 +2376,12 @@ show(
 // The browser restores the old scroll position after the reload; a new
 // revision starts at the top.
 if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
+else if (place?.top && !opened)
+  // The page is short until the renderers finish, and the browser clamps a
+  // scroll past the end, so the offset is restored after they settle.
+  Promise.allSettled([...renders]).then(() =>
+    scroller().scrollTo(0, place.top),
+  );
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
   show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {

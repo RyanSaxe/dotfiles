@@ -17,7 +17,8 @@ header, which opens the same page list in a dialog. The sidebar sits below
 the header and holds Agreed, the pages, and Review comments, which opens
 the Feedback page and carries the count of unsent items. The plan's title
 is not in the frame: the browser tab carries it, and the revision dialog
-shows it under the current revision. The page
+shows it under the current revision. A page's own HTML starts below the
+title and contains no `h1`; the build refuses one. The page
 layout is yours. The frame provides
 basic typography, tables, code, theme colors, focus, and selected-choice
 states; it provides no generic card or column layouts. The builder wraps
@@ -42,8 +43,12 @@ column is at most 780px of text.
 
 The frame is exactly as tall as the visible window and the page scrolls
 inside it, so the window itself never scrolls and no content passes under
-the header. Reading an older revision draws a strip under the header that
-names it and links back to the current one. Frame dialogs close on Escape
+the header. The page and the scroll offset are remembered per session, so
+the bell's jump to another session and back returns to where the reader left
+off; the record carries its revision, so a new revision starts at the top of
+the first page and a page the revision no longer has is ignored. Reading an
+older revision draws a strip under the header that names it and links back
+to the current one. Frame dialogs close on Escape
 or their ✕ without submitting anything, and each takes the focus on its own
 heading so no control is left ringed. Custom popups should do the same and keep unsent text. Single
 keys, listed under `?`, move between sessions and pages, `j` and `k` choose
@@ -60,6 +65,7 @@ keep authored controls focusable.
 | data-question                        | Stable question ID on a section with a textarea. Use data-label for the answer's label.                                                                                                                                                        |
 | data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                                                                                                                                         |
 | data-label on an option              | Readable option label, separate from its ID and action text. The build refuses one over 24 characters, which is what a tab strip fits; a group's data-label has no limit. Buttons fall back to their text; checkboxes fall back to data-value. |
+| data-kind on a block                 | The word the comment control uses for this block, after "this". A component sets it on its own root; any other block is named from what it holds.                                                                                              |
 | aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                                                                                                                               |
 | data-comment                         | Button action for a contextual note, using the attribute as its label; the nearest ancestor ID becomes the note's target.                                                                                                                      |
 | planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                                                                                                                               |
@@ -96,9 +102,16 @@ block that is not a paragraph, heading or list chooses it and draws a bar
 in the column's left padding beside it; clicking the same block again,
 clicking elsewhere on the page, or pressing Escape clears the choice. The
 control names the block by what it is, so a decision reads "Comment on this
-decision" and a table "Comment on this table"; a block the frame does not
-recognise, including a plan's own component, reads "Comment on this
-block".
+decision" and a table "Comment on this table". A component names itself with
+`data-kind`; a block with no `data-kind` the frame cannot recognise reads
+"Comment on this block". The note is filed under the name the block gives,
+its heading, `data-title`, `data-file`, figure title or caption. A block that
+names none of those takes the heading it sits under, then what it is, and a
+name shared with another block on the page is numbered, so every note in the
+Feedback list says which block it is on. A note on a block quotes nothing, so the
+block keeps a muted bar in the padding the chosen one uses: the accent means
+the block you are about to comment on, the muted bar means this block
+already has notes.
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom. The

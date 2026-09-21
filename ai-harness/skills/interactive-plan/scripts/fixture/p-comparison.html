@@ -28,7 +28,7 @@ table = "breakers"</div></section>
   <label class="scope-row"><span><strong>Canary first</strong><span class="scope-description">One region for a day before the rest.</span></span><input type="checkbox" class="scope-check" data-value="canary" data-label="Canary first" checked /></label>
   <label class="scope-row"><span><strong>Feature flag</strong><span class="scope-description">The breaker behind a flag that ops can flip.</span></span><input type="checkbox" class="scope-check" data-value="flag" data-label="Feature flag" /></label>
 </div>
-<div class="behavior-cases">
+<div class="behavior-cases" data-kind="set of cases">
   <div class="behavior-head" aria-hidden="true"><span>When</span><span>Proposed behavior</span><span></span></div>
   <section class="behavior-case" id="case-open"><h3>The breaker is open</h3><div>The client returns a PaymentError with code <code>breaker_open</code> in under 5 ms and does not call the gateway.</div><button class="btn" data-comment="case-open: The breaker is open">Revise</button></section>
   <section class="behavior-case" id="case-half"><h3>Cooldown elapsed</h3><div>One probe request goes through; success closes the breaker, failure reopens it for another cooldown.</div><button class="btn" data-comment="case-half: Cooldown elapsed">Revise</button></section>

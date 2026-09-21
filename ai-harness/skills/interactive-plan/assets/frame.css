@@ -1229,13 +1229,21 @@ dialog::backdrop {
 #reading {
   position: relative;
 }
-.chosen-bar {
+.chosen-bar,
+.note-bar {
   position: absolute;
   left: -12px;
   width: 3px;
   border-radius: 999px;
-  background: var(--accent);
   pointer-events: none;
+}
+.chosen-bar {
+  background: var(--accent);
+}
+/* A block that carries notes, in the same place and a quieter colour, so the
+   accent always means the block you are about to comment on. */
+.note-bar {
+  background: var(--line-strong);
 }
 .context-link {
   font-size: 12px;

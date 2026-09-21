@@ -1,5 +1,5 @@
 <h2>Text diff</h2>
-<section class="change-review" data-file="src/charge.ts">
+<section class="change-review" data-kind="diff" data-file="src/charge.ts">
   <div class="change-controls" role="group" aria-label="Diff layout"><button class="btn" data-diff-style="split" aria-pressed="true">Side by side</button><button class="btn" data-diff-style="unified" aria-pressed="false">Unified</button></div>
   <textarea data-diff-input hidden>{
   "before": "export async function charge(request) {\n  const client = new PaymentClient(config);\n  const result = await client.charge(request);\n  if (!result.ok) throw new PaymentError(result);\n  return result;\n}\n",
@@ -11,7 +11,7 @@
   <details class="change-source"><summary>Exact source and Git patch</summary><h3>Before</h3><pre data-diff-source="before"></pre><h3>Proposed</h3><pre data-diff-source="after"></pre><h3>Git patch</h3><pre data-diff-source="patch"></pre></details>
 </section>
 <h2>Visual change pair</h2>
-<section class="change-pair">
+<section class="change-pair" data-kind="pair of diagrams">
   <section><header>Before <span>− Removed or replaced</span></header><div class="change-content"><div data-diagram>flowchart LR
   C["Checkout"] --> P["PaymentClient"] --> G["Gateway"]
   class P changed</div></div></section>
@@ -22,7 +22,7 @@
 <div class="change-key"><span>− The client called the gateway directly</span><span>+ The breaker sits between them</span></div>
 <h2>The guide's pairs</h2>
 <h2>Link to a group, never into it from above</h2>
-<section class="change-pair">
+<section class="change-pair" data-kind="pair of diagrams">
   <section><header>Avoid <span>edge into the first node</span></header><div class="change-content"><div data-diagram>flowchart TB
   E["Pricing"] --> F
   subgraph pay [Payments]
@@ -37,7 +37,7 @@
   pay --> I["Ledger"]</div></div></section>
 </section>
 <h2>A long chain: top to bottom, groups, or a line that scrolls</h2>
-<section class="change-pair">
+<section class="change-pair" data-kind="pair of diagrams">
   <section><header>Avoid <span>ten hops in a line</span></header><div class="change-content"><div data-diagram>flowchart LR
   A["Browser"] --> B["Edge"] --> C["Checkout API"] --> D["Cart service"] --> E["Pricing"] --> F["PaymentClient"] --> G["Breaker"] --> H["Gateway"] --> I["Ledger"] --> J["Notifier"]</div></div></section>
   <section><header>Prefer <span>three groups, linked as groups</span></header><div class="change-content"><div data-diagram>flowchart TB
@@ -56,7 +56,7 @@
   front --> core --> pay --> I["Ledger"] --> J["Notifier"]</div></div></section>
 </section>
 <h2>One to three words in a node; the rest in the caption</h2>
-<section class="change-pair">
+<section class="change-pair" data-kind="pair of diagrams">
   <section><header>Avoid <span>long labels</span></header><div class="change-content"><div data-diagram>flowchart LR
   A["Checkout API validates the cart and prices"] --> B["PaymentClient with a five-failure breaker"] --> C["Gateway, 8 s timeout"]</div></div></section>
   <section><header>Prefer <span>short labels, caption below</span></header><div class="change-content"><div data-diagram>flowchart LR

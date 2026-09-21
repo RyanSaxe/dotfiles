@@ -56,6 +56,11 @@ test("an option label of exactly 24 characters is accepted", async () => {
   assert.match(html, /x{24}/);
 });
 
+// The rule is "no h1", not "no repeated words".
+test("a page may repeat its title in a lower heading", async () => {
+  await assert.doesNotReject(assemble(page("<h2>P</h2><p>x</p>")));
+});
+
 test("a group's label is not held to the option limit", async () => {
   const html = await assemble(
     page(
@@ -85,6 +90,10 @@ test("the build refuses each structural problem and names it", async () => {
       ),
     ),
     /^page "p": option label "x{25}" is 25 characters, over 24$/m,
+  );
+  await refused(
+    page("<h1>P</h1><p>x</p>"),
+    /^page "p": the frame draws the page title, so a page has no h1$/m,
   );
   await refused(
     page(decision(option() + `<button data-value="">x</button>`)),
