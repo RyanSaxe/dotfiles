@@ -1231,17 +1231,28 @@ const blockSkip = new Set([
   "TEMPLATE",
 ]);
 function blockHeading(block) {
-  const titled = block.matches("[data-title], [data-caption]")
-    ? block
-    : block.querySelector("[data-title], [data-caption]");
-  const named = block.querySelector("h1, h2, h3, h4, h5, h6, figcaption");
-  const text = normalize(
-    named?.textContent ||
-      titled?.dataset.title ||
-      titled?.dataset.caption ||
-      block.textContent,
+  const read = (node) => normalize(node?.textContent);
+  /* What the block gives for a name, in the order a reader would pick: its
+     own heading, the title an author set, the title the frame drew for a
+     figure, then the caption. Never the block's text, which is a table's
+     cells, a renderer's injected stylesheet and its buttons. A block that
+     gives no name returns none, and the note is filed under its page. */
+  const named = "[data-title], [data-caption], [data-file]";
+  const titled = block.matches(named) ? block : block.querySelector(named);
+  /* A heading inside a closed details is a section of the block's source,
+     not a name for it: the diff's own "Before" and "Git patch" live there. */
+  const heading = [...block.querySelectorAll("h1, h2, h3, h4, h5, h6")].find(
+    (node) => !node.closest("details"),
   );
-  return text.length > 60 ? text.slice(0, 57) + "…" : text;
+  const name =
+    read(heading) ||
+    normalize(titled?.dataset.title) ||
+    normalize(titled?.dataset.file) ||
+    read(block.querySelector(".figure-head b")) ||
+    normalize(titled?.dataset.caption) ||
+    read(block.querySelector(".figure-caption"));
+  if (!name) return "";
+  return name.length > 60 ? name.slice(0, 57) + "…" : name;
 }
 function renderSessions() {
   const others = sessions.filter((entry) => entry.id !== session.sessionId);

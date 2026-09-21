@@ -98,7 +98,9 @@ clicking elsewhere on the page, or pressing Escape clears the choice. The
 control names the block by what it is, so a decision reads "Comment on this
 decision" and a table "Comment on this table"; a block the frame does not
 recognise, including a plan's own component, reads "Comment on this
-block".
+block". The note is filed under the name the block gives, its heading,
+`data-title`, `data-file` or caption, and under its page alone when it
+gives none.
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom. The
