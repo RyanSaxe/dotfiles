@@ -212,8 +212,13 @@ function disposeRenderers() {
 // Page changes push history so the back button and a pasted hash both work;
 // re-rendering the same page, restoring after a reload, and popstate itself
 // leave history alone.
+/* Above 720px main scrolls and the sidebar stays; below it the body does. */
+const scroller = () =>
+  [document.querySelector("main"), document.querySelector(".app-body")].find(
+    (el) => /auto|scroll/.test(getComputedStyle(el).overflowY),
+  );
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
-  const scrollY = window.scrollY;
+  const top = scroller().scrollTop;
   const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
@@ -252,12 +257,12 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
-  if (!keepScroll) window.scrollTo(0, 0);
+  if (!keepScroll) scroller().scrollTo(0, 0);
   else if (!targetId) {
     // Replacing the page shortens it until the renderers finish, and the
     // browser clamps the scroll position meanwhile; restore it after they do.
-    window.scrollTo(0, scrollY);
-    Promise.allSettled([...renders]).then(() => window.scrollTo(0, scrollY));
+    scroller().scrollTo(0, top);
+    Promise.allSettled([...renders]).then(() => scroller().scrollTo(0, top));
   }
   const target = targetId && $(targetId);
   if (!feedback && target && $("page-content").contains(target)) {
@@ -395,7 +400,7 @@ function showTip(event) {
   tip.hidden = false;
   $("page-content").style.cursor = "pointer";
   const width = tip.offsetWidth;
-  tip.style.left = `${Math.min(event.pageX + 14, window.scrollX + innerWidth - width - 12)}px`;
+  tip.style.left = `${Math.min(event.pageX + 14, innerWidth - width - 12)}px`;
   tip.style.top = `${event.pageY + 18}px`;
 }
 $("page-content").addEventListener("mousemove", showTip);
@@ -2184,7 +2189,7 @@ show(
 );
 // The browser restores the old scroll position after the reload; a new
 // revision starts at the top.
-if (resume?.first) setTimeout(() => window.scrollTo(0, 0), 60);
+if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
   show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {
