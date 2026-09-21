@@ -1777,8 +1777,6 @@ systemTheme.addEventListener("change", () => {
 });
 
 /* Keys */
-const interactiveSelector =
-  "[data-choice] [data-value], [data-multiselect] input, [data-question] textarea, [data-comment], .link-btn, [data-diff-style], summary";
 document.addEventListener("keydown", (event) => {
   if (mode === "preview" || event.metaKey || event.ctrlKey || event.altKey)
     return;
@@ -1800,19 +1798,24 @@ document.addEventListener("keydown", (event) => {
     const next = order[index + (key === "]" ? 1 : -1)];
     if (next) show(next);
   } else if (key === "j" || key === "k") {
-    const items = Array.from(
-      $("page-content").querySelectorAll(interactiveSelector),
-    ).filter((item) => item.offsetParent);
-    if (!items.length) return;
-    const index = items.indexOf(document.activeElement);
+    /* The same blocks a click can choose, so the keys reach the comment
+       control's target. Tab still steps through the controls inside one. */
+    const blocks = [...$("page-content").children].filter(
+      (block) => !blockSkip.has(block.tagName) && block.offsetParent,
+    );
+    if (!blocks.length) return;
+    const index = blocks.indexOf(chosen);
     const next =
-      items[
+      blocks[
         index < 0
           ? key === "j"
             ? 0
-            : items.length - 1
-          : (index + (key === "j" ? 1 : -1) + items.length) % items.length
+            : blocks.length - 1
+          : (index + (key === "j" ? 1 : -1) + blocks.length) % blocks.length
       ];
+    // chooseBlock toggles, so landing on the current block would clear it.
+    if (next !== chosen) chooseBlock(next);
+    next.tabIndex = -1;
     next.focus({ preventScroll: true });
     next.scrollIntoView({ block: "center" });
   } else if (key === "c" && editable && !$("reading").hidden) commentOnTarget();

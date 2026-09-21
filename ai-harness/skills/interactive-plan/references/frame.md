@@ -46,9 +46,10 @@ the header. Reading an older revision draws a strip under the header that
 names it and links back to the current one. Frame dialogs close on Escape
 or their ✕ without submitting anything, and each takes the focus on its own
 heading so no control is left ringed. Custom popups should do the same and keep unsent text. Single
-keys, listed under `?`, move between sessions, pages, and interactive
-items, and `s` focuses Submit so that Enter sends. Keep authored controls
-focusable so the keys reach them.
+keys, listed under `?`, move between sessions and pages, `j` and `k` choose
+the next and previous block so that `c` comments on it, and `s` focuses
+Submit so that Enter sends. Tab reaches the controls inside a block, so
+keep authored controls focusable.
 
 ## Choices, comments, and answers
 
