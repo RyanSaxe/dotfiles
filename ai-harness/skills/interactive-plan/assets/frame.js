@@ -244,6 +244,9 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
         detail: { page, element: $("page-content") },
       }),
     );
+    // Shiki, Mermaid and the charts all change a block's height after the
+    // page renders, so the marks are placed again once they settle.
+    Promise.allSettled([...renders]).then(placeMarks);
   }
   closeDrawer();
   for (const button of document.querySelectorAll("#navigation [data-page]")) {
@@ -349,6 +352,7 @@ function markNotes() {
     "plan-note",
     noteRanges.map((item) => item.range),
   );
+  placeNoteBars();
   $("note-count").hidden = !notes.length;
   $("note-count").textContent = notes.length
     ? `${plural(notes.length, "note")} on this page`
@@ -1690,9 +1694,38 @@ function chooseBlock(block) {
   placeBar();
   commentTarget();
 }
+/* A note that quotes nothing leaves no highlight to find it by, so the block
+   it belongs to keeps a quiet bar in the same padding the chosen one uses.
+   Accent means chosen now; muted means this block has notes. */
+function placeNoteBars() {
+  const host = $("note-bars");
+  host.replaceChildren();
+  if ($("reading").hidden) return;
+  const blocks = new Set();
+  for (const note of state.notes) {
+    if (note.topic !== page.id || note.quote || !note.target) continue;
+    const block = document
+      .getElementById(note.target)
+      ?.closest("#page-content > *");
+    if (block) blocks.add(block);
+  }
+  const host_top = $("reading").getBoundingClientRect().top;
+  for (const block of blocks) {
+    const box = block.getBoundingClientRect();
+    const bar = document.createElement("div");
+    bar.className = "note-bar";
+    bar.style.top = `${Math.round(box.top - host_top)}px`;
+    bar.style.height = `${Math.round(box.height)}px`;
+    host.append(bar);
+  }
+}
+function placeMarks() {
+  placeBar();
+  placeNoteBars();
+}
 /* A tab switch, an image, or a new window width moves the block under the
    bar, and each of those changes the page's own size. */
-new ResizeObserver(placeBar).observe($("page-content"));
+new ResizeObserver(placeMarks).observe($("page-content"));
 /* The button names what kind of thing it will comment on; the note itself
    still records the block's own heading. */
 function blockKind(block) {

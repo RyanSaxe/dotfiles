@@ -101,8 +101,11 @@ control names the block by what it is, so a decision reads "Comment on this
 decision" and a table "Comment on this table". A component names itself with
 `data-kind`; a block with no `data-kind` the frame cannot recognise reads
 "Comment on this block". The note is filed under the name the block gives,
-its heading, `data-title`, figure title or caption, and under its page alone
-when it gives none.
+its heading, `data-title`, `data-file`, figure title or caption, and under
+its page alone when it gives none. A note on a block quotes nothing, so the
+block keeps a muted bar in the padding the chosen one uses: the accent means
+the block you are about to comment on, the muted bar means this block
+already has notes.
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom. The
