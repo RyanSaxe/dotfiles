@@ -3,9 +3,10 @@
 ## Frame and content
 
 The frame owns the header, the sidebar, the previous and next links at the
-end of each page, the bell for other live sessions, Settings (appearance
-and notifications), the Feedback page, the working card (the round's steps,
-ticked as the agent reports them), and the preview and read-only modes. The
+end of each page, the bell that lists other live sessions and closes them,
+Settings (appearance and notifications), the Feedback page, the working
+card (the round's steps, ticked as the agent reports them), and the preview
+and read-only modes. The
 header runs across the whole frame at every width and holds the revision
 clock, Settings and the bell at the left, and Submit at the right, which
 becomes Accept plan on a final plan that can be accepted and goes disabled

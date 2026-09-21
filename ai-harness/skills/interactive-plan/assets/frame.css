@@ -1497,3 +1497,16 @@ dialog::backdrop {
 body:has(dialog[open]) .quote-button {
   display: none;
 }
+/* A session row and the control that closes that session. */
+.session-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+.session-dismiss {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  font-size: 12px;
+}

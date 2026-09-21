@@ -4,9 +4,11 @@ const session = JSON.parse($("session-config").textContent);
 const base = typeof session.base === "string" ? session.base : "";
 const online =
   Boolean(session.sessionId) && /^https?:$/.test(location.protocol);
+/* A closed session reads like an older revision: nothing can be sent from
+   it. The strip below the header says which of the two it is. */
 const mode = session.preview
   ? "preview"
-  : session.readonly
+  : session.readonly || session.closed
     ? "readonly"
     : "live";
 const editable = mode === "live";
@@ -1172,7 +1174,9 @@ function status() {
     : !connected
       ? "The hub is unreachable. Your draft stays here and submits when it is back."
       : "";
-  if (newer && mode === "live") scheduleReload();
+  // A session closed from another tab reloads into read-only, so this tab
+  // cannot send anything to an agent that will never be woken again.
+  if ((newer || remote?.dismissedAt) && mode === "live") scheduleReload();
 }
 async function poll() {
   try {
@@ -1280,6 +1284,16 @@ function renderSessions() {
     const title = document.createElement("span");
     title.className = "title";
     title.textContent = entry.title;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "icon-btn session-dismiss";
+    close.setAttribute("aria-label", `Close ${entry.title}`);
+    close.textContent = "✕";
+    close.onclick = async (event) => {
+      event.stopPropagation();
+      await fetch(`${entry.url}api/dismiss`, { method: "POST" });
+      await poll();
+    };
     const words = document.createElement("span");
     words.className = "words";
     const state = document.createElement("em");
@@ -1293,7 +1307,13 @@ function renderSessions() {
       if (current) toggleSidecar(false);
       else location.assign(entry.url);
     };
-    list.append(row);
+    // The row is a button, so the close control is its sibling rather than
+    // a button inside one.
+    const line = document.createElement("div");
+    line.className = "session-line";
+    line.append(row);
+    if (!current) line.append(close);
+    list.append(line);
   }
 }
 function renderRevisions() {
@@ -1338,13 +1358,18 @@ function renderRevisions() {
     list.append(row);
   }
   // An older revision is read-only, and the clock alone does not say which
-  // one you are on, so a strip under the header names it.
+  // one you are on, so a strip under the header names it. A closed session
+  // is read-only on its current revision, and there is nowhere to go back
+  // to, so the strip says that instead and drops the link.
   const older = mode === "readonly";
   $("older-strip").hidden = !older;
   $("revision").classList.toggle("older", older);
-  $("older-text").textContent = older
-    ? `You are reading revision ${plan.revision} of ${latest}`
-    : "";
+  $("older-text").textContent = !older
+    ? ""
+    : session.closed
+      ? "This plan was closed. It is here to read."
+      : `You are reading revision ${plan.revision} of ${latest}`;
+  $("revision-back").hidden = Boolean(session.closed);
   $("revision-back").href = `${base}/`;
   $("revision").setAttribute(
     "aria-label",
