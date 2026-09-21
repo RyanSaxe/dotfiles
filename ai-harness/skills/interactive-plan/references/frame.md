@@ -3,19 +3,20 @@
 ## Frame and content
 
 The frame owns the header, the sidebar, the previous and next links at the
-end of each page, the bell for other live sessions, Settings (appearance and
-notifications), the Feedback page, the working card (the round's steps,
+end of each page, the bell for other live sessions, Settings (appearance
+and notifications), the Feedback page, the working card (the round's steps,
 ticked as the agent reports them), and the preview and read-only modes. The
 header runs across the whole frame at every width and holds the revision
 clock, Settings and the bell at the left, and Submit at the right, which
 becomes Accept plan on a final plan that can be accepted and goes disabled
 once a round is sent. The clock opens a dialog listing every revision,
 newest first, with the current one ticked; choosing another one opens it.
-Below 720px the header gains a menu button that slides the sidebar in as a
-full-screen drawer. The sidebar sits below the header and holds Agreed, the
-pages, and Review comments, which opens the Feedback page and carries the
-count of unsent items. The plan's title is not in the frame: the browser tab carries
-it, and the revision dialog shows it under the current revision. The page
+Below 720px the sidebar is replaced by a menu button at the left of the
+header, which opens the same page list in a dialog. The sidebar sits below
+the header and holds Agreed, the pages, and Review comments, which opens
+the Feedback page and carries the count of unsent items. The plan's title
+is not in the frame: the browser tab carries it, and the revision dialog
+shows it under the current revision. The page
 layout is yours. The frame provides
 basic typography, tables, code, theme colors, focus, and selected-choice
 states; it provides no generic card or column layouts. The builder wraps
@@ -36,7 +37,7 @@ labels so that meaning never rests on color alone.
 Type is the system stack: 13px chrome, 13.5px to 15px reading, 22px page
 titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
 6px for rows. The frame is at most 1160px wide and centered, and the reading
-column is at most 780px of text with a comment gutter on its right.
+column is at most 780px of text.
 
 The frame is exactly as tall as the visible window and the page scrolls
 inside it, so the window itself never scrolls and no content passes under
@@ -84,17 +85,24 @@ default afterwards. An empty set means "None selected", not unanswered.
 
 Register custom initialization on `plan:page`. The custom JS file runs
 before the frame module. Script elements inside page HTML do not execute.
-Page-level and text-selection comments need no custom code, and neither
-does the comment control the frame puts in the gutter beside every block
-that is not a paragraph, heading or list: a code block, a table, a figure,
-a component. It is drawn at every width, and darkens under a pointer.
+Page-level, block and text-selection comments need no custom code. One
+control sits at the bottom right at every width and names what it will
+comment on: the selection while there is one, otherwise the block the
+reader last clicked, otherwise the page. Pressing it opens the note dialog
+on that target, and the note keeps the target it opened on. Clicking a
+block that is not a paragraph, heading or list chooses it and draws a bar
+in the column's left padding beside it; clicking the same block again,
+clicking elsewhere on the page, or pressing Escape clears the choice. The
+control names the block by what it is, so a decision reads "Comment on this
+decision" and a table "Comment on this table"; a block the frame does not
+recognise, including a plan's own component, reads "Comment on this
+block".
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
-the note to edit. The count of notes on a page sits at the bottom, above
-the page actions. The Feedback page groups items by page, with edit and
-remove, and holds the overall comment. Submit, at the right of the header,
-sends everything unsent at once. Sent items stay listed as sent until the
-next revision; items whose page or text no longer exists are listed under
+the note to edit. The count of notes on a page sits at the bottom. The
+Feedback page groups items by page, with edit and remove, and holds the
+overall comment. Submit, at the right of the header, sends everything
+unsent at once. Sent items stay listed as sent until the next revision; items whose page or text no longer exists are listed under
 the revision they came from. A submission carries `groups.choices`
 (checklists with `touched`), `groups.notes`, and, when present,
 `groups.answers` keyed `page/question` with `label`, `text`, and `topic`.

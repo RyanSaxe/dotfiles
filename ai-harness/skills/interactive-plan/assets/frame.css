@@ -4,7 +4,6 @@
      cover something. The selection control sits above all of it. */
   --z-sidebar: 5;
   --z-header: 6;
-  --z-drawer: 30;
   --z-selection: 40;
   --ground: #f6f6f8;
   --panel: #ffffff;
@@ -355,20 +354,7 @@ kbd {
   text-transform: uppercase;
   color: var(--muted);
 }
-.pages-menu {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-.pages-menu > summary {
-  display: none;
-  list-style: none;
-}
-.pages-menu > summary::-webkit-details-marker {
-  display: none;
-}
-.sidebar nav {
+.pages-slot nav {
   display: grid;
   gap: 1px;
   align-content: start;
@@ -377,7 +363,7 @@ kbd {
   min-height: 0;
   overflow-y: auto;
 }
-.sidebar nav button {
+.pages-slot nav button {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -390,12 +376,12 @@ kbd {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-.sidebar nav button[aria-current="page"] {
+.pages-slot nav button[aria-current="page"] {
   color: var(--ink);
   font-weight: 600;
   border-left-color: var(--accent);
 }
-.sidebar nav .separator {
+.pages-slot nav .separator {
   border-top: 1px solid var(--line);
   margin: 8px 0;
 }
@@ -409,7 +395,7 @@ kbd {
   font-size: 12px;
   color: var(--attention);
 }
-.sidebar nav button .count {
+.pages-slot nav button .count {
   flex: none;
   min-width: 0;
   padding: 0;
@@ -478,10 +464,10 @@ select {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
 }
-/* The column used to take the full width of main and then add a 56px left
-   margin, which made it 56px wider than the space it sits in and scrolled
-   the page sideways below a 1100px window. The margin is padding now, and
-   the 40px on the right is the comment gutter. */
+/* The side offsets are padding rather than margin: a margin adds to the
+   full width of main and scrolls the page sideways below a 1100px window.
+   The 56px on the left holds the bar that marks a chosen block, and the
+   last line clears the comment control, which is always on screen. */
 .content {
   max-width: 876px;
   margin: 0;
@@ -500,13 +486,6 @@ body.is-working .content {
 #page-content p,
 #page-content li {
   font-size: 14px;
-}
-.page-actions {
-  display: flex;
-  gap: 12px;
-  border-top: 1px solid var(--line);
-  margin-top: 36px;
-  padding-top: 14px;
 }
 .page-footer {
   display: flex;
@@ -1242,6 +1221,22 @@ dialog::backdrop {
   bottom: calc(22px + env(safe-area-inset-bottom));
   z-index: var(--z-selection);
 }
+/* The bar sits in the padding the column already has: 56px on a desktop and
+   16px on a phone, so marking a block never narrows the text. It is one
+   element beside the page rather than a pseudo-element on the block, because
+   a table, a code block and a figure each scroll inside their own box and
+   would clip a bar that hung outside it. */
+#reading {
+  position: relative;
+}
+.chosen-bar {
+  position: absolute;
+  left: -12px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+}
 .context-link {
   font-size: 12px;
 }
@@ -1260,7 +1255,6 @@ dialog::backdrop {
 :root[data-mode="preview"] .sidebar,
 :root[data-mode="preview"] .frame-header,
 :root[data-mode="preview"] .older-strip,
-:root[data-mode="preview"] .page-actions,
 :root[data-mode="preview"] .page-footer,
 :root[data-mode="preview"] #quote,
 :root[data-mode="preview"] .working {
@@ -1276,7 +1270,6 @@ dialog::backdrop {
 :root[data-mode="preview"] h1 {
   font-size: 17px;
 }
-:root[data-mode="readonly"] .page-actions,
 :root[data-mode="readonly"] #submit,
 :root[data-mode="readonly"] #accept,
 :root[data-mode="readonly"] #quote,
@@ -1414,9 +1407,6 @@ dialog::backdrop {
   line-height: 16px;
   text-align: center;
 }
-.sidebar-close {
-  display: none;
-}
 /* Reading an older revision: the strip names it and carries the way back. */
 .older-strip {
   flex: none;
@@ -1442,45 +1432,12 @@ dialog::backdrop {
   color: var(--attention);
   background: var(--attention-bg);
 }
-/* A comment control in the gutter beside every block, clear of anything
-   inside it, and drawn at every width whether or not there is a pointer. It
-   is a child of the column rather than of the block, because a block that
-   clips its overflow would hide it. */
-.block-comment {
-  position: absolute;
-  right: -32px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel);
-  color: var(--muted);
-}
-.block-comment svg {
-  width: 13px;
-  height: 13px;
-}
-@media (hover: hover) {
-  .block-comment:hover {
-    color: var(--ink);
-    border-color: var(--line-strong);
-  }
-}
 :root[data-mode="preview"] .content {
   margin: 0;
 }
-:root[data-mode="preview"] .block-comment,
-:root[data-mode="readonly"] .block-comment {
-  display: none;
-}
 
-/* Narrow screens: the header stays, the sidebar becomes a full-screen
-   drawer behind the menu button, and the reading column gives 48px of its
-   right side to the comment gutter. */
+/* Narrow screens: the header stays and the page list moves from the sidebar
+   into a dialog behind the menu button. */
 @media (max-width: 720px) {
   .app {
     max-width: none;
@@ -1493,22 +1450,7 @@ dialog::backdrop {
     display: inline-flex;
   }
   .sidebar {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-drawer);
-    width: 100vw;
-    height: 100dvh;
-    border: 0;
-    transform: translateX(-100%);
-    transition: transform 0.18s ease;
-  }
-  .sidebar[data-open="true"] {
-    transform: none;
-  }
-  .sidebar-close {
-    display: inline-flex;
-    align-self: flex-end;
-    margin: 10px 12px 0;
+    display: none;
   }
   main {
     border-right: 0;
@@ -1517,7 +1459,8 @@ dialog::backdrop {
   .content {
     max-width: none;
     margin: 0;
-    padding: 20px 48px 24px 16px;
+    /* The last line clears the comment control, which is always on screen. */
+    padding: 20px 16px calc(90px + env(safe-area-inset-bottom));
   }
   .working {
     left: 0;
@@ -1543,4 +1486,14 @@ dialog::backdrop {
     justify-content: flex-start;
     max-width: none;
   }
+}
+
+/* The page list is one element, shown in the sidebar or in the dialog. */
+#pages-dialog .pages-slot nav {
+  padding: 0;
+  overflow: visible;
+}
+/* An open dialog covers the page, so the control that comments on it goes. */
+body:has(dialog[open]) .quote-button {
+  display: none;
 }
