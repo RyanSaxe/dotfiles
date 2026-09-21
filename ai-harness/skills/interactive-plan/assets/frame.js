@@ -931,6 +931,9 @@ function review() {
   }
   const sendable = connected && current() && editable;
   $("submit").disabled = !unsent.count || !sendable;
+  $("submit").textContent = unsent.count
+    ? `Submit (${unsent.count})`
+    : "Submit";
   // Accept plan takes the slot on an acceptable final plan. A sent round with
   // nothing new leaves Submit in place and disabled, so the header keeps its
   // shape between rounds; the working card reports how long the agent has been

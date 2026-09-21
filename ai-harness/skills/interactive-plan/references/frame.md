@@ -102,7 +102,8 @@ Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom. The
 Feedback page groups items by page, with edit and remove, and holds the
 overall comment. Submit, at the right of the header, sends everything
-unsent at once. Sent items stay listed as sent until the next revision; items whose page or text no longer exists are listed under
+unsent at once and carries the count while any are waiting. Sent items stay
+listed as sent until the next revision; items whose page or text no longer exists are listed under
 the revision they came from. A submission carries `groups.choices`
 (checklists with `touched`), `groups.notes`, and, when present,
 `groups.answers` keyed `page/question` with `label`, `text`, and `topic`.
