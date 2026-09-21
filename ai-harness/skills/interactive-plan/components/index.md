@@ -17,6 +17,10 @@ A plan-local component works the same way.
 | [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. The frame records the whole list, including untouched and empty selections. |
 | [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section. Keep each ID in its contextual comment label; Revise opens the comment dialog at that case.                            |
 
+A component that is not built from those attributes sets `data-kind` on its
+root, a singular noun that follows "this", so the comment control names it
+without the frame knowing the component.
+
 Code, diagrams, and charts need no component. The frame renders them as
 figures from `data-file`, `data-caption`, and `data-title`; see
 [frame.md](../references/frame.md). Notes on the text are frame

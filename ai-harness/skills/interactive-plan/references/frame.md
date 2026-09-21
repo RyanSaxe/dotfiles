@@ -60,6 +60,7 @@ keep authored controls focusable.
 | data-question                        | Stable question ID on a section with a textarea. Use data-label for the answer's label.                                                                                                                                                        |
 | data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                                                                                                                                         |
 | data-label on an option              | Readable option label, separate from its ID and action text. The build refuses one over 24 characters, which is what a tab strip fits; a group's data-label has no limit. Buttons fall back to their text; checkboxes fall back to data-value. |
+| data-kind on a block                 | The word the comment control uses for this block, after "this". A component sets it on its own root; any other block is named from what it holds. |
 | aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                                                                                                                               |
 | data-comment                         | Button action for a contextual note, using the attribute as its label; the nearest ancestor ID becomes the note's target.                                                                                                                      |
 | planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                                                                                                                               |
@@ -96,9 +97,9 @@ block that is not a paragraph, heading or list chooses it and draws a bar
 in the column's left padding beside it; clicking the same block again,
 clicking elsewhere on the page, or pressing Escape clears the choice. The
 control names the block by what it is, so a decision reads "Comment on this
-decision" and a table "Comment on this table"; a block the frame does not
-recognise, including a plan's own component, reads "Comment on this
-block". The note is filed under the name the block gives, its heading,
+decision" and a table "Comment on this table". A component names itself with
+`data-kind`; a block with no `data-kind` the frame cannot recognise reads
+"Comment on this block". The note is filed under the name the block gives, its heading,
 `data-title`, `data-file` or caption, and under its page alone when it
 gives none.
 

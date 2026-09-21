@@ -1691,15 +1691,17 @@ new ResizeObserver(placeBar).observe($("page-content"));
 function blockKind(block) {
   const has = (selector) =>
     block.matches(selector) || block.querySelector(selector) !== null;
+  /* A component names itself, so the frame never learns a component's class.
+     Everything below is an attribute any component may use. */
+  const declared = block.closest("[data-kind]")?.dataset.kind;
+  if (declared) return `this ${declared}`;
   /* What the block is comes before what it holds, so a decision whose options
      are diagrams is still a decision. A figure is last because every diagram
      and chart contains one. */
   if (has("[data-choice]")) return "this decision";
   if (has("[data-question]")) return "this question";
   if (has("[data-multiselect]")) return "this checklist";
-  if (has(".behavior-cases")) return "these cases";
   if (has("table")) return "this table";
-  if (has("[data-diff-input], .change-view")) return "this diff";
   if (has("[data-language], .shiki")) return "this code";
   if (has("[data-diagram]")) return "this diagram";
   if (has("[data-chart]")) return "this chart";
