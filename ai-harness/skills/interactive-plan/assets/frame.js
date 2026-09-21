@@ -230,6 +230,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     $("page-title").textContent = page.title;
     chooseBlock(null);
     $("page-content").innerHTML = page.html;
+    blockTargets($("page-content"), page.id);
     choiceTargets($("page-content"), page.id);
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
     else {
@@ -1410,6 +1411,12 @@ function closeMenus() {
 }
 
 /* Choices, checklists, answers */
+// A note on a block carries the block's ID so Feedback can jump back to it.
+function blockTargets(root, topic) {
+  [...root.children].forEach((block, index) => {
+    if (!blockSkip.has(block.tagName)) block.id ||= `block-${topic}-${index}`;
+  });
+}
 function choiceTargets(root, topic) {
   for (const type of ["choice", "multiselect", "question"])
     root.querySelectorAll(`[data-${type}]`).forEach((group, index) => {
@@ -1748,8 +1755,9 @@ function commentOnTarget() {
   if (selected.length > 3)
     openNote(page.id, page.title, selected, null, null, selectedTarget);
   else if (chosen) {
-    const heading = blockHeading(chosen);
-    openNote(page.id, heading, heading, null, null, chosen.id);
+    /* No quote: the note is about the block, and a quote would be searched
+       for in the page and highlighted, marking the block's opening words. */
+    openNote(page.id, blockHeading(chosen), "", null, null, chosen.id);
   } else openNote(page.id, page.title);
   chooseBlock(null);
 }
