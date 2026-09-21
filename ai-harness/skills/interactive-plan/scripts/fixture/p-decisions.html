@@ -39,7 +39,7 @@ app.post("/charge", async (req, res) =&gt; {
   await client.charge(job.data);
 });</div></figure></article>
 </section>
-<section class="visual-decision" data-choice="badge" data-label="Breaker badge" data-layout="columns">
+<section class="visual-decision" data-choice="badge" data-label="Breaker badge">
   <h3>Which badge shows the breaker state?</h3>
   <article class="visual-option" data-value="pill" data-label="Pill"><header>Pill <span class="tag">Recommended</span></header><p>Reads at a glance in the header.</p><figure><div style="padding:14px;text-align:center"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font-weight:600">closed</span></div></figure></article>
   <article class="visual-option" data-value="dot" data-label="Dot"><header>Dot</header><p>Smallest; needs a hover to name the state.</p><figure><div style="padding:14px;text-align:center"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--ok);vertical-align:middle"></span> <span style="color:var(--muted)">gateway</span></div></figure></article>

@@ -107,7 +107,9 @@
     // only then when every column would be wide enough; a narrow window
     // falls back to tabs and comes back when there is room again.
     function applyLayout() {
-      let mode = prefs?.get(key) || section.dataset.layout || "tabs";
+      // Tabs at every width; side by side is the reviewer's choice, not the
+      // author's.
+      let mode = prefs?.get(key) || "tabs";
       if (
         mode !== "columns" ||
         section.clientWidth / options.length < minimumColumn
