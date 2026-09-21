@@ -481,8 +481,9 @@ async function hub(t, extra = {}) {
 test("split authoring sources build a standalone artifact without executing content", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-build-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  // The frame draws the page title, so the page's own heading is an h2.
   const content =
-    '<h1>Interface</h1><pre data-language="text">literal </script> and $&</pre>';
+    '<h2>Interface</h2><pre data-language="text">literal </script> and $&</pre>';
   await fs.writeFile(path.join(directory, "interface.html"), content);
   await fs.writeFile(
     path.join(directory, "custom.css"),
