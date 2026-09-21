@@ -70,6 +70,7 @@ let activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
 
 const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}`;
 const resumeKey = `interactive-plan:resume:${session.sessionId || "offline"}`;
+const placeKey = `interactive-plan:place:${session.sessionId || "offline"}`;
 const prefsPrefix = `interactive-plan:prefs:${session.sessionId || "offline"}:`;
 let state = emptyDraft(plan.revision);
 if (editable)
@@ -219,6 +220,29 @@ const scroller = () =>
   [document.querySelector("main"), document.querySelector(".app-body")].find(
     (el) => /auto|scroll/.test(getComputedStyle(el).overflowY),
   );
+/* Where you were, so the bell's jump to another session and back lands on the
+   page you left. The revision is stored with it: a new revision does not
+   match and the record is ignored, which is what starts you at the top of the
+   first page. */
+let placeTimer = 0;
+function rememberPlace() {
+  clearTimeout(placeTimer);
+  placeTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(
+        placeKey,
+        JSON.stringify({
+          revision: plan.revision,
+          page: $("reading").hidden ? "feedback" : page.id,
+          top: Math.round(scroller().scrollTop),
+        }),
+      );
+    } catch {
+      /* Returning to the same place is a convenience, not a requirement. */
+    }
+  }, 250);
+}
+document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && editable;
@@ -270,6 +294,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     scroller().scrollTo(0, top);
     Promise.allSettled([...renders]).then(() => scroller().scrollTo(0, top));
   }
+  rememberPlace();
   const target = targetId && $(targetId);
   if (!feedback && target && $("page-content").contains(target)) {
     for (let ancestor = target; ancestor; ancestor = ancestor.parentElement)
@@ -1709,12 +1734,12 @@ function placeNoteBars() {
       ?.closest("#page-content > *");
     if (block) blocks.add(block);
   }
-  const host_top = $("reading").getBoundingClientRect().top;
+  const hostTop = $("reading").getBoundingClientRect().top;
   for (const block of blocks) {
     const box = block.getBoundingClientRect();
     const bar = document.createElement("div");
     bar.className = "note-bar";
-    bar.style.top = `${Math.round(box.top - host_top)}px`;
+    bar.style.top = `${Math.round(box.top - hostTop)}px`;
     bar.style.height = `${Math.round(box.height)}px`;
     host.append(bar);
   }
@@ -2304,8 +2329,19 @@ try {
 } catch {
   /* Start at the top. */
 }
+let place = null;
+try {
+  place = usablePlace(
+    JSON.parse(localStorage.getItem(placeKey)),
+    plan.revision,
+    [...pages.map((item) => item.id), ...(editable ? ["feedback"] : [])],
+  );
+} catch {
+  /* Start at the top. */
+}
+const opened = location.hash.slice(1) || query.get("target");
 show(
-  resume?.first ? pages[0].id : location.hash.slice(1),
+  resume?.first ? pages[0].id : location.hash.slice(1) || place?.page || "",
   query.get("target"),
   {
     keepScroll: false,
@@ -2315,6 +2351,12 @@ show(
 // The browser restores the old scroll position after the reload; a new
 // revision starts at the top.
 if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
+else if (place?.top && !opened)
+  // The page is short until the renderers finish, and the browser clamps a
+  // scroll past the end, so the offset is restored after they settle.
+  Promise.allSettled([...renders]).then(() =>
+    scroller().scrollTo(0, place.top),
+  );
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
   show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {
