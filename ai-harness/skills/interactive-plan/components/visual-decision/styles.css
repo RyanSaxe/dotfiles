@@ -42,7 +42,7 @@
 }
 .visual-option {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   gap: 8px;
   min-width: 0;
   border: 1px solid var(--line);
@@ -81,12 +81,13 @@
   font-size: 12.5px;
   color: var(--muted);
 }
+/* A diagram and a code block each scroll sideways inside their own figure,
+   so this one never needs to scroll and must not, or it traps the wheel. */
 .visual-option > figure {
   margin: 0;
   border-top: 1px solid var(--line);
   background: var(--ground);
   min-width: 0;
-  overflow: auto;
 }
 .visual-option > figure [data-diagram] {
   padding: 10px;
@@ -100,25 +101,32 @@
   border: 0;
   border-radius: 0;
 }
+/* The strip shares its width rather than scrolling: a box that scrolls on
+   one axis is given a scrollbar on the other, which put a stray pixel of
+   vertical scrolling on every decision. */
 .vd-tablist {
   display: flex;
   gap: 2px;
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
-  overflow-x: auto;
+  overflow: hidden;
 }
+/* The underline is painted inside the button rather than hung a pixel below
+   it, so the strip has nothing to overflow. */
 .vd-tablist button {
+  min-width: 0;
   padding: 8px 10px;
-  margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
+  box-shadow: inset 0 -2px 0 transparent;
   font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .vd-tablist button[aria-selected="true"] {
   color: var(--ink);
   font-weight: 600;
-  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 .vd-tablist button.chosen::before {
   content: "✓ ";

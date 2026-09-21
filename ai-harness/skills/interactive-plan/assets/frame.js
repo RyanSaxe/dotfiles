@@ -4,9 +4,11 @@ const session = JSON.parse($("session-config").textContent);
 const base = typeof session.base === "string" ? session.base : "";
 const online =
   Boolean(session.sessionId) && /^https?:$/.test(location.protocol);
+/* A closed session reads like an older revision: nothing can be sent from
+   it. The strip below the header says which of the two it is. */
 const mode = session.preview
   ? "preview"
-  : session.readonly
+  : session.readonly || session.closed
     ? "readonly"
     : "live";
 const editable = mode === "live";
@@ -212,8 +214,13 @@ function disposeRenderers() {
 // Page changes push history so the back button and a pasted hash both work;
 // re-rendering the same page, restoring after a reload, and popstate itself
 // leave history alone.
+/* Above 720px main scrolls and the sidebar stays; below it the body does. */
+const scroller = () =>
+  [document.querySelector("main"), document.querySelector(".app-body")].find(
+    (el) => /auto|scroll/.test(getComputedStyle(el).overflowY),
+  );
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
-  const scrollY = window.scrollY;
+  const top = scroller().scrollTop;
   const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
@@ -221,6 +228,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     page = pages.find((item) => item.id === id) || pages[0];
     disposeRenderers();
     $("page-title").textContent = page.title;
+    chooseBlock(null);
     $("page-content").innerHTML = page.html;
     choiceTargets($("page-content"), page.id);
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
@@ -229,15 +237,14 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       restoreAnswers();
       markNotes();
       enhance($("page-content"));
-      if (editable) addBlockControls($("page-content"), page);
     }
-    $("page-actions").hidden = page.id === "agreed" && builtInAgreed;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
         detail: { page, element: $("page-content") },
       }),
     );
   }
+  closeDrawer();
   for (const button of document.querySelectorAll("#navigation [data-page]")) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
@@ -252,12 +259,12 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
-  if (!keepScroll) window.scrollTo(0, 0);
+  if (!keepScroll) scroller().scrollTo(0, 0);
   else if (!targetId) {
     // Replacing the page shortens it until the renderers finish, and the
     // browser clamps the scroll position meanwhile; restore it after they do.
-    window.scrollTo(0, scrollY);
-    Promise.allSettled([...renders]).then(() => window.scrollTo(0, scrollY));
+    scroller().scrollTo(0, top);
+    Promise.allSettled([...renders]).then(() => scroller().scrollTo(0, top));
   }
   const target = targetId && $(targetId);
   if (!feedback && target && $("page-content").contains(target)) {
@@ -395,7 +402,7 @@ function showTip(event) {
   tip.hidden = false;
   $("page-content").style.cursor = "pointer";
   const width = tip.offsetWidth;
-  tip.style.left = `${Math.min(event.pageX + 14, window.scrollX + innerWidth - width - 12)}px`;
+  tip.style.left = `${Math.min(event.pageX + 14, innerWidth - width - 12)}px`;
   tip.style.top = `${event.pageY + 18}px`;
 }
 $("page-content").addEventListener("mousemove", showTip);
@@ -835,17 +842,23 @@ function badge(count) {
   mark.textContent = count || "";
   mark.hidden = !count;
 }
-/* On a narrow screen the sidebar is a drawer behind the menu button. */
+/* On a narrow screen the page list is a dialog, like every other panel.
+   The one navigation element moves between the sidebar and the dialog, so
+   the current page and the counts live in a single place. */
+const narrow = matchMedia("(max-width: 720px)");
+function placeNavigation() {
+  const target = narrow.matches ? $("pages-slot") : $("sidebar-slot");
+  if ($("navigation").parentElement !== target) target.append($("navigation"));
+  if (!narrow.matches) closeDrawer();
+}
 function openDrawer() {
-  $("sidebar").dataset.open = "true";
+  $("pages-dialog").showModal();
   $("menu-button").setAttribute("aria-expanded", "true");
-  $("navigation").querySelector("[aria-current]")?.focus();
 }
 function closeDrawer() {
-  if ($("sidebar").dataset.open !== "true") return;
-  delete $("sidebar").dataset.open;
+  if (!$("pages-dialog").open) return;
+  $("pages-dialog").close();
   $("menu-button").setAttribute("aria-expanded", "false");
-  $("menu-button").focus();
 }
 function canAccept(unsentCount) {
   return (
@@ -920,6 +933,9 @@ function review() {
   }
   const sendable = connected && current() && editable;
   $("submit").disabled = !unsent.count || !sendable;
+  $("submit").textContent = unsent.count
+    ? `Submit (${unsent.count})`
+    : "Submit";
   // Accept plan takes the slot on an acceptable final plan. A sent round with
   // nothing new leaves Submit in place and disabled, so the header keeps its
   // shape between rounds; the working card reports how long the agent has been
@@ -1158,7 +1174,9 @@ function status() {
     : !connected
       ? "The hub is unreachable. Your draft stays here and submits when it is back."
       : "";
-  if (newer && mode === "live") scheduleReload();
+  // A session closed from another tab reloads into read-only, so this tab
+  // cannot send anything to an agent that will never be woken again.
+  if ((newer || remote?.dismissedAt) && mode === "live") scheduleReload();
 }
 async function poll() {
   try {
@@ -1212,8 +1230,6 @@ const blockSkip = new Set([
   "STYLE",
   "TEMPLATE",
 ]);
-const blockIcon =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.2-4.3A8 8 0 1 1 21 12z"/></svg>';
 function blockHeading(block) {
   const titled = block.matches("[data-title], [data-caption]")
     ? block
@@ -1226,43 +1242,6 @@ function blockHeading(block) {
       block.textContent,
   );
   return text.length > 60 ? text.slice(0, 57) + "…" : text;
-}
-let blockControls = null;
-// The control sits in the column's gutter, so it hangs outside the block it
-// belongs to. Most blocks clip their overflow to hold a rounded corner, which
-// would hide it, so it is a child of the column and follows the block's top.
-function addBlockControls(root, current) {
-  blockControls?.disconnect();
-  const pairs = [];
-  let index = 0;
-  for (const block of [...root.children]) {
-    index++;
-    if (blockSkip.has(block.tagName) || !normalize(block.textContent)) continue;
-    if (!block.id) block.id = `block-${index}`;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "block-comment";
-    button.dataset.for = block.id;
-    button.setAttribute("aria-label", "Comment on this block");
-    button.innerHTML = blockIcon;
-    button.onclick = (event) => {
-      event.stopPropagation();
-      const heading = blockHeading(block);
-      openNote(current.id, heading, heading, null, null, block.id);
-    };
-    root.append(button);
-    pairs.push([button, block]);
-  }
-  const place = () => {
-    for (const [button, block] of pairs)
-      button.style.top = `${block.offsetTop}px`;
-  };
-  place();
-  // Shiki, Mermaid, charts and diffs all change a block's height after the
-  // page renders, and each one moves every control below it.
-  blockControls = new ResizeObserver(place);
-  blockControls.observe(root);
-  for (const [, block] of pairs) blockControls.observe(block);
 }
 function renderSessions() {
   const others = sessions.filter((entry) => entry.id !== session.sessionId);
@@ -1305,6 +1284,16 @@ function renderSessions() {
     const title = document.createElement("span");
     title.className = "title";
     title.textContent = entry.title;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "icon-btn session-dismiss";
+    close.setAttribute("aria-label", `Close ${entry.title}`);
+    close.textContent = "✕";
+    close.onclick = async (event) => {
+      event.stopPropagation();
+      await fetch(`${entry.url}api/dismiss`, { method: "POST" });
+      await poll();
+    };
     const words = document.createElement("span");
     words.className = "words";
     const state = document.createElement("em");
@@ -1318,7 +1307,13 @@ function renderSessions() {
       if (current) toggleSidecar(false);
       else location.assign(entry.url);
     };
-    list.append(row);
+    // The row is a button, so the close control is its sibling rather than
+    // a button inside one.
+    const line = document.createElement("div");
+    line.className = "session-line";
+    line.append(row);
+    if (!current) line.append(close);
+    list.append(line);
   }
 }
 function renderRevisions() {
@@ -1363,13 +1358,18 @@ function renderRevisions() {
     list.append(row);
   }
   // An older revision is read-only, and the clock alone does not say which
-  // one you are on, so a strip under the header names it.
+  // one you are on, so a strip under the header names it. A closed session
+  // is read-only on its current revision, and there is nowhere to go back
+  // to, so the strip says that instead and drops the link.
   const older = mode === "readonly";
   $("older-strip").hidden = !older;
   $("revision").classList.toggle("older", older);
-  $("older-text").textContent = older
-    ? `You are reading revision ${plan.revision} of ${latest}`
-    : "";
+  $("older-text").textContent = !older
+    ? ""
+    : session.closed
+      ? "This plan was closed. It is here to read."
+      : `You are reading revision ${plan.revision} of ${latest}`;
+  $("revision-back").hidden = Boolean(session.closed);
   $("revision-back").href = `${base}/`;
   $("revision").setAttribute(
     "aria-label",
@@ -1386,6 +1386,7 @@ function toggleSidecar(open = !$("sessions-dialog").open) {
   else if ($("sessions-dialog").open) $("sessions-dialog").close();
 }
 function closeMenus() {
+  chooseBlock(null);
   closeDrawer();
   toggleRevisionMenu(false);
   toggleSidecar(false);
@@ -1583,10 +1584,6 @@ document.addEventListener("click", (event) => {
     toggleSidecar(false);
     return;
   }
-  if (event.target.closest("#sidebar-close")) {
-    closeDrawer();
-    return;
-  }
   if (!editable) return;
   const comment = event.target.closest("[data-comment]");
   if (comment && $("page-content").contains(comment))
@@ -1651,22 +1648,95 @@ document.addEventListener("input", (event) => {
   clearTimeout(answerTimer);
   answerTimer = setTimeout(save, 300);
 });
+/* One button, three meanings: the selection, the block you chose, or the
+   page. Nothing is drawn on a block except the bar marking the chosen one. */
+let chosen = null;
+function placeBar() {
+  const bar = $("chosen-bar");
+  bar.hidden = !chosen;
+  if (!chosen) return;
+  const host = $("reading").getBoundingClientRect();
+  const box = chosen.getBoundingClientRect();
+  bar.style.top = `${Math.round(box.top - host.top)}px`;
+  bar.style.height = `${Math.round(box.height)}px`;
+}
+function chooseBlock(block) {
+  chosen?.classList.remove("is-chosen");
+  chosen = block && block !== chosen ? block : null;
+  chosen?.classList.add("is-chosen");
+  placeBar();
+  commentTarget();
+}
+/* A tab switch, an image, or a new window width moves the block under the
+   bar, and each of those changes the page's own size. */
+new ResizeObserver(placeBar).observe($("page-content"));
+/* The button names what kind of thing it will comment on; the note itself
+   still records the block's own heading. */
+function blockKind(block) {
+  const has = (selector) =>
+    block.matches(selector) || block.querySelector(selector) !== null;
+  /* What the block is comes before what it holds, so a decision whose options
+     are diagrams is still a decision. A figure is last because every diagram
+     and chart contains one. */
+  if (has("[data-choice]")) return "this decision";
+  if (has("[data-question]")) return "this question";
+  if (has("[data-multiselect]")) return "this checklist";
+  if (has(".behavior-cases")) return "these cases";
+  if (has("table")) return "this table";
+  if (has("[data-diff-input], .change-view")) return "this diff";
+  if (has("[data-language], .shiki")) return "this code";
+  if (has("[data-diagram]")) return "this diagram";
+  if (has("[data-chart]")) return "this chart";
+  if (has("[data-math]")) return "this formula";
+  if (has("[data-prototype]")) return "this prototype";
+  if (has("figure, .figure, svg, img")) return "this figure";
+  return "this block";
+}
+function commentTarget() {
+  const button = $("quote");
+  /* An open dialog hides the control in CSS, which no open path can forget. */
+  const usable = editable && !$("reading").hidden;
+  button.hidden = !usable;
+  if (!usable) return;
+  if (selected.length > 3) button.textContent = "Comment on selection";
+  else if (chosen) button.textContent = `Comment on ${blockKind(chosen)}`;
+  else button.textContent = "Comment on this page";
+}
 document.addEventListener("selectionchange", () => {
   const selection = getSelection(),
     parent = selection?.anchorNode?.parentElement;
-  selected = selection?.toString().trim() || "";
+  selected = parent?.closest("#page-content")
+    ? selection?.toString().trim() || ""
+    : "";
   selectedTarget = parent?.closest("#page-content [id]")?.id || null;
-  $("quote").hidden = !(
-    editable &&
-    selected.length > 3 &&
-    parent?.closest("#page-content") &&
-    !document.querySelector("dialog[open]")
-  );
+  commentTarget();
 });
+/* A control does its own job, a block becomes the target, and anything else
+   clears it. A drag is a selection, so it never reaches here as a press. */
+$("page-content").addEventListener("click", (event) => {
+  if (!editable) return;
+  if (
+    event.target.closest("button, a, input, label, select, textarea, summary")
+  )
+    return;
+  if (getSelection()?.toString().trim()) return;
+  const block = event.target.closest("#page-content > *");
+  // A paragraph, a heading or a list is commented on by selecting its words.
+  chooseBlock(block && !blockSkip.has(block.tagName) ? block : null);
+});
+/* The control and the c key comment on the same thing, so they share the
+   one function that decides what that is. */
+function commentOnTarget() {
+  if (selected.length > 3)
+    openNote(page.id, page.title, selected, null, null, selectedTarget);
+  else if (chosen) {
+    const heading = blockHeading(chosen);
+    openNote(page.id, heading, heading, null, null, chosen.id);
+  } else openNote(page.id, page.title);
+  chooseBlock(null);
+}
 $("quote").onpointerdown = (event) => event.preventDefault();
-$("quote").onclick = () =>
-  openNote(page.id, page.title, selected, null, null, selectedTarget);
-$("page-comment").onclick = () => openNote(page.id, page.title);
+$("quote").onclick = commentOnTarget;
 $("overall-note").onclick = () => openNote("overall", "Overall feedback");
 $("note-text").oninput = () => {
   (state.noteDrafts ||= {})[noteDraftKey] = $("note-text").value;
@@ -1745,8 +1815,7 @@ document.addEventListener("keydown", (event) => {
       ];
     next.focus({ preventScroll: true });
     next.scrollIntoView({ block: "center" });
-  } else if (key === "c" && editable && !$("reading").hidden)
-    openNote(page.id, page.title);
+  } else if (key === "c" && editable && !$("reading").hidden) commentOnTarget();
   else if (key === "r" && editable) show("feedback");
   else if (key === "s" && editable) {
     const target = $("accept").hidden ? $("submit") : $("accept");
@@ -2159,11 +2228,10 @@ if (editable) {
   $("navigation").append(separator(), review);
 }
 $("menu-button").addEventListener("click", () =>
-  $("sidebar").dataset.open === "true" ? closeDrawer() : openDrawer(),
+  $("pages-dialog").open ? closeDrawer() : openDrawer(),
 );
-matchMedia("(max-width: 720px)").addEventListener("change", (event) => {
-  if (!event.matches) closeDrawer();
-});
+narrow.addEventListener("change", placeNavigation);
+placeNavigation();
 if (editable) initializeChecklists();
 theme();
 renderRevisions();
@@ -2184,7 +2252,7 @@ show(
 );
 // The browser restores the old scroll position after the reload; a new
 // revision starts at the top.
-if (resume?.first) setTimeout(() => window.scrollTo(0, 0), 60);
+if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
   show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {

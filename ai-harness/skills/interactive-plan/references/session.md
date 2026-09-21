@@ -106,7 +106,14 @@ reopen review on a new revision.
 
 ## The hub
 
-A session is live from `start` until `complete` or `pause`. After 15
+A session is live from `start` until `complete`, `pause`, or the reviewer
+closing it from the bell panel. Closing completes it and stamps
+`dismissedAt`; the panel offers that on every session but the one being
+read, and the closed session's own page reloads read-only, so no tab left
+open on it can send anything. A closed session never wakes its agent
+again. The agent is not interrupted and is not told: a turn already in
+progress finishes, and the session is simply never woken, so `start` on a
+new session is the way back. After 15
 minutes with no live session, the hub exits and removes its record; the
 next `start` spawns a fresh one on the same port. The timeout is an
 environment variable listed in [setup.md](setup.md).

@@ -13,6 +13,8 @@ const attribute = (tag, name) => {
 };
 const controlKinds = ["data-choice", "data-multiselect", "data-question"];
 
+const labelLimit = 24;
+
 /** Structural problems in the assembled pages and the plan's script. */
 export function problems(data, js = "") {
   const list = [];
@@ -37,6 +39,19 @@ export function problems(data, js = "") {
         if (!attribute(tag, "data-label"))
           list.push(`${at}: control "${id}" has no data-label`);
       }
+      // The tab strip shares its width between the option labels, so a long
+      // one leaves nothing for the rest. Only the label a tab shows is
+      // bounded; the option's own header keeps its wording, and a group's
+      // label is read on Agreed and on Feedback, never in a strip.
+      const label = attribute(tag, "data-label");
+      if (
+        label !== undefined &&
+        attribute(tag, "data-value") !== undefined &&
+        label.length > labelLimit
+      )
+        list.push(
+          `${at}: option label "${label}" is ${label.length} characters, over ${labelLimit}`,
+        );
       if (/^<pre\b/i.test(tag) || /^<div\b/i.test(tag)) {
         const named = attribute(tag, "data-file") !== undefined;
         const source = attribute(tag, "data-diff-source") !== undefined;

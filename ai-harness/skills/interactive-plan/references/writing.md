@@ -1,6 +1,10 @@
 # Sentences
 
-Read every sentence on a page against this list before publishing.
+Read every sentence on a page against this list before publishing. Read
+the headings and the sentences that join one section to the next against
+it as well. Those are written last and skimmed first, and a claim or a
+piece of filler survives there more often than in the sentences that
+carry the argument.
 
 1. It has a subject and a verb, and states what a thing is or does. A
    fragment standing in for a claim ("One form.") is not a sentence.

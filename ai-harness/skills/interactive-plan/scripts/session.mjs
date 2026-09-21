@@ -336,6 +336,12 @@ async function loadSession(directory, config, origin) {
     }
     await transition({ wake: { harness: wake.harness, last } });
   }
+  /* Closing a session from the browser. complete() refuses without an
+     acceptance, so ending an abandoned session needs its own door. */
+  async function dismiss() {
+    await transition({ stage: "complete", dismissedAt: timestamp() });
+    return { status: view() };
+  }
   async function submit(data) {
     requireValue(data.sessionId === state.sessionId, "Wrong session", 409);
     requireValue(
@@ -741,6 +747,7 @@ async function loadSession(directory, config, origin) {
     exclusive,
     pending,
     submit,
+    dismiss,
     act,
     view,
     listing,
@@ -1084,12 +1091,15 @@ export async function startHub(config = settings()) {
           if (!session.state.current)
             return reply(200, "No artifact published yet.", "text/plain");
           // Resolved under the session's directory, so a moved session
-          // still serves its current revision.
+          // still serves its current revision. A session the reviewer closed
+          // is read-only, so no tab left open on it can submit and wake an
+          // agent that will never run again.
           return html(
             await artifactPage(
               session,
               session.revisionEntry(session.state.current.revision) ||
                 session.state.current,
+              session.state.dismissedAt ? { closed: true } : {},
             ),
             {
               "Set-Cookie": `interactive-plan-last=${session.id}; Path=/; SameSite=Strict; Max-Age=2592000`,
@@ -1128,6 +1138,14 @@ export async function startHub(config = settings()) {
         }
         if (method === "GET" && rest[0] === "api" && rest[1] === "status")
           return reply(200, session.view());
+        if (method === "POST" && rest[0] === "api" && rest[1] === "dismiss") {
+          requireValue(
+            req.headers.origin === `http://${req.headers.host}`,
+            "Unauthorized source",
+            403,
+          );
+          return reply(200, await session.exclusive(() => session.dismiss()));
+        }
         if (method === "POST" && rest[0] === "api" && rest[1] === "feedback") {
           requireValue(
             req.headers.origin === `http://${req.headers.host}`,

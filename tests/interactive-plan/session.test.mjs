@@ -1144,6 +1144,41 @@ test("the hub lists open sessions needs-you first, and a paused one stays listed
   assert.equal((await b.status()).body.paused, null);
 });
 
+test("closing a session from the bell panel completes it and drops it from the list", async (t) => {
+  const h = await hub(t);
+  const a = await h.session(),
+    b = await h.session();
+  await a.action("publish", { html: artifact() });
+  await b.action("publish", { html: artifact() });
+  assert.equal(
+    (await b.request(`${b.base}/api/dismiss`, {}, { Origin: "http://evil" }))
+      .code,
+    403,
+  );
+  const dismissed = await b.request(`${b.base}/api/dismiss`, {});
+  assert.equal(dismissed.code, 200);
+  assert.equal(dismissed.body.status.stage, "complete");
+  const status = (await b.status()).body;
+  assert.equal(status.stage, "complete");
+  assert.equal(typeof status.dismissedAt, "string");
+  const list = (await a.request("/api/sessions")).body.sessions;
+  assert.deepEqual(
+    list.map((item) => item.id),
+    [a.id],
+  );
+  // The closed session's own page comes back read-only, so a tab still
+  // open on it cannot send anything.
+  assert.deepEqual(sessionConfig((await b.request(`${b.base}/`)).body), {
+    sessionId: b.id,
+    base: b.base,
+    closed: true,
+  });
+  assert.deepEqual(sessionConfig((await a.request(`${a.base}/`)).body), {
+    sessionId: a.id,
+    base: a.base,
+  });
+});
+
 test("the root URL opens the session that most needs you, then the last viewed, else says so", async (t) => {
   const h = await hub(t);
   const open = async (cookie) => {

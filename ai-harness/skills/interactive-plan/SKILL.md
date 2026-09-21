@@ -44,9 +44,10 @@ user's default browser, and give the link in chat. From then on, anything
 the plan needs from the user is asked on a page.
 
 A turn ends after `publish` or `pause`; the hub starts the next one when a
-submission lands, acceptance included, and `complete` ends the review. When
-`start` refuses because the session cannot be woken, give the user the
-instruction it prints and stop until the session is restarted.
+submission lands, acceptance included, and `complete` ends the review. The
+user can also close a session from the browser, and then no next turn
+comes. When `start` refuses because the session cannot be woken, give the
+user the instruction it prints and stop until the session is restarted.
 
 Acceptance names a mode, save or implement. Follow that mode and the
 project's permissions. Accepted artifacts stay as they are.

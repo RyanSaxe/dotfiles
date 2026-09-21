@@ -1,11 +1,12 @@
+/* An accent bar down the left edge is how the frame marks the block the
+   reader chose, so the question wears its tag instead. */
 .question {
   display: grid;
   gap: 6px;
   margin: 16px 0 22px;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: 0 10px 10px 0;
+  border-radius: 10px;
   background: var(--panel);
 }
 .question > .tag {
