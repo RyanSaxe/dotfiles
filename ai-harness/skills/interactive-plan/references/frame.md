@@ -52,22 +52,22 @@ focusable so the keys reach them.
 
 ## Choices, comments, and answers
 
-| Interface                            | Behavior                                                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| data-choice                          | Stable choice-group ID. Use data-label for a readable label.                                                                      |
-| data-multiselect                     | Stable checklist-group ID. Use data-label for a readable question or group label.                                                 |
-| data-question                        | Stable question ID on a section with a textarea. Use data-label for the answer's label.                                           |
-| data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                            |
-| data-label on an option              | Readable option label, separate from its ID and action text. Buttons fall back to their text; checkboxes fall back to data-value. |
-| aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                  |
-| data-comment                         | Button action for a contextual note, using the attribute as its label; the nearest ancestor ID becomes the note's target.         |
-| planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                  |
-| plan:page                            | Window event after each page render; detail has page and element.                                                                 |
-| planUI.enhance(element)              | Render rich content added dynamically.                                                                                            |
-| planUI.chart(element, options)       | Return an ECharts instance asynchronously.                                                                                        |
-| planUI.diff(element, input, options) | Render one Git file patch through Pierre. Input contains before, after, and patch strings; options.diffStyle is split or unified. |
-| planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                       |
-| planUI.mode                          | live, readonly, or preview.                                                                                                       |
+| Interface                            | Behavior                                                                                                                                                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| data-choice                          | Stable choice-group ID. Use data-label for a readable label.                                                                                                                                                                                   |
+| data-multiselect                     | Stable checklist-group ID. Use data-label for a readable question or group label.                                                                                                                                                              |
+| data-question                        | Stable question ID on a section with a textarea. Use data-label for the answer's label.                                                                                                                                                        |
+| data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                                                                                                                                         |
+| data-label on an option              | Readable option label, separate from its ID and action text. The build refuses one over 24 characters, which is what a tab strip fits; a group's data-label has no limit. Buttons fall back to their text; checkboxes fall back to data-value. |
+| aria-pressed                         | Set by the frame to reflect the draft selection.                                                                                                                                                                                               |
+| data-comment                         | Button action for a contextual note, using the attribute as its label; the nearest ancestor ID becomes the note's target.                                                                                                                      |
+| planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                                                                                                                               |
+| plan:page                            | Window event after each page render; detail has page and element.                                                                                                                                                                              |
+| planUI.enhance(element)              | Render rich content added dynamically.                                                                                                                                                                                                         |
+| planUI.chart(element, options)       | Return an ECharts instance asynchronously.                                                                                                                                                                                                     |
+| planUI.diff(element, input, options) | Render one Git file patch through Pierre. Input contains before, after, and patch strings; options.diffStyle is split or unified.                                                                                                              |
+| planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                                                                                                                                    |
+| planUI.mode                          | live, readonly, or preview.                                                                                                                                                                                                                    |
 
 Choice clicks, checklist changes, and typed answers update the local draft;
 only Submit sends it. Keep control IDs and labels the same across

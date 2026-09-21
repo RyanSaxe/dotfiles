@@ -44,6 +44,27 @@ const refused = (plan, message, js) =>
     return true;
   });
 
+test("an option label of exactly 24 characters is accepted", async () => {
+  const long = "x".repeat(24);
+  const html = await assemble(
+    page(
+      decision(
+        `<button data-value="a" data-label="${long}">a</button>${option("b")}`,
+      ),
+    ),
+  );
+  assert.match(html, /x{24}/);
+});
+
+test("a group's label is not held to the option limit", async () => {
+  const html = await assemble(
+    page(
+      `<section data-choice="d" data-label="${"y".repeat(60)}">${option()}${option("b")}</section>`,
+    ),
+  );
+  assert.match(html, /y{60}/);
+});
+
 test("the build refuses each structural problem and names it", async () => {
   await refused(
     { ...data, pages: [data.pages[0], data.pages[0]] },
@@ -56,6 +77,14 @@ test("the build refuses each structural problem and names it", async () => {
   await refused(
     page(`<section data-choice="d">${option()}${option("b")}</section>`),
     /^page "p": control "d" has no data-label$/m,
+  );
+  await refused(
+    page(
+      decision(
+        `<button data-value="a" data-label="${"x".repeat(25)}">a</button>${option("b")}`,
+      ),
+    ),
+    /^page "p": option label "x{25}" is 25 characters, over 24$/m,
   );
   await refused(
     page(decision(option() + `<button data-value="">x</button>`)),
