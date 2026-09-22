@@ -5,9 +5,16 @@ description: Turn unpolished work into a pull request a reviewer can trust. Veri
 
 # Clean and raise a pull request
 
-Take a branch whose implementation is finished and turn it into a pull
-request that is ready to review. Run every phase every time, sized to the
-change: a one-line fix gets a three-line brief and one commit, a large
+Take work that is not polished and turn it into a pull request somebody can
+review. Most often that work is a finished branch. It can also be code that
+is already merged and wrong, or a corner of the codebase nobody has cleaned
+up, and you run the same phases on it: verify it, simplify it, document it,
+build the history, open the pull request.
+
+This is not how a feature gets built. Every phase works on code that
+already exists.
+
+Run every phase every time, sized to the work: a one-line fix gets a three-line brief and one commit, a large
 feature gets a user simulation and a rebuilt commit series. Skip the
 history rebuild only when the branch is already one clean commit.
 
@@ -46,70 +53,64 @@ When you stop early, say what happened and what is left.
 
 ## Align
 
+The user says where to start and how far to go. Usually that is a finished
+branch, and its diff is the scope. Where they point at code instead, work on
+what they named and nothing around it: read that code, and propose in the
+brief what to change. Do not widen the scope because the code beside it
+needs the same work. Say what you found there and let them decide.
+
 The base branch is the one the user named. If none, use the open pull
 request's base. If there is no pull request, use the default branch from
 `gh repo view --json defaultBranchRef`. Read every file under `references/`
 first: the brief uses their definitions of checks, the simulation, docs, and
-commits. Read the original ask if it exists in the conversation or in a file
-the user points to. If there is no record of the ask, the branch is the
-ask: compare Outcome against what its commits and pull request say, and
-say so in the brief. Then read the whole diff and the branch's commits:
+commits. Read the original ask. It may be in the conversation, in a file the user
+points to, in the body of a pull request that is already open, or in an
+issue the branch names. Where none of those has it, the work itself is the
+ask: say what its commits do, say in the brief that you inferred it, and
+let the user correct you. Then read the whole diff and the branch's commits:
 
     git fetch origin
     git diff origin/<base>...HEAD
     git log --reverse --shortstat origin/<base>..HEAD
 
-Post a brief and wait for the user's go. Always include Outcome and Size.
-Include the other lines only when they apply.
+Post a brief and wait for the user's go. The brief is where they redirect
+the work, cut a phase, or tell you the ask was something else, and it is
+the last cheap moment for any of that.
 
-- Outcome: what the branch does compared with the ask, in one sentence, and
-  any gap.
-- Size: the estimated number of hand-written lines and of commits, using the
-  size range in [history.md](references/history.md). Above about 2,000
-  lines, propose one core pull request and separate pull requests on top of
-  it, list them in a table, and say that the user can answer "one PR" to
-  keep it whole. Name the commits by subject when their grouping is not
-  obvious. Say which paths are fixtures, generated files, or vendored code;
-  the rebuild leaves them out of the count.
-- Separate: any unrelated change that should be its own pull request from
-  the base: what it is, how many lines, and that it goes first.
-- Verify: the project's checks, how you will use the change yourself, and
-  the user simulation if there is behavior you cannot check by using it:
-  who the user is and what they try.
-- Docs: which documents you will add or update beyond what the branch
-  already has, or that none are needed.
-- Decide: each decision that changes the result, with a recommendation.
+Say what you found: what the work does against the ask, and any gap. Then
+say what you expect to do, with enough detail to disagree with: what you
+will run and what you will use to check the change, which documents are
+wrong, what the commit series looks like and roughly how big each commit
+is, and whether this is one pull request or more. Where a decision changes
+the result, put it in front of them with your recommendation.
 
-Most branches are one pull request. Propose a split only above 2,000 lines,
-and a separate pull request only for unrelated work. Do neither before the
-go. When the Size line proposes a split, end the brief with one line saying
-the sizes are estimates and the rebuild will report measured ones.
+Leave out what has nothing to say. A one-line fix gets two sentences and no
+table.
 
-A brief for a small change:
+Most branches are one pull request. Two changes a reviewer would judge
+separately are two pull requests whatever their size, and a branch whose
+diff keeps growing is worth the same question. Propose a split in the brief
+and never act on one before the go. Say which paths are fixtures, generated
+files or vendored code, because the rebuild leaves them out of the count,
+and say that the sizes are estimates the rebuild will measure.
 
-    Outcome: the sidebar dims windows idle for ten minutes; matches the ask, no gap.
-    Size: about 60 lines, two commits.
-    Separate: the .editorconfig change is unrelated; it goes first, alone.
-    Verify: make check; open the sidebar with two windows and idle one; a user who reads only the README tries to change the threshold.
-    Docs: threshold section in the README; nothing else mentions idling.
-    Decide: default threshold ten minutes (recommended) or five.
+    The branch adds Parquet export and a --since flag. Both match the ask,
+    nothing is missing.
 
-A brief that proposes a split adds the table and the estimate line:
+    I will run make test, export a 2M-row table and open it in DuckDB, and
+    run --since with a date either side of the last export. The README's
+    format section and --help both describe the old behaviour.
 
-    Size: 8,800 hand-written lines, about 41 commits at review grain. Above 2,000 lines, so I propose one core pull request and eight on top of it. Say "one PR" to keep it whole.
+    Six commits, about 640 lines, and I think two pull requests: the
+    exporter and the flag share no code and read separately. Say "one PR"
+    to keep them together.
 
-      pull request            commits   lines
-      core                          8   1,500   skill folder, helper server, app shell
-      repository routes             6     900
-      agent loop and thread         6   1,000
-      page grammar                  5   1,060
-      blocks                        6   1,100
-      code pane                     5     900
-      quick open                    3     400
-      export                        4     800
-      fixtures                      2     240
+      pull request   commits  lines
+      exporter             4      430
+      --since flag         2      210
 
-    Sizes are estimates; the rebuild reports the measured ones.
+    One decision: --since defaults to the last export, or to all time. I
+    recommend the last export.
 
 The user's go may cut a phase ("one PR", "one commit", "skip the user
 simulation"). Do what it says and skip nothing else.
@@ -130,11 +131,12 @@ a user would. Run the user simulation when using the change yourself leaves
 some behavior unchecked. A change you can check completely by using it needs
 none.
 
-Fix what verification finds: a bug, a missing test, a bad test, or a wrong
-document goes in this pull request, in its own commit when it is a separate
-concept. Do not fix a finding unrelated to the change. Report it to the user
-at the end, open an issue if the repository uses them, and keep it out of
-the body. If a fix would change the scope of the ask, stop and report.
+Fix what verification finds inside the scope: a bug, a missing test, a bad
+test, or a wrong document goes in this pull request, in its own commit when
+it is a separate concept. Leave a finding outside the scope alone. List what
+you found and what fixing it would take in the final report, and open a
+second pull request for it only if the user asks. If a fix would change the
+scope of the ask, stop and report.
 
 ## Simplify
 
