@@ -150,7 +150,17 @@
 :root[data-theme="dark"] .shiki span {
   color: var(--shiki-dark) !important;
 }
-.figure-body > [data-language],
-.figure-body > .shiki {
+/* A <pre data-language> also matches the frame's generic pre rule and keeps
+   the browser's default margin: 1em 0, which frame.css never resets; a <div
+   data-language> carries none of it. The rendered code is identical either
+   way, because [data-language] .shiki supplies the vertical padding and
+   .line the horizontal, so the reset makes the two elements render alike in
+   every container rather than only inside a figure. */
+pre[data-language] {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.figure-body > [data-language] {
   border-radius: 0;
 }

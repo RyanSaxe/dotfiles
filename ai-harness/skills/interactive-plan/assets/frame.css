@@ -974,12 +974,41 @@ svg {
 ) {
   padding-bottom: 0;
 }
-:is(.comparison-content, .change-content, .behavior-case > div)
-  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child {
+/* A slot supplies its own padding, so what it holds brings no outer margin
+   of its own: a <pre> brings 12/12 from the browser default, a .figure 14/18,
+   a table 16/16, a blockquote 10/10 and a paragraph 0/14. Zeroing only the
+   last child's bottom margin, which is what this was, left every one of them
+   sitting lower in its slot than it sat from the bottom. */
+:is(
+    .visual-option,
+    .visual-option > figure,
+    .vd-columns,
+    .comparison-content,
+    .change-content,
+    .behavior-case > div
+  )
+  > :first-child {
+  margin-top: 0;
+}
+:is(
+    .visual-option,
+    .visual-option > figure,
+    .vd-columns,
+    .comparison-content,
+    .change-content,
+    .behavior-case > div
+  )
+  > :last-child {
   margin-bottom: 0;
 }
-:is(.visual-option > figure, .comparison-content, .change-content) > .figure {
-  margin: 0;
+/* A figure that fills a slot drops its own frame and takes the slot's. */
+:is(
+    .visual-option > figure,
+    .comparison-content,
+    .change-content,
+    .behavior-case > div
+  )
+  > .figure {
   border: 0;
   border-radius: 0;
 }
@@ -1122,9 +1151,13 @@ dialog::backdrop {
   margin: 0;
   color: var(--muted);
 }
+/* Beside the reading column, not the window. .app caps at 1160px and
+   centres, so on a wide screen a control fixed to the window sits hundreds
+   of pixels right of the text. Below 1160px the max() is zero and the value
+   is the 22px it has always been. .working uses the mirror of this. */
 .quote-button {
   position: fixed;
-  right: 22px;
+  right: calc(max(0px, (100% - 1160px) / 2) + 22px);
   bottom: calc(22px + env(safe-area-inset-bottom));
   z-index: var(--z-selection);
 }

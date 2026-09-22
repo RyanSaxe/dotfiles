@@ -1,0 +1,137 @@
+<p>Each slot holds one element of each kind. The space above a block and the space below it are the same when the slot rules are right.</p>
+<h2>visual-option, and vd-columns in side by side</h2>
+<section class="visual-decision" data-choice="slots" data-label="Slots" id="slots-vd">
+  <h3>One option per element kind</h3>
+  <article class="visual-option" data-value="pre" data-label="pre">
+    <header>pre</header>
+    <figure><pre data-language="ts">const t = 8;</pre></figure>
+  </article>
+  <article class="visual-option" data-value="div" data-label="div">
+    <header>div</header>
+    <figure><div data-language="ts">const t = 8;</div></figure>
+  </article>
+  <article class="visual-option" data-value="figure" data-label="figure">
+    <header>figure</header>
+    <figure><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div></figure>
+  </article>
+  <article class="visual-option" data-value="table" data-label="table">
+    <header>table</header>
+    <figure><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table></figure>
+  </article>
+  <article class="visual-option" data-value="blockquote" data-label="blockquote">
+    <header>blockquote</header>
+    <figure><blockquote>A quoted line.</blockquote></figure>
+  </article>
+  <article class="visual-option" data-value="p" data-label="p">
+    <header>p</header>
+    <figure><p>A paragraph.</p></figure>
+  </article>
+</section>
+<h2>vd-columns, side by side</h2>
+<section class="visual-decision" data-choice="slots-columns" data-label="Slots side by side" id="slots-columns">
+  <h3>Two options, each stacking every element kind</h3>
+  <article class="visual-option" data-value="left" data-label="Left">
+    <header>Left</header>
+    <figure><pre data-language="ts">const t = 8;</pre><div data-language="ts">const t = 8;</div><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table><blockquote>A quoted line.</blockquote><p>A paragraph.</p></figure>
+  </article>
+  <article class="visual-option" data-value="right" data-label="Right">
+    <header>Right</header>
+    <figure><pre data-language="ts">const t = 8;</pre><div data-language="ts">const t = 8;</div><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table><blockquote>A quoted line.</blockquote><p>A paragraph.</p></figure>
+  </article>
+</section>
+<h2>comparison-content</h2>
+<section class="comparison" data-choice="slots-cmp" data-label="Slots, compared" style="--comparison-rows: 6">
+  <article class="comparison-option">
+    <header><h2>Left</h2><p>One column.</p></header>
+    <section class="comparison-content"><h3>pre</h3><pre data-language="ts">const t = 8;</pre></section>
+    <section class="comparison-content"><h3>div</h3><div data-language="ts">const t = 8;</div></section>
+    <section class="comparison-content"><h3>figure</h3><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div></section>
+    <section class="comparison-content"><h3>table</h3><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table></section>
+    <section class="comparison-content"><h3>blockquote</h3><blockquote>A quoted line.</blockquote></section>
+    <section class="comparison-content"><h3>p</h3><p>A paragraph.</p></section>
+    <footer><button class="btn comparison-pick" data-value="left" data-label="Left">Choose left</button></footer>
+  </article>
+  <article class="comparison-option">
+    <header><h2>Right</h2><p>One column.</p></header>
+    <section class="comparison-content"><h3>pre</h3><pre data-language="ts">const t = 8;</pre></section>
+    <section class="comparison-content"><h3>div</h3><div data-language="ts">const t = 8;</div></section>
+    <section class="comparison-content"><h3>figure</h3><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div></section>
+    <section class="comparison-content"><h3>table</h3><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table></section>
+    <section class="comparison-content"><h3>blockquote</h3><blockquote>A quoted line.</blockquote></section>
+    <section class="comparison-content"><h3>p</h3><p>A paragraph.</p></section>
+    <footer><button class="btn comparison-pick" data-value="right" data-label="Right">Choose right</button></footer>
+  </article>
+</section>
+<h2>change-content</h2>
+<div class="change-pair" data-kind="pair" data-title="pre">
+  <section><header>Before <span>Removed</span></header>
+    <div class="change-content"><pre data-language="ts">const t = 8;</pre></div></section>
+  <section><header>Proposed <span>Added</span></header>
+    <div class="change-content"><pre data-language="ts">const t = 8;</pre></div></section>
+</div>
+<div class="change-pair" data-kind="pair" data-title="div">
+  <section><header>Before <span>Removed</span></header>
+    <div class="change-content"><div data-language="ts">const t = 8;</div></div></section>
+  <section><header>Proposed <span>Added</span></header>
+    <div class="change-content"><div data-language="ts">const t = 8;</div></div></section>
+</div>
+<div class="change-pair" data-kind="pair" data-title="figure">
+  <section><header>Before <span>Removed</span></header>
+    <div class="change-content"><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div></div></section>
+  <section><header>Proposed <span>Added</span></header>
+    <div class="change-content"><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div></div></section>
+</div>
+<div class="change-pair" data-kind="pair" data-title="table">
+  <section><header>Before <span>Removed</span></header>
+    <div class="change-content"><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table></div></section>
+  <section><header>Proposed <span>Added</span></header>
+    <div class="change-content"><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table></div></section>
+</div>
+<div class="change-pair" data-kind="pair" data-title="blockquote">
+  <section><header>Before <span>Removed</span></header>
+    <div class="change-content"><blockquote>A quoted line.</blockquote></div></section>
+  <section><header>Proposed <span>Added</span></header>
+    <div class="change-content"><blockquote>A quoted line.</blockquote></div></section>
+</div>
+<div class="change-pair" data-kind="pair" data-title="p">
+  <section><header>Before <span>Removed</span></header>
+    <div class="change-content"><p>A paragraph.</p></div></section>
+  <section><header>Proposed <span>Added</span></header>
+    <div class="change-content"><p>A paragraph.</p></div></section>
+</div>
+<h2>behavior-case</h2>
+<div class="behavior-cases" data-kind="set of cases">
+  <div class="behavior-head" aria-hidden="true">
+    <span>When</span><span>Proposed behavior</span><span></span>
+  </div>
+  <section class="behavior-case" id="slot-pre">
+    <h3><span class="micro">When</span>A slot holds a &lt;pre&gt;</h3>
+    <div><pre data-language="ts">const t = 8;</pre></div>
+    <button class="btn" data-comment="slot-pre: pre">Revise</button>
+  </section>
+  <section class="behavior-case" id="slot-div">
+    <h3><span class="micro">When</span>A slot holds a &lt;div&gt;</h3>
+    <div><div data-language="ts">const t = 8;</div></div>
+    <button class="btn" data-comment="slot-div: div">Revise</button>
+  </section>
+  <section class="behavior-case" id="slot-figure">
+    <h3><span class="micro">When</span>A slot holds a &lt;figure&gt;</h3>
+    <div><div data-language="ts" data-file="t.ts" data-caption="A captioned block.">const t = 8;</div></div>
+    <button class="btn" data-comment="slot-figure: figure">Revise</button>
+  </section>
+  <section class="behavior-case" id="slot-table">
+    <h3><span class="micro">When</span>A slot holds a &lt;table&gt;</h3>
+    <div><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>timeout</td><td>8 s</td></tr></tbody></table></div>
+    <button class="btn" data-comment="slot-table: table">Revise</button>
+  </section>
+  <section class="behavior-case" id="slot-blockquote">
+    <h3><span class="micro">When</span>A slot holds a &lt;blockquote&gt;</h3>
+    <div><blockquote>A quoted line.</blockquote></div>
+    <button class="btn" data-comment="slot-blockquote: blockquote">Revise</button>
+  </section>
+  <section class="behavior-case" id="slot-p">
+    <h3><span class="micro">When</span>A slot holds a &lt;p&gt;</h3>
+    <div><p>A paragraph.</p></div>
+    <button class="btn" data-comment="slot-p: p">Revise</button>
+  </section>
+</div>

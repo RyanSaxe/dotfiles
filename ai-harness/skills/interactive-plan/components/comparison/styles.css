@@ -54,9 +54,6 @@
   padding: 14px 16px;
   min-width: 0;
 }
-.comparison-content > :last-child {
-  margin-bottom: 0;
-}
 /* The section an option does not have. Matched sections line up only while
    every option has the same number of children, and nothing in the build or
    on the page says so when one is missing. */

@@ -32,9 +32,24 @@ skill work.
 | kind       | exploration for proposals. plan for the complete final handoff.                                            |
 | title      | Human-readable artifact title, shown once at the top of the sidebar.                                       |
 | pages      | Ordered records with unique id, title, and html, or file instead of html: a path relative to the manifest. |
-| css, js    | Optional paths to custom files, relative to the manifest.                                                  |
+| css, js    | Optional paths to the plan's own CSS and script, relative to the manifest.                                 |
 | agreements | Optional structured agreement records.                                                                     |
 | prototypes | Optional preserved, self-contained interactive documents.                                                  |
+
+`css` and `js` hold what the plan invents, and nothing else. Every component
+under `components/` is bundled by the builder, so a page uses one by copying
+its markup alone.
+
+The builder writes three cascade layers, `frame`, `plan` then `components`,
+and scopes the last two to `#page-content`. A component rule therefore beats
+a plan rule of any specificity: a plan that restyles `.decision-option` is
+ignored, and the same rule with `!important` applies. Content a page puts in
+a component's slot is the page's own markup under the page's own classes,
+so nothing there collides.
+
+The plan's script is a module that runs after the frame's, so it can call
+`planUI.define` to register a component of its own before the first page
+renders.
 
 A final plan begins with the page ID `overview`. The remaining pages are
 the implementation steps. The ID `feedback` is reserved, and `agreed` is

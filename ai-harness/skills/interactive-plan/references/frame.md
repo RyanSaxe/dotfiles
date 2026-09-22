@@ -21,7 +21,9 @@ layout. The frame provides basic typography, tables, code, theme colors,
 focus and selected-choice states. It does not provide generic card or column
 layouts.
 The builder wraps the plan's CSS in `@scope (#page-content)`, so a rule for
-`body`, `:root`, or `h1` reaches only the page's content.
+`body`, `:root`, or `h1` reaches only the page's content, and puts it in a
+cascade layer beneath the components. A plan cannot restyle a component's
+chrome by accident; `!important` still applies when a plan means it.
 
 The tokens and type below are shared design tokens for every plan. Style
 the components a plan makes with them and do not redefine them. Tokens, each
@@ -68,7 +70,9 @@ so keep authored controls focusable.
 | data-comment                         | Button action for a contextual note, using the attribute as its label. The nearest ancestor ID becomes the note's target.                                                                                                                          |
 | planUI.comment(anchor, quote)        | Open a contextual comment from a custom control.                                                                                                                                                                                                   |
 | plan:page                            | Window event after each page render. detail has page and element.                                                                                                                                                                                  |
-| planUI.enhance(element)              | Render rich content added dynamically.                                                                                                                                                                                                             |
+| planUI.enhance(element)              | Render rich content added dynamically. Runs every registered component over it.                                                                                                                                                                    |
+| planUI.define(name, {match, setup})  | Register a component. setup(element, {page, planUI}) runs for each match on each page render. See the component index.                                                                                                                             |
+| plan:theme                           | Window event after a theme change, for a component that baked a colour into what it drew.                                                                                                                                                          |
 | planUI.chart(element, options)       | Return an ECharts instance asynchronously.                                                                                                                                                                                                         |
 | planUI.diff(element, input, options) | Render one Git file patch through Pierre. Input contains before, after, and patch strings. options.diffStyle is split or unified.                                                                                                                  |
 | planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                                                                                                                                        |
@@ -91,8 +95,11 @@ they put it back. An
 untouched list is sent with `touched: false` and listed on Feedback as a
 default afterwards. An empty set means "None selected", not unanswered.
 
-Register custom initialization on `plan:page`. The custom JS file runs
-before the frame module. Script elements inside page HTML do not execute.
+Register a component of the plan's own with `planUI.define`. The plan's JS
+file is a module that runs after the frame's and before the first page
+renders, so a registration there reaches page one. `plan:page` still fires
+after each render, for work that is not a component. Script elements inside
+page HTML do not execute.
 Page-level, block and text-selection comments need no custom code. One
 control sits at the bottom right at every width and names what it will
 comment on: the selection while there is one, otherwise the block the reader
@@ -125,46 +132,14 @@ present, `groups.answers` keyed `page/question` with `label`, `text`, and
 `topic`. Its text lists untouched checklists after "Defaults, not
 confirmed:".
 
-## Renderers and figures
+## Figures and renderers
 
-Use the renderer that matches the content. Load only what the page needs.
+A code block, a formula, a diagram, a chart and a prototype are components,
+and the [component index](../components/index.md) states their markup and
+their attributes. The frame supplies what they share: the figure with its
+header, actions and caption; the pinned CDN locations and integrity values,
+so rendering needs a network connection; and the renderer error printed in
+place when one fails.
 
-| Content                                | Markup contract                                                          | Renderer |
-| -------------------------------------- | ------------------------------------------------------------------------ | -------- |
-| Source code                            | data-language set to the actual language, and the source as escaped text | Shiki    |
-| Inline or display math                 | data-math set to inline or display, and the source as text               | KaTeX    |
-| Diagrams                               | data-diagram with Mermaid source as text                                 | Mermaid  |
-| Charts and mathematical demonstrations | data-chart with an ECharts option object as JSON text                    | ECharts  |
-
-`data-file` on a code block adds a header with the file name, the language and
-a Copy button. Four more attributes identify parts of a figure:
-
-| Attribute    | On                | What the frame does with it                                                                                                        |
-| ------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| data-lines   | `[data-language]` | `"3-4"` or `"7"`. Numbers the lines, lights the range, and dims the rest until the pointer or the keyboard is on the block.        |
-| data-numbers | `[data-language]` | `"true"`. Numbers the lines and dims nothing.                                                                                      |
-| data-notes   | `[data-language]` | `[{"line": 3, "text": "…"}]`. A speech bubble in the gutter of each named line, opening the note in a popover. Needs no range.     |
-| data-terms   | `[data-math]`     | `[{"symbol": "t", "meaning": "…", "value": "8 s"}]`. Names the formula's coloured terms under it, in the order the colours appear. |
-
-A term takes its colour from a literal in the source, because KaTeX runs
-with no `trust` option and refuses `\htmlClass`: write
-`\textcolor{#1d4ed8}`, `\textcolor{#a16207}`, `\textcolor{#047857}` or
-`\textcolor{#9333ea}` and the frame swaps the literal for the class that
-follows the theme. Those four are a content palette, separate from
-`--accent`, `--ok`, `--attention` and `--danger`, which indicate state in the
-chrome. A block that scrolls sideways fades its right edge while content
-remains off-screen. `data-caption` on code, diagrams and charts adds a
-caption line. `data-title` on a chart adds a header. A diagram renders at
-its drawn size and scrolls sideways when it is wider than the column. It
-scales to the column inside a side-by-side layout. Clicking a diagram opens it
-full size. Flowcharts use rank spacing 36, node spacing 28 and a title margin
-of 8. The Diagrams section of the component index explains how to keep diagrams
-legible. Use the code renderer for source code, never a bare block, and the
-[diff component](../components/index.md) for before and after. Language
-grammars load on demand. If a language is unsupported, the renderer displays
-the source and reports the failure. Escape backslashes again when math is
-stored inside a JSON string.
-
-The frame defines the pinned CDN locations and integrity values, so rendering
-needs a network connection. Native SVG and custom components are still
-allowed when they present the content more clearly.
+`planUI.chart` and `planUI.diff` stay frame interfaces, so a plan and a
+component reach the same renderer by the same name.

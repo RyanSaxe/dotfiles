@@ -18,6 +18,11 @@
       "id": "figures",
       "title": "Figures",
       "file": "p-figures.html"
+    },
+    {
+      "id": "slots",
+      "title": "Component slots",
+      "file": "p-slots.html"
     }
   ],
   "prototypes": [

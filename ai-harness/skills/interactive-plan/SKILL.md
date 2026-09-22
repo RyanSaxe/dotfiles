@@ -26,10 +26,13 @@ exploration before presenting another complete plan.
 - [writing.md](references/writing.md): the rules every sentence follows.
 - [session.md](references/session.md): starting, resuming and accepting a
   session, and the hub. Read it before `start`.
+- [component index](components/index.md): every component, what each is
+  for, and how to write one. A component is a directory the builder bundles,
+  so a page copies its markup and nothing else.
 - [artifact.md](references/artifact.md), [agreements.md](references/agreements.md),
-  [frame.md](references/frame.md), [prototypes.md](references/prototypes.md)
-  and the [component index](components/index.md): the contracts. Look one
-  up while building.
+  [frame.md](references/frame.md) and
+  [prototypes.md](references/prototypes.md): the contracts. Look one up
+  while building.
 - [setup.md](references/setup.md): on first use in an environment, or when
   something fails.
 
