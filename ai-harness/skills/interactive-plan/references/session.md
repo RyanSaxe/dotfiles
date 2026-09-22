@@ -14,16 +14,17 @@ and exits:
 node scripts/session.mjs start
 ```
 
-`wake` names the harness and what was recorded. When the harness cannot be
-woken, `start` refuses, creates nothing, and prints the instruction to give
-the user. On Copilot it is `copilot --ui-server --resume <session id>` with
-Copilot's own session id filled in. After the restart, run `start` again.
+The `wake` field identifies the harness and the recorded wake target. When
+the harness cannot receive a wake event, `start` refuses, creates nothing and
+prints the instruction to give the user. On Copilot the instruction is
+`copilot --ui-server --resume <session id>` with Copilot's own session ID.
+After the restart, run `start` again.
 Every later command takes `--session-dir PATH`. Keep generated artifacts and
 feedback outside the project's history. If a session already exists, inspect
 its status and queued feedback instead of creating a replacement.
-`start --session-dir PATH` resumes it at the same URL and records the wake
-path again. Commands reattach on their own when the hub has exited or
-restarted.
+`start --session-dir PATH` resumes the session at the same URL and records the
+wake path again. Later commands reconnect automatically when the hub exits or
+restarts.
 
 ## Wake paths
 
@@ -45,20 +46,20 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html --sourc
 ```
 
 `publish` stores the artifact as `<artifactId>.<revision>.html` in the
-session's `artifacts/` directory, using the values embedded in the
-artifact, and refuses a revision that already exists, so build in the temp
-directory. `--source DIR` copies the directory the artifact was built from
-to `src/<revision>/` in the session before publishing, and
-`status.current.source` names it afterwards. Keep old revisions so that
-feedback stays attached to what the user saw. To return to an older
-proposal, use it as the baseline for a new revision.
+session's `artifacts/` directory, using the values embedded in the artifact.
+It refuses a revision that already exists, so build in the temp directory.
+`--source DIR` copies the directory used to build the artifact to
+`src/<revision>/` in the session before publishing. The
+`status.current.source` field contains that path. Keep old revisions so
+feedback remains linked to what the user saw. To return to an older proposal,
+use it as the baseline for a new revision.
 
 On the first publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,
 with the URL quoted) and give the link in chat, with `hostUrl` beside it
 when `start` printed one. If the launch fails, say so and keep the link
-available. Do not open another tab on later revisions: the page refreshes
-itself when a revision lands and keeps the user's unsent draft.
+available. Do not open another tab on later revisions. The browser refreshes
+the page when a revision lands and preserves the user's unsent draft.
 
 Every question goes on a page. There is no question event, reply field or
 reply notification, and none should be built.
@@ -75,10 +76,10 @@ recovery. Never delete ownership files without reading them.
 node scripts/session.mjs status --session-dir PATH
 ```
 
-When the user says in words to stop, run `pause`. The page says that the
+When the user says in words to stop, run `pause`. The page displays that the
 agent stopped and that a message in the chat resumes the session. The hub
-saves a submission to a paused session without waking anyone, and `read`
-returns it once `start --session-dir PATH` has resumed the session:
+saves a submission to a paused session without waking the agent. `read`
+returns the submission after `start --session-dir PATH` resumes the session:
 
 ```sh
 node scripts/session.mjs pause --session-dir PATH --reason "asked to stop"
@@ -86,7 +87,7 @@ node scripts/session.mjs pause --session-dir PATH --reason "asked to stop"
 
 ## Acceptance
 
-An `accept-plan` event carries an explicit `mode`:
+An `accept-plan` event includes an explicit `mode`:
 
 - `save`: acknowledge, complete, and report the durable plan path. Do not
   implement.
@@ -101,27 +102,26 @@ node scripts/session.mjs complete --session-dir PATH
 
 `complete` returns `nextAction` and `planPath`. Do not infer implementation
 permission from feedback, a recommendation, or an acknowledgement. Leave
-accepted artifacts and the acceptance record as they are. A later change
-reopens review on a new revision.
+accepted artifacts and the acceptance record unchanged. A later change
+requires a new revision and a new review.
 
-## The hub
+## Hub lifecycle and storage
 
-A session is live from `start` until `complete`, `pause`, or the reviewer
-closing it from the bell panel. Closing completes it and stamps
-`dismissedAt`. The panel offers that on every session but the one being
-read, and the closed session's own page reloads read-only, so no tab left
-open on it can send anything. A closed session never wakes its agent again.
-The agent is not interrupted and is not told: a turn already in progress
-finishes, and the session is simply never woken, so `start` on a new session
-is the way back. After 15 minutes with no live session, the hub exits and
-removes its record. The next `start` spawns a fresh one on the same port.
+A session is live from `start` until `complete`, `pause` or closure from the
+bell panel. Closure completes the session and writes `dismissedAt`. The panel
+offers the close action for every session except the one being read. The
+closed session's page reloads read-only, so an open tab cannot send anything.
+The hub sends no more wake events for a closed session. The current turn
+finishes without interruption. To resume work, start a new session. After 15
+minutes with no live session, the hub exits and removes its record. The next
+`start` creates a fresh hub on the same port.
 The timeout is an environment variable listed in [setup.md](setup.md).
 
 The directory name under `sessions/` is not the session id in the URL.
 `start` prints the directory name as `sessionDir`, and `connection.json`
-inside it holds the session id.
+inside it contains the session ID.
 
-Under `$XDG_STATE_HOME/interactive-plan/`, the hub keeps `hub/hub.json`
+Under `$XDG_STATE_HOME/interactive-plan/`, the hub stores `hub/hub.json`
 (pid, port, hosts, code version, start time, and a local secret used only to
 register sessions) and `hub/hub.log`. Each session lives in `sessions/<id>/`
 with `status.json`, `connection.json` (`sessionId`, hub `origin`, the agent
@@ -134,20 +134,20 @@ acknowledgements or submissions.
 was. `stage` is `ready`, `updated`, `submitted`, `working`, or `complete`: a
 submission moves it to `submitted`, `read` to `working`, `publish` to
 `updated`, `complete` to `complete`. `wake` is `ok`, or `failed` with the
-reason, after the last submission. The browser shows a failed wake and asks
-for a message in the chat, and an agent that is already working changes
-nothing on seeing it. `needsYou` is derived in responses and is true when a
-published revision is waiting on the reviewer, which is what the browser's
-bell counts. `publish` refuses while a submission is unread.
+reason, after the last submission. The browser displays a failed wake and
+prompts for a message in the chat. If an agent is already working, the event
+has no effect. Responses derive `needsYou` as true when a published revision
+waits for the reviewer. The browser bell counts `needsYou`. `publish` refuses
+while a submission is unread.
 
 When `start` finds a hub on older or newer code, it uses it and logs the
 mismatch. The hub restarts on the newer code once no session is live.
 
 To review from a phone, set `INTERACTIVE_PLAN_HOST` to the machine's
 Tailscale address in the shell environment before the hub starts. `start`
-then also prints `hostUrl`. A hub that is already running keeps the
-addresses it started with.
+then also prints `hostUrl`. A running hub continues to use the addresses it
+started with.
 
-If the hub is unavailable, the page keeps the saved draft and offers a JSON
+If the hub is unavailable, the browser preserves the saved draft and offers a JSON
 export. Treat an exported file as feedback, never as implementation
 permission, and do not report it as acknowledged through the live protocol.
