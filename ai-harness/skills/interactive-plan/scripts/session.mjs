@@ -352,6 +352,16 @@ async function loadSession(directory, config, origin) {
     await fs.writeFile(file, bytes, { mode: 0o600 });
     return { id, path: file, type: kind.type, bytes: bytes.length };
   }
+  async function readUpload(id) {
+    requireValue(/^[0-9a-f]{16}$/.test(id || ""), "Bad image ID", 404);
+    const held = await fs.readdir(path.join(directory, "uploads"));
+    const name = held.find((entry) => entry.startsWith(`${id}.`));
+    requireValue(name, "No such image", 404);
+    const bytes = await fs.readFile(path.join(directory, "uploads", name));
+    const kind = imageKind(bytes);
+    requireValue(kind, "No such image", 404);
+    return { bytes, type: kind.type };
+  }
   /* A note the reviewer removed takes its images with it. */
   async function removeUpload(id) {
     requireValue(/^[0-9a-f]{16}$/.test(id || ""), "Bad image ID");
@@ -395,29 +405,35 @@ async function loadSession(directory, config, origin) {
           "Answers require label, text, and topic",
         );
     }
-    if (data.attachments !== undefined) {
-      requireValue(
-        Array.isArray(data.attachments),
-        "attachments must be an array",
-      );
+    /* Images hang off the note they illustrate, and a note may only name an
+       image this session holds, so a submission cannot point the agent at a
+       path the hub never wrote. */
+    if (Array.isArray(data.groups.notes)) {
       const held = new Set(
         (await fs.readdir(path.join(directory, "uploads"))).map((name) =>
           name.slice(0, name.indexOf(".")),
         ),
       );
-      for (const item of data.attachments) {
+      for (const note of data.groups.notes) {
+        if (note?.attachments === undefined) continue;
         requireValue(
-          item &&
-            typeof item.id === "string" &&
-            typeof item.path === "string" &&
-            typeof item.type === "string" &&
-            Number.isInteger(item.bytes),
-          "An attachment needs id, path, type and bytes",
+          Array.isArray(note.attachments),
+          "A note's attachments must be an array",
         );
-        requireValue(
-          held.has(item.id),
-          `Image ${item.id} is not in this session`,
-        );
+        for (const item of note.attachments) {
+          requireValue(
+            item &&
+              typeof item.id === "string" &&
+              typeof item.path === "string" &&
+              typeof item.type === "string" &&
+              Number.isInteger(item.bytes),
+            "An attachment needs id, path, type and bytes",
+          );
+          requireValue(
+            held.has(item.id),
+            `Image ${item.id} is not in this session`,
+          );
+        }
       }
     }
     const file = path.join(directory, "feedback", data.id + ".json");
@@ -791,6 +807,7 @@ async function loadSession(directory, config, origin) {
     pending,
     submit,
     upload,
+    readUpload,
     removeUpload,
     dismiss,
     act,
@@ -1249,6 +1266,17 @@ export async function startHub(config = settings()) {
             201,
             await session.exclusive(() => session.upload(bytes)),
           );
+        }
+        /* The thumbnail in the note dialog, and the same image again after a
+           reload: the draft keeps a reference and the bytes stay here. */
+        if (
+          method === "GET" &&
+          rest[0] === "api" &&
+          rest[1] === "upload" &&
+          rest.length === 3
+        ) {
+          const image = await session.readUpload(rest[2]);
+          return reply(200, image.bytes, image.type);
         }
         if (
           method === "DELETE" &&

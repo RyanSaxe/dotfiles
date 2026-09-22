@@ -1728,21 +1728,40 @@ test("a note carries its images by path, and removing one deletes the file", asy
     body: png,
   }).then((r) => r.json());
 
-  // A submission may only name an image this session holds.
-  const unknown = a.event("feedback-only", "1", {
-    attachments: [
-      { id: "0".repeat(16), path: "/tmp/x.png", type: "image/png", bytes: 1 },
-    ],
+  const note = (attachments) => ({
+    id: crypto.randomUUID(),
+    topic: "overview",
+    anchor: "The strip under the header",
+    text: "This is what I mean.",
+    attachments,
   });
-  const rejected = await a.feedback(unknown);
+  // A note may only name an image this session holds.
+  const rejected = await a.feedback(
+    a.event("feedback-only", "1", {
+      groups: {
+        notes: [
+          note([
+            {
+              id: "0".repeat(16),
+              path: "/tmp/x.png",
+              type: "image/png",
+              bytes: 1,
+            },
+          ]),
+        ],
+      },
+    }),
+  );
   assert.equal(rejected.code, 400);
   assert.match(rejected.body.error, /not in this session/);
 
-  const event = a.event("feedback-only", "1", { attachments: [stored] });
+  const event = a.event("feedback-only", "1", {
+    groups: { notes: [note([stored])] },
+  });
   assert.equal((await a.feedback(event)).code, 200);
-  // The agent reads the path, and the bytes are still on disk under it.
+  // The agent reads the path off the note, and the bytes are on disk under it.
   const delivered = (await a.action("read", { id: event.id })).body.event;
-  assert.deepEqual(delivered.payload.attachments, [stored]);
+  assert.deepEqual(delivered.payload.groups.notes[0].attachments, [stored]);
   assert(await exists(stored.path));
 
   const removed = await fetch(
