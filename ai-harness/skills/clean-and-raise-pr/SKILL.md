@@ -1,9 +1,9 @@
 ---
-name: ready-for-review
-description: Turn finished implementation work into a pull request a reviewer can trust. Verifies the change through its real interface, audits and adds tests, simplifies the code, updates the documentation, rebuilds the commit history into a reviewable series, writes the description for the reviewer, opens a draft, watches CI to green, and marks the pull request ready. Use when invoked by name or when the user says finished work should be made ready for review, reviewable, or polished into a pull request. Do not use for a plain request to open or create a pull request.
+name: clean-and-raise-pr
+description: Turn unpolished work into a pull request a reviewer can trust. Verifies the change through its real interface, audits and adds tests, simplifies the code, updates the documentation, rebuilds the commit history into a reviewable series, writes the description for the reviewer, opens a draft, watches CI to green, and marks the pull request ready. Use when invoked by name, when the user says finished work should be cleaned up, made reviewable or polished into a pull request, or when they point at code that needs verifying and tidying before anyone reviews it. Do not use for a plain request to open or create a pull request, and do not use it to build a feature.
 ---
 
-# Ready for review
+# Clean and raise a pull request
 
 Take a branch whose implementation is finished and turn it into a pull
 request that is ready to review. Run every phase every time. How much each
