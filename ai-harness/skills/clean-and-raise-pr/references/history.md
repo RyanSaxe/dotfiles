@@ -1,22 +1,20 @@
 # Commit history
 
-The reviewer reads the commits in order. Each commit is small enough to read
-in one sitting, and the sequence explains the change without the pull
-request body.
+The commit series is the review path. Write it so someone reading the
+commits in order sees the change built up, and so a commit still makes
+sense to someone who reads only that one.
 
 ## The unit
 
-- A commit is one concept: one capability, one fix, or one refactor,
-  whatever its size.
-- Choose how fine the concepts are so that the series has the smallest
-  number of small commits. Ten components can be ten commits, one commit,
-  or three, depending on which grouping is easiest to review.
-- Most commits are 50 to 500 lines. 200 is a good size. Above 200 is harder
-  to review but acceptable. Go to 500 when the concept needs it. Above
-  1,000, reviewers refuse. Between 500 and 1,000, split when a smaller
-  grouping is as easy to review; keep the commit whole when the pieces only
-  make sense together. A 2,000-line commit is rare; when one is
-  necessary, its message says why.
+- A commit is one concept: one capability, one fix, or one refactor. The
+  right commit is the shortest accurate account of one piece of the work,
+  which is sometimes 5 lines and sometimes 500.
+- Choose how fine the concepts are so that the series has the fewest
+  commits that still read one at a time. Ten components can be ten commits,
+  one commit, or three.
+- Size is how you notice, not how you decide. Past a few hundred lines, ask
+  whether the commit is still one concept. A commit that is one concept
+  stays whole at any size, and its message says why it is large.
 - Count lines as insertions plus deletions, excluding paths the brief listed
   as fixtures, generated files, or vendored code. Put those paths in their
   own commit and say what they are in the subject.
