@@ -54,7 +54,9 @@ element's own ID so two of the same component on a page stay separate.
 
 `styles.css` needs no wrapper. The builder writes it into a cascade layer
 that beats the plan's own CSS, so a component's chrome is not restyled by
-accident. Use the design tokens in [frame.md](../references/frame.md).
+accident. It also beats `frame.css`, so a component sets its own type and
+spacing without fighting a frame selector. Use the design tokens in
+[frame.md](../references/frame.md).
 
 The frame supplies the shared parts a component uses directly: `figure()`
 for a figure's header, actions and caption, `copyButton()`, `failed()` for a
@@ -126,8 +128,8 @@ is still right when it presents the content more clearly.
 A component that holds authored content gives it a slot, and the frame
 supplies the space around it. Put what you like in one: a code block, a
 table, a diagram, a paragraph. The slot zeroes the outer margin of its first
-and last child, so every kind of element sits the same distance from the
-slot's edges.
+and last child, so a `<pre>`, a `<div>`, a figure and a table all sit the
+same distance from the slot's edges, above and below.
 
 | Component       | Slot                      |
 | --------------- | ------------------------- |

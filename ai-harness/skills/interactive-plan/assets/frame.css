@@ -960,25 +960,16 @@ svg {
   overflow: hidden;
   background: var(--panel);
 }
-/* A figure that ends a card meets the card's edge: the container keeps no
-   padding under it and the figure no margin, so no band of the container's
-   background shows below a code block, diagram, or chart. */
-:is(
-  .visual-option,
-  .vd-columns,
-  .comparison-content,
-  .change-content,
-  .behavior-case > div
-):has(
-  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child
-) {
-  padding-bottom: 0;
-}
 /* A slot supplies its own padding, so what it holds brings no outer margin
    of its own: a <pre> brings 12/12 from the browser default, a .figure 14/18,
    a table 16/16, a blockquote 10/10 and a paragraph 0/14. Zeroing only the
    last child's bottom margin, which is what this was, left every one of them
-   sitting lower in its slot than it sat from the bottom. */
+   sitting lower in its slot than it sat from the bottom.
+
+   A rule here used to drop a slot's bottom padding when a figure or a code
+   block ended it, so the block met the slot's edge. It named those four
+   elements and not a table, a blockquote or a paragraph, so what a slot
+   looked like depended on what an author had put in it last. */
 :is(
     .visual-option,
     .visual-option > figure,
@@ -1009,6 +1000,7 @@ svg {
     .behavior-case > div
   )
   > .figure {
+  margin: 0;
   border: 0;
   border-radius: 0;
 }
