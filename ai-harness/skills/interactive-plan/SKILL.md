@@ -37,13 +37,13 @@ before a new complete plan is presented.
 
 The session begins in the conversation. Before the first revision, get the
 context the plan needs: what the user wants, what they already know they
-want and do not want, what the project shows, and what is uncertain. That
-is a back and forth, not a list of questions. Move to the browser once
-there is material to compare or approve, open the first revision in the
-user's default browser, and give the link in chat. From then on, anything
-the plan needs from the user is asked on a page.
+want and do not want, what the project shows, and what is uncertain. Ask one
+question at a time and use the answer before asking the next. Move to the
+browser once there is material to compare or approve, open the first
+revision in the user's default browser, and give the link in chat. From then
+on, anything the plan needs from the user is asked on a page.
 
-A turn ends after `publish` or `pause`; the hub starts the next one when a
+A turn ends after `publish` or `pause`. The hub starts the next one when a
 submission lands, acceptance included, and `complete` ends the review. The
 user can also close a session from the browser, and then no next turn
 comes. When `start` refuses because the session cannot be woken, give the
