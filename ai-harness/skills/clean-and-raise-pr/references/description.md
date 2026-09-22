@@ -88,5 +88,10 @@ Before this change the pane opened at line 1 and the reader scrolled to the cite
   A referenced image that is not attached renders broken.
 - Link only what the reader can open. A path on your own disk is a dead
   link in a pull request.
+- After `gh pr create` or `gh pr edit`, read the body back with
+  `gh pr view --json body` and check that no image reference still points at
+  a local path. gh keeps a pull request whose attachments partly failed,
+  which leaves the ones that failed as broken images. Re-run `gh pr edit`
+  with those paths.
 - Add a review comment of your own only as a last resort, for one hunk whose
   reason fits neither in the code nor in the commit message.
