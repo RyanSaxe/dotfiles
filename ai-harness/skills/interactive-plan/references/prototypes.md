@@ -8,7 +8,7 @@ sees the behavior instead of a description of it.
 | id     | Unique stable ID with the same character rules as page IDs.              |
 | title  | Accessible, descriptive title, shown in the embed's header.              |
 | html   | Complete self-contained HTML document, including its styles and scripts. |
-| file   | Manifest-only alternative to html; resolved relative to the manifest.    |
+| file   | Manifest-only alternative to html, resolved relative to the manifest.    |
 | height | Positive preview height in pixels.                                       |
 
 Put `data-prototype="ID"` on the element where the prototype belongs. The
@@ -16,7 +16,7 @@ frame renders it with a header that has the title, a Source toggle that
 shows the exact source with syntax highlighting, and an Open full size
 button that shows the document alone in a new tab. The document runs in a
 sandboxed iframe with no same-origin access to the review frame, so its
-controls cannot submit real feedback; scripts, forms, and popup links work
+controls cannot submit real feedback. Scripts, forms, and popup links work
 inside the sandbox. The embed is transparent: the document paints its own
 background and should follow the viewer's theme with a
 `prefers-color-scheme` rule.
