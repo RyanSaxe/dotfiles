@@ -33,7 +33,7 @@ local function clock(token)
     return nil
   end
 
-  local value = assert(tonumber(hour))
+  local value = assert(tonumber(hour)) ---@type number
   if meridiem then
     if value < 1 or value > 12 then
       return nil
