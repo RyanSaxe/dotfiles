@@ -960,6 +960,16 @@ svg {
   overflow: hidden;
   background: var(--panel);
 }
+/* A component is a block in the page's rhythm, so the frame sets the space
+   around one. Seven components set their own, with three different top
+   values and three different bottom ones between them, and a pair of
+   diagrams set none at the bottom at all, so the paragraph after it began
+   against its border. These four attributes mark a component's root and are
+   the ones the build already checks for. */
+#page-content
+  > :is([data-choice], [data-multiselect], [data-question], [data-kind]) {
+  margin: 14px 0 22px;
+}
 /* A slot supplies its own padding, so what it holds brings no outer margin
    of its own: a <pre> brings 12/12 from the browser default, a .figure 14/18,
    a table 16/16, a blockquote 10/10 and a paragraph 0/14. Zeroing only the

@@ -3,7 +3,6 @@
 .question {
   display: grid;
   gap: 6px;
-  margin: 16px 0 22px;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 10px;
