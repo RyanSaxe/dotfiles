@@ -1,18 +1,18 @@
-# One round
+# Run one review round
 
-Interactive planning is a loop. The sooner a revision reaches the reviewer,
-the sooner the plan gets better, so work well and quickly: put every open
-point on the pages, publish, and let the feedback do the refining. Ship
-polished, not perfect. A page with unpleasant components or careless writing
-distracts the reviewer from the decision, and a page that arrives late
-delays every decision after it. The build checks each page's structure, and
-the reviewer's browser shows the result. Look at a page yourself only when
-it holds something you built and cannot judge from its source. Then publish.
+Interactive planning is a loop. Send each revision as soon as it contains
+the material the reviewer needs. Put every open point on the pages and
+publish. Use the reviewer's feedback to refine the next revision. Ship
+polished, not perfect. Careless components or writing distract the reviewer
+from the decision. A late revision delays every decision after it. The build
+checks each page's structure, and the reviewer's browser shows the result.
+Open a page yourself when it contains something you built that you cannot
+judge from its source. Then publish.
 
-A round begins when the hub wakes you with a submission and ends when you
-publish the next revision and stop. The wake message names `read`. Running
-it returns the submission with its choices, notes and answers, and marks it
-read. Every session command is `node scripts/session.mjs COMMAND
+A round begins when the hub sends a submission event. It ends when you
+publish the next revision and stop. The event names `read`. Running `read`
+returns the submission with its choices, notes and answers, and marks it read.
+Every session command is `node scripts/session.mjs COMMAND
 --session-dir PATH`, with the path from the wake message.
 
 1. Read. Read the whole submission, and anything the user said in the chat
@@ -38,11 +38,11 @@ read. Every session command is `node scripts/session.mjs COMMAND
    publish tells the reviewer nothing. Pages can be in progress together
    and finish in any order, and independent pages can go to subagents.
    Author under a directory of your own in the system temp directory,
-   starting from the copy of the last revision's source that `read`
-   reports as `status.current.source`. Every open point that remains goes
-   on the pages of this revision, one page per topic. Anything the next
-   revision needs from the user is asked on a page, next to the proposal
-   it affects, never in the chat. Remove the control from a settled point.
+   starting from the source directory that `read` reports as
+   `status.current.source`. Put every remaining open point on a page in this
+   revision, one page per topic. Ask every question needed for the next
+   revision on a page next to the proposal it affects, never in the chat.
+   Remove the control from a settled point.
 5. Check. Build with `node scripts/build.mjs SOURCE.json OUT.html`. It
    prints the output path when it finds nothing. Otherwise it lists every
    structural problem and writes nothing, so fix them and build again. Read
@@ -50,9 +50,9 @@ read. Every session command is `node scripts/session.mjs COMMAND
    wrote against [writing.md](writing.md). Nothing else is required before
    publishing.
 6. Publish. Run `publish --file ARTIFACT.html --source DIR` under a new
-   revision id, say in the chat what changed, and stop. The copy of `DIR`
-   kept with the revision is where the next round starts. The hub wakes you
-   for the next round.
+   revision id, say in the chat what changed, and stop. The publisher copies
+   `DIR` with the revision. The next round starts from that copy. The hub
+   sends the next submission event when the reviewer responds.
 
 When the user tells you in the chat to stop the review, run `pause`
 instead of publishing. A submission is feedback, never an instruction to

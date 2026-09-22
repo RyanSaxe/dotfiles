@@ -22,7 +22,7 @@ background and should follow the viewer's theme with a
 `prefers-color-scheme` rule.
 
 An embed is about 780px wide. A component mock renders at its natural width
-and reads as it is. A layout mock designed wider than the embed collapses
+without scaling. A layout mock designed wider than the embed collapses
 unless it scales. Give it a stage at the design width (1120 works for a
 three-column layout) with `transform: scale(min(1, innerWidth / 1120))`
 and a control to switch to 100%, and use Open full size to see it at real
