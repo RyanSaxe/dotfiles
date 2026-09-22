@@ -37,6 +37,23 @@
     table; every enabled window has one rail pane after a restart; and the rail
     repaints cleanly when Ghostty or tmux is restarted.
 
+- [ ] Find out why `luals-check` fails intermittently and passes on a re-run
+      of the same tree.
+
+  - Observed on 2026-09-22 on a branch whose diff is Markdown only, so no Lua
+    file changed. `prek run --all-files` reported `luals --check (nvim)` as
+    Failed once, and a `git rebase -x 'prek run --all-files'` over ten commits
+    stopped at the second of them. Re-running the same command on the same
+    tree passed both times, and `nvim -l ci/luals-check.lua` on the base
+    commit printed `Diagnosis completed, no problems found`.
+  - The nvim jobs in CI have not reproduced it.
+  - Unknown: what the diagnostic said. Both failing runs discarded output, so
+    the first step is a run that keeps it, such as
+    `prek run --all-files luals-check 2>&1 | tee /tmp/luals.log`, repeated
+    until one fails.
+  - Worth fixing because people learn to re-run a gate that fails for no
+    reason, and a real diagnostic gets skipped that way.
+
 - [ ] Rail mouse support: `set -g mouse on` plus click-to-act on the rail.
       v1 got clickable window names free from tmux's status bar; the rail is a
       painted pane, so the daemon must publish a row map (same pattern as
