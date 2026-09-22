@@ -1443,8 +1443,12 @@ dialog::backdrop {
   padding: 0;
   overflow: visible;
 }
-/* An open dialog covers the page, so the control that comments on it goes. */
-body:has(dialog[open]) .quote-button {
+/* A dialog and the working card both cover the page, so the control that
+   comments on it goes. While the agent works, the revision under the card is
+   the one about to be replaced, and a note on it would arrive against a page
+   that no longer exists. */
+body:has(dialog[open]) .quote-button,
+body.is-working .quote-button {
   display: none;
 }
 /* A session row and the control that closes that session. */
