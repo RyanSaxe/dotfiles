@@ -22,8 +22,7 @@ request body.
   own commit and say what they are in the subject.
 - Every commit builds, passes the project's checks, and includes its own
   tests and documentation. No fixup commits.
-- Order the commits as preparation, then the change, then cleanup. The
-  subjects, read in order, are the review path.
+- Order the commits as preparation, then the change, then cleanup.
 
 ## Repair or rebuild
 
@@ -31,8 +30,6 @@ Read the branch's commits before changing anything:
 
     base=$(git merge-base origin/<base> HEAD)
     git log --reverse --shortstat --format='%h %s' "$base"..HEAD
-
-Then choose one of two approaches.
 
 **Repair** when each commit is already one concept and only small fixes are
 needed: squash a fixup into the commit it fixes, reorder, reword a subject
@@ -68,11 +65,9 @@ check that the final tree is unchanged, and measure every commit.
 
        GIT_SEQUENCE_EDITOR='cp <todo file>' git rebase -i "$base"
 
-   In the todo file, `pick` keeps a commit, `fixup` merges a commit into the
-   one above it, moving a line reorders, `exec git commit --amend -F
-<message file>` replaces the message of the commit above it, and `edit`
-   stops at a commit so you can split it with `git reset HEAD^` and commit
-   the pieces.
+   Replace a message with `exec git commit --amend -F <message file>` under
+   the commit it belongs to, and split a commit by stopping at it with
+   `edit`, then `git reset HEAD^` and commit the pieces.
 
    To rebuild:
 
@@ -119,11 +114,9 @@ pass, then delete it.
 
 ## Messages
 
-Use the repository's subject style; read `git log --oneline -30` to find it,
-whether a prefix like `fix(scope):`, a bare imperative, or a ticket number.
-Write the subject in the imperative and say what the change does: "add retry
-to the upload client", not "added retries". Keep it short enough for a
-one-line log.
+Read `git log --oneline -30` and use the repository's subject style: a
+prefix like `fix(scope):`, a bare imperative, or a ticket number. Say what
+the change does, short enough for a one-line log.
 
 Add a body only when the subject cannot explain why. Write three to six
 lines: the problem, why this solution rather than the obvious one, and what
@@ -134,7 +127,22 @@ the code.
 
     Expanding the upper fold inserts 60 rows above the viewport and the
     browser keeps scrollTop, so the visible text jumps. Save the line under
-    the cursor and its offset before rendering; restore them after.
+    the cursor and its offset before rendering, then restore them after.
+
+A subject alone when the change explains itself:
+
+    fix(rail): a visit only acks while someone is at the machine
+
+A body that puts the reviewer where you were before the fix:
+
+    interactive-plan: put the comment control in a gutter
+
+    The control sat inside the block at its top right corner at 45%
+    opacity, over a file header's Copy button and a table's last column,
+    and it appeared only on hover. Ten of the twelve blocks on the Figures
+    page clip their overflow to hold a rounded corner, which hid it, and
+    the frame cannot change the overflow of a block a plan styles. It moves
+    into the 40px gutter the reading column already reserves.
 
 Trailers such as `Co-Authored-By` come from the harness or repository
 configuration, not from this skill.
@@ -153,12 +161,3 @@ When two groups add lines to the same list in a shared file, such as a
 README options list or a test list, the later cherry-pick conflicts. Resolve
 it by taking the core's version of the file and adding this group's lines.
 Say in the final report that the groups must merge in order.
-
-A separate pull request for unrelated work is a branch from the base with
-only that work. Create it before the rebuild, as the Align phase describes.
-
-## Further reading
-
-The rules in this file follow the Linux kernel's
-[Submitting patches](https://www.kernel.org/doc/html/latest/process/submitting-patches.html)
-guide, sections "Separate your changes" and "Describe your changes".

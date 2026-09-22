@@ -6,11 +6,10 @@ description: Turn unpolished work into a pull request a reviewer can trust. Veri
 # Clean and raise a pull request
 
 Take a branch whose implementation is finished and turn it into a pull
-request that is ready to review. Run every phase every time. How much each
-phase does depends on the size of the change: a one-line fix gets a
-three-line brief and one commit; a large feature gets a user simulation and
-a rebuilt commit series. Skip the history rebuild only when the branch is
-already one clean commit.
+request that is ready to review. Run every phase every time, sized to the
+change: a one-line fix gets a three-line brief and one commit, a large
+feature gets a user simulation and a rebuilt commit series. Skip the
+history rebuild only when the branch is already one clean commit.
 
 Requirements: `git`, and `gh` authenticated for the repository (`gh auth
 status`). Attaching images to the pull request needs gh 2.99.0 or newer. If
@@ -21,19 +20,18 @@ a requirement is missing, tell the user what to install or upgrade and stop.
 These rules apply to everything this skill writes: the brief, commit
 messages, the pull request body, and the final report.
 
-- Write facts. Every sentence tells the reader what the change is, why it
-  matters, how to review it, or what was checked.
-- Use short sentences. Say which function, which command, which number.
+- Write facts. Every sentence says what the change is, why it matters, how
+  to review it, or what was checked.
+- One idea per sentence. Say which function, which command, which number.
   Write "the test asserts the first visible line", not "carefully tested".
+  When more than three things need listing, they go in the commit table or
+  a list, not into one sentence.
 - Do not describe the diff line by line, do not describe what you did during
   the session, and do not repeat the ask.
 - No hedging and no filler. Delete any sentence that could appear unchanged
   in another pull request.
 - Do not write "not done", "not checked", or "I did not" lines. Do the work
   or leave the sentence out.
-- Write like the examples in this file, in
-  [history.md](references/history.md), and in
-  [description.md](references/description.md).
 
 ## Phases
 
@@ -57,7 +55,7 @@ When you stop early, say what happened and what is left.
 The base branch is the one the user named. If none, use the open pull
 request's base. If there is no pull request, use the default branch from
 `gh repo view --json defaultBranchRef`. Read every file under `references/`
-first; the brief uses their definitions of checks, the simulation, docs, and
+first: the brief uses their definitions of checks, the simulation, docs, and
 commits. Read the original ask if it exists in the conversation or in a file
 the user points to. If there is no record of the ask, the branch is the
 ask: compare Outcome against what its commits and pull request say, and
@@ -68,8 +66,7 @@ say so in the brief. Then read the whole diff and the branch's commits:
     git log --reverse --shortstat origin/<base>..HEAD
 
 Post a brief and wait for the user's go. Always include Outcome and Size.
-Include the other lines only when they apply. Every line is a fact or a
-decision.
+Include the other lines only when they apply.
 
 - Outcome: what the branch does compared with the ask, in one sentence, and
   any gap.
@@ -83,18 +80,18 @@ decision.
 - Separate: any unrelated change that should be its own pull request from
   the base: what it is, how many lines, and that it goes first.
 - Verify: the project's checks, how you will use the change yourself, and
-  the user simulation if there is behavior you cannot check by using it
-  (who the user is and what they try).
+  the user simulation if there is behavior you cannot check by using it:
+  who the user is and what they try.
 - Docs: which documents you will add or update beyond what the branch
   already has, or that none are needed.
 - Decide: each decision that changes the result, with a recommendation.
 
-If the Size line proposes a split, end with one line saying the sizes are
-estimates and the rebuild will report measured ones. Most branches are one
-pull request. Propose a split only above 2,000 lines, and a separate pull
-request only for unrelated work. Do neither before the go.
+Most branches are one pull request. Propose a split only above 2,000 lines,
+and a separate pull request only for unrelated work. Do neither before the
+go. When the Size line proposes a split, end the brief with one line saying
+the sizes are estimates and the rebuild will report measured ones.
 
-A small change:
+A brief for a small change:
 
     Outcome: the sidebar dims windows idle for ten minutes; matches the ask, no gap.
     Size: about 60 lines, two commits.
@@ -103,14 +100,9 @@ A small change:
     Docs: threshold section in the README; nothing else mentions idling.
     Decide: default threshold ten minutes (recommended) or five.
 
-A large one:
+A brief that proposes a split adds the table and the estimate line:
 
-    Outcome: the visual-review skill as designed in visual-review-design.4; no gap.
-    Size: 8,800 hand-written lines, about 41 commits at review grain. Above 2,000 lines, so I propose one core pull request and eight on top of it (table below). Say "one PR" to keep it whole.
-    Separate: the CI environment fix (13 lines) is unrelated. It goes first, alone, from v2-getting-ready.
-    Verify: node --test tests/visual-review; open a page, follow a reference, expand both folds, export; a fresh agent answers one question from SKILL.md alone.
-    Docs: SKILL.md, protocol.md, session.md, and answering.md ship in the commits they describe.
-    Decide: keep VirtualizedFile as the plan says, or drop it (recommended; its render range conflicts with the folds).
+    Size: 8,800 hand-written lines, about 41 commits at review grain. Above 2,000 lines, so I propose one core pull request and eight on top of it. Say "one PR" to keep it whole.
 
       pull request            commits   lines
       core                          8   1,500   skill folder, helper server, app shell
@@ -139,21 +131,16 @@ brief.
 
 Read [verification.md](references/verification.md). Run the project's own
 checks: formatting, linting, types, tests. Audit the tests that cover the
-change; add and delete tests as verification.md says. Use the change the way
-a user would.
+change, adding and deleting as verification.md says. Use the change the way
+a user would. Run the user simulation when using the change yourself leaves
+some behavior unchecked. A change you can check completely by using it needs
+none.
 
-Run the user simulation when using the change yourself leaves some behavior
-unchecked. A small change you can check completely by using it needs no
-simulation. Use a subagent if the harness has one and wait for its report.
-If it cannot wait for a subagent, do the simulation yourself: close the
-implementation and use only the documentation.
-
-Fix what verification finds. Fix a bug, a missing test, a bad test, or a
-wrong document in or next to the change in this pull request, in its own
-commit when it is a separate concept. Do not fix a finding unrelated to the
-change; report it to the user in the final report, and open an issue if the
-repository uses them. Never put it in the body. If a fix would change the
-scope of the ask, stop and report. Never write a "not done" list.
+Fix what verification finds: a bug, a missing test, a bad test, or a wrong
+document goes in this pull request, in its own commit when it is a separate
+concept. Do not fix a finding unrelated to the change. Report it to the user
+at the end, open an issue if the repository uses them, and keep it out of
+the body. If a fix would change the scope of the ask, stop and report.
 
 ## Simplify
 
@@ -210,8 +197,6 @@ Several pull requests, in this order:
    After the core merges, check each group pull request's base with
    `gh pr view --json baseRefName`; if GitHub did not move it to the base,
    run `gh pr edit --base <base>`.
-
-Never rewrite history on any of them once it has review comments.
 
 GitHub runs no CI on a pull request that conflicts with its base, so check
 that it is mergeable first. `UNKNOWN` means GitHub is still computing; ask
