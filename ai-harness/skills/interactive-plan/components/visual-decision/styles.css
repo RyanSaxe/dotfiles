@@ -81,6 +81,12 @@
   font-size: 12.5px;
   color: var(--muted);
 }
+/* An option with no figure ends under its line: the third row and its gap
+   otherwise leave 8px of panel below the last word. */
+.visual-option:not(:has(> figure)) {
+  grid-template-rows: auto auto;
+  padding-bottom: 10px;
+}
 /* A diagram and a code block each scroll sideways inside their own figure,
    so this one never needs to scroll and must not, or it traps the wheel. */
 .visual-option > figure {

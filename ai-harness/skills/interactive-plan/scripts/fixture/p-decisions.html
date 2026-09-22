@@ -13,6 +13,7 @@
   C["Checkout"] --> P["PaymentClient"] --> S["Envoy sidecar"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
   <article class="visual-option" data-value="gateway" data-label="At the gateway"><header>At the gateway</header><p>Central state; every service pays the extra hop.</p><figure><div data-diagram>flowchart LR
   C["Checkout"] --> P["PaymentClient"] --> A["API gateway + breaker"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
+  <article class="visual-option" data-value="none" data-label="No breaker"><header>No breaker</header><p>Every gateway blip reaches the customer, and there is nothing to draw.</p></article>
 </section>
 <section class="visual-decision" data-choice="handler" data-label="Handler shape">
   <h3>What does the charge handler look like?</h3>

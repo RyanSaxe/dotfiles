@@ -14,8 +14,7 @@ url = "redis://cache:6379"</div></section>
   <article class="comparison-option"><header><h2>Database row</h2><p>Durable; a write per state change.</p></header>
     <section class="comparison-content"><h3>Read path</h3><div data-language="sql">SELECT state FROM breakers WHERE name = 'gateway';</div></section>
     <section class="comparison-content"><h3>Failure mode</h3><p>The database is already on the charge path; a slow query slows every check.</p></section>
-    <section class="comparison-content"><h3>Config</h3><div data-language="toml" data-file="breaker.toml">store = "database"
-table = "breakers"</div></section>
+    <section class="comparison-content empty"><h3>Config</h3><p>Not stated</p></section>
     <footer><button class="btn comparison-pick" data-value="db" data-label="Database row">Choose database</button></footer></article>
 </section>
 <div class="scope-list" data-multiselect="scope" data-label="Included in this change">
@@ -32,8 +31,8 @@ table = "breakers"</div></section>
 </div>
 <div class="behavior-cases" data-kind="set of cases">
   <div class="behavior-head" aria-hidden="true"><span>When</span><span>Proposed behavior</span><span></span></div>
-  <section class="behavior-case" id="case-open"><h3>The breaker is open</h3><div>The client returns a PaymentError with code <code>breaker_open</code> in under 5 ms and does not call the gateway.</div><button class="btn" data-comment="case-open: The breaker is open">Revise</button></section>
-  <section class="behavior-case" id="case-half"><h3>Cooldown elapsed</h3><div>One probe request goes through; success closes the breaker, failure reopens it for another cooldown.</div><button class="btn" data-comment="case-half: Cooldown elapsed">Revise</button></section>
-  <section class="behavior-case" id="case-timeout"><h3>Gateway times out</h3><div>A timeout counts as a failure. The request fails after the configured 8 s, not the gateway's 60 s.</div><button class="btn" data-comment="case-timeout: Gateway times out">Revise</button></section>
-  <section class="behavior-case" id="case-4xx"><h3>Gateway rejects the card</h3><div>A 402 is not a failure for the breaker; the customer sees the decline and the breaker stays closed.</div><button class="btn" data-comment="case-4xx: Gateway rejects the card">Revise</button></section>
+  <section class="behavior-case" id="case-open"><h3><span class="micro">When</span>The breaker is open</h3><div><span class="micro">Then</span>The client returns a PaymentError with code <code>breaker_open</code> in under 5 ms and does not call the gateway.</div><button class="btn" data-comment="case-open: The breaker is open">Revise</button></section>
+  <section class="behavior-case" id="case-half"><h3><span class="micro">When</span>Cooldown elapsed</h3><div><span class="micro">Then</span>One probe request goes through; success closes the breaker, failure reopens it for another cooldown.</div><button class="btn" data-comment="case-half: Cooldown elapsed">Revise</button></section>
+  <section class="behavior-case" id="case-timeout"><h3><span class="micro">When</span>Gateway times out</h3><div><span class="micro">Then</span>A timeout counts as a failure. The request fails after the configured 8 s, not the gateway's 60 s.</div><button class="btn" data-comment="case-timeout: Gateway times out">Revise</button></section>
+  <section class="behavior-case" id="case-4xx"><h3><span class="micro">When</span>Gateway rejects the card</h3><div><span class="micro">Then</span>A 402 is not a failure for the breaker; the customer sees the decline and the breaker stays closed.</div><button class="btn" data-comment="case-4xx: Gateway rejects the card">Revise</button></section>
 </div>
