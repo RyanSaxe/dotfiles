@@ -45,9 +45,11 @@ app.post("/charge", async (req, res) =&gt; {
   <article class="visual-option" data-value="dot" data-label="Dot"><header>Dot</header><p>Smallest; needs a hover to name the state.</p><figure><div style="padding:14px;text-align:center"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--ok);vertical-align:middle"></span> <span style="color:var(--muted)">gateway</span></div></figure></article>
   <article class="visual-option" data-value="row" data-label="Status row"><header>Status row</header><p>Names every breaker; takes a line each.</p><figure><div style="padding:10px 14px;font-size:12.5px"><div>gateway <b style="color:var(--ok)">closed</b></div><div>ledger <b style="color:var(--attention)">half-open</b></div></div></figure></article>
 </section>
-<section class="question" data-question="threshold" data-label="Breaker threshold">
+<section class="question" data-question="threshold" data-label="Breaker threshold" data-state="open">
   <span class="tag">Question</span>
   <h3>How many consecutive failures should open the breaker?</h3>
   <p class="question-why">The number sets how long a gateway outage keeps failing checkouts before the fast error kicks in.</p>
-  <textarea rows="3" placeholder="Type your answer…" aria-label="Your answer"></textarea>
+  <textarea rows="2" placeholder="Type your answer…" aria-label="Your answer"></textarea>
+  <p class="answer-text" hidden></p>
+  <div class="answer-actions"><button type="button" class="btn primary" data-answer disabled>Answer</button><button type="button" class="btn" data-edit hidden>Edit</button></div>
 </section>

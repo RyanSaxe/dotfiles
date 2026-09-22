@@ -24,6 +24,25 @@
 }
 .question textarea {
   margin: 4px 0 0;
-  min-height: 64px;
+  min-height: 0;
+  field-sizing: content;
   background: var(--ground);
+}
+/* Answer turns the card into its answered state and leaves Edit where the
+   box was. The frame still records the text on every keystroke, so pressing
+   neither loses nothing. The answer in place of the box and the Edit button
+   are the state; the card takes no badge for it. */
+.answer-text {
+  margin: 4px 0 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--ground);
+  font-size: 13.5px;
+  white-space: pre-wrap;
+}
+.answer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
 }

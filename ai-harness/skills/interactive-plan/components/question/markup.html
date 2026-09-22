@@ -2,6 +2,7 @@
   class="question"
   data-question="QUESTION_ID"
   data-label="Short label for the answer"
+  data-state="open"
 >
   <span class="tag">Question</span>
   <h3>The question, as one full sentence?</h3>
@@ -9,8 +10,15 @@
     Why the agent is asking and what the answer decides.
   </p>
   <textarea
-    rows="3"
+    rows="2"
     placeholder="Type your answer…"
     aria-label="Your answer"
   ></textarea>
+  <p class="answer-text" hidden></p>
+  <div class="answer-actions">
+    <button type="button" class="btn primary" data-answer disabled>
+      Answer
+    </button>
+    <button type="button" class="btn" data-edit hidden>Edit</button>
+  </div>
 </section>
