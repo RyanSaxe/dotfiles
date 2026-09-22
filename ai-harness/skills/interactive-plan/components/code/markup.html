@@ -1,0 +1,18 @@
+<!-- A code block. data-language is the only required attribute; a block with
+     nothing else is a plain coloured block. data-file or data-caption gives
+     it a figure with a header and a Copy button. -->
+<div data-language="ts">const timeout = 8;</div>
+
+<!-- Line numbers, a focused range, and a note on a line. data-lines takes
+     "12" or "12-18"; data-notes takes a JSON array of {line, text}. -->
+<div
+  data-language="ts"
+  data-file="src/charge.ts"
+  data-lines="2-3"
+  data-numbers
+  data-notes='[{"line": 3, "text": "Why this line reads the way it does."}]'
+  data-caption="What the reader should take from this block."
+>
+  async function charge(amount) { const breaker = breakerFor("payments"); return
+  breaker.run(() => gateway.charge(amount)); }
+</div>

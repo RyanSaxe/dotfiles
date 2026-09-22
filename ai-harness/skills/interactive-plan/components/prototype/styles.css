@@ -1,0 +1,24 @@
+.figure.prototype .figure-body {
+  background: var(--ground);
+}
+.approved-prototype {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+.prototype-source:not([open]) {
+  display: none;
+}
+.prototype-source {
+  border-top: 1px solid var(--line);
+  padding: 8px 12px 10px;
+  max-height: 480px;
+  overflow: auto;
+}
+.prototype-source summary {
+  display: none;
+}
+.prototype-source [data-language] {
+  margin-top: 8px;
+}
