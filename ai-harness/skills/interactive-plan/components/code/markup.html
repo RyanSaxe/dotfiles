@@ -1,11 +1,22 @@
 <!-- A code block. data-language is the only required attribute; a block with
      nothing else is a plain coloured block. data-file or data-caption gives
-     it a figure with a header and a Copy button. -->
+     it a figure with a header and a Copy button. Either element works: a
+     pre keeps its lines as written, which is what a multi-line block wants,
+     and a div is fine for one line. -->
 <div data-language="ts">const timeout = 8;</div>
 
+<!-- The source is HTML, so every < and & in the code is escaped. Unescaped,
+     the browser reads &lt;T&gt; as a tag and swallows the rest of the line.
+     The block below reads: async function withRetry<T>(run: () => Promise<T>) -->
+<pre data-language="ts">
+async function withRetry&lt;T&gt;(run: () =&gt; Promise&lt;T&gt;) {
+  return run();
+}</pre>
+
 <!-- Line numbers, a focused range, and a note on a line. data-lines takes
-     "12" or "12-18"; data-notes takes a JSON array of {line, text}. -->
-<div
+     "12" or "12-18". data-numbers takes no value. data-notes takes a JSON
+     array of {line, text}. Line 1 is the first line of the source below. -->
+<pre
   data-language="ts"
   data-file="src/charge.ts"
   data-lines="2-3"
@@ -13,6 +24,7 @@
   data-notes='[{"line": 3, "text": "Why this line reads the way it does."}]'
   data-caption="What the reader should take from this block."
 >
-  async function charge(amount) { const breaker = breakerFor("payments"); return
-  breaker.run(() => gateway.charge(amount)); }
-</div>
+async function charge(amount) {
+  const breaker = breakerFor("payments");
+  return breaker.run(() =&gt; gateway.charge(amount));
+}</pre>

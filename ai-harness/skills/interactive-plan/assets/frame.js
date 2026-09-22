@@ -1446,9 +1446,11 @@ function toggleSidecar(open = !$("sessions-dialog").open) {
   if (open) $("sessions-dialog").showModal();
   else if ($("sessions-dialog").open) $("sessions-dialog").close();
 }
+/* Escape, and every page change. A component with a popover of its own
+   listens for plan:dismiss; the frame cannot reach inside one to close it. */
 function closeMenus() {
   chooseBlock(null);
-  closeCodeNote();
+  window.dispatchEvent(new CustomEvent("plan:dismiss"));
   closeDrawer();
   toggleRevisionMenu(false);
   toggleSidecar(false);

@@ -21,6 +21,7 @@ function followCodeNote() {
   codeNote?.place();
 }
 document.addEventListener("click", closeCodeNote);
+window.addEventListener("plan:dismiss", closeCodeNote);
 document.addEventListener("scroll", followCodeNote, {
   capture: true,
   passive: true,

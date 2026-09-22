@@ -96,7 +96,7 @@ the block in a figure.
 | Attribute    | On                | What it does                                                                                                                       |
 | ------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | data-lines   | `[data-language]` | `"3-4"` or `"7"`. Numbers the lines, lights the range, and dims the rest until the pointer or the keyboard is on the block.        |
-| data-numbers | `[data-language]` | `"true"`. Numbers the lines and dims nothing.                                                                                      |
+| data-numbers | `[data-language]` | Takes no value. Numbers the lines and dims nothing.                                                                                |
 | data-notes   | `[data-language]` | `[{"line": 3, "text": "…"}]`. A speech bubble in the gutter of each named line, opening the note in a popover. Needs no range.     |
 | data-terms   | `[data-math]`     | `[{"symbol": "t", "meaning": "…", "value": "8 s"}]`. Names the formula's coloured terms under it, in the order the colours appear. |
 
@@ -110,6 +110,12 @@ chrome. A block that scrolls sideways fades its right edge while content
 remains off-screen. Language grammars load on demand; an unsupported
 language shows the source and reports the failure. Escape backslashes again
 when math is stored inside a JSON string.
+
+A page is HTML, so a code block's source is escaped: write `&lt;` for `<`
+and `&amp;` for `&`. Nothing checks this. Unescaped, the browser reads
+`&lt;T&gt;` as a tag and drops the rest of the line, and the build reports
+nothing. A `<pre>` keeps its lines as written and a `<div>` does not, so
+write a multi-line block as a `<pre>`; both render the same.
 
 Use the code component for source code, never a bare block, and
 [before-after](before-after/markup.html) for a proposed change. Native SVG

@@ -25,10 +25,25 @@ skill work.
 
 ## Manifest
 
+A page's `html` is a fragment, not a document: the frame supplies the shell
+and draws the page title, so the fragment starts below it.
+
+```json
+{
+  "artifactId": "retry",
+  "revision": "1",
+  "kind": "exploration",
+  "title": "Retry policy",
+  "pages": [
+    { "id": "policy", "title": "Retry policy", "file": "p-policy.html" }
+  ]
+}
+```
+
 | Field      | Contract                                                                                                   |
 | ---------- | ---------------------------------------------------------------------------------------------------------- |
 | artifactId | Stable artifact ID, using letters, digits, underscores, or hyphens.                                        |
-| revision   | New value for each publication. Periods are allowed.                                                       |
+| revision   | New value for each publication. `"1"`, `"2"` is enough; periods are allowed.                               |
 | kind       | exploration for proposals. plan for the complete final handoff.                                            |
 | title      | Human-readable artifact title, shown once at the top of the sidebar.                                       |
 | pages      | Ordered records with unique id, title, and html, or file instead of html: a path relative to the manifest. |
@@ -52,8 +67,9 @@ The plan's script is a module that runs after the frame's, so it can call
 renders.
 
 A final plan begins with the page ID `overview`. The remaining pages are
-the implementation steps. The ID `feedback` is reserved, and `agreed` is
-reserved when the manifest has agreements. Keep page IDs the same across
+the implementation steps. The ID `feedback` is reserved, and the frame
+adds an `agreed` page unless the manifest already has one, so that ID is
+taken whether or not the manifest has agreements. Keep page IDs the same across
 revisions: unsent draft items carry over to the next revision by page ID
 and anchor.
 
