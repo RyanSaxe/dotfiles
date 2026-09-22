@@ -13,7 +13,10 @@ Ask who has to know about this change and where they would look.
   page, `--help` output.
 - A changed default, changed behavior, or removed option needs the same,
   plus a changelog entry when the project keeps one.
-- A public function or type needs its doc comment, in the project's style.
+- A public function or type needs a doc comment where the name and the
+  signature leave something unsaid. A typed `euclidean_distance(a, b)`
+  needs none. Follow what the project already does: many projects treat a
+  docstring on a self-evident function as noise.
 - A non-obvious decision, constraint, or workaround needs a code comment
   where a reader would otherwise be surprised.
 - An internal refactor with no visible change usually needs nothing.
@@ -38,8 +41,9 @@ worse than none, because readers trust it.
   commit message and the pull request.
 - Write each fact in one place and link to it from elsewhere. Copies go out
   of date.
-- Follow the project's existing structure, headings, and tone. Add to the
-  document readers already use before creating a new one.
+- Follow the project's existing structure, headings, and tone, and its
+  style guide when it has one. Add to the document readers already use
+  before creating a new one.
 - Every example must run. Run it and paste the real output.
 - Do not document unfinished work or promise future features.
 
