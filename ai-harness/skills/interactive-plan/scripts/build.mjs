@@ -1,12 +1,24 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { artifactData } from "./session.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
-const componentRoot = fileURLToPath(new URL("../components/", import.meta.url));
+/** Where a user keeps components of their own, outside the skill. The skill
+    is installed and updated as a unit, so a component written into its own
+    directory would be an edit to installed software. */
+export function userComponents(env = process.env) {
+  const home = env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  return path.join(home, "interactive-plan", "components");
+}
+
+const componentRoots = () => [
+  fileURLToPath(new URL("../components/", import.meta.url)),
+  userComponents(),
+];
 
 /** The component directories, sorted, so registration order is fixed. */
 async function componentNames(root) {
@@ -19,38 +31,46 @@ async function componentNames(root) {
     .sort();
 }
 
-/** One named file from every component that has it, in directory order. A
+/** Every component, by name. A name in a later root replaces the same name
+    in an earlier one, which is how a user changes a shipped component
+    without forking the skill. A root that does not exist contributes none. */
+export async function componentDirectories(roots = componentRoots()) {
+  const found = new Map();
+  for (const [index, root] of roots.entries())
+    for (const name of await componentNames(root))
+      found.set(name, { name, directory: path.join(root, name), root: index });
+  return [...found.values()].sort((a, b) => (a.name < b.name ? -1 : 1));
+}
+
+/** One named file from every component that has it, in name order. A
     component that ships no behavior, or no styles, is skipped rather than
     contributing an empty part. */
-async function componentParts(root, file, wrap) {
-  const names = await componentNames(root);
+async function componentParts(roots, file, wrap) {
+  const found = await componentDirectories(roots);
   const parts = await Promise.all(
-    names.map(async (name) => {
+    found.map(async ({ name, directory, root }) => {
       const text = await fs
-        .readFile(path.join(root, name, file), "utf8")
+        .readFile(path.join(directory, file), "utf8")
         .catch(() => "");
-      return text.trim() ? wrap(name, text.trim()) : "";
+      const from = root === 0 ? `components/${name}` : `${name} (yours)`;
+      return text.trim() ? wrap(`${from}/${file}`, text.trim()) : "";
     }),
   );
   return parts.filter(Boolean).join("\n");
 }
 
-const componentStyles = (root) =>
-  componentParts(
-    root,
-    "styles.css",
-    (name, text) => `/* components/${name}/styles.css */\n${text}`,
-  );
+const componentStyles = (roots) =>
+  componentParts(roots, "styles.css", (at, text) => `/* ${at} */\n${text}`);
 
 /* Each behavior is evaluated in a block, so what a component declares at the
    top of its file stays inside it and two components cannot collide over a
    name. The frame's own helpers stay in scope, because the block is inside
    the frame's module. */
-const componentBehaviors = (root) =>
+const componentBehaviors = (roots) =>
   componentParts(
-    root,
+    roots,
     "behavior.mjs",
-    (name, text) => `/* components/${name}/behavior.mjs */\n{\n${text}\n}`,
+    (at, text) => `/* ${at} */\n{\n${text}\n}`,
   );
 
 const attribute = (tag, name) => {
@@ -197,9 +217,10 @@ export async function assemble(data, { css = "", js = "" } = {}) {
     throw new Error(
       "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
     );
+  const roots = componentRoots();
   const [componentCss, componentJs] = await Promise.all([
-    componentStyles(componentRoot),
-    componentBehaviors(componentRoot),
+    componentStyles(roots),
+    componentBehaviors(roots),
   ]);
   const html = shell
     .replace(
