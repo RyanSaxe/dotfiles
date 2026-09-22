@@ -19,13 +19,15 @@ table = "breakers"</div></section>
     <footer><button class="btn comparison-pick" data-value="db" data-label="Database row">Choose database</button></footer></article>
 </section>
 <div class="scope-list" data-multiselect="scope" data-label="Included in this change">
-  <label class="scope-row"><span><strong>Breaker metrics</strong><span class="scope-description">Open, half-open, and closed transitions as counters.</span></span><input type="checkbox" class="scope-check" data-value="metrics" data-label="Breaker metrics" checked /></label>
+  <p class="scope-count"><b>0 of 4</b> included</p>
+  <label class="scope-row"><span><strong>Breaker metrics <span class="tag">Recommended</span></strong><span class="scope-description">Open, half-open, and closed transitions as counters.</span></span><input type="checkbox" class="scope-check" data-value="metrics" data-label="Breaker metrics" /></label>
   <label class="scope-row"><span><strong>Dashboard panel</strong><span class="scope-description">One Grafana row for the counters above.</span></span><input type="checkbox" class="scope-check" data-value="dashboard" data-label="Dashboard panel" /></label>
-  <label class="scope-row"><span><strong>Runbook entry</strong><span class="scope-description">What to do when the breaker stays open past five minutes.</span></span><input type="checkbox" class="scope-check" data-value="runbook" data-label="Runbook entry" checked /></label>
+  <label class="scope-row"><span><strong>Runbook entry <span class="tag">Recommended</span></strong><span class="scope-description">What to do when the breaker stays open past five minutes.</span></span><input type="checkbox" class="scope-check" data-value="runbook" data-label="Runbook entry" /></label>
   <label class="scope-row"><span><strong>Load test</strong><span class="scope-description">A k6 script that trips the breaker and measures recovery.</span></span><input type="checkbox" class="scope-check" data-value="load" data-label="Load test" /></label>
 </div>
 <div class="scope-list" data-multiselect="rollout" data-label="Rollout steps">
-  <label class="scope-row"><span><strong>Canary first</strong><span class="scope-description">One region for a day before the rest.</span></span><input type="checkbox" class="scope-check" data-value="canary" data-label="Canary first" checked /></label>
+  <p class="scope-count"><b>0 of 2</b> included</p>
+  <label class="scope-row"><span><strong>Canary first <span class="tag">Recommended</span></strong><span class="scope-description">One region for a day before the rest.</span></span><input type="checkbox" class="scope-check" data-value="canary" data-label="Canary first" /></label>
   <label class="scope-row"><span><strong>Feature flag</strong><span class="scope-description">The breaker behind a flag that ops can flip.</span></span><input type="checkbox" class="scope-check" data-value="flag" data-label="Feature flag" /></label>
 </div>
 <div class="behavior-cases" data-kind="set of cases">
