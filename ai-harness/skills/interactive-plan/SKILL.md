@@ -23,7 +23,7 @@ before a new complete plan is presented.
   hub's wake message names it.
 - [quality.md](references/quality.md): what makes a page and a plan good.
   Read it before the first revision.
-- [writing.md](references/writing.md): the sentence list every page passes.
+- [writing.md](references/writing.md): the rules every sentence follows.
 - [session.md](references/session.md): starting, resuming and accepting a
   session, and the hub. Read it before `start`.
 - [artifact.md](references/artifact.md), [agreements.md](references/agreements.md),

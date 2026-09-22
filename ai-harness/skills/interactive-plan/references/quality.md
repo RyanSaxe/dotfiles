@@ -75,4 +75,4 @@ one.
 
 ## Sentences
 
-Every sentence on every page passes the list in [writing.md](writing.md).
+Every sentence on every page follows [writing.md](writing.md).
