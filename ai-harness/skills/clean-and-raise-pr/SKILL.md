@@ -17,19 +17,13 @@ a requirement is missing, tell the user what to install or upgrade and stop.
 
 ## Writing
 
-These rules apply to everything this skill writes: the brief, commit
-messages, the pull request body, and the final report.
+[writing.md](references/writing.md) covers every sentence this skill
+writes: the brief, the commit messages, the pull request body and the final
+report. Read it before the brief. Two rules sit here instead, because they
+are about this skill and not about sentences.
 
-- Write facts. Every sentence says what the change is, why it matters, how
-  to review it, or what was checked.
-- One idea per sentence. Say which function, which command, which number.
-  Write "the test asserts the first visible line", not "carefully tested".
-  When more than three things need listing, they go in the commit table or
-  a list, not into one sentence.
 - Do not describe the diff line by line, do not describe what you did during
   the session, and do not repeat the ask.
-- No hedging and no filler. Delete any sentence that could appear unchanged
-  in another pull request.
 - Do not write "not done", "not checked", or "I did not" lines. Do the work
   or leave the sentence out.
 
