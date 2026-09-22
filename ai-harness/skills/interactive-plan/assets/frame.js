@@ -194,7 +194,7 @@ function theme() {
     );
   for (const chart of charts.values())
     chart.setOption({
-      color: [color("--accent"), color("--muted")],
+      color: chartPalette(),
       ...chartTheme(chart.getOption()),
     });
   for (const viewer of diffs.values()) {
@@ -2023,6 +2023,31 @@ systemTheme.addEventListener("change", () => {
 
 /* Keys */
 document.addEventListener("keydown", (event) => {
+  /* Textareas keep Enter for newlines. Shift+Enter is the explicit submit
+     gesture for the two text actions a reviewer otherwise has to click. */
+  if (
+    event.key === "Enter" &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    editable
+  ) {
+    const area = event.target.closest("textarea");
+    const answer = area
+      ?.closest("[data-question]")
+      ?.querySelector("[data-answer]");
+    if (answer && !answer.disabled) {
+      event.preventDefault();
+      answer.click();
+      return;
+    }
+    if (area === $("note-text") && area.value.trim()) {
+      event.preventDefault();
+      $("note-form").requestSubmit();
+      return;
+    }
+  }
   if (mode === "preview" || event.metaKey || event.ctrlKey || event.altKey)
     return;
   if (event.key === "Escape") {
@@ -2080,6 +2105,7 @@ const libraries = {
   diffs: "https://esm.sh/@pierre/diffs@1.4.2?bundle",
   mermaid:
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
+  elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
   katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
   katexCss: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
   echarts: "https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js",
@@ -2088,6 +2114,8 @@ const scripts = new Map();
 let diffsTask;
 const color = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const chartPalette = () =>
+  ["--accent", "--attention", "--ok", "--danger", "--muted"].map(color);
 function script(url, integrity, css = false) {
   if (scripts.has(url)) return scripts.get(url);
   const task = new Promise((resolve, reject) => {
@@ -2202,15 +2230,18 @@ async function chart(element, options) {
   if (!element.isConnected) return null;
   let instance = charts.get(element);
   if (!instance) {
-    instance = window.echarts.init(element);
+    instance = window.echarts.init(element, null, { renderer: "svg" });
     charts.set(element, instance);
   }
-  instance.setOption({
-    backgroundColor: "transparent",
-    color: [color("--accent"), color("--muted")],
-    textStyle: { color: color("--ink") },
-    ...options,
-  });
+  instance.setOption(
+    {
+      backgroundColor: "transparent",
+      color: chartPalette(),
+      textStyle: { color: color("--ink") },
+      ...options,
+    },
+    true,
+  );
   instance.setOption(chartTheme(options));
   return instance;
 }

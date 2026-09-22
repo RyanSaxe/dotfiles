@@ -53,8 +53,9 @@ submitting anything, and each takes the focus on its own heading so no
 control is left ringed. Custom popups do the same and keep unsent text.
 Single keys, listed under `?`, move between sessions and pages, `j` and `k`
 choose the next and previous block so that `c` comments on it, and `s`
-focuses Submit so that Enter sends. Tab reaches the controls inside a block,
-so keep authored controls focusable.
+focuses Submit so that Enter sends. `Shift+Enter` in a question or feedback
+textarea activates its Answer or Add to feedback action. Tab reaches the
+controls inside a block, so keep authored controls focusable.
 
 ## Choices, comments, and answers
 
@@ -142,10 +143,12 @@ confirmed:".
 
 A code block, a formula, a diagram, a chart and a prototype are components,
 and the [component index](../components/index.md) states their markup and
-their attributes. The frame supplies what they share: the figure with its
-header, actions and caption; the pinned CDN locations and integrity values,
-so rendering needs a network connection; and the renderer error printed in
-place when one fails.
+their attributes. Mermaid diagrams use the ELK layout engine, inherit the
+current theme, and can link nodes to pages whose IDs match. ECharts uses its
+SVG renderer and the frame's theme palette. The frame supplies what they
+share: the figure with its header, actions and caption; the pinned CDN
+locations and integrity values, so rendering needs a network connection; and
+the renderer error printed in place when one fails.
 
 `planUI.chart` and `planUI.diff` stay frame interfaces, so a plan and a
 component reach the same renderer by the same name.

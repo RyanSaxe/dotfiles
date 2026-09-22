@@ -947,11 +947,102 @@ svg {
 .lightbox svg {
   display: block;
   height: auto;
+  width: var(--diagram-width, auto);
   max-width: none;
 }
 .renderer-error {
   color: var(--muted);
   font-size: 12px;
+}
+/* Mermaid's theme sets the basic geometry; these rules keep diagrams in the
+   plan's visual language and leave source-controlled classes useful. */
+:is([data-diagram], .lightbox) .node rect,
+:is([data-diagram], .lightbox) .node polygon {
+  rx: 10px;
+  ry: 10px;
+}
+:is([data-diagram], .lightbox) .node.marked > rect,
+:is([data-diagram], .lightbox) .node.marked > polygon {
+  fill: var(--attention-bg) !important;
+  stroke: var(--attention) !important;
+  stroke-width: 1.8px !important;
+}
+:is([data-diagram], .lightbox) .node.linked {
+  cursor: pointer;
+}
+:is([data-diagram], .lightbox) .node.linked:hover > rect,
+:is([data-diagram], .lightbox) .node.linked:hover > polygon,
+:is([data-diagram], .lightbox) .node.linked:focus > rect,
+:is([data-diagram], .lightbox) .node.linked:focus > polygon {
+  stroke: var(--accent) !important;
+}
+:is([data-diagram], .lightbox) .cluster rect {
+  fill: none !important;
+  stroke: var(--line) !important;
+  stroke-dasharray: 4 4;
+  rx: 12px;
+  ry: 12px;
+}
+:is([data-diagram], .lightbox) .cluster .nodeLabel {
+  font-size: 10px;
+  color: var(--muted);
+}
+:is([data-diagram], .lightbox) .flowchart-link,
+:is([data-diagram], .lightbox) .edgePath path {
+  stroke: var(--line-strong) !important;
+}
+:is([data-diagram], .lightbox) marker path {
+  fill: var(--line-strong) !important;
+  stroke: var(--line-strong) !important;
+}
+:is([data-diagram], .lightbox) .edgeLabel p {
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--panel) !important;
+}
+/* Mermaid measures labels outside the diagram, so these vocabulary rules are
+   intentionally global. */
+.title {
+  display: block;
+  font-weight: 600;
+}
+.path {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--muted) !important;
+  font:
+    10px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.delta {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.delta.add {
+  color: var(--ok) !important;
+}
+.delta.cut {
+  color: var(--danger) !important;
+}
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 99px;
+  color: var(--accent) !important;
+  background: var(--accent-soft);
+  font-size: 10px;
+  font-weight: 600;
+}
+.note {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted) !important;
+  font-size: 11px;
 }
 .figure {
   margin: 14px 0 18px;
