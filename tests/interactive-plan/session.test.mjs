@@ -1644,6 +1644,124 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
   assert.equal(connection.origin, `http://127.0.0.1:${next.port}`);
 });
 
+// A reviewer's screenshot arrives as bytes with no name and no type worth
+// trusting, so the hub decides both and writes the file itself.
+test("an image upload is decided by its bytes, capped, and named by the hub", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  const send = (body, headers = {}) =>
+    fetch(`${h.server.origin}${a.base}/api/upload`, {
+      method: "POST",
+      headers: { Origin: h.server.origin, ...headers },
+      body,
+    });
+  const pad = (magic, size = 64) =>
+    Buffer.concat([Buffer.from(magic), Buffer.alloc(size)]);
+  const png = pad([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const jpeg = pad([0xff, 0xd8, 0xff]);
+  const gif = pad([0x47, 0x49, 0x46, 0x38]);
+  const webp = Buffer.concat([
+    Buffer.from("RIFF"),
+    Buffer.alloc(4),
+    Buffer.from("WEBP"),
+    Buffer.alloc(64),
+  ]);
+
+  const accepted = await send(png);
+  const record = await accepted.json();
+  assert.equal(accepted.status, 201, record.error);
+  assert.equal(record.type, "image/png");
+  assert.equal(record.bytes, png.length);
+  assert.match(record.id, /^[0-9a-f]{16}$/);
+  // The hub names the file, so the caller never picks a path.
+  assert.equal(
+    record.path,
+    path.join(a.directory, "uploads", `${record.id}.png`),
+  );
+  assert.deepEqual(await fs.readFile(record.path), png);
+
+  for (const [bytes, type] of [
+    [jpeg, "image/jpeg"],
+    [gif, "image/gif"],
+    [webp, "image/webp"],
+  ])
+    assert.equal((await send(bytes).then((r) => r.json())).type, type);
+
+  // A HEIC from a phone, and a PNG signature that a name cannot fake.
+  const heic = Buffer.concat([
+    Buffer.alloc(4),
+    Buffer.from("ftypheic"),
+    Buffer.alloc(64),
+  ]);
+  const refused = await send(heic);
+  assert.equal(refused.status, 415);
+  assert.match((await refused.json()).error, /PNG, JPEG, WebP and GIF/);
+
+  const tooBig = await send(
+    Buffer.concat([png, Buffer.alloc(10 * 1024 * 1024)]),
+  );
+  assert.equal(tooBig.status, 413);
+  assert.match((await tooBig.json()).error, /10MB/);
+
+  assert.equal((await send(png, { Origin: "http://example.com" })).status, 403);
+
+  // One request is bounded and the session is not, so a long review never
+  // meets a ceiling.
+  for (let n = 0; n < 30; n++) assert.equal((await send(png)).status, 201);
+  assert.equal(
+    (await fs.readdir(path.join(a.directory, "uploads"))).length,
+    34,
+  );
+});
+
+test("a note carries its images by path, and removing one deletes the file", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  assert.equal((await a.action("publish", { html: artifact() })).code, 200);
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(64),
+  ]);
+  const stored = await fetch(`${h.server.origin}${a.base}/api/upload`, {
+    method: "POST",
+    headers: { Origin: h.server.origin },
+    body: png,
+  }).then((r) => r.json());
+
+  // A submission may only name an image this session holds.
+  const unknown = a.event("feedback-only", "1", {
+    attachments: [
+      { id: "0".repeat(16), path: "/tmp/x.png", type: "image/png", bytes: 1 },
+    ],
+  });
+  const rejected = await a.feedback(unknown);
+  assert.equal(rejected.code, 400);
+  assert.match(rejected.body.error, /not in this session/);
+
+  const event = a.event("feedback-only", "1", { attachments: [stored] });
+  assert.equal((await a.feedback(event)).code, 200);
+  // The agent reads the path, and the bytes are still on disk under it.
+  const delivered = (await a.action("read", { id: event.id })).body.event;
+  assert.deepEqual(delivered.payload.attachments, [stored]);
+  assert(await exists(stored.path));
+
+  const removed = await fetch(
+    `${h.server.origin}${a.base}/api/upload/${stored.id}`,
+    { method: "DELETE", headers: { Origin: h.server.origin } },
+  );
+  assert.equal(removed.status, 200);
+  assert.deepEqual(await removed.json(), { id: stored.id, removed: true });
+  assert.equal(await exists(stored.path), false);
+  // Removing the same image twice is not an error, so a retry is safe.
+  assert.deepEqual(
+    await fetch(`${h.server.origin}${a.base}/api/upload/${stored.id}`, {
+      method: "DELETE",
+      headers: { Origin: h.server.origin },
+    }).then((r) => r.json()),
+    { id: stored.id, removed: false },
+  );
+});
+
 test("the component fixture builds, so every component's markup stays valid", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-fixture-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
