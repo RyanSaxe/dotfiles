@@ -86,7 +86,8 @@ for answers.
 Every checklist travels with a submission, including lists on pages the
 user has not visited, so put checklist markup in the page HTML instead of
 adding it from a script. Authored `checked` attributes set the initial
-values; saved draft values take precedence. A list counts as one unsent
+values, and the scope-checklist component ships none, so what the agent
+reads is what the reviewer pressed; saved draft values take precedence. A list counts as one unsent
 item once the user has changed a box, even if they put it back. An
 untouched list is sent with `touched: false` and listed on Feedback as a
 default afterwards. An empty set means "None selected", not unanswered.
@@ -136,7 +137,23 @@ Use the renderer that matches the content. Load only what the page needs.
 | Charts and mathematical demonstrations | data-chart with an ECharts option object as JSON text                 | ECharts  |
 
 `data-file` on a code block adds a header with the file name, the language,
-and a Copy button. `data-caption` on code, diagrams, and charts adds a
+and a Copy button. Four more attributes name parts of what a figure holds:
+
+| Attribute    | On                | What the frame does with it                                                                                                        |
+| ------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| data-lines   | `[data-language]` | `"3-4"` or `"7"`. Numbers the lines, lights the range, and dims the rest until the pointer or the keyboard is on the block.        |
+| data-numbers | `[data-language]` | `"true"`. Numbers the lines and dims nothing.                                                                                      |
+| data-notes   | `[data-language]` | `[{"line": 3, "text": "…"}]`. A speech bubble in the gutter of each named line, opening the note in a popover. Needs no range.     |
+| data-terms   | `[data-math]`     | `[{"symbol": "t", "meaning": "…", "value": "8 s"}]`. Names the formula's coloured terms under it, in the order the colours appear. |
+
+A term takes its colour from a literal in the source, because KaTeX runs
+with no `trust` option and refuses `\htmlClass`: write
+`\textcolor{#1d4ed8}`, `\textcolor{#a16207}`, `\textcolor{#047857}` or
+`\textcolor{#9333ea}` and the frame swaps the literal for the class that
+follows the theme. Those four are a content palette, separate from
+`--accent`, `--ok`, `--attention` and `--danger`, which carry meaning in the
+chrome. A block that scrolls sideways fades its right edge while there is
+more to see. `data-caption` on code, diagrams, and charts adds a
 caption line. `data-title` on a chart adds a header. A diagram renders at
 its drawn size and scrolls sideways when it is wider than the column,
 shrinks to its column inside a side-by-side layout, and opens full size on
