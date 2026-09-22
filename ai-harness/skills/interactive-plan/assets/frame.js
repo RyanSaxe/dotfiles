@@ -735,6 +735,21 @@ function itemCard({ kind, key, item }) {
   text.textContent =
     kind === "choice" || kind === "list" ? choiceText(item) : item.text;
   body.append(text);
+  /* What the reviewer attached, where they check what they are about to
+     send. The hub still holds the bytes, so this is the same image the
+     agent will open. */
+  if (kind === "note" && item.attachments?.length) {
+    const strip = document.createElement("div");
+    strip.className = "note-images";
+    for (const image of item.attachments) {
+      const thumb = document.createElement("img");
+      thumb.src = `${base}/api/upload/${encodeURIComponent(image.id)}`;
+      thumb.alt = "";
+      thumb.className = "note-image";
+      strip.append(thumb);
+    }
+    body.append(strip);
+  }
   const topicExists =
     item.topic === "agreed" ? builtInAgreed : known.text.has(item.topic);
   if (item.topic !== "overall" && topicExists)

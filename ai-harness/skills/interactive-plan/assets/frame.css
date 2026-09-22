@@ -1250,12 +1250,18 @@ dialog::backdrop {
   background: var(--ground);
   line-height: 0;
 }
-.note-image img {
+.note-image img,
+img.note-image {
   display: block;
   width: auto;
   height: 72px;
   max-width: 160px;
   object-fit: cover;
+}
+/* On Feedback the thumbnail is the whole element, with no control on it. */
+img.note-image {
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 .note-image .icon-btn {
   position: absolute;
