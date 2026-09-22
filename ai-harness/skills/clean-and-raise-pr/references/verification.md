@@ -30,16 +30,19 @@ prove.
 
 Read the tests that cover the changed behavior as if reviewing them.
 
-Add a test when the changed behavior has none: the normal path, an important
-edge case, or a failure the caller sees. Test at the smallest level that
-proves the behavior without mocking the thing under test. Name the test
-after the behavior and the condition, so a failure says what stopped
-working.
+A test is worth keeping when it fails if the behavior breaks and survives a
+refactor that keeps the behavior. Both halves matter. A test that reaches
+into a private call sequence, or that pins a string, a format or generated
+output nobody promised, breaks on a rewrite that changed nothing and passes
+while the behavior rots.
 
-Delete a test when it asserts internal call order or incidental details,
-mocks the thing under test, duplicates a stronger test, or pins wording,
-formatting, or generated output that is not part of the behavior. Say why in
-the commit that removes it.
+Test the interface a caller uses, at the smallest level that proves the
+contract without replacing the real thing with a mock. Cover the smallest
+set of cases that separates the intended behavior from a plausible mistake.
+A test whose assertion is not obvious from reading it is a test to rewrite.
+
+Delete a test that is not worth keeping, and say why in the commit that
+removes it. Do not add a test because a file changed.
 
 When the change is documentation or configuration and the project has no
 test for it, the project's validators are its tests, and the body says how
