@@ -994,6 +994,10 @@ function feedbackText() {
         "Overall",
       ...(note.quote ? ["Selected passage: " + note.quote] : []),
       note.text,
+      /* The bytes stay in the session directory, so the text names the file
+         rather than carrying it. An export the reviewer mails on says the
+         same, which is the only way the paths travel with it. */
+      ...(note.attachments || []).map((item) => `Image: ${item.path}`),
     );
   const defaults = Object.values(state.choices).filter(
     (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
