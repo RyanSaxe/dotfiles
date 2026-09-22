@@ -6,6 +6,52 @@ import { fileURLToPath } from "node:url";
 import { artifactData } from "./session.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
+const componentRoot = fileURLToPath(new URL("../components/", import.meta.url));
+
+/** The component directories, sorted, so registration order is fixed. */
+async function componentNames(root) {
+  const entries = await fs
+    .readdir(root, { withFileTypes: true })
+    .catch(() => []);
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+/** One named file from every component that has it, in directory order. A
+    component that ships no behavior, or no styles, is skipped rather than
+    contributing an empty part. */
+async function componentParts(root, file, wrap) {
+  const names = await componentNames(root);
+  const parts = await Promise.all(
+    names.map(async (name) => {
+      const text = await fs
+        .readFile(path.join(root, name, file), "utf8")
+        .catch(() => "");
+      return text.trim() ? wrap(name, text.trim()) : "";
+    }),
+  );
+  return parts.filter(Boolean).join("\n");
+}
+
+const componentStyles = (root) =>
+  componentParts(
+    root,
+    "styles.css",
+    (name, text) => `/* components/${name}/styles.css */\n${text}`,
+  );
+
+/* Each behavior is evaluated in a block, so what a component declares at the
+   top of its file stays inside it and two components cannot collide over a
+   name. The frame's own helpers stay in scope, because the block is inside
+   the frame's module. */
+const componentBehaviors = (root) =>
+  componentParts(
+    root,
+    "behavior.mjs",
+    (name, text) => `/* components/${name}/behavior.mjs */\n{\n${text}\n}`,
+  );
 
 const attribute = (tag, name) => {
   const match = tag.match(new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`));
@@ -151,18 +197,34 @@ export async function assemble(data, { css = "", js = "" } = {}) {
     throw new Error(
       "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
     );
+  const [componentCss, componentJs] = await Promise.all([
+    componentStyles(componentRoot),
+    componentBehaviors(componentRoot),
+  ]);
   const html = shell
     .replace(
       "<!-- FRAME_STYLE -->",
-      // Plan CSS is scoped to the page's content, so a rule for body, :root,
-      // or h1 cannot restyle the frame.
-      () => `<style>\n${style}\n@scope (#page-content) {\n${css}\n}\n</style>`,
+      // The cascade ranks an unlayered rule above every layered one, so the
+      // frame takes a layer of its own rather than staying outside them. A
+      // component rule then beats a plan rule of any specificity, and a plan
+      // that means it can still say !important.
+      // Plan and component CSS are scoped to the page's content, so a rule
+      // for body, :root, or h1 cannot restyle the frame.
+      () =>
+        `<style>\n@layer frame, plan, components;\n@layer frame {\n${style}\n}\n` +
+        `@scope (#page-content) {\n@layer plan {\n${css}\n}\n` +
+        `@layer components {\n${componentCss}\n}\n}\n</style>`,
     )
-    .replace("<!-- CUSTOM_SCRIPT -->", () => `<script>\n${js}\n</script>`)
     .replace(
       "<!-- FRAME_SCRIPT -->",
       () =>
-        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n</script>`,
+        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n${componentJs}\n</script>`,
+    )
+    // A module, and after the frame's, so the plan's own script sees planUI
+    // and can register a component of its own before the first page renders.
+    .replace(
+      "<!-- CUSTOM_SCRIPT -->",
+      () => `<script type="module">\n${js}\n</script>`,
     )
     .replace(
       /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,

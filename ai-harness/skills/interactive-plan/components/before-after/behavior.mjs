@@ -1,5 +1,8 @@
-window.addEventListener("plan:page", ({ detail: { element, page } }) => {
-  element.querySelectorAll(".change-review").forEach((root, index) => {
+/* The diff viewer over a before-and-after pair. planUI.diff owns the
+   renderer; this reads the pair out of the page and remembers the layout. */
+planUI.define("before-after", {
+  match: ".change-review",
+  setup(root, { page, planUI }) {
     const viewer = root.querySelector(".change-view");
     const error = root.querySelector("[data-diff-error]");
     const buttons = root.querySelectorAll("[data-diff-style]");
@@ -14,8 +17,15 @@ window.addEventListener("plan:page", ({ detail: { element, page } }) => {
       name.textContent = root.dataset.file;
       controls.prepend(name);
     }
-    const prefs = window.planUI?.prefs;
-    const key = `diff:${page.id}/${root.id || index}`;
+    const prefs = planUI.prefs;
+    // The element's own ID, so two diffs on a page keep separate layouts.
+    // A diff with no ID falls back to its position among the page's diffs.
+    const name =
+      root.id ||
+      [...root.closest("#page-content").querySelectorAll(".change-review")]
+        .indexOf(root)
+        .toString();
+    const key = `diff:${page.id}/${name}`;
     // Split needs room for two columns; below 900px the unified view reads
     // better. A click on the toggle overrides and is remembered per diff.
     const automatic = () =>
@@ -39,7 +49,7 @@ window.addEventListener("plan:page", ({ detail: { element, page } }) => {
     const render = async (diffStyle) => {
       style = diffStyle;
       try {
-        await window.planUI.diff(viewer, input, { diffStyle });
+        await planUI.diff(viewer, input, { diffStyle });
         for (const button of buttons)
           button.setAttribute(
             "aria-pressed",
@@ -60,5 +70,5 @@ window.addEventListener("plan:page", ({ detail: { element, page } }) => {
       const next = automatic();
       if (next !== style) render(next);
     }).observe(root);
-  });
+  },
 });

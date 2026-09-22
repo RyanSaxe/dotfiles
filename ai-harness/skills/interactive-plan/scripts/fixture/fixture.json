@@ -3,16 +3,22 @@
   "revision": "1",
   "kind": "exploration",
   "title": "Component fixture",
-  "css": "fixture.css",
-  "js": "fixture.js",
   "pages": [
-    { "id": "decisions", "title": "Decisions", "file": "p-decisions.html" },
+    {
+      "id": "decisions",
+      "title": "Decisions",
+      "file": "p-decisions.html"
+    },
     {
       "id": "comparison",
       "title": "Comparison and lists",
       "file": "p-comparison.html"
     },
-    { "id": "figures", "title": "Figures", "file": "p-figures.html" }
+    {
+      "id": "figures",
+      "title": "Figures",
+      "file": "p-figures.html"
+    }
   ],
   "prototypes": [
     {

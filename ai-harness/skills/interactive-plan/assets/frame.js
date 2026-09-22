@@ -2646,6 +2646,9 @@ function start() {
     setInterval(pollSessions, 5000);
   } else review();
 }
-if (document.readyState === "loading")
-  window.addEventListener("DOMContentLoaded", start, { once: true });
-else start();
+/* A module runs once the document is parsed, so readyState is "interactive"
+   by this line and DOMContentLoaded is still ahead. That event is the point
+   where every deferred script has run, this module's component blocks and
+   the plan's module included. */
+if (document.readyState === "complete") start();
+else window.addEventListener("DOMContentLoaded", start, { once: true });

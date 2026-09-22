@@ -14,12 +14,42 @@ const data = {
   pages: [{ id: "p", title: "P", html: "<p>x</p>" }],
 };
 
-test("plan CSS is scoped to the page content", async () => {
+test("plan CSS is scoped to the page content, under the plan layer", async () => {
   const html = await assemble(data, { css: "body{background:red}" });
+  assert.match(html, /@layer frame, plan, components;/);
   assert.match(
     html,
-    /@scope \(#page-content\) \{\nbody\{background:red\}\n\}\n<\/style>/,
+    /@scope \(#page-content\) \{\n@layer plan \{\nbody\{background:red\}\n\}/,
   );
+});
+
+// The cascade ranks an unlayered rule above every layered one, so an
+// unlayered frame.css would outrank both other layers.
+test("frame CSS is layered, and the component layer comes last", async () => {
+  const html = await assemble(data);
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  assert.match(style, /@layer frame \{\n:root \{/);
+  assert.ok(
+    style.indexOf("@layer plan {") < style.indexOf("@layer components {"),
+    "the plan layer is written before the component layer",
+  );
+});
+
+test("a component's styles and behavior are bundled", async () => {
+  const html = await assemble(data);
+  assert.match(html, /\/\* components\/question\/styles\.css \*\//);
+  assert.match(html, /\/\* components\/question\/behavior\.mjs \*\//);
+  assert.match(html, /planUI\.define\("question"/);
+});
+
+// A plan's script runs after the frame's module, so planUI.define is
+// available to it before the first page renders.
+test("the plan's script is the last module in the document", async () => {
+  const html = await assemble(data, { js: 'planUI.define("mine", {});' });
+  const modules = html.split('<script type="module">').slice(1);
+  assert.equal(modules.length, 2, "the frame's module and the plan's");
+  assert.match(modules[0], /planUI\.define\("question"/);
+  assert.match(modules[1], /^\nplanUI\.define\("mine", \{\}\);\n<\/script>/);
 });
 
 test("a closing style tag in plan CSS is refused", async () => {
@@ -163,8 +193,6 @@ test("the component fixture builds", async (t) => {
       path.join(here, "fixture", entry),
       path.join(work, entry),
     );
-  await fs.writeFile(path.join(work, "fixture.css"), "");
-  await fs.writeFile(path.join(work, "fixture.js"), "");
   const html = await build(path.join(work, "fixture.json"));
   assert.match(html, /id="plan-data"/);
 });
