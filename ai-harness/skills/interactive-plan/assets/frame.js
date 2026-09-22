@@ -2178,47 +2178,53 @@ async function renderCode(element) {
     failed(element, error);
   }
 }
+/* Mermaid keeps one global configuration and one id counter, so diagrams
+   render one after another on a single chain rather than in parallel. */
+function renderDiagram(element) {
+  element.dataset.source ||= element.textContent;
+  diagramSequence = diagramSequence
+    .catch(() => {})
+    .then(async () => {
+      try {
+        if (!element.isConnected) return;
+        mermaidTask ||= import(libraries.mermaid);
+        const { default: mermaid } = await mermaidTask;
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: "base",
+          themeVariables: {
+            primaryColor: color("--ground"),
+            primaryTextColor: color("--ink"),
+            primaryBorderColor: color("--line-strong"),
+            lineColor: color("--muted"),
+            fontFamily: "sans-serif",
+          },
+          flowchart: {
+            nodeSpacing: 28,
+            rankSpacing: 36,
+            padding: 12,
+            subGraphTitleMargin: { top: 8, bottom: 8 },
+          },
+        });
+        const result = await mermaid.render(
+          "diagram-" + uuid(),
+          element.dataset.source,
+        );
+        if (!element.isConnected) return;
+        element.innerHTML = result.svg;
+        const width = element.querySelector("svg")?.viewBox?.baseVal?.width;
+        if (width) element.style.setProperty("--diagram-width", `${width}px`);
+      } catch (error) {
+        failed(element, error);
+      }
+    });
+  return diagramSequence;
+}
 function renderDiagrams(root) {
-  for (const element of root.querySelectorAll("[data-diagram]")) {
-    element.dataset.source ||= element.textContent;
-    diagramSequence = diagramSequence
-      .catch(() => {})
-      .then(async () => {
-        try {
-          if (!element.isConnected) return;
-          mermaidTask ||= import(libraries.mermaid);
-          const { default: mermaid } = await mermaidTask;
-          mermaid.initialize({
-            startOnLoad: false,
-            securityLevel: "strict",
-            theme: "base",
-            themeVariables: {
-              primaryColor: color("--ground"),
-              primaryTextColor: color("--ink"),
-              primaryBorderColor: color("--line-strong"),
-              lineColor: color("--muted"),
-              fontFamily: "sans-serif",
-            },
-            flowchart: {
-              nodeSpacing: 28,
-              rankSpacing: 36,
-              padding: 12,
-              subGraphTitleMargin: { top: 8, bottom: 8 },
-            },
-          });
-          const result = await mermaid.render(
-            "diagram-" + uuid(),
-            element.dataset.source,
-          );
-          if (!element.isConnected) return;
-          element.innerHTML = result.svg;
-          const width = element.querySelector("svg")?.viewBox?.baseVal?.width;
-          if (width) element.style.setProperty("--diagram-width", `${width}px`);
-        } catch (error) {
-          failed(element, error);
-        }
-      });
-  }
+  for (const element of root.querySelectorAll("[data-diagram]"))
+    renderDiagram(element);
+  return diagramSequence;
 }
 /* KaTeX runs with no trust option, so \htmlClass is refused and a colour
    has to be a literal in the source. The literal is swapped for a class
@@ -2394,16 +2400,41 @@ function prototypeUrl(prototype) {
     return `${base}/r/${encodeURIComponent(plan.revision)}/prototype/${encodeURIComponent(prototype.id)}`;
   return URL.createObjectURL(new Blob([prototype.html], { type: "text/html" }));
 }
+/* Components. A component is a named markup contract and the setup that
+   turns an element carrying it into the rendered thing. define() records
+   one; enhance() runs every registration over a page. A page renders by
+   replacing #page-content, so setup runs again on every visit and rebuilds
+   its state from planUI.prefs rather than holding it. */
+const registry = new Map();
+function define(name, { match, setup }) {
+  registry.set(name, { match, setup });
+}
+/* One component's failure prints in place and leaves the rest of the page
+   rendered. A setup that returns a promise is tracked, so the scroll
+   position is restored only once its content has its height. */
 function enhance(root) {
-  root.querySelectorAll("[data-prototype]").forEach((mount) => {
-    if (mount.querySelector("iframe")) return;
+  for (const [name, { match, setup }] of registry) {
+    for (const element of root.querySelectorAll(match)) {
+      if (element.dataset.ready === name) continue;
+      element.dataset.ready = name;
+      try {
+        const task = setup(element, { page, planUI: window.planUI });
+        if (task instanceof Promise)
+          track(task).catch((error) => failed(element, error));
+      } catch (error) {
+        failed(element, error);
+      }
+    }
+  }
+}
+
+define("prototype", {
+  match: "[data-prototype]",
+  setup(mount) {
     const prototype = plan.prototypes?.find(
       (item) => item.id === mount.dataset.prototype,
     );
-    if (!prototype) {
-      failed(mount, Error("Prototype unavailable."));
-      return;
-    }
+    if (!prototype) throw Error("Prototype unavailable.");
     const frame = document.createElement("iframe");
     frame.title = prototype.title;
     frame.className = "approved-prototype";
@@ -2444,8 +2475,12 @@ function enhance(root) {
       kind: "prototype",
     });
     wrapper.append(details);
-  });
-  root.querySelectorAll("[data-language]").forEach((element) => {
+  },
+});
+
+define("code", {
+  match: "[data-language]",
+  setup(element) {
     if (element.dataset.file !== undefined || element.dataset.caption) {
       const meta = document.createElement("span");
       meta.textContent = element.dataset.language;
@@ -2459,45 +2494,49 @@ function enhance(root) {
         kind: "code",
       });
     }
-    track(renderCode(element));
-  });
-  root
-    .querySelectorAll("[data-math]")
-    .forEach((element) => track(renderMath(element)));
-  root
-    .querySelectorAll("[data-diagram][data-caption]")
-    .forEach((element) =>
-      figure(element, { caption: element.dataset.caption, kind: "diagram" }),
-    );
-  renderDiagrams(root);
-  track(diagramSequence);
-  root.querySelectorAll("[data-chart]").forEach((element) => {
-    try {
-      const options = JSON.parse(element.textContent);
-      element.textContent = "";
-      if (element.dataset.title || element.dataset.caption)
-        figure(element, {
-          title: element.dataset.title,
-          caption: element.dataset.caption,
-          kind: "chart",
-        });
-      track(chart(element, options)).catch((error) => {
-        element.textContent = JSON.stringify(options, null, 2);
-        failed(element, error);
+    return renderCode(element);
+  },
+});
+
+define("formula", {
+  match: "[data-math]",
+  setup: (element) => renderMath(element),
+});
+
+define("diagram", {
+  match: "[data-diagram]",
+  setup(element) {
+    if (element.dataset.caption)
+      figure(element, { caption: element.dataset.caption, kind: "diagram" });
+    return renderDiagram(element);
+  },
+});
+
+define("chart", {
+  match: "[data-chart]",
+  setup(element) {
+    const options = JSON.parse(element.textContent);
+    element.textContent = "";
+    if (element.dataset.title || element.dataset.caption)
+      figure(element, {
+        title: element.dataset.title,
+        caption: element.dataset.caption,
+        kind: "chart",
       });
-    } catch (error) {
+    return chart(element, options).catch((error) => {
+      element.textContent = JSON.stringify(options, null, 2);
       failed(element, error);
-    }
-  });
-}
+    });
+  },
+});
 new ResizeObserver(() => {
   for (const instance of charts.values()) instance.resize();
 }).observe($("page-content"));
 window.planUI = {
   chart,
+  define,
   diff,
-  comment: (anchor, quote = "") =>
-    codeNote(page.id, anchor, quote, null, null, null),
+  comment: (anchor, quote = "") => openNote(page.id, anchor, quote),
   enhance,
   prefs,
   mode,
@@ -2545,57 +2584,68 @@ placeNavigation();
 if (editable) initializeChecklists();
 theme();
 renderRevisions();
-let resume = null;
-try {
-  resume = JSON.parse(sessionStorage.getItem(resumeKey));
-  sessionStorage.removeItem(resumeKey);
-} catch {
-  /* Start at the top. */
-}
-let place = null;
-try {
-  place = usablePlace(
-    JSON.parse(localStorage.getItem(placeKey)),
-    plan.revision,
-    [...pages.map((item) => item.id), ...(editable ? ["feedback"] : [])],
-  );
-} catch {
-  /* Start at the top. */
-}
-const opened = location.hash.slice(1) || query.get("target");
-show(
-  resume?.first ? pages[0].id : location.hash.slice(1) || place?.page || "",
-  query.get("target"),
-  {
-    keepScroll: false,
-    push: false,
-  },
-);
-// The browser restores the old scroll position after the reload; a new
-// revision starts at the top.
-if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
-else if (place?.top && !opened)
-  // The page is short until the renderers finish, and the browser clamps a
-  // scroll past the end, so the offset is restored after they settle.
-  Promise.allSettled([...renders]).then(() =>
-    scroller().scrollTo(0, place.top),
-  );
-window.addEventListener("popstate", () => {
-  const url = new URL(location.href);
-  show(url.hash.slice(1) || plan.pages[0].id, url.searchParams.get("target"), {
-    push: false,
-  });
-});
-if (mode === "preview" && query.get("quote")) {
-  const range = findText($("page-content"), query.get("quote"));
-  if (range) {
-    highlight("plan-preview", [range]);
-    range.startContainer.parentElement?.scrollIntoView({ block: "center" });
+/* The first page renders once every component has registered. Component
+   behaviors are bundled after this file and the plan's script is a module
+   of its own, so both run while the document is still loading and both are
+   done by DOMContentLoaded. */
+function start() {
+  let resume = null;
+  try {
+    resume = JSON.parse(sessionStorage.getItem(resumeKey));
+    sessionStorage.removeItem(resumeKey);
+  } catch {
+    /* Start at the top. */
   }
+  let place = null;
+  try {
+    place = usablePlace(
+      JSON.parse(localStorage.getItem(placeKey)),
+      plan.revision,
+      [...pages.map((item) => item.id), ...(editable ? ["feedback"] : [])],
+    );
+  } catch {
+    /* Start at the top. */
+  }
+  const opened = location.hash.slice(1) || query.get("target");
+  show(
+    resume?.first ? pages[0].id : location.hash.slice(1) || place?.page || "",
+    query.get("target"),
+    {
+      keepScroll: false,
+      push: false,
+    },
+  );
+  // The browser restores the old scroll position after the reload; a new
+  // revision starts at the top.
+  if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
+  else if (place?.top && !opened)
+    // The page is short until the renderers finish, and the browser clamps a
+    // scroll past the end, so the offset is restored after they settle.
+    Promise.allSettled([...renders]).then(() =>
+      scroller().scrollTo(0, place.top),
+    );
+  window.addEventListener("popstate", () => {
+    const url = new URL(location.href);
+    show(
+      url.hash.slice(1) || plan.pages[0].id,
+      url.searchParams.get("target"),
+      { push: false },
+    );
+  });
+  if (mode === "preview" && query.get("quote")) {
+    const range = findText($("page-content"), query.get("quote"));
+    if (range) {
+      highlight("plan-preview", [range]);
+      range.startContainer.parentElement?.scrollIntoView({ block: "center" });
+    }
+  }
+  if (online && mode !== "preview") {
+    poll();
+    setInterval(poll, 1500);
+    pollSessions();
+    setInterval(pollSessions, 5000);
+  } else review();
 }
-if (online && mode !== "preview") {
-  poll();
-  setInterval(poll, 1500);
-  pollSessions();
-  setInterval(pollSessions, 5000);
-} else review();
+if (document.readyState === "loading")
+  window.addEventListener("DOMContentLoaded", start, { once: true });
+else start();
