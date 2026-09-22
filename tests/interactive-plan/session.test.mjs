@@ -1643,3 +1643,31 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
   assert.equal(connection.sessionId, started.sessionId);
   assert.equal(connection.origin, `http://127.0.0.1:${next.port}`);
 });
+
+test("the component fixture builds, so every component's markup stays valid", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-fixture-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const output = path.join(directory, "fixture.html");
+  await exec(process.execPath, [
+    path.join(
+      root,
+      "ai-harness/skills/interactive-plan/scripts/fixture/build.mjs",
+    ),
+    output,
+  ]);
+  // The fixture is the one place every component is rendered with real
+  // content, so a structural mistake in it is a mistake in a component:
+  // build.mjs refuses duplicate control IDs, a missing data-label, a
+  // decision with one option, and an option label over 24 characters.
+  const pages = artifactData(await fs.readFile(output, "utf8")).pages;
+  const html = pages.map((page) => page.html).join("");
+  for (const attribute of [
+    'data-choice="retry"',
+    'data-multiselect="scope"',
+    'data-question="threshold"',
+    'data-lines="3-4"',
+    "data-notes=",
+    "data-terms=",
+  ])
+    assert.ok(html.includes(attribute), `fixture lost ${attribute}`);
+});

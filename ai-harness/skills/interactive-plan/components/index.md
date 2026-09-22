@@ -7,15 +7,15 @@ replace its content and IDs. Concatenate the styles and behaviors you use
 into the artifact's `css` and `js` files. There is no registration step.
 A plan-local component works the same way.
 
-| Directory                                      | Use                                        | Content and interaction                                                                                                                         |
-| ---------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| [decision](decision/markup.html)               | Two to five text options                   | Radio-style rows; each row is the `data-value` button with a title, an optional Recommended tag, and one line of consequence.                   |
-| [visual-decision](visual-decision/markup.html) | Options that each need a visual            | Option articles with a header, one line, and a figure. Tabs, which the reviewer can toggle to side by side. Include its styles and behavior.    |
-| [question](question/markup.html)               | An open answer the agent needs             | A card with the Question tag, the question, why it matters, and a textarea. The answer travels with feedback as `groups.answers`.               |
-| [comparison](comparison/markup.html)           | Two or three options with matched sections | Repeat the option article; matching sections align across options. Selection uses the `data-choice` and `data-value` buttons.                   |
-| [before-after](before-after/markup.html)       | A proposed change                          | The text viewer for code, or the visual pair for diagrams; not both by default.                                                                 |
-| [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. The frame records the whole list, including untouched and empty selections. |
-| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section. Keep each ID in its contextual comment label; Revise opens the comment dialog at that case.                            |
+| Directory                                      | Use                                        | Content and interaction                                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [decision](decision/markup.html)               | Two to five text options                   | Radio-style rows; each row is the `data-value` button with a title, an optional Recommended tag, and one line of consequence.                                             |
+| [visual-decision](visual-decision/markup.html) | Options that each need a visual            | Option articles with a header, one line, and a figure. Tabs, which the reviewer can toggle to side by side. Include its styles and behavior.                              |
+| [question](question/markup.html)               | An open answer the agent needs             | A card with the Question tag, the question, why it matters, a textarea and an Answer button. The answer travels with feedback as `groups.answers`.                        |
+| [comparison](comparison/markup.html)           | Two or three options with matched sections | Repeat the option article; matching sections align across options. Selection uses the `data-choice` and `data-value` buttons.                                             |
+| [before-after](before-after/markup.html)       | A proposed change                          | The text viewer for code, or the visual pair for diagrams; not both by default.                                                                                           |
+| [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. Nothing starts checked. The frame records the whole list, including untouched and empty selections.   |
+| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section, with the When and Then labels that show under 700px. Keep each ID in its contextual comment label; Revise opens the comment dialog at that case. |
 
 A component that is not built from those attributes sets `data-kind` on its
 root, a singular noun that follows "this", so the comment control names it
@@ -23,8 +23,10 @@ without the frame knowing the component.
 
 Code, diagrams, and charts need no component. The frame renders them as
 figures from `data-file`, `data-caption`, and `data-title`; see
-[frame.md](../references/frame.md). Notes on the text are frame
-behavior.
+[frame.md](../references/frame.md). A code block also takes `data-lines`
+for a focused range, `data-numbers` for the numbers alone, and
+`data-notes` for a note on a line, and a formula takes `data-terms` to
+name its coloured terms. Notes on the text are frame behavior.
 
 ## Decisions
 
@@ -45,10 +47,22 @@ records its choice on Agreed.
 
 Use a question when the answer is prose, not a selection. Keep it to one
 sentence and say what the answer decides. Empty answers are not sent.
+The card carries an Answer button: pressing it shows the answered state
+with the text in place and an Edit button, and the frame records the text
+on every keystroke either way, so an answer that was never marked done
+still travels with the round.
 Answers appear on Feedback as their own items and can be cited as
 agreement sources with kind `answer`. Remove the question in the revision
 that records the answer on Agreed; a question that stays gets answered
 again.
+
+## Checklists
+
+A checklist arrives with nothing checked. Mark the items the plan
+recommends with the `Recommended` tag and keep the count line above the
+rows; the behavior updates it. Do not ship a checked box: a box the
+reviewer never pressed is what made agreement and silence arrive at the
+agent as the same thing.
 
 ## Matched sections
 
@@ -57,7 +71,10 @@ The comparison aligns matching sections across options. Set
 the header and the footer, or use `data-layout="independent"` when the
 options have different structures. Columns stack when they no longer fit.
 Keep the selection button separate from links, charts, and other
-interactive content inside an option.
+interactive content inside an option. Every option needs the same number
+of children for the rows to line up; an option that has nothing to say in
+a section keeps the section and marks it `class="comparison-content empty"`
+with one line saying so.
 
 ## Before and after
 

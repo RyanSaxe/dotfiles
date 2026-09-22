@@ -13,6 +13,7 @@
   C["Checkout"] --> P["PaymentClient"] --> S["Envoy sidecar"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
   <article class="visual-option" data-value="gateway" data-label="At the gateway"><header>At the gateway</header><p>Central state; every service pays the extra hop.</p><figure><div data-diagram>flowchart LR
   C["Checkout"] --> P["PaymentClient"] --> A["API gateway + breaker"] --> G["Gateway"] --> L["Ledger"] --> N["Notifier"]</div></figure></article>
+  <article class="visual-option" data-value="none" data-label="No breaker"><header>No breaker</header><p>Every gateway blip reaches the customer, and there is nothing to draw.</p></article>
 </section>
 <section class="visual-decision" data-choice="handler" data-label="Handler shape">
   <h3>What does the charge handler look like?</h3>
@@ -45,9 +46,11 @@ app.post("/charge", async (req, res) =&gt; {
   <article class="visual-option" data-value="dot" data-label="Dot"><header>Dot</header><p>Smallest; needs a hover to name the state.</p><figure><div style="padding:14px;text-align:center"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--ok);vertical-align:middle"></span> <span style="color:var(--muted)">gateway</span></div></figure></article>
   <article class="visual-option" data-value="row" data-label="Status row"><header>Status row</header><p>Names every breaker; takes a line each.</p><figure><div style="padding:10px 14px;font-size:12.5px"><div>gateway <b style="color:var(--ok)">closed</b></div><div>ledger <b style="color:var(--attention)">half-open</b></div></div></figure></article>
 </section>
-<section class="question" data-question="threshold" data-label="Breaker threshold">
+<section class="question" data-question="threshold" data-label="Breaker threshold" data-state="open">
   <span class="tag">Question</span>
   <h3>How many consecutive failures should open the breaker?</h3>
   <p class="question-why">The number sets how long a gateway outage keeps failing checkouts before the fast error kicks in.</p>
-  <textarea rows="3" placeholder="Type your answer…" aria-label="Your answer"></textarea>
+  <textarea rows="2" placeholder="Type your answer…" aria-label="Your answer"></textarea>
+  <p class="answer-text" hidden></p>
+  <div class="answer-actions"><button type="button" class="btn primary" data-answer disabled>Answer</button><button type="button" class="btn" data-edit hidden>Edit</button></div>
 </section>
