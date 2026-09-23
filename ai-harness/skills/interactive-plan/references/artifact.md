@@ -12,7 +12,7 @@ The output filename must not exist yet. Use the temp directory for scratch
 files. A sandbox can write there. `publish --source DIR` copies the source to
 `src/<revision>/` inside the session, and the next round starts from that
 copy. The publisher writes artifacts to `artifacts/` and refuses a revision
-that already exists there. The builder puts the frame and the authored
+number already used in the session. The builder puts the frame and the authored
 content into one HTML file. It does not bundle
 imports or linked files, so embed every local resource the plan needs. Do
 not install packages to author a plan.

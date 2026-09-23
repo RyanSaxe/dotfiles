@@ -47,7 +47,9 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html --sourc
 
 `publish` stores the artifact as `<artifactId>.<revision>.html` in the
 session's `artifacts/` directory, using the values embedded in the artifact.
-It refuses a revision that already exists, so build in the temp directory.
+It refuses any revision number already used in the session, even when another
+artifact used it, so build in the temp directory and continue the session's
+revision sequence.
 `--source DIR` copies the directory used to build the artifact to
 `src/<revision>/` in the session before publishing. The
 `status.current.source` field contains that path. Keep old revisions so

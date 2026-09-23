@@ -547,6 +547,17 @@ async function loadSession(directory, config, origin) {
     }
     const name = `${artifact.artifactId}.${artifact.revision}.html`;
     const file = path.join(directory, "artifacts", name);
+    /* One flat revision space per session: /r/ and src/
+       carry no artifact, so a second artifact continues the sequence rather
+       than restarting it. */
+    const taken = (state.revisions || []).find(
+      (item) => item.revision === artifact.revision,
+    );
+    requireValue(
+      !taken,
+      `Revision ${artifact.revision} is already used in this session by artifact "${taken?.artifactId}". A new artifact continues the session's sequence.`,
+      409,
+    );
     requireValue(
       !(await exists(file)),
       "Artifact revision already exists; choose a new revision",
