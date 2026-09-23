@@ -1096,7 +1096,9 @@ svg {
   > :last-child {
   margin-bottom: 0;
 }
-/* A figure that fills a slot drops its own frame and takes the slot's. */
+/* A figure in a slot keeps its border and its radius. Flattening it made the
+   same block look like two different things depending on where it sat, and
+   the slot's own padding is what separates it from the card. */
 :is(
     .visual-option > figure,
     .comparison-content,
@@ -1105,8 +1107,6 @@ svg {
   )
   > .figure {
   margin: 0;
-  border: 0;
-  border-radius: 0;
 }
 .figure-head {
   display: flex;
