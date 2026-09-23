@@ -53,8 +53,9 @@ submitting anything, and each takes the focus on its own heading so no
 control is left ringed. Custom popups do the same and keep unsent text.
 Single keys, listed under `?`, move between sessions and pages, `j` and `k`
 choose the next and previous block so that `c` comments on it, and `s`
-focuses Submit so that Enter sends. Tab reaches the controls inside a block,
-so keep authored controls focusable.
+focuses Submit so that Enter sends. `Shift+Enter` in a question or feedback
+textarea activates its Answer or Add to feedback action. Tab reaches the
+controls inside a block, so keep authored controls focusable.
 
 ## Choices, comments, and answers
 
@@ -78,12 +79,13 @@ so keep authored controls focusable.
 | planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                                                                                                                                        |
 | planUI.mode                          | live, readonly, or preview.                                                                                                                                                                                                                        |
 
-Choice clicks, checklist changes, and typed answers update the local
-draft. Only Submit sends it. Keep control IDs and labels the same across
-revisions. Group IDs must be unique within a page across all kinds, and
-option IDs within a group. Use native buttons for single choices, native
-labeled checkboxes for checklists, and a textarea inside `data-question`
-for answers.
+Choice clicks, checklist changes, and typing in a question update the local
+draft. Pressing Answer creates the recorded answer; editing it leaves that
+record unchanged until Answer is pressed again. Only Submit sends recorded
+items. Keep control IDs and labels the same across revisions. Group IDs must
+be unique within a page across all kinds, and option IDs within a group. Use
+native buttons for single choices, native labeled checkboxes for checklists,
+and a textarea inside `data-question` for answers.
 
 Include every checklist in a submission, including lists on pages the user
 has not visited. Put checklist markup in the page HTML instead of adding it
@@ -126,20 +128,28 @@ Feedback page groups items by page and includes edit, remove and the
 overall comment. Submit, at the right of the header, sends everything unsent
 at once and displays the count while items wait. Sent items stay listed
 as sent until the next revision. An item whose page or text no longer exists
-is listed under the revision it came from. A submission includes
-`groups.choices` (checklists with `touched`), `groups.notes` and, when
-present, `groups.answers` keyed `page/question` with `label`, `text`, and
-`topic`. Its text lists untouched checklists after "Defaults, not
+is listed under the revision it came from. A note takes images. Paste a
+screenshot, drop a file on the dialog, or use Add an image; each one uploads
+and appears as a thumbnail the reviewer can drop again. A note carries the
+reference and not the bytes, so the draft in the browser stays small and the
+file stays in the session. Closing the dialog without saving deletes what it
+uploaded, and removing a note deletes the images it named. A submission
+includes
+`groups.choices` (checklists with `touched`), `groups.notes` with any
+`attachments`, and, when present, `groups.answers` keyed `page/question`
+with `label`, `text`, and `topic`. Its text lists untouched checklists after "Defaults, not
 confirmed:".
 
 ## Figures and renderers
 
 A code block, a formula, a diagram, a chart and a prototype are components,
 and the [component index](../components/index.md) states their markup and
-their attributes. The frame supplies what they share: the figure with its
-header, actions and caption; the pinned CDN locations and integrity values,
-so rendering needs a network connection; and the renderer error printed in
-place when one fails.
+their attributes. Mermaid diagrams use the ELK layout engine, inherit the
+current theme, and can link nodes to pages whose IDs match. ECharts uses its
+SVG renderer and the frame's theme palette. The frame supplies what they
+share: the figure with its header, actions and caption; the pinned CDN
+locations and integrity values, so rendering needs a network connection; and
+the renderer error printed in place when one fails.
 
 `planUI.chart` and `planUI.diff` stay frame interfaces, so a plan and a
 component reach the same renderer by the same name.

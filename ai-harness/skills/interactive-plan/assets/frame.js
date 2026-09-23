@@ -194,7 +194,7 @@ function theme() {
     );
   for (const chart of charts.values())
     chart.setOption({
-      color: [color("--accent"), color("--muted")],
+      color: chartPalette(),
       ...chartTheme(chart.getOption()),
     });
   for (const viewer of diffs.values()) {
@@ -483,6 +483,13 @@ function openNote(
   $("note-text").value =
     state.noteDrafts?.[noteDraftKey] ??
     (id ? state.notes.find((note) => note.id === id).text : "");
+  settleNoteImages();
+  noteImages = id
+    ? [...(state.notes.find((note) => note.id === id)?.attachments || [])]
+    : [];
+  noteImagesAtOpen = noteImages.map((item) => item.id);
+  drawNoteImages();
+  imageError("");
   $("note-title").textContent = id ? "Edit note" : "Add note";
   $("note-form").querySelector('[type="submit"]').textContent = id
     ? "Save changes"
@@ -728,6 +735,21 @@ function itemCard({ kind, key, item }) {
   text.textContent =
     kind === "choice" || kind === "list" ? choiceText(item) : item.text;
   body.append(text);
+  /* What the reviewer attached, where they check what they are about to
+     send. The hub still holds the bytes, so this is the same image the
+     agent will open. */
+  if (kind === "note" && item.attachments?.length) {
+    const strip = document.createElement("div");
+    strip.className = "note-images";
+    for (const image of item.attachments) {
+      const thumb = document.createElement("img");
+      thumb.src = `${base}/api/upload/${encodeURIComponent(image.id)}`;
+      thumb.alt = "";
+      thumb.className = "note-image";
+      strip.append(thumb);
+    }
+    body.append(strip);
+  }
   const topicExists =
     item.topic === "agreed" ? builtInAgreed : known.text.has(item.topic);
   if (item.topic !== "overall" && topicExists)
@@ -762,6 +784,7 @@ function itemCard({ kind, key, item }) {
         ),
       );
       action("Remove", () => {
+        forgetImages(item.attachments);
         state.notes = state.notes.filter((note) => note.id !== item.id);
         save();
         if (item.topic === page.id) show(page.id, null, { keepScroll: true });
@@ -986,6 +1009,10 @@ function feedbackText() {
         "Overall",
       ...(note.quote ? ["Selected passage: " + note.quote] : []),
       note.text,
+      /* The bytes stay in the session directory, so the text names the file
+         rather than carrying it. An export the reviewer mails on says the
+         same, which is the only way the paths travel with it. */
+      ...(note.attachments || []).map((item) => `Image: ${item.path}`),
     );
   const defaults = Object.values(state.choices).filter(
     (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
@@ -1350,11 +1377,6 @@ function renderSessions() {
     close.className = "icon-btn session-dismiss";
     close.setAttribute("aria-label", `Close ${entry.title}`);
     close.textContent = "✕";
-    close.onclick = async (event) => {
-      event.stopPropagation();
-      await fetch(`${entry.url}api/dismiss`, { method: "POST" });
-      await poll();
-    };
     const words = document.createElement("span");
     words.className = "words";
     const state = document.createElement("em");
@@ -1373,7 +1395,28 @@ function renderSessions() {
     const line = document.createElement("div");
     line.className = "session-line";
     line.append(row);
-    if (!current) line.append(close);
+    if (!current) {
+      line.append(close);
+      close.onclick = async (event) => {
+        event.stopPropagation();
+        /* Two round trips, a dismiss and a poll, so the row says it is going
+           before either starts. Without it a slow hub looks like a dead
+           control. */
+        close.disabled = true;
+        line.dataset.closing = "true";
+        try {
+          const response = await fetch(`${entry.url}api/dismiss`, {
+            method: "POST",
+          });
+          if (!response.ok) throw Error();
+          await poll();
+        } catch {
+          delete line.dataset.closing;
+          close.disabled = false;
+          state.textContent = "Could not close";
+        }
+      };
+    }
     list.append(line);
   }
 }
@@ -1533,11 +1576,122 @@ function restoreChoices() {
 function restoreAnswers() {
   document.querySelectorAll("[data-question] textarea").forEach((area) => {
     const group = area.closest("[data-question]");
-    area.value =
-      state.answers[page.id + "/" + group.dataset.question]?.text ?? "";
+    const key = page.id + "/" + group.dataset.question;
+    area.value = state.drafts?.[key] ?? state.answers[key]?.text ?? "";
     area.readOnly = !editable;
   });
 }
+
+/* Images on a note. A screenshot pasted from the clipboard has no filename
+   and no path, and a file dropped from Finder arrives as a File the browser
+   will not give a path for, so the bytes go to the hub and it writes the
+   file. What comes back is a reference, which is what the note and the
+   draft carry; localStorage holds about 5MB and would not survive bytes. */
+let noteImages = [];
+let noteImagesAtOpen = [];
+let noteImagesSaved = false;
+const imageTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+function drawNoteImages() {
+  const box = $("note-images");
+  box.replaceChildren();
+  box.hidden = !noteImages.length;
+  for (const item of noteImages) {
+    const figure = document.createElement("figure");
+    figure.className = "note-image";
+    const image = document.createElement("img");
+    image.src = `${base}/api/upload/${encodeURIComponent(item.id)}`;
+    image.alt = "";
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.className = "icon-btn";
+    drop.textContent = "✕";
+    drop.setAttribute("aria-label", "Remove this image");
+    drop.onclick = () => {
+      noteImages = noteImages.filter((held) => held.id !== item.id);
+      forgetImages([item]);
+      drawNoteImages();
+    };
+    figure.append(image, drop);
+    box.append(figure);
+  }
+}
+function imageError(message) {
+  const line = $("note-image-error");
+  line.textContent = message;
+  line.hidden = !message;
+}
+/* Paste, drop and the picker all arrive here. */
+async function attach(files) {
+  const images = [...files].filter((file) => imageTypes.includes(file.type));
+  if (!images.length) {
+    imageError("Attach a PNG, JPEG, WebP or GIF.");
+    return;
+  }
+  imageError("");
+  for (const file of images) {
+    try {
+      const response = await fetch(`${base}/api/upload`, {
+        method: "POST",
+        body: file,
+      });
+      const record = await response.json();
+      if (!response.ok) throw Error(record.error || "Upload failed.");
+      noteImages.push(record);
+      drawNoteImages();
+    } catch (error) {
+      imageError(error.message);
+    }
+  }
+}
+/* A note the reviewer dropped takes its images with it, so the session does
+   not keep bytes nothing refers to. */
+function forgetImages(items) {
+  for (const item of items || [])
+    fetch(`${base}/api/upload/${encodeURIComponent(item.id)}`, {
+      method: "DELETE",
+    }).catch(() => {});
+}
+/* A dialog the reviewer abandoned drops what it uploaded, so the session
+   never keeps bytes no note refers to. This runs when the dialog is closed
+   by its own control and again before the next one opens, rather than on
+   the dialog's close event, which a note saved by Escape would also raise
+   and which this frame cannot observe. */
+function settleNoteImages() {
+  if (!noteImagesSaved)
+    forgetImages(
+      noteImages.filter((item) => !noteImagesAtOpen.includes(item.id)),
+    );
+  noteImages = [];
+  noteImagesAtOpen = [];
+  noteImagesSaved = false;
+}
+$("note-image-pick").onclick = () => $("note-image-input").click();
+$("note-image-input").onchange = (event) => {
+  attach(event.target.files);
+  event.target.value = "";
+};
+$("note-dialog").addEventListener("paste", (event) => {
+  const files = [...event.clipboardData.items]
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  if (!files.length) return;
+  event.preventDefault();
+  attach(files);
+});
+for (const type of ["dragover", "dragenter"])
+  $("note-dialog").addEventListener(type, (event) => {
+    event.preventDefault();
+    $("note-dialog").classList.add("dropping");
+  });
+for (const type of ["dragleave", "drop"])
+  $("note-dialog").addEventListener(type, (event) => {
+    event.preventDefault();
+    if (type === "dragleave" && $("note-dialog").contains(event.relatedTarget))
+      return;
+    $("note-dialog").classList.remove("dropping");
+    if (type === "drop") attach(event.dataTransfer.files);
+  });
 
 $("note-form").onsubmit = (event) => {
   event.preventDefault();
@@ -1548,6 +1702,7 @@ $("note-form").onsubmit = (event) => {
     id: editing || uuid(),
     text,
     revision: plan.revision,
+    ...(noteImages.length ? { attachments: noteImages } : {}),
   };
   if (editing)
     state.notes = state.notes.map((item) =>
@@ -1555,6 +1710,7 @@ $("note-form").onsubmit = (event) => {
     );
   else state.notes.push(note);
   if (state.noteDrafts) delete state.noteDrafts[noteDraftKey];
+  noteImagesSaved = true;
   save();
   $("note-dialog").close();
   if (note.topic === page.id && !$("reading").hidden)
@@ -1636,7 +1792,10 @@ document.querySelectorAll("[data-accept-mode]").forEach(
 window.addEventListener("blur", closeMenus);
 document.addEventListener("click", (event) => {
   const close = event.target.closest("[data-close]");
-  if (close) $(close.dataset.close).close();
+  if (close) {
+    if (close.dataset.close === "note-dialog") settleNoteImages();
+    $(close.dataset.close).close();
+  }
   const navigation = event.target.closest("[data-page]");
   if (navigation) {
     event.preventDefault();
@@ -1706,15 +1865,9 @@ document.addEventListener("input", (event) => {
   if (!area || !$("page-content").contains(area)) return;
   const group = area.closest("[data-question]");
   const key = page.id + "/" + group.dataset.question;
-  if (area.value.trim())
-    state.answers[key] = {
-      topic: page.id,
-      label: group.dataset.label || group.dataset.question,
-      text: area.value,
-      target: group.id,
-      revision: plan.revision,
-    };
-  else delete state.answers[key];
+  state.drafts ||= {};
+  if (area.value.trim()) state.drafts[key] = area.value;
+  else delete state.drafts[key];
   clearTimeout(answerTimer);
   answerTimer = setTimeout(save, 300);
 });
@@ -1880,6 +2033,31 @@ systemTheme.addEventListener("change", () => {
 
 /* Keys */
 document.addEventListener("keydown", (event) => {
+  /* Textareas keep Enter for newlines. Shift+Enter is the explicit submit
+     gesture for the two text actions a reviewer otherwise has to click. */
+  if (
+    event.key === "Enter" &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    editable
+  ) {
+    const area = event.target.closest("textarea");
+    const answer = area
+      ?.closest("[data-question]")
+      ?.querySelector("[data-answer]");
+    if (answer && !answer.disabled) {
+      event.preventDefault();
+      answer.click();
+      return;
+    }
+    if (area === $("note-text") && area.value.trim()) {
+      event.preventDefault();
+      $("note-form").requestSubmit();
+      return;
+    }
+  }
   if (mode === "preview" || event.metaKey || event.ctrlKey || event.altKey)
     return;
   if (event.key === "Escape") {
@@ -1937,6 +2115,7 @@ const libraries = {
   diffs: "https://esm.sh/@pierre/diffs@1.4.2?bundle",
   mermaid:
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
+  elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
   katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
   katexCss: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
   echarts: "https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js",
@@ -1945,6 +2124,8 @@ const scripts = new Map();
 let diffsTask;
 const color = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const chartPalette = () =>
+  ["--accent", "--attention", "--ok", "--danger", "--muted"].map(color);
 function script(url, integrity, css = false) {
   if (scripts.has(url)) return scripts.get(url);
   const task = new Promise((resolve, reject) => {
@@ -2059,15 +2240,18 @@ async function chart(element, options) {
   if (!element.isConnected) return null;
   let instance = charts.get(element);
   if (!instance) {
-    instance = window.echarts.init(element);
+    instance = window.echarts.init(element, null, { renderer: "svg" });
     charts.set(element, instance);
   }
-  instance.setOption({
-    backgroundColor: "transparent",
-    color: [color("--accent"), color("--muted")],
-    textStyle: { color: color("--ink") },
-    ...options,
-  });
+  instance.setOption(
+    {
+      backgroundColor: "transparent",
+      color: chartPalette(),
+      textStyle: { color: color("--ink") },
+      ...options,
+    },
+    true,
+  );
   instance.setOption(chartTheme(options));
   return instance;
 }
@@ -2142,6 +2326,19 @@ new ResizeObserver(() => {
   for (const instance of charts.values()) instance.resize();
 }).observe($("page-content"));
 window.planUI = {
+  answer(id, text, label, target) {
+    const key = page.id + "/" + id;
+    if (text.trim())
+      state.answers[key] = {
+        topic: page.id,
+        label: label || id,
+        text,
+        target,
+        revision: plan.revision,
+      };
+    else delete state.answers[key];
+    save();
+  },
   chart,
   define,
   diff,

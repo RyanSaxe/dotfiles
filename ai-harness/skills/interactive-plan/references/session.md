@@ -47,7 +47,9 @@ node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html --sourc
 
 `publish` stores the artifact as `<artifactId>.<revision>.html` in the
 session's `artifacts/` directory, using the values embedded in the artifact.
-It refuses a revision that already exists, so build in the temp directory.
+It refuses any revision number already used in the session, even when another
+artifact used it, so build in the temp directory and continue the session's
+revision sequence.
 `--source DIR` copies the directory used to build the artifact to
 `src/<revision>/` in the session before publishing. The
 `status.current.source` field contains that path. Keep old revisions so
@@ -126,8 +128,18 @@ Under `$XDG_STATE_HOME/interactive-plan/`, the hub stores `hub/hub.json`
 register sessions) and `hub/hub.log`. Each session lives in `sessions/<id>/`
 with `status.json`, `connection.json` (`sessionId`, hub `origin`, the agent
 token, and the wake target, all private to the agent), `artifacts/`,
-`feedback/`, and `acceptance.json` after acceptance. Sessions never share
-acknowledgements or submissions.
+`feedback/`, `uploads/`, and `acceptance.json` after acceptance. Sessions
+never share acknowledgements or submissions.
+
+`uploads/` holds the images a reviewer attached to a note. The hub decides
+each file's type from its leading bytes, takes PNG, JPEG, WebP and GIF, and
+refuses anything else, so an extension cannot make a file something it is
+not. It caps one request at 10MB and names the file itself, which is why a
+caller never chooses a path. A note names an image by `id`, `path`, `type`
+and `bytes` under `attachments`, and the submission's text repeats the path,
+so an exported JSON file names the images it cannot carry. `read` hands the
+agent those paths; the file is on disk and the agent opens it. Closing a
+session takes its images with it.
 
 `status.json` records `title`, `kind`, `revisions`, `progress`, `wake`, and
 `paused` next to the stage. `pause` sets `paused` and leaves the stage as it

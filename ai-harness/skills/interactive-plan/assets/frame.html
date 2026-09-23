@@ -254,10 +254,31 @@
         </div>
         <p class="small" id="note-anchor"></p>
         <blockquote id="note-quote" hidden></blockquote>
-        <label for="note-text">Feedback</label
-        ><textarea id="note-text" required></textarea>
-        <div class="row actions-right">
-          <button type="submit" class="btn primary">Add to feedback</button>
+        <label for="note-text">Feedback</label>
+        <div class="note-field">
+          <textarea id="note-text" required></textarea>
+        </div>
+        <div class="note-images" id="note-images" hidden></div>
+        <p class="renderer-error" id="note-image-error" hidden></p>
+        <div class="row note-actions">
+          <button class="btn quiet" type="button" id="note-image-pick">
+            Add an image
+          </button>
+          <input
+            type="file"
+            id="note-image-input"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            hidden
+          />
+          <span class="spacer"></span>
+          <button
+            type="submit"
+            class="btn primary"
+            aria-keyshortcuts="Shift+Enter"
+          >
+            Add to feedback
+          </button>
         </div>
       </form>
     </dialog>
@@ -330,6 +351,8 @@
         <dd>Review your feedback</dd>
         <dt><kbd>s</kbd></dt>
         <dd>Focus Submit; Enter sends</dd>
+        <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt>
+        <dd>Answer a question or add feedback from its textarea</dd>
         <dt><kbd>a</kbd></dt>
         <dd>Open Agreed</dd>
         <dt><kbd>Esc</kbd></dt>
