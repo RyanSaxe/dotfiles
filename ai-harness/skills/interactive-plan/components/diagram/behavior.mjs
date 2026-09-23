@@ -8,6 +8,11 @@ function renderDiagram(element) {
   diagramSequence = diagramSequence
     .catch(() => {})
     .then(async () => {
+      /* Mermaid renders into a container of its own named after the render
+         id. It removes that container when the render succeeds and leaves it
+         attached to the body when the source does not parse, where it draws
+         a full-width error graphic outside the app. */
+      const id = "diagram-" + uuid();
       try {
         if (!element.isConnected) return;
         mermaidTask ||= (async () => {
@@ -42,10 +47,7 @@ function renderDiagram(element) {
             htmlLabels: true,
           },
         });
-        const result = await mermaid.render(
-          "diagram-" + uuid(),
-          element.dataset.source,
-        );
+        const result = await mermaid.render(id, element.dataset.source);
         if (!element.isConnected) return;
         element.innerHTML = result.svg;
         const width = element.querySelector("svg")?.viewBox?.baseVal?.width;
@@ -53,6 +55,8 @@ function renderDiagram(element) {
         linkNodes(element);
       } catch (error) {
         failed(element, error);
+      } finally {
+        document.getElementById("d" + id)?.remove();
       }
     });
   return diagramSequence;
