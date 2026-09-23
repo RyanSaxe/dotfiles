@@ -1620,6 +1620,10 @@ body.is-working .quote-button {
      the dialog's own close instead. */
   padding-right: 8px;
 }
+.session-line[data-closing] {
+  opacity: 0.45;
+  pointer-events: none;
+}
 .session-dismiss {
   flex: none;
 }

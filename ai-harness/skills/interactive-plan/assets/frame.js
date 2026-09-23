@@ -1377,11 +1377,6 @@ function renderSessions() {
     close.className = "icon-btn session-dismiss";
     close.setAttribute("aria-label", `Close ${entry.title}`);
     close.textContent = "✕";
-    close.onclick = async (event) => {
-      event.stopPropagation();
-      await fetch(`${entry.url}api/dismiss`, { method: "POST" });
-      await poll();
-    };
     const words = document.createElement("span");
     words.className = "words";
     const state = document.createElement("em");
@@ -1400,7 +1395,28 @@ function renderSessions() {
     const line = document.createElement("div");
     line.className = "session-line";
     line.append(row);
-    if (!current) line.append(close);
+    if (!current) {
+      line.append(close);
+      close.onclick = async (event) => {
+        event.stopPropagation();
+        /* Two round trips, a dismiss and a poll, so the row says it is going
+           before either starts. Without it a slow hub looks like a dead
+           control. */
+        close.disabled = true;
+        line.dataset.closing = "true";
+        try {
+          const response = await fetch(`${entry.url}api/dismiss`, {
+            method: "POST",
+          });
+          if (!response.ok) throw Error();
+          await poll();
+        } catch {
+          delete line.dataset.closing;
+          close.disabled = false;
+          state.textContent = "Could not close";
+        }
+      };
+    }
     list.append(line);
   }
 }
