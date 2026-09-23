@@ -39,7 +39,33 @@ accepts any local client when `COPILOT_CONNECTION_TOKEN` is unset.
 
 ## Publishing
 
-Write a complete artifact, publish it, and end the turn:
+Publish either a complete artifact or, for a multi-page plan, a work set:
+
+For a multi-page plan, publish a work set as soon as its complete candidate
+artifact assembles. `Agreed so far` is ready immediately; the other declared
+pages begin pending, so the reviewer can read and comment on ready pages while
+the remaining pages are prepared:
+
+```sh
+node scripts/session.mjs start-workset --session-dir PATH --source SOURCE.json
+node scripts/build.mjs SOURCE.json PAGE.json --page PAGE_ID
+node scripts/session.mjs publish-page --session-dir PATH \
+  --workset-id WORKSET_ID --file PAGE.json
+```
+
+`publish-page` checks the candidate against the full work-set shell before it
+creates an immutable page record. Independent pages may be prepared together;
+their installation is serialized, and a page that fails its deterministic
+checks remains pending. If the optional browser runner is unavailable, the
+page is still reviewable with a visible unverified notice. The work-set URL
+returned by `start-workset` refreshes when another page becomes ready. Feedback
+can be drafted while pages are pending, but the hub accepts a submission only
+after every declared page is ready, and page feedback carries that page's
+immutable version.
+
+After every page is ready, publish the complete artifact as usual. The hub
+accepts it only when each page exactly matches the immutable page records and
+stores a manifest pinning those versions:
 
 ```sh
 node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html --source DIR
@@ -131,7 +157,10 @@ token, and the wake target, all private to the agent), `artifacts/`,
 `feedback/`, `uploads/`, and `acceptance.json` after acceptance. Sessions
 never share acknowledgements or submissions.
 
-`uploads/` holds the images a reviewer attached to a note. The hub decides
+`worksets/` holds the candidate artifact, immutable page records and rendered
+work-set view for an in-progress page-atomic revision. A final artifact keeps
+only its version manifest; its page records remain session-owned. `uploads/`
+holds the images a reviewer attached to a note. The hub decides
 each file's type from its leading bytes, takes PNG, JPEG, WebP and GIF, and
 refuses anything else, so an extension cannot make a file something it is
 not. It caps one request at 10MB and names the file itself, which is why a

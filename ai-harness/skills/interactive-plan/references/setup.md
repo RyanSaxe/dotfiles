@@ -43,6 +43,12 @@ Environment variables, all optional:
 | `INTERACTIVE_PLAN_PORT`         | 4747    | The hub's fixed port on 127.0.0.1. `0` asks the OS for a port (tests).  |
 | `INTERACTIVE_PLAN_HOST`         | unset   | An extra address to bind, such as a Tailscale IP, to review on a phone. |
 | `INTERACTIVE_PLAN_IDLE_SECONDS` | 900     | Time with no live session after which the hub exits.                    |
+| `INTERACTIVE_PLAN_RENDER_CHECK` | bundled | Node script used to render-check a page before it becomes immutable.    |
+
+The bundled render check records its expected Playwright and Chromium versions
+in `scripts/render-check.version`. If that runner is unavailable, static
+checks still gate publication and the page is marked visibly unverified. A
+deterministic render failure leaves the page pending.
 
 Browser routes are unauthenticated, which is why the extra bind is opt in.
 Agent routes require the per-session bearer token on every interface.
