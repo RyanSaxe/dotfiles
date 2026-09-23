@@ -1233,6 +1233,58 @@ dialog::backdrop {
   pointer-events: none;
 }
 
+/* Images on a note: a strip of thumbnails the reviewer can drop one by one,
+   and a border the whole dialog takes while a file is over it. */
+.note-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.note-image {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--ground);
+  line-height: 0;
+}
+.note-image img,
+img.note-image {
+  display: block;
+  width: auto;
+  height: 72px;
+  max-width: 160px;
+  object-fit: cover;
+}
+/* On Feedback the thumbnail is the whole element, with no control on it. */
+img.note-image {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.note-image .icon-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1;
+}
+.note-actions {
+  margin-top: 10px;
+}
+.note-actions .spacer {
+  margin-left: auto;
+}
+.dialog.note.dropping {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
 /* Dialogs share one treatment; a long body scrolls inside. */
 .dialog {
   overflow: auto;

@@ -254,7 +254,7 @@ function serializer() {
 
 async function loadSession(directory, config, origin) {
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  for (const child of ["artifacts", "feedback"])
+  for (const child of ["artifacts", "feedback", "uploads"])
     await fs.mkdir(path.join(directory, child), {
       recursive: true,
       mode: 0o700,
@@ -342,6 +342,34 @@ async function loadSession(directory, config, origin) {
     await transition({ stage: "complete", dismissedAt: timestamp() });
     return { status: view() };
   }
+  /* The hub names every file, so a caller never chooses a path and a name
+     can never escape the uploads directory. */
+  async function upload(bytes) {
+    const kind = imageKind(bytes);
+    requireValue(kind, "Only PNG, JPEG, WebP and GIF images are accepted", 415);
+    const id = crypto.randomBytes(8).toString("hex");
+    const file = path.join(directory, "uploads", `${id}.${kind.ext}`);
+    await fs.writeFile(file, bytes, { mode: 0o600 });
+    return { id, path: file, type: kind.type, bytes: bytes.length };
+  }
+  async function readUpload(id) {
+    requireValue(/^[0-9a-f]{16}$/.test(id || ""), "Bad image ID", 404);
+    const held = await fs.readdir(path.join(directory, "uploads"));
+    const name = held.find((entry) => entry.startsWith(`${id}.`));
+    requireValue(name, "No such image", 404);
+    const bytes = await fs.readFile(path.join(directory, "uploads", name));
+    const kind = imageKind(bytes);
+    requireValue(kind, "No such image", 404);
+    return { bytes, type: kind.type };
+  }
+  /* A note the reviewer removed takes its images with it. */
+  async function removeUpload(id) {
+    requireValue(/^[0-9a-f]{16}$/.test(id || ""), "Bad image ID");
+    const held = await fs.readdir(path.join(directory, "uploads"));
+    const name = held.find((entry) => entry.startsWith(`${id}.`));
+    if (name) await fs.rm(path.join(directory, "uploads", name));
+    return { id, removed: Boolean(name) };
+  }
   async function submit(data) {
     requireValue(data.sessionId === state.sessionId, "Wrong session", 409);
     requireValue(
@@ -376,6 +404,37 @@ async function loadSession(directory, config, origin) {
             answer.text.trim(),
           "Answers require label, text, and topic",
         );
+    }
+    /* Images hang off the note they illustrate, and a note may only name an
+       image this session holds, so a submission cannot point the agent at a
+       path the hub never wrote. */
+    if (Array.isArray(data.groups.notes)) {
+      const held = new Set(
+        (await fs.readdir(path.join(directory, "uploads"))).map((name) =>
+          name.slice(0, name.indexOf(".")),
+        ),
+      );
+      for (const note of data.groups.notes) {
+        if (note?.attachments === undefined) continue;
+        requireValue(
+          Array.isArray(note.attachments),
+          "A note's attachments must be an array",
+        );
+        for (const item of note.attachments) {
+          requireValue(
+            item &&
+              typeof item.id === "string" &&
+              typeof item.path === "string" &&
+              typeof item.type === "string" &&
+              Number.isInteger(item.bytes),
+            "An attachment needs id, path, type and bytes",
+          );
+          requireValue(
+            held.has(item.id),
+            `Image ${item.id} is not in this session`,
+          );
+        }
+      }
     }
     const file = path.join(directory, "feedback", data.id + ".json");
     if (await exists(file)) {
@@ -747,6 +806,9 @@ async function loadSession(directory, config, origin) {
     exclusive,
     pending,
     submit,
+    upload,
+    readUpload,
+    removeUpload,
     dismiss,
     act,
     view,
@@ -755,6 +817,46 @@ async function loadSession(directory, config, origin) {
     setWake,
     revisionEntry,
   };
+}
+
+/* An image is identified by its leading bytes, not by a Content-Type a
+   caller sets or an extension a name carries. Anything else is refused, so
+   the hub never writes a file it could not name. */
+const signatures = [
+  {
+    type: "image/png",
+    ext: "png",
+    magic: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  },
+  { type: "image/jpeg", ext: "jpg", magic: [0xff, 0xd8, 0xff] },
+  { type: "image/gif", ext: "gif", magic: [0x47, 0x49, 0x46, 0x38] },
+];
+function imageKind(bytes) {
+  for (const entry of signatures)
+    if (entry.magic.every((byte, at) => bytes[at] === byte)) return entry;
+  // RIFF....WEBP: the four-byte size sits between the two markers.
+  if (
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString("latin1") === "RIFF" &&
+    bytes.subarray(8, 12).toString("latin1") === "WEBP"
+  )
+    return { type: "image/webp", ext: "webp" };
+  return null;
+}
+/* One request is bounded, the session is not, which is how every other
+   route here behaves: a publish takes 10MB and a session may hold any
+   number of revisions. A reviewer attaching screenshots should never meet
+   a ceiling mid-review. */
+const uploadBytes = 10 * 1024 * 1024;
+async function readBytes(req, limit) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    requireValue(size <= limit, "Image is over 10MB", 413);
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 async function readBody(req, limit) {
@@ -1145,6 +1247,52 @@ export async function startHub(config = settings()) {
             403,
           );
           return reply(200, await session.exclusive(() => session.dismiss()));
+        }
+        /* The hub is a local review tool. It binds 127.0.0.1 unless the
+           operator sets INTERACTIVE_PLAN_HOST, and browser routes carry no
+           token by design (see session.md), so the same-origin check is what
+           stands between a page in another tab and this session. This route
+           writes bytes, so it also caps the size and the count, decides the
+           type from the leading bytes rather than a header, and names the
+           file itself. */
+        if (method === "POST" && rest[0] === "api" && rest[1] === "upload") {
+          requireValue(
+            req.headers.origin === `http://${req.headers.host}`,
+            "Unauthorized source",
+            403,
+          );
+          const bytes = await readBytes(req, uploadBytes);
+          return reply(
+            201,
+            await session.exclusive(() => session.upload(bytes)),
+          );
+        }
+        /* The thumbnail in the note dialog, and the same image again after a
+           reload: the draft keeps a reference and the bytes stay here. */
+        if (
+          method === "GET" &&
+          rest[0] === "api" &&
+          rest[1] === "upload" &&
+          rest.length === 3
+        ) {
+          const image = await session.readUpload(rest[2]);
+          return reply(200, image.bytes, image.type);
+        }
+        if (
+          method === "DELETE" &&
+          rest[0] === "api" &&
+          rest[1] === "upload" &&
+          rest.length === 3
+        ) {
+          requireValue(
+            req.headers.origin === `http://${req.headers.host}`,
+            "Unauthorized source",
+            403,
+          );
+          return reply(
+            200,
+            await session.exclusive(() => session.removeUpload(rest[2])),
+          );
         }
         if (method === "POST" && rest[0] === "api" && rest[1] === "feedback") {
           requireValue(

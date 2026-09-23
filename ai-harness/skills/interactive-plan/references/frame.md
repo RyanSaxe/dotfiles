@@ -126,10 +126,16 @@ Feedback page groups items by page and includes edit, remove and the
 overall comment. Submit, at the right of the header, sends everything unsent
 at once and displays the count while items wait. Sent items stay listed
 as sent until the next revision. An item whose page or text no longer exists
-is listed under the revision it came from. A submission includes
-`groups.choices` (checklists with `touched`), `groups.notes` and, when
-present, `groups.answers` keyed `page/question` with `label`, `text`, and
-`topic`. Its text lists untouched checklists after "Defaults, not
+is listed under the revision it came from. A note takes images. Paste a
+screenshot, drop a file on the dialog, or use Add an image; each one uploads
+and appears as a thumbnail the reviewer can drop again. A note carries the
+reference and not the bytes, so the draft in the browser stays small and the
+file stays in the session. Closing the dialog without saving deletes what it
+uploaded, and removing a note deletes the images it named. A submission
+includes
+`groups.choices` (checklists with `touched`), `groups.notes` with any
+`attachments`, and, when present, `groups.answers` keyed `page/question`
+with `label`, `text`, and `topic`. Its text lists untouched checklists after "Defaults, not
 confirmed:".
 
 ## Figures and renderers
