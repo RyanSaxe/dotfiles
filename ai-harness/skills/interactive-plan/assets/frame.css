@@ -1328,7 +1328,7 @@ dialog::backdrop {
 }
 
 /* Images on a note: a strip of thumbnails the reviewer can drop one by one,
-   and a border the whole dialog takes while a file is over it. */
+   and a layer over the field while a file is over it. */
 .note-images {
   display: flex;
   flex-wrap: wrap;
@@ -1375,9 +1375,21 @@ img.note-image {
 .note-actions .spacer {
   margin-left: auto;
 }
-.dialog.note.dropping {
-  outline: 2px dashed var(--accent);
-  outline-offset: -6px;
+.note-field {
+  position: relative;
+}
+.dialog.note.dropping .note-field::after {
+  content: "Drop to attach";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding-bottom: 7px;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 45%, transparent);
+  color: var(--accent);
+  font-weight: 600;
 }
 /* Dialogs share one treatment; a long body scrolls inside. */
 .dialog {

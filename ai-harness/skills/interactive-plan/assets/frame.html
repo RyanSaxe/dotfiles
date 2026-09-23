@@ -254,15 +254,16 @@
         </div>
         <p class="small" id="note-anchor"></p>
         <blockquote id="note-quote" hidden></blockquote>
-        <label for="note-text">Feedback</label
-        ><textarea id="note-text" required></textarea>
+        <label for="note-text">Feedback</label>
+        <div class="note-field">
+          <textarea id="note-text" required></textarea>
+        </div>
         <div class="note-images" id="note-images" hidden></div>
         <p class="renderer-error" id="note-image-error" hidden></p>
         <div class="row note-actions">
           <button class="btn quiet" type="button" id="note-image-pick">
             Add an image
           </button>
-          <span class="small" id="note-image-hint">or paste or drop one</span>
           <input
             type="file"
             id="note-image-input"
