@@ -312,6 +312,8 @@ kbd {
   height: 100dvh;
   max-width: 1160px;
   margin: 0 auto;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
 }
 .frame-header {
   flex: none;
@@ -343,7 +345,6 @@ kbd {
   min-height: 0;
   overflow-y: auto;
   background: var(--panel);
-  border-left: 1px solid var(--line);
   border-right: 1px solid var(--line);
 }
 .side-label {
@@ -414,7 +415,6 @@ main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   background: var(--panel);
-  border-right: 1px solid var(--line);
 }
 .bell {
   position: relative;
