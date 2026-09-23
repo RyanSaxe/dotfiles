@@ -1615,10 +1615,11 @@ body.is-working .quote-button {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
+  /* The list bleeds 8px so a row's background is wider than its text. The
+     control in the trailing column is not part of that, and lines up with
+     the dialog's own close instead. */
+  padding-right: 8px;
 }
 .session-dismiss {
-  width: 26px;
-  height: 26px;
   flex: none;
-  font-size: 12px;
 }
