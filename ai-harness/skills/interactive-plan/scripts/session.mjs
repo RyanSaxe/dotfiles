@@ -10,6 +10,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { choiceText } from "../assets/choices.mjs";
+import {
+  declareWorkset,
+  finalData,
+  manifestFor,
+  pageEntry,
+  pageVersion,
+  pageVersions,
+  readiness,
+  worksetData,
+} from "./workset.mjs";
 
 const here = fileURLToPath(import.meta.url);
 const round = path.resolve(path.dirname(here), "../references/round.md");
@@ -37,6 +47,11 @@ function requireValue(condition, message, code = 400) {
 async function atomic(file, value) {
   const temporary = `${file}.${crypto.randomUUID()}.tmp`;
   await fs.writeFile(temporary, json(value), { mode: 0o600 });
+  await fs.rename(temporary, file);
+}
+async function atomicText(file, value) {
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+  await fs.writeFile(temporary, value, { mode: 0o600 });
   await fs.rename(temporary, file);
 }
 function embedConfig(html, config) {
@@ -77,6 +92,9 @@ export function settings(env = process.env) {
     port,
     host: env.INTERACTIVE_PLAN_HOST || null,
     idleMs: seconds("INTERACTIVE_PLAN_IDLE_SECONDS", 900) * 1000,
+    renderCheck:
+      env.INTERACTIVE_PLAN_RENDER_CHECK ||
+      path.join(path.dirname(here), "render-check.mjs"),
   };
 }
 
@@ -218,6 +236,82 @@ export function artifactData(html) {
     );
     ids.add(page.id);
   }
+  if (data.workset !== undefined) {
+    const workset = data.workset;
+    requireValue(
+      workset &&
+        idPattern.test(workset.id || "") &&
+        typeof workset.title === "string" &&
+        Array.isArray(workset.declared),
+      "Invalid work-set metadata",
+    );
+    const slots = new Set();
+    for (const slot of workset.declared) {
+      requireValue(
+        slot &&
+          idPattern.test(slot.id || "") &&
+          !slots.has(slot.id) &&
+          Number.isInteger(slot.order) &&
+          ["pending", "ready"].includes(slot.state),
+        "Work-set page slots must be valid and unique",
+      );
+      slots.add(slot.id);
+      requireValue(
+        typeof slot.title === "string" && slot.title.trim(),
+        "Work-set page slots require titles",
+      );
+      if (slot.version !== undefined)
+        requireValue(
+          typeof slot.version === "string" && slot.version.trim(),
+          "Work-set page versions require IDs",
+        );
+      if (slot.renderVerified !== undefined)
+        requireValue(
+          typeof slot.renderVerified === "boolean",
+          "Work-set renderVerified must be boolean",
+        );
+    }
+    requireValue(
+      workset.declared.length > 0 &&
+        workset.declaredCount === workset.declared.length &&
+        workset.readyCount ===
+          workset.declared.filter((slot) => slot.state === "ready").length,
+      "Work-set counts do not match its slots",
+    );
+    requireValue(
+      workset.declared.some((slot) => slot.id === "agreed"),
+      "Work-set requires an Agreed page",
+    );
+    for (const page of data.pages)
+      requireValue(slots.has(page.id), "Work-set is missing a page slot");
+  }
+  if (data.manifest !== undefined) {
+    requireValue(
+      data.manifest &&
+        idPattern.test(data.manifest.worksetId || "") &&
+        Array.isArray(data.manifest.pages),
+      "Invalid revision manifest",
+    );
+    const manifestPages = new Set();
+    for (const entry of data.manifest.pages) {
+      requireValue(
+        entry &&
+          idPattern.test(entry.pageId || "") &&
+          typeof entry.version === "string" &&
+          entry.version.trim() &&
+          !manifestPages.has(entry.pageId),
+        "Revision manifest page entries must be valid and unique",
+      );
+      manifestPages.add(entry.pageId);
+    }
+    const pageIds = new Set(data.pages.map((page) => page.id));
+    requireValue(
+      manifestPages.size === pageIds.size + (pageIds.has("agreed") ? 0 : 1) &&
+        manifestPages.has("agreed") &&
+        [...pageIds].every((pageId) => manifestPages.has(pageId)),
+      "Revision manifest must pin every page and Agreed",
+    );
+  }
   for (const content of [...data.pages, ...(data.agreements || [])]) {
     for (const match of content.html.matchAll(
       /<[a-z][^>]*?\sdata-prototype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
@@ -254,7 +348,7 @@ function serializer() {
 
 async function loadSession(directory, config, origin) {
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  for (const child of ["artifacts", "feedback", "uploads"])
+  for (const child of ["artifacts", "feedback", "uploads", "worksets"])
     await fs.mkdir(path.join(directory, child), {
       recursive: true,
       mode: 0o700,
@@ -319,7 +413,265 @@ async function loadSession(directory, config, origin) {
   const sameArtifact = (event) =>
     state.current &&
     event.artifactId === state.current.artifactId &&
-    event.revision === state.current.revision;
+    event.revision === state.current.revision &&
+    (event.worksetId === undefined
+      ? !state.current.worksetId || state.current.viewKind !== "workset"
+      : event.worksetId === state.current.worksetId);
+  let builder;
+  const buildTools = async () => (builder ||= await import("./build.mjs"));
+  const worksetDirectory = (id) => path.join(directory, "worksets", id);
+  const worksetBaseFile = (id) => path.join(worksetDirectory(id), "base.json");
+  const worksetManifestFile = (id) =>
+    path.join(worksetDirectory(id), "manifest.json");
+  const worksetViewFile = (id) => path.join(worksetDirectory(id), "view.html");
+  const worksetPageFile = (id, version) =>
+    path.join(worksetDirectory(id), "pages", `${version}.json`);
+  async function worksetRecords(workset) {
+    const records = new Map();
+    for (const slot of workset.declared || []) {
+      if (!slot.version) continue;
+      const file = worksetPageFile(workset.id, slot.version);
+      const record = await read(file);
+      requireValue(
+        record.worksetId === workset.id &&
+          record.pageId === slot.id &&
+          record.version === slot.version,
+        "Work-set page record does not match its manifest",
+        409,
+      );
+      records.set(slot.id, record);
+    }
+    return records;
+  }
+  async function worksetView(workset, records) {
+    const baseData = await read(worksetBaseFile(workset.id));
+    try {
+      return await (
+        await buildTools()
+      ).assemble(worksetData(baseData, workset, records));
+    } catch (error) {
+      Object.assign(error, { statusCode: error.statusCode || 400 });
+      throw error;
+    }
+  }
+  async function renderCheck(file, pageId) {
+    return new Promise((resolve) => {
+      execFile(
+        process.execPath,
+        [config.renderCheck, "--file", file, "--page-id", pageId],
+        { timeout: 45_000, maxBuffer: 2_000_000 },
+        (error) =>
+          resolve(error ? (Number.isInteger(error.code) ? error.code : 2) : 0),
+      );
+    });
+  }
+  function currentWorkset() {
+    return state.current?.viewKind === "workset" ? state.workset : null;
+  }
+  async function startWorkset(artifact) {
+    requireValue(
+      artifact && typeof artifact === "object",
+      "Artifact data is required",
+    );
+    const { assemble } = await buildTools();
+    const validated = artifactData(await assemble(artifact));
+    requireValue(
+      !validated.workset,
+      "Start a work set from a complete artifact, not another work set",
+      409,
+    );
+    delete validated.manifest;
+    requireValue(!currentWorkset(), "A work set is already in progress", 409);
+    const workset = declareWorkset(validated);
+    const root = worksetDirectory(workset.id);
+    await fs.mkdir(path.join(root, "pages"), { recursive: true, mode: 0o700 });
+    await atomic(worksetBaseFile(workset.id), validated);
+    const agreed = {
+      worksetId: workset.id,
+      pageId: "agreed",
+      version: workset.declared[0].version,
+      title: workset.declared[0].title,
+      html: validated.pages.find((page) => page.id === "agreed")?.html || "",
+      renderVerified: true,
+      publishedAt: timestamp(),
+    };
+    await atomic(worksetPageFile(workset.id, agreed.version), agreed);
+    await atomic(worksetManifestFile(workset.id), {
+      worksetId: workset.id,
+      pages: pageVersions(workset),
+    });
+    const html = await worksetView(workset, new Map([["agreed", agreed]]));
+    await atomicText(worksetViewFile(workset.id), html);
+    const current = {
+      artifactId: validated.artifactId,
+      revision: validated.revision,
+      kind: validated.kind,
+      title: validated.title,
+      viewKind: "workset",
+      worksetId: workset.id,
+      path: worksetViewFile(workset.id),
+      url: `${base}/`,
+      sha256: crypto.createHash("sha256").update(html).digest("hex"),
+      publishedAt: timestamp(),
+    };
+    await transition({
+      stage: "working",
+      current,
+      workset,
+      title: current.title,
+      kind: current.kind,
+      accepted: null,
+      progress: null,
+    });
+    return { status: view(), url: origin + current.url, workset };
+  }
+  async function pageSnapshot(worksetId, candidate) {
+    const workset = currentWorkset();
+    requireValue(workset && workset.id === worksetId, "Unknown work set", 404);
+    requireValue(
+      candidate &&
+        candidate.pageId &&
+        typeof candidate.title === "string" &&
+        typeof candidate.html === "string",
+      "Page records require pageId, title and html",
+    );
+    const slot = pageEntry(workset, candidate.pageId);
+    requireValue(slot, "Page is not declared in this work set", 409);
+    requireValue(slot.state === "pending", "Page is already published", 409);
+    requireValue(
+      candidate.title === slot.title,
+      "Page title does not match its declaration",
+      409,
+    );
+    const records = await worksetRecords(workset);
+    const baseData = await read(worksetBaseFile(workset.id));
+    return {
+      workset,
+      records,
+      baseData,
+      candidate: { ...candidate },
+    };
+  }
+  async function installPage(prepared, renderVerified) {
+    const workset = currentWorkset();
+    requireValue(
+      workset && workset.id === prepared.workset.id,
+      "Unknown work set",
+      409,
+    );
+    const slot = pageEntry(workset, prepared.candidate.pageId);
+    requireValue(slot?.state === "pending", "Page is already published", 409);
+    const records = await worksetRecords(workset);
+    const baseData = await read(worksetBaseFile(workset.id));
+    const page = {
+      id: prepared.candidate.pageId,
+      title: prepared.candidate.title,
+      html: prepared.candidate.html,
+    };
+    const candidateData = worksetData(
+      baseData,
+      workset,
+      new Map([...records, [page.id, page]]),
+    );
+    try {
+      await (await buildTools()).assemble(candidateData);
+    } catch (error) {
+      Object.assign(error, { statusCode: error.statusCode || 400 });
+      throw error;
+    }
+    const record = {
+      worksetId: workset.id,
+      pageId: page.id,
+      version: pageVersion(),
+      title: page.title,
+      html: page.html,
+      renderVerified,
+      publishedAt: timestamp(),
+    };
+    await atomic(worksetPageFile(workset.id, record.version), record);
+    const next = {
+      ...workset,
+      declared: workset.declared.map((item) =>
+        item.id === record.pageId
+          ? {
+              ...item,
+              state: "ready",
+              version: record.version,
+              renderVerified,
+            }
+          : item,
+      ),
+      updatedAt: timestamp(),
+    };
+    next.readyCount = readiness(next).readyCount;
+    next.declaredCount = readiness(next).declaredCount;
+    await atomic(worksetManifestFile(workset.id), {
+      worksetId: next.id,
+      pages: pageVersions(next),
+    });
+    const nextRecords = new Map(records);
+    nextRecords.set(record.pageId, record);
+    const nextView = await worksetView(next, nextRecords);
+    await atomicText(worksetViewFile(workset.id), nextView);
+    const current = {
+      ...state.current,
+      path: worksetViewFile(workset.id),
+      sha256: crypto.createHash("sha256").update(nextView).digest("hex"),
+      updatedAt: timestamp(),
+    };
+    await transition({ workset: next, current, stage: "working" });
+    return {
+      status: view(),
+      page: record,
+      complete: readiness(next).complete,
+    };
+  }
+  async function publishPage(data) {
+    requireValue(data.sessionId === state.sessionId, "Wrong session", 409);
+    const prepared = await exclusive(() =>
+      pageSnapshot(data.worksetId, data.page),
+    );
+    const candidateData = worksetData(
+      prepared.baseData,
+      prepared.workset,
+      new Map([
+        ...prepared.records,
+        [
+          data.page.pageId,
+          {
+            id: data.page.pageId,
+            title: data.page.title,
+            html: data.page.html,
+          },
+        ],
+      ]),
+    );
+    let assembled;
+    try {
+      assembled = await (await buildTools()).assemble(candidateData);
+    } catch (error) {
+      Object.assign(error, { statusCode: error.statusCode || 400 });
+      throw error;
+    }
+    const temporary = path.join(
+      worksetDirectory(prepared.workset.id),
+      `candidate-${crypto.randomUUID()}.html`,
+    );
+    await atomicText(temporary, assembled);
+    let renderVerified = false;
+    try {
+      const result = await renderCheck(temporary, data.page.pageId);
+      requireValue(
+        result !== 1,
+        "The browser render check failed; the page remains pending",
+        422,
+      );
+      renderVerified = result === 0;
+    } finally {
+      await fs.rm(temporary, { force: true });
+    }
+    return exclusive(() => installPage(prepared, renderVerified));
+  }
   const needsYou = () =>
     Boolean(state.current) && ["ready", "updated"].includes(state.stage);
   const active = () => state.stage !== "complete" && !state.paused;
@@ -388,6 +740,41 @@ async function loadSession(directory, config, origin) {
         !Array.isArray(data.groups),
       "groups must be an object",
     );
+    const liveWorkset =
+      state.workset?.id === state.current?.worksetId ? state.workset : null;
+    if (data.worksetId !== undefined) {
+      requireValue(
+        data.worksetId === state.current?.worksetId,
+        "Feedback names a different work set",
+        409,
+      );
+      requireValue(
+        liveWorkset && readiness(liveWorkset).complete,
+        "Feedback cannot be submitted until every page is ready",
+        409,
+      );
+    }
+    const checkIdentity = (item) => {
+      if (!item || item.topic === "overall") return;
+      if (data.worksetId !== undefined)
+        requireValue(
+          typeof item.pageVersion === "string" && item.pageVersion.trim(),
+          "Page feedback requires an immutable page version",
+          409,
+        );
+      if (item.pageVersion === undefined) return;
+      requireValue(
+        data.worksetId === state.current?.worksetId &&
+          liveWorkset &&
+          pageEntry(liveWorkset, item.topic)?.version === item.pageVersion,
+        "Feedback does not identify the current page version",
+        409,
+      );
+    };
+    if (Array.isArray(data.groups.notes))
+      for (const note of data.groups.notes) checkIdentity(note);
+    for (const choice of Object.values(data.groups.choices || {}))
+      checkIdentity(choice);
     if (data.groups.answers !== undefined) {
       requireValue(
         data.groups.answers &&
@@ -404,6 +791,8 @@ async function loadSession(directory, config, origin) {
             answer.text.trim(),
           "Answers require label, text, and topic",
         );
+      for (const answer of Object.values(data.groups.answers))
+        checkIdentity(answer);
     }
     /* Images hang off the note they illustrate, and a note may only name an
        image this session holds, so a submission cannot point the agent at a
@@ -496,6 +885,31 @@ async function loadSession(directory, config, origin) {
       "Source must be a directory inside the session directory",
     );
     const artifact = artifactData(html);
+    if (state.current?.viewKind === "workset") {
+      const workset = state.workset;
+      requireValue(workset, "The current work set is missing", 409);
+      requireValue(
+        readiness(workset).complete,
+        "The final revision is not ready; publish every declared page first",
+        409,
+      );
+      const records = await worksetRecords(workset);
+      const expected = finalData(artifact, workset, records);
+      const candidates = new Map(artifact.pages.map((page) => [page.id, page]));
+      requireValue(
+        expected.pages.length === candidates.size &&
+          expected.pages.every(
+            (page) =>
+              candidates.get(page.id)?.title === page.title &&
+              candidates.get(page.id)?.html === page.html,
+          ),
+        "The final revision must use the exact published page versions",
+        409,
+      );
+      artifact.pages = expected.pages;
+      artifact.manifest = expected.manifest;
+      delete artifact.workset;
+    }
     const submissions = await events();
     for (const entry of artifact.agreements || []) {
       delete entry.sourceRecords;
@@ -575,14 +989,20 @@ async function loadSession(directory, config, origin) {
       (_, start, end) =>
         start + json(artifact).replaceAll("<", "\\u003c") + end,
     );
+    artifactData(stored);
     const temporary = file + ".tmp";
     await fs.writeFile(temporary, stored, { mode: 0o600, flag: "wx" });
     await fs.rename(temporary, file);
+    const completedWorkset =
+      state.current?.viewKind === "workset"
+        ? { ...state.workset, finalRevision: artifact.revision }
+        : state.workset;
     const current = {
       artifactId: artifact.artifactId,
       revision: artifact.revision,
       kind: artifact.kind,
       title: artifact.title,
+      ...(completedWorkset ? { worksetId: completedWorkset.id } : {}),
       path: file,
       url: base + "/",
       sha256: crypto.createHash("sha256").update(stored).digest("hex"),
@@ -605,6 +1025,7 @@ async function loadSession(directory, config, origin) {
       current,
       title: current.title,
       kind: current.kind,
+      workset: completedWorkset,
       revisions,
       accepted: null,
       progress: null,
@@ -653,6 +1074,7 @@ async function loadSession(directory, config, origin) {
       await transition({ stage: "working" });
       return { status: view() };
     }
+    if (data.action === "start-workset") return startWorkset(data.artifact);
     if (data.action === "progress") {
       requireValue(
         state.stage === "working",
@@ -772,6 +1194,9 @@ async function loadSession(directory, config, origin) {
       title: state.current.title,
       kind: state.current.kind,
       revision: state.current.revision,
+      ...(state.current.worksetId
+        ? { worksetId: state.current.worksetId }
+        : {}),
       stage: state.stage,
       needsYou: needsYou(),
       paused: Boolean(state.paused),
@@ -804,6 +1229,16 @@ async function loadSession(directory, config, origin) {
     if (state.current?.revision === revision) return state.current;
     return null;
   }
+  function worksetEntry(id) {
+    if (!state.workset || state.workset.id !== id) return null;
+    return {
+      ...state.current,
+      viewKind: "workset",
+      worksetId: id,
+      path: worksetViewFile(id),
+      url: `${base}/w/${encodeURIComponent(id)}/`,
+    };
+  }
   return {
     directory,
     token,
@@ -817,6 +1252,7 @@ async function loadSession(directory, config, origin) {
     exclusive,
     pending,
     submit,
+    publishPage,
     upload,
     readUpload,
     removeUpload,
@@ -827,6 +1263,7 @@ async function loadSession(directory, config, origin) {
     active,
     setWake,
     revisionEntry,
+    worksetEntry,
   };
 }
 
@@ -1188,6 +1625,8 @@ export async function startHub(config = settings()) {
           );
         if (method === "POST" && parts[2] === "action") {
           const data = await readBody(req, 10_000_000);
+          if (data.action === "publish-page")
+            return reply(200, await session.publishPage(data));
           return reply(200, await session.exclusive(() => session.act(data)));
         }
       }
@@ -1210,13 +1649,28 @@ export async function startHub(config = settings()) {
           return html(
             await artifactPage(
               session,
-              session.revisionEntry(session.state.current.revision) ||
-                session.state.current,
+              session.state.current.viewKind === "workset"
+                ? session.state.current
+                : session.revisionEntry(session.state.current.revision) ||
+                    session.state.current,
               session.state.dismissedAt ? { closed: true } : {},
             ),
             {
               "Set-Cookie": `interactive-plan-last=${session.id}; Path=/; SameSite=Strict; Max-Age=2592000`,
             },
+          );
+        }
+        if (
+          method === "GET" &&
+          rest[0] === "w" &&
+          (rest.length === 2 || (rest.length === 3 && rest[2] === ""))
+        ) {
+          const entry = session.worksetEntry(decodeURIComponent(rest[1]));
+          return html(
+            await artifactPage(session, entry, {
+              workset: true,
+              ...(session.state.dismissedAt ? { closed: true } : {}),
+            }),
           );
         }
         if (method === "GET" && rest[0] === "r" && rest.length === 2)
@@ -1239,6 +1693,24 @@ export async function startHub(config = settings()) {
         ) {
           const entry = session.revisionEntry(revision());
           requireValue(entry, "Unknown revision", 404);
+          const data = artifactData(await fs.readFile(entry.path, "utf8"));
+          const prototype = data.prototypes?.find(
+            (item) => item.id === decodeURIComponent(rest[3]),
+          );
+          requireValue(prototype, "Unknown prototype", 404);
+          return html(prototype.html, {
+            "Content-Security-Policy":
+              "sandbox allow-scripts allow-forms allow-popups",
+          });
+        }
+        if (
+          method === "GET" &&
+          rest[0] === "w" &&
+          rest[2] === "prototype" &&
+          rest.length === 4
+        ) {
+          const entry = session.worksetEntry(decodeURIComponent(rest[1]));
+          requireValue(entry, "Unknown work set", 404);
           const data = artifactData(await fs.readFile(entry.path, "utf8"));
           const prototype = data.prototypes?.find(
             (item) => item.id === decodeURIComponent(rest[3]),
@@ -1641,6 +2113,40 @@ export async function main(argv) {
   }
   if (command === "status")
     return console.log(json(await request((id) => `/s/${id}/api/status`)));
+  if (command === "start-workset") {
+    requireValue(options.source, "start-workset requires --source SOURCE.json");
+    const source = path.resolve(options.source);
+    const contents = await fs.readFile(source, "utf8");
+    const artifact = source.endsWith(".html")
+      ? artifactData(contents)
+      : artifactData(await (await import("./build.mjs")).build(source));
+    return console.log(
+      json(
+        await request((id) => `/agent/${id}/action`, {
+          action: command,
+          artifact,
+        }),
+      ),
+    );
+  }
+  if (command === "publish-page") {
+    requireValue(
+      options["workset-id"] && options.file,
+      "publish-page requires --workset-id ID and --file PAGE.json",
+    );
+    const page = JSON.parse(
+      await fs.readFile(path.resolve(options.file), "utf8"),
+    );
+    return console.log(
+      json(
+        await request((id) => `/agent/${id}/action`, {
+          action: command,
+          worksetId: options["workset-id"],
+          page,
+        }),
+      ),
+    );
+  }
   const action = { action: command };
   if (command === "read") action.id = options.id;
   if (command === "pause") action.reason = options.reason;

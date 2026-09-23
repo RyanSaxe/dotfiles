@@ -94,6 +94,8 @@ export function problems(data, js = "") {
   for (const page of data.pages) {
     const html = page.html || "";
     const at = `page "${page.id}"`;
+    if (/<script\b/i.test(html))
+      list.push(`${at}: page HTML cannot contain scripts`);
     const tags = html.match(/<[a-zA-Z][^>]*>/g) || [];
     const controls = new Set();
     for (const tag of tags) {
@@ -291,6 +293,17 @@ export async function build(source) {
   return assemble(data, { css, js });
 }
 
+export async function buildPage(source, pageId) {
+  const data = artifactData(await build(source));
+  const page = data.pages.find((item) => item.id === pageId);
+  if (!page) throw new Error(`Unknown page "${pageId}"`);
+  return {
+    pageId: page.id,
+    title: page.title,
+    html: page.html,
+  };
+}
+
 /** Whether this file is the one Node was asked to run, symlinks resolved. */
 function isMain(argv1 = process.argv[1]) {
   if (!argv1) return false;
@@ -307,10 +320,24 @@ function isMain(argv1 = process.argv[1]) {
 if (isMain()) {
   try {
     const [source, output, ...extra] = process.argv.slice(2);
-    if (!source || !output || extra.length)
-      throw new Error("Usage: node scripts/build.mjs SOURCE.json OUTPUT.html");
-    const html = await build(path.resolve(source));
-    await fs.writeFile(output, html, { flag: "wx", mode: 0o600 });
+    if (
+      !source ||
+      !output ||
+      ![0, 2].includes(extra.length) ||
+      (extra.length && extra[0] !== "--page")
+    )
+      throw new Error(
+        "Usage: node scripts/build.mjs SOURCE.json OUTPUT.html [--page PAGE_ID]",
+      );
+    const result =
+      extra.length === 2
+        ? JSON.stringify(
+            await buildPage(path.resolve(source), extra[1]),
+            null,
+            2,
+          )
+        : await build(path.resolve(source));
+    await fs.writeFile(output, result, { flag: "wx", mode: 0o600 });
     console.log(path.resolve(output));
   } catch (error) {
     console.error(error.message);
