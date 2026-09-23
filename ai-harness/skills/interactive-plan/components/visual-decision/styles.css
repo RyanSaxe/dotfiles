@@ -39,9 +39,13 @@
 .visual-decision[data-mode="columns"] .vd-columns {
   grid-template-columns: repeat(var(--vd-count, 2), minmax(0, 1fr));
 }
+/* The rows an option has are the rows it gets. A fixed three-row track list
+   charges the gap for a row the author left out, which showed as a strip of
+   card under the figure. */
 .visual-option {
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto;
+  grid-auto-rows: auto;
   gap: 8px;
   min-width: 0;
   border: 1px solid var(--line);
@@ -87,18 +91,18 @@
   padding-bottom: 10px;
 }
 /* A diagram and a code block each scroll sideways inside their own figure,
-   so this one never needs to scroll and must not, or it traps the wheel. */
+   so this one never needs to scroll and must not, or it traps the wheel. It
+   pads all four sides, and what it holds keeps the shape it has anywhere
+   else, so a code block looks like a code block in prose or in a card. */
 .visual-option > figure {
   margin: 0;
+  padding: 10px 12px;
   border-top: 1px solid var(--line);
   background: var(--ground);
   min-width: 0;
 }
 .visual-option > figure [data-diagram] {
   padding: 10px;
-}
-.visual-option > figure [data-language] {
-  border-radius: 0;
 }
 /* The strip shares its width rather than scrolling: a box that scrolls on
    one axis is given a scrollbar on the other, which put a stray pixel of

@@ -15,7 +15,17 @@ function termRow(term, index, show) {
   row.tabIndex = 0;
   const symbol = document.createElement("dt");
   symbol.className = `term-${index + 1}`;
-  symbol.textContent = term.symbol || "";
+  /* A term is LaTeX like the formula it names, not always a bare letter, so
+     it goes through the same engine. KaTeX is loaded by the time a row is
+     built. A term that does not parse keeps its source. */
+  try {
+    window.katex.render(term.symbol || "", symbol, {
+      throwOnError: true,
+      displayMode: false,
+    });
+  } catch {
+    symbol.textContent = term.symbol || "";
+  }
   const meaning = document.createElement("dd");
   meaning.append(term.meaning || "");
   if (term.value) {

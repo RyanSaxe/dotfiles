@@ -22,6 +22,12 @@ planUI.define("question", {
       save.disabled = !area.value.trim();
     });
     save.onclick = () => {
+      planUI.answer(
+        card.dataset.question,
+        area.value,
+        card.dataset.label,
+        card.id,
+      );
       planUI.prefs?.set(key, "1");
       show(true);
     };

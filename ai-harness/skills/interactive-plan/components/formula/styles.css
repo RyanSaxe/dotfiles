@@ -34,19 +34,27 @@
 .formula[data-focus] .katex .term:not([data-on="true"]) {
   opacity: 0.3;
 }
+/* Every row shares one column track, so the terms line up down the list and
+   the track is as wide as the widest term rather than one character. A row
+   sits on the parent track, so its own padding comes out of the term column
+   and the floor has to carry it. */
 .formula-terms {
+  --term-pad: 8px;
+  --term-track: minmax(calc(22px + var(--term-pad)), auto);
   display: grid;
-  gap: 1px;
+  grid-template-columns: var(--term-track) minmax(0, 1fr);
+  row-gap: 1px;
+  column-gap: 10px;
   margin: 0;
   padding: 6px;
   border-top: 1px solid var(--line);
 }
 .formula-term {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: baseline;
-  padding: 5px 8px;
+  padding: 5px var(--term-pad);
   border-radius: 6px;
 }
 .formula-term:hover,
@@ -54,12 +62,14 @@
   background: var(--ground);
 }
 .formula-term dt {
-  font:
-    600 14px/1.4 "KaTeX_Math",
-    Georgia,
-    serif;
-  font-style: italic;
+  font-size: 14px;
+  line-height: 1.4;
   text-align: center;
+}
+/* The term is rendered by KaTeX, which brings its own faces; it only has to
+   match the row it sits in rather than the display size it would take. */
+.formula-term dt .katex {
+  font-size: 1em;
 }
 .formula-term dd {
   display: flex;

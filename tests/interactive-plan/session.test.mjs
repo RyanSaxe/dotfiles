@@ -399,10 +399,14 @@ const frame = await assemble({
   title: "Example",
   pages: [{ id: "overview", title: "Overview", html: "" }],
 });
-function artifact(revision = "1", kind = "exploration") {
+function artifact(
+  revision = "1",
+  kind = "exploration",
+  artifactId = "example",
+) {
   return frame.replace(
     /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,
-    `$1${JSON.stringify({ artifactId: "example", revision, kind, title: "Example work", pages: [{ id: "overview", title: "Overview", html: "<p>Preserve one result per input.</p>" }] })}$2`,
+    `$1${JSON.stringify({ artifactId, revision, kind, title: "Example work", pages: [{ id: "overview", title: "Overview", html: "<p>Preserve one result per input.</p>" }] })}$2`,
   );
 }
 async function hub(t, extra = {}) {
@@ -1365,6 +1369,27 @@ test("explicit feedback is retryable, remains unread until read, and blocks prem
     ).stdout,
   );
   assert.equal(status.current.revision, "2");
+});
+
+test("a session rejects a revision reused by another artifact", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.action("publish", { html: artifact("1") });
+  const duplicate = await a.action("publish", {
+    html: artifact("1", "exploration", "other"),
+  });
+  assert.equal(duplicate.code, 409);
+  assert.match(duplicate.body.error, /artifact "example"/);
+  assert.equal(
+    await exists(path.join(a.directory, "artifacts/other.1.html")),
+    false,
+  );
+  assert.equal((await a.status()).body.current.artifactId, "example");
+  const next = await a.action("publish", {
+    html: artifact("2", "exploration", "other"),
+  });
+  assert.equal(next.code, 200, next.body.error);
+  assert.equal((await a.status()).body.current.artifactId, "other");
 });
 
 test("question actions and reply intents are unsupported", async (t) => {

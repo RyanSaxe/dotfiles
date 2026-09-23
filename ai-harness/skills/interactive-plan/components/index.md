@@ -20,8 +20,8 @@ content.
 | [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section, with the When and Then labels that show under 700px. Keep each ID in its contextual comment label. Revise opens the comment dialog at that case. |
 | [code](code/markup.html)                       | Source code                                | `data-language` with the source as escaped text. `data-lines`, `data-numbers` and `data-notes` add a focused range, numbers and a note on a line.                         |
 | [formula](formula/markup.html)                 | Inline or display math                     | `data-math` set to inline or display. `data-terms` names the coloured terms under the formula.                                                                            |
-| [diagram](diagram/markup.html)                 | A diagram                                  | `data-diagram` with Mermaid source as text. A click opens it full size.                                                                                                   |
-| [chart](chart/markup.html)                     | A chart or a mathematical demonstration    | `data-chart` with an ECharts option object as JSON text.                                                                                                                  |
+| [diagram](diagram/markup.html)                 | A diagram                                  | `data-diagram` with Mermaid source as text. ELK lays it out, nodes whose IDs match page IDs open those pages, and a click opens the diagram full size.                    |
+| [chart](chart/markup.html)                     | A chart or a mathematical demonstration    | `data-chart` with an ECharts option object as JSON text. The frame renders charts as SVG and applies the theme palette.                                                   |
 | [prototype](prototype/markup.html)             | An approved prototype                      | `data-prototype` naming an entry in the manifest. The frame supplies the sandboxed frame, the Source fold and Open full size.                                             |
 
 The last five carry no interaction of their own: they are the figures a page
@@ -167,9 +167,10 @@ the next revision.
 Use a question when the answer is prose, not a selection. Keep it to one
 sentence and say what the answer decides. Empty answers are not sent.
 The card has an Answer button. Pressing it shows the answered state with
-the text in place and an Edit button. The frame records the text on every
-keystroke, whether or not the reviewer presses Answer. Feedback includes
-each answer as its own item, and an agreement can cite it with kind `answer`.
+the text in place and an Edit button. Typing keeps a draft in the box;
+pressing Answer records it. Editing an answer keeps the recorded text until
+Answer is pressed again. Feedback includes each answer as its own item, and
+an agreement can cite it with kind `answer`.
 After recording the answer on Agreed, remove that question from the next
 revision. If the question remains in the revision, ask it again.
 

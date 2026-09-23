@@ -194,7 +194,7 @@ function theme() {
     );
   for (const chart of charts.values())
     chart.setOption({
-      color: [color("--accent"), color("--muted")],
+      color: chartPalette(),
       ...chartTheme(chart.getOption()),
     });
   for (const viewer of diffs.values()) {
@@ -1377,11 +1377,6 @@ function renderSessions() {
     close.className = "icon-btn session-dismiss";
     close.setAttribute("aria-label", `Close ${entry.title}`);
     close.textContent = "✕";
-    close.onclick = async (event) => {
-      event.stopPropagation();
-      await fetch(`${entry.url}api/dismiss`, { method: "POST" });
-      await poll();
-    };
     const words = document.createElement("span");
     words.className = "words";
     const state = document.createElement("em");
@@ -1400,7 +1395,28 @@ function renderSessions() {
     const line = document.createElement("div");
     line.className = "session-line";
     line.append(row);
-    if (!current) line.append(close);
+    if (!current) {
+      line.append(close);
+      close.onclick = async (event) => {
+        event.stopPropagation();
+        /* Two round trips, a dismiss and a poll, so the row says it is going
+           before either starts. Without it a slow hub looks like a dead
+           control. */
+        close.disabled = true;
+        line.dataset.closing = "true";
+        try {
+          const response = await fetch(`${entry.url}api/dismiss`, {
+            method: "POST",
+          });
+          if (!response.ok) throw Error();
+          await poll();
+        } catch {
+          delete line.dataset.closing;
+          close.disabled = false;
+          state.textContent = "Could not close";
+        }
+      };
+    }
     list.append(line);
   }
 }
@@ -1560,8 +1576,8 @@ function restoreChoices() {
 function restoreAnswers() {
   document.querySelectorAll("[data-question] textarea").forEach((area) => {
     const group = area.closest("[data-question]");
-    area.value =
-      state.answers[page.id + "/" + group.dataset.question]?.text ?? "";
+    const key = page.id + "/" + group.dataset.question;
+    area.value = state.drafts?.[key] ?? state.answers[key]?.text ?? "";
     area.readOnly = !editable;
   });
 }
@@ -1849,15 +1865,9 @@ document.addEventListener("input", (event) => {
   if (!area || !$("page-content").contains(area)) return;
   const group = area.closest("[data-question]");
   const key = page.id + "/" + group.dataset.question;
-  if (area.value.trim())
-    state.answers[key] = {
-      topic: page.id,
-      label: group.dataset.label || group.dataset.question,
-      text: area.value,
-      target: group.id,
-      revision: plan.revision,
-    };
-  else delete state.answers[key];
+  state.drafts ||= {};
+  if (area.value.trim()) state.drafts[key] = area.value;
+  else delete state.drafts[key];
   clearTimeout(answerTimer);
   answerTimer = setTimeout(save, 300);
 });
@@ -2023,6 +2033,31 @@ systemTheme.addEventListener("change", () => {
 
 /* Keys */
 document.addEventListener("keydown", (event) => {
+  /* Textareas keep Enter for newlines. Shift+Enter is the explicit submit
+     gesture for the two text actions a reviewer otherwise has to click. */
+  if (
+    event.key === "Enter" &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    editable
+  ) {
+    const area = event.target.closest("textarea");
+    const answer = area
+      ?.closest("[data-question]")
+      ?.querySelector("[data-answer]");
+    if (answer && !answer.disabled) {
+      event.preventDefault();
+      answer.click();
+      return;
+    }
+    if (area === $("note-text") && area.value.trim()) {
+      event.preventDefault();
+      $("note-form").requestSubmit();
+      return;
+    }
+  }
   if (mode === "preview" || event.metaKey || event.ctrlKey || event.altKey)
     return;
   if (event.key === "Escape") {
@@ -2080,6 +2115,7 @@ const libraries = {
   diffs: "https://esm.sh/@pierre/diffs@1.4.2?bundle",
   mermaid:
     "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs",
+  elk: "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.3/dist/mermaid-layout-elk.esm.min.mjs",
   katex: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
   katexCss: "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css",
   echarts: "https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js",
@@ -2088,6 +2124,8 @@ const scripts = new Map();
 let diffsTask;
 const color = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const chartPalette = () =>
+  ["--accent", "--attention", "--ok", "--danger", "--muted"].map(color);
 function script(url, integrity, css = false) {
   if (scripts.has(url)) return scripts.get(url);
   const task = new Promise((resolve, reject) => {
@@ -2202,15 +2240,18 @@ async function chart(element, options) {
   if (!element.isConnected) return null;
   let instance = charts.get(element);
   if (!instance) {
-    instance = window.echarts.init(element);
+    instance = window.echarts.init(element, null, { renderer: "svg" });
     charts.set(element, instance);
   }
-  instance.setOption({
-    backgroundColor: "transparent",
-    color: [color("--accent"), color("--muted")],
-    textStyle: { color: color("--ink") },
-    ...options,
-  });
+  instance.setOption(
+    {
+      backgroundColor: "transparent",
+      color: chartPalette(),
+      textStyle: { color: color("--ink") },
+      ...options,
+    },
+    true,
+  );
   instance.setOption(chartTheme(options));
   return instance;
 }
@@ -2285,6 +2326,19 @@ new ResizeObserver(() => {
   for (const instance of charts.values()) instance.resize();
 }).observe($("page-content"));
 window.planUI = {
+  answer(id, text, label, target) {
+    const key = page.id + "/" + id;
+    if (text.trim())
+      state.answers[key] = {
+        topic: page.id,
+        label: label || id,
+        text,
+        target,
+        revision: plan.revision,
+      };
+    else delete state.answers[key];
+    save();
+  },
   chart,
   define,
   diff,
