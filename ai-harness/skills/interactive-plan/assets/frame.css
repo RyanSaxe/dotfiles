@@ -1000,13 +1000,16 @@ svg {
   color: var(--muted);
   background: var(--panel) !important;
 }
-/* Mermaid measures labels outside the diagram, so these vocabulary rules are
-   intentionally global. */
-.title {
+/* A label Mermaid is measuring sits outside the diagram at that moment, so
+   these rules cannot be scoped to one. They carry the diagram- prefix
+   instead: a bare .note here matched the note dialog, which carries
+   class="dialog note", and gave a closed dialog display: block, so it
+   painted over the page and its close control did nothing. */
+.diagram-title {
   display: block;
   font-weight: 600;
 }
-.path {
+.diagram-path {
   display: inline-block;
   margin-top: 2px;
   color: var(--muted) !important;
@@ -1017,18 +1020,18 @@ svg {
     Consolas,
     monospace;
 }
-.delta {
+.diagram-delta {
   margin-left: 6px;
   font-size: 10px;
   font-weight: 600;
 }
-.delta.add {
+.diagram-delta.add {
   color: var(--ok) !important;
 }
-.delta.cut {
+.diagram-delta.cut {
   color: var(--danger) !important;
 }
-.badge {
+.diagram-badge {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 5px;
@@ -1038,7 +1041,7 @@ svg {
   font-size: 10px;
   font-weight: 600;
 }
-.note {
+.diagram-note {
   display: block;
   margin-top: 2px;
   color: var(--muted) !important;
