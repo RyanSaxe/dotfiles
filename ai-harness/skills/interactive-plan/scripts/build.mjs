@@ -1,11 +1,77 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { artifactData } from "./session.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
+/** Where a user keeps components of their own, outside the skill. The skill
+    is installed and updated as a unit, so a component written into its own
+    directory would be an edit to installed software. */
+export function userComponents(env = process.env) {
+  const home = env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  return path.join(home, "interactive-plan", "components");
+}
+
+const componentRoots = () => [
+  fileURLToPath(new URL("../components/", import.meta.url)),
+  userComponents(),
+];
+
+/** The component directories, sorted, so registration order is fixed. */
+async function componentNames(root) {
+  const entries = await fs
+    .readdir(root, { withFileTypes: true })
+    .catch(() => []);
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+/** Every component, by name. A name in a later root replaces the same name
+    in an earlier one, which is how a user changes a shipped component
+    without forking the skill. A root that does not exist contributes none. */
+export async function componentDirectories(roots = componentRoots()) {
+  const found = new Map();
+  for (const [index, root] of roots.entries())
+    for (const name of await componentNames(root))
+      found.set(name, { name, directory: path.join(root, name), root: index });
+  return [...found.values()].sort((a, b) => (a.name < b.name ? -1 : 1));
+}
+
+/** One named file from every component that has it, in name order. A
+    component that ships no behavior, or no styles, is skipped rather than
+    contributing an empty part. */
+async function componentParts(roots, file, wrap) {
+  const found = await componentDirectories(roots);
+  const parts = await Promise.all(
+    found.map(async ({ name, directory, root }) => {
+      const text = await fs
+        .readFile(path.join(directory, file), "utf8")
+        .catch(() => "");
+      const from = root === 0 ? `components/${name}` : `${name} (yours)`;
+      return text.trim() ? wrap(`${from}/${file}`, text.trim()) : "";
+    }),
+  );
+  return parts.filter(Boolean).join("\n");
+}
+
+const componentStyles = (roots) =>
+  componentParts(roots, "styles.css", (at, text) => `/* ${at} */\n${text}`);
+
+/* Each behavior is evaluated in a block, so what a component declares at the
+   top of its file stays inside it and two components cannot collide over a
+   name. The frame's own helpers stay in scope, because the block is inside
+   the frame's module. */
+const componentBehaviors = (roots) =>
+  componentParts(
+    roots,
+    "behavior.mjs",
+    (at, text) => `/* ${at} */\n{\n${text}\n}`,
+  );
 
 const attribute = (tag, name) => {
   const match = tag.match(new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`));
@@ -151,18 +217,35 @@ export async function assemble(data, { css = "", js = "" } = {}) {
     throw new Error(
       "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
     );
+  const roots = componentRoots();
+  const [componentCss, componentJs] = await Promise.all([
+    componentStyles(roots),
+    componentBehaviors(roots),
+  ]);
   const html = shell
     .replace(
       "<!-- FRAME_STYLE -->",
-      // Plan CSS is scoped to the page's content, so a rule for body, :root,
-      // or h1 cannot restyle the frame.
-      () => `<style>\n${style}\n@scope (#page-content) {\n${css}\n}\n</style>`,
+      // The cascade ranks an unlayered rule above every layered one, so the
+      // frame takes a layer of its own rather than staying outside them. A
+      // component rule then beats a plan rule of any specificity, and a plan
+      // that means it can still say !important.
+      // Plan and component CSS are scoped to the page's content, so a rule
+      // for body, :root, or h1 cannot restyle the frame.
+      () =>
+        `<style>\n@layer frame, plan, components;\n@layer frame {\n${style}\n}\n` +
+        `@scope (#page-content) {\n@layer plan {\n${css}\n}\n` +
+        `@layer components {\n${componentCss}\n}\n}\n</style>`,
     )
-    .replace("<!-- CUSTOM_SCRIPT -->", () => `<script>\n${js}\n</script>`)
     .replace(
       "<!-- FRAME_SCRIPT -->",
       () =>
-        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n</script>`,
+        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n${componentJs}\n</script>`,
+    )
+    // A module, and after the frame's, so the plan's own script sees planUI
+    // and can register a component of its own before the first page renders.
+    .replace(
+      "<!-- CUSTOM_SCRIPT -->",
+      () => `<script type="module">\n${js}\n</script>`,
     )
     .replace(
       /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,

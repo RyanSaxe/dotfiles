@@ -1,0 +1,26 @@
+/* A diagram keeps its drawn size and scrolls sideways; inside a side-by-side
+   container it shrinks to its column instead. Either way a click enlarges it.
+   Mermaid writes its own max-width inline, hence the priorities. */
+[data-diagram] {
+  display: block;
+  overflow-x: auto;
+  padding: 8px 0;
+  text-align: center;
+}
+[data-diagram] svg {
+  display: inline-block;
+  vertical-align: top;
+  height: auto;
+  width: var(--diagram-width, auto);
+  max-width: none !important;
+  cursor: zoom-in;
+}
+:is(.visual-decision[data-mode="columns"], .comparison, .change-pair)
+  [data-diagram]
+  svg {
+  width: 100%;
+  max-width: var(--diagram-width, 100%) !important;
+}
+.figure-body > [data-diagram] {
+  padding: 12px;
+}

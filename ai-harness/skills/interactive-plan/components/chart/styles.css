@@ -1,0 +1,7 @@
+[data-chart] {
+  height: 300px;
+  min-width: 0;
+}
+.figure-body > [data-chart] {
+  padding: 8px;
+}

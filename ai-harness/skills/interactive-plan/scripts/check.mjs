@@ -5,6 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { componentDirectories, userComponents } from "./build.mjs";
 
 // Codex runs shell commands in a sandbox with no sockets and no writes
 // outside the workspace. An allow rule for the skill's scripts, in a file
@@ -75,6 +76,21 @@ async function portReport(port) {
   }
   return { port, state: "busy" };
 }
+/* The builder reads a second component root outside the skill, so a user
+   keeps components of their own across skill updates. */
+async function componentReport() {
+  const directory = userComponents();
+  const found = await componentDirectories();
+  const yours = found.filter((entry) => entry.root === 1).map((e) => e.name);
+  return {
+    yours: directory,
+    present: yours.length > 0,
+    count: yours.length,
+    ...(yours.length ? { names: yours } : {}),
+    shipped: found.length - yours.length,
+  };
+}
+
 try {
   if (Number(process.versions.node.split(".")[0]) < 20)
     throw new Error("Node 20 or newer is required");
@@ -106,6 +122,7 @@ try {
         node: process.versions.node,
         platform: process.platform,
         storage: base,
+        components: await componentReport(),
         hub: port ? await portReport(port) : { port, state: "os-assigned" },
         browser: "Check available agent tools or ask for manual browser review",
         renderers: "Check required renderers in the actual browser",

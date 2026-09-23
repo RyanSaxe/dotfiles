@@ -14,9 +14,10 @@ each component is for.
 
 Build each page around the proposal. Where the browser can show the
 material, rendered, drawn or demonstrated, show it, and use prose for the
-context and consequences the page cannot show. A plan's CSS and script
-leave the frame's code blocks, diagrams and diffs as they are, and a
-component is as wide as the reading column. Resolve routine details from
+context and consequences the page cannot show. Do not restyle a component: the
+builder puts component CSS in a layer above the plan's, so the rule is
+ignored rather than half-applied. A component is as wide as the reading
+column. Resolve routine details from
 the project and the settled requirements instead of asking.
 
 The user can comment on any text or component without being asked, so do not

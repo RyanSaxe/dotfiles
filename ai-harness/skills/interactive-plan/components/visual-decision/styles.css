@@ -1,5 +1,4 @@
 .visual-decision {
-  margin: 16px 0 24px;
 }
 .vd-head {
   display: flex;
@@ -99,12 +98,6 @@
   padding: 10px;
 }
 .visual-option > figure [data-language] {
-  border-radius: 0;
-}
-/* A figure inside an option draws no second frame in either layout. */
-.visual-option > figure > .figure {
-  margin: 0;
-  border: 0;
   border-radius: 0;
 }
 /* The strip shares its width rather than scrolling: a box that scrolls on

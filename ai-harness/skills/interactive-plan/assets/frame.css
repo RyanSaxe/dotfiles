@@ -909,241 +909,6 @@ td code {
   border-radius: 4px;
   background: var(--code);
 }
-[data-language] {
-  background: var(--code);
-  border-radius: 8px;
-  overflow: auto;
-}
-[data-language]:not(:has(.shiki)) {
-  padding: 12px 14px;
-  white-space: pre;
-  font:
-    12px/1.65 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Consolas,
-    monospace;
-}
-.shiki {
-  background: var(--code) !important;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-}
-/* The generic pre rule pads 14px and .figure-head pads 12px, which put a
-   file name and the first character of its code 2px apart. */
-[data-language] .shiki {
-  padding: 10px 0;
-}
-[data-language] .shiki code {
-  display: block;
-  counter-reset: codeline;
-}
-/* Inline-block, never block: Shiki writes a newline after each line span,
-   and a block span turns that newline into a second, empty row. */
-/* min-width, not width: the line stretches to the full width so a lit line
-   is lit to the edge, and still grows past it so the block keeps scrolling
-   on a line the column cannot hold. */
-[data-language] .shiki .line {
-  position: relative;
-  display: inline-block;
-  min-width: 100%;
-  /* An empty line is a box with no content, which would collapse and put
-     its number on top of the next one. */
-  min-height: 1lh;
-  padding: 0 14px 0 12px;
-}
-/* One gutter whether or not the block carries notes: the bubble's 16px,
-   the numbers, then the code at 54px. */
-[data-language]:is([data-lines], [data-numbers], [data-notes]) .shiki .line {
-  padding-left: 54px;
-  counter-increment: codeline;
-}
-[data-language]:is([data-lines], [data-numbers], [data-notes])
-  .shiki
-  .line::before {
-  content: counter(codeline);
-  position: absolute;
-  left: 16px;
-  width: 30px;
-  padding-right: 6px;
-  border-right: 1px solid var(--line);
-  color: var(--muted);
-  text-align: right;
-  opacity: 0.75;
-}
-/* The named range is lit and the rest is dimmed until the pointer or the
-   keyboard asks for it. There is no control to press. */
-[data-language][data-lines] .shiki .line {
-  transition: opacity 0.12s ease;
-}
-[data-language][data-lines] .shiki .line:not(.in-focus) {
-  opacity: 0.38;
-}
-[data-language][data-lines]:hover .shiki .line,
-[data-language][data-lines]:focus-within .shiki .line {
-  opacity: 1;
-}
-[data-language][data-lines] .shiki .line.in-focus {
-  background: var(--accent-soft);
-}
-/* A line with a note carries a speech bubble 4px from the block's edge. */
-.code-note-mark {
-  position: absolute;
-  left: 4px;
-  top: 0;
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-}
-.code-note-mark:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  border-radius: 4px;
-}
-.code-note-mark[aria-expanded="true"] svg,
-.code-note-mark:hover svg {
-  fill: var(--accent-soft);
-}
-[data-language][data-notes] .shiki .line.has-note {
-  cursor: pointer;
-}
-/* The note is a popover, painted in the top layer, so the figure's own
-   overflow: hidden cannot clip a note on the last line of a block. */
-.code-popup {
-  position: fixed;
-  margin: 0;
-  max-width: min(460px, calc(100vw - 32px));
-  padding: 10px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  color: var(--ink);
-  font-size: 12.5px;
-  line-height: 1.5;
-  white-space: normal;
-}
-.code-popup b {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.code-popup .code-popup-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  color: var(--muted);
-  text-align: center;
-}
-/* A block with more to the right says so. The mask is on the box that
-   scrolls, so it stays at the right edge while the content moves under it. */
-.shiki[data-more="true"] {
-  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-}
-/* A formula that names its terms. The four hues are a content palette, kept
-   apart from the chrome's --accent, --ok, --attention and --danger, and
-   written as light-dark pairs so a term reads on both grounds. */
-.formula {
-  --t1: light-dark(#1d4ed8, #93b4ff);
-  --t2: light-dark(#a16207, #e8bd63);
-  --t3: light-dark(#047857, #6fd7a5);
-  --t4: light-dark(#9333ea, #cfa4f5);
-  margin: 16px 0 20px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  overflow: hidden;
-}
-.formula-body {
-  padding: 16px 12px;
-  background: var(--ground);
-}
-.formula-body [data-math] {
-  margin: 0;
-}
-.formula .term-1 {
-  color: var(--t1);
-}
-.formula .term-2 {
-  color: var(--t2);
-}
-.formula .term-3 {
-  color: var(--t3);
-}
-.formula .term-4 {
-  color: var(--t4);
-}
-.formula[data-focus] .katex .term:not([data-on="true"]) {
-  opacity: 0.3;
-}
-.formula-terms {
-  display: grid;
-  gap: 1px;
-  margin: 0;
-  padding: 6px;
-  border-top: 1px solid var(--line);
-}
-.formula-term {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
-  align-items: baseline;
-  padding: 5px 8px;
-  border-radius: 6px;
-}
-.formula-term:hover,
-.formula-term[data-active="true"] {
-  background: var(--ground);
-}
-.formula-term dt {
-  font:
-    600 14px/1.4 "KaTeX_Math",
-    Georgia,
-    serif;
-  font-style: italic;
-  text-align: center;
-}
-.formula-term dd {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.formula-term dd b {
-  color: var(--ink);
-  font-weight: 600;
-  white-space: nowrap;
-}
-/* The scroll belongs to the element KaTeX lays out, not to the box around
-   it: .katex-display overflows visible, so a formula wider than the column
-   simply loses what does not fit. */
-.katex-display {
-  overflow-x: auto;
-  padding-bottom: 6px;
-}
-.shiki,
-.shiki span {
-  color: var(--shiki-light) !important;
-}
-:root[data-theme="dark"] .shiki,
-:root[data-theme="dark"] .shiki span {
-  color: var(--shiki-dark) !important;
-}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1168,32 +933,6 @@ img,
 svg {
   max-width: 100%;
 }
-[data-math] {
-  overflow: auto;
-}
-/* A diagram keeps its drawn size and scrolls sideways; inside a side-by-side
-   container it shrinks to its column instead. Either way a click enlarges it.
-   Mermaid writes its own max-width inline, hence the priorities. */
-[data-diagram] {
-  display: block;
-  overflow-x: auto;
-  padding: 8px 0;
-  text-align: center;
-}
-[data-diagram] svg {
-  display: inline-block;
-  vertical-align: top;
-  height: auto;
-  width: var(--diagram-width, auto);
-  max-width: none !important;
-  cursor: zoom-in;
-}
-:is(.visual-decision[data-mode="columns"], .comparison, .change-pair)
-  [data-diagram]
-  svg {
-  width: 100%;
-  max-width: var(--diagram-width, 100%) !important;
-}
 .lightbox {
   width: fit-content;
   max-width: min(96vw, 1600px);
@@ -1210,10 +949,6 @@ svg {
   height: auto;
   max-width: none;
 }
-[data-chart] {
-  height: 300px;
-  min-width: 0;
-}
 .renderer-error {
   color: var(--muted);
   font-size: 12px;
@@ -1225,25 +960,56 @@ svg {
   overflow: hidden;
   background: var(--panel);
 }
-/* A figure that ends a card meets the card's edge: the container keeps no
-   padding under it and the figure no margin, so no band of the container's
-   background shows below a code block, diagram, or chart. */
-:is(
-  .visual-option,
-  .vd-columns,
-  .comparison-content,
-  .change-content,
-  .behavior-case > div
-):has(
-  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child
-) {
-  padding-bottom: 0;
+/* A component is a block in the page's rhythm, so the frame sets the space
+   around one. Seven components set their own, with three different top
+   values and three different bottom ones between them, and a pair of
+   diagrams set none at the bottom at all, so the paragraph after it began
+   against its border. These four attributes mark a component's root and are
+   the ones the build already checks for. */
+#page-content
+  > :is([data-choice], [data-multiselect], [data-question], [data-kind]) {
+  margin: 14px 0 22px;
 }
-:is(.comparison-content, .change-content, .behavior-case > div)
-  > :is(.figure, [data-language], [data-diagram], [data-chart]):last-child {
+/* A slot supplies its own padding, so what it holds brings no outer margin
+   of its own: a <pre> brings 12/12 from the browser default, a .figure 14/18,
+   a table 16/16, a blockquote 10/10 and a paragraph 0/14. Zeroing only the
+   last child's bottom margin, which is what this was, left every one of them
+   sitting lower in its slot than it sat from the bottom.
+
+   A rule here used to drop a slot's bottom padding when a figure or a code
+   block ended it, so the block met the slot's edge. It named those four
+   elements and not a table, a blockquote or a paragraph, so what a slot
+   looked like depended on what an author had put in it last. */
+:is(
+    .visual-option,
+    .visual-option > figure,
+    .vd-columns,
+    .comparison-content,
+    .change-content,
+    .behavior-case > div
+  )
+  > :first-child {
+  margin-top: 0;
+}
+:is(
+    .visual-option,
+    .visual-option > figure,
+    .vd-columns,
+    .comparison-content,
+    .change-content,
+    .behavior-case > div
+  )
+  > :last-child {
   margin-bottom: 0;
 }
-:is(.visual-option > figure, .comparison-content, .change-content) > .figure {
+/* A figure that fills a slot drops its own frame and takes the slot's. */
+:is(
+    .visual-option > figure,
+    .comparison-content,
+    .change-content,
+    .behavior-case > div
+  )
+  > .figure {
   margin: 0;
   border: 0;
   border-radius: 0;
@@ -1274,16 +1040,6 @@ svg {
   padding: 2px 8px;
   font-size: 11.5px;
 }
-.figure-body > [data-language],
-.figure-body > .shiki {
-  border-radius: 0;
-}
-.figure-body > [data-diagram] {
-  padding: 12px;
-}
-.figure-body > [data-chart] {
-  padding: 8px;
-}
 .figure-caption {
   padding: 8px 12px 10px;
   border-top: 1px solid var(--line);
@@ -1292,30 +1048,6 @@ svg {
 }
 .figure-caption b {
   color: var(--ink);
-}
-.figure.prototype .figure-body {
-  background: var(--ground);
-}
-.approved-prototype {
-  display: block;
-  width: 100%;
-  border: 0;
-  background: transparent;
-}
-.prototype-source:not([open]) {
-  display: none;
-}
-.prototype-source {
-  border-top: 1px solid var(--line);
-  padding: 8px 12px 10px;
-  max-height: 480px;
-  overflow: auto;
-}
-.prototype-source summary {
-  display: none;
-}
-.prototype-source [data-language] {
-  margin-top: 8px;
 }
 
 /* Question component's answer field and other frame-owned inputs */
@@ -1421,9 +1153,13 @@ dialog::backdrop {
   margin: 0;
   color: var(--muted);
 }
+/* Beside the reading column, not the window. .app caps at 1160px and
+   centres, so on a wide screen a control fixed to the window sits hundreds
+   of pixels right of the text. Below 1160px the max() is zero and the value
+   is the 22px it has always been. .working uses the mirror of this. */
 .quote-button {
   position: fixed;
-  right: 22px;
+  right: calc(max(0px, (100% - 1160px) / 2) + 22px);
   bottom: calc(22px + env(safe-area-inset-bottom));
   z-index: var(--z-selection);
 }
@@ -1707,8 +1443,12 @@ dialog::backdrop {
   padding: 0;
   overflow: visible;
 }
-/* An open dialog covers the page, so the control that comments on it goes. */
-body:has(dialog[open]) .quote-button {
+/* A dialog and the working card both cover the page, so the control that
+   comments on it goes. While the agent works, the revision under the card is
+   the one about to be replaced, and a note on it would arrive against a page
+   that no longer exists. */
+body:has(dialog[open]) .quote-button,
+body.is-working .quote-button {
   display: none;
 }
 /* A session row and the control that closes that session. */

@@ -11,6 +11,12 @@ endpoint works and which process owns the hub port. It reports `free`, `hub`
 (another program owns the port). An optional path argument checks a different
 storage location. If you pass one, use that location for the session too.
 
+It also reports `components`: the path the builder reads for the user's own
+components, `$XDG_CONFIG_HOME/interactive-plan/components` with `~/.config`
+as the fallback, whether that directory exists, and what it and the skill
+hold. The builder skips it when it does not exist. The component index
+states when to write there.
+
 The hub needs a writable state directory and a listener on loopback. If the
 sandbox blocks either operation, allow the skill's scripts. Do not switch to
 a different state directory. A session under a temp directory is invisible
