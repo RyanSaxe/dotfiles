@@ -1560,8 +1560,8 @@ function restoreChoices() {
 function restoreAnswers() {
   document.querySelectorAll("[data-question] textarea").forEach((area) => {
     const group = area.closest("[data-question]");
-    area.value =
-      state.answers[page.id + "/" + group.dataset.question]?.text ?? "";
+    const key = page.id + "/" + group.dataset.question;
+    area.value = state.drafts?.[key] ?? state.answers[key]?.text ?? "";
     area.readOnly = !editable;
   });
 }
@@ -1849,15 +1849,9 @@ document.addEventListener("input", (event) => {
   if (!area || !$("page-content").contains(area)) return;
   const group = area.closest("[data-question]");
   const key = page.id + "/" + group.dataset.question;
-  if (area.value.trim())
-    state.answers[key] = {
-      topic: page.id,
-      label: group.dataset.label || group.dataset.question,
-      text: area.value,
-      target: group.id,
-      revision: plan.revision,
-    };
-  else delete state.answers[key];
+  state.drafts ||= {};
+  if (area.value.trim()) state.drafts[key] = area.value;
+  else delete state.drafts[key];
   clearTimeout(answerTimer);
   answerTimer = setTimeout(save, 300);
 });
@@ -2316,6 +2310,19 @@ new ResizeObserver(() => {
   for (const instance of charts.values()) instance.resize();
 }).observe($("page-content"));
 window.planUI = {
+  answer(id, text, label, target) {
+    const key = page.id + "/" + id;
+    if (text.trim())
+      state.answers[key] = {
+        topic: page.id,
+        label: label || id,
+        text,
+        target,
+        revision: plan.revision,
+      };
+    else delete state.answers[key];
+    save();
+  },
   chart,
   define,
   diff,

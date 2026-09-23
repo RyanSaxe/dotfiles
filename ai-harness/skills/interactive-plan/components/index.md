@@ -167,9 +167,10 @@ the next revision.
 Use a question when the answer is prose, not a selection. Keep it to one
 sentence and say what the answer decides. Empty answers are not sent.
 The card has an Answer button. Pressing it shows the answered state with
-the text in place and an Edit button. The frame records the text on every
-keystroke, whether or not the reviewer presses Answer. Feedback includes
-each answer as its own item, and an agreement can cite it with kind `answer`.
+the text in place and an Edit button. Typing keeps a draft in the box;
+pressing Answer records it. Editing an answer keeps the recorded text until
+Answer is pressed again. Feedback includes each answer as its own item, and
+an agreement can cite it with kind `answer`.
 After recording the answer on Agreed, remove that question from the next
 revision. If the question remains in the revision, ask it again.
 

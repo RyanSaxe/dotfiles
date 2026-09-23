@@ -79,12 +79,13 @@ controls inside a block, so keep authored controls focusable.
 | planUI.prefs.get(key), set(key, v)   | Remember a viewing preference for this session and artifact in the browser.                                                                                                                                                                        |
 | planUI.mode                          | live, readonly, or preview.                                                                                                                                                                                                                        |
 
-Choice clicks, checklist changes, and typed answers update the local
-draft. Only Submit sends it. Keep control IDs and labels the same across
-revisions. Group IDs must be unique within a page across all kinds, and
-option IDs within a group. Use native buttons for single choices, native
-labeled checkboxes for checklists, and a textarea inside `data-question`
-for answers.
+Choice clicks, checklist changes, and typing in a question update the local
+draft. Pressing Answer creates the recorded answer; editing it leaves that
+record unchanged until Answer is pressed again. Only Submit sends recorded
+items. Keep control IDs and labels the same across revisions. Group IDs must
+be unique within a page across all kinds, and option IDs within a group. Use
+native buttons for single choices, native labeled checkboxes for checklists,
+and a textarea inside `data-question` for answers.
 
 Include every checklist in a submission, including lists on pages the user
 has not visited. Put checklist markup in the page HTML instead of adding it
