@@ -7,9 +7,10 @@ const mapValues = (object, fn) =>
     Object.entries(object).map(([key, value]) => [key, fn(value)]),
   );
 
-export function emptyDraft(revision) {
+export function emptyDraft(revision, worksetId = undefined) {
   return {
     revision,
+    ...(worksetId ? { worksetId } : {}),
     notes: [],
     choices: {},
     answers: {},
@@ -31,22 +32,47 @@ export function usablePlace(saved, revision, pageIds) {
 
 // Drafts are keyed by session and artifact, not revision. When a new revision
 // lands, items that were already sent are dropped and unsent items carry over.
-export function loadDraft(saved, revision) {
+export function loadDraft(
+  saved,
+  revision,
+  worksetId = undefined,
+  versions = {},
+) {
   if (!record(saved) || !Array.isArray(saved.notes) || !record(saved.choices))
-    return emptyDraft(revision);
+    return emptyDraft(revision, worksetId);
   const draft = {
-    ...emptyDraft(revision),
+    ...emptyDraft(revision, worksetId),
     ...saved,
     answers: record(saved.answers) ? saved.answers : {},
     noteDrafts: record(saved.noteDrafts) ? saved.noteDrafts : {},
   };
-  if (saved.revision !== revision) {
-    draft.notes = draft.notes.filter((note) => !note.sentIn);
-    draft.choices = filterValues(draft.choices, (choice) => !choice.sentIn);
-    draft.answers = filterValues(draft.answers, (answer) => !answer.sentIn);
+  const identityChanged =
+    saved.revision !== revision ||
+    (worksetId !== undefined && (saved.worksetId || null) !== worksetId);
+  const pageVersionChanged =
+    worksetId !== undefined &&
+    [
+      ...draft.notes,
+      ...Object.values(draft.choices),
+      ...Object.values(draft.answers),
+    ].some(
+      (item) =>
+        item.topic !== "overall" && item.pageVersion !== versions[item.topic],
+    );
+  if (identityChanged || pageVersionChanged) {
+    const current = (item) =>
+      !item.sentIn &&
+      (item.topic === "overall" ||
+        (worksetId === undefined && !item.pageVersion) ||
+        versions[item.topic] === item.pageVersion);
+    draft.notes = draft.notes.filter(current);
+    draft.choices = filterValues(draft.choices, current);
+    draft.answers = filterValues(draft.answers, current);
     draft.submitted = null;
     draft.pending = null;
     draft.revision = revision;
+    if (worksetId) draft.worksetId = worksetId;
+    else delete draft.worksetId;
   }
   return draft;
 }

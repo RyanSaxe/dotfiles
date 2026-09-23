@@ -407,6 +407,90 @@ kbd {
   font-weight: 700;
   line-height: 1.4;
 }
+.workset-progress {
+  margin: 4px 0 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ground);
+}
+.workset-progress summary {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+.workset-progress summary::-webkit-details-marker {
+  display: none;
+}
+.workset-progress-title {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.workset-progress-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+.workset-progress-bar {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 2px;
+  height: 4px;
+  margin-top: 8px;
+}
+.workset-progress-bar i {
+  border-radius: 3px;
+  background: var(--line-strong);
+}
+.workset-progress-bar i.ready {
+  background: var(--ok);
+}
+.workset-progress ul {
+  display: grid;
+  gap: 3px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 11.5px;
+}
+.workset-progress li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+}
+.workset-progress li b {
+  color: var(--muted);
+  text-align: center;
+}
+.workset-progress li.ready {
+  color: var(--ink);
+}
+.workset-progress li.ready b {
+  color: var(--ok);
+}
+.workset-progress li.unverified b,
+.pages-slot nav button.unverified .nav-status {
+  color: var(--attention);
+}
+.pages-slot nav button.pending {
+  color: var(--muted);
+}
+.pages-slot nav button .nav-status {
+  flex: none;
+  font-weight: 700;
+}
+.workset-pending {
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--ground);
+}
+.workset-pending h2 {
+  margin-top: 0;
+}
 main {
   position: relative;
   min-height: 0;
@@ -1606,7 +1690,8 @@ img.note-image {
    the one about to be replaced, and a note on it would arrive against a page
    that no longer exists. */
 body:has(dialog[open]) .quote-button,
-body.is-working .quote-button {
+body.is-working .quote-button,
+body.page-pending .quote-button {
   display: none;
 }
 /* A session row and the control that closes that session. */

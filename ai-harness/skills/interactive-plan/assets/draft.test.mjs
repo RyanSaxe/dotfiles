@@ -78,3 +78,34 @@ test("single choices count as before", () => {
   });
   assert.equal(unsentItems(draft).count, 1);
 });
+
+test("a work-set draft carries only matching immutable page versions", () => {
+  const draft = emptyDraft("1", "ws-1");
+  draft.notes.push(
+    { id: "keep", topic: "overview", pageVersion: "pv-1", text: "keep" },
+    { id: "drop", topic: "detail", pageVersion: "pv-old", text: "drop" },
+    { id: "overall", topic: "overall", text: "keep" },
+  );
+  const next = loadDraft(draft, "2", null, { overview: "pv-1" });
+  assert.deepEqual(
+    next.notes.map((note) => note.id),
+    ["keep", "overall"],
+  );
+  assert.equal(next.worksetId, undefined);
+});
+
+test("a page publication invalidates only that page's draft", () => {
+  const draft = emptyDraft("1", "ws-1");
+  draft.notes.push(
+    { id: "changed", topic: "overview", pageVersion: "pv-old", text: "drop" },
+    { id: "same", topic: "detail", pageVersion: "pv-1", text: "keep" },
+  );
+  const next = loadDraft(draft, "1", "ws-1", {
+    overview: "pv-new",
+    detail: "pv-1",
+  });
+  assert.deepEqual(
+    next.notes.map((note) => note.id),
+    ["same"],
+  );
+});

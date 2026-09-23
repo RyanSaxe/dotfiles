@@ -15,6 +15,15 @@ const editable = mode === "live";
 document.documentElement.dataset.mode = mode;
 const query = new URL(location.href).searchParams;
 const agreements = plan.agreements || [];
+const workset = plan.workset || null;
+const manifest = plan.manifest || null;
+const slots = new Map((workset?.declared || []).map((item) => [item.id, item]));
+const versions = Object.fromEntries(
+  (workset?.declared || manifest?.pages || [])
+    .filter((item) => item.version)
+    .map((item) => [item.id || item.pageId, item.version]),
+);
+const currentWorksetId = workset?.id || manifest?.worksetId || null;
 const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
 const pages = [
   ...plan.pages,
@@ -22,6 +31,12 @@ const pages = [
     ? [{ id: "agreed", title: "Agreed so far", html: "" }]
     : []),
 ];
+const pageState = (id) => slots.get(id) || null;
+const pageReady = (id) => pageState(id)?.state !== "pending";
+const pageIdentity = (id) => {
+  const version = versions[id];
+  return version ? { worksetId: currentWorksetId, pageVersion: version } : {};
+};
 // crypto.randomUUID exists only in a secure context; over plain http on a
 // Tailscale address, which is how a phone reaches the hub, it is undefined.
 function uuid() {
@@ -72,12 +87,14 @@ const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.ar
 const resumeKey = `interactive-plan:resume:${session.sessionId || "offline"}`;
 const placeKey = `interactive-plan:place:${session.sessionId || "offline"}`;
 const prefsPrefix = `interactive-plan:prefs:${session.sessionId || "offline"}:`;
-let state = emptyDraft(plan.revision);
+let state = emptyDraft(plan.revision, currentWorksetId);
 if (editable)
   try {
     state = loadDraft(
       JSON.parse(localStorage.getItem(storageKey)),
       plan.revision,
+      currentWorksetId,
+      versions,
     );
   } catch {
     /* The in-memory draft and export remain usable. */
@@ -103,6 +120,12 @@ for (const topic of plan.pages) {
 function stale(kind, key, item) {
   if (kind === "note") {
     if (item.topic === "overall") return false;
+    if (
+      item.pageVersion &&
+      versions[item.topic] &&
+      item.pageVersion !== versions[item.topic]
+    )
+      return true;
     if (item.topic === "agreed" && builtInAgreed)
       return Boolean(
         item.agreementId &&
@@ -114,6 +137,12 @@ function stale(kind, key, item) {
       !known.text.get(item.topic).includes(normalize(item.quote))
     );
   }
+  if (
+    item.pageVersion &&
+    versions[item.topic] &&
+    item.pageVersion !== versions[item.topic]
+  )
+    return true;
   if (kind === "answer") return !known.questions.has(key);
   if (kind === "list") return !known.lists.has(key);
   return !known.choices.has(key);
@@ -145,7 +174,10 @@ function track(task) {
 const syntaxThemes = { light: "github-light", dark: "github-dark" };
 const current = () =>
   remote?.current?.artifactId === plan.artifactId &&
-  remote?.current?.revision === plan.revision;
+  remote?.current?.revision === plan.revision &&
+  (currentWorksetId
+    ? remote?.current?.worksetId === currentWorksetId
+    : !remote?.current?.worksetId || remote?.current?.viewKind !== "workset");
 const reviewAlerts = createReviewAlerts({
   window,
   button: $("notifications"),
@@ -247,14 +279,25 @@ document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && editable;
+  document.body.classList.toggle("page-pending", !feedback && !pageReady(id));
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
   if (!feedback) {
     page = pages.find((item) => item.id === id) || pages[0];
+    document.body.classList.toggle("page-pending", !pageReady(page.id));
     disposeRenderers();
     $("page-title").textContent = page.title;
     chooseBlock(null);
     $("page-content").innerHTML = page.html;
+    const slot = pageState(page.id);
+    if (slot?.state === "ready" && slot.renderVerified === false) {
+      const notice = document.createElement("p");
+      notice.className = "notice";
+      notice.dataset.tone = "attention";
+      notice.textContent =
+        "Rendering not verified. The page passed its static checks and remains available to review.";
+      $("page-content").prepend(notice);
+    }
     blockTargets($("page-content"), page.id);
     choiceTargets($("page-content"), page.id);
     if (page.id === "agreed" && builtInAgreed) renderAgreements();
@@ -465,11 +508,12 @@ function openNote(
   entryId = null,
   target = null,
 ) {
-  if (!editable) return;
+  if (!editable || (topic !== "overall" && !pageReady(topic))) return;
   noteContext = {
     topic,
     anchor,
     quote,
+    ...(topic !== "overall" ? pageIdentity(topic) : {}),
     ...(entryId ? { agreementId: entryId } : {}),
     ...(target ? { target } : {}),
   };
@@ -519,6 +563,8 @@ function recordUrl(record, route) {
   if (record.target) params.set("target", record.target);
   if (record.quote) params.set("quote", record.quote);
   const search = params.toString();
+  if (record.worksetId && (!manifest || record.revision !== plan.revision))
+    return `${base}/w/${encodeURIComponent(record.worksetId)}/${search ? "?" + search : ""}#${encodeURIComponent(record.topic)}`;
   return `${base}/${route}/${encodeURIComponent(record.revision)}${search ? "?" + search : ""}#${encodeURIComponent(record.topic)}`;
 }
 function tag(text, tone = "") {
@@ -909,6 +955,7 @@ function closeDrawer() {
 function canAccept(unsentCount) {
   return (
     plan.kind === "plan" &&
+    !workset &&
     connected &&
     current() &&
     !unsentCount &&
@@ -977,7 +1024,9 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
-  const sendable = connected && current() && editable;
+  const worksetWaiting =
+    workset && workset.readyCount !== workset.declaredCount;
+  const sendable = connected && current() && editable && !worksetWaiting;
   $("submit").disabled = !unsent.count || !sendable;
   $("submit").textContent = unsent.count
     ? `Submit (${unsent.count})`
@@ -987,7 +1036,11 @@ function review() {
   // shape between rounds; the working card reports how long the agent has been
   // at it.
   $("submit").hidden = !$("accept").hidden;
-  $("submit-status").textContent = submissionError;
+  $("submit-status").textContent =
+    submissionError ||
+    (worksetWaiting
+      ? `${workset.declaredCount - workset.readyCount} page${workset.declaredCount - workset.readyCount === 1 ? "" : "s"} still pending`
+      : "");
   status();
 }
 function feedbackText() {
@@ -1028,6 +1081,7 @@ function envelope(intent, text, extra = {}) {
     id: uuid(),
     artifactId: plan.artifactId,
     revision: plan.revision,
+    ...(currentWorksetId ? { worksetId: currentWorksetId } : {}),
     intent,
     groups: {},
     text,
@@ -1204,12 +1258,15 @@ function renderWorking(model) {
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
   const newer = connected && remote?.current && !current();
+  const worksetChanged =
+    workset && connected && remote?.workset?.updatedAt !== workset.updatedAt;
   const accepting =
     state.acceptance && remote?.latestSubmissionId === state.acceptance.id;
   const working =
     editable &&
     connected &&
     current() &&
+    !workset &&
     ["submitted", "working"].includes(stage);
   document.body.classList.toggle("is-working", working);
   $("working").hidden = !working;
@@ -1228,7 +1285,8 @@ function status() {
       : "";
   // A session closed from another tab reloads into read-only, so this tab
   // cannot send anything to an agent that will never be woken again.
-  if ((newer || remote?.dismissedAt) && mode === "live") scheduleReload();
+  if ((newer || worksetChanged || remote?.dismissedAt) && mode === "live")
+    scheduleReload();
 }
 async function poll() {
   try {
@@ -1383,7 +1441,7 @@ function renderSessions() {
     state.textContent = current ? "This tab" : stateWords(entry);
     words.append(
       state,
-      ` · ${entry.kind === "plan" ? "final plan" : "exploration"} · revision ${entry.revision} · ${ago(entry.updatedAt)}`,
+      ` · ${entry.worksetId ? "work set" : entry.kind === "plan" ? "final plan" : "exploration"}${entry.worksetId ? "" : ` · revision ${entry.revision}`} · ${ago(entry.updatedAt)}`,
     );
     row.append(title, words);
     row.onclick = () => {
@@ -1517,6 +1575,7 @@ function checklist(group, topic, previous) {
   return {
     kind: "multiple",
     topic,
+    ...pageIdentity(topic),
     label: group.dataset.label || group.dataset.multiselect,
     target: group.id,
     revision: plan.revision,
@@ -1833,6 +1892,7 @@ document.addEventListener("click", (event) => {
     else
       state.choices[id] = {
         topic: page.id,
+        ...pageIdentity(page.id),
         label: group.dataset.label || group.dataset.choice,
         value: choice.dataset.value,
         valueLabel:
@@ -1949,7 +2009,7 @@ function blockKind(block) {
 function commentTarget() {
   const button = $("quote");
   /* An open dialog hides the control in CSS, which no open path can forget. */
-  const usable = editable && !$("reading").hidden;
+  const usable = editable && !$("reading").hidden && pageReady(page.id);
   button.hidden = !usable;
   if (!usable) return;
   if (selected.length > 3) button.textContent = "Comment on selection";
@@ -2331,6 +2391,7 @@ window.planUI = {
     if (text.trim())
       state.answers[key] = {
         topic: page.id,
+        ...pageIdentity(page.id),
         label: label || id,
         text,
         target,
@@ -2358,6 +2419,45 @@ function separator() {
   divider.setAttribute("role", "separator");
   return divider;
 }
+function renderWorksetProgress() {
+  if (!workset) return;
+  const details = document.createElement("details");
+  details.className = "workset-progress";
+  details.id = "workset-progress";
+  const summary = document.createElement("summary");
+  const title = document.createElement("span");
+  title.className = "workset-progress-title";
+  title.textContent = workset.title;
+  const count = document.createElement("span");
+  count.className = "workset-progress-count";
+  count.textContent = `${workset.readyCount} of ${workset.declaredCount} pages ready`;
+  summary.append(title, count);
+  const bar = document.createElement("span");
+  bar.className = "workset-progress-bar";
+  for (const slot of workset.declared) {
+    const segment = document.createElement("i");
+    segment.className = slot.state;
+    bar.append(segment);
+  }
+  const list = document.createElement("ul");
+  for (const slot of workset.declared) {
+    const row = document.createElement("li");
+    row.className = slot.state;
+    const mark = document.createElement("b");
+    mark.textContent = slot.state === "ready" ? "✓" : "·";
+    if (slot.state === "ready" && slot.renderVerified === false) {
+      row.className = "unverified";
+      mark.textContent = "!";
+    }
+    const label = document.createElement("span");
+    label.textContent = slot.title;
+    row.append(mark, label);
+    list.append(row);
+  }
+  details.append(summary, bar, list);
+  $("navigation").append(details);
+}
+renderWorksetProgress();
 for (const item of [
   pages.find((item) => item.id === "agreed"),
   ...pages.filter((item) => item.id !== "agreed"),
@@ -2365,7 +2465,21 @@ for (const item of [
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.page = item.id;
-  button.textContent = item.title;
+  const label = document.createElement("span");
+  label.textContent = item.title;
+  button.append(label);
+  const slot = pageState(item.id);
+  if (slot?.state === "pending") {
+    button.classList.add("pending");
+    button.title = "This page is still pending publication";
+  } else if (slot?.renderVerified === false) {
+    button.classList.add("unverified");
+    const mark = document.createElement("span");
+    mark.className = "nav-status";
+    mark.textContent = "!";
+    mark.setAttribute("aria-label", "Rendering not verified");
+    button.append(mark);
+  }
   $("navigation").append(button);
   if (item.id === "agreed") $("navigation").append(separator());
 }
@@ -2421,6 +2535,9 @@ function start() {
       push: false,
     },
   );
+  Promise.allSettled([...renders]).then(() => {
+    document.documentElement.dataset.planReady = "true";
+  });
   // The browser restores the old scroll position after the reload; a new
   // revision starts at the top.
   if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
