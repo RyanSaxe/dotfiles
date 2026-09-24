@@ -17,6 +17,12 @@ enough information to implement and verify the work without earlier revisions
 or the conversation. If feedback reopens a settled choice, return to
 exploration before presenting another complete plan.
 
+An exploration revision shows new or materially changed material. Move
+settled choices to Agreed, and omit unchanged pages that received no feedback.
+Silence does not settle a decision. Return to an unanswered decision when new
+evidence, a changed proposal, or a sharper question gives the reviewer
+something new to judge.
+
 ## Files
 
 - [round.md](references/round.md): the sequence for each revision. The hub's

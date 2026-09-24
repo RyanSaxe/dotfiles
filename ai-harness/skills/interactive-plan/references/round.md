@@ -1,8 +1,8 @@
 # Run one review round
 
 Interactive planning is a loop. Send each revision as soon as it contains
-the material the reviewer needs. Put every open point on the pages and
-publish. Use the reviewer's feedback to refine the next revision. Ship
+new or changed material the reviewer needs. Use the reviewer's feedback to
+refine the next revision. Ship
 polished, not perfect. Careless components or writing distract the reviewer
 from the decision. A late revision delays every decision after it. The build
 checks each page's structure, and the reviewer's browser shows the result.
@@ -39,10 +39,13 @@ Every session command is `node scripts/session.mjs COMMAND
    and finish in any order, and independent pages can go to subagents.
    Author under a directory of your own in the system temp directory,
    starting from the source directory that `read` reports as
-   `status.current.source`. Put every remaining open point on a page in this
-   revision, one page per topic. Ask every question needed for the next
-   revision on a page next to the proposal it affects, never in the chat.
-   Remove the control from a settled point.
+   `status.current.source`. Put each new, reopened, or materially changed
+   point on its own page. Keep an unanswered decision open, but omit its page
+   if nothing about it has changed. Silence is not agreement. Return to that
+   decision with new material or a sharper question before it can bind the
+   final plan. Ask every question needed for the next revision on a page next
+   to the proposal it affects, never in the chat. Remove the control from a
+   settled point.
 5. Check. Build with `node scripts/build.mjs SOURCE.json OUT.html`. It
    prints the output path when it finds nothing. Otherwise it lists every
    structural problem and writes nothing, so fix them and build again. Read

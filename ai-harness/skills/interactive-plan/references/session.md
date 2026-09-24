@@ -94,15 +94,18 @@ An `accept-plan` event includes an explicit `mode`:
 - `save`: acknowledge, complete, and report the durable plan path. Do not
   implement.
 - `implement`: acknowledge, complete, and read the accepted plan from the
-  returned path. Implement it under the project's instructions, isolation
-  requirements, and existing permissions. Acceptance authorizes nothing
-  else.
+  returned path. The event may include optional `guidance`, trimmed to at most
+  4,000 characters. Read it with the plan and implement under the project's
+  instructions, isolation requirements, and existing permissions. If the
+  guidance changes an agreed requirement, request a new review. Acceptance
+  authorizes nothing else.
 
 ```sh
 node scripts/session.mjs complete --session-dir PATH
 ```
 
-`complete` returns `nextAction` and `planPath`. Do not infer implementation
+`complete` returns `nextAction`, `planPath`, and any implementation `guidance`.
+Save mode never includes guidance. Do not infer implementation
 permission from feedback, a recommendation, or an acknowledgement. Leave
 accepted artifacts and the acceptance record unchanged. A later change
 requires a new revision and a new review.

@@ -436,6 +436,24 @@ async function loadSession(directory, config, origin) {
         }
       }
     }
+    if (data.intent === "accept-plan") {
+      requireValue(
+        ["save", "implement"].includes(data.mode),
+        "Choose save or implement explicitly",
+      );
+      if (data.guidance !== undefined) {
+        requireValue(
+          data.mode === "implement" && typeof data.guidance === "string",
+          "Only implementation acceptance can include guidance",
+        );
+        data.guidance = data.guidance.trim();
+        requireValue(
+          data.guidance.length <= 4000,
+          "Implementation guidance exceeds 4,000 characters",
+        );
+        if (!data.guidance) delete data.guidance;
+      }
+    }
     const file = path.join(directory, "feedback", data.id + ".json");
     if (await exists(file)) {
       const original = await read(file);
@@ -452,10 +470,6 @@ async function loadSession(directory, config, origin) {
       409,
     );
     if (data.intent === "accept-plan") {
-      requireValue(
-        ["save", "implement"].includes(data.mode),
-        "Choose save or implement explicitly",
-      );
       requireValue(
         state.current.kind === "plan" &&
           ["ready", "updated"].includes(state.stage) &&
@@ -642,6 +656,9 @@ async function loadSession(directory, config, origin) {
           eventId: event.id,
           ...state.current,
           mode: event.payload.mode,
+          ...(event.payload.guidance
+            ? { guidance: event.payload.guidance }
+            : {}),
           acceptedAt: event.receivedAt,
         };
         await atomic(path.join(directory, "acceptance.json"), patch.accepted);
@@ -751,6 +768,9 @@ async function loadSession(directory, config, origin) {
         status: view(),
         planPath: state.accepted.path,
         nextAction: state.accepted.mode === "implement" ? "implement" : "save",
+        ...(state.accepted.guidance
+          ? { guidance: state.accepted.guidance }
+          : {}),
       };
     }
     requireValue(false, "Unknown agent action");

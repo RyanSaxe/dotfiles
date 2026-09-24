@@ -32,14 +32,16 @@ that repeat nearby text.
 
 ## Exploration
 
-Use one exploration page per open decision. Do not add an overview, summary
-or early implementation page. Use Agreed as the only running context. Put
-every open point on the pages in one revision so the reviewer can settle them
-in one round. If one revision has only one question on one page, investigate
-the remaining open points before asking the user to review it.
+Use one exploration page per decision that needs review in this round. Do not
+add an overview, summary or early implementation page. Use Agreed as the only
+running context. Put related new or changed points in one revision so the
+reviewer can settle them in one round. Do not repeat an unchanged page because
+the reviewer did not answer it. Keep that decision open and return with new
+evidence, a changed proposal, or a sharper question.
 
 Assemble the final plan from Agreed. A decision that is not on Agreed is not
-settled and cannot bind a step. Resolve every open point in each revision.
+settled and cannot bind a step. Resolve decisions needed for the final plan
+before presenting it.
 When the user asks you to decide, decide, record the decision on Agreed and
 continue. When implementation must answer a question, state what it will
 find out, how it will find out and what result is acceptable. If two
@@ -66,10 +68,11 @@ Match the detail to the work.
 
 When a proposal changes between revisions, show the change against what the
 user reviewed: a diff for text and code, before and after for visuals.
-Treat an unannotated passage as agreement, so show the diff the user must
-review next. Remove a decision or question after recording its answer on
-Agreed. If a control remains, the next revision asks the question again. If
-the topic is still open, ask the next question, never the same one.
+Unannotated wording can stay in a revised proposal, but silence does not
+settle its central decision. Remove a decision or question after recording
+its answer on Agreed. If a control remains, the next revision asks the
+question again. If the topic is still open, bring back new material or ask a
+sharper question, never the same one.
 
 ## Sentences
 

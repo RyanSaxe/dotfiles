@@ -299,6 +299,15 @@
         Starting implementation hands the plan to the waiting agent. Saving
         keeps it for later and the agent stops.
       </p>
+      <label for="accept-guidance">Implementation guidance, optional</label>
+      <textarea
+        id="accept-guidance"
+        maxlength="4000"
+        aria-describedby="accept-guidance-detail"
+      ></textarea>
+      <p class="small" id="accept-guidance-detail">
+        Sent only with Start implementation.
+      </p>
       <p class="small" id="accept-error" role="status"></p>
       <div class="actions">
         <button class="btn" type="button" data-accept-mode="save">

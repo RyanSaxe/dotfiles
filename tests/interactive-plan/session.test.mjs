@@ -55,17 +55,18 @@ const alive = (pid) => {
     return error.code !== "ESRCH";
   }
 };
-// The helper's start detects the harness from the environment. A dummy inbox
-// socket makes every wake fail harmlessly instead of reaching a real session.
+// The helper detects the nearest agent process before environment variables.
+// Give both supported agent paths dummy targets so a test wake cannot reach
+// a real session, including when this suite runs under Codex.
 function cliEnv(home, extra = {}) {
   const env = {
     ...process.env,
     XDG_STATE_HOME: home,
     CLAUDE_CODE_MESSAGING_SOCKET: path.join(home, "none.sock"),
     CLAUDE_CODE_MESSAGING_TOKEN: "test",
+    CODEX_THREAD_ID: "interactive-plan-test-thread",
     ...extra,
   };
-  delete env.CODEX_THREAD_ID;
   delete env.COPILOT_AGENT_SESSION_ID;
   return env;
 }
@@ -187,9 +188,12 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   );
   assert.equal("sentIn" in groups.notes[0], false);
   assert.equal("answers" in groups, false);
+  draft.acceptance = { id: "accept-1", mode: "implement", guidance: "Do this" };
+  draft.acceptGuidance = "Do this";
   const same = loadDraft(JSON.parse(JSON.stringify(draft)), "1");
   assert.equal(same.notes.length, 2);
   assert.equal(same.submitted.id, "sub-1");
+  assert.equal(same.acceptGuidance, "Do this");
   const next = loadDraft(JSON.parse(JSON.stringify(draft)), "2");
   assert.deepEqual(
     next.notes.map((note) => note.id),
@@ -198,6 +202,8 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   assert.deepEqual(next.choices, {});
   assert.deepEqual(next.answers, {});
   assert.equal(next.submitted, null);
+  assert.equal(next.acceptance, null);
+  assert.equal(next.acceptGuidance, "");
   assert.equal(next.revision, "2");
   assert.deepEqual(loadDraft(null, "3"), emptyDraft("3"));
   assert.deepEqual(loadDraft({ notes: "bad" }, "3"), emptyDraft("3"));
@@ -1466,6 +1472,52 @@ for (const mode of ["save", "implement"])
     assert.equal((await a.status()).body.accepted, null);
   });
 
+test("implementation guidance is validated, saved with acceptance, and returned on completion", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.action("publish", { html: artifact("1", "plan") });
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("accept-plan", "1", { mode: "save", guidance: "Do this" }),
+      )
+    ).code,
+    400,
+  );
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("accept-plan", "1", {
+          mode: "implement",
+          guidance: "x".repeat(4001),
+        }),
+      )
+    ).code,
+    400,
+  );
+  const acceptance = a.event("accept-plan", "1", {
+    mode: "implement",
+    guidance: "  Start with the drawing question.  ",
+  });
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  assert.equal(
+    (await a.feedback({ ...acceptance, guidance: "Different work" })).code,
+    409,
+  );
+  const read = await a.action("read");
+  assert.equal(
+    read.body.event.payload.guidance,
+    "Start with the drawing question.",
+  );
+  const complete = (await a.action("complete")).body;
+  assert.equal(complete.guidance, "Start with the drawing question.");
+  const record = JSON.parse(
+    await fs.readFile(path.join(a.directory, "acceptance.json"), "utf8"),
+  );
+  assert.equal(record.guidance, complete.guidance);
+});
+
 test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-idle-"));
   const port = 30000 + Math.floor(Math.random() * 20000);
@@ -1483,7 +1535,8 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
   assert.equal(first.url, `http://127.0.0.1:${port}/s/${first.sessionId}/`);
   assert(first.sessionDir.startsWith(config.sessions));
-  assert.deepEqual(first.wake, { harness: "claude-code" });
+  assert.deepEqual(Object.keys(first.wake), ["harness"]);
+  assert(["codex", "claude-code"].includes(first.wake.harness));
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.equal(record.port, port);
   assert.equal(record.version, version);
