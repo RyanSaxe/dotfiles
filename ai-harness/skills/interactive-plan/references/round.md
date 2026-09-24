@@ -23,6 +23,8 @@ Every session command is `node scripts/session.mjs COMMAND
    [prototypes.md](prototypes.md) and the
    [component index](../components/index.md). Look one up while building
    instead of re-reading them all.
+   For a drawing answer, inspect its `previewPath` PNG; its `scenePath`
+   holds the editable Excalidraw source if you need the underlying shapes.
 2. Agreed. Decide what the feedback did to each open point: settled,
    reopened, retired, or still open. A recommendation is not an agreement,
    and an answer is recorded once.

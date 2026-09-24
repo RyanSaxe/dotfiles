@@ -282,6 +282,30 @@
         </div>
       </form>
     </dialog>
+    <dialog
+      class="drawing-dialog"
+      id="drawing-dialog"
+      aria-labelledby="drawing-title"
+    >
+      <div class="drawing-head">
+        <h2 id="drawing-title">Draw an answer</h2>
+        <span class="spacer"></span>
+        <button class="btn" id="drawing-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="drawing-save" type="button">
+          Save drawing
+        </button>
+      </div>
+      <p class="renderer-error" id="drawing-error" role="status" hidden></p>
+      <iframe
+        id="drawing-frame"
+        title="Drawing editor"
+        sandbox="allow-scripts"
+        referrerpolicy="no-referrer"
+      ></iframe>
+    </dialog>
+    <script type="application/json" id="drawing-editor-source">
+      <!-- DRAWING_EDITOR -->
+    </script>
     <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
       <div class="dialog-head">
         <h2 id="accept-title" tabindex="-1" autofocus>Accept this plan?</h2>

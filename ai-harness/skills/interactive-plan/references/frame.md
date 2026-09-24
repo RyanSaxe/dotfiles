@@ -64,6 +64,7 @@ controls inside a block, so keep authored controls focusable.
 | data-choice                          | Stable choice-group ID. Use data-label for a readable label.                                                                                                                                                                                       |
 | data-multiselect                     | Stable checklist-group ID. Use data-label for a readable question or group label.                                                                                                                                                                  |
 | data-question                        | Stable question ID on a section with a textarea. Use data-label for the answer's label.                                                                                                                                                            |
+| data-drawing-question                | Stable drawing-question ID on a section using the drawing-question component. Use data-label for the answer's label.                                                                                                                               |
 | data-value                           | Stable option ID on a button in data-choice, or a native checkbox in data-multiselect.                                                                                                                                                             |
 | data-label on an option              | Readable option label, separate from its ID and action text. The build refuses one over 24 characters, which is what a tab strip fits. A group's data-label has no limit. Buttons fall back to their text, and checkboxes fall back to data-value. |
 | data-kind on a block                 | The word the comment control uses for this block, after "this". A component sets it on its own root. The frame names any other block from its contents.                                                                                            |
@@ -137,7 +138,9 @@ uploaded, and removing a note deletes the images it named. A submission
 includes
 `groups.choices` (checklists with `touched`), `groups.notes` with any
 `attachments`, and, when present, `groups.answers` keyed `page/question`
-with `label`, `text`, and `topic`. Its text lists untouched checklists after "Defaults, not
+with `label`, `text`, and `topic`, or a drawing answer with `kind: "drawing"`,
+`sceneId`, `previewId`, `label`, `topic`, and `revision`. The agent's read
+response adds the session-owned `scenePath` and `previewPath`. Its text lists untouched checklists after "Defaults, not
 confirmed:".
 
 ## Figures and renderers

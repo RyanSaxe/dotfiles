@@ -254,7 +254,7 @@ function serializer() {
 
 async function loadSession(directory, config, origin) {
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  for (const child of ["artifacts", "feedback", "uploads"])
+  for (const child of ["artifacts", "feedback", "uploads", "scenes"])
     await fs.mkdir(path.join(directory, child), {
       recursive: true,
       mode: 0o700,
@@ -323,6 +323,41 @@ async function loadSession(directory, config, origin) {
   const needsYou = () =>
     Boolean(state.current) && ["ready", "updated"].includes(state.stage);
   const active = () => state.stage !== "complete" && !state.paused;
+  function withDrawingPaths(event) {
+    const answers = event.payload.groups?.answers;
+    if (
+      !answers ||
+      !Object.values(answers).some((item) => item.kind === "drawing")
+    )
+      return event;
+    const mapped = Object.fromEntries(
+      Object.entries(answers).map(([key, answer]) => [
+        key,
+        answer.kind === "drawing"
+          ? {
+              ...answer,
+              scenePath: path.join(
+                directory,
+                "scenes",
+                `${answer.sceneId}.excalidraw`,
+              ),
+              previewPath: path.join(
+                directory,
+                "uploads",
+                `${answer.previewId}.png`,
+              ),
+            }
+          : answer,
+      ]),
+    );
+    return {
+      ...event,
+      payload: {
+        ...event.payload,
+        groups: { ...event.payload.groups, answers: mapped },
+      },
+    };
+  }
   // Runs after the submission is saved, outside the browser's request, so a
   // slow or failing harness never delays the reviewer's Sent state.
   async function wakeAgent(revision) {
@@ -362,6 +397,41 @@ async function loadSession(directory, config, origin) {
     requireValue(kind, "No such image", 404);
     return { bytes, type: kind.type };
   }
+  async function uploadScene(bytes) {
+    let scene;
+    try {
+      scene = JSON.parse(bytes.toString("utf8"));
+    } catch {
+      requireValue(false, "Drawing scene must be JSON");
+    }
+    requireValue(
+      scene?.type === "excalidraw" &&
+        Array.isArray(scene.elements) &&
+        scene.elements.length > 0 &&
+        scene.appState &&
+        typeof scene.appState === "object" &&
+        !Array.isArray(scene.appState) &&
+        scene.files &&
+        typeof scene.files === "object" &&
+        !Array.isArray(scene.files),
+      "Drawing scene must contain Excalidraw elements, appState and files",
+    );
+    const id = crypto.randomBytes(8).toString("hex");
+    const file = path.join(directory, "scenes", `${id}.excalidraw`);
+    await fs.writeFile(file, bytes, { mode: 0o600 });
+    return {
+      id,
+      path: file,
+      type: "application/vnd.excalidraw+json",
+      bytes: bytes.length,
+    };
+  }
+  async function readScene(id) {
+    requireValue(/^[0-9a-f]{16}$/.test(id || ""), "Bad drawing scene ID", 404);
+    const file = path.join(directory, "scenes", `${id}.excalidraw`);
+    requireValue(await exists(file), "No such drawing scene", 404);
+    return { bytes: await fs.readFile(file), path: file };
+  }
   /* A note the reviewer removed takes its images with it. */
   async function removeUpload(id) {
     requireValue(/^[0-9a-f]{16}$/.test(id || ""), "Bad image ID");
@@ -395,15 +465,31 @@ async function loadSession(directory, config, origin) {
           !Array.isArray(data.groups.answers),
         "answers must be an object",
       );
-      for (const answer of Object.values(data.groups.answers))
-        requireValue(
-          answer &&
-            ["label", "text", "topic"].every(
-              (key) => typeof answer[key] === "string",
-            ) &&
-            answer.text.trim(),
-          "Answers require label, text, and topic",
-        );
+      for (const answer of Object.values(data.groups.answers)) {
+        if (answer?.kind === "drawing") {
+          requireValue(
+            ["label", "topic", "revision", "sceneId", "previewId"].every(
+              (key) => typeof answer[key] === "string" && answer[key],
+            ),
+            "Drawing answers require label, topic, revision and both file IDs",
+          );
+          await readScene(answer.sceneId);
+          const preview = await readUpload(answer.previewId);
+          requireValue(
+            preview.type === "image/png",
+            "Drawing preview must be PNG",
+          );
+        } else
+          requireValue(
+            answer &&
+              answer.kind === undefined &&
+              ["label", "text", "topic"].every(
+                (key) => typeof answer[key] === "string",
+              ) &&
+              answer.text.trim(),
+            "Answers require label, text, and topic",
+          );
+      }
     }
     /* Images hang off the note they illustrate, and a note may only name an
        image this session holds, so a submission cannot point the agent at a
@@ -621,7 +707,7 @@ async function loadSession(directory, config, origin) {
         const event = await read(
           path.join(directory, "feedback", data.id + ".json"),
         );
-        return { status: view(), event };
+        return { status: view(), event: withDrawingPaths(event) };
       }
       const [event] = await pending();
       if (!event) return { status: view(), event: null };
@@ -647,7 +733,7 @@ async function loadSession(directory, config, origin) {
         await atomic(path.join(directory, "acceptance.json"), patch.accepted);
       }
       await transition(patch);
-      return { status: view(), event };
+      return { status: view(), event: withDrawingPaths(event) };
     }
     if (data.action === "working") {
       await transition({ stage: "working" });
@@ -819,6 +905,8 @@ async function loadSession(directory, config, origin) {
     submit,
     upload,
     readUpload,
+    uploadScene,
+    readScene,
     removeUpload,
     dismiss,
     act,
@@ -1277,6 +1365,32 @@ export async function startHub(config = settings()) {
             201,
             await session.exclusive(() => session.upload(bytes)),
           );
+        }
+        if (
+          method === "POST" &&
+          rest[0] === "api" &&
+          rest[1] === "drawing-scene" &&
+          rest.length === 2
+        ) {
+          requireValue(
+            req.headers.origin === `http://${req.headers.host}`,
+            "Unauthorized source",
+            403,
+          );
+          const bytes = await readBytes(req, uploadBytes);
+          return reply(
+            201,
+            await session.exclusive(() => session.uploadScene(bytes)),
+          );
+        }
+        if (
+          method === "GET" &&
+          rest[0] === "api" &&
+          rest[1] === "drawing-scene" &&
+          rest.length === 3
+        ) {
+          const scene = await session.readScene(rest[2]);
+          return reply(200, scene.bytes, "application/vnd.excalidraw+json");
         }
         /* The thumbnail in the note dialog, and the same image again after a
            reload: the draft keeps a reference and the bytes stay here. */
