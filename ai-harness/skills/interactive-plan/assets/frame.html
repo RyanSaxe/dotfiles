@@ -187,6 +187,11 @@
               <div class="note-bars" id="note-bars"></div>
               <div class="chosen-bar" id="chosen-bar" hidden></div>
               <div id="page-content"></div>
+              <section
+                class="sent-page-comments"
+                id="sent-page-comments"
+                hidden
+              ></section>
               <p class="note-count" id="note-count" hidden></p>
               <nav class="page-footer" aria-label="Previous and next">
                 <a id="footer-previous" hidden></a>
@@ -194,18 +199,24 @@
               </nav>
             </section>
             <section id="feedback" hidden>
-              <h1 tabindex="-1" id="feedback-title">Feedback</h1>
+              <p class="review-kicker" id="review-kicker"></p>
+              <h1 tabindex="-1" id="feedback-title">Review</h1>
               <div class="submission-receipt" id="submission-receipt" hidden>
                 <p class="receipt-stage" role="status">
                   <span class="page-activity active" aria-hidden="true"></span>
                   <span id="receipt-stage"></span>
                 </p>
                 <p class="muted" id="receipt-detail"></p>
-                <button class="btn" id="read-submitted" type="button">
-                  Read submitted revision
-                </button>
+              </div>
+              <div id="review-queue" hidden>
+                <p class="queue-progress" id="queue-progress"></p>
+                <div class="queue-list" id="queue-list"></div>
               </div>
               <div id="feedback-review">
+                <div class="draft-head" id="draft-head" hidden>
+                  <h2>Your comments</h2>
+                  <span id="draft-count"></span>
+                </div>
                 <p
                   class="notice"
                   id="submit-error"
@@ -240,8 +251,18 @@
                 <p class="small" id="storage-status"></p>
                 <p class="small" id="connection-status"></p>
               </div>
-              <nav class="page-footer" aria-label="Back">
-                <a id="feedback-back" hidden></a>
+              <details class="last-submission" id="last-submission" hidden>
+                <summary>
+                  <span
+                    ><strong>Your last submission</strong
+                    ><small id="last-submission-meta"></small
+                  ></span>
+                </summary>
+                <div id="last-submission-body"></div>
+                <a id="last-submission-link">Read submitted revision →</a>
+              </details>
+              <nav class="page-footer" aria-label="Pages">
+                <button id="feedback-pages" type="button">Pages →</button>
               </nav>
             </section>
           </div>

@@ -131,6 +131,8 @@ let page = pages[0],
   selectedTarget = null,
   submissionError = "",
   submissionInFlight = false,
+  lastSubmission = null,
+  lastSubmissionLoadedId = null,
   noteDraftKey = "",
   renderedFeedback = null,
   answerTimer;
@@ -273,7 +275,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     chooseBlock(null);
     $("page-content").dataset.pageId = page.id;
     $("page-content").innerHTML = page.pending
-      ? `<div class="pending-page"><span class="pending-state">${pageIndicator(page.working ? "active" : "queued").outerHTML}${page.working ? "Being prepared" : "Waiting its turn"}</span><p>${page.working ? "The agent is working on this page. It will appear when its publication check passes." : "The agent has listed this page but has not started it yet."} You can read Agreed now.</p></div>`
+      ? `<div class="pending-page ${page.working ? "working" : "queued"}"><span class="pending-state">${pageIndicator(page.working ? "active" : "queued").outerHTML}${page.working ? "Being prepared" : "Waiting its turn"}</span><p>${page.working ? "The agent is working on this page. It will appear after its publication check passes." : "The agent has listed this page but has not started it yet."}</p></div>`
       : page.html;
     if (!page.pending) {
       blockTargets($("page-content"), page.id);
@@ -286,6 +288,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       markNotes();
       enhance($("page-content"));
     }
+    renderSentPageComments();
     window.planUI.page = page;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
@@ -902,15 +905,165 @@ function renderFeedback() {
       revision ? `From revision ${revision}` : "From an earlier revision",
       orphans.filter((entry) => entry.item.revision === revision),
     );
-  if (!items.some((entry) => entry.topic !== "overall")) {
-    const empty = document.createElement("p");
-    empty.className = "feedback-empty";
-    empty.textContent = "No specific comments.";
-    groups.append(empty);
-  }
   $("overall-notes").replaceChildren(
     ...items.filter((entry) => entry.topic === "overall").map(itemCard),
   );
+}
+function sentEntries(submission) {
+  if (!submission) return [];
+  const groups = submission.groups || {};
+  return [
+    ...(groups.notes || []).map((note) => ({
+      topic: note.topic,
+      label: note.anchor || "Comment",
+      text: note.text,
+      quote: note.quote,
+      images: (note.attachments || []).map((item) => item.id),
+    })),
+    ...Object.values(groups.choices || {}).map((choice) => ({
+      topic: choice.topic,
+      label: choice.label || "Choice",
+      text: choiceText(choice),
+    })),
+    ...Object.values(groups.answers || {}).map((answer) => ({
+      topic: answer.topic,
+      label: answer.label || "Answer",
+      text: answer.kind === "drawing" ? "Drawing attached" : answer.text,
+      images: answer.kind === "drawing" ? [answer.previewId] : [],
+    })),
+  ];
+}
+function sentCard(entry) {
+  const card = document.createElement("div");
+  card.className = "sent-card";
+  const label = document.createElement("small");
+  label.textContent = `${pages.find((item) => item.id === entry.topic)?.title || entry.topic || "Overall"} · ${entry.label}`;
+  const body = document.createElement("p");
+  body.textContent = entry.text;
+  card.append(label);
+  if (entry.quote) {
+    const quote = document.createElement("blockquote");
+    quote.textContent = entry.quote;
+    card.append(quote);
+  }
+  card.append(body);
+  if (entry.images?.length) {
+    const images = document.createElement("div");
+    images.className = "sent-images";
+    for (const id of entry.images) {
+      const link = document.createElement("a");
+      link.href = `${base}/api/upload/${encodeURIComponent(id)}`;
+      link.target = "_blank";
+      link.rel = "noopener";
+      const thumbnail = document.createElement("img");
+      thumbnail.src = link.href;
+      thumbnail.alt = "Attached image";
+      thumbnail.loading = "lazy";
+      link.append(thumbnail);
+      images.append(link);
+    }
+    card.append(images);
+  }
+  return card;
+}
+function renderSentPageComments() {
+  const section = $("sent-page-comments");
+  section.replaceChildren();
+  const entries =
+    lastSubmission?.revision === plan.revision
+      ? sentEntries(lastSubmission).filter((entry) => entry.topic === page.id)
+      : [];
+  section.hidden = !entries.length;
+  if (!entries.length) return;
+  const heading = document.createElement("h2");
+  heading.textContent = "Your sent comments";
+  section.append(heading, ...entries.map(sentCard));
+}
+function renderQueue() {
+  const queue = $("review-queue");
+  queue.hidden = !editable || submittedCurrent() || submissionInFlight;
+  if (queue.hidden) return;
+  const ready = pages.filter((item) => !item.pending).length;
+  $("queue-progress").textContent = `${ready} of ${pages.length} pages ready`;
+  const list = $("queue-list");
+  if (list.dataset.rendered) return;
+  list.replaceChildren();
+  for (const item of pages) {
+    const state = item.pending
+      ? item.working
+        ? "active"
+        : "queued"
+      : "complete";
+    const card = document.createElement("article");
+    card.className = `queue-card ${state}`;
+    const head = document.createElement("div");
+    head.className = "queue-head";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const status = document.createElement("span");
+    status.className = "queue-status";
+    status.textContent =
+      state === "complete"
+        ? "Ready"
+        : state === "active"
+          ? "Working"
+          : "Queued";
+    head.append(pageIndicator(state), title, status);
+    const detail = document.createElement("p");
+    detail.textContent =
+      state === "complete"
+        ? "Ready to review."
+        : state === "active"
+          ? "The agent is preparing this page."
+          : "Waiting its turn.";
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "queue-link";
+    link.textContent = state === "complete" ? "Read page →" : "View status →";
+    link.onclick = () => show(item.id);
+    card.append(head, detail, link);
+    list.append(card);
+  }
+  list.dataset.rendered = "true";
+}
+function renderLastSubmission() {
+  const container = $("last-submission");
+  container.hidden = !lastSubmission;
+  if (!lastSubmission) return;
+  const entries = sentEntries(lastSubmission);
+  const aligned = lastSubmission.groups.alignUnflagged;
+  $("last-submission-meta").textContent =
+    `Revision ${lastSubmission.revision} · ${entries.length ? plural(entries.length, "comment") : aligned === true ? "aligned review" : "no comments"}`;
+  const alignment = document.createElement("p");
+  alignment.className = "sent-alignment";
+  alignment.textContent = `Everything else looks good: ${aligned ? "Yes" : "No"}`;
+  $("last-submission-body").replaceChildren(
+    ...entries.map(sentCard),
+    ...(typeof aligned === "boolean" ? [alignment] : []),
+  );
+  $("last-submission-link").href =
+    `${base}/r/${encodeURIComponent(lastSubmission.revision)}`;
+  container.open = submittedCurrent();
+  renderSentPageComments();
+}
+async function loadSubmission() {
+  const key =
+    mode === "readonly"
+      ? `revision:${plan.revision}`
+      : remote?.latestSubmissionId;
+  if (!key || key === lastSubmissionLoadedId) return;
+  const route =
+    mode === "readonly"
+      ? `${base}/api/submission?revision=${encodeURIComponent(plan.revision)}`
+      : `${base}/api/submission`;
+  const response = await fetch(route);
+  if (!response.ok) return;
+  const { submission } = await response.json();
+  if (mode !== "readonly" && remote?.latestSubmissionId !== key) return;
+  if (mode !== "readonly" && submission && submission.id !== key) return;
+  lastSubmission = submission;
+  lastSubmissionLoadedId = key;
+  renderLastSubmission();
 }
 function badge(count) {
   const row = $("review-row");
@@ -947,8 +1100,7 @@ function canAccept(unsentCount) {
     ["ready", "updated"].includes(remote.stage)
   );
 }
-// Every page ends with where you came from and where to go next; the last
-// page leads to review, and the Feedback page leads back.
+// Every reading page ends with where you came from and where to go next.
 function renderFooter(feedback) {
   // Agreed so far leads the order, as it leads the sidebar.
   const order = [
@@ -968,14 +1120,7 @@ function renderFooter(feedback) {
     element.dataset.page = item.id;
     element.href = "#" + item.id;
   };
-  if (feedback) {
-    link(
-      $("feedback-back"),
-      previous,
-      previous ? `← Back to ${previous.title}` : "",
-    );
-    return;
-  }
+  if (feedback) return;
   link(
     $("footer-previous"),
     previous,
@@ -1000,6 +1145,8 @@ function review() {
   const unsent = unsentItems(state);
   const sent = submittedCurrent();
   const locked = sent || submissionInFlight;
+  $("draft-head").hidden = unsent.count === 0;
+  $("draft-count").textContent = `${unsent.count} to send`;
   badge(locked ? 0 : unsent.count);
   const reviewLabel = $("review-row")?.querySelector("span");
   if (reviewLabel)
@@ -1013,11 +1160,15 @@ function review() {
     ? "Sending feedback"
     : sent
       ? "Feedback sent"
-      : "Feedback";
-  $("feedback").classList.toggle("has-receipt", locked);
+      : `Review revision ${plan.revision}`;
+  $("review-kicker").textContent =
+    `Revision ${plan.revision} · ${sent ? "feedback sent" : remote?.pageRound ? "agent working" : "ready to review"}`;
   $("feedback").classList.toggle("sending", submissionInFlight);
   $("submission-receipt").hidden = !locked;
-  $("feedback-review").hidden = locked;
+  $("feedback-review").hidden =
+    locked || (Boolean(remote?.pageRound) && unsent.count === 0);
+  renderQueue();
+  $("last-submission").hidden = !lastSubmission || submissionInFlight;
   $("receipt-stage").textContent = submissionInFlight
     ? "Saving your comments"
     : agentStage();
@@ -1025,8 +1176,7 @@ function review() {
     ? "Your draft stays saved until the hub confirms it."
     : remote?.wake?.last?.ok === false
       ? "Your feedback is saved. Ask the agent to resume in chat."
-      : "Agreed will appear when it is ready.";
-  $("read-submitted").disabled = submissionInFlight;
+      : "New pages will appear after their publication checks pass.";
   $("submit-error").hidden = !submissionError;
   $("submit-error").textContent = submissionError;
   $("overall-note").disabled = locked;
@@ -1044,7 +1194,6 @@ function review() {
   commentTarget();
   $("accept").hidden = !canAccept(unsent.count);
   renderFooter(!$("feedback").hidden);
-  $("feedback-back").hidden = locked;
   const rendered = JSON.stringify([
     state.notes,
     state.choices,
@@ -1057,19 +1206,22 @@ function review() {
   }
   const sendable =
     connected && current() && feedbackEditable() && !remote?.pageRound;
+  const waitingForPages = Boolean(remote?.pageRound);
   const hasFeedback =
     unsent.count > 0 || (plan.kind === "exploration" && state.alignUnflagged);
   $("submit").disabled =
     submissionInFlight ||
-    (sent ? !$("feedback").hidden : !hasFeedback || !sendable);
+    (sent || waitingForPages
+      ? !$("feedback").hidden
+      : !hasFeedback || !sendable);
   $("submit").textContent = submissionInFlight
     ? "Sending"
-    : sent
+    : sent || waitingForPages
       ? "View status"
       : unsent.count
         ? `Submit (${unsent.count})`
         : "Submit";
-  $("submit").classList.toggle("primary", !sent);
+  $("submit").classList.toggle("primary", !sent && !waitingForPages);
   // Accept plan uses the same slot when a final plan has no unsent feedback.
   $("submit").hidden = !$("accept").hidden;
   status();
@@ -1207,6 +1359,7 @@ async function poll() {
     if (result.sessionId !== session.sessionId) throw Error("Wrong session");
     remote = result;
     connected = true;
+    void loadSubmission().catch(() => {});
     if (
       state.pending?.event?.id === remote.latestSubmissionId &&
       remote.latestSubmissionRevision === plan.revision &&
@@ -1707,7 +1860,7 @@ $("align-unflagged").onchange = (event) => {
   save();
 };
 $("submit").onclick = async () => {
-  if (submittedCurrent()) {
+  if (submittedCurrent() || remote?.pageRound) {
     show("feedback");
     return;
   }
@@ -1733,6 +1886,7 @@ $("submit").onclick = async () => {
     markSent(state, result.id, new Date().toISOString());
     submissionInFlight = false;
     save();
+    void loadSubmission().catch(() => {});
   } catch (error) {
     submissionInFlight = false;
     submissionError = submittedCurrent()
@@ -1744,7 +1898,6 @@ $("submit").onclick = async () => {
     else show(page.id, null, { keepScroll: true });
   }
 };
-$("read-submitted").onclick = () => show(page.id);
 $("export").onclick = () => {
   const groups = submissionGroups(state);
   const event =
@@ -2533,21 +2686,14 @@ addPageButton(pages.find((item) => item.id === "agreed"));
 $("navigation").append(separator());
 for (const item of pages.filter((item) => item.id !== "agreed"))
   addPageButton(item);
-const unfinishedPages = plan.pages.filter((item) => item.pending).length;
+const readyPages = pages.filter((item) => !item.pending).length;
 const pageCount = $("page-count");
-pageCount.hidden = plan.pageMode !== "partial" || !unfinishedPages;
-pageCount.textContent = unfinishedPages;
-$("menu-button").classList.toggle(
-  "need",
-  plan.pageMode === "partial" && unfinishedPages > 0,
-);
+pageCount.hidden = !readyPages;
+pageCount.textContent = readyPages;
+$("menu-button").classList.toggle("need", readyPages > 0);
 $("menu-button").setAttribute(
   "aria-label",
-  plan.pageMode !== "partial"
-    ? "Pages, all ready"
-    : unfinishedPages
-      ? `Pages, ${plural(unfinishedPages, "page")} unfinished`
-      : "Pages, more pages are being planned",
+  `Pages, ${plural(readyPages, "page")} ready to read`,
 );
 if (editable) {
   const review = document.createElement("button");
@@ -2567,6 +2713,7 @@ if (editable) {
 $("menu-button").addEventListener("click", () =>
   $("pages-dialog").open ? closeDrawer() : openDrawer(),
 );
+$("feedback-pages").addEventListener("click", openDrawer);
 let arrivalTimer;
 let arrivalPage = null;
 function hideArrival() {

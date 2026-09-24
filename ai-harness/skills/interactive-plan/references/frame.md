@@ -3,31 +3,39 @@
 ## Frame and content
 
 The frame provides the header, sidebar, previous and next links, the bell,
-Settings, the Feedback page, and preview and read-only modes. The bell lists
+Settings, the Review page, and preview and read-only modes. The bell lists
 other live sessions and closes them. The header spans the frame at every
 width. It displays the revision clock, Settings and the bell on the left,
-and Submit on the right. Submit stays disabled until the last listed page
-publishes. Its slot remains in place as it reads Sending during a save and
-View status after submission. A final plan with no unsent feedback offers
+and Submit on the right. While pages are publishing, the button reads View
+status and opens Review from another page. It is disabled on Review. After
+the last page publishes, it offers Submit when the current review has feedback
+or alignment to send. Its slot remains in place as it reads Sending during a
+save and View status after submission. A final plan with no unsent feedback offers
 Accept plan. The clock lists completed revisions and the current one. The
 sidebar keeps Agreed, this revision's pages in their declared order, and
 Review comments in one list. A clock marks a queued page, a pulsing light
 marks an active one, and a green check marks a ready page. A pending page has
 no page-specific comment control. Below 720px, the Pages button opens that
-same list. Its badge and icon use the bell's attention styling while the badge
-counts unfinished pages. The badge disappears when no count is available.
+same list. The Pages icon and badge use the accent color, separate from the
+bell's attention color. The badge counts ready pages in the displayed revision,
+including Agreed.
 A newly ready page briefly appears in a non-blocking notice with a View action;
 it does
 not take focus or navigate away from the current page. Reduced-motion mode
-keeps the marks visible without pulsing. Review comments opens the Feedback
-page and displays the count of unsent items.
-Submit from any page moves to Feedback. While the hub saves, the page says
-Sending feedback and keeps the draft. A confirmed save shows a short receipt
-with the agent's current status and a way back to the submitted revision.
-Feedback becomes Feedback sent in the page list. The submitted revision stays
-readable, but its comment and answer controls remain visible and disabled.
-View status in the header returns to the receipt. A failed save restores the
-review controls and shows the error on Feedback. The browser tab displays the
+keeps the marks visible without pulsing. Review comments opens the Review page
+and displays the count of unsent items. Review lists the current revision's
+ready, working, and queued pages. Ready cards open published content; other
+cards open a status placeholder. Review remains available when all pages are
+ready so the reader can review and submit comments.
+Submit from any page moves to Review. While the hub saves, the page says
+Sending feedback and keeps the draft. A confirmed save shows the agent's
+status and expands Your last submission. That section shows the saved feedback
+and links to the submitted revision. It stays collapsed on later revisions.
+The hub serves saved feedback by revision, so read-only older pages can show
+the comments sent on them. Review becomes Feedback sent in the page list
+while the displayed revision is locked. The submitted revision stays readable,
+but its comment and answer controls remain visible and disabled. A failed save
+restores the review controls and shows the error on Review. The browser tab displays the
 plan title. The revision dialog displays it under
 the current revision. Page HTML starts below the title and must not contain
 an `h1`. The build rejects a page that contains one. The page controls its own
@@ -142,7 +150,7 @@ block that already has notes.
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom. Before
-submission, the Feedback page groups items by page and includes edit, remove
+submission, the Review page groups items by page and includes edit, remove
 and the overall comment. A default-on "Everything else looks good" switch sits
 above those comments. Its value persists across reloads and revisions. Submit
 includes it as the boolean `groups.alignUnflagged`, and the feedback text names
@@ -152,8 +160,9 @@ submitted after all pages are ready. A successful submission locks that
 revision against another submission. Accept plan remains a separate action
 and the switch never authorizes implementation.
 Submit, at the right of the header, sends everything unsent
-at once and displays the count while items wait. Submitted feedback remains
-in the local draft until the next revision, which starts fresh. An item whose
+at once and displays the count while items wait. The hub retains sent feedback
+for Review and older revision pages. The local draft starts fresh on the next
+revision. An item whose
 page or text no longer exists
 is listed under the revision it came from. A note takes images. Paste a
 screenshot, drop a file on the dialog, or use Add an image; each one uploads

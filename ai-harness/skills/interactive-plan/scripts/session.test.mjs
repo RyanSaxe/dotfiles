@@ -94,6 +94,20 @@ before(async () => {
 });
 after(() => hub.close());
 
+test("the browser can read sent feedback without agent-only paths", async () => {
+  const submission = await (
+    await fetch(`${hub.origin}/s/${sessionId}/api/submission?revision=1`)
+  ).json();
+  assert.equal(submission.submission.id, "evt1");
+  assert.equal(submission.submission.revision, "1");
+  assert.deepEqual(submission.submission.groups.notes, []);
+  assert.deepEqual(submission.submission.groups.choices, {});
+  const invalid = await fetch(
+    `${hub.origin}/s/${sessionId}/api/submission?revision=..%2Fsecret`,
+  );
+  assert.equal(invalid.status, 400);
+});
+
 test("pages cannot be listed before Agreed for the next revision", async () => {
   const result = await act({
     action: "progress",
