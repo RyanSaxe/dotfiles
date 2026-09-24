@@ -12,9 +12,12 @@ option is a different plan, not a different label. Do not invent an
 alternative when only one way is credible. The component index says what
 each component is for.
 
-Build each page around the proposal. Where the browser can show the
-material, rendered, drawn or demonstrated, show it, and use prose for the
-context and consequences the page cannot show. Do not restyle a component: the
+Build each page around the proposal. Choose components by what the reviewer
+needs to see. For architecture choices, show boundaries or data flow when
+those differ. Put costs and risks side by side when they distinguish the
+options. Where the browser can show material,
+rendered, drawn or demonstrated, show it, and use prose for the context and
+consequences the page cannot show. Do not restyle a component: the
 builder puts component CSS in a layer above the plan's, so the rule is
 ignored rather than half-applied. A component is as wide as the reading
 column. Resolve routine details from

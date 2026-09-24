@@ -6,8 +6,10 @@ reads every directory here and writes what it finds into the artifact, so
 an author copies the markup into a page, replaces its content and IDs, and
 does nothing else. Nothing goes into the plan's `css` or `js`.
 
-Choose a component for the structure of the decision, not for its sample
-content.
+Choose a component for what the reviewer needs to compare or inspect, not
+for its sample content. Use a diagram to show boundaries, dependencies, or
+order when those details matter to the decision. Use a comparison to align
+the same criteria across options. Otherwise, explain the decision in prose.
 
 | Directory                                        | Use                                        | Content and interaction                                                                                                                                                                      |
 | ------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,7 +21,7 @@ content.
 | [before-after](before-after/markup.html)         | A proposed change                          | By default, show either code in the text viewer or diagrams in the visual pair.                                                                                                              |
 | [scope-checklist](scope-checklist/markup.html)   | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. Start with no boxes checked. The frame includes untouched and empty selections in the submitted list.                    |
 | [behavior-cases](behavior-cases/markup.html)     | Situations and proposed outcomes           | Repeat the case section, with the When and Then labels that show under 700px. Keep each ID in its contextual comment label. Revise opens the comment dialog at that case.                    |
-| [code](code/markup.html)                         | Source code                                | `data-language` with the source as escaped text. `data-lines`, `data-numbers` and `data-notes` add a focused range, numbers and a note on a line.                                            |
+| [code](code/markup.html)                         | Source code                                | `data-language` with the source as escaped text. Plain syntax-coloured code is the default; `data-lines` and `data-notes` focus specific lines only when that focus explains the point.      |
 | [formula](formula/markup.html)                   | Inline or display math                     | `data-math` set to inline or display. `data-terms` names the coloured terms under the formula.                                                                                               |
 | [diagram](diagram/markup.html)                   | A diagram                                  | `data-diagram` with Mermaid source as text. ELK lays it out, nodes whose IDs match page IDs open those pages, and a click opens the diagram full size.                                       |
 | [chart](chart/markup.html)                       | A chart or a mathematical demonstration    | `data-chart` with an ECharts option object as JSON text. The frame renders charts as SVG and applies the theme palette.                                                                      |
@@ -102,6 +104,10 @@ the block in a figure.
 | data-numbers | `[data-language]` | Takes no value. Numbers the lines and dims nothing.                                                                                |
 | data-notes   | `[data-language]` | `[{"line": 3, "text": "…"}]`. A speech bubble in the gutter of each named line, opening the note in a popover. Needs no range.     |
 | data-terms   | `[data-math]`     | `[{"symbol": "t", "meaning": "…", "value": "8 s"}]`. Names the formula's coloured terms under it, in the order the colours appear. |
+
+Use `data-lines` only when the selected range is the subject of the review,
+and `data-notes` only when the exact line needs an explanation. Leave both
+off routine code examples.
 
 A term takes its colour from a literal in the source, because KaTeX runs
 with no `trust` option and refuses `\htmlClass`: write
