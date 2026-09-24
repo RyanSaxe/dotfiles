@@ -9,20 +9,21 @@ styles and behavior do not belong in the page's `css` or `js`.
 Choose a component for the structure of the decision, not for its sample
 content.
 
-| Directory                                      | Use                                        | Content and interaction                                                                                                                                                   |
-| ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [decision](decision/markup.html)               | Two to five text options                   | Radio-style rows. Each row is the `data-value` button with a title, an optional Recommended tag, and one line of consequence.                                             |
-| [visual-decision](visual-decision/markup.html) | Options that each need a visual            | Option articles with a header, one line, and a figure. The reviewer can switch between tabs and side-by-side view.                                                        |
-| [question](question/markup.html)               | An open answer the agent needs             | A card with the Question tag, the question, why it matters, a textarea and an Answer button. Feedback includes the answer under `groups.answers`.                         |
-| [comparison](comparison/markup.html)           | Two or three options with matched sections | Repeat the option article. Matching sections align across options. Selection uses the `data-choice` and `data-value` buttons.                                             |
-| [before-after](before-after/markup.html)       | A proposed change                          | By default, show either code in the text viewer or diagrams in the visual pair.                                                                                           |
-| [scope-checklist](scope-checklist/markup.html) | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. Start with no boxes checked. The frame includes untouched and empty selections in the submitted list. |
-| [behavior-cases](behavior-cases/markup.html)   | Situations and proposed outcomes           | Repeat the case section, with the When and Then labels that show under 700px. Keep each ID in its contextual comment label. Revise opens the comment dialog at that case. |
-| [code](code/markup.html)                       | Source code                                | `data-language` with the source as escaped text. `data-lines`, `data-numbers` and `data-notes` add a focused range, numbers and a note on a line.                         |
-| [formula](formula/markup.html)                 | Inline or display math                     | `data-math` set to inline or display. `data-terms` names the coloured terms under the formula.                                                                            |
-| [diagram](diagram/markup.html)                 | A diagram                                  | `data-diagram` with Mermaid source as text. ELK lays it out, nodes whose IDs match page IDs open those pages, and a click opens the diagram full size.                    |
-| [chart](chart/markup.html)                     | A chart or a mathematical demonstration    | `data-chart` with an ECharts option object as JSON text. The frame renders charts as SVG and applies the theme palette.                                                   |
-| [prototype](prototype/markup.html)             | An approved prototype                      | `data-prototype` naming an entry in the owning page source. The frame supplies the sandboxed frame, the Source fold and Open full size.                                   |
+| Directory                                        | Use                                        | Content and interaction                                                                                                                                                                      |
+| ------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [decision](decision/markup.html)                 | Two to five text options                   | Radio-style rows. Each row is the `data-value` button with a title, an optional Recommended tag, and one line of consequence.                                                                |
+| [visual-decision](visual-decision/markup.html)   | Options that each need a visual            | Option articles with a header, one line, and a figure. The reviewer can switch between tabs and side-by-side view.                                                                           |
+| [question](question/markup.html)                 | An open answer the agent needs             | A card with the Question tag, the question, why it matters, a textarea and an Answer button. Feedback includes the answer under `groups.answers`.                                            |
+| [drawing-question](drawing-question/markup.html) | A spatial answer the reviewer should draw  | Opens a full-screen drawing editor. Save records an editable Excalidraw scene and PNG preview; Cancel preserves the prior answer. Requires a live hub and network access to load the editor. |
+| [comparison](comparison/markup.html)             | Two or three options with matched sections | Repeat the option article. Matching sections align across options. Selection uses the `data-choice` and `data-value` buttons.                                                                |
+| [before-after](before-after/markup.html)         | A proposed change                          | By default, show either code in the text viewer or diagrams in the visual pair.                                                                                                              |
+| [scope-checklist](scope-checklist/markup.html)   | Independent inclusions                     | Repeat the checkbox row with stable option IDs and readable labels. Start with no boxes checked. The frame includes untouched and empty selections in the submitted list.                    |
+| [behavior-cases](behavior-cases/markup.html)     | Situations and proposed outcomes           | Repeat the case section, with the When and Then labels that show under 700px. Keep each ID in its contextual comment label. Revise opens the comment dialog at that case.                    |
+| [code](code/markup.html)                         | Source code                                | `data-language` with the source as escaped text. `data-lines`, `data-numbers` and `data-notes` add a focused range, numbers and a note on a line.                                            |
+| [formula](formula/markup.html)                   | Inline or display math                     | `data-math` set to inline or display. `data-terms` names the coloured terms under the formula.                                                                                               |
+| [diagram](diagram/markup.html)                   | A diagram                                  | `data-diagram` with Mermaid source as text. ELK lays it out, nodes whose IDs match page IDs open those pages, and a click opens the diagram full size.                                       |
+| [chart](chart/markup.html)                       | A chart or a mathematical demonstration    | `data-chart` with an ECharts option object as JSON text. The frame renders charts as SVG and applies the theme palette.                                                                      |
+| [prototype](prototype/markup.html)               | An approved prototype                      | `data-prototype` naming an entry in the owning page source. The frame supplies the sandboxed frame, the Source fold and Open full size.                                                      |
 
 The last five carry no interaction of their own: they are the figures a page
 puts inside another component or on its own. They are components in the same
@@ -173,6 +174,12 @@ Answer is pressed again. Feedback includes each answer as its own item, and
 an agreement can cite it with kind `answer`.
 After recording the answer on Agreed, remove that question from the next
 revision. If the question remains in the revision, ask it again.
+
+Use a drawing question when the reviewer needs to sketch a boundary, flow, or
+layout rather than write prose. The editor loads only when opened. Saved
+drawings remain editable; the submitted answer includes session-owned scene
+and preview paths for the agent to inspect. A drawing cannot be added to an
+offline artifact.
 
 ## Checklists
 

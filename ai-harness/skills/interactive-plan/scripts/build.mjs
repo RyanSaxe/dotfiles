@@ -77,7 +77,12 @@ const attribute = (tag, name) => {
   const match = tag.match(new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`));
   return match ? (match[1] ?? match[2]) : undefined;
 };
-const controlKinds = ["data-choice", "data-multiselect", "data-question"];
+const controlKinds = [
+  "data-choice",
+  "data-multiselect",
+  "data-question",
+  "data-drawing-question",
+];
 
 const labelLimit = 24;
 
@@ -146,7 +151,7 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
     }
     // Each control's options run from its tag to the next control's tag.
     const parts = html.split(
-      /(?=<[a-zA-Z][^>]*\sdata-(?:choice|multiselect|question)=)/,
+      /(?=<[a-zA-Z][^>]*\sdata-(?:choice|multiselect|question|drawing-question)=)/,
     );
     for (const part of parts) {
       const tag = part.match(/^<[a-zA-Z][^>]*>/)?.[0];
@@ -204,7 +209,7 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
 }
 
 export async function frameBundle() {
-  const [shell, style, script, notifications, choices, draft] =
+  const [shell, style, script, notifications, choices, draft, drawingEditor] =
     await Promise.all(
       [
         "frame.html",
@@ -213,6 +218,7 @@ export async function frameBundle() {
         "notifications.mjs",
         "choices.mjs",
         "draft.mjs",
+        "drawing-editor.html",
       ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
     );
   const roots = componentRoots();
@@ -227,6 +233,7 @@ export async function frameBundle() {
     notifications,
     choices,
     draft,
+    drawingEditor,
     componentCss,
     componentJs,
   };
@@ -245,6 +252,7 @@ export async function assemble(
     notifications,
     choices,
     draft,
+    drawingEditor,
     componentCss,
     componentJs,
   } = bundle || (await frameBundle());
@@ -253,6 +261,9 @@ export async function assemble(
       "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
     );
   const html = shell
+    .replace("<!-- DRAWING_EDITOR -->", () =>
+      JSON.stringify(drawingEditor).replaceAll("<", "\\u003c"),
+    )
     .replace(
       "<!-- FRAME_STYLE -->",
       // The cascade ranks an unlayered rule above every layered one, so the

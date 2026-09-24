@@ -10,6 +10,9 @@ open. A recommendation is not an agreement. The Agreed page records each
 settled decision and its source. Read [agreements.md](agreements.md) before
 changing it.
 
+For a drawing answer, inspect its `previewPath` PNG. Its `scenePath` holds
+the editable Excalidraw shapes when you need to examine the source.
+
 1. Write this revision's Agreed source first. Build it with
    `node scripts/build.mjs agreed.json agreed.html`, then run
    `node scripts/session.mjs publish --session-dir PATH --file agreed.html --source DIR`.
