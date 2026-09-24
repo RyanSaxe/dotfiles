@@ -8,10 +8,12 @@ sees the behavior instead of a description of it.
 | id     | Unique stable ID with the same character rules as page IDs.              |
 | title  | Accessible, descriptive title, shown in the embed's header.              |
 | html   | Complete self-contained HTML document, including its styles and scripts. |
-| file   | Manifest-only alternative to html, resolved relative to the manifest.    |
+| file   | Page-source alternative to html, resolved relative to the page JSON.     |
 | height | Positive preview height in pixels.                                       |
 
-Put `data-prototype="ID"` on the element where the prototype belongs. The
+Put prototypes in their owning page's `prototypes` array. IDs are unique
+within that revision. Put `data-prototype="ID"` on the element where the
+prototype belongs. The
 frame renders it with a header that has the title, a Source toggle that
 shows the exact source with syntax highlighting, and an Open full size
 button that shows the document alone in a new tab. The document runs in a

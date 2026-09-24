@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { assemble, build } from "./build.mjs";
+import { assemble, buildPage } from "./build.mjs";
 
 const data = {
   artifactId: "t",
@@ -14,12 +12,23 @@ const data = {
   pages: [{ id: "p", title: "P", html: "<p>x</p>" }],
 };
 
-test("plan CSS is scoped to the page content, under the plan layer", async () => {
-  const html = await assemble(data, { css: "body{background:red}" });
-  assert.match(html, /@layer frame, plan, components;/);
+test("page CSS uses its own scope outside the frame content scope", async () => {
+  const html = await buildPage(path.join(os.tmpdir(), "page.json"), {
+    artifactId: "t",
+    revision: "1",
+    kind: "exploration",
+    title: "T",
+    page: { id: "p", title: "P", html: "<p>x</p>", cssText: "p{color:red}" },
+  });
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  assert.match(style, /@layer frame, plan, components;/);
   assert.match(
-    html,
-    /@scope \(#page-content\) \{\n@layer plan \{\nbody\{background:red\}\n\}/,
+    style,
+    /@layer plan \{\n@scope \(#page-content\[data-page-id="p"\]\) \{ p\{color:red\} \}/,
+  );
+  assert.ok(
+    style.indexOf('@scope (#page-content[data-page-id="p"])') <
+      style.indexOf("@scope (#page-content)"),
   );
 });
 
@@ -56,6 +65,25 @@ test("a closing style tag in plan CSS is refused", async () => {
   await assert.rejects(
     assemble(data, { css: "</style><script>1</script>" }),
     /closing style/,
+  );
+});
+
+test("page JavaScript cannot restyle the frame", async () => {
+  await assert.rejects(
+    buildPage(path.join(os.tmpdir(), "page.json"), {
+      artifactId: "t",
+      revision: "1",
+      kind: "exploration",
+      title: "T",
+      page: {
+        id: "p",
+        title: "P",
+        html: "<p>x</p>",
+        jsText:
+          "export function setup() { document.body.style.color = 'red'; }",
+      },
+    }),
+    /restyles document\.body/,
   );
 });
 
@@ -181,18 +209,5 @@ test("well-formed controls, anchors and blocks pass", async () => {
     ),
     { js: "const wide = document.body.clientWidth > 900;" },
   );
-  assert.match(html, /id="plan-data"/);
-});
-
-test("the component fixture builds", async (t) => {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const work = await fs.mkdtemp(path.join(os.tmpdir(), "plan-fixture-"));
-  t.after(() => fs.rm(work, { recursive: true, force: true }));
-  for (const entry of await fs.readdir(path.join(here, "fixture")))
-    await fs.copyFile(
-      path.join(here, "fixture", entry),
-      path.join(work, entry),
-    );
-  const html = await build(path.join(work, "fixture.json"));
   assert.match(html, /id="plan-data"/);
 });

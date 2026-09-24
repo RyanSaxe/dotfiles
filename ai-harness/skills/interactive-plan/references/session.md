@@ -39,29 +39,38 @@ accepts any local client when `COPILOT_CONNECTION_TOKEN` is unset.
 
 ## Publishing
 
-Write a complete artifact, publish it, and end the turn:
+Build Agreed, then publish it. Use the same command for every later page:
 
 ```sh
-node scripts/session.mjs publish --session-dir PATH --file ARTIFACT.html --source DIR
+node scripts/session.mjs publish --session-dir PATH --file PAGE.html --source DIR
 ```
 
-`publish` stores the artifact as `<artifactId>.<revision>.html` in the
-session's `artifacts/` directory, using the values embedded in the artifact.
-It refuses any revision number already used in the session, even when another
-artifact used it, so build in the temp directory and continue the session's
-revision sequence.
-`--source DIR` copies the directory used to build the artifact to
-`src/<revision>/` in the session before publishing. The
-`status.current.source` field contains that path. Keep old revisions so
-feedback remains linked to what the user saw. To return to an older proposal,
-use it as the baseline for a new revision.
+After Agreed, declare this revision's ordered pages with
+`progress --pages pages.json`. The JSON file has a `pages` array of
+`{ "id": "...", "title": "..." }` objects. Report work with
+`progress --start ID`. Each successful publication makes that page readable
+and marks its slot ready. The last page completes the revision and opens
+Submit. Feedback and agent wake are unavailable before then.
 
-On the first publication, open the URL in the operating system's default
+The publisher keeps each immutable page record under `pages/<revision>/`
+and its source under `src/<revision>/<page-id>/`. It writes and checks a new
+view before changing the live pointer. A failed publication leaves the
+visible page set unchanged. Completed revisions remain at their historical
+URLs with their original page sets. A later revision chooses its own pages;
+it does not inherit them automatically.
+
+The frame and built-in components are pinned when Agreed publishes. Each
+later page brings its own HTML, CSS, JavaScript, and prototypes. Build and
+assembly are the required publication check. Do not launch a browser after
+every page.
+
+On the first Agreed publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,
 with the URL quoted) and give the link in chat, with `hostUrl` beside it
 when `start` printed one. If the launch fails, say so and keep the link
 available. Do not open another tab on later revisions. The browser refreshes
-the page when a revision lands and preserves the user's unsent draft.
+when a page arrives and preserves the user's current page, scroll position,
+and unsent draft within the revision.
 
 Every question goes on a page. There is no question event, reply field or
 reply notification, and none should be built.
@@ -141,14 +150,16 @@ so an exported JSON file names the images it cannot carry. `read` hands the
 agent those paths; the file is on disk and the agent opens it. Closing a
 session takes its images with it.
 
-`status.json` records `title`, `kind`, `revisions`, `progress`, `wake`, and
-`paused` next to the stage. `pause` sets `paused` and leaves the stage as it
-was. `stage` is `ready`, `updated`, `submitted`, `working`, or `complete`: a
-submission moves it to `submitted`, `read` to `working`, `publish` to
-`updated`, `complete` to `complete`. `wake` is `ok`, or `failed` with the
+`status.json` records `title`, `kind`, `revisions`, `pageRound`, `wake`, and
+`paused` next to the stage. `pageRound` holds Agreed and each declared page's
+queued, active, or ready state until the last page publishes. `pause` sets
+`paused` and leaves the stage as it was. `stage` is `ready`, `updated`,
+`submitted`, `working`, or `complete`: a submission moves it to `submitted`,
+`read` to `working`, the last page's `publish` to `updated`, and `complete`
+to `complete`. Earlier page publications keep it `working`. `wake` is `ok`, or `failed` with the
 reason, after the last submission. The browser displays a failed wake and
 prompts for a message in the chat. If an agent is already working, the event
-has no effect. Responses derive `needsYou` as true when a published revision
+has no effect. Responses derive `needsYou` as true when a complete revision
 waits for the reviewer. The browser bell counts `needsYou`. `publish` refuses
 while a submission is unread.
 

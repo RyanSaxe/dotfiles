@@ -17,10 +17,10 @@ Each reference has a `kind`:
 | answer       | submissionId, answerId | A saved answer to a question component. answerId is the submission's answers key.    |
 | conversation | text                   | Context from the agent conversation, labeled as such.                                |
 
-At publication, the helper resolves each browser reference against this
-session's saved submissions, embeds the exact text and location as
-`sourceRecords`, and fails when a submission or item is missing, so a
-successful publication has resolved every source. Do not write
+When Agreed publishes, the publisher resolves each browser reference against
+this session's saved submissions before that page becomes visible. It embeds
+the exact text and location as `sourceRecords` and rejects a missing
+submission or item. Do not write
 `sourceRecords` yourself. Remove old `change` markers on the next
 publication, and do not recreate settled entries to fill the record.
 

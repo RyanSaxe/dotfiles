@@ -17,6 +17,12 @@ enough information to implement and verify the work without earlier revisions
 or the conversation. If feedback reopens a settled choice, return to
 exploration before presenting another complete plan.
 
+Publish Agreed first, then list only the pages this revision needs. Publish
+each finished page with the same `publish` command. The reader can review
+ready pages while the agent works on the others. A published page is fixed;
+the next revision may omit it, revisit its topic, or use entirely new pages.
+Feedback is sent only after the last listed page completes the revision.
+
 ## Files
 
 - [round.md](references/round.md): the sequence for each revision. The hub's
@@ -45,7 +51,7 @@ asking the next question. Move to the browser once there is material to
 compare or approve. Open the first revision in the user's default browser and
 give the link in chat. Ask every later question on a page.
 
-After `publish` or `pause`, the turn ends. The hub starts another turn when a
+After the last listed page publishes or the session pauses, the turn ends. The hub starts another turn when a
 submission arrives, including an acceptance. `complete` ends the review. If
 the user closes a session in the browser, the hub sends no further wake event
 for that session. When `start` refuses because the harness cannot receive a

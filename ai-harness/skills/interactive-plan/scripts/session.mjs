@@ -100,7 +100,8 @@ export function artifactData(html) {
     "title is required",
   );
   requireValue(
-    Array.isArray(data.pages) && data.pages.length > 0,
+    Array.isArray(data.pages) &&
+      (data.pages.length > 0 || data.pageMode === "partial"),
     "At least one page is required",
   );
   const ids = new Set();
@@ -205,10 +206,9 @@ export function artifactData(html) {
   for (const page of data.pages) {
     requireValue(
       idPattern.test(page.id || "") &&
-        page.id !== "feedback" &&
-        !(page.id === "agreed" && data.agreements !== undefined) &&
+        !["agreed", "feedback"].includes(page.id) &&
         !ids.has(page.id),
-      "Page IDs must be unique; feedback and structured agreed are reserved",
+      "Page IDs must be unique; agreed and feedback are reserved",
     );
     requireValue(
       typeof page.title === "string" &&
@@ -228,10 +228,70 @@ export function artifactData(html) {
       );
   }
   requireValue(
-    data.kind !== "plan" || data.pages[0].id === "overview",
+    data.kind !== "plan" ||
+      data.pageMode === "partial" ||
+      data.pages[0].id === "overview",
     "A final plan starts with an overview page",
   );
   return data;
+}
+export function pageData(html) {
+  const match = html.match(
+    /<script\b(?=[^>]*\bid=["']page-data["'])(?=[^>]*\btype=["']application\/json["'])[^>]*>([\s\S]*?)<\/script>/i,
+  );
+  let record;
+  try {
+    record = JSON.parse(match ? match[1] : html);
+  } catch {
+    requireValue(false, "Invalid page record");
+  }
+  const page = record?.page;
+  requireValue(page && typeof page === "object", "Page record requires page");
+  requireValue(
+    idPattern.test(page.id || "") && page.id !== "feedback",
+    "Invalid page ID",
+  );
+  requireValue(
+    typeof page.title === "string" && page.title.trim(),
+    "Page title is required",
+  );
+  requireValue(
+    page.id === "agreed"
+      ? Array.isArray(page.agreements)
+      : typeof page.html === "string" && page.html.trim(),
+    "Agreed requires agreements; other pages require HTML",
+  );
+  for (const key of ["cssText", "jsText"])
+    requireValue(
+      page[key] === undefined || typeof page[key] === "string",
+      `${key} must be text`,
+    );
+  if (page.jsText)
+    requireValue(
+      /export\s+(?:async\s+)?function\s+setup\s*\(/.test(page.jsText),
+      "Page JavaScript must export setup(root, planUI)",
+    );
+  if (
+    /<\/style/i.test(page.cssText || "") ||
+    /<\/script/i.test(page.jsText || "")
+  )
+    requireValue(false, "Page CSS/JS cannot contain closing style/script tags");
+  artifactData(
+    `<script type="application/json" id="plan-data">${JSON.stringify({
+      artifactId: record.artifactId,
+      revision: record.revision,
+      kind: record.kind,
+      title: record.title,
+      pageMode: "partial",
+      pages:
+        page.id === "agreed"
+          ? []
+          : [{ id: page.id, title: page.title, html: page.html }],
+      agreements: page.id === "agreed" ? page.agreements : [],
+      prototypes: page.prototypes || [],
+    }).replaceAll("<", "\\u003c")}</script>`,
+  );
+  return record;
 }
 function sourceItemKey(kind) {
   return { note: "noteId", choice: "choiceId", answer: "answerId" }[kind];
@@ -268,7 +328,6 @@ async function loadSession(directory, config, origin) {
         current: null,
         acknowledged: [],
         accepted: null,
-        progress: null,
         updatedAt: timestamp(),
       };
   requireValue(
@@ -293,8 +352,9 @@ async function loadSession(directory, config, origin) {
   const wakeFile = path.join(directory, "wake.json");
   let wake = (await exists(wakeFile)) ? await read(wakeFile) : null;
   const transition = async (patch) => {
-    state = { ...state, ...patch, updatedAt: timestamp() };
-    await atomic(stateFile, state);
+    const next = { ...state, ...patch, updatedAt: timestamp() };
+    await atomic(stateFile, next);
+    state = next;
     return state;
   };
   async function events() {
@@ -321,7 +381,9 @@ async function loadSession(directory, config, origin) {
     event.artifactId === state.current.artifactId &&
     event.revision === state.current.revision;
   const needsYou = () =>
-    Boolean(state.current) && ["ready", "updated"].includes(state.stage);
+    Boolean(state.current) &&
+    !state.pageRound &&
+    ["ready", "updated"].includes(state.stage);
   const active = () => state.stage !== "complete" && !state.paused;
   // Runs after the submission is saved, outside the browser's request, so a
   // slow or failing harness never delays the reviewer's Sent state.
@@ -464,6 +526,11 @@ async function loadSession(directory, config, origin) {
         409,
       );
     }
+    requireValue(
+      !state.pageRound,
+      "Finish every listed page before submitting feedback",
+      409,
+    );
     await atomic(file, {
       id: data.id,
       sequence: ++sequence,
@@ -482,22 +549,9 @@ async function loadSession(directory, config, origin) {
       setTimeout(() => exclusive(() => wakeAgent(data.revision)), 0);
     return { id: data.id, saved: true, status: view() };
   }
-  async function publish(html, source) {
-    requireValue(
-      !(await pending()).length,
-      "Read pending feedback before publishing",
-      409,
-    );
-    requireValue(typeof html === "string", "HTML is required");
-    requireValue(
-      source === undefined ||
-        (typeof source === "string" &&
-          path.resolve(source).startsWith(directory + path.sep)),
-      "Source must be a directory inside the session directory",
-    );
-    const artifact = artifactData(html);
+  async function resolvePageAgreements(entries) {
     const submissions = await events();
-    for (const entry of artifact.agreements || []) {
+    for (const entry of entries) {
       delete entry.sourceRecords;
       if (!entry.sourceRefs) continue;
       entry.sourceRecords = [];
@@ -508,8 +562,7 @@ async function loadSession(directory, config, origin) {
         }
         const event = submissions.find((item) => item.id === ref.submissionId);
         requireValue(event, "Source submission not found");
-        const payload = event.payload;
-        const item = sourceItem(payload, ref);
+        const item = sourceItem(event.payload, ref);
         requireValue(
           item && typeof item.topic === "string",
           "Source item not found",
@@ -520,15 +573,16 @@ async function loadSession(directory, config, origin) {
           typeof text === "string" && typeof label === "string",
           "Source item has invalid content",
         );
+        const target =
+          typeof item.target === "string" && idPattern.test(item.target)
+            ? item.target
+            : null;
+        const payload = event.payload;
         requireValue(
           idPattern.test(payload.artifactId || "") &&
             revisionPattern.test(payload.revision || ""),
           "Invalid source artifact",
         );
-        const target =
-          typeof item.target === "string" && idPattern.test(item.target)
-            ? item.target
-            : null;
         const href = `./${payload.artifactId}.${payload.revision}.html${target ? "?target=" + encodeURIComponent(target) : ""}#${encodeURIComponent(item.topic)}`;
         entry.sourceRecords.push({
           kind: ref.kind,
@@ -545,71 +599,290 @@ async function loadSession(directory, config, origin) {
         });
       }
     }
-    const name = `${artifact.artifactId}.${artifact.revision}.html`;
+  }
+  async function renderPageRound(round) {
+    const { assemble, pageScripts } = await import("./build.mjs");
+    const bundle = await read(round.bundlePath);
+    const agreed = await read(round.agreed);
+    const records = await Promise.all(
+      (round.pages || [])
+        .filter((slot) => slot.recordPath)
+        .map((slot) => read(slot.recordPath)),
+    );
+    const ready = new Map(
+      records.map((record) => [record.page.id, record.page]),
+    );
+    const complete =
+      Boolean(round.pages?.length) &&
+      round.pages.every((slot) => slot.recordPath);
+    const pages = (round.pages || []).map((slot) => ({
+      id: slot.id,
+      title: slot.title,
+      html: ready.get(slot.id)?.html || "",
+      pending: !slot.recordPath,
+      working: slot.state === "active",
+    }));
+    const all = [agreed.page, ...records.map((record) => record.page)];
+    const css = all
+      .filter((page) => page.cssText)
+      .map(
+        (page) =>
+          `@scope (#page-content[data-page-id="${page.id}"]) { ${page.cssText} }`,
+      )
+      .join("\n");
+    const data = {
+      artifactId: round.artifactId,
+      revision: round.revision,
+      kind: round.kind,
+      title: round.title,
+      ...(complete ? {} : { pageMode: "partial" }),
+      pages,
+      agreements: agreed.page.agreements,
+      prototypes: all.flatMap((page) => page.prototypes || []),
+    };
+    const html = await assemble(data, {
+      css,
+      js: pageScripts(all),
+      allowUnknownPages: !complete,
+      bundle,
+    });
+    return { html, complete };
+  }
+  async function commitPageRound(round, source = null) {
+    let html, complete;
+    try {
+      ({ html, complete } = await renderPageRound(round));
+    } catch (error) {
+      error.statusCode ||= 400;
+      throw error;
+    }
+    const stored = embedConfig(html, { sessionId: state.sessionId, base });
+    const name = complete
+      ? `${round.artifactId}.${round.revision}.html`
+      : `${round.artifactId}.${round.revision}.live.${crypto.randomUUID()}.html`;
     const file = path.join(directory, "artifacts", name);
-    /* One flat revision space per session: /r/ and src/
-       carry no artifact, so a second artifact continues the sequence rather
-       than restarting it. */
-    const taken = (state.revisions || []).find(
-      (item) => item.revision === artifact.revision,
-    );
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await fs.writeFile(temporary, stored, { mode: 0o600, flag: "wx" });
+    await fs.rename(temporary, file);
+    const current = {
+      artifactId: round.artifactId,
+      revision: round.revision,
+      kind: round.kind,
+      title: round.title,
+      path: file,
+      url: base + "/",
+      sha256: crypto.createHash("sha256").update(stored).digest("hex"),
+      publishedAt: timestamp(),
+      source,
+    };
+    const revisions = complete
+      ? [
+          ...(state.revisions || []),
+          {
+            artifactId: round.artifactId,
+            revision: round.revision,
+            kind: round.kind,
+            title: round.title,
+            publishedAt: current.publishedAt,
+            url: `${base}/r/${encodeURIComponent(round.revision)}`,
+          },
+        ]
+      : state.revisions || [];
+    await transition({
+      pageRound: complete ? null : round,
+      stage: complete ? "updated" : "working",
+      current,
+      title: round.title,
+      kind: round.kind,
+      revisions,
+      accepted: null,
+    });
+    return { status: view(), url: origin + current.url, complete };
+  }
+  async function publishPage(html, source) {
     requireValue(
-      !taken,
-      `Revision ${artifact.revision} is already used in this session by artifact "${taken?.artifactId}". A new artifact continues the session's sequence.`,
+      !(await pending()).length,
+      "Read pending feedback before publishing",
       409,
     );
     requireValue(
-      !(await exists(file)),
-      "Artifact revision already exists; choose a new revision",
+      ["ready", "working"].includes(state.stage),
+      "Read feedback before publishing a page",
       409,
+    );
+    requireValue(
+      source === undefined ||
+        (typeof source === "string" &&
+          path.resolve(source).startsWith(directory + path.sep)),
+      "Source must be a directory inside the session directory",
     );
     requireValue(
       configScript.test(html),
       "HTML requires a session-config JSON script",
     );
-    const stored = embedConfig(html, {
-      sessionId: state.sessionId,
-      base,
-    }).replace(
-      /(<script\b(?=[^>]*\bid=["']plan-data["'])[^>]*>)[\s\S]*?(<\/script>)/i,
-      (_, start, end) =>
-        start + json(artifact).replaceAll("<", "\\u003c") + end,
+    requireValue(
+      /\bid=["']page-data["']/.test(html),
+      "HTML requires a page-data JSON script",
     );
-    const temporary = file + ".tmp";
-    await fs.writeFile(temporary, stored, { mode: 0o600, flag: "wx" });
-    await fs.rename(temporary, file);
-    const current = {
-      artifactId: artifact.artifactId,
-      revision: artifact.revision,
-      kind: artifact.kind,
-      title: artifact.title,
-      path: file,
-      url: base + "/",
-      sha256: crypto.createHash("sha256").update(stored).digest("hex"),
-      publishedAt: timestamp(),
-      source: source || null,
-    };
-    const revisions = [
-      ...(state.revisions || []),
-      {
-        artifactId: current.artifactId,
-        revision: current.revision,
-        kind: current.kind,
-        title: current.title,
-        publishedAt: current.publishedAt,
-        url: `${base}/r/${encodeURIComponent(current.revision)}`,
+    const record = pageData(html);
+    const { page } = record;
+    let round;
+    if (page.id === "agreed") {
+      requireValue(
+        !state.pageRound,
+        "Agreed is already published for this revision",
+        409,
+      );
+      requireValue(
+        !(state.revisions || []).some(
+          (item) => item.revision === record.revision,
+        ),
+        `Revision ${record.revision} is already used`,
+        409,
+      );
+      await resolvePageAgreements(page.agreements);
+      round = {
+        artifactId: record.artifactId,
+        revision: record.revision,
+        kind: record.kind,
+        title: record.title,
+        agreed: null,
+        pages: null,
+        bundlePath: null,
+      };
+    } else {
+      requireValue(state.pageRound, "Publish Agreed before other pages", 409);
+      round = structuredClone(state.pageRound);
+      requireValue(
+        ["artifactId", "revision", "kind", "title"].every(
+          (key) => record[key] === round[key],
+        ),
+        "Page does not match this revision",
+        409,
+      );
+      const slot = round.pages?.find((item) => item.id === page.id);
+      requireValue(
+        slot && slot.title === page.title,
+        "Page is not in this revision's list",
+        409,
+      );
+      requireValue(!slot.recordPath, "Page is already published", 409);
+      const used = new Set([
+        ...((await read(round.agreed)).page.prototypes?.map(
+          (item) => item.id,
+        ) || []),
+      ]);
+      for (const entry of round.pages.filter((item) => item.recordPath))
+        for (const item of (await read(entry.recordPath)).page.prototypes || [])
+          used.add(item.id);
+      requireValue(
+        !(page.prototypes || []).some((item) => used.has(item.id)),
+        "Prototype ID is already used in this revision",
+        409,
+      );
+    }
+    const recordDir = path.join(directory, "pages", record.revision);
+    await fs.mkdir(recordDir, { recursive: true, mode: 0o700 });
+    const recordPath = path.join(
+      recordDir,
+      `${page.id}.${crypto.randomUUID()}.json`,
+    );
+    const recordBytes = json(record);
+    await fs.writeFile(recordPath, recordBytes, { mode: 0o600, flag: "wx" });
+    if (page.id === "agreed") round.agreed = recordPath;
+    else {
+      const slot = round.pages.find((item) => item.id === page.id);
+      slot.recordPath = recordPath;
+      slot.state = "ready";
+    }
+    if (page.id === "agreed") {
+      const { frameBundle } = await import("./build.mjs");
+      round.bundlePath = path.join(
+        recordDir,
+        `frame.${crypto.randomUUID()}.json`,
+      );
+      await fs.writeFile(round.bundlePath, json(await frameBundle()), {
+        mode: 0o600,
+        flag: "wx",
+      });
+    }
+    const result = await commitPageRound(round, source);
+    return {
+      ...result,
+      page: {
+        id: page.id,
+        revision: record.revision,
+        version: crypto.createHash("sha256").update(recordBytes).digest("hex"),
+        recordPath,
       },
-    ];
-    await transition({
-      stage: "updated",
-      current,
-      title: current.title,
-      kind: current.kind,
-      revisions,
-      accepted: null,
-      progress: null,
-    });
-    return { status: view(), url: origin + current.url };
+    };
+  }
+  async function pageProgress(data) {
+    requireValue(
+      state.pageRound && state.stage === "working",
+      "Publish Agreed first",
+      409,
+    );
+    const round = structuredClone(state.pageRound);
+    if (data.pages !== undefined) {
+      requireValue(
+        data.start === undefined && data.done === undefined,
+        "List pages or start them in separate calls",
+      );
+      requireValue(
+        round.pages === null,
+        "This revision's page list is fixed",
+        409,
+      );
+      requireValue(
+        Array.isArray(data.pages) && data.pages.length > 0,
+        "List at least one page",
+      );
+      const ids = new Set();
+      for (const item of data.pages) {
+        requireValue(
+          item &&
+            idPattern.test(item.id || "") &&
+            !["agreed", "feedback"].includes(item.id) &&
+            !ids.has(item.id) &&
+            typeof item.title === "string" &&
+            item.title.trim(),
+          "Page IDs and titles must be valid and unique",
+        );
+        ids.add(item.id);
+      }
+      requireValue(
+        round.kind !== "plan" || data.pages[0].id === "overview",
+        "A final plan lists overview first",
+      );
+      round.pages = data.pages.map(({ id, title }) => ({
+        id,
+        title,
+        state: "queued",
+      }));
+    } else {
+      requireValue(
+        round.pages !== null,
+        "List this revision's pages first",
+        409,
+      );
+      requireValue(
+        data.done === undefined &&
+          Array.isArray(data.start) &&
+          data.start.length > 0,
+        "Page progress only takes --start; publishing marks a page done",
+      );
+      for (const id of data.start) {
+        const slot = round.pages.find((item) => item.id === id);
+        requireValue(
+          slot && !slot.recordPath,
+          `Unknown or ready page ${id}`,
+          409,
+        );
+        slot.state = "active";
+      }
+    }
+    return commitPageRound(round);
   }
   async function act(data) {
     requireValue(data.sessionId === state.sessionId, "Wrong session", 409);
@@ -630,7 +903,6 @@ async function loadSession(directory, config, origin) {
         acknowledged: [...state.acknowledged, event.id],
         acknowledgedAt: timestamp(),
         lastAcknowledgedId: event.id,
-        progress: null,
       };
       if (event.payload.intent === "accept-plan") {
         requireValue(
@@ -649,83 +921,8 @@ async function loadSession(directory, config, origin) {
       await transition(patch);
       return { status: view(), event };
     }
-    if (data.action === "working") {
-      await transition({ stage: "working" });
-      return { status: view() };
-    }
     if (data.action === "progress") {
-      requireValue(
-        state.stage === "working",
-        "Read the submission before reporting progress",
-        409,
-      );
-      const given = ["steps", "start", "done"].filter(
-        (key) => data[key] !== undefined,
-      );
-      requireValue(
-        given.length > 0 && (data.steps === undefined || given.length === 1),
-        "progress takes steps alone, or start and done in one call",
-      );
-      if (data.steps !== undefined) {
-        requireValue(
-          Array.isArray(data.steps) &&
-            data.steps.length > 0 &&
-            data.steps.length <= 12,
-          "progress requires 1 to 12 steps",
-        );
-        const titles = data.steps.map((title) =>
-          typeof title === "string" ? title.trim() : "",
-        );
-        requireValue(
-          titles.every((title) => title && title.length <= 80) &&
-            new Set(titles).size === titles.length,
-          "Step titles must be unique, non-empty, and at most 80 characters",
-        );
-        await transition({
-          progress: {
-            steps: titles.map((title) => ({ title, state: "pending" })),
-            updatedAt: timestamp(),
-          },
-        });
-        return { status: view() };
-      }
-      requireValue(state.progress, "Declare steps before marking one");
-      // Steps are a set: several can be active at once, in any order, and
-      // one call can finish some and start others.
-      const marks = new Map();
-      for (const [key, next] of [
-        ["done", "done"],
-        ["start", "active"],
-      ]) {
-        if (data[key] === undefined) continue;
-        const named = Array.isArray(data[key]) ? data[key] : [data[key]];
-        requireValue(
-          named.length > 0 && named.every((title) => typeof title === "string"),
-          `progress ${key} requires step titles`,
-        );
-        for (const title of named.map((item) => item.trim())) {
-          requireValue(
-            state.progress.steps.some((step) => step.title === title),
-            "Unknown progress step",
-          );
-          requireValue(
-            !marks.has(title),
-            "A step cannot be started and finished in one call",
-          );
-          marks.set(title, next);
-        }
-      }
-      await transition({
-        progress: {
-          steps: state.progress.steps.map((step) =>
-            marks.has(step.title)
-              ? { ...step, state: marks.get(step.title) }
-              : step,
-          ),
-          updatedAt: timestamp(),
-        },
-      });
-      return { status: view() };
+      return pageProgress(data);
     }
     if (data.action === "pause") {
       requireValue(
@@ -737,7 +934,7 @@ async function loadSession(directory, config, origin) {
       });
       return { status: view() };
     }
-    if (data.action === "publish") return publish(data.html, data.source);
+    if (data.action === "publish") return publishPage(data.html, data.source);
     if (data.action === "complete") {
       requireValue(
         state.accepted &&
@@ -759,7 +956,6 @@ async function loadSession(directory, config, origin) {
     return {
       ...state,
       revisions: state.revisions || [],
-      progress: state.progress || null,
       wake: state.wake || null,
       paused: state.paused || null,
       needsYou: needsYou(),
@@ -774,6 +970,16 @@ async function loadSession(directory, config, origin) {
       revision: state.current.revision,
       stage: state.stage,
       needsYou: needsYou(),
+      ...(state.pageRound
+        ? {
+            pageRound: {
+              ready:
+                1 +
+                (state.pageRound.pages || []).filter((item) => item.recordPath)
+                  .length,
+            },
+          }
+        : {}),
       paused: Boolean(state.paused),
       publishedAt: state.current.publishedAt,
       updatedAt: state.updatedAt,
@@ -1084,6 +1290,10 @@ export async function startHub(config = settings()) {
     return embedConfig(html, {
       sessionId: session.id,
       base: session.base,
+      ...(session.state.current?.revision === entry.revision &&
+      session.state.current?.artifactId === entry.artifactId
+        ? { viewHash: session.state.current.sha256 }
+        : {}),
       ...flags,
     });
   };
@@ -1529,8 +1739,13 @@ export async function attach(
 // The source a revision was built from is kept beside the artifacts, so the
 // next round starts from it after the temp directory is gone.
 async function keepSource(sessionDir, source, html) {
-  const { revision } = artifactData(html);
-  const target = path.join(path.resolve(sessionDir), "src", revision);
+  const record = pageData(html);
+  const target = path.join(
+    path.resolve(sessionDir),
+    "src",
+    record.revision,
+    record.page.id,
+  );
   await fs.mkdir(path.dirname(target), { recursive: true });
   try {
     await fs.mkdir(target);
@@ -1645,14 +1860,18 @@ export async function main(argv) {
   if (command === "read") action.id = options.id;
   if (command === "pause") action.reason = options.reason;
   if (command === "progress") {
-    const given = ["steps", "start", "done"].filter(
+    const given = ["start", "pages"].filter(
       (key) => options[key] !== undefined,
     );
     requireValue(
-      given.length > 0 && (options.steps === undefined || given.length === 1),
-      "progress takes --steps alone, or --start and --done in one call",
+      given.length === 1 &&
+        options.steps === undefined &&
+        options.done === undefined,
+      "progress takes --pages FILE or --start ID",
     );
-    for (const key of given) action[key] = options[key].split("|");
+    if (options.pages !== undefined)
+      action.pages = (await read(path.resolve(options.pages))).pages;
+    else action.start = options.start.split("|");
   }
   let kept = null;
   if (command === "publish") {

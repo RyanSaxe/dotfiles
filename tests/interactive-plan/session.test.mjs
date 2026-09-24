@@ -24,9 +24,11 @@ import {
 import {
   assemble,
   build,
+  buildPage,
 } from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
 import {
   artifactData,
+  pageData,
   settings,
   startHub,
   version,
@@ -63,9 +65,9 @@ function cliEnv(home, extra = {}) {
     XDG_STATE_HOME: home,
     CLAUDE_CODE_MESSAGING_SOCKET: path.join(home, "none.sock"),
     CLAUDE_CODE_MESSAGING_TOKEN: "test",
+    ...(process.env.CODEX_THREAD_ID ? { CODEX_THREAD_ID: "test-thread" } : {}),
     ...extra,
   };
-  delete env.CODEX_THREAD_ID;
   delete env.COPILOT_AGENT_SESSION_ID;
   return env;
 }
@@ -461,8 +463,68 @@ async function hub(t, extra = {}) {
       }
       return { code: response.status, body, headers: response.headers };
     };
-    const action = (action, data = {}) =>
+    const rawAction = (action, data = {}) =>
       request(`/agent/${id}/action`, { action, sessionId: id, ...data });
+    // Most hub tests need a completed revision as setup. Feed the old fixture's
+    // assembled pages through the actual page-publication API instead of
+    // retaining a second production publisher just for their setup.
+    const action = async (name, data = {}) => {
+      if (name !== "publish" || !data.html?.includes('id="plan-data"'))
+        return rawAction(name, data);
+      let revision;
+      try {
+        revision = artifactData(data.html);
+      } catch {
+        return rawAction(name, data);
+      }
+      const shared = {
+        artifactId: revision.artifactId,
+        revision: revision.revision,
+        kind: revision.kind,
+        title: revision.title,
+      };
+      const source = path.join(directory, "fixture.json");
+      const pageHtml = (page) => buildPage(source, { ...shared, page });
+      const pages = revision.pages.filter((page) => page.id !== "agreed");
+      const prototypes = revision.prototypes || [];
+      const ownedBy = (id) =>
+        prototypes.filter((prototype) => {
+          const owner = pages.find(
+            (page) =>
+              page.html?.includes(`data-prototype="${prototype.id}"`) ||
+              page.html?.includes(`data-prototype='${prototype.id}'`),
+          );
+          return (owner?.id || "agreed") === id;
+        });
+      const agreed = await rawAction("publish", {
+        html: await pageHtml({
+          id: "agreed",
+          title: "Agreed so far",
+          agreements: revision.agreements || [],
+          prototypes: ownedBy("agreed"),
+        }),
+        source: data.source,
+      });
+      if (agreed.code !== 200) return agreed;
+      const listed = await rawAction("progress", {
+        pages: pages.map(({ id, title }) => ({ id, title })),
+      });
+      if (listed.code !== 200) return listed;
+      let result = listed;
+      for (const page of pages) {
+        result = await rawAction("publish", {
+          html: await pageHtml({
+            id: page.id,
+            title: page.title,
+            html: page.html,
+            prototypes: ownedBy(page.id),
+          }),
+          source: data.source,
+        });
+        if (result.code !== 200) break;
+      }
+      return result;
+    };
     const event = (intent = "feedback-only", revision = "1", extra = {}) => ({
       sessionId: id,
       artifactId: "example",
@@ -498,7 +560,7 @@ async function hub(t, extra = {}) {
   };
 }
 
-test("split authoring sources build a standalone artifact without executing content", async (t) => {
+test("a page source builds a standalone preview without executing content", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-build-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   // The frame draws the page title, so the page's own heading is an h2.
@@ -511,7 +573,7 @@ test("split authoring sources build a standalone artifact without executing cont
   );
   await fs.writeFile(
     path.join(directory, "custom.js"),
-    'window.addEventListener("plan:page", () => {});',
+    'export function setup(root) { root.dataset.test = "ready"; }',
   );
   const source = path.join(directory, "source.json");
   await fs.writeFile(
@@ -521,24 +583,30 @@ test("split authoring sources build a standalone artifact without executing cont
       revision: "1",
       kind: "plan",
       title: "Build",
-      css: "custom.css",
-      js: "custom.js",
-      pages: [{ id: "overview", title: "Overview", file: "interface.html" }],
+      page: {
+        id: "overview",
+        title: "Overview",
+        file: "interface.html",
+        css: "custom.css",
+        js: "custom.js",
+      },
     }),
   );
   const html = await build(source);
-  assert.equal(artifactData(html).pages[0].html, content);
-  assert.equal(artifactData(html).pages[0].file, undefined);
-  assert.equal(artifactData(html).css, undefined);
+  assert.equal(pageData(html).page.html, content);
+  assert.equal(pageData(html).page.file, undefined);
+  assert.equal(
+    pageData(html).page.cssText,
+    ".prototype { color: var(--attention); }",
+  );
+  assert.equal(
+    pageData(html).page.jsText,
+    'export function setup(root) { root.dataset.test = "ready"; }',
+  );
   assert(html.includes(".prototype { color: var(--attention); }"));
-  assert(html.includes('window.addEventListener("plan:page"'));
   assert(html.includes("export function loadDraft"));
   assert(!html.includes("<!-- FRAME_"));
   assert(!html.includes('src="frame.js"'));
-  await assert.rejects(
-    assemble(artifactData(html), { js: 'const text = "</script>";' }),
-    /closing/,
-  );
   const output = path.join(directory, "artifact.html");
   const builder = path.join(path.dirname(helper), "build.mjs");
   await exec(process.execPath, [builder, source, output]);
@@ -572,41 +640,50 @@ test("preserved prototypes retain exact executable source without escaping into 
     '<!doctype html><button id="try">Try</button><script>document.querySelector("button").onclick = () => alert("$&");</script>';
   await fs.writeFile(path.join(directory, "prototype.html"), html);
   const data = {
-    ...artifactData(artifact()),
-    pages: [
-      {
-        id: "overview",
-        title: "Preview",
-        html: '<div data-prototype="demo"></div><code>data-prototype="ID"</code>',
-      },
-    ],
-    prototypes: [
-      {
-        id: "demo",
-        title: "Approved interaction",
-        file: "prototype.html",
-        height: 420,
-      },
-    ],
+    artifactId: "example",
+    revision: "1",
+    kind: "exploration",
+    title: "Example work",
+    page: {
+      id: "overview",
+      title: "Preview",
+      html: '<div data-prototype="demo"></div><code>data-prototype="ID"</code>',
+      prototypes: [
+        {
+          id: "demo",
+          title: "Approved interaction",
+          file: "prototype.html",
+          height: 420,
+        },
+      ],
+    },
   };
   const source = path.join(directory, "source.json");
   await fs.writeFile(source, JSON.stringify(data));
   const result = await build(source);
-  const parsed = artifactData(result);
-  assert.equal(parsed.prototypes[0].html, html);
-  assert.equal(parsed.prototypes[0].file, undefined);
+  const parsed = pageData(result);
+  assert.equal(parsed.page.prototypes[0].html, html);
+  assert.equal(parsed.page.prototypes[0].file, undefined);
   assert(!result.includes(html));
   for (const prototypes of [
     [],
     [null],
-    [{ ...parsed.prototypes[0], height: 0 }],
-    [{ ...parsed.prototypes[0], html: "" }],
-    [parsed.prototypes[0], parsed.prototypes[0]],
+    [{ ...parsed.page.prototypes[0], height: 0 }],
+    [{ ...parsed.page.prototypes[0], html: "" }],
+    [parsed.page.prototypes[0], parsed.page.prototypes[0]],
   ])
-    await assert.rejects(assemble({ ...parsed, prototypes }));
+    await assert.rejects(
+      buildPage(source, { ...parsed, page: { ...parsed.page, prototypes } }),
+    );
   await fs.writeFile(
     source,
-    JSON.stringify({ ...data, prototypes: [{ ...data.prototypes[0], html }] }),
+    JSON.stringify({
+      ...data,
+      page: {
+        ...data.page,
+        prototypes: [{ ...data.page.prototypes[0], html }],
+      },
+    }),
   );
   await assert.rejects(build(source), /file.*html|html.*file/);
 });
@@ -679,6 +756,8 @@ test("publication resolves exact mixed sources from saved feedback before hashin
     result.body.status.current.sha256,
     crypto.createHash("sha256").update(snapshot).digest("hex"),
   );
+  await a.feedback(a.event("feedback-only", "2"));
+  await a.action("read");
   for (const ref of [
     { kind: "note", submissionId: "missing", noteId: "note-1" },
     { kind: "note", submissionId: feedback.id, noteId: "missing" },
@@ -836,6 +915,8 @@ test("answers travel with feedback and resolve as agreement sources", async (t) 
     "./example.1.html?target=question-overview-0#overview",
   );
   assert(!html.includes("Yes, keep the <sidebar>"));
+  await a.feedback(a.event("feedback-only", "2"));
+  await a.action("read");
   const missing = await a.action("publish", {
     html: await assemble({
       ...artifactData(artifact("3")),
@@ -918,15 +999,14 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
     null,
   ])
     await assert.rejects(assemble({ ...data, agreements }));
-  const legacy = {
+  const duplicateAgreed = {
     ...data,
     pages: [
       ...data.pages,
       { id: "agreed", title: "Agreed", html: "Previous decision" },
     ],
   };
-  assert.equal(artifactData(await assemble(legacy)).pages.length, 2);
-  await assert.rejects(assemble({ ...legacy, agreements: [] }));
+  await assert.rejects(assemble({ ...duplicateAgreed, agreements: [] }));
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), "agreement-build-"),
   );
@@ -937,11 +1017,18 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
   await fs.writeFile(
     source,
     JSON.stringify({
-      ...data,
-      agreements: [{ ...metadata, file: "decision.html" }],
+      artifactId: data.artifactId,
+      revision: data.revision,
+      kind: data.kind,
+      title: data.title,
+      page: {
+        id: "agreed",
+        title: "Agreed so far",
+        agreements: [{ ...metadata, file: "decision.html" }],
+      },
     }),
   );
-  assert.equal(artifactData(await build(source)).agreements[0].html, html);
+  assert.equal(pageData(await build(source)).page.agreements[0].html, html);
 });
 
 test("agreements survive topic changes and targeted feedback without rewriting snapshots", async (t) => {
@@ -1192,11 +1279,13 @@ test("closing a session from the bell panel completes it and drops it from the l
   assert.deepEqual(sessionConfig((await b.request(`${b.base}/`)).body), {
     sessionId: b.id,
     base: b.base,
+    viewHash: (await b.status()).body.current.sha256,
     closed: true,
   });
   assert.deepEqual(sessionConfig((await a.request(`${a.base}/`)).body), {
     sessionId: a.id,
     base: a.base,
+    viewHash: (await a.status()).body.current.sha256,
   });
 });
 
@@ -1268,9 +1357,15 @@ test("revision routes inject read-only and preview flags and serve prototypes sa
     ],
   };
   await a.action("publish", { html: await assemble(data) });
+  await a.feedback(a.event());
+  await a.action("read");
   await a.action("publish", { html: artifact("2") });
   const live = (await a.request(`${a.base}/`)).body;
-  assert.deepEqual(sessionConfig(live), { sessionId: a.id, base: a.base });
+  assert.deepEqual(sessionConfig(live), {
+    sessionId: a.id,
+    base: a.base,
+    viewHash: (await a.status()).body.current.sha256,
+  });
   assert.equal(artifactData(live).revision, "2");
   const readonly = await a.request(`${a.base}/r/1`);
   assert.equal(readonly.code, 200);
@@ -1375,11 +1470,13 @@ test("a session rejects a revision reused by another artifact", async (t) => {
   const h = await hub(t);
   const a = await h.session();
   await a.action("publish", { html: artifact("1") });
+  await a.feedback(a.event());
+  await a.action("read");
   const duplicate = await a.action("publish", {
     html: artifact("1", "exploration", "other"),
   });
   assert.equal(duplicate.code, 409);
-  assert.match(duplicate.body.error, /artifact "example"/);
+  assert.match(duplicate.body.error, /Revision 1 is already used/);
   assert.equal(
     await exists(path.join(a.directory, "artifacts/other.1.html")),
     false,
@@ -1436,6 +1533,8 @@ for (const mode of ["save", "implement"])
       (await a.feedback(a.event("accept-plan", "1", { mode }))).code,
       409,
     );
+    await a.feedback(a.event());
+    await a.action("read");
     await a.action("publish", { html: artifact("2", "plan") });
     assert.equal((await a.feedback(a.event("accept-plan", "2"))).code, 400);
     assert.equal((await a.action("complete")).code, 409);
@@ -1461,9 +1560,11 @@ for (const mode of ["save", "implement"])
         .digest("hex"),
     );
     assert.deepEqual((await a.request("/api/sessions")).body.sessions, []);
-    await a.action("publish", { html: artifact("3", "plan") });
-    assert.equal((await a.action("complete")).code, 409);
-    assert.equal((await a.status()).body.accepted, null);
+    assert.equal(
+      (await a.action("publish", { html: artifact("3", "plan") })).code,
+      409,
+    );
+    assert.equal((await a.status()).body.accepted.mode, mode);
   });
 
 test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
@@ -1483,7 +1584,9 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
   assert.equal(first.url, `http://127.0.0.1:${port}/s/${first.sessionId}/`);
   assert(first.sessionDir.startsWith(config.sessions));
-  assert.deepEqual(first.wake, { harness: "claude-code" });
+  assert.deepEqual(first.wake, {
+    harness: process.env.CODEX_THREAD_ID ? "codex" : "claude-code",
+  });
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.equal(record.port, port);
   assert.equal(record.version, version);
@@ -1516,42 +1619,9 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
 });
 
-test("the CLI marks steps in one call, keeps the source with a publication, and refuses to run inside a sandbox without network", async (t) => {
+test("the Codex network check installs rules and reports sandbox state", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
-  await a.feedback(a.event());
-  await a.action("read");
-  const run = (...args) =>
-    exec(process.execPath, [helper, ...args, "--session-dir", a.directory], {
-      env: h.env,
-    });
-  await run("progress", "--steps", "Update Agreed|Page A|Page B");
-  await run("progress", "--start", "Update Agreed");
-  await run("progress", "--done", "Update Agreed", "--start", "Page A|Page B");
-  assert.deepEqual(
-    (await a.status()).body.progress.steps.map((step) => step.state),
-    ["done", "active", "active"],
-  );
-  await assert.rejects(
-    run("progress", "--steps", "X", "--start", "X"),
-    /steps alone/,
-  );
-  const work = await fs.mkdtemp(path.join(os.tmpdir(), "plan-source-"));
-  t.after(() => fs.rm(work, { recursive: true, force: true }));
-  await fs.writeFile(path.join(work, "page.html"), "<p>two</p>");
-  await fs.writeFile(path.join(work, "art.html"), artifact("2"));
-  await run("publish", "--file", path.join(work, "art.html"), "--source", work);
-  const kept = path.join(a.directory, "src", "2");
-  assert.equal((await a.status()).body.current.source, kept);
-  assert.equal(
-    await fs.readFile(path.join(kept, "page.html"), "utf8"),
-    "<p>two</p>",
-  );
-  await assert.rejects(
-    run("publish", "--file", path.join(work, "art.html"), "--source", work),
-    /already exists/,
-  );
   const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "plan-codex-"));
   t.after(() => fs.rm(codexHome, { recursive: true, force: true }));
   const check = path.join(path.dirname(helper), "check.mjs");
@@ -1625,13 +1695,45 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.notEqual(record.pid, dead.pid);
   assert.notEqual(record.port, 1);
-  const file = path.join(home, "artifact.html");
-  await fs.writeFile(file, artifact());
-  await exec(
-    process.execPath,
-    [helper, "publish", "--session-dir", started.sessionDir, "--file", file],
-    { env },
+  const source = path.join(home, "source.json");
+  const shared = {
+    artifactId: "example",
+    revision: "1",
+    kind: "exploration",
+    title: "Example work",
+  };
+  const command = (...args) =>
+    exec(
+      process.execPath,
+      [helper, ...args, "--session-dir", started.sessionDir],
+      {
+        env,
+      },
+    );
+  const agreedFile = path.join(home, "agreed.html");
+  await fs.writeFile(
+    agreedFile,
+    await buildPage(source, {
+      ...shared,
+      page: { id: "agreed", title: "Agreed so far", agreements: [] },
+    }),
   );
+  await command("publish", "--file", agreedFile);
+  const pagesFile = path.join(home, "pages.json");
+  await fs.writeFile(
+    pagesFile,
+    JSON.stringify({ pages: [{ id: "overview", title: "Overview" }] }),
+  );
+  await command("progress", "--pages", pagesFile);
+  const overviewFile = path.join(home, "overview.html");
+  await fs.writeFile(
+    overviewFile,
+    await buildPage(source, {
+      ...shared,
+      page: { id: "overview", title: "Overview", html: "<p>Ready</p>" },
+    }),
+  );
+  await command("publish", "--file", overviewFile);
   const origin = `http://127.0.0.1:${record.port}`;
   const event = {
     sessionId: started.sessionId,
