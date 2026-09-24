@@ -2,9 +2,9 @@
 
 A component is a directory the builder reads. It holds `markup.html`, and
 `styles.css` and `behavior.mjs` when the component needs them. The builder
-reads every directory here and writes what it finds into the artifact, so
-an author copies the markup into a page, replaces its content and IDs, and
-does nothing else. Nothing goes into the plan's `css` or `js`.
+includes these in the frame pinned by the Agreed page, so an author copies
+the markup into a page and replaces its content and IDs. The component's
+styles and behavior do not belong in the page's `css` or `js`.
 
 Choose a component for the structure of the decision, not for its sample
 content.
@@ -53,7 +53,7 @@ such as a layout, belongs in `planUI.prefs`, keyed by `page.id` and the
 element's own ID so two of the same component on a page stay separate.
 
 `styles.css` needs no wrapper. The builder writes it into a cascade layer
-that beats the plan's own CSS, so a component's chrome is not restyled by
+that beats page CSS, so a component's chrome is not restyled by
 accident. It also beats `frame.css`, so a component sets its own type and
 spacing without fighting a frame selector. Use the design tokens in
 [frame.md](../references/frame.md).
@@ -72,12 +72,12 @@ and `behavior.mjs` and nothing else.
 
 ## Components of your own
 
-A plan that needs a shape no component has builds it in the plan's own `css`
-and `js`. That is what those two files are for.
+A page that needs a shape no component has builds it in its own `css` and
+`js`. Those fields refer to files in the page source.
 
 To keep one for later, ask. The agent then writes
 `$XDG_CONFIG_HOME/interactive-plan/components/<name>/` with `markup.html`,
-`styles.css` and `behavior.mjs`, moves the code out of the plan's files, and
+`styles.css` and `behavior.mjs`, moves the code out of the page's files, and
 says the path. `~/.config` is the fallback when `XDG_CONFIG_HOME` is unset.
 Every later plan gets it with nothing copied, and a skill update cannot
 touch it, because the skill is installed and updated as a unit.

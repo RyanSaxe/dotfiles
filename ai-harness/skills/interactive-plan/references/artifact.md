@@ -67,8 +67,8 @@ pages in a browser before publication.
 Page IDs are unique within a revision, not across revisions. The next
 revision may use a different page set. Reusing an ID makes a new immutable
 record and lets matching unsent draft items carry forward; it never edits
-the old record. `agreed` and `feedback` are reserved. A final plan lists
-`overview` first after Agreed.
+the old record. `agreed` is only for the Agreed page, and `feedback` is
+reserved for the frame. A final plan lists `overview` first after Agreed.
 
 Each published page's HTML is trusted agent-authored markup. Reviewer comments
 are plain text. Do not put comments in executable HTML or JavaScript. The

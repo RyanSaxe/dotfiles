@@ -14,13 +14,13 @@ Name the actor. Use `is`, `has` or `contains` when one of those words states
 the fact plainly. Otherwise use a specific verb. Do not make an abstract idea
 carry out an action when the system, agent or user does it.
 
-| Avoid                                       | Write                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------ |
-| "The answer travels with feedback."         | "Feedback includes the answer under `groups.answers`."             |
-| "A checklist arrives with nothing checked." | "Start each checklist with no checked boxes."                      |
-| "The revision closes open points."          | "Resolve every open point before publishing the revision."         |
-| "The hub wakes you with a submission."      | "The hub sends a wake event when a submission arrives."            |
-| "The mock reads as it is."                  | "The component mock renders at its natural width without scaling." |
+| Avoid                                       | Write                                                                 |
+| ------------------------------------------- | --------------------------------------------------------------------- |
+| "The answer travels with feedback."         | "Feedback includes the answer under `groups.answers`."                |
+| "A checklist arrives with nothing checked." | "Start each checklist with no checked boxes."                         |
+| "The revision closes open points."          | "Put every open point on a declared page before asking for feedback." |
+| "The hub wakes you with a submission."      | "The hub sends a wake event when a submission arrives."               |
+| "The mock reads as it is."                  | "The component mock renders at its natural width without scaling."    |
 
 Use a stronger verb when it names the action: "The frame stores the draft"
 is clearer than "The draft is stored" because it names the actor.

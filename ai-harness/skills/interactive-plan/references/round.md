@@ -3,7 +3,7 @@
 The hub wakes the agent after the reviewer submits a complete revision. Run
 `node scripts/session.mjs read --session-dir PATH` and read the submission and
 new chat feedback. An acceptance follows [session.md](session.md); do not
-publish another revision after acceptance.
+publish more pages after acceptance.
 
 For feedback, decide which points are settled, reopened, retired, or still
 open. A recommendation is not an agreement. The Agreed page records each
