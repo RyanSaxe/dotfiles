@@ -6,7 +6,13 @@
 | title, html | Concise title and the actual agreement, with exact details as needed.                        |
 | state       | agreed by default. reopened retains prior wording until resolved. retired includes a reason. |
 | change      | Optional marker for this publication only: `new` or `updated`.                               |
-| sourceRefs  | One or more references to the material that supports the agreement.                          |
+| sourceRefs  | References to choices, notes, answers or conversation context that support the agreement.    |
+| source      | Plain source text when no feedback item can be referenced.                                   |
+
+Each agreement needs `sourceRefs` or `source`. If an aligned submission has
+no choice, note or answer for a settled decision, name its revision and
+submission ID in `source`, state that `groups.alignUnflagged` was true, and
+explain why the comments did not challenge that decision.
 
 Each reference has a `kind`:
 

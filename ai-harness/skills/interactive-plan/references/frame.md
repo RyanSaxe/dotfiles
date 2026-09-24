@@ -143,7 +143,15 @@ block that already has notes.
 Noted text is highlighted. Hovering it shows the note, and clicking opens
 the note to edit. The count of notes on a page sits at the bottom. Before
 submission, the Feedback page groups items by page and includes edit, remove
-and the overall comment. Submit, at the right of the header, sends everything unsent
+and the overall comment. A default-on "Everything else looks good" switch sits
+above those comments. Its value persists across reloads and revisions. Submit
+includes it as the boolean `groups.alignUnflagged`, and the feedback text names
+its value. Older submissions without the field give no alignment signal.
+On an exploration revision, an aligned review with no other feedback may be
+submitted after all pages are ready. A successful submission locks that
+revision against another submission. Accept plan remains a separate action
+and the switch never authorizes implementation.
+Submit, at the right of the header, sends everything unsent
 at once and displays the count while items wait. Submitted feedback remains
 in the local draft until the next revision, which starts fresh. An item whose
 page or text no longer exists

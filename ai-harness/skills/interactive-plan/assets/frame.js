@@ -905,7 +905,7 @@ function renderFeedback() {
   if (!items.some((entry) => entry.topic !== "overall")) {
     const empty = document.createElement("p");
     empty.className = "feedback-empty";
-    empty.textContent = "Nothing marked yet.";
+    empty.textContent = "No specific comments.";
     groups.append(empty);
   }
   $("overall-notes").replaceChildren(
@@ -1030,6 +1030,8 @@ function review() {
   $("submit-error").hidden = !submissionError;
   $("submit-error").textContent = submissionError;
   $("overall-note").disabled = locked;
+  $("align-unflagged").checked = state.alignUnflagged;
+  $("align-unflagged").disabled = locked;
   if (locked)
     $("page-content")
       .querySelectorAll(
@@ -1055,9 +1057,11 @@ function review() {
   }
   const sendable =
     connected && current() && feedbackEditable() && !remote?.pageRound;
+  const hasFeedback =
+    unsent.count > 0 || (plan.kind === "exploration" && state.alignUnflagged);
   $("submit").disabled =
     submissionInFlight ||
-    (sent ? !$("feedback").hidden : !unsent.count || !sendable);
+    (sent ? !$("feedback").hidden : !hasFeedback || !sendable);
   $("submit").textContent = submissionInFlight
     ? "Sending"
     : sent
@@ -1076,6 +1080,7 @@ function feedbackText() {
     `Feedback: ${plan.title}`,
     `Artifact ${plan.artifactId}, revision ${plan.revision}`,
     "Feedback only. No implementation approval.",
+    `Everything else looks good: ${state.alignUnflagged ? "yes" : "no"}.`,
   ];
   for (const choice of Object.values(choices))
     lines.push("", `${choice.label}: ${choiceText(choice)}`);
@@ -1696,12 +1701,22 @@ $("note-form").onsubmit = (event) => {
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
+$("align-unflagged").onchange = (event) => {
+  if (!feedbackEditable()) return;
+  state.alignUnflagged = event.target.checked;
+  save();
+};
 $("submit").onclick = async () => {
   if (submittedCurrent()) {
     show("feedback");
     return;
   }
-  if (!feedbackEditable() || !unsentItems(state).count) return;
+  if (
+    !feedbackEditable() ||
+    (unsentItems(state).count === 0 &&
+      (plan.kind !== "exploration" || !state.alignUnflagged))
+  )
+    return;
   submissionError = "";
   const groups = submissionGroups(state);
   const snapshot = JSON.stringify(groups);

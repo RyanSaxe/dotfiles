@@ -8,10 +8,14 @@ publish more pages after acceptance.
 A revision can omit an unchanged open topic. Return to it when new evidence,
 a changed proposal, or a sharper question gives the reviewer a useful choice.
 
-For feedback, decide which points are settled, reopened, retired, or still
-open. A recommendation is not an agreement. The Agreed page records each
-settled decision and its source. Read [agreements.md](agreements.md) before
-changing it.
+For feedback, read [quality.md](quality.md) and the whole submission before
+deciding what belongs on Agreed. If `groups.alignUnflagged` is `true`, treat
+decisions the reviewer did not challenge as aligned. Use the comments and
+their context to judge which decisions they challenge. A note's anchor does
+not limit its reach. If the field is `false` or missing, do not infer
+agreement from silence. Decide which points are settled, reopened, retired,
+or still open. The Agreed page records each settled decision and its source.
+Read [agreements.md](agreements.md) before changing it.
 
 For a drawing answer, inspect its `previewPath` PNG. Its `scenePath` holds
 the editable Excalidraw shapes when you need to examine the source.

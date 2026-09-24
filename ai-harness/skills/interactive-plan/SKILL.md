@@ -19,9 +19,10 @@ exploration before presenting another complete plan.
 
 An exploration revision shows new or materially changed material. Move
 settled choices to Agreed, and omit unchanged pages that received no feedback.
-Silence does not settle a decision. Return to an unanswered decision when new
-evidence, a changed proposal, or a sharper question gives the reviewer
-something new to judge.
+For submitted feedback, use `groups.alignUnflagged` and the comments as
+[round.md](references/round.md) directs. Return to an unanswered decision
+when new evidence, a changed proposal, or a sharper question gives the
+reviewer something new to judge.
 
 Publish Agreed first, then list only the pages this revision needs. Publish
 each finished page with the same `publish` command. The reader can review

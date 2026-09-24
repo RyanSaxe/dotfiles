@@ -19,6 +19,18 @@ const list = (label, touched = false) => ({
 });
 const draftWith = (choices) => ({ ...emptyDraft("1"), choices });
 
+test("alignment defaults on, preserves a changed value, and travels with feedback", () => {
+  const fresh = emptyDraft("1");
+  assert.equal(fresh.alignUnflagged, true);
+  assert.equal(submissionGroups(fresh).alignUnflagged, true);
+  fresh.alignUnflagged = false;
+  assert.equal(submissionGroups(fresh).alignUnflagged, false);
+  assert.equal(loadDraft(fresh, "2").alignUnflagged, false);
+  const older = { ...fresh };
+  delete older.alignUnflagged;
+  assert.equal(loadDraft(older, "2").alignUnflagged, true);
+});
+
 test("an untouched checklist does not count", () => {
   const draft = draftWith({
     "scope/one": list("One"),

@@ -167,6 +167,7 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   };
   assert.equal(unsentItems(draft).count, 3);
   assert.deepEqual(Object.keys(submissionGroups(draft)), [
+    "alignUnflagged",
     "choices",
     "notes",
     "answers",

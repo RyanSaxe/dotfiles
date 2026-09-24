@@ -71,11 +71,10 @@ Match the detail to the work.
 
 When a proposal changes between revisions, show the change against what the
 user reviewed: a diff for text and code, before and after for visuals.
-Unannotated wording can stay in a revised proposal, but silence does not
-settle its central decision. Remove a decision or question after recording
-its answer on Agreed. If a control remains, the next revision asks the
-question again. If the topic is still open, bring back new material or ask a
-sharper question, never the same one.
+Unannotated wording can stay in a revised proposal. Once a decision is
+recorded on Agreed, omit its choice or question from the next revision.
+If a decision is still open, leave it open without repeating the page.
+Return with new evidence, a changed proposal, or a sharper question.
 
 ## Sentences
 
