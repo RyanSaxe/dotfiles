@@ -7,19 +7,28 @@ Settings, the Feedback page, and preview and read-only modes. The bell lists
 other live sessions and closes them. The header spans the frame at every
 width. It displays the revision clock, Settings and the bell on the left,
 and Submit on the right. Submit stays disabled until the last listed page
-publishes. A final plan with no unsent feedback offers Accept plan. The
-clock lists completed revisions and the current one. The sidebar keeps Agreed,
-this revision's pages in their declared order, and Review comments in one
-list. A hollow dot marks a queued page, a pulsing dot marks an active one,
-and a ready page has no status mark. A pending page has no page-specific
-comment control. Below 720px, the Pages button opens that same list. Its
-numbered badge counts unfinished pages, then disappears when all are ready.
-The badge shows an ellipsis before the agent lists the pages. A newly ready
-page briefly appears in a non-blocking notice with a View action; it does
+publishes. Its slot remains in place as it reads Sending during a save and
+View status after submission. A final plan with no unsent feedback offers
+Accept plan. The clock lists completed revisions and the current one. The
+sidebar keeps Agreed, this revision's pages in their declared order, and
+Review comments in one list. A clock marks a queued page, a pulsing light
+marks an active one, and a green check marks a ready page. A pending page has
+no page-specific comment control. Below 720px, the Pages button opens that
+same list. Its badge and icon use the bell's attention styling while the badge
+counts unfinished pages. The badge disappears when no count is available.
+A newly ready page briefly appears in a non-blocking notice with a View action;
+it does
 not take focus or navigate away from the current page. Reduced-motion mode
-keeps the marks visible without pulsing. Review
-comments opens the Feedback page and displays the count of unsent items. The
-browser tab displays the plan title. The revision dialog displays it under
+keeps the marks visible without pulsing. Review comments opens the Feedback
+page and displays the count of unsent items.
+Submit from any page moves to Feedback. While the hub saves, the page says
+Sending feedback and keeps the draft. A confirmed save shows a short receipt
+with the agent's current status and a way back to the submitted revision.
+Feedback becomes Feedback sent in the page list. The submitted revision stays
+readable, but its comment and answer controls remain visible and disabled.
+View status in the header returns to the receipt. A failed save restores the
+review controls and shows the error on Feedback. The browser tab displays the
+plan title. The revision dialog displays it under
 the current revision. Page HTML starts below the title and must not contain
 an `h1`. The build rejects a page that contains one. The page controls its own
 layout. The frame provides basic typography, tables, code, theme colors,
@@ -46,9 +55,10 @@ titles, uppercase 10.5px labels. Radii are 10px for cards, 7px for buttons,
 6px for rows. The frame is at most 1160px wide and centered, and the reading
 column is at most 780px of text.
 
-The frame is exactly as tall as the visible window. The browser scrolls the
-page inside the frame, so the window itself never scrolls and content does not
-pass under the header. The session stores the page and scroll offset, so the
+The frame is exactly as tall as the visible window. Short pages keep the panel
+background and footer to the bottom, including on phones. The browser scrolls
+the page inside the frame, so the window itself never scrolls and content does
+not pass under the header. The session stores the page and scroll offset, so the
 bell can return the reader to the same place after a jump to another session.
 The session record stores the revision. A newly published page in the same
 revision leaves the reader on the current page and restores scroll and draft
@@ -131,11 +141,12 @@ marks the block the reader is about to comment on. The muted bar marks a
 block that already has notes.
 
 Noted text is highlighted. Hovering it shows the note, and clicking opens
-the note to edit. The count of notes on a page sits at the bottom. The
-Feedback page groups items by page and includes edit, remove and the
-overall comment. Submit, at the right of the header, sends everything unsent
-at once and displays the count while items wait. Sent items stay listed
-as sent until the next revision. An item whose page or text no longer exists
+the note to edit. The count of notes on a page sits at the bottom. Before
+submission, the Feedback page groups items by page and includes edit, remove
+and the overall comment. Submit, at the right of the header, sends everything unsent
+at once and displays the count while items wait. Submitted feedback remains
+in the local draft until the next revision, which starts fresh. An item whose
+page or text no longer exists
 is listed under the revision it came from. A note takes images. Paste a
 screenshot, drop a file on the dialog, or use Add an image; each one uploads
 and appears as a thumbnail the reviewer can drop again. A note carries the

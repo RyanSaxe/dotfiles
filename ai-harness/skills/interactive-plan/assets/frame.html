@@ -96,8 +96,12 @@
           <b id="bell-count"></b>
         </button>
         <span class="spacer"></span>
-        <span class="small" id="submit-status"></span>
-        <button class="btn primary" id="submit" type="button" disabled>
+        <button
+          class="btn primary header-submit"
+          id="submit"
+          type="button"
+          disabled
+        >
           Submit</button
         ><button class="btn primary" id="accept" type="button" hidden>
           Accept plan
@@ -176,6 +180,9 @@
               hidden
             ></p>
             <section id="reading">
+              <p class="submitted-strip" id="submitted-strip" hidden>
+                Feedback sent · <span id="submitted-stage"></span>
+              </p>
               <h1 tabindex="-1" id="page-title"></h1>
               <div class="note-bars" id="note-bars"></div>
               <div class="chosen-bar" id="chosen-bar" hidden></div>
@@ -187,24 +194,43 @@
               </nav>
             </section>
             <section id="feedback" hidden>
-              <h1 tabindex="-1">Feedback</h1>
-              <div id="feedback-groups"></div>
-              <section class="feedback-group">
-                <div class="group-head">
-                  <h2>Overall</h2>
-                  <button class="btn quiet" id="overall-note" type="button">
-                    Add overall comment
-                  </button>
-                </div>
-                <div id="overall-notes"></div>
-              </section>
-              <div class="feedback-end">
-                <button class="btn quiet" id="export" type="button">
-                  Export copy
+              <h1 tabindex="-1" id="feedback-title">Feedback</h1>
+              <div class="submission-receipt" id="submission-receipt" hidden>
+                <p class="receipt-stage" role="status">
+                  <span class="page-activity active" aria-hidden="true"></span>
+                  <span id="receipt-stage"></span>
+                </p>
+                <p class="muted" id="receipt-detail"></p>
+                <button class="btn" id="read-submitted" type="button">
+                  Read submitted revision
                 </button>
               </div>
-              <p class="small" id="storage-status"></p>
-              <p class="small" id="connection-status"></p>
+              <div id="feedback-review">
+                <p
+                  class="notice"
+                  id="submit-error"
+                  data-tone="danger"
+                  role="alert"
+                  hidden
+                ></p>
+                <div id="feedback-groups"></div>
+                <section class="feedback-group">
+                  <div class="group-head">
+                    <h2>Overall</h2>
+                    <button class="btn quiet" id="overall-note" type="button">
+                      Add overall comment
+                    </button>
+                  </div>
+                  <div id="overall-notes"></div>
+                </section>
+                <div class="feedback-end">
+                  <button class="btn quiet" id="export" type="button">
+                    Export copy
+                  </button>
+                </div>
+                <p class="small" id="storage-status"></p>
+                <p class="small" id="connection-status"></p>
+              </div>
               <nav class="page-footer" aria-label="Back">
                 <a id="feedback-back" hidden></a>
               </nav>

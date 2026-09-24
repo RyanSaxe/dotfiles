@@ -332,6 +332,11 @@ kbd {
 .frame-header .small {
   overflow-wrap: anywhere;
 }
+.header-submit {
+  flex: none;
+  width: 92px;
+  text-align: center;
+}
 .app-body {
   flex: 1;
   min-height: 0;
@@ -385,22 +390,40 @@ kbd {
 }
 .pages-slot nav button.pending {
   color: var(--muted);
-  opacity: 0.72;
 }
 .pages-slot nav button.pending[aria-current="page"] {
   opacity: 1;
 }
 .pages-slot nav button .page-activity {
   flex: none;
+}
+.page-activity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.page-activity svg {
+  width: 16px;
+  height: 16px;
+}
+.page-activity.queued {
+  color: var(--muted);
+}
+.page-activity.complete {
+  color: var(--ok);
+}
+.page-activity.active {
+  color: var(--accent);
+}
+.page-activity.active::before {
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
-}
-.page-activity.queued {
-  border: 1.5px solid var(--muted);
-}
-.page-activity.active {
-  background: var(--accent);
+  background: currentColor;
   animation: page-breathe 2s ease-in-out infinite;
 }
 @keyframes page-breathe {
@@ -411,11 +434,7 @@ kbd {
 }
 .pending-page {
   max-width: 620px;
-  margin-top: 36px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
+  margin-top: 24px;
 }
 .pending-state {
   display: flex;
@@ -425,7 +444,7 @@ kbd {
   font-weight: 650;
 }
 .pending-page p {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
 }
 .pages-slot nav .separator {
@@ -448,8 +467,8 @@ main {
   min-height: 0;
   overflow-y: auto;
   min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
 }
 .bell {
@@ -505,12 +524,22 @@ select {
    The 56px on the left holds the bar that marks a chosen block, and the
    last line clears the comment control, which is always on screen. */
 .content {
+  flex: 1 0 auto;
   max-width: 876px;
   margin: 0;
   padding: 24px 40px 90px 56px;
   width: 100%;
   min-width: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   transition: opacity 0.2s ease;
+}
+#reading,
+#feedback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 #page-content {
   position: relative;
@@ -524,10 +553,49 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 22px;
+  margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid var(--line);
   font-size: 13px;
+}
+.submitted-strip {
+  margin: -24px -40px 22px -56px;
+  padding: 8px 40px 8px 56px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.submission-receipt {
+  max-width: 500px;
+}
+#feedback.has-receipt {
+  justify-content: center;
+}
+#feedback.has-receipt .page-footer {
+  display: none;
+}
+#feedback.has-receipt #feedback-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+#feedback.has-receipt:not(.sending) #feedback-title::before {
+  content: "✓";
+  color: var(--ok);
+  font-size: 23px;
+}
+.receipt-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.submission-receipt .muted {
+  margin-bottom: 16px;
 }
 .page-footer a {
   cursor: pointer;
@@ -1433,26 +1501,21 @@ img.note-image {
 }
 .icon-btn.menu b {
   position: absolute;
-  top: -4px;
-  right: -6px;
+  top: 1px;
+  right: 1px;
   min-width: 16px;
   height: 16px;
-  padding: 0 3px;
-  border: 2px solid var(--panel);
+  padding: 0 4px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 12px;
+  background: var(--attention);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
   text-align: center;
-  animation: page-badge-breathe 2s ease-in-out infinite;
 }
-@keyframes page-badge-breathe {
-  50% {
-    opacity: 0.6;
-    transform: scale(0.9);
-  }
+.icon-btn.menu.need {
+  color: var(--attention);
 }
 .page-arrival {
   position: absolute;
@@ -1524,12 +1587,17 @@ img.note-image {
   main {
     border-right: 0;
     overflow: visible;
+    min-height: 100%;
   }
   .content {
     max-width: none;
     margin: 0;
     /* The last line clears the comment control, which is always on screen. */
     padding: 20px 16px calc(90px + env(safe-area-inset-bottom));
+  }
+  .submitted-strip {
+    margin: -20px -16px 20px;
+    padding: 9px 16px;
   }
   .page-arrival {
     top: 60px;
@@ -1569,8 +1637,7 @@ body:has(dialog[open]) .quote-button {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .page-activity.active,
-  .icon-btn.menu b {
+  .page-activity.active::before {
     animation: none;
   }
 }

@@ -643,6 +643,9 @@ async function loadSession(directory, config, origin) {
           ? "working"
           : "submitted",
       latestSubmissionId: data.id,
+      latestSubmissionRevision:
+        data.intent === "feedback-only" ? data.revision : null,
+      wake: state.wake ? { ...state.wake, last: null } : null,
       accepted: null,
     });
     if (wake && !state.paused)

@@ -130,6 +130,7 @@ let page = pages[0],
   selected = "",
   selectedTarget = null,
   submissionError = "",
+  submissionInFlight = false,
   noteDraftKey = "",
   renderedFeedback = null,
   answerTimer;
@@ -147,6 +148,20 @@ const syntaxThemes = { light: "github-light", dark: "github-dark" };
 const current = () =>
   remote?.current?.artifactId === plan.artifactId &&
   remote?.current?.revision === plan.revision;
+const submittedCurrent = () =>
+  editable &&
+  (state.submitted?.revision === plan.revision ||
+    (current() && remote?.latestSubmissionRevision === plan.revision));
+const feedbackEditable = () =>
+  editable && !submissionInFlight && !submittedCurrent();
+function agentStage() {
+  if (!connected) return "Connection lost";
+  if (remote?.wake?.last?.ok === false) return "Agent could not start";
+  if (remote?.paused) return "Agent paused";
+  return remote?.stage === "working"
+    ? "Agent working on next revision"
+    : "Waiting for agent";
+}
 const reviewAlerts = createReviewAlerts({
   window,
   button: $("notifications"),
@@ -258,7 +273,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     chooseBlock(null);
     $("page-content").dataset.pageId = page.id;
     $("page-content").innerHTML = page.pending
-      ? `<div class="pending-page"><span class="pending-state"><span class="page-activity ${page.working ? "active" : "queued"}" aria-hidden="true"></span>${page.working ? "This page is being prepared" : "This page is waiting its turn"}</span><p>You can keep reading pages that are ready. This one appears after its publication check passes.</p></div>`
+      ? `<div class="pending-page"><span class="pending-state">${pageIndicator(page.working ? "active" : "queued").outerHTML}${page.working ? "Being prepared" : "Waiting its turn"}</span><p>${page.working ? "The agent is working on this page. It will appear when its publication check passes." : "The agent has listed this page but has not started it yet."} You can read Agreed now.</p></div>`
       : page.html;
     if (!page.pending) {
       blockTargets($("page-content"), page.id);
@@ -473,7 +488,7 @@ function openNote(
   entryId = null,
   target = null,
 ) {
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   noteContext = {
     topic,
     anchor,
@@ -927,6 +942,7 @@ function canAccept(unsentCount) {
     plan.kind === "plan" &&
     connected &&
     current() &&
+    !submittedCurrent() &&
     !unsentCount &&
     ["ready", "updated"].includes(remote.stage)
   );
@@ -972,17 +988,61 @@ function renderFooter(feedback) {
     !next
       ? ""
       : next.id === "feedback"
-        ? acceptable
-          ? "Review and accept →"
-          : "Review your feedback →"
+        ? submittedCurrent()
+          ? "Feedback sent →"
+          : acceptable
+            ? "Review and accept →"
+            : "Review your feedback →"
         : `Next: ${next.title} →`,
   );
 }
 function review() {
   const unsent = unsentItems(state);
-  badge(unsent.count);
+  const sent = submittedCurrent();
+  const locked = sent || submissionInFlight;
+  badge(locked ? 0 : unsent.count);
+  const reviewLabel = $("review-row")?.querySelector("span");
+  if (reviewLabel)
+    reviewLabel.textContent = sent ? "Feedback sent" : "Review comments";
+  $("review-row")?.classList.toggle("sent", sent);
+  const sentMark = $("review-row")?.querySelector(".page-activity");
+  if (sentMark) sentMark.hidden = !sent;
+  $("submitted-strip").hidden = !sent;
+  $("submitted-stage").textContent = agentStage();
+  $("feedback-title").textContent = submissionInFlight
+    ? "Sending feedback"
+    : sent
+      ? "Feedback sent"
+      : "Feedback";
+  $("feedback").classList.toggle("has-receipt", locked);
+  $("feedback").classList.toggle("sending", submissionInFlight);
+  $("submission-receipt").hidden = !locked;
+  $("feedback-review").hidden = locked;
+  $("receipt-stage").textContent = submissionInFlight
+    ? "Saving your comments"
+    : agentStage();
+  $("receipt-detail").textContent = submissionInFlight
+    ? "Your draft stays saved until the hub confirms it."
+    : remote?.wake?.last?.ok === false
+      ? "Your feedback is saved. Ask the agent to resume in chat."
+      : "Agreed will appear when it is ready.";
+  $("read-submitted").disabled = submissionInFlight;
+  $("submit-error").hidden = !submissionError;
+  $("submit-error").textContent = submissionError;
+  $("overall-note").disabled = locked;
+  if (locked)
+    $("page-content")
+      .querySelectorAll(
+        "[data-choice] [data-value], [data-multiselect] input, [data-question] textarea, [data-answer], [data-edit], [data-drawing-question] [data-draw], [data-comment]",
+      )
+      .forEach((control) => {
+        if (control.tagName === "TEXTAREA") control.readOnly = true;
+        else control.disabled = true;
+      });
+  commentTarget();
   $("accept").hidden = !canAccept(unsent.count);
   renderFooter(!$("feedback").hidden);
+  $("feedback-back").hidden = locked;
   const rendered = JSON.stringify([
     state.notes,
     state.choices,
@@ -993,15 +1053,21 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
-  const sendable = connected && current() && editable && !remote?.pageRound;
-  $("submit").disabled = !unsent.count || !sendable;
-  $("submit").textContent = unsent.count
-    ? `Submit (${unsent.count})`
-    : "Submit";
-  // Accept plan takes the slot on an acceptable final plan. A sent round with
-  // nothing new leaves Submit in place and disabled, so the header stays put.
+  const sendable =
+    connected && current() && feedbackEditable() && !remote?.pageRound;
+  $("submit").disabled =
+    submissionInFlight ||
+    (sent ? !$("feedback").hidden : !unsent.count || !sendable);
+  $("submit").textContent = submissionInFlight
+    ? "Sending"
+    : sent
+      ? "View status"
+      : unsent.count
+        ? `Submit (${unsent.count})`
+        : "Submit";
+  $("submit").classList.toggle("primary", !sent);
+  // Accept plan uses the same slot when a final plan has no unsent feedback.
   $("submit").hidden = !$("accept").hidden;
-  $("submit-status").textContent = submissionError;
   status();
 }
 function feedbackText() {
@@ -1136,6 +1202,14 @@ async function poll() {
     if (result.sessionId !== session.sessionId) throw Error("Wrong session");
     remote = result;
     connected = true;
+    if (
+      state.pending?.event?.id === remote.latestSubmissionId &&
+      remote.latestSubmissionRevision === plan.revision &&
+      state.submitted?.id !== remote.latestSubmissionId
+    ) {
+      markSent(state, remote.latestSubmissionId, new Date().toISOString());
+      persist();
+    }
   } catch {
     connected = false;
   }
@@ -1600,6 +1674,7 @@ for (const type of ["dragleave", "drop"])
 
 $("note-form").onsubmit = (event) => {
   event.preventDefault();
+  if (!feedbackEditable()) return;
   const text = $("note-text").value.trim();
   if (!text) return;
   const note = {
@@ -1622,6 +1697,11 @@ $("note-form").onsubmit = (event) => {
     show(page.id, null, { keepScroll: true });
 };
 $("submit").onclick = async () => {
+  if (submittedCurrent()) {
+    show("feedback");
+    return;
+  }
+  if (!feedbackEditable() || !unsentItems(state).count) return;
   submissionError = "";
   const groups = submissionGroups(state);
   const snapshot = JSON.stringify(groups);
@@ -1631,18 +1711,25 @@ $("submit").onclick = async () => {
       event: envelope("feedback-only", feedbackText(), { groups }),
     };
   persist();
-  $("submit").disabled = true;
+  submissionInFlight = true;
+  show("feedback");
   try {
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
+    submissionInFlight = false;
     save();
-    show(page.id, null, { keepScroll: true });
   } catch (error) {
-    submissionError = error.message;
-    $("submit").disabled = false;
-    $("submit-status").textContent = error.message;
+    submissionInFlight = false;
+    submissionError = submittedCurrent()
+      ? ""
+      : error instanceof TypeError
+        ? "Could not reach the hub. Your comments are saved here. Try Submit again."
+        : error.message;
+    if ($("reading").hidden) review();
+    else show(page.id, null, { keepScroll: true });
   }
 };
+$("read-submitted").onclick = () => show(page.id);
 $("export").onclick = () => {
   const groups = submissionGroups(state);
   const event =
@@ -1733,7 +1820,7 @@ document.addEventListener("click", (event) => {
     toggleSidecar(false);
     return;
   }
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   const comment = event.target.closest("[data-comment]");
   if (comment && $("page-content").contains(comment))
     openNote(
@@ -1767,7 +1854,7 @@ document.addEventListener("click", (event) => {
   }
 });
 document.addEventListener("change", (event) => {
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   const input = event.target.closest(
     '[data-multiselect] input[type="checkbox"][data-value]',
   );
@@ -1780,7 +1867,7 @@ document.addEventListener("change", (event) => {
   save();
 });
 document.addEventListener("input", (event) => {
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   const area = event.target.closest("[data-question] textarea");
   if (!area || !$("page-content").contains(area)) return;
   const group = area.closest("[data-question]");
@@ -1872,6 +1959,11 @@ function commentTarget() {
   const usable = editable && !page.pending && !$("reading").hidden;
   button.hidden = !usable;
   if (!usable) return;
+  button.disabled = !feedbackEditable();
+  if (button.disabled) {
+    button.textContent = "Comments sent";
+    return;
+  }
   if (selected.length > 3) button.textContent = "Comment on selection";
   else if (chosen) button.textContent = `Comment on ${blockKind(chosen)}`;
   else button.textContent = "Comment on this page";
@@ -1888,7 +1980,7 @@ document.addEventListener("selectionchange", () => {
 /* A control does its own job, a block becomes the target, and anything else
    clears it. A drag is a selection, so it never reaches here as a press. */
 $("page-content").addEventListener("click", (event) => {
-  if (!editable || page.pending) return;
+  if (!feedbackEditable() || page.pending) return;
   if (
     event.target.closest("button, a, input, label, select, textarea, summary")
   )
@@ -1901,7 +1993,7 @@ $("page-content").addEventListener("click", (event) => {
 /* The control and the c key comment on the same thing, so they share the
    one function that decides what that is. */
 function commentOnTarget() {
-  if (page.pending) return;
+  if (!feedbackEditable() || page.pending) return;
   if (selected.length > 3)
     openNote(page.id, page.title, selected, null, null, selectedTarget);
   else if (chosen) {
@@ -1962,7 +2054,7 @@ document.addEventListener("keydown", (event) => {
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
-    editable
+    feedbackEditable()
   ) {
     const area = event.target.closest("textarea");
     const answer = area
@@ -2019,7 +2111,8 @@ document.addEventListener("keydown", (event) => {
     next.tabIndex = -1;
     next.focus({ preventScroll: true });
     next.scrollIntoView({ block: "center" });
-  } else if (key === "c" && editable && !$("reading").hidden) commentOnTarget();
+  } else if (key === "c" && feedbackEditable() && !$("reading").hidden)
+    commentOnTarget();
   else if (key === "r" && editable) show("feedback");
   else if (key === "s" && editable) {
     const target = $("accept").hidden ? $("submit") : $("accept");
@@ -2259,7 +2352,7 @@ function closeDrawing() {
   if ($("drawing-dialog").open) $("drawing-dialog").close();
 }
 async function openDrawing(id, label, target, onSaved) {
-  if (!editable || !online) return;
+  if (!feedbackEditable() || !online) return;
   const key = `${page.id}/${id}`;
   const previous = state.answers[key];
   let scene = null;
@@ -2354,6 +2447,7 @@ addEventListener("message", async (event) => {
 });
 window.planUI = {
   answer(id, text, label, target) {
+    if (!feedbackEditable()) return;
     const key = page.id + "/" + id;
     if (text.trim())
       state.answers[key] = {
@@ -2390,6 +2484,17 @@ function separator() {
   divider.setAttribute("role", "separator");
   return divider;
 }
+function pageIndicator(state) {
+  const indicator = document.createElement("span");
+  indicator.className = `page-activity ${state}`;
+  indicator.setAttribute("aria-hidden", "true");
+  if (state !== "active")
+    indicator.innerHTML =
+      state === "complete"
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+  return indicator;
+}
 function addPageButton(item) {
   const button = document.createElement("button");
   button.type = "button";
@@ -2403,10 +2508,9 @@ function addPageButton(item) {
       "aria-label",
       `${item.title}, ${item.working ? "being prepared" : "queued"}`,
     );
-    const indicator = document.createElement("span");
-    indicator.className = `page-activity ${item.working ? "active" : "queued"}`;
-    indicator.setAttribute("aria-hidden", "true");
-    button.append(indicator);
+    button.append(pageIndicator(item.working ? "active" : "queued"));
+  } else {
+    button.append(pageIndicator("complete"));
   }
   $("navigation").append(button);
 }
@@ -2416,8 +2520,12 @@ for (const item of pages.filter((item) => item.id !== "agreed"))
   addPageButton(item);
 const unfinishedPages = plan.pages.filter((item) => item.pending).length;
 const pageCount = $("page-count");
-pageCount.hidden = plan.pageMode !== "partial";
-pageCount.textContent = unfinishedPages || "…";
+pageCount.hidden = plan.pageMode !== "partial" || !unfinishedPages;
+pageCount.textContent = unfinishedPages;
+$("menu-button").classList.toggle(
+  "need",
+  plan.pageMode === "partial" && unfinishedPages > 0,
+);
 $("menu-button").setAttribute(
   "aria-label",
   plan.pageMode !== "partial"
@@ -2436,7 +2544,9 @@ if (editable) {
   const count = document.createElement("b");
   count.className = "count";
   count.hidden = true;
-  review.append(label, count);
+  const sentMark = pageIndicator("complete");
+  sentMark.hidden = true;
+  review.append(label, count, sentMark);
   $("navigation").append(separator(), review);
 }
 $("menu-button").addEventListener("click", () =>

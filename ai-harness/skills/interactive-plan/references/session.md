@@ -154,7 +154,9 @@ agent those paths; the file is on disk and the agent opens it. Closing a
 session takes its images with it.
 
 `status.json` records `title`, `kind`, `revisions`, `pageRound`, `wake`, and
-`paused` next to the stage. `pageRound` holds Agreed and each declared page's
+`paused` next to the stage. `latestSubmissionRevision` identifies the revision
+whose feedback the hub last saved, so another browser can show its submitted
+state. `pageRound` holds Agreed and each declared page's
 queued, active, or ready state until the last page publishes. `pause` sets
 `paused` and leaves the stage as it was. `stage` is `ready`, `updated`,
 `submitted`, `working`, or `complete`: a submission moves it to `submitted`,
