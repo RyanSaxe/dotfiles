@@ -307,6 +307,7 @@ kbd {
    scroll by the height of a browser toolbar. The content scrolls inside
    the shell rather than the window. */
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -382,19 +383,54 @@ kbd {
   font-weight: 600;
   border-left-color: var(--accent);
 }
+.pages-slot nav button.pending {
+  color: var(--muted);
+  opacity: 0.72;
+}
+.pages-slot nav button.pending[aria-current="page"] {
+  opacity: 1;
+}
+.pages-slot nav button .page-activity {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.page-activity.queued {
+  border: 1.5px solid var(--muted);
+}
+.page-activity.active {
+  background: var(--accent);
+  animation: page-breathe 2s ease-in-out infinite;
+}
+@keyframes page-breathe {
+  50% {
+    opacity: 0.4;
+    transform: scale(0.75);
+  }
+}
+.pending-page {
+  max-width: 620px;
+  margin-top: 36px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.pending-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 650;
+}
+.pending-page p {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
 .pages-slot nav .separator {
   border-top: 1px solid var(--line);
   margin: 8px 0;
-}
-.working-card .working-between {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-.working-card .working-report {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--attention);
 }
 .pages-slot nav button .count {
   flex: none;
@@ -480,9 +516,6 @@ select {
   position: relative;
   container: page / inline-size;
 }
-body.is-working .content {
-  opacity: 0.33;
-}
 #page-content p,
 #page-content li {
   font-size: 14px;
@@ -515,151 +548,6 @@ body.is-working .content {
 }
 .accepted code {
   font-size: 11px;
-}
-
-/* Working state */
-.working {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: calc(max(0px, (100% - 1160px) / 2) + 280px);
-  width: min(820px, 100% - 280px);
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  pointer-events: none;
-  z-index: 3;
-}
-.working-card {
-  pointer-events: auto;
-  width: min(380px, 100%);
-  padding: 14px 18px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  font-size: 13px;
-}
-.working-card .head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.working-card .head b {
-  font-size: 15px;
-}
-.working-card .head small {
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.working-note {
-  margin: -4px 0 8px;
-  color: var(--attention);
-  font-size: 12.5px;
-}
-/* The card patches in place: one segment and one row per step, classes
-   toggled on a poll, so nothing is rebuilt while the agent works. */
-.working-card .bar {
-  display: grid;
-  grid-auto-flow: column;
-  gap: 3px;
-  height: 5px;
-  margin-bottom: 12px;
-}
-.working-card .bar i {
-  border-radius: 3px;
-  background: var(--line);
-  transition:
-    background 0.2s ease,
-    opacity 0.2s ease;
-}
-.working-card .bar i.done {
-  background: var(--accent);
-}
-.working-card .bar i.now {
-  background: var(--accent);
-  opacity: 0.45;
-}
-.working-card .steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 5px;
-}
-.working-card .steps li {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  color: var(--muted);
-}
-.working-card .steps li::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
-  box-sizing: border-box;
-  justify-self: center;
-}
-.working-card .steps li.done {
-  color: var(--ink);
-}
-.working-card .steps li.done::before {
-  content: "✓";
-  border: 0;
-  color: var(--ok);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 14px;
-  text-align: center;
-}
-.working-card .steps li.now,
-.working-card .steps li.wait {
-  color: var(--ink);
-  font-weight: 600;
-}
-.working-card .steps li.now::before {
-  border-color: var(--accent);
-  border-width: 3.5px;
-  animation: working-pulse 1.2s ease-in-out infinite;
-}
-.working-card .steps li.wait::before {
-  border-color: var(--attention);
-  border-width: 3.5px;
-  animation: working-pulse 1.2s ease-in-out infinite;
-}
-.working-card .steps li.enter {
-  animation: working-enter 0.2s ease;
-}
-@keyframes working-pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-@keyframes working-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-.working-card .foot {
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .working-card .bar i {
-    transition: none;
-  }
-  .working-card .steps li::before,
-  .working-card .steps li.enter {
-    animation: none;
-  }
 }
 
 /* Sessions panel */
@@ -1502,18 +1390,48 @@ img.note-image {
 }
 .icon-btn.menu b {
   position: absolute;
-  top: 1px;
-  right: 1px;
+  top: -4px;
+  right: -6px;
   min-width: 16px;
   height: 16px;
-  padding: 0 4px;
+  padding: 0 3px;
+  border: 2px solid var(--panel);
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 10px;
-  font-weight: 700;
-  line-height: 16px;
+  font-weight: 800;
+  line-height: 12px;
   text-align: center;
+  animation: page-badge-breathe 2s ease-in-out infinite;
+}
+@keyframes page-badge-breathe {
+  50% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+}
+.page-arrival {
+  position: absolute;
+  z-index: var(--z-header);
+  top: 64px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+.page-arrival button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 650;
 }
 /* Reading an older revision: the strip names it and carries the way back. */
 .older-strip {
@@ -1570,9 +1488,11 @@ img.note-image {
     /* The last line clears the comment control, which is always on screen. */
     padding: 20px 16px calc(90px + env(safe-area-inset-bottom));
   }
-  .working {
-    left: 0;
-    width: 100%;
+  .page-arrival {
+    top: 60px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
   }
   table {
     display: block;
@@ -1601,13 +1521,15 @@ img.note-image {
   padding: 0;
   overflow: visible;
 }
-/* A dialog and the working card both cover the page, so the control that
-   comments on it goes. While the agent works, the revision under the card is
-   the one about to be replaced, and a note on it would arrive against a page
-   that no longer exists. */
-body:has(dialog[open]) .quote-button,
-body.is-working .quote-button {
+/* Dialogs cover the current page, so its comment control steps aside. */
+body:has(dialog[open]) .quote-button {
   display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-activity.active,
+  .icon-btn.menu b {
+    animation: none;
+  }
 }
 /* A session row and the control that closes that session. */
 .session-line {

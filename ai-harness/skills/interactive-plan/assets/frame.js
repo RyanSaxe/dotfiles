@@ -15,12 +15,9 @@ const editable = mode === "live";
 document.documentElement.dataset.mode = mode;
 const query = new URL(location.href).searchParams;
 const agreements = plan.agreements || [];
-const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
 const pages = [
+  { id: "agreed", title: "Agreed so far", html: "" },
   ...plan.pages,
-  ...(builtInAgreed
-    ? [{ id: "agreed", title: "Agreed so far", html: "" }]
-    : []),
 ];
 // crypto.randomUUID exists only in a secure context; over plain http on a
 // Tailscale address, which is how a phone reaches the hub, it is undefined.
@@ -88,7 +85,7 @@ const known = {
   questions: new Set(),
   text: new Map(),
 };
-for (const topic of plan.pages) {
+for (const topic of plan.pages.filter((item) => !item.pending)) {
   const template = document.createElement("template");
   template.innerHTML = topic.html;
   choiceTargets(template.content, topic.id);
@@ -103,7 +100,7 @@ for (const topic of plan.pages) {
 function stale(kind, key, item) {
   if (kind === "note") {
     if (item.topic === "overall") return false;
-    if (item.topic === "agreed" && builtInAgreed)
+    if (item.topic === "agreed")
       return Boolean(
         item.agreementId &&
         !agreements.some((entry) => entry.id === item.agreementId),
@@ -119,7 +116,7 @@ function stale(kind, key, item) {
   return !known.choices.has(key);
 }
 
-let page = plan.pages[0],
+let page = pages[0],
   remote = null,
   connected = false,
   sessions = [],
@@ -245,6 +242,7 @@ function rememberPlace() {
 }
 document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
+  hideArrival();
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && editable;
   $("reading").hidden = feedback;
@@ -254,16 +252,22 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     disposeRenderers();
     $("page-title").textContent = page.title;
     chooseBlock(null);
-    $("page-content").innerHTML = page.html;
-    blockTargets($("page-content"), page.id);
-    choiceTargets($("page-content"), page.id);
-    if (page.id === "agreed" && builtInAgreed) renderAgreements();
-    else {
+    $("page-content").dataset.pageId = page.id;
+    $("page-content").innerHTML = page.pending
+      ? `<div class="pending-page"><span class="pending-state"><span class="page-activity ${page.working ? "active" : "queued"}" aria-hidden="true"></span>${page.working ? "This page is being prepared" : "This page is waiting its turn"}</span><p>You can keep reading pages that are ready. This one appears after its publication check passes.</p></div>`
+      : page.html;
+    if (!page.pending) {
+      blockTargets($("page-content"), page.id);
+      choiceTargets($("page-content"), page.id);
+    }
+    if (page.id === "agreed") renderAgreements();
+    else if (!page.pending) {
       restoreChoices();
       restoreAnswers();
       markNotes();
       enhance($("page-content"));
     }
+    window.planUI.page = page;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
         detail: { page, element: $("page-content") },
@@ -751,7 +755,7 @@ function itemCard({ kind, key, item }) {
     body.append(strip);
   }
   const topicExists =
-    item.topic === "agreed" ? builtInAgreed : known.text.has(item.topic);
+    item.topic === "agreed" ? true : known.text.has(item.topic);
   if (item.topic !== "overall" && topicExists)
     body.append(
       contextLink(
@@ -977,15 +981,13 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
-  const sendable = connected && current() && editable;
+  const sendable = connected && current() && editable && !remote?.pageRound;
   $("submit").disabled = !unsent.count || !sendable;
   $("submit").textContent = unsent.count
     ? `Submit (${unsent.count})`
     : "Submit";
   // Accept plan takes the slot on an acceptable final plan. A sent round with
-  // nothing new leaves Submit in place and disabled, so the header keeps its
-  // shape between rounds; the working card reports how long the agent has been
-  // at it.
+  // nothing new leaves Submit in place and disabled, so the header stays put.
   $("submit").hidden = !$("accept").hidden;
   $("submit-status").textContent = submissionError;
   status();
@@ -1050,7 +1052,7 @@ async function send(event) {
 }
 
 /* Status, sessions, revisions */
-function scheduleReload() {
+function scheduleReload(sameRevision = false) {
   if (
     document.querySelector("dialog[open]") ||
     ["TEXTAREA", "INPUT"].includes(document.activeElement?.tagName)
@@ -1059,161 +1061,32 @@ function scheduleReload() {
   // A new revision opens at the top of its first page; the unsent draft is
   // stored separately and carries over on its own.
   try {
-    sessionStorage.setItem(resumeKey, JSON.stringify({ first: true }));
+    if (sameRevision) {
+      const place = {
+        revision: plan.revision,
+        page: $("reading").hidden ? "feedback" : page.id,
+        top: Math.round(scroller().scrollTop),
+      };
+      sessionStorage.setItem(
+        resumeKey,
+        JSON.stringify({
+          same: true,
+          ...place,
+          ready: pages.filter((item) => !item.pending).map((item) => item.id),
+        }),
+      );
+      try {
+        localStorage.setItem(placeKey, JSON.stringify(place));
+      } catch {}
+    } else sessionStorage.setItem(resumeKey, JSON.stringify({ first: true }));
   } catch {
     /* Reload without the marker. */
   }
   location.reload();
 }
-// Under a minute reads "just now"; after that the bare duration, as the card
-// shows it beside the title.
-function elapsed(value) {
-  const ms = Date.now() - Date.parse(value);
-  return Number.isFinite(ms) && ms < 60000 ? "just now" : since(value);
-}
-// The bookends are derived here, not stored: the hub only keeps the steps the
-// agent declared. Rows carry "done", "now", "wait", or nothing.
-function workingModel(accepting) {
-  if (accepting)
-    return {
-      title: "Plan accepted",
-      since: state.acceptance?.at || remote.updatedAt,
-      bar: false,
-      rows: [{ text: "Recording your acceptance", state: "now" }],
-    };
-  const sent = state.submitted?.revision === plan.revision;
-  const read = sent
-    ? plural(state.submitted.count, "comment")
-    : "your feedback";
-  const next = /^\d+$/.test(plan.revision)
-    ? `revision ${Number(plan.revision) + 1}`
-    : "the next revision";
-  const publish = { text: `Publish ${next}`, state: "" };
-  if (remote.stage === "submitted")
-    return {
-      title: "Sent",
-      since: sent ? state.submitted.at : remote.updatedAt,
-      bar: true,
-      rows: [
-        { text: `Waiting for the agent to read ${read}`, state: "wait" },
-        { text: "Work out the steps", state: "" },
-        { text: "Check and polish", state: "" },
-        publish,
-      ],
-    };
-  const steps = remote.progress?.steps;
-  const done = { text: `Read ${read}`, state: "done" };
-  const title = `Working on ${next}`;
-  const since = remote.acknowledgedAt || remote.updatedAt;
-  if (!steps)
-    return {
-      title,
-      since,
-      bar: true,
-      rows: [
-        done,
-        { text: "Working out the steps", state: "now" },
-        { text: "Check and polish", state: "" },
-        publish,
-      ],
-    };
-  // Steps are a set: each row shows its own state, and several can be
-  // active at once.
-  const finished = steps.every((step) => step.state === "done");
-  return {
-    title,
-    since,
-    bar: true,
-    rows: [
-      done,
-      ...steps.map((step) => ({
-        text: step.title,
-        state:
-          step.state === "done" ? "done" : step.state === "active" ? "now" : "",
-      })),
-      { text: "Check and polish", state: finished ? "now" : "" },
-      publish,
-    ],
-  };
-}
-function renderWorking(model) {
-  $("working-title").textContent = model.title;
-  $("working-time").textContent = model.since ? elapsed(model.since) : "";
-  // A step the agent started and never reported on looks like work; after
-  // two minutes without a report the card says so.
-  const report = remote?.progress?.updatedAt || remote?.acknowledgedAt;
-  const stale =
-    remote?.stage === "working" &&
-    report &&
-    Date.now() - Date.parse(report) >= 120000;
-  $("working-report").hidden = !stale;
-  if (stale) $("working-report").textContent = `Last report ${ago(report)}`;
-  // Declared steps with none active and some pending: the agent is between
-  // reports, and the card says so instead of looking idle.
-  const steps = remote?.progress?.steps;
-  $("working-between").hidden =
-    stale ||
-    remote?.stage !== "working" ||
-    !Array.isArray(steps) ||
-    steps.length === 0 ||
-    steps.some((step) => step.state === "active") ||
-    steps.every((step) => step.state === "done");
-  const note = remote?.paused
-    ? `The agent stopped at your request (${remote.paused.reason}). Send it a message in the chat to resume.`
-    : remote?.wake?.last?.ok === false
-      ? `The agent could not be woken (${remote.wake.last.reason}). Send it a message in the chat.`
-      : "";
-  $("working-note").hidden = !note;
-  if (note) $("working-note").textContent = note;
-  const bar = $("working-bar");
-  const list = $("working-steps");
-  bar.hidden = !model.bar;
-  while (bar.children.length > model.rows.length) bar.lastElementChild.remove();
-  while (list.children.length > model.rows.length)
-    list.lastElementChild.remove();
-  while (bar.children.length < model.rows.length)
-    bar.append(document.createElement("i"));
-  // Rows added after the first render slide in; the class leaves with the
-  // animation so later polls compare plain state classes.
-  const grown = list.children.length > 0;
-  while (list.children.length < model.rows.length) {
-    const row = document.createElement("li");
-    if (grown) {
-      row.classList.add("enter");
-      row.addEventListener(
-        "animationend",
-        () => row.classList.remove("enter"),
-        {
-          once: true,
-        },
-      );
-    }
-    list.append(row);
-  }
-  model.rows.forEach((row, index) => {
-    const segment = bar.children[index];
-    const item = list.children[index];
-    const state = row.state === "wait" ? "" : row.state;
-    if (segment.className !== state) segment.className = state;
-    const entering = item.classList.contains("enter");
-    const className = entering ? `${row.state} enter`.trim() : row.state;
-    if (item.className !== className) item.className = className;
-    if (item.textContent !== row.text) item.textContent = row.text;
-  });
-}
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
   const newer = connected && remote?.current && !current();
-  const accepting =
-    state.acceptance && remote?.latestSubmissionId === state.acceptance.id;
-  const working =
-    editable &&
-    connected &&
-    current() &&
-    ["submitted", "working"].includes(stage);
-  document.body.classList.toggle("is-working", working);
-  $("working").hidden = !working;
-  if (working) renderWorking(workingModel(accepting));
   const complete = stage === "complete" && remote?.accepted;
   $("accepted").hidden = !complete;
   if (complete)
@@ -1229,6 +1102,13 @@ function status() {
   // A session closed from another tab reloads into read-only, so this tab
   // cannot send anything to an agent that will never be woken again.
   if ((newer || remote?.dismissedAt) && mode === "live") scheduleReload();
+  else if (
+    session.viewHash &&
+    current() &&
+    remote.current.sha256 !== session.viewHash &&
+    mode === "live"
+  )
+    scheduleReload(true);
 }
 async function poll() {
   try {
@@ -1259,6 +1139,8 @@ function stateWords(entry) {
   if (entry.needsYou)
     return entry.kind === "plan" ? "Ready to accept" : "Waiting for you";
   if (entry.paused) return "Paused";
+  if (entry.pageRound)
+    return `Working · ${entry.pageRound.ready} pages readable`;
   if (["submitted", "working"].includes(entry.stage))
     return `Working · ${since(entry.updatedAt)}`;
   return "Live";
@@ -1428,6 +1310,11 @@ function renderRevisions() {
   )
     .slice()
     .reverse();
+  if (
+    remote?.pageRound &&
+    !entries.some((entry) => entry.revision === remote.current.revision)
+  )
+    entries.unshift(remote.current);
   const latest = remote?.current?.revision ?? entries[0].revision;
   const list = $("revision-list");
   list.replaceChildren();
@@ -1535,7 +1422,7 @@ function checklist(group, topic, previous) {
   };
 }
 function initializeChecklists() {
-  for (const topic of plan.pages) {
+  for (const topic of plan.pages.filter((item) => !item.pending)) {
     const template = document.createElement("template");
     template.innerHTML = topic.html;
     choiceTargets(template.content, topic.id);
@@ -1949,7 +1836,7 @@ function blockKind(block) {
 function commentTarget() {
   const button = $("quote");
   /* An open dialog hides the control in CSS, which no open path can forget. */
-  const usable = editable && !$("reading").hidden;
+  const usable = editable && !page.pending && !$("reading").hidden;
   button.hidden = !usable;
   if (!usable) return;
   if (selected.length > 3) button.textContent = "Comment on selection";
@@ -1968,7 +1855,7 @@ document.addEventListener("selectionchange", () => {
 /* A control does its own job, a block becomes the target, and anything else
    clears it. A drag is a selection, so it never reaches here as a press. */
 $("page-content").addEventListener("click", (event) => {
-  if (!editable) return;
+  if (!editable || page.pending) return;
   if (
     event.target.closest("button, a, input, label, select, textarea, summary")
   )
@@ -1981,6 +1868,7 @@ $("page-content").addEventListener("click", (event) => {
 /* The control and the c key comment on the same thing, so they share the
    one function that decides what that is. */
 function commentOnTarget() {
+  if (page.pending) return;
   if (selected.length > 3)
     openNote(page.id, page.title, selected, null, null, selectedTarget);
   else if (chosen) {
@@ -2346,6 +2234,7 @@ window.planUI = {
   enhance,
   prefs,
   mode,
+  page: null,
 };
 
 /* Start */
@@ -2358,17 +2247,42 @@ function separator() {
   divider.setAttribute("role", "separator");
   return divider;
 }
-for (const item of [
-  pages.find((item) => item.id === "agreed"),
-  ...pages.filter((item) => item.id !== "agreed"),
-]) {
+function addPageButton(item) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.page = item.id;
-  button.textContent = item.title;
+  const title = document.createElement("span");
+  title.textContent = item.title;
+  button.append(title);
+  if (item.pending) {
+    button.classList.add("pending");
+    button.setAttribute(
+      "aria-label",
+      `${item.title}, ${item.working ? "being prepared" : "queued"}`,
+    );
+    const indicator = document.createElement("span");
+    indicator.className = `page-activity ${item.working ? "active" : "queued"}`;
+    indicator.setAttribute("aria-hidden", "true");
+    button.append(indicator);
+  }
   $("navigation").append(button);
-  if (item.id === "agreed") $("navigation").append(separator());
 }
+addPageButton(pages.find((item) => item.id === "agreed"));
+$("navigation").append(separator());
+for (const item of pages.filter((item) => item.id !== "agreed"))
+  addPageButton(item);
+const unfinishedPages = plan.pages.filter((item) => item.pending).length;
+const pageCount = $("page-count");
+pageCount.hidden = plan.pageMode !== "partial";
+pageCount.textContent = unfinishedPages || "…";
+$("menu-button").setAttribute(
+  "aria-label",
+  plan.pageMode !== "partial"
+    ? "Pages, all ready"
+    : unfinishedPages
+      ? `Pages, ${plural(unfinishedPages, "page")} unfinished`
+      : "Pages, more pages are being planned",
+);
 if (editable) {
   const review = document.createElement("button");
   review.type = "button";
@@ -2385,6 +2299,33 @@ if (editable) {
 $("menu-button").addEventListener("click", () =>
   $("pages-dialog").open ? closeDrawer() : openDrawer(),
 );
+let arrivalTimer;
+let arrivalPage = null;
+function hideArrival() {
+  clearTimeout(arrivalTimer);
+  $("page-arrival").hidden = true;
+}
+function announceArrivals(previousReady) {
+  if (!narrow.matches || !Array.isArray(previousReady)) return;
+  const seen = new Set(previousReady);
+  const arrived = pages.filter(
+    (item) => item.id !== "agreed" && !item.pending && !seen.has(item.id),
+  );
+  if (!arrived.length) return;
+  arrivalPage = arrived.length === 1 ? arrived[0].id : null;
+  $("page-arrival-text").textContent = arrivalPage
+    ? `${arrived[0].title} is ready`
+    : `${plural(arrived.length, "page")} are ready`;
+  $("page-arrival-view").textContent = arrivalPage ? "View" : "Pages";
+  $("page-arrival").hidden = false;
+  arrivalTimer = setTimeout(hideArrival, 5500);
+}
+$("page-arrival-view").addEventListener("click", () => {
+  hideArrival();
+  if (arrivalPage) show(arrivalPage);
+  else openDrawer();
+});
+$("page-arrival-dismiss").addEventListener("click", hideArrival);
 narrow.addEventListener("change", placeNavigation);
 placeNavigation();
 if (editable) initializeChecklists();
@@ -2414,7 +2355,11 @@ function start() {
   }
   const opened = location.hash.slice(1) || query.get("target");
   show(
-    resume?.first ? pages[0].id : location.hash.slice(1) || place?.page || "",
+    resume?.first
+      ? pages[0].id
+      : resume?.same
+        ? resume.page
+        : location.hash.slice(1) || place?.page || "",
     query.get("target"),
     {
       keepScroll: false,
@@ -2424,19 +2369,18 @@ function start() {
   // The browser restores the old scroll position after the reload; a new
   // revision starts at the top.
   if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
-  else if (place?.top && !opened)
+  else if (resume?.same || (place?.top && !opened))
     // The page is short until the renderers finish, and the browser clamps a
     // scroll past the end, so the offset is restored after they settle.
     Promise.allSettled([...renders]).then(() =>
-      scroller().scrollTo(0, place.top),
+      scroller().scrollTo(0, resume?.same ? resume.top : place.top),
     );
+  if (resume?.same) announceArrivals(resume.ready);
   window.addEventListener("popstate", () => {
     const url = new URL(location.href);
-    show(
-      url.hash.slice(1) || plan.pages[0].id,
-      url.searchParams.get("target"),
-      { push: false },
-    );
+    show(url.hash.slice(1) || pages[0].id, url.searchParams.get("target"), {
+      push: false,
+    });
   });
   if (mode === "preview" && query.get("quote")) {
     const range = findText($("page-content"), query.get("quote"));

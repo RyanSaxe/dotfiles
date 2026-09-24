@@ -29,6 +29,7 @@
             <rect x="2.5" y="2.5" width="19" height="19" rx="3.5" />
             <path d="M7 9h10M7 13h10M7 17h6" />
           </svg>
+          <b id="page-count" aria-hidden="true" hidden></b>
         </button>
         <button
           class="icon-btn"
@@ -102,6 +103,13 @@
           Accept plan
         </button>
       </header>
+      <div class="page-arrival" id="page-arrival" role="status" hidden>
+        <span id="page-arrival-text"></span>
+        <button type="button" id="page-arrival-view">View</button>
+        <button type="button" id="page-arrival-dismiss" aria-label="Dismiss">
+          ✕
+        </button>
+      </div>
       <p class="older-strip" id="older-strip" hidden>
         <span id="older-text"></span
         ><a id="revision-back">Back to the current revision</a>
@@ -201,21 +209,6 @@
                 <a id="feedback-back" hidden></a>
               </nav>
             </section>
-          </div>
-          <div class="working" id="working" hidden>
-            <div class="working-card" role="status">
-              <div class="head">
-                <b id="working-title"></b><small id="working-time"></small>
-              </div>
-              <p class="working-note" id="working-note" hidden></p>
-              <div class="bar" id="working-bar"></div>
-              <ul class="steps" id="working-steps"></ul>
-              <p class="working-between" id="working-between" hidden>
-                Between steps
-              </p>
-              <p class="working-report" id="working-report" hidden></p>
-              <p class="foot">This page refreshes when it is ready.</p>
-            </div>
           </div>
           <dialog
             class="dialog sessions"

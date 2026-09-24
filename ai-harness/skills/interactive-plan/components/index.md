@@ -22,7 +22,7 @@ content.
 | [formula](formula/markup.html)                 | Inline or display math                     | `data-math` set to inline or display. `data-terms` names the coloured terms under the formula.                                                                            |
 | [diagram](diagram/markup.html)                 | A diagram                                  | `data-diagram` with Mermaid source as text. ELK lays it out, nodes whose IDs match page IDs open those pages, and a click opens the diagram full size.                    |
 | [chart](chart/markup.html)                     | A chart or a mathematical demonstration    | `data-chart` with an ECharts option object as JSON text. The frame renders charts as SVG and applies the theme palette.                                                   |
-| [prototype](prototype/markup.html)             | An approved prototype                      | `data-prototype` naming an entry in the manifest. The frame supplies the sandboxed frame, the Source fold and Open full size.                                             |
+| [prototype](prototype/markup.html)             | An approved prototype                      | `data-prototype` naming an entry in the owning page source. The frame supplies the sandboxed frame, the Source fold and Open full size.                                   |
 
 The last five carry no interaction of their own: they are the figures a page
 puts inside another component or on its own. They are components in the same

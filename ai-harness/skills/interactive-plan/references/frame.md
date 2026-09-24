@@ -3,16 +3,21 @@
 ## Frame and content
 
 The frame provides the header, sidebar, previous and next links, the bell,
-Settings, the Feedback page, the working card and preview and read-only
-modes. The bell lists other live sessions and closes them. The working card
-lists the round's steps and ticks them as the agent reports progress. The
-header spans the frame at every width. It displays the revision clock,
-Settings and the bell on the left, and Submit on the right. Submit changes to
-Accept plan for a final plan and becomes disabled after the agent
-sends a round. The clock opens a dialog that lists every revision, newest
-first, and ticks the current revision. Selecting a revision opens it. Below
-720px, a menu button replaces the sidebar and opens the same page list in a
-dialog. The sidebar lists Agreed, the pages and Review comments. Review
+Settings, the Feedback page, and preview and read-only modes. The bell lists
+other live sessions and closes them. The header spans the frame at every
+width. It displays the revision clock, Settings and the bell on the left,
+and Submit on the right. Submit stays disabled until the last listed page
+publishes. A final plan with no unsent feedback offers Accept plan. The
+clock lists completed revisions and the current one. The sidebar keeps Agreed,
+this revision's pages in their declared order, and Review comments in one
+list. A hollow dot marks a queued page, a pulsing dot marks an active one,
+and a ready page has no status mark. A pending page has no page-specific
+comment control. Below 720px, the Pages button opens that same list. Its
+numbered badge counts unfinished pages, then disappears when all are ready.
+The badge shows an ellipsis before the agent lists the pages. A newly ready
+page briefly appears in a non-blocking notice with a View action; it does
+not take focus or navigate away from the current page. Reduced-motion mode
+keeps the marks visible without pulsing. Review
 comments opens the Feedback page and displays the count of unsent items. The
 browser tab displays the plan title. The revision dialog displays it under
 the current revision. Page HTML starts below the title and must not contain
@@ -20,10 +25,10 @@ an `h1`. The build rejects a page that contains one. The page controls its own
 layout. The frame provides basic typography, tables, code, theme colors,
 focus and selected-choice states. It does not provide generic card or column
 layouts.
-The builder wraps the plan's CSS in `@scope (#page-content)`, so a rule for
-`body`, `:root`, or `h1` reaches only the page's content, and puts it in a
-cascade layer beneath the components. A plan cannot restyle a component's
-chrome by accident; `!important` still applies when a plan means it.
+The builder scopes a page's CSS to its `#page-content[data-page-id]` and puts
+it in a cascade layer beneath the components. Publishing another page cannot
+restyle a ready page through its CSS. A component's chrome still wins over
+page CSS unless the page deliberately uses `!important`.
 
 The tokens and type below are shared design tokens for every plan. Style
 the components a plan makes with them and do not redefine them. Tokens, each
@@ -45,8 +50,10 @@ The frame is exactly as tall as the visible window. The browser scrolls the
 page inside the frame, so the window itself never scrolls and content does not
 pass under the header. The session stores the page and scroll offset, so the
 bell can return the reader to the same place after a jump to another session.
-The session record stores the revision. A new revision opens at the top of its
-first page, and the frame ignores a page that the revision no longer has.
+The session record stores the revision. A newly published page in the same
+revision leaves the reader on the current page and restores scroll and draft
+text. A new revision opens at the top of Agreed, and the frame ignores
+a page that the revision no longer has.
 Reading an older revision draws a strip under the header that names it and
 links back to the current one. Frame dialogs close on Escape or their ✕ without
 submitting anything, and each takes the focus on its own heading so no
@@ -82,7 +89,8 @@ controls inside a block, so keep authored controls focusable.
 Choice clicks, checklist changes, and typing in a question update the local
 draft. Pressing Answer creates the recorded answer; editing it leaves that
 record unchanged until Answer is pressed again. Only Submit sends recorded
-items. Keep control IDs and labels the same across revisions. Group IDs must
+items. When a topic continues in the next revision, keep its control IDs and
+labels stable so unsent drafts can follow it. Group IDs must
 be unique within a page across all kinds, and option IDs within a group. Use
 native buttons for single choices, native labeled checkboxes for checklists,
 and a textarea inside `data-question` for answers.
@@ -97,11 +105,10 @@ they put it back. An
 untouched list is sent with `touched: false` and listed on Feedback as a
 default afterwards. An empty set means "None selected", not unanswered.
 
-Register a component of the plan's own with `planUI.define`. The plan's JS
-file is a module that runs after the frame's and before the first page
-renders, so a registration there reaches page one. `plan:page` still fires
-after each render, for work that is not a component. Script elements inside
-page HTML do not execute.
+Page JavaScript exports `setup(root, planUI)`. The frame calls it when that
+page renders. It may register a component with `planUI.define`; `plan:page`
+still fires after each render. Script elements inside page HTML do not
+execute.
 Page-level, block and text-selection comments need no custom code. One
 control sits at the bottom right at every width and names what it will
 comment on: the selection while there is one, otherwise the block the reader
