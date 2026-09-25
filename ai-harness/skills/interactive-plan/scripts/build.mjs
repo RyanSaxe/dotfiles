@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { artifactData } from "./session.mjs";
+import { artifactData, pagePlan, validPage } from "./session.mjs";
 
 const assets = new URL("../assets/", import.meta.url);
 /** Where a user keeps components of their own, outside the skill. The skill
@@ -82,7 +82,7 @@ const controlKinds = ["data-choice", "data-multiselect", "data-question"];
 const labelLimit = 24;
 
 /** Structural problems in the assembled pages and the plan's script. */
-export function problems(data, js = "") {
+export function problems(data, js = "", { allowUnknownPages = false } = {}) {
   const list = [];
   const pageIds = new Set();
   for (const page of data.pages) {
@@ -133,7 +133,11 @@ export function problems(data, js = "") {
           list.push(`${at}: a code block has no data-language`);
       }
       const link = attribute(tag, "href");
-      if (link?.startsWith("#") && !targets.has(link.slice(1)))
+      if (
+        link?.startsWith("#") &&
+        !targets.has(link.slice(1)) &&
+        !allowUnknownPages
+      )
         if (!new RegExp(`\\sid="${link.slice(1)}"`).test(html))
           list.push(`${at}: link "${link}" names no page`);
       const prototype = attribute(tag, "data-prototype");
@@ -199,9 +203,7 @@ export function problems(data, js = "") {
   return list;
 }
 
-export async function assemble(data, { css = "", js = "" } = {}) {
-  const found = problems(data, js);
-  if (found.length) throw new Error(found.join("\n"));
+export async function frameBundle() {
   const [shell, style, script, notifications, choices, draft] =
     await Promise.all(
       [
@@ -213,15 +215,43 @@ export async function assemble(data, { css = "", js = "" } = {}) {
         "draft.mjs",
       ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
     );
-  if (/<\/style/i.test(css) || /<\/script/i.test(js))
-    throw new Error(
-      "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
-    );
   const roots = componentRoots();
   const [componentCss, componentJs] = await Promise.all([
     componentStyles(roots),
     componentBehaviors(roots),
   ]);
+  return {
+    shell,
+    style,
+    script,
+    notifications,
+    choices,
+    draft,
+    componentCss,
+    componentJs,
+  };
+}
+
+export async function assemble(
+  data,
+  { css = "", js = "", allowUnknownPages = false, bundle } = {},
+) {
+  const found = problems(data, js, { allowUnknownPages });
+  if (found.length) throw new Error(found.join("\n"));
+  const {
+    shell,
+    style,
+    script,
+    notifications,
+    choices,
+    draft,
+    componentCss,
+    componentJs,
+  } = bundle || (await frameBundle());
+  if (/<\/style/i.test(css) || /<\/script/i.test(js))
+    throw new Error(
+      "Custom CSS/JS cannot contain HTML closing style/script tags; escape the less-than character in strings.",
+    );
   const html = shell
     .replace(
       "<!-- FRAME_STYLE -->",
@@ -229,12 +259,12 @@ export async function assemble(data, { css = "", js = "" } = {}) {
       // frame takes a layer of its own rather than staying outside them. A
       // component rule then beats a plan rule of any specificity, and a plan
       // that means it can still say !important.
-      // Plan and component CSS are scoped to the page's content, so a rule
-      // for body, :root, or h1 cannot restyle the frame.
+      // Page CSS arrives scoped to its page. Nesting it inside the component
+      // scope would exclude the root itself.
       () =>
         `<style>\n@layer frame, plan, components;\n@layer frame {\n${style}\n}\n` +
-        `@scope (#page-content) {\n@layer plan {\n${css}\n}\n` +
-        `@layer components {\n${componentCss}\n}\n}\n</style>`,
+        `@layer plan {\n${css}\n}\n@scope (#page-content) {\n@layer components {\n${componentCss}\n}\n}\n` +
+        `</style>`,
     )
     .replace(
       "<!-- FRAME_SCRIPT -->",
@@ -256,39 +286,86 @@ export async function assemble(data, { css = "", js = "" } = {}) {
   return html;
 }
 
-export async function build(source) {
-  const data = JSON.parse(await fs.readFile(source, "utf8"));
+// Revisions reuse page IDs, and the reader keeps several revisions loaded,
+// so page CSS and scripts match the revision as well as the page.
+export function pageScope(id, revision) {
+  return `#page-content[data-page-id="${id}"][data-revision="${revision}"]`;
+}
+
+export function pageScripts(pages, revision) {
+  return pages
+    .filter((page) => page.jsText)
+    .map((page) => {
+      const encoded = Buffer.from(page.jsText).toString("base64");
+      return `import("data:text/javascript;base64,${encoded}").then(({ setup }) => {
+        if (typeof setup !== "function") throw new Error("Page ${page.id} must export setup");
+        const run = ({ detail }) => {
+          if (detail.page.id === ${JSON.stringify(page.id)} && detail.revision === ${JSON.stringify(revision)}) setup(detail.element, window.planUI);
+        };
+        window.addEventListener("plan:page", run);
+        if (window.planUI?.page?.id === ${JSON.stringify(page.id)} && window.planUI?.revision === ${JSON.stringify(revision)})
+          setup(document.getElementById("page-content"), window.planUI);
+      }).catch((error) => console.error("Page ${page.id} script:", error));`;
+    })
+    .join("\n");
+}
+
+export async function buildPage(source, input) {
   const read = (file) =>
     fs.readFile(path.resolve(path.dirname(source), file), "utf8");
-  const css = data.css ? await read(data.css) : "";
-  const js = data.js ? await read(data.js) : "";
-  delete data.css;
-  delete data.js;
-  data.pages = await Promise.all(
-    data.pages.map(async ({ file, ...page }) => {
-      if (file && page.html !== undefined)
-        throw new Error("Use file or html for a page, not both");
-      return file ? { ...page, html: await read(file) } : page;
-    }),
-  );
-  if (data.prototypes) {
-    data.prototypes = await Promise.all(
-      data.prototypes.map(async ({ file, ...prototype }) => {
+  const { page: rawPage, ...outer } = input;
+  if (!rawPage || typeof rawPage !== "object" || Array.isArray(rawPage))
+    throw new Error("Page source requires one page object");
+  if (rawPage.file && rawPage.html !== undefined)
+    throw new Error("Use file or html for a page, not both");
+  const page = { ...rawPage };
+  if (page.file) page.html = await read(page.file);
+  delete page.file;
+  if (page.css) page.cssText = await read(page.css);
+  if (page.js) page.jsText = await read(page.js);
+  delete page.css;
+  delete page.js;
+  if (page.prototypes)
+    page.prototypes = await Promise.all(
+      page.prototypes.map(async ({ file, ...prototype }) => {
         if (file && prototype.html !== undefined)
           throw new Error("Use file or html for a prototype, not both");
-        return file ? { ...prototype, html: await read(file) } : prototype;
+        return { ...prototype, ...(file ? { html: await read(file) } : {}) };
       }),
     );
-  }
-  if (Array.isArray(data.agreements))
-    data.agreements = await Promise.all(
-      data.agreements.map(async ({ file, ...entry }) => {
+  if (page.agreements)
+    page.agreements = await Promise.all(
+      page.agreements.map(async ({ file, ...entry }) => {
         if (file && entry.html !== undefined)
           throw new Error("Use file or html for an agreement, not both");
-        return file ? { ...entry, html: await read(file) } : entry;
+        return { ...entry, ...(file ? { html: await read(file) } : {}) };
       }),
     );
-  return assemble(data, { css, js });
+  const record = validPage({ ...outer, page });
+  const data = pagePlan(record);
+  const css = page.cssText
+    ? `@scope (${pageScope(page.id, record.revision)}) { ${page.cssText} }`
+    : "";
+  // assemble checks the script the frame runs, which carries the page's own
+  // script encoded, so the page's script is checked here as written.
+  const authoredProblems = problems(data, page.jsText || "", {
+    allowUnknownPages: true,
+  });
+  if (authoredProblems.length) throw new Error(authoredProblems.join("\n"));
+  const preview = await assemble(data, {
+    css,
+    js: pageScripts([page], record.revision),
+    allowUnknownPages: true,
+  });
+  return preview.replace(
+    "</body>",
+    () =>
+      `<script type="application/json" id="page-data">${JSON.stringify(record).replaceAll("<", "\\u003c")}</script></body>`,
+  );
+}
+
+export async function build(source) {
+  return buildPage(source, JSON.parse(await fs.readFile(source, "utf8")));
 }
 
 /** Whether this file is the one Node was asked to run, symlinks resolved. */

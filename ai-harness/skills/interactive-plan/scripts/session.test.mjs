@@ -3,19 +3,26 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { assemble } from "./build.mjs";
+import { buildPage } from "./build.mjs";
 import { detectWake, settings, startHub, withSandboxHint } from "./session.mjs";
 
-let hub, sessionId, sessionDir, token;
+let hub, home, sessionId, sessionDir, token;
 const wakes = [];
 let wakeFails = false;
-const artifact = (revision) =>
-  assemble({
+const page = (revision, id) =>
+  buildPage(path.join(os.tmpdir(), "wake-page.json"), {
     artifactId: "t",
     revision,
     kind: "exploration",
     title: "T",
-    pages: [{ id: "p", title: "P", html: "<p>x</p>" }],
+    page:
+      id === "agreed"
+        ? {
+            id,
+            title: "Agreed so far",
+            agreements: [],
+          }
+        : { id, title: "P", html: "<p>x</p>" },
   });
 const post = async (route, body, headers) => {
   const response = await fetch(hub.origin + route, {
@@ -37,9 +44,18 @@ const act = (data) =>
   );
 const status = async () =>
   (await fetch(`${hub.origin}/s/${sessionId}/api/status`)).json();
+const publishRevision = async (revision) => {
+  const agreed = await act({
+    action: "publish",
+    html: await page(revision, "agreed"),
+    pages: [{ id: "p", title: "P" }],
+  });
+  assert.ok(agreed.ok, JSON.stringify(agreed.body));
+  return act({ action: "publish", html: await page(revision, "p") });
+};
 
 before(async () => {
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-progress-"));
+  home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-progress-"));
   const config = {
     ...settings({ XDG_STATE_HOME: home, INTERACTIVE_PLAN_PORT: "0" }),
     log() {},
@@ -60,7 +76,7 @@ before(async () => {
   token = JSON.parse(
     await fs.readFile(path.join(sessionDir, "connection.json"), "utf8"),
   ).token;
-  assert.ok((await act({ action: "publish", html: await artifact("1") })).ok);
+  assert.ok((await publishRevision("1")).ok);
   const feedback = await post(
     `/s/${sessionId}/api/feedback`,
     {
@@ -76,12 +92,18 @@ before(async () => {
   );
   assert.ok(feedback.ok, JSON.stringify(feedback.body));
 });
-after(() => hub.close());
+after(async () => {
+  await hub.close();
+  await fs.rm(home, { recursive: true, force: true });
+});
 
-test("progress needs an acknowledged round", async () => {
-  const result = await act({ action: "progress", steps: ["A"] });
+test("page progress cannot start before Agreed for the next revision", async () => {
+  const result = await act({
+    action: "progress",
+    start: ["p"],
+  });
   assert.equal(result.status, 409);
-  assert.equal((await status()).progress, null);
+  assert.equal((await status()).pageRound, null);
 });
 
 test("read returns the oldest unread submission once and marks it read", async () => {
@@ -97,93 +119,6 @@ test("read returns the oldest unread submission once and marks it read", async (
   assert.equal((await act({ action: "read", id: "nope" })).status, 404);
 });
 
-test("declared steps, start, and done marks round-trip through status", async () => {
-  assert.equal((await status()).progress, null);
-  const declared = await act({
-    action: "progress",
-    steps: [" Update Agreed ", "Write: P", "Write: Q"],
-  });
-  assert.ok(declared.ok, JSON.stringify(declared.body));
-  assert.deepEqual((await status()).progress.steps, [
-    { title: "Update Agreed", state: "pending" },
-    { title: "Write: P", state: "pending" },
-    { title: "Write: Q", state: "pending" },
-  ]);
-  const states = async () =>
-    (await status()).progress.steps.map((step) => step.state);
-  assert.ok(
-    (await act({ action: "progress", start: ["Write: P", "Write: Q"] })).ok,
-  );
-  assert.deepEqual(await states(), ["pending", "active", "active"]);
-  assert.ok((await act({ action: "progress", done: "Write: Q" })).ok);
-  assert.deepEqual(await states(), ["pending", "active", "done"]);
-  assert.ok((await act({ action: "progress", start: ["Write: Q"] })).ok);
-  assert.deepEqual(await states(), ["pending", "active", "active"]);
-  // One call finishes some steps and starts others.
-  assert.ok(
-    (
-      await act({
-        action: "progress",
-        done: ["Write: P"],
-        start: ["Update Agreed"],
-      })
-    ).ok,
-  );
-  assert.deepEqual(await states(), ["active", "done", "active"]);
-  assert.equal(
-    (await act({ action: "progress", done: ["Write: Q"], start: ["Write: Q"] }))
-      .status,
-    400,
-  );
-  assert.equal(
-    (await act({ action: "progress", steps: ["A"], start: ["A"] })).status,
-    400,
-  );
-  const unknown = await act({ action: "progress", done: "Nope" });
-  assert.equal(unknown.status, 400);
-  assert.equal(unknown.body.error, "Unknown progress step");
-  assert.equal(
-    (await act({ action: "progress", start: ["Write: P", "Nope"] })).status,
-    400,
-  );
-  assert.ok((await act({ action: "progress", steps: ["Again"] })).ok);
-  assert.deepEqual(await states(), ["pending"]);
-});
-
-test("invalid declarations are rejected", async () => {
-  assert.equal((await act({ action: "progress", steps: [] })).status, 400);
-  assert.equal(
-    (await act({ action: "progress", steps: ["A", "A"] })).status,
-    400,
-  );
-  assert.equal(
-    (await act({ action: "progress", steps: ["x".repeat(81)] })).status,
-    400,
-  );
-  assert.equal((await act({ action: "progress" })).status, 400);
-  assert.equal(
-    (await act({ action: "progress", steps: ["A"], done: "A" })).status,
-    400,
-  );
-});
-
-test("publish records a source inside the session and refuses one outside", async () => {
-  const outside = await act({
-    action: "publish",
-    html: await artifact("1b"),
-    source: "/elsewhere/src/1b",
-  });
-  assert.equal(outside.status, 400);
-  const inside = path.join(sessionDir, "src", "1b");
-  const kept = await act({
-    action: "publish",
-    html: await artifact("1b"),
-    source: inside,
-  });
-  assert.ok(kept.ok, JSON.stringify(kept.body));
-  assert.equal((await status()).current.source, inside);
-});
-
 test("the sandbox hint follows a refusal, not the environment alone", () => {
   const env = { CODEX_SANDBOX: "seatbelt" };
   assert.match(
@@ -197,11 +132,11 @@ test("the sandbox hint follows a refusal, not the environment alone", () => {
   );
 });
 
-test("publish clears progress", async () => {
-  assert.ok((await act({ action: "publish", html: await artifact("2") })).ok);
+test("a complete page round opens the next revision", async () => {
+  assert.ok((await publishRevision("2")).ok);
   const view = await status();
   assert.equal(view.stage, "updated");
-  assert.equal(view.progress, null);
+  assert.equal(view.pageRound, null);
 });
 
 const feedback = (id) =>
@@ -220,13 +155,10 @@ const feedback = (id) =>
   );
 // The before hook's submission already woke the agent once, so each test
 // waits for its own wake by count and for its result to reach the status.
-const settled = async (count) => {
+const settled = async (count, ok = true) => {
   for (let i = 0; i < 50; i++) {
     const view = await status();
-    if (wakes.length === count && view.wake?.last?.at !== settled.seen) {
-      settled.seen = view.wake.last.at;
-      return view;
-    }
+    if (wakes.length === count && view.wake?.last?.ok === ok) return view;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error("the wake was never recorded");
@@ -270,7 +202,7 @@ test("a submission wakes the agent with the line that names the session", async 
 test("a failed wake is recorded and the submission stays readable", async () => {
   wakeFails = true;
   assert.ok((await feedback("evt3")).ok);
-  const view = await settled(3);
+  const view = await settled(3, false);
   wakeFails = false;
   assert.equal(view.wake.last.ok, false);
   assert.equal(view.wake.last.reason, "thread gone");

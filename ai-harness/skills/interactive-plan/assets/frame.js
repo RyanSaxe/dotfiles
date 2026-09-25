@@ -254,6 +254,8 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     disposeRenderers();
     $("page-title").textContent = page.title;
     chooseBlock(null);
+    $("page-content").dataset.pageId = page.id;
+    $("page-content").dataset.revision = plan.revision;
     $("page-content").innerHTML = page.html;
     blockTargets($("page-content"), page.id);
     choiceTargets($("page-content"), page.id);
@@ -264,9 +266,11 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       markNotes();
       enhance($("page-content"));
     }
+    window.planUI.page = page;
+    window.planUI.revision = plan.revision;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
-        detail: { page, element: $("page-content") },
+        detail: { page, element: $("page-content"), revision: plan.revision },
       }),
     );
     // Shiki, Mermaid and the charts all change a block's height after the
@@ -2346,6 +2350,7 @@ window.planUI = {
   enhance,
   prefs,
   mode,
+  page: null,
 };
 
 /* Start */
