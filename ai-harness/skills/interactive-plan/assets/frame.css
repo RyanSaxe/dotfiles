@@ -397,31 +397,51 @@ kbd {
 .tab-count {
   margin-left: 4px;
 }
+/* A page name stays on one line, so a row never changes height. A page that
+   is not ready yet is dimmed and fades up when it publishes. The working
+   page is the only one with a mark, the breathing dot. */
 #page-list button {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  /* A grid item keeps its text's full width unless allowed to shrink, and
+     then a long name would push the row past the sidebar. */
+  min-width: 0;
   padding: 6px 9px;
   border-radius: 6px;
   color: var(--muted);
   font-size: 13px;
-  overflow-wrap: anywhere;
+}
+#page-list button > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 0.6s ease;
 }
 #page-list button[aria-current="page"] {
   color: var(--ink);
   font-weight: 600;
   background: var(--accent-soft);
 }
-#page-list button.pending {
-  color: var(--muted);
+#page-list button.pending > span:first-child {
+  opacity: 0.45;
 }
-#page-list button.pending[aria-current="page"] {
-  opacity: 1;
+#page-list button.pending[aria-current="page"] > span:first-child {
+  opacity: 0.6;
 }
 #page-list button .page-activity {
   flex: none;
+}
+#page-list button .page-activity:not(.active) {
+  display: none;
+}
+/* The unsent count reads as text beside its label, as Current (4) does. */
+#review-row {
+  justify-content: flex-start;
+  gap: 4px;
 }
 .page-activity {
   display: inline-flex;
@@ -503,10 +523,10 @@ kbd {
   padding: 0;
   margin: 0;
   background: none;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
 }
 main {
   position: relative;
@@ -1915,6 +1935,9 @@ body:has(dialog[open]) .quote-button {
   .activity-segments i.track.moving::after {
     animation: none;
     opacity: 0.5;
+  }
+  #page-list button > span:first-child {
+    transition: none;
   }
 }
 /* A session row and the control that closes that session. */

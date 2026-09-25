@@ -1070,7 +1070,7 @@ function badge(count) {
   const row = $("review-row");
   if (!row) return;
   const mark = row.querySelector(".count");
-  mark.textContent = count || "";
+  mark.textContent = count ? `(${count})` : "";
   mark.hidden = !count;
 }
 /* On a narrow screen the page list is a dialog, like every other panel.
@@ -3012,6 +3012,8 @@ function addPageButton(item) {
   button.dataset.page = item.id;
   const title = document.createElement("span");
   title.textContent = item.title;
+  // A long name ends in an ellipsis, so the full name is a tooltip.
+  title.title = item.title;
   button.append(title);
   if (item.status !== "ready" && item.pending) {
     button.classList.add("pending");

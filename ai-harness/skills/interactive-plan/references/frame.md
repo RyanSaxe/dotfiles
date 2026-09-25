@@ -16,11 +16,15 @@ The sidebar and phone drawer keep Current and Submitted in fixed tabs.
 After submission, Current is disabled until the next Agreed page and its
 complete page list publish together. The reader stays on Submitted until
 choosing Current. Page names keep their declared order as statuses change.
-A clock marks a queued page, a pulsing light marks an active one, and a green
-check marks a ready page. A pending page shows a loading body without a
-page-specific comment control. If that page publishes while open, its content
-loads in place. Another page's publication never replaces the page being read.
-Reduced-motion mode keeps the marks visible without pulsing. Below 720px, the
+A ready page's name is plain text with no mark. A page that is not ready is
+dimmed, and the page the agent is working on also shows a breathing dot. When
+a page publishes, its name fades up to normal. Names stay on one line and end
+in an ellipsis, with the full name as a tooltip, so a row never changes
+height. The Review row shows its unsent count as text, for example Review (3).
+A pending page shows a loading body without a page-specific comment control.
+If that page publishes while open, its content loads in place. Another page's
+publication never replaces the page being read. Reduced-motion mode keeps the
+dot visible without breathing and changes names without fading. Below 720px, the
 Pages button opens the same tabs and list. Its accent-colored badge counts
 ready Current pages, including Agreed, even while Submitted is selected.
 While Submitted is selected, the Current tab shows the same count as text,
