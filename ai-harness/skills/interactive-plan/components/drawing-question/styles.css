@@ -17,6 +17,7 @@
 .drawing-question .drawing-preview[hidden] {
   display: none;
 }
+.drawing-question > .tag,
 .drawing-question .btn {
   justify-self: start;
 }
