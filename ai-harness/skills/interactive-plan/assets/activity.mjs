@@ -87,3 +87,18 @@ export function activityModel({
       : "still";
   return { slots, ready, failed, stopped, title, summary, footer, track };
 }
+
+// While a revision's pages are still arriving, the Pages heading says so, so
+// dim names never sit there without a sign of the agent. The page round
+// exists only until the last page publishes.
+export function roundModel({ remote, now = Date.now() }) {
+  const round = remote?.pageRound;
+  if (!round) return null;
+  const total = round.pages.length + 1;
+  const ready = 1 + round.pages.filter((item) => item.state === "ready").length;
+  if (ready === total) return null;
+  if (remote.paused) return { text: "Agent paused", late: true };
+  const minutes = Math.floor((now - Date.parse(remote.updatedAt)) / 60000);
+  if (minutes >= 5) return { text: `No report for ${minutes} min`, late: true };
+  return { text: `${ready} of ${total} ready`, late: false };
+}

@@ -1690,7 +1690,18 @@ async function poll() {
   }
   renderRevisions();
   updateNavigation();
+  renderRound();
   review();
+}
+// The Pages heading in the sidebar and in the phone drawer shows the page
+// round's status. The text stays while the status fades out.
+function renderRound() {
+  const model = editable ? roundModel({ remote }) : null;
+  for (const status of document.querySelectorAll("[data-round]")) {
+    status.classList.toggle("idle", !model);
+    status.classList.toggle("late", Boolean(model?.late));
+    if (model) status.lastElementChild.textContent = model.text;
+  }
 }
 async function pollSessions() {
   try {
@@ -3037,7 +3048,7 @@ for (const tab of ["current", "submitted"]) {
   button.id = `${tab}-tab`;
   button.dataset.tab = tab;
   button.setAttribute("role", "tab");
-  button.textContent = tab === "current" ? "Current" : "Submitted";
+  button.textContent = tab === "current" ? "Current" : "Previous";
   tabs.append(button);
 }
 // A read-only page shows one revision, so there is nothing to switch to.

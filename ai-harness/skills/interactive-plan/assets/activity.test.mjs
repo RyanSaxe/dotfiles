@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activityModel } from "./activity.mjs";
+import { activityModel, roundModel } from "./activity.mjs";
 
 const now = Date.parse("2026-01-01T00:10:00Z");
 const submittedRevision = "1";
@@ -121,4 +121,35 @@ test("a report older than five minutes turns late and pause or wake failure wins
     paused: { reason: "Waiting" },
   });
   assert.equal(pausedEarly.track, "still");
+});
+
+test("the round status counts pages until the last one and names a silent agent", () => {
+  const pageRound = {
+    pages: [
+      { id: "overview", state: "ready" },
+      { id: "detail", state: "active" },
+      { id: "steps", state: "queued" },
+    ],
+  };
+  const remote = { pageRound, updatedAt: "2026-01-01T00:08:00Z" };
+  assert.deepEqual(roundModel({ remote, now }), {
+    text: "2 of 4 ready",
+    late: false,
+  });
+  assert.deepEqual(
+    roundModel({
+      remote: { ...remote, updatedAt: "2026-01-01T00:03:00Z" },
+      now,
+    }),
+    { text: "No report for 7 min", late: true },
+  );
+  assert.deepEqual(roundModel({ remote: { ...remote, paused: {} }, now }), {
+    text: "Agent paused",
+    late: true,
+  });
+  const done = {
+    pages: pageRound.pages.map((item) => ({ ...item, state: "ready" })),
+  };
+  assert.equal(roundModel({ remote: { pageRound: done }, now }), null);
+  assert.equal(roundModel({ remote: {}, now }), null);
 });

@@ -354,12 +354,62 @@ kbd {
   border-right: 1px solid var(--line);
 }
 .side-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   padding: 14px 16px 4px;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+/* The round's status sits in the Pages heading, which is always there, so it
+   appears and fades without moving the list. */
+.round-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: opacity 0.6s ease;
+}
+.round-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.round-status i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: page-breathe 2s ease-in-out infinite;
+}
+.round-status.late {
+  color: var(--attention);
+}
+.round-status.late i {
+  background: var(--attention);
+  animation: none;
+}
+.round-status.idle {
+  opacity: 0;
+}
+.dialog-head .round-status {
+  margin-left: auto;
+  font-size: 12.5px;
+}
+/* `.dialog h2` gives every dialog heading a bottom margin, which would lift
+   Pages above the status and the close button beside it. */
+#pages-dialog .dialog-head h2 {
+  margin-bottom: 0;
 }
 .pages-slot nav {
   display: block;
@@ -1929,8 +1979,12 @@ body:has(dialog[open]) .quote-button {
 }
 @media (prefers-reduced-motion: reduce) {
   .page-activity.active::before,
-  .activity-segments i.now {
+  .activity-segments i.now,
+  .round-status i {
     animation: none;
+  }
+  .round-status {
+    transition: none;
   }
   .activity-segments i.track.moving::after {
     animation: none;

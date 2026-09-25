@@ -12,22 +12,28 @@ during a save, and becomes Feedback after submission. A final plan with no
 unsent feedback offers Accept plan. The clock lists completed revisions and
 the current one.
 
-The sidebar and phone drawer keep Current and Submitted in fixed tabs.
-After submission, Current is disabled until the next Agreed page and its
-complete page list publish together. The reader stays on Submitted until
-choosing Current. Page names keep their declared order as statuses change.
+The sidebar and phone drawer keep Current and Previous in fixed tabs.
+Previous holds the last submitted revision and is disabled until the first
+submission. After submission, Current is disabled until the next Agreed page
+and its complete page list publish together. The reader stays on Previous
+until choosing Current. Page names keep their declared order as statuses change.
 A ready page's name is plain text with no mark. A page that is not ready is
 dimmed, and the page the agent is working on also shows a breathing dot. When
 a page publishes, its name fades up to normal. Names stay on one line and end
 in an ellipsis, with the full name as a tooltip, so a row never changes
 height. The Review row shows its unsent count as text, for example Review (3).
+While pages are still arriving, the Pages heading in the sidebar and the
+drawer shows a breathing dot and how many are ready, for example 3 of 7
+ready. After five minutes without a report it reads No report for 7 min in
+the attention color. It fades out when every page is ready, and the list
+never moves.
 A pending page shows a loading body without a page-specific comment control.
 If that page publishes while open, its content loads in place. Another page's
 publication never replaces the page being read. Reduced-motion mode keeps the
 dot visible without breathing and changes names without fading. Below 720px, the
 Pages button opens the same tabs and list. Its accent-colored badge counts
-ready Current pages, including Agreed, even while Submitted is selected.
-While Submitted is selected, the Current tab shows the same count as text,
+ready Current pages, including Agreed, even while Previous is selected.
+While Previous is selected, the Current tab shows the same count as text,
 for example Current (4). The bell uses a different attention color. The
 selected tab has an underline; the selected page has a soft fill. Both keep a
 separate keyboard focus outline.
@@ -35,8 +41,8 @@ separate keyboard focus outline.
 Current's Review contains only unsent comments, choices, and answers, grouped
 by page. It retains editing, removal, the alignment switch, overall comments,
 attachment thumbnails, and Export. Page progress lives in navigation and on
-Submitted's Feedback page, not in Review. Submit from any Current page opens
-Submitted / Feedback. While the hub saves, the page says Sending feedback and
+the Feedback page under Previous, not in Review. Submit from any Current page
+opens Previous / Feedback. While the hub saves, the page says Sending feedback and
 keeps the draft. A confirmed save shows saved comments and the agent activity
 card. The card keeps a progress bar and a footer line in every state, so it
 changes height only when the page rows arrive. Before the page list exists,
@@ -86,11 +92,11 @@ not pass under the header. The session stores the page and scroll offset, so the
 bell can return the reader to the same place after a jump to another session.
 The session record stores the revision. A newly published page in the same
 revision leaves the reader on the current page with scroll, focus, and draft
-text unchanged. A new revision enables Current without leaving Submitted.
-Submitted pages and older read-only revisions use the same soft-blue history
+text unchanged. A new revision enables Current without leaving Previous.
+Previous pages and older read-only revisions use the same soft-blue history
 strip across the main column, with a return action. On an older revision the
 strip reads Earlier revision with its number. A read-only revision lists only
-its own pages, without the Current and Submitted tabs, and ends with a
+its own pages, without the Current and Previous tabs, and ends with a
 Feedback page that lists everything sent on it, overall comments included.
 Its choices, checkboxes and answers show what was sent and cannot change. Frame
 dialogs close on Escape or their ✕ without

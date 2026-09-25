@@ -116,7 +116,12 @@
       </div>
       <div class="app-body">
         <aside class="sidebar" id="sidebar">
-          <div class="side-label">Pages</div>
+          <div class="side-label">
+            <span>Pages</span
+            ><span class="round-status idle" data-round
+              ><i></i><span></span
+            ></span>
+          </div>
           <div class="pages-slot" id="sidebar-slot">
             <nav id="navigation" aria-label="Plan pages"></nav>
           </div>
@@ -449,6 +454,7 @@
     <dialog class="dialog" id="pages-dialog" aria-labelledby="pages-title">
       <div class="dialog-head">
         <h2 id="pages-title" tabindex="-1" autofocus>Pages</h2>
+        <span class="round-status idle" data-round><i></i><span></span></span>
         <button
           class="icon-btn"
           type="button"
