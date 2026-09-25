@@ -1900,6 +1900,104 @@ test("a note carries its images by path, and removing one deletes the file", asy
   );
 });
 
+test("a drawing answer saves a scene and PNG preview in its own session", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  const other = await h.session();
+  assert.equal((await a.publish(planData())).code, 200);
+  const scene = {
+    type: "excalidraw",
+    version: 2,
+    elements: [{ id: "shape" }],
+    appState: {},
+    files: {},
+  };
+  const post = (suffix, body) =>
+    fetch(`${h.server.origin}${a.base}/api/${suffix}`, {
+      method: "POST",
+      headers: { Origin: h.server.origin },
+      body,
+    });
+  const saved = await post("drawing-scene", JSON.stringify(scene));
+  assert.equal(saved.status, 201);
+  const drawing = await saved.json();
+  assert.equal(
+    drawing.path,
+    path.join(a.directory, "scenes", `${drawing.id}.excalidraw`),
+  );
+  assert.deepEqual(JSON.parse(await fs.readFile(drawing.path, "utf8")), scene);
+  assert.deepEqual(
+    await fetch(
+      `${h.server.origin}${a.base}/api/drawing-scene/${drawing.id}`,
+    ).then((r) => r.json()),
+    scene,
+  );
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(64),
+  ]);
+  const preview = await (await post("upload", png)).json();
+  const answer = {
+    kind: "drawing",
+    topic: "overview",
+    label: "System boundary",
+    revision: "1",
+    sceneId: drawing.id,
+    previewId: preview.id,
+  };
+  const event = a.event("feedback-only", "1", {
+    groups: { answers: { "overview/boundary": answer } },
+  });
+  assert.equal((await a.feedback(event)).code, 200);
+  const read = (await a.action("read", { id: event.id })).body.event.payload
+    .groups.answers["overview/boundary"];
+  assert.equal(read.scenePath, drawing.path);
+  assert.equal(read.previewPath, preview.path);
+  assert(await exists(read.scenePath));
+  assert(await exists(read.previewPath));
+  const foreign = await (
+    await fetch(`${h.server.origin}${other.base}/api/drawing-scene`, {
+      method: "POST",
+      headers: { Origin: h.server.origin },
+      body: JSON.stringify(scene),
+    })
+  ).json();
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("feedback-only", "1", {
+          groups: {
+            answers: {
+              "overview/foreign": { ...answer, sceneId: foreign.id },
+            },
+          },
+        }),
+      )
+    ).code,
+    404,
+  );
+  assert.equal((await post("drawing-scene", "not JSON")).status, 400);
+  assert.equal(
+    (await post("drawing-scene", JSON.stringify({ ...scene, elements: [] })))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await post("drawing-scene", Buffer.alloc(10 * 1024 * 1024 + 1))).status,
+    413,
+  );
+  assert.equal(
+    (
+      await fetch(`${h.server.origin}${a.base}/api/drawing-scene`, {
+        method: "POST",
+        headers: { Origin: "http://example.com" },
+        body: JSON.stringify(scene),
+      })
+    ).status,
+    403,
+  );
+});
+
 test("the component fixture builds, so every component's markup stays valid", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-fixture-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
@@ -1921,6 +2019,7 @@ test("the component fixture builds, so every component's markup stays valid", as
     'data-choice="retry"',
     'data-multiselect="scope"',
     'data-question="threshold"',
+    'data-drawing-question="boundary"',
     'data-lines="3-4"',
     "data-notes=",
     "data-terms=",

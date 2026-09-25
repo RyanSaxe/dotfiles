@@ -5,6 +5,14 @@
   <button class="decision-option" type="button" data-value="none" data-label="No retries"><b>No retries</b><p>Every gateway blip becomes a failed checkout the customer has to redo.</p></button>
   <button class="decision-option" type="button" data-value="queue" data-label="Queue and confirm later"><b>Queue and confirm later</b><p>The order completes before the charge; refunds and declined cards become a separate reconciliation job.</p></button>
 </section>
+<section class="drawing-question" data-drawing-question="boundary" data-label="System boundary" data-kind="drawing question">
+  <span class="tag">Drawing question</span>
+  <h3>Where should the circuit breaker sit?</h3>
+  <p>Sketch the services and the failure boundary so we can review the placement.</p>
+  <img class="drawing-preview" alt="Saved drawing" hidden>
+  <button class="btn primary" type="button" data-draw>Draw answer</button>
+  <p class="renderer-error" data-drawing-error role="status" hidden></p>
+</section>
 <section class="visual-decision" data-choice="topology" data-label="Service topology">
   <h3>Where does the breaker live?</h3>
   <article class="visual-option" data-value="client" data-label="In the client"><header>In the client <span class="tag">Recommended</span></header><p>One breaker per process; state is lost on restart.</p><figure><div data-diagram>flowchart LR

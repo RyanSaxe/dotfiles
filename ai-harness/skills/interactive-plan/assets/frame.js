@@ -128,6 +128,10 @@ function indexPage(topic) {
     known.lists.add(`${topic.id}/${group.dataset.multiselect}`);
   for (const group of template.content.querySelectorAll("[data-question]"))
     known.questions.add(`${topic.id}/${group.dataset.question}`);
+  for (const group of template.content.querySelectorAll(
+    "[data-drawing-question]",
+  ))
+    known.questions.add(`${topic.id}/${group.dataset.drawingQuestion}`);
   known.text.set(topic.id, normalize(template.content.textContent));
 }
 function rebuildKnown() {
@@ -941,10 +945,18 @@ function itemCard({ kind, key, item }) {
     quote.textContent = item.quote;
     body.append(quote);
   }
-  const text = document.createElement("p");
-  text.textContent =
-    kind === "choice" || kind === "list" ? choiceText(item) : item.text;
-  body.append(text);
+  if (kind === "answer" && item.kind === "drawing") {
+    const image = document.createElement("img");
+    image.className = "drawing-preview";
+    image.src = `${base}/api/upload/${encodeURIComponent(item.previewId)}`;
+    image.alt = `Drawing answer: ${item.label}`;
+    body.append(image);
+  } else {
+    const text = document.createElement("p");
+    text.textContent =
+      kind === "choice" || kind === "list" ? choiceText(item) : item.text;
+    body.append(text);
+  }
   /* What the reviewer attached, where they check what they are about to
      send. The hub still holds the bytes, so this is the same image the
      agent will open. */
@@ -1107,7 +1119,8 @@ function sentEntries(submission) {
     ...Object.values(groups.answers || {}).map((answer) => ({
       topic: answer.topic,
       label: answer.label || "Answer",
-      text: answer.text,
+      text: answer.kind === "drawing" ? "Drawing attached" : answer.text,
+      images: answer.kind === "drawing" ? [answer.previewId] : [],
     })),
   ];
 }
@@ -1477,7 +1490,7 @@ function review() {
   if (locked)
     $("page-content")
       .querySelectorAll(
-        "[data-choice] [data-value], [data-multiselect] input, [data-question] textarea, [data-answer], [data-edit], [data-comment]",
+        "[data-choice] [data-value], [data-multiselect] input, [data-question] textarea, [data-answer], [data-edit], [data-drawing-question] [data-draw], [data-comment]",
       )
       .forEach((control) => {
         if (control.tagName === "TEXTAREA") control.readOnly = true;
@@ -1544,7 +1557,13 @@ function feedbackText() {
   for (const choice of Object.values(choices))
     lines.push("", `${choice.label}: ${choiceText(choice)}`);
   for (const answer of Object.values(answers))
-    lines.push("", `${answer.label}`, answer.text);
+    lines.push(
+      "",
+      `${answer.label}`,
+      answer.kind === "drawing"
+        ? `Drawing scene ${answer.sceneId}; PNG preview ${answer.previewId}`
+        : answer.text,
+    );
   for (const note of notes)
     lines.push(
       "",
@@ -3113,6 +3132,111 @@ function enhance(root) {
 new ResizeObserver(() => {
   for (const instance of charts.values()) instance.resize();
 }).observe($("page-content"));
+let activeDrawing = null;
+function drawingError(message) {
+  $("drawing-error").textContent = message;
+  $("drawing-error").hidden = !message;
+  $("drawing-save").disabled = false;
+}
+function resetDrawing() {
+  if (activeDrawing?.loadingTimer) clearTimeout(activeDrawing.loadingTimer);
+  activeDrawing = null;
+  $("drawing-frame").removeAttribute("srcdoc");
+}
+function closeDrawing() {
+  resetDrawing();
+  if ($("drawing-dialog").open) $("drawing-dialog").close();
+}
+async function openDrawing(id, label, target, onSaved) {
+  if (!feedbackEditable() || !online) return;
+  const key = `${page.id}/${id}`;
+  const previous = state.answers[key];
+  let scene = null;
+  if (previous?.kind === "drawing") {
+    const response = await fetch(
+      `${base}/api/drawing-scene/${encodeURIComponent(previous.sceneId)}`,
+    );
+    if (!response.ok) throw new Error("Could not load the saved drawing.");
+    scene = await response.json();
+  }
+  const nonce = uuid();
+  activeDrawing = { key, label, target, nonce, scene, onSaved, topic: page.id };
+  activeDrawing.loadingTimer = setTimeout(() => {
+    if (activeDrawing?.nonce === nonce)
+      drawingError(
+        "The drawing editor did not load. Check your connection and try again.",
+      );
+  }, 20000);
+  $("drawing-title").textContent = label;
+  drawingError("");
+  $("drawing-save").disabled = true;
+  $("drawing-frame").srcdoc = JSON.parse(
+    $("drawing-editor-source").textContent,
+  ).replace("__DRAWING_NONCE__", JSON.stringify(nonce));
+  $("drawing-dialog").showModal();
+}
+$("drawing-cancel").onclick = closeDrawing;
+$("drawing-dialog").addEventListener("close", resetDrawing);
+$("drawing-save").onclick = () => {
+  if (!activeDrawing) return;
+  $("drawing-save").disabled = true;
+  $("drawing-frame").contentWindow.postMessage(
+    { type: "save", nonce: activeDrawing.nonce },
+    "*",
+  );
+};
+addEventListener("message", async (event) => {
+  const drawing = activeDrawing;
+  if (
+    !drawing ||
+    event.source !== $("drawing-frame").contentWindow ||
+    event.data?.nonce !== drawing.nonce
+  )
+    return;
+  if (event.data.type === "ready") {
+    clearTimeout(drawing.loadingTimer);
+    drawing.loadingTimer = null;
+    $("drawing-save").disabled = false;
+    event.source.postMessage(
+      { type: "init", nonce: drawing.nonce, scene: drawing.scene },
+      "*",
+    );
+  } else if (event.data.type === "error") {
+    drawingError(event.data.message || "Could not save the drawing.");
+  } else if (event.data.type === "saved") {
+    try {
+      const [sceneResponse, previewResponse] = await Promise.all([
+        fetch(`${base}/api/drawing-scene`, {
+          method: "POST",
+          body: JSON.stringify(event.data.scene),
+        }),
+        fetch(`${base}/api/upload`, { method: "POST", body: event.data.png }),
+      ]);
+      if (!sceneResponse.ok || !previewResponse.ok)
+        throw new Error("Could not upload the drawing. Please try again.");
+      const [scene, preview] = await Promise.all([
+        sceneResponse.json(),
+        previewResponse.json(),
+      ]);
+      if (activeDrawing !== drawing) return;
+      const answer = {
+        topic: drawing.topic,
+        label: drawing.label,
+        kind: "drawing",
+        revision: plan.revision,
+        sceneId: scene.id,
+        previewId: preview.id,
+        target: drawing.target,
+      };
+      state.answers[drawing.key] = answer;
+      save();
+      drawing.onSaved(answer);
+      closeDrawing();
+    } catch (error) {
+      drawingError(error.message || "Could not save the drawing.");
+    }
+  }
+});
 window.planUI = {
   answer(id, text, label, target) {
     if (!feedbackEditable()) return;
@@ -3128,6 +3252,10 @@ window.planUI = {
     else delete state.answers[key];
     save();
   },
+  drawing(id) {
+    return state.answers[`${page.id}/${id}`];
+  },
+  draw: openDrawing,
   chart,
   define,
   diff,
