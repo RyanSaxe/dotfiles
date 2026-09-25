@@ -362,39 +362,71 @@ kbd {
   color: var(--muted);
 }
 .pages-slot nav {
-  display: grid;
-  gap: 1px;
-  align-content: start;
-  padding: 0 8px;
+  display: block;
+  padding: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
-.pages-slot nav button {
+#page-list {
+  display: grid;
+  gap: 1px;
+  padding: 8px;
+}
+.page-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 8px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pages-slot nav .page-tabs button {
+  justify-content: center;
+  min-height: 34px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.pages-slot nav .page-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+.tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+}
+#page-list button {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 5px 8px;
-  border-left: 2px solid transparent;
-  border-radius: 0 6px 6px 0;
+  padding: 6px 9px;
+  border-radius: 6px;
   color: var(--muted);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-.pages-slot nav button[aria-current="page"] {
+#page-list button[aria-current="page"] {
   color: var(--ink);
   font-weight: 600;
-  border-left-color: var(--accent);
+  background: var(--accent-soft);
 }
-.pages-slot nav button.pending {
+#page-list button.pending {
   color: var(--muted);
 }
-.pages-slot nav button.pending[aria-current="page"] {
+#page-list button.pending[aria-current="page"] {
   opacity: 1;
 }
-.pages-slot nav button .page-activity {
+#page-list button .page-activity {
   flex: none;
 }
 .page-activity {
@@ -434,14 +466,7 @@ kbd {
 }
 .pending-page {
   max-width: 620px;
-  margin: 24px 0;
-  padding: 17px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--ground);
-}
-.pending-page.working {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  margin: 20px 0;
 }
 .pending-state {
   display: flex;
@@ -450,11 +475,23 @@ kbd {
   color: var(--ink);
   font-weight: 650;
 }
-.pending-page p {
-  margin: 7px 0 0 28px;
-  color: var(--muted);
+.pending-skeleton {
+  display: grid;
+  gap: 11px;
+  margin-top: 24px;
 }
-.pages-slot nav .separator {
+.pending-skeleton i {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--ground);
+}
+.pending-skeleton i:nth-child(2) {
+  width: 78%;
+}
+.pending-skeleton i:nth-child(3) {
+  width: 58%;
+}
+#page-list .separator {
   border-top: 1px solid var(--line);
   margin: 8px 0;
 }
@@ -565,74 +602,77 @@ select {
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
-.submitted-strip {
-  margin: -24px -40px 22px -56px;
-  padding: 8px 40px 8px 56px;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
-  color: var(--accent);
-  background: var(--accent-soft);
-  font-size: 12px;
-  font-weight: 600;
-}
-.submission-receipt {
-  max-width: 500px;
-}
-.review-kicker {
-  margin-bottom: 5px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-}
-.queue-progress {
-  margin: 15px 0 10px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-}
-.queue-list {
-  display: grid;
-  gap: 9px;
-}
-.queue-card {
-  padding: 14px;
+.agent-activity {
+  max-width: 520px;
+  padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
+  border-radius: 8px;
 }
-.queue-card.active,
-.queue-card.queued {
-  background: var(--ground);
-}
-.queue-card.active {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
-}
-.queue-head {
+.activity-heading,
+.activity-page {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.queue-head strong {
-  font-size: 14px;
+.activity-heading {
+  justify-content: space-between;
 }
-.queue-status {
-  margin-left: auto;
+.activity-heading strong {
+  font-size: 15px;
+}
+.activity-heading time,
+.agent-activity p,
+.activity-page small {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 650;
 }
-.queue-card.complete .queue-status {
-  color: var(--ok);
+.agent-activity p {
+  margin: 3px 0 11px;
 }
-.queue-card p {
-  margin: 7px 0 6px 26px;
-  color: var(--muted);
+.activity-segments {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.activity-segments i {
+  flex: 1;
+  height: 5px;
+  border-radius: 4px;
+  background: var(--line);
+}
+.activity-segments i.done {
+  background: var(--accent);
+}
+.activity-segments i.now {
+  background: var(--accent);
+  opacity: 0.5;
+}
+.activity-page {
+  padding: 3px 0;
   font-size: 12px;
 }
-.queue-link {
-  margin-left: 26px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 650;
+.activity-page span:nth-child(2) {
+  flex: 1;
+}
+.activity-report:not([hidden]) {
+  margin: 11px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.sent-feedback {
+  max-width: 520px;
+  margin-top: 22px;
+}
+.sent-feedback h2 {
+  margin: 0 0 10px;
+}
+.page-load-error {
+  padding: 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+}
+.page-load-error p {
+  color: var(--danger);
 }
 .draft-head {
   display: flex;
@@ -647,36 +687,13 @@ select {
   color: var(--muted);
   font-size: 12px;
 }
-.last-submission {
-  margin: 20px 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-}
-.last-submission summary {
-  padding: 13px 15px;
-  cursor: pointer;
-}
-.last-submission summary span {
-  display: inline-flex;
-  flex-direction: column;
-}
-.last-submission summary small,
 .sent-card small {
   color: var(--muted);
   font-size: 11px;
 }
-#last-submission-body,
-#last-submission-link {
-  display: block;
-  margin: 0 15px 12px;
-}
 .sent-card {
-  margin-bottom: 8px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--ground);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
 }
 .sent-card p {
   margin: 5px 0 0;
@@ -714,17 +731,6 @@ select {
 }
 .sent-page-comments h2 {
   margin-bottom: 9px;
-}
-.receipt-stage {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 650;
-}
-.submission-receipt .muted {
-  margin-bottom: 16px;
 }
 .page-footer a {
   cursor: pointer;
@@ -1483,7 +1489,7 @@ dialog::backdrop {
 }
 :root[data-mode="preview"] .sidebar,
 :root[data-mode="preview"] .frame-header,
-:root[data-mode="preview"] .older-strip,
+:root[data-mode="preview"] .history-strip,
 :root[data-mode="preview"] .page-footer,
 :root[data-mode="preview"] #quote,
 :root[data-mode="preview"] .working {
@@ -1725,30 +1731,76 @@ img.note-image {
   color: var(--accent);
   font-weight: 650;
 }
-/* Reading an older revision: the strip names it and carries the way back. */
-.older-strip {
+.save-error {
+  position: fixed;
+  z-index: var(--z-header);
+  top: 64px;
+  right: max(16px, calc((100vw - 1160px) / 2 + 16px));
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+.save-error button {
+  margin-left: auto;
+  font-size: 16px;
+  line-height: 1;
+}
+/* The same quiet strip marks submitted pages and older revisions. */
+.history-strip {
   flex: none;
+  position: sticky;
+  top: 0;
   z-index: var(--z-header);
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--attention-border);
-  background: var(--attention-bg);
-  color: var(--attention);
-  font-size: 12.5px;
+  min-height: 38px;
+  padding: 8px 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 12px;
 }
-.older-strip a {
+.history-strip button {
   margin-left: auto;
-  color: var(--attention);
+  color: var(--accent);
   font-weight: 600;
   white-space: nowrap;
-  cursor: pointer;
 }
 #revision.older {
-  color: var(--attention);
-  background: var(--attention-bg);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+main:has(.history-strip:not([hidden])) .content {
+  min-height: calc(100% - 38px);
+}
+:where(main, .sidebar, .pages-slot nav, .app-body) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+/* Safari ignores scrollbar-color and styles scrollbars only through the
+   WebKit pseudo-elements. */
+@supports not (scrollbar-color: auto) {
+  :where(main, .sidebar, .pages-slot nav, .app-body)::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  :where(main, .sidebar, .pages-slot nav, .app-body)::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  :where(main, .sidebar, .pages-slot nav, .app-body)::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: var(--line-strong) padding-box;
+  }
 }
 :root[data-mode="preview"] .content {
   margin: 0;
@@ -1783,10 +1835,6 @@ img.note-image {
     margin: 0;
     /* The last line clears the comment control, which is always on screen. */
     padding: 20px 16px calc(90px + env(safe-area-inset-bottom));
-  }
-  .submitted-strip {
-    margin: -20px -16px 20px;
-    padding: 9px 16px;
   }
   .page-arrival {
     top: 60px;

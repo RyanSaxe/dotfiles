@@ -114,10 +114,6 @@
           ✕
         </button>
       </div>
-      <p class="older-strip" id="older-strip" hidden>
-        <span id="older-text"></span
-        ><a id="revision-back">Back to the current revision</a>
-      </p>
       <div class="app-body">
         <aside class="sidebar" id="sidebar">
           <div class="side-label">Pages</div>
@@ -126,6 +122,10 @@
           </div>
         </aside>
         <main>
+          <div class="history-strip" id="history-strip" hidden>
+            <span id="history-label"></span>
+            <button type="button" id="history-return"></button>
+          </div>
           <dialog
             class="dialog"
             id="settings-dialog"
@@ -173,6 +173,16 @@
             </div>
           </dialog>
           <div class="content" id="content">
+            <div class="save-error" id="save-error" role="alert" hidden>
+              <span id="save-error-text"></span>
+              <button
+                type="button"
+                id="save-error-dismiss"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
             <p
               class="notice accepted"
               id="accepted"
@@ -180,9 +190,6 @@
               hidden
             ></p>
             <section id="reading">
-              <p class="submitted-strip" id="submitted-strip" hidden>
-                Feedback sent · <span id="submitted-stage"></span>
-              </p>
               <h1 tabindex="-1" id="page-title"></h1>
               <div class="note-bars" id="note-bars"></div>
               <div class="chosen-bar" id="chosen-bar" hidden></div>
@@ -199,19 +206,25 @@
               </nav>
             </section>
             <section id="feedback" hidden>
-              <p class="review-kicker" id="review-kicker"></p>
               <h1 tabindex="-1" id="feedback-title">Review</h1>
-              <div class="submission-receipt" id="submission-receipt" hidden>
-                <p class="receipt-stage" role="status">
-                  <span class="page-activity active" aria-hidden="true"></span>
-                  <span id="receipt-stage"></span>
-                </p>
-                <p class="muted" id="receipt-detail"></p>
+              <div class="agent-activity" id="agent-activity" hidden>
+                <div class="activity-heading">
+                  <strong id="activity-title"></strong>
+                  <time id="activity-elapsed"></time>
+                </div>
+                <p id="activity-summary"></p>
+                <div
+                  class="activity-segments"
+                  id="activity-segments"
+                  aria-hidden="true"
+                ></div>
+                <div class="activity-pages" id="activity-pages"></div>
+                <p class="activity-report" id="activity-report"></p>
               </div>
-              <div id="review-queue" hidden>
-                <p class="queue-progress" id="queue-progress"></p>
-                <div class="queue-list" id="queue-list"></div>
-              </div>
+              <section class="sent-feedback" id="sent-feedback" hidden>
+                <h2>Your feedback</h2>
+                <div id="sent-feedback-list"></div>
+              </section>
               <div id="feedback-review">
                 <div class="draft-head" id="draft-head" hidden>
                   <h2>Your comments</h2>
@@ -251,16 +264,6 @@
                 <p class="small" id="storage-status"></p>
                 <p class="small" id="connection-status"></p>
               </div>
-              <details class="last-submission" id="last-submission" hidden>
-                <summary>
-                  <span
-                    ><strong>Your last submission</strong
-                    ><small id="last-submission-meta"></small
-                  ></span>
-                </summary>
-                <div id="last-submission-body"></div>
-                <a id="last-submission-link">Read submitted revision →</a>
-              </details>
               <nav class="page-footer" aria-label="Pages">
                 <button id="feedback-pages" type="button">Pages →</button>
               </nav>

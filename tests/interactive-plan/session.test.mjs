@@ -472,9 +472,8 @@ async function hub(t, extra = {}) {
     };
     const rawAction = (action, data = {}) =>
       request(`/agent/${id}/action`, { action, sessionId: id, ...data });
-    // Most hub tests need a completed revision as setup. Feed the old fixture's
-    // assembled pages through the actual page-publication API instead of
-    // retaining a second production publisher just for their setup.
+    // Most hub tests need a completed revision as setup. Feed the assembled
+    // fixture through the page-publication API.
     const action = async (name, data = {}) => {
       if (name !== "publish" || !data.html?.includes('id="plan-data"'))
         return rawAction(name, data);
@@ -510,14 +509,11 @@ async function hub(t, extra = {}) {
           agreements: revision.agreements || [],
           prototypes: ownedBy("agreed"),
         }),
+        pages: pages.map(({ id, title }) => ({ id, title })),
         source: data.source,
       });
       if (agreed.code !== 200) return agreed;
-      const listed = await rawAction("progress", {
-        pages: pages.map(({ id, title }) => ({ id, title })),
-      });
-      if (listed.code !== 200) return listed;
-      let result = listed;
+      let result = agreed;
       for (const page of pages) {
         result = await rawAction("publish", {
           html: await pageHtml({
@@ -1286,13 +1282,11 @@ test("closing a session from the bell panel completes it and drops it from the l
   assert.deepEqual(sessionConfig((await b.request(`${b.base}/`)).body), {
     sessionId: b.id,
     base: b.base,
-    viewHash: (await b.status()).body.current.sha256,
     closed: true,
   });
   assert.deepEqual(sessionConfig((await a.request(`${a.base}/`)).body), {
     sessionId: a.id,
     base: a.base,
-    viewHash: (await a.status()).body.current.sha256,
   });
 });
 
@@ -1371,7 +1365,6 @@ test("revision routes inject read-only and preview flags and serve prototypes sa
   assert.deepEqual(sessionConfig(live), {
     sessionId: a.id,
     base: a.base,
-    viewHash: (await a.status()).body.current.sha256,
   });
   assert.equal(artifactData(live).revision, "2");
   const readonly = await a.request(`${a.base}/r/1`);
@@ -1717,6 +1710,17 @@ test("a moved session still serves its current and earlier revisions", async (t)
   assert.equal(registered.status, 200);
   assert.equal((await a.request(`${a.base}/`)).code, 200);
   assert.equal((await a.request(`${a.base}/r/1`)).code, 200);
+  const manifest = await a.request(`${a.base}/api/page-set?revision=1`);
+  assert.equal(manifest.code, 200);
+  const slot = manifest.body.pages.find((item) => item.id === "overview");
+  assert.equal(
+    (
+      await a.request(
+        `${a.base}/api/page?revision=1&id=overview&version=${slot.version}`,
+      )
+    ).code,
+    200,
+  );
 });
 
 test("start replaces a stale hub record, and helper commands reattach after a crash without losing the queue", async (t) => {
@@ -1770,13 +1774,12 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
       page: { id: "agreed", title: "Agreed so far", agreements: [] },
     }),
   );
-  await command("publish", "--file", agreedFile);
   const pagesFile = path.join(home, "pages.json");
   await fs.writeFile(
     pagesFile,
     JSON.stringify({ pages: [{ id: "overview", title: "Overview" }] }),
   );
-  await command("progress", "--pages", pagesFile);
+  await command("publish", "--file", agreedFile, "--pages", pagesFile);
   const overviewFile = path.join(home, "overview.html");
   await fs.writeFile(
     overviewFile,

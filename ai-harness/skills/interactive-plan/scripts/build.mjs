@@ -209,18 +209,27 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
 }
 
 export async function frameBundle() {
-  const [shell, style, script, notifications, choices, draft, drawingEditor] =
-    await Promise.all(
-      [
-        "frame.html",
-        "frame.css",
-        "frame.js",
-        "notifications.mjs",
-        "choices.mjs",
-        "draft.mjs",
-        "drawing-editor.html",
-      ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
-    );
+  const [
+    shell,
+    style,
+    script,
+    notifications,
+    choices,
+    draft,
+    activity,
+    drawingEditor,
+  ] = await Promise.all(
+    [
+      "frame.html",
+      "frame.css",
+      "frame.js",
+      "notifications.mjs",
+      "choices.mjs",
+      "draft.mjs",
+      "activity.mjs",
+      "drawing-editor.html",
+    ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
+  );
   const roots = componentRoots();
   const [componentCss, componentJs] = await Promise.all([
     componentStyles(roots),
@@ -233,6 +242,7 @@ export async function frameBundle() {
     notifications,
     choices,
     draft,
+    activity,
     drawingEditor,
     componentCss,
     componentJs,
@@ -252,6 +262,7 @@ export async function assemble(
     notifications,
     choices,
     draft,
+    activity,
     drawingEditor,
     componentCss,
     componentJs,
@@ -280,7 +291,7 @@ export async function assemble(
     .replace(
       "<!-- FRAME_SCRIPT -->",
       () =>
-        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n${componentJs}\n</script>`,
+        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${activity}\n${script}\n${componentJs}\n</script>`,
     )
     // A module, and after the frame's, so the plan's own script sees planUI
     // and can register a component of its own before the first page renders.
@@ -297,7 +308,13 @@ export async function assemble(
   return html;
 }
 
-export function pageScripts(pages) {
+// Revisions reuse page IDs, and the reader keeps several revisions loaded,
+// so page CSS and scripts match the revision as well as the page.
+export function pageScope(id, revision) {
+  return `#page-content[data-page-id="${id}"][data-revision="${revision}"]`;
+}
+
+export function pageScripts(pages, revision) {
   return pages
     .filter((page) => page.jsText)
     .map((page) => {
@@ -305,10 +322,10 @@ export function pageScripts(pages) {
       return `import("data:text/javascript;base64,${encoded}").then(({ setup }) => {
         if (typeof setup !== "function") throw new Error("Page ${page.id} must export setup");
         const run = ({ detail }) => {
-          if (detail.page.id === ${JSON.stringify(page.id)}) setup(detail.element, window.planUI);
+          if (detail.page.id === ${JSON.stringify(page.id)} && detail.revision === ${JSON.stringify(revision)}) setup(detail.element, window.planUI);
         };
         window.addEventListener("plan:page", run);
-        if (window.planUI?.page?.id === ${JSON.stringify(page.id)})
+        if (window.planUI?.page?.id === ${JSON.stringify(page.id)} && window.planUI?.revision === ${JSON.stringify(revision)})
           setup(document.getElementById("page-content"), window.planUI);
       }).catch((error) => console.error("Page ${page.id} script:", error));`;
     })
@@ -360,7 +377,7 @@ export async function buildPage(source, input) {
     prototypes: page.prototypes || [],
   };
   const css = page.cssText
-    ? `@scope (#page-content[data-page-id="${page.id}"]) { ${page.cssText} }`
+    ? `@scope (${pageScope(page.id, record.revision)}) { ${page.cssText} }`
     : "";
   const authoredProblems = problems(data, page.jsText || "", {
     allowUnknownPages: true,
@@ -368,7 +385,7 @@ export async function buildPage(source, input) {
   if (authoredProblems.length) throw new Error(authoredProblems.join("\n"));
   const preview = await assemble(data, {
     css,
-    js: pageScripts([page]),
+    js: pageScripts([page], record.revision),
     allowUnknownPages: true,
   });
   return preview.replace(

@@ -24,8 +24,9 @@ For submitted feedback, use `groups.alignUnflagged` and the comments as
 when new evidence, a changed proposal, or a sharper question gives the
 reviewer something new to judge.
 
-Publish Agreed first, then list only the pages this revision needs. Publish
-each finished page with the same `publish` command. The reader can review
+Publish Agreed with the ordered list of every page this revision needs in
+one `publish --pages pages.json` command. Publish each finished page with
+the same `publish` command, without `--pages`. The reader can review
 ready pages while the agent works on the others. A published page is fixed;
 the next revision may omit it, revisit its topic, or use entirely new pages.
 Feedback is sent only after the last listed page completes the revision.

@@ -24,11 +24,12 @@ test("page CSS uses its own scope outside the frame content scope", async () => 
   assert.match(style, /@layer frame, plan, components;/);
   assert.match(
     style,
-    /@layer plan \{\n@scope \(#page-content\[data-page-id="p"\]\) \{ p\{color:red\} \}/,
+    /@layer plan \{\n@scope \(#page-content\[data-page-id="p"\]\[data-revision="1"\]\) \{ p\{color:red\} \}/,
   );
   assert.ok(
-    style.indexOf('@scope (#page-content[data-page-id="p"])') <
-      style.indexOf("@scope (#page-content)"),
+    style.indexOf(
+      '@scope (#page-content[data-page-id="p"][data-revision="1"])',
+    ) < style.indexOf("@scope (#page-content)"),
   );
 });
 

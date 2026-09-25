@@ -39,11 +39,20 @@ const page = async (revision, id, title, html, extra = {}) =>
       ...extra,
     },
   });
-const publish = async (revision, id, title, html, extra) =>
+const publish = async (revision, id, title, html, extra, pages) =>
   act({
     action: "publish",
     html: await page(revision, id, title, html, extra),
+    ...(pages ? { pages } : {}),
   });
+const firstPages = [
+  { id: "overview", title: "Overview" },
+  { id: "detail", title: "Detail" },
+];
+const firstAgreements = [
+  { id: "alpha", title: "Alpha", html: "<p>Same</p>", source: "Conversation" },
+  { id: "beta", title: "Beta", html: "<p>Before</p>", source: "Conversation" },
+];
 
 before(async () => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "page-round-"));
@@ -70,8 +79,27 @@ after(async () => {
   if (hub) await hub.close();
 });
 
-test("Agreed is readable before this revision lists its pages", async () => {
-  const result = await publish("1", "agreed", "Agreed so far");
+test("Agreed and all page names become visible in one publication", async () => {
+  assert.equal((await publish("1", "agreed", "Agreed so far")).status, 400);
+  assert.equal((await status()).current, null);
+  assert.equal(
+    (
+      await publish("1", "agreed", "Agreed so far", undefined, {}, [
+        firstPages[0],
+        firstPages[0],
+      ])
+    ).status,
+    400,
+  );
+  assert.equal((await status()).current, null);
+  const result = await publish(
+    "1",
+    "agreed",
+    "Agreed so far",
+    undefined,
+    { agreements: firstAgreements },
+    firstPages,
+  );
   assert.equal(result.status, 200, JSON.stringify(result.body));
   assert.equal(result.body.page.id, "agreed");
   assert.equal((await status()).revisions.length, 0);
@@ -79,6 +107,16 @@ test("Agreed is readable before this revision lists its pages", async () => {
   const html = await response.text();
   assert.match(html, /Agreed so far/);
   assert.match(html, /"pageMode":"partial"/);
+  assert.match(html, /Detail/);
+  const manifest = await (
+    await fetch(`${hub.origin}/s/${sessionId}/api/page-set?revision=1`)
+  ).json();
+  assert.deepEqual(
+    manifest.pages.map((item) => item.id),
+    ["agreed", "overview", "detail"],
+  );
+  assert.equal(manifest.pages[1].state, "queued");
+  assert.equal(manifest.complete, false);
   assert.equal(
     (
       await act({
@@ -92,24 +130,18 @@ test("Agreed is readable before this revision lists its pages", async () => {
     400,
   );
   assert.equal(
-    (
-      await act({
-        action: "progress",
-        pages: [{ id: "overview", title: "Overview" }],
-        start: ["overview"],
-      })
-    ).status,
+    (await publish("1", "detail", "Detail", "<p>x</p>", {}, firstPages)).status,
     400,
   );
   assert.equal(
-    (await act({ action: "progress", start: ["overview"] })).status,
+    (await act({ action: "progress", start: ["missing"] })).status,
     409,
   );
   assert.equal(
     (
       await act({
         action: "publish",
-        html: await page("1", "detail", "Detail", "<p>x</p>"),
+        html: await page("1", "unlisted", "Unlisted", "<p>x</p>"),
       })
     ).status,
     409,
@@ -117,14 +149,6 @@ test("Agreed is readable before this revision lists its pages", async () => {
 });
 
 test("listed pages arrive independently and only the last completes the revision", async () => {
-  const list = await act({
-    action: "progress",
-    pages: [
-      { id: "overview", title: "Overview" },
-      { id: "detail", title: "Detail" },
-    ],
-  });
-  assert.equal(list.status, 200, JSON.stringify(list.body));
   assert.equal(
     (await act({ action: "progress", start: ["detail"] })).status,
     200,
@@ -155,9 +179,27 @@ test("listed pages arrive independently and only the last completes the revision
   assert.equal(detail.status, 200, JSON.stringify(detail.body));
   assert.equal(detail.body.complete, false);
   const immutable = await fs.readFile(detail.body.page.recordPath, "utf8");
-  assert.match(
+  assert.doesNotMatch(
     await (await fetch(`${hub.origin}/s/${sessionId}/`)).text(),
     /Finished detail/,
+  );
+  const manifest = await (
+    await fetch(`${hub.origin}/s/${sessionId}/api/page-set?revision=1`)
+  ).json();
+  const slot = manifest.pages.find((item) => item.id === "detail");
+  assert.equal(slot.state, "ready");
+  const recordResponse = await fetch(
+    `${hub.origin}/s/${sessionId}/api/page?revision=1&id=detail&version=${slot.version}`,
+  );
+  assert.equal(recordResponse.status, 200);
+  assert.match((await recordResponse.json()).page.html, /Finished detail/);
+  assert.equal(
+    (
+      await fetch(
+        `${hub.origin}/s/${sessionId}/api/page?revision=1&id=detail&version=${"0".repeat(64)}`,
+      )
+    ).status,
+    404,
   );
   const valid = await page(
     "1",
@@ -211,6 +253,23 @@ test("listed pages arrive independently and only the last completes the revision
   assert.equal((await status()).revisions.length, 1);
   assert.equal((await status()).pageRound, null);
   assert.equal((await status()).needsYou, true);
+  const completeSet = await (
+    await fetch(`${hub.origin}/s/${sessionId}/api/page-set?revision=1`)
+  ).json();
+  assert.equal(completeSet.complete, true);
+  assert.equal(
+    (await fetch(`${hub.origin}/s/${sessionId}/api/page-set?revision=missing`))
+      .status,
+    404,
+  );
+  assert.equal(
+    (
+      await fetch(
+        `${hub.origin}/s/${sessionId}/api/page?revision=1&id=missing&version=${completeSet.pages[0].version}`,
+      )
+    ).status,
+    404,
+  );
   assert.equal(
     await fs.readFile(detail.body.page.recordPath, "utf8"),
     immutable,
@@ -246,36 +305,47 @@ test("the next revision may choose unrelated pages without changing history", as
   );
   assert.equal(response.status, 200, JSON.stringify(response.body));
   assert.equal((await act({ action: "read" })).status, 200);
-  const agreed = await publish("2", "agreed", "Agreed so far", undefined, {
-    agreements: [
-      {
-        id: "from-detail",
-        title: "A settled detail",
-        html: "<p>The earlier detail is settled.</p>",
-        sourceRefs: [
-          { kind: "note", submissionId: "feedback-1", noteId: "note-1" },
-        ],
-      },
+  const agreed = await publish(
+    "2",
+    "agreed",
+    "Agreed so far",
+    undefined,
+    {
+      agreements: [
+        { ...firstAgreements[1], html: "<p>After</p>" },
+        {
+          id: "gamma",
+          title: "Gamma",
+          html: "<p>New</p>",
+          source: "Conversation",
+        },
+        firstAgreements[0],
+        {
+          id: "from-detail",
+          title: "A settled detail",
+          html: "<p>The earlier detail is settled.</p>",
+          sourceRefs: [
+            { kind: "note", submissionId: "feedback-1", noteId: "note-1" },
+          ],
+        },
+      ],
+    },
+    [
+      { id: "overview", title: "Overview" },
+      { id: "new-topic", title: "New topic" },
     ],
-  });
+  );
   assert.equal(agreed.status, 200, JSON.stringify(agreed.body));
   const source = JSON.parse(
     await fs.readFile(agreed.body.page.recordPath, "utf8"),
-  ).page.agreements[0].sourceRecords[0];
+  ).page.agreements.find((entry) => entry.id === "from-detail")
+    .sourceRecords[0];
   assert.equal(source.revision, "1");
   assert.equal(source.topic, "detail");
-  assert.equal(
-    (
-      await act({
-        action: "progress",
-        pages: [
-          { id: "overview", title: "Overview" },
-          { id: "new-topic", title: "New topic" },
-        ],
-      })
-    ).status,
-    200,
-  );
+  const ordered = JSON.parse(
+    await fs.readFile(agreed.body.page.recordPath, "utf8"),
+  ).page.agreements.map((entry) => entry.id);
+  assert.deepEqual(ordered, ["beta", "gamma", "from-detail", "alpha"]);
   const [one, two] = await Promise.all([
     publish("2", "new-topic", "New topic", "<p>Fresh topic</p>"),
     publish("2", "overview", "Overview", "<p>New overview</p>"),
@@ -288,6 +358,11 @@ test("the next revision may choose unrelated pages without changing history", as
   assert.doesNotMatch(fresh, /Finished detail/);
   assert.match(fresh, /Fresh topic/);
   assert.equal((await status()).revisions.length, 2);
+  assert.equal(
+    (await fetch(`${hub.origin}/s/${sessionId}/api/page-set?revision=1`))
+      .status,
+    200,
+  );
 });
 
 test("the CLI builds and publishes each page with its own saved source", async () => {
@@ -389,26 +464,21 @@ test("the CLI builds and publishes each page with its own saved source", async (
   );
   const agreedHtml = path.join(root, "agreed.html");
   await command(builder, [path.join(agreedSource, "agreed.json"), agreedHtml]);
-  await command(helper, [
-    "publish",
-    "--session-dir",
-    session,
-    "--file",
-    agreedHtml,
-    "--source",
-    agreedSource,
-  ]);
   const list = path.join(root, "pages.json");
   await fs.writeFile(
     list,
     JSON.stringify({ pages: [{ id: "overview", title: "Overview" }] }),
   );
   await command(helper, [
-    "progress",
+    "publish",
     "--session-dir",
     session,
+    "--file",
+    agreedHtml,
     "--pages",
     list,
+    "--source",
+    agreedSource,
   ]);
   const overviewSource = path.join(root, "overview-source");
   await fs.mkdir(overviewSource);
@@ -510,14 +580,6 @@ test("an unfinished revision resumes after the hub restarts", async () => {
             title: "Agreed",
             agreements: [],
           }),
-        })
-      ).status,
-      200,
-    );
-    assert.equal(
-      (
-        await action({
-          action: "progress",
           pages: [
             { id: "overview", title: "Overview" },
             { id: "detail", title: "Detail" },

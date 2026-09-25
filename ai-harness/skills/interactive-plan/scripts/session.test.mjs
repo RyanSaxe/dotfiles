@@ -44,13 +44,9 @@ const publishRevision = async (revision) => {
   const agreed = await act({
     action: "publish",
     html: await page(revision, "agreed"),
-  });
-  assert.ok(agreed.ok, JSON.stringify(agreed.body));
-  const list = await act({
-    action: "progress",
     pages: [{ id: "p", title: "P" }],
   });
-  assert.ok(list.ok, JSON.stringify(list.body));
+  assert.ok(agreed.ok, JSON.stringify(agreed.body));
   return act({ action: "publish", html: await page(revision, "p") });
 };
 
@@ -108,10 +104,10 @@ test("the browser can read sent feedback without agent-only paths", async () => 
   assert.equal(invalid.status, 400);
 });
 
-test("pages cannot be listed before Agreed for the next revision", async () => {
+test("page progress cannot start before Agreed for the next revision", async () => {
   const result = await act({
     action: "progress",
-    pages: [{ id: "p", title: "P" }],
+    start: ["p"],
   });
   assert.equal(result.status, 409);
   assert.equal((await status()).pageRound, null);

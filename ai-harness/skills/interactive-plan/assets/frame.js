@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const plan = JSON.parse($("plan-data").textContent);
+let plan = JSON.parse($("plan-data").textContent);
 const session = JSON.parse($("session-config").textContent);
 const base = typeof session.base === "string" ? session.base : "";
 const online =
@@ -14,11 +14,14 @@ const mode = session.preview
 const editable = mode === "live";
 document.documentElement.dataset.mode = mode;
 const query = new URL(location.href).searchParams;
-const agreements = plan.agreements || [];
-const pages = [
-  { id: "agreed", title: "Agreed so far", html: "" },
-  ...plan.pages,
-];
+let agreements = plan.agreements || [];
+let pages = [{ id: "agreed", title: "Agreed so far", html: "" }, ...plan.pages];
+let selectedTab = "current";
+let submittedRevision = null;
+const views = new Map([[plan.revision, { plan, agreements, pages }]]);
+const pageSets = new Map();
+const recordLoads = new Map();
+let pageSetLoading = null;
 // crypto.randomUUID exists only in a secure context; over plain http on a
 // Tailscale address, which is how a phone reaches the hub, it is undefined.
 function uuid() {
@@ -66,7 +69,6 @@ try {
 let activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
 
 const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}`;
-const resumeKey = `interactive-plan:resume:${session.sessionId || "offline"}`;
 const placeKey = `interactive-plan:place:${session.sessionId || "offline"}`;
 const prefsPrefix = `interactive-plan:prefs:${session.sessionId || "offline"}:`;
 let state = emptyDraft(plan.revision);
@@ -79,13 +81,17 @@ if (editable)
   } catch {
     /* The in-memory draft and export remain usable. */
   }
+if (editable && state.submitted?.revision === plan.revision) {
+  submittedRevision = plan.revision;
+  selectedTab = "submitted";
+}
 const known = {
   choices: new Set(),
   lists: new Set(),
   questions: new Set(),
   text: new Map(),
 };
-for (const topic of plan.pages.filter((item) => !item.pending)) {
+function indexPage(topic) {
   const template = document.createElement("template");
   template.innerHTML = topic.html;
   choiceTargets(template.content, topic.id);
@@ -101,6 +107,18 @@ for (const topic of plan.pages.filter((item) => !item.pending)) {
     known.questions.add(`${topic.id}/${group.dataset.drawingQuestion}`);
   known.text.set(topic.id, normalize(template.content.textContent));
 }
+for (const topic of plan.pages.filter((item) => !item.pending))
+  indexPage(topic);
+function rebuildKnown() {
+  known.choices.clear();
+  known.lists.clear();
+  known.questions.clear();
+  known.text.clear();
+  for (const topic of pages.filter(
+    (item) => item.id !== "agreed" && !item.pending,
+  ))
+    indexPage(topic);
+}
 function stale(kind, key, item) {
   if (kind === "note") {
     if (item.topic === "overall") return false;
@@ -109,12 +127,15 @@ function stale(kind, key, item) {
         item.agreementId &&
         !agreements.some((entry) => entry.id === item.agreementId),
       );
-    if (!known.text.has(item.topic)) return true;
+    if (!known.text.has(item.topic))
+      return !pages.some((entry) => entry.id === item.topic && entry.pending);
     return (
       Boolean(item.quote) &&
       !known.text.get(item.topic).includes(normalize(item.quote))
     );
   }
+  if (pages.some((entry) => entry.id === item.topic && entry.pending))
+    return false;
   if (kind === "answer") return !known.questions.has(key);
   if (kind === "list") return !known.lists.has(key);
   return !known.choices.has(key);
@@ -148,22 +169,19 @@ function track(task) {
 }
 const syntaxThemes = { light: "github-light", dark: "github-dark" };
 const current = () =>
+  selectedTab === "current" &&
   remote?.current?.artifactId === plan.artifactId &&
   remote?.current?.revision === plan.revision;
 const submittedCurrent = () =>
   editable &&
-  (state.submitted?.revision === plan.revision ||
+  (selectedTab === "submitted" ||
+    state.submitted?.revision === plan.revision ||
     (current() && remote?.latestSubmissionRevision === plan.revision));
 const feedbackEditable = () =>
-  editable && !submissionInFlight && !submittedCurrent();
-function agentStage() {
-  if (!connected) return "Connection lost";
-  if (remote?.wake?.last?.ok === false) return "Agent could not start";
-  if (remote?.paused) return "Agent paused";
-  return remote?.stage === "working"
-    ? "Agent working on next revision"
-    : "Waiting for agent";
-}
+  editable &&
+  selectedTab === "current" &&
+  !submissionInFlight &&
+  !submittedCurrent();
 const reviewAlerts = createReviewAlerts({
   window,
   button: $("notifications"),
@@ -190,7 +208,7 @@ const prefs = {
 };
 
 function persist() {
-  if (!editable) return;
+  if (!editable || selectedTab !== "current") return;
   try {
     localStorage.setItem(storageKey, JSON.stringify(state));
     $("storage-status").textContent = "";
@@ -270,12 +288,16 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   $("feedback").hidden = !feedback;
   if (!feedback) {
     page = pages.find((item) => item.id === id) || pages[0];
+    if (page.status === "ready" && page.pending)
+      void loadPageRecord(plan.revision, page.id).catch(() => {});
     disposeRenderers();
     $("page-title").textContent = page.title;
     chooseBlock(null);
     $("page-content").dataset.pageId = page.id;
+    $("page-content").dataset.revision = plan.revision;
+    const [mark, label] = pendingState(page);
     $("page-content").innerHTML = page.pending
-      ? `<div class="pending-page ${page.working ? "working" : "queued"}"><span class="pending-state">${pageIndicator(page.working ? "active" : "queued").outerHTML}${page.working ? "Being prepared" : "Waiting its turn"}</span><p>${page.working ? "The agent is working on this page. It will appear after its publication check passes." : "The agent has listed this page but has not started it yet."}</p></div>`
+      ? `<div class="pending-page ${mark === "active" ? "working" : "queued"}"><span class="pending-state">${pageIndicator(mark).outerHTML}${label}</span><div class="pending-skeleton" aria-hidden="true"><i></i><i></i><i></i></div></div>`
       : page.html;
     if (!page.pending) {
       blockTargets($("page-content"), page.id);
@@ -290,9 +312,10 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     }
     renderSentPageComments();
     window.planUI.page = page;
+    window.planUI.revision = plan.revision;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
-        detail: { page, element: $("page-content") },
+        detail: { page, element: $("page-content"), revision: plan.revision },
       }),
     );
     // Shiki, Mermaid and the charts all change a block's height after the
@@ -300,7 +323,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     Promise.allSettled([...renders]).then(placeMarks);
   }
   closeDrawer();
-  for (const button of document.querySelectorAll("#navigation [data-page]")) {
+  for (const button of document.querySelectorAll("#page-list [data-page]")) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -979,71 +1002,23 @@ function renderSentPageComments() {
   heading.textContent = "Your sent comments";
   section.append(heading, ...entries.map(sentCard));
 }
-function renderQueue() {
-  const queue = $("review-queue");
-  queue.hidden = !editable || submittedCurrent() || submissionInFlight;
-  if (queue.hidden) return;
-  const ready = pages.filter((item) => !item.pending).length;
-  $("queue-progress").textContent = `${ready} of ${pages.length} pages ready`;
-  const list = $("queue-list");
-  if (list.dataset.rendered) return;
+let renderedSentId = null;
+function renderSentFeedback() {
+  if (renderedSentId === lastSubmission?.id) return;
+  renderedSentId = lastSubmission?.id || null;
+  const list = $("sent-feedback-list");
   list.replaceChildren();
-  for (const item of pages) {
-    const state = item.pending
-      ? item.working
-        ? "active"
-        : "queued"
-      : "complete";
-    const card = document.createElement("article");
-    card.className = `queue-card ${state}`;
-    const head = document.createElement("div");
-    head.className = "queue-head";
-    const title = document.createElement("strong");
-    title.textContent = item.title;
-    const status = document.createElement("span");
-    status.className = "queue-status";
-    status.textContent =
-      state === "complete"
-        ? "Ready"
-        : state === "active"
-          ? "Working"
-          : "Queued";
-    head.append(pageIndicator(state), title, status);
-    const detail = document.createElement("p");
-    detail.textContent =
-      state === "complete"
-        ? "Ready to review."
-        : state === "active"
-          ? "The agent is preparing this page."
-          : "Waiting its turn.";
-    const link = document.createElement("button");
-    link.type = "button";
-    link.className = "queue-link";
-    link.textContent = state === "complete" ? "Read page →" : "View status →";
-    link.onclick = () => show(item.id);
-    card.append(head, detail, link);
-    list.append(card);
-  }
-  list.dataset.rendered = "true";
-}
-function renderLastSubmission() {
-  const container = $("last-submission");
-  container.hidden = !lastSubmission;
   if (!lastSubmission) return;
   const entries = sentEntries(lastSubmission);
-  const aligned = lastSubmission.groups.alignUnflagged;
-  $("last-submission-meta").textContent =
-    `Revision ${lastSubmission.revision} · ${entries.length ? plural(entries.length, "comment") : aligned === true ? "aligned review" : "no comments"}`;
-  const alignment = document.createElement("p");
-  alignment.className = "sent-alignment";
-  alignment.textContent = `Everything else looks good: ${aligned ? "Yes" : "No"}`;
-  $("last-submission-body").replaceChildren(
-    ...entries.map(sentCard),
-    ...(typeof aligned === "boolean" ? [alignment] : []),
-  );
-  $("last-submission-link").href =
-    `${base}/r/${encodeURIComponent(lastSubmission.revision)}`;
-  container.open = submittedCurrent();
+  for (const entry of entries) list.append(sentCard(entry));
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = lastSubmission.groups.alignUnflagged
+      ? "Everything else looked good."
+      : "No comments were sent.";
+    list.append(empty);
+  }
   renderSentPageComments();
 }
 async function loadSubmission() {
@@ -1063,7 +1038,7 @@ async function loadSubmission() {
   if (mode !== "readonly" && submission && submission.id !== key) return;
   lastSubmission = submission;
   lastSubmissionLoadedId = key;
-  renderLastSubmission();
+  renderSentFeedback();
 }
 function badge(count) {
   const row = $("review-row");
@@ -1134,51 +1109,120 @@ function renderFooter(feedback) {
       ? ""
       : next.id === "feedback"
         ? submittedCurrent()
-          ? "Feedback sent →"
+          ? "Feedback →"
           : acceptable
             ? "Review and accept →"
             : "Review your feedback →"
         : `Next: ${next.title} →`,
   );
 }
+function renderActivity() {
+  const visible = selectedTab === "submitted" || submissionInFlight;
+  $("agent-activity").hidden = !visible;
+  $("sent-feedback").hidden = !visible || submissionInFlight;
+  if (!visible) return;
+  const model = activityModel({
+    remote,
+    currentSet: pageSets.get(remote?.current?.revision),
+    submittedRevision,
+    inFlight: submissionInFlight,
+  });
+  const { slots, stopped } = model;
+  const sentAt = lastSubmission?.receivedAt || state.submitted?.at;
+  $("activity-elapsed").textContent = sentAt ? since(sentAt) : "";
+  $("activity-title").textContent = model.title;
+  $("activity-summary").textContent = model.summary;
+  const signature = JSON.stringify([
+    stopped,
+    model.failed,
+    slots.map(({ id, title, state }) => [id, title, state]),
+  ]);
+  const segments = $("activity-segments");
+  const rows = $("activity-pages");
+  if (rows.dataset.signature !== signature) {
+    rows.dataset.signature = signature;
+    segments.replaceChildren();
+    rows.replaceChildren();
+    for (const slot of slots) {
+      const item = document.createElement("i");
+      item.className =
+        slot.state === "ready"
+          ? "done"
+          : slot.state === "active" && !stopped
+            ? "now"
+            : "";
+      segments.append(item);
+      const row = document.createElement("div");
+      row.className = "activity-page";
+      const name = document.createElement("span");
+      name.textContent = slot.title;
+      const label = document.createElement("small");
+      label.textContent =
+        slot.state === "ready"
+          ? "Ready"
+          : slot.state === "active"
+            ? stopped
+              ? model.failed
+                ? "Stopped"
+                : "Paused"
+              : "Working"
+            : "Queued";
+      row.append(
+        pageIndicator(stopped ? "queued" : pageStatus({ status: slot.state })),
+        name,
+        label,
+      );
+      rows.append(row);
+    }
+  }
+  segments.hidden = !slots.length;
+  const report = $("activity-report");
+  report.textContent =
+    model.report === "stale"
+      ? `Last report ${ago(model.reportAt)}`
+      : model.report;
+  report.hidden = !report.textContent;
+  if (!submissionInFlight) renderSentFeedback();
+}
+function renderHistory() {
+  const old = mode === "readonly";
+  const submittedPage = selectedTab === "submitted" && !$("reading").hidden;
+  const strip = $("history-strip");
+  strip.hidden = !(old || submittedPage);
+  if (strip.hidden) return;
+  $("history-label").textContent = old
+    ? session.closed
+      ? "This plan is closed"
+      : "Earlier revision"
+    : "Feedback sent";
+  const button = $("history-return");
+  button.hidden = old && session.closed;
+  button.textContent = old ? "Back to current" : "Feedback →";
+  button.onclick = old
+    ? () => location.assign(`${base}/`)
+    : () => show("feedback");
+}
 function review() {
   const unsent = unsentItems(state);
-  const sent = submittedCurrent();
-  const locked = sent || submissionInFlight;
+  const sent = selectedTab === "submitted";
+  const locked = sent || submissionInFlight || submittedCurrent();
   $("draft-head").hidden = unsent.count === 0;
   $("draft-count").textContent = `${unsent.count} to send`;
   badge(locked ? 0 : unsent.count);
   const reviewLabel = $("review-row")?.querySelector("span");
-  if (reviewLabel)
-    reviewLabel.textContent = sent ? "Feedback sent" : "Review comments";
-  $("review-row")?.classList.toggle("sent", sent);
-  const sentMark = $("review-row")?.querySelector(".page-activity");
-  if (sentMark) sentMark.hidden = !sent;
-  $("submitted-strip").hidden = !sent;
-  $("submitted-stage").textContent = agentStage();
-  $("feedback-title").textContent = submissionInFlight
-    ? "Sending feedback"
-    : sent
-      ? "Feedback sent"
-      : `Review revision ${plan.revision}`;
-  $("review-kicker").textContent =
-    `Revision ${plan.revision} · ${sent ? "feedback sent" : remote?.pageRound ? "agent working" : "ready to review"}`;
-  $("feedback").classList.toggle("sending", submissionInFlight);
-  $("submission-receipt").hidden = !locked;
-  $("feedback-review").hidden =
-    locked || (Boolean(remote?.pageRound) && unsent.count === 0);
-  renderQueue();
-  $("last-submission").hidden = !lastSubmission || submissionInFlight;
-  $("receipt-stage").textContent = submissionInFlight
-    ? "Saving your comments"
-    : agentStage();
-  $("receipt-detail").textContent = submissionInFlight
-    ? "Your draft stays saved until the hub confirms it."
-    : remote?.wake?.last?.ok === false
-      ? "Your feedback is saved. Ask the agent to resume in chat."
-      : "New pages will appear after their publication checks pass.";
+  if (reviewLabel) reviewLabel.textContent = sent ? "Feedback" : "Review";
+  $("feedback-title").textContent = sent
+    ? "Feedback"
+    : submissionInFlight
+      ? "Sending feedback"
+      : "Review";
+  $("feedback-review").hidden = locked;
+  renderActivity();
+  renderHistory();
   $("submit-error").hidden = !submissionError;
   $("submit-error").textContent = submissionError;
+  $("save-error").hidden = !submissionError || $("reading").hidden;
+  $("save-error-text").textContent = submissionError;
   $("overall-note").disabled = locked;
   $("align-unflagged").checked = state.alignUnflagged;
   $("align-unflagged").disabled = locked;
@@ -1211,13 +1255,11 @@ function review() {
     unsent.count > 0 || (plan.kind === "exploration" && state.alignUnflagged);
   $("submit").disabled =
     submissionInFlight ||
-    (sent || waitingForPages
-      ? !$("feedback").hidden
-      : !hasFeedback || !sendable);
+    (sent ? $("reading").hidden : waitingForPages || !hasFeedback || !sendable);
   $("submit").textContent = submissionInFlight
     ? "Sending"
-    : sent || waitingForPages
-      ? "View status"
+    : sent
+      ? "Feedback"
       : unsent.count
         ? `Submit (${unsent.count})`
         : "Submit";
@@ -1292,42 +1334,264 @@ async function send(event) {
   return result;
 }
 
-/* Status, sessions, revisions */
-function scheduleReload(sameRevision = false) {
+/* A published page is fetched once. Polls only update its place in the list. */
+async function loadPageRecord(revision, id) {
+  const view = views.get(revision);
+  const manifest = pageSets.get(revision);
+  const slot = manifest?.pages.find((item) => item.id === id);
+  if (!view || !slot?.version) return;
+  const key = `${revision}/${id}/${slot.version}`;
+  if (recordLoads.has(key)) return recordLoads.get(key);
+  const task = (async () => {
+    const url = `${base}/api/page?revision=${encodeURIComponent(revision)}&id=${encodeURIComponent(id)}&version=${slot.version}`;
+    const response = await fetch(url);
+    if (!response.ok) throw Error("Could not load this page.");
+    const record = await response.json();
+    if (record.revision !== revision || record.page.id !== id)
+      throw Error("Wrong page record.");
+    const entry = view.pages.find((item) => item.id === id);
+    if (id === "agreed") {
+      view.agreements = record.page.agreements;
+      if (plan.revision === revision) agreements = view.agreements;
+    } else {
+      let setup = null;
+      if (record.page.jsText) {
+        const blob = new Blob([record.page.jsText], {
+          type: "text/javascript",
+        });
+        const moduleUrl = URL.createObjectURL(blob);
+        try {
+          ({ setup } = await import(moduleUrl));
+          if (typeof setup !== "function")
+            throw Error("Page setup is unavailable.");
+        } finally {
+          URL.revokeObjectURL(moduleUrl);
+        }
+      }
+      entry.html = record.page.html;
+      entry.loaded = true;
+      entry.pending = false;
+      indexPage(entry);
+      view.plan.prototypes ||= [];
+      view.plan.prototypes.push(...(record.page.prototypes || []));
+      if (record.page.cssText) {
+        const style = document.createElement("style");
+        style.textContent = `@layer plan { @scope (#page-content[data-page-id="${id}"][data-revision="${revision}"]) { ${record.page.cssText} } }`;
+        document.head.append(style);
+      }
+      if (setup)
+        window.addEventListener("plan:page", ({ detail }) => {
+          if (detail.page.id === id && detail.revision === revision)
+            setup(detail.element, window.planUI);
+        });
+    }
+    if (
+      id !== "agreed" &&
+      plan.revision === revision &&
+      page.id === id &&
+      !$("reading").hidden
+    ) {
+      const top = scroller().scrollTop;
+      const focused = document.activeElement;
+      show(id, null, { keepScroll: true, push: false });
+      if (focused?.isConnected) focused.focus({ preventScroll: true });
+      scroller().scrollTo(0, top);
+    }
+    return record;
+  })().catch((error) => {
+    recordLoads.delete(key);
+    if (plan.revision === revision && page.id === id && !$("reading").hidden) {
+      $("page-content").innerHTML =
+        `<div class="page-load-error" role="alert"><p>Could not load this page.</p><button class="btn" type="button">Retry</button></div>`;
+      $("page-content").querySelector("button").onclick = () =>
+        loadPageRecord(revision, id).catch(() => {});
+    }
+    throw error;
+  });
+  recordLoads.set(key, task);
+  return task;
+}
+function pageStatus(item) {
+  return item.status === "ready" || (!item.status && !item.pending)
+    ? "complete"
+    : item.status === "active"
+      ? "active"
+      : "queued";
+}
+// A ready page whose record has not arrived yet shows as loading, not queued.
+function pendingState(item) {
+  if (item.status === "ready") return ["active", "Loading this page"];
+  return item.working
+    ? ["active", "Preparing this page"]
+    : ["queued", "Waiting to start"];
+}
+function reconcilePages(view, manifest) {
+  for (const slot of manifest.pages) {
+    let entry = view.pages.find((item) => item.id === slot.id);
+    if (!entry) {
+      entry = { id: slot.id, title: slot.title, html: "", pending: true };
+      view.pages.push(entry);
+    }
+    if (entry.loaded === undefined) entry.loaded = !entry.pending;
+    entry.title = slot.title;
+    entry.status = slot.state;
+    entry.working = slot.state === "active";
+    if (slot.state !== "ready") entry.pending = true;
+    if (slot.state === "ready" && !entry.loaded && slot.id !== "agreed")
+      entry.pending = true;
+  }
+  view.pages = manifest.pages.map((slot) =>
+    view.pages.find((item) => item.id === slot.id),
+  );
+  view.plan.pages = view.pages.filter((item) => item.id !== "agreed");
+  if (plan.revision === view.plan.revision) pages = view.pages;
+}
+async function syncPageSet() {
+  const revision = remote?.current?.revision;
+  if (!revision || !remote.pageSetGeneration) return;
+  if (pageSetLoading) return pageSetLoading;
+  const previous = pageSets.get(revision);
+  if (previous?.generation === remote.pageSetGeneration) return;
+  pageSetLoading = (async () => {
+    const response = await fetch(
+      `${base}/api/page-set?revision=${encodeURIComponent(revision)}`,
+    );
+    if (!response.ok) throw Error("Could not load page list.");
+    const manifest = await response.json();
+    let view = views.get(revision);
+    if (!view) {
+      const nextPlan = {
+        artifactId: remote.current.artifactId,
+        revision,
+        kind: remote.current.kind,
+        title: remote.current.title,
+        pages: [],
+        agreements: [],
+      };
+      view = { plan: nextPlan, agreements: [], pages: [] };
+      views.set(revision, view);
+    }
+    const wasReady = new Set(
+      previous?.pages
+        .filter((item) => item.state === "ready")
+        .map((item) => item.id),
+    );
+    pageSets.set(revision, manifest);
+    reconcilePages(view, manifest);
+    try {
+      await loadPageRecord(revision, "agreed");
+    } catch (error) {
+      if (previous) pageSets.set(revision, previous);
+      else pageSets.delete(revision);
+      throw error;
+    }
+    if (selectedTab === "current" && plan.revision === revision) {
+      updateNavigation();
+      const selected = manifest.pages.find((item) => item.id === page.id);
+      if (selected?.state === "ready" && page.pending)
+        void loadPageRecord(revision, page.id).catch(() => {});
+      else if (selected && page.pending && !$("reading").hidden) {
+        const [mark, label] = pendingState(page);
+        $("page-content")
+          .querySelector(".pending-state")
+          ?.replaceChildren(
+            pageIndicator(mark),
+            document.createTextNode(label),
+          );
+      }
+      announceArrivals([...wasReady]);
+    } else updateNavigation();
+  })().finally(() => {
+    pageSetLoading = null;
+  });
+  return pageSetLoading;
+}
+let submittedSetLoading = null;
+// A revision published before page sets existed has none; Submitted stays
+// disabled for it rather than asking again on every poll.
+const missingSets = new Set();
+async function syncSubmittedSet() {
   if (
-    document.querySelector("dialog[open]") ||
-    ["TEXTAREA", "INPUT"].includes(document.activeElement?.tagName)
+    !submittedRevision ||
+    views.has(submittedRevision) ||
+    missingSets.has(submittedRevision)
   )
     return;
-  // A new revision opens at the top of its first page; the unsent draft is
-  // stored separately and carries over on its own.
-  try {
-    if (sameRevision) {
-      const place = {
-        revision: plan.revision,
-        page: $("reading").hidden ? "feedback" : page.id,
-        top: Math.round(scroller().scrollTop),
-      };
-      sessionStorage.setItem(
-        resumeKey,
-        JSON.stringify({
-          same: true,
-          ...place,
-          ready: pages.filter((item) => !item.pending).map((item) => item.id),
-        }),
-      );
-      try {
-        localStorage.setItem(placeKey, JSON.stringify(place));
-      } catch {}
-    } else sessionStorage.setItem(resumeKey, JSON.stringify({ first: true }));
-  } catch {
-    /* Reload without the marker. */
-  }
-  location.reload();
+  if (submittedSetLoading) return submittedSetLoading;
+  submittedSetLoading = (async () => {
+    const response = await fetch(
+      `${base}/api/page-set?revision=${encodeURIComponent(submittedRevision)}`,
+    );
+    if (response.status === 404) {
+      missingSets.add(submittedRevision);
+      return;
+    }
+    if (!response.ok) throw Error("Could not load submitted pages.");
+    const manifest = await response.json();
+    const entry = remote?.revisions?.find(
+      (item) => item.revision === submittedRevision,
+    );
+    const oldPlan = {
+      artifactId: entry?.artifactId || remote.current.artifactId,
+      revision: submittedRevision,
+      kind: entry?.kind || remote.current.kind,
+      title: entry?.title || remote.current.title,
+      pages: [],
+      agreements: [],
+    };
+    const view = { plan: oldPlan, agreements: [], pages: [] };
+    views.set(submittedRevision, view);
+    pageSets.set(submittedRevision, manifest);
+    reconcilePages(view, manifest);
+    try {
+      await loadPageRecord(submittedRevision, "agreed");
+    } catch (error) {
+      views.delete(submittedRevision);
+      pageSets.delete(submittedRevision);
+      throw error;
+    }
+    updateNavigation();
+  })().finally(() => {
+    submittedSetLoading = null;
+  });
+  return submittedSetLoading;
 }
+function switchTab(tab) {
+  if (tab === "current" && !currentAvailable()) return;
+  if (tab === "submitted" && !submittedAvailable()) return;
+  const revision =
+    tab === "current" ? remote.current.revision : submittedRevision;
+  const view = views.get(revision);
+  views.get(plan.revision).draft = state;
+  selectedTab = tab;
+  plan = view.plan;
+  document.title = plan.title;
+  agreements = view.agreements;
+  pages = view.pages;
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey));
+  } catch {
+    /* The in-memory draft and export remain available. */
+  }
+  state = view.draft || loadDraft(saved, revision);
+  rebuildKnown();
+  if (tab === "current") initializeChecklists();
+  page = pages[0];
+  renderedFeedback = null;
+  updateNavigation(true);
+  show(tab === "current" ? "agreed" : "feedback");
+}
+const currentAvailable = () =>
+  Boolean(
+    remote?.current &&
+    remote.current.revision !== submittedRevision &&
+    views.has(remote.current.revision),
+  );
+const submittedAvailable = () =>
+  Boolean(submittedRevision && views.has(submittedRevision));
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
-  const newer = connected && remote?.current && !current();
   const complete = stage === "complete" && remote?.accepted;
   $("accepted").hidden = !complete;
   if (complete)
@@ -1342,14 +1606,7 @@ function status() {
       : "";
   // A session closed from another tab reloads into read-only, so this tab
   // cannot send anything to an agent that will never be woken again.
-  if ((newer || remote?.dismissedAt) && mode === "live") scheduleReload();
-  else if (
-    session.viewHash &&
-    current() &&
-    remote.current.sha256 !== session.viewHash &&
-    mode === "live"
-  )
-    scheduleReload(true);
+  if (remote?.dismissedAt && mode === "live") location.reload();
 }
 async function poll() {
   try {
@@ -1359,6 +1616,21 @@ async function poll() {
     if (result.sessionId !== session.sessionId) throw Error("Wrong session");
     remote = result;
     connected = true;
+    if (editable && !submittedRevision)
+      submittedRevision =
+        state.submitted?.revision || remote.latestSubmissionRevision;
+    // A read-only page stays on its own revision. A failed page-set fetch is
+    // retried on the next poll and does not mean the hub is unreachable.
+    if (editable) {
+      await syncPageSet().catch(() => {});
+      await syncSubmittedSet().catch(() => {});
+    }
+    if (
+      selectedTab === "current" &&
+      submittedRevision === plan.revision &&
+      remote.latestSubmissionRevision === plan.revision
+    )
+      switchTab("submitted");
     void loadSubmission().catch(() => {});
     if (
       state.pending?.event?.id === remote.latestSubmissionId &&
@@ -1372,6 +1644,7 @@ async function poll() {
     connected = false;
   }
   renderRevisions();
+  updateNavigation();
   review();
 }
 async function pollSessions() {
@@ -1552,6 +1825,7 @@ function renderSessions() {
     list.append(line);
   }
 }
+let renderedRevisions = "";
 function renderRevisions() {
   const entries = (
     remote?.revisions?.length
@@ -1566,6 +1840,14 @@ function renderRevisions() {
   )
     entries.unshift(remote.current);
   const latest = remote?.current?.revision ?? entries[0].revision;
+  const signature = JSON.stringify([
+    latest,
+    entries.map((entry) => [entry.revision, entry.publishedAt]),
+    plan.revision,
+    mode,
+  ]);
+  if (signature === renderedRevisions) return;
+  renderedRevisions = signature;
   const list = $("revision-list");
   list.replaceChildren();
   for (const entry of entries) {
@@ -1603,15 +1885,8 @@ function renderRevisions() {
   // is read-only on its current revision, and there is nowhere to go back
   // to, so the strip says that instead and drops the link.
   const older = mode === "readonly";
-  $("older-strip").hidden = !older;
   $("revision").classList.toggle("older", older);
-  $("older-text").textContent = !older
-    ? ""
-    : session.closed
-      ? "This plan was closed. It is here to read."
-      : `You are reading revision ${plan.revision} of ${latest}`;
-  $("revision-back").hidden = Boolean(session.closed);
-  $("revision-back").href = `${base}/`;
+  renderHistory();
   $("revision").setAttribute(
     "aria-label",
     `Revisions, on revision ${plan.revision}`,
@@ -1860,10 +2135,11 @@ $("align-unflagged").onchange = (event) => {
   save();
 };
 $("submit").onclick = async () => {
-  if (submittedCurrent() || remote?.pageRound) {
+  if (selectedTab === "submitted") {
     show("feedback");
     return;
   }
+  if (remote?.pageRound) return;
   if (
     !feedbackEditable() ||
     (unsentItems(state).count === 0 &&
@@ -1871,21 +2147,33 @@ $("submit").onclick = async () => {
   )
     return;
   submissionError = "";
-  const groups = submissionGroups(state);
-  const snapshot = JSON.stringify(groups);
-  if (state.pending?.snapshot !== snapshot)
-    state.pending = {
-      snapshot,
-      event: envelope("feedback-only", feedbackText(), { groups }),
-    };
-  persist();
+  const origin = {
+    page: $("reading").hidden ? "feedback" : page.id,
+    top: scroller().scrollTop,
+  };
   submissionInFlight = true;
   show("feedback");
   try {
+    await Promise.all(
+      pages
+        .filter((item) => item.id !== "agreed" && item.pending)
+        .map((item) => loadPageRecord(plan.revision, item.id)),
+    );
+    initializeChecklists();
+    const groups = submissionGroups(state);
+    const snapshot = JSON.stringify(groups);
+    if (state.pending?.snapshot !== snapshot)
+      state.pending = {
+        snapshot,
+        event: envelope("feedback-only", feedbackText(), { groups }),
+      };
+    persist();
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
     submissionInFlight = false;
     save();
+    submittedRevision = plan.revision;
+    switchTab("submitted");
     void loadSubmission().catch(() => {});
   } catch (error) {
     submissionInFlight = false;
@@ -1894,9 +2182,14 @@ $("submit").onclick = async () => {
       : error instanceof TypeError
         ? "Could not reach the hub. Your comments are saved here. Try Submit again."
         : error.message;
-    if ($("reading").hidden) review();
-    else show(page.id, null, { keepScroll: true });
+    show(origin.page);
+    scroller().scrollTo(0, origin.top);
+    review();
   }
+};
+$("save-error-dismiss").onclick = () => {
+  submissionError = "";
+  review();
 };
 $("export").onclick = () => {
   const groups = submissionGroups(state);
@@ -1970,6 +2263,11 @@ document.addEventListener("click", (event) => {
   if (close) {
     if (close.dataset.close === "note-dialog") settleNoteImages();
     $(close.dataset.close).close();
+  }
+  const tab = event.target.closest("button[data-tab]");
+  if (tab) {
+    switchTab(tab.dataset.tab);
+    return;
   }
   const navigation = event.target.closest("[data-page]");
   if (navigation) {
@@ -2644,7 +2942,7 @@ window.planUI = {
 
 /* Start */
 document.title = plan.title;
-// Agreed so far reads before the pages, Review comments after them, each
+// Agreed so far reads before the pages, Review or Feedback after them, each
 // behind a separator, and the drawer shows the same list as the sidebar.
 function separator() {
   const divider = document.createElement("div");
@@ -2670,7 +2968,7 @@ function addPageButton(item) {
   const title = document.createElement("span");
   title.textContent = item.title;
   button.append(title);
-  if (item.pending) {
+  if (item.status !== "ready" && item.pending) {
     button.classList.add("pending");
     button.setAttribute(
       "aria-label",
@@ -2680,36 +2978,97 @@ function addPageButton(item) {
   } else {
     button.append(pageIndicator("complete"));
   }
-  $("navigation").append(button);
+  $("page-list").append(button);
 }
-addPageButton(pages.find((item) => item.id === "agreed"));
-$("navigation").append(separator());
-for (const item of pages.filter((item) => item.id !== "agreed"))
-  addPageButton(item);
-const readyPages = pages.filter((item) => !item.pending).length;
-const pageCount = $("page-count");
-pageCount.hidden = !readyPages;
-pageCount.textContent = readyPages;
-$("menu-button").classList.toggle("need", readyPages > 0);
-$("menu-button").setAttribute(
-  "aria-label",
-  `Pages, ${plural(readyPages, "page")} ready to read`,
-);
-if (editable) {
-  const review = document.createElement("button");
-  review.type = "button";
-  review.id = "review-row";
-  review.dataset.page = "feedback";
-  const label = document.createElement("span");
-  label.textContent = "Review comments";
-  const count = document.createElement("b");
-  count.className = "count";
-  count.hidden = true;
-  const sentMark = pageIndicator("complete");
-  sentMark.hidden = true;
-  review.append(label, count, sentMark);
-  $("navigation").append(separator(), review);
+const tabs = document.createElement("div");
+tabs.className = "page-tabs";
+tabs.setAttribute("role", "tablist");
+tabs.setAttribute("aria-label", "Page versions");
+for (const tab of ["current", "submitted"]) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.id = `${tab}-tab`;
+  button.dataset.tab = tab;
+  button.setAttribute("role", "tab");
+  button.textContent = tab === "current" ? "Current" : "Submitted";
+  tabs.append(button);
 }
+// A read-only page shows one revision, so there is nothing to switch to.
+tabs.hidden = !editable;
+const pageList = document.createElement("div");
+pageList.id = "page-list";
+$("navigation").append(tabs, pageList);
+function updateNavigation(force = false) {
+  const currentSet = pageSets.get(remote?.current?.revision);
+  const readyPages = currentAvailable()
+    ? currentSet?.pages.filter((item) => item.state === "ready").length || 0
+    : selectedTab === "current"
+      ? pages.filter((item) => !item.pending).length
+      : 0;
+  $("page-count").hidden = !readyPages;
+  $("page-count").textContent = readyPages;
+  $("menu-button").classList.toggle("need", readyPages > 0);
+  $("menu-button").setAttribute(
+    "aria-label",
+    `Pages, ${plural(readyPages, "current page")} ready to read`,
+  );
+  $("current-tab").disabled = Boolean(submittedRevision) && !currentAvailable();
+  $("submitted-tab").disabled = !submittedAvailable();
+  for (const tab of ["current", "submitted"])
+    $(`${tab}-tab`).setAttribute("aria-selected", String(selectedTab === tab));
+  let count = $("current-tab").querySelector(".tab-count");
+  if (!count) {
+    count = document.createElement("b");
+    count.className = "tab-count";
+    $("current-tab").append(count);
+  }
+  count.textContent = readyPages;
+  count.hidden = !readyPages || selectedTab === "current";
+  if (
+    force ||
+    pageList.dataset.revision !== plan.revision ||
+    pageList.dataset.tab !== selectedTab
+  ) {
+    pageList.replaceChildren();
+    addPageButton(pages[0]);
+    pageList.append(separator());
+    for (const item of pages.slice(1)) addPageButton(item);
+    if (editable) {
+      const review = document.createElement("button");
+      review.type = "button";
+      review.id = "review-row";
+      review.dataset.page = "feedback";
+      const label = document.createElement("span");
+      label.textContent = selectedTab === "current" ? "Review" : "Feedback";
+      const total = document.createElement("b");
+      total.className = "count";
+      total.hidden = true;
+      review.append(label, total);
+      pageList.append(separator(), review);
+    }
+    pageList.dataset.revision = plan.revision;
+    pageList.dataset.tab = selectedTab;
+  }
+  for (const item of pages) {
+    const button = [...pageList.querySelectorAll("[data-page]")].find(
+      (node) => node.dataset.page === item.id,
+    );
+    if (!button) continue;
+    button.classList.toggle("pending", pageStatus(item) !== "complete");
+    const old = button.querySelector(".page-activity");
+    const next = pageIndicator(pageStatus(item));
+    if (old?.className !== next.className) old?.replaceWith(next);
+    button.setAttribute(
+      "aria-label",
+      `${item.title}, ${pageStatus(item) === "complete" ? "ready" : item.working ? "working" : "queued"}`,
+    );
+  }
+  for (const button of pageList.querySelectorAll("[data-page]"))
+    if (button.dataset.page === ($("reading").hidden ? "feedback" : page.id))
+      button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+}
+updateNavigation(true);
 $("menu-button").addEventListener("click", () =>
   $("pages-dialog").open ? closeDrawer() : openDrawer(),
 );
@@ -2751,13 +3110,6 @@ renderRevisions();
    of its own, so both run while the document is still loading and both are
    done by DOMContentLoaded. */
 function start() {
-  let resume = null;
-  try {
-    resume = JSON.parse(sessionStorage.getItem(resumeKey));
-    sessionStorage.removeItem(resumeKey);
-  } catch {
-    /* Start at the top. */
-  }
   let place = null;
   try {
     place = usablePlace(
@@ -2769,28 +3121,14 @@ function start() {
     /* Start at the top. */
   }
   const opened = location.hash.slice(1) || query.get("target");
-  show(
-    resume?.first
-      ? pages[0].id
-      : resume?.same
-        ? resume.page
-        : location.hash.slice(1) || place?.page || "",
-    query.get("target"),
-    {
-      keepScroll: false,
-      push: false,
-    },
-  );
-  // The browser restores the old scroll position after the reload; a new
-  // revision starts at the top.
-  if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
-  else if (resume?.same || (place?.top && !opened))
-    // The page is short until the renderers finish, and the browser clamps a
-    // scroll past the end, so the offset is restored after they settle.
+  show(location.hash.slice(1) || place?.page || "", query.get("target"), {
+    keepScroll: false,
+    push: false,
+  });
+  if (place?.top && !opened)
     Promise.allSettled([...renders]).then(() =>
-      scroller().scrollTo(0, resume?.same ? resume.top : place.top),
+      scroller().scrollTo(0, place.top),
     );
-  if (resume?.same) announceArrivals(resume.ready);
   window.addEventListener("popstate", () => {
     const url = new URL(location.href);
     show(url.hash.slice(1) || pages[0].id, url.searchParams.get("target"), {

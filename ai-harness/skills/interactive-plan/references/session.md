@@ -39,23 +39,26 @@ accepts any local client when `COPILOT_CONNECTION_TOKEN` is unset.
 
 ## Publishing
 
-Build Agreed, then publish it. Use the same command for every later page:
+Build Agreed, then publish it with the complete page list:
 
 ```sh
-node scripts/session.mjs publish --session-dir PATH --file PAGE.html --source DIR
+node scripts/session.mjs publish --session-dir PATH --file agreed.html --pages pages.json --source DIR
 ```
 
-After Agreed, declare this revision's ordered pages with
-`progress --pages pages.json`. The JSON file has a `pages` array of
+The JSON file has an ordered `pages` array of
 `{ "id": "...", "title": "..." }` objects. Report work with
-`progress --start ID`. Each successful publication makes that page readable
+`progress --start ID`. Publish a finished page with
+`publish --session-dir PATH --file PAGE.html --source DIR`, without `--pages`.
+Each successful publication makes that page readable
 and marks its slot ready. The last page completes the revision and opens
 Submit. Feedback and agent wake are unavailable before then.
 
 The publisher keeps each immutable page record under `pages/<revision>/`
-and its source under `src/<revision>/<page-id>/`. It writes and checks a new
-view before changing the live pointer. A failed publication leaves the
-visible page set unchanged. Completed revisions remain at their historical
+and its source under `src/<revision>/<page-id>/`. Agreed publication checks
+the initial reader and exposes Agreed with every page name in one transition.
+Later publications update the page-set generation and record, without rebuilding
+the live reader. The last page builds the complete historical HTML. A failed
+publication leaves the visible page set unchanged. Completed revisions remain at their historical
 URLs with their original page sets. A later revision chooses its own pages;
 it does not inherit them automatically.
 
@@ -68,9 +71,9 @@ On the first Agreed publication, open the URL in the operating system's default
 browser (macOS `open`, Windows PowerShell `Start-Process`, Linux `xdg-open`,
 with the URL quoted) and give the link in chat, with `hostUrl` beside it
 when `start` printed one. If the launch fails, say so and keep the link
-available. Do not open another tab on later revisions. The browser refreshes
-when a page arrives and preserves the user's current page, scroll position,
-and unsent draft within the revision.
+available. Do not open another tab on later revisions. The browser fetches
+new page records in place. A page arriving elsewhere does not change the
+selected page, scroll position, focus, or unsent draft.
 
 Every question goes on a page. There is no question event, reply field or
 reply notification, and none should be built.
@@ -167,6 +170,16 @@ prompts for a message in the chat. If an agent is already working, the event
 has no effect. Responses derive `needsYou` as true when a complete revision
 waits for the reviewer. The browser bell counts `needsYou`. `publish` refuses
 while a submission is unread.
+
+The reader polls `GET /s/:session/api/status` for the current revision and
+`pageSetGeneration`. It fetches `GET /s/:session/api/page-set?revision=R` when
+either changes. The page set contains ordered IDs, titles, states, and a
+version hash for each ready page. It fetches a ready page with
+`GET /s/:session/api/page?revision=R&id=ID&version=HASH`. The server returns
+only the published immutable record matching that page-set entry. The same
+routes read completed revisions; an unknown revision, page, or version fails.
+The status response omits the stored page-set paths. The reader does not reload
+for page progress or a new revision.
 
 When `start` finds a hub on older or newer code, it uses it and logs the
 mismatch. The hub restarts on the newer code once no session is live.

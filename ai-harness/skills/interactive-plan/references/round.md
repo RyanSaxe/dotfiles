@@ -20,17 +20,17 @@ Read [agreements.md](agreements.md) before changing it.
 For a drawing answer, inspect its `previewPath` PNG. Its `scenePath` holds
 the editable Excalidraw shapes when you need to examine the source.
 
-1. Write this revision's Agreed source first. Build it with
-   `node scripts/build.mjs agreed.json agreed.html`, then run
-   `node scripts/session.mjs publish --session-dir PATH --file agreed.html --source DIR`.
-   The publisher resolves its source references before the reader can see it.
-2. Choose the new or materially changed pages this revision needs. Make
+1. Choose the new or materially changed pages this revision needs. Make
    `pages.json` contain an ordered `pages` array of
-   `{ "id": "topic", "title": "Topic" }` entries. Run
-   `progress --pages pages.json` after Agreed. A final plan lists `overview`
-   first. Do not copy a previous page just to fill the new revision. A topic
+   `{ "id": "topic", "title": "Topic" }` entries. A final plan lists
+   `overview` first. Do not copy a previous page just to fill the new revision. A topic
    moved to Agreed may disappear, and a new topic may get a new page ID. An
    unanswered decision stays open when its unchanged page is omitted.
+2. Write this revision's Agreed source. Build it with
+   `node scripts/build.mjs agreed.json agreed.html`, then run
+   `node scripts/session.mjs publish --session-dir PATH --file agreed.html --pages pages.json --source DIR`.
+   The publisher resolves its source references and checks the complete page list
+   before the reader can see either one.
 3. Report work with `progress --start ID`. Several declared pages can be
    active together. Put each point needing review on a page beside the
    proposal it affects, and ask every question in the browser, not in chat.

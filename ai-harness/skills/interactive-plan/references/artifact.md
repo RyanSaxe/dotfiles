@@ -29,8 +29,9 @@ Agreed and every other page use the same source shape. Publish Agreed first:
 }
 ```
 
-After Agreed, `progress --pages pages.json` fixes this revision's ordered
-page IDs and titles. A normal page uses the same outer fields:
+Publish Agreed with `--pages pages.json`. The file fixes this revision's
+ordered page IDs and titles at the same moment Agreed becomes visible. A
+normal page uses the same outer fields:
 
 ```json
 {
@@ -58,7 +59,8 @@ page cannot change an earlier page's record. The publisher checks assembly
 with all pages already ready and checks the complete revision on its last
 page.
 
-Page CSS is scoped to `#page-content[data-page-id="ID"]` and remains below
+Page CSS is scoped to
+`#page-content[data-page-id="ID"][data-revision="REVISION"]` and remains below
 the component cascade layer. Page JavaScript must export
 `setup(root, planUI)`. The frame calls it when that page renders. A browser
 runtime error may still escape the build check, so inspect novel interactive
