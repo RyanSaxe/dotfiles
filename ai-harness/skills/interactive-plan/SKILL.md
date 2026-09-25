@@ -51,8 +51,7 @@ not described.
   [frame.md](references/frame.md) and
   [prototypes.md](references/prototypes.md): the contracts. Look one up
   while building.
-- [setup.md](references/setup.md): on first use in an environment, or when
-  starting, waking or a command fails.
+- [setup.md](references/setup.md): when starting, waking or a command fails.
 
 ## Opening
 

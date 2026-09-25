@@ -1,15 +1,18 @@
 # Check the environment
 
-The helpers require Node 20 or newer and no installed npm packages. Check
-`node --version` once per environment. If Node is unavailable or too old,
-explain the requirement and ask how the user wants to provide it.
+The helpers require Node 20 or newer and no installed npm packages. `start`
+checks what a session needs and refuses with the reason: Node too old, the
+hub port taken by another program, storage it cannot write, or a sandbox
+that blocks the hub. If Node is unavailable or too old, explain the
+requirement and ask how the user wants to provide it.
 
-Before the first session, run `node scripts/check.mjs` from the skill
-directory. It checks that session storage is writable, that a local HTTP
-endpoint works and which process owns the hub port. It reports `free`, `hub`
-(with the running hub's code version and live session count) or `busy`
-(another program owns the port). An optional path argument checks a different
-storage location. If you pass one, use that location for the session too.
+When `start` or another command fails, run `node scripts/check.mjs` from the
+skill directory. It checks each part on its own: that session storage is
+writable, that a local HTTP endpoint works and which process owns the hub
+port. It reports the port as `free`, `hub` (with the running hub's code
+version and live session count) or `busy` (another program owns it). An
+optional path argument checks a different storage location. If you pass one,
+use that location for the session too.
 
 It also reports `components`: the path the builder reads for the user's own
 components, `$XDG_CONFIG_HOME/interactive-plan/components` with `~/.config`
