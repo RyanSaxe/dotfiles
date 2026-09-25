@@ -27,6 +27,7 @@ import {
 } from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
 import {
   artifactData,
+  detectWake,
   settings,
   startHub,
   version,
@@ -55,17 +56,18 @@ const alive = (pid) => {
     return error.code !== "ESRCH";
   }
 };
-// The helper's start detects the harness from the environment. A dummy inbox
-// socket makes every wake fail harmlessly instead of reaching a real session.
+// The helper detects the nearest agent process before environment variables.
+// Give both supported agent paths dummy targets so a test wake cannot reach
+// a real session, including when this suite runs under Codex.
 function cliEnv(home, extra = {}) {
   const env = {
     ...process.env,
     XDG_STATE_HOME: home,
     CLAUDE_CODE_MESSAGING_SOCKET: path.join(home, "none.sock"),
     CLAUDE_CODE_MESSAGING_TOKEN: "test",
+    CODEX_THREAD_ID: "interactive-plan-test-thread",
     ...extra,
   };
-  delete env.CODEX_THREAD_ID;
   delete env.COPILOT_AGENT_SESSION_ID;
   return env;
 }
@@ -1483,7 +1485,9 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
   assert.equal(first.url, `http://127.0.0.1:${port}/s/${first.sessionId}/`);
   assert(first.sessionDir.startsWith(config.sessions));
-  assert.deepEqual(first.wake, { harness: "claude-code" });
+  // The printed wake names the harness and carries none of the token or
+  // thread it wakes with.
+  assert.deepEqual(first.wake, { harness: detectWake(env).harness });
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.equal(record.port, port);
   assert.equal(record.version, version);
