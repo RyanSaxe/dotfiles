@@ -18,7 +18,7 @@ carry out an action when the system, agent or user does it.
 | ------------------------------------------- | ------------------------------------------------------------------ |
 | "The answer travels with feedback."         | "Feedback includes the answer under `groups.answers`."             |
 | "A checklist arrives with nothing checked." | "Start each checklist with no checked boxes."                      |
-| "The revision closes open points."          | "Resolve every open point before publishing the revision."         |
+| "The revision closes open points."          | "Move the settled choice to Agreed before removing its page."      |
 | "The hub wakes you with a submission."      | "The hub sends a wake event when a submission arrives."            |
 | "The mock reads as it is."                  | "The component mock renders at its natural width without scaling." |
 
