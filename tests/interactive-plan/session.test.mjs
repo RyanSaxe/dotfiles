@@ -531,6 +531,7 @@ async function hub(t, extra = {}) {
         html: await pageHtml({
           id: "agreed",
           title: "Agreed so far",
+          task: { title: "The task", html: "<p>What the plan builds.</p>" },
           agreements: revision.agreements || [],
           prototypes: ownedBy("agreed"),
         }),
@@ -1052,6 +1053,7 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
       page: {
         id: "agreed",
         title: "Agreed so far",
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
         agreements: [{ ...metadata, file: "decision.html" }],
       },
     }),
@@ -1796,7 +1798,12 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
     agreedFile,
     await buildPage(source, {
       ...shared,
-      page: { id: "agreed", title: "Agreed so far", agreements: [] },
+      page: {
+        id: "agreed",
+        title: "Agreed so far",
+        agreements: [],
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
+      },
     }),
   );
   const pagesFile = path.join(home, "pages.json");

@@ -374,6 +374,7 @@ export async function buildPage(source, input) {
     pageMode: "partial",
     pages: agreed ? [] : [{ id: page.id, title: page.title, html: page.html }],
     agreements: agreed ? page.agreements : [],
+    task: agreed ? page.task : undefined,
     prototypes: page.prototypes || [],
   };
   const css = page.cssText

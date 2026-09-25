@@ -17,6 +17,7 @@ const hasFeedbackPage = editable || mode === "readonly";
 document.documentElement.dataset.mode = mode;
 const query = new URL(location.href).searchParams;
 let agreements = plan.agreements || [];
+let agreedTask = plan.task || null;
 let pages = [{ id: "agreed", title: "Agreed so far", html: "" }, ...plan.pages];
 let selectedTab = "current";
 // The last revision this reader submitted, which keeps Current disabled until
@@ -25,7 +26,9 @@ let submittedRevision = null;
 let pastRevision = null;
 // What was sent on each past revision the left tab has shown.
 const sentByRevision = new Map();
-const views = new Map([[plan.revision, { plan, agreements, pages }]]);
+const views = new Map([
+  [plan.revision, { plan, agreements, task: agreedTask, pages }],
+]);
 const pageSets = new Map();
 const recordLoads = new Map();
 let pageSetLoading = null;
@@ -149,6 +152,7 @@ function stale(kind, key, item) {
     if (item.topic === "agreed")
       return Boolean(
         item.agreementId &&
+        !(item.agreementId === "task" && agreedTask) &&
         !agreements.some((entry) => entry.id === item.agreementId),
       );
     if (!known.text.has(item.topic))
@@ -808,13 +812,66 @@ function agreementCard(entry) {
   card.append(strip, details, preview);
   return card;
 }
+// The task a reviewer reads before the decisions: a statement, never a
+// checklist, with nothing on it to approve.
+function taskCard() {
+  const card = document.createElement("section");
+  card.className = "agreement-card task-card";
+  card.id = "agreement-task";
+  const body = document.createElement("div");
+  body.className = "agreement-body";
+  const title = document.createElement("h2");
+  title.textContent = agreedTask.title;
+  const noteCount = state.notes.filter(
+    (note) => note.agreementId === "task",
+  ).length;
+  if (noteCount) title.append(tag(plural(noteCount, "note"), "muted"));
+  const content = document.createElement("div");
+  content.innerHTML = agreedTask.html;
+  body.append(title, content);
+  const strip = document.createElement("div");
+  strip.className = "agreement-source";
+  const text = document.createElement("span");
+  text.textContent =
+    agreedTask.change === "new"
+      ? "New in this revision"
+      : agreedTask.change === "updated"
+        ? "Updated in this revision"
+        : "";
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  if (editable)
+    actions.append(
+      linkButton("Comment", () =>
+        openNote("agreed", "The task", "", null, "task", card.id),
+      ),
+    );
+  strip.append(text, actions);
+  strip.hidden = !text.textContent && !actions.children.length;
+  card.append(body, strip);
+  return card;
+}
+function agreedLabel(text) {
+  const label = document.createElement("p");
+  label.className = "agreed-label";
+  label.textContent = text;
+  return label;
+}
 function renderAgreements() {
   const root = $("page-content");
   root.replaceChildren();
+  if (agreedTask) root.append(agreedLabel("The task"), taskCard());
   if (!agreements.length) {
-    root.innerHTML = '<p class="muted">No agreements recorded yet.</p>';
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = agreedTask
+      ? "No decisions recorded yet."
+      : "No agreements recorded yet.";
+    root.append(empty);
+    enhance(root);
     return;
   }
+  if (agreedTask) root.append(agreedLabel("Decisions"));
   const active = agreements.filter((entry) => entry.state !== "retired");
   const retired = agreements.filter((entry) => entry.state === "retired");
   for (const entry of active) root.append(agreementCard(entry));
@@ -1556,7 +1613,11 @@ async function loadPageRecord(revision, id) {
     const entry = view.pages.find((item) => item.id === id);
     if (id === "agreed") {
       view.agreements = record.page.agreements;
-      if (plan.revision === revision) agreements = view.agreements;
+      view.task = record.page.task || null;
+      if (plan.revision === revision) {
+        agreements = view.agreements;
+        agreedTask = view.task;
+      }
     } else {
       let setup = null;
       if (record.page.jsText) {
@@ -1797,6 +1858,7 @@ function switchTab(tab, targetId = null) {
   plan = view.plan;
   document.title = plan.title;
   agreements = view.agreements;
+  agreedTask = view.task || null;
   pages = view.pages;
   let saved = null;
   try {

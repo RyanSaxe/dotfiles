@@ -35,7 +35,12 @@ const page = async (revision, id, title, html, extra = {}) =>
     page: {
       id,
       title,
-      ...(id === "agreed" ? { agreements: [] } : { html }),
+      ...(id === "agreed"
+        ? {
+            agreements: [],
+            task: { title: "The task", html: "<p>What the plan builds.</p>" },
+          }
+        : { html }),
       ...extra,
     },
   });
@@ -398,6 +403,7 @@ test("the CLI builds and publishes each page with its own saved source", async (
     page: {
       id: "agreed",
       title: "Agreed so far",
+      task: { title: "The task", html: "<p>What the plan builds.</p>" },
       agreements: [
         {
           id: "unsupported",
@@ -425,7 +431,12 @@ test("the CLI builds and publishes each page with its own saved source", async (
     revision: "1",
     kind: "plan",
     title: "CLI plan",
-    page: { id: "agreed", title: "Agreed so far", agreements: [] },
+    page: {
+      id: "agreed",
+      title: "Agreed so far",
+      agreements: [],
+      task: { title: "The task", html: "<p>What the plan builds.</p>" },
+    },
   });
   const outside = await post(
     `/agent/${registered.body.sessionId}/action`,
@@ -459,7 +470,12 @@ test("the CLI builds and publishes each page with its own saved source", async (
       revision: "1",
       kind: "plan",
       title: "CLI plan",
-      page: { id: "agreed", title: "Agreed so far", agreements: [] },
+      page: {
+        id: "agreed",
+        title: "Agreed so far",
+        agreements: [],
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
+      },
     }),
   );
   const agreedHtml = path.join(root, "agreed.html");
@@ -578,6 +594,7 @@ test("an unfinished revision resumes after the hub restarts", async () => {
           html: await build({
             id: "agreed",
             title: "Agreed",
+            task: { title: "The task", html: "<p>What the plan builds.</p>" },
             agreements: [],
           }),
           pages: [

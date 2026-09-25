@@ -1044,6 +1044,29 @@ blockquote {
   margin-bottom: 12px;
   background: var(--panel);
 }
+/* The task opens Agreed, above the decisions. */
+.agreed-label {
+  margin: 4px 0 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.task-card {
+  margin-bottom: 18px;
+  border-color: var(--line-strong);
+}
+.task-card .agreement-body {
+  padding: 14px 16px 12px;
+}
+.task-card .agreement-body h2 {
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+.task-card .agreement-body p {
+  font-size: 13.5px;
+}
 .agreement-body {
   padding: 12px 14px 10px;
 }
