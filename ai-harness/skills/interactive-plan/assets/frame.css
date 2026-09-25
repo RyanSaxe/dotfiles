@@ -609,7 +609,6 @@ select {
   font-size: 13px;
 }
 .agent-activity {
-  max-width: 520px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -666,7 +665,6 @@ select {
   border-top: 1px solid var(--line);
 }
 .sent-feedback {
-  max-width: 520px;
   margin-top: 22px;
 }
 .sent-feedback h2 {
