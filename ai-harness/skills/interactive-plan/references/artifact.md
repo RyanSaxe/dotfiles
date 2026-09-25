@@ -1,15 +1,17 @@
 # Page source and build
 
-Write one JSON source file for each page in a directory of your own under
-the system temp directory. Build it before publishing:
+Give each page a source directory of its own under the system temp
+directory, holding its JSON source and the files it names. Build it to a
+path outside that directory before publishing:
 
 ```sh
-node scripts/build.mjs PAGE.json PAGE.html
+node scripts/build.mjs SRC/policy/policy.json OUT/policy.html
 ```
 
-The output path must not exist. `publish --source DIR` keeps the page's
-source under `src/<revision>/<page-id>/` in the session, so keep generated
-previews and scratch files out of `DIR`. Embed every local resource a page
+The build refuses to overwrite, so build a change to a new path or delete
+the old output first. `publish --source SRC/policy` keeps that directory
+under `src/<revision>/<page-id>/` in the session, so keep built pages,
+previews and scratch files out of it. Embed every local resource a page
 uses. Do not install packages to author a plan.
 
 A revision changes its pages, their CSS, JavaScript and prototypes, and

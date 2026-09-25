@@ -13,6 +13,7 @@ import { choiceText } from "../assets/choices.mjs";
 
 const here = fileURLToPath(import.meta.url);
 const round = path.resolve(path.dirname(here), "../references/round.md");
+const sessionDoc = path.resolve(path.dirname(here), "../references/session.md");
 export const version = crypto
   .createHash("sha256")
   .update(readFileSync(here))
@@ -500,10 +501,45 @@ async function loadSession(directory, config, origin) {
       },
     };
   }
+  const command = (name) => `node ${here} ${name} --session-dir ${directory}`;
+  // Each agent command is a report, and the reviewer sees when the last one
+  // came. Only ack carries a note, so any other report clears the last one.
+  const report = (note = null) => ({ report: { at: timestamp(), note } });
+  const receive = (event) =>
+    event && state.lastReceivedId !== event.id
+      ? { lastReceivedId: event.id, receivedAt: timestamp() }
+      : {};
+  // Every agent command prints the step after it, so an agent that lost its
+  // place, or skipped round.md, is told where the session stands.
+  async function nextStep() {
+    const [event] = await pending();
+    if (event)
+      return event.payload.intent === "accept-plan"
+        ? `Read the Acceptance section of ${sessionDoc}, then run: ${command("read")}`
+        : `Read ${round} in full, then run: ${command("read")}`;
+    if (state.stage === "complete") return "The session is complete.";
+    if (state.accepted)
+      return `Run: ${command("complete")}, then follow the acceptance mode in ${sessionDoc}.`;
+    if (state.paused)
+      return `The session is paused. Tell the user, and resume it with: ${command("start")}`;
+    if (!state.current)
+      return `When the first revision is ready, publish Agreed with --pages before any other page, as ${round} describes.`;
+    if (state.pageRound) {
+      const left = state.pageRound.pages
+        .filter((slot) => !slot.recordPath)
+        .map((slot) =>
+          slot.state === "active" ? `${slot.id} (started)` : slot.id,
+        );
+      return `Pages still to publish: ${left.join(", ")}. Run progress --start ID as you begin a page, publish it as soon as it builds, and report with ack --note at least every 5 minutes.`;
+    }
+    if (state.stage === "working")
+      return `Update the task and Agreed from the feedback, then publish Agreed with --pages before any other page, as ${round} describes. Report with ack --note at least every 5 minutes.`;
+    return "The revision is with the reviewer. Say in chat what changed if you have not, then end the turn. The hub wakes you when they submit.";
+  }
   // Runs after the submission is saved, outside the browser's request, so a
   // slow or failing harness never delays the reviewer's Sent state.
   async function wakeAgent(revision) {
-    const line = `interactive-plan: feedback arrived on session ${directory} (revision ${revision}). Run: node ${here} read --session-dir ${directory}, then follow ${round}`;
+    const line = `interactive-plan: feedback arrived on session ${directory} (revision ${revision}). Run first: ${command("ack")}. It prints the next step.`;
     let last;
     try {
       await (config.wake || wakeRunner)(wake, line);
@@ -883,6 +919,7 @@ async function loadSession(directory, config, origin) {
         ]
       : state.revisions || [];
     await transition({
+      ...report(),
       pageRound: complete ? null : round,
       pageSets: { ...(state.pageSets || {}), [round.revision]: round },
       pageSetGeneration: round.generation,
@@ -893,7 +930,12 @@ async function loadSession(directory, config, origin) {
       revisions,
       accepted: null,
     });
-    return { status: view(), url: origin + current.url, complete };
+    return {
+      status: view(),
+      url: origin + current.url,
+      revisionComplete: complete,
+      next: await nextStep(),
+    };
   }
   async function publishPage(html, source, pages) {
     requireValue(
@@ -1073,11 +1115,18 @@ async function loadSession(directory, config, origin) {
         const event = await read(
           path.join(directory, "feedback", data.id + ".json"),
         );
-        return { status: view(), event: withDrawingPaths(event) };
+        return {
+          status: view(),
+          event: withDrawingPaths(event),
+          next: await nextStep(),
+        };
       }
       const [event] = await pending();
-      if (!event) return { status: view(), event: null };
+      if (!event)
+        return { status: view(), event: null, next: await nextStep() };
       const patch = {
+        ...report(),
+        ...receive(event),
         stage: "working",
         acknowledged: [...state.acknowledged, event.id],
         acknowledgedAt: timestamp(),
@@ -1101,7 +1150,28 @@ async function loadSession(directory, config, origin) {
         await atomic(path.join(directory, "acceptance.json"), patch.accepted);
       }
       await transition(patch);
-      return { status: view(), event: withDrawingPaths(event) };
+      return {
+        status: view(),
+        event: withDrawingPaths(event),
+        next: await nextStep(),
+      };
+    }
+    if (data.action === "ack") {
+      requireValue(
+        data.note === undefined ||
+          (typeof data.note === "string" && data.note.trim().length <= 80),
+        "An ack note is text of at most 80 characters",
+      );
+      const [event] = await pending();
+      await transition({
+        ...report(data.note?.trim() || null),
+        ...receive(event),
+      });
+      return {
+        status: view(),
+        received: event ? { id: event.id, intent: event.payload.intent } : null,
+        next: await nextStep(),
+      };
     }
     if (data.action === "progress") {
       return pageProgress(data);
@@ -2144,8 +2214,16 @@ export async function main(argv) {
   let directory =
     options["session-dir"] && path.resolve(options["session-dir"]);
   if (command === "start") {
+    const resuming = Boolean(directory);
     directory ||= path.join(config.sessions, crypto.randomUUID());
-    return console.log(json(await attach(directory, config)));
+    return console.log(
+      json({
+        ...(await attach(directory, config)),
+        next: resuming
+          ? `Run: node ${here} ack --session-dir ${directory}`
+          : `When the first revision is ready, publish it as ${round} describes, from "Publish the revision".`,
+      }),
+    );
   }
   requireValue(directory, "Every operation requires --session-dir PATH");
   const connectionFile = path.join(directory, "connection.json");
@@ -2205,6 +2283,7 @@ export async function main(argv) {
     return console.log(json(await request((id) => `/s/${id}/api/status`)));
   const action = { action: command };
   if (command === "read") action.id = options.id;
+  if (command === "ack") action.note = options.note;
   if (command === "pause") action.reason = options.reason;
   if (command === "progress") {
     requireValue(

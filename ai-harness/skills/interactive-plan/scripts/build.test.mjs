@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { assemble, buildPage } from "./build.mjs";
@@ -179,6 +180,18 @@ test("the build refuses each structural problem and names it", async () => {
     /^page "p": a code block marked diff belongs in before-after\. Run node components\/before-after\/diff\.mjs BEFORE AFTER OUT\.json$/m,
   );
   await refused(
+    page(`<pre data-language="golang">x</pre>`),
+    /^page "p": data-language "golang" is not a language Shiki highlights\. Did you mean "go"\?$/m,
+  );
+  await refused(
+    page(`<pre data-language="Dockerfile">x</pre>`),
+    /Did you mean "dockerfile"\?$/m,
+  );
+  await refused(
+    page(`<pre data-language="zzz">x</pre>`),
+    /^page "p": data-language "zzz" is not a language Shiki highlights\. Use a Shiki language ID, such as ts, python, shell or text\.$/m,
+  );
+  await refused(
     page(
       `<fieldset data-multiselect="s" data-label="S"><label><input type="checkbox" data-value="a" checked> A</label></fieldset>`,
     ),
@@ -248,4 +261,15 @@ test("an Agreed page opens with a task, and the plan data carries it", async () 
       .replaceAll("\\u003c", "<"),
   );
   assert.deepEqual(data.task, task);
+});
+
+test("the build's language list is the one for the Shiki the frame loads", async () => {
+  const frame = await fs.readFile(
+    new URL("../assets/frame.js", import.meta.url),
+    "utf8",
+  );
+  const list = JSON.parse(
+    await fs.readFile(new URL("shiki-languages.json", import.meta.url), "utf8"),
+  );
+  assert.equal(frame.match(/esm\.sh\/shiki@([\d.]+)/)[1], list.shiki);
 });

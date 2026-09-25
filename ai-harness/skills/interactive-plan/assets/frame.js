@@ -1431,8 +1431,10 @@ function renderActivity() {
   const old = report.querySelector(".page-activity");
   if (old?.className !== mark.className)
     old ? old.replaceWith(mark) : report.prepend(mark);
+  // The agent's own note stands apart from the time it was sent, and the
+  // time stays on one line when the note wraps.
   $("activity-report-text").textContent = footer.at
-    ? `${footer.text} ${recently(footer.at)}`
+    ? `${footer.text}${footer.note ? " ·" : ""} ${recently(footer.at).replaceAll(" ", " ")}`
     : footer.text;
   report.classList.toggle("late", Boolean(footer.late));
   if (!submissionInFlight) renderSentFeedback();

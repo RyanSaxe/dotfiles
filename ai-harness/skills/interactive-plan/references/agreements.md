@@ -29,10 +29,10 @@ when it is wrong. Never ask the reviewer to approve it.
 | sourceRefs  | References to choices, notes, answers or conversation context that support the agreement.    |
 | source      | Plain source text when no feedback item can be referenced.                                   |
 
-Each agreement needs `sourceRefs` or `source`. If an aligned submission has
-no choice, note or answer for a settled decision, name its revision and
-submission ID in `source`, state that `groups.alignUnflagged` was true, and
-explain why the comments did not challenge that decision.
+Each agreement needs `sourceRefs` or `source`. When `groups.alignUnflagged`
+settled a proposal the page stated, name the revision and submission ID in
+`source`, state that `groups.alignUnflagged` was true, and explain why the
+comments did not challenge it.
 
 Each reference has a `kind`:
 

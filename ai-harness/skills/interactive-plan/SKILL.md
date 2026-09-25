@@ -37,7 +37,7 @@ not described.
 ## Files
 
 - [round.md](references/round.md): the sequence for each revision. The hub's
-  wake message names it.
+  wake message names `ack`, which points to it.
 - [quality.md](references/quality.md): what makes a page and a plan good.
   Read it before the first revision.
 - [writing.md](references/writing.md): the rules every sentence follows.
@@ -51,8 +51,7 @@ not described.
   [frame.md](references/frame.md) and
   [prototypes.md](references/prototypes.md): the contracts. Look one up
   while building.
-- [setup.md](references/setup.md): on first use in an environment, or when
-  starting, waking or a command fails.
+- [setup.md](references/setup.md): when starting, waking or a command fails.
 
 ## Opening
 
@@ -60,8 +59,9 @@ The session begins in the conversation. Before the first revision, establish
 what the user wants, what they do and do not want, what the project shows and
 what remains uncertain. Ask one question at a time and use each answer before
 asking the next question. Move to the browser once there is material to
-compare or approve. Open the first revision in the user's default browser and
-give the link in chat. Ask every later question on a page.
+compare or approve. When the first Agreed publishes, open the session in the
+user's default browser and give the link in chat. Ask every later question on
+a page.
 
 After the last page of a revision publishes, or after `pause`, the turn ends.
 The hub starts another turn when a submission arrives, including an

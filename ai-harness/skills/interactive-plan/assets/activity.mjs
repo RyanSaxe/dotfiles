@@ -5,11 +5,16 @@ export function activityModel({
   inFlight = false,
   now = Date.now(),
 }) {
-  // acknowledgedAt survives from earlier rounds, so only the ids say whether
-  // the agent has read this submission.
-  const acknowledged =
-    Boolean(remote?.latestSubmissionId) &&
-    remote.lastAcknowledgedId === remote.latestSubmissionId;
+  // Timestamps survive from earlier rounds, so only the ids say whether the
+  // agent has this submission: ack receives it, and read receives and reads it.
+  const latest = remote?.latestSubmissionId;
+  const read = Boolean(latest) && remote.lastAcknowledgedId === latest;
+  const received =
+    read || (Boolean(latest) && remote.lastReceivedId === latest);
+  // The agent's last report, and the note it gave with ack. State saved
+  // before reports existed has only acknowledgedAt and updatedAt.
+  const reportAt = remote?.report?.at;
+  const note = remote?.report?.note;
   const failed = remote?.wake?.last?.ok === false;
   const paused = Boolean(remote?.paused);
   const stopped = failed || paused;
@@ -31,7 +36,7 @@ export function activityModel({
         ? "All pages ready"
         : slots.length
           ? "Pages in progress"
-          : acknowledged
+          : received
             ? "Preparing the next revision"
             : "Waiting for the agent";
   const summary = inFlight
@@ -56,33 +61,38 @@ export function activityModel({
       text: `Agent paused${remote.paused.reason ? `: ${remote.paused.reason}.` : "."} Send a message in chat.`,
       late: true,
     };
-  else if (!acknowledged)
-    footer = { mark: "queued", text: "No agent report yet" };
+  else if (!received) footer = { mark: "queued", text: "No agent report yet" };
   else if (finished)
     footer = {
       mark: "complete",
       text: "Finished",
       at: remote.current?.publishedAt,
     };
-  else if (!slots.length)
+  else if (note)
     footer = {
       mark: "active",
-      text: "Agent read your feedback",
-      at: remote.acknowledgedAt,
-      late: late(remote.acknowledgedAt),
+      text: note,
+      note: true,
+      at: reportAt,
+      late: late(reportAt),
     };
-  else
+  else if (!slots.length) {
+    const at = reportAt || remote.acknowledgedAt;
     footer = {
       mark: "active",
-      text: "Last report",
-      at: remote.updatedAt,
-      late: late(remote.updatedAt),
+      text: read ? "Agent read your feedback" : "Agent received your feedback",
+      at,
+      late: late(at),
     };
+  } else {
+    const at = reportAt || remote.updatedAt;
+    footer = { mark: "active", text: "Last report", at, late: late(at) };
+  }
   // Until the page list exists, the bar is one track that moves while the
   // agent works on the feedback.
   const track = slots.length
     ? null
-    : inFlight || (acknowledged && !stopped)
+    : inFlight || (received && !stopped)
       ? "moving"
       : "still";
   return { slots, ready, failed, stopped, title, summary, footer, track };
@@ -98,7 +108,8 @@ export function roundModel({ remote, now = Date.now() }) {
   const ready = 1 + round.pages.filter((item) => item.state === "ready").length;
   if (ready === total) return null;
   if (remote.paused) return { text: "Agent paused", late: true };
-  const minutes = Math.floor((now - Date.parse(remote.updatedAt)) / 60000);
+  const reported = remote.report?.at || remote.updatedAt;
+  const minutes = Math.floor((now - Date.parse(reported)) / 60000);
   if (minutes >= 5) return { text: `No report for ${minutes} min`, late: true };
   return { text: `${ready} of ${total} ready`, late: false };
 }

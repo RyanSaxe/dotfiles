@@ -48,8 +48,8 @@ what depends on answers not yet given. Some plans take two rounds and others
 ten. A page holds one coherent topic and may hold several related decisions.
 Agreed is the only running context, so add no overview or summary page.
 
-A decision the reviewer did not answer stays open, unless the submission
-says everything else looks good (`groups.alignUnflagged`). Do not repeat an
+A choice or question the reviewer did not answer stays open, even one with a
+recommended option, whatever `groups.alignUnflagged` says. Do not repeat an
 open decision's unchanged page. Return to it with new evidence, a changed
 proposal or a sharper question. When the user asks you to decide, decide,
 record the decision on Agreed and continue. When a proposal changes, show
