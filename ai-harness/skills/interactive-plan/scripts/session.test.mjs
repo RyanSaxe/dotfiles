@@ -21,6 +21,7 @@ const page = (revision, id) =>
             id,
             title: "Agreed so far",
             agreements: [],
+            task: { title: "The task", html: "<p>What the plan builds.</p>" },
           }
         : { id, title: "P", html: "<p>x</p>" },
   });

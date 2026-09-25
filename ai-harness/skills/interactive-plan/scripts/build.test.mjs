@@ -212,3 +212,30 @@ test("well-formed controls, anchors and blocks pass", async () => {
   );
   assert.match(html, /id="plan-data"/);
 });
+
+test("an Agreed page opens with a task, and the plan data carries it", async () => {
+  const agreed = (page) =>
+    buildPage(path.join(os.tmpdir(), "agreed.json"), {
+      artifactId: "t",
+      revision: "1",
+      kind: "exploration",
+      title: "T",
+      page: { id: "agreed", title: "Agreed so far", agreements: [], ...page },
+    });
+  await assert.rejects(
+    agreed({}),
+    /page "agreed": Agreed has no task\. State what the plan is building towards\./,
+  );
+  await assert.rejects(
+    agreed({ task: { title: " ", html: "<p>x</p>" } }),
+    /page "agreed": the task has no title/,
+  );
+  const task = { title: "Retries", html: "<p>Checkout retries once.</p>" };
+  const html = await agreed({ task });
+  const data = JSON.parse(
+    html
+      .match(/id="plan-data">([\s\S]*?)<\/script>/)[1]
+      .replaceAll("\\u003c", "<"),
+  );
+  assert.deepEqual(data.task, task);
+});

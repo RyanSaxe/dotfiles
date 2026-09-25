@@ -220,6 +220,7 @@ function validPlan(data) {
     );
     ids.add(page.id);
   }
+  if (data.task !== undefined) validTask(data.task);
   for (const content of [...data.pages, ...(data.agreements || [])]) {
     for (const match of content.html.matchAll(
       /<[a-z][^>]*?\sdata-prototype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
@@ -236,6 +237,26 @@ function validPlan(data) {
     "A final plan starts with an overview page",
   );
   return data;
+}
+// The task opens Agreed: what the plan is building towards, in a title and a
+// few sentences.
+function validTask(task) {
+  requireValue(
+    task && typeof task === "object" && !Array.isArray(task),
+    'page "agreed": Agreed has no task. State what the plan is building towards.',
+  );
+  requireValue(
+    typeof task.title === "string" && task.title.trim(),
+    'page "agreed": the task has no title',
+  );
+  requireValue(
+    typeof task.html === "string" && task.html.trim(),
+    'page "agreed": the task has no text',
+  );
+  requireValue(
+    task.change === undefined || ["new", "updated"].includes(task.change),
+    'page "agreed": the task\'s change is new or updated',
+  );
 }
 export function pageData(html) {
   const match = html.match(
@@ -266,6 +287,7 @@ export function validPage(record) {
       : typeof page.html === "string" && page.html.trim(),
     "Agreed requires agreements; other pages require HTML",
   );
+  if (page.id === "agreed") validTask(page.task);
   for (const key of ["cssText", "jsText"])
     requireValue(
       page[key] === undefined || typeof page[key] === "string",
@@ -284,8 +306,8 @@ export function validPage(record) {
   validPlan(pagePlan(record));
   return record;
 }
-// A page record as plan data on its own: Agreed carries the agreements, and
-// any other page carries itself.
+// A page record as plan data on its own: Agreed carries the agreements and
+// the task, and any other page carries itself.
 export function pagePlan({ page, ...record }) {
   const agreed = page.id === "agreed";
   return {
@@ -296,6 +318,7 @@ export function pagePlan({ page, ...record }) {
     pageMode: "partial",
     pages: agreed ? [] : [{ id: page.id, title: page.title, html: page.html }],
     agreements: agreed ? page.agreements : [],
+    task: agreed ? page.task : undefined,
     prototypes: page.prototypes || [],
   };
 }
@@ -697,6 +720,7 @@ async function loadSession(directory, config, origin) {
       ...(complete ? {} : { pageMode: "partial" }),
       pages,
       agreements: agreed.page.agreements,
+      task: agreed.page.task,
       prototypes: all.flatMap((page) => page.prototypes || []),
     };
     return assemble(data, {

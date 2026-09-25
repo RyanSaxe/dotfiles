@@ -509,6 +509,7 @@ async function hub(t, extra = {}) {
         html: await build({
           id: "agreed",
           title: "Agreed so far",
+          task: { title: "The task", html: "<p>What the plan builds.</p>" },
           agreements: data.agreements || [],
         }),
         pages: data.pages.map(({ id, title }) => ({ id, title })),
@@ -1007,6 +1008,7 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
       page: {
         id: "agreed",
         title: "Agreed so far",
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
         agreements: [{ ...metadata, file: "decision.html" }],
       },
     }),
@@ -1704,6 +1706,7 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
         id: "agreed",
         title: "Agreed so far",
         agreements: [],
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
       },
     }),
   );
