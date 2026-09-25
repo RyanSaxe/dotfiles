@@ -1,7 +1,6 @@
 import { normalizeLogin, type AttentionConfig } from "./config.js";
-import { reviewContext } from "./context.js";
 import type {
-  AttentionItem,
+  AttentionReason,
   CiMemory,
   CiTransition,
   PullRequestTarget,
@@ -25,35 +24,36 @@ export function applyCiTransition(
   previous: CiMemory | undefined,
   username: string,
   config: AttentionConfig,
+  baselineAt: string | null = null,
 ): CiTransition {
   const red = ciIsRed(pr.ciState);
   const headChanged = previous !== undefined && previous.headSha !== pr.headSha;
   const newlyRed =
     red && (previous === undefined || !previous.red || headChanged);
   const redEpoch = (previous?.redEpoch ?? 0) + (newlyRed ? 1 : 0);
+  const isAfterBaseline =
+    baselineAt === null || Date.parse(pr.updatedAt) >= Date.parse(baselineAt);
+  const alerted =
+    red && (previous?.alerted === true || (newlyRed && isAfterBaseline));
   const memory: CiMemory = {
     state: pr.ciState,
     headSha: pr.headSha,
     red,
     redEpoch,
+    alerted,
   };
 
   if (!config.ownPrCi || !ownsPullRequest(pr, username) || !red) {
-    return { memory, item: null, newlyRed };
+    return { memory, reason: null, newlyRed };
   }
+
+  if (!alerted) return { memory, reason: null, newlyRed };
 
   return {
     memory,
-    item: {
+    reason: {
       id: `ci:${pr.repository}#${pr.number}:${pr.headSha || "unknown"}:${redEpoch}`,
       kind: "ci",
-      targetKind: "pull_request",
-      repository: pr.repository,
-      number: pr.number,
-      title: pr.title,
-      url: pr.url,
-      // One item per PR, naming the checks that failed — never one item
-      // per check, and never the ones that passed.
       summary:
         pr.failingChecks.length > 0
           ? `CI failed: ${pr.failingChecks.join(", ")}`
@@ -61,7 +61,6 @@ export function applyCiTransition(
       actor: null,
       createdAt: pr.updatedAt,
       priority: "high",
-      context: reviewContext(pr),
     },
     newlyRed,
   };

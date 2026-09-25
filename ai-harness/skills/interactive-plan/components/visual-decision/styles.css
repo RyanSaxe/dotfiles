@@ -1,0 +1,169 @@
+.visual-decision {
+}
+.vd-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.vd-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.vd-layout {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.vd-layout button {
+  padding: 4px 9px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.vd-layout button + button {
+  border-left: 1px solid var(--line-strong);
+}
+.vd-layout button.current {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.vd-columns {
+  display: grid;
+  gap: 10px;
+}
+.visual-decision[data-mode="columns"] .vd-columns {
+  grid-template-columns: repeat(var(--vd-count, 2), minmax(0, 1fr));
+}
+/* The rows an option has are the rows it gets. A fixed three-row track list
+   charges the gap for a row the author left out, which showed as a strip of
+   card under the figure. */
+.visual-option {
+  display: grid;
+  grid-template-rows: auto;
+  grid-auto-rows: auto;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.visual-option:has(> .vd-pick[aria-pressed="true"]) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.vd-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  width: 100%;
+}
+.vd-pick::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  box-sizing: border-box;
+}
+.vd-pick[aria-pressed="true"]::before {
+  border: 4.5px solid var(--accent);
+}
+.visual-option > p {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+/* An option with no figure ends under its line: the third row and its gap
+   otherwise leave 8px of panel below the last word. */
+.visual-option:not(:has(> figure)) {
+  grid-template-rows: auto auto;
+  padding-bottom: 10px;
+}
+/* A diagram and a code block each scroll sideways inside their own figure,
+   so this one never needs to scroll and must not, or it traps the wheel. It
+   pads all four sides, and what it holds keeps the shape it has anywhere
+   else, so a code block looks like a code block in prose or in a card. */
+.visual-option > figure {
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--ground);
+  min-width: 0;
+}
+.visual-option > figure [data-diagram] {
+  padding: 10px;
+}
+/* The strip shares its width rather than scrolling: a box that scrolls on
+   one axis is given a scrollbar on the other, which put a stray pixel of
+   vertical scrolling on every decision. */
+.vd-tablist {
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+/* The underline is painted inside the button rather than hung a pixel below
+   it, so the strip has nothing to overflow. */
+.vd-tablist button {
+  min-width: 0;
+  padding: 8px 10px;
+  box-shadow: inset 0 -2px 0 transparent;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vd-tablist button[aria-selected="true"] {
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.vd-tablist button.chosen::before {
+  content: "✓ ";
+  color: var(--accent);
+}
+.visual-decision[data-mode="tabs"] .vd-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+/* In tabs the option's radio header is the pick, at the top of the panel;
+   the tab carries the tick. */
+.visual-decision[data-mode="tabs"] .vd-columns {
+  display: block;
+  padding: 0;
+}
+.visual-decision[data-mode="tabs"] .visual-option {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.visual-decision[data-mode="tabs"] .vd-pick {
+  padding: 12px 14px 2px;
+}
+.visual-decision[data-mode="tabs"] .visual-option > p {
+  padding: 0 14px 10px;
+}
+.visual-decision[data-mode="tabs"] .visual-option > figure {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--ground);
+}
+.visual-decision[data-mode="columns"] .vd-tablist {
+  display: none;
+}

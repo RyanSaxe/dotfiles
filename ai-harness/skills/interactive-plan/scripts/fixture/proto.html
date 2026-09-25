@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font: 14px system-ui;
+        background: #fff;
+        color: #111;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1a1d22;
+          color: #eee;
+        }
+      }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #e6f5ec;
+        color: #1f7a45;
+      }
+    </style>
+  </head>
+  <body>
+    <h3 style="margin: 0 0 8px">Breaker status</h3>
+    <span class="pill" id="s">closed</span>
+    <button
+      onclick="s.textContent = s.textContent === 'closed' ? 'open' : 'closed'"
+    >
+      Toggle
+    </button>
+  </body>
+</html>

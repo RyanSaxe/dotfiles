@@ -1,0 +1,96 @@
+/* A formula that names its terms. The four hues are a content palette, kept
+   apart from the chrome's --accent, --ok, --attention and --danger, and
+   written as light-dark pairs so a term reads on both grounds. */
+.formula {
+  --t1: light-dark(#1d4ed8, #93b4ff);
+  --t2: light-dark(#a16207, #e8bd63);
+  --t3: light-dark(#047857, #6fd7a5);
+  --t4: light-dark(#9333ea, #cfa4f5);
+  margin: 16px 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.formula-body {
+  padding: 16px 12px;
+  background: var(--ground);
+}
+.formula-body [data-math] {
+  margin: 0;
+}
+.formula .term-1 {
+  color: var(--t1);
+}
+.formula .term-2 {
+  color: var(--t2);
+}
+.formula .term-3 {
+  color: var(--t3);
+}
+.formula .term-4 {
+  color: var(--t4);
+}
+.formula[data-focus] .katex .term:not([data-on="true"]) {
+  opacity: 0.3;
+}
+/* Every row shares one column track, so the terms line up down the list and
+   the track is as wide as the widest term rather than one character. A row
+   sits on the parent track, so its own padding comes out of the term column
+   and the floor has to carry it. */
+.formula-terms {
+  --term-pad: 8px;
+  --term-track: minmax(calc(22px + var(--term-pad)), auto);
+  display: grid;
+  grid-template-columns: var(--term-track) minmax(0, 1fr);
+  row-gap: 1px;
+  column-gap: 10px;
+  margin: 0;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+}
+.formula-term {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  padding: 5px var(--term-pad);
+  border-radius: 6px;
+}
+.formula-term:hover,
+.formula-term[data-active="true"] {
+  background: var(--ground);
+}
+.formula-term dt {
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+}
+/* The term is rendered by KaTeX, which brings its own faces; it only has to
+   match the row it sits in rather than the display size it would take. */
+.formula-term dt .katex {
+  font-size: 1em;
+}
+.formula-term dd {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.formula-term dd b {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* The scroll belongs to the element KaTeX lays out, not to the box around
+   it: .katex-display overflows visible, so a formula wider than the column
+   simply loses what does not fit. */
+.katex-display {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+[data-math] {
+  overflow: auto;
+}

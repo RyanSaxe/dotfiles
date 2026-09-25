@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css"
+    />
+    <script>
+      window.EXCALIDRAW_ASSET_PATH =
+        "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@19.0.0",
+          "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
+          "react-dom": "https://esm.sh/react-dom@19.0.0",
+          "react-dom/client": "https://esm.sh/react-dom@19.0.0/client"
+        }
+      }
+    </script>
+    <style>
+      html,
+      body,
+      #canvas {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+      #canvas .excalidraw {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="canvas"></div>
+    <script type="module">
+      import React from "https://esm.sh/react@19.0.0";
+      import { createRoot } from "https://esm.sh/react-dom@19.0.0/client";
+      import {
+        Excalidraw,
+        exportToBlob,
+      } from "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom";
+
+      const nonce = __DRAWING_NONCE__;
+      let draft = {
+        elements: [],
+        appState: { viewBackgroundColor: "#ffffff" },
+        files: {},
+      };
+      const send = (type, extra = {}) =>
+        parent.postMessage({ type, nonce, ...extra }, "*");
+      addEventListener("message", async (event) => {
+        if (event.source !== parent || event.data?.nonce !== nonce) return;
+        if (event.data.type === "init") {
+          const scene = event.data.scene;
+          if (scene)
+            draft = {
+              elements: scene.elements,
+              appState: scene.appState,
+              files: scene.files,
+            };
+          createRoot(document.getElementById("canvas")).render(
+            React.createElement(Excalidraw, {
+              initialData: draft,
+              onChange: (elements, appState, files) => {
+                draft = {
+                  elements: [...elements],
+                  appState: {
+                    viewBackgroundColor: appState.viewBackgroundColor,
+                  },
+                  files,
+                };
+              },
+              UIOptions: {
+                canvasActions: {
+                  saveToActiveFile: false,
+                  loadScene: false,
+                  export: false,
+                },
+              },
+            }),
+          );
+        }
+        if (event.data.type === "save") {
+          try {
+            if (!draft.elements.some((element) => !element.isDeleted))
+              throw new Error("Draw something before saving.");
+            const blob = await exportToBlob({
+              ...draft,
+              mimeType: "image/png",
+            });
+            const png = await blob.arrayBuffer();
+            send("saved", {
+              scene: {
+                type: "excalidraw",
+                version: 2,
+                source: "interactive-plan",
+                ...draft,
+              },
+              png,
+            });
+          } catch (error) {
+            send("error", { message: error.message });
+          }
+        }
+      });
+      send("ready");
+    </script>
+  </body>
+</html>

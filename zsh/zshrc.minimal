@@ -1,0 +1,24 @@
+# Minimal rc for tmux popup shells (Alt+O/Alt+S/Alt+C, prefix o/s) — the
+# v1 precedent (aa44729) rebuilt. A popup exists to run exactly one of
+# to/ts/theme-picker, so it loads only what those need and skips compinit,
+# plugins, starship, fast-theme, venv, and history. zshrc dispatches here
+# and returns when TMUX_POPUP is set.
+#
+# The tmux bindings stay `zsh -ic`: interactive job control gives `to`'s
+# background rescan and the mascot sync their own process groups, so popup
+# teardown doesn't kill them (documented v1 regression).
+
+# Everything to/ts call transitively: _tmux_attach_or_switch and
+# _sanitize_tmux_session_name live in tmux.zsh; cache_csv and _to in
+# git-repos.zsh. theme-picker is a PATH script needing nothing from here.
+source "$HOME/.config/zsh/functions/tmux.zsh"
+source "$HOME/.config/zsh/functions/git-repos.zsh"
+
+# REQUIRED, not cosmetic: FZF_DEFAULT_OPTS styles the popup, and its
+# explicit base scheme suppresses fzf's terminal-theme autodetection,
+# whose mode-2031 probe otherwise leaks literal "?997;2n" into queries.
+_shell_colors="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated/shell-colors.zsh"
+[[ -r "$_shell_colors" ]] && source "$_shell_colors"
+unset _shell_colors
+
+PROMPT='$ '

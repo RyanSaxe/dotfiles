@@ -1,0 +1,166 @@
+[data-language] {
+  background: var(--code);
+  border-radius: 8px;
+  overflow: auto;
+}
+[data-language]:not(:has(.shiki)) {
+  padding: 12px 14px;
+  white-space: pre;
+  font:
+    12px/1.65 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+.shiki {
+  background: var(--code) !important;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+/* The generic pre rule pads 14px and .figure-head pads 12px, which put a
+   file name and the first character of its code 2px apart. */
+[data-language] .shiki {
+  padding: 10px 0;
+}
+[data-language] .shiki code {
+  display: block;
+  counter-reset: codeline;
+}
+/* Inline-block, never block: Shiki writes a newline after each line span,
+   and a block span turns that newline into a second, empty row. */
+/* min-width, not width: the line stretches to the full width so a lit line
+   is lit to the edge, and still grows past it so the block keeps scrolling
+   on a line the column cannot hold. */
+[data-language] .shiki .line {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+  /* An empty line is a box with no content, which would collapse and put
+     its number on top of the next one. */
+  min-height: 1lh;
+  padding: 0 14px 0 12px;
+}
+/* One gutter whether or not the block carries notes: the bubble's 16px,
+   the numbers, then the code at 54px. */
+[data-language]:is([data-lines], [data-numbers], [data-notes]) .shiki .line {
+  padding-left: 54px;
+  counter-increment: codeline;
+}
+[data-language]:is([data-lines], [data-numbers], [data-notes])
+  .shiki
+  .line::before {
+  content: counter(codeline);
+  position: absolute;
+  left: 16px;
+  width: 30px;
+  padding-right: 6px;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  text-align: right;
+  opacity: 0.75;
+}
+/* The named range is lit and the rest is dimmed until the pointer or the
+   keyboard asks for it. There is no control to press. */
+[data-language][data-lines] .shiki .line {
+  transition: opacity 0.12s ease;
+}
+[data-language][data-lines] .shiki .line:not(.in-focus) {
+  opacity: 0.38;
+}
+[data-language][data-lines]:hover .shiki .line,
+[data-language][data-lines]:focus-within .shiki .line {
+  opacity: 1;
+}
+[data-language][data-lines] .shiki .line.in-focus {
+  background: var(--accent-soft);
+}
+/* A line with a note carries a speech bubble 4px from the block's edge. */
+.code-note-mark {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+}
+.code-note-mark:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.code-note-mark[aria-expanded="true"] svg,
+.code-note-mark:hover svg {
+  fill: var(--accent-soft);
+}
+[data-language][data-notes] .shiki .line.has-note {
+  cursor: pointer;
+}
+/* The note is a popover, painted in the top layer, so the figure's own
+   overflow: hidden cannot clip a note on the last line of a block. */
+.code-popup {
+  position: fixed;
+  margin: 0;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: normal;
+}
+.code-popup b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.code-popup .code-popup-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--muted);
+  text-align: center;
+}
+/* A block with more to the right says so. The mask is on the box that
+   scrolls, so it stays at the right edge while the content moves under it. */
+.shiki[data-more="true"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.shiki,
+.shiki span {
+  color: var(--shiki-light) !important;
+}
+:root[data-theme="dark"] .shiki,
+:root[data-theme="dark"] .shiki span {
+  color: var(--shiki-dark) !important;
+}
+/* A <pre data-language> also matches the frame's generic pre rule and keeps
+   the browser's default margin: 1em 0, which frame.css never resets; a <div
+   data-language> carries none of it. The rendered code is identical either
+   way, because [data-language] .shiki supplies the vertical padding and
+   .line the horizontal, so the reset makes the two elements render alike in
+   every container rather than only inside a figure. */
+pre[data-language] {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.figure-body > [data-language] {
+  border-radius: 0;
+}

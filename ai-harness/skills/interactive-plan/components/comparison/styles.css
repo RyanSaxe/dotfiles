@@ -1,0 +1,92 @@
+.comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 12px;
+  --comparison-rows: 3;
+}
+/* No orphan card: two options side by side when the column has room,
+   three across when it has room for three, four or more in pairs; an odd
+   count above three stacks rather than leave one alone. */
+@container page (min-width: 640px) {
+  .comparison:has(> :nth-child(2):last-child),
+  .comparison:has(> :nth-child(4)):not(:has(> :nth-child(odd):last-child)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container page (min-width: 760px) {
+  .comparison:has(> :nth-child(3):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.comparison-option {
+  display: grid;
+  grid-row: span var(--comparison-rows);
+  grid-template-rows: subgrid;
+  min-width: 0;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.comparison[data-layout="independent"] .comparison-option {
+  display: flex;
+  flex-direction: column;
+}
+.comparison-option:has(.comparison-pick[aria-pressed="true"]) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.comparison-option > header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.comparison-option h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.comparison-option > header p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.comparison-content {
+  padding: 14px 16px;
+  min-width: 0;
+}
+/* The section an option does not have. Matched sections line up only while
+   every option has the same number of children, and nothing in the build or
+   on the page says so when one is missing. */
+.comparison-content.empty p {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+}
+.comparison-content [data-language] {
+  overflow: auto;
+}
+.comparison-content [data-diagram] {
+  display: grid;
+  place-items: center;
+}
+.comparison-content svg {
+  max-width: 100%;
+  height: auto;
+}
+.comparison-option > footer {
+  margin-top: auto;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+}
+.comparison-pick {
+  width: 100%;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.comparison-pick[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.comparison-pick[aria-pressed="true"]::before {
+  content: "✓ ";
+}

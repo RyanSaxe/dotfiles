@@ -1,0 +1,40 @@
+{
+  "artifactId": "fixture",
+  "revision": "1",
+  "kind": "exploration",
+  "title": "Component fixture",
+  "task": {
+    "title": "Payment retries",
+    "html": "<p>Checkout retries a failed charge through one client with a circuit breaker, so a gateway outage costs one slow request instead of a queue of stuck orders. Refunds and the ledger are out of scope.</p>"
+  },
+  "pages": [
+    {
+      "id": "decisions",
+      "title": "Decisions",
+      "file": "p-decisions.html"
+    },
+    {
+      "id": "comparison",
+      "title": "Comparison and lists",
+      "file": "p-comparison.html"
+    },
+    {
+      "id": "figures",
+      "title": "Figures",
+      "file": "p-figures.html"
+    },
+    {
+      "id": "slots",
+      "title": "Component slots",
+      "file": "p-slots.html"
+    }
+  ],
+  "prototypes": [
+    {
+      "id": "breaker-ui",
+      "title": "Breaker status pill",
+      "file": "proto.html",
+      "height": 160
+    }
+  ]
+}

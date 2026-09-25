@@ -1,7 +1,5 @@
 // Agent attention pushed beyond the terminal: the Sketchybar code-workspace
-// highlight and an ntfy phone ping. Both consume the current live status and
-// its clearable notification projection. Nothing here turns old attention
-// into a second live status.
+// highlight and an ntfy phone ping. Both consume current agent status.
 
 import { writeFileSync } from "node:fs";
 import { platform } from "node:os";
@@ -119,8 +117,12 @@ export type ReviewLevel = "ci" | "review" | "none";
 
 export function reviewLevel(items: readonly AttentionItem[]): ReviewLevel {
   if (items.length === 0) return "none";
-  // CI failure outranks conversation, matching the rows' own urgency.
-  return items.some((item) => item.kind === "ci") ? "ci" : "review";
+  // CI failure outranks comments, matching the rows' own urgency.
+  return items.some((item) =>
+    item.reasons.some((reason) => reason.kind === "ci"),
+  )
+    ? "ci"
+    : "review";
 }
 
 let publishedReviewLevel: ReviewLevel | null = null;
@@ -144,6 +146,11 @@ const lastStatus = new Map<string, { status: AgentStatus; statusTs: number }>();
 let seeded = false;
 let wasPresent: boolean | null = null;
 let warnedNoChannel = false;
+// ntfy failures arrive in storms (429 rate limiting, in the live log), and
+// the channel is documented at-most-once — so a failed push buys a cooldown
+// during which pings are dropped outright instead of hammering the endpoint.
+const PUSH_COOLDOWN_MS = 60_000;
+let pushCooldownUntil = 0;
 
 // What rides this tick's ping. Present ticks send nothing. The departure
 // tick sweeps in every active waiting/done notification alongside the raw
@@ -241,6 +248,10 @@ export function pushPhone(
   // A dropped ping is a missed agent: log it (no retries — an unreliable
   // channel that says so beats retry machinery).
   const names = transitions.map(agentIdentity).join(", ");
+  if (Date.now() < pushCooldownUntil) {
+    logLine(`ntfy cooling down after a failed push; dropped ping for ${names}`);
+    return;
+  }
   sendNtfy(
     {
       title,
@@ -250,6 +261,7 @@ export function pushPhone(
     },
     endpoint,
   ).catch((error: unknown) => {
+    pushCooldownUntil = Date.now() + PUSH_COOLDOWN_MS;
     // Node reports every network failure as "TypeError: fetch failed";
     // the cause is the part that names what actually broke.
     const cause = error instanceof Error ? error.cause : null;

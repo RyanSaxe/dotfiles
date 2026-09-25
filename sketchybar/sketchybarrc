@@ -114,8 +114,9 @@ WORKSPACE_KEYS=(
   meeting "M" # Teams meetings (right monitor)
 )
 
-# Workspace order (left to right in bar, matches monitor layout)
-WORKSPACES=("message" "browser" "code" "meeting")
+# The workspace list is shared with plugins/aerospace.sh, which repaints
+# these items; it lives in one file so the two cannot disagree.
+source "$CONFIG_DIR/workspaces.sh"
 
 for workspace in "${WORKSPACES[@]}"; do
   key="${WORKSPACE_KEYS[$workspace]}"
@@ -129,11 +130,19 @@ for workspace in "${WORKSPACES[@]}"; do
     background.color="$WORKSPACE_INACTIVE_BG" \
     background.corner_radius=6 \
     background.height=22 \
-    click_script="aerospace workspace $workspace" \
-    script="$PLUGIN_DIR/aerospace.sh"
-
-  sketchybar --subscribe "space.$workspace" aerospace_workspace_change mascot_colors_changed
+    click_script="aerospace workspace $workspace"
 done
+
+# One invisible item owns the repaint of every letter above. When each
+# letter ran its own copy of the plugin, two events close together — a
+# workspace change and the mascot colors that follow a jump, or the focus
+# bounce between monitors — raced: whichever process finished last won per
+# letter, and two letters stayed lit. One script, one answer, one --set.
+sketchybar --add item workspace_sync left \
+  --set workspace_sync \
+  drawing=off \
+  script="$PLUGIN_DIR/aerospace.sh" \
+  --subscribe workspace_sync aerospace_workspace_change mascot_colors_changed
 
 # The agent-attention letter: not an aerospace workspace, but it wears the
 # same shape because it answers the same question — where should I look.
@@ -150,7 +159,7 @@ sketchybar --add item space.agent left \
   background.color="$WORKSPACE_INACTIVE_BG" \
   background.corner_radius=6 \
   background.height=22 \
-  click_script="aerospace workspace code; open -a Ghostty; $HOME/.local/bin/rail jump-attention" \
+  click_script="$HOME/.config/aerospace/focus-terminal.sh && $HOME/.local/bin/rail jump-attention" \
   script="$PLUGIN_DIR/agent.sh" \
   --subscribe space.agent agent_attention_change mascot_colors_changed
 
@@ -168,7 +177,7 @@ sketchybar --add item space.review left \
   background.color="$WORKSPACE_INACTIVE_BG" \
   background.corner_radius=6 \
   background.height=22 \
-  click_script="aerospace workspace code; open -a Ghostty; $HOME/.local/bin/rail dashboard-popup" \
+  click_script="$HOME/.config/aerospace/focus-terminal.sh && $HOME/.local/bin/rail dashboard-popup" \
   script="$PLUGIN_DIR/review.sh" \
   --subscribe space.review review_attention_change mascot_colors_changed
 
@@ -177,8 +186,9 @@ sketchybar --add item space.review left \
 # -----------------------------------------------------------------------------
 
 # Clock (rightmost) - time with clock icon
-# Highlights in the notify color at meeting reminder times (00, 29, 30, 59
-# minutes) - see plugins/clock.sh
+# Highlights in peach at meeting reminder times (00, 29, 30, 59 minutes):
+# the fixed palette peach, deliberately not the mascot's notify color -
+# see plugins/clock.sh
 sketchybar --add item clock right \
   --set clock \
   update_freq=15 \

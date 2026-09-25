@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Interactive plan</title>
+    <!-- FRAME_STYLE -->
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="frame-header" id="frame-header">
+        <button
+          class="icon-btn menu"
+          id="menu-button"
+          type="button"
+          aria-label="Pages"
+          aria-controls="pages-dialog"
+          aria-expanded="false"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="2.5" y="2.5" width="19" height="19" rx="3.5" />
+            <path d="M7 9h10M7 13h10M7 17h6" />
+          </svg>
+          <b id="page-count" aria-hidden="true" hidden></b>
+        </button>
+        <button
+          class="icon-btn"
+          id="revision"
+          type="button"
+          aria-haspopup="dialog"
+          aria-label="Revisions"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3.2 12a8.8 8.8 0 1 0 2.6-6.2" />
+            <path d="M3.2 3.4v4.4h4.4" />
+            <path d="M12 7.3V12l3.5 2.1" />
+          </svg>
+        </button>
+        <button
+          class="icon-btn"
+          id="settings"
+          type="button"
+          aria-label="Settings"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+            />
+          </svg>
+        </button>
+        <button
+          class="bell"
+          id="bell"
+          type="button"
+          aria-haspopup="dialog"
+          aria-label="Other live sessions"
+          hidden
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10 21a2 2 0 0 0 4 0" />
+          </svg>
+          <b id="bell-count"></b>
+        </button>
+        <span class="spacer"></span>
+        <button
+          class="btn primary header-submit"
+          id="submit"
+          type="button"
+          disabled
+        >
+          Submit</button
+        ><button class="btn primary" id="accept" type="button" hidden>
+          Accept plan
+        </button>
+      </header>
+      <div class="page-arrival" id="page-arrival" role="status" hidden>
+        <span id="page-arrival-text"></span>
+        <button type="button" id="page-arrival-view">View</button>
+        <button type="button" id="page-arrival-dismiss" aria-label="Dismiss">
+          ✕
+        </button>
+      </div>
+      <div class="app-body">
+        <aside class="sidebar" id="sidebar">
+          <div class="side-label">
+            <span>Pages</span
+            ><span class="round-status idle" data-round
+              ><i></i><span></span
+            ></span>
+          </div>
+          <div class="pages-slot" id="sidebar-slot">
+            <nav id="navigation" aria-label="Plan pages"></nav>
+          </div>
+        </aside>
+        <!-- The strip sits above the scrolling column, so the scrollbar
+             starts below it. -->
+        <div class="main-column">
+          <div class="history-strip" id="history-strip" hidden>
+            <span id="history-label"></span>
+            <button type="button" id="history-return"></button>
+          </div>
+          <main>
+            <dialog
+              class="dialog"
+              id="settings-dialog"
+              aria-labelledby="settings-title"
+            >
+              <div class="dialog-head">
+                <h2 id="settings-title" tabindex="-1" autofocus>Settings</h2>
+                <button
+                  class="icon-btn"
+                  type="button"
+                  data-close="settings-dialog"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="settings-row">
+                <span>Appearance</span>
+                <div
+                  class="segmented"
+                  id="theme"
+                  role="radiogroup"
+                  aria-label="Appearance"
+                >
+                  <button type="button" role="radio" data-theme="system">
+                    System
+                  </button>
+                  <button type="button" role="radio" data-theme="light">
+                    Light
+                  </button>
+                  <button type="button" role="radio" data-theme="dark">
+                    Dark
+                  </button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <span>Notifications</span>
+                <button class="btn" id="notifications" type="button">
+                  Enable
+                </button>
+              </div>
+              <div class="settings-row">
+                <span>Keys</span>
+                <span class="small">Press <kbd>?</kbd> for the list</span>
+              </div>
+            </dialog>
+            <div class="content" id="content">
+              <div class="save-error" id="save-error" role="alert" hidden>
+                <span id="save-error-text"></span>
+                <button
+                  type="button"
+                  id="save-error-dismiss"
+                  aria-label="Dismiss error"
+                >
+                  ×
+                </button>
+              </div>
+              <p
+                class="notice accepted"
+                id="accepted"
+                data-tone="success"
+                hidden
+              ></p>
+              <section id="reading">
+                <h1 tabindex="-1" id="page-title"></h1>
+                <div class="note-bars" id="note-bars"></div>
+                <div class="chosen-bar" id="chosen-bar" hidden></div>
+                <div id="page-content"></div>
+                <section
+                  class="sent-page-comments"
+                  id="sent-page-comments"
+                  hidden
+                ></section>
+                <p class="note-count" id="note-count" hidden></p>
+                <nav class="page-footer" aria-label="Previous and next">
+                  <a id="footer-previous" hidden></a>
+                  <a id="footer-next" hidden></a>
+                </nav>
+              </section>
+              <section id="feedback" hidden>
+                <h1 tabindex="-1" id="feedback-title">Review</h1>
+                <div class="agent-activity" id="agent-activity" hidden>
+                  <div class="activity-heading">
+                    <strong id="activity-title"></strong>
+                    <time id="activity-elapsed"></time>
+                  </div>
+                  <p id="activity-summary"></p>
+                  <div
+                    class="activity-segments"
+                    id="activity-segments"
+                    aria-hidden="true"
+                  ></div>
+                  <div class="activity-pages" id="activity-pages"></div>
+                  <p class="activity-report" id="activity-report">
+                    <span id="activity-report-text"></span>
+                  </p>
+                </div>
+                <section class="sent-feedback" id="sent-feedback" hidden>
+                  <h2>Your feedback</h2>
+                  <div id="sent-feedback-list"></div>
+                </section>
+                <div id="feedback-review">
+                  <div class="draft-head" id="draft-head" hidden>
+                    <h2>Your comments</h2>
+                    <span id="draft-count"></span>
+                  </div>
+                  <p
+                    class="notice"
+                    id="submit-error"
+                    data-tone="danger"
+                    role="alert"
+                    hidden
+                  ></p>
+                  <label class="alignment-switch" for="align-unflagged">
+                    <span>Everything else looks good</span>
+                    <input
+                      id="align-unflagged"
+                      type="checkbox"
+                      role="switch"
+                      checked
+                    />
+                  </label>
+                  <div id="feedback-groups"></div>
+                  <section class="feedback-group">
+                    <div class="group-head">
+                      <h2>Overall</h2>
+                      <button class="btn quiet" id="overall-note" type="button">
+                        Add overall comment
+                      </button>
+                    </div>
+                    <div id="overall-notes"></div>
+                  </section>
+                  <div class="feedback-end">
+                    <button class="btn quiet" id="export" type="button">
+                      Export copy
+                    </button>
+                  </div>
+                  <p class="small" id="storage-status"></p>
+                  <p class="small" id="connection-status"></p>
+                </div>
+                <nav class="page-footer" aria-label="Pages">
+                  <button id="feedback-pages" type="button">Pages →</button>
+                </nav>
+              </section>
+            </div>
+            <dialog
+              class="dialog sessions"
+              id="sessions-dialog"
+              aria-labelledby="sessions-title"
+            >
+              <div class="dialog-head">
+                <h2 id="sessions-title" tabindex="-1" autofocus>
+                  Live sessions
+                </h2>
+                <button
+                  class="icon-btn"
+                  id="sidecar-close"
+                  type="button"
+                  data-close="sessions-dialog"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="session-list" id="sidecar-list"></div>
+            </dialog>
+          </main>
+        </div>
+      </div>
+    </div>
+    <dialog class="dialog note" id="note-dialog" aria-labelledby="note-title">
+      <form id="note-form">
+        <div class="dialog-head">
+          <h2 id="note-title">Add note</h2>
+          <button
+            class="icon-btn"
+            type="button"
+            data-close="note-dialog"
+            aria-label="Close note"
+          >
+            ✕
+          </button>
+        </div>
+        <p class="small" id="note-anchor"></p>
+        <blockquote id="note-quote" hidden></blockquote>
+        <label for="note-text">Feedback</label>
+        <div class="note-field">
+          <textarea id="note-text" required></textarea>
+        </div>
+        <div class="note-images" id="note-images" hidden></div>
+        <p class="renderer-error" id="note-image-error" hidden></p>
+        <div class="row note-actions">
+          <button class="btn quiet" type="button" id="note-image-pick">
+            Add an image
+          </button>
+          <input
+            type="file"
+            id="note-image-input"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            hidden
+          />
+          <span class="spacer"></span>
+          <button
+            type="submit"
+            class="btn primary"
+            aria-keyshortcuts="Shift+Enter"
+          >
+            Add to feedback
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      class="drawing-dialog"
+      id="drawing-dialog"
+      aria-labelledby="drawing-title"
+    >
+      <div class="drawing-head">
+        <h2 id="drawing-title">Draw an answer</h2>
+        <span class="spacer"></span>
+        <button class="btn" id="drawing-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="drawing-save" type="button">
+          Save drawing
+        </button>
+      </div>
+      <p class="renderer-error" id="drawing-error" role="status" hidden></p>
+      <iframe
+        id="drawing-frame"
+        title="Drawing editor"
+        sandbox="allow-scripts"
+        referrerpolicy="no-referrer"
+      ></iframe>
+    </dialog>
+    <script type="application/json" id="drawing-editor-source">
+      <!-- DRAWING_EDITOR -->
+    </script>
+    <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
+      <div class="dialog-head">
+        <h2 id="accept-title" tabindex="-1" autofocus>Accept this plan?</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="accept-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <p id="accept-detail"></p>
+      <p class="small">
+        Starting implementation hands the plan to the waiting agent. Saving
+        keeps it for later and the agent stops.
+      </p>
+      <label for="accept-guidance">Implementation guidance, optional</label>
+      <textarea
+        id="accept-guidance"
+        maxlength="4000"
+        aria-describedby="accept-guidance-detail"
+      ></textarea>
+      <p class="small" id="accept-guidance-detail">
+        Sent only with Start implementation.
+      </p>
+      <p class="small" id="accept-error" role="status"></p>
+      <div class="actions">
+        <button class="btn" type="button" data-accept-mode="save">
+          Save for later</button
+        ><button class="btn primary" type="button" data-accept-mode="implement">
+          Start implementation
+        </button>
+      </div>
+    </dialog>
+    <dialog
+      class="dialog"
+      id="revision-dialog"
+      aria-labelledby="revision-title"
+    >
+      <div class="dialog-head">
+        <h2 id="revision-title" tabindex="-1" autofocus>Revisions</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="revision-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <p class="rev-plan" id="revision-plan"></p>
+      <div class="rev-list" id="revision-list"></div>
+    </dialog>
+    <dialog class="dialog keys" id="keys-dialog" aria-labelledby="keys-title">
+      <div class="dialog-head">
+        <h2 id="keys-title" tabindex="-1" autofocus>Keys</h2>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="keys-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <dl class="key-list">
+        <dt><kbd>1</kbd>–<kbd>9</kbd></dt>
+        <dd>Jump to a session, in the order of the bell panel</dd>
+        <dt><kbd>]</kbd> <kbd>[</kbd></dt>
+        <dd>Next and previous page</dd>
+        <dt><kbd>j</kbd> <kbd>k</kbd></dt>
+        <dd>Choose the next and previous block on the page</dd>
+        <dt><kbd>c</kbd></dt>
+        <dd>Comment on the selection, the chosen block, or the page</dd>
+        <dt><kbd>r</kbd></dt>
+        <dd>Review your feedback</dd>
+        <dt><kbd>s</kbd></dt>
+        <dd>Focus Submit; Enter sends</dd>
+        <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt>
+        <dd>Answer a question or add feedback from its textarea</dd>
+        <dt><kbd>a</kbd></dt>
+        <dd>Open Agreed</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>Close menus, panels, and dialogs</dd>
+      </dl>
+    </dialog>
+    <dialog class="dialog" id="pages-dialog" aria-labelledby="pages-title">
+      <div class="dialog-head">
+        <h2 id="pages-title" tabindex="-1" autofocus>Pages</h2>
+        <span class="round-status idle" data-round><i></i><span></span></span>
+        <button
+          class="icon-btn"
+          type="button"
+          data-close="pages-dialog"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="pages-slot" id="pages-slot"></div>
+    </dialog>
+    <dialog
+      class="lightbox"
+      id="diagram-dialog"
+      aria-label="Diagram, full size"
+    ></dialog>
+    <button class="btn primary quote-button" id="quote" type="button" hidden>
+      Comment on this page
+    </button>
+    <div class="note-tip" id="note-tip" hidden></div>
+
+    <script type="application/json" id="session-config">
+      {}
+    </script>
+    <script type="application/json" id="plan-data">
+      {
+        "artifactId": "proposal",
+        "revision": "1",
+        "kind": "exploration",
+        "title": "Work proposal",
+        "pages": [
+          {
+            "id": "overview",
+            "title": "Work proposal",
+            "html": "<p>Describe the proposed work and its meaningful alternatives here.</p>"
+          }
+        ]
+      }
+    </script>
+    <!-- FRAME_SCRIPT -->
+    <!-- CUSTOM_SCRIPT -->
+  </body>
+</html>
