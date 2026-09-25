@@ -20,10 +20,12 @@ Run `read`. It returns the submission and marks it read. Also read anything
 the user said in the chat since the last revision. An acceptance follows
 [session.md](session.md), and no pages are published after it.
 
-- `groups.alignUnflagged: true` means the reviewer agrees with every decision
-  on the revision that no note, choice or answer challenges. A submission may
-  contain nothing else. When the field is `false` or missing, silence is not
-  agreement.
+- `groups.alignUnflagged: true` means the reviewer agrees with what the
+  pages stated that no note challenges: a proposed design, wording or plan.
+  It answers no control. A choice with nothing selected stays open, even when
+  an option was recommended, and a checklist is exactly the boxes the
+  reviewer left checked, which can be none. A submission may contain nothing
+  but this. When the field is `false` or missing, silence is not agreement.
 - A note's anchor does not limit its reach. Read each note for every decision
   it challenges.
 - Open the image at every `attachments` path on a note, and the
