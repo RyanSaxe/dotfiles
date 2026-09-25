@@ -124,6 +124,14 @@ SVG by hand with the frame's tokens, as [flow.svg](../references/flow.svg)
 does. A diagram renders at its drawn size and scrolls sideways when it is
 wider than the column.
 
+The text of `data-diagram` is the Mermaid source, one statement per line.
+It is HTML text, like a code block's source: write `&lt;` for `<` and
+`&amp;` for `&`, so a line break in a label is `&lt;br/&gt;`. An unescaped
+`<br/>` becomes an HTML element, and the label loses the break without an
+error. `>` needs no escaping, so `-->` and `->>` stay as written. The build
+does not check Mermaid, and a diagram that does not parse shows the error
+under it.
+
 1. **Edges into a group.** An edge into a subgraph's first node passes
    through the subgraph's title. Point the edge at the group, or lay the
    flow out left to right.
@@ -133,6 +141,8 @@ wider than the column.
 3. **Labels.** Put one to three words in a node and the sentence in the
    caption. Long labels widen every node in the rank and push the chain past
    the column.
+
+In these examples, `·` stands for a line break.
 
 ```text
 1, avoid    flowchart TB · E["Pricing"] --> F · subgraph pay [Payments]

@@ -37,9 +37,11 @@ and `ack` itself.
 
 ## Read the feedback
 
-Run `read`. It returns the submission and marks it read. Also read anything
-the user said in the chat since the last revision. An acceptance follows
-[session.md](session.md), and no pages are published after it.
+Run `read`. It returns the submission as `event.payload` and marks it read.
+Its `intent` is `feedback-only` for feedback and `accept-plan` for an
+acceptance, and its `groups` hold the choices, answers and notes. Also read
+anything the user said in the chat since the last revision. An acceptance
+follows [session.md](session.md), and no pages are published after it.
 
 - `groups.alignUnflagged: true` means the reviewer agrees with what the
   pages stated that no note challenges: a proposed design, wording or plan.

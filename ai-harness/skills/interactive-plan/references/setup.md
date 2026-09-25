@@ -64,8 +64,9 @@ creates nothing, and prints the instruction to give the user.
 Copilot listens only when started with `--ui-server`, so its refusal names
 `copilot --ui-server --resume <session id>`. Its embedded server accepts any
 local client when `COPILOT_CONNECTION_TOKEN` is unset. After a submission,
-`status` reports `wake` as `ok`, or `failed` with the reason, and the
-browser asks the reader to send a message in chat.
+`status` reports the last wake under `wake.last`, with `ok` and, when it
+failed, the `reason`. The browser then asks the reader to send a message in
+chat.
 
 ### The hub
 

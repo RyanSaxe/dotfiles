@@ -60,8 +60,9 @@ The session begins in the conversation. Before the first revision, establish
 what the user wants, what they do and do not want, what the project shows and
 what remains uncertain. Ask one question at a time and use each answer before
 asking the next question. Move to the browser once there is material to
-compare or approve. Open the first revision in the user's default browser and
-give the link in chat. Ask every later question on a page.
+compare or approve. When the first Agreed publishes, open the session in the
+user's default browser and give the link in chat. Ask every later question on
+a page.
 
 After the last page of a revision publishes, or after `pause`, the turn ends.
 The hub starts another turn when a submission arrives, including an
