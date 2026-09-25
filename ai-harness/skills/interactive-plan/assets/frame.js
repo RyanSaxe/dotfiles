@@ -1167,11 +1167,9 @@ function renderActivity() {
                 : "Paused"
               : "Working"
             : "Queued";
-      row.append(
-        pageIndicator(stopped ? "queued" : pageStatus({ status: slot.state })),
-        name,
-        label,
-      );
+      const mark = pageIndicator(pageStatus({ status: slot.state }));
+      if (stopped) mark.classList.add("stopped");
+      row.append(mark, name, label);
       rows.append(row);
     }
   }

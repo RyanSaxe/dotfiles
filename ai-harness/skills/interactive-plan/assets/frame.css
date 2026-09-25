@@ -380,6 +380,8 @@ kbd {
   border-bottom: 1px solid var(--line);
 }
 .pages-slot nav .page-tabs button {
+  display: flex;
+  align-items: center;
   justify-content: center;
   min-height: 34px;
   border: 0;
@@ -457,6 +459,10 @@ kbd {
   border-radius: 50%;
   background: currentColor;
   animation: page-breathe 2s ease-in-out infinite;
+}
+/* A paused or unwoken agent is not working, so its active page stops breathing. */
+.page-activity.active.stopped::before {
+  animation: none;
 }
 @keyframes page-breathe {
   50% {
