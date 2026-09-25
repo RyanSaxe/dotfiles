@@ -2552,20 +2552,35 @@ $("export").onclick = () => {
 };
 function openAccept() {
   $("accept-detail").textContent = `${plan.title}, revision ${plan.revision}`;
+  $("accept-guidance").value = state.acceptGuidance || "";
   $("accept-error").textContent = "";
   $("accept-dialog").showModal();
 }
 $("accept").onclick = openAccept;
+$("accept-guidance").oninput = (event) => {
+  state.acceptGuidance = event.target.value;
+  persist();
+};
 document.querySelectorAll("[data-accept-mode]").forEach(
   (button) =>
     (button.onclick = async () => {
       const mode = button.dataset.acceptMode;
-      if (state.acceptance?.mode !== mode)
-        state.acceptance = envelope(
-          "accept-plan",
-          `Accept ${plan.artifactId} revision ${plan.revision}. ${mode === "implement" ? "Start implementation of this plan." : "Save for later. Do not start implementation."}`,
-          { mode },
-        );
+      const guidance =
+        mode === "implement" ? $("accept-guidance").value.trim() : "";
+      const action =
+        mode === "implement"
+          ? "Start implementation of this plan."
+          : "Save for later. Do not start implementation.";
+      const text = `Accept ${plan.artifactId} revision ${plan.revision}. ${action}${guidance ? `\n\nImplementation guidance:\n${guidance}` : ""}`;
+      if (
+        state.acceptance?.mode !== mode ||
+        (state.acceptance?.guidance || "") !== guidance
+      )
+        state.acceptance = envelope("accept-plan", text, {
+          mode,
+          ...(guidance ? { guidance } : {}),
+        });
+      persist();
       document
         .querySelectorAll("[data-accept-mode]")
         .forEach((item) => (item.disabled = true));

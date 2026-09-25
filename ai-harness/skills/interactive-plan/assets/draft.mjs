@@ -75,6 +75,8 @@ export function loadDraft(saved, revision) {
     draft.answers = filterValues(draft.answers, (answer) => !answer.sentIn);
     draft.submitted = null;
     draft.pending = null;
+    draft.acceptance = null;
+    draft.acceptGuidance = "";
     draft.revision = revision;
   }
   return draft;

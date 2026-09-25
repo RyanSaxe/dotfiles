@@ -217,9 +217,12 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   );
   assert.equal("sentIn" in groups.notes[0], false);
   assert.equal("answers" in groups, false);
+  draft.acceptance = { id: "accept-1", mode: "implement", guidance: "Do this" };
+  draft.acceptGuidance = "Do this";
   const same = loadDraft(JSON.parse(JSON.stringify(draft)), "1");
   assert.equal(same.notes.length, 2);
   assert.equal(same.submitted.id, "sub-1");
+  assert.equal(same.acceptGuidance, "Do this");
   const next = loadDraft(JSON.parse(JSON.stringify(draft)), "2");
   assert.deepEqual(
     next.notes.map((note) => note.id),
@@ -228,6 +231,8 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   assert.deepEqual(next.choices, {});
   assert.deepEqual(next.answers, {});
   assert.equal(next.submitted, null);
+  assert.equal(next.acceptance, null);
+  assert.equal(next.acceptGuidance, "");
   assert.equal(next.revision, "2");
   assert.deepEqual(loadDraft(null, "3"), emptyDraft("3"));
   assert.deepEqual(loadDraft({ notes: "bad" }, "3"), emptyDraft("3"));
@@ -1541,6 +1546,52 @@ for (const mode of ["save", "implement"])
     assert.equal((await a.publish(planData("3", "plan"))).code, 409);
     assert.equal((await a.status()).body.accepted.mode, mode);
   });
+
+test("implementation guidance is validated, saved with acceptance, and returned on completion", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.publish(planData("1", "plan"));
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("accept-plan", "1", { mode: "save", guidance: "Do this" }),
+      )
+    ).code,
+    400,
+  );
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("accept-plan", "1", {
+          mode: "implement",
+          guidance: "x".repeat(4001),
+        }),
+      )
+    ).code,
+    400,
+  );
+  const acceptance = a.event("accept-plan", "1", {
+    mode: "implement",
+    guidance: "  Start with the drawing question.  ",
+  });
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  assert.equal(
+    (await a.feedback({ ...acceptance, guidance: "Different work" })).code,
+    409,
+  );
+  const read = await a.action("read");
+  assert.equal(
+    read.body.event.payload.guidance,
+    "Start with the drawing question.",
+  );
+  const complete = (await a.action("complete")).body;
+  assert.equal(complete.guidance, "Start with the drawing question.");
+  const record = JSON.parse(
+    await fs.readFile(path.join(a.directory, "acceptance.json"), "utf8"),
+  );
+  assert.equal(record.guidance, complete.guidance);
+});
 
 test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-idle-"));
