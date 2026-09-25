@@ -934,8 +934,6 @@ function itemCard({ kind, key, item }) {
   // empty h3 draws a blank line above the note's own words.
   title.hidden = kind === "note" && !item.anchor;
   if (item.sentIn) title.append(tag("Sent", "ok"));
-  if (kind === "list" && item.sentIn && !item.touched)
-    title.append(tag("Default", "muted"));
   const old = stale(kind, key, item);
   if (old && item.revision && item.revision !== plan.revision)
     title.append(tag(`from revision ${item.revision}`, "muted"));
@@ -1043,7 +1041,7 @@ function itemCard({ kind, key, item }) {
 }
 function renderFeedback() {
   // An untouched, unsent list is not feedback yet; it appears once it went
-  // with a round, marked as a default.
+  // with a round.
   const items = [
     ...Object.entries(state.choices)
       .filter(
@@ -1554,7 +1552,12 @@ function feedbackText() {
     "Feedback only. No implementation approval.",
     `Everything else looks good: ${state.alignUnflagged ? "yes" : "no"}.`,
   ];
-  for (const choice of Object.values(choices))
+  // A checklist the reviewer left alone reads like any other. An empty one
+  // means none picked.
+  const untouched = Object.values(state.choices).filter(
+    (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
+  );
+  for (const choice of [...Object.values(choices), ...untouched])
     lines.push("", `${choice.label}: ${choiceText(choice)}`);
   for (const answer of Object.values(answers))
     lines.push(
@@ -1577,12 +1580,6 @@ function feedbackText() {
          same, which is the only way the paths travel with it. */
       ...(note.attachments || []).map((item) => `Image: ${item.path}`),
     );
-  const defaults = Object.values(state.choices).filter(
-    (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
-  );
-  if (defaults.length) lines.push("", "Defaults, not confirmed:");
-  for (const choice of defaults)
-    lines.push(`${choice.label}: ${choiceText(choice)}`);
   return lines.join("\n");
 }
 function envelope(intent, text, extra = {}) {
