@@ -20,14 +20,32 @@ export function emptyDraft(revision) {
   };
 }
 
-// The remembered reading place is keyed by session, not revision. A record
-// written under an earlier revision, or one naming a page this revision no
-// longer has, would land the reader somewhere arbitrary, so it is dropped.
-export function usablePlace(saved, revision, pageIds) {
-  if (!record(saved) || saved.revision !== revision) return null;
-  if (!pageIds.includes(saved.page)) return null;
-  const top = Number(saved.top);
-  return { page: saved.page, top: Number.isFinite(top) && top > 0 ? top : 0 };
+// Where the reader was in each revision, and which tab and past revision were
+// on screen. A record from before places were kept per revision holds one
+// revision's place, which is kept.
+export function readPlaces(saved) {
+  const places = {};
+  const place = (value) => {
+    const top = Number(value.top);
+    return { page: value.page, top: Number.isFinite(top) && top > 0 ? top : 0 };
+  };
+  if (!record(saved)) return { tab: "current", past: null, places };
+  if (typeof saved.revision === "string" && typeof saved.page === "string")
+    places[saved.revision] = place(saved);
+  if (record(saved.places))
+    for (const [revision, value] of Object.entries(saved.places))
+      if (record(value) && typeof value.page === "string")
+        places[revision] = place(value);
+  return {
+    tab: saved.tab === "past" ? "past" : "current",
+    past: typeof saved.past === "string" ? saved.past : null,
+    places,
+  };
+}
+// A remembered page that the revision no longer has is ignored.
+export function placeFor(places, revision, pageIds) {
+  const place = places[revision];
+  return place && pageIds.includes(place.page) ? place : null;
 }
 
 // Drafts are keyed by session and artifact, not revision. When a new revision

@@ -1527,6 +1527,12 @@ dialog::backdrop {
 .rev-row small {
   color: var(--muted);
   font-size: 11.5px;
+  font-weight: 400;
+}
+.rev-plan {
+  margin: -6px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .key-list {
   display: grid;
@@ -1882,6 +1888,12 @@ img.note-image {
 #revision.older {
   color: var(--accent);
   background: var(--accent-soft);
+}
+#history-label b {
+  font-weight: 600;
+}
+#history-label .meta {
+  color: var(--muted);
 }
 main:has(.history-strip:not([hidden])) .content {
   min-height: calc(100% - 38px);

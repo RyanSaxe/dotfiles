@@ -6,17 +6,24 @@ The frame provides the header, sidebar, previous and next links, the bell,
 Settings, Review, Feedback, and preview and read-only modes. The bell lists
 other live sessions and closes them. The header spans the frame at every
 width. It displays the revision clock, Settings and the bell on the left,
-and Submit on the right. Submit stays in place. It is disabled until all
-pages publish and the reader has feedback or alignment to send, reads Sending
-during a save, and becomes Feedback after submission. A final plan with no
-unsent feedback offers Accept plan. The clock lists completed revisions and
-the current one.
+and Submit on the right. Submit stays in place and always acts on Current,
+from either tab. It is disabled until all pages publish and the reader has
+feedback or alignment to send, reads Sending during a save, and becomes
+Feedback, which opens the sent revision's Feedback page, until the next
+revision arrives. A final plan with no unsent feedback offers Accept plan.
+The clock lists every revision, newest first, as Current or Feedback sent,
+with the plan title under its heading. Picking a past revision loads it into
+the left tab, and picking the current one returns to Current.
 
-The sidebar and phone drawer keep Current and Previous in fixed tabs.
-Previous holds the last submitted revision and is disabled until the first
-submission. After submission, Current is disabled until the next Agreed page
-and its complete page list publish together. The reader stays on Previous
-until choosing Current. Page names keep their declared order as statuses change.
+The sidebar and phone drawer keep two fixed tabs: the past revision on
+screen on the left, labelled Revision N, and Current on the right. The left
+tab starts as the revision last submitted and reads Previous, disabled,
+until something has been sent. It keeps the revision the reader picked
+while they visit Current, and changes only when they pick another revision
+or submit. After submission, it holds the revision just sent, on its
+Feedback page, and Current is disabled until the next Agreed page and its
+complete page list publish together. The reader stays on the left tab until
+choosing Current. Page names keep their declared order as statuses change.
 A ready page's name is plain text with no mark. A page that is not ready is
 dimmed, and the page the agent is working on also shows a breathing dot. When
 a page publishes, its name fades up to normal. Names stay on one line and end
@@ -32,8 +39,8 @@ If that page publishes while open, its content loads in place. Another page's
 publication never replaces the page being read. Reduced-motion mode keeps the
 dot visible without breathing and changes names without fading. Below 720px, the
 Pages button opens the same tabs and list. Its accent-colored badge counts
-ready Current pages, including Agreed, even while Previous is selected.
-While Previous is selected, the Current tab shows the same count as text,
+ready Current pages, including Agreed, even while the left tab is selected.
+While the left tab is selected, the Current tab shows the same count as text,
 for example Current (4). The bell uses a different attention color. The
 selected tab has an underline; the selected page has a soft fill. Both keep a
 separate keyboard focus outline.
@@ -41,8 +48,8 @@ separate keyboard focus outline.
 Current's Review contains only unsent comments, choices, and answers, grouped
 by page. It retains editing, removal, the alignment switch, overall comments,
 attachment thumbnails, and Export. Page progress lives in navigation and on
-the Feedback page under Previous, not in Review. Submit from any Current page
-opens Previous / Feedback. While the hub saves, the page says Sending feedback and
+the sent revision's Feedback page, not in Review. Submit from either tab opens
+the sent revision's Feedback page. While the hub saves, the page says Sending feedback and
 keeps the draft. A confirmed save shows saved comments and the agent activity
 card. The card keeps a progress bar and a footer line in every state, so it
 changes height only when the page rows arrive. Before the page list exists,
@@ -88,16 +95,21 @@ column is at most 780px of text.
 The frame is exactly as tall as the visible window. Short pages keep the panel
 background and footer to the bottom, including on phones. The browser scrolls
 the page inside the frame, so the window itself never scrolls and content does
-not pass under the header. The session stores the page and scroll offset, so the
-bell can return the reader to the same place after a jump to another session.
-The session record stores the revision. A newly published page in the same
+not pass under the header. The browser keeps the page and scroll position the
+reader left in each revision, Current included, and which past revision the
+left tab held. Switching tabs, picking a revision from the clock, a reload
+and the bell's jump to another session and back all return there. A revision
+not yet visited opens at Agreed. A newly published page in the same
 revision leaves the reader on the current page with scroll, focus, and draft
-text unchanged. A new revision enables Current without leaving Previous.
-Previous pages and older read-only revisions use the same soft-blue history
-strip across the main column, with a return action. On an older revision the
-strip reads Earlier revision with its number. A read-only revision lists only
-its own pages, without the Current and Previous tabs, and ends with a
-Feedback page that lists everything sent on it, overall comments included.
+text unchanged. A new revision enables Current without leaving the left tab.
+Every page of the left tab, its Feedback page included, carries a soft-blue
+strip across the main column that reads Revision N · Feedback sent, with
+Back to current once Current is ready. Current never has the strip. An
+agreement's Open link loads its source revision into the left tab at the
+page it names. A revision published before page lists existed, and a link
+opened in a new tab, use the read-only page, which has no tabs, carries the
+same strip, and ends with a Feedback page that lists everything sent on it,
+overall comments included.
 Its choices, checkboxes and answers show what was sent and cannot change. Frame
 dialogs close on Escape or their ✕ without
 submitting anything, and each takes the focus on its own heading so no

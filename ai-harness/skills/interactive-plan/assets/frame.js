@@ -19,7 +19,12 @@ const query = new URL(location.href).searchParams;
 let agreements = plan.agreements || [];
 let pages = [{ id: "agreed", title: "Agreed so far", html: "" }, ...plan.pages];
 let selectedTab = "current";
+// The last revision this reader submitted, which keeps Current disabled until
+// the next one arrives, and the past revision the left tab shows.
 let submittedRevision = null;
+let pastRevision = null;
+// What was sent on each past revision the left tab has shown.
+const sentByRevision = new Map();
 const views = new Map([[plan.revision, { plan, agreements, pages }]]);
 const pageSets = new Map();
 const recordLoads = new Map();
@@ -91,9 +96,18 @@ if (editable)
   } catch {
     /* The in-memory draft and export remain usable. */
   }
+let placeStore = { tab: "current", past: null, places: {} };
+try {
+  placeStore = readPlaces(JSON.parse(localStorage.getItem(placeKey)));
+} catch {
+  /* Every revision then opens at its first page. */
+}
+const places = placeStore.places;
+if (editable) pastRevision = placeStore.past;
 if (editable && state.submitted?.revision === plan.revision) {
   submittedRevision = plan.revision;
-  selectedTab = "submitted";
+  pastRevision = plan.revision;
+  selectedTab = "past";
 }
 const known = {
   choices: new Set(),
@@ -184,7 +198,7 @@ const current = () =>
   remote?.current?.revision === plan.revision;
 const submittedCurrent = () =>
   editable &&
-  (selectedTab === "submitted" ||
+  (selectedTab === "past" ||
     state.submitted?.revision === plan.revision ||
     (current() && remote?.latestSubmissionRevision === plan.revision));
 const feedbackEditable = () =>
@@ -267,31 +281,63 @@ const scroller = () =>
   [document.querySelector("main"), document.querySelector(".app-body")].find(
     (el) => /auto|scroll/.test(getComputedStyle(el).overflowY),
   );
-/* Where you were, so the bell's jump to another session and back lands on the
-   page you left. The revision is stored with it: a new revision does not
-   match and the record is ignored, which is what starts you at the top of the
-   first page. */
+/* Where you were in each revision, so switching tabs, picking a revision from
+   the clock, a reload, and the bell's jump to another session and back all
+   land on the page and scroll position you left. A revision you have not
+   visited has no entry, which starts it at its first page. Only the live
+   reader stores them, so a read-only page cannot overwrite its tabs. */
 let placeTimer = 0;
 function rememberPlace() {
+  const pageId = $("reading").hidden ? "feedback" : page.id;
+  const held =
+    restoring?.revision === plan.revision && restoring.page === pageId;
+  places[plan.revision] = {
+    page: pageId,
+    top: held ? restoring.top : Math.round(scroller().scrollTop),
+  };
+  if (!editable) return;
   clearTimeout(placeTimer);
   placeTimer = setTimeout(() => {
     try {
       localStorage.setItem(
         placeKey,
-        JSON.stringify({
-          revision: plan.revision,
-          page: $("reading").hidden ? "feedback" : page.id,
-          top: Math.round(scroller().scrollTop),
-        }),
+        JSON.stringify({ tab: selectedTab, past: pastRevision, places }),
       );
     } catch {
       /* Returning to the same place is a convenience, not a requirement. */
     }
   }, 250);
 }
+const placeIn = (revision, pageIds) => placeFor(places, revision, pageIds);
+/* A page can still be loading, or its renderers can still change its height,
+   when the reader returns to it, and the browser clamps the position
+   meanwhile. Until the page settles, the position being restored stands in
+   for the clamped one. */
+let restoring = null;
+function restoreScroll(top) {
+  restoring = {
+    revision: plan.revision,
+    page: $("reading").hidden ? "feedback" : page.id,
+    top,
+  };
+  settleScroll();
+}
+function settleScroll() {
+  const target = restoring;
+  if (!target) return;
+  scroller().scrollTo(0, target.top);
+  Promise.allSettled([...renders]).then(() => {
+    if (restoring !== target) return;
+    scroller().scrollTo(0, target.top);
+    if ($("reading").hidden || !page.pending) restoring = null;
+  });
+}
 document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   hideArrival();
+  const resuming =
+    restoring?.revision === plan.revision && restoring.page === id;
+  if (!resuming) restoring = null;
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && hasFeedbackPage;
   $("reading").hidden = feedback;
@@ -348,6 +394,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     preventScroll: true,
   });
   if (!keepScroll) scroller().scrollTo(0, 0);
+  else if (resuming) settleScroll();
   else if (!targetId) {
     // Replacing the page shortens it until the renderers finish, and the
     // browser clamps the scroll position meanwhile; restore it after they do.
@@ -573,6 +620,27 @@ function describeRecord(record) {
   if (record.kind === "answer") return `your answer to “${record.label}”`;
   return `your choice “${record.text}” for ${record.label}`;
 }
+// In the live reader, a source's Open link loads its revision into the left
+// tab at the page and block it names. A modified click still opens the
+// read-only page in a new tab.
+function openInTab(link, record) {
+  if (!editable) return;
+  link.addEventListener("click", (event) => {
+    if (
+      event.button ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
+    event.preventDefault();
+    void openPast(record.revision, {
+      pageId: record.topic,
+      targetId: record.target,
+    });
+  });
+}
 function recordUrl(record, route) {
   const params = new URLSearchParams();
   if (record.target) params.set("target", record.target);
@@ -650,8 +718,10 @@ function agreementCard(entry) {
   if (first) {
     const open = document.createElement("a");
     open.textContent = "Open";
-    if (online) open.href = recordUrl(first, "r");
-    else {
+    if (online) {
+      open.href = recordUrl(first, "r");
+      openInTab(open, first);
+    } else {
       open.href = first.href;
       open.target = "_blank";
       open.rel = "noopener";
@@ -1002,10 +1072,10 @@ function sentCard(entry) {
 function renderSentPageComments() {
   const section = $("sent-page-comments");
   section.replaceChildren();
-  const entries =
-    lastSubmission?.revision === plan.revision
-      ? sentEntries(lastSubmission).filter((entry) => entry.topic === page.id)
-      : [];
+  const sent = shownSubmission();
+  const entries = sent
+    ? sentEntries(sent).filter((entry) => entry.topic === page.id)
+    : [];
   section.hidden = !entries.length;
   if (!entries.length) return;
   const heading = document.createElement("h2");
@@ -1014,13 +1084,17 @@ function renderSentPageComments() {
 }
 let renderedSentKey = null;
 function renderSentFeedback() {
-  const key = lastSubmission?.id || "";
+  const sent = shownSubmission();
+  // A past revision's submission may still be loading, which is not the same
+  // as none having been sent.
+  const loaded = mode === "readonly" || sentByRevision.has(plan.revision);
+  const key = `${plan.revision}:${sent?.id || (loaded ? "none" : "")}`;
   if (renderedSentKey === key) return;
   renderedSentKey = key;
   const list = $("sent-feedback-list");
   list.replaceChildren();
-  if (!lastSubmission) {
-    if (mode === "readonly") {
+  if (!sent) {
+    if (loaded) {
       const empty = document.createElement("p");
       empty.className = "muted";
       empty.textContent = "No feedback was sent on this revision.";
@@ -1028,17 +1102,57 @@ function renderSentFeedback() {
     }
     return;
   }
-  const entries = sentEntries(lastSubmission);
+  const entries = sentEntries(sent);
   for (const entry of entries) list.append(sentCard(entry));
   if (!entries.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = lastSubmission.groups.alignUnflagged
+    empty.textContent = sent.groups.alignUnflagged
       ? "Everything else looked good."
       : "No comments were sent.";
     list.append(empty);
   }
   renderSentPageComments();
+}
+// The submission sent on the revision on screen: the latest one, which the
+// poll keeps, or one fetched for an older revision in the left tab.
+function shownSubmission() {
+  if (mode === "readonly" || lastSubmission?.revision === plan.revision)
+    return lastSubmission;
+  return sentByRevision.get(plan.revision) || null;
+}
+// A past revision shows what was sent on it, so its controls read from that
+// revision's submission rather than from a draft.
+function sentDraft(revision) {
+  const draft = emptyDraft(revision);
+  const sent =
+    lastSubmission?.revision === revision
+      ? lastSubmission
+      : sentByRevision.get(revision);
+  draft.choices = sent?.groups?.choices || {};
+  draft.answers = sent?.groups?.answers || {};
+  return draft;
+}
+async function loadPastSubmission(revision) {
+  if (sentByRevision.has(revision) || lastSubmission?.revision === revision)
+    return;
+  const response = await fetch(
+    `${base}/api/submission?revision=${encodeURIComponent(revision)}`,
+  );
+  if (!response.ok) return;
+  const { submission } = await response.json();
+  sentByRevision.set(revision, submission);
+  const onScreen = selectedTab === "past" && plan.revision === revision;
+  const draft = onScreen ? state : views.get(revision)?.draft;
+  if (submission && draft && !draft.submitted) {
+    draft.choices = submission.groups?.choices || {};
+    draft.answers = submission.groups?.answers || {};
+  }
+  if (!onScreen) return;
+  if (!$("reading").hidden)
+    show(page.id, null, { keepScroll: true, push: false });
+  renderSentFeedback();
+  renderHistory();
 }
 async function loadSubmission() {
   const key =
@@ -1150,10 +1264,17 @@ function renderActivity() {
     renderSentFeedback();
     return;
   }
-  const visible = selectedTab === "submitted" || submissionInFlight;
+  // The agent's progress belongs to the revision last submitted. An older
+  // revision in the left tab shows only what was sent on it.
+  const past = selectedTab === "past";
+  const visible =
+    (past && plan.revision === submittedRevision) || submissionInFlight;
   $("agent-activity").hidden = !visible;
-  $("sent-feedback").hidden = !visible || submissionInFlight;
-  if (!visible) return;
+  $("sent-feedback").hidden = !past || submissionInFlight;
+  if (!visible) {
+    if (past) renderSentFeedback();
+    return;
+  }
   const model = activityModel({
     remote,
     currentSet: pageSets.get(remote?.current?.revision),
@@ -1229,27 +1350,37 @@ function renderActivity() {
   report.classList.toggle("late", Boolean(footer.late));
   if (!submissionInFlight) renderSentFeedback();
 }
+// Every page of a past revision, its Feedback page included, names the
+// revision. Current never has the strip.
 function renderHistory() {
   const old = mode === "readonly";
-  const submittedPage = selectedTab === "submitted" && !$("reading").hidden;
+  const past = selectedTab === "past";
   const strip = $("history-strip");
-  strip.hidden = !(old || submittedPage);
+  strip.hidden = !(old || past);
   if (strip.hidden) return;
-  $("history-label").textContent = old
-    ? session.closed
-      ? "This plan is closed"
-      : `Earlier revision (${plan.revision})`
-    : "Feedback sent";
+  const label = $("history-label");
+  if (old && session.closed) label.textContent = "This plan is closed";
+  else {
+    const name = document.createElement("b");
+    name.textContent = `Revision ${plan.revision}`;
+    label.replaceChildren(name);
+    if (past || shownSubmission()) {
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = " · Feedback sent";
+      label.append(meta);
+    }
+  }
   const button = $("history-return");
-  button.hidden = old && session.closed;
-  button.textContent = old ? "Back to current" : "Feedback →";
+  button.hidden = old ? session.closed : !currentAvailable();
+  button.textContent = "Back to current";
   button.onclick = old
     ? () => location.assign(`${base}/`)
-    : () => show("feedback");
+    : () => switchTab("current");
 }
 function review() {
   const unsent = unsentItems(state);
-  const sent = selectedTab === "submitted" || mode === "readonly";
+  const sent = selectedTab === "past" || mode === "readonly";
   const locked = sent || submissionInFlight || submittedCurrent();
   $("draft-head").hidden = unsent.count === 0;
   $("draft-count").textContent = `${unsent.count} to send`;
@@ -1293,22 +1424,39 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
+  // The header button always acts on Current. From a past revision it submits
+  // Current's draft, and once Current's revision is sent it opens that
+  // revision's Feedback.
+  const forCurrent = selectedTab === "past" && currentAvailable();
+  const draft = forCurrent ? currentDraft() : state;
+  const pending = forCurrent ? unsentItems(draft) : unsent;
+  const kind = forCurrent
+    ? views.get(remote.current.revision).plan.kind
+    : plan.kind;
+  const opensFeedback = sent && !forCurrent;
+  const onSentFeedback =
+    $("reading").hidden &&
+    (mode === "readonly" || plan.revision === submittedRevision);
   const sendable =
-    connected && current() && feedbackEditable() && !remote?.pageRound;
+    connected &&
+    !remote?.pageRound &&
+    (forCurrent || (current() && feedbackEditable()));
   const waitingForPages = Boolean(remote?.pageRound);
   const hasFeedback =
-    unsent.count > 0 || (plan.kind === "exploration" && state.alignUnflagged);
+    pending.count > 0 || (kind === "exploration" && draft.alignUnflagged);
   $("submit").disabled =
     submissionInFlight ||
-    (sent ? $("reading").hidden : waitingForPages || !hasFeedback || !sendable);
+    (opensFeedback
+      ? onSentFeedback
+      : waitingForPages || !hasFeedback || !sendable);
   $("submit").textContent = submissionInFlight
     ? "Sending"
-    : sent
+    : opensFeedback
       ? "Feedback"
-      : unsent.count
-        ? `Submit (${unsent.count})`
+      : pending.count
+        ? `Submit (${pending.count})`
         : "Submit";
-  $("submit").classList.toggle("primary", !sent && !waitingForPages);
+  $("submit").classList.toggle("primary", !opensFeedback && !waitingForPages);
   // Accept plan uses the same slot when a final plan has no unsent feedback.
   $("submit").hidden = !$("accept").hidden;
   status();
@@ -1440,7 +1588,7 @@ async function loadPageRecord(revision, id) {
       const focused = document.activeElement;
       show(id, null, { keepScroll: true, push: false });
       if (focused?.isConnected) focused.focus({ preventScroll: true });
-      scroller().scrollTo(0, top);
+      if (!restoring) scroller().scrollTo(0, top);
     }
     return record;
   })().catch((error) => {
@@ -1551,61 +1699,87 @@ async function syncPageSet() {
   });
   return pageSetLoading;
 }
-let submittedSetLoading = null;
-// A revision published before page sets existed has none; Submitted stays
-// disabled for it rather than asking again on every poll.
+// A revision published before page sets existed has none. It opens on its
+// own read-only page instead, without asking again on every poll.
 const missingSets = new Set();
-async function syncSubmittedSet() {
-  if (
-    !submittedRevision ||
-    views.has(submittedRevision) ||
-    missingSets.has(submittedRevision)
-  )
-    return;
-  if (submittedSetLoading) return submittedSetLoading;
-  submittedSetLoading = (async () => {
+const pastLoads = new Map();
+// Load a past revision's page list and Agreed into a view the left tab can
+// show. Resolves false for a revision that has no page set.
+function loadPastView(revision) {
+  if (!revision) return Promise.resolve(false);
+  if (views.has(revision)) return Promise.resolve(true);
+  if (missingSets.has(revision)) return Promise.resolve(false);
+  if (pastLoads.has(revision)) return pastLoads.get(revision);
+  const task = (async () => {
     const response = await fetch(
-      `${base}/api/page-set?revision=${encodeURIComponent(submittedRevision)}`,
+      `${base}/api/page-set?revision=${encodeURIComponent(revision)}`,
     );
     if (response.status === 404) {
-      missingSets.add(submittedRevision);
-      return;
+      missingSets.add(revision);
+      return false;
     }
-    if (!response.ok) throw Error("Could not load submitted pages.");
+    if (!response.ok) throw Error("Could not load that revision's pages.");
     const manifest = await response.json();
-    const entry = remote?.revisions?.find(
-      (item) => item.revision === submittedRevision,
-    );
+    const entry = remote?.revisions?.find((item) => item.revision === revision);
     const oldPlan = {
       artifactId: entry?.artifactId || remote.current.artifactId,
-      revision: submittedRevision,
+      revision,
       kind: entry?.kind || remote.current.kind,
       title: entry?.title || remote.current.title,
       pages: [],
       agreements: [],
     };
     const view = { plan: oldPlan, agreements: [], pages: [] };
-    views.set(submittedRevision, view);
-    pageSets.set(submittedRevision, manifest);
+    views.set(revision, view);
+    pageSets.set(revision, manifest);
     reconcilePages(view, manifest);
     try {
-      await loadPageRecord(submittedRevision, "agreed");
+      await loadPageRecord(revision, "agreed");
     } catch (error) {
-      views.delete(submittedRevision);
-      pageSets.delete(submittedRevision);
+      views.delete(revision);
+      pageSets.delete(revision);
       throw error;
     }
     updateNavigation();
+    return true;
   })().finally(() => {
-    submittedSetLoading = null;
+    pastLoads.delete(revision);
   });
-  return submittedSetLoading;
+  pastLoads.set(revision, task);
+  return task;
 }
-function switchTab(tab) {
+// The clock and an agreement's Open link load a past revision into the left
+// tab. A revision from before page sets opens on its own read-only page.
+async function openPast(revision, { pageId = null, targetId = null } = {}) {
+  const loaded = await loadPastView(revision).catch(() => false);
+  if (!loaded) {
+    location.assign(`${base}/r/${encodeURIComponent(revision)}`);
+    return;
+  }
+  pastRevision = revision;
+  if (pageId) places[revision] = { page: pageId, top: 0 };
+  switchTab("past", targetId);
+}
+// Current's draft while a past revision is on screen: the one set aside when
+// the reader left Current, or the saved one.
+function currentDraft() {
+  const view = views.get(remote?.current?.revision);
+  if (view?.draft) return view.draft;
+  try {
+    return loadDraft(
+      JSON.parse(localStorage.getItem(storageKey)),
+      remote.current.revision,
+    );
+  } catch {
+    return emptyDraft(remote.current.revision);
+  }
+}
+// Each tab reopens its revision at the page and scroll position the reader
+// left, or at Agreed on a first visit.
+function switchTab(tab, targetId = null) {
   if (tab === "current" && !currentAvailable()) return;
-  if (tab === "submitted" && !submittedAvailable()) return;
-  const revision =
-    tab === "current" ? remote.current.revision : submittedRevision;
+  if (tab === "past" && !pastAvailable()) return;
+  const revision = tab === "current" ? remote.current.revision : pastRevision;
   const view = views.get(revision);
   views.get(plan.revision).draft = state;
   selectedTab = tab;
@@ -1619,13 +1793,22 @@ function switchTab(tab) {
   } catch {
     /* The in-memory draft and export remain available. */
   }
-  state = view.draft || loadDraft(saved, revision);
+  state =
+    view.draft ||
+    (tab === "past" ? sentDraft(revision) : loadDraft(saved, revision));
   rebuildKnown();
   if (tab === "current") initializeChecklists();
   page = pages[0];
   renderedFeedback = null;
   updateNavigation(true);
-  show(tab === "current" ? "agreed" : "feedback");
+  const place = placeIn(revision, [
+    ...pages.map((item) => item.id),
+    "feedback",
+  ]);
+  show(place?.page || "agreed", targetId);
+  if (place?.top && !targetId) restoreScroll(place.top);
+  if (tab === "past") void loadPastSubmission(revision).catch(() => {});
+  renderRevisions();
 }
 const currentAvailable = () =>
   Boolean(
@@ -1633,8 +1816,7 @@ const currentAvailable = () =>
     remote.current.revision !== submittedRevision &&
     views.has(remote.current.revision),
   );
-const submittedAvailable = () =>
-  Boolean(submittedRevision && views.has(submittedRevision));
+const pastAvailable = () => Boolean(pastRevision && views.has(pastRevision));
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
   const complete = stage === "complete" && remote?.accepted;
@@ -1664,18 +1846,24 @@ async function poll() {
     if (editable && !submittedRevision)
       submittedRevision =
         state.submitted?.revision || remote.latestSubmissionRevision;
+    if (editable && !pastRevision) pastRevision = submittedRevision || null;
     // A read-only page stays on its own revision. A failed page-set fetch is
     // retried on the next poll and does not mean the hub is unreachable.
     if (editable) {
       await syncPageSet().catch(() => {});
-      await syncSubmittedSet().catch(() => {});
+      await loadPastView(pastRevision).catch(() => {});
     }
+    // Current's revision was sent, here or in another browser: the left tab
+    // takes it, on its Feedback page, where the agent's progress shows.
     if (
       selectedTab === "current" &&
       submittedRevision === plan.revision &&
       remote.latestSubmissionRevision === plan.revision
-    )
-      switchTab("submitted");
+    ) {
+      pastRevision = plan.revision;
+      places[plan.revision] = { page: "feedback", top: 0 };
+      switchTab("past");
+    }
     void loadSubmission().catch(() => {});
     if (
       state.pending?.event?.id === remote.latestSubmissionId &&
@@ -1901,6 +2089,8 @@ function renderRevisions() {
     entries.map((entry) => [entry.revision, entry.publishedAt]),
     plan.revision,
     mode,
+    selectedTab,
+    submittedRevision,
   ]);
   if (signature === renderedRevisions) return;
   renderedRevisions = signature;
@@ -1916,23 +2106,29 @@ function renderRevisions() {
     tick.textContent = here ? "✓" : "";
     const label = document.createElement("span");
     label.textContent = `Revision ${entry.revision}`;
-    // The plan's name lives here, because the frame shows it nowhere else.
-    if (here) {
-      const name = document.createElement("small");
-      name.textContent = plan.title;
-      label.append(document.createElement("br"), name);
-    }
+    const status = document.createElement("small");
+    status.textContent =
+      entry.revision === latest && latest !== submittedRevision
+        ? "Current"
+        : "Feedback sent";
+    label.append(document.createElement("br"), status);
     const time = document.createElement("small");
     time.textContent = entry.publishedAt ? ago(entry.publishedAt) : "";
     row.append(tick, label, time);
+    // The live reader loads a past revision into the left tab. A read-only
+    // page has no tabs, so it opens the revision's own page.
     row.onclick = () => {
       toggleRevisionMenu(false);
-      if (here && mode === "live") return;
-      location.assign(
-        entry.revision === latest
-          ? `${base}/`
-          : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
-      );
+      if (here) return;
+      if (mode !== "live")
+        location.assign(
+          entry.revision === latest
+            ? `${base}/`
+            : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
+        );
+      else if (entry.revision === latest && currentAvailable())
+        switchTab("current");
+      else void openPast(entry.revision);
     };
     list.append(row);
   }
@@ -1940,7 +2136,10 @@ function renderRevisions() {
   // one you are on, so a strip under the header names it. A closed session
   // is read-only on its current revision, and there is nowhere to go back
   // to, so the strip says that instead and drops the link.
-  const older = mode === "readonly";
+  // The plan's name lives in this dialog, because the frame shows it nowhere
+  // else.
+  $("revision-plan").textContent = plan.title;
+  const older = mode === "readonly" || selectedTab === "past";
   $("revision").classList.toggle("older", older);
   renderHistory();
   $("revision").setAttribute(
@@ -2191,9 +2390,14 @@ $("align-unflagged").onchange = (event) => {
   save();
 };
 $("submit").onclick = async () => {
-  if (selectedTab === "submitted") {
-    show("feedback");
-    return;
+  if (selectedTab === "past") {
+    // Current's revision was already sent, so the button opens its Feedback.
+    if (!currentAvailable()) {
+      places[submittedRevision] = { page: "feedback", top: 0 };
+      void openPast(submittedRevision);
+      return;
+    }
+    switchTab("current");
   }
   if (remote?.pageRound) return;
   if (
@@ -2229,7 +2433,9 @@ $("submit").onclick = async () => {
     submissionInFlight = false;
     save();
     submittedRevision = plan.revision;
-    switchTab("submitted");
+    pastRevision = plan.revision;
+    places[plan.revision] = { page: "feedback", top: 0 };
+    switchTab("past");
     void loadSubmission().catch(() => {});
   } catch (error) {
     submissionInFlight = false;
@@ -3042,7 +3248,9 @@ const tabs = document.createElement("div");
 tabs.className = "page-tabs";
 tabs.setAttribute("role", "tablist");
 tabs.setAttribute("aria-label", "Page versions");
-for (const tab of ["current", "submitted"]) {
+// The left tab holds the past revision on screen, so the tabs read in time
+// order.
+for (const tab of ["past", "current"]) {
   const button = document.createElement("button");
   button.type = "button";
   button.id = `${tab}-tab`;
@@ -3071,8 +3279,11 @@ function updateNavigation(force = false) {
     `Pages, ${plural(readyPages, "current page")} ready to read`,
   );
   $("current-tab").disabled = Boolean(submittedRevision) && !currentAvailable();
-  $("submitted-tab").disabled = !submittedAvailable();
-  for (const tab of ["current", "submitted"])
+  $("past-tab").disabled = !pastAvailable();
+  $("past-tab").textContent = pastRevision
+    ? `Revision ${pastRevision}`
+    : "Previous";
+  for (const tab of ["past", "current"])
     $(`${tab}-tab`).setAttribute("aria-selected", String(selectedTab === tab));
   let count = $("current-tab").querySelector(".tab-count");
   if (!count) {
@@ -3169,25 +3380,16 @@ renderRevisions();
    of its own, so both run while the document is still loading and both are
    done by DOMContentLoaded. */
 function start() {
-  let place = null;
-  try {
-    place = usablePlace(
-      JSON.parse(localStorage.getItem(placeKey)),
-      plan.revision,
-      [...pages.map((item) => item.id), ...(editable ? ["feedback"] : [])],
-    );
-  } catch {
-    /* Start at the top. */
-  }
+  const place = placeIn(plan.revision, [
+    ...pages.map((item) => item.id),
+    ...(editable ? ["feedback"] : []),
+  ]);
   const opened = location.hash.slice(1) || query.get("target");
   show(location.hash.slice(1) || place?.page || "", query.get("target"), {
     keepScroll: false,
     push: false,
   });
-  if (place?.top && !opened)
-    Promise.allSettled([...renders]).then(() =>
-      scroller().scrollTo(0, place.top),
-    );
+  if (place?.top && !opened) restoreScroll(place.top);
   window.addEventListener("popstate", () => {
     const url = new URL(location.href);
     show(url.hash.slice(1) || pages[0].id, url.searchParams.get("target"), {
@@ -3202,7 +3404,11 @@ function start() {
     }
   }
   if (online && mode !== "preview") {
-    poll();
+    // A reload returns to the past revision that was on screen.
+    poll().then(() => {
+      if (editable && placeStore.tab === "past" && selectedTab === "current")
+        if (placeStore.past) void openPast(placeStore.past);
+    });
     setInterval(poll, 1500);
     pollSessions();
     setInterval(pollSessions, 5000);

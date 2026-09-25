@@ -17,9 +17,10 @@ import {
   emptyDraft,
   loadDraft,
   markSent,
+  placeFor,
+  readPlaces,
   submissionGroups,
   unsentItems,
-  usablePlace,
 } from "../../ai-harness/skills/interactive-plan/assets/draft.mjs";
 import {
   assemble,
@@ -92,18 +93,33 @@ async function killHub(config) {
 const sessionConfig = (html) =>
   JSON.parse(html.match(/id="session-config">([\s\S]*?)<\/script>/)[1]);
 
-test("a remembered place survives its own revision and nothing else", () => {
+test("each revision keeps its own remembered place", () => {
   const pages = ["overview", "steps", "feedback"];
-  const place = { revision: "2", page: "steps", top: 640 };
-  assert.deepEqual(usablePlace(place, "2", pages), { page: "steps", top: 640 });
-  // A new revision reopens at the top of the first page.
-  assert.equal(usablePlace(place, "3", pages), null);
+  const { tab, past, places } = readPlaces({
+    tab: "past",
+    past: "1",
+    places: {
+      1: { page: "steps", top: 640 },
+      2: { page: "overview", top: "x" },
+    },
+  });
+  assert.equal(tab, "past");
+  assert.equal(past, "1");
+  assert.deepEqual(placeFor(places, "1", pages), { page: "steps", top: 640 });
+  assert.deepEqual(placeFor(places, "2", pages), { page: "overview", top: 0 });
+  // A revision never visited opens at its first page.
+  assert.equal(placeFor(places, "3", pages), null);
   // A page the revision dropped would land the reader nowhere.
-  assert.equal(usablePlace(place, "2", ["overview", "feedback"]), null);
-  assert.equal(usablePlace(null, "2", pages), null);
+  assert.equal(placeFor(places, "1", ["overview", "feedback"]), null);
+  assert.deepEqual(readPlaces(null), {
+    tab: "current",
+    past: null,
+    places: {},
+  });
+  // A record from before places were kept per revision still counts.
   assert.deepEqual(
-    usablePlace({ revision: "2", page: "overview", top: "x" }, "2", pages),
-    { page: "overview", top: 0 },
+    readPlaces({ revision: "2", page: "steps", top: 10 }).places,
+    { 2: { page: "steps", top: 10 } },
   );
 });
 
