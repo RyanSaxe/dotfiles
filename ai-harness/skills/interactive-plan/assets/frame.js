@@ -1125,8 +1125,12 @@ function sentEntries(submission) {
 function sentCard(entry) {
   const card = document.createElement("div");
   card.className = "sent-card";
+  const where =
+    pages.find((item) => item.id === entry.topic)?.title ||
+    (entry.topic === "overall" ? "Overall" : entry.topic) ||
+    "Overall";
   const label = document.createElement("small");
-  label.textContent = `${pages.find((item) => item.id === entry.topic)?.title || entry.topic || "Overall"} · ${entry.label}`;
+  label.textContent = `${where} · ${entry.label}`;
   const body = document.createElement("p");
   body.textContent = entry.text;
   card.append(label);
