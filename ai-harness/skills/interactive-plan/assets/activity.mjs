@@ -39,13 +39,51 @@ export function activityModel({
     : slots.length
       ? `${ready} of ${slots.length} pages ready`
       : "Feedback saved";
-  const reportAt = acknowledged ? remote.updatedAt : null;
-  let report = "";
-  if (failed) report = "Could not wake the agent. Send a message in chat.";
+  const late = (at) => Boolean(at) && now - Date.parse(at) >= 300000;
+  // The footer always has a mark and a line, so the card keeps its shape
+  // from Submit to the last page. The frame shows `at` as a relative time.
+  let footer;
+  if (inFlight) footer = { mark: "active", text: "Saving your feedback" };
+  else if (failed)
+    footer = {
+      mark: "stopped",
+      text: "Could not wake the agent. Send a message in chat.",
+      late: true,
+    };
   else if (paused)
-    report = `Agent paused${remote.paused.reason ? `: ${remote.paused.reason}.` : "."} Send a message in chat.`;
-  else if (!inFlight && !acknowledged) report = "No agent report yet";
-  else if (!finished && reportAt && now - Date.parse(reportAt) >= 300000)
-    report = "stale";
-  return { slots, ready, failed, stopped, title, summary, report, reportAt };
+    footer = {
+      mark: "stopped",
+      text: `Agent paused${remote.paused.reason ? `: ${remote.paused.reason}.` : "."} Send a message in chat.`,
+      late: true,
+    };
+  else if (!acknowledged)
+    footer = { mark: "queued", text: "No agent report yet" };
+  else if (finished)
+    footer = {
+      mark: "complete",
+      text: "Finished",
+      at: remote.current?.publishedAt,
+    };
+  else if (!slots.length)
+    footer = {
+      mark: "active",
+      text: "Agent read your feedback",
+      at: remote.acknowledgedAt,
+      late: late(remote.acknowledgedAt),
+    };
+  else
+    footer = {
+      mark: "active",
+      text: "Last report",
+      at: remote.updatedAt,
+      late: late(remote.updatedAt),
+    };
+  // Until the page list exists, the bar is one track that moves while the
+  // agent works on the feedback.
+  const track = slots.length
+    ? null
+    : inFlight || (acknowledged && !stopped)
+      ? "moving"
+      : "still";
+  return { slots, ready, failed, stopped, title, summary, footer, track };
 }

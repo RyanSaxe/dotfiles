@@ -32,9 +32,15 @@ attachment thumbnails, and Export. Page progress lives in navigation and on
 Submitted's Feedback page, not in Review. Submit from any Current page opens
 Submitted / Feedback. While the hub saves, the page says Sending feedback and
 keeps the draft. A confirmed save shows saved comments and the agent activity
-card. The card has elapsed time, named page statuses and progress once the
-page list exists, and Last report after five minutes without an agent update.
-Pause and wake failure stop the active mark and direct the reader to chat.
+card. The card keeps a progress bar and a footer line in every state, so it
+changes height only when the page rows arrive. Before the page list exists,
+the bar is one track, with a sliding segment once the agent has read the
+feedback. Afterwards it has one segment per page, and the working segment
+breathes. The footer shows No agent report yet, then how long ago the agent
+read the feedback or last reported, in seconds for the first minute. It turns
+the attention color after five minutes without a report, and shows Finished
+when every page is ready. Pause and wake failure stop the active marks, color
+them with the attention color, and direct the reader to chat.
 The submitted revision stays readable, but comment and answer controls are
 disabled. A failed save restores the originating page and scroll offset,
 keeps the draft, and shows the error.

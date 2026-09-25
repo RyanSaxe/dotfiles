@@ -26,16 +26,29 @@ test("feedback waits without inventing page names", () => {
   });
   assert.equal(waiting.title, "Waiting for the agent");
   assert.deepEqual(waiting.slots, []);
-  assert.equal(waiting.report, "No agent report yet");
+  assert.equal(waiting.track, "still");
+  assert.deepEqual(waiting.footer, {
+    mark: "queued",
+    text: "No agent report yet",
+  });
   const sending = run({ current: { revision: "1" } }, { inFlight: true });
   assert.equal(sending.title, "Sending feedback");
-  assert.equal(sending.report, "");
+  assert.equal(sending.track, "moving");
+  assert.equal(sending.footer.mark, "active");
   const acknowledged = run({
     current: { revision: "1" },
     ...read,
+    acknowledgedAt: "2026-01-01T00:09:20Z",
   });
   assert.equal(acknowledged.title, "Preparing the next revision");
   assert.deepEqual(acknowledged.slots, []);
+  assert.equal(acknowledged.track, "moving");
+  assert.deepEqual(acknowledged.footer, {
+    mark: "active",
+    text: "Agent read your feedback",
+    at: "2026-01-01T00:09:20Z",
+    late: false,
+  });
 });
 
 test("published page names keep their order while readiness changes", () => {
@@ -46,13 +59,20 @@ test("published page names keep their order while readiness changes", () => {
   });
   assert.equal(model.title, "Pages in progress");
   assert.equal(model.summary, "1 of 3 pages ready");
+  assert.equal(model.track, null);
   assert.deepEqual(
     model.slots.map((item) => item.id),
     ["agreed", "overview", "detail"],
   );
+  assert.deepEqual(model.footer, {
+    mark: "active",
+    text: "Last report",
+    at: "2026-01-01T00:09:00Z",
+    late: false,
+  });
   const finished = run(
     {
-      current: { revision: "2" },
+      current: { revision: "2", publishedAt: "2026-01-01T00:08:00Z" },
       ...read,
       updatedAt: "2026-01-01T00:00:00Z",
     },
@@ -63,27 +83,42 @@ test("published page names keep their order while readiness changes", () => {
     },
   );
   assert.equal(finished.title, "All pages ready");
-  assert.equal(finished.report, "");
+  assert.deepEqual(finished.footer, {
+    mark: "complete",
+    text: "Finished",
+    at: "2026-01-01T00:08:00Z",
+  });
 });
 
-test("last report waits five minutes and pause or wake failure wins", () => {
+test("a report older than five minutes turns late and pause or wake failure wins", () => {
   const remote = {
     current: { revision: "2" },
     ...read,
     updatedAt: "2026-01-01T00:05:00Z",
   };
   assert.equal(
-    run(remote, { now: Date.parse("2026-01-01T00:09:59Z") }).report,
-    "",
+    run(remote, { now: Date.parse("2026-01-01T00:09:59Z") }).footer.late,
+    false,
   );
-  assert.equal(run(remote).report, "stale");
+  assert.equal(run(remote).footer.late, true);
+  assert.equal(run(remote).footer.text, "Last report");
   const paused = run({ ...remote, paused: { reason: "Waiting for input" } });
   assert.equal(paused.stopped, true);
-  assert.match(paused.report, /Waiting for input\. Send a message in chat/);
+  assert.equal(paused.footer.mark, "stopped");
+  assert.match(
+    paused.footer.text,
+    /Waiting for input\. Send a message in chat/,
+  );
   const failed = run({
     ...remote,
     wake: { last: { ok: false } },
     paused: { reason: "Waiting" },
   });
-  assert.match(failed.report, /Could not wake the agent/);
+  assert.match(failed.footer.text, /Could not wake the agent/);
+  const pausedEarly = run({
+    current: { revision: "1" },
+    ...read,
+    paused: { reason: "Waiting" },
+  });
+  assert.equal(pausedEarly.track, "still");
 });

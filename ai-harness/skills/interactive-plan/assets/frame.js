@@ -44,6 +44,14 @@ function ago(value) {
   if (hours < 24) return `${hours} h ago`;
   return `${Math.round(hours / 24)} d ago`;
 }
+// The activity card counts seconds in its first minute, so a fresh report
+// visibly ticks up while the agent works.
+function recently(value) {
+  const ms = Date.now() - Date.parse(value);
+  if (!Number.isFinite(ms)) return "";
+  if (ms < 5000) return "just now";
+  return ms < 60000 ? `${Math.round(ms / 1000)} s ago` : ago(value);
+}
 function since(value) {
   const ms = Date.now() - Date.parse(value);
   if (!Number.isFinite(ms)) return "";
@@ -1135,6 +1143,7 @@ function renderActivity() {
   const signature = JSON.stringify([
     stopped,
     model.failed,
+    model.track,
     slots.map(({ id, title, state }) => [id, title, state]),
   ]);
   const segments = $("activity-segments");
@@ -1143,6 +1152,11 @@ function renderActivity() {
     rows.dataset.signature = signature;
     segments.replaceChildren();
     rows.replaceChildren();
+    if (model.track) {
+      const track = document.createElement("i");
+      track.className = `track ${model.track}`;
+      segments.append(track);
+    }
     for (const slot of slots) {
       const item = document.createElement("i");
       item.className =
@@ -1173,13 +1187,21 @@ function renderActivity() {
       rows.append(row);
     }
   }
-  segments.hidden = !slots.length;
+  const { footer } = model;
   const report = $("activity-report");
-  report.textContent =
-    model.report === "stale"
-      ? `Last report ${ago(model.reportAt)}`
-      : model.report;
-  report.hidden = !report.textContent;
+  // The mark is replaced only when its state changes, so polling does not
+  // restart its breathing.
+  const mark = pageIndicator(
+    footer.mark === "stopped" ? "active" : footer.mark,
+  );
+  if (footer.mark === "stopped") mark.classList.add("stopped");
+  const old = report.querySelector(".page-activity");
+  if (old?.className !== mark.className)
+    old ? old.replaceWith(mark) : report.prepend(mark);
+  $("activity-report-text").textContent = footer.at
+    ? `${footer.text} ${recently(footer.at)}`
+    : footer.text;
+  report.classList.toggle("late", Boolean(footer.late));
   if (!submissionInFlight) renderSentFeedback();
 }
 function renderHistory() {

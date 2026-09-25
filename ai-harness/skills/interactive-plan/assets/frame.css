@@ -460,7 +460,11 @@ kbd {
   background: currentColor;
   animation: page-breathe 2s ease-in-out infinite;
 }
-/* A paused or unwoken agent is not working, so its active page stops breathing. */
+/* A paused or unwoken agent is not working, so its active page stops
+   breathing and takes the attention color. */
+.page-activity.active.stopped {
+  color: var(--attention);
+}
 .page-activity.active.stopped::before {
   animation: none;
 }
@@ -650,7 +654,35 @@ select {
 }
 .activity-segments i.now {
   background: var(--accent);
-  opacity: 0.5;
+  animation: segment-breathe 2s ease-in-out infinite;
+}
+@keyframes segment-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+/* Before the page list exists the bar is one track. It carries a sliding
+   segment while the agent works on the feedback. */
+.activity-segments i.track {
+  position: relative;
+  overflow: hidden;
+}
+.activity-segments i.track.moving::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  border-radius: 4px;
+  background: var(--accent);
+  animation: track-slide 1.8s ease-in-out infinite;
+}
+@keyframes track-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
 }
 .activity-page {
   padding: 3px 0;
@@ -659,10 +691,16 @@ select {
 .activity-page span:nth-child(2) {
   flex: 1;
 }
-.activity-report:not([hidden]) {
+.agent-activity .activity-report {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 11px 0 0;
   padding-top: 9px;
   border-top: 1px solid var(--line);
+}
+.agent-activity .activity-report.late {
+  color: var(--attention);
 }
 .sent-feedback {
   margin-top: 22px;
@@ -1878,8 +1916,13 @@ body:has(dialog[open]) .quote-button {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .page-activity.active::before {
+  .page-activity.active::before,
+  .activity-segments i.now {
     animation: none;
+  }
+  .activity-segments i.track.moving::after {
+    animation: none;
+    opacity: 0.5;
   }
 }
 /* A session row and the control that closes that session. */
