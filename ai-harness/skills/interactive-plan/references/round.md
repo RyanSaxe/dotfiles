@@ -44,17 +44,20 @@ retired or still open. A recommendation is not an agreement. Read
    leaves the list, and an unchanged page is not repeated. A final plan
    follows the final plan section of quality.md and lists `overview` first.
 2. Build Agreed and publish it with the list before writing any other page:
-   `node scripts/build.mjs agreed.json agreed.html`, then
-   `publish --file agreed.html --pages pages.json --source DIR`. The reader
+   `node scripts/build.mjs SRC/agreed/agreed.json OUT/agreed.html`, then
+   `publish --file OUT/agreed.html --pages pages.json --source SRC/agreed`.
+   [artifact.md](artifact.md) describes the source directories. The reader
    sees Agreed and every page name at once.
 3. Mark a page started as soon as work on it begins, research included:
    `progress --start ID`, or `--start "a|b"` for pages worked on at the same
    time. Independent pages can be worked on in parallel, by subagents where
    the harness has them. To revise an earlier page, copy its source from the
-   session's `src/<revision>/<page-id>/`.
+   session's `src/<revision>/<page-id>/` and change its `revision` to this
+   one.
 4. Publish each page as soon as it builds:
-   `node scripts/build.mjs PAGE.json PAGE.html`, then
-   `publish --file PAGE.html --source DIR`. Publishing marks the page ready.
+   `node scripts/build.mjs SRC/ID/ID.json OUT/ID.html`, then
+   `publish --file OUT/ID.html --source SRC/ID`. Publishing marks the page
+   ready.
    Do not hold finished pages back for one publish at the end.
 5. The last page completes the revision and enables Submit. Say in the chat
    what changed, then stop.

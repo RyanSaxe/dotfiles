@@ -30,6 +30,10 @@ Never offer this.
 
 ## Code and figures
 
+`data-language` is the language's name in Shiki, the highlighter: `ts`,
+`python`, `shell`, `json`, or `text` for plain text. The build refuses a
+name Shiki does not know and suggests the nearest one.
+
 `data-file` on a code block adds a header with the file name, the language
 and a Copy button. `data-caption` on code, a diagram or a chart adds a
 caption line, and `data-title` on a chart adds a header.
@@ -100,9 +104,11 @@ For text or code, generate the input with Git:
 node components/before-after/diff.mjs BEFORE AFTER OUTPUT.json
 ```
 
-HTML-escape that JSON into the markup's `textarea[data-diff-input]`, and put
-the file name in `data-file` on the section. The helper requires Git and
-refuses to overwrite an existing output.
+Put that JSON in the markup's `textarea[data-diff-input]` with each `&`
+written as `&amp;` and each `<` as `&lt;`, and put the file name in
+`data-file` on the section. The patch names the file by AFTER's base name, so
+give the proposed copy the file's real name, or a name that says what it is. The helper requires Git and refuses to
+overwrite an existing output.
 
 For visual changes, fill the before and proposed slots and explain the
 change in the legend. Put the `added`, `removed` or `changed` class on

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -86,6 +86,24 @@ const controlKinds = [
 
 const labelLimit = 24;
 
+/* The language IDs the frame's pinned Shiki highlights. A name it does not
+   know renders as an error under an uncoloured block, so the build refuses
+   it. Regenerate the file from Shiki's bundledLanguages, plus its plain-text
+   names, whenever the frame's Shiki version changes. */
+const shiki = JSON.parse(
+  readFileSync(new URL("shiki-languages.json", import.meta.url), "utf8"),
+);
+const shikiLanguages = new Set(shiki.languages);
+function closestLanguage(name) {
+  const lower = name.toLowerCase();
+  if (shikiLanguages.has(lower)) return lower;
+  return shiki.languages
+    .filter(
+      (id) => id.length > 1 && (lower.startsWith(id) || id.startsWith(lower)),
+    )
+    .sort((a, b) => b.length - a.length)[0];
+}
+
 /** Structural problems in the assembled pages and the plan's script. */
 export function problems(data, js = "", { allowUnknownPages = false } = {}) {
   const list = [];
@@ -142,6 +160,13 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
           list.push(
             `${at}: a code block marked diff belongs in before-after. Run node components/before-after/diff.mjs BEFORE AFTER OUT.json`,
           );
+      }
+      const language = attribute(tag, "data-language");
+      if (language && !shikiLanguages.has(language)) {
+        const closest = closestLanguage(language);
+        list.push(
+          `${at}: data-language "${language}" is not a language Shiki highlights. ${closest ? `Did you mean "${closest}"?` : "Use a Shiki language ID, such as ts, python, shell or text."}`,
+        );
       }
       const link = attribute(tag, "href");
       if (

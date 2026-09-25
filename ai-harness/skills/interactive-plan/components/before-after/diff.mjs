@@ -35,7 +35,21 @@ export async function compareFiles(beforePath, afterPath) {
       throw Error("Git is required to generate a diff.");
     else throw Error(error.stderr?.trim() || error.message);
   }
-  return { before, after, patch };
+  return { before, after, patch: named(patch, path.basename(paths[1])) };
+}
+
+/* git names both sides by the paths it was given, which for scratch copies
+   are absolute temp paths the reader sees in the patch. The headers name
+   the file instead, as a patch from the file's own repository would. */
+function named(patch, name) {
+  const lines = patch.split("\n");
+  for (let i = 0; i < lines.length && !lines[i].startsWith("@@"); i++) {
+    if (lines[i].startsWith("diff --git "))
+      lines[i] = `diff --git a/${name} b/${name}`;
+    else if (lines[i].startsWith("--- ")) lines[i] = `--- a/${name}`;
+    else if (lines[i].startsWith("+++ ")) lines[i] = `+++ b/${name}`;
+  }
+  return lines.join("\n");
 }
 
 // Compare real paths: the skill is installed through a symlink, and a guard
