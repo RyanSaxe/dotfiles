@@ -126,176 +126,182 @@
             <nav id="navigation" aria-label="Plan pages"></nav>
           </div>
         </aside>
-        <main>
+        <!-- The strip sits above the scrolling column, so the scrollbar
+             starts below it. -->
+        <div class="main-column">
           <div class="history-strip" id="history-strip" hidden>
             <span id="history-label"></span>
             <button type="button" id="history-return"></button>
           </div>
-          <dialog
-            class="dialog"
-            id="settings-dialog"
-            aria-labelledby="settings-title"
-          >
-            <div class="dialog-head">
-              <h2 id="settings-title" tabindex="-1" autofocus>Settings</h2>
-              <button
-                class="icon-btn"
-                type="button"
-                data-close="settings-dialog"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div class="settings-row">
-              <span>Appearance</span>
-              <div
-                class="segmented"
-                id="theme"
-                role="radiogroup"
-                aria-label="Appearance"
-              >
-                <button type="button" role="radio" data-theme="system">
-                  System
-                </button>
-                <button type="button" role="radio" data-theme="light">
-                  Light
-                </button>
-                <button type="button" role="radio" data-theme="dark">
-                  Dark
+          <main>
+            <dialog
+              class="dialog"
+              id="settings-dialog"
+              aria-labelledby="settings-title"
+            >
+              <div class="dialog-head">
+                <h2 id="settings-title" tabindex="-1" autofocus>Settings</h2>
+                <button
+                  class="icon-btn"
+                  type="button"
+                  data-close="settings-dialog"
+                  aria-label="Close"
+                >
+                  ✕
                 </button>
               </div>
-            </div>
-            <div class="settings-row">
-              <span>Notifications</span>
-              <button class="btn" id="notifications" type="button">
-                Enable
-              </button>
-            </div>
-            <div class="settings-row">
-              <span>Keys</span>
-              <span class="small">Press <kbd>?</kbd> for the list</span>
-            </div>
-          </dialog>
-          <div class="content" id="content">
-            <div class="save-error" id="save-error" role="alert" hidden>
-              <span id="save-error-text"></span>
-              <button
-                type="button"
-                id="save-error-dismiss"
-                aria-label="Dismiss error"
-              >
-                ×
-              </button>
-            </div>
-            <p
-              class="notice accepted"
-              id="accepted"
-              data-tone="success"
-              hidden
-            ></p>
-            <section id="reading">
-              <h1 tabindex="-1" id="page-title"></h1>
-              <div class="note-bars" id="note-bars"></div>
-              <div class="chosen-bar" id="chosen-bar" hidden></div>
-              <div id="page-content"></div>
-              <section
-                class="sent-page-comments"
-                id="sent-page-comments"
-                hidden
-              ></section>
-              <p class="note-count" id="note-count" hidden></p>
-              <nav class="page-footer" aria-label="Previous and next">
-                <a id="footer-previous" hidden></a>
-                <a id="footer-next" hidden></a>
-              </nav>
-            </section>
-            <section id="feedback" hidden>
-              <h1 tabindex="-1" id="feedback-title">Review</h1>
-              <div class="agent-activity" id="agent-activity" hidden>
-                <div class="activity-heading">
-                  <strong id="activity-title"></strong>
-                  <time id="activity-elapsed"></time>
-                </div>
-                <p id="activity-summary"></p>
+              <div class="settings-row">
+                <span>Appearance</span>
                 <div
-                  class="activity-segments"
-                  id="activity-segments"
-                  aria-hidden="true"
-                ></div>
-                <div class="activity-pages" id="activity-pages"></div>
-                <p class="activity-report" id="activity-report">
-                  <span id="activity-report-text"></span>
-                </p>
-              </div>
-              <section class="sent-feedback" id="sent-feedback" hidden>
-                <h2>Your feedback</h2>
-                <div id="sent-feedback-list"></div>
-              </section>
-              <div id="feedback-review">
-                <div class="draft-head" id="draft-head" hidden>
-                  <h2>Your comments</h2>
-                  <span id="draft-count"></span>
-                </div>
-                <p
-                  class="notice"
-                  id="submit-error"
-                  data-tone="danger"
-                  role="alert"
-                  hidden
-                ></p>
-                <label class="alignment-switch" for="align-unflagged">
-                  <span>Everything else looks good</span>
-                  <input
-                    id="align-unflagged"
-                    type="checkbox"
-                    role="switch"
-                    checked
-                  />
-                </label>
-                <div id="feedback-groups"></div>
-                <section class="feedback-group">
-                  <div class="group-head">
-                    <h2>Overall</h2>
-                    <button class="btn quiet" id="overall-note" type="button">
-                      Add overall comment
-                    </button>
-                  </div>
-                  <div id="overall-notes"></div>
-                </section>
-                <div class="feedback-end">
-                  <button class="btn quiet" id="export" type="button">
-                    Export copy
+                  class="segmented"
+                  id="theme"
+                  role="radiogroup"
+                  aria-label="Appearance"
+                >
+                  <button type="button" role="radio" data-theme="system">
+                    System
+                  </button>
+                  <button type="button" role="radio" data-theme="light">
+                    Light
+                  </button>
+                  <button type="button" role="radio" data-theme="dark">
+                    Dark
                   </button>
                 </div>
-                <p class="small" id="storage-status"></p>
-                <p class="small" id="connection-status"></p>
               </div>
-              <nav class="page-footer" aria-label="Pages">
-                <button id="feedback-pages" type="button">Pages →</button>
-              </nav>
-            </section>
-          </div>
-          <dialog
-            class="dialog sessions"
-            id="sessions-dialog"
-            aria-labelledby="sessions-title"
-          >
-            <div class="dialog-head">
-              <h2 id="sessions-title" tabindex="-1" autofocus>Live sessions</h2>
-              <button
-                class="icon-btn"
-                id="sidecar-close"
-                type="button"
-                data-close="sessions-dialog"
-                aria-label="Close"
-              >
-                ✕
-              </button>
+              <div class="settings-row">
+                <span>Notifications</span>
+                <button class="btn" id="notifications" type="button">
+                  Enable
+                </button>
+              </div>
+              <div class="settings-row">
+                <span>Keys</span>
+                <span class="small">Press <kbd>?</kbd> for the list</span>
+              </div>
+            </dialog>
+            <div class="content" id="content">
+              <div class="save-error" id="save-error" role="alert" hidden>
+                <span id="save-error-text"></span>
+                <button
+                  type="button"
+                  id="save-error-dismiss"
+                  aria-label="Dismiss error"
+                >
+                  ×
+                </button>
+              </div>
+              <p
+                class="notice accepted"
+                id="accepted"
+                data-tone="success"
+                hidden
+              ></p>
+              <section id="reading">
+                <h1 tabindex="-1" id="page-title"></h1>
+                <div class="note-bars" id="note-bars"></div>
+                <div class="chosen-bar" id="chosen-bar" hidden></div>
+                <div id="page-content"></div>
+                <section
+                  class="sent-page-comments"
+                  id="sent-page-comments"
+                  hidden
+                ></section>
+                <p class="note-count" id="note-count" hidden></p>
+                <nav class="page-footer" aria-label="Previous and next">
+                  <a id="footer-previous" hidden></a>
+                  <a id="footer-next" hidden></a>
+                </nav>
+              </section>
+              <section id="feedback" hidden>
+                <h1 tabindex="-1" id="feedback-title">Review</h1>
+                <div class="agent-activity" id="agent-activity" hidden>
+                  <div class="activity-heading">
+                    <strong id="activity-title"></strong>
+                    <time id="activity-elapsed"></time>
+                  </div>
+                  <p id="activity-summary"></p>
+                  <div
+                    class="activity-segments"
+                    id="activity-segments"
+                    aria-hidden="true"
+                  ></div>
+                  <div class="activity-pages" id="activity-pages"></div>
+                  <p class="activity-report" id="activity-report">
+                    <span id="activity-report-text"></span>
+                  </p>
+                </div>
+                <section class="sent-feedback" id="sent-feedback" hidden>
+                  <h2>Your feedback</h2>
+                  <div id="sent-feedback-list"></div>
+                </section>
+                <div id="feedback-review">
+                  <div class="draft-head" id="draft-head" hidden>
+                    <h2>Your comments</h2>
+                    <span id="draft-count"></span>
+                  </div>
+                  <p
+                    class="notice"
+                    id="submit-error"
+                    data-tone="danger"
+                    role="alert"
+                    hidden
+                  ></p>
+                  <label class="alignment-switch" for="align-unflagged">
+                    <span>Everything else looks good</span>
+                    <input
+                      id="align-unflagged"
+                      type="checkbox"
+                      role="switch"
+                      checked
+                    />
+                  </label>
+                  <div id="feedback-groups"></div>
+                  <section class="feedback-group">
+                    <div class="group-head">
+                      <h2>Overall</h2>
+                      <button class="btn quiet" id="overall-note" type="button">
+                        Add overall comment
+                      </button>
+                    </div>
+                    <div id="overall-notes"></div>
+                  </section>
+                  <div class="feedback-end">
+                    <button class="btn quiet" id="export" type="button">
+                      Export copy
+                    </button>
+                  </div>
+                  <p class="small" id="storage-status"></p>
+                  <p class="small" id="connection-status"></p>
+                </div>
+                <nav class="page-footer" aria-label="Pages">
+                  <button id="feedback-pages" type="button">Pages →</button>
+                </nav>
+              </section>
             </div>
-            <div class="session-list" id="sidecar-list"></div>
-          </dialog>
-        </main>
+            <dialog
+              class="dialog sessions"
+              id="sessions-dialog"
+              aria-labelledby="sessions-title"
+            >
+              <div class="dialog-head">
+                <h2 id="sessions-title" tabindex="-1" autofocus>
+                  Live sessions
+                </h2>
+                <button
+                  class="icon-btn"
+                  id="sidecar-close"
+                  type="button"
+                  data-close="sessions-dialog"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="session-list" id="sidecar-list"></div>
+            </dialog>
+          </main>
+        </div>
       </div>
     </div>
     <dialog class="dialog note" id="note-dialog" aria-labelledby="note-title">

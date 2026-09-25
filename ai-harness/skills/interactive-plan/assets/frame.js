@@ -320,12 +320,33 @@ const placeIn = (revision, pageIds) => placeFor(places, revision, pageIds);
    meanwhile. Until the page settles, the position being restored stands in
    for the clamped one. */
 let restoring = null;
+/* The height each page had when the reader left it. Returning holds that
+   height while the page's renderers work, so the browser does not clamp the
+   position and then jump when they finish. */
+const heights = new Map();
+const shownBody = () =>
+  $("reading").hidden ? $("feedback") : $("page-content");
+function rememberHeight() {
+  const pageId = $("reading").hidden ? "feedback" : page.id;
+  if (restoring?.revision === plan.revision && restoring.page === pageId)
+    return;
+  heights.set(`${plan.revision}:${pageId}`, shownBody().offsetHeight);
+}
+document.addEventListener("scroll", rememberHeight, true);
+function endRestore() {
+  restoring = null;
+  $("page-content").style.minHeight = "";
+  $("feedback").style.minHeight = "";
+}
 function restoreScroll(top) {
+  endRestore();
   restoring = {
     revision: plan.revision,
     page: $("reading").hidden ? "feedback" : page.id,
     top,
   };
+  const height = heights.get(`${restoring.revision}:${restoring.page}`);
+  if (height) shownBody().style.minHeight = `${height}px`;
   settleScroll();
 }
 function settleScroll() {
@@ -335,7 +356,7 @@ function settleScroll() {
   Promise.allSettled([...renders]).then(() => {
     if (restoring !== target) return;
     scroller().scrollTo(0, target.top);
-    if ($("reading").hidden || !page.pending) restoring = null;
+    if ($("reading").hidden || !page.pending) endRestore();
   });
 }
 document.addEventListener("scroll", rememberPlace, true);
@@ -343,7 +364,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   hideArrival();
   const resuming =
     restoring?.revision === plan.revision && restoring.page === id;
-  if (!resuming) restoring = null;
+  if (!resuming) endRestore();
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && hasFeedbackPage;
   $("reading").hidden = feedback;
@@ -1848,6 +1869,7 @@ function currentDraft() {
 function switchTab(tab, targetId = null) {
   if (tab === "current" && !currentAvailable()) return;
   if (tab === "past" && !pastAvailable()) return;
+  rememberHeight();
   const revision = tab === "current" ? remote.current.revision : pastRevision;
   const view = views.get(revision);
   views.get(plan.revision).draft = state;

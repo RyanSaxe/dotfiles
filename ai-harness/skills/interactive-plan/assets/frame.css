@@ -575,6 +575,15 @@ kbd {
   font-weight: inherit;
   line-height: inherit;
 }
+.main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.main-column > main {
+  flex: 1;
+}
 main {
   position: relative;
   min-height: 0;
@@ -1915,9 +1924,6 @@ img.note-image {
 #history-label .meta {
   color: var(--muted);
 }
-main:has(.history-strip:not([hidden])) .content {
-  min-height: calc(100% - 38px);
-}
 :where(main, .sidebar, .pages-slot nav, .app-body) {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
@@ -1960,6 +1966,9 @@ main:has(.history-strip:not([hidden])) .content {
   }
   .sidebar {
     display: none;
+  }
+  .main-column {
+    min-height: 100%;
   }
   main {
     border-right: 0;
