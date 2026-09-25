@@ -600,6 +600,9 @@ async function loadSession(directory, config, origin) {
           ? "working"
           : "submitted",
       latestSubmissionId: data.id,
+      latestSubmissionRevision:
+        data.intent === "feedback-only" ? data.revision : null,
+      wake: state.wake ? { ...state.wake, last: null } : null,
       accepted: null,
     });
     if (wake && !state.paused)
@@ -1019,6 +1022,50 @@ async function loadSession(directory, config, origin) {
       needsYou: needsYou(),
     };
   }
+  async function latestFeedback(requestedRevision) {
+    requireValue(
+      requestedRevision === null || revisionPattern.test(requestedRevision),
+      "Invalid revision",
+    );
+    const event = requestedRevision
+      ? (await events())
+          .filter(
+            (item) =>
+              item.payload.intent === "feedback-only" &&
+              item.payload.revision === requestedRevision,
+          )
+          .sort((a, b) => b.sequence - a.sequence)[0]
+      : state.latestSubmissionId && idPattern.test(state.latestSubmissionId)
+        ? await read(
+            path.join(
+              directory,
+              "feedback",
+              `${state.latestSubmissionId}.json`,
+            ),
+          )
+        : null;
+    if (!event) return null;
+    if (event.payload.intent !== "feedback-only") return null;
+    const { groups, revision } = event.payload;
+    return {
+      id: event.id,
+      revision,
+      receivedAt: event.receivedAt,
+      groups: {
+        notes: (groups.notes || []).map(
+          ({ topic, anchor, quote, text, attachments }) => ({
+            topic,
+            anchor,
+            quote,
+            text,
+            attachments: (attachments || []).map(({ id }) => ({ id })),
+          }),
+        ),
+        choices: groups.choices || {},
+        answers: groups.answers || {},
+      },
+    };
+  }
   function listing() {
     if (!state.current) return null;
     return {
@@ -1148,6 +1195,7 @@ async function loadSession(directory, config, origin) {
     dismiss,
     act,
     view,
+    latestFeedback,
     listing,
     active,
     setWake,
@@ -1587,6 +1635,12 @@ export async function startHub(config = settings()) {
               url.searchParams.get("version"),
             ),
           );
+        if (method === "GET" && rest[0] === "api" && rest[1] === "submission")
+          return reply(200, {
+            submission: await session.latestFeedback(
+              url.searchParams.get("revision"),
+            ),
+          });
         if (method === "POST" && rest[0] === "api" && rest[1] === "dismiss") {
           requireValue(
             req.headers.origin === `http://${req.headers.host}`,

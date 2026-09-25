@@ -204,7 +204,7 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
 }
 
 export async function frameBundle() {
-  const [shell, style, script, notifications, choices, draft] =
+  const [shell, style, script, notifications, choices, draft, activity] =
     await Promise.all(
       [
         "frame.html",
@@ -213,6 +213,7 @@ export async function frameBundle() {
         "notifications.mjs",
         "choices.mjs",
         "draft.mjs",
+        "activity.mjs",
       ].map((name) => fs.readFile(new URL(name, assets), "utf8")),
     );
   const roots = componentRoots();
@@ -227,6 +228,7 @@ export async function frameBundle() {
     notifications,
     choices,
     draft,
+    activity,
     componentCss,
     componentJs,
   };
@@ -245,6 +247,7 @@ export async function assemble(
     notifications,
     choices,
     draft,
+    activity,
     componentCss,
     componentJs,
   } = bundle || (await frameBundle());
@@ -269,7 +272,7 @@ export async function assemble(
     .replace(
       "<!-- FRAME_SCRIPT -->",
       () =>
-        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${script}\n${componentJs}\n</script>`,
+        `<script type="module">\n${notifications}\n${choices}\n${draft}\n${activity}\n${script}\n${componentJs}\n</script>`,
     )
     // A module, and after the frame's, so the plan's own script sees planUI
     // and can register a component of its own before the first page renders.

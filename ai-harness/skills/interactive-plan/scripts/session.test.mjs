@@ -97,6 +97,20 @@ after(async () => {
   await fs.rm(home, { recursive: true, force: true });
 });
 
+test("the browser can read sent feedback without agent-only paths", async () => {
+  const submission = await (
+    await fetch(`${hub.origin}/s/${sessionId}/api/submission?revision=1`)
+  ).json();
+  assert.equal(submission.submission.id, "evt1");
+  assert.equal(submission.submission.revision, "1");
+  assert.deepEqual(submission.submission.groups.notes, []);
+  assert.deepEqual(submission.submission.groups.choices, {});
+  const invalid = await fetch(
+    `${hub.origin}/s/${sessionId}/api/submission?revision=..%2Fsecret`,
+  );
+  assert.equal(invalid.status, 400);
+});
+
 test("page progress cannot start before Agreed for the next revision", async () => {
   const result = await act({
     action: "progress",
@@ -107,6 +121,7 @@ test("page progress cannot start before Agreed for the next revision", async () 
 });
 
 test("read returns the oldest unread submission once and marks it read", async () => {
+  assert.equal((await status()).latestSubmissionRevision, "1");
   const first = await act({ action: "read" });
   assert.ok(first.ok, JSON.stringify(first.body));
   assert.equal(first.body.event.id, "evt1");
@@ -188,6 +203,7 @@ test("a submission wakes the agent with the line that names the session", async 
   assert.equal(wakes.length, 1);
   assert.ok((await feedback("evt2")).ok);
   const view = await settled(2);
+  assert.equal(view.latestSubmissionRevision, "2");
   assert.deepEqual(wakes[1].target, { harness: "codex", thread: "thread-1" });
   assert.match(
     wakes[1].line,
