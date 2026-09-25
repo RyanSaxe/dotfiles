@@ -444,9 +444,6 @@ kbd {
   border-bottom-color: var(--accent);
   color: var(--ink);
 }
-.tab-count {
-  margin-left: 4px;
-}
 /* A page name stays on one line, so a row never changes height. A page that
    is not ready yet is dimmed and fades up when it publishes. The working
    page is the only one with a mark, the breathing dot. */

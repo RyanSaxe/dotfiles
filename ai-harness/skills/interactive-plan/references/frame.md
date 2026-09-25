@@ -39,9 +39,9 @@ If that page publishes while open, its content loads in place. Another page's
 publication never replaces the page being read. Reduced-motion mode keeps the
 dot visible without breathing and changes names without fading. Below 720px, the
 Pages button opens the same tabs and list. Its accent-colored badge counts
-ready Current pages, including Agreed, even while the left tab is selected.
-While the left tab is selected, the Current tab shows the same count as text,
-for example Current (4). The bell uses a different attention color. The
+ready Current pages, including Agreed, even while the left tab is selected,
+because the drawer and its Pages heading are closed. The bell uses a
+different attention color. The
 selected tab has an underline; the selected page has a soft fill. Both keep a
 separate keyboard focus outline.
 

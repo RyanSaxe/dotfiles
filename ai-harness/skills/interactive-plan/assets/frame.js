@@ -3296,14 +3296,6 @@ function updateNavigation(force = false) {
     : "Previous";
   for (const tab of ["past", "current"])
     $(`${tab}-tab`).setAttribute("aria-selected", String(selectedTab === tab));
-  let count = $("current-tab").querySelector(".tab-count");
-  if (!count) {
-    count = document.createElement("span");
-    count.className = "tab-count";
-    $("current-tab").append(count);
-  }
-  count.textContent = `(${readyPages})`;
-  count.hidden = !readyPages || selectedTab === "current";
   if (
     force ||
     pageList.dataset.revision !== plan.revision ||
