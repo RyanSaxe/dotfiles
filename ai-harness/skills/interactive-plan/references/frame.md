@@ -23,8 +23,10 @@ loads in place. Another page's publication never replaces the page being read.
 Reduced-motion mode keeps the marks visible without pulsing. Below 720px, the
 Pages button opens the same tabs and list. Its accent-colored badge counts
 ready Current pages, including Agreed, even while Submitted is selected.
-The bell uses a different attention color. The selected tab has an underline;
-the selected page has a soft fill. Both keep a separate keyboard focus outline.
+While Submitted is selected, the Current tab shows the same count as text,
+for example Current (4). The bell uses a different attention color. The
+selected tab has an underline; the selected page has a soft fill. Both keep a
+separate keyboard focus outline.
 
 Current's Review contains only unsent comments, choices, and answers, grouped
 by page. It retains editing, removal, the alignment switch, overall comments,
@@ -82,8 +84,11 @@ The session record stores the revision. A newly published page in the same
 revision leaves the reader on the current page with scroll, focus, and draft
 text unchanged. A new revision enables Current without leaving Submitted.
 Submitted pages and older read-only revisions use the same soft-blue history
-strip across the main column, with a return action. A read-only revision
-lists only its own pages, without the Current and Submitted tabs. Frame
+strip across the main column, with a return action. On an older revision the
+strip reads Earlier revision with its number. A read-only revision lists only
+its own pages, without the Current and Submitted tabs, and ends with a
+Feedback page that lists everything sent on it, overall comments included.
+Its choices, checkboxes and answers show what was sent and cannot change. Frame
 dialogs close on Escape or their ✕ without
 submitting anything, and each takes the focus on its own heading so no
 control is left ringed. Custom popups do the same and keep unsent text.

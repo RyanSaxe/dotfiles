@@ -12,6 +12,8 @@ const mode = session.preview
     ? "readonly"
     : "live";
 const editable = mode === "live";
+// A read-only revision keeps a Feedback page that lists what was sent on it.
+const hasFeedbackPage = editable || mode === "readonly";
 document.documentElement.dataset.mode = mode;
 const query = new URL(location.href).searchParams;
 let agreements = plan.agreements || [];
@@ -291,7 +293,7 @@ document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   hideArrival();
   const top = scroller().scrollTop;
-  const feedback = id === "feedback" && editable;
+  const feedback = id === "feedback" && hasFeedbackPage;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
   if (!feedback) {
@@ -1010,13 +1012,22 @@ function renderSentPageComments() {
   heading.textContent = "Your sent comments";
   section.append(heading, ...entries.map(sentCard));
 }
-let renderedSentId = null;
+let renderedSentKey = null;
 function renderSentFeedback() {
-  if (renderedSentId === lastSubmission?.id) return;
-  renderedSentId = lastSubmission?.id || null;
+  const key = lastSubmission?.id || "";
+  if (renderedSentKey === key) return;
+  renderedSentKey = key;
   const list = $("sent-feedback-list");
   list.replaceChildren();
-  if (!lastSubmission) return;
+  if (!lastSubmission) {
+    if (mode === "readonly") {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No feedback was sent on this revision.";
+      list.append(empty);
+    }
+    return;
+  }
   const entries = sentEntries(lastSubmission);
   for (const entry of entries) list.append(sentCard(entry));
   if (!entries.length) {
@@ -1046,6 +1057,13 @@ async function loadSubmission() {
   if (mode !== "readonly" && submission && submission.id !== key) return;
   lastSubmission = submission;
   lastSubmissionLoadedId = key;
+  // A read-only revision has no draft, so its controls show what was sent.
+  if (mode === "readonly" && submission) {
+    state.choices = submission.groups?.choices || {};
+    state.answers = submission.groups?.answers || {};
+    if (!$("reading").hidden)
+      show(page.id, null, { keepScroll: true, push: false });
+  }
   renderSentFeedback();
 }
 function badge(count) {
@@ -1089,7 +1107,7 @@ function renderFooter(feedback) {
   const order = [
     ...pages.filter((item) => item.id === "agreed"),
     ...pages.filter((item) => item.id !== "agreed"),
-    ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
+    ...(hasFeedbackPage ? [{ id: "feedback", title: "Feedback" }] : []),
   ];
   const index = order.findIndex(
     (item) => item.id === (feedback ? "feedback" : page.id),
@@ -1116,7 +1134,7 @@ function renderFooter(feedback) {
     !next
       ? ""
       : next.id === "feedback"
-        ? submittedCurrent()
+        ? submittedCurrent() || !editable
           ? "Feedback →"
           : acceptable
             ? "Review and accept →"
@@ -1125,6 +1143,13 @@ function renderFooter(feedback) {
   );
 }
 function renderActivity() {
+  // A read-only revision shows what was sent on it, without agent activity.
+  if (mode === "readonly") {
+    $("agent-activity").hidden = true;
+    $("sent-feedback").hidden = false;
+    renderSentFeedback();
+    return;
+  }
   const visible = selectedTab === "submitted" || submissionInFlight;
   $("agent-activity").hidden = !visible;
   $("sent-feedback").hidden = !visible || submissionInFlight;
@@ -1213,7 +1238,7 @@ function renderHistory() {
   $("history-label").textContent = old
     ? session.closed
       ? "This plan is closed"
-      : "Earlier revision"
+      : `Earlier revision (${plan.revision})`
     : "Feedback sent";
   const button = $("history-return");
   button.hidden = old && session.closed;
@@ -1224,7 +1249,7 @@ function renderHistory() {
 }
 function review() {
   const unsent = unsentItems(state);
-  const sent = selectedTab === "submitted";
+  const sent = selectedTab === "submitted" || mode === "readonly";
   const locked = sent || submissionInFlight || submittedCurrent();
   $("draft-head").hidden = unsent.count === 0;
   $("draft-count").textContent = `${unsent.count} to send`;
@@ -3038,11 +3063,11 @@ function updateNavigation(force = false) {
     $(`${tab}-tab`).setAttribute("aria-selected", String(selectedTab === tab));
   let count = $("current-tab").querySelector(".tab-count");
   if (!count) {
-    count = document.createElement("b");
+    count = document.createElement("span");
     count.className = "tab-count";
     $("current-tab").append(count);
   }
-  count.textContent = readyPages;
+  count.textContent = `(${readyPages})`;
   count.hidden = !readyPages || selectedTab === "current";
   if (
     force ||
@@ -3053,13 +3078,14 @@ function updateNavigation(force = false) {
     addPageButton(pages[0]);
     pageList.append(separator());
     for (const item of pages.slice(1)) addPageButton(item);
-    if (editable) {
+    if (hasFeedbackPage) {
       const review = document.createElement("button");
       review.type = "button";
       review.id = "review-row";
       review.dataset.page = "feedback";
       const label = document.createElement("span");
-      label.textContent = selectedTab === "current" ? "Review" : "Feedback";
+      label.textContent =
+        editable && selectedTab === "current" ? "Review" : "Feedback";
       const total = document.createElement("b");
       total.className = "count";
       total.hidden = true;

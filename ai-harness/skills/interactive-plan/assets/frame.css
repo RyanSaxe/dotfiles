@@ -395,15 +395,7 @@ kbd {
   color: var(--ink);
 }
 .tab-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 16px;
-  height: 16px;
   margin-left: 4px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 10px;
 }
 #page-list button {
   display: flex;
@@ -575,13 +567,13 @@ select {
 }
 /* The side offsets are padding rather than margin: a margin adds to the
    full width of main and scrolls the page sideways below a 1100px window.
-   The 56px on the left holds the bar that marks a chosen block, and the
-   last line clears the comment control, which is always on screen. */
+   The 56px on the left holds the bar that marks a chosen block, the right
+   side matches it so the column sits evenly in main, and the last line
+   clears the comment control, which is always on screen. */
 .content {
   flex: 1 0 auto;
-  max-width: 876px;
   margin: 0;
-  padding: 24px 40px 90px 56px;
+  padding: 24px 56px 90px;
   width: 100%;
   min-width: 0;
   min-height: 100%;
@@ -1806,7 +1798,7 @@ img.note-image {
   gap: 10px;
   min-height: 38px;
   padding: 8px 20px;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  border-bottom: 1px solid var(--line);
   background: var(--accent-soft);
   color: var(--ink);
   font-size: 12px;
