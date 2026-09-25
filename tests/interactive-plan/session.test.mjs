@@ -99,14 +99,23 @@ test("each revision keeps its own remembered place", () => {
     tab: "past",
     past: "1",
     places: {
-      1: { page: "steps", top: 640 },
-      2: { page: "overview", top: "x" },
+      1: { page: "steps", top: 640, tops: { steps: 640, overview: 120 } },
+      2: { page: "overview", top: "x", tops: { overview: -3 } },
     },
   });
   assert.equal(tab, "past");
   assert.equal(past, "1");
-  assert.deepEqual(placeFor(places, "1", pages), { page: "steps", top: 640 });
-  assert.deepEqual(placeFor(places, "2", pages), { page: "overview", top: 0 });
+  // Each page read keeps its own scroll position.
+  assert.deepEqual(placeFor(places, "1", pages), {
+    page: "steps",
+    top: 640,
+    tops: { steps: 640, overview: 120 },
+  });
+  assert.deepEqual(placeFor(places, "2", pages), {
+    page: "overview",
+    top: 0,
+    tops: {},
+  });
   // A revision never visited opens at its first page.
   assert.equal(placeFor(places, "3", pages), null);
   // A page the revision dropped would land the reader nowhere.
@@ -119,7 +128,7 @@ test("each revision keeps its own remembered place", () => {
   // A record from before places were kept per revision still counts.
   assert.deepEqual(
     readPlaces({ revision: "2", page: "steps", top: 10 }).places,
-    { 2: { page: "steps", top: 10 } },
+    { 2: { page: "steps", top: 10, tops: {} } },
   );
 });
 

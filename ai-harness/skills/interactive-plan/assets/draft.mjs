@@ -20,14 +20,22 @@ export function emptyDraft(revision) {
   };
 }
 
-// Where the reader was in each revision, and which tab and past revision were
-// on screen. A record from before places were kept per revision holds one
+// Where the reader was in each revision: the last page, and the scroll
+// position on every page they read. Also which tab and past revision were on
+// screen. A record from before places were kept per revision holds one
 // revision's place, which is kept.
 export function readPlaces(saved) {
   const places = {};
+  const offset = (value) => {
+    const top = Number(value);
+    return Number.isFinite(top) && top > 0 ? top : 0;
+  };
   const place = (value) => {
-    const top = Number(value.top);
-    return { page: value.page, top: Number.isFinite(top) && top > 0 ? top : 0 };
+    const tops = {};
+    if (record(value.tops))
+      for (const [id, top] of Object.entries(value.tops))
+        if (offset(top)) tops[id] = offset(top);
+    return { page: value.page, top: offset(value.top), tops };
   };
   if (!record(saved)) return { tab: "current", past: null, places };
   if (typeof saved.revision === "string" && typeof saved.page === "string")

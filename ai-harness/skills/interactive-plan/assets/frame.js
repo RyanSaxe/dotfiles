@@ -291,9 +291,11 @@ function rememberPlace() {
   const pageId = $("reading").hidden ? "feedback" : page.id;
   const held =
     restoring?.revision === plan.revision && restoring.page === pageId;
+  const top = held ? restoring.top : Math.round(scroller().scrollTop);
   places[plan.revision] = {
     page: pageId,
-    top: held ? restoring.top : Math.round(scroller().scrollTop),
+    top,
+    tops: { ...places[plan.revision]?.tops, [pageId]: top },
   };
   if (!editable) return;
   clearTimeout(placeTimer);
@@ -393,8 +395,14 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
-  if (!keepScroll) scroller().scrollTo(0, 0);
-  else if (resuming) settleScroll();
+  // Returning to a page within a revision lands where the reader left it.
+  if (!keepScroll) {
+    const saved = targetId
+      ? 0
+      : places[plan.revision]?.tops?.[feedback ? "feedback" : page.id];
+    if (saved) restoreScroll(saved);
+    else scroller().scrollTo(0, 0);
+  } else if (resuming) settleScroll();
   else if (!targetId) {
     // Replacing the page shortens it until the renderers finish, and the
     // browser clamps the scroll position meanwhile; restore it after they do.
@@ -924,7 +932,10 @@ function itemCard({ kind, key, item }) {
         forgetImages(item.attachments);
         state.notes = state.notes.filter((note) => note.id !== item.id);
         save();
-        if (item.topic === page.id) show(page.id, null, { keepScroll: true });
+        // Only a page on screen needs its marks redrawn. The Review page
+        // stays where it is.
+        if (item.topic === page.id && !$("reading").hidden)
+          show(page.id, null, { keepScroll: true });
       });
     } else if (kind === "choice") {
       action("Add comment", () =>
