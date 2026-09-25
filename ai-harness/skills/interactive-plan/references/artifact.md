@@ -1,32 +1,24 @@
-# Artifact format
+# Page source and build
 
-Write HTML pages and a JSON manifest in a directory of your own under the
-system temp directory, with custom CSS and JavaScript when a page needs
-them, and build one artifact from them there:
+Write one JSON source file for each page in a directory of your own under
+the system temp directory. Build it before publishing:
 
 ```sh
-node scripts/build.mjs SOURCE.json ARTIFACT.html
+node scripts/build.mjs PAGE.json PAGE.html
 ```
 
-The output filename must not exist yet. Use the temp directory for scratch
-files. A sandbox can write there. `publish --source DIR` copies the source to
-`src/<revision>/` inside the session, and the next round starts from that
-copy. The publisher writes artifacts to `artifacts/` and refuses a revision
-number already used in the session. The builder puts the frame and the authored
-content into one HTML file. It does not bundle
-imports or linked files, so embed every local resource the plan needs. Do
-not install packages to author a plan.
+The output path must not exist. `publish --source DIR` keeps the page's
+source under `src/<revision>/<page-id>/` in the session, so keep generated
+previews and scratch files out of `DIR`. Embed every local resource a page
+uses. Do not install packages to author a plan.
 
-A revision can change the plan's pages, its CSS and JavaScript, its
-prototypes and Agreed. A request to redesign the look applies to those parts.
-The frame, the skill's components, the helper and the hub are skill code. If
-feedback requests a change to one of them, say so in the chat and plan it as
-skill work.
+A revision changes its pages, their CSS, JavaScript and prototypes, and
+Agreed. The frame, the skill's components, the helper and the hub are skill
+code. If feedback asks to change one of them, say so in the chat and plan it
+as skill work.
 
-## Manifest
-
-A page's `html` is a fragment, not a document: the frame supplies the shell
-and draws the page title, so the fragment starts below it.
+Agreed and every other page share the outer fields. Agreed also requires a
+`task`, whose fields are in [agreements.md](agreements.md):
 
 ```json
 {
@@ -34,49 +26,51 @@ and draws the page title, so the fragment starts below it.
   "revision": "1",
   "kind": "exploration",
   "title": "Retry policy",
-  "pages": [
-    { "id": "policy", "title": "Retry policy", "file": "p-policy.html" }
-  ]
+  "page": {
+    "id": "agreed",
+    "title": "Agreed so far",
+    "task": {
+      "title": "Retry policy",
+      "html": "<p>Checkout retries a failed charge once, so a brief gateway outage costs one slow request instead of a failed order.</p>"
+    },
+    "agreements": []
+  }
 }
 ```
 
-| Field      | Contract                                                                                                   |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| artifactId | Stable artifact ID, using letters, digits, underscores, or hyphens.                                        |
-| revision   | New value for each publication. `"1"`, `"2"` is enough; periods are allowed.                               |
-| kind       | exploration for proposals. plan for the complete final handoff.                                            |
-| title      | Human-readable artifact title, shown once at the top of the sidebar.                                       |
-| pages      | Ordered records with unique id, title, and html, or file instead of html: a path relative to the manifest. |
-| css, js    | Optional paths to the plan's own CSS and script, relative to the manifest.                                 |
-| agreements | Optional structured agreement records.                                                                     |
-| prototypes | Optional preserved, self-contained interactive documents.                                                  |
+```json
+{
+  "artifactId": "retry",
+  "revision": "1",
+  "kind": "exploration",
+  "title": "Retry policy",
+  "page": {
+    "id": "policy",
+    "title": "Retry policy",
+    "file": "policy.html",
+    "css": "policy.css",
+    "js": "policy.mjs",
+    "prototypes": []
+  }
+}
+```
 
-`css` and `js` hold what the plan invents, and nothing else. Every component
-under `components/` is bundled by the builder, so a page uses one by copying
-its markup alone.
+| Field      | Contract                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| artifactId | Stable ID for the whole session, using letters, digits, underscores or hyphens.                |
+| revision   | The same value on every page of a revision, and a new value for each revision: `"1"`, `"2"`.   |
+| kind       | `exploration` for proposals, `plan` for the complete final handoff.                            |
+| title      | The plan's title.                                                                              |
+| page.file  | An HTML fragment, relative to the JSON file. `page.html` may hold the fragment inline instead. |
+| page.css   | Optional page CSS. The frame scopes it to this page.                                           |
+| page.js    | Optional module that exports `setup(root, planUI)`.                                            |
+| prototypes | Optional prototypes for this page. See [prototypes.md](prototypes.md).                         |
 
-The builder writes three cascade layers, `frame`, `plan` then `components`,
-and scopes the last two to `#page-content`. A component rule therefore beats
-a plan rule of any specificity: a plan that restyles `.decision-option` is
-ignored, and the same rule with `!important` applies. Content a page puts in
-a component's slot is the page's own markup under the page's own classes,
-so nothing there collides.
+Page IDs are unique within a revision. Reusing a page ID in a later
+revision lets the reviewer's unsent draft on that page carry forward. `agreed`
+is only for the Agreed page, and `feedback` is reserved. A final plan lists
+`overview` first after Agreed.
 
-The plan's script is a module that runs after the frame's, so it can call
-`planUI.define` to register a component of its own before the first page
-renders.
-
-A final plan begins with the page ID `overview`. The remaining pages are
-the implementation steps. The ID `feedback` is reserved, and the frame
-adds an `agreed` page unless the manifest already has one, so that ID is
-taken whether or not the manifest has agreements. Keep page IDs the same across
-revisions: unsent draft items carry over to the next revision by page ID
-and anchor.
-
-The embedded `plan-data` JSON contains the page HTML, agreement records and
-prototype source. Page HTML is trusted markup written by the agent,
-not Markdown. User comments are plain text. Never put them into executable
-HTML or JavaScript. The builder escapes literal less-than characters in the
-embedded JSON, and that escaping stays if you edit an assembled artifact.
-Leave `session-config` empty for the publisher to fill, and never put the
-agent token in the page.
+Page HTML is trusted markup written by the agent. Reviewer comments are
+plain text. Never put them into executable HTML or JavaScript, and never put
+the agent token in a page.

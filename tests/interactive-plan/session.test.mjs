@@ -17,16 +17,20 @@ import {
   emptyDraft,
   loadDraft,
   markSent,
+  placeFor,
+  readPlaces,
   submissionGroups,
   unsentItems,
-  usablePlace,
 } from "../../ai-harness/skills/interactive-plan/assets/draft.mjs";
 import {
   assemble,
   build,
+  buildPage,
 } from "../../ai-harness/skills/interactive-plan/scripts/build.mjs";
 import {
   artifactData,
+  detectWake,
+  pageData,
   settings,
   startHub,
   version,
@@ -55,17 +59,18 @@ const alive = (pid) => {
     return error.code !== "ESRCH";
   }
 };
-// The helper's start detects the harness from the environment. A dummy inbox
-// socket makes every wake fail harmlessly instead of reaching a real session.
+// The helper detects the nearest agent process before environment variables.
+// Give both supported agent paths dummy targets so a test wake cannot reach
+// a real session, including when this suite runs under Codex.
 function cliEnv(home, extra = {}) {
   const env = {
     ...process.env,
     XDG_STATE_HOME: home,
     CLAUDE_CODE_MESSAGING_SOCKET: path.join(home, "none.sock"),
     CLAUDE_CODE_MESSAGING_TOKEN: "test",
+    CODEX_THREAD_ID: "interactive-plan-test-thread",
     ...extra,
   };
-  delete env.CODEX_THREAD_ID;
   delete env.COPILOT_AGENT_SESSION_ID;
   return env;
 }
@@ -89,18 +94,42 @@ async function killHub(config) {
 const sessionConfig = (html) =>
   JSON.parse(html.match(/id="session-config">([\s\S]*?)<\/script>/)[1]);
 
-test("a remembered place survives its own revision and nothing else", () => {
+test("each revision keeps its own remembered place", () => {
   const pages = ["overview", "steps", "feedback"];
-  const place = { revision: "2", page: "steps", top: 640 };
-  assert.deepEqual(usablePlace(place, "2", pages), { page: "steps", top: 640 });
-  // A new revision reopens at the top of the first page.
-  assert.equal(usablePlace(place, "3", pages), null);
+  const { tab, past, places } = readPlaces({
+    tab: "past",
+    past: "1",
+    places: {
+      1: { page: "steps", top: 640, tops: { steps: 640, overview: 120 } },
+      2: { page: "overview", top: "x", tops: { overview: -3 } },
+    },
+  });
+  assert.equal(tab, "past");
+  assert.equal(past, "1");
+  // Each page read keeps its own scroll position.
+  assert.deepEqual(placeFor(places, "1", pages), {
+    page: "steps",
+    top: 640,
+    tops: { steps: 640, overview: 120 },
+  });
+  assert.deepEqual(placeFor(places, "2", pages), {
+    page: "overview",
+    top: 0,
+    tops: {},
+  });
+  // A revision never visited opens at its first page.
+  assert.equal(placeFor(places, "3", pages), null);
   // A page the revision dropped would land the reader nowhere.
-  assert.equal(usablePlace(place, "2", ["overview", "feedback"]), null);
-  assert.equal(usablePlace(null, "2", pages), null);
+  assert.equal(placeFor(places, "1", ["overview", "feedback"]), null);
+  assert.deepEqual(readPlaces(null), {
+    tab: "current",
+    past: null,
+    places: {},
+  });
+  // A record from before places were kept per revision still counts.
   assert.deepEqual(
-    usablePlace({ revision: "2", page: "overview", top: "x" }, "2", pages),
-    { page: "overview", top: 0 },
+    readPlaces({ revision: "2", page: "steps", top: 10 }).places,
+    { 2: { page: "steps", top: 10, tops: {} } },
   );
 });
 
@@ -164,6 +193,7 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   };
   assert.equal(unsentItems(draft).count, 3);
   assert.deepEqual(Object.keys(submissionGroups(draft)), [
+    "alignUnflagged",
     "choices",
     "notes",
     "answers",
@@ -187,9 +217,12 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   );
   assert.equal("sentIn" in groups.notes[0], false);
   assert.equal("answers" in groups, false);
+  draft.acceptance = { id: "accept-1", mode: "implement", guidance: "Do this" };
+  draft.acceptGuidance = "Do this";
   const same = loadDraft(JSON.parse(JSON.stringify(draft)), "1");
   assert.equal(same.notes.length, 2);
   assert.equal(same.submitted.id, "sub-1");
+  assert.equal(same.acceptGuidance, "Do this");
   const next = loadDraft(JSON.parse(JSON.stringify(draft)), "2");
   assert.deepEqual(
     next.notes.map((note) => note.id),
@@ -198,6 +231,8 @@ test("drafts carry unsent items across revisions and drop what was sent", () => 
   assert.deepEqual(next.choices, {});
   assert.deepEqual(next.answers, {});
   assert.equal(next.submitted, null);
+  assert.equal(next.acceptance, null);
+  assert.equal(next.acceptGuidance, "");
   assert.equal(next.revision, "2");
   assert.deepEqual(loadDraft(null, "3"), emptyDraft("3"));
   assert.deepEqual(loadDraft({ notes: "bad" }, "3"), emptyDraft("3"));
@@ -392,22 +427,24 @@ test("denied, unavailable, and failed notifications disable the control", async 
   assert.match(a.button.title, /delivery failed/);
 });
 
-const frame = await assemble({
-  artifactId: "example",
-  revision: "0",
-  kind: "exploration",
-  title: "Example",
-  pages: [{ id: "overview", title: "Overview", html: "" }],
-});
-function artifact(
+function planData(
   revision = "1",
   kind = "exploration",
   artifactId = "example",
 ) {
-  return frame.replace(
-    /(<script type="application\/json" id="plan-data">)[\s\S]*?(<\/script>)/,
-    `$1${JSON.stringify({ artifactId, revision, kind, title: "Example work", pages: [{ id: "overview", title: "Overview", html: "<p>Preserve one result per input.</p>" }] })}$2`,
-  );
+  return {
+    artifactId,
+    revision,
+    kind,
+    title: "Example work",
+    pages: [
+      {
+        id: "overview",
+        title: "Overview",
+        html: "<p>Preserve one result per input.</p>",
+      },
+    ],
+  };
 }
 async function hub(t, extra = {}) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-hub-"));
@@ -463,6 +500,32 @@ async function hub(t, extra = {}) {
     };
     const action = (action, data = {}) =>
       request(`/agent/${id}/action`, { action, sessionId: id, ...data });
+    // A revision goes out as an agent sends it: Agreed with the page list,
+    // then each page. The result is the first refusal, or the last page's.
+    const publish = async (data) => {
+      const build = (page) =>
+        buildPage(path.join(directory, "source.json"), {
+          artifactId: data.artifactId,
+          revision: data.revision,
+          kind: data.kind,
+          title: data.title,
+          page,
+        });
+      let result = await action("publish", {
+        html: await build({
+          id: "agreed",
+          title: "Agreed so far",
+          task: { title: "The task", html: "<p>What the plan builds.</p>" },
+          agreements: data.agreements || [],
+        }),
+        pages: data.pages.map(({ id, title }) => ({ id, title })),
+      });
+      for (const page of data.pages) {
+        if (result.code !== 200) break;
+        result = await action("publish", { html: await build(page) });
+      }
+      return result;
+    };
     const event = (intent = "feedback-only", revision = "1", extra = {}) => ({
       sessionId: id,
       artifactId: "example",
@@ -481,6 +544,7 @@ async function hub(t, extra = {}) {
       connection,
       request,
       action,
+      publish,
       event,
       feedback: (data, headers) =>
         request(`/s/${id}/api/feedback`, data, headers),
@@ -498,7 +562,7 @@ async function hub(t, extra = {}) {
   };
 }
 
-test("split authoring sources build a standalone artifact without executing content", async (t) => {
+test("a page source builds a standalone preview without executing content", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-build-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   // The frame draws the page title, so the page's own heading is an h2.
@@ -511,7 +575,7 @@ test("split authoring sources build a standalone artifact without executing cont
   );
   await fs.writeFile(
     path.join(directory, "custom.js"),
-    'window.addEventListener("plan:page", () => {});',
+    'export function setup(root) { root.dataset.test = "ready"; }',
   );
   const source = path.join(directory, "source.json");
   await fs.writeFile(
@@ -521,24 +585,30 @@ test("split authoring sources build a standalone artifact without executing cont
       revision: "1",
       kind: "plan",
       title: "Build",
-      css: "custom.css",
-      js: "custom.js",
-      pages: [{ id: "overview", title: "Overview", file: "interface.html" }],
+      page: {
+        id: "overview",
+        title: "Overview",
+        file: "interface.html",
+        css: "custom.css",
+        js: "custom.js",
+      },
     }),
   );
   const html = await build(source);
-  assert.equal(artifactData(html).pages[0].html, content);
-  assert.equal(artifactData(html).pages[0].file, undefined);
-  assert.equal(artifactData(html).css, undefined);
+  assert.equal(pageData(html).page.html, content);
+  assert.equal(pageData(html).page.file, undefined);
+  assert.equal(
+    pageData(html).page.cssText,
+    ".prototype { color: var(--attention); }",
+  );
+  assert.equal(
+    pageData(html).page.jsText,
+    'export function setup(root) { root.dataset.test = "ready"; }',
+  );
   assert(html.includes(".prototype { color: var(--attention); }"));
-  assert(html.includes('window.addEventListener("plan:page"'));
   assert(html.includes("export function loadDraft"));
   assert(!html.includes("<!-- FRAME_"));
   assert(!html.includes('src="frame.js"'));
-  await assert.rejects(
-    assemble(artifactData(html), { js: 'const text = "</script>";' }),
-    /closing/,
-  );
   const output = path.join(directory, "artifact.html");
   const builder = path.join(path.dirname(helper), "build.mjs");
   await exec(process.execPath, [builder, source, output]);
@@ -572,41 +642,50 @@ test("preserved prototypes retain exact executable source without escaping into 
     '<!doctype html><button id="try">Try</button><script>document.querySelector("button").onclick = () => alert("$&");</script>';
   await fs.writeFile(path.join(directory, "prototype.html"), html);
   const data = {
-    ...artifactData(artifact()),
-    pages: [
-      {
-        id: "overview",
-        title: "Preview",
-        html: '<div data-prototype="demo"></div><code>data-prototype="ID"</code>',
-      },
-    ],
-    prototypes: [
-      {
-        id: "demo",
-        title: "Approved interaction",
-        file: "prototype.html",
-        height: 420,
-      },
-    ],
+    artifactId: "example",
+    revision: "1",
+    kind: "exploration",
+    title: "Example work",
+    page: {
+      id: "overview",
+      title: "Preview",
+      html: '<div data-prototype="demo"></div><code>data-prototype="ID"</code>',
+      prototypes: [
+        {
+          id: "demo",
+          title: "Approved interaction",
+          file: "prototype.html",
+          height: 420,
+        },
+      ],
+    },
   };
   const source = path.join(directory, "source.json");
   await fs.writeFile(source, JSON.stringify(data));
   const result = await build(source);
-  const parsed = artifactData(result);
-  assert.equal(parsed.prototypes[0].html, html);
-  assert.equal(parsed.prototypes[0].file, undefined);
+  const parsed = pageData(result);
+  assert.equal(parsed.page.prototypes[0].html, html);
+  assert.equal(parsed.page.prototypes[0].file, undefined);
   assert(!result.includes(html));
   for (const prototypes of [
     [],
     [null],
-    [{ ...parsed.prototypes[0], height: 0 }],
-    [{ ...parsed.prototypes[0], html: "" }],
-    [parsed.prototypes[0], parsed.prototypes[0]],
+    [{ ...parsed.page.prototypes[0], height: 0 }],
+    [{ ...parsed.page.prototypes[0], html: "" }],
+    [parsed.page.prototypes[0], parsed.page.prototypes[0]],
   ])
-    await assert.rejects(assemble({ ...parsed, prototypes }));
+    await assert.rejects(
+      buildPage(source, { ...parsed, page: { ...parsed.page, prototypes } }),
+    );
   await fs.writeFile(
     source,
-    JSON.stringify({ ...data, prototypes: [{ ...data.prototypes[0], html }] }),
+    JSON.stringify({
+      ...data,
+      page: {
+        ...data.page,
+        prototypes: [{ ...data.page.prototypes[0], html }],
+      },
+    }),
   );
   await assert.rejects(build(source), /file.*html|html.*file/);
 });
@@ -614,7 +693,7 @@ test("preserved prototypes retain exact executable source without escaping into 
 test("publication resolves exact mixed sources from saved feedback before hashing", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   const feedback = a.event("feedback-only", "1", {
     groups: {
       notes: [
@@ -657,8 +736,8 @@ test("publication resolves exact mixed sources from saved feedback before hashin
     ],
     sourceRecords: [{ kind: "note", text: "Forged source" }],
   };
-  const data = { ...artifactData(artifact("2")), agreements: [entry] };
-  const result = await a.action("publish", { html: await assemble(data) });
+  const data = { ...planData("2"), agreements: [entry] };
+  const result = await a.publish(data);
   assert.equal(result.code, 200);
   const snapshot = await fs.readFile(
     path.join(a.directory, "artifacts/example.2.html"),
@@ -679,17 +758,17 @@ test("publication resolves exact mixed sources from saved feedback before hashin
     result.body.status.current.sha256,
     crypto.createHash("sha256").update(snapshot).digest("hex"),
   );
+  await a.feedback(a.event("feedback-only", "2"));
+  await a.action("read");
   for (const ref of [
     { kind: "note", submissionId: "missing", noteId: "note-1" },
     { kind: "note", submissionId: feedback.id, noteId: "missing" },
     { kind: "choice", submissionId: feedback.id, choiceId: "missing" },
   ]) {
-    const rejected = await a.action("publish", {
-      html: await assemble({
-        ...data,
-        revision: "3",
-        agreements: [{ ...entry, sourceRefs: [ref] }],
-      }),
+    const rejected = await a.publish({
+      ...data,
+      revision: "3",
+      agreements: [{ ...entry, sourceRefs: [ref] }],
     });
     assert.equal(rejected.code, 400);
     assert.match(rejected.body.error, /Source .*not found/);
@@ -709,7 +788,7 @@ test("publication resolves exact mixed sources from saved feedback before hashin
 test("choice sources preserve readable labels and complete checklist snapshots", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   const choices = {
     "overview/policy": {
       topic: "overview",
@@ -740,7 +819,7 @@ test("choice sources preserve readable labels and complete checklist snapshots",
   assert.equal((await a.feedback(feedback)).code, 200);
   await a.action("read");
   const data = {
-    ...artifactData(artifact("2")),
+    ...planData("2"),
     agreements: [
       {
         id: "scope",
@@ -754,7 +833,7 @@ test("choice sources preserve readable labels and complete checklist snapshots",
       },
     ],
   };
-  const published = await a.action("publish", { html: await assemble(data) });
+  const published = await a.publish(data);
   assert.equal(published.code, 200);
   const html = await fs.readFile(
     path.join(a.directory, "artifacts/example.2.html"),
@@ -776,7 +855,7 @@ test("choice sources preserve readable labels and complete checklist snapshots",
 test("answers travel with feedback and resolve as agreement sources", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   for (const answers of [
     [],
     { "overview/q1": { label: "Sidebar?", topic: "overview" } },
@@ -815,12 +894,7 @@ test("answers travel with feedback and resolve as agreement sources", async (t) 
       { kind: "answer", submissionId: feedback.id, answerId: "overview/q1" },
     ],
   };
-  const published = await a.action("publish", {
-    html: await assemble({
-      ...artifactData(artifact("2")),
-      agreements: [entry],
-    }),
-  });
+  const published = await a.publish({ ...planData("2"), agreements: [entry] });
   assert.equal(published.code, 200, published.body.error);
   const html = await fs.readFile(
     path.join(a.directory, "artifacts/example.2.html"),
@@ -836,18 +910,18 @@ test("answers travel with feedback and resolve as agreement sources", async (t) 
     "./example.1.html?target=question-overview-0#overview",
   );
   assert(!html.includes("Yes, keep the <sidebar>"));
-  const missing = await a.action("publish", {
-    html: await assemble({
-      ...artifactData(artifact("3")),
-      agreements: [
-        {
-          ...entry,
-          sourceRefs: [
-            { kind: "answer", submissionId: feedback.id, answerId: "nope" },
-          ],
-        },
-      ],
-    }),
+  await a.feedback(a.event("feedback-only", "2"));
+  await a.action("read");
+  const missing = await a.publish({
+    ...planData("3"),
+    agreements: [
+      {
+        ...entry,
+        sourceRefs: [
+          { kind: "answer", submissionId: feedback.id, answerId: "nope" },
+        ],
+      },
+    ],
   });
   assert.equal(missing.code, 400);
   assert.match(missing.body.error, /Source item not found/);
@@ -856,14 +930,11 @@ test("answers travel with feedback and resolve as agreement sources", async (t) 
 test("final review can reopen exploration and only accept the recomposed plan", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact("1", "plan") });
+  await a.publish(planData("1", "plan"));
   const feedback = a.event();
   await a.feedback(feedback);
   await a.action("read");
-  assert.equal(
-    (await a.action("publish", { html: artifact("2", "exploration") })).code,
-    200,
-  );
+  assert.equal((await a.publish(planData("2", "exploration"))).code, 200);
   assert.equal(
     (await a.feedback(a.event("accept-plan", "1", { mode: "save" }))).code,
     409,
@@ -877,7 +948,7 @@ test("final review can reopen exploration and only accept the recomposed plan", 
   });
   await a.feedback(choice);
   await a.action("read");
-  await a.action("publish", { html: artifact("3", "plan") });
+  await a.publish(planData("3", "plan"));
   const acceptance = a.event("accept-plan", "3", { mode: "save" });
   assert.equal((await a.feedback(acceptance)).code, 200);
   await a.action("read");
@@ -897,7 +968,7 @@ test("final review can reopen exploration and only accept the recomposed plan", 
 });
 
 test("agreement authoring preserves rich content and rejects ambiguous records", async (t) => {
-  const data = artifactData(artifact());
+  const data = planData();
   const entry = {
     id: "errors",
     title: "Per-item errors",
@@ -918,15 +989,14 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
     null,
   ])
     await assert.rejects(assemble({ ...data, agreements }));
-  const legacy = {
+  const duplicateAgreed = {
     ...data,
     pages: [
       ...data.pages,
       { id: "agreed", title: "Agreed", html: "Previous decision" },
     ],
   };
-  assert.equal(artifactData(await assemble(legacy)).pages.length, 2);
-  await assert.rejects(assemble({ ...legacy, agreements: [] }));
+  await assert.rejects(assemble({ ...duplicateAgreed, agreements: [] }));
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), "agreement-build-"),
   );
@@ -937,11 +1007,19 @@ test("agreement authoring preserves rich content and rejects ambiguous records",
   await fs.writeFile(
     source,
     JSON.stringify({
-      ...data,
-      agreements: [{ ...metadata, file: "decision.html" }],
+      artifactId: data.artifactId,
+      revision: data.revision,
+      kind: data.kind,
+      title: data.title,
+      page: {
+        id: "agreed",
+        title: "Agreed so far",
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
+        agreements: [{ ...metadata, file: "decision.html" }],
+      },
     }),
   );
-  assert.equal(artifactData(await build(source)).agreements[0].html, html);
+  assert.equal(pageData(await build(source)).page.agreements[0].html, html);
 });
 
 test("agreements survive topic changes and targeted feedback without rewriting snapshots", async (t) => {
@@ -957,7 +1035,7 @@ test("agreements survive topic changes and targeted feedback without rewriting s
   for (const [index, state] of states.entries()) {
     const revision = String(index + 1);
     const data = {
-      ...artifactData(artifact(revision)),
+      ...planData(revision),
       pages: [
         {
           id: `topic-${revision}`,
@@ -967,10 +1045,7 @@ test("agreements survive topic changes and targeted feedback without rewriting s
       ],
       agreements: [{ ...entry, state }],
     };
-    assert.equal(
-      (await a.action("publish", { html: await assemble(data) })).code,
-      200,
-    );
+    assert.equal((await a.publish(data)).code, 200);
     const event = a.event("feedback-only", revision, {
       groups: {
         notes: [
@@ -1040,19 +1115,22 @@ test("capability check tests storage, loopback, and the hub port, then cleans up
 });
 
 test("artifact parsing requires a real plan overview and preserves rich HTML", () => {
+  const html = (data) =>
+    `<script type="application/json" id="plan-data">${JSON.stringify(data)}</script>`;
+  const renamed = (kind, id) => {
+    const data = planData("1", kind);
+    data.pages[0].id = id;
+    return html(data);
+  };
   assert.equal(
-    artifactData(artifact("1", "plan")).pages[0].html,
+    artifactData(html(planData("1", "plan"))).pages[0].html,
     "<p>Preserve one result per input.</p>",
   );
   assert.throws(
-    () => artifactData(artifact().replace('"overview"', '"feedback"')),
+    () => artifactData(renamed("exploration", "feedback")),
     /reserved/,
   );
-  assert.throws(
-    () =>
-      artifactData(artifact("1", "plan").replace('"overview"', '"details"')),
-    /overview/,
-  );
+  assert.throws(() => artifactData(renamed("plan", "details")), /overview/);
 });
 
 test("two sessions on one hub isolate tokens, events, and acknowledgements", async (t) => {
@@ -1063,8 +1141,8 @@ test("two sessions on one hub isolate tokens, events, and acknowledgements", asy
   assert.notEqual(a.connection.token, b.connection.token);
   assert.equal(a.connection.origin, h.server.origin);
   assert.equal(a.info.url, `${h.server.origin}${a.base}/`);
-  assert.equal((await a.action("publish", { html: artifact() })).code, 200);
-  assert.equal((await b.action("publish", { html: artifact() })).code, 200);
+  assert.equal((await a.publish(planData())).code, 200);
+  assert.equal((await b.publish(planData())).code, 200);
   const event = a.event();
   assert.equal((await b.feedback(event)).code, 409);
   assert.equal((await a.feedback(event)).code, 200);
@@ -1107,9 +1185,9 @@ test("the hub lists open sessions needs-you first, and a paused one stays listed
   const a = await h.session(),
     b = await h.session();
   await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   await sleep(5);
-  await b.action("publish", { html: artifact() });
+  await b.publish(planData());
   let list = (await a.request("/api/sessions")).body.sessions;
   assert.deepEqual(
     list.map((item) => item.id),
@@ -1126,7 +1204,7 @@ test("the hub lists open sessions needs-you first, and a paused one stays listed
       [b.id, false, "working"],
     ],
   );
-  await b.action("publish", { html: artifact("2") });
+  await b.publish(planData("2"));
   const first = a.event();
   await a.feedback(first);
   await a.action("read");
@@ -1169,8 +1247,8 @@ test("closing a session from the bell panel completes it and drops it from the l
   const h = await hub(t);
   const a = await h.session(),
     b = await h.session();
-  await a.action("publish", { html: artifact() });
-  await b.action("publish", { html: artifact() });
+  await a.publish(planData());
+  await b.publish(planData());
   assert.equal(
     (await b.request(`${b.base}/api/dismiss`, {}, { Origin: "http://evil" }))
       .code,
@@ -1218,9 +1296,9 @@ test("the root URL opens the session that most needs you, then the last viewed, 
   assert.match(result.text, /No live sessions/);
   const a = await h.session(),
     b = await h.session();
-  await b.action("publish", { html: artifact() });
+  await b.publish(planData());
   await sleep(5);
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   result = await open();
   assert.equal(result.code, 302);
   assert.equal(result.location, `${b.base}/`);
@@ -1249,28 +1327,32 @@ test("the root URL opens the session that most needs you, then the last viewed, 
 test("revision routes inject read-only and preview flags and serve prototypes sandboxed", async (t) => {
   const h = await hub(t);
   const a = await h.session();
+  const demo = {
+    id: "demo",
+    title: "Demo",
+    html: "<!doctype html><p>demo $&</p>",
+    height: 100,
+  };
   const data = {
-    ...artifactData(artifact()),
+    ...planData(),
     pages: [
       {
         id: "overview",
         title: "Preview",
         html: '<div data-prototype="demo"></div>',
-      },
-    ],
-    prototypes: [
-      {
-        id: "demo",
-        title: "Demo",
-        html: "<!doctype html><p>demo $&</p>",
-        height: 100,
+        prototypes: [demo],
       },
     ],
   };
-  await a.action("publish", { html: await assemble(data) });
-  await a.action("publish", { html: artifact("2") });
+  assert.equal((await a.publish(data)).code, 200);
+  await a.feedback(a.event());
+  await a.action("read");
+  assert.equal((await a.publish(planData("2"))).code, 200);
   const live = (await a.request(`${a.base}/`)).body;
-  assert.deepEqual(sessionConfig(live), { sessionId: a.id, base: a.base });
+  assert.deepEqual(sessionConfig(live), {
+    sessionId: a.id,
+    base: a.base,
+  });
   assert.equal(artifactData(live).revision, "2");
   const readonly = await a.request(`${a.base}/r/1`);
   assert.equal(readonly.code, 200);
@@ -1291,7 +1373,7 @@ test("revision routes inject read-only and preview flags and serve prototypes sa
   assert.equal((await a.request(`${a.base}/r/9`)).code, 404);
   const prototype = await a.request(`${a.base}/r/1/prototype/demo`);
   assert.equal(prototype.code, 200);
-  assert.equal(prototype.body, data.prototypes[0].html);
+  assert.equal(prototype.body, demo.html);
   assert.match(prototype.headers.get("content-security-policy"), /sandbox/);
   assert.equal((await a.request(`${a.base}/r/1/prototype/nope`)).code, 404);
   const stored = await fs.readFile(
@@ -1319,14 +1401,14 @@ test("revision routes inject read-only and preview flags and serve prototypes sa
 test("explicit feedback is retryable, remains unread until read, and blocks premature publication", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   const event = a.event();
   const receipt = await a.feedback(event);
   assert.equal(receipt.body.status.stage, "submitted");
   assert.deepEqual(receipt.body.status.acknowledged, []);
   assert.equal((await a.feedback(event)).code, 200);
   assert.equal((await a.feedback({ ...event, text: "Changed" })).code, 409);
-  assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
+  assert.equal((await a.publish(planData("2"))).code, 409);
   const cli = async (...args) =>
     JSON.parse(
       (
@@ -1349,7 +1431,7 @@ test("explicit feedback is retryable, remains unread until read, and blocks prem
     path.join(a.directory, "artifacts/example.1.html"),
     "utf8",
   );
-  assert.equal((await a.action("publish", { html: artifact("2") })).code, 200);
+  assert.equal((await a.publish(planData("2"))).code, 200);
   assert.equal(
     await fs.readFile(
       path.join(a.directory, "artifacts/example.1.html"),
@@ -1358,7 +1440,7 @@ test("explicit feedback is retryable, remains unread until read, and blocks prem
     original,
   );
   assert.equal((await a.feedback(a.event())).code, 409);
-  assert.equal((await a.action("publish", { html: artifact("2") })).code, 409);
+  assert.equal((await a.publish(planData("2"))).code, 409);
   const status = JSON.parse(
     (
       await exec(
@@ -1374,20 +1456,18 @@ test("explicit feedback is retryable, remains unread until read, and blocks prem
 test("a session rejects a revision reused by another artifact", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact("1") });
-  const duplicate = await a.action("publish", {
-    html: artifact("1", "exploration", "other"),
-  });
+  await a.publish(planData("1"));
+  await a.feedback(a.event());
+  await a.action("read");
+  const duplicate = await a.publish(planData("1", "exploration", "other"));
   assert.equal(duplicate.code, 409);
-  assert.match(duplicate.body.error, /artifact "example"/);
+  assert.match(duplicate.body.error, /Revision 1 is already used/);
   assert.equal(
     await exists(path.join(a.directory, "artifacts/other.1.html")),
     false,
   );
   assert.equal((await a.status()).body.current.artifactId, "example");
-  const next = await a.action("publish", {
-    html: artifact("2", "exploration", "other"),
-  });
+  const next = await a.publish(planData("2", "exploration", "other"));
   assert.equal(next.code, 200, next.body.error);
   assert.equal((await a.status()).body.current.artifactId, "other");
 });
@@ -1395,7 +1475,7 @@ test("a session rejects a revision reused by another artifact", async (t) => {
 test("question actions and reply intents are unsupported", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   const status = (await a.status()).body;
   assert.equal(Object.hasOwn(status, "question"), false);
   const browser = (await a.request(`${a.base}/`)).body;
@@ -1413,7 +1493,7 @@ test("question actions and reply intents are unsupported", async (t) => {
 test("queued rounds keep receipt order", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
+  await a.publish(planData());
   const first = a.event(),
     second = a.event();
   await a.feedback(first);
@@ -1431,12 +1511,14 @@ for (const mode of ["save", "implement"])
   test(`acceptance records explicit ${mode} mode for the exact final plan`, async (t) => {
     const h = await hub(t);
     const a = await h.session();
-    await a.action("publish", { html: artifact() });
+    await a.publish(planData());
     assert.equal(
       (await a.feedback(a.event("accept-plan", "1", { mode }))).code,
       409,
     );
-    await a.action("publish", { html: artifact("2", "plan") });
+    await a.feedback(a.event());
+    await a.action("read");
+    await a.publish(planData("2", "plan"));
     assert.equal((await a.feedback(a.event("accept-plan", "2"))).code, 400);
     assert.equal((await a.action("complete")).code, 409);
     const acceptance = a.event("accept-plan", "2", { mode });
@@ -1461,10 +1543,55 @@ for (const mode of ["save", "implement"])
         .digest("hex"),
     );
     assert.deepEqual((await a.request("/api/sessions")).body.sessions, []);
-    await a.action("publish", { html: artifact("3", "plan") });
-    assert.equal((await a.action("complete")).code, 409);
-    assert.equal((await a.status()).body.accepted, null);
+    assert.equal((await a.publish(planData("3", "plan"))).code, 409);
+    assert.equal((await a.status()).body.accepted.mode, mode);
   });
+
+test("implementation guidance is validated, saved with acceptance, and returned on completion", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.publish(planData("1", "plan"));
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("accept-plan", "1", { mode: "save", guidance: "Do this" }),
+      )
+    ).code,
+    400,
+  );
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("accept-plan", "1", {
+          mode: "implement",
+          guidance: "x".repeat(4001),
+        }),
+      )
+    ).code,
+    400,
+  );
+  const acceptance = a.event("accept-plan", "1", {
+    mode: "implement",
+    guidance: "  Start with the drawing question.  ",
+  });
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  assert.equal(
+    (await a.feedback({ ...acceptance, guidance: "Different work" })).code,
+    409,
+  );
+  const read = await a.action("read");
+  assert.equal(
+    read.body.event.payload.guidance,
+    "Start with the drawing question.",
+  );
+  const complete = (await a.action("complete")).body;
+  assert.equal(complete.guidance, "Start with the drawing question.");
+  const record = JSON.parse(
+    await fs.readFile(path.join(a.directory, "acceptance.json"), "utf8"),
+  );
+  assert.equal(record.guidance, complete.guidance);
+});
 
 test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-idle-"));
@@ -1483,7 +1610,9 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
   assert.equal(first.url, `http://127.0.0.1:${port}/s/${first.sessionId}/`);
   assert(first.sessionDir.startsWith(config.sessions));
-  assert.deepEqual(first.wake, { harness: "claude-code" });
+  // The printed wake names the harness and carries none of the token or
+  // thread it wakes with.
+  assert.deepEqual(first.wake, { harness: detectWake(env).harness });
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.equal(record.port, port);
   assert.equal(record.version, version);
@@ -1516,42 +1645,9 @@ test("the hub exits when nothing is live and start spawns a fresh one on the sam
   );
 });
 
-test("the CLI marks steps in one call, keeps the source with a publication, and refuses to run inside a sandbox without network", async (t) => {
+test("the Codex network check installs rules and reports sandbox state", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact() });
-  await a.feedback(a.event());
-  await a.action("read");
-  const run = (...args) =>
-    exec(process.execPath, [helper, ...args, "--session-dir", a.directory], {
-      env: h.env,
-    });
-  await run("progress", "--steps", "Update Agreed|Page A|Page B");
-  await run("progress", "--start", "Update Agreed");
-  await run("progress", "--done", "Update Agreed", "--start", "Page A|Page B");
-  assert.deepEqual(
-    (await a.status()).body.progress.steps.map((step) => step.state),
-    ["done", "active", "active"],
-  );
-  await assert.rejects(
-    run("progress", "--steps", "X", "--start", "X"),
-    /steps alone/,
-  );
-  const work = await fs.mkdtemp(path.join(os.tmpdir(), "plan-source-"));
-  t.after(() => fs.rm(work, { recursive: true, force: true }));
-  await fs.writeFile(path.join(work, "page.html"), "<p>two</p>");
-  await fs.writeFile(path.join(work, "art.html"), artifact("2"));
-  await run("publish", "--file", path.join(work, "art.html"), "--source", work);
-  const kept = path.join(a.directory, "src", "2");
-  assert.equal((await a.status()).body.current.source, kept);
-  assert.equal(
-    await fs.readFile(path.join(kept, "page.html"), "utf8"),
-    "<p>two</p>",
-  );
-  await assert.rejects(
-    run("publish", "--file", path.join(work, "art.html"), "--source", work),
-    /already exists/,
-  );
   const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "plan-codex-"));
   t.after(() => fs.rm(codexHome, { recursive: true, force: true }));
   const check = path.join(path.dirname(helper), "check.mjs");
@@ -1577,8 +1673,10 @@ test("the CLI marks steps in one call, keeps the source with a publication, and 
 test("a moved session still serves its current and earlier revisions", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  await a.action("publish", { html: artifact("1") });
-  await a.action("publish", { html: artifact("2") });
+  assert.equal((await a.publish(planData("1"))).code, 200);
+  await a.feedback(a.event());
+  await a.action("read");
+  assert.equal((await a.publish(planData("2"))).code, 200);
   const moved = a.directory + "-moved";
   await fs.rename(a.directory, moved);
   const registered = await fetch(h.server.origin + "/agent/register", {
@@ -1595,6 +1693,17 @@ test("a moved session still serves its current and earlier revisions", async (t)
   assert.equal(registered.status, 200);
   assert.equal((await a.request(`${a.base}/`)).code, 200);
   assert.equal((await a.request(`${a.base}/r/1`)).code, 200);
+  const manifest = await a.request(`${a.base}/api/page-set?revision=1`);
+  assert.equal(manifest.code, 200);
+  const slot = manifest.body.pages.find((item) => item.id === "overview");
+  assert.equal(
+    (
+      await a.request(
+        `${a.base}/api/page?revision=1&id=overview&version=${slot.version}`,
+      )
+    ).code,
+    200,
+  );
 });
 
 test("start replaces a stale hub record, and helper commands reattach after a crash without losing the queue", async (t) => {
@@ -1625,13 +1734,49 @@ test("start replaces a stale hub record, and helper commands reattach after a cr
   const record = JSON.parse(await fs.readFile(config.hubFile, "utf8"));
   assert.notEqual(record.pid, dead.pid);
   assert.notEqual(record.port, 1);
-  const file = path.join(home, "artifact.html");
-  await fs.writeFile(file, artifact());
-  await exec(
-    process.execPath,
-    [helper, "publish", "--session-dir", started.sessionDir, "--file", file],
-    { env },
+  const source = path.join(home, "source.json");
+  const shared = {
+    artifactId: "example",
+    revision: "1",
+    kind: "exploration",
+    title: "Example work",
+  };
+  const command = (...args) =>
+    exec(
+      process.execPath,
+      [helper, ...args, "--session-dir", started.sessionDir],
+      {
+        env,
+      },
+    );
+  const agreedFile = path.join(home, "agreed.html");
+  await fs.writeFile(
+    agreedFile,
+    await buildPage(source, {
+      ...shared,
+      page: {
+        id: "agreed",
+        title: "Agreed so far",
+        agreements: [],
+        task: { title: "The task", html: "<p>What the plan builds.</p>" },
+      },
+    }),
   );
+  const pagesFile = path.join(home, "pages.json");
+  await fs.writeFile(
+    pagesFile,
+    JSON.stringify({ pages: [{ id: "overview", title: "Overview" }] }),
+  );
+  await command("publish", "--file", agreedFile, "--pages", pagesFile);
+  const overviewFile = path.join(home, "overview.html");
+  await fs.writeFile(
+    overviewFile,
+    await buildPage(source, {
+      ...shared,
+      page: { id: "overview", title: "Overview", html: "<p>Ready</p>" },
+    }),
+  );
+  await command("publish", "--file", overviewFile);
   const origin = `http://127.0.0.1:${record.port}`;
   const event = {
     sessionId: started.sessionId,
@@ -1742,7 +1887,7 @@ test("an image upload is decided by its bytes, capped, and named by the hub", as
 test("a note carries its images by path, and removing one deletes the file", async (t) => {
   const h = await hub(t);
   const a = await h.session();
-  assert.equal((await a.action("publish", { html: artifact() })).code, 200);
+  assert.equal((await a.publish(planData())).code, 200);
   const png = Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     Buffer.alloc(64),
@@ -1806,6 +1951,104 @@ test("a note carries its images by path, and removing one deletes the file", asy
   );
 });
 
+test("a drawing answer saves a scene and PNG preview in its own session", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  const other = await h.session();
+  assert.equal((await a.publish(planData())).code, 200);
+  const scene = {
+    type: "excalidraw",
+    version: 2,
+    elements: [{ id: "shape" }],
+    appState: {},
+    files: {},
+  };
+  const post = (suffix, body) =>
+    fetch(`${h.server.origin}${a.base}/api/${suffix}`, {
+      method: "POST",
+      headers: { Origin: h.server.origin },
+      body,
+    });
+  const saved = await post("drawing-scene", JSON.stringify(scene));
+  assert.equal(saved.status, 201);
+  const drawing = await saved.json();
+  assert.equal(
+    drawing.path,
+    path.join(a.directory, "scenes", `${drawing.id}.excalidraw`),
+  );
+  assert.deepEqual(JSON.parse(await fs.readFile(drawing.path, "utf8")), scene);
+  assert.deepEqual(
+    await fetch(
+      `${h.server.origin}${a.base}/api/drawing-scene/${drawing.id}`,
+    ).then((r) => r.json()),
+    scene,
+  );
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(64),
+  ]);
+  const preview = await (await post("upload", png)).json();
+  const answer = {
+    kind: "drawing",
+    topic: "overview",
+    label: "System boundary",
+    revision: "1",
+    sceneId: drawing.id,
+    previewId: preview.id,
+  };
+  const event = a.event("feedback-only", "1", {
+    groups: { answers: { "overview/boundary": answer } },
+  });
+  assert.equal((await a.feedback(event)).code, 200);
+  const read = (await a.action("read", { id: event.id })).body.event.payload
+    .groups.answers["overview/boundary"];
+  assert.equal(read.scenePath, drawing.path);
+  assert.equal(read.previewPath, preview.path);
+  assert(await exists(read.scenePath));
+  assert(await exists(read.previewPath));
+  const foreign = await (
+    await fetch(`${h.server.origin}${other.base}/api/drawing-scene`, {
+      method: "POST",
+      headers: { Origin: h.server.origin },
+      body: JSON.stringify(scene),
+    })
+  ).json();
+  assert.equal(
+    (
+      await a.feedback(
+        a.event("feedback-only", "1", {
+          groups: {
+            answers: {
+              "overview/foreign": { ...answer, sceneId: foreign.id },
+            },
+          },
+        }),
+      )
+    ).code,
+    404,
+  );
+  assert.equal((await post("drawing-scene", "not JSON")).status, 400);
+  assert.equal(
+    (await post("drawing-scene", JSON.stringify({ ...scene, elements: [] })))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await post("drawing-scene", Buffer.alloc(10 * 1024 * 1024 + 1))).status,
+    413,
+  );
+  assert.equal(
+    (
+      await fetch(`${h.server.origin}${a.base}/api/drawing-scene`, {
+        method: "POST",
+        headers: { Origin: "http://example.com" },
+        body: JSON.stringify(scene),
+      })
+    ).status,
+    403,
+  );
+});
+
 test("the component fixture builds, so every component's markup stays valid", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "plan-fixture-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
@@ -1827,6 +2070,7 @@ test("the component fixture builds, so every component's markup stays valid", as
     'data-choice="retry"',
     'data-multiselect="scope"',
     'data-question="threshold"',
+    'data-drawing-question="boundary"',
     'data-lines="3-4"',
     "data-notes=",
     "data-terms=",

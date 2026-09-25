@@ -307,6 +307,7 @@ kbd {
    scroll by the height of a browser toolbar. The content scrolls inside
    the shell rather than the window. */
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -331,6 +332,11 @@ kbd {
 .frame-header .small {
   overflow-wrap: anywhere;
 }
+.header-submit {
+  flex: none;
+  width: 92px;
+  text-align: center;
+}
 .app-body {
   flex: 1;
   min-height: 0;
@@ -348,6 +354,10 @@ kbd {
   border-right: 1px solid var(--line);
 }
 .side-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   padding: 14px 16px 4px;
   font-size: 10.5px;
   font-weight: 600;
@@ -355,46 +365,204 @@ kbd {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* The round's status sits in the Pages heading, which is always there, so it
+   appears and fades without moving the list. */
+.round-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: opacity 0.6s ease;
+}
+.round-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.round-status i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: page-breathe 2s ease-in-out infinite;
+}
+.round-status.late {
+  color: var(--attention);
+}
+.round-status.late i {
+  background: var(--attention);
+  animation: none;
+}
+.round-status.idle {
+  opacity: 0;
+}
+.dialog-head .round-status {
+  margin-left: auto;
+  font-size: 12.5px;
+}
+/* `.dialog h2` gives every dialog heading a bottom margin, which would lift
+   Pages above the status and the close button beside it. */
+#pages-dialog .dialog-head h2 {
+  margin-bottom: 0;
+}
 .pages-slot nav {
-  display: grid;
-  gap: 1px;
-  align-content: start;
-  padding: 0 8px;
+  display: block;
+  padding: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
-.pages-slot nav button {
+#page-list {
+  display: grid;
+  gap: 1px;
+  padding: 8px;
+}
+.page-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 8px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pages-slot nav .page-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.pages-slot nav .page-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+/* A page name stays on one line, so a row never changes height. A page that
+   is not ready yet is dimmed and fades up when it publishes. The working
+   page is the only one with a mark, the breathing dot. */
+#page-list button {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 5px 8px;
-  border-left: 2px solid transparent;
-  border-radius: 0 6px 6px 0;
+  /* A grid item keeps its text's full width unless allowed to shrink, and
+     then a long name would push the row past the sidebar. */
+  min-width: 0;
+  padding: 6px 9px;
+  border-radius: 6px;
   color: var(--muted);
   font-size: 13px;
-  overflow-wrap: anywhere;
 }
-.pages-slot nav button[aria-current="page"] {
+#page-list button > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 0.6s ease;
+}
+#page-list button[aria-current="page"] {
   color: var(--ink);
   font-weight: 600;
-  border-left-color: var(--accent);
+  background: var(--accent-soft);
 }
-.pages-slot nav .separator {
-  border-top: 1px solid var(--line);
-  margin: 8px 0;
+#page-list button.pending > span:first-child {
+  opacity: 0.45;
 }
-.working-card .working-between {
-  margin: 2px 0 0;
-  font-size: 12px;
+#page-list button.pending[aria-current="page"] > span:first-child {
+  opacity: 0.6;
+}
+#page-list button .page-activity {
+  flex: none;
+}
+#page-list button .page-activity:not(.active) {
+  display: none;
+}
+/* The unsent count reads as text beside its label, as Current (4) does. */
+#review-row {
+  justify-content: flex-start;
+  gap: 4px;
+}
+.page-activity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.page-activity svg {
+  width: 16px;
+  height: 16px;
+}
+.page-activity.queued {
   color: var(--muted);
 }
-.working-card .working-report {
-  margin: 2px 0 0;
-  font-size: 12px;
+.page-activity.complete {
+  color: var(--ok);
+}
+.page-activity.active {
+  color: var(--accent);
+}
+.page-activity.active::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: page-breathe 2s ease-in-out infinite;
+}
+/* A paused or unwoken agent is not working, so its active page stops
+   breathing and takes the attention color. */
+.page-activity.active.stopped {
   color: var(--attention);
+}
+.page-activity.active.stopped::before {
+  animation: none;
+}
+@keyframes page-breathe {
+  50% {
+    opacity: 0.4;
+    transform: scale(0.75);
+  }
+}
+.pending-page {
+  max-width: 620px;
+  margin: 20px 0;
+}
+.pending-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 650;
+}
+.pending-skeleton {
+  display: grid;
+  gap: 11px;
+  margin-top: 24px;
+}
+.pending-skeleton i {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--ground);
+}
+.pending-skeleton i:nth-child(2) {
+  width: 78%;
+}
+.pending-skeleton i:nth-child(3) {
+  width: 58%;
+}
+#page-list .separator {
+  border-top: 1px solid var(--line);
+  margin: 8px 0;
 }
 .pages-slot nav button .count {
   flex: none;
@@ -402,18 +570,27 @@ kbd {
   padding: 0;
   margin: 0;
   background: none;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+.main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.main-column > main {
+  flex: 1;
 }
 main {
   position: relative;
   min-height: 0;
   overflow-y: auto;
   min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
 }
 .bell {
@@ -466,22 +643,29 @@ select {
 }
 /* The side offsets are padding rather than margin: a margin adds to the
    full width of main and scrolls the page sideways below a 1100px window.
-   The 56px on the left holds the bar that marks a chosen block, and the
-   last line clears the comment control, which is always on screen. */
+   The 56px on the left holds the bar that marks a chosen block, the right
+   side matches it so the column sits evenly in main, and the last line
+   clears the comment control, which is always on screen. */
 .content {
-  max-width: 876px;
+  flex: 1 0 auto;
   margin: 0;
-  padding: 24px 40px 90px 56px;
+  padding: 24px 56px 90px;
   width: 100%;
   min-width: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   transition: opacity 0.2s ease;
+}
+#reading,
+#feedback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 #page-content {
   position: relative;
   container: page / inline-size;
-}
-body.is-working .content {
-  opacity: 0.33;
 }
 #page-content p,
 #page-content li {
@@ -491,14 +675,178 @@ body.is-working .content {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 22px;
+  margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
+.agent-activity {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.activity-heading,
+.activity-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.activity-heading {
+  justify-content: space-between;
+}
+.activity-heading strong {
+  font-size: 15px;
+}
+.activity-heading time,
+.agent-activity p,
+.activity-page small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.agent-activity p {
+  margin: 3px 0 11px;
+}
+.activity-segments {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.activity-segments i {
+  flex: 1;
+  height: 5px;
+  border-radius: 4px;
+  background: var(--line);
+}
+.activity-segments i.done {
+  background: var(--accent);
+}
+.activity-segments i.now {
+  background: var(--accent);
+  animation: segment-breathe 2s ease-in-out infinite;
+}
+@keyframes segment-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+/* Before the page list exists the bar is one track. It carries a sliding
+   segment while the agent works on the feedback. */
+.activity-segments i.track {
+  position: relative;
+  overflow: hidden;
+}
+.activity-segments i.track.moving::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  border-radius: 4px;
+  background: var(--accent);
+  animation: track-slide 1.8s ease-in-out infinite;
+}
+@keyframes track-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+.activity-page {
+  padding: 3px 0;
+  font-size: 12px;
+}
+.activity-page span:nth-child(2) {
+  flex: 1;
+}
+.agent-activity .activity-report {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 11px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.agent-activity .activity-report.late {
+  color: var(--attention);
+}
+.sent-feedback {
+  margin-top: 22px;
+}
+.sent-feedback h2 {
+  margin: 0 0 10px;
+}
+.page-load-error {
+  padding: 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+}
+.page-load-error p {
+  color: var(--danger);
+}
+.draft-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.draft-head h2 {
+  margin: 0;
+}
+.draft-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.sent-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.sent-card {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sent-card p {
+  margin: 5px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sent-card blockquote {
+  margin: 7px 0;
+  padding-left: 9px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 12px;
+}
+.sent-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+.sent-images img {
+  display: block;
+  width: auto;
+  max-width: 130px;
+  height: 90px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  object-fit: cover;
+}
+.sent-page-comments {
+  margin: 24px 0;
+}
+.sent-page-comments h2 {
+  margin-bottom: 9px;
+}
 .page-footer a {
   cursor: pointer;
   text-decoration: none;
+}
+#feedback-pages {
+  display: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
 }
 @media (hover: hover) {
   .page-footer a:hover {
@@ -515,151 +863,6 @@ body.is-working .content {
 }
 .accepted code {
   font-size: 11px;
-}
-
-/* Working state */
-.working {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: calc(max(0px, (100% - 1160px) / 2) + 280px);
-  width: min(820px, 100% - 280px);
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  pointer-events: none;
-  z-index: 3;
-}
-.working-card {
-  pointer-events: auto;
-  width: min(380px, 100%);
-  padding: 14px 18px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  font-size: 13px;
-}
-.working-card .head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.working-card .head b {
-  font-size: 15px;
-}
-.working-card .head small {
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.working-note {
-  margin: -4px 0 8px;
-  color: var(--attention);
-  font-size: 12.5px;
-}
-/* The card patches in place: one segment and one row per step, classes
-   toggled on a poll, so nothing is rebuilt while the agent works. */
-.working-card .bar {
-  display: grid;
-  grid-auto-flow: column;
-  gap: 3px;
-  height: 5px;
-  margin-bottom: 12px;
-}
-.working-card .bar i {
-  border-radius: 3px;
-  background: var(--line);
-  transition:
-    background 0.2s ease,
-    opacity 0.2s ease;
-}
-.working-card .bar i.done {
-  background: var(--accent);
-}
-.working-card .bar i.now {
-  background: var(--accent);
-  opacity: 0.45;
-}
-.working-card .steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 5px;
-}
-.working-card .steps li {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  color: var(--muted);
-}
-.working-card .steps li::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
-  box-sizing: border-box;
-  justify-self: center;
-}
-.working-card .steps li.done {
-  color: var(--ink);
-}
-.working-card .steps li.done::before {
-  content: "✓";
-  border: 0;
-  color: var(--ok);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 14px;
-  text-align: center;
-}
-.working-card .steps li.now,
-.working-card .steps li.wait {
-  color: var(--ink);
-  font-weight: 600;
-}
-.working-card .steps li.now::before {
-  border-color: var(--accent);
-  border-width: 3.5px;
-  animation: working-pulse 1.2s ease-in-out infinite;
-}
-.working-card .steps li.wait::before {
-  border-color: var(--attention);
-  border-width: 3.5px;
-  animation: working-pulse 1.2s ease-in-out infinite;
-}
-.working-card .steps li.enter {
-  animation: working-enter 0.2s ease;
-}
-@keyframes working-pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-@keyframes working-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-.working-card .foot {
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .working-card .bar i {
-    transition: none;
-  }
-  .working-card .steps li::before,
-  .working-card .steps li.enter {
-    animation: none;
-  }
 }
 
 /* Sessions panel */
@@ -706,6 +909,57 @@ mark.note-mark {
 }
 
 /* Feedback page */
+.alignment-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.alignment-switch input {
+  appearance: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--line-strong);
+  cursor: pointer;
+}
+.alignment-switch input::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 2px;
+  border-radius: 50%;
+  background: var(--panel);
+  transition: transform 120ms ease;
+}
+.alignment-switch input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.alignment-switch input:checked::before {
+  transform: translateX(14px);
+}
+.alignment-switch input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.alignment-switch input:disabled {
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .alignment-switch input::before {
+    transition: none;
+  }
+}
 .feedback-group {
   margin-bottom: 26px;
 }
@@ -768,11 +1022,6 @@ mark.note-mark {
 .feedback-item.sent {
   opacity: 0.7;
 }
-.feedback-empty {
-  font-size: 12.5px;
-  color: var(--muted);
-  padding: 8px 0;
-}
 blockquote {
   margin: 10px 0;
   border-left: 2px solid var(--line-strong);
@@ -794,6 +1043,29 @@ blockquote {
   overflow: hidden;
   margin-bottom: 12px;
   background: var(--panel);
+}
+/* The task opens Agreed, above the decisions. */
+.agreed-label {
+  margin: 4px 0 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.task-card {
+  margin-bottom: 18px;
+  border-color: var(--line-strong);
+}
+.task-card .agreement-body {
+  padding: 14px 16px 12px;
+}
+.task-card .agreement-body h2 {
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+.task-card .agreement-body p {
+  font-size: 13.5px;
 }
 .agreement-body {
   padding: 12px 14px 10px;
@@ -1190,6 +1462,49 @@ dialog::backdrop {
   border-radius: 10px;
   box-shadow: var(--shadow);
 }
+.drawing-dialog {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel);
+  color: var(--ink);
+}
+.drawing-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.drawing-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.drawing-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.drawing-dialog .renderer-error {
+  margin: 0 16px 8px;
+}
+.drawing-dialog iframe {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: white;
+}
+.feedback-item .drawing-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
 .dialog h2 {
   margin: 0 0 14px;
   font-size: 16px;
@@ -1232,6 +1547,12 @@ dialog::backdrop {
 .rev-row small {
   color: var(--muted);
   font-size: 11.5px;
+  font-weight: 400;
+}
+.rev-plan {
+  margin: -6px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .key-list {
   display: grid;
@@ -1250,7 +1571,7 @@ dialog::backdrop {
 /* Beside the reading column, not the window. .app caps at 1160px and
    centres, so on a wide screen a control fixed to the window sits hundreds
    of pixels right of the text. Below 1160px the max() is zero and the value
-   is the 22px it has always been. .working uses the mirror of this. */
+   is the 22px it has always been. */
 .quote-button {
   position: fixed;
   right: calc(max(0px, (100% - 1160px) / 2) + 22px);
@@ -1298,10 +1619,9 @@ dialog::backdrop {
 }
 :root[data-mode="preview"] .sidebar,
 :root[data-mode="preview"] .frame-header,
-:root[data-mode="preview"] .older-strip,
+:root[data-mode="preview"] .history-strip,
 :root[data-mode="preview"] .page-footer,
-:root[data-mode="preview"] #quote,
-:root[data-mode="preview"] .working {
+:root[data-mode="preview"] #quote {
   display: none !important;
 }
 :root[data-mode="preview"] main {
@@ -1510,35 +1830,109 @@ img.note-image {
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
 }
-/* Reading an older revision: the strip names it and carries the way back. */
-.older-strip {
+.icon-btn.menu.need {
+  color: var(--accent);
+}
+.page-arrival {
+  position: absolute;
+  z-index: var(--z-header);
+  top: 64px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+.page-arrival button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 650;
+}
+.save-error {
+  position: fixed;
+  z-index: var(--z-header);
+  top: 64px;
+  right: max(16px, calc((100vw - 1160px) / 2 + 16px));
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+.save-error button {
+  margin-left: auto;
+  font-size: 16px;
+  line-height: 1;
+}
+/* The same quiet strip marks submitted pages and older revisions. */
+.history-strip {
   flex: none;
+  position: sticky;
+  top: 0;
   z-index: var(--z-header);
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--attention-border);
-  background: var(--attention-bg);
-  color: var(--attention);
-  font-size: 12.5px;
+  min-height: 38px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 12px;
 }
-.older-strip a {
+.history-strip button {
   margin-left: auto;
-  color: var(--attention);
+  color: var(--accent);
   font-weight: 600;
   white-space: nowrap;
-  cursor: pointer;
 }
 #revision.older {
-  color: var(--attention);
-  background: var(--attention-bg);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+#history-label b {
+  font-weight: 600;
+}
+#history-label .meta {
+  color: var(--muted);
+}
+:where(main, .sidebar, .pages-slot nav, .app-body) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+/* Safari ignores scrollbar-color and styles scrollbars only through the
+   WebKit pseudo-elements. */
+@supports not (scrollbar-color: auto) {
+  :where(main, .sidebar, .pages-slot nav, .app-body)::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  :where(main, .sidebar, .pages-slot nav, .app-body)::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  :where(main, .sidebar, .pages-slot nav, .app-body)::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: var(--line-strong) padding-box;
+  }
 }
 :root[data-mode="preview"] .content {
   margin: 0;
@@ -1547,6 +1941,9 @@ img.note-image {
 /* Narrow screens: the header stays and the page list moves from the sidebar
    into a dialog behind the menu button. */
 @media (max-width: 720px) {
+  #feedback-pages {
+    display: inline-block;
+  }
   .app {
     max-width: none;
   }
@@ -1560,9 +1957,13 @@ img.note-image {
   .sidebar {
     display: none;
   }
+  .main-column {
+    min-height: 100%;
+  }
   main {
     border-right: 0;
     overflow: visible;
+    min-height: 100%;
   }
   .content {
     max-width: none;
@@ -1570,9 +1971,11 @@ img.note-image {
     /* The last line clears the comment control, which is always on screen. */
     padding: 20px 16px calc(90px + env(safe-area-inset-bottom));
   }
-  .working {
-    left: 0;
-    width: 100%;
+  .page-arrival {
+    top: 60px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
   }
   table {
     display: block;
@@ -1601,13 +2004,26 @@ img.note-image {
   padding: 0;
   overflow: visible;
 }
-/* A dialog and the working card both cover the page, so the control that
-   comments on it goes. While the agent works, the revision under the card is
-   the one about to be replaced, and a note on it would arrive against a page
-   that no longer exists. */
-body:has(dialog[open]) .quote-button,
-body.is-working .quote-button {
+/* Dialogs cover the current page, so its comment control steps aside. */
+body:has(dialog[open]) .quote-button {
   display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-activity.active::before,
+  .activity-segments i.now,
+  .round-status i {
+    animation: none;
+  }
+  .round-status {
+    transition: none;
+  }
+  .activity-segments i.track.moving::after {
+    animation: none;
+    opacity: 0.5;
+  }
+  #page-list button > span:first-child {
+    transition: none;
+  }
 }
 /* A session row and the control that closes that session. */
 .session-line {

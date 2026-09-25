@@ -1,0 +1,23 @@
+.drawing-question {
+  display: grid;
+  gap: 10px;
+}
+.drawing-question h3,
+.drawing-question p {
+  margin: 0;
+}
+.drawing-question .drawing-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+.drawing-question .drawing-preview[hidden] {
+  display: none;
+}
+.drawing-question > .tag,
+.drawing-question .btn {
+  justify-self: start;
+}

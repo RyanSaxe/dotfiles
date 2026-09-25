@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { assemble, build } from "./build.mjs";
+import { assemble, buildPage } from "./build.mjs";
 
 const data = {
   artifactId: "t",
@@ -14,12 +12,24 @@ const data = {
   pages: [{ id: "p", title: "P", html: "<p>x</p>" }],
 };
 
-test("plan CSS is scoped to the page content, under the plan layer", async () => {
-  const html = await assemble(data, { css: "body{background:red}" });
-  assert.match(html, /@layer frame, plan, components;/);
+test("page CSS uses its own scope outside the frame content scope", async () => {
+  const html = await buildPage(path.join(os.tmpdir(), "page.json"), {
+    artifactId: "t",
+    revision: "1",
+    kind: "exploration",
+    title: "T",
+    page: { id: "p", title: "P", html: "<p>x</p>", cssText: "p{color:red}" },
+  });
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  assert.match(style, /@layer frame, plan, components;/);
   assert.match(
-    html,
-    /@scope \(#page-content\) \{\n@layer plan \{\nbody\{background:red\}\n\}/,
+    style,
+    /@layer plan \{\n@scope \(#page-content\[data-page-id="p"\]\[data-revision="1"\]\) \{ p\{color:red\} \}/,
+  );
+  assert.ok(
+    style.indexOf(
+      '@scope (#page-content[data-page-id="p"][data-revision="1"])',
+    ) < style.indexOf("@scope (#page-content)"),
   );
 });
 
@@ -56,6 +66,25 @@ test("a closing style tag in plan CSS is refused", async () => {
   await assert.rejects(
     assemble(data, { css: "</style><script>1</script>" }),
     /closing style/,
+  );
+});
+
+test("page JavaScript cannot restyle the frame", async () => {
+  await assert.rejects(
+    buildPage(path.join(os.tmpdir(), "page.json"), {
+      artifactId: "t",
+      revision: "1",
+      kind: "exploration",
+      title: "T",
+      page: {
+        id: "p",
+        title: "P",
+        html: "<p>x</p>",
+        jsText:
+          "export function setup() { document.body.style.color = 'red'; }",
+      },
+    }),
+    /restyles document\.body/,
   );
 });
 
@@ -146,6 +175,16 @@ test("the build refuses each structural problem and names it", async () => {
     /^page "p": a code block has no data-language$/m,
   );
   await refused(
+    page(`<pre data-language="diff">- a\n+ b</pre>`),
+    /^page "p": a code block marked diff belongs in before-after\. Run node components\/before-after\/diff\.mjs BEFORE AFTER OUT\.json$/m,
+  );
+  await refused(
+    page(
+      `<fieldset data-multiselect="s" data-label="S"><label><input type="checkbox" data-value="a" checked> A</label></fieldset>`,
+    ),
+    /^page "p": checklist "s" has a checked box\. Start every box unchecked\.$/m,
+  );
+  await refused(
     page(`<textarea data-diff-input hidden>{"before":""}</textarea>`),
     /^page "p": a diff input is not JSON with before, after and patch$/m,
   );
@@ -184,15 +223,29 @@ test("well-formed controls, anchors and blocks pass", async () => {
   assert.match(html, /id="plan-data"/);
 });
 
-test("the component fixture builds", async (t) => {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const work = await fs.mkdtemp(path.join(os.tmpdir(), "plan-fixture-"));
-  t.after(() => fs.rm(work, { recursive: true, force: true }));
-  for (const entry of await fs.readdir(path.join(here, "fixture")))
-    await fs.copyFile(
-      path.join(here, "fixture", entry),
-      path.join(work, entry),
-    );
-  const html = await build(path.join(work, "fixture.json"));
-  assert.match(html, /id="plan-data"/);
+test("an Agreed page opens with a task, and the plan data carries it", async () => {
+  const agreed = (page) =>
+    buildPage(path.join(os.tmpdir(), "agreed.json"), {
+      artifactId: "t",
+      revision: "1",
+      kind: "exploration",
+      title: "T",
+      page: { id: "agreed", title: "Agreed so far", agreements: [], ...page },
+    });
+  await assert.rejects(
+    agreed({}),
+    /page "agreed": Agreed has no task\. State what the plan is building towards\./,
+  );
+  await assert.rejects(
+    agreed({ task: { title: " ", html: "<p>x</p>" } }),
+    /page "agreed": the task has no title/,
+  );
+  const task = { title: "Retries", html: "<p>Checkout retries once.</p>" };
+  const html = await agreed({ task });
+  const data = JSON.parse(
+    html
+      .match(/id="plan-data">([\s\S]*?)<\/script>/)[1]
+      .replaceAll("\\u003c", "<"),
+  );
+  assert.deepEqual(data.task, task);
 });

@@ -1,17 +1,20 @@
 # Prototypes
 
 A prototype preserves an approved interaction exactly, so the implementer
-sees the behavior instead of a description of it.
+sees the behavior instead of a description of it. An approved prototype goes
+into the final plan unchanged.
 
 | Field  | Contract                                                                 |
 | ------ | ------------------------------------------------------------------------ |
 | id     | Unique stable ID with the same character rules as page IDs.              |
 | title  | Accessible, descriptive title, shown in the embed's header.              |
 | html   | Complete self-contained HTML document, including its styles and scripts. |
-| file   | Manifest-only alternative to html, resolved relative to the manifest.    |
+| file   | Page-source alternative to html, resolved relative to the page JSON.     |
 | height | Positive preview height in pixels.                                       |
 
-Put `data-prototype="ID"` on the element where the prototype belongs. The
+Put prototypes in their owning page's `prototypes` array. IDs are unique
+within that revision. Put `data-prototype="ID"` on the element where the
+prototype belongs. The
 frame renders it with a header that has the title, a Source toggle that
 shows the exact source with syntax highlighting, and an Open full size
 button that shows the document alone in a new tab. The document runs in a
@@ -21,7 +24,7 @@ inside the sandbox. The embed is transparent: the document paints its own
 background and should follow the viewer's theme with a
 `prefers-color-scheme` rule.
 
-An embed is about 780px wide. A component mock renders at its natural width
+An embed is about 820px wide. A component mock renders at its natural width
 without scaling. A layout mock designed wider than the embed collapses
 unless it scales. Give it a stage at the design width (1120 works for a
 three-column layout) with `transform: scale(min(1, innerWidth / 1120))`

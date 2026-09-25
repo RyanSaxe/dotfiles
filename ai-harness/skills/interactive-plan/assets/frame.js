@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const plan = JSON.parse($("plan-data").textContent);
+let plan = JSON.parse($("plan-data").textContent);
 const session = JSON.parse($("session-config").textContent);
 const base = typeof session.base === "string" ? session.base : "";
 const online =
@@ -12,16 +12,26 @@ const mode = session.preview
     ? "readonly"
     : "live";
 const editable = mode === "live";
+// A read-only revision keeps a Feedback page that lists what was sent on it.
+const hasFeedbackPage = editable || mode === "readonly";
 document.documentElement.dataset.mode = mode;
 const query = new URL(location.href).searchParams;
-const agreements = plan.agreements || [];
-const builtInAgreed = !plan.pages.some((item) => item.id === "agreed");
-const pages = [
-  ...plan.pages,
-  ...(builtInAgreed
-    ? [{ id: "agreed", title: "Agreed so far", html: "" }]
-    : []),
-];
+let agreements = plan.agreements || [];
+let agreedTask = plan.task || null;
+let pages = [{ id: "agreed", title: "Agreed so far", html: "" }, ...plan.pages];
+let selectedTab = "current";
+// The last revision this reader submitted, which keeps Current disabled until
+// the next one arrives, and the past revision the left tab shows.
+let submittedRevision = null;
+let pastRevision = null;
+// What was sent on each past revision the left tab has shown.
+const sentByRevision = new Map();
+const views = new Map([
+  [plan.revision, { plan, agreements, task: agreedTask, pages }],
+]);
+const pageSets = new Map();
+const recordLoads = new Map();
+let pageSetLoading = null;
 // crypto.randomUUID exists only in a secure context; over plain http on a
 // Tailscale address, which is how a phone reaches the hub, it is undefined.
 function uuid() {
@@ -43,6 +53,14 @@ function ago(value) {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} h ago`;
   return `${Math.round(hours / 24)} d ago`;
+}
+// The activity card counts seconds in its first minute, so a fresh report
+// visibly ticks up while the agent works.
+function recently(value) {
+  const ms = Date.now() - Date.parse(value);
+  if (!Number.isFinite(ms)) return "";
+  if (ms < 5000) return "just now";
+  return ms < 60000 ? `${Math.round(ms / 1000)} s ago` : ago(value);
 }
 function since(value) {
   const ms = Date.now() - Date.parse(value);
@@ -69,7 +87,6 @@ try {
 let activeTheme = preferredTheme || (systemTheme.matches ? "dark" : "light");
 
 const storageKey = `interactive-plan:${session.sessionId || "offline"}:${plan.artifactId}`;
-const resumeKey = `interactive-plan:resume:${session.sessionId || "offline"}`;
 const placeKey = `interactive-plan:place:${session.sessionId || "offline"}`;
 const prefsPrefix = `interactive-plan:prefs:${session.sessionId || "offline"}:`;
 let state = emptyDraft(plan.revision);
@@ -82,13 +99,26 @@ if (editable)
   } catch {
     /* The in-memory draft and export remain usable. */
   }
+let placeStore = { tab: "current", past: null, places: {} };
+try {
+  placeStore = readPlaces(JSON.parse(localStorage.getItem(placeKey)));
+} catch {
+  /* Every revision then opens at its first page. */
+}
+const places = placeStore.places;
+if (editable) pastRevision = placeStore.past;
+if (editable && state.submitted?.revision === plan.revision) {
+  submittedRevision = plan.revision;
+  pastRevision = plan.revision;
+  selectedTab = "past";
+}
 const known = {
   choices: new Set(),
   lists: new Set(),
   questions: new Set(),
   text: new Map(),
 };
-for (const topic of plan.pages) {
+function indexPage(topic) {
   const template = document.createElement("template");
   template.innerHTML = topic.html;
   choiceTargets(template.content, topic.id);
@@ -98,28 +128,47 @@ for (const topic of plan.pages) {
     known.lists.add(`${topic.id}/${group.dataset.multiselect}`);
   for (const group of template.content.querySelectorAll("[data-question]"))
     known.questions.add(`${topic.id}/${group.dataset.question}`);
+  for (const group of template.content.querySelectorAll(
+    "[data-drawing-question]",
+  ))
+    known.questions.add(`${topic.id}/${group.dataset.drawingQuestion}`);
   known.text.set(topic.id, normalize(template.content.textContent));
 }
+function rebuildKnown() {
+  known.choices.clear();
+  known.lists.clear();
+  known.questions.clear();
+  known.text.clear();
+  for (const topic of pages.filter(
+    (item) => item.id !== "agreed" && !item.pending,
+  ))
+    indexPage(topic);
+}
+rebuildKnown();
 function stale(kind, key, item) {
   if (kind === "note") {
     if (item.topic === "overall") return false;
-    if (item.topic === "agreed" && builtInAgreed)
+    if (item.topic === "agreed")
       return Boolean(
         item.agreementId &&
+        !(item.agreementId === "task" && agreedTask) &&
         !agreements.some((entry) => entry.id === item.agreementId),
       );
-    if (!known.text.has(item.topic)) return true;
+    if (!known.text.has(item.topic))
+      return !pages.some((entry) => entry.id === item.topic && entry.pending);
     return (
       Boolean(item.quote) &&
       !known.text.get(item.topic).includes(normalize(item.quote))
     );
   }
+  if (pages.some((entry) => entry.id === item.topic && entry.pending))
+    return false;
   if (kind === "answer") return !known.questions.has(key);
   if (kind === "list") return !known.lists.has(key);
   return !known.choices.has(key);
 }
 
-let page = plan.pages[0],
+let page = pages[0],
   remote = null,
   connected = false,
   sessions = [],
@@ -129,6 +178,9 @@ let page = plan.pages[0],
   selected = "",
   selectedTarget = null,
   submissionError = "",
+  submissionInFlight = false,
+  lastSubmission = null,
+  lastSubmissionLoadedId = null,
   noteDraftKey = "",
   renderedFeedback = null,
   answerTimer;
@@ -144,8 +196,19 @@ function track(task) {
 }
 const syntaxThemes = { light: "github-light", dark: "github-dark" };
 const current = () =>
+  selectedTab === "current" &&
   remote?.current?.artifactId === plan.artifactId &&
   remote?.current?.revision === plan.revision;
+const submittedCurrent = () =>
+  editable &&
+  (selectedTab === "past" ||
+    state.submitted?.revision === plan.revision ||
+    (current() && remote?.latestSubmissionRevision === plan.revision));
+const feedbackEditable = () =>
+  editable &&
+  selectedTab === "current" &&
+  !submissionInFlight &&
+  !submittedCurrent();
 const reviewAlerts = createReviewAlerts({
   window,
   button: $("notifications"),
@@ -172,7 +235,7 @@ const prefs = {
 };
 
 function persist() {
-  if (!editable) return;
+  if (!editable || selectedTab !== "current") return;
   try {
     localStorage.setItem(storageKey, JSON.stringify(state));
     $("storage-status").textContent = "";
@@ -221,52 +284,120 @@ const scroller = () =>
   [document.querySelector("main"), document.querySelector(".app-body")].find(
     (el) => /auto|scroll/.test(getComputedStyle(el).overflowY),
   );
-/* Where you were, so the bell's jump to another session and back lands on the
-   page you left. The revision is stored with it: a new revision does not
-   match and the record is ignored, which is what starts you at the top of the
-   first page. */
+/* Where you were in each revision, so switching tabs, picking a revision from
+   the clock, a reload, and the bell's jump to another session and back all
+   land on the page and scroll position you left. A revision you have not
+   visited has no entry, which starts it at its first page. Only the live
+   reader stores them, so a read-only page cannot overwrite its tabs. */
 let placeTimer = 0;
 function rememberPlace() {
+  const pageId = $("reading").hidden ? "feedback" : page.id;
+  const held =
+    restoring?.revision === plan.revision && restoring.page === pageId;
+  const top = held ? restoring.top : Math.round(scroller().scrollTop);
+  places[plan.revision] = {
+    page: pageId,
+    top,
+    tops: { ...places[plan.revision]?.tops, [pageId]: top },
+  };
+  if (!editable) return;
   clearTimeout(placeTimer);
   placeTimer = setTimeout(() => {
     try {
       localStorage.setItem(
         placeKey,
-        JSON.stringify({
-          revision: plan.revision,
-          page: $("reading").hidden ? "feedback" : page.id,
-          top: Math.round(scroller().scrollTop),
-        }),
+        JSON.stringify({ tab: selectedTab, past: pastRevision, places }),
       );
     } catch {
       /* Returning to the same place is a convenience, not a requirement. */
     }
   }, 250);
 }
+const placeIn = (revision, pageIds) => placeFor(places, revision, pageIds);
+/* A page can still be loading, or its renderers can still change its height,
+   when the reader returns to it, and the browser clamps the position
+   meanwhile. Until the page settles, the position being restored stands in
+   for the clamped one. */
+let restoring = null;
+/* The height each page had when the reader left it. Returning holds that
+   height while the page's renderers work, so the browser does not clamp the
+   position and then jump when they finish. */
+const heights = new Map();
+const shownBody = () =>
+  $("reading").hidden ? $("feedback") : $("page-content");
+function rememberHeight() {
+  const pageId = $("reading").hidden ? "feedback" : page.id;
+  if (restoring?.revision === plan.revision && restoring.page === pageId)
+    return;
+  heights.set(`${plan.revision}:${pageId}`, shownBody().offsetHeight);
+}
+document.addEventListener("scroll", rememberHeight, true);
+function endRestore() {
+  restoring = null;
+  $("page-content").style.minHeight = "";
+  $("feedback").style.minHeight = "";
+}
+function restoreScroll(top) {
+  endRestore();
+  restoring = {
+    revision: plan.revision,
+    page: $("reading").hidden ? "feedback" : page.id,
+    top,
+  };
+  const height = heights.get(`${restoring.revision}:${restoring.page}`);
+  if (height) shownBody().style.minHeight = `${height}px`;
+  settleScroll();
+}
+function settleScroll() {
+  const target = restoring;
+  if (!target) return;
+  scroller().scrollTo(0, target.top);
+  Promise.allSettled([...renders]).then(() => {
+    if (restoring !== target) return;
+    scroller().scrollTo(0, target.top);
+    if ($("reading").hidden || !page.pending) endRestore();
+  });
+}
 document.addEventListener("scroll", rememberPlace, true);
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
+  hideArrival();
+  const resuming =
+    restoring?.revision === plan.revision && restoring.page === id;
+  if (!resuming) endRestore();
   const top = scroller().scrollTop;
-  const feedback = id === "feedback" && editable;
+  const feedback = id === "feedback" && hasFeedbackPage;
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
   if (!feedback) {
     page = pages.find((item) => item.id === id) || pages[0];
+    if (page.status === "ready" && page.pending)
+      void loadPageRecord(plan.revision, page.id).catch(() => {});
     disposeRenderers();
     $("page-title").textContent = page.title;
     chooseBlock(null);
-    $("page-content").innerHTML = page.html;
-    blockTargets($("page-content"), page.id);
-    choiceTargets($("page-content"), page.id);
-    if (page.id === "agreed" && builtInAgreed) renderAgreements();
-    else {
+    $("page-content").dataset.pageId = page.id;
+    $("page-content").dataset.revision = plan.revision;
+    const [mark, label] = pendingState(page);
+    $("page-content").innerHTML = page.pending
+      ? `<div class="pending-page ${mark === "active" ? "working" : "queued"}"><span class="pending-state">${pageIndicator(mark).outerHTML}${label}</span><div class="pending-skeleton" aria-hidden="true"><i></i><i></i><i></i></div></div>`
+      : page.html;
+    if (!page.pending) {
+      blockTargets($("page-content"), page.id);
+      choiceTargets($("page-content"), page.id);
+    }
+    if (page.id === "agreed") renderAgreements();
+    else if (!page.pending) {
       restoreChoices();
       restoreAnswers();
       markNotes();
       enhance($("page-content"));
     }
+    renderSentPageComments();
+    window.planUI.page = page;
+    window.planUI.revision = plan.revision;
     window.dispatchEvent(
       new CustomEvent("plan:page", {
-        detail: { page, element: $("page-content") },
+        detail: { page, element: $("page-content"), revision: plan.revision },
       }),
     );
     // Shiki, Mermaid and the charts all change a block's height after the
@@ -274,7 +405,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     Promise.allSettled([...renders]).then(placeMarks);
   }
   closeDrawer();
-  for (const button of document.querySelectorAll("#navigation [data-page]")) {
+  for (const button of document.querySelectorAll("#page-list [data-page]")) {
     if (button.dataset.page === (feedback ? "feedback" : page.id))
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -288,7 +419,14 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
     preventScroll: true,
   });
-  if (!keepScroll) scroller().scrollTo(0, 0);
+  // Returning to a page within a revision lands where the reader left it.
+  if (!keepScroll) {
+    const saved = targetId
+      ? 0
+      : places[plan.revision]?.tops?.[feedback ? "feedback" : page.id];
+    if (saved) restoreScroll(saved);
+    else scroller().scrollTo(0, 0);
+  } else if (resuming) settleScroll();
   else if (!targetId) {
     // Replacing the page shortens it until the renderers finish, and the
     // browser clamps the scroll position meanwhile; restore it after they do.
@@ -465,7 +603,7 @@ function openNote(
   entryId = null,
   target = null,
 ) {
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   noteContext = {
     topic,
     anchor,
@@ -513,6 +651,27 @@ function describeRecord(record) {
   if (record.kind === "note") return `your note on ${where}`;
   if (record.kind === "answer") return `your answer to “${record.label}”`;
   return `your choice “${record.text}” for ${record.label}`;
+}
+// In the live reader, a source's Open link loads its revision into the left
+// tab at the page and block it names. A modified click still opens the
+// read-only page in a new tab.
+function openInTab(link, record) {
+  if (!editable) return;
+  link.addEventListener("click", (event) => {
+    if (
+      event.button ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
+    event.preventDefault();
+    void openPast(record.revision, {
+      pageId: record.topic,
+      targetId: record.target,
+    });
+  });
 }
 function recordUrl(record, route) {
   const params = new URLSearchParams();
@@ -591,8 +750,10 @@ function agreementCard(entry) {
   if (first) {
     const open = document.createElement("a");
     open.textContent = "Open";
-    if (online) open.href = recordUrl(first, "r");
-    else {
+    if (online) {
+      open.href = recordUrl(first, "r");
+      openInTab(open, first);
+    } else {
       open.href = first.href;
       open.target = "_blank";
       open.rel = "noopener";
@@ -671,13 +832,66 @@ function agreementCard(entry) {
   card.append(strip, details, preview);
   return card;
 }
+// The task a reviewer reads before the decisions: a statement, never a
+// checklist, with nothing on it to approve.
+function taskCard() {
+  const card = document.createElement("section");
+  card.className = "agreement-card task-card";
+  card.id = "agreement-task";
+  const body = document.createElement("div");
+  body.className = "agreement-body";
+  const title = document.createElement("h2");
+  title.textContent = agreedTask.title;
+  const noteCount = state.notes.filter(
+    (note) => note.agreementId === "task",
+  ).length;
+  if (noteCount) title.append(tag(plural(noteCount, "note"), "muted"));
+  const content = document.createElement("div");
+  content.innerHTML = agreedTask.html;
+  body.append(title, content);
+  const strip = document.createElement("div");
+  strip.className = "agreement-source";
+  const text = document.createElement("span");
+  text.textContent =
+    agreedTask.change === "new"
+      ? "New in this revision"
+      : agreedTask.change === "updated"
+        ? "Updated in this revision"
+        : "";
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  if (editable)
+    actions.append(
+      linkButton("Comment", () =>
+        openNote("agreed", "The task", "", null, "task", card.id),
+      ),
+    );
+  strip.append(text, actions);
+  strip.hidden = !text.textContent && !actions.children.length;
+  card.append(body, strip);
+  return card;
+}
+function agreedLabel(text) {
+  const label = document.createElement("p");
+  label.className = "agreed-label";
+  label.textContent = text;
+  return label;
+}
 function renderAgreements() {
   const root = $("page-content");
   root.replaceChildren();
+  if (agreedTask) root.append(agreedLabel("The task"), taskCard());
   if (!agreements.length) {
-    root.innerHTML = '<p class="muted">No agreements recorded yet.</p>';
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = agreedTask
+      ? "No decisions recorded yet."
+      : "No agreements recorded yet.";
+    root.append(empty);
+    enhance(root);
     return;
   }
+  if (agreedTask) root.append(agreedLabel("Decisions"));
   const active = agreements.filter((entry) => entry.state !== "retired");
   const retired = agreements.filter((entry) => entry.state === "retired");
   for (const entry of active) root.append(agreementCard(entry));
@@ -720,8 +934,6 @@ function itemCard({ kind, key, item }) {
   // empty h3 draws a blank line above the note's own words.
   title.hidden = kind === "note" && !item.anchor;
   if (item.sentIn) title.append(tag("Sent", "ok"));
-  if (kind === "list" && item.sentIn && !item.touched)
-    title.append(tag("Default", "muted"));
   const old = stale(kind, key, item);
   if (old && item.revision && item.revision !== plan.revision)
     title.append(tag(`from revision ${item.revision}`, "muted"));
@@ -731,10 +943,18 @@ function itemCard({ kind, key, item }) {
     quote.textContent = item.quote;
     body.append(quote);
   }
-  const text = document.createElement("p");
-  text.textContent =
-    kind === "choice" || kind === "list" ? choiceText(item) : item.text;
-  body.append(text);
+  if (kind === "answer" && item.kind === "drawing") {
+    const image = document.createElement("img");
+    image.className = "drawing-preview";
+    image.src = `${base}/api/upload/${encodeURIComponent(item.previewId)}`;
+    image.alt = `Drawing answer: ${item.label}`;
+    body.append(image);
+  } else {
+    const text = document.createElement("p");
+    text.textContent =
+      kind === "choice" || kind === "list" ? choiceText(item) : item.text;
+    body.append(text);
+  }
   /* What the reviewer attached, where they check what they are about to
      send. The hub still holds the bytes, so this is the same image the
      agent will open. */
@@ -751,7 +971,7 @@ function itemCard({ kind, key, item }) {
     body.append(strip);
   }
   const topicExists =
-    item.topic === "agreed" ? builtInAgreed : known.text.has(item.topic);
+    item.topic === "agreed" ? true : known.text.has(item.topic);
   if (item.topic !== "overall" && topicExists)
     body.append(
       contextLink(
@@ -787,7 +1007,10 @@ function itemCard({ kind, key, item }) {
         forgetImages(item.attachments);
         state.notes = state.notes.filter((note) => note.id !== item.id);
         save();
-        if (item.topic === page.id) show(page.id, null, { keepScroll: true });
+        // Only a page on screen needs its marks redrawn. The Review page
+        // stays where it is.
+        if (item.topic === page.id && !$("reading").hidden)
+          show(page.id, null, { keepScroll: true });
       });
     } else if (kind === "choice") {
       action("Add comment", () =>
@@ -818,7 +1041,7 @@ function itemCard({ kind, key, item }) {
 }
 function renderFeedback() {
   // An untouched, unsent list is not feedback yet; it appears once it went
-  // with a round, marked as a default.
+  // with a round.
   const items = [
     ...Object.entries(state.choices)
       .filter(
@@ -871,21 +1094,187 @@ function renderFeedback() {
       revision ? `From revision ${revision}` : "From an earlier revision",
       orphans.filter((entry) => entry.item.revision === revision),
     );
-  if (!items.some((entry) => entry.topic !== "overall")) {
-    const empty = document.createElement("p");
-    empty.className = "feedback-empty";
-    empty.textContent = "Nothing marked yet.";
-    groups.append(empty);
-  }
   $("overall-notes").replaceChildren(
     ...items.filter((entry) => entry.topic === "overall").map(itemCard),
   );
+}
+function sentEntries(submission) {
+  if (!submission) return [];
+  const groups = submission.groups || {};
+  return [
+    ...(groups.notes || []).map((note) => ({
+      topic: note.topic,
+      label: note.anchor || "Comment",
+      text: note.text,
+      quote: note.quote,
+      images: (note.attachments || []).map((item) => item.id),
+    })),
+    ...Object.values(groups.choices || {}).map((choice) => ({
+      topic: choice.topic,
+      label: choice.label || "Choice",
+      text: choiceText(choice),
+    })),
+    ...Object.values(groups.answers || {}).map((answer) => ({
+      topic: answer.topic,
+      label: answer.label || "Answer",
+      text: answer.kind === "drawing" ? "Drawing attached" : answer.text,
+      images: answer.kind === "drawing" ? [answer.previewId] : [],
+    })),
+  ];
+}
+function sentCard(entry) {
+  const card = document.createElement("div");
+  card.className = "sent-card";
+  const where =
+    pages.find((item) => item.id === entry.topic)?.title ||
+    (entry.topic === "overall" ? "Overall" : entry.topic) ||
+    "Overall";
+  const label = document.createElement("small");
+  label.textContent = `${where} · ${entry.label}`;
+  const body = document.createElement("p");
+  body.textContent = entry.text;
+  card.append(label);
+  if (entry.quote) {
+    const quote = document.createElement("blockquote");
+    quote.textContent = entry.quote;
+    card.append(quote);
+  }
+  card.append(body);
+  if (entry.images?.length) {
+    const images = document.createElement("div");
+    images.className = "sent-images";
+    for (const id of entry.images) {
+      const link = document.createElement("a");
+      link.href = `${base}/api/upload/${encodeURIComponent(id)}`;
+      link.target = "_blank";
+      link.rel = "noopener";
+      const thumbnail = document.createElement("img");
+      thumbnail.src = link.href;
+      thumbnail.alt = "Attached image";
+      thumbnail.loading = "lazy";
+      link.append(thumbnail);
+      images.append(link);
+    }
+    card.append(images);
+  }
+  return card;
+}
+function renderSentPageComments() {
+  const section = $("sent-page-comments");
+  section.replaceChildren();
+  const sent = shownSubmission();
+  const entries = sent
+    ? sentEntries(sent).filter((entry) => entry.topic === page.id)
+    : [];
+  section.hidden = !entries.length;
+  if (!entries.length) return;
+  const heading = document.createElement("h2");
+  heading.textContent = "Your sent comments";
+  section.append(heading, ...entries.map(sentCard));
+}
+let renderedSentKey = null;
+function renderSentFeedback() {
+  const sent = shownSubmission();
+  // A past revision's submission may still be loading, which is not the same
+  // as none having been sent.
+  const loaded = mode === "readonly" || sentByRevision.has(plan.revision);
+  const key = `${plan.revision}:${sent?.id || (loaded ? "none" : "")}`;
+  if (renderedSentKey === key) return;
+  renderedSentKey = key;
+  const list = $("sent-feedback-list");
+  list.replaceChildren();
+  if (!sent) {
+    if (loaded) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No feedback was sent on this revision.";
+      list.append(empty);
+    }
+    return;
+  }
+  const entries = sentEntries(sent);
+  for (const entry of entries) list.append(sentCard(entry));
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = sent.groups.alignUnflagged
+      ? "Everything else looked good."
+      : "No comments were sent.";
+    list.append(empty);
+  }
+  renderSentPageComments();
+}
+// The submission sent on the revision on screen: the latest one, which the
+// poll keeps, or one fetched for an older revision in the left tab.
+function shownSubmission() {
+  if (mode === "readonly" || lastSubmission?.revision === plan.revision)
+    return lastSubmission;
+  return sentByRevision.get(plan.revision) || null;
+}
+// A past revision shows what was sent on it, so its controls read from that
+// revision's submission rather than from a draft.
+function showSent(draft, submission) {
+  draft.choices = submission?.groups?.choices || {};
+  draft.answers = submission?.groups?.answers || {};
+}
+function sentDraft(revision) {
+  const draft = emptyDraft(revision);
+  showSent(
+    draft,
+    lastSubmission?.revision === revision
+      ? lastSubmission
+      : sentByRevision.get(revision),
+  );
+  return draft;
+}
+async function loadPastSubmission(revision) {
+  if (sentByRevision.has(revision) || lastSubmission?.revision === revision)
+    return;
+  const response = await fetch(
+    `${base}/api/submission?revision=${encodeURIComponent(revision)}`,
+  );
+  if (!response.ok) return;
+  const { submission } = await response.json();
+  sentByRevision.set(revision, submission);
+  const onScreen = selectedTab === "past" && plan.revision === revision;
+  const draft = onScreen ? state : views.get(revision)?.draft;
+  if (submission && draft && !draft.submitted) showSent(draft, submission);
+  if (!onScreen) return;
+  if (!$("reading").hidden)
+    show(page.id, null, { keepScroll: true, push: false });
+  renderSentFeedback();
+  renderHistory();
+}
+async function loadSubmission() {
+  const key =
+    mode === "readonly"
+      ? `revision:${plan.revision}`
+      : remote?.latestSubmissionId;
+  if (!key || key === lastSubmissionLoadedId) return;
+  const route =
+    mode === "readonly"
+      ? `${base}/api/submission?revision=${encodeURIComponent(plan.revision)}`
+      : `${base}/api/submission`;
+  const response = await fetch(route);
+  if (!response.ok) return;
+  const { submission } = await response.json();
+  if (mode !== "readonly" && remote?.latestSubmissionId !== key) return;
+  if (mode !== "readonly" && submission && submission.id !== key) return;
+  lastSubmission = submission;
+  lastSubmissionLoadedId = key;
+  // A read-only revision has no draft, so its controls show what was sent.
+  if (mode === "readonly" && submission) {
+    showSent(state, submission);
+    if (!$("reading").hidden)
+      show(page.id, null, { keepScroll: true, push: false });
+  }
+  renderSentFeedback();
 }
 function badge(count) {
   const row = $("review-row");
   if (!row) return;
   const mark = row.querySelector(".count");
-  mark.textContent = count || "";
+  mark.textContent = count ? `(${count})` : "";
   mark.hidden = !count;
 }
 /* On a narrow screen the page list is a dialog, like every other panel.
@@ -911,18 +1300,18 @@ function canAccept(unsentCount) {
     plan.kind === "plan" &&
     connected &&
     current() &&
+    !submittedCurrent() &&
     !unsentCount &&
     ["ready", "updated"].includes(remote.stage)
   );
 }
-// Every page ends with where you came from and where to go next; the last
-// page leads to review, and the Feedback page leads back.
+// Every reading page ends with where you came from and where to go next.
 function renderFooter(feedback) {
   // Agreed so far leads the order, as it leads the sidebar.
   const order = [
     ...pages.filter((item) => item.id === "agreed"),
     ...pages.filter((item) => item.id !== "agreed"),
-    ...(editable ? [{ id: "feedback", title: "Feedback" }] : []),
+    ...(hasFeedbackPage ? [{ id: "feedback", title: "Feedback" }] : []),
   ];
   const index = order.findIndex(
     (item) => item.id === (feedback ? "feedback" : page.id),
@@ -936,14 +1325,7 @@ function renderFooter(feedback) {
     element.dataset.page = item.id;
     element.href = "#" + item.id;
   };
-  if (feedback) {
-    link(
-      $("feedback-back"),
-      previous,
-      previous ? `← Back to ${previous.title}` : "",
-    );
-    return;
-  }
+  if (feedback) return;
   link(
     $("footer-previous"),
     previous,
@@ -956,15 +1338,167 @@ function renderFooter(feedback) {
     !next
       ? ""
       : next.id === "feedback"
-        ? acceptable
-          ? "Review and accept →"
-          : "Review your feedback →"
+        ? submittedCurrent() || !editable
+          ? "Feedback →"
+          : acceptable
+            ? "Review and accept →"
+            : "Review your feedback →"
         : `Next: ${next.title} →`,
   );
 }
+function slotLabel(state, { stopped, failed }) {
+  if (state === "ready") return "Ready";
+  if (state !== "active") return "Queued";
+  if (!stopped) return "Working";
+  return failed ? "Stopped" : "Paused";
+}
+function renderActivity() {
+  // A read-only revision shows what was sent on it, without agent activity.
+  if (mode === "readonly") {
+    $("agent-activity").hidden = true;
+    $("sent-feedback").hidden = false;
+    renderSentFeedback();
+    return;
+  }
+  // The agent's progress belongs to the revision last submitted. An older
+  // revision in the left tab shows only what was sent on it.
+  const past = selectedTab === "past";
+  const visible =
+    (past && plan.revision === submittedRevision) || submissionInFlight;
+  $("agent-activity").hidden = !visible;
+  $("sent-feedback").hidden = !past || submissionInFlight;
+  if (!visible) {
+    if (past) renderSentFeedback();
+    return;
+  }
+  const model = activityModel({
+    remote,
+    currentSet: pageSets.get(remote?.current?.revision),
+    submittedRevision,
+    inFlight: submissionInFlight,
+  });
+  const { slots, stopped } = model;
+  const sentAt = lastSubmission?.receivedAt || state.submitted?.at;
+  $("activity-elapsed").textContent = sentAt ? since(sentAt) : "";
+  $("activity-title").textContent = model.title;
+  $("activity-summary").textContent = model.summary;
+  const signature = JSON.stringify([
+    stopped,
+    model.failed,
+    model.track,
+    slots.map(({ id, title, state }) => [id, title, state]),
+  ]);
+  const segments = $("activity-segments");
+  const rows = $("activity-pages");
+  if (rows.dataset.signature !== signature) {
+    rows.dataset.signature = signature;
+    segments.replaceChildren();
+    rows.replaceChildren();
+    if (model.track) {
+      const track = document.createElement("i");
+      track.className = `track ${model.track}`;
+      segments.append(track);
+    }
+    for (const slot of slots) {
+      const item = document.createElement("i");
+      item.className =
+        slot.state === "ready"
+          ? "done"
+          : slot.state === "active" && !stopped
+            ? "now"
+            : "";
+      segments.append(item);
+      const row = document.createElement("div");
+      row.className = "activity-page";
+      const name = document.createElement("span");
+      name.textContent = slot.title;
+      const label = document.createElement("small");
+      label.textContent = slotLabel(slot.state, model);
+      const mark = pageIndicator(pageStatus({ status: slot.state }));
+      if (stopped) mark.classList.add("stopped");
+      row.append(mark, name, label);
+      rows.append(row);
+    }
+  }
+  const { footer } = model;
+  const report = $("activity-report");
+  // The mark is replaced only when its state changes, so polling does not
+  // restart its breathing.
+  const mark = pageIndicator(
+    footer.mark === "stopped" ? "active" : footer.mark,
+  );
+  if (footer.mark === "stopped") mark.classList.add("stopped");
+  const old = report.querySelector(".page-activity");
+  if (old?.className !== mark.className)
+    old ? old.replaceWith(mark) : report.prepend(mark);
+  $("activity-report-text").textContent = footer.at
+    ? `${footer.text} ${recently(footer.at)}`
+    : footer.text;
+  report.classList.toggle("late", Boolean(footer.late));
+  if (!submissionInFlight) renderSentFeedback();
+}
+// Every page of a past revision, its Feedback page included, names the
+// revision. Current never has the strip.
+function renderHistory() {
+  const old = mode === "readonly";
+  const past = selectedTab === "past";
+  const strip = $("history-strip");
+  strip.hidden = !(old || past);
+  if (strip.hidden) return;
+  const label = $("history-label");
+  if (old && session.closed) label.textContent = "This plan is closed";
+  else {
+    const name = document.createElement("b");
+    name.textContent = `Revision ${plan.revision}`;
+    label.replaceChildren(name);
+    if (past || shownSubmission()) {
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = " · Feedback sent";
+      label.append(meta);
+    }
+  }
+  const button = $("history-return");
+  button.hidden = old ? session.closed : !currentAvailable();
+  button.textContent = "Back to current";
+  button.onclick = old
+    ? () => location.assign(`${base}/`)
+    : () => switchTab("current");
+}
 function review() {
   const unsent = unsentItems(state);
-  badge(unsent.count);
+  const sent = selectedTab === "past" || mode === "readonly";
+  const locked = sent || submissionInFlight || submittedCurrent();
+  $("draft-head").hidden = unsent.count === 0;
+  $("draft-count").textContent = `${unsent.count} to send`;
+  badge(locked ? 0 : unsent.count);
+  const reviewLabel = $("review-row")?.querySelector("span");
+  if (reviewLabel) reviewLabel.textContent = sent ? "Feedback" : "Review";
+  $("feedback-title").textContent = sent
+    ? "Feedback"
+    : submissionInFlight
+      ? "Sending feedback"
+      : "Review";
+  $("feedback-review").hidden = locked;
+  renderActivity();
+  renderHistory();
+  $("submit-error").hidden = !submissionError;
+  $("submit-error").textContent = submissionError;
+  $("save-error").hidden = !submissionError || $("reading").hidden;
+  $("save-error-text").textContent = submissionError;
+  $("overall-note").disabled = locked;
+  $("align-unflagged").checked = state.alignUnflagged;
+  $("align-unflagged").disabled = locked;
+  if (locked)
+    $("page-content")
+      .querySelectorAll(
+        "[data-choice] [data-value], [data-multiselect] input, [data-question] textarea, [data-answer], [data-edit], [data-drawing-question] [data-draw], [data-comment]",
+      )
+      .forEach((control) => {
+        if (control.tagName === "TEXTAREA") control.readOnly = true;
+        else control.disabled = true;
+      });
+  commentTarget();
   $("accept").hidden = !canAccept(unsent.count);
   renderFooter(!$("feedback").hidden);
   const rendered = JSON.stringify([
@@ -977,17 +1511,41 @@ function review() {
     renderFeedback();
     renderedFeedback = rendered;
   }
-  const sendable = connected && current() && editable;
-  $("submit").disabled = !unsent.count || !sendable;
-  $("submit").textContent = unsent.count
-    ? `Submit (${unsent.count})`
-    : "Submit";
-  // Accept plan takes the slot on an acceptable final plan. A sent round with
-  // nothing new leaves Submit in place and disabled, so the header keeps its
-  // shape between rounds; the working card reports how long the agent has been
-  // at it.
+  // The header button always acts on Current. From a past revision it submits
+  // Current's draft, and once Current's revision is sent it opens that
+  // revision's Feedback.
+  const forCurrent = selectedTab === "past" && currentAvailable();
+  const draft = forCurrent ? currentDraft() : state;
+  const pending = forCurrent ? unsentItems(draft) : unsent;
+  const kind = forCurrent
+    ? views.get(remote.current.revision).plan.kind
+    : plan.kind;
+  const opensFeedback = sent && !forCurrent;
+  const onSentFeedback =
+    $("reading").hidden &&
+    (mode === "readonly" || plan.revision === submittedRevision);
+  const sendable =
+    connected &&
+    !remote?.pageRound &&
+    (forCurrent || (current() && feedbackEditable()));
+  const waitingForPages = Boolean(remote?.pageRound);
+  const hasFeedback =
+    pending.count > 0 || (kind === "exploration" && draft.alignUnflagged);
+  $("submit").disabled =
+    submissionInFlight ||
+    (opensFeedback
+      ? onSentFeedback
+      : waitingForPages || !hasFeedback || !sendable);
+  $("submit").textContent = submissionInFlight
+    ? "Sending"
+    : opensFeedback
+      ? "Feedback"
+      : pending.count
+        ? `Submit (${pending.count})`
+        : "Submit";
+  $("submit").classList.toggle("primary", !opensFeedback && !waitingForPages);
+  // Accept plan uses the same slot when a final plan has no unsent feedback.
   $("submit").hidden = !$("accept").hidden;
-  $("submit-status").textContent = submissionError;
   status();
 }
 function feedbackText() {
@@ -996,11 +1554,23 @@ function feedbackText() {
     `Feedback: ${plan.title}`,
     `Artifact ${plan.artifactId}, revision ${plan.revision}`,
     "Feedback only. No implementation approval.",
+    `Everything else looks good: ${state.alignUnflagged ? "yes" : "no"}.`,
   ];
-  for (const choice of Object.values(choices))
+  // A checklist the reviewer left alone reads like any other. An empty one
+  // means none picked.
+  const untouched = Object.values(state.choices).filter(
+    (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
+  );
+  for (const choice of [...Object.values(choices), ...untouched])
     lines.push("", `${choice.label}: ${choiceText(choice)}`);
   for (const answer of Object.values(answers))
-    lines.push("", `${answer.label}`, answer.text);
+    lines.push(
+      "",
+      `${answer.label}`,
+      answer.kind === "drawing"
+        ? `Drawing scene ${answer.sceneId}; PNG preview ${answer.previewId}`
+        : answer.text,
+    );
   for (const note of notes)
     lines.push(
       "",
@@ -1014,12 +1584,6 @@ function feedbackText() {
          same, which is the only way the paths travel with it. */
       ...(note.attachments || []).map((item) => `Image: ${item.path}`),
     );
-  const defaults = Object.values(state.choices).filter(
-    (choice) => choice.kind === "multiple" && !choice.sentIn && !choice.touched,
-  );
-  if (defaults.length) lines.push("", "Defaults, not confirmed:");
-  for (const choice of defaults)
-    lines.push(`${choice.label}: ${choiceText(choice)}`);
   return lines.join("\n");
 }
 function envelope(intent, text, extra = {}) {
@@ -1049,171 +1613,297 @@ async function send(event) {
   return result;
 }
 
-/* Status, sessions, revisions */
-function scheduleReload() {
-  if (
-    document.querySelector("dialog[open]") ||
-    ["TEXTAREA", "INPUT"].includes(document.activeElement?.tagName)
-  )
-    return;
-  // A new revision opens at the top of its first page; the unsent draft is
-  // stored separately and carries over on its own.
-  try {
-    sessionStorage.setItem(resumeKey, JSON.stringify({ first: true }));
-  } catch {
-    /* Reload without the marker. */
-  }
-  location.reload();
-}
-// Under a minute reads "just now"; after that the bare duration, as the card
-// shows it beside the title.
-function elapsed(value) {
-  const ms = Date.now() - Date.parse(value);
-  return Number.isFinite(ms) && ms < 60000 ? "just now" : since(value);
-}
-// The bookends are derived here, not stored: the hub only keeps the steps the
-// agent declared. Rows carry "done", "now", "wait", or nothing.
-function workingModel(accepting) {
-  if (accepting)
-    return {
-      title: "Plan accepted",
-      since: state.acceptance?.at || remote.updatedAt,
-      bar: false,
-      rows: [{ text: "Recording your acceptance", state: "now" }],
-    };
-  const sent = state.submitted?.revision === plan.revision;
-  const read = sent
-    ? plural(state.submitted.count, "comment")
-    : "your feedback";
-  const next = /^\d+$/.test(plan.revision)
-    ? `revision ${Number(plan.revision) + 1}`
-    : "the next revision";
-  const publish = { text: `Publish ${next}`, state: "" };
-  if (remote.stage === "submitted")
-    return {
-      title: "Sent",
-      since: sent ? state.submitted.at : remote.updatedAt,
-      bar: true,
-      rows: [
-        { text: `Waiting for the agent to read ${read}`, state: "wait" },
-        { text: "Work out the steps", state: "" },
-        { text: "Check and polish", state: "" },
-        publish,
-      ],
-    };
-  const steps = remote.progress?.steps;
-  const done = { text: `Read ${read}`, state: "done" };
-  const title = `Working on ${next}`;
-  const since = remote.acknowledgedAt || remote.updatedAt;
-  if (!steps)
-    return {
-      title,
-      since,
-      bar: true,
-      rows: [
-        done,
-        { text: "Working out the steps", state: "now" },
-        { text: "Check and polish", state: "" },
-        publish,
-      ],
-    };
-  // Steps are a set: each row shows its own state, and several can be
-  // active at once.
-  const finished = steps.every((step) => step.state === "done");
-  return {
-    title,
-    since,
-    bar: true,
-    rows: [
-      done,
-      ...steps.map((step) => ({
-        text: step.title,
-        state:
-          step.state === "done" ? "done" : step.state === "active" ? "now" : "",
-      })),
-      { text: "Check and polish", state: finished ? "now" : "" },
-      publish,
-    ],
-  };
-}
-function renderWorking(model) {
-  $("working-title").textContent = model.title;
-  $("working-time").textContent = model.since ? elapsed(model.since) : "";
-  // A step the agent started and never reported on looks like work; after
-  // two minutes without a report the card says so.
-  const report = remote?.progress?.updatedAt || remote?.acknowledgedAt;
-  const stale =
-    remote?.stage === "working" &&
-    report &&
-    Date.now() - Date.parse(report) >= 120000;
-  $("working-report").hidden = !stale;
-  if (stale) $("working-report").textContent = `Last report ${ago(report)}`;
-  // Declared steps with none active and some pending: the agent is between
-  // reports, and the card says so instead of looking idle.
-  const steps = remote?.progress?.steps;
-  $("working-between").hidden =
-    stale ||
-    remote?.stage !== "working" ||
-    !Array.isArray(steps) ||
-    steps.length === 0 ||
-    steps.some((step) => step.state === "active") ||
-    steps.every((step) => step.state === "done");
-  const note = remote?.paused
-    ? `The agent stopped at your request (${remote.paused.reason}). Send it a message in the chat to resume.`
-    : remote?.wake?.last?.ok === false
-      ? `The agent could not be woken (${remote.wake.last.reason}). Send it a message in the chat.`
-      : "";
-  $("working-note").hidden = !note;
-  if (note) $("working-note").textContent = note;
-  const bar = $("working-bar");
-  const list = $("working-steps");
-  bar.hidden = !model.bar;
-  while (bar.children.length > model.rows.length) bar.lastElementChild.remove();
-  while (list.children.length > model.rows.length)
-    list.lastElementChild.remove();
-  while (bar.children.length < model.rows.length)
-    bar.append(document.createElement("i"));
-  // Rows added after the first render slide in; the class leaves with the
-  // animation so later polls compare plain state classes.
-  const grown = list.children.length > 0;
-  while (list.children.length < model.rows.length) {
-    const row = document.createElement("li");
-    if (grown) {
-      row.classList.add("enter");
-      row.addEventListener(
-        "animationend",
-        () => row.classList.remove("enter"),
-        {
-          once: true,
-        },
-      );
+/* A published page is fetched once. Polls only update its place in the list. */
+async function loadPageRecord(revision, id) {
+  const view = views.get(revision);
+  const manifest = pageSets.get(revision);
+  const slot = manifest?.pages.find((item) => item.id === id);
+  if (!view || !slot?.version) return;
+  const key = `${revision}/${id}/${slot.version}`;
+  if (recordLoads.has(key)) return recordLoads.get(key);
+  const task = (async () => {
+    const url = `${base}/api/page?revision=${encodeURIComponent(revision)}&id=${encodeURIComponent(id)}&version=${slot.version}`;
+    const response = await fetch(url);
+    if (!response.ok) throw Error("Could not load this page.");
+    const record = await response.json();
+    if (record.revision !== revision || record.page.id !== id)
+      throw Error("Wrong page record.");
+    const entry = view.pages.find((item) => item.id === id);
+    if (id === "agreed") {
+      view.agreements = record.page.agreements;
+      view.task = record.page.task || null;
+      if (plan.revision === revision) {
+        agreements = view.agreements;
+        agreedTask = view.task;
+      }
+    } else {
+      let setup = null;
+      if (record.page.jsText) {
+        const blob = new Blob([record.page.jsText], {
+          type: "text/javascript",
+        });
+        const moduleUrl = URL.createObjectURL(blob);
+        try {
+          ({ setup } = await import(moduleUrl));
+          if (typeof setup !== "function")
+            throw Error("Page setup is unavailable.");
+        } finally {
+          URL.revokeObjectURL(moduleUrl);
+        }
+      }
+      entry.html = record.page.html;
+      entry.loaded = true;
+      entry.pending = false;
+      indexPage(entry);
+      view.plan.prototypes ||= [];
+      view.plan.prototypes.push(...(record.page.prototypes || []));
+      if (record.page.cssText) {
+        const style = document.createElement("style");
+        style.textContent = `@layer plan { @scope (#page-content[data-page-id="${id}"][data-revision="${revision}"]) { ${record.page.cssText} } }`;
+        document.head.append(style);
+      }
+      if (setup)
+        window.addEventListener("plan:page", ({ detail }) => {
+          if (detail.page.id === id && detail.revision === revision)
+            setup(detail.element, window.planUI);
+        });
     }
-    list.append(row);
-  }
-  model.rows.forEach((row, index) => {
-    const segment = bar.children[index];
-    const item = list.children[index];
-    const state = row.state === "wait" ? "" : row.state;
-    if (segment.className !== state) segment.className = state;
-    const entering = item.classList.contains("enter");
-    const className = entering ? `${row.state} enter`.trim() : row.state;
-    if (item.className !== className) item.className = className;
-    if (item.textContent !== row.text) item.textContent = row.text;
+    if (
+      id !== "agreed" &&
+      plan.revision === revision &&
+      page.id === id &&
+      !$("reading").hidden
+    ) {
+      const top = scroller().scrollTop;
+      const focused = document.activeElement;
+      show(id, null, { keepScroll: true, push: false });
+      if (focused?.isConnected) focused.focus({ preventScroll: true });
+      if (!restoring) scroller().scrollTo(0, top);
+    }
+    return record;
+  })().catch((error) => {
+    recordLoads.delete(key);
+    if (plan.revision === revision && page.id === id && !$("reading").hidden) {
+      $("page-content").innerHTML =
+        `<div class="page-load-error" role="alert"><p>Could not load this page.</p><button class="btn" type="button">Retry</button></div>`;
+      $("page-content").querySelector("button").onclick = () =>
+        loadPageRecord(revision, id).catch(() => {});
+    }
+    throw error;
   });
+  recordLoads.set(key, task);
+  return task;
 }
+function pageStatus(item) {
+  return item.status === "ready" || (!item.status && !item.pending)
+    ? "complete"
+    : item.status === "active"
+      ? "active"
+      : "queued";
+}
+// A ready page whose record has not arrived yet shows as loading, not queued.
+function pendingState(item) {
+  if (item.status === "ready") return ["active", "Loading this page"];
+  return item.working
+    ? ["active", "Preparing this page"]
+    : ["queued", "Waiting to start"];
+}
+function reconcilePages(view, manifest) {
+  for (const slot of manifest.pages) {
+    let entry = view.pages.find((item) => item.id === slot.id);
+    if (!entry) {
+      entry = { id: slot.id, title: slot.title, html: "", pending: true };
+      view.pages.push(entry);
+    }
+    if (entry.loaded === undefined) entry.loaded = !entry.pending;
+    entry.title = slot.title;
+    entry.status = slot.state;
+    entry.working = slot.state === "active";
+    if (slot.state !== "ready") entry.pending = true;
+    if (slot.state === "ready" && !entry.loaded && slot.id !== "agreed")
+      entry.pending = true;
+  }
+  view.pages = manifest.pages.map((slot) =>
+    view.pages.find((item) => item.id === slot.id),
+  );
+  view.plan.pages = view.pages.filter((item) => item.id !== "agreed");
+  if (plan.revision === view.plan.revision) pages = view.pages;
+}
+// A revision this reader has not loaded, which its page set then fills in.
+function emptyView(revision, { artifactId, kind, title }) {
+  const view = {
+    plan: { artifactId, revision, kind, title, pages: [], agreements: [] },
+    agreements: [],
+    pages: [],
+  };
+  views.set(revision, view);
+  return view;
+}
+async function syncPageSet() {
+  const revision = remote?.current?.revision;
+  if (!revision || !remote.pageSetGeneration) return;
+  if (pageSetLoading) return pageSetLoading;
+  const previous = pageSets.get(revision);
+  if (previous?.generation === remote.pageSetGeneration) return;
+  pageSetLoading = (async () => {
+    const response = await fetch(
+      `${base}/api/page-set?revision=${encodeURIComponent(revision)}`,
+    );
+    if (!response.ok) throw Error("Could not load page list.");
+    const manifest = await response.json();
+    const view = views.get(revision) || emptyView(revision, remote.current);
+    const wasReady = new Set(
+      previous?.pages
+        .filter((item) => item.state === "ready")
+        .map((item) => item.id),
+    );
+    pageSets.set(revision, manifest);
+    reconcilePages(view, manifest);
+    try {
+      await loadPageRecord(revision, "agreed");
+    } catch (error) {
+      if (previous) pageSets.set(revision, previous);
+      else pageSets.delete(revision);
+      throw error;
+    }
+    if (selectedTab === "current" && plan.revision === revision) {
+      updateNavigation();
+      const selected = manifest.pages.find((item) => item.id === page.id);
+      if (selected?.state === "ready" && page.pending)
+        void loadPageRecord(revision, page.id).catch(() => {});
+      else if (selected && page.pending && !$("reading").hidden) {
+        const [mark, label] = pendingState(page);
+        $("page-content")
+          .querySelector(".pending-state")
+          ?.replaceChildren(
+            pageIndicator(mark),
+            document.createTextNode(label),
+          );
+      }
+      announceArrivals([...wasReady]);
+    } else updateNavigation();
+  })().finally(() => {
+    pageSetLoading = null;
+  });
+  return pageSetLoading;
+}
+// A revision published before page sets existed has none. It opens on its
+// own read-only page instead, without asking again on every poll.
+const missingSets = new Set();
+const pastLoads = new Map();
+// Load a past revision's page list and Agreed into a view the left tab can
+// show. Resolves false for a revision that has no page set.
+function loadPastView(revision) {
+  if (!revision) return Promise.resolve(false);
+  if (views.has(revision)) return Promise.resolve(true);
+  if (missingSets.has(revision)) return Promise.resolve(false);
+  if (pastLoads.has(revision)) return pastLoads.get(revision);
+  const task = (async () => {
+    const response = await fetch(
+      `${base}/api/page-set?revision=${encodeURIComponent(revision)}`,
+    );
+    if (response.status === 404) {
+      missingSets.add(revision);
+      return false;
+    }
+    if (!response.ok) throw Error("Could not load that revision's pages.");
+    const manifest = await response.json();
+    const entry = remote?.revisions?.find((item) => item.revision === revision);
+    const view = emptyView(revision, {
+      artifactId: entry?.artifactId || remote.current.artifactId,
+      kind: entry?.kind || remote.current.kind,
+      title: entry?.title || remote.current.title,
+    });
+    pageSets.set(revision, manifest);
+    reconcilePages(view, manifest);
+    try {
+      await loadPageRecord(revision, "agreed");
+    } catch (error) {
+      views.delete(revision);
+      pageSets.delete(revision);
+      throw error;
+    }
+    updateNavigation();
+    return true;
+  })().finally(() => {
+    pastLoads.delete(revision);
+  });
+  pastLoads.set(revision, task);
+  return task;
+}
+// The clock and an agreement's Open link load a past revision into the left
+// tab. A revision from before page sets opens on its own read-only page.
+async function openPast(revision, { pageId = null, targetId = null } = {}) {
+  const loaded = await loadPastView(revision).catch(() => false);
+  if (!loaded) {
+    location.assign(`${base}/r/${encodeURIComponent(revision)}`);
+    return;
+  }
+  pastRevision = revision;
+  if (pageId) places[revision] = { page: pageId, top: 0 };
+  switchTab("past", targetId);
+}
+// Current's draft while a past revision is on screen: the one set aside when
+// the reader left Current, or the saved one.
+function currentDraft() {
+  const view = views.get(remote?.current?.revision);
+  if (view?.draft) return view.draft;
+  try {
+    return loadDraft(
+      JSON.parse(localStorage.getItem(storageKey)),
+      remote.current.revision,
+    );
+  } catch {
+    return emptyDraft(remote.current.revision);
+  }
+}
+// Each tab reopens its revision at the page and scroll position the reader
+// left, or at Agreed on a first visit.
+function switchTab(tab, targetId = null) {
+  if (tab === "current" && !currentAvailable()) return;
+  if (tab === "past" && !pastAvailable()) return;
+  rememberHeight();
+  const revision = tab === "current" ? remote.current.revision : pastRevision;
+  const view = views.get(revision);
+  views.get(plan.revision).draft = state;
+  selectedTab = tab;
+  plan = view.plan;
+  document.title = plan.title;
+  agreements = view.agreements;
+  agreedTask = view.task || null;
+  pages = view.pages;
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey));
+  } catch {
+    /* The in-memory draft and export remain available. */
+  }
+  state =
+    view.draft ||
+    (tab === "past" ? sentDraft(revision) : loadDraft(saved, revision));
+  rebuildKnown();
+  if (tab === "current") initializeChecklists();
+  page = pages[0];
+  renderedFeedback = null;
+  updateNavigation(true);
+  const place = placeIn(revision, [
+    ...pages.map((item) => item.id),
+    "feedback",
+  ]);
+  show(place?.page || "agreed", targetId);
+  if (place?.top && !targetId) restoreScroll(place.top);
+  if (tab === "past") void loadPastSubmission(revision).catch(() => {});
+  renderRevisions();
+}
+const currentAvailable = () =>
+  Boolean(
+    remote?.current &&
+    remote.current.revision !== submittedRevision &&
+    views.has(remote.current.revision),
+  );
+const pastAvailable = () => Boolean(pastRevision && views.has(pastRevision));
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
-  const newer = connected && remote?.current && !current();
-  const accepting =
-    state.acceptance && remote?.latestSubmissionId === state.acceptance.id;
-  const working =
-    editable &&
-    connected &&
-    current() &&
-    ["submitted", "working"].includes(stage);
-  document.body.classList.toggle("is-working", working);
-  $("working").hidden = !working;
-  if (working) renderWorking(workingModel(accepting));
   const complete = stage === "complete" && remote?.accepted;
   $("accepted").hidden = !complete;
   if (complete)
@@ -1228,7 +1918,7 @@ function status() {
       : "";
   // A session closed from another tab reloads into read-only, so this tab
   // cannot send anything to an agent that will never be woken again.
-  if ((newer || remote?.dismissedAt) && mode === "live") scheduleReload();
+  if (remote?.dismissedAt && mode === "live") location.reload();
 }
 async function poll() {
   try {
@@ -1238,11 +1928,53 @@ async function poll() {
     if (result.sessionId !== session.sessionId) throw Error("Wrong session");
     remote = result;
     connected = true;
+    if (editable && !submittedRevision)
+      submittedRevision =
+        state.submitted?.revision || remote.latestSubmissionRevision;
+    if (editable && !pastRevision) pastRevision = submittedRevision || null;
+    // A read-only page stays on its own revision. A failed page-set fetch is
+    // retried on the next poll and does not mean the hub is unreachable.
+    if (editable) {
+      await syncPageSet().catch(() => {});
+      await loadPastView(pastRevision).catch(() => {});
+    }
+    // Current's revision was sent, here or in another browser: the left tab
+    // takes it, on its Feedback page, where the agent's progress shows.
+    if (
+      selectedTab === "current" &&
+      submittedRevision === plan.revision &&
+      remote.latestSubmissionRevision === plan.revision
+    ) {
+      pastRevision = plan.revision;
+      places[plan.revision] = { page: "feedback", top: 0 };
+      switchTab("past");
+    }
+    void loadSubmission().catch(() => {});
+    if (
+      state.pending?.event?.id === remote.latestSubmissionId &&
+      remote.latestSubmissionRevision === plan.revision &&
+      state.submitted?.id !== remote.latestSubmissionId
+    ) {
+      markSent(state, remote.latestSubmissionId, new Date().toISOString());
+      persist();
+    }
   } catch {
     connected = false;
   }
   renderRevisions();
+  updateNavigation();
+  renderRound();
   review();
+}
+// The Pages heading in the sidebar and in the phone drawer shows the page
+// round's status. The text stays while the status fades out.
+function renderRound() {
+  const model = editable ? roundModel({ remote }) : null;
+  for (const status of document.querySelectorAll("[data-round]")) {
+    status.classList.toggle("idle", !model);
+    status.classList.toggle("late", Boolean(model?.late));
+    if (model) status.lastElementChild.textContent = model.text;
+  }
 }
 async function pollSessions() {
   try {
@@ -1259,6 +1991,8 @@ function stateWords(entry) {
   if (entry.needsYou)
     return entry.kind === "plan" ? "Ready to accept" : "Waiting for you";
   if (entry.paused) return "Paused";
+  if (entry.pageRound)
+    return `Working · ${entry.pageRound.ready} pages readable`;
   if (["submitted", "working"].includes(entry.stage))
     return `Working · ${since(entry.updatedAt)}`;
   return "Live";
@@ -1420,6 +2154,7 @@ function renderSessions() {
     list.append(line);
   }
 }
+let renderedRevisions = "";
 function renderRevisions() {
   const entries = (
     remote?.revisions?.length
@@ -1428,7 +2163,22 @@ function renderRevisions() {
   )
     .slice()
     .reverse();
+  if (
+    remote?.pageRound &&
+    !entries.some((entry) => entry.revision === remote.current.revision)
+  )
+    entries.unshift(remote.current);
   const latest = remote?.current?.revision ?? entries[0].revision;
+  const signature = JSON.stringify([
+    latest,
+    entries.map((entry) => [entry.revision, entry.publishedAt]),
+    plan.revision,
+    mode,
+    selectedTab,
+    submittedRevision,
+  ]);
+  if (signature === renderedRevisions) return;
+  renderedRevisions = signature;
   const list = $("revision-list");
   list.replaceChildren();
   for (const entry of entries) {
@@ -1441,40 +2191,38 @@ function renderRevisions() {
     tick.textContent = here ? "✓" : "";
     const label = document.createElement("span");
     label.textContent = `Revision ${entry.revision}`;
-    // The plan's name lives here, because the frame shows it nowhere else.
-    if (here) {
-      const name = document.createElement("small");
-      name.textContent = plan.title;
-      label.append(document.createElement("br"), name);
-    }
+    const status = document.createElement("small");
+    status.textContent =
+      entry.revision === latest && latest !== submittedRevision
+        ? "Current"
+        : "Feedback sent";
+    label.append(document.createElement("br"), status);
     const time = document.createElement("small");
     time.textContent = entry.publishedAt ? ago(entry.publishedAt) : "";
     row.append(tick, label, time);
+    // The live reader loads a past revision into the left tab. A read-only
+    // page has no tabs, so it opens the revision's own page.
     row.onclick = () => {
       toggleRevisionMenu(false);
-      if (here && mode === "live") return;
-      location.assign(
-        entry.revision === latest
-          ? `${base}/`
-          : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
-      );
+      if (here) return;
+      if (mode !== "live")
+        location.assign(
+          entry.revision === latest
+            ? `${base}/`
+            : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
+        );
+      else if (entry.revision === latest && currentAvailable())
+        switchTab("current");
+      else void openPast(entry.revision);
     };
     list.append(row);
   }
-  // An older revision is read-only, and the clock alone does not say which
-  // one you are on, so a strip under the header names it. A closed session
-  // is read-only on its current revision, and there is nowhere to go back
-  // to, so the strip says that instead and drops the link.
-  const older = mode === "readonly";
-  $("older-strip").hidden = !older;
+  // The plan's name lives in this dialog, because the frame shows it nowhere
+  // else.
+  $("revision-plan").textContent = plan.title;
+  const older = mode === "readonly" || selectedTab === "past";
   $("revision").classList.toggle("older", older);
-  $("older-text").textContent = !older
-    ? ""
-    : session.closed
-      ? "This plan was closed. It is here to read."
-      : `You are reading revision ${plan.revision} of ${latest}`;
-  $("revision-back").hidden = Boolean(session.closed);
-  $("revision-back").href = `${base}/`;
+  renderHistory();
   $("revision").setAttribute(
     "aria-label",
     `Revisions, on revision ${plan.revision}`,
@@ -1535,7 +2283,7 @@ function checklist(group, topic, previous) {
   };
 }
 function initializeChecklists() {
-  for (const topic of plan.pages) {
+  for (const topic of plan.pages.filter((item) => !item.pending)) {
     const template = document.createElement("template");
     template.innerHTML = topic.html;
     choiceTargets(template.content, topic.id);
@@ -1695,6 +2443,7 @@ for (const type of ["dragleave", "drop"])
 
 $("note-form").onsubmit = (event) => {
   event.preventDefault();
+  if (!feedbackEditable()) return;
   const text = $("note-text").value.trim();
   if (!text) return;
   const note = {
@@ -1716,27 +2465,74 @@ $("note-form").onsubmit = (event) => {
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
+$("align-unflagged").onchange = (event) => {
+  if (!feedbackEditable()) return;
+  state.alignUnflagged = event.target.checked;
+  save();
+};
 $("submit").onclick = async () => {
+  if (selectedTab === "past") {
+    // Current's revision was already sent, so the button opens its Feedback.
+    if (!currentAvailable()) {
+      places[submittedRevision] = { page: "feedback", top: 0 };
+      void openPast(submittedRevision);
+      return;
+    }
+    switchTab("current");
+  }
+  if (remote?.pageRound) return;
+  if (
+    !feedbackEditable() ||
+    (unsentItems(state).count === 0 &&
+      (plan.kind !== "exploration" || !state.alignUnflagged))
+  )
+    return;
   submissionError = "";
-  const groups = submissionGroups(state);
-  const snapshot = JSON.stringify(groups);
-  if (state.pending?.snapshot !== snapshot)
-    state.pending = {
-      snapshot,
-      event: envelope("feedback-only", feedbackText(), { groups }),
-    };
-  persist();
-  $("submit").disabled = true;
+  const origin = {
+    page: $("reading").hidden ? "feedback" : page.id,
+    top: scroller().scrollTop,
+  };
+  submissionInFlight = true;
+  show("feedback");
   try {
+    await Promise.all(
+      pages
+        .filter((item) => item.id !== "agreed" && item.pending)
+        .map((item) => loadPageRecord(plan.revision, item.id)),
+    );
+    initializeChecklists();
+    const groups = submissionGroups(state);
+    const snapshot = JSON.stringify(groups);
+    if (state.pending?.snapshot !== snapshot)
+      state.pending = {
+        snapshot,
+        event: envelope("feedback-only", feedbackText(), { groups }),
+      };
+    persist();
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
+    submissionInFlight = false;
     save();
-    show(page.id, null, { keepScroll: true });
+    submittedRevision = plan.revision;
+    pastRevision = plan.revision;
+    places[plan.revision] = { page: "feedback", top: 0 };
+    switchTab("past");
+    void loadSubmission().catch(() => {});
   } catch (error) {
-    submissionError = error.message;
-    $("submit").disabled = false;
-    $("submit-status").textContent = error.message;
+    submissionInFlight = false;
+    submissionError = submittedCurrent()
+      ? ""
+      : error instanceof TypeError
+        ? "Could not reach the hub. Your comments are saved here. Try Submit again."
+        : error.message;
+    show(origin.page);
+    scroller().scrollTo(0, origin.top);
+    review();
   }
+};
+$("save-error-dismiss").onclick = () => {
+  submissionError = "";
+  review();
 };
 $("export").onclick = () => {
   const groups = submissionGroups(state);
@@ -1757,20 +2553,35 @@ $("export").onclick = () => {
 };
 function openAccept() {
   $("accept-detail").textContent = `${plan.title}, revision ${plan.revision}`;
+  $("accept-guidance").value = state.acceptGuidance || "";
   $("accept-error").textContent = "";
   $("accept-dialog").showModal();
 }
 $("accept").onclick = openAccept;
+$("accept-guidance").oninput = (event) => {
+  state.acceptGuidance = event.target.value;
+  persist();
+};
 document.querySelectorAll("[data-accept-mode]").forEach(
   (button) =>
     (button.onclick = async () => {
       const mode = button.dataset.acceptMode;
-      if (state.acceptance?.mode !== mode)
-        state.acceptance = envelope(
-          "accept-plan",
-          `Accept ${plan.artifactId} revision ${plan.revision}. ${mode === "implement" ? "Start implementation of this plan." : "Save for later. Do not start implementation."}`,
-          { mode },
-        );
+      const guidance =
+        mode === "implement" ? $("accept-guidance").value.trim() : "";
+      const action =
+        mode === "implement"
+          ? "Start implementation of this plan."
+          : "Save for later. Do not start implementation.";
+      const text = `Accept ${plan.artifactId} revision ${plan.revision}. ${action}${guidance ? `\n\nImplementation guidance:\n${guidance}` : ""}`;
+      if (
+        state.acceptance?.mode !== mode ||
+        (state.acceptance?.guidance || "") !== guidance
+      )
+        state.acceptance = envelope("accept-plan", text, {
+          mode,
+          ...(guidance ? { guidance } : {}),
+        });
+      persist();
       document
         .querySelectorAll("[data-accept-mode]")
         .forEach((item) => (item.disabled = true));
@@ -1796,6 +2607,11 @@ document.addEventListener("click", (event) => {
     if (close.dataset.close === "note-dialog") settleNoteImages();
     $(close.dataset.close).close();
   }
+  const tab = event.target.closest("button[data-tab]");
+  if (tab) {
+    switchTab(tab.dataset.tab);
+    return;
+  }
   const navigation = event.target.closest("[data-page]");
   if (navigation) {
     event.preventDefault();
@@ -1813,7 +2629,7 @@ document.addEventListener("click", (event) => {
     toggleSidecar(false);
     return;
   }
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   const comment = event.target.closest("[data-comment]");
   if (comment && $("page-content").contains(comment))
     openNote(
@@ -1847,7 +2663,7 @@ document.addEventListener("click", (event) => {
   }
 });
 document.addEventListener("change", (event) => {
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   const input = event.target.closest(
     '[data-multiselect] input[type="checkbox"][data-value]',
   );
@@ -1860,7 +2676,7 @@ document.addEventListener("change", (event) => {
   save();
 });
 document.addEventListener("input", (event) => {
-  if (!editable) return;
+  if (!feedbackEditable()) return;
   const area = event.target.closest("[data-question] textarea");
   if (!area || !$("page-content").contains(area)) return;
   const group = area.closest("[data-question]");
@@ -1949,9 +2765,14 @@ function blockKind(block) {
 function commentTarget() {
   const button = $("quote");
   /* An open dialog hides the control in CSS, which no open path can forget. */
-  const usable = editable && !$("reading").hidden;
+  const usable = editable && !page.pending && !$("reading").hidden;
   button.hidden = !usable;
   if (!usable) return;
+  button.disabled = !feedbackEditable();
+  if (button.disabled) {
+    button.textContent = "Comments sent";
+    return;
+  }
   if (selected.length > 3) button.textContent = "Comment on selection";
   else if (chosen) button.textContent = `Comment on ${blockKind(chosen)}`;
   else button.textContent = "Comment on this page";
@@ -1968,7 +2789,7 @@ document.addEventListener("selectionchange", () => {
 /* A control does its own job, a block becomes the target, and anything else
    clears it. A drag is a selection, so it never reaches here as a press. */
 $("page-content").addEventListener("click", (event) => {
-  if (!editable) return;
+  if (!feedbackEditable() || page.pending) return;
   if (
     event.target.closest("button, a, input, label, select, textarea, summary")
   )
@@ -1981,6 +2802,7 @@ $("page-content").addEventListener("click", (event) => {
 /* The control and the c key comment on the same thing, so they share the
    one function that decides what that is. */
 function commentOnTarget() {
+  if (!feedbackEditable() || page.pending) return;
   if (selected.length > 3)
     openNote(page.id, page.title, selected, null, null, selectedTarget);
   else if (chosen) {
@@ -2041,7 +2863,7 @@ document.addEventListener("keydown", (event) => {
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
-    editable
+    feedbackEditable()
   ) {
     const area = event.target.closest("textarea");
     const answer = area
@@ -2098,7 +2920,8 @@ document.addEventListener("keydown", (event) => {
     next.tabIndex = -1;
     next.focus({ preventScroll: true });
     next.scrollIntoView({ block: "center" });
-  } else if (key === "c" && editable && !$("reading").hidden) commentOnTarget();
+  } else if (key === "c" && feedbackEditable() && !$("reading").hidden)
+    commentOnTarget();
   else if (key === "r" && editable) show("feedback");
   else if (key === "s" && editable) {
     const target = $("accept").hidden ? $("submit") : $("accept");
@@ -2325,8 +3148,114 @@ function enhance(root) {
 new ResizeObserver(() => {
   for (const instance of charts.values()) instance.resize();
 }).observe($("page-content"));
+let activeDrawing = null;
+function drawingError(message) {
+  $("drawing-error").textContent = message;
+  $("drawing-error").hidden = !message;
+  $("drawing-save").disabled = false;
+}
+function resetDrawing() {
+  if (activeDrawing?.loadingTimer) clearTimeout(activeDrawing.loadingTimer);
+  activeDrawing = null;
+  $("drawing-frame").removeAttribute("srcdoc");
+}
+function closeDrawing() {
+  resetDrawing();
+  if ($("drawing-dialog").open) $("drawing-dialog").close();
+}
+async function openDrawing(id, label, target, onSaved) {
+  if (!feedbackEditable() || !online) return;
+  const key = `${page.id}/${id}`;
+  const previous = state.answers[key];
+  let scene = null;
+  if (previous?.kind === "drawing") {
+    const response = await fetch(
+      `${base}/api/drawing-scene/${encodeURIComponent(previous.sceneId)}`,
+    );
+    if (!response.ok) throw new Error("Could not load the saved drawing.");
+    scene = await response.json();
+  }
+  const nonce = uuid();
+  activeDrawing = { key, label, target, nonce, scene, onSaved, topic: page.id };
+  activeDrawing.loadingTimer = setTimeout(() => {
+    if (activeDrawing?.nonce === nonce)
+      drawingError(
+        "The drawing editor did not load. Check your connection and try again.",
+      );
+  }, 20000);
+  $("drawing-title").textContent = label;
+  drawingError("");
+  $("drawing-save").disabled = true;
+  $("drawing-frame").srcdoc = JSON.parse(
+    $("drawing-editor-source").textContent,
+  ).replace("__DRAWING_NONCE__", JSON.stringify(nonce));
+  $("drawing-dialog").showModal();
+}
+$("drawing-cancel").onclick = closeDrawing;
+$("drawing-dialog").addEventListener("close", resetDrawing);
+$("drawing-save").onclick = () => {
+  if (!activeDrawing) return;
+  $("drawing-save").disabled = true;
+  $("drawing-frame").contentWindow.postMessage(
+    { type: "save", nonce: activeDrawing.nonce },
+    "*",
+  );
+};
+addEventListener("message", async (event) => {
+  const drawing = activeDrawing;
+  if (
+    !drawing ||
+    event.source !== $("drawing-frame").contentWindow ||
+    event.data?.nonce !== drawing.nonce
+  )
+    return;
+  if (event.data.type === "ready") {
+    clearTimeout(drawing.loadingTimer);
+    drawing.loadingTimer = null;
+    $("drawing-save").disabled = false;
+    event.source.postMessage(
+      { type: "init", nonce: drawing.nonce, scene: drawing.scene },
+      "*",
+    );
+  } else if (event.data.type === "error") {
+    drawingError(event.data.message || "Could not save the drawing.");
+  } else if (event.data.type === "saved") {
+    try {
+      const [sceneResponse, previewResponse] = await Promise.all([
+        fetch(`${base}/api/drawing-scene`, {
+          method: "POST",
+          body: JSON.stringify(event.data.scene),
+        }),
+        fetch(`${base}/api/upload`, { method: "POST", body: event.data.png }),
+      ]);
+      if (!sceneResponse.ok || !previewResponse.ok)
+        throw new Error("Could not upload the drawing. Please try again.");
+      const [scene, preview] = await Promise.all([
+        sceneResponse.json(),
+        previewResponse.json(),
+      ]);
+      if (activeDrawing !== drawing) return;
+      const answer = {
+        topic: drawing.topic,
+        label: drawing.label,
+        kind: "drawing",
+        revision: plan.revision,
+        sceneId: scene.id,
+        previewId: preview.id,
+        target: drawing.target,
+      };
+      state.answers[drawing.key] = answer;
+      save();
+      drawing.onSaved(answer);
+      closeDrawing();
+    } catch (error) {
+      drawingError(error.message || "Could not save the drawing.");
+    }
+  }
+});
 window.planUI = {
   answer(id, text, label, target) {
+    if (!feedbackEditable()) return;
     const key = page.id + "/" + id;
     if (text.trim())
       state.answers[key] = {
@@ -2339,6 +3268,10 @@ window.planUI = {
     else delete state.answers[key];
     save();
   },
+  drawing(id) {
+    return state.answers[`${page.id}/${id}`];
+  },
+  draw: openDrawing,
   chart,
   define,
   diff,
@@ -2346,11 +3279,12 @@ window.planUI = {
   enhance,
   prefs,
   mode,
+  page: null,
 };
 
 /* Start */
 document.title = plan.title;
-// Agreed so far reads before the pages, Review comments after them, each
+// Agreed so far reads before the pages, Review or Feedback after them, each
 // behind a separator, and the drawer shows the same list as the sidebar.
 function separator() {
   const divider = document.createElement("div");
@@ -2358,33 +3292,156 @@ function separator() {
   divider.setAttribute("role", "separator");
   return divider;
 }
-for (const item of [
-  pages.find((item) => item.id === "agreed"),
-  ...pages.filter((item) => item.id !== "agreed"),
-]) {
+function pageIndicator(state) {
+  const indicator = document.createElement("span");
+  indicator.className = `page-activity ${state}`;
+  indicator.setAttribute("aria-hidden", "true");
+  if (state !== "active")
+    indicator.innerHTML =
+      state === "complete"
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+  return indicator;
+}
+function addPageButton(item) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.page = item.id;
-  button.textContent = item.title;
-  $("navigation").append(button);
-  if (item.id === "agreed") $("navigation").append(separator());
+  const title = document.createElement("span");
+  title.textContent = item.title;
+  // A long name ends in an ellipsis, so the full name is a tooltip.
+  title.title = item.title;
+  button.append(title);
+  if (item.status !== "ready" && item.pending) {
+    button.classList.add("pending");
+    button.setAttribute(
+      "aria-label",
+      `${item.title}, ${item.working ? "being prepared" : "queued"}`,
+    );
+    button.append(pageIndicator(item.working ? "active" : "queued"));
+  } else {
+    button.append(pageIndicator("complete"));
+  }
+  $("page-list").append(button);
 }
-if (editable) {
-  const review = document.createElement("button");
-  review.type = "button";
-  review.id = "review-row";
-  review.dataset.page = "feedback";
-  const label = document.createElement("span");
-  label.textContent = "Review comments";
-  const count = document.createElement("b");
-  count.className = "count";
-  count.hidden = true;
-  review.append(label, count);
-  $("navigation").append(separator(), review);
+const tabs = document.createElement("div");
+tabs.className = "page-tabs";
+tabs.setAttribute("role", "tablist");
+tabs.setAttribute("aria-label", "Page versions");
+// The left tab holds the past revision on screen, so the tabs read in time
+// order.
+for (const tab of ["past", "current"]) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.id = `${tab}-tab`;
+  button.dataset.tab = tab;
+  button.setAttribute("role", "tab");
+  button.textContent = tab === "current" ? "Current" : "Previous";
+  tabs.append(button);
 }
+// A read-only page shows one revision, so there is nothing to switch to.
+tabs.hidden = !editable;
+const pageList = document.createElement("div");
+pageList.id = "page-list";
+$("navigation").append(tabs, pageList);
+function updateNavigation(force = false) {
+  const currentSet = pageSets.get(remote?.current?.revision);
+  const readyPages = currentAvailable()
+    ? currentSet?.pages.filter((item) => item.state === "ready").length || 0
+    : selectedTab === "current"
+      ? pages.filter((item) => !item.pending).length
+      : 0;
+  $("page-count").hidden = !readyPages;
+  $("page-count").textContent = readyPages;
+  $("menu-button").classList.toggle("need", readyPages > 0);
+  $("menu-button").setAttribute(
+    "aria-label",
+    `Pages, ${plural(readyPages, "current page")} ready to read`,
+  );
+  $("current-tab").disabled = Boolean(submittedRevision) && !currentAvailable();
+  $("past-tab").disabled = !pastAvailable();
+  $("past-tab").textContent = pastRevision
+    ? `Revision ${pastRevision}`
+    : "Previous";
+  for (const tab of ["past", "current"])
+    $(`${tab}-tab`).setAttribute("aria-selected", String(selectedTab === tab));
+  if (
+    force ||
+    pageList.dataset.revision !== plan.revision ||
+    pageList.dataset.tab !== selectedTab
+  ) {
+    pageList.replaceChildren();
+    addPageButton(pages[0]);
+    pageList.append(separator());
+    for (const item of pages.slice(1)) addPageButton(item);
+    if (hasFeedbackPage) {
+      const review = document.createElement("button");
+      review.type = "button";
+      review.id = "review-row";
+      review.dataset.page = "feedback";
+      const label = document.createElement("span");
+      label.textContent =
+        editable && selectedTab === "current" ? "Review" : "Feedback";
+      const total = document.createElement("b");
+      total.className = "count";
+      total.hidden = true;
+      review.append(label, total);
+      pageList.append(separator(), review);
+    }
+    pageList.dataset.revision = plan.revision;
+    pageList.dataset.tab = selectedTab;
+  }
+  for (const item of pages) {
+    const button = [...pageList.querySelectorAll("[data-page]")].find(
+      (node) => node.dataset.page === item.id,
+    );
+    if (!button) continue;
+    button.classList.toggle("pending", pageStatus(item) !== "complete");
+    const old = button.querySelector(".page-activity");
+    const next = pageIndicator(pageStatus(item));
+    if (old?.className !== next.className) old?.replaceWith(next);
+    button.setAttribute(
+      "aria-label",
+      `${item.title}, ${pageStatus(item) === "complete" ? "ready" : item.working ? "working" : "queued"}`,
+    );
+  }
+  for (const button of pageList.querySelectorAll("[data-page]"))
+    if (button.dataset.page === ($("reading").hidden ? "feedback" : page.id))
+      button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+}
+updateNavigation(true);
 $("menu-button").addEventListener("click", () =>
   $("pages-dialog").open ? closeDrawer() : openDrawer(),
 );
+$("feedback-pages").addEventListener("click", openDrawer);
+let arrivalTimer;
+let arrivalPage = null;
+function hideArrival() {
+  clearTimeout(arrivalTimer);
+  $("page-arrival").hidden = true;
+}
+function announceArrivals(previousReady) {
+  if (!narrow.matches || !Array.isArray(previousReady)) return;
+  const seen = new Set(previousReady);
+  const arrived = pages.filter(
+    (item) => item.id !== "agreed" && !item.pending && !seen.has(item.id),
+  );
+  if (!arrived.length) return;
+  arrivalPage = arrived.length === 1 ? arrived[0].id : null;
+  $("page-arrival-text").textContent = arrivalPage
+    ? `${arrived[0].title} is ready`
+    : `${plural(arrived.length, "page")} are ready`;
+  $("page-arrival-view").textContent = arrivalPage ? "View" : "Pages";
+  $("page-arrival").hidden = false;
+  arrivalTimer = setTimeout(hideArrival, 5500);
+}
+$("page-arrival-view").addEventListener("click", () => {
+  hideArrival();
+  if (arrivalPage) show(arrivalPage);
+  else openDrawer();
+});
+$("page-arrival-dismiss").addEventListener("click", hideArrival);
 narrow.addEventListener("change", placeNavigation);
 placeNavigation();
 if (editable) initializeChecklists();
@@ -2395,48 +3452,21 @@ renderRevisions();
    of its own, so both run while the document is still loading and both are
    done by DOMContentLoaded. */
 function start() {
-  let resume = null;
-  try {
-    resume = JSON.parse(sessionStorage.getItem(resumeKey));
-    sessionStorage.removeItem(resumeKey);
-  } catch {
-    /* Start at the top. */
-  }
-  let place = null;
-  try {
-    place = usablePlace(
-      JSON.parse(localStorage.getItem(placeKey)),
-      plan.revision,
-      [...pages.map((item) => item.id), ...(editable ? ["feedback"] : [])],
-    );
-  } catch {
-    /* Start at the top. */
-  }
+  const place = placeIn(plan.revision, [
+    ...pages.map((item) => item.id),
+    ...(editable ? ["feedback"] : []),
+  ]);
   const opened = location.hash.slice(1) || query.get("target");
-  show(
-    resume?.first ? pages[0].id : location.hash.slice(1) || place?.page || "",
-    query.get("target"),
-    {
-      keepScroll: false,
-      push: false,
-    },
-  );
-  // The browser restores the old scroll position after the reload; a new
-  // revision starts at the top.
-  if (resume?.first) setTimeout(() => scroller().scrollTo(0, 0), 60);
-  else if (place?.top && !opened)
-    // The page is short until the renderers finish, and the browser clamps a
-    // scroll past the end, so the offset is restored after they settle.
-    Promise.allSettled([...renders]).then(() =>
-      scroller().scrollTo(0, place.top),
-    );
+  show(location.hash.slice(1) || place?.page || "", query.get("target"), {
+    keepScroll: false,
+    push: false,
+  });
+  if (place?.top && !opened) restoreScroll(place.top);
   window.addEventListener("popstate", () => {
     const url = new URL(location.href);
-    show(
-      url.hash.slice(1) || plan.pages[0].id,
-      url.searchParams.get("target"),
-      { push: false },
-    );
+    show(url.hash.slice(1) || pages[0].id, url.searchParams.get("target"), {
+      push: false,
+    });
   });
   if (mode === "preview" && query.get("quote")) {
     const range = findText($("page-content"), query.get("quote"));
@@ -2446,7 +3476,11 @@ function start() {
     }
   }
   if (online && mode !== "preview") {
-    poll();
+    // A reload returns to the past revision that was on screen.
+    poll().then(() => {
+      if (editable && placeStore.tab === "past" && selectedTab === "current")
+        if (placeStore.past) void openPast(placeStore.past);
+    });
     setInterval(poll, 1500);
     pollSessions();
     setInterval(pollSessions, 5000);
