@@ -1,7 +1,8 @@
 # Prototypes
 
 A prototype preserves an approved interaction exactly, so the implementer
-sees the behavior instead of a description of it.
+sees the behavior instead of a description of it. An approved prototype goes
+into the final plan unchanged.
 
 | Field  | Contract                                                                 |
 | ------ | ------------------------------------------------------------------------ |

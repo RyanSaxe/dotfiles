@@ -1,19 +1,24 @@
 # Page source and build
 
-Write one JSON source file for each page in a directory under the system temp
-directory. Build it before publishing:
+Write one JSON source file for each page in a directory of your own under
+the system temp directory. Build it before publishing:
 
 ```sh
 node scripts/build.mjs PAGE.json PAGE.html
 ```
 
-The output path must not exist. Build checks structure and writes a
-self-contained local preview with an embedded `page-data` record. It changes
-no session state. `publish --source DIR` keeps that page's source under
-`src/<revision>/<page-id>/`. Do not put generated previews or scratch files
-in `DIR`.
+The output path must not exist. `publish --source DIR` keeps the page's
+source under `src/<revision>/<page-id>/` in the session, so keep generated
+previews and scratch files out of `DIR`. Embed every local resource a page
+uses. Do not install packages to author a plan.
 
-Agreed and every other page use the same source shape. Publish Agreed first:
+A revision changes its pages, their CSS, JavaScript and prototypes, and
+Agreed. The frame, the skill's components, the helper and the hub are skill
+code. If feedback asks to change one of them, say so in the chat and plan it
+as skill work.
+
+Agreed and every other page share the outer fields. Agreed also requires a
+`task`, whose fields are in [agreements.md](agreements.md):
 
 ```json
 {
@@ -24,14 +29,14 @@ Agreed and every other page use the same source shape. Publish Agreed first:
   "page": {
     "id": "agreed",
     "title": "Agreed so far",
+    "task": {
+      "title": "Retry policy",
+      "html": "<p>Checkout retries a failed charge once, so a brief gateway outage costs one slow request instead of a failed order.</p>"
+    },
     "agreements": []
   }
 }
 ```
-
-Publish Agreed with `--pages pages.json`. The file fixes this revision's
-ordered page IDs and titles at the same moment Agreed becomes visible. A
-normal page uses the same outer fields:
 
 ```json
 {
@@ -50,29 +55,22 @@ normal page uses the same outer fields:
 }
 ```
 
-`page.html` may replace `page.file`. Both contain an HTML fragment below the
-frame's page title, so do not include an `h1`. Paths are relative to the
-source JSON file. CSS, JavaScript, and prototypes belong to the page that
-publishes them. The builder embeds their bytes in that page's `page-data`.
-The frame and built-in components are pinned when Agreed publishes; another
-page cannot change an earlier page's record. The publisher checks assembly
-with all pages already ready and checks the complete revision on its last
-page.
+| Field      | Contract                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| artifactId | Stable ID for the whole session, using letters, digits, underscores or hyphens.                |
+| revision   | The same value on every page of a revision, and a new value for each revision: `"1"`, `"2"`.   |
+| kind       | `exploration` for proposals, `plan` for the complete final handoff.                            |
+| title      | The plan's title.                                                                              |
+| page.file  | An HTML fragment, relative to the JSON file. `page.html` may hold the fragment inline instead. |
+| page.css   | Optional page CSS. The frame scopes it to this page.                                           |
+| page.js    | Optional module that exports `setup(root, planUI)`.                                            |
+| prototypes | Optional prototypes for this page. See [prototypes.md](prototypes.md).                         |
 
-Page CSS is scoped to
-`#page-content[data-page-id="ID"][data-revision="REVISION"]` and remains below
-the component cascade layer. Page JavaScript must export
-`setup(root, planUI)`. The frame calls it when that page renders. A browser
-runtime error may still escape the build check, so inspect novel interactive
-pages in a browser before publication.
+Page IDs are unique within a revision. Reusing a page ID in a later
+revision lets the reviewer's unsent draft on that page carry forward. `agreed`
+is only for the Agreed page, and `feedback` is reserved. A final plan lists
+`overview` first after Agreed.
 
-Page IDs are unique within a revision, not across revisions. The next
-revision may use a different page set. Reusing an ID makes a new immutable
-record and lets matching unsent draft items carry forward; it never edits
-the old record. `agreed` is only for the Agreed page, and `feedback` is
-reserved for the frame. A final plan lists `overview` first after Agreed.
-
-Each published page's HTML is trusted agent-authored markup. Reviewer comments
-are plain text. Do not put comments in executable HTML or JavaScript. The
-builder escapes literal less-than characters in embedded JSON. Never put the
-agent token in a page.
+Page HTML is trusted markup written by the agent. Reviewer comments are
+plain text. Never put them into executable HTML or JavaScript, and never put
+the agent token in a page.

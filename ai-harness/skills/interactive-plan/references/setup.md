@@ -46,3 +46,52 @@ Environment variables, all optional:
 
 Browser routes are unauthenticated, which is why the extra bind is opt in.
 Agent routes require the per-session bearer token on every interface.
+
+## When something fails
+
+### Waking
+
+`start` records how the hub wakes this agent, from the environment the
+harness gives its shell commands. When it finds no wake path, it refuses,
+creates nothing, and prints the instruction to give the user.
+
+| Harness     | `start` records                                                                                                                            | The hub's wake call                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Claude Code | The inbox socket and token from `CLAUDE_CODE_MESSAGING_SOCKET` and `CLAUDE_CODE_MESSAGING_TOKEN`.                                          | Two JSON lines over the socket: the auth line, then a user message.               |
+| Codex       | The thread ID from `CODEX_THREAD_ID`.                                                                                                      | `codex queue --thread ID --message TEXT`                                          |
+| Copilot     | The session ID from `COPILOT_AGENT_SESSION_ID` and the port the Copilot process listens on, found by walking up from the helper's process. | The SDK shipped inside the CLI resumes the session and sends with mode `enqueue`. |
+
+Copilot listens only when started with `--ui-server`, so its refusal names
+`copilot --ui-server --resume <session id>`. Its embedded server accepts any
+local client when `COPILOT_CONNECTION_TOKEN` is unset. After a submission,
+`status` reports `wake` as `ok`, or `failed` with the reason, and the
+browser asks the reader to send a message in chat.
+
+### The hub
+
+One hub process serves every live session. `start` spawns it when none is
+running. A session is live from `start` until `complete`, `pause` or
+closure from the browser. With no live session for
+`INTERACTIVE_PLAN_IDLE_SECONDS`, the hub exits and the next `start` creates
+a new one on the same port. When `start` finds a hub running other code, it
+uses that hub and logs the mismatch, and the hub restarts on the newer code
+once no session is live. A running hub keeps the addresses it started with,
+so `INTERACTIVE_PLAN_HOST` takes effect only on a new hub.
+
+### Storage
+
+Everything lives under `$XDG_STATE_HOME/interactive-plan/`, or
+`~/.local/state/interactive-plan/`:
+
+- `hub/hub.json` holds the pid, port, hosts, code version and the local
+  secret that registers sessions. `hub/hub.log` is the hub's log.
+- `sessions/<dir>/status.json` holds the stage (`ready`, `updated`,
+  `submitted`, `working` or `complete`), `pageRound` while a revision's pages
+  are arriving, `paused` and `wake`. `status` prints it.
+- `sessions/<dir>/connection.json` holds the session ID, the hub's origin,
+  the agent token and the wake target. The directory name is not the
+  session ID.
+- The same directory holds `feedback/`, `uploads/` with the reviewer's
+  images, `pages/<revision>/` with the published page records,
+  `src/<revision>/<page-id>/` with each page's source, `artifacts/` with the
+  built revisions, and `acceptance.json` after acceptance.
