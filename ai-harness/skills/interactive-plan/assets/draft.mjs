@@ -82,8 +82,8 @@ export function loadDraft(saved, revision) {
   return draft;
 }
 
-// A checklist counts only once the reviewer touched it; an untouched list is
-// still sent with the round so the agent has its defaults.
+// A checklist counts toward the Submit count only once the reviewer touched
+// it. An untouched list is still sent with the round, as the reviewer left it.
 const counted = (choice) =>
   !choice.sentIn && (choice.kind !== "multiple" || choice.touched === true);
 

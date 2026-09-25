@@ -175,6 +175,16 @@ test("the build refuses each structural problem and names it", async () => {
     /^page "p": a code block has no data-language$/m,
   );
   await refused(
+    page(`<pre data-language="diff">- a\n+ b</pre>`),
+    /^page "p": a code block marked diff belongs in before-after\. Run node components\/before-after\/diff\.mjs BEFORE AFTER OUT\.json$/m,
+  );
+  await refused(
+    page(
+      `<fieldset data-multiselect="s" data-label="S"><label><input type="checkbox" data-value="a" checked> A</label></fieldset>`,
+    ),
+    /^page "p": checklist "s" has a checked box\. Start every box unchecked\.$/m,
+  );
+  await refused(
     page(`<textarea data-diff-input hidden>{"before":""}</textarea>`),
     /^page "p": a diff input is not JSON with before, after and patch$/m,
   );

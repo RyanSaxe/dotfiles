@@ -136,6 +136,12 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
           !attribute(tag, "data-language")
         )
           list.push(`${at}: a code block has no data-language`);
+        // before-after shows both sides in the Pierre viewer. A code block
+        // marked as a diff shows neither.
+        if (/^(?:diff|patch)$/i.test(attribute(tag, "data-language") || ""))
+          list.push(
+            `${at}: a code block marked diff belongs in before-after. Run node components/before-after/diff.mjs BEFORE AFTER OUT.json`,
+          );
       }
       const link = attribute(tag, "href");
       if (
@@ -171,6 +177,16 @@ export function problems(data, js = "", { allowUnknownPages = false } = {}) {
         );
       if (kind === "data-question" && !/<textarea\b/i.test(part))
         list.push(`${at}: question "${id}" has no textarea`);
+      // A box the author checked would read as the reviewer's choice.
+      if (
+        kind === "data-multiselect" &&
+        (part.match(/<input\b[^>]*>/gi) || []).some((input) =>
+          /\schecked(?=[\s=/>])/i.test(input),
+        )
+      )
+        list.push(
+          `${at}: checklist "${id}" has a checked box. Start every box unchecked.`,
+        );
     }
     for (const input of html.match(
       /<textarea[^>]*\sdata-diff-input[^>]*>([\s\S]*?)<\/textarea>/gi,
