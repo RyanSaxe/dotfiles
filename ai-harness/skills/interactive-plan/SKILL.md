@@ -37,7 +37,7 @@ not described.
 ## Files
 
 - [round.md](references/round.md): the sequence for each revision. The hub's
-  wake message names it.
+  wake message names `ack`, which points to it.
 - [quality.md](references/quality.md): what makes a page and a plan good.
   Read it before the first revision.
 - [writing.md](references/writing.md): the rules every sentence follows.

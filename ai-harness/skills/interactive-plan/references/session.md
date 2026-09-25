@@ -31,14 +31,14 @@ shows new pages and revisions in place.
 
 ## Resuming
 
-If a turn is interrupted, the next turn runs `status` and reads any unread
-submission with `read` before doing anything else. `publish` refuses while a
-submission is unread. A failed request to the hub is not completion: check
+If a turn is interrupted, the next turn runs `ack` before doing anything else.
+It prints where the session stands and the next step. `publish` refuses
+while a submission is unread. A failed request to the hub is not completion: check
 that the hub is alive, retry the same session, and inspect the recorded owner
 before any recovery. Never delete ownership files without reading them.
 
 ```sh
-node scripts/session.mjs status --session-dir PATH
+node scripts/session.mjs ack --session-dir PATH
 ```
 
 When the user says in words to stop, run `pause`. The page tells the reader

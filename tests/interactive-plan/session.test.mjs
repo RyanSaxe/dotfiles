@@ -1535,7 +1535,11 @@ for (const mode of ["save", "implement"])
     const acceptance = a.event("accept-plan", "2", { mode });
     assert.equal((await a.feedback(acceptance)).code, 200);
     assert.equal((await a.action("complete")).code, 409);
-    await a.action("read");
+    assert.match(
+      (await a.action("ack")).body.next,
+      /^Read the Acceptance section of .*session\.md, then run: node .*session\.mjs read /,
+    );
+    assert.match((await a.action("read")).body.next, /^Run: node .*complete/);
     const complete = (await a.action("complete")).body;
     assert.equal(complete.nextAction, mode);
     assert.equal(
@@ -1557,6 +1561,39 @@ for (const mode of ["save", "implement"])
     assert.equal((await a.publish(planData("3", "plan"))).code, 409);
     assert.equal((await a.status()).body.accepted.mode, mode);
   });
+
+test("ack says the agent has a submission without reading it, and carries a note", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  assert.equal((await a.publish(planData())).code, 200);
+  const event = a.event();
+  await a.feedback(event);
+  const ack = await a.action("ack", { note: "  Reading your feedback  " });
+  assert.equal(ack.code, 200);
+  assert.deepEqual(ack.body.received, {
+    id: event.id,
+    intent: "feedback-only",
+  });
+  assert.equal(ack.body.status.lastReceivedId, event.id);
+  assert.equal(ack.body.status.report.note, "Reading your feedback");
+  assert.match(
+    ack.body.next,
+    /^Read .*round\.md in full, then run: node .*session\.mjs read --session-dir /,
+  );
+  // Receiving is not reading: the submission stays unread, so publish waits.
+  assert.deepEqual(ack.body.status.acknowledged, []);
+  assert.equal((await a.publish(planData("2"))).code, 409);
+  for (const note of ["x".repeat(81), 3])
+    assert.equal((await a.action("ack", { note })).code, 400);
+  const read = await a.action("read");
+  assert.equal(read.body.event.id, event.id);
+  // Any other report clears the note, so the card never shows a stale one.
+  assert.equal(read.body.status.report.note, null);
+  assert.match(read.body.next, /publish Agreed with --pages/);
+  const published = await a.publish(planData("2"));
+  assert.equal(published.body.revisionComplete, true);
+  assert.match(published.body.next, /^The revision is with the reviewer\./);
+});
 
 test("implementation guidance is validated, saved with acceptance, and returned on completion", async (t) => {
   const h = await hub(t);

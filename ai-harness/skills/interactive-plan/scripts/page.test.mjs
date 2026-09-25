@@ -108,6 +108,7 @@ test("Agreed and all page names become visible in one publication", async () => 
   );
   assert.equal(result.status, 200, JSON.stringify(result.body));
   assert.equal(result.body.page.id, "agreed");
+  assert.match(result.body.next, /^Pages still to publish: overview, detail\./);
   assert.equal((await status()).revisions.length, 0);
   const response = await fetch(`${hub.origin}/s/${sessionId}/`);
   const html = await response.text();
@@ -183,7 +184,7 @@ test("listed pages arrive independently and only the last completes the revision
     "<p>Finished detail</p>",
   );
   assert.equal(detail.status, 200, JSON.stringify(detail.body));
-  assert.equal(detail.body.complete, false);
+  assert.equal(detail.body.revisionComplete, false);
   const immutable = await fs.readFile(detail.body.page.recordPath, "utf8");
   assert.doesNotMatch(
     await (await fetch(`${hub.origin}/s/${sessionId}/`)).text(),
@@ -255,7 +256,7 @@ test("listed pages arrive independently and only the last completes the revision
     "<p>Finished overview</p>",
   );
   assert.equal(overview.status, 200, JSON.stringify(overview.body));
-  assert.equal(overview.body.complete, true);
+  assert.equal(overview.body.revisionComplete, true);
   assert.equal((await status()).revisions.length, 1);
   assert.equal((await status()).pageRound, null);
   assert.equal((await status()).needsYou, true);
@@ -502,6 +503,18 @@ test("the CLI builds and publishes each page with its own saved source", async (
     "--source",
     agreedSource,
   ]);
+  const acked = JSON.parse(
+    (
+      await command(helper, [
+        "ack",
+        "--note",
+        "Writing the overview page",
+        "--session-dir",
+        session,
+      ])
+    ).stdout,
+  );
+  assert.equal(acked.status.report.note, "Writing the overview page");
   const overviewSource = path.join(root, "overview-source");
   await fs.mkdir(overviewSource);
   await fs.writeFile(

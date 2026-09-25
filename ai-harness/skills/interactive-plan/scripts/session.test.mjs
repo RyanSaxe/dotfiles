@@ -226,7 +226,7 @@ test("a submission wakes the agent with the line that names the session", async 
   assert.match(
     wakes[1].line,
     new RegExp(
-      `^interactive-plan: feedback arrived on session ${sessionDir} \\(revision 2\\)\\. Run: node .*session\\.mjs read --session-dir ${sessionDir}, then follow .*/references/round\\.md$`,
+      `^interactive-plan: feedback arrived on session ${sessionDir} \\(revision 2\\)\\. Run first: node .*session\\.mjs ack --session-dir ${sessionDir}\\.`,
     ),
   );
   assert.equal(view.wake.last.ok, true);

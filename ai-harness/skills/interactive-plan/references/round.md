@@ -10,9 +10,30 @@ them judge it. The final plan must stand on its own for someone who saw
 none of the revisions. [quality.md](quality.md) has the detail behind these
 goals. Reread it when a page or the plan needs more than this paragraph.
 
-The hub wakes the agent when the reviewer submits. Every command is
+The hub wakes the agent when the reviewer submits, and the wake message
+names `ack`. Every command is
 `node scripts/session.mjs COMMAND --session-dir PATH`, with the path from the
-wake message.
+wake message, and every command prints the next step.
+
+## Tell the reviewer what you are doing
+
+Run `ack` first when the hub wakes you. It tells the reviewer you have their
+submission, without reading it, and prints where to go next.
+
+From the first revision on, `ack --note "…"` is how the reviewer knows what
+you are working on: the note appears on their Feedback card beside the time
+you sent it. Run it whenever you start something they would want to know
+about, such as reading their feedback, checking the code a page depends on,
+planning the pages, writing a page or waiting for subagents. Write the note
+for them, in under 80 characters. `progress --start` shows which page you
+are on, and a note says what you are doing on it:
+`ack --note "Adding last month's CI failures to the retry page"`.
+
+Report whenever the work changes, and at least every five minutes. After
+five minutes without a report, the card's report line and the Pages heading
+turn orange. `read`, `progress` and `publish` are reports too, and each
+clears the last note. A subagent that writes a page reports with `progress`
+and `ack` itself.
 
 ## Read the feedback
 
