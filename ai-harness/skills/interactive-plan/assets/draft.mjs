@@ -10,6 +10,7 @@ const mapValues = (object, fn) =>
 export function emptyDraft(revision) {
   return {
     revision,
+    alignUnflagged: true,
     notes: [],
     choices: {},
     answers: {},
@@ -63,6 +64,8 @@ export function loadDraft(saved, revision) {
   const draft = {
     ...emptyDraft(revision),
     ...saved,
+    alignUnflagged:
+      typeof saved.alignUnflagged === "boolean" ? saved.alignUnflagged : true,
     answers: record(saved.answers) ? saved.answers : {},
     noteDrafts: record(saved.noteDrafts) ? saved.noteDrafts : {},
   };
@@ -100,6 +103,7 @@ export function submissionGroups(draft) {
   const choices = filterValues(draft.choices, (choice) => !choice.sentIn);
   const strip = ({ sentIn, ...item }) => item;
   return {
+    alignUnflagged: draft.alignUnflagged,
     choices: mapValues(choices, strip),
     notes: notes.map(strip),
     ...(Object.keys(answers).length

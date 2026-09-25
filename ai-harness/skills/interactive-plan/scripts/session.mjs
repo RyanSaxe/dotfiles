@@ -530,6 +530,14 @@ async function loadSession(directory, config, origin) {
         !Array.isArray(data.groups),
       "groups must be an object",
     );
+    if (
+      data.intent === "feedback-only" &&
+      data.groups.alignUnflagged !== undefined
+    )
+      requireValue(
+        typeof data.groups.alignUnflagged === "boolean",
+        "alignUnflagged must be a boolean",
+      );
     if (data.groups.answers !== undefined) {
       requireValue(
         data.groups.answers &&
@@ -1076,6 +1084,7 @@ async function loadSession(directory, config, origin) {
       revision,
       receivedAt: event.receivedAt,
       groups: {
+        alignUnflagged: groups.alignUnflagged,
         notes: (groups.notes || []).map(
           ({ topic, anchor, quote, text, attachments }) => ({
             topic,

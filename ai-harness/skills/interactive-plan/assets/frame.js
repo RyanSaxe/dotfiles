@@ -1182,7 +1182,9 @@ function renderSentFeedback() {
   if (!entries.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No comments were sent.";
+    empty.textContent = sent.groups.alignUnflagged
+      ? "Everything else looked good."
+      : "No comments were sent.";
     list.append(empty);
   }
   renderSentPageComments();
@@ -1470,6 +1472,8 @@ function review() {
   $("save-error").hidden = !submissionError || $("reading").hidden;
   $("save-error-text").textContent = submissionError;
   $("overall-note").disabled = locked;
+  $("align-unflagged").checked = state.alignUnflagged;
+  $("align-unflagged").disabled = locked;
   if (locked)
     $("page-content")
       .querySelectorAll(
@@ -1498,6 +1502,9 @@ function review() {
   const forCurrent = selectedTab === "past" && currentAvailable();
   const draft = forCurrent ? currentDraft() : state;
   const pending = forCurrent ? unsentItems(draft) : unsent;
+  const kind = forCurrent
+    ? views.get(remote.current.revision).plan.kind
+    : plan.kind;
   const opensFeedback = sent && !forCurrent;
   const onSentFeedback =
     $("reading").hidden &&
@@ -1507,11 +1514,13 @@ function review() {
     !remote?.pageRound &&
     (forCurrent || (current() && feedbackEditable()));
   const waitingForPages = Boolean(remote?.pageRound);
+  const hasFeedback =
+    pending.count > 0 || (kind === "exploration" && draft.alignUnflagged);
   $("submit").disabled =
     submissionInFlight ||
     (opensFeedback
       ? onSentFeedback
-      : waitingForPages || !pending.count || !sendable);
+      : waitingForPages || !hasFeedback || !sendable);
   $("submit").textContent = submissionInFlight
     ? "Sending"
     : opensFeedback
@@ -1530,6 +1539,7 @@ function feedbackText() {
     `Feedback: ${plan.title}`,
     `Artifact ${plan.artifactId}, revision ${plan.revision}`,
     "Feedback only. No implementation approval.",
+    `Everything else looks good: ${state.alignUnflagged ? "yes" : "no"}.`,
   ];
   for (const choice of Object.values(choices))
     lines.push("", `${choice.label}: ${choiceText(choice)}`);
@@ -2435,6 +2445,11 @@ $("note-form").onsubmit = (event) => {
   if (note.topic === page.id && !$("reading").hidden)
     show(page.id, null, { keepScroll: true });
 };
+$("align-unflagged").onchange = (event) => {
+  if (!feedbackEditable()) return;
+  state.alignUnflagged = event.target.checked;
+  save();
+};
 $("submit").onclick = async () => {
   if (selectedTab === "past") {
     // Current's revision was already sent, so the button opens its Feedback.
@@ -2446,7 +2461,12 @@ $("submit").onclick = async () => {
     switchTab("current");
   }
   if (remote?.pageRound) return;
-  if (!feedbackEditable() || !unsentItems(state).count) return;
+  if (
+    !feedbackEditable() ||
+    (unsentItems(state).count === 0 &&
+      (plan.kind !== "exploration" || !state.alignUnflagged))
+  )
+    return;
   submissionError = "";
   const origin = {
     page: $("reading").hidden ? "feedback" : page.id,
