@@ -44,16 +44,6 @@ function uuid() {
 }
 const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
-function ago(value) {
-  const ms = Date.now() - Date.parse(value);
-  if (!Number.isFinite(ms)) return "";
-  const minutes = Math.round(ms / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
-}
 // The activity card counts seconds in its first minute, so a fresh report
 // visibly ticks up while the agent works.
 function recently(value) {
@@ -61,14 +51,6 @@ function recently(value) {
   if (!Number.isFinite(ms)) return "";
   if (ms < 5000) return "just now";
   return ms < 60000 ? `${Math.round(ms / 1000)} s ago` : ago(value);
-}
-function since(value) {
-  const ms = Date.now() - Date.parse(value);
-  if (!Number.isFinite(ms)) return "";
-  const minutes = Math.round(ms / 60000);
-  if (minutes < 60) return `${Math.max(minutes, 1)} min`;
-  const hours = Math.round(minutes / 60);
-  return hours < 24 ? `${hours} h` : `${Math.round(hours / 24)} d`;
 }
 
 const systemTheme = matchMedia("(prefers-color-scheme: dark)");
@@ -107,10 +89,16 @@ try {
 }
 const places = placeStore.places;
 if (editable) pastRevision = placeStore.past;
+// A reload after a send opens Current waiting for the next revision, with the
+// sent revision in the left tab.
 if (editable && state.submitted?.revision === plan.revision) {
   submittedRevision = plan.revision;
   pastRevision = plan.revision;
-  selectedTab = "past";
+  const view = waitingView(plan.revision);
+  plan = view.plan;
+  pages = view.pages;
+  agreements = view.agreements;
+  agreedTask = view.task;
 }
 const known = {
   choices: new Set(),
@@ -295,7 +283,9 @@ function rememberPlace() {
   const pageId = $("reading").hidden ? "feedback" : page.id;
   const revision = displayedRevision;
   const held = restoring?.revision === revision && restoring.page === pageId;
-  const top = held ? restoring.top : Math.round(scroller().scrollTop);
+  const top = held
+    ? restoring.top
+    : Math.round(scroller().scrollTop) - aboveAgreed();
   places[revision] = {
     page: pageId,
     top,
@@ -352,26 +342,40 @@ function restoreScroll(top) {
   if (height) shownBody().style.minHeight = `${height}px`;
   settleScroll();
 }
+// The activity component and the finished line sit above Agreed's content
+// and come and go with the round, so Agreed's place is kept relative to the
+// content below them.
+function aboveAgreed() {
+  if (page.id !== "agreed" || $("reading").hidden) return 0;
+  const title = $("page-title");
+  return $("note-bars").offsetTop - title.offsetTop - title.offsetHeight;
+}
 function settleScroll() {
   const target = restoring;
   if (!target) return;
-  scroller().scrollTo(0, target.top);
+  scroller().scrollTo(0, target.top + aboveAgreed());
   Promise.allSettled([...renders]).then(() => {
     if (restoring !== target) return;
-    scroller().scrollTo(0, target.top);
+    scroller().scrollTo(0, target.top + aboveAgreed());
     if ($("reading").hidden || !page.pending) endRestore();
   });
 }
 document.addEventListener("scroll", rememberPlace, true);
 function visiblePageId() {
-  if (displayedRevision !== plan.revision) return null;
+  if (displayedRevision !== viewKey()) return null;
   return $("reading").hidden ? "feedback" : page.id;
 }
-function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
-  displayedRevision = plan.revision;
+// inPlace re-renders the page on screen for an arrival, without closing the
+// Pages drawer or another menu, or moving focus.
+function show(
+  id,
+  targetId = null,
+  { keepScroll = false, push = true, inPlace = false } = {},
+) {
+  displayedRevision = viewKey();
   hideArrival();
   const resuming =
-    restoring?.revision === plan.revision && restoring.page === id;
+    restoring?.revision === displayedRevision && restoring.page === id;
   if (!resuming) endRestore();
   const top = scroller().scrollTop;
   const feedback = id === "feedback" && hasFeedbackPage;
@@ -395,7 +399,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       blockTargets($("page-content"), page.id);
       choiceTargets($("page-content"), page.id);
     }
-    if (page.id === "agreed") renderAgreements();
+    if (page.id === "agreed" && !page.waiting) renderAgreements();
     else if (!page.pending) {
       restoreChoices();
       restoreAnswers();
@@ -415,7 +419,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     // page renders, so the marks are placed again once they settle.
     Promise.allSettled([...renders]).then(placeMarks);
   }
-  closeDrawer();
+  if (!inPlace) closeDrawer();
   for (const button of document.querySelectorAll("#page-list [data-page]")) {
     if (button.dataset.page === visiblePageId())
       button.setAttribute("aria-current", "page");
@@ -427,14 +431,15 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   if (targetId) url.searchParams.set("target", targetId);
   if (push && url.href !== location.href) history.pushState(null, "", url);
   else history.replaceState(null, "", url);
-  (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
-    preventScroll: true,
-  });
+  if (!inPlace)
+    (feedback ? $("feedback").querySelector("h1") : $("page-title")).focus({
+      preventScroll: true,
+    });
   // Returning to a page within a revision lands where the reader left it.
   if (!keepScroll) {
     const saved = targetId
       ? 0
-      : places[plan.revision]?.tops?.[feedback ? "feedback" : page.id];
+      : places[displayedRevision]?.tops?.[feedback ? "feedback" : page.id];
     if (saved) restoreScroll(saved);
     else scroller().scrollTo(0, 0);
   } else if (resuming) settleScroll();
@@ -454,7 +459,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
     target.scrollIntoView({ block: "center" });
   }
   $("quote").hidden = true;
-  closeMenus();
+  if (!inPlace) closeMenus();
   review();
 }
 
@@ -537,7 +542,9 @@ function markNotes() {
 // Agreed and a page still being prepared never reach markNotes, so show sets
 // the count for every page the reader opens.
 function countNotes() {
-  const count = state.notes.filter((note) => note.topic === page.id).length;
+  const count = showingWaiting()
+    ? 0
+    : state.notes.filter((note) => note.topic === page.id).length;
   $("note-count").hidden = !count;
   $("note-count").textContent = count
     ? `${plural(count, "note")} on this page`
@@ -1191,7 +1198,7 @@ function sentCard(entry) {
 function renderSentPageComments() {
   const section = $("sent-page-comments");
   section.replaceChildren();
-  const sent = shownSubmission();
+  const sent = showingWaiting() ? null : shownSubmission();
   const entries = sent
     ? sentEntries(sent).filter((entry) => entry.topic === page.id)
     : [];
@@ -1343,7 +1350,9 @@ function renderFooter(feedback) {
   const order = [
     ...pages.filter((item) => item.id === "agreed"),
     ...pages.filter((item) => item.id !== "agreed"),
-    ...(hasFeedbackPage ? [{ id: "feedback", title: "Feedback" }] : []),
+    ...(hasFeedbackPage && !showingWaiting()
+      ? [{ id: "feedback", title: "Feedback" }]
+      : []),
   ];
   const index = order.findIndex(
     (item) => item.id === (feedback ? "feedback" : page.id),
@@ -1392,17 +1401,29 @@ function renderActivity() {
     renderSentFeedback();
     return;
   }
-  // The agent's progress belongs to the revision last submitted. An older
-  // revision in the left tab shows only what was sent on it.
+  // The agent's progress shows at the top of Current's Agreed, from the send
+  // to the round's last page. The left tab shows only what was sent on it.
   const past = selectedTab === "past";
-  const visible =
-    (past && plan.revision === submittedRevision) || submissionInFlight;
+  $("sent-feedback").hidden = !past;
+  if (past) renderSentFeedback();
+  const onAgreed =
+    !past && displayedRevision === viewKey() && page.id === "agreed";
+  const visible = onAgreed && (submissionInFlight || roundRunning());
   $("agent-activity").hidden = !visible;
-  $("sent-feedback").hidden = !past || submissionInFlight;
-  if (!visible) {
-    if (past) renderSentFeedback();
-    return;
-  }
+  const finished =
+    onAgreed && !visible && roundFinished()
+      ? finishedLine({
+          publishedAt: remote.current.publishedAt,
+          receivedAt: lastSubmission.receivedAt,
+        })
+      : null;
+  $("finished-line").hidden = !finished;
+  if (finished)
+    $("finished-line").replaceChildren(
+      pageIndicator("complete"),
+      document.createTextNode(finished),
+    );
+  if (!visible) return;
   const model = activityModel({
     remote,
     currentSet: pageSets.get(remote?.current?.revision),
@@ -1469,8 +1490,22 @@ function renderActivity() {
     ? `${footer.text}${footer.note ? " ·" : ""} ${recently(footer.at).replaceAll(" ", " ")}`
     : footer.text;
   report.classList.toggle("late", Boolean(footer.late));
-  if (!submissionInFlight) renderSentFeedback();
 }
+// The round the reader's last send started runs from the send until its last
+// page is published, and then Agreed says when it finished.
+const roundRunning = () =>
+  Boolean(submittedRevision) &&
+  (waiting() ||
+    Boolean(
+      remote?.pageRound && remote.current?.revision !== submittedRevision,
+    ));
+const roundFinished = () =>
+  Boolean(submittedRevision) &&
+  Boolean(remote?.current) &&
+  !remote.pageRound &&
+  remote.current.revision !== submittedRevision &&
+  remote.latestSubmissionRevision === submittedRevision &&
+  lastSubmission?.revision === submittedRevision;
 // Every page of a past revision, its Feedback page included, names the
 // revision. Current never has the strip.
 function renderHistory() {
@@ -1493,14 +1528,14 @@ function renderHistory() {
     }
   }
   const button = $("history-return");
-  button.hidden = old ? session.closed : !currentAvailable();
+  button.hidden = old ? session.closed : !currentShown();
   button.textContent = "Back to current";
   button.onclick = old
     ? () => location.assign(`${base}/`)
     : () => switchTab("current");
 }
 function review() {
-  if (displayedRevision !== plan.revision) {
+  if (displayedRevision !== viewKey()) {
     renderHistory();
     status();
     return;
@@ -1671,7 +1706,7 @@ async function loadPageRecord(revision, id) {
     if (id === "agreed") {
       view.agreements = record.page.agreements;
       view.task = record.page.task || null;
-      if (plan.revision === revision) {
+      if (plan.revision === revision && !showingWaiting()) {
         agreements = view.agreements;
         agreedTask = view.task;
       }
@@ -1772,7 +1807,8 @@ function reconcilePages(view, manifest) {
     view.pages.find((item) => item.id === slot.id),
   );
   view.plan.pages = view.pages.filter((item) => item.id !== "agreed");
-  if (plan.revision === view.plan.revision) pages = view.pages;
+  if (plan.revision === view.plan.revision && !showingWaiting())
+    pages = view.pages;
 }
 // A revision this reader has not loaded, which its page set then fills in.
 function emptyView(revision, { artifactId, kind, title }) {
@@ -1811,7 +1847,11 @@ async function syncPageSet() {
       else pageSets.delete(revision);
       throw error;
     }
-    if (selectedTab === "current" && plan.revision === revision) {
+    if (
+      selectedTab === "current" &&
+      plan.revision === revision &&
+      !showingWaiting()
+    ) {
       updateNavigation();
       if (displayedRevision === revision) {
         const selected = manifest.pages.find((item) => item.id === page.id);
@@ -1907,11 +1947,14 @@ function currentDraft() {
 // Each tab reopens its revision at the page and scroll position the reader
 // left, or at Agreed on a first visit.
 function switchTab(tab, targetId = null, { showPage = true } = {}) {
-  if (tab === "current" && !currentAvailable()) return;
+  if (tab === "current" && !currentShown() && !submissionInFlight) return;
   if (tab === "past" && !pastAvailable()) return;
   rememberHeight();
   const revision = tab === "current" ? remote.current.revision : pastRevision;
-  const view = views.get(revision);
+  const view =
+    tab === "current" && (waiting() || submissionInFlight)
+      ? waitingView(revision)
+      : views.get(revision);
   views.get(plan.revision).draft = state;
   selectedTab = tab;
   plan = view.plan;
@@ -1925,8 +1968,9 @@ function switchTab(tab, targetId = null, { showPage = true } = {}) {
   } catch {
     /* The in-memory draft and export remain available. */
   }
+  // The waiting view has no draft of its own; it holds the sent revision's.
   state =
-    view.draft ||
+    views.get(revision).draft ||
     (tab === "past" ? sentDraft(revision) : loadDraft(saved, revision));
   rebuildKnown();
   if (tab === "current") initializeChecklists();
@@ -1934,10 +1978,9 @@ function switchTab(tab, targetId = null, { showPage = true } = {}) {
   updateNavigation(true);
   if (showPage) {
     page = pages[0];
-    const place = placeIn(revision, [
-      ...pages.map((item) => item.id),
-      "feedback",
-    ]);
+    const place = view.waiting
+      ? null
+      : placeIn(revision, [...pages.map((item) => item.id), "feedback"]);
     show(place?.page || "agreed", targetId);
     if (place?.top && !targetId) restoreScroll(place.top);
   } else savePlaces();
@@ -1950,6 +1993,45 @@ const currentAvailable = () =>
     remote.current.revision !== submittedRevision &&
     views.has(remote.current.revision),
   );
+// Current's revision was sent, here or in another browser, and the agent has
+// not published the next one. Before the first poll, the draft says so.
+const waiting = () =>
+  editable &&
+  (remote?.current
+    ? remote.latestSubmissionRevision === remote.current.revision
+    : state.submitted?.revision === plan.revision);
+const currentShown = () => currentAvailable() || waiting();
+// While Current waits, it holds one Agreed page that is still being
+// prepared, above which the activity component shows. The next revision's
+// Agreed replaces it in place.
+function waitingView(revision) {
+  const sent = views.get(revision).plan;
+  return {
+    plan: { ...sent, pages: [] },
+    agreements: [],
+    task: null,
+    pages: [
+      {
+        id: "agreed",
+        title: "Agreed so far",
+        html: "",
+        pending: true,
+        working: true,
+        waiting: true,
+      },
+    ],
+    waiting: true,
+  };
+}
+// The waiting view carries the sent revision's number, which the left tab
+// shows too, so code that finds the view on screen by its revision checks
+// this first.
+const showingWaiting = () =>
+  selectedTab === "current" && Boolean(pages[0]?.waiting);
+// What show() puts on screen, for the checks that compare it with the view
+// the tabs hold. The waiting view gets a key of its own.
+const viewKey = () =>
+  showingWaiting() ? `${plan.revision} waiting` : plan.revision;
 const pastAvailable = () => Boolean(pastRevision && views.has(pastRevision));
 function status() {
   const stage = !connected ? "disconnected" : remote?.stage || "ready";
@@ -1988,15 +2070,23 @@ async function poll() {
       await loadPastView(pastRevision).catch(() => {});
     }
     // Current's revision was sent, here or in another browser: the left tab
-    // takes it, on its Feedback page, where the agent's progress shows.
-    if (
-      selectedTab === "current" &&
-      submittedRevision === plan.revision &&
-      remote.latestSubmissionRevision === plan.revision
-    ) {
-      pastRevision = plan.revision;
-      places[plan.revision] = { page: "feedback", top: 0 };
-      switchTab("past");
+    // takes it, and Current waits for the next revision.
+    if (waiting() && !submissionInFlight) {
+      submittedRevision = remote.current.revision;
+      if (selectedTab === "current" && !showingWaiting()) {
+        pastRevision = submittedRevision;
+        switchTab("current");
+      }
+    }
+    // The next revision's Agreed arrived while Current waited. It replaces
+    // the pending Agreed without moving the reader or the scroll position.
+    if (showingWaiting() && currentAvailable() && !submissionInFlight) {
+      switchTab("current", null, { showPage: false });
+      show($("reading").hidden ? "feedback" : "agreed", null, {
+        keepScroll: true,
+        push: false,
+        inPlace: true,
+      });
     }
     void loadSubmission().catch(() => {});
     if (
@@ -2221,7 +2311,7 @@ function renderRevisions() {
   const signature = JSON.stringify([
     latest,
     entries.map((entry) => [entry.revision, entry.publishedAt]),
-    plan.revision,
+    displayedRevision,
     mode,
     selectedTab,
     submittedRevision,
@@ -2231,7 +2321,7 @@ function renderRevisions() {
   const list = $("revision-list");
   list.replaceChildren();
   for (const entry of entries) {
-    const here = entry.revision === plan.revision;
+    const here = entry.revision === displayedRevision;
     const row = document.createElement("button");
     row.type = "button";
     row.className = "rev-row" + (here ? " current" : "");
@@ -2519,7 +2609,7 @@ $("align-unflagged").onchange = (event) => {
   state.alignUnflagged = event.target.checked;
   save();
 };
-$("submit").onclick = async () => {
+$("submit").onclick = () => {
   if (selectedTab === "past") {
     // Current's revision was already sent, so the button opens its Feedback.
     if (!currentAvailable()) {
@@ -2529,11 +2619,16 @@ $("submit").onclick = async () => {
     }
     switchTab("current");
   }
-  if (remote?.pageRound) return;
+  void sendFeedback();
+};
+// Sends Current's draft and leaves Current waiting on Agreed for the next
+// revision. Agreed shows the send while it is in flight, and a failure
+// returns the reader to where they were.
+async function sendFeedback() {
+  if (remote?.pageRound || !feedbackEditable()) return;
   if (
-    !feedbackEditable() ||
-    (unsentItems(state).count === 0 &&
-      (plan.kind !== "exploration" || !state.alignUnflagged))
+    unsentItems(state).count === 0 &&
+    (plan.kind !== "exploration" || !state.alignUnflagged)
   )
     return;
   submissionError = "";
@@ -2542,7 +2637,7 @@ $("submit").onclick = async () => {
     top: scroller().scrollTop,
   };
   submissionInFlight = true;
-  show("feedback");
+  review();
   try {
     await Promise.all(
       pages
@@ -2558,14 +2653,13 @@ $("submit").onclick = async () => {
         event: envelope("feedback-only", feedbackText(), { groups }),
       };
     persist();
+    switchTab("current");
     const result = await send(state.pending.event);
     markSent(state, result.id, new Date().toISOString());
     submissionInFlight = false;
-    save();
     submittedRevision = plan.revision;
     pastRevision = plan.revision;
-    places[plan.revision] = { page: "feedback", top: 0 };
-    switchTab("past");
+    save();
     void loadSubmission().catch(() => {});
   } catch (error) {
     submissionInFlight = false;
@@ -2574,11 +2668,12 @@ $("submit").onclick = async () => {
       : error instanceof TypeError
         ? "Could not reach the hub. Your comments are saved here. Try Submit again."
         : error.message;
+    switchTab("current", null, { showPage: false });
     show(origin.page);
     scroller().scrollTo(0, origin.top);
     review();
   }
-};
+}
 $("save-error-dismiss").onclick = () => {
   submissionError = "";
   review();
@@ -3407,7 +3502,7 @@ function updateNavigation(force = false) {
     "aria-label",
     `Pages, ${plural(readyPages, "current page")} ready to read`,
   );
-  $("current-tab").disabled = Boolean(submittedRevision) && !currentAvailable();
+  $("current-tab").disabled = Boolean(submittedRevision) && !currentShown();
   $("past-tab").disabled = !pastAvailable();
   $("past-tab").textContent = pastRevision
     ? `Revision ${pastRevision}`
@@ -3421,9 +3516,10 @@ function updateNavigation(force = false) {
   ) {
     pageList.replaceChildren();
     addPageButton(pages[0]);
-    pageList.append(separator());
+    // The waiting Current lists Agreed alone.
+    if (!showingWaiting()) pageList.append(separator());
     for (const item of pages.slice(1)) addPageButton(item);
-    if (hasFeedbackPage) {
+    if (hasFeedbackPage && !showingWaiting()) {
       const review = document.createElement("button");
       review.type = "button";
       review.id = "review-row";

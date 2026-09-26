@@ -48,3 +48,7 @@ test("every page sets its own note line, Agreed and unfinished pages included", 
     "only countNotes writes the line",
   );
 });
+
+test("a send keeps the reader on Current", () => {
+  assert.ok(!frame.includes('switchTab("past")'));
+});

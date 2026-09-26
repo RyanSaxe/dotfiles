@@ -770,6 +770,17 @@ select {
 .agent-activity .activity-report.late {
   color: var(--attention);
 }
+#reading > .agent-activity {
+  margin-bottom: 24px;
+}
+.finished-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .sent-feedback {
   margin-top: 22px;
 }
