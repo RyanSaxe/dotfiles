@@ -369,6 +369,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   $("reading").hidden = feedback;
   $("feedback").hidden = !feedback;
   if (!feedback) {
+    clearHighlight("plan-note");
     page = pages.find((item) => item.id === id) || pages[0];
     if (page.status === "ready" && page.pending)
       void loadPageRecord(plan.revision, page.id).catch(() => {});
@@ -482,9 +483,13 @@ function findText(root, needle) {
   range.setEnd(end.node, end.offset + 1);
   return range;
 }
+function clearHighlight(name) {
+  /* Safari can keep custom-highlight paint stale when nearby text changes. */
+  if (typeof CSS !== "undefined" && CSS.highlights) CSS.highlights.delete(name);
+}
 function highlight(name, ranges) {
   if (typeof CSS !== "undefined" && CSS.highlights) {
-    CSS.highlights.delete(name);
+    clearHighlight(name);
     if (ranges.length) CSS.highlights.set(name, new Highlight(...ranges));
     return;
   }
@@ -604,6 +609,7 @@ function openNote(
   target = null,
 ) {
   if (!feedbackEditable()) return;
+  clearHighlight("plan-note");
   noteContext = {
     topic,
     anchor,
@@ -636,6 +642,13 @@ function openNote(
   $("note-text").focus();
   $("quote").hidden = true;
 }
+/* Rebuild the range after a close has finished any page replacement. */
+$("note-dialog").addEventListener("close", () => {
+  requestAnimationFrame(() => {
+    if (!$("note-dialog").open && !$("reading").hidden && page.id !== "agreed")
+      markNotes();
+  });
+});
 
 /* Agreed */
 function agreementLabel(entry) {
