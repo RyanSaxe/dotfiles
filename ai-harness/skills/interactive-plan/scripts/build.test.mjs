@@ -273,3 +273,40 @@ test("the build's language list is the one for the Shiki the frame loads", async
   );
   assert.equal(frame.match(/esm\.sh\/shiki@([\d.]+)/)[1], list.shiki);
 });
+
+test("page tabs leave the reader in place, while revision choices open a page", async () => {
+  const frame = await fs.readFile(
+    new URL("../assets/frame.js", import.meta.url),
+    "utf8",
+  );
+  const tabClick = frame.slice(
+    frame.indexOf('const tab = event.target.closest("button[data-tab]");'),
+    frame.indexOf('const navigation = event.target.closest("[data-page]");'),
+  );
+  assert.match(
+    tabClick,
+    /switchTab\(tab\.dataset\.tab, null, \{ showPage: false \}\);/,
+  );
+  assert.doesNotMatch(tabClick, /\bshow\(/);
+
+  const revisionClick = frame.slice(
+    frame.indexOf("row.onclick = () => {"),
+    frame.indexOf("list.append(row);"),
+  );
+  assert.match(
+    revisionClick,
+    /switchTab\("current", null, \{ showPage: true \}\);/,
+  );
+
+  const pastOpen = frame.slice(
+    frame.indexOf("async function openPast"),
+    frame.indexOf(
+      "// Current's draft",
+      frame.indexOf("async function openPast"),
+    ),
+  );
+  assert.match(
+    pastOpen,
+    /switchTab\("past", targetId, \{ showPage: true \}\);/,
+  );
+});
