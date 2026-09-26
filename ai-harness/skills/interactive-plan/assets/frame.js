@@ -169,6 +169,7 @@ function stale(kind, key, item) {
 }
 
 let page = pages[0],
+  displayedRevision = plan.revision,
   remote = null,
   connected = false,
   sessions = [],
@@ -292,14 +293,17 @@ const scroller = () =>
 let placeTimer = 0;
 function rememberPlace() {
   const pageId = $("reading").hidden ? "feedback" : page.id;
-  const held =
-    restoring?.revision === plan.revision && restoring.page === pageId;
+  const revision = displayedRevision;
+  const held = restoring?.revision === revision && restoring.page === pageId;
   const top = held ? restoring.top : Math.round(scroller().scrollTop);
-  places[plan.revision] = {
+  places[revision] = {
     page: pageId,
     top,
-    tops: { ...places[plan.revision]?.tops, [pageId]: top },
+    tops: { ...places[revision]?.tops, [pageId]: top },
   };
+  savePlaces();
+}
+function savePlaces() {
   if (!editable) return;
   clearTimeout(placeTimer);
   placeTimer = setTimeout(() => {
@@ -327,9 +331,9 @@ const shownBody = () =>
   $("reading").hidden ? $("feedback") : $("page-content");
 function rememberHeight() {
   const pageId = $("reading").hidden ? "feedback" : page.id;
-  if (restoring?.revision === plan.revision && restoring.page === pageId)
+  if (restoring?.revision === displayedRevision && restoring.page === pageId)
     return;
-  heights.set(`${plan.revision}:${pageId}`, shownBody().offsetHeight);
+  heights.set(`${displayedRevision}:${pageId}`, shownBody().offsetHeight);
 }
 document.addEventListener("scroll", rememberHeight, true);
 function endRestore() {
@@ -340,7 +344,7 @@ function endRestore() {
 function restoreScroll(top) {
   endRestore();
   restoring = {
-    revision: plan.revision,
+    revision: displayedRevision,
     page: $("reading").hidden ? "feedback" : page.id,
     top,
   };
@@ -359,7 +363,12 @@ function settleScroll() {
   });
 }
 document.addEventListener("scroll", rememberPlace, true);
+function visiblePageId() {
+  if (displayedRevision !== plan.revision) return null;
+  return $("reading").hidden ? "feedback" : page.id;
+}
 function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
+  displayedRevision = plan.revision;
   hideArrival();
   const resuming =
     restoring?.revision === plan.revision && restoring.page === id;
@@ -406,7 +415,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
   }
   closeDrawer();
   for (const button of document.querySelectorAll("#page-list [data-page]")) {
-    if (button.dataset.page === (feedback ? "feedback" : page.id))
+    if (button.dataset.page === visiblePageId())
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
@@ -1236,7 +1245,10 @@ async function loadPastSubmission(revision) {
   if (!response.ok) return;
   const { submission } = await response.json();
   sentByRevision.set(revision, submission);
-  const onScreen = selectedTab === "past" && plan.revision === revision;
+  const onScreen =
+    selectedTab === "past" &&
+    displayedRevision === revision &&
+    plan.revision === revision;
   const draft = onScreen ? state : views.get(revision)?.draft;
   if (submission && draft && !draft.submitted) showSent(draft, submission);
   if (!onScreen) return;
@@ -1468,6 +1480,11 @@ function renderHistory() {
     : () => switchTab("current");
 }
 function review() {
+  if (displayedRevision !== plan.revision) {
+    renderHistory();
+    status();
+    return;
+  }
   const unsent = unsentItems(state);
   const sent = selectedTab === "past" || mode === "readonly";
   const locked = sent || submissionInFlight || submittedCurrent();
@@ -1671,6 +1688,7 @@ async function loadPageRecord(revision, id) {
         });
     }
     if (
+      displayedRevision === revision &&
       id !== "agreed" &&
       plan.revision === revision &&
       page.id === id &&
@@ -1685,7 +1703,12 @@ async function loadPageRecord(revision, id) {
     return record;
   })().catch((error) => {
     recordLoads.delete(key);
-    if (plan.revision === revision && page.id === id && !$("reading").hidden) {
+    if (
+      displayedRevision === revision &&
+      plan.revision === revision &&
+      page.id === id &&
+      !$("reading").hidden
+    ) {
       $("page-content").innerHTML =
         `<div class="page-load-error" role="alert"><p>Could not load this page.</p><button class="btn" type="button">Retry</button></div>`;
       $("page-content").querySelector("button").onclick = () =>
@@ -1770,17 +1793,19 @@ async function syncPageSet() {
     }
     if (selectedTab === "current" && plan.revision === revision) {
       updateNavigation();
-      const selected = manifest.pages.find((item) => item.id === page.id);
-      if (selected?.state === "ready" && page.pending)
-        void loadPageRecord(revision, page.id).catch(() => {});
-      else if (selected && page.pending && !$("reading").hidden) {
-        const [mark, label] = pendingState(page);
-        $("page-content")
-          .querySelector(".pending-state")
-          ?.replaceChildren(
-            pageIndicator(mark),
-            document.createTextNode(label),
-          );
+      if (displayedRevision === revision) {
+        const selected = manifest.pages.find((item) => item.id === page.id);
+        if (selected?.state === "ready" && page.pending)
+          void loadPageRecord(revision, page.id).catch(() => {});
+        else if (selected && page.pending && !$("reading").hidden) {
+          const [mark, label] = pendingState(page);
+          $("page-content")
+            .querySelector(".pending-state")
+            ?.replaceChildren(
+              pageIndicator(mark),
+              document.createTextNode(label),
+            );
+        }
       }
       announceArrivals([...wasReady]);
     } else updateNavigation();
@@ -1843,7 +1868,7 @@ async function openPast(revision, { pageId = null, targetId = null } = {}) {
   }
   pastRevision = revision;
   if (pageId) places[revision] = { page: pageId, top: 0 };
-  switchTab("past", targetId);
+  switchTab("past", targetId, { showPage: true });
 }
 // Current's draft while a past revision is on screen: the one set aside when
 // the reader left Current, or the saved one.
@@ -1861,7 +1886,7 @@ function currentDraft() {
 }
 // Each tab reopens its revision at the page and scroll position the reader
 // left, or at Agreed on a first visit.
-function switchTab(tab, targetId = null) {
+function switchTab(tab, targetId = null, { showPage = true } = {}) {
   if (tab === "current" && !currentAvailable()) return;
   if (tab === "past" && !pastAvailable()) return;
   rememberHeight();
@@ -1885,15 +1910,17 @@ function switchTab(tab, targetId = null) {
     (tab === "past" ? sentDraft(revision) : loadDraft(saved, revision));
   rebuildKnown();
   if (tab === "current") initializeChecklists();
-  page = pages[0];
   renderedFeedback = null;
   updateNavigation(true);
-  const place = placeIn(revision, [
-    ...pages.map((item) => item.id),
-    "feedback",
-  ]);
-  show(place?.page || "agreed", targetId);
-  if (place?.top && !targetId) restoreScroll(place.top);
+  if (showPage) {
+    page = pages[0];
+    const place = placeIn(revision, [
+      ...pages.map((item) => item.id),
+      "feedback",
+    ]);
+    show(place?.page || "agreed", targetId);
+    if (place?.top && !targetId) restoreScroll(place.top);
+  } else savePlaces();
   if (tab === "past") void loadPastSubmission(revision).catch(() => {});
   renderRevisions();
 }
@@ -2214,7 +2241,7 @@ function renderRevisions() {
             : entry.url || `${base}/r/${encodeURIComponent(entry.revision)}`,
         );
       else if (entry.revision === latest && currentAvailable())
-        switchTab("current");
+        switchTab("current", null, { showPage: true });
       else void openPast(entry.revision);
     };
     list.append(row);
@@ -2611,7 +2638,7 @@ document.addEventListener("click", (event) => {
   }
   const tab = event.target.closest("button[data-tab]");
   if (tab) {
-    switchTab(tab.dataset.tab);
+    switchTab(tab.dataset.tab, null, { showPage: false });
     return;
   }
   const navigation = event.target.closest("[data-page]");
@@ -3408,7 +3435,7 @@ function updateNavigation(force = false) {
     );
   }
   for (const button of pageList.querySelectorAll("[data-page]"))
-    if (button.dataset.page === ($("reading").hidden ? "feedback" : page.id))
+    if (button.dataset.page === visiblePageId())
       button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
 }
