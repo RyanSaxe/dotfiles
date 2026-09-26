@@ -82,7 +82,7 @@ export function loadDraft(saved, revision) {
   return draft;
 }
 
-// A checklist counts toward the Submit count only once the reviewer touched
+// A checklist counts toward the header count only once the reviewer touched
 // it. An untouched list is still sent with the round, as the reviewer left it.
 const counted = (choice) =>
   !choice.sentIn && (choice.kind !== "multiple" || choice.touched === true);
@@ -98,6 +98,20 @@ export function unsentItems(draft) {
     count:
       notes.length + Object.keys(choices).length + Object.keys(answers).length,
   };
+}
+
+// The words behind the count: notes and written answers are comments, and
+// picked options and touched checklists are choices.
+export function draftedWords(draft) {
+  const { notes, choices, answers } = unsentItems(draft);
+  const count = (number, word) =>
+    number ? `${number} ${word}${number === 1 ? "" : "s"}` : "";
+  return [
+    count(notes.length + Object.keys(answers).length, "comment"),
+    count(Object.keys(choices).length, "choice"),
+  ]
+    .filter(Boolean)
+    .join(" and ");
 }
 
 export function submissionGroups(draft) {

@@ -334,7 +334,6 @@ kbd {
 }
 .header-submit {
   flex: none;
-  width: 92px;
   text-align: center;
 }
 .app-body {
@@ -769,6 +768,17 @@ select {
 }
 .agent-activity .activity-report.late {
   color: var(--attention);
+}
+#reading > .agent-activity {
+  margin-bottom: 24px;
+}
+.finished-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 20px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .sent-feedback {
   margin-top: 22px;
@@ -1635,7 +1645,6 @@ dialog::backdrop {
   font-size: 17px;
 }
 :root[data-mode="readonly"] #submit,
-:root[data-mode="readonly"] #accept,
 :root[data-mode="readonly"] #quote,
 :root[data-mode="readonly"] [data-comment],
 :root[data-mode="readonly"] .note-count {
@@ -1718,6 +1727,19 @@ img.note-image {
 .dialog .actions-right {
   display: flex;
   justify-content: flex-end;
+}
+.decide-sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.decide-sections .actions {
+  flex-wrap: wrap;
+}
+.decide-sections > div {
+  grid-area: 1 / 1;
+}
+.decide-sections > [inert] {
+  visibility: hidden;
 }
 .dialog.note #note-anchor {
   margin: 0 0 6px;

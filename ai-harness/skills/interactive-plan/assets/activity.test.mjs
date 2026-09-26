@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activityModel, roundModel } from "./activity.mjs";
+import { activityModel, finishedLine, roundModel } from "./activity.mjs";
 
 const now = Date.parse("2026-01-01T00:10:00Z");
 const submittedRevision = "1";
@@ -195,4 +195,39 @@ test("the round status counts pages until the last one and names a silent agent"
   );
   assert.equal(roundModel({ remote: { pageRound: done }, now }), null);
   assert.equal(roundModel({ remote: {}, now }), null);
+});
+
+test("the finished line says when the round finished and how long it took", () => {
+  assert.equal(
+    finishedLine({
+      publishedAt: "2026-01-01T00:08:00Z",
+      receivedAt: "2026-01-01T00:02:00Z",
+      now,
+    }),
+    "Finished 2 min ago · took 6 min",
+  );
+  assert.equal(
+    finishedLine({
+      publishedAt: "2026-01-01T00:10:00Z",
+      receivedAt: "2026-01-01T00:09:50Z",
+      now,
+    }),
+    "Finished just now · took 1 min",
+  );
+  assert.equal(
+    finishedLine({
+      publishedAt: "2026-01-01T02:00:00Z",
+      receivedAt: "2026-01-01T00:00:00Z",
+      now: Date.parse("2026-01-01T05:00:00Z"),
+    }),
+    "Finished 3 h ago · took 2 h",
+  );
+  assert.equal(
+    finishedLine({
+      publishedAt: "2026-01-01T00:08:00Z",
+      receivedAt: null,
+      now,
+    }),
+    null,
+  );
 });

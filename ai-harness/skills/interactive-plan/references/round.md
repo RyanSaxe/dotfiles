@@ -84,8 +84,9 @@ retired or still open. A recommendation is not an agreement. Read
    `publish --file OUT/ID.html --source SRC/ID`. Publishing marks the page
    ready.
    Do not hold finished pages back for one publish at the end.
-5. The last page completes the revision and enables Submit. Say in the chat
-   what changed, then stop.
+5. The last page completes the revision and enables the reviewer's Send
+   feedback button, or Finish review on a final plan. Say in the chat what
+   changed, then stop.
 
 A published page cannot change in this revision. Build is the publication
 check: it lists every structural problem and writes nothing on failure.

@@ -1641,6 +1641,57 @@ test("implementation guidance is validated, saved with acceptance, and returned 
   assert.equal(record.guidance, complete.guidance);
 });
 
+test("an acceptance keeps the comments sent with it, and unread feedback still blocks one", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.publish(planData("1", "plan"));
+  await a.feedback(a.event("feedback-only", "1"));
+  assert.equal(
+    (await a.feedback(a.event("accept-plan", "1", { mode: "save" }))).code,
+    409,
+  );
+  await a.action("read");
+  await a.publish(planData("2", "plan"));
+  const note = {
+    id: "note-1",
+    topic: "overview",
+    anchor: "Overview",
+    quote: "",
+    text: "Keep the diff small.",
+    revision: "2",
+  };
+  const acceptance = a.event("accept-plan", "2", {
+    mode: "implement",
+    groups: { alignUnflagged: true, choices: {}, notes: [note] },
+  });
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  await a.action("read");
+  const complete = (await a.action("complete")).body;
+  assert.deepEqual(complete.groups.notes, [note]);
+  const record = JSON.parse(
+    await fs.readFile(path.join(a.directory, "acceptance.json"), "utf8"),
+  );
+  assert.deepEqual(record.groups, complete.groups);
+});
+
+test("an acceptance with nothing drafted records no comments", async (t) => {
+  const h = await hub(t);
+  const a = await h.session();
+  await a.publish(planData("1", "plan"));
+  const acceptance = a.event("accept-plan", "1", {
+    mode: "save",
+    groups: { alignUnflagged: true, choices: {}, notes: [] },
+  });
+  assert.equal((await a.feedback(acceptance)).code, 200);
+  await a.action("read");
+  const complete = (await a.action("complete")).body;
+  assert.equal(complete.groups, undefined);
+  const record = JSON.parse(
+    await fs.readFile(path.join(a.directory, "acceptance.json"), "utf8"),
+  );
+  assert.equal(record.groups, undefined);
+});
+
 test("the hub exits when nothing is live and start spawns a fresh one on the same port", async (t) => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "plan-idle-"));
   const port = 30000 + Math.floor(Math.random() * 20000);
