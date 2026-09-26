@@ -100,6 +100,20 @@ export function unsentItems(draft) {
   };
 }
 
+// The words behind the count: notes and written answers are comments, and
+// picked options and touched checklists are choices.
+export function draftedWords(draft) {
+  const { notes, choices, answers } = unsentItems(draft);
+  const count = (number, word) =>
+    number ? `${number} ${word}${number === 1 ? "" : "s"}` : "";
+  return [
+    count(notes.length + Object.keys(answers).length, "comment"),
+    count(Object.keys(choices).length, "choice"),
+  ]
+    .filter(Boolean)
+    .join(" and ");
+}
+
 export function submissionGroups(draft) {
   const { notes, answers } = unsentItems(draft);
   const choices = filterValues(draft.choices, (choice) => !choice.sentIn);

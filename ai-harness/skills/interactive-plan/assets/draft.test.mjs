@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  draftedWords,
   emptyDraft,
   loadDraft,
   markSent,
@@ -89,4 +90,25 @@ test("single choices count as before", () => {
     },
   });
   assert.equal(unsentItems(draft).count, 1);
+});
+
+test("the Review line names the comments and choices behind the count", () => {
+  const draft = emptyDraft("1");
+  assert.equal(draftedWords(draft), "");
+  const note = (id) => ({ id, topic: "p", anchor: "P", quote: "", text: id });
+  draft.notes.push(note("a"));
+  assert.equal(draftedWords(draft), "1 comment");
+  draft.notes.push(note("b"), note("c"));
+  draft.choices["d/pick"] = { topic: "d", label: "Pick", value: "x" };
+  assert.equal(draftedWords(draft), "3 comments and 1 choice");
+  // A written answer is a comment, and an untouched checklist is not counted.
+  draft.answers["d/why"] = { topic: "d", label: "Why", text: "Because." };
+  draft.choices["scope/one"] = list("One");
+  assert.equal(draftedWords(draft), "4 comments and 1 choice");
+  assert.equal(
+    draftedWords(draftWith({ "scope/one": list("One", true) })),
+    "1 choice",
+  );
+  markSent(draft, "sent", "2026-01-01T00:00:00Z");
+  assert.equal(draftedWords(draft), "");
 });

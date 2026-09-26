@@ -1509,7 +1509,7 @@ function review() {
   const sent = selectedTab === "past" || mode === "readonly";
   const locked = sent || submissionInFlight || submittedCurrent();
   $("draft-head").hidden = unsent.count === 0;
-  $("draft-count").textContent = `${unsent.count} to send`;
+  $("draft-count").textContent = `${draftedWords(state)} to send`;
   badge(locked ? 0 : unsent.count);
   const reviewLabel = $("review-row")?.querySelector("span");
   if (reviewLabel) reviewLabel.textContent = sent ? "Feedback" : "Review";
