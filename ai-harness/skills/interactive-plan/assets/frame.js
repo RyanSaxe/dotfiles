@@ -402,6 +402,7 @@ function show(id, targetId = null, { keepScroll = false, push = true } = {}) {
       markNotes();
       enhance($("page-content"));
     }
+    countNotes();
     renderSentPageComments();
     window.planUI.page = page;
     window.planUI.revision = plan.revision;
@@ -531,9 +532,15 @@ function markNotes() {
     noteRanges.map((item) => item.range),
   );
   placeNoteBars();
-  $("note-count").hidden = !notes.length;
-  $("note-count").textContent = notes.length
-    ? `${plural(notes.length, "note")} on this page`
+  countNotes();
+}
+// Agreed and a page still being prepared never reach markNotes, so show sets
+// the count for every page the reader opens.
+function countNotes() {
+  const count = state.notes.filter((note) => note.topic === page.id).length;
+  $("note-count").hidden = !count;
+  $("note-count").textContent = count
+    ? `${plural(count, "note")} on this page`
     : "";
 }
 // Highlights have no element to hover, so the pointer is hit-tested against

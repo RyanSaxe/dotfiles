@@ -27,3 +27,24 @@ test("note highlights are cleared before page and dialog text changes", () => {
   assert.ok(close.includes('page.id !== "agreed"'));
   assert.ok(close.includes("markNotes();"));
 });
+
+const between = (start, end) =>
+  frame.slice(frame.indexOf(start), frame.indexOf(end, frame.indexOf(start)));
+
+test("every page sets its own note line, Agreed and unfinished pages included", () => {
+  const show = between("function show(", "\n/* Notes on the text */");
+  const branch = show.indexOf("renderAgreements();");
+  const count = show.indexOf("countNotes();");
+  assert.ok(branch >= 0 && count > branch, "show counts after the page branch");
+  const counted = show.slice(show.lastIndexOf("}", count), count);
+  assert.ok(
+    !counted.includes("pending"),
+    "the count does not depend on the branch",
+  );
+  const mark = between("function markNotes(", "\nfunction countNotes(");
+  assert.ok(mark.includes("countNotes();"));
+  assert.ok(
+    !mark.includes('$("note-count")'),
+    "only countNotes writes the line",
+  );
+});
