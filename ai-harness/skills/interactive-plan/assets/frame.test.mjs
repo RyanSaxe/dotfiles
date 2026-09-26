@@ -52,3 +52,8 @@ test("every page sets its own note line, Agreed and unfinished pages included", 
 test("a send keeps the reader on Current", () => {
   assert.ok(!frame.includes('switchTab("past")'));
 });
+
+test("drafting a comment never hides the way to accept a final plan", () => {
+  const accept = between("function canAccept(", "\n}");
+  assert.ok(!/unsent/i.test(accept));
+});

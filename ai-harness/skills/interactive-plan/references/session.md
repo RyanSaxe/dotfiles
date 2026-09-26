@@ -69,6 +69,11 @@ An `accept-plan` event includes an explicit `mode`:
   and existing permissions. If the guidance changes an agreed requirement,
   request a new review. Acceptance authorizes nothing else.
 
+In either mode, the event's `groups` field contains the comments and
+choices the reader wrote on the plan before accepting it, and `complete`
+returns them as `groups`. Read them with the plan. If one of them changes an
+agreed requirement, request a new review, as with guidance.
+
 ```sh
 node scripts/session.mjs complete --session-dir PATH
 ```

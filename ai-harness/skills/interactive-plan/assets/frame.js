@@ -1334,13 +1334,12 @@ function closeDrawer() {
   $("pages-dialog").close();
   $("menu-button").setAttribute("aria-expanded", "false");
 }
-function canAccept(unsentCount) {
+function canAccept() {
   return (
     plan.kind === "plan" &&
     connected &&
     current() &&
     !submittedCurrent() &&
-    !unsentCount &&
     ["ready", "updated"].includes(remote.stage)
   );
 }
@@ -1372,7 +1371,6 @@ function renderFooter(feedback) {
     previous,
     previous ? `← Previous: ${previous.title}` : "",
   );
-  const acceptable = canAccept(unsentItems(state).count);
   link(
     $("footer-next"),
     next,
@@ -1381,9 +1379,7 @@ function renderFooter(feedback) {
       : next.id === "feedback"
         ? submittedCurrent() || !editable
           ? "Feedback →"
-          : acceptable
-            ? "Review and accept →"
-            : "Review your feedback →"
+          : "Review your feedback →"
         : `Next: ${next.title} →`,
   );
 }
@@ -1573,7 +1569,6 @@ function review() {
         else control.disabled = true;
       });
   commentTarget();
-  $("accept").hidden = !canAccept(unsent.count);
   renderFooter(!$("feedback").hidden);
   const rendered = JSON.stringify([
     state.notes,
@@ -1594,6 +1589,12 @@ function review() {
   const kind = forCurrent
     ? views.get(remote.current.revision).plan.kind
     : plan.kind;
+  const finishes = kind === "plan";
+  const finishable = forCurrent
+    ? connected &&
+      !remote.pageRound &&
+      ["ready", "updated"].includes(remote.stage)
+    : canAccept();
   const opensFeedback = sent && !forCurrent;
   const onSentFeedback =
     $("reading").hidden &&
@@ -1609,27 +1610,34 @@ function review() {
     submissionInFlight ||
     (opensFeedback
       ? onSentFeedback
-      : waitingForPages || !hasFeedback || !sendable);
+      : finishes
+        ? !finishable
+        : waitingForPages || !hasFeedback || !sendable);
+  const label = finishes ? "Finish review" : "Send feedback";
   $("submit").textContent = submissionInFlight
     ? "Sending"
     : opensFeedback
       ? "Feedback"
       : pending.count
-        ? `Submit (${pending.count})`
-        : "Submit";
+        ? `${label} (${pending.count})`
+        : label;
   $("submit").classList.toggle("primary", !opensFeedback && !waitingForPages);
-  // Accept plan uses the same slot when a final plan has no unsent feedback.
-  $("submit").hidden = !$("accept").hidden;
   status();
 }
-function feedbackText() {
-  const { notes, choices, answers } = unsentItems(state);
-  const lines = [
+function feedbackText(extraNotes = []) {
+  return [
     `Feedback: ${plan.title}`,
     `Artifact ${plan.artifactId}, revision ${plan.revision}`,
     "Feedback only. No implementation approval.",
     `Everything else looks good: ${state.alignUnflagged ? "yes" : "no"}.`,
-  ];
+    ...itemLines(extraNotes),
+  ].join("\n");
+}
+// Every unsent item as the agent reads it, each after a blank line.
+function itemLines(extraNotes = []) {
+  const { notes: unsent, choices, answers } = unsentItems(state);
+  const notes = [...unsent, ...extraNotes];
+  const lines = [];
   // A checklist the reviewer left alone reads like any other. An empty one
   // means none picked.
   const untouched = Object.values(state.choices).filter(
@@ -1658,7 +1666,7 @@ function feedbackText() {
          same, which is the only way the paths travel with it. */
       ...(note.attachments || []).map((item) => `Image: ${item.path}`),
     );
-  return lines.join("\n");
+  return lines;
 }
 function envelope(intent, text, extra = {}) {
   return {
@@ -1949,6 +1957,7 @@ function currentDraft() {
 function switchTab(tab, targetId = null, { showPage = true } = {}) {
   if (tab === "current" && !currentShown() && !submissionInFlight) return;
   if (tab === "past" && !pastAvailable()) return;
+  if ($("finish-dialog").open) $("finish-dialog").close();
   rememberHeight();
   const revision = tab === "current" ? remote.current.revision : pastRevision;
   const view =
@@ -2619,15 +2628,19 @@ $("submit").onclick = () => {
     }
     switchTab("current");
   }
-  void sendFeedback();
+  if (plan.kind === "plan") openFinish();
+  else void sendFeedback();
 };
-// Sends Current's draft and leaves Current waiting on Agreed for the next
-// revision. Agreed shows the send while it is in flight, and a failure
-// returns the reader to where they were.
-async function sendFeedback() {
+// Sends Current's draft, with the overall comment typed in the Finish review
+// dialog when there is one, and leaves Current waiting on Agreed for the next
+// revision. From the header, Agreed shows the send while it is in flight and
+// a failure returns the reader to where they were. From the dialog, the
+// dialog stays open and shows the failure itself.
+async function sendFeedback({ comment = null, fromDialog = false } = {}) {
   if (remote?.pageRound || !feedbackEditable()) return;
+  const extra = comment ? [comment] : [];
   if (
-    unsentItems(state).count === 0 &&
+    unsentItems(state).count + extra.length === 0 &&
     (plan.kind !== "exploration" || !state.alignUnflagged)
   )
     return;
@@ -2646,27 +2659,36 @@ async function sendFeedback() {
     );
     initializeChecklists();
     const groups = submissionGroups(state);
+    groups.notes.push(...extra);
     const snapshot = JSON.stringify(groups);
     if (state.pending?.snapshot !== snapshot)
       state.pending = {
         snapshot,
-        event: envelope("feedback-only", feedbackText(), { groups }),
+        event: envelope("feedback-only", feedbackText(extra), { groups }),
       };
     persist();
-    switchTab("current");
+    if (!fromDialog) switchTab("current");
     const result = await send(state.pending.event);
+    state.notes.push(...extra);
+    state.requestComment = "";
+    delete state.requestCommentId;
     markSent(state, result.id, new Date().toISOString());
     submissionInFlight = false;
     submittedRevision = plan.revision;
     pastRevision = plan.revision;
+    if (fromDialog) switchTab("current");
     save();
     void loadSubmission().catch(() => {});
   } catch (error) {
     submissionInFlight = false;
+    if (fromDialog) {
+      review();
+      throw error;
+    }
     submissionError = submittedCurrent()
       ? ""
       : error instanceof TypeError
-        ? "Could not reach the hub. Your comments are saved here. Try Submit again."
+        ? "Could not reach the hub. Your comments are saved here. Try Send feedback again."
         : error.message;
     switchTab("current", null, { showPage: false });
     show(origin.page);
@@ -2695,17 +2717,122 @@ $("export").onclick = () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
-function openAccept() {
-  $("accept-detail").textContent = `${plan.title}, revision ${plan.revision}`;
+/* Finish review: on a final plan the reader accepts it or requests changes,
+   and whatever they drafted goes with either decision. */
+const commentsDrafted = () => {
+  const { notes, answers } = unsentItems(state);
+  return notes.length + Object.keys(answers).length > 0;
+};
+function openFinish() {
+  if (!canAccept()) return;
+  $("finish-detail").textContent = `${plan.title}, revision ${plan.revision}`;
+  const words = draftedWords(state);
+  if (words) {
+    const link = document.createElement("a");
+    link.href = "#feedback";
+    link.textContent = "Review it";
+    link.onclick = (event) => {
+      event.preventDefault();
+      $("finish-dialog").close();
+      show("feedback");
+    };
+    const goes = unsentItems(state).count === 1 ? "goes" : "go";
+    $("finish-drafted").replaceChildren(
+      `Your ${words} ${goes} with either decision. `,
+      link,
+    );
+  } else $("finish-drafted").textContent = "Nothing drafted.";
   $("accept-guidance").value = state.acceptGuidance || "";
-  $("accept-error").textContent = "";
-  $("accept-dialog").showModal();
+  $("request-comment").value = state.requestComment || "";
+  $("request-comment-label").textContent = commentsDrafted()
+    ? "Overall comment, optional"
+    : "Overall comment";
+  $("request-comment").setAttribute(
+    "aria-required",
+    String(!commentsDrafted()),
+  );
+  finishError("");
+  chooseDecision("accept");
+  $("finish-dialog").showModal();
 }
-$("accept").onclick = openAccept;
+function chooseDecision(value) {
+  for (const row of document.querySelectorAll("[data-decision]")) {
+    const on = row.dataset.decision === value;
+    row.classList.toggle("current", on);
+    row.setAttribute("aria-checked", String(on));
+    row.tabIndex = on ? 0 : -1;
+    row.querySelector(".tick").textContent = on ? "●" : "○";
+  }
+  $("finish-accept").inert = value !== "accept";
+  $("finish-changes").inert = value !== "changes";
+  finishError("");
+  requestable();
+}
+// Request changes needs a comment, drafted before or typed here.
+function requestable() {
+  $("request-changes").disabled =
+    !commentsDrafted() && !$("request-comment").value.trim();
+}
+function finishError(message) {
+  $("finish-error").hidden = !message;
+  $("finish-error").textContent = message;
+}
+function finishBusy(busy) {
+  for (const button of document.querySelectorAll(
+    "[data-accept-mode], [data-decision]",
+  ))
+    button.disabled = busy;
+  if (busy) $("request-changes").disabled = true;
+  else requestable();
+}
+for (const row of document.querySelectorAll("[data-decision]")) {
+  row.onclick = () => chooseDecision(row.dataset.decision);
+  row.onkeydown = (event) => {
+    if (!/^Arrow(Up|Down|Left|Right)$/.test(event.key)) return;
+    event.preventDefault();
+    const next = row.dataset.decision === "accept" ? "changes" : "accept";
+    chooseDecision(next);
+    document.querySelector(`[data-decision="${next}"]`).focus();
+  };
+}
 $("accept-guidance").oninput = (event) => {
   state.acceptGuidance = event.target.value;
   persist();
 };
+$("request-comment").oninput = (event) => {
+  state.requestComment = event.target.value;
+  persist();
+  requestable();
+};
+$("request-changes").onclick = async () => {
+  const text = $("request-comment").value.trim();
+  // The id is kept until the send succeeds, so a retry sends the same note.
+  if (text) state.requestCommentId ||= uuid();
+  const comment = text
+    ? {
+        topic: "overall",
+        anchor: "Overall feedback",
+        quote: "",
+        id: state.requestCommentId,
+        text,
+        revision: plan.revision,
+      }
+    : null;
+  finishError("");
+  finishBusy(true);
+  try {
+    await sendFeedback({ comment, fromDialog: true });
+    $("finish-dialog").close();
+  } catch (error) {
+    finishError(unreachable(error));
+  } finally {
+    finishBusy(false);
+  }
+};
+const unreachable = (error) =>
+  error instanceof TypeError
+    ? "The hub is unreachable. Try again shortly."
+    : error.message;
 document.querySelectorAll("[data-accept-mode]").forEach(
   (button) =>
     (button.onclick = async () => {
@@ -2716,29 +2843,30 @@ document.querySelectorAll("[data-accept-mode]").forEach(
         mode === "implement"
           ? "Start implementation of this plan."
           : "Save for later. Do not start implementation.";
-      const text = `Accept ${plan.artifactId} revision ${plan.revision}. ${action}${guidance ? `\n\nImplementation guidance:\n${guidance}` : ""}`;
+      const groups = submissionGroups(state);
+      const items = itemLines();
+      const text = `Accept ${plan.artifactId} revision ${plan.revision}. ${action}${guidance ? `\n\nImplementation guidance:\n${guidance}` : ""}${items.length ? `\n\nComments on the plan:\n${items.join("\n")}` : ""}`;
       if (
         state.acceptance?.mode !== mode ||
-        (state.acceptance?.guidance || "") !== guidance
+        (state.acceptance?.guidance || "") !== guidance ||
+        JSON.stringify(state.acceptance?.groups) !== JSON.stringify(groups)
       )
         state.acceptance = envelope("accept-plan", text, {
           mode,
+          groups,
           ...(guidance ? { guidance } : {}),
         });
       persist();
-      document
-        .querySelectorAll("[data-accept-mode]")
-        .forEach((item) => (item.disabled = true));
+      finishError("");
+      finishBusy(true);
       try {
         await send(state.acceptance);
         save();
-        $("accept-dialog").close();
+        $("finish-dialog").close();
       } catch (error) {
-        $("accept-error").textContent = error.message;
+        finishError(unreachable(error));
       } finally {
-        document
-          .querySelectorAll("[data-accept-mode]")
-          .forEach((item) => (item.disabled = false));
+        finishBusy(false);
       }
     }),
 );
@@ -3068,9 +3196,8 @@ document.addEventListener("keydown", (event) => {
     commentOnTarget();
   else if (key === "r" && editable) show("feedback");
   else if (key === "s" && editable) {
-    const target = $("accept").hidden ? $("submit") : $("accept");
-    if (target.hidden || target.disabled) return;
-    target.focus();
+    if ($("submit").disabled) return;
+    $("submit").focus();
   } else if (key === "a") show("agreed");
   else return;
   event.preventDefault();

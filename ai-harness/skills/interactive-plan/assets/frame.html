@@ -102,9 +102,7 @@
           type="button"
           disabled
         >
-          Submit</button
-        ><button class="btn primary" id="accept" type="button" hidden>
-          Accept plan
+          Send feedback
         </button>
       </header>
       <div class="page-arrival" id="page-arrival" role="status" hidden>
@@ -372,39 +370,100 @@
     <script type="application/json" id="drawing-editor-source">
       <!-- DRAWING_EDITOR -->
     </script>
-    <dialog class="dialog" id="accept-dialog" aria-labelledby="accept-title">
+    <dialog class="dialog" id="finish-dialog" aria-labelledby="finish-title">
       <div class="dialog-head">
-        <h2 id="accept-title" tabindex="-1" autofocus>Accept this plan?</h2>
+        <h2 id="finish-title" tabindex="-1" autofocus>Finish your review</h2>
         <button
           class="icon-btn"
           type="button"
-          data-close="accept-dialog"
+          data-close="finish-dialog"
           aria-label="Close"
         >
           ✕
         </button>
       </div>
-      <p id="accept-detail"></p>
-      <p class="small">
-        Starting implementation hands the plan to the waiting agent. Saving
-        keeps it for later and the agent stops.
-      </p>
-      <label for="accept-guidance">Implementation guidance, optional</label>
-      <textarea
-        id="accept-guidance"
-        maxlength="4000"
-        aria-describedby="accept-guidance-detail"
-      ></textarea>
-      <p class="small" id="accept-guidance-detail">
-        Sent only with Start implementation.
-      </p>
-      <p class="small" id="accept-error" role="status"></p>
-      <div class="actions">
-        <button class="btn" type="button" data-accept-mode="save">
-          Save for later</button
-        ><button class="btn primary" type="button" data-accept-mode="implement">
-          Start implementation
+      <p class="rev-plan" id="finish-detail"></p>
+      <div class="rev-list" role="radiogroup" aria-label="Decision">
+        <button
+          class="rev-row"
+          type="button"
+          role="radio"
+          data-decision="accept"
+        >
+          <span class="tick"></span
+          ><span
+            >Accept plan<br /><small
+              >Save it for later, or start implementation now.</small
+            ></span
+          >
         </button>
+        <button
+          class="rev-row"
+          type="button"
+          role="radio"
+          data-decision="changes"
+        >
+          <span class="tick"></span
+          ><span
+            >Request changes<br /><small
+              >The agent revises the plan and publishes a new revision.</small
+            ></span
+          >
+        </button>
+      </div>
+      <p class="small" id="finish-drafted"></p>
+      <p class="small" id="finish-error" role="status" hidden></p>
+      <!-- Both sections share one grid cell, so switching rows keeps the
+           dialog's size. -->
+      <div class="decide-sections">
+        <div id="finish-accept">
+          <p class="small">
+            Starting implementation hands the plan to the waiting agent. Saving
+            keeps it for later and the agent stops.
+          </p>
+          <label for="accept-guidance">Implementation guidance, optional</label>
+          <textarea
+            id="accept-guidance"
+            maxlength="4000"
+            aria-describedby="accept-guidance-detail"
+          ></textarea>
+          <p class="small" id="accept-guidance-detail">
+            Sent only with Start implementation.
+          </p>
+          <div class="actions">
+            <button class="btn" type="button" data-accept-mode="save">
+              Save for later</button
+            ><button
+              class="btn primary"
+              type="button"
+              data-accept-mode="implement"
+            >
+              Start implementation
+            </button>
+          </div>
+        </div>
+        <div id="finish-changes" inert>
+          <p class="small">
+            Requesting changes sends your comments to the waiting agent. Nothing
+            is accepted, and the plan stays open.
+          </p>
+          <label for="request-comment" id="request-comment-label"
+            >Overall comment</label
+          >
+          <textarea
+            id="request-comment"
+            maxlength="4000"
+            aria-describedby="request-comment-detail"
+          ></textarea>
+          <p class="small" id="request-comment-detail">
+            Sent with your request, like an overall comment on Review.
+          </p>
+          <div class="actions actions-right">
+            <button class="btn primary" type="button" id="request-changes">
+              Request changes
+            </button>
+          </div>
+        </div>
       </div>
     </dialog>
     <dialog
@@ -450,7 +509,7 @@
         <dt><kbd>r</kbd></dt>
         <dd>Review your feedback</dd>
         <dt><kbd>s</kbd></dt>
-        <dd>Focus Submit; Enter sends</dd>
+        <dd>Focus Send feedback or Finish review; Enter sends or opens it</dd>
         <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt>
         <dd>Answer a question or add feedback from its textarea</dd>
         <dt><kbd>a</kbd></dt>

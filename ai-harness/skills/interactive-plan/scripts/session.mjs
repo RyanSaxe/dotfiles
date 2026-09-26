@@ -384,6 +384,17 @@ function sourceItem(payload, ref) {
   return payload.groups?.answers?.[ref.answerId];
 }
 
+// Every event carries groups, which are often empty. An acceptance record
+// keeps them only when they hold a note, a choice or an answer.
+function heldItems(groups) {
+  return (
+    Boolean(groups) &&
+    ((Array.isArray(groups.notes) && groups.notes.length > 0) ||
+      Object.keys(groups.choices || {}).length > 0 ||
+      Object.keys(groups.answers || {}).length > 0)
+  );
+}
+
 function serializer() {
   let queue = Promise.resolve();
   return (fn) => {
@@ -1145,6 +1156,9 @@ async function loadSession(directory, config, origin) {
           ...(event.payload.guidance
             ? { guidance: event.payload.guidance }
             : {}),
+          ...(heldItems(event.payload.groups)
+            ? { groups: event.payload.groups }
+            : {}),
           acceptedAt: event.receivedAt,
         };
         await atomic(path.join(directory, "acceptance.json"), patch.accepted);
@@ -1204,6 +1218,7 @@ async function loadSession(directory, config, origin) {
         ...(state.accepted.guidance
           ? { guidance: state.accepted.guidance }
           : {}),
+        ...(state.accepted.groups ? { groups: state.accepted.groups } : {}),
       };
     }
     requireValue(false, "Unknown agent action");
