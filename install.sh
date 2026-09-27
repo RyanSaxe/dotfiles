@@ -368,6 +368,40 @@ install_ai_harness() {
   AI_HARNESS_SETUP_DONE=1
 }
 
+# pair (RyanSaxe/pair) runs from a checkout where one exists, so an edit there
+# takes effect at the next command. npm link puts `pair` on PATH, and the
+# ignored skills/pair link reaches every agent CLI through the harness.
+PAIR_CHECKOUT="$HOME/Projects/pair"
+
+install_pair_checkout() {
+  if [ ! -d "$PAIR_CHECKOUT" ]; then
+    echo "pair: skipped (no checkout at $PAIR_CHECKOUT)"
+    return 0
+  fi
+  # Linux's global npm prefix is root-owned, so link into ~/.local like the
+  # agent CLIs. The prefix comes from the environment because --prefix on the
+  # command line also changes which package npm link links.
+  case "$OS" in
+  Darwin) (cd "$PAIR_CHECKOUT" && npm link --no-fund --no-audit --silent) ;;
+  *) (cd "$PAIR_CHECKOUT" && npm_config_prefix="$HOME/.local" npm link --no-fund --no-audit --silent) ;;
+  esac
+  # workmux copies ignored files into every new worktree. On a branch whose
+  # .gitignore predates the pair line, the link is untracked there, and
+  # `git add -A` would commit a link into this machine's home. info/exclude in
+  # the common git dir applies to every worktree. env -i keeps an inherited
+  # GIT_DIR from pointing git at another repository. -ef compares the
+  # directories rather than their paths, because on macOS REPO_ROOT keeps the
+  # letter case the user typed.
+  [ "$(env -i PATH="$PATH" git -C "$REPO_ROOT" rev-parse --show-toplevel)" -ef "$REPO_ROOT" ] || {
+    echo "error: $REPO_ROOT is not the top of a git checkout" >&2
+    return 1
+  }
+  exclude="$(env -i PATH="$PATH" git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  mkdir -p "${exclude%/*}"
+  grep -qxF ai-harness/skills/pair "$exclude" 2>/dev/null || echo ai-harness/skills/pair >>"$exclude"
+  link_owned "$PAIR_CHECKOUT/skills/pair" "$AI_HARNESS_SOURCE/skills/pair"
+}
+
 install_neovim_linux() {
   # apt's neovim lags far behind the nvim config's 0.12 floor; the official
   # tarball into ~/.local is both the install and the upgrade path.
@@ -528,6 +562,7 @@ install_tier_packages() {
     command -v workmux >/dev/null 2>&1 || install_workmux
     setup_agents
     install_ai_harness
+    install_pair_checkout
     ;;
   mac:Darwin)
     # sketchybar itself is mac-only; the plugins under sketchybar/ shell out

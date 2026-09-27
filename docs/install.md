@@ -78,6 +78,13 @@ This configures status hooks and bundled skills in the same install, including
 explicit invocations such as `./install.sh core`; no follow-up `workmux setup`
 command is required.
 
+When `~/Projects/pair` holds a checkout of
+[pair](https://github.com/RyanSaxe/pair), the `agents` tier runs `npm link`
+there, so the `pair` command runs that checkout and an edit takes effect at
+the next command. It also links the checkout's skill into the harness as
+`ai-harness/skills/pair`, which git ignores. Without a checkout the tier skips
+both and prints `pair: skipped`.
+
 ## Upgrading
 
 ```sh

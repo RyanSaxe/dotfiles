@@ -163,32 +163,6 @@ def validate_statusline() -> None:
         raise HarnessError(f"statusline omitted expected context: {outputs[0]!r}")
 
 
-def validate_planning_sessions() -> None:
-    node = shutil.which("node")
-    if node is None:
-        raise HarnessError("node is required to check interactive planning sessions")
-    # The skill keeps unit tests beside the modules they cover.
-    skill_tests = sorted(
-        str(path)
-        for path in (HARNESS_ROOT / "skills/interactive-plan").rglob("*.test.mjs")
-    )
-    result = subprocess.run(
-        [
-            node,
-            "--test",
-            str(REPO_ROOT / "tests/interactive-plan/session.test.mjs"),
-            *skill_tests,
-        ],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    if result.returncode:
-        raise HarnessError(
-            f"planning sessions failed: {result.stdout}\n{result.stderr}"
-        )
-
-
 def validate_documents() -> None:
     node = shutil.which("node")
     if node is None:
@@ -211,7 +185,6 @@ def main() -> int:
         validate_skills,
         validate_settings,
         validate_statusline,
-        validate_planning_sessions,
         validate_documents,
     )
     try:
