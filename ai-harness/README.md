@@ -202,6 +202,16 @@ line, and every skill with the Agent Skills reference validator. The
 configuration was last checked against Claude Code 2.1.221, Codex CLI 0.149.0,
 and Copilot CLI 1.0.80.
 
+`claude plugin validate` reads no linked directory. On a machine where
+`install.sh` linked `skills/pair`, it warns about that link, and `--strict`
+turns the warning into a failure. On such a machine, validate the harness
+without `--strict` and pair's skill at its real path:
+
+```sh
+claude plugin validate ai-harness
+claude plugin validate --strict ~/Projects/pair/skills
+```
+
 ## Codex compatibility
 
 Codex's managed `/etc` link can move to a user-level plugin layer when one can

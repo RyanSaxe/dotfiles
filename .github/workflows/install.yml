@@ -62,3 +62,58 @@ jobs:
           command -v byor
           command -v prek
           command -v nvim
+
+      - name: a pair checkout is linked and stays ignored in every worktree
+        # RyanSaxe/pair is private, so a stand-in holds the two things the
+        # agents tier reads: package.json with the pair bin, and skills/pair.
+        timeout-minutes: 10
+        run: |
+          set -eux
+          # Strip every GIT_ variable, so an inherited GIT_DIR cannot steer the
+          # worktree and commit below into another repository.
+          for var in $(compgen -e); do
+            case "$var" in GIT_*) unset "$var" ;; esac
+          done
+          checkout="$PWD"
+          [ "$(git rev-parse --show-toplevel)" -ef "$checkout" ]
+
+          pair="$HOME/Projects/pair"
+          mkdir -p "$pair/src" "$pair/skills/pair"
+          echo '{"name": "@ryansaxe/pair", "version": "0.0.0", "bin": {"pair": "src/cli.mjs"}}' >"$pair/package.json"
+          printf '#!/usr/bin/env node\nconsole.log("before")\n' >"$pair/src/cli.mjs"
+          chmod +x "$pair/src/cli.mjs"
+          printf -- '---\nname: pair\ndescription: Stand-in for the pair skill.\n---\n\nStand-in.\n' >"$pair/skills/pair/SKILL.md"
+
+          # macOS resolves a path typed in another letter case to the same
+          # directory, so the installer runs from the checkout's path in
+          # capitals there.
+          typed="$checkout"
+          if [ "$RUNNER_OS" = macOS ]; then
+            typed="$(dirname "$checkout")/$(basename "$checkout" | tr '[:lower:]' '[:upper:]')"
+          fi
+          (cd "$typed" && ./install.sh agents)
+
+          # npm link runs the checkout, so an edit shows at the next command.
+          [ "$(pair)" = before ]
+          printf '#!/usr/bin/env node\nconsole.log("after")\n' >"$pair/src/cli.mjs"
+          [ "$(pair)" = after ]
+
+          test -L ai-harness/skills/pair
+          [ -z "$(git status --porcelain -- ai-harness/skills/pair)" ]
+
+          # The validation ai-harness/README.md gives for a machine with the link.
+          claude plugin validate ai-harness
+          claude plugin validate --strict "$pair/skills"
+
+          # workmux copies ignored files, the link among them, into a worktree
+          # of a branch whose .gitignore predates the pair line.
+          old="$RUNNER_TEMP/old-branch"
+          git worktree add -q --detach "$old"
+          [ "$(git -C "$old" rev-parse --show-toplevel)" -ef "$old" ]
+          grep -vx ai-harness/skills/pair .gitignore >"$old/.gitignore"
+          git -C "$old" -c user.name=ci -c user.email=ci@localhost \
+            commit -q --no-verify -m 'a .gitignore without the pair line' .gitignore
+          WM_PROJECT_ROOT="$checkout" WM_WORKTREE_PATH="$old" workmux/bin/workmux-copy-ignored
+          test -L "$old/ai-harness/skills/pair"
+          [ -z "$(git -C "$old" status --porcelain)" ]
+          [ -z "$(git -C "$old" add -A --dry-run)" ]
