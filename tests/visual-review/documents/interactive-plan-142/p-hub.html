@@ -1,0 +1,22 @@
+<p>
+  The hub has one new action, <code>progress</code>. It refuses to record
+  anything until the round has been acknowledged, so a card cannot appear
+  for feedback nobody has read.
+</p>
+<figure class="excerpt" data-file="ai-harness/skills/interactive-plan/scripts/session.mjs" data-lines="559-564" data-language="javascript">
+  <ol class="notes">
+    <li data-line="564" data-span="560-564">
+      <b>Why 409</b>
+      The request is well formed, so this is not a 400. The state is wrong,
+      and the agent is expected to acknowledge the round and retry, not to
+      change its request.
+    </li>
+  </ol>
+</figure>
+<p>
+  After that check, the action has two forms. <code>steps</code> replaces the
+  whole list with one to twelve titles, each unique and at most eighty
+  characters, because the card is a list the reader scans, not a log.
+  <code>done</code> names one declared title and ticks it. An unknown title
+  is an error, not a no-op.
+</p>

@@ -109,6 +109,32 @@ Not every change needs new documentation. When documentation is appropriate:
 Choose the form and level of detail that best serves the reader. These are
 purposes, not templates.
 
+## Check every sentence
+
+Read each sentence of anything durable, a document, a plan page, a commit
+message, a pull request body, a reply that hands work back, against this
+list.
+
+1. It has a subject and a verb, and it states what a thing is or does. A
+   fragment standing in for a claim ("One form.") is not a sentence.
+2. It holds one idea. Two half-thoughts joined by a semicolon are two
+   sentences.
+3. It states the fact instead of hinting at it. "The command overwrites;
+   but only a file it wrote" hints. "The command checks first that the
+   file is one it built" states.
+4. It uses the real name: the function, the file, the command, the number.
+   Not "the mark of a built document" but "a script element with id
+   `document-data`".
+5. A heading or a note title is a label ("Edge labels", "Errors before the
+   checks"), not a claim.
+6. It has no flourish: no inverted word order, no aphorism, no "found by
+   breaking them", no "the way X does".
+7. It says something about this subject. A sentence that could appear
+   unchanged in a document about a different project says nothing about
+   this one. Cut it.
+8. A reader who has never seen the subject could restate it as a fact
+   about it. If they could not, rewrite it.
+
 ## Before you send
 
 Check that the reader can find the point, identify who acts, distinguish

@@ -5,6 +5,11 @@
   scope roles mirror lua/theme/highlights.lua rather than reproducing a full
   upstream theme. TextMate cannot see semantic tokens, so the grammar scopes
   below are the closest useful equivalent for bat and delta.
+
+  The caret is pinned to mauve (the accent role's palette default), never
+  the mascot accent: without the accent token this theme is mode-only, so
+  mascot flips never rewrite it — and never rebuild bat's cache or touch
+  codex.
 -->
 <plist version="1.0">
   <dict>
@@ -28,7 +33,7 @@
           <key>foreground</key>
           <string>{{fg}}</string>
           <key>caret</key>
-          <string>{{accent}}</string>
+          <string>{{mauve}}</string>
           <key>lineHighlight</key>
           <string>{{surface0}}</string>
           <key>misspelling</key>

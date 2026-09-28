@@ -1,0 +1,12 @@
+<p>
+  Before this change, a round was publish, wait, acknowledge. Between
+  acknowledging and publishing, the agent sent nothing, so the reader could
+  not tell a long revision from a dead one. Now the agent declares the steps
+  it is about to take and marks each one done, the hub records them, and the
+  page shows a card with the steps ticking off.
+</p>
+<p>
+  The diagram shows five parts. Four changed. The feedback page did not:
+  how a reader sends feedback is the same, and only what they see while they
+  wait is new.
+</p>

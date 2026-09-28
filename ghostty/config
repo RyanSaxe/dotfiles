@@ -1,13 +1,13 @@
 # Ghostty configuration.
 #
-# Theme: Ghostty's terminal palette is the inner surface and follows macOS
-# appearance NATIVELY via the light:/dark: pair below. Inner theme changes set
-# the OS appearance; outer changes never do. The generated frame shader is
-# outer chrome and can therefore be dark around a light terminal.
-# jewelbox-dark/-light are rendered by the theme system into
+# Theme: Ghostty's terminal palette follows macOS appearance NATIVELY via
+# the light:/dark: pair below; `theme dark|light` sets the OS appearance and
+# ghostty flips with it. The generated frame shader paints the crust ring
+# around the terminal content.
+# dotfiles-dark/-light are rendered by the theme system into
 # ~/.config/ghostty/themes, so the terminal surface and ANSI 16 speak
 # the same palette as every other consumer.
-theme = light:jewelbox-light,dark:jewelbox-dark
+theme = light:dotfiles-light,dark:dotfiles-dark
 
 # Option is Alt: makes the alt layer real for terminal-world keybinds
 # (alt+c theme picker, alt+o sessions, workmux binds in Phase 4).

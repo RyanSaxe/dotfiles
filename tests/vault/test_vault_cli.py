@@ -197,6 +197,32 @@ def test_a_project_is_the_projects_directory_and_null_elsewhere(
     assert find(rows, "ask about the naïve café façade")["project"] is None
 
 
+def test_daily_note_date_is_the_default_due_date(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    day = today()
+    path = vault / f"daily/{day}.md"
+    write_note(
+        vault,
+        path.relative_to(vault).as_posix(),
+        "# daily\n"
+        "\n"
+        "- [ ] finish the daily task\n"
+        f"- [x] explicit date wins {DUE} {day + timedelta(days=2)}\n",
+    )
+    write_note(vault, "notes.md", "- [ ] an undated ordinary task\n")
+    before = path.read_bytes()
+
+    rows = tasks_json(tmp_path, overdue_after="23:59")
+
+    assert path.read_bytes() == before
+    assert find(rows, "finish the daily task")["due"] == day.isoformat()
+    assert find(rows, "finish the daily task")["state"] == "today"
+    assert (
+        find(rows, "explicit date wins")["due"] == (day + timedelta(days=2)).isoformat()
+    )
+    assert find(rows, "an undated ordinary task")["due"] is None
+
+
 # One task per due state, named for the state its distance from today
 # produces while the day still has time left in it.
 DUE_LADDER = {
@@ -311,7 +337,7 @@ def test_a_fresh_vault_has_no_tasks(tmp_path: Path) -> None:
 def test_init_produces_a_vault_that_check_passes(tmp_path: Path) -> None:
     vault = make_vault(tmp_path)
 
-    for name in ("assets", "daily", "people", "projects", "public", ".git"):
+    for name in ("assets", "daily", "meetings", "people", "projects", "public", ".git"):
         assert (vault / name).is_dir(), name
     assert (vault / ".ignore").read_text() == "!*\n.git/\n"
     assert ".obsidian/" in (vault / ".gitignore").read_text()
@@ -352,6 +378,7 @@ def test_init_in_place_adds_only_the_missing_pieces(tmp_path: Path) -> None:
     for path, contents in before.items():
         assert path.read_bytes() == contents, path
     assert (vault / ".ignore").is_file()
+    assert (vault / "meetings").is_dir()
     assert (vault / "people").is_dir()
     assert (vault / ".git").is_dir()
     # An unchanged file is never announced as created.

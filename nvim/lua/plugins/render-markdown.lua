@@ -10,8 +10,8 @@
 -- `anti_conceal.ignore` keeps the checkbox glyph on the cursor line so it does
 -- not flicker back to `- [ ]` while moving through a list.
 --
--- The latex converters are external executables, reported by
--- `:checkhealth markdown`.
+-- The latex converters are external executables. markdown/health.lua owns
+-- the list and reports it through `:checkhealth markdown`.
 return {
   "MeanderingProgrammer/render-markdown.nvim",
   ---@module 'render-markdown'
@@ -22,7 +22,7 @@ return {
     anti_conceal = { ignore = { check_icon = true } },
     checkbox = { enabled = true },
     bullet = { enabled = true },
-    latex = { enabled = true, converter = { "utftex", "latex2text" } },
+    latex = { enabled = true, converter = require("markdown.health").LATEX_CONVERTERS },
     html = { enabled = true, comment = { conceal = true } },
   },
 }

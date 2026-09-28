@@ -1,0 +1,46 @@
+checks:
+  - name: ruff
+    extensions:
+      - py
+      - pyi
+    run: uv run ~/.config/byor/scripts/ruff.py
+    tags:
+      - greenfield
+      - lint
+      - format
+  - name: ty
+    extensions:
+      - py
+      - pyi
+    run: uvx ty check --output-format concise --no-progress --color never --error all
+    tags:
+      - greenfield
+      - typing
+      - strict
+  - name: no-suppression-comments
+    extensions:
+      - py
+      - pyi
+    run: uv run ~/.config/byor/scripts/no-suppression-comments.py
+    tags:
+      - greenfield
+      - suppression
+      - style-guide
+  - name: module-contract
+    extensions:
+      - py
+      - pyi
+    run: uv run ~/.config/byor/scripts/module-contract.py
+    tags:
+      - greenfield
+      - documentation
+      - api
+  - name: no-thin-docstrings
+    extensions:
+      - py
+      - pyi
+    run: uv run ~/.config/byor/scripts/no-thin-docstrings.py
+    tags:
+      - greenfield
+      - documentation
+      - style-guide

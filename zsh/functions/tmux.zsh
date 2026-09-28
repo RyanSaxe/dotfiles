@@ -48,3 +48,20 @@ ts() {
     echo "No session selected."
   fi
 }
+
+# Kill a selected tmux session with fzf.
+tks() {
+  local session
+  session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --prompt="Kill session: " --height=40% --reverse)
+  if [[ -n "$session" ]]; then
+    if read -q "reply?Kill session '$session'? [y/N] "; then
+      print
+      tmux kill-session -t "=$session"
+    else
+      print
+      print "Cancelled."
+    fi
+  else
+    echo "No session selected."
+  fi
+}

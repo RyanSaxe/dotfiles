@@ -1,0 +1,221 @@
+metric	run	ms
+window-select cmd	0	4.34
+window-select cmd	1	4.17
+window-select cmd	2	4.22
+window-select cmd	3	4.41
+window-select cmd	4	4.09
+window-select cmd	5	4.04
+window-select cmd	6	4.34
+window-select cmd	7	5.25
+window-select cmd	8	5.16
+window-select cmd	9	4.07
+window-select cmd	10	4.12
+window-select cmd	11	4.36
+window-select cmd	12	4.15
+window-select cmd	13	4.63
+window-select cmd	14	4.22
+window-select cmd	15	5.09
+window-select cmd	16	4.26
+window-select cmd	17	4.12
+window-select cmd	18	4.08
+window-select cmd	19	4.53
+window-select drain	0	41.30
+window-select drain	1	40.60
+window-select drain	2	40.06
+window-select drain	3	41.26
+window-select drain	4	40.52
+window-select drain	5	39.97
+window-select drain	6	40.82
+window-select drain	7	40.07
+window-select drain	8	41.96
+window-select drain	9	40.49
+window-select drain	10	41.04
+window-select drain	11	39.06
+window-select drain	12	41.07
+window-select drain	13	41.05
+window-select drain	14	38.94
+window-select drain	15	41.66
+window-select drain	16	39.56
+window-select drain	17	40.04
+window-select drain	18	38.51
+window-select drain	19	41.00
+alt+L end-to-end	0	30071.03
+alt+L end-to-end	1	70.83
+alt+L end-to-end	2	69.85
+alt+L end-to-end	3	70.31
+alt+L end-to-end	4	69.98
+alt+L end-to-end	5	72.31
+alt+L end-to-end	6	70.13
+alt+L end-to-end	7	71.28
+alt+L end-to-end	8	70.53
+alt+L end-to-end	9	69.94
+alt+L end-to-end	10	68.92
+alt+L end-to-end	11	70.04
+alt+L end-to-end	12	71.09
+alt+L end-to-end	13	70.14
+alt+L end-to-end	14	69.80
+alt+L end-to-end	15	72.28
+alt+L end-to-end	16	72.81
+alt+L end-to-end	17	70.88
+alt+L end-to-end	18	71.81
+alt+L end-to-end	19	73.43
+element jump	0	428.11
+element jump	1	294.50
+element jump	2	298.56
+element jump	3	297.89
+element jump	4	299.87
+element jump	5	299.31
+element jump	6	300.25
+element jump	7	298.89
+element jump	8	303.95
+element jump	9	299.80
+element jump	10	299.21
+element jump	11	300.73
+element jump	12	297.16
+element jump	13	300.37
+element jump	14	295.07
+element jump	15	305.75
+element jump	16	299.59
+element jump	17	299.38
+element jump	18	297.14
+element jump	19	294.93
+tab write -> repaint (tasks)	0	35.20
+tab write -> repaint (tasks)	1	54.07
+tab write -> repaint (tasks)	2	34.78
+tab write -> repaint (tasks)	3	52.16
+tab write -> repaint (tasks)	4	54.69
+tab write -> repaint (tasks)	5	52.76
+tab write -> repaint (tasks)	6	52.34
+tab write -> repaint (tasks)	7	36.33
+tab write -> repaint (tasks)	8	37.04
+tab write -> repaint (tasks)	9	51.82
+tab write -> repaint (tasks)	10	53.47
+tab write -> repaint (tasks)	11	36.20
+tab write -> repaint (tasks)	12	52.92
+tab write -> repaint (tasks)	13	53.85
+tab write -> repaint (tasks)	14	53.51
+tab write -> repaint (tasks)	15	49.39
+tab write -> repaint (tasks)	16	53.46
+tab write -> repaint (tasks)	17	54.36
+tab write -> repaint (tasks)	18	36.11
+tab write -> repaint (tasks)	19	49.26
+tab write -> repaint (reviews)	0	35.12
+tab write -> repaint (reviews)	1	52.38
+tab write -> repaint (reviews)	2	53.13
+tab write -> repaint (reviews)	3	48.54
+tab write -> repaint (reviews)	4	37.68
+tab write -> repaint (reviews)	5	34.11
+tab write -> repaint (reviews)	6	52.55
+tab write -> repaint (reviews)	7	53.78
+tab write -> repaint (reviews)	8	53.34
+tab write -> repaint (reviews)	9	36.67
+tab write -> repaint (reviews)	10	53.22
+tab write -> repaint (reviews)	11	51.77
+tab write -> repaint (reviews)	12	36.64
+tab write -> repaint (reviews)	13	51.12
+tab write -> repaint (reviews)	14	37.59
+tab write -> repaint (reviews)	15	35.94
+tab write -> repaint (reviews)	16	36.91
+tab write -> repaint (reviews)	17	53.58
+tab write -> repaint (reviews)	18	53.97
+tab write -> repaint (reviews)	19	36.60
+popup shell start (warm)	0	83.69
+popup shell start (warm)	1	82.93
+popup shell start (warm)	2	80.58
+popup shell start (warm)	3	81.59
+popup shell start (warm)	4	82.24
+popup shell start (warm)	5	82.85
+popup shell start (warm)	6	82.31
+popup shell start (warm)	7	88.00
+popup shell start (warm)	8	82.37
+popup shell start (warm)	9	81.29
+popup shell start (warm)	10	81.93
+popup shell start (warm)	11	83.37
+popup shell start (warm)	12	81.57
+popup shell start (warm)	13	82.01
+popup shell start (warm)	14	83.09
+popup shell start (warm)	15	81.47
+popup shell start (warm)	16	81.47
+popup shell start (warm)	17	82.40
+popup shell start (warm)	18	83.16
+popup shell start (warm)	19	82.34
+popup shell start (cold)	0	274.14
+popup shell start (cold)	1	272.60
+popup shell start (cold)	2	270.21
+popup shell start (cold)	3	275.54
+popup shell start (cold)	4	273.77
+popup shell start (cold)	5	276.39
+popup shell start (cold)	6	273.19
+popup shell start (cold)	7	271.46
+popup shell start (cold)	8	273.58
+popup shell start (cold)	9	274.83
+popup shell start (cold)	10	273.21
+popup shell start (cold)	11	273.92
+popup shell start (cold)	12	274.86
+popup shell start (cold)	13	275.85
+popup shell start (cold)	14	272.61
+popup shell start (cold)	15	267.63
+popup shell start (cold)	16	273.18
+popup shell start (cold)	17	271.71
+popup shell start (cold)	18	273.45
+popup shell start (cold)	19	273.78
+prompt collector	0	16.34
+prompt collector	1	15.11
+prompt collector	2	16.09
+prompt collector	3	15.12
+prompt collector	4	15.76
+prompt collector	5	15.97
+prompt collector	6	15.83
+prompt collector	7	15.75
+prompt collector	8	15.95
+prompt collector	9	15.99
+prompt collector	10	15.13
+prompt collector	11	15.09
+prompt collector	12	16.02
+prompt collector	13	15.34
+prompt collector	14	15.20
+prompt collector	15	15.49
+prompt collector	16	15.29
+prompt collector	17	15.24
+prompt collector	18	14.75
+prompt collector	19	15.57
+mascot sync (noop)	0	10.64
+mascot sync (noop)	1	11.32
+mascot sync (noop)	2	13.21
+mascot sync (noop)	3	13.24
+mascot sync (noop)	4	10.60
+mascot sync (noop)	5	10.35
+mascot sync (noop)	6	10.20
+mascot sync (noop)	7	10.37
+mascot sync (noop)	8	10.81
+mascot sync (noop)	9	11.32
+mascot sync (noop)	10	10.78
+mascot sync (noop)	11	10.23
+mascot sync (noop)	12	10.13
+mascot sync (noop)	13	10.90
+mascot sync (noop)	14	11.40
+mascot sync (noop)	15	10.54
+mascot sync (noop)	16	10.37
+mascot sync (noop)	17	10.71
+mascot sync (noop)	18	10.40
+mascot sync (noop)	19	10.97
+mascot sync (flip)	0	521.05
+mascot sync (flip)	1	529.88
+mascot sync (flip)	2	530.21
+mascot sync (flip)	3	533.75
+mascot sync (flip)	4	538.66
+mascot sync (flip)	5	530.56
+mascot sync (flip)	6	536.50
+mascot sync (flip)	7	530.81
+mascot sync (flip)	8	529.04
+mascot sync (flip)	9	532.33
+mascot sync (flip)	10	533.49
+mascot sync (flip)	11	532.58
+mascot sync (flip)	12	532.37
+mascot sync (flip)	13	534.68
+mascot sync (flip)	14	548.08
+mascot sync (flip)	15	528.85
+mascot sync (flip)	16	532.07
+mascot sync (flip)	17	532.24
+mascot sync (flip)	18	531.35
+mascot sync (flip)	19	532.74

@@ -90,6 +90,7 @@ TASK_RE = re.compile(r"^(?P<indent>\s*)[-*+] \[(?P<mark>[ xX])\](?P<text> .*)?$"
 HEADING_RE = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<text>.*?)\s*$")
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 DUE_RE = re.compile(rf"\s*{DUE_SIGIL}\s*(\d{{4}}-\d{{2}}-\d{{2}})")
+DAILY_NOTE_RE = re.compile(r"^daily/(\d{4}-\d{2}-\d{2})\.md$")
 ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 RELATIVE_RE = re.compile(r"^(\d+)d$")
 WEEKDAYS = (
@@ -111,7 +112,7 @@ DEFAULT_OVERDUE_AFTER = time(15, 0)
 CUTOFF_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
 CUTOFF_FORM = f"HH:MM on a 24-hour clock (the default is {DEFAULT_OVERDUE_AFTER:%H:%M})"
 
-VAULT_DIRS = ("assets", "daily", "people", "projects", "public")
+VAULT_DIRS = ("assets", "daily", "meetings", "people", "projects", "public")
 VAULT_FILES = {".gitignore": GITIGNORE, ".ignore": IGNORE}
 
 # Templates ship next to this script and deploy to
@@ -257,6 +258,17 @@ def split_due(text: str) -> tuple[str, date | None]:
     return (text[: match.start()] + text[match.end() :]).strip(), due
 
 
+def daily_note_date(relative: str) -> date | None:
+    """Infer a due date from a daily note's canonical filename."""
+    match = DAILY_NOTE_RE.fullmatch(relative)
+    if not match:
+        return None
+    try:
+        return date.fromisoformat(match.group(1))
+    except ValueError:
+        return None
+
+
 def outline(lines: list[str]) -> Outline:
     """Headings and tasks in line order, blind to anything inside a fence.
 
@@ -396,6 +408,7 @@ def project_of(relative: str) -> str | None:
 def file_tasks(relative: str, lines: list[str]) -> list[Task]:
     document = outline(lines)
     project = project_of(relative)
+    default_due = daily_note_date(relative)
     headings, cursor = document.headings, 0
     section: str | None = None
     tasks: list[Task] = []
@@ -409,7 +422,7 @@ def file_tasks(relative: str, lines: list[str]) -> list[Task]:
                 entry.index + 1,
                 entry.text,
                 entry.done,
-                entry.due,
+                entry.due or default_due,
                 section,
                 project,
             )

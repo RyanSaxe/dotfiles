@@ -1,0 +1,49 @@
+id: python.question-mocks
+language: Python
+severity: info
+message: Verify this mock or monkeypatch is necessary.
+rule:
+  any:
+    - pattern: import unittest.mock
+    - pattern: import unittest.mock as $ALIAS
+    - pattern: from unittest.mock import $$$MOCK_NAMES
+    - all:
+        - kind: dotted_name
+        - regex: ^mock$
+        - inside:
+            all:
+              - kind: import_from_statement
+              - has:
+                  field: module_name
+                  regex: ^unittest$
+            # stopBy reaches through aliased_import: from unittest import mock as m
+            stopBy: end
+    - all:
+        - kind: parameters > identifier
+        - regex: ^monkeypatch$
+    # Typed forms nest the identifier one level deeper than parameters.
+    - all:
+        - kind: typed_parameter > identifier
+        - regex: ^monkeypatch$
+    - all:
+        - kind: typed_default_parameter
+        - has:
+            field: name
+            regex: ^monkeypatch$
+metadata:
+  byor:
+    rationale: >
+      Mocks and monkeypatching can couple tests to implementation details and
+      hide integration problems.
+    agent_prompt: >
+      Prefer real collaborators, small fakes, fixtures, or dependency
+      injection. Use mocks only when crossing an external boundary, controlling
+      time or randomness, simulating failure paths, or avoiding slow or
+      unavailable systems. If this is genuinely necessary, add
+      `# ast-grep-ignore: python.question-mocks` on its own line directly
+      above the offending line, with a short comment above it explaining why.
+    tags:
+      - python
+      - testing
+      - style-guide
+      - greenfield

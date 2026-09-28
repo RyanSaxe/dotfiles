@@ -17,11 +17,12 @@ export interface HostFacts {
 
 // HIDIdleTime is reported in nanoseconds.
 const HID_IDLE = /"HIDIdleTime"\s*=\s*(\d+)/;
-// The probe spawns a process and parses a registry subtree, and it feeds a
-// minutes-wide threshold — riding the 250ms render cadence would be pure
-// waste. Time-gated rather than tick-gated so the daemon's idle back-off
-// can't stretch it further.
-const INPUT_IDLE_PROBE_MS = 5000;
+// The probe spawns a process and parses a registry subtree, and it feeds
+// a minutes-wide threshold — probing more often would be pure waste. The
+// gate dedupes any extra callers; it sits BELOW the host poller's 5s
+// cadence so every scheduled poll lands a fresh probe instead of losing
+// a timer-jitter race against its own memo.
+const INPUT_IDLE_PROBE_MS = 4000;
 let inputIdleCache: { at: number; secs: number | null } | null = null;
 
 async function probeInputIdle(): Promise<number | null> {

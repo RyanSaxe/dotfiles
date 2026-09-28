@@ -6,7 +6,7 @@
 #
 # States mirror the dashboard's own hues:
 # - ci:     a check is failing on your own pull request
-# - review: a comment, review request or issue is waiting
+# - review: a comment or watched issue/PR is waiting
 # - none:   dim, like an unfocused workspace — still a keybind reminder
 #
 # The level is published by the rail daemon (see notifications.ts). This

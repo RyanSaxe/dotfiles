@@ -1,6 +1,15 @@
 # Rendered by `theme` — do not edit; change the template or tokens instead.
 # Sourced by .zshrc when present.
 
+# Give terminal applications a portable light/dark hint. COLORFGBG carries
+# ANSI foreground/background indexes rather than the theme's exact RGB base,
+# but it is enough for applications that need to choose a light or dark
+# rendering path when the terminal uses its default background.
+case "{{mode}}" in
+  light) export COLORFGBG='0;15' ;;
+  dark) export COLORFGBG='15;0' ;;
+esac
+
 # Ghost text (zsh-autosuggestions).
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg={{ghost}}'
 

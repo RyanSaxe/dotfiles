@@ -1,7 +1,7 @@
 -- Bridge between the theme system and nvim. Loads the generated token
--- file (inner layer), applies the catppuccin floor plus the semantic
--- layer in highlights.lua, and watches the generated dir so mode and
--- mascot changes repaint running instances. Without a generated file
+-- file, applies the catppuccin floor plus the semantic layer in
+-- highlights.lua, and watches the generated dir so mode and mascot
+-- changes repaint running instances. Without a generated file
 -- (fresh machine, CI) the stock catppuccin floor stands alone.
 ---@class ThemeRoles
 ---@field bg string
@@ -47,33 +47,10 @@
 ---@field mantle string
 ---@field crust string
 
--- The surfaces of the OTHER layer. The editor's chrome touches terminal
--- edges, so it paints in the outer mode even when the buffer is inner.
----@class ThemeOuter
----@field mode "dark"|"light"
----@field accent string
----@field notify string
----@field bg string
----@field fg string
----@field fg_muted string
----@field fg_faint string
----@field border string
----@field base string
----@field mantle string
----@field crust string
----@field mauve string
----@field pink string
----@field blue string
----@field peach string
----@field green string
----@field red string
----@field yellow string
-
 ---@class ThemeTokens
 ---@field mode "dark"|"light"
 ---@field accent string
 ---@field notify string
----@field outer ThemeOuter
 ---@field roles ThemeRoles
 ---@field palette ThemePalette
 

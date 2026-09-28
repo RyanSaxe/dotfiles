@@ -2,7 +2,13 @@ import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import type { AttentionItem, ObserverState } from "./types.js";
+import type {
+  AttentionItem,
+  AttentionReason,
+  GitHubReviewState,
+  ObserverState,
+} from "./types.js";
+import { activityAcknowledgesItem, ATTENTION_STATE_VERSION } from "./state.js";
 
 const STATE_PATH = join(
   process.env["XDG_STATE_HOME"] ?? join(homedir(), ".local", "state"),
@@ -41,30 +47,70 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isAttentionItem(value: unknown): value is AttentionItem {
+function isReviewState(value: unknown): value is GitHubReviewState {
   return (
-    isRecord(value) &&
+    value === "APPROVED" ||
+    value === "CHANGES_REQUESTED" ||
+    value === "COMMENTED" ||
+    value === "DISMISSED"
+  );
+}
+
+function isAttentionReason(value: unknown): value is AttentionReason {
+  if (!isRecord(value)) return false;
+  const kind = value["kind"];
+  const reviewState = value["reviewState"];
+  return (
     typeof value["id"] === "string" &&
-    typeof value["kind"] === "string" &&
-    typeof value["repository"] === "string" &&
-    typeof value["number"] === "number" &&
-    typeof value["title"] === "string" &&
-    typeof value["url"] === "string" &&
+    (kind === "comment" ||
+      kind === "ci" ||
+      kind === "opened" ||
+      kind === "review") &&
+    (kind !== "review" || isReviewState(reviewState)) &&
+    (kind === "review" || reviewState === undefined) &&
     typeof value["summary"] === "string" &&
     typeof value["createdAt"] === "string" &&
     (value["priority"] === "normal" || value["priority"] === "high")
   );
 }
 
+function isAttentionItem(value: unknown): value is AttentionItem {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    (value["targetKind"] === "pull_request" ||
+      value["targetKind"] === "issue") &&
+    typeof value["repository"] === "string" &&
+    typeof value["number"] === "number" &&
+    typeof value["title"] === "string" &&
+    typeof value["url"] === "string" &&
+    typeof value["activityKey"] === "string" &&
+    Array.isArray(value["reasons"]) &&
+    value["reasons"].length > 0 &&
+    value["reasons"].every(isAttentionReason)
+  );
+}
+
+function primaryReason(item: AttentionItem): AttentionReason {
+  const reason = item.reasons[0];
+  if (reason === undefined)
+    throw new Error(`attention item ${item.id} has no reason`);
+  return reason;
+}
+
 function itemSort(a: AttentionItem, b: AttentionItem): number {
-  if (a.priority !== b.priority) return a.priority === "high" ? -1 : 1;
-  return b.createdAt.localeCompare(a.createdAt);
+  const aReason = primaryReason(a);
+  const bReason = primaryReason(b);
+  if (aReason.priority !== bReason.priority) {
+    return aReason.priority === "high" ? -1 : 1;
+  }
+  return bReason.createdAt.localeCompare(aReason.createdAt);
 }
 
 function parseState(value: unknown): ObserverState {
   if (
     !isRecord(value) ||
-    value["version"] !== 1 ||
+    value["version"] !== ATTENTION_STATE_VERSION ||
     !isRecord(value["items"]) ||
     !isRecord(value["acknowledged"])
   ) {
@@ -74,14 +120,23 @@ function parseState(value: unknown): ObserverState {
 }
 
 function readSnapshot(path: string, revision: number): ReviewSnapshot {
-  const state = parseState(JSON.parse(readFileSync(path, "utf8")) as unknown);
+  const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  // The target-level schema starts clean. Do not render rows from the old
+  // per-comment state while the observer is waiting for its first refresh.
+  if (!isRecord(raw) || raw["version"] !== ATTENTION_STATE_VERSION) {
+    return emptyReviewSnapshot(revision);
+  }
+  const state = parseState(raw);
   const items = Object.values(state.items)
     .filter(isAttentionItem)
-    // State written before targets existed has no targetKind; everything
-    // the observer knew about then was a pull request.
-    .map((item) => ({ ...item, targetKind: item.targetKind ?? "pull_request" }))
     .sort(itemSort);
-  const acknowledged = new Set(Object.keys(state.acknowledged));
+  const acknowledged = new Set(
+    items
+      .filter((item) =>
+        activityAcknowledgesItem(state.acknowledged[item.id], item),
+      )
+      .map((item) => item.id),
+  );
   return {
     revision,
     username: state.username ?? null,

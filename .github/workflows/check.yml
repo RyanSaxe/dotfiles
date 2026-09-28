@@ -9,7 +9,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # The harness check builds a document against the commit it explains,
+      # which a shallow checkout does not have.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
 
       # zsh runs the workmux hook checks; ripgrep is what the vault

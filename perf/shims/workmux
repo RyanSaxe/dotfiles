@@ -1,0 +1,45 @@
+#!/bin/sh
+# Fake workmux. `status --json` assembles the agent list by joining the
+# synthetic per-agent state files (one complete JSON object each), so the
+# heartbeat churn below feeds straight through — exactly how the real
+# workmux state dir behaves under the daemon's fs.watch. `churn <secs>`
+# loops forever rewriting each file's heartbeat_ts; the harness backgrounds
+# and kills it. PERF_WORKMUX_DELAY (seconds) simulates the loaded machine's
+# slow status calls.
+set -eu
+AGENTS_DIR="$HOME/.local/state/workmux/agents"
+case "${1:-}" in
+status)
+  if [ -n "${PERF_COUNT_DIR:-}" ]; then
+    printf '%s\n' "$(date +%s)" >>"$PERF_COUNT_DIR/workmux.count"
+  fi
+  if [ -n "${PERF_WORKMUX_DELAY:-}" ]; then
+    sleep "$PERF_WORKMUX_DELAY"
+  fi
+  printf '{"agents":['
+  first=1
+  for f in "$AGENTS_DIR"/*.json; do
+    [ -e "$f" ] || continue
+    [ "$first" = 1 ] || printf ','
+    first=0
+    cat "$f"
+  done
+  printf ']}\n'
+  ;;
+churn)
+  interval="${2:?usage: workmux churn <seconds>}"
+  while :; do
+    now="$(date +%s)"
+    for f in "$AGENTS_DIR"/*.json; do
+      [ -e "$f" ] || continue
+      sed -E "s/\"heartbeat_ts\": *[0-9]+/\"heartbeat_ts\": $now/" "$f" >"$f.tmp" &&
+        mv "$f.tmp" "$f"
+    done
+    sleep "$interval"
+  done
+  ;;
+*)
+  echo "perf workmux shim: unsupported args: $*" >&2
+  exit 1
+  ;;
+esac

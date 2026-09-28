@@ -10,11 +10,12 @@
 # needs to learn about it.
 #
 # ~/.config/byor is a directory byor WRITES into — `byor init` and `byor
-# disable` rewrite repos.yml with absolute paths for this machine, and `byor
-# package install` fills packages/ with rules byor ships. Neither belongs in
-# the repo, so this is the bat/ghostty shape: a real directory with the
-# authored parts linked inside it. rules/ and scripts/ are linked whole, so a
-# rule written with `byor add` lands in the repo the moment it is saved.
+# disable` rewrite repos.yml with absolute paths for this machine. That
+# registry never belongs in the repo, so this is the bat/ghostty shape: a
+# real directory with the authored parts linked inside it. rules/, scripts/,
+# and packages/ are linked whole, so a rule written with `byor add` (or a
+# package rule authored anywhere) lands in the repo the moment it is saved
+# and reaches every machine on the next pull.
 
 - defaults:
     link:
@@ -35,4 +36,12 @@
       if: command -v byor
     ~/.config/byor/scripts:
       path: byor/scripts
+      if: command -v byor
+    ~/.config/byor/packages:
+      path: byor/packages
+      if: command -v byor
+    # ast-grep resolves ruleDirs relative to this file's location (~), so
+    # the link serves the same paths the copied original did.
+    ~/sgconfig.yml:
+      path: sgconfig.yml
       if: command -v byor
