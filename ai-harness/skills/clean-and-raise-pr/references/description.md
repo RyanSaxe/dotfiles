@@ -49,34 +49,6 @@ an empty section is worse than none.
 Nothing else. For a one-commit pull request, the title is the commit
 subject and the body is the first part plus Checked.
 
-## Example
-
-```markdown
-feat(visual-review): open a referenced file on the cited lines
-
-Clicking a reference such as `src/session.py:345-357` opens the file in the code pane at lines 345–357. The lines above and below are collapsed into two fold bars. Each bar shows the name of the function or class it hides and expands by 60 lines per click. Notes on the file appear as numbered markers in the gutter. Clicking one opens the note. Selecting lines and pressing `a` adds `path:start-end` to the question composer.
-
-Before this change the pane opened at line 1 and the reader scrolled to the cited lines by hand.
-
-## Commits
-
-|   # | Commit                                      | Lines | What to check                                                                                                                                                                         |
-| --: | ------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   1 | open a file on its cited lines              |   210 | Renders lines 337–365 for a 345–357 reference (8 lines of padding). Pierre's `renderRange` takes a zero-based start, and the test asserts the first visible line.                     |
-|   2 | fold bars named after the hidden definition |   180 | `enclosingSymbol` scans upward for a `def`, `class`, or `function` line. Tests cover Python, JavaScript, and a file with no definitions, which falls back to the line count.          |
-|   3 | keep the reader's line when a fold expands  |   120 | Expanding the upper fold inserts rows above the viewport. The pane saves the line under the cursor and its pixel offset before rendering and restores them after. Read with its test. |
-|   4 | notes as gutter markers                     |   240 | Pierre renders into a shadow root, so marker styles are an adopted stylesheet on that root. A marker on a folded line is drawn on the fold bar.                                       |
-|   5 | selected lines as a composer chip           |   150 | Reads the selection into `{path, ref, start, end}` and appends a chip. No helper changes.                                                                                             |
-
-## Checked
-
-- 12 tests added, one file per commit, run by `node --test tests/visual-review`: the first visible line for a 345–357 reference, the fold bar's name in Python, JavaScript, and a file with no definitions, the cursor line after a fold expands, a marker on a folded line, and the chip's `{path, ref, start, end}`.
-- Opened `src/session.py:345-357` from a page, expanded both folds to the ends of the file, and opened a 20,000-line file at lines 10001–10010. Both files come from the `play.mjs` fixture in this pull request.
-
-![The pane at lines 345–357 with both fold bars](pane.png)
-![A marker's note open under its line](marker.png)
-```
-
 ## Rules
 
 - Write the body to a file and pass it with `--body-file`. Do not write it

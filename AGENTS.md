@@ -35,7 +35,6 @@ the commands `git rebase -x` runs, and they override the working directory.
 A fixture that creates a repository strips every `GIT_*` variable from the
 environment it gives git and checks that the repository git ended up in is
 the one it just created, before it writes anything;
-`tests/visual-review/build.test.mjs` and
-`tuis/rail/tests/workspace.test.ts` show the shape. Without that, a suite
+`tuis/rail/tests/workspace.test.ts` shows the shape. Without that, a suite
 run from the commit hook reinitialises this repository as bare and commits
 into it.

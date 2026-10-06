@@ -121,12 +121,6 @@ lines: the problem, why this solution rather than the obvious one, and what
 the commit leaves out. Do not repeat what the diff shows. Do not describe
 the code.
 
-    feat(visual-review): keep the reader's line when a fold expands
-
-    Expanding the upper fold inserts 60 rows above the viewport and the
-    browser keeps scrollTop, so the visible text jumps. Save the line under
-    the cursor and its offset before rendering, then restore them after.
-
 A subject alone when the change explains itself:
 
     fix(rail): a visit only acks while someone is at the machine
