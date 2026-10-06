@@ -19,3 +19,7 @@ status_line = [
   "task-progress",
 ]
 status_line_use_colors = true
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@0.0.83"]
