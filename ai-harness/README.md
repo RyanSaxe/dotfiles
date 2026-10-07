@@ -136,10 +136,28 @@ managed config:
 /etc/codex/managed_config.toml -> ai-harness/codex/managed_config.toml
 ```
 
-The interactive shell wrapper adds `model_reasoning_effort="xhigh"` for
-runtime launches. Workmux invokes Codex directly and adds
-`model_reasoning_effort="max"` in its own config. Reasoning effort is not in
-managed config because launcher-specific values must remain overridable.
+Managed config sets GPT-6 Luna with `xhigh` reasoning, enables daemon
+auto-start, and selects the `uv-tools` permission profile. That profile extends
+Codex's `:workspace` permissions and grants writes to the home-relative UV
+cache, tool bin, tool environments, and Python installation directories.
+`approval_policy = "on-request"` with `approvals_reviewer = "auto_review"`
+keeps workspace commands automatic and routes eligible sandbox-boundary
+requests through Auto-review.
+
+The shell wrapper passes normal launch arguments through without runtime
+configuration overrides. It blocks config and feature overrides, `--search`,
+`--profile`, `--no-daemon`, permission-mode overrides, and full-access bypass
+flags so shell launches keep the shared daemon and configured Auto-review
+boundary.
+Workmux invokes Codex directly with the dedicated `--model` flag and inherits
+the managed reasoning and permission defaults. To choose a different model for
+one launch, use `codex --model <model>`; the configured reasoning effort stays
+`xhigh` unless another supported setting changes it.
+
+`~/.codex/config.toml` remains mutable local state and has higher precedence
+than system managed defaults. Remove any local `model` or
+`model_reasoning_effort` entries that should defer to the dotfiles defaults;
+the installer preserves this file and does not remove those overrides.
 
 ## Tools and references
 

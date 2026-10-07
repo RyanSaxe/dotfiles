@@ -37,22 +37,25 @@ copilot() {
 
 codex() {
   local first_arg="${1:-}"
-  local shell_env_config="shell_environment_policy.set={ UV_CACHE_DIR = \"$HOME/.cache/uv\", UV_TOOL_BIN_DIR = \"$HOME/.local/bin\", UV_TOOL_DIR = \"$HOME/.local/share/uv/tools\", UV_PYTHON_INSTALL_DIR = \"$HOME/.local/share/uv/python\", UV_SYSTEM_CERTS = \"true\" }"
-  local runtime_config_args=(-c "$shell_env_config" -c 'model_reasoning_effort="xhigh"')
 
   case "$first_arg" in
   agents | login | logout | mcp | plugin | mcp-server | app-server | remote-control | app | completion | update | doctor | sandbox | debug | apply | a | migrate-rollouts | cloud | exec-server | features | help | -h | --help | -V | --version)
     command codex "$@"
     ;;
-  "" | -* | exec | e | review | resume | queue | archive | delete | unarchive | fork)
-    command codex \
-      "${runtime_config_args[@]}" \
-      "$@"
-    ;;
   *)
-    command codex \
-      "${runtime_config_args[@]}" \
-      "$@"
+    local arg
+    for arg in "$@"; do
+      case "$arg" in
+      -c* | --config* | --enable* | --disable* | \
+        --search* | --profile* | --no-daemon* | \
+        -a | --ask-for-approval* | -s | --sandbox* | \
+        --dangerously-bypass-approvals-and-sandbox* | --yolo*)
+        print -u2 "codex: $arg is blocked here to keep this launch on the shared daemon; use managed config or --model instead"
+        return 2
+        ;;
+      esac
+    done
+    command codex "$@"
     ;;
   esac
 }

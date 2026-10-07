@@ -5,6 +5,13 @@ export LC_ALL="en_US.UTF-8"
 export EDITOR="nvim"
 export VISUAL="nvim"
 
+# Keep uv paths consistent for Codex and Workmux launches from this shell.
+export UV_CACHE_DIR="$HOME/.cache/uv"
+export UV_TOOL_BIN_DIR="$HOME/.local/bin"
+export UV_TOOL_DIR="$HOME/.local/share/uv/tools"
+export UV_PYTHON_INSTALL_DIR="$HOME/.local/share/uv/python"
+export UV_SYSTEM_CERTS="true"
+
 # The Markdown vault, read by the `vault` CLI and by Neovim. Exported from
 # every zsh, interactive or not, so an editor launched from anywhere finds it.
 export VAULT_DIR="$HOME/generic/vault"
