@@ -39,6 +39,7 @@ PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/rail"
 ENABLED_FLAG="$STATE/enabled"
 PID_FILE="$STATE/daemon.pid"
+LOCK_FILE="$STATE/daemon.lock"
 # The log lives OUTSIDE $STATE: the daemon fs.watch()es its state dir, so
 # a log in there turned every stderr line into a watch event that re-fired
 # the daemon's own watcher.
@@ -78,19 +79,28 @@ load_env() {
   fi
 }
 
-# A pid being alive is not enough: a daemon that died ungracefully leaves
-# its pidfile behind, and the pid can be reused by an unrelated process —
-# trusting it froze rails with no self-recovery. The recorded pid counts
-# as running only if its command line is still a rail daemon. The pattern
-# matches both runtimes: `…/tuis/rail/dist/daemon.mjs` (bundled) and the
-# tsx loader's `…/tuis/rail/node_modules/tsx/… src/daemon.ts` — the same
-# pattern the daemon's own pidfile takeover check uses (src/daemon.ts).
+# The pidfile is status information, not the singleton lock. Validate its
+# owner so a stale pid or a reused pid cannot suppress startup.
 daemon_running() {
   [ -f "$PID_FILE" ] || return 1
   pid="$(cat "$PID_FILE")"
   kill -0 "$pid" 2>/dev/null || return 1
   ps -o command= -p "$pid" 2>/dev/null | grep -qE 'rail.*daemon\.(ts|mjs)'
 }
+
+# Run one command while holding a kernel lock for its lifetime. Keep the lock
+# file in place so a waiter can never lock a replacement inode after startup.
+launch_locked() (
+  cd "$RAIL_DIR"
+  if command -v lockf >/dev/null 2>&1; then
+    nohup lockf -k -s -t 0 "$LOCK_FILE" env RAIL_DAEMON_LOCKED=1 "$@" >>"$LOG_FILE" 2>&1 &
+  elif command -v flock >/dev/null 2>&1; then
+    nohup flock -n "$LOCK_FILE" env RAIL_DAEMON_LOCKED=1 "$@" >>"$LOG_FILE" 2>&1 &
+  else
+    echo "rail: daemon startup requires lockf or flock; refusing to start unlocked" >&2
+    return 1
+  fi
+)
 
 # Rebuild the dist bundles when any source is newer than the build stamp
 # (~5ms probe), so edit-and-press keeps working without a manual build.
@@ -129,13 +139,11 @@ ensure_daemon() {
     mv "$LOG_FILE" "$LOG_FILE.1" 2>/dev/null || true
   fi
   if [ "${RAIL_RUN:-}" = tsx ]; then
-    (cd "$RAIL_DIR" && nohup npx tsx src/daemon.ts >>"$LOG_FILE" 2>&1 &)
+    launch_locked npx tsx src/daemon.ts
   else
     ensure_built
-    # Absolute entry path on purpose: daemon_running above matches the
-    # command line against rail.*daemon.(ts|mjs), and a relative argv
-    # would carry neither.
-    (cd "$RAIL_DIR" && nohup node "$RAIL_DIR/dist/daemon.mjs" >>"$LOG_FILE" 2>&1 &)
+    # Keep the absolute entry path so daemon_running can identify this pid.
+    launch_locked node "$RAIL_DIR/dist/daemon.mjs"
   fi
 }
 

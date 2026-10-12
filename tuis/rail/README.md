@@ -7,12 +7,13 @@ mascot. Cross-platform — anywhere tmux runs, the rail runs.
 ## How it works
 
 One daemon (`src/daemon.ts`) renders a frame per (session, geometry) and
-writes it straight to each rail pane's tty. The panes themselves hold only
-`tail -f /dev/null` (~500KB): tmux interprets the tty writes into its own
-screen buffer, so frames survive detach/attach and remote clients with no
-viewer process at all. Frames are diffed per pane and committed under
-synchronized output — an unchanged rail costs zero writes and repaints
-never flicker.
+writes it straight to each rail pane's tty. `rail ensure-daemon` holds an OS
+lock on `daemon.lock` for the daemon's lifetime; `daemon.pid` is status data.
+The panes themselves hold only `tail -f /dev/null` (~500KB): tmux interprets
+the tty writes into its own screen buffer, so frames survive detach/attach
+and remote clients with no viewer process at all. Frames are diffed per pane
+and committed under synchronized output — an unchanged rail costs zero
+writes and repaints never flicker.
 
 - **tmux data** is event-driven: a control-mode client (`src/control.ts`)
   delivers structural notifications the moment a window, pane, or session

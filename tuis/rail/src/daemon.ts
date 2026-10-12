@@ -29,7 +29,7 @@
 // nowhere while disabled, and never survive alone in a window.
 
 import { existsSync, readFileSync, watch } from "node:fs";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -714,52 +714,17 @@ async function guardedRefresh(): Promise<void> {
   }
 }
 
-// Liveness alone is not holdership: an unclean death leaves the pidfile
-// behind, and the pid can be reused by an unrelated process. The holder
-// counts only while its command line is still a rail daemon — either
-// runtime form (`…/tuis/rail/dist/daemon.mjs` bundled, or tsx running
-// `src/daemon.ts` with the loader resolved under tuis/rail). The same
-// pattern gates bin/rail's daemon_running; keep them in lockstep.
-async function isRailDaemon(pid: number): Promise<boolean> {
-  try {
-    const { stdout } = await run("ps", ["-o", "command=", "-p", String(pid)]);
-    return /rail.*daemon\.(ts|mjs)/.test(stdout);
-  } catch {
-    // ps fails for a dead pid.
-    return false;
-  }
-}
-
-// Exclusive-create (wx) makes the pidfile the lock itself: two daemons
-// booting concurrently — tmux.conf sourcing races `rail on` — can both
-// pass a check-then-write gate, but only one wins the create. A stale
-// holder's file is unlinked and the claim retried; the loop is bounded
-// for the pathological case where fresh claimants keep dying mid-race.
-async function claimPidfile(): Promise<boolean> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      await writeFile(PID_FILE, String(process.pid), { flag: "wx" });
-      return true;
-    } catch {
-      // Pidfile exists; reclaim below only if it's stale.
-    }
-    try {
-      const pid = Number(await readFile(PID_FILE, "utf8"));
-      if (pid > 0 && (await isRailDaemon(pid))) return false;
-    } catch {
-      // Unreadable pidfile: stale.
-    }
-    await unlink(PID_FILE).catch(() => {});
-  }
-  return false;
-}
-
 async function main(): Promise<void> {
-  await mkdir(STATE_DIR, { recursive: true });
-  if (!(await claimPidfile())) {
-    logLine("rail daemon already running");
-    process.exit(0);
+  if (process.env.RAIL_DAEMON_LOCKED !== "1") {
+    logLine(
+      "rail daemon must start through `rail ensure-daemon` to acquire its lock",
+    );
+    process.exit(1);
   }
+  await mkdir(STATE_DIR, { recursive: true });
+  // The launcher holds daemon.lock for this process's lifetime. The pidfile
+  // is only a status hint and can be overwritten after a crash.
+  await writeFile(PID_FILE, String(process.pid));
 
   // Telemetry on demand: `kill -USR2 $(cat daemon.pid)` drops the tick
   // ring, counters, and the scheduler's wake-reason counts into the log
