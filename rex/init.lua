@@ -1,6 +1,6 @@
--- Rex configuration: Rex's own default keys, plus the tmux keys from
--- tmux/tmux.conf bound to the Rex actions that do the same thing. Font and
--- padding are app settings, not Lua.
+-- Rex configuration: Rex's own default keys, the tmux keys from
+-- tmux/tmux.conf bound to the Rex actions that do the same thing, and popups
+-- for `ws`. Font and padding are app settings, not Lua.
 --
 -- Rex's Dark Mode and Light Mode themes are Catppuccin Mocha and Latte,
 -- imported in the app from https://github.com/catppuccin/ghostty.
@@ -181,6 +181,17 @@ rex.action({
   end,
 })
 
+-- `ws pick` switches the app itself, so it gets the client to switch.
+rex.action({
+  name = "ws_pick",
+  title = "Pick with ws",
+  args = { name = "string" },
+  run = function(ctx, args)
+    remember(ctx)
+    open_float("ws " .. args.name, { "ws", "pick", args.name, "--client", ctx.client_id })
+  end,
+})
+
 rex.action({
   name = "keys_cheatsheet",
   title = "Rex Keys",
@@ -235,6 +246,10 @@ rex.bind("alt+a", "client.sidebar.activity.toggle")
 rex.bind("alt+g", "client.sidebar.toggle")
 rex.bind("alt+c", "client.theme.change")
 rex.bind("alt+/", "keys_cheatsheet")
+
+for key, name in pairs({ o = "go", w = "worktrees", r = "reviews", t = "tasks", space = "agents" }) do
+  rex.bind("alt+" .. key, "ws_pick", { name = name })
+end
 
 -- Bindings match unshifted keys, so | is shift+\ and L is shift+l.
 rex.bind(PREFIX .. "shift+\\", "move", { action = "pane.split.right" })
