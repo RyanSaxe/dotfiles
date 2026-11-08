@@ -31,6 +31,7 @@ const usage = `usage:
   ws ls [--json]                     list worktrees and their agents
   ws rm NAME [--force]               close a worktree's session, remove it and delete its branch,
                                      but without --force it refuses uncommitted changes and keeps an unmerged branch
+  ws pick NAME [--client ID]         open a popup: reviews
 Layouts are ~/.config/ws/layouts/NAME.toml. Extra folders for go are ~/.config/ws/bookmarks.
 `
 
@@ -75,7 +76,7 @@ func run(cmd string, args []string) error {
 	for fs.Parse(args); fs.NArg() > 0; fs.Parse(args) {
 		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
 	}
-	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1}[cmd]
+	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1}[cmd]
 	if !known || len(pos) != nargs {
 		return errors.New("unknown command or arguments, see ws --help")
 	}
@@ -94,8 +95,10 @@ func run(cmd string, args []string) error {
 		return send(pos[0], pos[1])
 	case "ls":
 		return printWorktrees(*asJSON)
+	case "rm":
+		return remove(pos[0], *force)
 	}
-	return remove(pos[0], *force)
+	return pick(pos[0])
 }
 
 // open shows the session for dir, creating it from the layout when there is
