@@ -91,3 +91,12 @@ def test_shallow_repo_parent_stays_whole(tmp_path: Path) -> None:
     home = make_home(tmp_path)
     repo = make_repo(home, home / "a/shallow")
     assert segments(home, repo)["REPO_PARENT"] == "~/a"
+
+
+def test_deleted_directory_shows_only_where_it_was(tmp_path: Path) -> None:
+    home = make_home(tmp_path)
+    gone = home / "a/b/c/d/gone"
+    assert segments(home, Path("/"), {"_PROMPT_GONE": str(gone)}) == {
+        "DIR_PLAIN": "~/…/c/d",
+        "GONE": "gone",
+    }

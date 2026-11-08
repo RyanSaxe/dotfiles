@@ -116,6 +116,18 @@ collapse() { # $1: path, $2: max segments -> first/…/last/two
   fi
 }
 
+# The precmd (.zshrc) runs this from / when the shell's own directory was
+# deleted, as `workmux remove` does to a worktree under an open pane, and
+# names that directory in _PROMPT_GONE. Line 1 shows where it was and line
+# 2 says it is gone. Every other segment would describe /, so none prints.
+if [ -n "${_PROMPT_GONE:-}" ]; then
+  p="${_PROMPT_GONE%/*}"
+  [ -n "$p" ] || p=/
+  emit DIR_PLAIN "$(collapse "$(home_tilde "$p")" 4)"
+  emit GONE "${_PROMPT_GONE##*/}"
+  exit 0
+fi
+
 if [ "$in_repo" = true ]; then
   # WHERE: repo-relative path, hidden at the root itself, where the repo's
   # parent directory shows instead.

@@ -257,11 +257,18 @@ add-zsh-hook precmd _prompt_spacer
 # after every precmd has finished. The <US> separator (0x1f) cannot appear
 # in branch names or versions, so no quoting or eval is involved.
 _prompt_segments() {
-  local name value
-  unset _PROMPT_SEG_{SUBDIR,REPO_PARENT,DIR_PLAIN,BRANCH,BRANCH_BEHIND,PKG,AGE,CLEAN,DIRTY,ARROWS,PROJ_BAD,PROJ_OK,PROJ_PLAIN,DIR_NAME,PYVERSION}
+  local name value gone=
+  unset _PROMPT_SEG_{SUBDIR,REPO_PARENT,DIR_PLAIN,BRANCH,BRANCH_BEHIND,PKG,AGE,CLEAN,DIRTY,ARROWS,PROJ_BAD,PROJ_OK,PROJ_PLAIN,DIR_NAME,PYVERSION,GONE}
+  # dash prints getcwd() errors before it reads a line when this shell's
+  # directory was deleted, so the script runs from / and is told which
+  # directory is gone. -ef also catches a directory recreated at the same path.
+  [[ $PWD -ef . ]] || gone=$PWD
   while IFS=$'\x1f' read -r name value; do
     typeset -gx "_PROMPT_SEG_${name}=${value}"
-  done < <(dash "$HOME/.config/zsh/prompt-segments.sh")
+  done < <(
+    [[ -z $gone ]] || builtin cd -q /
+    _PROMPT_GONE=$gone dash "$HOME/.config/zsh/prompt-segments.sh"
+  )
 }
 
 if command -v starship > /dev/null; then
