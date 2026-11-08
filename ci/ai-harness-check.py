@@ -159,7 +159,7 @@ def validate_statusline() -> None:
             "Claude and Copilot payloads produced different status lines: "
             f"{outputs[0]!r} != {outputs[1]!r}"
         )
-    if not all(value in outputs[0] for value in ("project", "Opus/xhigh", "75% left")):
+    if not all(value in outputs[0] for value in ("project", "Opus xhigh", "75% left")):
         raise HarnessError(f"statusline omitted expected context: {outputs[0]!r}")
 
 
