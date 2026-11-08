@@ -101,9 +101,9 @@ jobs:
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
           HOME="$SCRATCH" XDG_STATE_HOME="$SCRATCH/.local/state" \
             "$SCRATCH/.local/bin/theme" apply dark
-          dark_crust="$(sed -n 's/^crust=//p' theme/palettes/mocha.conf)"
-          test -n "$dark_crust"
-          grep -qF "set -g @crust \"$dark_crust\"" \
+          dark_chrome="$(sed -n 's/^chrome=//p' theme/palettes/mocha.conf)"
+          test -n "$dark_chrome"
+          grep -qF "set -g @chrome \"$dark_chrome\"" \
             "$SCRATCH/.local/state/dotfiles/generated/tmux-colors.conf"
 
       - name: Generated artifacts stay out of the checkout

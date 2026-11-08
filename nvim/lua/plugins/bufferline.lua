@@ -1,5 +1,5 @@
 -- The tab row spans two surfaces. Its fill and the branch name ride the
--- chrome surface (crust), because the row touches the terminal's top
+-- chrome surface, because the row touches the terminal's top
 -- edge and must read as one piece with the tmux rail; the tabs
 -- themselves ride the content surface, so the active tab looks cut out
 -- of the buffer below it.
@@ -59,7 +59,7 @@ local function surfaces()
   end
   local p = tokens.palette
   return {
-    fill = p.crust,
+    fill = p.chrome,
     fill_fg = tokens.roles.fg_faint,
     tab = p.mantle,
     tab_fg = tokens.roles.fg_faint,

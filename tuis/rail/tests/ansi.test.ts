@@ -18,7 +18,7 @@ const palette: Palette = {
   accent: "#d8b44a",
   notify: "#69ceea",
   base: "#1e1e2e",
-  crust: "#11111b",
+  chrome: "#1a1a27",
   surface0: "#313244",
   text: "#cdd6f4",
   dim: "#7f849c",
