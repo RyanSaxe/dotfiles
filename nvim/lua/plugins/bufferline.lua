@@ -61,7 +61,7 @@ local function surfaces()
   return {
     fill = p.chrome,
     fill_fg = tokens.roles.fg_faint,
-    tab = p.mantle,
+    tab = p.base,
     tab_fg = tokens.roles.fg_faint,
     active = p.base,
     active_fg = tokens.roles.fg,

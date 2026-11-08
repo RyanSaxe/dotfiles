@@ -224,7 +224,7 @@ function M.apply(tokens)
   -- theme.surfaces. This is the only place the chrome color is named.
   hl("ThemeChromeNormal", { fg = r.fg_muted, bg = p.chrome })
   hl("ThemeChromeNormalNC", { fg = r.fg_faint, bg = p.chrome })
-  hl("ThemeChromeCursorLine", { bg = p.mantle })
+  hl("ThemeChromeCursorLine", { bg = p.base })
   -- The chrome copy of a picker's frame, for the explorer alone. Its only
   -- framed window is the input, and notify is the color the pickers give
   -- an input's border and title.
