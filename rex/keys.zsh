@@ -7,9 +7,12 @@ titles=$({
   rex actions --json
 } | jq -s '[.[].actions[] | {(.name): .title}] | add')
 {
+  # A `move` binding runs the Rex action in its args.
   rex keymap --json | jq -r --argjson t "$titles" '
     .bindings[]
-    | [(.keys | join(" ")), ($t[.action] // .action) + (.args // {} | to_entries | map(" \(.key)=\(.value)") | join("")), "init.lua"]
+    | (if .action == "move" then .args else {action, args} end) as $b
+    | ($t[$b.action] // $b.action) as $title
+    | [(.keys | join(" ")), $title + ($b.args // {} | to_entries | map(" \(.key)=\(.value)") | join("")), "init.lua"]
     | join("\t")'
   awk -F'\t' '{ print $1 "\t" $2 "\tRex" }' "${0:A:h}/default-keys.tsv"
 } | column -t -s $'\t' | fzf --prompt='Keys: ' --no-sort --layout=reverse
