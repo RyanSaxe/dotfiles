@@ -152,6 +152,35 @@ rex.action({
   end,
 })
 
+-- The first terminal whose program reports it is blocked on you, else the
+-- first that finished, across every session.
+rex.action({
+  name = "focus_agent",
+  title = "Focus the Agent That Needs You",
+  run = function(ctx)
+    local done
+    for _, session in ipairs(rex.call("session.list").sessions) do
+      local list = rex.session.list_blocks({ session_id = session.session_id })
+      for _, block in ipairs(list and list.blocks or {}) do
+        local pane = { session_id = session.session_id, block_id = block.block_id }
+        local status = block.creator_name == TERMINAL and rex.block.call(TERMINAL, "program_status", pane)
+        for _, record in ipairs(status and status.records or {}) do
+          if record.state == "blocked" then
+            go_to(ctx, pane)
+            return
+          end
+          if record.state == "done" and not done then
+            done = pane
+          end
+        end
+      end
+    end
+    if done then
+      go_to(ctx, done)
+    end
+  end,
+})
+
 rex.action({
   name = "keys_cheatsheet",
   title = "Rex Keys",
@@ -201,6 +230,7 @@ end
 rex.bind("alt+n", "move", { action = "client.tab.new" })
 rex.bind("alt+s", "move", { action = "session.switch" })
 rex.bind("alt+l", "last_pane")
+rex.bind("alt+shift+a", "focus_agent")
 rex.bind("alt+a", "client.sidebar.activity.toggle")
 rex.bind("alt+g", "client.sidebar.toggle")
 rex.bind("alt+c", "client.theme.change")
