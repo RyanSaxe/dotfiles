@@ -233,6 +233,15 @@ repos:
         pass_filenames: false
         files: "^theme/|^tests/theme/"
 
+      # The prompt collector against throwaway repos, run by dash as the
+      # precmd runs it.
+      - id: prompt-tests
+        name: pytest (prompt)
+        language: system
+        entry: uv run --no-project --with pytest pytest -q tests/zsh
+        pass_filenames: false
+        files: "^zsh/prompt-segments\\.sh$|^tests/zsh/"
+
       # The vault CLI against scratch vaults: the init/check contract, the
       # task grammar, and the writes. Needs ripgrep for the .ignore check
       # (the cases that do skip cleanly without it).

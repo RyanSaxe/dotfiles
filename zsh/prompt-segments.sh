@@ -125,7 +125,7 @@ if [ "$in_repo" = true ]; then
   else
     p="${top%/*}"
     [ -n "$p" ] || p=/
-    emit REPO_PARENT "$(home_tilde "$p")"
+    emit REPO_PARENT "$(collapse "$(home_tilde "$p")" 4)"
   fi
   # Branch: named, or short hash when detached.
   [ -n "$branch" ] || branch="$shorthead"
