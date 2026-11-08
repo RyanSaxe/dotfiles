@@ -1,6 +1,6 @@
 -- Rex configuration: Rex's own default keys, the tmux keys from
 -- tmux/tmux.conf bound to the Rex actions that do the same thing, and popups
--- for `ws`. Font and padding are app settings, not Lua.
+-- for `ws` and copy mode. Font and padding are app settings, not Lua.
 --
 -- Rex's Dark Mode and Light Mode themes are Catppuccin Mocha and Latte,
 -- imported in the app from https://github.com/catppuccin/ghostty.
@@ -192,6 +192,24 @@ rex.action({
   end,
 })
 
+-- Shows the pane's text in read-only Neovim to select and copy, as tmux's
+-- copy mode does.
+rex.action({
+  name = "copy_mode",
+  title = "Copy Mode",
+  run = function(ctx)
+    open_float("copy", {
+      "zsh",
+      "-c",
+      'rex capture -s "$1" -b "$2" --trim | nvim -R -S "$3" -',
+      "copy-mode",
+      ctx.session_id,
+      ctx.block_id,
+      REX_DIR .. "/copy-mode.lua",
+    })
+  end,
+})
+
 rex.action({
   name = "keys_cheatsheet",
   title = "Rex Keys",
@@ -258,6 +276,7 @@ rex.bind(PREFIX .. "c", "move", { action = "client.tab.new" })
 rex.bind(PREFIX .. "s", "move", { action = "session.switch" })
 rex.bind(PREFIX .. "z", "pane.zoom")
 rex.bind(PREFIX .. "x", "pane.close")
+rex.bind(PREFIX .. "[", "copy_mode")
 rex.bind(PREFIX .. "l", "last_tab")
 rex.bind(PREFIX .. "shift+l", "last_session")
 rex.bind(PREFIX .. "ctrl+space", "pane.send_key", { key = "ctrl+space" })
