@@ -55,7 +55,7 @@ function formatTokens(value) {
   const tokens = number(value);
   if (tokens === undefined || tokens <= 0) return undefined;
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k`;
   return String(Math.round(tokens));
 }
 
@@ -69,40 +69,54 @@ function colorize(colors, name, value) {
   return prefix ? `${prefix}${value}${reset}` : value;
 }
 
+function git(cwd, args) {
+  return execFileSync("git", ["-C", cwd, ...args], {
+    encoding: "utf8",
+    // Like the prompt, never take index.lock: the agent's own git commands
+    // run while the status line refreshes.
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+}
+
+// The prompt's branch, its color when upstream is ahead, and its clean or
+// dirty mark, from the same `git status` call prompt-segments.sh makes.
 function gitInfo(cwd, colors) {
+  let status;
   try {
-    execFileSync("git", ["-C", cwd, "rev-parse", "--git-dir"], {
-      stdio: ["ignore", "ignore", "ignore"],
-    });
+    status = git(cwd, ["status", "--porcelain=v2", "--branch"]);
   } catch (_error) {
     return "";
   }
 
-  let branch = "detached";
-  try {
-    branch =
-      execFileSync("git", ["-C", cwd, "branch", "--show-current"], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim() || "detached";
-  } catch (_error) {
-    // Keep the detached label when the branch cannot be read.
-  }
-
+  let branch = "";
+  let behind = 0;
   let dirty = false;
-  try {
-    dirty =
-      execFileSync("git", ["-C", cwd, "status", "--porcelain"], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim().length > 0;
-  } catch (_error) {
-    // A missing status is less useful than the branch, so keep going.
+  for (const line of status.split("\n")) {
+    if (line.startsWith("# branch.head ")) {
+      branch = line.slice("# branch.head ".length);
+    } else if (line.startsWith("# branch.ab ")) {
+      behind = Number(line.split(" ")[3].slice(1));
+    } else if (line && !line.startsWith("#")) {
+      dirty = true;
+      break;
+    }
+  }
+  if (branch === "(detached)") {
+    try {
+      branch = git(cwd, ["rev-parse", "--short", "HEAD"]).trim();
+    } catch (_error) {
+      branch = "";
+    }
   }
 
-  const mark = dirty ? "●" : "✓";
-  const role = dirty ? "waiting" : "done";
-  return ` ${colorize(colors, "muted", "on")} ${colorize(colors, "accent", branch)} ${colorize(colors, role, mark)}`;
+  const branchLabel = branch
+    ? ` ${colorize(colors, "faint", "on")} ${colorize(colors, behind > 0 ? "branchBehind" : "branch", branch)}`
+    : "";
+  const mark = dirty
+    ? colorize(colors, "dirty", "✗")
+    : colorize(colors, "clean", "✓");
+  return `${branchLabel} ${mark}`;
 }
 
 function main() {
@@ -127,7 +141,6 @@ function main() {
     nested(data, "effort", "level"),
     data.effortLevel,
   );
-  const modelLabel = effort ? `${model}/${effort}` : model;
 
   const context = data.context_window || {};
   const used = number(
@@ -149,12 +162,13 @@ function main() {
       nested(context, "current_usage", "input_tokens"),
     ),
   );
-  const contextLabel =
-    remaining === undefined && tokens === undefined
-      ? ""
-      : ` [ctx: ${tokens ? `${tokens} ` : ""}${remaining === undefined ? "" : `${Math.round(remaining)}% left`}]`;
+  const details = [
+    effort,
+    tokens,
+    remaining === undefined ? undefined : `${Math.round(remaining)}% left`,
+  ].filter(Boolean);
 
-  const line = `${colorize(colors, "muted", "in")} ${colorize(colors, "info", directory)}${gitInfo(cwd, colors)} ${colorize(colors, "muted", "with")} ${colorize(colors, "working", modelLabel)}${colorize(colors, "muted", contextLabel)}`;
+  const line = `${colorize(colors, "faint", "in")} ${colorize(colors, "project", directory)}${gitInfo(cwd, colors)} ${colorize(colors, "faint", "with")} ${colorize(colors, "model", model)}${details.length ? ` ${colorize(colors, "faint", details.join(" "))}` : ""}`;
   process.stdout.write(`${line}\n`);
 }
 
