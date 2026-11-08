@@ -7,11 +7,12 @@ titles=$({
   rex actions --json
 } | jq -s '[.[].actions[] | {(.name): .title}] | add')
 {
-  # A `move` binding runs the Rex action in its args.
+  # A `move` binding runs the Rex action in its args. A Lua function binding
+  # shows as client.key.forward, so its line says where init.lua defines it.
   rex keymap --json | jq -r --argjson t "$titles" '
     .bindings[]
     | (if .action == "move" then .args else {action, args} end) as $b
-    | ($t[$b.action] // $b.action) as $title
+    | (if $b.action == "client.key.forward" then "Lua function at \(.source)" else $t[$b.action] // $b.action end) as $title
     | [(.keys | join(" ")), $title + ($b.args // {} | to_entries | map(" \(.key)=\(.value)") | join("")), "init.lua"]
     | join("\t")'
   awk -F'\t' '{ print $1 "\t" $2 "\tRex" }' "${0:A:h}/default-keys.tsv"

@@ -12,6 +12,7 @@
 -- Alt-Period, Alt-Shift-R, Alt-Shift-T, and prefix r, comma and $.
 
 local SHELL = "com.superlogical.terminal.shell"
+local TERMINAL = "com.superlogical.terminal"
 -- ~/.config/rex links to this directory, so the scripts sit beside this file.
 local REX_DIR = debug.getinfo(1, "S").source:match("^@?(.*)/")
 local PREFIX = "ctrl+space>"
@@ -25,6 +26,33 @@ local function open_float(label, command)
   if err ~= nil then
     error(err, 0)
   end
+end
+
+-- The programs that use Ctrl-H/J/K/L and Ctrl-B/F/U/D themselves, from the
+-- is_vim test in tmux.conf. fzf is one so those keys move its selection.
+local EDITORS = { nvim = true, vim = true, vi = true, view = true, vimdiff = true, fzf = true }
+
+local function in_float(block_id)
+  local view = rex.session.view({})
+  for _, window in ipairs(view and view.windows or {}) do
+    for _, layer in ipairs(window.layers) do
+      for _, block in ipairs(layer.kind == "floating" and layer.blocks or {}) do
+        if block.block_id == block_id then
+          return true
+        end
+      end
+    end
+  end
+  return false
+end
+
+-- Those keys go to an editor in any pane, and to any program in a float, as
+-- they did in a tmux popup. A float's program can sit behind a shell, so its
+-- name isn't a reliable test there.
+local function program_takes_keys(block_id)
+  local process = rex.block.call(TERMINAL, "process", { block_id = block_id })
+  local foreground = process and process.foreground
+  return foreground ~= nil and EDITORS[foreground.name] == true or in_float(block_id)
 end
 
 -- Rex keeps no focus history yet, so Alt-L and prefix l and L read this list
@@ -131,6 +159,41 @@ rex.action({
     open_float("keys", { REX_DIR .. "/keys.zsh", ctx.client_id })
   end,
 })
+
+-- An action binding never passes its key on, so this one sends the key to an
+-- editor itself.
+rex.action({
+  name = "scroll_or_send",
+  title = "Scroll, or Send the Key to an Editor",
+  args = { key = "string", scroll = "string" },
+  repeats = true,
+  run = function(ctx, args)
+    if program_takes_keys(ctx.block_id) then
+      rex.client.queue("pane.send_key", { key = args.key })
+    else
+      rex.client.queue(args.scroll)
+    end
+  end,
+})
+
+-- Ctrl-H/J/K/L cross Neovim windows and Rex panes as one grid. A function
+-- that returns false passes the key on to Neovim, which runs `rex focus` at
+-- its edge (rex/nvim.lua). A key function can't queue app actions, so it
+-- moves focus on the server, as `rex focus` does.
+for key, direction in pairs({ h = "left", j = "down", k = "up", l = "right" }) do
+  rex.bind("ctrl+" .. key, function(ctx)
+    if program_takes_keys(ctx.block_id) then
+      return false
+    end
+    remember(ctx)
+    rex.session.focus_direction({ direction = direction })
+    return true
+  end)
+end
+
+for key, scroll in pairs({ b = "page_up", u = "page_up", f = "page_down", d = "page_down" }) do
+  rex.bind("ctrl+" .. key, "scroll_or_send", { key = "ctrl+" .. key, scroll = "client.scroll." .. scroll })
+end
 
 for i = 1, 9 do
   rex.bind("alt+" .. i, "move", { action = "client.tab.goto", args = { index = i } })
