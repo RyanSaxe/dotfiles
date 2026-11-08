@@ -23,9 +23,11 @@
 # (no extractor, no renderer), and `rm -rf` of the cache is always safe.
 set -eu
 
-# This script is invoked from contexts with a bare PATH (launchd) —
-# make sure tmux and friends resolve.
-PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# This script is invoked from contexts with a bare PATH (launchd), so
+# Homebrew's tmux, sketchybar, bat and uv must still resolve. Its
+# directories go last: a command on the caller's PATH wins, which is how
+# the tests replace sketchybar and bat with stubs.
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 
 # Palettes, tokens, and templates live in the component directory above
 # this script; resolving our own symlink finds them wherever the repo lives.

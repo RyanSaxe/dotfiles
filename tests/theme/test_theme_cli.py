@@ -2,7 +2,8 @@
 
 Stub executables cover everything that would otherwise touch the live
 machine: osascript (macOS appearance), bat (theme cache rebuild), pkill
-(ghostty reload signal), and mascot-accents (network extraction).
+(ghostty reload signal), sketchybar (the bar's theme_changed event), and
+mascot-accents (network extraction).
 Stdlib-only imports, like
 test_mascot_accents.py: the type checker's environment has no pytest;
 the built-in tmp_path fixture arrives by argument name.
@@ -70,6 +71,9 @@ def make_home(tmp_path: Path) -> Path:
         stub = stubs / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
+    sketchybar = stubs / "sketchybar"
+    sketchybar.write_text('#!/bin/sh\necho "$*" >>"$HOME/sketchybar.calls"\n')
+    sketchybar.chmod(0o755)
     return tmp_path
 
 
@@ -115,6 +119,19 @@ def map_projects(home: Path) -> None:
     (state_dir(home) / "mascot.conf").write_text(
         "proja=pokemon:mew\nprojb=pokemon:ditto\n"
     )
+
+
+def test_a_stub_on_the_callers_path_wins_over_homebrew(tmp_path: Path) -> None:
+    # theme adds Homebrew's directories to PATH for bare launchd contexts.
+    # Ahead of the caller's PATH, a Homebrew sketchybar shadows this stub
+    # and every render here signals the live bar. Only a machine whose
+    # Homebrew has sketchybar can catch that.
+    home, config = make_home(tmp_path), make_config(tmp_path)
+
+    result = run_theme(home, config, "apply")
+
+    assert result.returncode == 0, result.stderr
+    assert "--trigger theme_changed" in (home / "sketchybar.calls").read_text()
 
 
 def test_project_mappings_survive_metacharacter_names(tmp_path: Path) -> None:
