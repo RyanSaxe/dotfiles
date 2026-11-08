@@ -31,7 +31,7 @@ const usage = `usage:
   ws ls [--json]                     list worktrees and their agents
   ws rm NAME [--force]               close a worktree's session, remove it and delete its branch,
                                      but without --force it refuses uncommitted changes and keeps an unmerged branch
-  ws pick NAME [--client ID]         open a popup: reviews
+  ws pick NAME [--client ID]         open a popup: go, worktrees, reviews, tasks or agents
 Layouts are ~/.config/ws/layouts/NAME.toml. Extra folders for go are ~/.config/ws/bookmarks.
 `
 
