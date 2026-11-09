@@ -111,8 +111,8 @@ def validate_settings() -> None:
         if not isinstance(command, str) or not command.endswith("statusline.js"):
             raise HarnessError(f"{name} statusLine must invoke statusline.js")
 
-    codex_path = HARNESS_ROOT / "codex/managed_config.toml"
-    tomllib.loads(codex_path.read_text())
+    for codex_file in ("managed_config.toml", "requirements.toml"):
+        tomllib.loads((HARNESS_ROOT / "codex" / codex_file).read_text())
 
 
 def validate_statusline() -> None:
@@ -224,6 +224,11 @@ def validate_notify_pushover() -> None:
         "error": "rate_limit",
         "error_details": "429 Too Many Requests",
     }
+    codex_permission: dict[str, JsonValue] = {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Bash",
+        "tool_input": {"command": "git push"},
+    }
     no_keys = {"PUSHOVER_USER": "", "PUSHOVER_TOKEN": ""}
     recent_input = {"STUB_IDLE_NS": str(5 * 10**9)}
     cases: tuple[
@@ -252,6 +257,13 @@ def validate_notify_pushover() -> None:
             failure,
             {},
             push("project · Claude Code failed: rate_limit", "429 Too Many Requests"),
+        ),
+        (
+            "Codex permission request",
+            "Codex",
+            codex_permission,
+            {},
+            push("project · Codex wants permission", "git push"),
         ),
         (
             "turn another Stop hook continued",

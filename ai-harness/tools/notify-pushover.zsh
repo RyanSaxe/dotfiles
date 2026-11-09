@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Sends a Pushover push for the agent hook event on stdin: a finished turn, a
-# permission prompt or question, or a failed turn. Claude Code calls it from
-# its hooks, with the agent's name as $1.
+# permission prompt or question, or a failed turn. Claude Code and Codex call
+# it from their hooks, with the agent's name as $1.
 #
 # The keys come from PUSHOVER_USER and PUSHOVER_TOKEN, or from the login
 # keychain (service "pushover", accounts "user" and "token"). Without them it
@@ -24,13 +24,16 @@ if (($+commands[ioreg])); then
   ((${idle:-0} >= ${PUSHOVER_IDLE:-60})) || exit 0
 fi
 
-# Each event's own words. A Stop that another hook continued has not ended
-# the turn.
+# Each event's own words: Claude Code sends Stop, Notification and
+# StopFailure, Codex sends Stop and PermissionRequest. A Stop that another
+# hook continued has not ended the turn.
 fields=$(jq -r '
   if .stop_hook_active then empty
   elif .hook_event_name == "Stop" then "done", (.last_assistant_message // "")
   elif .hook_event_name == "Notification" then (.title // "needs you"), (.message // "")
   elif .hook_event_name == "StopFailure" then "failed: \(.error)", (.error_details // .last_assistant_message // "")
+  elif .hook_event_name == "PermissionRequest" then "wants permission",
+    (.tool_input.description // .tool_input.command // .tool_name // "")
   else empty end
   | gsub("\n"; " ")' <<<"$event" 2>/dev/null) || exit 0
 [[ -n $fields ]] || exit 0

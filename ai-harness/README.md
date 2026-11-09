@@ -107,7 +107,7 @@ Harness-specific files use the native format of each CLI.
 | ------- | --------------------------- | -------------------------------- | ------------------------- |
 | Claude  | `claude/settings.json`      | `claude/agents/<name>.md`        | `claude/hooks/hooks.json` |
 | Copilot | `copilot/settings.json`     | `copilot/agents/<name>.agent.md` | `copilot/hooks.json`      |
-| Codex   | `codex/managed_config.toml` | `codex/agents/<name>.toml`       | native user/project state |
+| Codex   | `codex/managed_config.toml` | `codex/agents/<name>.toml`       | `codex/requirements.toml` |
 
 Add Claude and Copilot agent or hook directories to their plugin manifests
 when the first implementation is added. Codex agent files are linked
@@ -197,7 +197,17 @@ The title names the project, the agent and the event, such as
 or what it is asking for.
 
 Claude Code calls it from the `Stop`, `Notification` and `StopFailure` hooks
-in `claude/hooks/hooks.json`.
+in `claude/hooks/hooks.json`. Codex calls it from the `Stop` and
+`PermissionRequest` hooks in `codex/requirements.toml`, and the installer
+links that file and the script into `/etc/codex`:
+
+```text
+/etc/codex/requirements.toml         -> ai-harness/codex/requirements.toml
+/etc/codex/hooks/notify-pushover.zsh -> ai-harness/tools/notify-pushover.zsh
+```
+
+Codex treats hooks from `requirements.toml` as managed and runs them without
+a trust prompt in `/hooks`.
 
 The script reads the keys from `PUSHOVER_USER` and `PUSHOVER_TOKEN`, or from
 the login keychain:

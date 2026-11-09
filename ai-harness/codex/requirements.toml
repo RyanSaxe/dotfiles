@@ -1,0 +1,18 @@
+# Codex reads this file as /etc/codex/requirements.toml. Hooks defined here
+# are managed: Codex trusts them by policy, so they need no review in /hooks.
+# It holds hooks only, because every other key here would be enforced.
+
+[hooks]
+managed_dir = "/etc/codex/hooks"
+
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "/etc/codex/hooks/notify-pushover.zsh Codex"
+
+[[hooks.PermissionRequest]]
+
+[[hooks.PermissionRequest.hooks]]
+type = "command"
+command = "/etc/codex/hooks/notify-pushover.zsh Codex"

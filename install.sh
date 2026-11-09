@@ -356,6 +356,8 @@ install_ai_harness() {
   link_owned "$AI_HARNESS_SOURCE/references" "$HOME/.codex/references"
   link_system_owned "$AI_HARNESS_SOURCE/codex/managed_config.toml" "/etc/codex/managed_config.toml"
   link_system_owned "$AI_HARNESS_SOURCE/skills" "/etc/codex/skills"
+  link_system_owned "$AI_HARNESS_SOURCE/codex/requirements.toml" "/etc/codex/requirements.toml"
+  link_system_owned "$AI_HARNESS_SOURCE/tools/notify-pushover.zsh" "/etc/codex/hooks/notify-pushover.zsh"
 
   # ~/.codex/config.toml is Codex's own mutable state and the installer does
   # not edit it. Portable defaults live in managed config now, so a top-level
