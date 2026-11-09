@@ -1,6 +1,5 @@
 # Backlog
 
-- [ ] Improve the notification service (for example, replace ntfy with Pushover).
 - [x] Make rail daemon startup singleton-safe after tmux or host restarts.
 
   - Launch paths: `rail ensure-daemon` can currently start from three paths at

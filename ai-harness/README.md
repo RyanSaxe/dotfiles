@@ -188,6 +188,36 @@ They do not define a second palette. Claude and Copilot call the shared
 `statusline.js`; Codex uses its native status-line items and the generated
 `dotfiles.tmTheme` in `~/.codex/themes`.
 
+## Phone notifications
+
+`tools/notify-pushover.zsh` sends a [Pushover](https://pushover.net) push
+when an agent finishes a turn, asks for permission or a question, or fails.
+The title names the project, the agent and the event, such as
+`dotfiles · Claude Code done`, and the message is the agent's last message
+or what it is asking for.
+
+Claude Code calls it from the `Stop`, `Notification` and `StopFailure` hooks
+in `claude/hooks/hooks.json`.
+
+The script reads the keys from `PUSHOVER_USER` and `PUSHOVER_TOKEN`, or from
+the login keychain:
+
+```sh
+security add-generic-password -s pushover -a user -w
+security add-generic-password -s pushover -a token -w
+```
+
+Each command asks for the value. Without the keys the hook does nothing. On
+macOS it also does nothing when the keyboard or mouse was used in the last 60
+seconds, or in the last `PUSHOVER_IDLE` seconds when the agent's environment
+sets it. A session loads the hooks when it starts. To send a test push from
+the dotfiles root:
+
+```sh
+echo '{"hook_event_name": "Stop", "last_assistant_message": "test"}' |
+  PUSHOVER_IDLE=0 ai-harness/tools/notify-pushover.zsh test
+```
+
 ## Extending the harness
 
 1. Put portable content in `skills/`, `references/`, or `tools/`.
@@ -216,7 +246,8 @@ copilot --plugin-dir ai-harness plugin list
 ```
 
 The repository check validates manifests, settings syntax, the shared status
-line, and every skill with the Agent Skills reference validator. The
+line, the push hook's events, and every skill with the Agent Skills reference
+validator. The
 configuration was last checked against Claude Code 2.1.221, Codex CLI 0.149.0,
 and Copilot CLI 1.0.80.
 
