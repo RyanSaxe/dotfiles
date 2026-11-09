@@ -24,6 +24,13 @@ jobs:
           sudo apt-get install -y zsh ripgrep
           zsh --version
 
+      # The go (ws) hook vets and tests ws with the Go version its go.mod
+      # names.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clis/workspace/go.mod
+          cache-dependency-path: clis/workspace/go.sum
+
       - name: Install StyLua
         run: |
           npm install --global --prefix "$HOME/.local" @johnnymorganz/stylua-bin@2.5.2

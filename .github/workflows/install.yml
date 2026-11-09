@@ -62,6 +62,7 @@ jobs:
           command -v byor
           command -v prek
           command -v nvim
+          ws --help
 
       - name: a pair checkout is linked and stays ignored in every worktree
         # RyanSaxe/pair is private, so a stand-in holds the two things the

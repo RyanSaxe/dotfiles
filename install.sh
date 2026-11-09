@@ -136,9 +136,9 @@ ensure_package_manager() {
 # One inventory per package manager. POSIX sh has no arrays: these are
 # space-separated words, expanded unquoted on purpose (hence the shellcheck
 # disables at each use).
-CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua jq'
+CORE_BREW_FORMULAS='git gh git-delta uv starship fzf tmux node bat fd ripgrep rsync neovim lua-language-server stylua jq go'
 # fd-find: apt names the binary fdfind; aliases.zsh renames it back.
-CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync jq'
+CORE_APT_PACKAGES='git gh git-delta curl zsh fzf tmux nodejs npm bat fd-find ripgrep rsync jq golang-go'
 STYLUA_NPM_PACKAGE='@johnnymorganz/stylua-bin@2.5.2'
 MAC_BREW_FORMULAS='sketchybar'
 MAC_BREW_CASKS='ghostty aerospace font-jetbrains-mono-nerd-font karabiner-elements'
@@ -173,6 +173,13 @@ install_zsh_plugins() {
 install_rail() {
   (cd "$RAIL_DIR" && npm install --no-fund --no-audit --silent)
   (cd "$RAIL_DIR" && npm run --silent build)
+}
+
+# ws (clis/workspace) is a Go program, so it is built rather than linked, and
+# every run rebuilds it. GOTOOLCHAIN=auto lets an older distro go fetch the
+# version go.mod names.
+install_ws() {
+  GOTOOLCHAIN=auto go -C "$REPO_ROOT/clis/workspace" build -o "$HOME/.local/bin/ws" .
 }
 
 install_stylua_linux() {
@@ -539,6 +546,7 @@ install_tier_packages() {
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
+    install_ws
     install_latex_converter
     ;;
   core:Linux)
@@ -556,6 +564,7 @@ install_tier_packages() {
     ensure_zsh_login_shell
     install_zsh_plugins
     install_rail
+    install_ws
     install_latex_converter
     ;;
   agents:Darwin | agents:Linux)

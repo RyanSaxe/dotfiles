@@ -31,6 +31,7 @@ it is included by the default install and can be run separately with
 | `workmux`    | global worktree-agent defaults, status integration, and ignored-file replication                      |
 | `git`        | git + gh, delta as pager                                                                              |
 | `bat`        | `cat` with syntax highlighting, themed from the same tokens                                           |
+| `clis`       | `ws` for worktree sessions and popups in Rex or tmux, `vault` for notes and tasks, and `repo-size`    |
 | `theme`      | the theming pipeline                                                                                  |
 | `tiers`      | which packages install on which machines                                                              |
 

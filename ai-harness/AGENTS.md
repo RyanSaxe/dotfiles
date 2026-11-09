@@ -97,10 +97,10 @@ understand → isolate → plan → implement → test → verify
 
 ### Isolate the Work
 
-Use Workmux for feature development that can be isolated in a worktree. Create
-or resume the worktree before editing. Do not create a nested worktree when the
-task is already in one. Read-only investigation and genuinely trivial changes
-do not require a new worktree.
+Use `ws` for feature development that can be isolated in a worktree, as the
+worktrees skill describes. Create or resume the worktree before editing. Do
+not create a nested worktree when the task is already in one. Read-only
+investigation and genuinely trivial changes do not require a new worktree.
 
 ### Development Practices
 

@@ -251,3 +251,18 @@ repos:
         entry: uv run --no-project --with pytest pytest -q tests/vault
         pass_filenames: false
         files: "^clis/vault/|^tests/vault/"
+
+      # ws, the Go program in clis/workspace: gofmt rewrites files like the
+      # other formatters, then vet and its tests. GOTOOLCHAIN=auto lets a
+      # distro go older than go.mod fetch the version go.mod names.
+      - id: go-ws
+        name: go (ws)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "cd clis/workspace && gofmt -w . && GOTOOLCHAIN=auto go vet ./... && GOTOOLCHAIN=auto go test ./...",
+          ]
+        pass_filenames: false
+        files: "^clis/workspace/"
