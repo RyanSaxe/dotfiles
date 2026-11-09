@@ -1,9 +1,9 @@
 /*
  * Window frame shader for Ghostty.
  *
- * Paints a ring around the window edge in the theme's darkest background
- * tier, so every surface — bare shell, nvim, any TUI — sits inside a dark
- * chrome that the terminal sidebar leans into. Ghostty has no
+ * Paints a ring around the window edge in the palette's chrome color, so
+ * every surface (bare shell, nvim, any TUI) sits inside chrome the
+ * terminal sidebar leans into. Ghostty has no
  * "padding in a custom color" option; this shader is that option.
  *
  * FRAME_PT is in POINTS and must equal window-padding-x/y in the ghostty
@@ -22,7 +22,7 @@
  * the same treatment.
  */
 
-#define FRAME_HEX 0x{{crust_hex}}
+#define FRAME_HEX 0x{{chrome_hex}}
 #define FRAME_PT 19.0
 
 vec3 frameColor() {
@@ -46,8 +46,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // Hard edge, not a gradient. framePx is a whole number of device
     // pixels and lands exactly on a pixel boundary, so there is nothing
     // to anti-alias — and a one-pixel blend between the ring and the
-    // content is a visible seam the moment the two differ in lightness,
-    // which is precisely the inner-light / outer-dark case.
+    // content is a visible seam whenever the two differ in lightness
+    // (chrome against a bright buffer, say).
     float ring = edge < framePx ? 1.0 : 0.0;
     fragColor = vec4(mix(color.rgb, frameColor(), ring), color.a);
 }

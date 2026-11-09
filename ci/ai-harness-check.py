@@ -111,8 +111,8 @@ def validate_settings() -> None:
         if not isinstance(command, str) or not command.endswith("statusline.js"):
             raise HarnessError(f"{name} statusLine must invoke statusline.js")
 
-    codex_path = HARNESS_ROOT / "codex/managed_config.toml"
-    tomllib.loads(codex_path.read_text())
+    for codex_file in ("managed_config.toml", "requirements.toml"):
+        tomllib.loads((HARNESS_ROOT / "codex" / codex_file).read_text())
 
 
 def validate_statusline() -> None:
@@ -159,8 +159,148 @@ def validate_statusline() -> None:
             "Claude and Copilot payloads produced different status lines: "
             f"{outputs[0]!r} != {outputs[1]!r}"
         )
-    if not all(value in outputs[0] for value in ("project", "Opus/xhigh", "75% left")):
+    if not all(value in outputs[0] for value in ("project", "Opus xhigh", "75% left")):
         raise HarnessError(f"statusline omitted expected context: {outputs[0]!r}")
+
+
+# The curl stub writes each form field to the descriptor the check reads. The
+# ioreg and security stubs stand in for the Mac's input idle time and the
+# login keychain, so the check never reads real keys or sends a push.
+NOTIFY_STUBS = {
+    "curl": """#!/usr/bin/env zsh
+while (($#)); do
+  [[ $1 == --form-string ]] && print -r -u $STUB_FD -- $2
+  shift
+done
+""",
+    "ioreg": """#!/bin/sh
+echo "    |   \\"HIDIdleTime\\" = $STUB_IDLE_NS"
+""",
+    "security": "#!/bin/sh\nexit 44\n",
+}
+
+
+def send_notify_event(
+    agent: str, event: dict[str, JsonValue], env: dict[str, str]
+) -> dict[str, str]:
+    zsh = shutil.which("zsh")
+    if zsh is None or shutil.which("jq") is None:
+        raise HarnessError("zsh and jq are required to run notify-pushover.zsh")
+
+    read_fd, write_fd = os.pipe()
+    with subprocess.Popen(
+        [zsh, "-f", str(HARNESS_ROOT / "tools/notify-pushover.zsh"), agent],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env={**env, "STUB_FD": str(write_fd)},
+        pass_fds=(write_fd,),
+        text=True,
+    ) as process:
+        os.close(write_fd)
+        process.communicate(json.dumps(event))
+    # curl runs in the background after the script exits. Reading to the end
+    # of the pipe waits for it, because curl holds the write end open too.
+    with os.fdopen(read_fd, encoding="utf-8") as fields:
+        return dict(line.split("=", 1) for line in fields.read().splitlines())
+
+
+def validate_notify_pushover() -> None:
+    def push(title: str, message: str) -> dict[str, str]:
+        return {"token": "T", "user": "U", "title": title, "message": message}
+
+    stop: dict[str, JsonValue] = {
+        "hook_event_name": "Stop",
+        "stop_hook_active": False,
+        "last_assistant_message": "Tests pass.\nPR opened.",
+    }
+    permission_prompt: dict[str, JsonValue] = {
+        "hook_event_name": "Notification",
+        "notification_type": "permission_prompt",
+        "message": "Claude needs your permission to use Bash",
+    }
+    failure: dict[str, JsonValue] = {
+        "hook_event_name": "StopFailure",
+        "error": "rate_limit",
+        "error_details": "429 Too Many Requests",
+    }
+    codex_permission: dict[str, JsonValue] = {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Bash",
+        "tool_input": {"command": "git push"},
+    }
+    no_keys = {"PUSHOVER_USER": "", "PUSHOVER_TOKEN": ""}
+    recent_input = {"STUB_IDLE_NS": str(5 * 10**9)}
+    cases: tuple[
+        tuple[str, str, dict[str, JsonValue], dict[str, str], dict[str, str]], ...
+    ] = (
+        (
+            "finished turn",
+            "Claude Code",
+            stop,
+            {},
+            push("project · Claude Code done", "Tests pass. PR opened."),
+        ),
+        (
+            "permission prompt",
+            "Claude Code",
+            permission_prompt,
+            {},
+            push(
+                "project · Claude Code needs you",
+                "Claude needs your permission to use Bash",
+            ),
+        ),
+        (
+            "failed turn",
+            "Claude Code",
+            failure,
+            {},
+            push("project · Claude Code failed: rate_limit", "429 Too Many Requests"),
+        ),
+        (
+            "Codex permission request",
+            "Codex",
+            codex_permission,
+            {},
+            push("project · Codex wants permission", "git push"),
+        ),
+        (
+            "turn another Stop hook continued",
+            "Claude Code",
+            {**stop, "stop_hook_active": True},
+            {},
+            {},
+        ),
+        ("input 5 seconds ago", "Claude Code", stop, recent_input, {}),
+        ("no keys", "Claude Code", stop, no_keys, {}),
+    )
+
+    with tempfile.TemporaryDirectory() as scratch:
+        stubs = Path(scratch) / "bin"
+        stubs.mkdir()
+        for name, body in NOTIFY_STUBS.items():
+            (stubs / name).write_text(body)
+            (stubs / name).chmod(0o755)
+        project = Path(scratch) / "project"
+        project.mkdir()
+        env = {
+            "PATH": f"{stubs}:{os.environ['PATH']}",
+            "HOME": scratch,
+            "GIT_CEILING_DIRECTORIES": scratch,
+            "PUSHOVER_USER": "U",
+            "PUSHOVER_TOKEN": "T",
+            "STUB_IDLE_NS": str(120 * 10**9),
+        }
+
+        for label, agent, event, overrides, expected in cases:
+            sent = send_notify_event(
+                agent, {**event, "cwd": str(project)}, {**env, **overrides}
+            )
+            if sent != expected:
+                raise HarnessError(
+                    f"notify-pushover {label}: expected {expected!r}, sent {sent!r}"
+                )
 
 
 def main() -> int:
@@ -169,6 +309,7 @@ def main() -> int:
         validate_skills,
         validate_settings,
         validate_statusline,
+        validate_notify_pushover,
     )
     try:
         for check in checks:

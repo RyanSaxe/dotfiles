@@ -9,7 +9,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # The harness check builds a document against the commit it explains,
+      # which a shallow checkout does not have.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
 
       # zsh runs the workmux hook checks; ripgrep is what the vault
@@ -19,6 +23,13 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y zsh ripgrep
           zsh --version
+
+      # The go (ws) hook vets and tests ws with the Go version its go.mod
+      # names.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clis/workspace/go.mod
+          cache-dependency-path: clis/workspace/go.sum
 
       - name: Install StyLua
         run: |

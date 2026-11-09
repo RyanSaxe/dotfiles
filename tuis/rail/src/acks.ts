@@ -67,14 +67,22 @@ function visitedPaneIds(
 // Advance acks for visited waiting/done agents, prune panes that no longer
 // exist, and persist when anything moved. Working is never acknowledged: it
 // is live information, not a notification.
+//
+// A visit only counts while someone is present at this machine (`present`,
+// from HID input idle). A phone client parked on the agent's window keeps
+// reporting focus long after it goes in a pocket; without the presence
+// gate it silently acks every transition and the phone push never fires.
 export function updateAcks(
   acks: AckStore,
   agents: Agent[],
   panes: Pane[],
   focusedSessions: Set<string>,
+  present: boolean,
 ): Set<string> {
   let changed = false;
-  const visited = visitedPaneIds(agents, panes, focusedSessions);
+  const visited = present
+    ? visitedPaneIds(agents, panes, focusedSessions)
+    : new Set<string>();
   const live = new Set(agents.map((agent) => agent.paneId));
 
   for (const paneId of Object.keys(acks)) {

@@ -1,5 +1,5 @@
 -- Per-window chrome. There is no statusline at all: it spanned the full
--- width and cut the outer surface off before the terminal's bottom edge,
+-- width and cut the chrome surface off before the terminal's bottom edge,
 -- so a right-hand explorer never reached the floor. Global state (mode,
 -- recording, branch) moved to the tab row, which is genuinely global;
 -- what is left here is per-window and belongs under the tab row —

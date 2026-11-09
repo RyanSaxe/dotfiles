@@ -31,6 +31,7 @@ it is included by the default install and can be run separately with
 | `workmux`    | global worktree-agent defaults, status integration, and ignored-file replication                      |
 | `git`        | git + gh, delta as pager                                                                              |
 | `bat`        | `cat` with syntax highlighting, themed from the same tokens                                           |
+| `clis`       | `ws` for worktree sessions and popups in Rex or tmux, `vault` for notes and tasks, and `repo-size`    |
 | `theme`      | the theming pipeline                                                                                  |
 | `tiers`      | which packages install on which machines                                                              |
 
@@ -55,17 +56,17 @@ chord that isn't listed fails the build.
 
 ## One theme, everywhere
 
-Catppuccin rendered from a single token file into every tool. No config
-hardcodes a color:
+One palette per mode rendered from a single token file into every tool. No
+config hardcodes a color:
 
 ```sh
 theme dark
-theme inner light               # light terminal inside dark chrome
+theme light
 theme mascot pokemon:gengar     # accents extracted from a mascot image
 ```
 
-Two surfaces switch independently — `inner` is content, `outer` is the chrome
-around it — which is why a light editor can sit inside a dark frame. See
+Chrome (sketchybar, the rail, the terminal frame, editor sidebars) paints
+the palette's `chrome` color, and content paints base. See
 [docs/theming.md](docs/theming.md) for the pipeline, how to add a consumer, and
 how to write a mascot provider.
 
@@ -81,5 +82,3 @@ prek run --all-files                  # run every check manually
 
 See [docs/development.md](docs/development.md) for what each check enforces,
 including how Lua is held to the same typing standard as the rest.
-
-Also: [what was considered and left out](docs/considered.md).

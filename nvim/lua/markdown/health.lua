@@ -8,9 +8,10 @@ local M = {}
 ---@type string[]
 local PARSERS = { "markdown", "markdown_inline", "html", "latex", "yaml" }
 
--- Tried in order; the first one present wins.
+-- Tried in order; the first one present wins. Exported because this is the
+-- list render-markdown is configured with: stated once, checked here.
 ---@type string[]
-local LATEX_CONVERTERS = { "utftex", "latex2text" }
+M.LATEX_CONVERTERS = { "utftex", "latex2text" }
 
 ---@param lang string
 local function check_parser(lang)
@@ -25,13 +26,13 @@ local function check_parser(lang)
 end
 
 local function check_latex_converter()
-  for _, converter in ipairs(LATEX_CONVERTERS) do
+  for _, converter in ipairs(M.LATEX_CONVERTERS) do
     if vim.fn.executable(converter) == 1 then
       vim.health.ok(("LaTeX converter installed: %s"):format(converter))
       return
     end
   end
-  vim.health.warn(("no LaTeX converter on PATH: %s"):format(table.concat(LATEX_CONVERTERS, ", ")), {
+  vim.health.warn(("no LaTeX converter on PATH: %s"):format(table.concat(M.LATEX_CONVERTERS, ", ")), {
     "macOS: `brew install utftex`",
     "elsewhere: `uv tool install pylatexenc`, which provides latex2text",
     "or set `latex = { enabled = false }` on render-markdown",

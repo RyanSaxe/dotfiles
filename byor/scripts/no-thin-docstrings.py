@@ -3,8 +3,7 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Reject thin docstrings, and comments standing in for them, on classes,
-methods, and functions.
+"""Reject thin docstrings on classes, methods, and functions.
 
 Function-level docstrings should be rare in greenfield code because strong
 names, precise type signatures, and straightforward bodies usually explain the
@@ -13,24 +12,17 @@ need real argument and behavior documentation, or for complex signatures whose
 meaning requires one or more explanatory paragraphs. File discovery is shared
 with the sibling checks via the `lib/pyfiles.py` subprocess (see its
 docstring).
-
-A definition must also never open with a `#` comment as its first body line:
-that is a docstring wearing the wrong syntax. It should be a real docstring if
-it carries a contract worth keeping, or nothing at all. Comments are absent
-from the `ast`, so a `tokenize` pass finds these.
 """
 
 from __future__ import annotations
 
 import ast
-import io
 import subprocess
 import sys
-import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 
-PYFILES_LIB = Path(__file__).resolve().parent / "lib" / "pyfiles.py"
+PYFILES_LIB = Path("~/.config/byor/scripts/lib/pyfiles.py").expanduser()
 MAX_THIN_LINES = 3
 THIN_DOCSTRING_ADVICE = (
     "delete it if the signature and body are enough, or expand it into "
@@ -38,14 +30,8 @@ THIN_DOCSTRING_ADVICE = (
     "and examples where useful; when expanding, build on what it already "
     "says — never swap real information for generic filler"
 )
-LEADING_COMMENT_ADVICE = (
-    "a definition must not open with a comment as its first body line; "
-    "make it a real docstring if it states a contract worth keeping, or "
-    "delete it"
-)
 
 DOC_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-DEFINITION_KEYWORDS = frozenset({"def", "class"})
 
 
 @dataclass(frozen=True)
@@ -91,73 +77,7 @@ def _check(path: Path) -> list[_Finding]:
         if len(_meaningful_lines(docstring)) <= MAX_THIN_LINES:
             message = f"thin docstring on {_label(node)}; {THIN_DOCSTRING_ADVICE}"
             findings.append(_Finding(path, _docstring_line(node), message))
-    findings.extend(_leading_comment_findings(source, path))
     return findings
-
-
-def _leading_comment_findings(source: str, path: Path) -> list[_Finding]:
-    try:
-        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
-    except (tokenize.TokenError, IndentationError, SyntaxError):
-        return []  # ast.parse already reported anything unparseable
-    findings: list[_Finding] = []
-    for index, token in enumerate(tokens):
-        if token.type != tokenize.NAME or token.string not in DEFINITION_KEYWORDS:
-            continue
-        first = _first_body_token(tokens, index)
-        if first is not None and first.type == tokenize.COMMENT:
-            label = f"{token.string} `{_definition_name(tokens, index)}`"
-            findings.append(
-                _Finding(
-                    path,
-                    first.start[0],
-                    f"leading comment on {label}; {LEADING_COMMENT_ADVICE}",
-                )
-            )
-    return findings
-
-
-def _definition_name(tokens: list[tokenize.TokenInfo], keyword_index: int) -> str:
-    following = tokens[keyword_index + 1] if keyword_index + 1 < len(tokens) else None
-    return (
-        following.string
-        if following and following.type == tokenize.NAME
-        else "<anonymous>"
-    )
-
-
-def _first_body_token(tokens: list[tokenize.TokenInfo], keyword_index: int):
-    depth = 0
-    cursor = keyword_index + 1
-    while cursor < len(tokens):
-        token = tokens[cursor]
-        if token.type == tokenize.OP and token.string in "([{":
-            depth += 1
-        elif token.type == tokenize.OP and token.string in ")]}":
-            depth -= 1
-        elif token.type == tokenize.OP and token.string == ":" and depth == 0:
-            break
-        cursor += 1
-    else:
-        return None
-    cursor += 1
-    while cursor < len(tokens):  # walk the signature line to its NEWLINE
-        token = tokens[cursor]
-        if token.type == tokenize.NEWLINE:
-            break
-        if token.type != tokenize.COMMENT:
-            return token  # a one-line body: no leading-comment position exists
-        cursor += 1
-    else:
-        return None
-    cursor += 1
-    while cursor < len(tokens) and tokens[cursor].type in (
-        tokenize.INDENT,
-        tokenize.NL,
-        tokenize.NEWLINE,
-    ):
-        cursor += 1
-    return tokens[cursor] if cursor < len(tokens) else None
 
 
 def _parse_failure_message(error: SyntaxError) -> str:

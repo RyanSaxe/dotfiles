@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { XDG_STATE } from "./paths.js";
@@ -54,9 +54,4 @@ export function loadRailTab(path = RAIL_TAB_PATH): RailTabId {
   } catch {
     return "agents";
   }
-}
-
-export function saveRailTab(tab: RailTabId, path = RAIL_TAB_PATH): void {
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, `${tab}\n`);
 }

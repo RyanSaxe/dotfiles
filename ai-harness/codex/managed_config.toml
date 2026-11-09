@@ -1,10 +1,23 @@
 approval_policy = "on-request"
 approvals_reviewer = "auto_review"
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
+model_reasoning_effort = "xhigh"
 service_tier = "default"
+default_permissions = "uv-tools"
 
 [features]
+daemon_auto_start = true
 fast_mode = false
+
+[permissions.uv-tools]
+description = "Workspace Auto with writable UV tool paths"
+extends = ":workspace"
+
+[permissions.uv-tools.filesystem]
+"~/.cache/uv" = "write"
+"~/.local/bin" = "write"
+"~/.local/share/uv/tools" = "write"
+"~/.local/share/uv/python" = "write"
 
 [tui]
 theme = "dotfiles"
@@ -19,3 +32,7 @@ status_line = [
   "task-progress",
 ]
 status_line_use_colors = true
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@0.0.83", "--headless"]

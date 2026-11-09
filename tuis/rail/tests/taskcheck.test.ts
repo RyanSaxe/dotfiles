@@ -32,7 +32,7 @@ const palette: Palette = {
   accent: "#d8b44a",
   notify: "#69ceea",
   base: "#1e1e2e",
-  crust: "#11111b",
+  chrome: "#1a1a27",
   surface0: "#313244",
   text: "#cdd6f4",
   dim: "#6c7086",
@@ -437,7 +437,7 @@ test("a task becomes a row in its own vocabulary", () => {
   assert.equal(item.time, "08-18");
   assert.equal(item.url, null);
   assert.equal(item.preview.headline, "Overdue since 2026-08-18");
-  assert.deepEqual(item.preview.body, ["  - [ ] something else"]);
+  assert.deepEqual(item.preview.body(), ["  - [ ] something else"]);
   assert.ok(item.preview.context.includes("section feat/vault-rail"));
   assert.ok(item.preview.context.includes("file projects/dotfiles/TODO.md:7"));
 });

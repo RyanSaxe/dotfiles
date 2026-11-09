@@ -7,8 +7,7 @@
 # commit.
 #
 # Editor parity: nvim resolves project-local tools first (.venv/bin via
-# venv.zsh, node_modules/.bin via conform), then globals. See
-# docs/v2-plan.md#toolchain.
+# venv.zsh, node_modules/.bin via conform), then globals.
 
 fail_fast: false
 
@@ -49,7 +48,7 @@ repos:
 
   # ---------------------------------------------------------------- Shell
   # POSIX sh only — zsh interactive config is deliberately unlinted
-  # (shellcheck has no zsh dialect; see docs/v2-plan.md#shell-language-split).
+  # (shellcheck has no zsh dialect).
   # sketchybar's plugins and the workmux helpers are zsh too
   # (shebang, not extension), same reason.
   # zsh/ is excluded per-file, not as a tree: prompt-segments.sh lives there
@@ -80,7 +79,7 @@ repos:
         types_or: [html, css, javascript, ts, json, yaml, markdown]
         # lazy.nvim owns its lockfile's formatting and rewrites it on
         # every sync; reformatting it here is perpetual churn.
-        exclude: lazy-lock\.json$
+        exclude: 'lazy-lock\.json$'
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.49.1
@@ -234,6 +233,15 @@ repos:
         pass_filenames: false
         files: "^theme/|^tests/theme/"
 
+      # The prompt collector against throwaway repos, run by dash as the
+      # precmd runs it.
+      - id: prompt-tests
+        name: pytest (prompt)
+        language: system
+        entry: uv run --no-project --with pytest pytest -q tests/zsh
+        pass_filenames: false
+        files: "^zsh/prompt-segments\\.sh$|^tests/zsh/"
+
       # The vault CLI against scratch vaults: the init/check contract, the
       # task grammar, and the writes. Needs ripgrep for the .ignore check
       # (the cases that do skip cleanly without it).
@@ -243,3 +251,18 @@ repos:
         entry: uv run --no-project --with pytest pytest -q tests/vault
         pass_filenames: false
         files: "^clis/vault/|^tests/vault/"
+
+      # ws, the Go program in clis/workspace: gofmt rewrites files like the
+      # other formatters, then vet and its tests. GOTOOLCHAIN=auto lets a
+      # distro go older than go.mod fetch the version go.mod names.
+      - id: go-ws
+        name: go (ws)
+        language: system
+        entry: sh
+        args:
+          [
+            "-c",
+            "cd clis/workspace && gofmt -w . && GOTOOLCHAIN=auto go vet ./... && GOTOOLCHAIN=auto go test ./...",
+          ]
+        pass_filenames: false
+        files: "^clis/workspace/"

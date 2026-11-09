@@ -3,15 +3,24 @@
 
 agent: codex
 
-# Workmux invokes the binary directly, so make its reasoning override explicit
-# instead of relying on the interactive zsh wrapper.
+# Workmux invokes the binary directly. Keep the model override on a dedicated
+# flag; reasoning effort and permissions come from Codex's shared config.
 agents:
   codex:
     type: codex
     command: codex
     args:
-      - --config
-      - 'model_reasoning_effort="max"'
+      - --model
+      - gpt-6-luna
+  # Selected with `workmux add -a claude-opus`.
+  claude-opus:
+    type: claude
+    command: claude
+    args:
+      - --model
+      - claude-opus-5-5
+      - --effort
+      - xhigh
 
 # Named pane layouts, selected with `workmux add -l <name>`.
 #

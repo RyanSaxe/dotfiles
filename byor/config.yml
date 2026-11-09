@@ -1,19 +1,30 @@
 version: 1
 paths:
   rules: rules
-  repos: repos.yml
   packages: packages
-  commands: commands
+  repos: repos.yml
 ast_grep:
   command: auto
-output:
-  concise: true
 ai:
   agents:
-    - claude-code
     - codex
     - copilot
-    - opencode
-    - pi
     - skill
+output:
+  concise: true
 checks: []
+init:
+  private: true
+  packages:
+    - style
+profiles:
+  existing:
+    description: Exclude greenfield rules and checks for mature repositories.
+    rules:
+      excluded_tags:
+        - greenfield
+      excluded_rule_ids: []
+    checks:
+      excluded_tags:
+        - greenfield
+      excluded: []

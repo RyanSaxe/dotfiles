@@ -46,42 +46,43 @@ const UNFOCUSED = new Set<string>();
 
 const acks = loadAcks();
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(false, true), FOCUSED).size,
+  updateAcks(acks, [agent(100)], pane(false, true), FOCUSED, true).size,
   0,
   "unvisited stays colored",
 );
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(true, true), UNFOCUSED).size,
+  updateAcks(acks, [agent(100)], pane(true, true), UNFOCUSED, true).size,
   0,
   "unfocused terminal does not ack",
 );
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(true, true), new Set(["elsewhere"])).size,
+  updateAcks(acks, [agent(100)], pane(true, true), new Set(["elsewhere"]), true)
+    .size,
   0,
   "focus on another session does not ack this one",
 );
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(true, true), FOCUSED).size,
+  updateAcks(acks, [agent(100)], pane(true, true), FOCUSED, true).size,
   1,
   "visiting acks",
 );
 assert.equal(
-  updateAcks(acks, [agent(100)], pane(false, true), FOCUSED).size,
+  updateAcks(acks, [agent(100)], pane(false, true), FOCUSED, true).size,
   1,
   "ack persists after leaving",
 );
 assert.equal(
-  updateAcks(acks, [agent(200)], pane(false, true), FOCUSED).size,
+  updateAcks(acks, [agent(200)], pane(false, true), FOCUSED, true).size,
   0,
   "new status re-fires",
 );
 assert.equal(
-  updateAcks(acks, [agent(200)], pane(true, false), FOCUSED).size,
+  updateAcks(acks, [agent(200)], pane(true, false), FOCUSED, true).size,
   0,
   "detached visit does not ack",
 );
 assert.equal(
-  updateAcks(acks, [agent(300, 10_000)], pane(true, true), FOCUSED).size,
+  updateAcks(acks, [agent(300, 10_000)], pane(true, true), FOCUSED, true).size,
   1,
   "a visited heartbeat does not change the transition being acknowledged",
 );
@@ -89,5 +90,15 @@ assert.equal(
   loadAcks()["%1"],
   300,
   "acks persist the status transition timestamp",
+);
+assert.equal(
+  updateAcks(acks, [agent(400)], pane(true, true), FOCUSED, false).size,
+  0,
+  "a focused visit while away from the machine does not ack",
+);
+assert.equal(
+  updateAcks(acks, [agent(400)], pane(true, true), FOCUSED, true).size,
+  1,
+  "the same visit acks once presence returns",
 );
 console.log("ack lifecycle ok");

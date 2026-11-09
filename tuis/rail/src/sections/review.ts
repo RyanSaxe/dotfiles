@@ -9,7 +9,7 @@ function itemColor(
   item: ReviewSnapshot["items"][number],
   palette: Palette,
 ): string {
-  if (item.kind === "ci") return palette.red;
+  if (item.reasons.some((reason) => reason.kind === "ci")) return palette.red;
   return item.targetKind === "issue" ? palette.mauve : palette.peach;
 }
 
@@ -43,7 +43,16 @@ function age(createdAt: string): string {
 }
 
 function summary(item: ReviewSnapshot["items"][number]): string {
-  return item.summary.replace(/\s+/g, " ").trim();
+  return item.reasons
+    .map((reason) => reason.summary.replace(/\s+/g, " ").trim())
+    .join(" · ");
+}
+
+function latestActivity(item: ReviewSnapshot["items"][number]): string {
+  return item.reasons.reduce(
+    (latest, reason) => (reason.createdAt > latest ? reason.createdAt : latest),
+    item.reasons[0]?.createdAt ?? "",
+  );
 }
 
 export function reviewRows(
@@ -80,7 +89,7 @@ export function reviewRows(
     // rail width. Summary and age are supporting text and stay dim, so a
     // clipped summary can never take the signal with it.
     const identityFg = blend(itemColor(item, palette), bg, DIM_KEEP);
-    const elapsed = age(item.createdAt);
+    const elapsed = age(latestActivity(item));
     // The pill is three cells, then a space; the timer sits flush right with
     // a cell of air. Whatever is left is the identity's, and the summary gets
     // only what the identity does not need.
