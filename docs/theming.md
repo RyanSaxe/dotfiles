@@ -17,10 +17,12 @@ theme mascot local:cat.png      # a machine-local image
 ## Two surfaces
 
 Chrome and content are different tiers of one palette. Anything that touches
-a terminal edge — sketchybar, the rail, tmux separators, the ghostty frame
-shader, editor sidebars — paints crust, the deepest background tier; content
-(buffers, shells, prompts) paints base. A float hovering over a buffer is
-content; a sidebar running to the edge continues the tmux rail and is chrome.
+a terminal edge paints the `chrome` palette key: sketchybar, the rail, tmux
+pane borders, the ghostty frame shader, and Neovim's sidebars, tab row and
+window separators. In dark mode `chrome` matches the sidebar of the Rex
+terminal app. Content (buffers, shells, prompts) paints base. A float
+hovering over a buffer is content. A sidebar running to the edge continues
+the tmux rail and is chrome.
 
 ## The pipeline
 
@@ -42,9 +44,14 @@ The dark palette preserves upstream Catppuccin Mocha values; the light
 palette keeps Latte's accent hues on a warmer, higher-contrast neutral ramp.
 The theme's identity lives in the **role assignments**, not in custom accent
 hexes. The palettes also contain dotfiles-owned keys used by generated
-consumers: `semantic_*` keys for diff rendering and `os_window_stroke` for
-the macOS window border. Both palettes must define the same key set so every
-consumer can render in either mode; CI checks that invariant.
+consumers: `semantic_*` keys for diff rendering, `chrome` for the chrome
+surface, and `os_window_stroke` for the macOS window border. Both palettes
+must define the same key set so every consumer can render in either mode; CI
+checks that invariant.
+
+The dark `os_window_stroke` value was measured with the macOS window hairline
+over crust. The window edge paints `chrome`, so that value has not been
+checked against the hairline the OS draws there.
 
 ### Neovim
 

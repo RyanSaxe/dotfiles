@@ -64,8 +64,8 @@ theme light
 theme mascot pokemon:gengar     # accents extracted from a mascot image
 ```
 
-Chrome (sketchybar, the rail, sidebars) paints the deepest background tier;
-content paints base — one palette, two surfaces. See
+Chrome (sketchybar, the rail, the terminal frame, editor sidebars) paints
+the palette's `chrome` color, and content paints base. See
 [docs/theming.md](docs/theming.md) for the pipeline, how to add a consumer, and
 how to write a mascot provider.
 

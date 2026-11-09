@@ -1,4 +1,5 @@
--- Which windows paint on the chrome surface (crust, like the tmux rail).
+-- Which windows paint on the chrome surface (the chrome color, like the
+-- tmux rail).
 --
 -- Neovim already separates hovering from anchored chrome: floats get
 -- `NormalFloat`, everything else gets `Normal`. So the only windows that
@@ -140,7 +141,7 @@ local function is_anchored_sidebar(win)
   end
   -- The start screen is a thing you look at, not a sidebar. It is caught
   -- late rather than at startup: snacks sets `nofile` after the first pass
-  -- runs, so the dashboard only turns to crust once something else — an
+  -- runs, so the dashboard only turns to chrome once something else — an
   -- explorer, say — triggers another pass.
   if vim.bo[buf].filetype == "snacks_dashboard" then
     return false

@@ -8,7 +8,7 @@ export interface Palette {
   accent: string;
   notify: string;
   base: string;
-  crust: string;
+  chrome: string;
   surface0: string;
   text: string;
   dim: string;
@@ -31,9 +31,9 @@ export interface Palette {
   statusDone: string;
 }
 
-// The rail's slab color: the darkest palette tier, so the sidebar fuses
-// with the window frame it leans against.
-export const railBg = (palette: Palette): string => palette.crust;
+// The rail's slab color: the chrome color the window frame also paints, so
+// the sidebar fuses with the frame it leans against.
+export const railBg = (palette: Palette): string => palette.chrome;
 
 // The spec's single dim level: how much of a foreground survives when a
 // row is de-emphasized (the elsewhere section, the timers).

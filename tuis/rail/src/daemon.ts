@@ -129,7 +129,7 @@ const NO_SERVER_PATTERN = /no server running|error connecting/i;
 // erroring forever.
 const NO_SERVER_EXIT_FAILS = 5;
 // 28 content cells: five terminal columns wider than the original rail,
-// approximately 41px at the current font, plus the crust gutter. The tab
+// approximately 41px at the current font, plus the chrome gutter. The tab
 // bar derives chip positions from the registry, distributing spare cells
 // between the chips when the labels or tab count change.
 //
@@ -205,11 +205,11 @@ async function spawnRail(windowId: string): Promise<void> {
   await tmux("set-option", "-p", "-t", paneId, "@rail", "1");
   // The pane's DEFAULT background must match the frames: tmux clears a
   // pane region to its default bg before redrawing on window/session
-  // switches, and a default that differs from the rail's crust flashes
+  // switches, and a default that differs from the rail's chrome flashes
   // visibly on every switch. (Content panes don't need this — their bg
   // already equals the terminal default.)
   await tmux("select-pane", "-P", `bg=${railBg(loadPalette())}`, "-t", paneId);
-  // No per-pane border styling: borders are crust-filled globally
+  // No per-pane border styling: borders are chrome-filled globally
   // (tmux.conf), which is attribution-proof — per-pane styles only ever
   // controlled half a shared border and the active pane's style took
   // the rest.
@@ -543,7 +543,7 @@ async function renderSnapshot(
   }
   warnedNoPalette = false;
   // Keep every rail pane's default bg in step with the theme (spawn sets
-  // it once; a mode flip changes crust under all existing panes).
+  // it once; a mode flip changes chrome under all existing panes).
   const bg = railBg(palette);
   if (bg !== appliedBg) {
     for (const pane of panes) {

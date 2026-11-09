@@ -191,7 +191,7 @@ function M.apply(tokens)
   -- Chrome splits by whether a surface touches a terminal edge.
   --
   -- Floats hover over the buffer and paint the float tier; sidebars run
-  -- to an edge and continue the tmux rail on crust (see ThemeChromeNormal
+  -- to an edge and continue the tmux rail on chrome (see ThemeChromeNormal
   -- below). Accent is the common frame color, notify marks the input
   -- focus.
   hl("WinBar", { fg = r.fg_muted, bg = r.bg })
@@ -221,27 +221,27 @@ function M.apply(tokens)
   -- The chrome surface: sidebars that run to a terminal edge and read as
   -- a continuation of the tmux rail. Ordinary sidebars opt in via
   -- winhighlight; the Snacks explorer uses an active namespace in
-  -- theme.surfaces. This is the only place the chrome crust is named.
-  hl("ThemeChromeNormal", { fg = r.fg_muted, bg = p.crust })
-  hl("ThemeChromeNormalNC", { fg = r.fg_faint, bg = p.crust })
-  hl("ThemeChromeCursorLine", { bg = p.mantle })
+  -- theme.surfaces. This is the only place the chrome color is named.
+  hl("ThemeChromeNormal", { fg = r.fg_muted, bg = p.chrome })
+  hl("ThemeChromeNormalNC", { fg = r.fg_faint, bg = p.chrome })
+  hl("ThemeChromeCursorLine", { bg = p.base })
   -- The chrome copy of a picker's frame, for the explorer alone. Its only
   -- framed window is the input, and notify is the color the pickers give
   -- an input's border and title.
-  hl("ThemeChromeFrame", { fg = notify, bg = p.crust })
+  hl("ThemeChromeFrame", { fg = notify, bg = p.chrome })
 
   -- Window separators are painted bands, not hairlines: a glyph drawn in
   -- fg leaves the cell's background showing, which ghostty's always-extend
   -- then smears at the edges and which never merges with the explorer
   -- beside it. Space glyphs (see fillchars) plus a background make the
   -- divider one solid strip of chrome, exactly as on the tmux side.
-  hl("WinSeparator", { fg = p.crust, bg = p.crust })
+  hl("WinSeparator", { fg = p.chrome, bg = p.chrome })
   hl("VertSplit", { link = "WinSeparator" })
   hl("ThemeChromeWinSeparator", { link = "WinSeparator" })
   -- With no statusline, nvim still draws one as the divider between
   -- stacked windows. Blanked in options.lua, it becomes the horizontal
   -- twin of the band above.
-  hl("StatusLine", { fg = p.crust, bg = p.crust })
+  hl("StatusLine", { fg = p.chrome, bg = p.chrome })
   hl("StatusLineNC", { link = "StatusLine" })
 
   -- The tab row's state readout. These are real groups rather than
@@ -258,7 +258,7 @@ function M.apply(tokens)
     Terminal = p.green,
   }
   for name, color in pairs(modes) do
-    hl("ThemeMode" .. name, { fg = color, bg = p.crust, bold = true })
+    hl("ThemeMode" .. name, { fg = color, bg = p.chrome, bold = true })
   end
   -- The recording fade, precomputed. A cell can only hold one color, so
   -- the animation is a ramp of groups the pulse timer walks. Cosine, not
@@ -268,9 +268,9 @@ function M.apply(tokens)
   local pulse = require("theme.pulse")
   for i = 1, pulse.FRAMES do
     local wave = 0.5 + 0.5 * math.cos(2 * math.pi * (i - 1) / pulse.FRAMES)
-    hl(pulse.group(i), { fg = blend(p.red, p.crust, 0.35 + 0.65 * wave), bg = p.crust, bold = true })
+    hl(pulse.group(i), { fg = blend(p.red, p.chrome, 0.35 + 0.65 * wave), bg = p.chrome, bold = true })
   end
-  hl("ThemeBranch", { fg = r.fg_faint, bg = p.crust })
+  hl("ThemeBranch", { fg = r.fg_faint, bg = p.chrome })
 
   -- Snacks windows hover over the buffer and do not reach a terminal
   -- edge, so they paint the content surface. The explorer is scoped

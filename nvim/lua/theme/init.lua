@@ -46,6 +46,7 @@
 ---@field base string
 ---@field mantle string
 ---@field crust string
+---@field chrome string
 
 ---@class ThemeTokens
 ---@field mode "dark"|"light"
