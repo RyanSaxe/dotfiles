@@ -31,8 +31,8 @@ own sessions and agent statuses, and gh owns pull requests. `ws` asks them
 each time and keeps no copy. What it does keep is in `~/.local/state/ws`.
 `XDG_STATE_HOME` moves that folder, so a scratch run can use its own.
 
-`ws attention --watch` runs as a launchd agent on each Mac with a screen,
-and writes the files sketchybar and Reviews read:
+`ws attention --watch` runs as a launchd agent on each Mac with the `gui`
+role, and writes the files sketchybar and Reviews read:
 
 - `inbox.json`: the pull requests and issues Reviews lists, as the job last
   fetched them from GitHub

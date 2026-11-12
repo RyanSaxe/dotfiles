@@ -16,6 +16,7 @@ ai-harness/
 ├── skills/           Agent Skills: worktrees
 ├── tools/            notify-pushover.zsh, the agents' push hook, and
 │                     link-agent-skills.sh, which shares Codex's skills
+│                     with Claude Code
 ├── statusline.js     Claude Code's status line
 └── codex/            requirements.toml, Codex's managed hooks
 ```
@@ -63,11 +64,13 @@ agent's last message or what it is asking for. Claude Code calls it from its
 `Stop`, `Notification` and `StopFailure` hooks, and Codex from the managed
 `Stop` and `PermissionRequest` hooks in `codex/requirements.toml`.
 
-The keys come from `PUSHOVER_USER` and `PUSHOVER_TOKEN`, from
-`~/.config/sops-nix/secrets/pushover-user` and `pushover-token`, which each
-home switch decrypts from `secrets/secrets.yaml`, or from the login keychain.
-On macOS it does nothing while the keyboard or mouse was used in the last 60
-seconds, or `PUSHOVER_IDLE` seconds. To send a test push:
+The script takes its two keys from the first place that has them:
+`PUSHOVER_USER` and `PUSHOVER_TOKEN` in the environment, then
+`pushover-user` and `pushover-token` in `~/.config/sops-nix/secrets`, which
+each home switch decrypts from `secrets/secrets.yaml`, then the login
+keychain. On macOS it sends nothing if the keyboard or mouse was used in the
+last 60 seconds, and `PUSHOVER_IDLE` sets a different number of seconds. To
+send a test push:
 
 ```sh
 echo '{"hook_event_name": "Stop", "last_assistant_message": "test"}' |

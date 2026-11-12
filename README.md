@@ -56,10 +56,10 @@ gh auth login
 ```
 
 `-b pre-nix` renames any file the home switch would replace, such as an old
-`~/.zshrc`, to `NAME.pre-nix`. `gh auth login` signs in to GitHub with the
-gh the home switch installed, and git and Reviews use that sign-in. Rex,
-Tailscale and Google Chrome are still installed by hand, as
-[LATER.md](LATER.md) says.
+`~/.zshrc`, to `NAME.pre-nix`. The home switch installs gh, and
+`gh auth login` signs it in to GitHub for git and Reviews. Rex, Tailscale
+and Google Chrome are still installed by hand, as [LATER.md](LATER.md)
+says.
 
 ### A Linux box
 
