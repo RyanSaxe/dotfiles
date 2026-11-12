@@ -1,0 +1,52 @@
+/*
+ * Window frame shader for Ghostty.
+ *
+ * Paints a ring around the window edge in the palette's chrome color, so
+ * every surface (bare shell, nvim, any TUI) sits inside chrome the
+ * terminal sidebar leans into. Ghostty has no
+ * "padding in a custom color" option; this shader is that option.
+ *
+ * FRAME_PT is in POINTS and must equal window-padding-x/y in the ghostty
+ * config, so the ring exactly covers the padding on every display. Shaders
+ * only see device pixels, so the scale factor is inferred from the cursor:
+ * iCurrentCursor.w is the cursor height in device pixels, the cursor is
+ * one cell tall, and a cell at font-size 16 is ~20pt — so ~20px means a
+ * 1x display and ~40px means retina (macOS backing scale is only ever
+ * 1x or 2x; fractional "looks like" modes still render at 2x).
+ *
+ * THE PROBE'S ONE REQUIREMENT: every cursor shape must be a full cell
+ * tall. A short cursor reads as a low-DPI display and halves the ring —
+ * visibly, since the uncovered padding then shows whatever is beneath.
+ * nvim's stock `r-cr-o:hor20` breaks this; see guicursor in nvim's
+ * config/options.lua. Any TUI that sets a horizontal-bar cursor needs
+ * the same treatment.
+ */
+
+#define FRAME_PT 19.0
+
+vec3 frameColor() {
+    int c = FRAME_HEX;
+    return vec3(
+        float((c >> 16) & 0xFF) / 255.0,
+        float((c >> 8) & 0xFF) / 255.0,
+        float(c & 0xFF) / 255.0
+    );
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec4 color = texture(iChannel0, fragCoord.xy / iResolution.xy);
+    // Display scale from the cursor-height probe (see header comment).
+    // A zero cursor (uniform not yet populated) falls back to 1x, which
+    // can only under-paint, never cover content.
+    float scale = iCurrentCursor.w >= 30.0 ? 2.0 : 1.0;
+    float framePx = FRAME_PT * scale;
+    vec2 fromEdge = min(fragCoord.xy, iResolution.xy - fragCoord.xy);
+    float edge = min(fromEdge.x, fromEdge.y);
+    // Hard edge, not a gradient. framePx is a whole number of device
+    // pixels and lands exactly on a pixel boundary, so there is nothing
+    // to anti-alias — and a one-pixel blend between the ring and the
+    // content is a visible seam whenever the two differ in lightness
+    // (chrome against a bright buffer, say).
+    float ring = edge < framePx ? 1.0 : 0.0;
+    fragColor = vec4(mix(color.rgb, frameColor(), ring), color.a);
+}

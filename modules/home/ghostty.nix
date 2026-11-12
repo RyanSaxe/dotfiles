@@ -1,6 +1,7 @@
-# Ghostty, with its look: the config links from the checkout, and the two
-# themes are Rex's Catppuccin themes so both terminals share their colors.
-# Ghostty picks the dark or light theme by macOS's appearance.
+# Ghostty, with its look: the config links from the checkout, the two
+# themes are Rex's Catppuccin themes so both terminals share their colors,
+# and the shaders follow the theme's mode. Ghostty picks the dark or light
+# theme by macOS's appearance.
 {
   config,
   lib,
@@ -9,6 +10,7 @@
 }:
 let
   cfg = config.dotfiles;
+  linkTheme = file: config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/${file}";
 
   # Rex keeps colors as sRGB fractions, and Ghostty takes hex.
   byte =
@@ -38,5 +40,8 @@ lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
     "ghostty/config".source = config.lib.file.mkOutOfStoreSymlink "${cfg.repo}/config/ghostty/config";
     "ghostty/themes/catppuccin-mocha".text = rexTheme "Catppuccin Mocha";
     "ghostty/themes/catppuccin-latte".text = rexTheme "Catppuccin Latte";
+    # `theme` points these at one mode and has Ghostty reload them.
+    "ghostty/shaders/frame.glsl".source = linkTheme "frame.glsl";
+    "ghostty/shaders/cursor_trail.glsl".source = linkTheme "cursor_trail.glsl";
   };
 }

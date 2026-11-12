@@ -61,6 +61,17 @@ sketchybar --default "${default[@]}"
 # Custom Events (must be defined before items subscribe to them)
 # -----------------------------------------------------------------------------
 sketchybar --add event aerospace_workspace_change
+# macOS posts this whenever its appearance changes, from System Settings
+# or anywhere else, and `theme` points every app at the new mode. sketchybar
+# also runs every script once when it loads, and `theme` reloads sketchybar,
+# so the script acts only on the appearance event.
+sketchybar --add event appearance_change AppleInterfaceThemeChangedNotification
+
+sketchybar --add item theme_sync left \
+  --set theme_sync \
+  drawing=off \
+  script='[ "$SENDER" = appearance_change ] && theme' \
+  --subscribe theme_sync appearance_change
 
 # -----------------------------------------------------------------------------
 # Date (Left - far left, before workspaces)

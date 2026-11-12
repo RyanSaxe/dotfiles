@@ -165,7 +165,66 @@ autoload -Uz edit-command-line
 zle -N edit-command-line
 bindkey -M vicmd 'z' edit-command-line
 
+# ----- theme -----------------------------------------------------------
+# Each home switch renders the theme for both modes, and `theme` links
+# these names to the current one; see theme/theme.sh.
+THEME_GENERATED="$HOME/.config/theme"
+
 autoload -U add-zsh-hook
+THEME_FSH="$THEME_GENERATED/fast-syntax-highlighting.ini"
+
+if [[ -r "$THEME_GENERATED/shell-colors.zsh" ]]; then
+  _theme_shell_colors() {
+    source "$THEME_GENERATED/shell-colors.zsh"
+    # The fzf-tab popup takes colors as appended flags, never FZF_DEFAULT_OPTS.
+    if (( ${+functions[fzf-tab-complete]} && ${+FZF_THEME_COLORS} )); then
+      zstyle ':fzf-tab:*' fzf-flags $FZF_THEME_COLORS
+    fi
+  }
+  _theme_fsh() {
+    if (( $+functions[fast-theme] )) && [[ -r "$THEME_FSH" ]]; then
+      fast-theme -q "$THEME_FSH"
+    fi
+  }
+  _theme_shell_colors
+  _theme_fsh
+  # Re-apply when `theme` re-points them, so running shells follow a flip.
+  zmodload -F zsh/stat b:zstat
+  # Inode+mtime, not mtime alone: a flip points the link at the other
+  # mode's file (new inode), and two flips inside one second share a
+  # whole-second mtime.
+  _theme_stamp() {
+    # Sets REPLY. Pure builtins: this runs every precmd.
+    local -a _i _m
+    if zstat -A _i +inode "$1" 2> /dev/null && zstat -A _m +mtime "$1" 2> /dev/null; then
+      REPLY="${_i[1]}-${_m[1]}"
+    else
+      REPLY=""
+    fi
+  }
+  _theme_stamp "$THEME_GENERATED/shell-colors.zsh"
+  typeset -g _THEME_COLORS_STAMP="$REPLY"
+  _theme_stamp "$THEME_FSH"
+  typeset -g _THEME_FSH_STAMP="$REPLY"
+  # Each file has its own stamp, so a home switch that changes only one
+  # keeps the fast-theme cycle, the expensive half, off every open shell's
+  # next prompt.
+  _theme_refresh() {
+    _theme_stamp "$THEME_GENERATED/shell-colors.zsh"
+    if [[ "$REPLY" != "$_THEME_COLORS_STAMP" ]]; then
+      typeset -g _THEME_COLORS_STAMP="$REPLY"
+      _theme_shell_colors
+    fi
+    _theme_stamp "$THEME_FSH"
+    if [[ "$REPLY" != "$_THEME_FSH_STAMP" ]]; then
+      typeset -g _THEME_FSH_STAMP="$REPLY"
+      _theme_fsh
+    fi
+  }
+  add-zsh-hook precmd _theme_refresh
+fi
+
+[[ -f "$THEME_GENERATED/starship.toml" ]] && export STARSHIP_CONFIG="$THEME_GENERATED/starship.toml"
 
 # ----- prompt ----------------------------------------------------------
 # Blank line between prompts, but never above the first one: starship's

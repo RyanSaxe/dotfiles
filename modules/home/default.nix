@@ -2,6 +2,7 @@
 {
   imports = [
     ./packages.nix
+    ./theme.nix
     ./zsh.nix
     ./git.nix
     ./tmux.nix

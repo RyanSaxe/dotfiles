@@ -44,6 +44,8 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     ".claude/references".source = link "ai-harness/references";
     ".claude/statusline.js".source = link "ai-harness/statusline.js";
     ".codex/references".source = link "ai-harness/references";
+    ".codex/themes/dotfiles.tmTheme".source =
+      config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
   };
 
   programs.claude-code = {
@@ -103,6 +105,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
         };
       };
       tui = {
+        theme = "dotfiles";
         status_line = [
           "project-name"
           "git-branch"
