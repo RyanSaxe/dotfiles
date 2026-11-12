@@ -1,0 +1,58 @@
+# Ghostty configuration.
+#
+# Theme: Ghostty's terminal palette follows macOS's appearance natively via
+# the light:/dark: pair below. The two themes are Rex's Catppuccin Latte
+# and Mocha, written into ~/.config/ghostty/themes by the ghostty module,
+# so both terminals show the same 16 colors. The frame shader paints the
+# chrome ring around the terminal content.
+theme = light:catppuccin-latte,dark:catppuccin-mocha
+
+# Option is Alt: makes the alt layer real for terminal-world keybinds
+# (alt+c theme picker, alt+o sessions).
+# Cost: option no longer types accented characters (ç, ¡, …).
+macos-option-as-alt = true
+
+# ----- misc keybinds ---------------------------------------------------
+# tmux owns panes and windows; ghostty-native splits are deliberately
+# not configured.
+
+keybind = cmd+r=reload_config
+keybind = cmd+o=open_config
+
+# Multiline input for claude code (shift+enter sends ESC+CR).
+keybind = shift+enter=text:\x1b\r
+
+# ----- styling ---------------------------------------------------------
+
+font-size = 16
+
+# The frame: 19pt of symmetric padding that the frame shader (below)
+# paints in the palette's chrome color, a frame around every surface.
+# 19pt is the design's spacing unit: two terminal cells at
+# font-size 16 (2 × 9.6pt). The grid starts at (19,19). Must stay in
+# sync with FRAME_PT in config/ghostty/shaders/frame.glsl (the shader
+# detects the display scale itself). `extend-always` keeps the sub-cell
+# remainder in edge colors beneath the shader's ring; balance splits it
+# evenly.
+# Padding is symmetric: the tmux border column is chrome-colored and reads
+# as chrome, not as air, so the right side needs no compensating breather.
+# extend-always still fills the sub-cell remainder with each edge cell's
+# own background beneath the shader's ring.
+window-padding-x = 19
+window-padding-y = 19
+window-padding-color = extend-always
+# balance OFF: it redistributes padding evenly across sides, moving the
+# sub-cell remainder away from the right/bottom edges where the shader
+# expects it.
+window-padding-balance = false
+
+# Copying highlighted text needs no shortcut.
+copy-on-select = clipboard
+
+# When a TUI (Claude Code fullscreen, etc.) captures the mouse, holding
+# SHIFT while dragging forces terminal-native selection — and copy-on-select
+# fires. `never` guarantees apps can't claim shift away from the terminal.
+mouse-shift-capture = never
+
+# Title bar hidden — window moving is keyboard territory.
+macos-titlebar-style = hidden

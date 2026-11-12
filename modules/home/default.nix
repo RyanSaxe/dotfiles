@@ -6,8 +6,14 @@
     ./git.nix
     ./tmux.nix
     ./neovim.nix
+    ./rex.nix
     ./agents.nix
     ./secrets.nix
+    ./ghostty.nix
+    ./aerospace.nix
+    ./karabiner.nix
+    ./sketchybar.nix
+    ./macos.nix
   ];
 
   home = {

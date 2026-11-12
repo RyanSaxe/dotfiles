@@ -1,5 +1,8 @@
 # Machine-local environment.
 .env
 __pycache__/
+# Karabiner-Elements writes these beside karabiner.json.
+config/karabiner/assets/
+config/karabiner/automatic_backups/
 result
 result-*
