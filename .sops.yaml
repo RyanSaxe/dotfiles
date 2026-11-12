@@ -1,0 +1,9 @@
+# Each computer's age public key. A computer can open the secrets once its
+# key is listed here and `sops updatekeys secrets/secrets.yaml` has run.
+keys:
+  - &mac age1t4plplu4hgler2uy8sm950p0qj6vk7z2w3cyc6yeewr4k088fuuqmw48cx
+creation_rules:
+  - path_regex: secrets/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *mac
