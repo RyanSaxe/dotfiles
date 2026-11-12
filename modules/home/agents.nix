@@ -1,6 +1,8 @@
-# Claude Code and Codex. Both install and update themselves, so their
-# modules have no package and only merge settings into each agent's own
-# file, keeping whatever the agent writes there itself. ~/.codex/AGENTS.md
+# Claude Code and Codex. On a Mac both install and update themselves, so
+# their modules have no package. Linux installs them from nixpkgs, and
+# Claude Code only on a personal computer. Either way the modules only
+# merge settings into each agent's own file, keeping whatever the agent
+# writes there itself. ~/.codex/AGENTS.md
 # is yours, so it never comes from the repo. Skills from other installers,
 # such as byor, Rex and pair, stay with those tools.
 {
@@ -16,6 +18,10 @@ let
   pair = pkgs.callPackage ../../pkgs/pair { src = inputs.pair; };
 
   personal = lib.elem "personal" cfg.roles;
+  inherit (pkgs.stdenv.hostPlatform) isLinux;
+  # Where the agents' commands are, which the switch's own PATH leaves out.
+  agentPath =
+    if isLinux then "${config.home.path}/bin" else "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
   linkSkills = "${cfg.repo}/ai-harness/tools/link-agent-skills.sh";
 
   skills.worktrees = link "ai-harness/skills/worktrees";
@@ -54,9 +60,21 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   // skillLinks ".claude/skills"
   // skillLinks ".agents/skills";
 
+  # Codex reads its managed hooks from /etc/codex, which Home Manager can't
+  # write. A Linux computer links that folder to these files once:
+  #   sudo ln -sfn ~/.config/codex/managed /etc/codex
+  xdg.configFile = lib.mkIf isLinux (
+    lib.mapAttrs' (
+      name: source:
+      lib.nameValuePair "codex/managed/${name}" {
+        source = if builtins.isPath source then source else config.lib.file.mkOutOfStoreSymlink source;
+      }
+    ) (import ../codex-managed.nix cfg.repo)
+  );
+
   programs.claude-code = {
     enable = true;
-    package = null;
+    package = if isLinux && personal then pkgs.claude-code else null;
     mutableSettings = true;
     settings = {
       model = "opus[1m]";
@@ -84,7 +102,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
 
   programs.codex = {
     enable = true;
-    package = null;
+    package = if isLinux then pkgs.codex else null;
     mutableSettings = true;
     settings = {
       model = "gpt-6-luna";
@@ -145,9 +163,9 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       fi
     '';
     # pair's own installer, for each agent this computer has that lacks the
-    # skill. The switch's PATH has none of the agents' folders.
+    # skill.
     pairSkill = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      installed() { PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin" command -v "$1" > /dev/null; }
+      installed() { PATH="${agentPath}" command -v "$1" > /dev/null; }
       agents=""
       if installed claude && [ ! -e "$HOME/.claude/skills/pair" ]; then agents="$agents -a claude-code"; fi
       if installed codex && [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a codex"; fi
