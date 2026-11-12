@@ -5,6 +5,8 @@ on:
     branches: [v2]
   pull_request:
 
+# Neither job has an age key, so neither decrypts a secret. A build only
+# checks that secrets/secrets.yaml has each key a config names.
 jobs:
   mac:
     # Apple Silicon, like the Mac configs it builds.
@@ -24,3 +26,14 @@ jobs:
           nix build --no-link --print-build-logs \
             .#darwinConfigurations.mac.system \
             '.#homeConfigurations."ryansaxe@mac".activationPackage'
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Build the Linux home config
+        run: |
+          nix build --no-link --print-build-logs \
+            '.#homeConfigurations."ryansaxe@linux".activationPackage'

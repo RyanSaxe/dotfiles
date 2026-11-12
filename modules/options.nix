@@ -23,6 +23,7 @@ in
           "gui"
           "personal"
           "work"
+          "rex-server"
         ]
       );
       description = "What this computer is for. Each module checks the roles it belongs to.";

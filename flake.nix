@@ -23,6 +23,10 @@
       url = "github:RyanSaxe/pair/develop";
       flake = false;
     };
+    rex = {
+      url = "https://pkgs.superlogical.com/rex/nix/preview.tar.gz";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -40,10 +44,24 @@
           user = "ryansaxe";
         };
       };
+      # A Linux computer has a home config and no system config.
+      linux = {
+        linux = {
+          system = "x86_64-linux";
+          user = "ryansaxe";
+        };
+      };
       systems = [
         "aarch64-darwin"
+        "x86_64-linux"
       ];
-      pkgsFor = system: nixpkgs.legacyPackages.${system};
+      # Claude Code is the one unfree package. Linux installs it from nixpkgs.
+      pkgsFor =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "claude-code";
+        };
       specialArgs = { inherit inputs; };
     in
     {
@@ -77,7 +95,7 @@
             ];
           }
         )
-      ) macs;
+      ) (macs // linux);
 
       packages = nixpkgs.lib.genAttrs systems (system: {
         ws = (pkgsFor system).callPackage ./pkgs/ws { };

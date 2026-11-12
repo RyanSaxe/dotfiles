@@ -9,6 +9,12 @@
 }:
 let
   has = role: lib.elem role config.dotfiles.roles;
+  # Linux installs the agents from nixpkgs, as modules/home/agents.nix says.
+  agentPath =
+    if pkgs.stdenv.hostPlatform.isLinux then
+      "${config.home.path}/bin"
+    else
+      "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
 
   # uv installs these into ~/.local/bin, and each switch adds any that are
   # missing. nix-update upgrades them. A fresh byor also registers its own
@@ -93,7 +99,7 @@ in
           if [ "$tool" = byor ]; then
             # Only the agents this computer has, since Claude isn't allowed on
             # every one. The switch's own PATH has none of their folders.
-            has() { PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin" command -v "$1" > /dev/null; }
+            has() { PATH="${agentPath}" command -v "$1" > /dev/null; }
             agents=skill
             has claude && agents="$agents,claude-code"
             has codex && agents="$agents,codex"
