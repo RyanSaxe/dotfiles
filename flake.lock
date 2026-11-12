@@ -57,11 +57,29 @@
         "type": "github"
       }
     },
+    "pair": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794269715,
+        "narHash": "sha256-bA9848KilN4cESnG4LhOF/apEhHL4uW+uzm3Hw7ZPBo=",
+        "owner": "RyanSaxe",
+        "repo": "pair",
+        "rev": "611c89fd77a94d20e07ad20520765f2d9e96bc6a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "RyanSaxe",
+        "ref": "develop",
+        "repo": "pair",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",
         "nixpkgs": "nixpkgs",
+        "pair": "pair",
         "sops-nix": "sops-nix"
       }
     },

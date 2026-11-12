@@ -43,10 +43,14 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       # Gaia's OpenRouter key, kept in the login keychain, for Gaia's engine.
       export OPENROUTER_API_KEY="$(security find-generic-password -s gaia-openrouter -a openrouter -w 2>/dev/null)"
     '';
-    envExtra = lib.optionalString isDarwin ''
-      # Homebrew only installs a few apps now, so its commands go last.
-      [[ -d /opt/homebrew/bin ]] && path+=(/opt/homebrew/bin /opt/homebrew/sbin)
-    '';
+    envExtra =
+      lib.optionalString isDarwin ''
+        # Homebrew only installs a few apps now, so its commands go last.
+        [[ -d /opt/homebrew/bin ]] && path+=(/opt/homebrew/bin /opt/homebrew/sbin)
+      ''
+      + ''
+        [[ -r ${config.sops.secrets.pair-hub-host.path} ]] && export PAIR_HUB_HOST=$(<${config.sops.secrets.pair-hub-host.path})
+      '';
     initContent = ''
       ZSH_PLUGINS=${plugins}
       # fast-syntax-highlighting writes its compiled theme beside itself

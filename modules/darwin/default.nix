@@ -3,6 +3,10 @@ let
   inherit (config.dotfiles) user;
 in
 {
+  imports = [
+    ./codex.nix
+  ];
+
   # Determinate's installer owns Nix itself, so nix-darwin leaves it alone.
   nix.enable = false;
 

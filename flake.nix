@@ -15,6 +15,10 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    pair = {
+      url = "github:RyanSaxe/pair/develop";
+      flake = false;
+    };
   };
 
   outputs =
@@ -70,6 +74,10 @@
           }
         )
       ) macs;
+
+      packages = nixpkgs.lib.genAttrs systems (system: {
+        pair = (pkgsFor system).callPackage ./pkgs/pair { src = inputs.pair; };
+      });
 
       formatter = nixpkgs.lib.genAttrs systems (system: (pkgsFor system).nixfmt);
     };
