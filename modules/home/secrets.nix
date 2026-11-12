@@ -24,6 +24,9 @@
       secrets.pushover-token = { };
       # Each computer's Tailscale address, where its pair hub listens.
       secrets.pair-hub-host.key = "pair-hub-host/${config.dotfiles.host}";
+      # Repositories whose new items show in Reviews, as owner/name separated
+      # by spaces. Each computer's starts empty.
+      secrets.attention-watch.key = "attention-watch/${config.dotfiles.host}";
     };
   };
 }

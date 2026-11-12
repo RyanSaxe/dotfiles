@@ -34,6 +34,13 @@ repos:
         # shfmt has no zsh dialect.
         exclude: '\.zsh$|^config/zsh/zshrc(\.minimal)?$'
 
+      - id: ws
+        name: gofmt, go vet and go test (ws)
+        entry: sh -c 'cd pkgs/ws && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
+        language: system
+        files: ^pkgs/ws/
+        pass_filenames: false
+
       - id: prompt
         name: pytest (prompt)
         entry: uv run --no-project --with pytest pytest -q tests/zsh

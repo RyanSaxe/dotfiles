@@ -80,6 +80,7 @@
       ) macs;
 
       packages = nixpkgs.lib.genAttrs systems (system: {
+        ws = (pkgsFor system).callPackage ./pkgs/ws { };
         pair = (pkgsFor system).callPackage ./pkgs/pair { src = inputs.pair; };
       });
 

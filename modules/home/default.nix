@@ -8,6 +8,7 @@
     ./tmux.nix
     ./neovim.nix
     ./rex.nix
+    ./ws.nix
     ./agents.nix
     ./secrets.nix
     ./ghostty.nix

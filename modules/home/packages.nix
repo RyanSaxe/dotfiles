@@ -58,6 +58,7 @@ in
         stylua
         tree-sitter
 
+        go
         nodejs_26
         uv
 

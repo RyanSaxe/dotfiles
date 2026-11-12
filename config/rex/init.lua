@@ -181,6 +181,17 @@ rex.action({
   end,
 })
 
+-- `ws pick` switches the app itself, so it gets the client to switch.
+rex.action({
+  name = "ws_pick",
+  title = "Pick with ws",
+  args = { name = "string" },
+  run = function(ctx, args)
+    remember(ctx)
+    open_float("ws " .. args.name, { "ws", "pick", args.name, "--client", ctx.client_id, "--from", ctx.block_id })
+  end,
+})
+
 -- Shows the pane's text in read-only Neovim to select and copy, as tmux's
 -- copy mode does.
 rex.action({
@@ -244,6 +255,11 @@ rex.bind("alt+shift+a", "focus_agent")
 rex.bind("alt+a", "client.sidebar.activity.toggle")
 rex.bind("alt+g", "client.sidebar.toggle")
 rex.bind("alt+shift+c", "client.theme.change")
+rex.bind("alt+/", "ws_pick", { name = "keys" })
+
+for key, name in pairs({ o = "go", w = "worktrees", r = "reviews", t = "tasks", space = "agents", c = "theme" }) do
+  rex.bind("alt+" .. key, "ws_pick", { name = name })
+end
 
 -- Bindings match unshifted keys, so | is shift+\ and L is shift+l.
 rex.bind(PREFIX .. "shift+\\", "move", { action = "pane.split.right" })

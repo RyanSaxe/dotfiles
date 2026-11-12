@@ -1,0 +1,50 @@
+app	chord	action
+tmux	alt+1-9	switch to window N
+tmux	alt+n	new window
+tmux	alt+q	detach client
+tmux	alt+l	jump back to last pane
+tmux	ctrl+h/j/k/l	move between panes (vim-aware)
+tmux	ctrl+b/f	scroll full page up/down (vim-aware copy-mode)
+tmux	ctrl+u/d	scroll half page up/down (vim-aware copy-mode)
+tmux	copy v	begin selection
+tmux	copy ctrl+v	toggle rectangle selection
+tmux	copy y	copy selection and exit
+tmux	copy ctrl+h/j/k/l	move between panes
+tmux	copy ctrl+\	last active pane
+tmux	alt+s	ws go popup: sessions, repos, folders
+tmux	alt+o	ws go popup: sessions, repos, folders
+tmux	alt+w	ws worktrees popup
+tmux	alt+c	ws theme popup: mode and mascot
+tmux	alt+space	ws agents popup
+tmux	alt+r	ws reviews popup
+tmux	alt+t	ws tasks popup
+tmux	alt+/	ws keys popup: this list
+tmux	prefix r	reload tmux config
+tmux	prefix s	ws go popup
+tmux	prefix o	ws go popup
+tmux	prefix c	new window (inherits current path)
+tmux	prefix |/-	split pane right/below (inherits current path)
+tmux	prefix l	last window
+tmux	prefix L	last session
+aerospace	cmd+alt+h/j/k/l	focus window left/down/up/right
+aerospace	cmd+alt+shift+h/j/k/l	move window left/down/up/right
+aerospace	cmd+alt+v/b/n/m	workspace: message/browser/code/meeting
+aerospace	cmd+alt+shift+v/b/n/m	send window to workspace
+aerospace	cmd+alt+s	summon the stack (on-demand accordion)
+aerospace	cmd+alt+shift+s	throw window onto the stack
+aerospace	cmd+alt+a	jump to agent needing attention (from anywhere)
+aerospace	cmd+alt+shift+r	reload aerospace config
+aerospace	cmd+alt+tab	previous workspace
+aerospace	cmd+alt+f	fullscreen
+aerospace	cmd+alt+/	toggle split orientation
+aerospace	cmd+alt+minus	flatten layout (reset)
+aerospace	cmd+alt+equal	balance window sizes
+ghostty	cmd+r	reload ghostty config
+ghostty	cmd+o	open ghostty config
+ghostty	shift+enter	newline without submitting
+zsh	tab	completion menu (fzf)
+zsh	shift+tab	accept ghost suggestion
+zsh	ctrl+r	fuzzy history search (fzf)
+zsh	up	search history for what is typed
+zsh	down	search history forward
+zsh	z	edit command in nvim (normal mode)
