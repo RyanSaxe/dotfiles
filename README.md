@@ -87,15 +87,20 @@ commit and push. Then:
 nix run nixpkgs#git -- -C ~/generic/dotfiles pull
 nix run home-manager/master -- switch -b pre-nix --flake ~/generic/dotfiles#ryansaxe@linux
 gh auth login
+echo ~/.nix-profile/bin/zsh | sudo tee -a /etc/shells
+sudo chsh -s ~/.nix-profile/bin/zsh "$USER"
 sudo ln -sfn ~/.config/codex/managed /etc/codex
 loginctl enable-linger
 rex server status
 ```
 
-Home Manager can't write to `/etc`, so the link in `/etc/codex` is what
-gives Codex its managed hooks. Lingering keeps Rex's server running while
-you're logged out. The first time the server starts, it has to join your
-tailnet, and `rex server status` prints the sign-in link.
+Home Manager can't change the login shell or write to `/etc`, so these
+steps do it once by hand. The `/etc/shells` and `chsh` lines make zsh your
+login shell, at a path that stays the same across switches, and the link
+in `/etc/codex` is what gives Codex its managed hooks. Lingering keeps
+Rex's server running while you're logged out. The first time the server
+starts, it has to join your tailnet, and `rex server status` prints the
+sign-in link.
 
 After the first switches, `home-switch` and, on a Mac, `mac-switch` apply a
 change. `nix-update` updates the flake's inputs and uv's tools and runs the

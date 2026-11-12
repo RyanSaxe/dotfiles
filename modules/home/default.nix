@@ -1,4 +1,9 @@
-{ config, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   imports = [
     ./packages.nix
@@ -27,4 +32,13 @@
   };
 
   programs.home-manager.enable = true;
+
+  # A Linux box runs another distribution, not NixOS. Nix's installer adds
+  # its paths only for interactive shells, so this has every zsh, including
+  # `ssh box CMD`, load them from the session variables. The box has no
+  # screen, so the GPU driver setup stays off.
+  targets.genericLinux = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+    enable = true;
+    gpu.enable = false;
+  };
 }
