@@ -5,6 +5,7 @@
     ./zsh.nix
     ./git.nix
     ./tmux.nix
+    ./neovim.nix
     ./secrets.nix
   ];
 
