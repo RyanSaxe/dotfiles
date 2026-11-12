@@ -1,0 +1,4 @@
+# Machine-local environment.
+.env
+result
+result-*

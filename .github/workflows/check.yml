@@ -1,0 +1,26 @@
+name: check
+
+on:
+  push:
+    branches: [v2]
+  pull_request:
+
+jobs:
+  mac:
+    # Apple Silicon, like the Mac configs it builds.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: astral-sh/setup-uv@v5
+
+      - name: prek
+        run: |
+          tools=$(nix build --no-link --print-out-paths --inputs-from . nixpkgs#stylua nixpkgs#shfmt nixpkgs#go | sed 's|$|/bin|' | paste -sd: -)
+          PATH="$tools:$PATH" uvx prek run --all-files --show-diff-on-failure
+
+      - name: Build this Mac's configs
+        run: |
+          nix build --no-link --print-build-logs \
+            .#darwinConfigurations.mac.system \
+            '.#homeConfigurations."ryansaxe@mac".activationPackage'
