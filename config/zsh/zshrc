@@ -1,0 +1,211 @@
+# Interactive shell configuration, sourced by the ~/.zshrc that the zsh module writes.
+
+# ----- stale $TMUX scrubber --------------------------------------------
+# A shell can inherit $TMUX from three broken situations: tmux crashed, a
+# new terminal inherited the parent's env, or the socket died. Detect by
+# checking whether THIS tty is actually the tty of a live tmux pane.
+if [[ -n "$TMUX" ]]; then
+  _tmux_socket="${TMUX%%,*}"
+  if [[ ! -S "$_tmux_socket" ]]; then
+    # No socket file, no server — learned without spawning anything.
+    unset TMUX TMUX_PANE
+  elif [[ -n "$TMUX_PANE" ]]; then
+    # O(1): ask for this pane's tty instead of listing every pane.
+    _current_tty="$(tty 2> /dev/null)"
+    if ! _pane_tty="$(tmux -S "$_tmux_socket" display-message -p -t "$TMUX_PANE" '#{pane_tty}' 2> /dev/null)"; then
+      unset TMUX TMUX_PANE # server dead or pane gone
+    elif [[ -n "$_current_tty" && "$_pane_tty" != "$_current_tty" ]]; then
+      unset TMUX TMUX_PANE # inherited env: this tty is not that pane
+    fi
+  else
+    # Env kept $TMUX but lost $TMUX_PANE: fall back to the full scan.
+    _current_tty="$(tty 2> /dev/null)"
+    if ! tmux -S "$_tmux_socket" list-clients &> /dev/null; then
+      unset TMUX TMUX_PANE
+    elif [[ -n "$_current_tty" ]] &&
+      ! tmux -S "$_tmux_socket" list-panes -a -F "#{pane_tty}" 2> /dev/null | grep -Fxq "$_current_tty"; then
+      unset TMUX TMUX_PANE
+    fi
+  fi
+  unset _tmux_socket _current_tty _pane_tty
+fi
+
+# ----- history ---------------------------------------------------------
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS HIST_VERIFY
+
+# ----- completion ------------------------------------------------------
+fpath=("$HOME/.config/zsh/completions" "$HOME/.zfunc" $fpath)
+autoload -Uz compinit
+# -C trusts the existing dump, skipping the per-start security audit and
+# fpath rescan; a full compinit re-runs both once the dump is a day old.
+# The touch restarts the 24h window even when compinit leaves an
+# up-to-date dump untouched. Accepted trade: newly installed
+# completions can show up as much as 24h late.
+_zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
+_zcompdump_fresh=("$_zcompdump"(N.mh-24))
+if (( $#_zcompdump_fresh )); then
+  compinit -C -d "$_zcompdump"
+else
+  compinit -d "$_zcompdump"
+  # Only restart the 24h window on a real dump: a failed compinit would
+  # otherwise mint an empty file that -C then trusts for a day.
+  [[ -s "$_zcompdump" ]] && touch "$_zcompdump" 2> /dev/null
+fi
+unset _zcompdump _zcompdump_fresh
+# Case-insensitive matching.
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+# ----- functions and aliases -------------------------------------------
+for _fn in "$HOME/.config/zsh/functions/"*.zsh; do
+  source "$_fn"
+done
+unset _fn
+source "$HOME/.config/zsh/aliases.zsh"
+vi_mode_init
+venv_init
+
+# The prompt owns the venv indicator; activate must not inject its own.
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# ----- plugins (linked by the zsh module) -----------------------------
+# Order matters: fzf-tab needs compinit first; syntax highlighting goes last.
+# ZSH_PLUGINS is set by the zsh module to a folder of Nix-built plugins.
+
+if [[ -r "$ZSH_PLUGINS/fzf-tab/fzf-tab.plugin.zsh" ]]; then
+  source "$ZSH_PLUGINS/fzf-tab/fzf-tab.plugin.zsh"
+  # Convention: Tab is menu completion. (Bind after vi_mode_init, which resets keymaps.)
+  bindkey -M viins '^I' fzf-tab-complete
+fi
+
+if [[ -r "$ZSH_PLUGINS/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+  source "$ZSH_PLUGINS/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  # Convention: Shift-Tab accepts ghost text.
+  bindkey -M viins '^[[Z' autosuggest-accept
+fi
+
+if [[ -r "$ZSH_PLUGINS/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" ]]; then
+  source "$ZSH_PLUGINS/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+fi
+
+# ----- history and line editing ----------------------------------------
+# Bound after vi_mode_init, which resets the keymaps.
+
+# Ctrl-R fuzzy history. fzf also binds ^T and Alt-C; both are removed.
+# ^T duplicates fzf-tab's completion menu, and Alt-C never arrives
+# because tmux binds M-c to the theme picker.
+if command -v fzf > /dev/null; then
+  eval "$(fzf --zsh)"
+  bindkey -M viins -r '^T' '\ec' 2> /dev/null
+  bindkey -M vicmd -r '^T' '\ec' 2> /dev/null
+fi
+
+# While an fzf widget holds the line, C-j/C-k must reach fzf, not switch
+# panes. tmux routes those keys in-server off the @is_fzf pane option
+# (the is_vim format in tmux.conf), so each widget marks its own
+# lifetime: one tmux spawn on entry, one on exit — never per keystroke.
+# The wrappers call the saved functions directly, not through zle, so
+# zsh-autosuggestions re-binding the widget names at first prompt cannot
+# reroute the inner dispatch.
+if [[ -n "$TMUX_PANE" ]]; then
+  # fzf-tab is sourced above, so both widget functions exist by now.
+  # The orig-copy check makes a re-source a no-op: copying an already
+  # wrapped widget over its own saved original would recurse.
+  for _w in fzf-history-widget fzf-tab-complete; do
+    (( ${+functions[$_w]} )) || continue
+    (( ${+functions[_is_fzf_orig_$_w]} )) && continue
+    functions -c "$_w" "_is_fzf_orig_$_w"
+    eval "$_w() {
+      tmux set-option -p -t \"\$TMUX_PANE\" @is_fzf 1
+      {
+        _is_fzf_orig_$_w \"\$@\"
+      } always {
+        tmux set-option -pu -t \"\$TMUX_PANE\" @is_fzf
+      }
+    }"
+  done
+  unset _w
+
+  # nvim clears @is_vim on exit/suspend, but a SIGKILL'd nvim cannot; a
+  # stale 1 would misroute C-hjkl into whatever non-shell program runs in
+  # the pane next. The shell regains the foreground exactly when that
+  # crash happens, so clear once after any command that could have owned
+  # the option — vim-ish commands and the porcelains that spawn editors.
+  # Everything else costs nothing (no spawn, flag never set).
+  _is_vim_preexec() {
+    [[ "$1" =~ '(^|[ /|;])(n?vim?x?|view|git|jj)([ ;|]|$)' ]] && _IS_VIM_CLEAR=1
+  }
+  _is_vim_precmd() {
+    [[ -n "${_IS_VIM_CLEAR:-}" ]] || return 0
+    unset _IS_VIM_CLEAR
+    (tmux set-option -pu -t "$TMUX_PANE" @is_vim 2> /dev/null &)
+  }
+  autoload -U add-zsh-hook
+  add-zsh-hook preexec _is_vim_preexec
+  add-zsh-hook precmd _is_vim_precmd
+fi
+
+# Up/down search history for what is already typed, rather than walking
+# it blindly. k/j in normal mode are left alone.
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey -M viins '^[[A' up-line-or-beginning-search
+bindkey -M viins '^[[B' down-line-or-beginning-search
+bindkey -M vicmd '^[[A' up-line-or-beginning-search
+bindkey -M vicmd '^[[B' down-line-or-beginning-search
+
+# `z` in normal mode opens the current command in $EDITOR as a .zsh
+# buffer; quitting returns the edited text to the prompt WITHOUT running
+# it. `z` has no default binding and no z* sequences, so nothing is lost
+# and no prefix delay is introduced.
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey -M vicmd 'z' edit-command-line
+
+autoload -U add-zsh-hook
+
+# ----- prompt ----------------------------------------------------------
+# Blank line between prompts, but never above the first one: starship's
+# add_newline (deliberately off in the template) would also pad the very
+# first prompt, breaking the flush top edge under the window frame.
+_prompt_spacer() {
+  [[ -n "${_PROMPT_SEEN:-}" ]] && print ""
+  typeset -g _PROMPT_SEEN=1
+}
+add-zsh-hook precmd _prompt_spacer
+
+# Every segment on the two prompt lines is computed HERE, once per prompt:
+# one dash spawn (prompt-segments.sh) gathers the git and package facts,
+# exported as _PROMPT_SEG_* vars that starship reads through env_var
+# modules. Each $PROMPT expansion still execs starship once — --keymap is
+# what flips the vi-mode character — but a keymap toggle reuses this
+# computation instead of re-running the shell-outs.
+# Runs before prompt expansion by construction: zsh expands $PROMPT only
+# after every precmd has finished. The <US> separator (0x1f) cannot appear
+# in branch names or versions, so no quoting or eval is involved.
+_prompt_segments() {
+  local name value gone=
+  unset _PROMPT_SEG_{SUBDIR,REPO_PARENT,DIR_PLAIN,BRANCH,BRANCH_BEHIND,PKG,AGE,CLEAN,DIRTY,ARROWS,PROJ_BAD,PROJ_OK,PROJ_PLAIN,DIR_NAME,PYVERSION,GONE}
+  # dash prints getcwd() errors before it reads a line when this shell's
+  # directory was deleted, so the script runs from / and is told which
+  # directory is gone. -ef also catches a directory recreated at the same path.
+  [[ $PWD -ef . ]] || gone=$PWD
+  while IFS=$'\x1f' read -r name value; do
+    typeset -gx "_PROMPT_SEG_${name}=${value}"
+  done < <(
+    [[ -z $gone ]] || builtin cd -q /
+    _PROMPT_GONE=$gone dash "$HOME/.config/zsh/prompt-segments.sh"
+  )
+}
+
+if command -v starship > /dev/null; then
+  add-zsh-hook precmd _prompt_segments
+  eval "$(starship init zsh)"
+  # The template has no right_format, but starship's stock init installs
+  # an RPROMPT that execs starship once per render anyway — to print
+  # nothing. Emptying it halves the per-render exec count.
+  RPROMPT=''
+fi

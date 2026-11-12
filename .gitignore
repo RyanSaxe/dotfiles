@@ -1,4 +1,5 @@
 # Machine-local environment.
 .env
+__pycache__/
 result
 result-*
