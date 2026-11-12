@@ -20,6 +20,12 @@ repos:
         # One nix process at a time, or each waits on the flake lock.
         require_serial: true
 
+      - id: stylua
+        name: stylua
+        entry: stylua
+        language: system
+        files: ^config/(nvim|rex)/.*\.lua$
+
       - id: shfmt
         name: shfmt
         entry: shfmt --write --indent 2

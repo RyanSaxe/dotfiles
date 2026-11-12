@@ -40,8 +40,15 @@ lib.mkIf (lib.elem "base" cfg.roles) {
         ddiff = "-c delta.side-by-side=true diff";
         dshow = "-c delta.side-by-side=true show";
       };
+      diff.tool = "codediff";
+      difftool.codediff.cmd = ''nvim -c "CodeDiff file $LOCAL $REMOTE"'';
       merge = {
+        tool = "codediff";
         conflictStyle = "zdiff3";
+      };
+      mergetool.codediff = {
+        cmd = ''nvim -c "CodeDiff merge $MERGED"'';
+        trustExitCode = true;
       };
       status.showUntrackedFiles = "all";
     };

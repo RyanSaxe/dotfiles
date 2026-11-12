@@ -14,6 +14,7 @@ let
   # missing. nix-update upgrades them.
   uvTools = [
     "prek"
+    "pylatexenc"
   ];
 
   # mmdc draws with a browser, and nixpkgs has no Chromium for Macs, so on
@@ -45,8 +46,17 @@ in
         rsync
         tree
         wget
-        shfmt
 
+        # Neovim's language servers and formatters. Mason fills in the rest.
+        ast-grep
+        lua-language-server
+        markdownlint-cli
+        prettier
+        shfmt
+        stylua
+        tree-sitter
+
+        nodejs_26
         uv
 
         age
