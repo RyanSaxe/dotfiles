@@ -1,0 +1,65 @@
+cmd+n	New Window	client.window.new
+shift+cmd+w	Close Window	client.window.close
+ctrl+cmd+f	Toggle Full Screen	client.window.fullscreen.toggle
+cmd+w	Close	client.close
+shift+cmd+p	Command Palette…	client.palette.toggle
+cmd+,	Settings…	client.settings
+shift+cmd+,	Rex Diagnostics	client.diagnostics
+shift+cmd+u	Install Update	client.update.accept
+alt+shift+cmd+u	Relaunch when Idle	client.update.accept_when_idle
+shift+cmd+.	Dismiss Notice	client.notice.dismiss
+shift+cmd+n	New Session	session.new
+cmd+k	Change Session…	session.switch
+cmd+r	Refresh Sessions	session.refresh
+cmd+t	New Tab	client.tab.new
+alt+cmd+w	Close Tab	client.tab.close
+ctrl+tab	Show Next Tab	client.tab.next
+shift+cmd+]	Show Next Tab	client.tab.next
+ctrl+shift+tab	Show Previous Tab	client.tab.previous
+shift+cmd+[	Show Previous Tab	client.tab.previous
+cmd+1…9	Go to Tab	client.tab.goto
+ctrl+shift+pageup	Move Tab Backward	client.tab.move.backward
+ctrl+shift+pagedown	Move Tab Forward	client.tab.move.forward
+shift+cmd+left	Split Pane Left	pane.split.left
+cmd+d	Split Pane Right	pane.split.right
+shift+cmd+right	Split Pane Right	pane.split.right
+shift+cmd+up	Split Pane Up	pane.split.up
+shift+cmd+d	Split Pane Down	pane.split.down
+shift+cmd+down	Split Pane Down	pane.split.down
+cmd+enter	Split Pane Best Fit	pane.split.auto
+alt+cmd+left	Focus Pane Left	pane.focus.left
+alt+cmd+right	Focus Pane Right	pane.focus.right
+alt+cmd+up	Focus Pane Up	pane.focus.up
+alt+cmd+down	Focus Pane Down	pane.focus.down
+cmd+]	Focus Next Pane	pane.focus_next
+cmd+[	Focus Previous Pane	pane.focus_previous
+alt+shift+cmd+left	Move Pane Left	pane.move.left
+alt+shift+cmd+right	Move Pane Right	pane.move.right
+alt+shift+cmd+up	Move Pane Up	pane.move.up
+alt+shift+cmd+down	Move Pane Down	pane.move.down
+alt+cmd+enter	Float Pane	pane.float
+alt+cmd+m	Minimize Floating Window	pane.minimize_floating
+alt+shift+cmd+enter	Minimize Floating Windows	pane.minimize_all_floating
+shift+cmd+enter	Zoom Pane	pane.zoom
+cmd+w	Close Pane	pane.close
+shift+cmd+g	Go to Directory…	pane.go_to_directory
+cmd+p	Go to Anything…	pane.go_to
+ctrl+cmd+i	Insert Path…	pane.insert_path
+cmd+backspace	Send Key	pane.send_key
+cmd+left	Send Key	pane.send_key
+cmd+right	Send Key	pane.send_key
+alt+left	Send Key	pane.send_key
+alt+right	Send Key	pane.send_key
+cmd+up	Jump to Previous Prompt	client.prompt.previous
+cmd+down	Jump to Next Prompt	client.prompt.next
+cmd+y	client.quick_look	client.quick_look
+cmd+f	Find…	client.find.open
+cmd+g	Find Next	client.find.next
+shift+cmd+g	Find Previous	client.find.previous
+shift+cmd+=	Increase Font Size	client.font.increase
+cmd+=	Increase Font Size	client.font.increase
+cmd+-	Decrease Font Size	client.font.decrease
+cmd+0	Reset Font Size	client.font.reset
+cmd+/	Toggle Sidebar	client.sidebar.toggle
+cmd+.	Toggle Activity	client.sidebar.activity.toggle
+shift+cmd+s	Toggle Tab Style	client.tab_style.toggle

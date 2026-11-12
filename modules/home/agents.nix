@@ -18,6 +18,10 @@ let
   personal = lib.elem "personal" cfg.roles;
   linkSkills = "${cfg.repo}/ai-harness/tools/link-agent-skills.sh";
 
+  skills.worktrees = link "ai-harness/skills/worktrees";
+  skillLinks =
+    dir: lib.mapAttrs' (name: source: lib.nameValuePair "${dir}/${name}" { inherit source; }) skills;
+
   pushover = name: "${cfg.repo}/ai-harness/tools/notify-pushover.zsh '${name}'";
   claudeHook =
     matcher:
@@ -46,7 +50,9 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     ".codex/references".source = link "ai-harness/references";
     ".codex/themes/dotfiles.tmTheme".source =
       config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
-  };
+  }
+  // skillLinks ".claude/skills"
+  // skillLinks ".agents/skills";
 
   programs.claude-code = {
     enable = true;

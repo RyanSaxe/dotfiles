@@ -61,6 +61,8 @@ sketchybar --default "${default[@]}"
 # Custom Events (must be defined before items subscribe to them)
 # -----------------------------------------------------------------------------
 sketchybar --add event aerospace_workspace_change
+sketchybar --add event agent_attention_change
+sketchybar --add event review_attention_change
 # macOS posts this whenever its appearance changes, from System Settings
 # or anywhere else, and `theme` points every app at the new mode. sketchybar
 # also runs every script once when it loads, and `theme` reloads sketchybar,
@@ -135,6 +137,40 @@ sketchybar --add item workspace_sync left \
   drawing=off \
   script="$PLUGIN_DIR/aerospace.sh" \
   --subscribe workspace_sync aerospace_workspace_change
+
+# The agent-attention letter: not an aerospace workspace, but it wears the
+# same shape because it answers the same question — where should I look.
+# It is its own letter, so "an agent needs you" never reads as "this is
+# where your terminal lives", which the code workspace's letter says.
+# cmd-alt-a walks through the agents, the one that wants you first.
+sketchybar --add item space.agent left \
+  --set space.agent \
+  icon="A" \
+  icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+  icon.padding_left=8 \
+  icon.padding_right=8 \
+  label.drawing=off \
+  background.color="$WORKSPACE_INACTIVE_BG" \
+  background.corner_radius=6 \
+  background.height=22 \
+  script="$PLUGIN_DIR/agent.sh" \
+  --subscribe space.agent agent_attention_change
+
+# The review letter, beside the agent one because it answers the neighbouring
+# question: an agent wants you versus GitHub wants you. Alt-R in Rex or tmux
+# opens the Reviews popup.
+sketchybar --add item space.review left \
+  --set space.review \
+  icon="R" \
+  icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+  icon.padding_left=8 \
+  icon.padding_right=8 \
+  label.drawing=off \
+  background.color="$WORKSPACE_INACTIVE_BG" \
+  background.corner_radius=6 \
+  background.height=22 \
+  script="$PLUGIN_DIR/review.sh" \
+  --subscribe space.review review_attention_change
 
 # -----------------------------------------------------------------------------
 # Right Side Items (ordered right-to-left)

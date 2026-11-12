@@ -139,3 +139,6 @@ cmd-alt-minus = 'flatten-workspace-tree'
 cmd-alt-equal = 'balance-sizes'
 cmd-alt-tab = 'workspace-back-and-forth'
 cmd-alt-shift-r = 'reload-config'
+
+# cmd-alt-a, the jump to the agent that needs you, is bound in
+# modules/home/aerospace.nix on computers with Rex.
