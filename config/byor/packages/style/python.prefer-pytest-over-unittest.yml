@@ -1,0 +1,37 @@
+id: python.prefer-pytest-over-unittest
+language: Python
+severity: warning
+message: Prefer pytest over unittest.
+rule:
+  any:
+    - all:
+        - kind: dotted_name
+        - regex: ^unittest(\.case)?$
+        - inside:
+            kind: import_statement
+            stopBy: end
+    - all:
+        - kind: dotted_name
+        - regex: ^(TestCase|IsolatedAsyncioTestCase|main|skip|skipIf|skipUnless|expectedFailure)$
+        - inside:
+            all:
+              - kind: import_from_statement
+              - has:
+                  field: module_name
+                  regex: ^unittest(\.case)?$
+            # stopBy reaches through aliased_import: from unittest import TestCase as TC
+            stopBy: end
+metadata:
+  byor:
+    rationale: >
+      Pytest supports plain test functions, fixtures, and direct assertions,
+      which keeps tests smaller and less framework-heavy than unittest classes.
+    agent_prompt: >
+      Prefer pytest over unittest. Add pytest as a development/test dependency
+      using the project's existing dependency manager, then write tests as plain
+      functions with pytest assertions and fixtures.
+    tags:
+      - python
+      - testing
+      - style-guide
+      - greenfield

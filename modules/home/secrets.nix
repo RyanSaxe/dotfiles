@@ -19,6 +19,11 @@
         else
           "${config.xdg.configHome}/sops/age/keys.txt";
       defaultSopsFile = ../../secrets/secrets.yaml;
+      # The Pushover hook reads these on every computer.
+      secrets.pushover-user = { };
+      secrets.pushover-token = { };
+      # Each computer's Tailscale address, where its pair hub listens.
+      secrets.pair-hub-host.key = "pair-hub-host/${config.dotfiles.host}";
     };
   };
 }

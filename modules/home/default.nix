@@ -6,6 +6,7 @@
     ./git.nix
     ./tmux.nix
     ./neovim.nix
+    ./agents.nix
     ./secrets.nix
   ];
 

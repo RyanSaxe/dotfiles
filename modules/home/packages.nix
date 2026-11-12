@@ -11,9 +11,11 @@ let
   has = role: lib.elem role config.dotfiles.roles;
 
   # uv installs these into ~/.local/bin, and each switch adds any that are
-  # missing. nix-update upgrades them.
+  # missing. nix-update upgrades them. A fresh byor also registers its own
+  # skill and hooks, so a new computer needs nothing by hand.
   uvTools = [
     "prek"
+    "byor"
     "pylatexenc"
   ];
 
@@ -65,6 +67,7 @@ in
       ++ [ mermaid-cli ]
     )
     ++ lib.optionals (has "personal") [
+      pkgs.pi-coding-agent
       pkgs.pnpm
       (pkgs.python312.withPackages (
         python: with python; [
@@ -80,9 +83,27 @@ in
       for tool in ${lib.escapeShellArgs uvTools}; do
         if ! ${pkgs.uv}/bin/uv tool list 2>/dev/null | grep -q "^$tool "; then
           run ${pkgs.uv}/bin/uv tool install "$tool"
+          if [ "$tool" = byor ]; then
+            # Only the agents this computer has, since Claude isn't allowed on
+            # every one. The switch's own PATH has none of their folders.
+            has() { PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin" command -v "$1" > /dev/null; }
+            agents=skill
+            has claude && agents="$agents,claude-code"
+            has codex && agents="$agents,codex"
+            run "$HOME/.local/bin/byor" install --agents "$agents" < /dev/null
+          fi
         fi
       done
     ''
+  );
+
+  # byor's global rules, its style package and the scripts their checks
+  # run, linked from the checkout so a rule byor writes lands in the repo.
+  # byor owns the rest of ~/.config/byor.
+  xdg.configFile = lib.mkIf (has "personal") (
+    lib.genAttrs [ "byor/rules" "byor/packages" "byor/scripts" ] (path: {
+      source = config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/${path}";
+    })
   );
 
   home.sessionPath = [ "$HOME/.local/bin" ];
