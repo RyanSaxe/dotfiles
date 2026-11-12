@@ -15,6 +15,10 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    catppuccin-palette = {
+      url = "github:catppuccin/palette";
+      flake = false;
+    };
     pair = {
       url = "github:RyanSaxe/pair/develop";
       flake = false;

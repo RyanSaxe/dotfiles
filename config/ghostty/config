@@ -54,5 +54,13 @@ copy-on-select = clipboard
 # fires. `never` guarantees apps can't claim shift away from the terminal.
 mouse-shift-capture = never
 
+# Theme-rendered shaders (config/ghostty/shaders, with colors from
+# theme/apps/ghostty.nix). `theme` points them at the current mode and
+# signals ghostty (SIGUSR2 = reload), so both follow a flip with no
+# keypress. The frame shader runs last so its ring
+# paints over everything at the edges.
+custom-shader = shaders/cursor_trail.glsl
+custom-shader = shaders/frame.glsl
+
 # Title bar hidden — window moving is keyboard territory.
 macos-titlebar-style = hidden

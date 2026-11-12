@@ -57,6 +57,8 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   programs.delta = {
     enable = true;
     enableGitIntegration = true;
+    # delta takes bat's theme from BAT_THEME, which the shell sets to the
+    # current mode's.
     options.navigate = true;
   };
 
@@ -67,5 +69,19 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       git_protocol = "https";
       aliases.co = "pr checkout";
     };
+  };
+
+  # Dotfiles.tmTheme for each mode, which bat and delta share. bat picks
+  # one from macOS's appearance, and a shell's BAT_THEME names the same.
+  programs.bat = {
+    enable = true;
+    config = {
+      theme = "auto:system";
+      theme-dark = "dotfiles-dark";
+      theme-light = "dotfiles-light";
+    };
+    themes = lib.genAttrs [ "dotfiles-dark" "dotfiles-light" ] (name: {
+      src = config.xdg.configFile."theme/${lib.removePrefix "dotfiles-" name}/Dotfiles.tmTheme".source;
+    });
   };
 }

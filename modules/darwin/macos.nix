@@ -1,5 +1,6 @@
 # The macOS settings each switch writes. Anything not set here stays
-# however it was set by hand.
+# however it was set by hand. Dark or light mode is macOS's own setting,
+# which `theme` changes.
 { config, lib, ... }:
 let
   inherit (config.dotfiles) user;

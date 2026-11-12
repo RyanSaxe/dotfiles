@@ -1,4 +1,6 @@
-# sketchybar, with its scripts linked from the checkout.
+# sketchybar, with its scripts linked from the checkout. It reads its
+# colors from ~/.config/theme, and `theme` reloads it, which each switch
+# also runs.
 {
   config,
   lib,

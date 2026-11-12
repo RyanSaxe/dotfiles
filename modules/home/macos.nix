@@ -1,5 +1,6 @@
 # The macOS settings that belong to the user: Ctrl-Space freed for Rex and
-# tmux, and Caps Lock per keyboard.
+# tmux, and Caps Lock per keyboard. Light or dark is macOS's own setting,
+# which `theme` changes.
 {
   config,
   lib,
