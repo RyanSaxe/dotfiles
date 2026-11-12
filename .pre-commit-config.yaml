@@ -19,3 +19,18 @@ repos:
         files: \.nix$
         # One nix process at a time, or each waits on the flake lock.
         require_serial: true
+
+      - id: shfmt
+        name: shfmt
+        entry: shfmt --write --indent 2
+        language: system
+        types: [shell]
+        # shfmt has no zsh dialect.
+        exclude: '\.zsh$|^config/zsh/zshrc(\.minimal)?$'
+
+      - id: prompt
+        name: pytest (prompt)
+        entry: uv run --no-project --with pytest pytest -q tests/zsh
+        language: system
+        files: ^(config/zsh/prompt-segments\.sh|tests/zsh/)
+        pass_filenames: false

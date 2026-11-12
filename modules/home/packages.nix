@@ -45,6 +45,7 @@ in
         rsync
         tree
         wget
+        shfmt
 
         uv
 

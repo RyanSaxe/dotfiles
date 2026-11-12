@@ -1,0 +1,134 @@
+# The prompt. Its colors are names from the theme's palette, which
+# theme/apps/starship.nix appends for each mode. Starship reads that copy,
+# ~/.config/theme/starship.toml, not this file.
+#
+# Grammar:
+#   [user] [in path] [on branch] [at version] [from time ago] [status]
+#   [project] [language version] ❯
+#
+# Line 1 is the repo's story: where inside it, which branch (ORANGE when
+# upstream has commits you haven't pulled — a local check against the last
+# fetch, never the network), the package's own declared version, how stale,
+# clean/dirty. Line 2 is the venv verdict: project name colored by state —
+# faint none, green matching, red shows the name of a MISMATCHED venv —
+# plus the venv interpreter's version, faint. The caret never moves.
+# The prompt shows identity, declared facts, and chosen state — never
+# inventory (installed toolchains, incidental file types).
+#
+# Both lines open with a space: tmux gives panes no padding, so the shell
+# owns its gutter and text rests off the pane border instead of hugging
+# it. Command output still starts at column 0 — nothing sits between an
+# app and the border.
+#
+# Every segment is precomputed once per prompt by prompt-segments.sh (one
+# dash spawn, all git queries in parallel) and exported by the
+# _prompt_segments precmd (.zshrc) as _PROMPT_SEG_* vars; the env_var
+# modules below render them in-process — starship spawns no shells and
+# never scans the repo at render time. A segment hides by being UNSET: an
+# empty-string var would still render its connector words.
+#
+# Starship's add_newline pads EVERY prompt, including the first one in a
+# fresh pane — which reads as broken top padding under the window frame.
+# The blank line between commands comes from a zsh precmd instead (.zshrc),
+# which skips the first prompt.
+add_newline = false
+palette = "theme"
+format = " ${env_var._PROMPT_SEG_SUBDIR}${env_var._PROMPT_SEG_REPO_PARENT}${env_var._PROMPT_SEG_DIR_PLAIN}${env_var._PROMPT_SEG_BRANCH}${env_var._PROMPT_SEG_BRANCH_BEHIND}${env_var._PROMPT_SEG_PKG}${env_var._PROMPT_SEG_AGE}${env_var._PROMPT_SEG_CLEAN}${env_var._PROMPT_SEG_DIRTY}${env_var._PROMPT_SEG_ARROWS}$line_break ${env_var._PROMPT_SEG_PROJ_BAD}${env_var._PROMPT_SEG_PROJ_OK}${env_var._PROMPT_SEG_PROJ_PLAIN}${env_var._PROMPT_SEG_DIR_NAME}${env_var._PROMPT_SEG_GONE}${env_var._PROMPT_SEG_PYVERSION}$character"
+
+# WHERE — exactly one of the three shows: repo-relative path (hidden at the
+# repo root), the directory the repo lives in (at the root), or the parent
+# of the current folder (outside any repo). Long paths collapse to
+# first/…/last/two in the gather script.
+[env_var._PROMPT_SEG_SUBDIR]
+variable = "_PROMPT_SEG_SUBDIR"
+format = '[in ](faint)[$env_value](folder) '
+
+[env_var._PROMPT_SEG_REPO_PARENT]
+variable = "_PROMPT_SEG_REPO_PARENT"
+format = '[in ](faint)[$env_value](folder) '
+
+[env_var._PROMPT_SEG_DIR_PLAIN]
+variable = "_PROMPT_SEG_DIR_PLAIN"
+format = '[in ](faint)[$env_value](folder) '
+
+# Branch, colored as a pull-reminder: mauve normally, peach when the last
+# fetch recorded upstream commits this branch doesn't have. Purely local
+# (offline-safe) — it can only know what the last fetch/pull learned.
+[env_var._PROMPT_SEG_BRANCH]
+variable = "_PROMPT_SEG_BRANCH"
+format = '[on ](faint)[$env_value](branch) '
+
+[env_var._PROMPT_SEG_BRANCH_BEHIND]
+variable = "_PROMPT_SEG_BRANCH_BEHIND"
+format = '[on ](faint)[$env_value](behind) '
+
+# The project's own declared version, from a parallel walk between here and
+# the repo root — so a monorepo half shows its own version, and the display
+# never changes with cd inside one package. All ~15 manifest formats are
+# starship's ([package] below), not ours.
+[env_var._PROMPT_SEG_PKG]
+variable = "_PROMPT_SEG_PKG"
+format = '[at ](faint)[$env_value](version) '
+
+# Time since last commit.
+[env_var._PROMPT_SEG_AGE]
+variable = "_PROMPT_SEG_AGE"
+format = '[from ](faint)[$env_value](age)[ ago](faint) '
+
+# Clean/dirty as a single glanceable mark; the arrows are the old native
+# git_status $ahead_behind defaults (⇡ ⇣ ⇕, nothing when synced), fed by
+# the same rev-list count as the branch color.
+[env_var._PROMPT_SEG_CLEAN]
+variable = "_PROMPT_SEG_CLEAN"
+format = '[$env_value](clean) '
+
+[env_var._PROMPT_SEG_DIRTY]
+variable = "_PROMPT_SEG_DIRTY"
+format = '[$env_value](dirty) '
+
+[env_var._PROMPT_SEG_ARROWS]
+variable = "_PROMPT_SEG_ARROWS"
+format = '[$env_value](faint) '
+
+# ---- line 2: project name as the venv status light --------------------
+# No venv: faint project name (or bare folder name outside repos). Venv
+# belonging to this project: green. Venv from some OTHER project: red,
+# showing the impostor's name.
+[env_var._PROMPT_SEG_PROJ_BAD]
+variable = "_PROMPT_SEG_PROJ_BAD"
+format = '[$env_value](error) '
+
+[env_var._PROMPT_SEG_PROJ_OK]
+variable = "_PROMPT_SEG_PROJ_OK"
+format = '[$env_value](ok) '
+
+[env_var._PROMPT_SEG_PROJ_PLAIN]
+variable = "_PROMPT_SEG_PROJ_PLAIN"
+format = '[$env_value](project) '
+
+[env_var._PROMPT_SEG_DIR_NAME]
+variable = "_PROMPT_SEG_DIR_NAME"
+format = '[$env_value](faint) '
+
+# The shell's directory was deleted: its name, then the word "deleted".
+[env_var._PROMPT_SEG_GONE]
+variable = "_PROMPT_SEG_GONE"
+format = '[$env_value](error)[ deleted](faint) '
+
+# The venv interpreter's version, read from pyvenv.cfg by the gather script
+# — instant, whereas the standard python module launches the interpreter.
+[env_var._PROMPT_SEG_PYVERSION]
+variable = "_PROMPT_SEG_PYVERSION"
+format = '[$env_value](faint) '
+
+# Not in the prompt's format — this is the render backend for the pkgversion
+# walk in prompt-segments.sh (`starship module package`). Plain output; the
+# env_var module above styles it.
+[package]
+version_format = '${raw}'
+format = 'v${version}'
+
+[character]
+success_symbol = "[❯](caret)"
+error_symbol = "[❯](error)"
+vimcmd_symbol = "[❮](caret_vi)"
