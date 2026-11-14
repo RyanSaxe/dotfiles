@@ -2,7 +2,7 @@ name: check
 
 on:
   push:
-    branches: [v2]
+    branches: [main]
   pull_request:
 
 # Neither job has an age key, so neither decrypts a secret. A build only

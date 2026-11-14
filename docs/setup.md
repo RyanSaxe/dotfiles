@@ -17,11 +17,11 @@ file expects it. These steps set up the two computers `flake.nix` lists,
    curl -fsSL https://claude.ai/install.sh | bash
    ```
 
-2. In a new terminal, so that `nix` is on the PATH, clone the `v2` branch
+2. In a new terminal, so that `nix` is on the PATH, clone the repository
    and make the age key that opens the secrets:
 
    ```sh
-   nix run nixpkgs#git -- clone -b v2 https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
+   nix run nixpkgs#git -- clone https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
    mkdir -p ~/Library/Application\ Support/sops/age
    nix shell nixpkgs#age -c age-keygen -o ~/Library/Application\ Support/sops/age/keys.txt
    ```
@@ -59,10 +59,10 @@ and runs Rex's server as a systemd user service.
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
    ```
 
-2. In a new terminal, clone the `v2` branch and make the age key:
+2. In a new terminal, clone the repository and make the age key:
 
    ```sh
-   nix run nixpkgs#git -- clone -b v2 https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
+   nix run nixpkgs#git -- clone https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
    mkdir -p ~/.config/sops/age
    nix shell nixpkgs#age -c age-keygen -o ~/.config/sops/age/keys.txt
    ```
