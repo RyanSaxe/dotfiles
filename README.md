@@ -1,228 +1,112 @@
 # dotfiles
 
-## Ryan's computers, set up by one Nix flake.
+One Nix flake sets up my Mac: Rex as the terminal, Neovim as the editor,
+AeroSpace to tile the windows and sketchybar across the top. nix-darwin sets
+macOS's own settings, and Home Manager installs most of the tools and writes
+their config.
+Ghostty with tmux is set up as well, with the same keys and popups except
+Agents, for a computer without Rex.
 
-This repository installs the tools and writes the settings on each of Ryan's
-computers. nix-darwin sets up each Mac, and Home Manager sets up the user on
-every computer, including a Linux box with no screen that runs Rex's server.
-On the Mac, Ryan works in the Rex terminal with Neovim, AeroSpace tiles the
-windows and sketchybar runs across the top. `ws`, built here, opens each
-folder, worktree and pull request as a Rex session with an agent in it, and
-draws the popups that move between them.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/computer-dark.png">
-  <img alt="The Mac's screen. sketchybar runs across the top. Below it, Rex shows Neovim, with the Alt-O picker open over it listing sessions, repositories and folders." src="assets/computer-light.png">
-</picture>
-
-## Get started
-
-Each computer keeps its checkout at `~/generic/dotfiles`, where its host
-file expects it. These steps set up the two computers `flake.nix` lists,
-`mac` and `linux`.
-
-### A Mac
-
-Install Nix, Homebrew and Claude Code. The Mac switch installs its apps
-through Homebrew but can't install Homebrew itself. Claude Code goes before
-the first home switch, so that the switch sets byor and pair up for it.
-
-```sh
-curl -fsSL https://install.determinate.systems/nix | sh -s -- install
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-curl -fsSL https://claude.ai/install.sh | bash
-```
-
-Open a new terminal, so that `nix` is on its PATH. Clone the `v2` branch,
-and make the age key that opens the secrets. The key goes where sops and
-sops-nix look for it on a Mac, and `age-keygen` prints its public key.
-
-```sh
-nix run nixpkgs#git -- clone -b v2 https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
-mkdir -p ~/Library/Application\ Support/sops/age
-nix shell nixpkgs#age -c age-keygen -o ~/Library/Application\ Support/sops/age/keys.txt
-```
-
-The new key can't open the secrets until they're encrypted to it. On a
-computer whose key `.sops.yaml` already lists, add the new public key to
-`.sops.yaml`, run `sops updatekeys secrets/secrets.yaml`, and commit and push
-both files. Then pull on the new Mac and run the first switches:
-
-```sh
-nix run nixpkgs#git -- -C ~/generic/dotfiles pull
-sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake ~/generic/dotfiles#mac
-nix run home-manager/master -- switch -b pre-nix --flake ~/generic/dotfiles#ryansaxe@mac
-gh auth login
-```
-
-`-b pre-nix` renames any file the home switch would replace, such as an old
-`~/.zshrc`, to `NAME.pre-nix`. The home switch installs gh, and
-`gh auth login` signs it in to GitHub for git and Reviews. Rex, Tailscale
-and Google Chrome are still installed by hand, as [LATER.md](LATER.md)
-says.
-
-### A Linux box
-
-The steps match the Mac's, without Homebrew, Claude Code's installer or
-nix-darwin. The home switch installs Claude Code and Codex from nixpkgs,
-and runs Rex's server as a systemd user service.
-
-```sh
-curl -fsSL https://install.determinate.systems/nix | sh -s -- install
-```
-
-Open a new terminal, then clone the `v2` branch and make the age key:
-
-```sh
-nix run nixpkgs#git -- clone -b v2 https://github.com/RyanSaxe/dotfiles ~/generic/dotfiles
-mkdir -p ~/.config/sops/age
-nix shell nixpkgs#age -c age-keygen -o ~/.config/sops/age/keys.txt
-```
-
-As for a Mac, add the public key to `.sops.yaml` on a computer that already
-opens the secrets, run `sops updatekeys secrets/secrets.yaml` there, and
-commit and push. Then:
-
-```sh
-nix run nixpkgs#git -- -C ~/generic/dotfiles pull
-nix run home-manager/master -- switch -b pre-nix --flake ~/generic/dotfiles#ryansaxe@linux
-gh auth login
-echo ~/.nix-profile/bin/zsh | sudo tee -a /etc/shells
-sudo chsh -s ~/.nix-profile/bin/zsh "$USER"
-sudo ln -sfn ~/.config/codex/managed /etc/codex
-loginctl enable-linger
-rex server status
-```
-
-Home Manager can't change the login shell or write to `/etc`, so these
-steps do it once by hand. The `/etc/shells` and `chsh` lines make zsh your
-login shell, at a path that stays the same across switches, and the link
-in `/etc/codex` is what gives Codex its managed hooks. Lingering keeps
-Rex's server running while you're logged out. The first time the server
-starts, it has to join your tailnet, and `rex server status` prints the
-sign-in link.
-
-After the first switches, `home-switch` and, on a Mac, `mac-switch` apply a
-change. `nix-update` updates the flake's inputs and uv's tools and runs the
-switches. [AGENTS.md](AGENTS.md) says which change needs which switch.
-Another computer needs its own host file in `hosts/`, an entry in
-`flake.nix`, and its own lines under `pair-hub-host` and `attention-watch`
-in the secrets.
-
-## Reviews
-
-Alt-R in Rex or tmux, or Cmd-Alt-R from anywhere, opens Reviews, a popup of
-the open pull requests and issues on GitHub that involve you. Its first tab,
-Needs you, lists what is waiting on you, most urgent first: a failing check
-or a request for changes on your own pull request, a review of it, a comment
-since your last reply, or a pull request or issue opened this week in a
-repository you watch. Each computer's watched repositories are its
-`attention-watch` secret.
-
-Enter checks a pull request out into its own worktree and opens it in
-Neovim, and Ctrl-T also starts an agent in a second tab there to review it.
-Ctrl-X marks an item done until something new happens on it. The R in
-sketchybar lights while anything needs you, and the A lights while an agent
-is blocked on you or has failed.
+The same flake has a config for a headless Linux machine that runs Rex's
+server.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/reviews-dark.png">
-  <img alt="The Reviews popup over Rex. The Needs you tab lists pull requests, each tagged with why it needs you, and the details of the selected one show the comment that made it need you." src="assets/reviews-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screen-dark.png">
+  <img alt="The Mac's screen: sketchybar across the top, and Rex below it with a Python file and docs/layout.md open in Neovim, the second with its diagram drawn as a picture." src="assets/screen-light.png">
 </picture>
-
-## Light and dark
-
-`theme light` switches macOS and every app to Catppuccin Latte, and
-`theme dark` switches them to Mocha. Changing the appearance in macOS
-works too, because sketchybar runs `theme` whenever it changes.
-
-<p>
-  <img src="assets/computer-light.png" width="49%" alt="The Mac's screen in light mode, in Catppuccin Latte">
-  <img src="assets/computer-dark.png" width="49%" alt="The same screen in dark mode, in Catppuccin Mocha">
-</p>
-
-`theme/meanings.nix` names what each color means, such as `muted` or
-`code.function`, once for each mode. Each file in `theme/apps` turns those
-meanings into one app's format, and each home switch renders them all for
-both modes, into `~/.config/theme/dark` and `light`. `theme` points the
-files in `~/.config/theme` at one mode, then reloads tmux, Ghostty,
-sketchybar and Claude Code, which keep their colors in memory.
-
-Chrome's theme is an extension in `~/.config/theme/chrome`. Load it once
-on each computer: in `chrome://extensions`, turn on Developer mode, click
-Load unpacked and choose that folder. Chrome builds its theme only when it
-starts, so it changes mode at its next launch.
 
 ## How it works
 
-`flake.nix` lists each computer. A Mac gets a nix-darwin config, built from
-`modules/darwin`, and every computer gets a Home Manager config, built from
-`modules/home`. Both read the computer's host file in `hosts/`, which names
-its roles, and each module turns itself on for the roles it belongs to.
+- Each computer has a file in `hosts/` that lists its roles, such as `gui`
+  for a computer with a screen or `personal` for one that isn't for work.
+  Each module applies only to computers with the roles it names, so one
+  flake can set up different computers.
+- Most files under `config/` and `ai-harness/` are links into this
+  checkout, so a program picks up an edit the next time it starts. Any other
+  change needs a rebuild, which the commands below run.
+- `ws`, a Go program in `pkgs/ws`, opens each folder, worktree and pull
+  request as a Rex session with an agent in it. You switch between those
+  sessions with its popups, listed below.
+- In `theme/meanings.nix`, each use of color, such as `error` or `muted`,
+  has a Catppuccin color. Every app's colors are generated from that file in
+  light and dark mode, so changing `error` there changes it everywhere.
 
-```mermaid
-flowchart LR
-  subgraph Hosts
-    mac["hosts/mac.nix"]
-    linux["hosts/linux.nix"]
-  end
-  subgraph Roles
-    gui
-    base
-    personal
-    rexServer["rex-server"]
-  end
-  subgraph Modules
-    guiModules["ghostty, aerospace, sketchybar, macos,<br>darwin/macos, darwin/homebrew"]
-    baseModules["zsh, git, tmux, neovim, packages,<br>ws, agents, secrets, darwin/codex"]
-    personalModules["rex, karabiner"]
-    rexServerModules["rex-server"]
-  end
-  mac --> base & gui & personal
-  linux --> base & personal & rexServer
-  gui --> guiModules
-  base --> baseModules
-  personal --> personalModules
-  rexServer --> rexServerModules
+## Commands
+
+```sh
+home-switch     # rebuild the tools and their config, on the Mac or Linux
+mac-switch      # apply macOS's settings and Homebrew apps (asks for a password)
+nix-update      # update the flake's inputs, rebuild, and upgrade uv's tools
+theme dark      # switch macOS and every app to dark, or to light
+ws new NAME     # make a worktree on branch NAME and start an agent in it
+ws pr NUMBER    # check a pull request out into its own worktree
+ws rm NAME      # close a worktree's session, remove it and delete its branch
 ```
 
-The modules are the files in `modules/home`, or in `modules/darwin` for the
-names that start with `darwin/`. `base` is every computer's shell, editor,
-tools and agent settings. `gui` is a Mac's window manager, bar, fonts, apps
-and macOS settings. `personal` adds what only Ryan's own computers get,
-such as Rex's settings, Karabiner and byor's rules. `rex-server` runs Rex's
-server. `work` has nothing yet. Some modules also check a second role:
-`packages`, for example, adds fonts for `gui` and pi, pnpm and Python for
-`personal`. The theme module applies on every computer.
+[docs/ws.md](docs/ws.md) has the other `ws` commands, and `ws --help` lists them
+all.
 
-```text
-flake.nix           the inputs, and the configs each computer gets
-hosts/              each computer's roles and settings
-modules/
-  options.nix       the options a host file sets
-  home/             one file per program, for Home Manager
-  darwin/           macOS settings, Homebrew casks and /etc/codex, for nix-darwin
-  codex-managed.nix the files Codex's managed hooks need in /etc/codex
-theme/              what each color means, one file per app, and `theme`
-pkgs/               ws's Go source and the pair package
-config/             files programs read as they are, linked from the checkout
-ai-harness/         the agents' instructions, references, skills and hooks
-secrets/            secrets.yaml, encrypted to the keys in .sops.yaml
-tests/              the prompt's test
-assets/             this README's screenshots
-```
+Most changes need only `home-switch`. It changes only files in your home
+folder, so it doesn't need your password. `mac-switch` changes macOS's
+settings, the Homebrew apps and files in `/etc`, so it asks for your password.
+`nix-update` runs both.
 
-Most files under `config/` and `ai-harness/` are linked from the checkout,
-so a program picks up an edit when it next starts or reloads. A switch
-writes everything else, and also reads a few files from those two folders
-as it builds. AGENTS.md names them, since an edit to one needs a switch.
+In Rex or tmux, Alt and a key opens a `ws` popup:
+
+| Key       | Popup                                                          |
+| --------- | -------------------------------------------------------------- |
+| Alt-O     | Go: sessions, repositories and bookmarked folders              |
+| Alt-W     | Worktrees: this project's worktrees, and all of them on a tab  |
+| Alt-R     | Reviews: the pull requests and issues that need you            |
+| Alt-T     | Tasks: the open tasks in your notes                            |
+| Alt-A     | Agents: every running agent, the ones waiting on you first     |
+| Alt-C     | Theme: switch light and dark, and pick the picture in popups   |
+| Alt-/     | Keys: every key binding                                        |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/picker-dark.png">
+  <img alt="The Alt-O picker over Rex, listing sessions, repositories and a bookmarked folder beside the selected session's screen." src="assets/picker-light.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/reviews-dark.png">
+  <img alt="The Reviews popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description." src="assets/reviews-light.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/tasks-dark.png">
+  <img alt="The Tasks popup over Rex, with sketchybar's T lit. It lists the repository's open tasks by due date beside the note they're in." src="assets/tasks-light.png">
+</picture>
+
+At the left of sketchybar, after the date, are AeroSpace's four workspaces,
+with the focused one in the accent color:
+
+| Key       | Workspace |
+| --------- | --------- |
+| Cmd-Alt-V | Messages  |
+| Cmd-Alt-B | Browser   |
+| Cmd-Alt-N | Code      |
+| Cmd-Alt-M | Meetings  |
+
+Add Shift to the key to move the focused window to that workspace.
+
+After them are three letters that light up when something needs you. From any
+app, press Cmd-Alt and the letter to act on it:
+
+| Letter | Lights up when                                         | Cmd-Alt and the letter |
+| ------ | ------------------------------------------------------ | ---------------------- |
+| A      | An agent is blocked on you or has failed               | Go to that agent       |
+| R      | A pull request or issue is in Reviews' Needs you tab  | Open Reviews           |
+| T      | A task is due by tomorrow                              | Open Tasks             |
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md) says which command applies each change, and lists
-  the checks and the rules for changing this repository.
-- [ai-harness/README.md](ai-harness/README.md) explains where Claude Code
-  and Codex get their instructions, skills, settings and phone
-  notifications.
-- [pkgs/ws/AGENTS.md](pkgs/ws/AGENTS.md) explains how `ws` is put together
-  and what it keeps on disk.
+| Page                               | Contents                                                    |
+| ---------------------------------- | ----------------------------------------------------------- |
+| [Setup](docs/setup.md)             | Setting up a new Mac or Linux machine                       |
+| [Layout](docs/layout.md)           | Hosts, roles, modules and where each file is                |
+| [ws](docs/ws.md)                   | ws's commands, layouts and popups, and the state it saves   |
+| [Theme](docs/theme.md)             | Light and dark, and coloring another app                    |
+| [AGENTS.md](AGENTS.md)             | Which rebuild each change needs, the checks and the rules   |
+| [AI harness](ai-harness/README.md) | The agents' instructions, skills, settings and phone alerts |
+| [LATER.md](LATER.md)               | What is still set up by hand                                |

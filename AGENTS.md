@@ -1,44 +1,46 @@
 # Working in this repository
 
-This repository configures Ryan's computers with Nix. README.md describes the
-roles and the layout.
+This repository sets up the user's computers with one Nix flake.
+`docs/layout.md` describes the hosts, roles and where each file lives.
 
 ## Applying a change
 
-What an edit needs depends on where it is:
+How a change takes effect depends on the file:
 
-- **No command:** most files under `config/` and `ai-harness/` are linked
-  from this checkout. A program picks up the edit when it next starts or
-  reloads. Rex needs `rex config reload` and tmux needs `prefix r`.
-- **`home-switch`:** everything in `modules/home/`, `theme/`, `pkgs/` and
-  `secrets/`, including new tools. A home switch also reads these files from
-  the linked folders as it builds, so they need it too:
-  `config/aerospace/aerospace.toml`, `config/zsh/starship.toml`, the
-  shaders in `config/ghostty/shaders`, and `ai-harness/AGENTS.md`, whose
-  text Codex gets from its settings. It needs no password, so run it
-  yourself and check the result in the program.
-- **`mac-switch`:** `modules/darwin/` (macOS settings, the Homebrew casks and
-  `/etc/codex`), `modules/codex-managed.nix`, and
-  `ai-harness/codex/requirements.toml`, which a Mac switch copies into
-  `/etc/codex`. On Linux, a home switch applies those two files. A Mac
-  switch asks for Ryan's password, so stop and give him the command.
+- **No command:** most files under `config/` and `ai-harness/` are links
+  into this checkout, so a program picks up an edit when it next starts or
+  reloads. Reload Rex with `rex config reload` and tmux with `prefix r`.
+- **`home-switch`:** files in `modules/home/`, `theme/`, `pkgs/` and
+  `secrets/`, including new tools. The build also reads four linked files,
+  so they need it too: `config/aerospace/aerospace.toml`,
+  `config/zsh/starship.toml`, the shaders in `config/ghostty/shaders`, and
+  `ai-harness/AGENTS.md`, which the build writes into Codex's settings.
+  `home-switch` needs no password, so run it yourself and check the result
+  in the program.
+- **`mac-switch`:** `modules/darwin/` (macOS settings, the Homebrew casks
+  and `/etc/codex`), `modules/codex-managed.nix`, and
+  `ai-harness/codex/requirements.toml`, which `mac-switch` copies into
+  `/etc/codex`. On Linux, `home-switch` applies those two files instead.
+  `mac-switch` asks for the user's password, so stop and give the user the
+  command to run.
 - **Both:** `flake.nix`, `flake.lock`, `hosts/` and `modules/options.nix`
-  reach every config, so a Mac needs both switches.
+  affect every config, so a Mac needs `home-switch` and `mac-switch`.
 
-Light and dark need no switch: `theme light` or `theme dark` flips macOS and
-every app at once. ws keeps its mascot in `~/.local/state/ws/mascot.json`,
-outside this repository, and rewrites it itself.
+`theme light` and `theme dark` switch macOS and every app between light and
+dark without a rebuild. ws keeps its mascot in
+`~/.local/state/ws/mascot.json`, outside this repository, and rewrites that
+file itself.
 
-To color a new app, add a file to `theme/apps` that turns the meanings in
-`theme/meanings.nix`, such as `t.muted` or `t.code.function`, into the
-files the app reads. Never write a hex there. Each home switch renders every
-file in `theme/apps` for both modes, and `theme` points `~/.config/theme`
-at the current one. An app that reads its file when it runs needs nothing
-more. One that keeps its colors in memory also needs a reload line in
-`theme/theme.sh`.
+To color a new app, add a file to `theme/apps` that maps the meanings in
+`theme/meanings.nix`, such as `t.muted` or `t.code.function`, to the files
+the app reads. Never write a hex color there. Each `home-switch` renders
+every file in `theme/apps` for both modes, and `theme` points
+`~/.config/theme` at the current mode. An app that reads its file when it
+runs needs nothing more. An app that keeps its colors in memory also needs a
+reload line in `theme/theme.sh`.
 
-A Mac switch installs the casks `modules/darwin/homebrew.nix` lists. It
-leaves every other Homebrew formula and cask as it is.
+`mac-switch` installs the casks listed in `modules/darwin/homebrew.nix` and
+leaves every other Homebrew formula and cask alone.
 
 ## Checks
 
@@ -59,12 +61,12 @@ nix eval --raw '.#homeConfigurations."ryansaxe@linux".activationPackage.drvPath'
 
 ## Rules
 
-- Use the role a setting belongs to. Check a role with
+- Put each setting under the role it belongs to. Check a role with
   `lib.elem "ROLE" config.dotfiles.roles`.
-- Install tools through Nix. Use Homebrew for a Mac app that nixpkgs has no
-  Mac build of, or that its vendor ships as a cask, as Codex and Karabiner
-  are.
-- Prefer small code of our own, then tools from established maintainers.
-  Avoid community plugins and flakes unless nothing else works.
+- Install tools through Nix. Use Homebrew only for a Mac app that nixpkgs
+  has no Mac build of, or that its vendor ships as a cask, as Codex and
+  Karabiner are.
+- Prefer a little code in this repository, then tools from established
+  maintainers. Avoid community plugins and flakes unless nothing else works.
 - Never decrypt a secret into a file outside `~/.config/sops-nix`, and never
   commit an age private key.
