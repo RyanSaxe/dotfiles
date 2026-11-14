@@ -26,6 +26,13 @@ repos:
         language: system
         files: ^config/(nvim|rex)/.*\.lua$
 
+      - id: nvim-queries
+        name: Neovim's context queries parse
+        entry: nvim --clean --headless -l config/nvim/scripts/check-queries.lua config/nvim
+        language: system
+        files: ^config/nvim/(queries/|scripts/check-queries\.lua$)
+        pass_filenames: false
+
       - id: shfmt
         name: shfmt
         entry: shfmt --write --indent 2

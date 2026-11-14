@@ -143,15 +143,20 @@ function M.apply(tokens)
 
   -- Editing surfaces
   hl("CursorLine", { bg = bb(p.mauve, 0.1) })
+  -- The wash runs across the gutter too, and the cursor's number is bold
+  -- in the accent color.
+  hl("CursorLineNr", { fg = accent, bg = bb(p.mauve, 0.1), bold = true })
+  hl("CursorLineSign", { bg = bb(p.mauve, 0.1) })
+  hl("CursorLineFold", { bg = bb(p.mauve, 0.1) })
 
-  -- The sticky context header wears the same mauve wash as CursorLine:
-  -- both mark "where you are", one vertically, one structurally. The
-  -- bottom row underlines in a stronger mix to seal the header off from
-  -- the buffer.
-  hl("TreesitterContext", { bg = bb(p.mauve, 0.1) })
-  hl("TreesitterContextLineNumber", { fg = r.fg_faint, bg = bb(p.mauve, 0.1) })
-  hl("TreesitterContextBottom", { bg = bb(p.mauve, 0.1), underline = true, sp = bb(p.mauve, 0.5) })
-  hl("TreesitterContextLineNumberBottom", { link = "TreesitterContextBottom" })
+  -- The sticky context header sits on the buffer's own background. A line
+  -- under it in the structure color, mixed halfway into the background,
+  -- separates it from the code.
+  hl("TreesitterContext", { bg = r.bg })
+  hl("TreesitterContextLineNumber", { fg = r.fg_faint, bg = r.bg })
+  hl("TreesitterContextBottom", { link = "TreesitterContext" })
+  hl("TreesitterContextLineNumberBottom", { link = "TreesitterContextLineNumber" })
+  hl("TreesitterContextSeparator", { fg = bb(p.mauve, 0.5), bg = r.bg })
 
   -- Ghost text: AI suggestions whisper in pink
   hl("BlinkCmpGhostText", { fg = bb(p.pink, 0.5), bg = r.bg_alt })
@@ -197,13 +202,24 @@ function M.apply(tokens)
   -- marks the input focus.
   hl("WinBar", { fg = r.fg_muted, bg = r.bg })
   hl("WinBarNC", { fg = r.fg_faint, bg = r.bg })
-  hl("ThemeStlNormal", { fg = accent, bg = r.bg, bold = true })
-  hl("ThemeStlInsert", { fg = p.mauve, bg = r.bg, bold = true })
-  hl("ThemeStlVisual", { fg = p.blue, bg = r.bg, bold = true })
-  hl("ThemeStlCommand", { fg = p.peach, bg = r.bg, bold = true })
-  hl("ThemeStlReplace", { fg = p.pink, bg = r.bg, bold = true })
-  hl("ThemeStlTerminal", { fg = p.green, bg = r.bg, bold = true })
+  hl("ThemeWinbarFile", { fg = r.fg, bg = r.bg, bold = true })
+  hl("ThemeWinbarFileNC", { fg = r.fg_muted, bg = r.bg })
+  hl("ThemeWinbarPath", { fg = r.fg_faint, bg = r.bg })
+  hl("ThemeWinbarDirty", { fg = r.warn, bg = r.bg })
+  -- The mode's color says what you're doing: moving around in the accent,
+  -- sending text in notify (the color an input's border has), selecting in
+  -- info, and the command line and a terminal in peach. Green and red stay
+  -- for good and bad.
+  hl("ThemeStlMove", { fg = accent, bg = r.bg, bold = true })
+  hl("ThemeStlSend", { fg = notify, bg = r.bg, bold = true })
+  hl("ThemeStlSelect", { fg = r.info, bg = r.bg, bold = true })
+  hl("ThemeStlWait", { fg = p.peach, bg = r.bg, bold = true })
   hl("ThemeStlBranch", { fg = r.fg_faint, bg = r.bg })
+  -- The branch name's colors when it needs you: behind wants a pull (peach,
+  -- as in the prompt), and an operation in progress or a detached HEAD needs
+  -- attention soon.
+  hl("ThemeStlBehind", { fg = p.peach, bg = r.bg })
+  hl("ThemeStlAttention", { fg = r.warn, bg = r.bg })
   hl("ThemeStlRecording", { fg = p.red, bg = r.bg, bold = true })
   hl("ThemeStlAdd", { fg = p.semantic_add, bg = r.bg })
   hl("ThemeStlChange", { fg = p.semantic_change, bg = r.bg })
@@ -231,36 +247,16 @@ function M.apply(tokens)
   -- an input's border and title.
   hl("ThemeChromeFrame", { fg = notify, bg = p.chrome })
 
-  -- Window separators are painted bands, not hairlines: a glyph drawn in
-  -- fg leaves the cell's background showing, which ghostty's always-extend
-  -- then smears at the edges and which never merges with the explorer
-  -- beside it. Space glyphs (see fillchars) plus a background make the
-  -- divider one solid strip of chrome, exactly as on the tmux side.
-  hl("WinSeparator", { fg = p.chrome, bg = p.chrome })
+  -- Splits are divided by a thin line in a quiet gray (see fillchars). A
+  -- sidebar's own edge stays a band of its chrome color, so the explorer
+  -- reads as one surface.
+  hl("WinSeparator", { fg = p.surface1, bg = r.bg })
   hl("VertSplit", { link = "WinSeparator" })
-  hl("ThemeChromeWinSeparator", { link = "WinSeparator" })
-  -- With no statusline, nvim still draws one as the divider between
-  -- stacked windows. Blanked in options.lua, it becomes the horizontal
-  -- twin of the band above.
-  hl("StatusLine", { fg = p.chrome, bg = p.chrome })
+  hl("ThemeChromeWinSeparator", { fg = p.chrome, bg = p.chrome })
+  -- The one status line sits on the buffer's background, like the tab row.
+  hl("StatusLine", { fg = r.fg_faint, bg = r.bg })
   hl("StatusLineNC", { link = "StatusLine" })
 
-  -- The tab row's state readout. These are real groups rather than
-  -- per-render colors because bufferline creates custom-area highlights
-  -- with `default = true`: the first paint would win forever and the
-  -- mode color would never change again.
-  ---@type table<string, string>
-  local modes = {
-    Normal = accent,
-    Insert = p.mauve,
-    Visual = p.blue,
-    Command = p.peach,
-    Replace = p.pink,
-    Terminal = p.green,
-  }
-  for name, color in pairs(modes) do
-    hl("ThemeMode" .. name, { fg = color, bg = p.chrome, bold = true })
-  end
   -- The recording fade, precomputed. A cell can only hold one color, so
   -- the animation is a ramp of groups the pulse timer walks. Cosine, not
   -- linear: it eases at both ends, which is what makes it read as
@@ -269,9 +265,8 @@ function M.apply(tokens)
   local pulse = require("theme.pulse")
   for i = 1, pulse.FRAMES do
     local wave = 0.5 + 0.5 * math.cos(2 * math.pi * (i - 1) / pulse.FRAMES)
-    hl(pulse.group(i), { fg = blend(p.red, p.chrome, 0.35 + 0.65 * wave), bg = p.chrome, bold = true })
+    hl(pulse.group(i), { fg = blend(p.red, r.bg, 0.35 + 0.65 * wave), bg = r.bg, bold = true })
   end
-  hl("ThemeBranch", { fg = r.fg_faint, bg = p.chrome })
 
   -- Snacks windows hover over the buffer and do not reach a terminal
   -- edge, so they paint the content surface. The explorer is scoped

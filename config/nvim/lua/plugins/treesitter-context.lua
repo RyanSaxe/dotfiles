@@ -1,21 +1,15 @@
--- Sticky scope header: the enclosing function/class stays pinned to the
--- top of the window while its body scrolls. Its colors are in
--- theme/highlights.lua with everything else.
+-- Sticky scope header: the enclosing blocks stay pinned to the top of the
+-- window while their bodies scroll, one row per block, each header
+-- collapsed to one line. context-line draws it from nvim-treesitter-context's
+-- queries and highlight groups, whose colors are in theme/highlights.lua.
 return {
-  "nvim-treesitter/nvim-treesitter-context",
+  dir = vim.fn.stdpath("config") .. "/local/context-line",
+  main = "context_line",
+  dependencies = { "nvim-treesitter/nvim-treesitter-context" },
   event = "LazyFile",
-  ---@param opts table
-  config = function(_, opts)
-    require("treesitter-context").setup(opts)
-    -- The selected tab follows the header's wash while it is visible;
-    -- see theme/context_chrome.lua.
-    require("theme.context_chrome").setup()
-  end,
   opts = {
     max_lines = 4,
-    mode = "cursor",
     trim_scope = "inner",
-    -- One line per nested scope, so four levels never eat the viewport.
-    multiline_threshold = 1,
+    separator = "─",
   },
 }

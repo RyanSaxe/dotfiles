@@ -1,9 +1,8 @@
--- Per-window chrome. There is no statusline at all: it spanned the full
--- width and cut the chrome surface off before the terminal's bottom edge,
--- so a right-hand explorer never reached the floor. Global state (mode,
--- recording, branch) moved to the tab row, which is genuinely global;
--- what is left here is per-window and belongs under the tab row —
--- diagnostics on the left, git counts on the right.
+-- Each split's own line at its top. The left side says which file the split
+-- holds, its folders faint and its name bold while the split has focus. The
+-- right side holds that split's facts: git counts, diagnostics by icon, and
+-- the cursor's position. A file with unsaved changes gets a yellow dot. The
+-- blocks the cursor is in belong to the sticky context header, not here.
 local M = {}
 
 ---@param group string
@@ -13,13 +12,20 @@ local function paint(group, text)
   return "%#" .. group .. "#" .. text
 end
 
+---@param s string
 ---@return string
-local function git_counts()
+local function esc(s)
+  return (s:gsub("%%", "%%%%"))
+end
+
+---@param buf integer
+---@return string
+local function git_counts(buf)
   local ok, diff = pcall(require, "mini.diff")
   if not ok then
     return ""
   end
-  local data = diff.get_buf_data(0)
+  local data = diff.get_buf_data(buf)
   local s = data and data.summary
   if not s then
     return ""
@@ -38,19 +44,17 @@ local function git_counts()
   return table.concat(parts, " ")
 end
 
--- Glyph then count, colored by severity. The glyphs are read from the
--- floor's icon table rather than copied here, so the winbar always
--- shows exactly what the sign column shows.
+-- Icon then count, colored by severity. The icons are the sign column's own,
+-- so the winbar shows exactly the marks the gutter shows.
+---@param buf integer
 ---@return string
-local function diagnostics()
-  -- The sign column's own configured text is the single source: whoever
-  -- sets the signs, the winbar shows the same mark.
+local function diagnostics(buf)
   local signs = vim.diagnostic.config().signs
   ---@type table<integer, string>
   local marks = type(signs) == "table" and signs.text or {}
   ---@type table<integer, integer>
   local counts = {}
-  for _, d in ipairs(vim.diagnostic.get(0)) do
+  for _, d in ipairs(vim.diagnostic.get(buf)) do
     counts[d.severity] = (counts[d.severity] or 0) + 1
   end
   local sev = vim.diagnostic.severity
@@ -65,41 +69,86 @@ local function diagnostics()
   return table.concat(parts, " ")
 end
 
--- Diagnostics sit left, above the number column; git sits right, under
--- the tab row's branch.
+-- Where a file is: its path from its repository's root, led by the
+-- repository's name when that isn't the folder Neovim works in. A file
+-- outside any repository shows its path from the home folder.
+---@param buf integer
 ---@return string
-function M.winbar()
-  return " " .. diagnostics() .. "%=" .. git_counts() .. paint("ThemeStlBranch", " ")
+local function location(buf)
+  local path = vim.api.nvim_buf_get_name(buf)
+  local root = vim.fs.root(buf, ".git")
+  if not root then
+    return vim.fn.fnamemodify(path, ":~")
+  end
+  local rel = vim.fs.relpath(root, path) or vim.fn.fnamemodify(path, ":t")
+  if root == vim.fn.getcwd() then
+    return rel
+  end
+  return vim.fs.basename(root) .. "/" .. rel
 end
 
--- Only real file windows get a winbar. Floats never render one, so
--- pickers are already exempt; splits holding an explorer, help, or
--- terminal must be excluded by hand.
+-- The file's folders, then its name.
+---@param buf integer
+---@param focus boolean
+---@return string
+local function crumbs(buf, focus)
+  local rel = location(buf)
+  ---@type string[]
+  local parts = {}
+  for part in rel:gmatch("[^/]+") do
+    parts[#parts + 1] = esc(part)
+  end
+  local name = table.remove(parts) or ""
+  local file = paint(focus and "ThemeWinbarFile" or "ThemeWinbarFileNC", name)
+  if vim.bo[buf].modified then
+    file = file .. paint("ThemeWinbarDirty", " ●")
+  end
+  if #parts == 0 then
+    return file
+  end
+  return paint("ThemeWinbarPath", table.concat(parts, " › ") .. " › ") .. file
+end
+
+---@return string
+function M.render()
+  local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
+  local focus = win == (tonumber(vim.g.actual_curwin) or vim.api.nvim_get_current_win())
+  local buf = vim.api.nvim_win_get_buf(win)
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  ---@type string[]
+  local right = {}
+  for _, part in ipairs({ git_counts(buf), diagnostics(buf) }) do
+    if part ~= "" then
+      right[#right + 1] = part
+    end
+  end
+  right[#right + 1] = paint("ThemeWinbarPath", cursor[1] .. ":" .. (cursor[2] + 1))
+  return " " .. crumbs(buf, focus) .. "%=" .. table.concat(right, "  ") .. " "
+end
+
+-- Only real file windows get a winbar. Floats never render one, so pickers
+-- are already exempt; splits holding an explorer, help, or a terminal must
+-- be excluded by hand.
 ---@param win integer
-local function apply_winbar(win)
+local function apply(win)
   if vim.api.nvim_win_get_config(win).relative ~= "" then
     return
   end
   local buf = vim.api.nvim_win_get_buf(win)
   local normal = vim.bo[buf].buftype == "" and vim.bo[buf].filetype ~= ""
-  vim.wo[win].winbar = normal and "%!v:lua.require'theme.winbar'.winbar()" or ""
-end
-
-local function apply_all()
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    apply_winbar(win)
-  end
+  vim.wo[win].winbar = normal and "%!v:lua.require'theme.winbar'.render()" or ""
 end
 
 function M.setup()
   vim.api.nvim_create_autocmd({ "BufWinEnter", "FileType", "WinEnter", "WinNew" }, {
     group = vim.api.nvim_create_augroup("theme_winbar", { clear = true }),
     callback = function()
-      apply_winbar(vim.api.nvim_get_current_win())
+      apply(vim.api.nvim_get_current_win())
     end,
   })
-  -- Setup lands after the first windows exist, so seed them directly.
-  apply_all()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    apply(win)
+  end
 end
 
 return M

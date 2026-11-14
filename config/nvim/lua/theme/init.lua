@@ -131,6 +131,7 @@ function M.setup(floor_opts)
   })
   M.apply()
   require("theme.surfaces").setup()
+  require("theme.statusline").setup()
   require("theme.winbar").setup()
   require("theme.pulse").setup()
   if vim.uv.fs_stat(generated_dir) then

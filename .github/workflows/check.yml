@@ -17,6 +17,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
 
       - name: prek
+        # The query check needs Neovim's plugins and parsers, which only a
+        # computer that runs Neovim has.
+        env:
+          SKIP: nvim-queries
         run: |
           tools=$(nix build --no-link --print-out-paths --inputs-from . nixpkgs#stylua nixpkgs#shfmt nixpkgs#go | sed 's|$|/bin|' | paste -sd: -)
           PATH="$tools:$PATH" uvx prek run --all-files --show-diff-on-failure

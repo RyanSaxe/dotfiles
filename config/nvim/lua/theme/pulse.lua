@@ -1,4 +1,4 @@
--- The recording tell: the state dot in the tab row breathes red while a
+-- The recording tell: the state dot in the status line breathes red while a
 -- macro records, and rides the mode color the rest of the time.
 --
 -- A terminal cell holds one color at a time, so the fade is precomputed
@@ -6,10 +6,9 @@
 -- FRAMES constant) and this timer walks it. Two alternating colors would
 -- be a blink; a full cosine cycle reads as breathing.
 --
--- The tab row is not redrawn on mode changes or on a timer by default —
--- it repaints on buffer events only. So this module owns every trigger
--- that has to reach it, and is the single place that knows the tab row
--- needs waking.
+-- The status line is not redrawn on a timer by default, so this module
+-- owns every trigger that has to reach it, and is the single place that
+-- knows the status line needs waking.
 local M = {}
 
 -- One full breath is FRAMES * TICK_MS.
@@ -33,12 +32,12 @@ function M.frame()
   return frame and M.group(frame) or nil
 end
 
--- Marking the tab row dirty and flushing are separate things, and both
+-- Marking the status line dirty and flushing are separate things, and both
 -- are needed: marking alone leaves the new color unpainted until some
 -- later event flushes (which is why the dot used to wait for the next
--- keystroke), and flushing alone repaints the row from cache.
+-- keystroke), and flushing alone repaints the line from cache.
 local function repaint()
-  vim.api.nvim__redraw({ tabline = true, flush = true })
+  vim.api.nvim__redraw({ statusline = true, flush = true })
 end
 
 local function stop()
