@@ -5,12 +5,10 @@ in
 lib.mkIf (lib.elem "base" cfg.roles) {
   programs.git = {
     enable = true;
-    # agent-notes/ holds agents' plans and scratch files in any repository.
-    # TODO.local/ is its older name, which some clones still have.
+    # Agents keep their plans and scratch files in agent-notes/, in any repository.
     ignores = [
       "**/*.local.*"
       "agent-notes/"
-      "TODO.local/"
     ];
     settings = {
       user = {
@@ -51,8 +49,15 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       };
       status.showUntrackedFiles = "all";
     };
-    # delta's diff colors for the current mode, which `theme` relinks.
-    includes = [ { path = "${config.xdg.configHome}/theme/delta-colors.gitconfig"; } ];
+    includes = [
+      # delta's diff colors for the current mode, which `theme` relinks.
+      { path = "${config.xdg.configHome}/theme/delta-colors.gitconfig"; }
+      # The vault's pre-commit hook runs its check, bin/check, before each commit.
+      {
+        condition = "gitdir:${config.home.homeDirectory}/generic/vault/";
+        contents.core.hooksPath = ".githooks";
+      }
+    ];
   };
 
   programs.delta = {

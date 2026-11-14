@@ -39,7 +39,6 @@ const usage = `usage:
                                      that isn't merged and whose pull request GitHub doesn't show as merged
   ws pick NAME [--client ID]         open a popup: go, worktrees, reviews, tasks, agents, theme, keys or files.
                                      --from BLOCK starts it in the folder of that Rex pane
-  ws tasks --json                    print every task in the vault, for Neovim's pickers
   ws theme                           the theme popup: light or dark, and the mascot
   ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file
   ws attention [--watch]             print what needs you, as agents (waiting or none), reviews
@@ -129,7 +128,7 @@ func run(cmd string, args []string) error {
 	for fs.Parse(args); fs.NArg() > 0; fs.Parse(args) {
 		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
 	}
-	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "tasks": 0, "attention": 0, "focus": 1, "agent": 1}[cmd]
+	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}[cmd]
 	if !known || len(pos) != nargs && (cmd != "agent" || len(pos) > 0) {
 		return errors.New("unknown command or arguments, see ws --help")
 	}
@@ -158,8 +157,6 @@ func run(cmd string, args []string) error {
 		return printWorktrees(b, *asJSON)
 	case "rm":
 		return remove(b, pos[0], *force)
-	case "tasks":
-		return printTasks()
 	case "theme":
 		return pick(b, "theme")
 	case "mascot":

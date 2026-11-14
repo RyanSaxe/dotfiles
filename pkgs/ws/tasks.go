@@ -2,7 +2,6 @@ package main
 
 import (
 	"cmp"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,14 +26,14 @@ import (
 // outside a fenced code block. ws reads the vault each time it lists tasks
 // and writes a note only to add a task or tick one.
 type task struct {
-	Text    string `json:"text"`
-	Done    bool   `json:"done"`
-	Due     string `json:"due,omitempty"` // YYYY-MM-DD, from 📅 on the line
-	State   string `json:"state"`         // overdue, today, soon, later or none
-	Project string `json:"project,omitempty"`
-	Section string `json:"section,omitempty"`
-	File    string `json:"file"` // relative to the vault
-	Line    int    `json:"line"`
+	Text    string
+	Done    bool
+	Due     string // YYYY-MM-DD, from 📅 on the line
+	State   string // overdue, today, soon, later or none
+	Project string
+	Section string
+	File    string // relative to the vault
+	Line    int
 }
 
 var (
@@ -64,13 +63,20 @@ func unfenced(lines []string, visit func(i int, line string)) {
 	}
 }
 
+// noteProject names the project of a note in the vault: NAME for a note
+// under notes/projects/NAME/ or private/notes/projects/NAME/.
+func noteProject(file string) string {
+	parts := strings.Split(strings.TrimPrefix(file, "private/"), "/")
+	if len(parts) > 3 && parts[0] == "notes" && parts[1] == "projects" {
+		return parts[2]
+	}
+	return ""
+}
+
 // noteTasks reads the tasks in one note. file is its path in the vault.
 func noteTasks(file, content string, today time.Time) []task {
 	var ts []task
-	project, section := "", ""
-	if parts := strings.Split(file, "/"); len(parts) > 2 && parts[0] == "projects" {
-		project = parts[1]
-	}
+	project, section := noteProject(file), ""
 	unfenced(strings.Split(content, "\n"), func(i int, line string) {
 		if h := headingRe.FindStringSubmatch(line); h != nil {
 			section = h[1]
@@ -153,13 +159,13 @@ func dueDate(s string, today time.Time) (string, error) {
 	return today.AddDate(0, 0, n).Format(time.DateOnly), nil
 }
 
-// addTask appends a task to projects/PROJECT/TODO.md, above the first ##
-// heading so it sits with the project's tasks rather than a branch's.
+// addTask appends a task to notes/projects/PROJECT/TODO.md, above the first
+// ## heading so it sits with the project's tasks rather than a branch's.
 func addTask(vault, project, text, due string) error {
 	if project == "" {
 		return errors.New("this folder has no origin remote to name the task's project")
 	}
-	file := filepath.Join(vault, "projects", project, "TODO.md")
+	file := filepath.Join(vault, "notes", "projects", project, "TODO.md")
 	data, err := os.ReadFile(file)
 	if errors.Is(err, os.ErrNotExist) {
 		data, err = []byte("# "+project+"\n"), os.MkdirAll(filepath.Dir(file), 0o755)
@@ -205,15 +211,6 @@ func tickTask(vault string, t task, today time.Time) error {
 	return os.WriteFile(file, []byte(strings.Join(lines, "")), 0o644)
 }
 
-// printTasks prints every task in the vault as JSON, for Neovim's pickers.
-func printTasks() error {
-	ts, err := vaultTasks(vaultDir(), time.Now())
-	if err != nil {
-		return err
-	}
-	return json.NewEncoder(os.Stdout).Encode(ts)
-}
-
 func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 	rex, inRex := b.(mux.Rex)
 	vault := vaultDir()
@@ -238,11 +235,17 @@ func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 			slices.SortStableFunc(ts, func(a, b task) int { return strings.Compare(cmp.Or(a.Due, "~"), cmp.Or(b.Due, "~")) })
 			rows := make([]popup.Row, len(ts))
 			for i, t := range ts {
-				// projects/NAME/TODO.md:4 reads as TODO.md:4 on NAME's tab.
+				// notes/projects/NAME/TODO.md:4 reads as NAME/TODO.md:4, and as
+				// TODO.md:4 on NAME's tab. private/notes/projects/NAME/TODO.md:4
+				// reads the same with private/ in front.
 				id := t.File + ":" + strconv.Itoa(t.Line)
-				note := strings.TrimPrefix(id, "projects/")
+				note, private := strings.CutPrefix(id, "private/")
+				note = strings.TrimPrefix(note, "notes/projects/")
 				if project != "" && tab == 0 {
 					note = strings.TrimPrefix(note, project+"/")
+				}
+				if private {
+					note = "private/" + note
 				}
 				rows[i] = popup.Row{ID: id, Title: t.Text, Detail: note, Tag: tags[t.State], Data: t}
 				if due, err := time.Parse(time.DateOnly, t.Due); err == nil {

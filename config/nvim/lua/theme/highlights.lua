@@ -247,6 +247,13 @@ function M.apply(tokens)
   hl("ThemeStlError", { fg = p.red, bg = r.bg })
   hl("ThemeStlWarn", { fg = p.yellow, bg = r.bg })
 
+  -- A task's 📅 date in the T letter's colors: red overdue, peach due today,
+  -- blue due tomorrow, and faint once the task is done (plugins/task-dates.lua).
+  hl("ThemeTaskOverdue", { fg = p.red })
+  hl("ThemeTaskToday", { fg = p.peach })
+  hl("ThemeTaskTomorrow", { fg = r.info })
+  hl("ThemeTaskDone", { fg = r.fg_faint })
+
   -- Catppuccin puts floats on mantle, which the theme makes the chrome
   -- color. Their frames and titles take the accent.
   local float = p.mantle

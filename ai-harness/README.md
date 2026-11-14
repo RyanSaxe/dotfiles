@@ -13,7 +13,7 @@ computer with the `personal` role.
 ai-harness/
 ├── AGENTS.md         global instructions
 ├── references/       documentation AGENTS.md links to
-├── skills/           Agent Skills: worktrees
+├── skills/           Agent Skills: worktrees and wiki
 ├── tools/            notify-pushover.zsh, the agents' push hook, and
 │                     link-agent-skills.sh, which shares Codex's skills
 │                     with Claude Code
@@ -28,6 +28,7 @@ ai-harness/
 | `~/.codex/AGENTS.md`                                       | Yours. A switch only creates it, empty, when it's missing |
 | `~/.claude/references`, `~/.codex/references`              | Links to `references/`                                    |
 | `~/.claude/skills/worktrees`, `~/.agents/skills/worktrees` | Links to `skills/worktrees`                               |
+| `~/.claude/skills/wiki`, `~/.agents/skills/wiki`           | Links to `skills/wiki`                                    |
 | `~/.claude/statusline.js`                                  | A link to `statusline.js`                                 |
 | `/etc/codex/requirements.toml`                             | A copy of `codex/requirements.toml`                       |
 | `/etc/codex/hooks/notify-pushover.zsh`                     | A link to `tools/notify-pushover.zsh`                     |

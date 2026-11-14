@@ -24,7 +24,10 @@ let
     if isLinux then "${config.home.path}/bin" else "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
   linkSkills = "${cfg.repo}/ai-harness/tools/link-agent-skills.sh";
 
-  skills.worktrees = link "ai-harness/skills/worktrees";
+  skills = {
+    worktrees = link "ai-harness/skills/worktrees";
+    wiki = link "ai-harness/skills/wiki";
+  };
   skillLinks =
     dir: lib.mapAttrs' (name: source: lib.nameValuePair "${dir}/${name}" { inherit source; }) skills;
 
