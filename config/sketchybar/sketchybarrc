@@ -65,6 +65,7 @@ sketchybar --default "${default[@]}"
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event agent_attention_change
 sketchybar --add event review_attention_change
+sketchybar --add event task_attention_change
 # macOS posts this whenever its appearance changes, from System Settings
 # or anywhere else, and `theme` points every app at the new mode. sketchybar
 # also runs every script once when it loads, and `theme` reloads sketchybar,
@@ -163,8 +164,8 @@ sketchybar --add item space.agent left \
   --subscribe space.agent agent_attention_change
 
 # The review letter, beside the agent one because it answers the neighbouring
-# question: an agent wants you versus GitHub wants you. Alt-R in Rex or tmux
-# opens the Reviews popup.
+# question: an agent wants you versus GitHub wants you. Alt-R in Rex or tmux,
+# or Cmd-Alt-R from anywhere, opens the Reviews popup.
 sketchybar --add item space.review left \
   --set space.review \
   icon="R" \
@@ -178,14 +179,28 @@ sketchybar --add item space.review left \
   script="$PLUGIN_DIR/review.sh" \
   --subscribe space.review review_attention_change
 
+# The task letter, last of the three: a task in the vault is due. Alt-T in
+# Rex or tmux, or Cmd-Alt-T from anywhere, opens the Tasks popup.
+sketchybar --add item space.task left \
+  --set space.task \
+  icon="T" \
+  icon.font="JetBrainsMono Nerd Font:Bold:11.0" \
+  icon.padding_left=8 \
+  icon.padding_right=8 \
+  label.drawing=off \
+  background.color="$WORKSPACE_INACTIVE_BG" \
+  background.corner_radius=6 \
+  background.height=22 \
+  script="$PLUGIN_DIR/task.sh" \
+  --subscribe space.task task_attention_change
+
 # -----------------------------------------------------------------------------
 # Right Side Items (ordered right-to-left)
 # -----------------------------------------------------------------------------
 
 # Clock (rightmost) - time with clock icon
-# Highlights in peach at meeting reminder times (00, 29, 30, 59 minutes):
-# the fixed palette peach, deliberately not the notify color - see
-# plugins/clock.sh
+# Turns red at meeting reminder times (00, 29, 30, 59 minutes), the
+# theme's red for look now - see plugins/clock.sh
 sketchybar --add item clock right \
   --set clock \
   update_freq=15 \

@@ -18,27 +18,32 @@ lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
   programs.aerospace = {
     enable = true;
     launchd.enable = true;
-    settings = lib.recursiveUpdate toml (
-      {
-        gaps.outer.top =
-          if cfg.notchInset == 0 then
+    settings = lib.recursiveUpdate toml {
+      gaps.outer.top =
+        if cfg.notchInset == 0 then
+          top
+        else
+          [
+            { monitor.built-in = top - cfg.notchInset; }
             top
-          else
-            [
-              { monitor.built-in = top - cfg.notchInset; }
-              top
-            ];
-        # launchd starts AeroSpace without the Nix profile on PATH, so the
-        # workspace-change callback could not find sketchybar.
-        exec.env-vars.PATH = "${config.home.profileDirectory}/bin:\${PATH}";
-      }
-      // lib.optionalAttrs (lib.elem "personal" cfg.roles) {
-        # Bring Rex forward and focus the agent that needs you most.
-        mode.main.binding.cmd-alt-a = [
-          "workspace code"
-          "exec-and-forget /usr/bin/open -b com.superlogical.rex && PATH='${rexDir}':$PATH ${ws}/bin/ws attention --jump"
-        ];
-      }
-    );
+          ];
+      # launchd starts AeroSpace without the Nix profile on PATH, so the
+      # workspace-change callback could not find sketchybar.
+      exec.env-vars.PATH = "${config.home.profileDirectory}/bin:\${PATH}";
+      # Cmd-Alt-A, T and R bring Rex, or Ghostty on tmux where Rex isn't
+      # installed, onto the code workspace, then go to the agent that needs
+      # you or open Tasks or Reviews.
+      mode.main.binding =
+        lib.mapAttrs
+          (_: what: [
+            "workspace code"
+            "exec-and-forget PATH='${rexDir}':$PATH ${ws}/bin/ws focus ${what}"
+          ])
+          {
+            cmd-alt-a = "agent";
+            cmd-alt-t = "tasks";
+            cmd-alt-r = "reviews";
+          };
+    };
   };
 }

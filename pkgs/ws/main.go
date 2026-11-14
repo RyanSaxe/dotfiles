@@ -42,10 +42,13 @@ const usage = `usage:
   ws tasks --json                    print every task in the vault, for Neovim's pickers
   ws theme                           the theme popup: light or dark, and the mascot
   ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file
-  ws attention [--watch | --jump]    print what needs you, as agents (waiting or none) and reviews
-                                     (ci, review or none). --watch publishes both for sketchybar and
-                                     fetches the inbox Reviews lists every 5 minutes, and --jump brings
-                                     Rex to the next agent, the one that needs you first
+  ws attention [--watch]             print what needs you, as agents (waiting or none), reviews
+                                     (ci, review or none) and tasks (overdue, today, tomorrow or none).
+                                     --watch publishes all three for sketchybar and fetches the inbox
+                                     Reviews lists every 5 minutes
+  ws focus agent|tasks|reviews       bring Rex, or Ghostty on tmux without Rex, onto the code workspace,
+                                     then go to the agent that needs you first or open Tasks or Reviews.
+                                     AeroSpace's Cmd-Alt-A, T and R run it
 In a popup, typing filters, the arrows, ^j/^k or the wheel move, enter or a click on a row acts,
 and esc clears the filter or closes.
 Outside Rex and tmux there is no terminal to open a session in, so ws open fails, and ws new and ws pr
@@ -118,7 +121,6 @@ func run(cmd string, args []string) error {
 	asJSON := fs.Bool("json", false, "")
 	force := fs.Bool("force", false, "")
 	watch := fs.Bool("watch", false, "")
-	jump := fs.Bool("jump", false, "")
 	client := fs.String("client", "", "")
 	from := fs.String("from", "", "")
 	// flag stops at the first argument, so parse again after each one to
@@ -127,7 +129,7 @@ func run(cmd string, args []string) error {
 	for fs.Parse(args); fs.NArg() > 0; fs.Parse(args) {
 		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
 	}
-	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "tasks": 0, "attention": 0, "agent": 1}[cmd]
+	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "tasks": 0, "attention": 0, "focus": 1, "agent": 1}[cmd]
 	if !known || len(pos) != nargs && (cmd != "agent" || len(pos) > 0) {
 		return errors.New("unknown command or arguments, see ws --help")
 	}
@@ -163,7 +165,9 @@ func run(cmd string, args []string) error {
 	case "mascot":
 		return setMascot(pos[0])
 	case "attention":
-		return attention(*watch, *jump, *client)
+		return attention(*watch)
+	case "focus":
+		return focus(pos[0])
 	}
 	// A popup's "the project you're in" is the project of the Rex pane it
 	// opened from. A float starts in the session's folder otherwise.

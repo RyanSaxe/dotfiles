@@ -4,8 +4,9 @@
 # 1 minute before and right at the start of every half hour. Preserve this
 # exactly.
 #
-# The highlight is peach, not the accent. It means check whether something
-# is starting, so it has to read apart from the bar's ordinary colors.
+# The highlight is the theme's red, not the accent. It means look now,
+# because a meeting may be starting or ending, so it has to stand out from the
+# bar's ordinary colors.
 
 source "$HOME/.config/sketchybar/colors.sh"
 

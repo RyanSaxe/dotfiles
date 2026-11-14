@@ -17,10 +17,10 @@ import (
 	"workspace/mux"
 )
 
-// Attention is what sketchybar's A and R letters show. The agent level comes
-// from Rex's statuses, and the review level from the inbox. The files under
-// ~/.local/state/ws are what --watch last published, for sketchybar and
-// Reviews to read.
+// Attention is what sketchybar's A, R and T letters show. The agent level
+// comes from Rex's statuses, the review level from the inbox, and the task
+// level from the vault. The files under ~/.local/state/ws are what --watch
+// last published, for sketchybar and Reviews to read.
 
 // agentLevel is waiting when a program is blocked on you or failed, and none
 // otherwise. A finished agent doesn't count: Rex doesn't tell ws when you've
@@ -51,12 +51,28 @@ func reviewLevel(in inbox, a acks) string {
 	return level
 }
 
-func attention(watch, jump bool, client string) error {
-	switch {
-	case watch:
+// taskLevel is overdue when an open task is past its date, today when one is
+// due today, tomorrow when one is due tomorrow, and none otherwise.
+func taskLevel(ts []task, today time.Time) string {
+	tomorrow := today.AddDate(0, 0, 1).Format(time.DateOnly)
+	level := "none"
+	for _, t := range ts {
+		switch {
+		case t.Done:
+		case t.State == "overdue":
+			return "overdue"
+		case t.State == "today":
+			level = "today"
+		case t.Due == tomorrow && level == "none":
+			level = "tomorrow"
+		}
+	}
+	return level
+}
+
+func attention(watch bool) error {
+	if watch {
 		return watchAttention()
-	case jump:
-		return jumpToAgent(client)
 	}
 	agents, err := agentLevel()
 	if err != nil {
@@ -66,7 +82,11 @@ func attention(watch, jump bool, client string) error {
 	var a acks
 	readJSON("inbox.json", &in)
 	readJSON("acknowledged.json", &a)
-	fmt.Println(agents, reviewLevel(in, a))
+	ts, err := vaultTasks(vaultDir(), time.Now())
+	if err != nil {
+		return err
+	}
+	fmt.Println(agents, reviewLevel(in, a), taskLevel(ts, time.Now()))
 	return nil
 }
 
@@ -84,7 +104,8 @@ func publish(name, level string) {
 }
 
 // watchAttention republishes the agent level whenever Rex reports a status
-// change, and fetches the inbox every 5 minutes. It is the only process that
+// change, fetches the inbox every 5 minutes and rereads the vault's tasks
+// every minute, which also catches a new day. It is the only process that
 // fetches the inbox. SIGUSR1 asks it to fetch now, as Ctrl-R in Reviews does,
 // and SIGUSR2 to republish the review level, after an acknowledgement. It
 // runs until it is killed.
@@ -122,10 +143,23 @@ func watchAttention() error {
 		in = next
 		republish()
 	}
+	recount := func() {
+		now := time.Now()
+		ts, err := vaultTasks(vaultDir(), now)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "ws: tasks:", err)
+			return
+		}
+		publish("task-attention", taskLevel(ts, now))
+	}
 	reviews := time.NewTicker(5 * time.Minute)
+	tasks := time.NewTicker(time.Minute)
 	refresh()
+	recount()
 	for {
 		select {
+		case <-tasks.C:
+			recount()
 		case <-changed:
 			// A burst of reports, such as an agent finishing, settles first.
 			time.Sleep(300 * time.Millisecond)

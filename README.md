@@ -111,12 +111,13 @@ in the secrets.
 
 ## Reviews
 
-Alt-R in Rex or tmux opens Reviews, a popup of the open pull requests and
-issues on GitHub that involve you. Its first tab, Needs you, lists what is
-waiting on you, most urgent first: a failing check or a request for changes
-on your own pull request, a review of it, a comment since your last reply,
-or a pull request or issue opened this week in a repository you watch. Each
-computer's watched repositories are its `attention-watch` secret.
+Alt-R in Rex or tmux, or Cmd-Alt-R from anywhere, opens Reviews, a popup of
+the open pull requests and issues on GitHub that involve you. Its first tab,
+Needs you, lists what is waiting on you, most urgent first: a failing check
+or a request for changes on your own pull request, a review of it, a comment
+since your last reply, or a pull request or issue opened this week in a
+repository you watch. Each computer's watched repositories are its
+`attention-watch` secret.
 
 Enter checks a pull request out into its own worktree and opens it in
 Neovim, and Ctrl-T also starts an agent in a second tab there to review it.

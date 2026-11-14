@@ -36,15 +36,15 @@ role, and writes the files sketchybar and Reviews read:
 
 - `inbox.json`: the pull requests and issues Reviews lists, as the job last
   fetched them from GitHub
-- `agent-attention` and `review-attention`: the levels the job last
-  published for sketchybar's A and R
+- `agent-attention`, `review-attention` and `task-attention`: the levels
+  the job last published for sketchybar's A, R and T
 - `attention.pid`: the job's process ID, which Reviews signals to fetch now
 
 The rest are records `ws` keeps for itself:
 
 - `acknowledged.json`: each item you marked done in Reviews, with what it
   needed you for then, so that anything newer brings it back
-- `last-jump`: the Rex pane the last `ws attention --jump` went to, so the
+- `last-jump`: the Rex pane the last `ws focus agent` went to, so the
   next jump moves on
 - `mascot.json`: the mascot and its two colors, which only the popups use,
   written by `ws mascot` and the theme popup

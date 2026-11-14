@@ -17,13 +17,19 @@ let
     WORKSPACE_INACTIVE_FG = argb "ff" t.faint;
     WORKSPACE_INACTIVE_BG = "0x00000000";
     TIME_NORMAL = argb "ff" t.accent;
-    TIME_HIGHLIGHT = argb "ff" t.waiting; # a meeting is about to start
+    TIME_HIGHLIGHT = argb "ff" t.error; # a meeting is about to start or end
     AGENT_WAITING_FG = argb "ff" t.waiting;
     AGENT_WAITING_BG = argb "33" t.waiting;
     REVIEW_CI_FG = argb "ff" t.error; # a check failed on your pull request
     REVIEW_CI_BG = argb "33" t.error;
     REVIEW_PENDING_FG = argb "ff" t.waiting;
     REVIEW_PENDING_BG = argb "33" t.waiting;
+    TASK_OVERDUE_FG = argb "ff" t.error;
+    TASK_OVERDUE_BG = argb "33" t.error;
+    TASK_TODAY_FG = argb "ff" t.waiting;
+    TASK_TODAY_BG = argb "33" t.waiting;
+    TASK_TOMORROW_FG = argb "ff" t.info;
+    TASK_TOMORROW_BG = argb "33" t.info;
     WARN_COLOR = argb "ff" t.warn;
     DANGER_COLOR = argb "ff" t.error;
   };

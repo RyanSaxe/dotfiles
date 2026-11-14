@@ -7,6 +7,30 @@ import (
 	"workspace/mux"
 )
 
+func TestTaskLevel(t *testing.T) {
+	late := task{Due: "2026-11-08", State: "overdue"}
+	due := task{Due: "2026-11-09", State: "today"}
+	next := task{Due: "2026-11-10", State: "soon"}
+	later := task{Due: "2026-11-11", State: "soon"}
+	for _, c := range []struct {
+		name  string
+		tasks []task
+		want  string
+	}{
+		{"overdue wins", []task{next, due, late}, "overdue"},
+		{"today beats tomorrow", []task{next, due}, "today"},
+		{"tomorrow", []task{later, next}, "tomorrow"},
+		{"two days out stays quiet", []task{later, {}}, "none"},
+		{"done tasks don't count", []task{{Done: true, Due: "2026-11-08", State: "overdue"}}, "none"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := taskLevel(c.tasks, now); got != c.want {
+				t.Errorf("taskLevel = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 func TestNextAgent(t *testing.T) {
 	agents := []mux.Terminal{
 		{Label: "web", Block: "idle", Status: mux.Idle},

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,21 +13,35 @@ import (
 	"workspace/popup"
 )
 
-// filesPopup lists dir's files as fd finds them. Each tab lets more in:
-// hidden files, then what git ignores as well.
+// filesPopup lists dir's files as fd finds them, one kind per tab: the
+// files, then only the hidden ones, then only what git ignores.
 func filesPopup(b mux.Backend, dir string) popup.Popup {
+	// Each tab's fd flags let in more than the tab before, and the tab shows
+	// only what they add.
 	flags := [][]string{nil, {"--hidden"}, {"--hidden", "--no-ignore"}}
+	find := func(extra []string) ([]string, error) {
+		out, err := runIn(dir, "fd", append([]string{"--type", "f", "--strip-cwd-prefix", "--exclude", ".git"}, extra...)...)
+		var files []string
+		for f := range strings.SplitSeq(out, "\n") {
+			if f != "" {
+				files = append(files, f)
+			}
+		}
+		return files, err
+	}
 	return popup.Popup{
 		Noun: "files", OneLine: true,
-		Tabs: []popup.Tab{{Name: "Files", Empty: "No files."}, {Name: "+ hidden", Empty: "No files."}, {Name: "+ ignored", Empty: "No files."}},
+		Tabs: []popup.Tab{{Name: "Files", Empty: "No files."}, {Name: "Hidden", Empty: "No hidden files."}, {Name: "Ignored", Empty: "No ignored files."}},
 		Load: func(t int) ([]popup.Row, error) {
-			out, err := runIn(dir, "fd", append([]string{"--type", "f", "--strip-cwd-prefix", "--exclude", ".git"}, flags[t]...)...)
+			files, err := find(flags[t])
+			if err == nil && t > 0 {
+				var before []string
+				before, err = find(flags[t-1])
+				files = without(files, before)
+			}
 			changed := gitChanges(dir)
 			var rows []popup.Row
-			for f := range strings.SplitSeq(out, "\n") {
-				if f == "" {
-					continue
-				}
+			for _, f := range files {
 				r := popup.Row{ID: f, Title: f, Tag: changed[f]}
 				if info, err := os.Stat(filepath.Join(dir, f)); err == nil {
 					r.Qualifier = relAge(info.ModTime())
@@ -83,4 +98,13 @@ func openFile(b mux.Backend, dir, file string) error {
 		return err
 	}
 	return b.Show(id)
+}
+
+// without is files minus every name in drop, in files' order.
+func without(files, drop []string) []string {
+	seen := make(map[string]bool, len(drop))
+	for _, f := range drop {
+		seen[f] = true
+	}
+	return slices.DeleteFunc(files, func(f string) bool { return seen[f] })
 }
