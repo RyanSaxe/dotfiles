@@ -114,11 +114,12 @@ in
     ''
   );
 
-  # byor's global rules, its style package and the scripts their checks
-  # run, linked from the checkout so a rule byor writes lands in the repo.
+  # byor's global rules, its command rules, its style package and the
+  # scripts their checks run, linked from the checkout so a rule byor writes
+  # lands in the repo.
   # byor owns the rest of ~/.config/byor.
   xdg.configFile = lib.mkIf (has "personal") (
-    lib.genAttrs [ "byor/rules" "byor/packages" "byor/scripts" ] (path: {
+    lib.genAttrs [ "byor/rules" "byor/commands" "byor/packages" "byor/scripts" ] (path: {
       source = config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/${path}";
     })
   );

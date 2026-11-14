@@ -200,6 +200,8 @@ because several files or commands were involved. Commits may depend on earlier
 commits, and normal history repairs such as amendments or reverts are fine when
 they improve the result. Do not commit scratch work, plans, logs, temporary
 diagnostics, or generated noise unless they are intentional project artifacts.
+Keep them in an `agent-notes/` folder at the repository root, which the
+global git ignore covers in every repository.
 Unless the driver asks for an uncommitted draft, leave intended implementation
 work committed at handoff.
 

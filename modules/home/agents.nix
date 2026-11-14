@@ -78,7 +78,10 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     mutableSettings = true;
     settings = {
       model = "opus[1m]";
-      effortLevel = "xhigh";
+      effortLevel = "medium";
+      # Compact at 80% of the 1M window, and never while a session sits idle.
+      env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = "80";
+      idleCompaction = false;
       alwaysThinkingEnabled = true;
       editorMode = "vim";
       statusLine = {
@@ -105,8 +108,11 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     package = if isLinux then pkgs.codex else null;
     mutableSettings = true;
     settings = {
-      model = "gpt-6-luna";
-      model_reasoning_effort = "xhigh";
+      model = "gpt-6.1-sol";
+      model_reasoning_effort = "medium";
+      # gpt-6.1-sol's largest window, compacted at 80% of it.
+      model_context_window = 872000;
+      model_auto_compact_token_limit = 697600;
       # Codex adds these to ~/.codex/AGENTS.md, so an edit to the repo's
       # file reaches Codex at the next home switch.
       developer_instructions = builtins.readFile ../../ai-harness/AGENTS.md;
@@ -117,7 +123,11 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       features = {
         daemon_auto_start = true;
         fast_mode = false;
+        # Codex keeps notes from its sessions, as Claude does.
+        memories = true;
       };
+      # How many subagents can run at once in one session.
+      agents.max_concurrent_threads_per_session = 30;
       permissions.uv-tools = {
         description = "Workspace Auto with writable UV tool paths";
         extends = ":workspace";

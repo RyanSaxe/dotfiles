@@ -5,13 +5,12 @@ in
 lib.mkIf (lib.elem "base" cfg.roles) {
   programs.git = {
     enable = true;
+    # agent-notes/ holds agents' plans and scratch files in any repository.
+    # TODO.local/ is its older name, which some clones still have.
     ignores = [
       "**/*.local.*"
+      "agent-notes/"
       "TODO.local/"
-      "TASKS/"
-      "SPECS/"
-      "tasks/"
-      "specs/"
     ];
     settings = {
       user = {

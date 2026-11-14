@@ -1,0 +1,23 @@
+id: git-add-force
+language: Bash
+severity: error
+message: "`git add --force` stages a file the ignore rules keep out."
+rule:
+  kind: command
+  # A command's name sits a level below it, so its direct words are its
+  # arguments, wherever they come.
+  all:
+    - has:
+        field: name
+        regex: (^|/)git$
+    - has:
+        kind: word
+        regex: ^add$
+    - has:
+        kind: word
+        regex: ^(--force|-[A-Za-z]*f[A-Za-z]*)$
+metadata:
+  byor:
+    rationale: Ignored files hold secrets, local settings and agents' notes, and forcing one in is how they reach a commit.
+    agent_prompt: That file is ignored on purpose. Stage the files git doesn't ignore, and if the ignored one really belongs in the repository, ask the user to change the ignore rules.
+    tags: [git]

@@ -1,0 +1,23 @@
+id: git-commit-no-verify
+language: Bash
+severity: error
+message: "`git commit --no-verify` skips the repository's commit hooks."
+rule:
+  kind: command
+  # A command's name sits a level below it, so its direct words are its
+  # arguments, wherever they come.
+  all:
+    - has:
+        field: name
+        regex: (^|/)git$
+    - has:
+        kind: word
+        regex: ^commit$
+    - has:
+        kind: word
+        regex: ^(--no-verify|-[A-Za-z]*n[A-Za-z]*)$
+metadata:
+  byor:
+    rationale: The commit hooks are the repository's checks, and skipping them commits work nobody checked.
+    agent_prompt: Fix what the hooks report and commit again. If a hook itself is broken, tell the user instead of skipping it.
+    tags: [git]
