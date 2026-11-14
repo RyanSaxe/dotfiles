@@ -108,6 +108,8 @@ return {
         cycle_next_file = false,
         cycle_hunks_across_files = true,
         jump_to_first_change = true,
+        -- Marks a block that moved within a file, and gm lines its two sides up.
+        compute_moves = true,
       },
       keymaps = {
         view = {

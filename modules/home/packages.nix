@@ -57,9 +57,13 @@ in
 
         # Neovim's language servers and formatters. Mason fills in the rest.
         ast-grep
+        gopls
         lua-language-server
         markdownlint-cli
+        nil
+        nixfmt
         prettier
+        rust-analyzer
         shfmt
         stylua
         tree-sitter
