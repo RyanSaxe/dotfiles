@@ -15,7 +15,7 @@ tmux	alt+s	ws go popup: sessions, repos, folders
 tmux	alt+o	ws go popup: sessions, repos, folders
 tmux	alt+w	ws worktrees popup
 tmux	alt+c	ws theme popup: mode and mascot
-tmux	alt+space	ws agents popup
+tmux	alt+a	ws agents popup
 tmux	alt+r	ws reviews popup
 tmux	alt+t	ws tasks popup
 tmux	alt+/	ws keys popup: this list
