@@ -52,3 +52,10 @@ vim.opt.fillchars:append({
   vertright = "│",
   verthoriz = "│",
 })
+
+-- snacks.nvim recognizes kitty, Ghostty and WezTerm by name but not Rex,
+-- which draws the same Kitty graphics, so in Rex it's told so before it
+-- loads (plugins/images.lua).
+if vim.env.TERM_PROGRAM == "rex" then
+  vim.env.SNACKS_KITTY = "true"
+end

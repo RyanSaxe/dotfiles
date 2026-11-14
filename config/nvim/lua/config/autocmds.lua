@@ -49,3 +49,30 @@ if pane then
     end,
   })
 end
+
+-- snacks.nvim keeps a picture once it is placed, so after `theme light` or
+-- `theme dark` an open note would keep diagrams and math drawn for the old
+-- mode. On each colorscheme change, which comes after the theme's
+-- highlights are set, drop each note's pictures and run snacks' own redraw
+-- for that buffer, which converts them again in the new mode's colors. The
+-- conversions are in plugins/images.lua.
+vim.api.nvim_create_autocmd("ColorScheme", {
+  group = vim.api.nvim_create_augroup("redraw_note_pictures", { clear = true }),
+  callback = function()
+    if not package.loaded["snacks.image.placement"] then
+      return
+    end
+    -- snacks would place the picture it sent the last time this mode was
+    -- on, and after a while in the other mode that picture no longer shows
+    -- in Rex. Emptying snacks' list of sent pictures makes it send each one
+    -- again.
+    require("snacks.image.image").clear()
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.b[buf].snacks_image_attached then
+        Snacks.image.placement.clean(buf)
+        -- Only snacks' inline-image group, so no other plugin reacts.
+        pcall(vim.api.nvim_exec_autocmds, "BufWinEnter", { group = "snacks.image.inline." .. buf, buffer = buf })
+      end
+    end
+  end,
+})

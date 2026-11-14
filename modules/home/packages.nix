@@ -22,7 +22,6 @@ let
   uvTools = [
     "prek"
     "byor"
-    "pylatexenc"
   ];
 
   # mmdc draws with a browser, and nixpkgs has no Chromium for Macs, so on
@@ -74,6 +73,21 @@ in
 
         age
         sops
+
+        # What snacks.nvim draws a note's pictures, diagrams and math with:
+        # ImageMagick for every picture, in the build that reads PDFs, and
+        # LaTeX with the packages its math template loads.
+        imagemagickBig
+        (texliveBasic.withPackages (
+          tex: with tex; [
+            amsfonts
+            mathtools
+            preview
+            standalone
+            varwidth
+            xcolor
+          ]
+        ))
       ]
       ++ [ mermaid-cli ]
     )

@@ -313,6 +313,9 @@ function M.apply(tokens)
   -- A pull request's +N and -N count lines, as CodeDiff's do.
   hl("SnacksGhAdditions", { link = "Added" })
   hl("SnacksGhDeletions", { link = "Removed" })
+  -- snacks sets a note's math in this group's color, which defaults to
+  -- LaTeX's math color.
+  hl("SnacksImageMath", { fg = r.fg })
   hl("SnacksPicker", { bg = r.bg })
   hl("SnacksPickerList", { bg = r.bg })
   hl("SnacksPickerBox", { bg = r.bg })

@@ -62,6 +62,10 @@ local M = {}
 local generated_dir = vim.env.HOME .. "/.config/theme"
 local tokens_path = generated_dir .. "/nvim-tokens.lua"
 
+-- The theme's folder: one folder of files for each mode, and links beside
+-- them to the current mode's.
+M.dir = generated_dir
+
 ---@return ThemeTokens|nil
 function M.load()
   local ok, tokens = pcall(dofile, tokens_path)

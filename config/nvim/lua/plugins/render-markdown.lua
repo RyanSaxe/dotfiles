@@ -10,8 +10,12 @@
 -- `anti_conceal.ignore` keeps the checkbox glyph on the cursor line so it does
 -- not flicker back to `- [ ]` while moving through a list.
 --
--- The latex converters are external executables. markdown/health.lua owns
--- the list and reports it through `:checkhealth markdown`.
+-- LaTeX is off because snacks draws math as pictures (plugins/images.lua),
+-- and the two would both draw each equation.
+--
+-- A code block's closing fence shows as a thin edge rather than being hidden.
+-- snacks draws a Mermaid diagram under that line, and a hidden line hides the
+-- diagram with it (folke/snacks.nvim#2761).
 return {
   "MeanderingProgrammer/render-markdown.nvim",
   ---@module 'render-markdown'
@@ -22,7 +26,8 @@ return {
     anti_conceal = { ignore = { check_icon = true } },
     checkbox = { enabled = true },
     bullet = { enabled = true },
-    latex = { enabled = true, converter = require("markdown.health").LATEX_CONVERTERS },
+    latex = { enabled = false },
+    code = { border = "thin" },
     html = { enabled = true, comment = { conceal = true } },
   },
 }

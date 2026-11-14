@@ -1,17 +1,21 @@
 -- What the Markdown surface needs from outside Neovim: the Tree-sitter parsers
--- render-markdown renders from, and the executables it shells out to for
--- LaTeX. Markdown still edits without either, so both report as warnings.
+-- render-markdown and snacks read, and the programs snacks runs to draw
+-- pictures, diagrams and math. Markdown still edits without any of them, so
+-- each reports as a warning.
 local M = {}
 
--- render-markdown's own render paths: markdown and markdown_inline always,
--- then one per enabled element (html, latex, yaml frontmatter).
+-- markdown and markdown_inline always, html and yaml for render-markdown's
+-- comments and frontmatter, and latex for the math snacks finds.
 ---@type string[]
 local PARSERS = { "markdown", "markdown_inline", "html", "latex", "yaml" }
 
--- Tried in order; the first one present wins. Exported because this is the
--- list render-markdown is configured with: stated once, checked here.
----@type string[]
-M.LATEX_CONVERTERS = { "utftex", "latex2text" }
+-- Each program snacks runs, and what it draws, from plugins/images.lua.
+---@type { [1]: string, [2]: string }[]
+local PROGRAMS = {
+  { "magick", "any picture" },
+  { "mmdc", "Mermaid diagrams" },
+  { "pdflatex", "math" },
+}
 
 ---@param lang string
 local function check_parser(lang)
@@ -25,20 +29,6 @@ local function check_parser(lang)
   end
 end
 
-local function check_latex_converter()
-  for _, converter in ipairs(M.LATEX_CONVERTERS) do
-    if vim.fn.executable(converter) == 1 then
-      vim.health.ok(("LaTeX converter installed: %s"):format(converter))
-      return
-    end
-  end
-  vim.health.warn(("no LaTeX converter on PATH: %s"):format(table.concat(M.LATEX_CONVERTERS, ", ")), {
-    "macOS: `brew install utftex`",
-    "elsewhere: `uv tool install pylatexenc`, which provides latex2text",
-    "or set `latex = { enabled = false }` on render-markdown",
-  })
-end
-
 function M.check()
   vim.health.start("markdown")
 
@@ -46,7 +36,16 @@ function M.check()
     check_parser(lang)
   end
 
-  check_latex_converter()
+  for _, program in ipairs(PROGRAMS) do
+    local name, draws = program[1], program[2]
+    if vim.fn.executable(name) == 1 then
+      vim.health.ok(("%s installed, for %s"):format(name, draws))
+    else
+      vim.health.warn(("%s missing, so snacks can't draw %s"):format(name, draws), {
+        "modules/home/packages.nix installs it at a home switch",
+      })
+    end
+  end
 end
 
 return M
