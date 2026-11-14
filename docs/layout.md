@@ -42,6 +42,9 @@ Some modules also check a second role. `packages`, for example, adds fonts
 for `gui`, and pi, pnpm and Python for `personal`. The theme module applies
 on every computer.
 
+Rex is the terminal, and tmux, with Ghostty on a Mac, is set up as well for
+a computer without Rex. It has the same keys and popups, except Agents.
+
 ## Files
 
 ```text

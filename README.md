@@ -1,14 +1,7 @@
 # dotfiles
 
-One Nix flake sets up my Mac: Rex as the terminal, Neovim as the editor,
-AeroSpace to tile the windows and sketchybar across the top. nix-darwin sets
-macOS's own settings, and Home Manager installs most of the tools and writes
-their config.
-Ghostty with tmux is set up as well, with the same keys and popups except
-Agents, for a computer without Rex.
-
-The same flake has a config for a headless Linux machine that runs Rex's
-server.
+These are my dotfiles: one Nix flake that sets up my Mac and a Linux server,
+from macOS's settings to my editor.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/screen-dark.png">
