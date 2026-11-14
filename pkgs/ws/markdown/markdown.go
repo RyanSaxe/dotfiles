@@ -5,6 +5,7 @@ package markdown
 import (
 	"bytes"
 	"cmp"
+	"encoding/json"
 	"hash/fnv"
 	"image"
 	"image/png"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -21,7 +23,11 @@ import (
 
 // Options are what rendering needs from the program around it.
 type Options struct {
-	Dark     bool           // Catppuccin Mocha, or Latte
+	Dark bool // Catppuccin Mocha, or Latte
+	// Style is a glamour style as JSON, which colors everything, code
+	// included. Without one, text takes glamour's own style for the mode and
+	// code takes Catppuccin's.
+	Style    []byte
 	Terminal kitty.Terminal // where pictures are drawn, or one line of their description
 	// Fetch loads a picture's source, such as a URL or a path.
 	Fetch func(src string) (image.Image, error)
@@ -155,13 +161,22 @@ func Load(md string, o Options) Doc {
 // placeholders, with the image sent on its first row, or one line of its
 // description where the terminal can't draw images.
 func (d Doc) Render(w int, o Options) string {
-	style, theme := styles.DarkStyleConfig, "catppuccin-mocha"
-	if !o.Dark {
-		style, theme = styles.LightStyleConfig, "catppuccin-latte"
+	var style ansi.StyleConfig
+	if o.Style == nil || json.Unmarshal(o.Style, &style) != nil {
+		theme := "catppuccin-mocha"
+		style = styles.DarkStyleConfig
+		if !o.Dark {
+			style, theme = styles.LightStyleConfig, "catppuccin-latte"
+		}
+		// glamour uses a style's own Chroma colors over the theme whenever
+		// it has them, and both built-in styles do.
+		style.CodeBlock.Theme, style.CodeBlock.Chroma = theme, nil
 	}
 	zero := uint(0)
-	style.Document.Margin, style.CodeBlock.Margin, style.CodeBlock.Theme = &zero, &zero, theme
-	r, err := glamour.NewTermRenderer(glamour.WithStyles(style), glamour.WithWordWrap(w), glamour.WithColorProfile(termenv.TrueColor))
+	style.Document.Margin, style.CodeBlock.Margin = &zero, &zero
+	// glamour's code formatter defaults to 256 colors, which shifts the
+	// style's.
+	r, err := glamour.NewTermRenderer(glamour.WithStyles(style), glamour.WithWordWrap(w), glamour.WithColorProfile(termenv.TrueColor), glamour.WithChromaFormatter("terminal16m"))
 	if err != nil {
 		return err.Error()
 	}

@@ -6,6 +6,7 @@ let
   colors = {
     BAR_COLOR = argb "ff" t.chrome; # one surface with the window frames
     BORDER_COLOR = argb "ff" t.stroke;
+    BAR_SHADOW = "0x33000000"; # black at 20%, a faint line in either mode
     ITEM_BG = "0x00000000";
     ICON_COLOR = argb "ff" t.faint; # present but quiet
     LABEL_COLOR = argb "ff" t.faint;

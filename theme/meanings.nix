@@ -1,6 +1,6 @@
 # What each color means, for one mode. Apps ask for a meaning, such as
 # `muted` or `code.function`, never a hex, so changing one here changes it
-# everywhere. Catppuccin supplies every color but the five it lacks.
+# everywhere. Catppuccin supplies every color but the four it lacks.
 { c, mode }:
 let
   both = dark: light: if mode == "dark" then dark else light;
@@ -11,7 +11,7 @@ in
   panel = c.mantle; # a recessed area, such as a sidebar
   raised = c.surface0; # the current line, a selected row
   border = c.surface1;
-  chrome = both "#1a1a27" "#eaebee"; # Rex's sidebar: the bar, the window frame
+  chrome = c.crust; # Rex's sidebar: the bar, the window frame
   stroke = both "#414149" "#e9e2d4"; # macOS's hairline around a window
 
   # Text, by how much it should be read.
@@ -48,6 +48,26 @@ in
     constant = c.red; # constants and private names
     literal = c.subtext1; # strings and numbers stay quiet
     comment = c.overlay0;
+  };
+
+  # Markdown, as Neovim draws it through Catppuccin and render-markdown: a
+  # color for each heading level, and one for each mark around the text.
+  markdown = {
+    headings = [
+      c.red
+      c.peach
+      c.yellow
+      c.green
+      c.sapphire
+      c.lavender
+    ];
+    code = c.green; # inline code's text
+    link = c.lavender;
+    url = c.blue;
+    bullet = c.sky;
+    quote = c.pink;
+    emphasis = c.red; # bold and italic text
+    rule = c.surface1;
   };
 
   # A repository's state, as the prompt and the agents' status line show it.

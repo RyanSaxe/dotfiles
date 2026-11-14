@@ -4,6 +4,7 @@
   lib,
   t,
   c,
+  wash,
   ...
 }:
 let
@@ -49,9 +50,43 @@ in
       kind: scope: rule scope t.code.${kind} (if kind == "comment" then "italic" else null)
     ) scopes
     ++ [
-      (rule "markup.bold" t.code.function "bold")
-      (rule "markup.italic" t.code.member "italic")
       (rule "invalid, invalid.illegal, invalid.deprecated, markup.deleted" t.error "bold")
-    ];
+    ]
+    # Markdown in the colors Neovim draws it in. bat's grammar numbers only
+    # the first two heading levels, so the rest share the third's color.
+    ++ (
+      let
+        md = t.markdown;
+        heading = lib.elemAt md.headings;
+      in
+      [
+        (rule "markup.heading.1, markup.heading.1 punctuation" (heading 0) null)
+        (rule "markup.heading.2, markup.heading.2 punctuation" (heading 1) null)
+        (rule "markup.heading.markdown, markup.heading.markdown punctuation" (heading 2) null)
+        (rule "markup.raw.inline" md.code null)
+        (rule "meta.link.inline.description, meta.link.reference.description, meta.image.inline.description"
+          md.link
+          null
+        )
+        (rule "markup.underline.link" md.url null)
+        (rule "punctuation.definition.list_item" md.bullet null)
+        (rule "markup.quote, punctuation.definition.blockquote" md.quote null)
+        (rule "markup.bold" md.emphasis "bold")
+        (rule "markup.italic" md.emphasis "italic")
+        (rule "punctuation.definition.thematic-break" md.rule null)
+      ]
+    )
+    # Codex paints the lines of every edit it shows with these backgrounds,
+    # which are Neovim's row colors. bat ignores a scope's background.
+    ++
+      lib.mapAttrsToList
+        (scope: color: {
+          inherit scope;
+          settings.background = wash 0.2 color;
+        })
+        {
+          "markup.inserted" = t.added;
+          "markup.deleted" = t.removed;
+        };
   };
 }

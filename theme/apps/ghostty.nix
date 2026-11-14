@@ -1,6 +1,6 @@
 # Ghostty's two shaders, from config/ghostty/shaders, with the colors they
 # paint: the frame in chrome, and the cursor trail in the accent pair.
-# Ghostty's own colors come from Rex's themes, in the ghostty module.
+# Ghostty's own colors come from terminal.nix, which Rex's come from too.
 { lib, t, ... }:
 let
   hex = color: "0x${lib.removePrefix "#" color}";

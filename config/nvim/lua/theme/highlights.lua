@@ -181,6 +181,26 @@ function M.apply(tokens)
   hl("MiniDiffSignChange", { fg = p.semantic_change })
   hl("MiniDiffSignDelete", { fg = p.semantic_delete })
 
+  -- The marks outside a diff that link here, such as the git status
+  -- picker's files, the undo picker's lines and CodeDiff's +N and -N.
+  -- Catppuccin sets no Removed, which would leave Neovim's own pink.
+  hl("Added", { fg = p.semantic_add })
+  hl("Changed", { fg = p.semantic_change })
+  hl("Removed", { fg = p.semantic_delete })
+
+  -- CodeDiff fills the lines one side lacks with slashes, and marks code
+  -- that moved in the gutter and on a line above it.
+  hl("CodeDiffFiller", { fg = r.border })
+  hl("CodeDiffMoveFrom", { fg = p.semantic_change })
+  hl("CodeDiffMoveTo", { fg = p.semantic_change })
+
+  -- grug-far's marks beside a result: a matched line, and the lines a
+  -- replacement removes and adds. grug-far sets them once when it loads,
+  -- so a light and dark flip used to clear them.
+  hl("GrugFarResultsChangeIndicator", { fg = p.semantic_change })
+  hl("GrugFarResultsRemoveIndicator", { fg = p.semantic_delete })
+  hl("GrugFarResultsAddIndicator", { fg = p.semantic_add })
+
   -- Todo-comment badges: fg-only, bold italic, trailing text stays quiet
   local badges = {
     TodoBgPERF = bb(p.teal, 0.7),
@@ -227,12 +247,11 @@ function M.apply(tokens)
   hl("ThemeStlError", { fg = p.red, bg = r.bg })
   hl("ThemeStlWarn", { fg = p.yellow, bg = r.bg })
 
-  local float = p.chrome
-  hl("NormalFloat", { bg = float })
+  -- Catppuccin puts floats on mantle, which the theme makes the chrome
+  -- color. Their frames and titles take the accent.
+  local float = p.mantle
   hl("FloatBorder", { fg = accent, bg = float })
   hl("FloatTitle", { fg = accent, bg = float })
-  hl("MiniFilesNormal", { bg = float })
-  hl("MiniFilesBorder", { fg = accent, bg = float })
   hl("MiniFilesTitleFocused", { fg = accent, bg = float })
 
   -- The chrome surface: sidebars that run to a terminal edge and read as
@@ -284,6 +303,16 @@ function M.apply(tokens)
   -- even while they land on the same surface as the rest.
   hl("SnacksGhNormal", { fg = r.fg, bg = r.bg })
   hl("SnacksGhNormalNC", { fg = r.fg_muted, bg = r.bg })
+  -- Snacks colors a pull request's or issue's state, its checks and its
+  -- reviews through these four, which default to GitHub's own colors: open
+  -- and passing, closed and failing, merged and completed, draft.
+  hl("SnacksGhGreen", { fg = r.success })
+  hl("SnacksGhRed", { fg = p.red })
+  hl("SnacksGhPurple", { fg = accent })
+  hl("SnacksGhGray", { fg = r.fg_faint })
+  -- A pull request's +N and -N count lines, as CodeDiff's do.
+  hl("SnacksGhAdditions", { link = "Added" })
+  hl("SnacksGhDeletions", { link = "Removed" })
   hl("SnacksPicker", { bg = r.bg })
   hl("SnacksPickerList", { bg = r.bg })
   hl("SnacksPickerBox", { bg = r.bg })

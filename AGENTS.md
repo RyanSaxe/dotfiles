@@ -13,10 +13,10 @@ What an edit needs depends on where it is:
 - **`home-switch`:** everything in `modules/home/`, `theme/`, `pkgs/` and
   `secrets/`, including new tools. A home switch also reads these files from
   the linked folders as it builds, so they need it too:
-  `config/aerospace/aerospace.toml`, `config/rex/themes.json`,
-  `config/zsh/starship.toml`, the shaders in `config/ghostty/shaders`, and
-  `ai-harness/AGENTS.md`, whose text Codex gets from its settings. It needs
-  no password, so run it yourself and check the result in the program.
+  `config/aerospace/aerospace.toml`, `config/zsh/starship.toml`, the
+  shaders in `config/ghostty/shaders`, and `ai-harness/AGENTS.md`, whose
+  text Codex gets from its settings. It needs no password, so run it
+  yourself and check the result in the program.
 - **`mac-switch`:** `modules/darwin/` (macOS settings, the Homebrew casks and
   `/etc/codex`), `modules/codex-managed.nix`, and
   `ai-harness/codex/requirements.toml`, which a Mac switch copies into

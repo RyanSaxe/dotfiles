@@ -144,8 +144,13 @@ works too, because sketchybar runs `theme` whenever it changes.
 `code.function`, once for each mode. Each file in `theme/apps` turns those
 meanings into one app's format, and each home switch renders them all for
 both modes, into `~/.config/theme/dark` and `light`. `theme` points the
-files in `~/.config/theme` at one mode, then reloads tmux, Ghostty and
-sketchybar, which keep their colors in memory.
+files in `~/.config/theme` at one mode, then reloads tmux, Ghostty,
+sketchybar and Claude Code, which keep their colors in memory.
+
+Chrome's theme is an extension in `~/.config/theme/chrome`. Load it once
+on each computer: in `chrome://extensions`, turn on Developer mode, click
+Load unpacked and choose that folder. Chrome builds its theme only when it
+starts, so it changes mode at its next launch.
 
 ## How it works
 

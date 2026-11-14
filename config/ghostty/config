@@ -1,10 +1,10 @@
 # Ghostty configuration.
 #
 # Theme: Ghostty's terminal palette follows macOS's appearance natively via
-# the light:/dark: pair below. The two themes are Rex's Catppuccin Latte
-# and Mocha, written into ~/.config/ghostty/themes by the ghostty module,
-# so both terminals show the same 16 colors. The frame shader paints the
-# chrome ring around the terminal content.
+# the light:/dark: pair below. The ghostty module writes the two themes
+# into ~/.config/ghostty/themes from theme/apps/terminal.nix, which Rex's
+# themes come from too, so both terminals show the same colors. The frame
+# shader paints the chrome ring around the terminal content.
 theme = light:catppuccin-latte,dark:catppuccin-mocha
 
 # Option is Alt: makes the alt layer real for terminal-world keybinds

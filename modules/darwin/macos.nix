@@ -46,6 +46,7 @@ lib.mkIf (lib.elem "gui" config.dotfiles.roles) {
     WindowManager = {
       EnableStandardClickToShowDesktop = false;
       StandardHideDesktopIcons = true;
+      StandardHideWidgets = true;
       HideDesktop = true;
     };
 

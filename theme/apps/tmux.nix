@@ -1,6 +1,12 @@
 # tmux's colors, as the @variables its styles use. `theme` has every
 # running server re-read them.
-{ lib, t, ... }:
+{
+  lib,
+  t,
+  c,
+  wash,
+  ...
+}:
 let
   colors = {
     bg = t.background;
@@ -14,6 +20,10 @@ let
     notify = t.second;
     warn = t.warn;
     info = t.info;
+    # Neovim's Search and CurSearch: every match, and the one the cursor
+    # is on.
+    search = wash 0.3 c.sky;
+    search_current = c.red;
   };
 in
 {

@@ -22,11 +22,13 @@ import (
 	"workspace/markdown"
 )
 
-// markdownIn is how this program renders markdown: in the theme file's mode,
-// with pictures from dir, GitHub and mmdc.
+// markdownIn is how this program renders markdown: in the theme's glamour
+// style for the current mode, with pictures from dir, GitHub and mmdc.
 func markdownIn(dir string, term kitty.Terminal) markdown.Options {
+	style, _ := os.ReadFile(filepath.Join(home, ".config", "theme", "glamour.json"))
 	return markdown.Options{
 		Dark:     darkMode(),
+		Style:    style,
 		Terminal: term,
 		Fetch:    func(src string) (image.Image, error) { return loadImage(src, dir) },
 		Mermaid:  mermaidPNG,
@@ -79,10 +81,10 @@ func loadImage(src, dir string) (image.Image, error) {
 }
 
 // mermaidThemes color diagrams like the terminal around them, in
-// Catppuccin Mocha and Latte.
+// Catppuccin Mocha and Latte with the theme's chrome color as mantle.
 var mermaidThemes = map[bool]string{
-	true:  `{"theme":"base","themeVariables":{"background":"#1e1e2e","primaryColor":"#313244","primaryTextColor":"#cdd6f4","primaryBorderColor":"#89b4fa","lineColor":"#9399b2","secondaryColor":"#45475a","tertiaryColor":"#181825","fontFamily":"Menlo"}}`,
-	false: `{"theme":"base","themeVariables":{"background":"#eff1f5","primaryColor":"#ccd0da","primaryTextColor":"#4c4f69","primaryBorderColor":"#1e66f5","lineColor":"#7c7f93","secondaryColor":"#bcc0cc","tertiaryColor":"#e6e9ef","fontFamily":"Menlo"}}`,
+	true:  `{"theme":"base","themeVariables":{"background":"#1e1e2e","primaryColor":"#313244","primaryTextColor":"#cdd6f4","primaryBorderColor":"#89b4fa","lineColor":"#9399b2","secondaryColor":"#45475a","tertiaryColor":"#1a1a27","fontFamily":"Menlo"}}`,
+	false: `{"theme":"base","themeVariables":{"background":"#eff1f5","primaryColor":"#ccd0da","primaryTextColor":"#4c4f69","primaryBorderColor":"#1e66f5","lineColor":"#7c7f93","secondaryColor":"#bcc0cc","tertiaryColor":"#eaebee","fontFamily":"Menlo"}}`,
 }
 
 // mermaidPNG renders a diagram with mmdc once and keeps the PNG by the hash

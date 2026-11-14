@@ -46,6 +46,26 @@ done
 echo "$mode" >"$dir/.mode.new"
 mv -f "$dir/.mode.new" "$dir/mode"
 
+# Chrome builds its theme into this file once and reuses it at each launch,
+# so removing it makes Chrome's next launch build the current mode's. A
+# running Chrome keeps its colors until then.
+rm -f "$dir/chrome/Cached Theme.pak"
+
+# A personal Mac with a screen has a desktop picture for each mode. AppKit
+# sets it on every screen, which needs no permission to control another app.
+if [[ $OSTYPE == darwin* && -f "$dir/$mode/desktop.png" ]]; then
+  /usr/bin/osascript -l JavaScript - "$dir/$mode/desktop.png" >/dev/null <<'JS'
+function run(argv) {
+  ObjC.import("AppKit");
+  const url = $.NSURL.fileURLWithPath(argv[0]);
+  const screens = $.NSScreen.screens;
+  for (let i = 0; i < screens.count; i++) {
+    $.NSWorkspace.sharedWorkspace.setDesktopImageURLForScreenOptionsError(url, screens.objectAtIndex(i), $({}), null);
+  }
+}
+JS
+fi
+
 # tmux, Ghostty and sketchybar keep colors in memory, so each re-reads its
 # own. tmux servers are sockets in tmux's folder, which /tmp and
 # /private/tmp can both name on macOS. A stale socket is skipped.
@@ -65,6 +85,11 @@ for sockets in "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)" "/private/tmp/tmux-$(id -u)"
   done
 done
 pkill -USR2 -x ghostty 2>/dev/null || true
+# Claude Code re-reads its themes when an entry in ~/.claude/themes
+# changes. Its link there still names the same file after the swap, so
+# touching the link is the change.
+claude_theme="$HOME/.claude/themes/dotfiles.json"
+if [[ -L $claude_theme ]]; then touch -h "$claude_theme"; fi
 # Last, since sketchybar may be the one running this.
 sketchybar=${SKETCHYBAR:-$(command -v sketchybar || true)}
 if [[ -n $sketchybar ]]; then "$sketchybar" --reload 2>/dev/null || true; fi

@@ -28,6 +28,17 @@ let
   skillLinks =
     dir: lib.mapAttrs' (name: source: lib.nameValuePair "${dir}/${name}" { inherit source; }) skills;
 
+  # pi writes its own settings file, so the switch sets only the theme key:
+  # the theme for each background, light first, which pi switches between
+  # as the terminal's background changes.
+  piTheme = pkgs.writeShellScript "pi-theme" ''
+    settings="$HOME/.pi/agent/settings.json"
+    mkdir -p "''${settings%/*}"
+    [ -s "$settings" ] || echo '{}' > "$settings"
+    ${pkgs.jq}/bin/jq '.theme = "dotfiles-light/dotfiles-dark"' "$settings" > "$settings.new"
+    mv "$settings.new" "$settings"
+  '';
+
   pushover = name: "${cfg.repo}/ai-harness/tools/notify-pushover.zsh '${name}'";
   claudeHook =
     matcher:
@@ -56,9 +67,19 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     ".codex/references".source = link "ai-harness/references";
     ".codex/themes/dotfiles.tmTheme".source =
       config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
+    ".claude/themes/dotfiles.json".source =
+      config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
   }
   // skillLinks ".claude/skills"
-  // skillLinks ".agents/skills";
+  // skillLinks ".agents/skills"
+  // lib.optionalAttrs personal (
+    lib.genAttrs' [ "dark" "light" ] (
+      mode:
+      lib.nameValuePair ".pi/agent/themes/dotfiles-${mode}.json" {
+        source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/${mode}/pi-theme.json";
+      }
+    )
+  );
 
   # Codex reads its managed hooks from /etc/codex, which Home Manager can't
   # write. A Linux computer links that folder to these files once:
@@ -84,6 +105,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       idleCompaction = false;
       alwaysThinkingEnabled = true;
       editorMode = "vim";
+      theme = "custom:dotfiles";
       statusLine = {
         type = "command";
         command = "$HOME/.claude/statusline.js";
@@ -189,6 +211,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
       run /bin/sh ${linkSkills}
     '';
+    piTheme = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${piTheme}";
   };
 
   # Some installers put skills only in Codex's folder. This links each new

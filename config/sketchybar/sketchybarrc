@@ -20,20 +20,22 @@ source "$CONFIG_DIR/colors.sh"
 # -----------------------------------------------------------------------------
 # Bar Configuration
 # -----------------------------------------------------------------------------
-# Floating rounded bar
+# The bar's window is transparent. The rounded bar you see is the bracket
+# at the end of this file, whose own shadow draws a faint line under it.
+# macOS's window shadow is only on or off, and too strong on a light
+# desktop. The window is 8 pixels taller than the bracket, so the line has
+# room, and it sits 4 pixels higher, so the bracket stays 10 from the top.
 bar=(
   position=top
-  height=32
+  height=40
   margin=10
-  corner_radius=10
-  color="$BAR_COLOR"
-  border_color="$BORDER_COLOR"
-  border_width=1
-  blur_radius=30
-  shadow=on
+  color=0x00000000
+  shadow=off
   sticky=on
   topmost=off
-  y_offset=10
+  y_offset=6
+  padding_left=0
+  padding_right=0
   notch_width=0
 )
 sketchybar --bar "${bar[@]}"
@@ -81,10 +83,14 @@ sketchybar --add item theme_sync left \
 # label.padding_right overrides the 12px default, which is meant for the
 # right-hand readouts where labels have to clear each other. Here it would
 # only push the first workspace letter away from the date it sits beside.
+#
+# The bar has no padding, so the bracket reaches its ends, and the date and
+# the clock hold the 24-pixel inset themselves.
 # -----------------------------------------------------------------------------
 sketchybar --add item date left \
   --set date \
   update_freq=60 \
+  padding_left=24 \
   icon="󰃭 " \
   icon.color="$ACCENT_COLOR" \
   label.color="$ACCENT_COLOR" \
@@ -188,6 +194,7 @@ sketchybar --add item clock right \
   label.font="JetBrainsMono Nerd Font:Bold:12.0" \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/clock.sh" \
+  padding_right=24 \
   label.padding_right=0 \
   --subscribe clock system_woke
 
@@ -226,6 +233,23 @@ sketchybar --add item cpu right \
   icon.font="JetBrainsMono Nerd Font:Bold:14.0" \
   background.color="$ITEM_BG" \
   script="$PLUGIN_DIR/cpu.sh"
+
+# -----------------------------------------------------------------------------
+# The Bar You See
+# -----------------------------------------------------------------------------
+# A bracket around every item, from the date to the clock. Its shadow is a
+# copy of its shape 2 pixels lower, with no blur.
+sketchybar --add bracket bar_background '/.*/' \
+  --set bar_background \
+  background.color="$BAR_COLOR" \
+  background.height=32 \
+  background.corner_radius=10 \
+  background.border_color="$BORDER_COLOR" \
+  background.border_width=1 \
+  background.shadow.drawing=on \
+  background.shadow.color="$BAR_SHADOW" \
+  background.shadow.distance=2 \
+  background.shadow.angle=90
 
 # -----------------------------------------------------------------------------
 # Force Initial Update

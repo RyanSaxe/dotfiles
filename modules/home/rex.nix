@@ -11,6 +11,16 @@
 let
   cfg = config.dotfiles;
   domain = "com.superlogical.rex";
+  # The terminal colors, from theme/apps/terminal.nix, as Rex keeps them.
+  themes = lib.genAttrs [ "dark" "light" ] (
+    mode: builtins.fromJSON config.xdg.configFile."theme/${mode}/rex-theme.json".text
+  );
+  customThemes = pkgs.writeText "rex-themes.json" (
+    builtins.toJSON [
+      themes.dark
+      themes.light
+    ]
+  );
 in
 lib.mkIf (lib.elem "personal" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
   xdg.configFile."rex".source = config.lib.file.mkOutOfStoreSymlink "${cfg.repo}/config/rex";
@@ -60,15 +70,15 @@ lib.mkIf (lib.elem "personal" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
     "Workspace.cursorShader" = "blazeTapered";
     "Workspace.experiments.usesNewQuickSwitcher" = true;
 
-    # The two themes below, by their ids in themes.json.
-    "Workspace.darkThemeID" = "custom-47F1463D-62EA-4D1A-AE4A-F422BE174B36";
-    "Workspace.lightThemeID" = "custom-9EB6C009-5725-4ED3-AD39-81DB0F2B6E67";
+    # The two themes below, by their ids.
+    "Workspace.darkThemeID" = themes.dark.id;
+    "Workspace.lightThemeID" = themes.light.id;
   };
 
   # Rex keeps its themes as one JSON document stored as plist data, which
-  # the defaults module can't write, so this writes config/rex/themes.json.
+  # the defaults module can't write, so this writes both themes as that list.
   home.activation.rexThemes = lib.hm.dag.entryAfter [ "setDarwinDefaults" ] ''
     run /usr/bin/defaults write ${domain} Workspace.customThemes -data \
-      "$(${pkgs.jq}/bin/jq -c . ${../../config/rex/themes.json} | /usr/bin/xxd -p | tr -d '\n')"
+      "$(/usr/bin/xxd -p ${customThemes} | tr -d '\n')"
   '';
 }
