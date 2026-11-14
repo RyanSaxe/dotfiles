@@ -91,12 +91,9 @@ in
       ]
       ++ [ mermaid-cli ]
     )
-    # Rex uses FiraCode Nerd Font and sketchybar JetBrainsMono Nerd Font.
-    # Ghostty keeps its built-in font.
-    ++ lib.optionals (has "gui") [
-      pkgs.nerd-fonts.fira-code
-      pkgs.nerd-fonts.jetbrains-mono
-    ]
+    # Rex and sketchybar use JetBrains Mono's Nerd Fonts, and Ghostty the
+    # JetBrains Mono built into it.
+    ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals (has "personal") [
       pkgs.pi-coding-agent
       pkgs.pnpm

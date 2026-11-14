@@ -40,9 +40,9 @@ lib.mkMerge [
     # `defaults import` merges these keys and leaves Rex's other state alone.
     targets.darwin.defaults.${domain} = {
       # Layout
-      "Workspace.tabStyle" = "vertical";
+      "Workspace.tabStyle" = "horizontal";
       "Workspace.sidebarPosition" = "left";
-      "Workspace.sidebarCollapsed" = false;
+      "Workspace.sidebarCollapsed" = true;
       "Workspace.sidebarShowsActivity" = false;
       "Workspace.sidebarTextPointSize" = 13.0;
       "Workspace.tabIconCount" = 3;
@@ -55,7 +55,7 @@ lib.mkMerge [
       "Workspace.appearance" = "system";
 
       # Font
-      "Workspace.terminalFontName" = "FiraCode Nerd Font Mono";
+      "Workspace.terminalFontName" = "JetBrainsMono Nerd Font Mono";
       "Workspace.terminalFontPointSize" = 12.0;
       "Workspace.terminalFontStyle" = "Retina";
       "Workspace.terminalFontSmoothing" = true;
