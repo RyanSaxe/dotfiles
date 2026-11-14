@@ -1,5 +1,0 @@
-MaCo
-MMM
-WatchTower
-CatExpert
-TestOps

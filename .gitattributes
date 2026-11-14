@@ -1,2 +1,0 @@
-config/*.txt text eol=lf
-aerospace/aerospace.toml filter=aerospace-notch
