@@ -25,8 +25,9 @@ then instructions you loaded for the task at hand, and this file last.
 ## Writing code
 
 Before planning or building a substantial change, read
-`~/generic/dotfiles/ai-harness/references/development.md`. These rules apply
-to every change:
+`~/generic/dotfiles/ai-harness/references/development.md`. The references'
+examples are in Python, and the same ideas apply in any language. These
+rules apply to every change:
 
 - Keep a change to what the task needs. Leave unrelated code, formatting and
   structure as they are, and don't add abstractions, options or error
