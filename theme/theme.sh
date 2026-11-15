@@ -58,6 +58,15 @@ done
 echo "$mode" >"$dir/.mode.new"
 mv -f "$dir/.mode.new" "$dir/mode"
 
+# Chrome loads its theme from a folder that stays put, so the current
+# mode's manifest is copied in. Chrome didn't load the theme when the
+# manifest there was a link.
+if [[ -f "$dir/$mode/chrome-manifest.json" ]]; then
+  mkdir -p "$dir/chrome"
+  cat "$dir/$mode/chrome-manifest.json" >"$dir/chrome/.manifest.json.new"
+  mv -f "$dir/chrome/.manifest.json.new" "$dir/chrome/manifest.json"
+fi
+
 # Chrome builds its theme into this file once and reuses it at each launch,
 # so removing it makes Chrome's next launch build the current mode's. A
 # running Chrome keeps its colors until then, so when the mode changes,

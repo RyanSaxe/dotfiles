@@ -45,16 +45,8 @@ in
 lib.mkMerge [
   {
     home.packages = [ theme ];
-    xdg.configFile =
-      files "dark"
-      // files "light"
-      // {
-        # Chrome's theme is a folder that Chrome loads once. Chrome would
-        # follow a linked folder to one mode's, so the folder stays put and
-        # its manifest links to the current mode's.
-        "theme/chrome/manifest.json".source =
-          config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/chrome-manifest.json";
-      };
+    # `theme` writes Chrome's theme folder, ~/.config/theme/chrome.
+    xdg.configFile = files "dark" // files "light";
     home.activation.theme = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${sketchybar} run ${theme}/bin/theme
     '';
