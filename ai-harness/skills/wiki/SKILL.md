@@ -46,7 +46,7 @@ has a page on it, update that page instead of starting another one.
   move doesn't break links.
 - When you rename a page, change every `[[old-name]]` in the wiki to
   `[[new-name]]` in the same edit.
-- After you add, move or rename pages, run `~/generic/vault/bin/check`. It
+- After you add, move or rename pages, run `~/generic/vault/bin/check.py`. It
   reports two pages with the same name and links that find no page.
 - Start a page with two lines, `updated: YYYY-MM-DD` and `sources:` with
   the links you used, then the answer to the page's question in a sentence

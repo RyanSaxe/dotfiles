@@ -52,7 +52,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     includes = [
       # delta's diff colors for the current mode, which `theme` relinks.
       { path = "${config.xdg.configHome}/theme/delta-colors.gitconfig"; }
-      # The vault's pre-commit hook runs its check, bin/check, before each commit.
+      # The vault's pre-commit hook runs its check, bin/check.py, before each commit.
       {
         condition = "gitdir:${config.home.homeDirectory}/generic/vault/";
         contents.core.hooksPath = ".githooks";
