@@ -1,9 +1,9 @@
--- Tasks in any Markdown file. A task is a `- [ ]` or `- [x]` line, with
--- `*` or `+` also allowed as the bullet, and the lines it wraps onto, which
--- end where ws ends them in pkgs/ws/tasks.go: at a blank line, a list item,
--- a heading, a quote, a table or a code fence. Its due date is 📅 and a
--- YYYY-MM-DD date anywhere in that text, even with a line break between
--- them.
+-- Tasks in any Markdown file, outside fenced code. A task is a `- [ ]` or
+-- `- [x]` line, with `*` or `+` also allowed as the bullet, and the lines it
+-- wraps onto, which end where ws ends them in pkgs/ws/tasks.go: at a blank
+-- line, a list item, a heading, a quote, a table or a code fence. Its due
+-- date is 📅 and a YYYY-MM-DD date anywhere in that text, even with a line
+-- break between them.
 local M = {}
 
 local TASK = "^%s*[-*+] %[([ xX])%]%s+%S"
@@ -31,12 +31,36 @@ local function line_at(buf, row)
   return vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1]
 end
 
----Finds the task that a line is part of.
+---@param buf integer
+---@param row integer 1-based
+---@return boolean
+local function in_fence(buf, row)
+  local parser = vim.treesitter.get_parser(buf, nil, { error = false })
+  if not parser or parser:lang() ~= "markdown" then
+    return false
+  end
+  -- Inside a list item, the first column belongs to the item, so look where the line's text starts.
+  local col = (line_at(buf, row):find("%S") or 1) - 1
+  local node = parser:parse()[1]:root():named_descendant_for_range(row - 1, col, row - 1, col)
+  while node do
+    if node:type() == "fenced_code_block" then
+      return true
+    end
+    node = node:parent()
+  end
+  return false
+end
+
+---Finds the task that a line is part of. A line in fenced code is part of
+---none, as ws skips fenced code.
 ---@param buf integer
 ---@param row integer 1-based
 ---@return integer? first the task's line with the box
 ---@return string? mark the character in the box
 function M.find(buf, row)
+  if in_fence(buf, row) then
+    return nil
+  end
   for r = row, 1, -1 do
     local line = line_at(buf, r)
     local mark = line:match(TASK)
