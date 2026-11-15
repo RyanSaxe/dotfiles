@@ -112,8 +112,12 @@ func folderRows(ss []mux.Session) []popup.Row {
 	}
 	var rows []popup.Row
 	for _, f := range folders() {
-		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, sessions[labelFor(f.dir)]}}
-		if f.bookmark {
+		session := sessions[labelFor(f.dir)]
+		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, session}}
+		switch {
+		case session != "":
+			r.Tag = popup.Green.SetString("session")
+		case f.bookmark:
 			r.Tag = popup.Dim.SetString("bookmark")
 		}
 		rows = append(rows, r)

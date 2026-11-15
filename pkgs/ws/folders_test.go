@@ -65,6 +65,13 @@ esac`)
 	if want := []string{"quiet/feature", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
 		t.Errorf("Folders lists %v, want %v", titles, want)
 	}
+	var tags []string
+	for _, r := range folders {
+		tags = append(tags, r.Tag.String())
+	}
+	if want := []string{"", "session", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
+		t.Errorf("Folders tags its rows %q, want %q", tags, want)
+	}
 	enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
 	if msg := enter.Run(folders[1])(); msg != popup.Quit {
 		t.Errorf("Enter on busy gave %v, want the popup to close", msg)

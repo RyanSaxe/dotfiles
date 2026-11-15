@@ -70,7 +70,8 @@ closes. The bottom line lists the popup's other keys.
 | tasks     | edit   | add                    | done          |                                  |
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
-per line. Enter on a folder that has a running session goes to that session.
+per line. A folder that has a running session is tagged `session`, and
+Enter on it goes to that session.
 In Rex, Alt-Shift-S opens Rex's own Change Session.
 
 ## Reviews
