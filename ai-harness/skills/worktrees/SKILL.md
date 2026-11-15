@@ -30,6 +30,8 @@ ws new NAME --agent claude --prompt "…"
   change.
 - The prompt is the agent's whole brief: the goal, the files to read, what is
   out of scope, and how to verify. The agent knows nothing else.
+- Run `ws new --help` to start the agent with flags of its own, such as
+  `--effort` or `--model`.
 - `--base REF` branches from REF instead of the current HEAD. Fetch first and
   pass `origin/BRANCH`, so the base is current.
 - Run by an agent, `ws new` opens the session without switching the user's
