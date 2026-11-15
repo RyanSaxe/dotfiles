@@ -88,6 +88,24 @@ let
     register "$opencode" plugin "${pairAdapters}/${opencodePlugin}"
   '';
 
+  # `pair agents` lists a session once it registers, so other agents can
+  # message it. Claude Code registers each session from a SessionStart hook.
+  # Rex writes its own hook in that list, so this adds pair's beside it.
+  pairRegister = "${config.home.profileDirectory}/bin/pair register --hook";
+  pairStartHook = pkgs.writeShellScript "pair-start-hook" ''
+    set -eu
+    jq=${pkgs.jq}/bin/jq
+    settings="$HOME/.claude/settings.json"
+    [ -s "$settings" ] || exit 0
+    if ! "$jq" -e --arg command '${pairRegister}' \
+      '[.hooks.SessionStart[]?.hooks[]?.command] | index($command)' "$settings" > /dev/null; then
+      "$jq" --arg command '${pairRegister}' \
+        '.hooks.SessionStart = (.hooks.SessionStart // []) + [{hooks: [{type: "command", command: $command}]}]' \
+        "$settings" > "$settings.new"
+      mv "$settings.new" "$settings"
+    fi
+  '';
+
   pushover = name: "${cfg.repo}/ai-harness/tools/notify-pushover.zsh '${name}'";
   claudeHook =
     matcher:
@@ -115,6 +133,19 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
     ".claude/themes/dotfiles.json".source =
       config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
+  }
+  // lib.optionalAttrs personal {
+    # Copilot CLI registers each session with pair from this start hook.
+    ".copilot/hooks/pair.json".text = builtins.toJSON {
+      version = 1;
+      hooks.sessionStart = [
+        {
+          type = "command";
+          bash = pairRegister;
+          timeoutSec = 30;
+        }
+      ];
+    };
   }
   // skillLinks ".claude/skills"
   // skillLinks ".agents/skills"
@@ -240,6 +271,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   home.activation = {
     # pair's own installer, for each agent this computer has that lacks the
     # skill.
+    pairStartHook = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${pairStartHook}";
     pairSkill = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       installed() { PATH="${agentPath}" command -v "$1" > /dev/null; }
       agents=""

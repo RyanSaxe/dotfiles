@@ -4,4 +4,5 @@
 repo: {
   "requirements.toml" = ../ai-harness/codex/requirements.toml;
   "hooks/notify-pushover.zsh" = "${repo}/ai-harness/tools/notify-pushover.zsh";
+  "hooks/pair-register.sh" = "${repo}/ai-harness/tools/pair-register.sh";
 }

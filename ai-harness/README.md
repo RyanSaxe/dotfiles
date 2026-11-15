@@ -23,14 +23,15 @@ ai-harness/
 └── codex/            requirements.toml, Codex's managed hooks
 ```
 
-| Where the agent looks                                      | What's there                                              |
-| ---------------------------------------------------------- | --------------------------------------------------------- |
-| `~/.claude/CLAUDE.md`                                      | An import of `AGENTS.md`                                  |
-| `developer_instructions` in `~/.codex/config.toml`         | The text of `AGENTS.md`, copied at each home switch       |
-| `~/.claude/skills/NAME`, `~/.agents/skills/NAME`           | Links to each skill in `skills/`                          |
-| `~/.claude/statusline.js`                                  | A link to `statusline.js`                                 |
-| `/etc/codex/requirements.toml`                             | A copy of `codex/requirements.toml`                       |
-| `/etc/codex/hooks/notify-pushover.zsh`                     | A link to `tools/notify-pushover.zsh`                     |
+| Where the agent looks                              | What's there                                        |
+| -------------------------------------------------- | --------------------------------------------------- |
+| `~/.claude/CLAUDE.md`                              | An import of `AGENTS.md`                            |
+| `developer_instructions` in `~/.codex/config.toml` | The text of `AGENTS.md`, copied at each home switch |
+| `~/.claude/skills/NAME`, `~/.agents/skills/NAME`   | Links to each skill in `skills/`                    |
+| `~/.claude/statusline.js`                          | A link to `statusline.js`                           |
+| `/etc/codex/requirements.toml`                     | A copy of `codex/requirements.toml`                 |
+| `/etc/codex/hooks/notify-pushover.zsh`             | A link to `tools/notify-pushover.zsh`               |
+| `/etc/codex/hooks/pair-register.sh`                | A link to `tools/pair-register.sh`                  |
 
 Claude reads the instructions live through the import. Codex has no import,
 so it gets them at the next `home-switch`.
@@ -60,6 +61,12 @@ extension and opencode plugin from
 `~/.nix-profile`, a path that stays the same when pair updates. The
 `copilot` alias starts Copilot CLI with its UI server and access to pair's
 state folder, which pair needs.
+
+Each Claude Code, Codex and Copilot session registers with pair as it
+starts, so `pair agents` lists it and other agents can message it. Each home
+switch adds pair's hook to Claude Code's `SessionStart` list beside Rex's,
+and writes `~/.copilot/hooks/pair.json` on computers with the `personal`
+role. Codex runs `tools/pair-register.sh` as a managed hook.
 
 Each agent's settings live in `modules/home/agents.nix`. Each home switch
 merges them into `~/.claude/settings.json` and `~/.codex/config.toml`, keeping

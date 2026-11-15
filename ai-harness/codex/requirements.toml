@@ -16,3 +16,9 @@ command = "/etc/codex/hooks/notify-pushover.zsh Codex"
 [[hooks.PermissionRequest.hooks]]
 type = "command"
 command = "/etc/codex/hooks/notify-pushover.zsh Codex"
+
+[[hooks.SessionStart]]
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "/etc/codex/hooks/pair-register.sh"
