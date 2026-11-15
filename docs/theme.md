@@ -56,6 +56,7 @@ An app that keeps its colors in memory also needs a reload line in
 
 Chrome's theme is an extension in `~/.config/theme/chrome`, which each
 computer loads once, as [By hand](manual.md#chrome-on-a-mac) says. Its
-frame and tabs are the chrome color and its toolbar the background, like
-sketchybar and Neovim. Chrome builds a theme only when it starts, so when
-the mode changes `theme` quits Chrome and opens it again.
+frame and tabs are the chrome color, like sketchybar, and its toolbar and
+selected tab the raised color of Neovim's current line. Chrome builds a
+theme only when it starts, so when the mode changes `theme` quits Chrome
+and opens it again.

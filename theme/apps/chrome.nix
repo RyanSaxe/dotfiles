@@ -1,7 +1,9 @@
 # Chrome's theme, as the manifest of a theme extension: the tab strip in
 # chrome, one surface with the bar and the window frames, and the toolbar
-# and current tab on the background. Chrome loads it from
-# ~/.config/theme/chrome, whose manifest.json links to this file.
+# and selected tab raised, like Neovim's current line, so the selected tab
+# stands out. A theme can't color a tab under the pointer, which Chrome
+# blends from those two. `theme` copies this file into
+# ~/.config/theme/chrome, which Chrome loads.
 { lib, t, ... }:
 let
   rgb =
@@ -20,7 +22,7 @@ in
     theme.colors = lib.mapAttrs (_: rgb) {
       frame = t.chrome;
       frame_inactive = t.chrome;
-      toolbar = t.background;
+      toolbar = t.raised;
       tab_text = t.text;
       tab_background_text = t.muted;
       toolbar_text = t.text;
