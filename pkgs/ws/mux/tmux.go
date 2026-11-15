@@ -130,6 +130,13 @@ func (t Tmux) Statuses() map[string]Status {
 
 func (t Tmux) Inside() bool { return t.inside }
 
+// Current is the session of the pane or popup the program runs in, which
+// tmux names in the TMUX variable it gives both.
+func (Tmux) Current() (string, error) {
+	name, err := tmux("display-message", "-p", "#{session_name}")
+	return "=" + name, err
+}
+
 // Images asks tmux which terminal it runs in, since tmux names itself in
 // TERM_PROGRAM, and sends images through tmux to it.
 func (t Tmux) Images() kitty.Terminal {

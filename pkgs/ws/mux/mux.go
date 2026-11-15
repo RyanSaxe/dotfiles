@@ -26,7 +26,7 @@ type Backend interface {
 	Sessions() ([]Session, error)
 	Create(label, dir string, panes []layout.Pane) (id string, err error)
 	Show(id string) error
-	Tab(id, dir string, args ...string) error // a new tab running args, which closes when they exit
+	Tab(id, dir string, args ...string) error // a new tab running args, which the session shows and which closes when they exit
 	Send(id, text string) error               // types text and Enter into the session's agent pane
 	Kill(id string) error
 	Capture(id string) (string, error) // the text of the pane the session shows
@@ -35,6 +35,7 @@ type Backend interface {
 	Statuses() map[string]Status
 	// Inside says whether the program runs in one of this multiplexer's panes.
 	Inside() bool
+	Current() (string, error) // the id of the session the program runs in, popups included
 	// Images is what the terminal showing the program can do with images.
 	Images() kitty.Terminal
 }

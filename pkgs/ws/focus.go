@@ -129,7 +129,13 @@ func focusTmux(what string) error {
 		_, err := runIn("", "tmux", "display-message", "-c", client, "Agents report no status in tmux yet")
 		return err
 	}
-	_, err := runIn("", "tmux", "display-popup", "-c", client, "-d", "#{pane_current_path}", "-h", "80%", "-w", "90%", "-E", "ws pick "+what)
+	// Run from outside tmux, the popup would otherwise belong to the session
+	// used last, which may not be the one the client shows.
+	pane, err := runIn("", "tmux", "display-message", "-c", client, "-p", "#{pane_id}")
+	if err != nil {
+		return err
+	}
+	_, err = runIn("", "tmux", "display-popup", "-c", client, "-t", pane, "-d", "#{pane_current_path}", "-h", "80%", "-w", "90%", "-E", "ws pick "+what)
 	return err
 }
 

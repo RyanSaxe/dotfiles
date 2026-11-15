@@ -3,8 +3,13 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"workspace/kitty"
+	"workspace/mux"
+	"workspace/popup"
 )
 
 // now is Monday 2026-11-09.
@@ -187,6 +192,56 @@ func TestATaskIsAddedAboveTheFirstBranch(t *testing.T) {
 	}
 	if err := addTask(t.TempDir(), "", "new", ""); err == nil {
 		t.Error("a task with no project was added")
+	}
+}
+
+// Enter on a task opens its note in a new tab of the popup's session and
+// lands there. Rex's app keeps showing its own tab when the server makes
+// another active, so it is sent to the new one, and tmux shows a new window
+// unless told not to.
+func TestEnterOnATaskLandsInItsTab(t *testing.T) {
+	for _, tc := range []struct {
+		name, program, script string
+		env                   map[string]string
+		want                  []string // lines the program was called with, in order
+	}{
+		{"rex", "rex",
+			`case " $* " in *" run "*) echo '{"window_id":"window:task","block_ids":["block:task"]}';; esac`,
+			map[string]string{"REX_BLOCK": "block:popup", "REX_SESSION": "session:work"},
+			[]string{
+				"--autostart=false run -s session:work -c VAULT --json -- nvim +1 notes/daily/2026-11-09.md",
+				"--autostart=false -C client:app do session.select session_id=session:work window_id=window:task",
+			}},
+		{"tmux", "tmux",
+			`case "$1" in display-message) echo work;; esac`,
+			map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"},
+			[]string{
+				"display-message -p #{session_name}",
+				"new-window -t =work: -c VAULT -- nvim +1 notes/daily/2026-11-09.md",
+			}},
+	} {
+		vault := t.TempDir()
+		t.Setenv("VAULT_DIR", vault)
+		writeNote(t, vault, "notes/daily/2026-11-09.md", "- [ ] call the bank\n")
+		calls := filepath.Join(t.TempDir(), "calls")
+		onPath(t, tc.program, `echo "$*" >> `+calls+"\n"+tc.script)
+		p := tasksPopup(mux.Detect(func(k string) string { return tc.env[k] }, "client:app"), kitty.Terminal{})
+		rows, err := p.Load(len(p.Tabs) - 1)
+		if err != nil || len(rows) != 1 {
+			t.Fatalf("%s: loaded %v (%v), want the one task", tc.name, rows, err)
+		}
+		enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
+		if msg := enter.Run(rows[0])(); msg != popup.Quit {
+			t.Errorf("%s: Enter gave %v, want the popup to close", tc.name, msg)
+		}
+		got := strings.Split(strings.TrimSpace(readNote(t, filepath.Dir(calls), "calls")), "\n")
+		want := slices.Clone(tc.want)
+		for i := range want {
+			want[i] = strings.ReplaceAll(want[i], "VAULT", vault)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s ran\n%s\nwant\n%s", tc.program, strings.Join(got, "\n"), strings.Join(want, "\n"))
+		}
 	}
 }
 

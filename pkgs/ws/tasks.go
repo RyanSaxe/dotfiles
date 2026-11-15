@@ -225,7 +225,6 @@ func tickTask(vault string, t task, today time.Time) error {
 }
 
 func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
-	rex, inRex := b.(mux.Rex)
 	vault := vaultDir()
 	tags := map[string]lipgloss.Style{"overdue": popup.Red.SetString("overdue"), "today": popup.Yellow.SetString("today"), "soon": popup.Accent.SetString("soon")}
 	// A project's tasks are filed under the name of its origin remote.
@@ -283,7 +282,9 @@ func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 			{Key: "enter", Help: "edit", Run: func(r popup.Row) tea.Cmd {
 				t := r.Data.(task)
 				line := "+" + strconv.Itoa(t.Line)
-				if !inRex {
+				// Outside Rex and tmux there's no tab to open, so Neovim runs
+				// in the popup.
+				if !b.Inside() {
 					return tea.ExecProcess(exec.Command("nvim", line, filepath.Join(vault, t.File)), func(err error) tea.Msg {
 						if err != nil {
 							return popup.Notice(err.Error())
@@ -291,7 +292,13 @@ func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 						return popup.Reload("")
 					})
 				}
-				return popup.Do(func() error { return rex.Tab(os.Getenv("REX_SESSION"), vault, "nvim", line, t.File) }, popup.Quit)
+				return popup.Do(func() error {
+					here, err := b.Current()
+					if err == nil {
+						err = b.Tab(here, vault, "nvim", line, t.File)
+					}
+					return err
+				}, popup.Quit)
 			}},
 			{Key: "ctrl+t", Help: "add", Always: true, Run: func(popup.Row) tea.Cmd {
 				return popup.Ask("task:", func(text string) tea.Cmd {

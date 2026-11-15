@@ -96,14 +96,22 @@ func (Rex) Create(label, dir string, panes []layout.Pane) (string, error) {
 	return s, err
 }
 
-// Show switches a Rex app to a session, trying each viewer in turn because
-// a client that created a pane stays its owner after it disconnects.
-func (r Rex) Show(id string) error {
+// Show switches a Rex app to a session.
+func (r Rex) Show(id string) error { return r.show(id, "") }
+
+// show switches a Rex app to a session, and to one of its tabs when window
+// isn't "", trying each viewer in turn because a client that created a pane
+// stays its owner after it disconnects.
+func (r Rex) show(session, window string) error {
+	selection := []string{"do", "session.select", "session_id=" + session}
+	if window != "" {
+		selection = append(selection, "window_id="+window)
+	}
 	var err error
 	for _, c := range r.viewers() {
-		args := []string{"do", "session.select", "session_id=" + id}
+		args := selection
 		if c != "" {
-			args = append([]string{"-C", c}, args...)
+			args = append([]string{"-C", c}, selection...)
 		}
 		if _, err = rex(args...); err == nil {
 			return nil
@@ -133,9 +141,16 @@ func (r Rex) viewers() []string {
 	return append(slices.Compact(slices.DeleteFunc(cs, func(c string) bool { return c == "" })), "")
 }
 
-func (Rex) Tab(id, dir string, args ...string) error {
-	_, err := rex(append([]string{"run", "-s", id, "-c", dir, "--"}, args...)...)
-	return err
+// Tab brings the app to the tab it opens, since the app keeps showing its
+// own tab when the server makes another one active.
+func (r Rex) Tab(id, dir string, args ...string) error {
+	var made struct {
+		Window string `json:"window_id"`
+	}
+	if err := rexJSON(&made, append([]string{"run", "-s", id, "-c", dir, "--json", "--"}, args...)...); err != nil {
+		return err
+	}
+	return r.show(id, made.Window)
 }
 
 func (Rex) Send(id, text string) error {
@@ -232,6 +247,8 @@ func (r Rex) Statuses() map[string]Status {
 }
 
 func (Rex) Inside() bool { return true }
+
+func (r Rex) Current() (string, error) { return r.session, nil }
 
 func (r Rex) Images() kitty.Terminal { return kitty.Terminal{Draws: draws(r.term)} }
 
