@@ -250,6 +250,20 @@ return {
     },
     { "<leader>op", people, desc = "People" },
     { "<leader>ob", obsidian("backlinks"), desc = "Backlinks" },
-    { "<leader>ox", obsidian("toggle_checkbox"), desc = "Tick or untick a task" },
+    -- These two work on a task in any Markdown file, outside the vault too.
+    {
+      "<leader>ox",
+      function()
+        require("markdown.tasks").toggle()
+      end,
+      desc = "Tick or untick a task",
+    },
+    {
+      "<leader>ou",
+      function()
+        require("markdown.tasks").pick_due()
+      end,
+      desc = "Set or clear a task's due date",
+    },
   },
 }

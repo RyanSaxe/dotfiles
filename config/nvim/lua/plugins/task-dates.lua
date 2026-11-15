@@ -2,6 +2,8 @@
 -- overdue, today and tomorrow, or faint once the task is done. A date on a
 -- line a task wraps onto takes that task's color, and a date anywhere else
 -- stays plain. The colors are ThemeTask* in theme/highlights.lua.
+--
+-- In a task in any Markdown file, @ completes a due date (markdown/due_source.lua).
 local tasks = require("markdown.tasks")
 
 local DATE = "%d%d%d%d%-%d%d%-%d%d"
@@ -77,5 +79,16 @@ return {
         end,
       })
     end,
+  },
+  {
+    "saghen/blink.cmp",
+    opts = {
+      sources = {
+        per_filetype = { markdown = { inherit_defaults = true, "task_due" } },
+        providers = {
+          task_due = { name = "Due", module = "markdown.due_source", min_keyword_length = 0, score_offset = 100 },
+        },
+      },
+    },
   },
 }
