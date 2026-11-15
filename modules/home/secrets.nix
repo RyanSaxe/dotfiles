@@ -27,6 +27,9 @@
       # Repositories whose new items show in Reviews, as owner/name separated
       # by spaces. Each computer's starts empty.
       secrets.attention-watch.key = "attention-watch/${config.dotfiles.host}";
+      # Accounts whose items and activity Reviews skips, one GitHub login or
+      # pattern with * per line. A new computer's starts empty.
+      secrets.attention-ignore.key = "attention-ignore/${config.dotfiles.host}";
     };
   };
 }

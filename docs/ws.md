@@ -105,6 +105,17 @@ Pull requests and Issues list your own open ones, and Watching lists what
 is new in the repositories you watch. Each computer's watched repositories
 are its `attention-watch` secret.
 
+Reviews skips the accounts in each computer's `attention-ignore` secret:
+the pull requests and issues they open, and their comments and reviews on
+the rest, so nothing they do needs you or lights sketchybar's R. Each line
+is a GitHub login, or a pattern where `*` stands for any text. An app's
+login ends in `[bot]`, so `*[bot]` skips every app:
+
+```text
+release-robot
+*[bot]
+```
+
 Enter checks a pull request out into its own worktree and opens it in
 Neovim. On an issue, it opens the browser. Ctrl-T does the same as Enter
 and also starts an agent in a second tab, asked to review the pull

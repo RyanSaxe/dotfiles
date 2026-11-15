@@ -131,7 +131,7 @@ func watchAttention() error {
 		publish("review-attention", reviewLevel(in, a))
 	}
 	refresh := func() {
-		next, err := fetchInbox(in, watchList(), time.Now())
+		next, err := fetchInbox(in, watchList(), ignoreList(), time.Now())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "ws: reviews:", err)
 			return

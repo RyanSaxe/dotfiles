@@ -110,5 +110,5 @@ switch.
 ## Another computer
 
 A new computer needs its own host file in `hosts/`, an entry in
-`flake.nix`, and its own lines under `pair-hub-host` and `attention-watch`
-in the secrets.
+`flake.nix`, and its own lines under `pair-hub-host`, `attention-watch` and
+`attention-ignore` in the secrets.

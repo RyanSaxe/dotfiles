@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -22,6 +25,8 @@ func node(t *testing.T, raw string) ghNode {
 const (
 	me    = `{"login": "ryansaxe", "__typename": "User"}`
 	alice = `{"login": "alice", "__typename": "User"}`
+	bob   = `{"login": "bob", "__typename": "User"}`
+	carol = `{"login": "carol", "__typename": "User"}`
 	bot   = `{"login": "dependabot", "__typename": "Bot"}`
 )
 
@@ -129,5 +134,73 @@ func TestAWatchedRepositorysNewItemNotifies(t *testing.T) {
 				t.Errorf("reasons %v, want %v", got, c.want)
 			}
 		})
+	}
+}
+
+// Nothing an account on the ignore list does needs you. What it opens is
+// gone, and its comments and reviews don't count, even on an item the last
+// fetch built before the account was on the list.
+func TestIgnoredAccountsAreSkipped(t *testing.T) {
+	github := t.TempDir()
+	newPR := func(id, author string) string {
+		return `{"__typename": "PullRequest", "id": "` + id + `", "createdAt": "2026-11-07T00:00:00Z", "updatedAt": "2026-11-07T00:00:00Z",
+			"repository": {"nameWithOwner": "acme/web"}, "author": ` + author + `}`
+	}
+	nodes := map[string]string{
+		"yours": `{"__typename": "PullRequest", "id": "yours", "updatedAt": "2026-11-08T00:00:00Z", "author": ` + me + `,
+			"comments": {"nodes": [` + comment("c1", alice, "2026-11-01T00:00:00Z", "one more thing", false) + `, ` + comment("c2", carol, "2026-11-02T00:00:00Z", "deployed", false) + `]},
+			"reviews": {"nodes": [{"id": "r1", "state": "CHANGES_REQUESTED", "submittedAt": "2026-11-03T00:00:00Z", "author": ` + carol + `}]}}`,
+		"carols":  newPR("carols", carol),
+		"an-apps": newPR("an-apps", bot),
+		// bob's login ends in b, which a pattern that read [bot] as a set of
+		// letters would skip too.
+		"bobs": newPR("bobs", bob),
+	}
+	search := `{"data": {"viewer": {"login": "ryansaxe"}, "search": {"pageInfo": {"hasNextPage": false}, "nodes": [`
+	for id, raw := range nodes {
+		n := node(t, raw)
+		author, _ := json.Marshal(n.Author)
+		search += `{"id": "` + id + `", "updatedAt": "` + n.UpdatedAt.Format(time.RFC3339) + `", "author": ` + string(author) + `},`
+		if err := os.WriteFile(filepath.Join(github, id+".node"), []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(github, "search"), []byte(search[:len(search)-1]+`]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A fake GitHub answers a search with every item, and a lookup with the
+	// items it names.
+	onPath(t, "gh", `cd '`+github+`'
+case "$4" in
+*'search('*) cat search ;;
+*)
+  printf '{"data": {"nodes": [null'
+  for f in *.node; do
+    case "$4" in *\"${f%.node}\"*) printf ,; cat "$f" ;; esac
+  done
+  echo ']}}'
+  ;;
+esac`)
+	before := inbox{Items: []item{{ID: "yours", Updated: time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC),
+		Reasons: []reason{{Kind: commented, Actor: "carol", Key: "c2"}}}}}
+
+	in, err := fetchInbox(before, []string{"acme/web"}, []string{"carol", "*[bot]"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type why struct {
+		kind  reasonKind
+		actor string
+	}
+	got := map[string][]why{}
+	for _, it := range in.Items {
+		got[it.ID] = []why{}
+		for _, r := range it.Reasons {
+			got[it.ID] = append(got[it.ID], why{r.Kind, r.Actor})
+		}
+	}
+	want := map[string][]why{"yours": {{commented, "alice"}}, "bobs": {{opened, "bob"}}}
+	if !maps.EqualFunc(got, want, slices.Equal[[]why]) {
+		t.Errorf("inbox %v, want %v", got, want)
 	}
 }

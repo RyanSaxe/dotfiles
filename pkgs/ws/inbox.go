@@ -167,6 +167,31 @@ type ghActor struct {
 
 func (a *ghActor) person() bool { return a != nil && a.Type == "User" }
 
+// shownLogin is the login as GitHub shows it. GraphQL leaves off the [bot]
+// that ends an app's.
+func (a *ghActor) shownLogin() string {
+	switch {
+	case a == nil:
+		return ""
+	case a.Type == "Bot":
+		return a.Login + "[bot]"
+	}
+	return a.Login
+}
+
+// ignoring says whether one of the entries names a login. An entry is a
+// login, or a pattern where * stands for any text.
+func ignoring(entries []string) func(login string) bool {
+	if len(entries) == 0 {
+		return func(string) bool { return false }
+	}
+	patterns := make([]string, len(entries))
+	for i, e := range entries {
+		patterns[i] = strings.ReplaceAll(regexp.QuoteMeta(e), `\*`, ".*")
+	}
+	return regexp.MustCompile(`(?i)^(?:` + strings.Join(patterns, "|") + `)$`).MatchString
+}
+
 type ghComment struct {
 	ID, Body       string
 	CreatedAt      time.Time
@@ -207,6 +232,18 @@ type ghCommit struct {
 			Nodes []struct{ Name, Conclusion, Context, State string }
 		}
 	}
+}
+
+// dropActivityOf removes the comments and reviews of the accounts ignored
+// names, so only everyone else's can make the item need you.
+func (n *ghNode) dropActivityOf(ignored func(login string) bool) {
+	byIgnored := func(c ghComment) bool { return ignored(c.Author.shownLogin()) }
+	n.Comments.Nodes = slices.DeleteFunc(n.Comments.Nodes, byIgnored)
+	for i := range n.ReviewThreads.Nodes {
+		thread := &n.ReviewThreads.Nodes[i].Comments
+		thread.Nodes = slices.DeleteFunc(thread.Nodes, byIgnored)
+	}
+	n.Reviews.Nodes = slices.DeleteFunc(n.Reviews.Nodes, func(r ghReview) bool { return ignored(r.Author.shownLogin()) })
 }
 
 var mention = regexp.MustCompile(`@([A-Za-z0-9-]+)`)
@@ -332,7 +369,10 @@ func graphql(query string, out any) error {
 
 // fetchInbox asks GitHub which items involve you or are new in a watched
 // repository, then fetches the details of only those that changed since prev.
-func fetchInbox(prev inbox, watch []string, now time.Time) (inbox, error) {
+// It skips the items that accounts on the ignore list opened, and those
+// accounts' comments and reviews on the rest.
+func fetchInbox(prev inbox, watch, ignore []string, now time.Time) (inbox, error) {
+	ignored := ignoring(ignore)
 	searches := []string{"is:open involves:@me updated:>=" + now.AddDate(0, 0, -90).Format(time.DateOnly)}
 	if len(watch) > 0 {
 		searches = append(searches, "is:open updated:>="+now.AddDate(0, 0, -90).Format(time.DateOnly)+" repo:"+strings.Join(watch, " repo:"))
@@ -351,17 +391,20 @@ func fetchInbox(prev inbox, watch []string, now time.Time) (inbox, error) {
 					Nodes []struct {
 						ID        string
 						UpdatedAt time.Time
+						Author    *ghActor
 					}
 				}
 			}
 			err := graphql(fmt.Sprintf(`query { viewer { login } search(query: %q, type: ISSUE, first: 100, after: %s) {
-  pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { id updatedAt } ... on Issue { id updatedAt } } } }`, q, after), &page)
+  pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { id updatedAt author { login __typename } } ... on Issue { id updatedAt author { login __typename } } } } }`, q, after), &page)
 			if err != nil {
 				return prev, err
 			}
 			me = page.Viewer.Login
 			for _, n := range page.Search.Nodes {
-				updated[n.ID] = n.UpdatedAt
+				if !ignored(n.Author.shownLogin()) {
+					updated[n.ID] = n.UpdatedAt
+				}
 			}
 			if !page.Search.PageInfo.HasNextPage {
 				break
@@ -371,7 +414,10 @@ func fetchInbox(prev inbox, watch []string, now time.Time) (inbox, error) {
 	}
 	kept := map[string]item{}
 	for _, it := range prev.Items {
-		if at, ok := updated[it.ID]; ok && at.Equal(it.Updated) {
+		// An item whose reason came from an account ignored since the last
+		// fetch is built again.
+		fromIgnored := slices.ContainsFunc(it.Reasons, func(r reason) bool { return r.Kind != failing && ignored(r.Actor) })
+		if at, ok := updated[it.ID]; ok && at.Equal(it.Updated) && !fromIgnored {
 			it.Reasons = slices.DeleteFunc(it.Reasons, func(r reason) bool { return r.Kind == opened && now.Sub(r.At) >= 7*24*time.Hour })
 			kept[it.ID] = it
 		}
@@ -395,6 +441,7 @@ func fetchInbox(prev inbox, watch []string, now time.Time) (inbox, error) {
 		}
 		for _, n := range res.Nodes {
 			if n.ID != "" {
+				n.dropActivityOf(ignored)
 				kept[n.ID] = itemFrom(n, me, watched[strings.ToLower(n.Repository.NameWithOwner)], now)
 			}
 		}
@@ -411,5 +458,12 @@ func fetchInbox(prev inbox, watch []string, now time.Time) (inbox, error) {
 // per line or space, from the secrets file. None is fine.
 func watchList() []string {
 	data, _ := os.ReadFile(filepath.Join(home, ".config", "sops-nix", "secrets", "attention-watch"))
+	return strings.Fields(string(data))
+}
+
+// ignoreList is the accounts whose items and activity the inbox skips, one
+// login or pattern per line, from the secrets file. None is fine.
+func ignoreList() []string {
+	data, _ := os.ReadFile(filepath.Join(home, ".config", "sops-nix", "secrets", "attention-ignore"))
 	return strings.Fields(string(data))
 }
