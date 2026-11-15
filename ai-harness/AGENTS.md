@@ -106,9 +106,9 @@ message, and `pair agents` lists the sessions that are running.
 included. Read its AGENTS.md before you install a tool or change a setting.
 A general-purpose tool goes in through Nix there, not a global `brew`, `pip`
 or `npm` install, so every computer gets the same one. The dotfiles are
-public, so a tool for one project or for the user's work is installed in
-that project's own environment, not in the dotfiles. Ask when you can't
-tell.
+public, so a tool that only one project needs, or one that is internal to a
+company, is installed in that project's own environment, not in the
+dotfiles. Ask when you can't tell.
 
 ## The wiki
 
