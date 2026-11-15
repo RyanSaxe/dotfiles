@@ -17,11 +17,12 @@ local TERMINAL = "com.superlogical.terminal"
 local REX_DIR = debug.getinfo(1, "S").source:match("^@?(.*)/")
 local PREFIX = "ctrl+space>"
 
-local function open_float(label, command)
+-- Opens command in a float, starting in cwd when it isn't nil.
+local function open_float(label, command, cwd)
   local _, err = rex.session.new_layer({
     bounds = { 0.08, 0.08, 0.84, 0.84 },
     focus = true,
-    layout = rex.layout.block({ flavor = SHELL, label = label, options = { command = command } }),
+    layout = rex.layout.block({ flavor = SHELL, label = label, options = { command = command, cwd = cwd } }),
   })
   if err ~= nil then
     error(err, 0)
@@ -32,18 +33,23 @@ end
 -- is_vim test in tmux.conf. fzf is one so those keys move its selection.
 local EDITORS = { nvim = true, vim = true, vi = true, view = true, vimdiff = true, fzf = true }
 
-local function in_float(block_id)
+-- The floating layer that holds the block and the block's label, or nil when
+-- the block isn't in a float.
+local function float_of(block_id)
   local view = rex.session.view({})
   for _, window in ipairs(view and view.windows or {}) do
     for _, layer in ipairs(window.layers) do
       for _, block in ipairs(layer.kind == "floating" and layer.blocks or {}) do
         if block.block_id == block_id then
-          return true
+          return layer.layer_id, block.label or ""
         end
       end
     end
   end
-  return false
+end
+
+local function in_float(block_id)
+  return float_of(block_id) ~= nil
 end
 
 -- Those keys go to an editor in any pane, and to any program in a float, as
@@ -181,14 +187,26 @@ rex.action({
   end,
 })
 
--- `ws pick` switches the app itself, so it gets the client to switch.
+-- `ws pick` switches the app itself, so it gets the client to switch. A ws
+-- key pressed in a ws popup replaces that popup instead of stacking another
+-- over it, and the new one starts in the folder the old one was in, which is
+-- the folder of the pane it opened from.
 rex.action({
   name = "ws_pick",
   title = "Pick with ws",
   args = { name = "string" },
   run = function(ctx, args)
-    remember(ctx)
-    open_float("ws " .. args.name, { "ws", "pick", args.name, "--client", ctx.client_id, "--from", ctx.block_id })
+    local label = "ws " .. args.name
+    local layer, shown = float_of(ctx.block_id)
+    if layer == nil or shown:sub(1, 3) ~= "ws " then
+      remember(ctx)
+      open_float(label, { "ws", "pick", args.name, "--client", ctx.client_id, "--from", ctx.block_id })
+      return
+    end
+    local process = rex.block.call(TERMINAL, "process", { block_id = ctx.block_id })
+    local cwd = process and process.foreground and process.foreground.cwd
+    open_float(label, { "ws", "pick", args.name, "--client", ctx.client_id }, cwd)
+    rex.session.close_layer({ layer_id = layer })
   end,
 })
 

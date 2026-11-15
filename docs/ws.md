@@ -53,8 +53,9 @@ built-in `review` layout runs `nvim gh://{pr}`.
 | Alt-/     | keys      | Every key binding, and where it is set                                 |
 
 Rex binds these in `config/rex/init.lua`, and tmux in
-`config/tmux/tmux.conf`. The agents popup works only in Rex. `ws pick NAME`
-opens any of them from a shell.
+`config/tmux/tmux.conf`. In Rex, one of these keys pressed inside a popup
+replaces that popup, and in tmux the popup ignores it. The agents popup
+works only in Rex. `ws pick NAME` opens any of them from a shell.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab switches tabs, Enter acts on the row and Esc clears the filter or

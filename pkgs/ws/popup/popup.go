@@ -77,7 +77,7 @@ type (
 // Notice shows text in the footer until the next key.
 func Notice(text string) tea.Msg { return noticeMsg(text) }
 
-// Reload loads every tab again and shows notice.
+// Reload loads every tab and draws the art again, and shows notice.
 func Reload(notice string) tea.Msg { return reloadMsg(notice) }
 
 // Quit closes the popup and every popup it was opened over.

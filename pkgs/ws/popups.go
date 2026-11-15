@@ -32,7 +32,9 @@ func pick(b mux.Backend, name string) error {
 	if hex := accentColor(); hex != "" {
 		popup.Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(hex))
 	}
-	return popup.Run(build(), mascotArt(2, term))
+	// The mascot is drawn again on each reload, so the theme popup shows a
+	// new one as soon as it's set.
+	return popup.Run(build(), func() popup.Art { return mascotArt(2, term) })
 }
 
 // statusTag names an agent's status in its color.

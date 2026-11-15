@@ -246,7 +246,7 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 		m.active = (m.active + 1) % len(m.lists)
 		return m, m.selectionChanged()
 	case "ctrl+r":
-		return m.update(reloadMsg(""))
+		return m, func() tea.Msg { return reloadMsg("") } // through the stack, which draws the art again
 	case "ctrl+d":
 		m.vp.HalfPageDown()
 		return m, nil

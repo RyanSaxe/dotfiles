@@ -6,27 +6,37 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Run shows p until it quits, with art at the right of every header.
-func Run(p Popup, art Art) error {
-	_, err := tea.NewProgram(New(p, art), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+// Run shows p until it quits, with the art that draw returns at the right of
+// every header. Each reload draws it again, so the art can change while the
+// popup is open, and a nil draw shows none.
+func Run(p Popup, draw func() Art) error {
+	_, err := tea.NewProgram(New(p, draw), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
 	return err
 }
 
 // New is p as a Bubble Tea model, for a program that runs its own.
-func New(p Popup, art Art) tea.Model { return open(p, art) }
+func New(p Popup, draw func() Art) tea.Model { return open(p, draw) }
 
 // A stack is the popups open in one run: the first is the one Run opened,
 // and each Push opens one over the last. Esc closes the top one, and
 // closing the first quits.
 type stack struct {
 	frames []frame
-	art    Art
+	draw   func() Art
+	art    Art // what draw last returned, which every frame shows
 	next   int // the id the next frame gets
 	size   tea.WindowSizeMsg
 }
 
-func open(p Popup, art Art) stack {
-	return stack{frames: []frame{newFrame(0, p, art)}, art: art, next: 1}
+// artMsg is the art a reload drew.
+type artMsg Art
+
+func open(p Popup, draw func() Art) stack {
+	var art Art
+	if draw != nil {
+		art = draw()
+	}
+	return stack{frames: []frame{newFrame(0, p, art)}, draw: draw, art: art, next: 1}
 }
 
 func (s stack) Init() tea.Cmd { return s.top().load() }
@@ -55,6 +65,24 @@ func (s stack) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.frames = slices.Clone(s.frames[:len(s.frames)-1])
 		if s.top().busy() {
 			return s, s.top().spin.Tick
+		}
+		return s, nil
+	case reloadMsg:
+		m, cmd := s.updateFrame(s.top().id, msg)
+		if s.draw == nil {
+			return m, cmd
+		}
+		draw := s.draw
+		return m, tea.Batch(cmd, func() tea.Msg { return artMsg(draw()) })
+	case artMsg:
+		// Every frame shows the art in its header, and the header's height
+		// sets the room left for the list.
+		s.art, s.frames = Art(msg), slices.Clone(s.frames)
+		for i := range s.frames {
+			s.frames[i].art = s.art
+			if s.size.Width > 0 {
+				s.frames[i], _ = s.frames[i].update(s.size)
+			}
 		}
 		return s, nil
 	case rowsMsg:

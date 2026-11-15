@@ -61,7 +61,7 @@ func results(cmd tea.Cmd) []tea.Msg {
 
 // start opens p at a usable size and lets its first load finish.
 func start(p popup.Popup) tea.Model {
-	m := popup.New(p, popup.Art{})
+	m := popup.New(p, nil)
 	m, _ = run(m, size, m.Init()())
 	return m
 }
@@ -111,7 +111,7 @@ func TestFailedLoadRetries(t *testing.T) {
 func TestAFailedLoadFitsTheTerminal(t *testing.T) {
 	p := picker(nil, errors.New("there's no inbox yet, and the job that fetches it isn't running"), new([]string))
 	p.Noun, p.Fetch = "your inbox for the first time", func(popup.Row) (any, error) { return nil, nil }
-	m := popup.New(p, popup.Art{})
+	m := popup.New(p, nil)
 	m, _ = run(m, tea.WindowSizeMsg{Width: 80, Height: 40}, m.Init()())
 	if h := lipgloss.Height(m.View()); h > 40 {
 		t.Errorf("the view is %d lines, taller than the 40-line terminal", h)
@@ -125,7 +125,7 @@ func TestRowsFromBeforeAReloadAreDropped(t *testing.T) {
 	answer := "old"
 	p := picker(nil, nil, &picked)
 	p.Load = func(int) ([]popup.Row, error) { return []popup.Row{{ID: answer, Title: answer}}, nil }
-	m := popup.New(p, popup.Art{})
+	m := popup.New(p, nil)
 	first := m.Init() // the first load, still running
 	answer = "new"
 	m, _ = run(m, size, ctrlR)
@@ -141,7 +141,7 @@ func TestRowsFromBeforeAReloadAreDropped(t *testing.T) {
 // it does.
 func TestRowsBeforeTheSizeCanBePicked(t *testing.T) {
 	var picked []string
-	m := popup.New(picker([]popup.Row{{ID: "a", Title: "a"}}, nil, &picked), popup.Art{})
+	m := popup.New(picker([]popup.Row{{ID: "a", Title: "a"}}, nil, &picked), nil)
 	run(m, m.Init()(), size, enter)
 	if !slices.Equal(picked, []string{"a"}) {
 		t.Errorf("picked %v, want [a]", picked)
@@ -201,7 +201,7 @@ func TestTheMousePicksRows(t *testing.T) {
 			p := picker(rows, nil, &picked)
 			p.OneLine = oneLine
 			p.Fetch = func(r popup.Row) (any, error) { return "about " + r.Title, nil }
-			m := popup.New(p, popup.Art{})
+			m := popup.New(p, nil)
 			m, _ = run(m, tea.WindowSizeMsg{Width: width, Height: 40}, m.Init()())
 			misses := []tea.Msg{press(t, m, "Rows")}
 			if width >= 80 {
@@ -215,6 +215,28 @@ func TestTheMousePicksRows(t *testing.T) {
 				t.Errorf("%d columns wide, one line %v, picked %v, want %v", width, oneLine, picked, want)
 			}
 		}
+	}
+}
+
+// A reload draws the header's art again, so the popup shows art that an
+// action or anything else changed, such as a new mascot, without being opened
+// again.
+func TestAReloadDrawsTheArtAgain(t *testing.T) {
+	mascot := "raikou"
+	draw := func() popup.Art { return popup.Art{Cells: mascot, Cols: len(mascot), Rows: 1} }
+	p := picker([]popup.Row{{ID: "gengar", Title: "gengar"}}, nil, new([]string))
+	p.Actions = []popup.Action{{Key: "enter", Help: "apply", Run: func(r popup.Row) tea.Cmd {
+		return popup.Do(func() error { mascot = r.ID; return nil }, popup.Reload("switched to "+r.Title))
+	}}}
+	header := func(m tea.Model) string { return strings.Split(ansi.Strip(m.View()), "\n")[0] }
+	m := popup.New(p, draw)
+	m, _ = run(m, size, m.Init()(), enter)
+	if h := header(m); !strings.Contains(h, "gengar") || strings.Contains(h, "raikou") {
+		t.Errorf("after Enter changed the art, the header is %q", h)
+	}
+	mascot = "mew"
+	if m, _ = run(m, ctrlR); !strings.Contains(header(m), "mew") {
+		t.Errorf("after Ctrl-R, the header is %q", header(m))
 	}
 }
 
