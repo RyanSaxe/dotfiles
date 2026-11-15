@@ -13,8 +13,8 @@ then instructions you loaded for the task at hand, and this file last.
   sound approach.
 - Check each fact your work depends on at its source before you rely on
   it.
-- Before you start, ask about any choice that could change correctness,
-  scope, behavior or risk.
+- Ask about any choice that could change correctness, scope, behavior or
+  risk.
 - During a long task, don't stop to ask. Decide, note what you assumed, and
   keep going. Stop only when going on could do harm that's hard to undo, or
   when the work can't continue.
