@@ -101,9 +101,10 @@ The global git ignore keeps that folder out of every repository.
 ## Other agents
 
 To start an agent in another terminal and work with it, run
-`pair spawn CLI --prompt "…"`, which prints the name to message it by.
-`pair message --to NAME --text "…"` sends it a message, and `pair agents`
-lists the sessions that are running.
+`pair spawn CLI --prompt "…"`, which prints the name to message it by. Read
+`pair spawn --help` before you start one, for the CLIs it can start and how
+to pass a CLI its own flags. `pair message --to NAME --text "…"` sends it a
+message, and `pair agents` lists the sessions that are running.
 
 ## This computer
 
