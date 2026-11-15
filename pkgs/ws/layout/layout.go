@@ -25,8 +25,8 @@ type Pane struct {
 }
 
 // Load reads dir/NAME.toml, or builtins[name] when there is no such file,
-// and fills its {placeholders} from vars, each quoted for the shell.
-func Load(dir, name string, builtins, vars map[string]string) ([]Pane, error) {
+// and fills its {placeholders} from vars, each word quoted for the shell.
+func Load(dir, name string, builtins map[string]string, vars map[string][]string) ([]Pane, error) {
 	data, err := os.ReadFile(filepath.Join(dir, name+".toml"))
 	if builtin, ok := builtins[name]; ok && errors.Is(err, os.ErrNotExist) {
 		data, err = []byte(builtin), nil
@@ -42,8 +42,8 @@ func Load(dir, name string, builtins, vars map[string]string) ([]Pane, error) {
 		err = errors.New("it has no [[pane]]")
 	}
 	var pairs []string
-	for k, v := range vars {
-		pairs = append(pairs, k, Quote(v))
+	for k, words := range vars {
+		pairs = append(pairs, k, Line(words))
 	}
 	fill := strings.NewReplacer(pairs...)
 	for i := range l.Pane {
@@ -60,10 +60,19 @@ func Load(dir, name string, builtins, vars map[string]string) ([]Pane, error) {
 	return l.Pane, nil
 }
 
+// Line is words as one line the shell reads back as those words.
+func Line(words []string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = Quote(w)
+	}
+	return strings.Join(quoted, " ")
+}
+
 // Quote makes a word safe to type into the shell, leaving plain words bare
 // so the typed command reads the way a person would type it.
 func Quote(s string) string {
-	if strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./:@%+,") == "" {
+	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./:@%+,") == "" {
 		return s
 	}
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"

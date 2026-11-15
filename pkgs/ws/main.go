@@ -25,36 +25,82 @@ import (
 	"workspace/mux"
 )
 
-const usage = `usage:
-  ws open DIR [--layout NAME]        open a folder as a session, or switch to its session
-  ws new NAME [--agent claude|codex] [--prompt TEXT] [--layout NAME] [--base REF]
-                                     make ~/worktrees/PROJECT/NAME on branch NAME and start an agent there
-  ws pr NUMBER [--layout NAME]       the same, checked out to a pull request. The review layout opens it in Neovim
-  ws send NAME TEXT                  type TEXT and Enter into a session's agent pane
-  ws agent [claude|codex]            print the agent this computer starts by default, or set it. With none set,
-                                     it is claude when that is installed and codex otherwise
-  ws ls [--json]                     list worktrees and their agents
+// commandArgs is how many arguments each command takes. ws agent takes none
+// or one.
+var commandArgs = map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}
+
+// commandUsages are the commands' entries in ws --help, and ws COMMAND
+// --help prints the command's entry with its commandDetails.
+var commandUsages = []string{`
+  ws open DIR [--layout NAME]        open a folder as a session, or switch to its session`, `
+  ws new NAME [--agent claude|codex] [--prompt TEXT] [--layout NAME] [--base REF] [-- FLAGS]
+                                     make ~/worktrees/PROJECT/NAME on branch NAME and start an agent there,
+                                     with FLAGS in place of the agent's defaults`, `
+  ws pr NUMBER [--layout NAME]       the same, checked out to a pull request. The review layout opens it in Neovim`, `
+  ws send NAME TEXT                  type TEXT and Enter into a session's agent pane`, `
+  ws agent [claude|codex [FLAGS]]    print the default agent and each agent's default flags, or set them.
+                                     Every agent ws starts gets its defaults unless its command gives its own
+                                     flags. With no default agent set, it is claude when that is installed
+                                     and codex otherwise`, `
+  ws ls [--json]                     list worktrees and their agents`, `
   ws rm NAME [--force]               close a worktree's session, remove it and delete its branch,
                                      but without --force it refuses uncommitted changes and keeps a branch
-                                     that isn't merged and whose pull request GitHub doesn't show as merged
+                                     that isn't merged and whose pull request GitHub doesn't show as merged`, `
   ws pick NAME [--client ID]         open a popup: go, sessions, worktrees, reviews, tasks, agents, theme, keys or files.
                                      sessions is the go popup on its Sessions tab.
-                                     --from BLOCK starts it in the folder of that Rex pane
-  ws theme                           the theme popup: light or dark, and the mascot
-  ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file
+                                     --from BLOCK starts it in the folder of that Rex pane`, `
+  ws theme                           the theme popup: light or dark, and the mascot`, `
+  ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file`, `
   ws attention [--watch]             print what needs you, as agents (waiting or none), reviews
                                      (ci, review or none) and tasks (overdue, today, tomorrow or none).
                                      --watch publishes all three for sketchybar and fetches the inbox
-                                     Reviews lists every 5 minutes
+                                     Reviews lists every 5 minutes`, `
   ws focus agent|tasks|reviews       bring Rex, or Ghostty on tmux without Rex, onto the code workspace,
                                      then go to the agent that needs you first or open Tasks or Reviews.
-                                     AeroSpace's Cmd-Alt-A, T and R run it
+                                     AeroSpace's Cmd-Alt-A, T and R run it`,
+}
+
+const agentExample = `
+Example: give claude default flags, then give one agent its own.
+  ws agent claude --effort medium
+  ws new fix-login                                  starts claude --effort medium
+  ws new fix-popups -- --effort high --model opus   starts claude --effort high --model opus
+`
+
+var commandDetails = map[string]string{
+	"new": `
+  --agent claude|codex  start this agent instead of the default one
+  --prompt TEXT         the agent's first prompt
+  --layout NAME         the session's layout, agent by default
+  --base REF            start the branch from REF instead of HEAD
+  -- FLAGS              start the agent with FLAGS instead of its defaults, which ws agent sets
+` + agentExample,
+	"agent": `
+ws agent prints the default agent first, then each other agent that has defaults.
+ws agent AGENT makes AGENT the default agent and keeps every agent's defaults.
+ws agent AGENT FLAGS also saves FLAGS as AGENT's defaults, so it makes AGENT the default
+too, and ws agent AGENT -- with nothing after it clears AGENT's defaults.
+` + agentExample,
+}
+
+var usage = "usage:" + strings.Join(commandUsages, "") + `
 In a popup, typing filters, the arrows, ^j/^k or the wheel move, enter or a click on a row acts,
 and esc clears the filter or closes.
 Outside Rex and tmux there is no terminal to open a session in, so ws open fails, and ws new and ws pr
 only make the worktree and print its path.
 Layouts are ~/.config/ws/layouts/NAME.toml, and agent and review are built in. Extra folders for go are ~/.config/ws/bookmarks.
-`
+ws COMMAND --help prints that command's usage.
+` + agentExample
+
+// commandUsage is what ws COMMAND --help prints, or "" for no such command.
+func commandUsage(cmd string) string {
+	for _, u := range commandUsages {
+		if strings.HasPrefix(u, "\n  ws "+cmd+" ") {
+			return "usage:" + u + "\n" + commandDetails[cmd]
+		}
+	}
+	return ""
+}
 
 var (
 	home, _      = os.UserHomeDir()
@@ -71,7 +117,7 @@ var (
 var builtinLayouts = map[string]string{
 	"agent": `
 [[pane]]
-run = "{agent} {prompt}"
+run = "{agent} -- {prompt}"
 focus = true
 
 [[pane]]
@@ -112,8 +158,22 @@ func main() {
 }
 
 func run(cmd string, args []string) error {
+	// The agent's words are its own, so ws parses none of them: those after
+	// ws new's --, and those after ws agent's agent.
+	var agentWords []string
+	if i := slices.Index(args, "--"); cmd == "new" && i >= 0 {
+		args, agentWords = args[:i], args[i+1:]
+	}
+	isHelp := func(a string) bool { return slices.Contains([]string{"-h", "-help", "--help"}, a) }
+	if help := commandUsage(cmd); help != "" && slices.ContainsFunc(args, isHelp) {
+		fmt.Print(help)
+		return nil
+	}
+	if cmd == "agent" && len(args) > 1 {
+		args, agentWords = args[:1], args[1:]
+	}
 	fs := flag.NewFlagSet("ws "+cmd, flag.ExitOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	fs.Usage = func() { fmt.Fprint(os.Stderr, cmp.Or(commandUsage(cmd), usage)) }
 	layout := fs.String("layout", "agent", "")
 	agent := fs.String("agent", "", "")
 	prompt := fs.String("prompt", "", "")
@@ -129,7 +189,7 @@ func run(cmd string, args []string) error {
 	for fs.Parse(args); fs.NArg() > 0; fs.Parse(args) {
 		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
 	}
-	nargs, known := map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}[cmd]
+	nargs, known := commandArgs[cmd]
 	if !known || len(pos) != nargs && (cmd != "agent" || len(pos) > 0) {
 		return errors.New("unknown command or arguments, see ws --help")
 	}
@@ -142,16 +202,16 @@ func run(cmd string, args []string) error {
 		}
 		return open(b, dir, start{layout: *layout}, true)
 	case "new":
-		return newWorktree(b, ".", pos[0], *agent, *prompt, *layout, *base)
+		return newWorktree(b, ".", pos[0], *base, start{layout: *layout, agent: *agent, flags: agentWords, prompt: *prompt})
 	case "pr":
 		_, err := pullRequest(b, ".", pos[0], *layout)
 		return err
 	case "agent":
 		if len(pos) == 0 {
-			fmt.Println(defaultAgent())
+			printAgents()
 			return nil
 		}
-		return setAgent(pos[0])
+		return setAgent(pos[0], agentWords)
 	case "send":
 		return send(b, pos[0], pos[1])
 	case "ls":
@@ -178,10 +238,13 @@ func run(cmd string, args []string) error {
 }
 
 // start is how a new session begins: its layout, the agent its agent pane
-// runs with a first prompt, and for the review layout the pull request as
-// owner/repo/pr/N. The zero value is the agent layout running the default
-// agent.
-type start struct{ layout, agent, prompt, pr, file string }
+// runs with its flags and a first prompt, and for the review layout the pull
+// request as owner/repo/pr/N. The zero value is the agent layout running the
+// default agent with its defaults.
+type start struct {
+	layout, agent, prompt, pr, file string
+	flags                           []string
+}
 
 // open shows the session for dir, creating it from the layout when there is
 // none. Outside Rex and tmux there is no terminal to create one in, so it
@@ -196,7 +259,15 @@ func open(b mux.Backend, dir string, s start, needsSession bool) error {
 		return errors.New("there is no terminal to open a session in, so run this inside Rex or tmux")
 	}
 	if id == "" && b.Inside() {
-		vars := map[string]string{"{agent}": cmp.Or(s.agent, defaultAgent()), "{prompt}": s.prompt, "{pr}": s.pr, "{file}": s.file, "{dir}": dir, "{name}": filepath.Base(dir)}
+		// An empty value fills in no word, so a session without a prompt
+		// starts its agent with none.
+		word := func(v string) []string {
+			if v == "" {
+				return nil
+			}
+			return []string{v}
+		}
+		vars := map[string][]string{"{agent}": agentCommand(s.agent, s.flags), "{prompt}": word(s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
 		panes, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, vars)
 		if err != nil {
 			return err
@@ -228,20 +299,67 @@ func defaultAgent() string {
 	return "claude"
 }
 
-func setAgent(name string) error {
+// agentFlags are each agent's default flags, which `ws agent` saves.
+func agentFlags() map[string][]string {
+	flags := map[string][]string{}
+	readJSON("agent-flags.json", &flags)
+	return flags
+}
+
+// agentCommand is the words that start agent, or the default agent when
+// agent is empty: the agent and flags, or its defaults when flags is empty.
+func agentCommand(agent string, flags []string) []string {
+	agent = cmp.Or(agent, defaultAgent())
+	if len(flags) == 0 {
+		flags = agentFlags()[agent]
+	}
+	return append([]string{agent}, flags...)
+}
+
+// printAgents prints the default agent first, then each other agent that
+// has defaults, with its defaults.
+func printAgents() {
+	def, all := defaultAgent(), agentFlags()
+	fmt.Println(layout.Line(append([]string{def}, all[def]...)))
+	for _, name := range agents {
+		if name != def && len(all[name]) > 0 {
+			fmt.Println(layout.Line(append([]string{name}, all[name]...)))
+		}
+	}
+}
+
+// setAgent makes name the default agent. Words after it replace its
+// defaults, and a -- with nothing after it clears them.
+func setAgent(name string, words []string) error {
 	if !slices.Contains(agents, name) {
 		return fmt.Errorf("%q is not an agent ws starts, which are %s", name, strings.Join(agents, " and "))
+	}
+	if len(words) > 0 {
+		if words[0] == "--" {
+			words = words[1:]
+		}
+		all := agentFlags()
+		all[name] = words
+		if len(words) == 0 {
+			delete(all, name)
+		}
+		if err := writeJSON("agent-flags.json", all); err != nil {
+			return err
+		}
 	}
 	return writeWhole("agent", []byte(name+"\n"))
 }
 
-func newWorktree(b mux.Backend, from, name, agent, prompt, layoutName, base string) error {
+func newWorktree(b mux.Backend, from, name, base string, s start) error {
 	if strings.ContainsAny(name, "/ ") {
 		return fmt.Errorf("%q has a slash or space, and a worktree name must be one folder", name)
 	}
+	if s.agent != "" && !slices.Contains(agents, s.agent) {
+		return fmt.Errorf("%q is not an agent ws starts, which are %s", s.agent, strings.Join(agents, " and "))
+	}
 	main, err := mainCheckout(from)
 	if err == nil {
-		_, err = layout.Load(layoutsDir, layoutName, builtinLayouts, nil) // a bad layout fails before there is a worktree to clean up
+		_, err = layout.Load(layoutsDir, s.layout, builtinLayouts, nil) // a bad layout fails before there is a worktree to clean up
 	}
 	if err != nil {
 		return err
@@ -250,7 +368,7 @@ func newWorktree(b mux.Backend, from, name, agent, prompt, layoutName, base stri
 	if _, err := git(from, append([]string{"worktree", "add", "-b", name, dir}, cmp.Or(base, "HEAD"))...); err != nil {
 		return err
 	}
-	return prepare(b, main, dir, start{layout: layoutName, agent: agent, prompt: prompt})
+	return prepare(b, main, dir, s)
 }
 
 // pullRequest opens a pull request's worktree with layout, which can be

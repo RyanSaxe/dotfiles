@@ -22,6 +22,19 @@ Without `--force`, `ws rm` refuses a worktree with uncommitted changes, and
 keeps a branch that hasn't merged. Outside Rex and tmux, `ws new` and
 `ws pr` only make the worktree and print its path.
 
+Each agent has its own default flags, which every agent ws starts gets.
+`ws new` replaces them with the words after `--`:
+
+```sh
+ws agent claude --effort medium     # claude starts with --effort medium, and is the default
+ws new fix-login                    # starts claude --effort medium
+ws new fix-popups -- --model opus   # starts claude --model opus
+ws agent claude --                  # clears claude's default flags
+```
+
+The worktrees popup's Ctrl-T asks for an agent, flags or both, such as
+`--model opus` or `codex -c model_reasoning_effort=high`.
+
 ## Layouts
 
 A layout is the panes a new session opens with. `--layout NAME` reads
@@ -29,7 +42,7 @@ A layout is the panes a new session opens with. `--layout NAME` reads
 
 ```toml
 [[pane]]
-run = "{agent} {prompt}"
+run = "{agent} -- {prompt}"
 focus = true
 
 [[pane]]
@@ -37,8 +50,10 @@ split = "right"   # right, left, above or below
 size = 35         # percent of the space
 ```
 
-`run` can use `{agent}`, `{prompt}`, `{pr}`, `{dir}` and `{name}`. The
-built-in `review` layout runs `nvim gh://{pr}`.
+`run` can use `{agent}`, `{prompt}`, `{pr}`, `{dir}` and `{name}`.
+`{agent}` is the agent and its flags, and the `--` after it keeps a flag
+that takes several values, such as claude's `--add-dir`, from taking the
+prompt as one of them. The built-in `review` layout runs `nvim gh://{pr}`.
 
 ## Popups
 

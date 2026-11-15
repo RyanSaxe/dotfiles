@@ -12,11 +12,12 @@ import (
 var builtins = map[string]string{"agent": "[[pane]]\nrun = \"{agent} {prompt}\"\nfocus = true\n\n[[pane]]\nsize = 35\n"}
 
 func TestLoadFillsPlaceholders(t *testing.T) {
-	panes, err := layout.Load(t.TempDir(), "agent", builtins, map[string]string{"{agent}": "claude", "{prompt}": "fix the 'bug'"})
+	vars := map[string][]string{"{agent}": {"codex", "-c", "model_reasoning_effort=high"}, "{prompt}": {"fix the 'bug'"}}
+	panes, err := layout.Load(t.TempDir(), "agent", builtins, vars)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := panes[0].Run, `claude 'fix the '\''bug'\'''`; got != want || !panes[0].Agent || !panes[0].Focus {
+	if got, want := panes[0].Run, `codex -c 'model_reasoning_effort=high' 'fix the '\''bug'\'''`; got != want || !panes[0].Agent || !panes[0].Focus {
 		t.Errorf("first pane runs %s (agent %v, focus %v), want %s as the focused agent", got, panes[0].Agent, panes[0].Focus, want)
 	}
 	if p := panes[1]; p.Split != "right" || p.Size != 35 || p.Run != "" {
@@ -53,5 +54,18 @@ func TestZshReadsQuotedWordsBackUnchanged(t *testing.T) {
 		if err != nil || string(out) != word {
 			t.Errorf("zsh read %q back as %q (%v)", word, out, err)
 		}
+	}
+}
+
+// An agent's flags can include an empty value, which must stay a word, or
+// the next word takes its place.
+func TestZshReadsALineBackAsItsWords(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh is not installed")
+	}
+	out, err := exec.Command(zsh, "-f", "-c", `printf '[%s]' `+layout.Line([]string{"--append-system-prompt", "", "fix it"})).Output()
+	if want := "[--append-system-prompt][][fix it]"; err != nil || string(out) != want {
+		t.Errorf("zsh read the line back as %s (%v), want %s", out, err, want)
 	}
 }

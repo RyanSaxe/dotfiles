@@ -49,6 +49,7 @@ The rest are records `ws` keeps for itself:
 - `mascot.json`: the mascot and its two colors, which only the popups use,
   written by `ws mascot` and the theme popup
 - `agent`: the agent this computer starts by default, set by `ws agent`
+- `agent-flags.json`: each agent's default flags, set by `ws agent`
 
 Mascot pictures from PokeAPI and drawn mermaid diagrams are caches, in
 `~/.cache/dotfiles`. `ws` reads layouts from `~/.config/ws/layouts`, extra

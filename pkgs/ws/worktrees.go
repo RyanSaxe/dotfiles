@@ -1,14 +1,33 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/junegunn/go-shellwords"
 
+	"workspace/layout"
 	"workspace/mux"
 	"workspace/popup"
 )
+
+// startFromAnswer reads the popup's answer to "agent and flags", split into
+// words as the shell splits them: an agent, flags for the default agent, or
+// both.
+func startFromAnswer(answer string) (start, error) {
+	parser := shellwords.NewParser()
+	words, err := parser.Parse(answer)
+	if err == nil && parser.Position >= 0 {
+		err = fmt.Errorf("put %q in quotes, or the agent never gets it", answer[parser.Position:])
+	}
+	s := start{layout: "agent", flags: words}
+	if len(words) > 0 && !strings.HasPrefix(words[0], "-") {
+		s.agent, s.flags = words[0], words[1:]
+	}
+	return s, err
+}
 
 // worktreesPopup opens on the worktrees of the project ws runs in, with
 // every project's on a second tab.
@@ -65,14 +84,19 @@ func worktreesPopup(b mux.Backend) popup.Popup {
 					from = w.Path
 				}
 				return popup.Ask("name:", func(name string) tea.Cmd {
-					return popup.Ask("agent (claude or codex, or empty for "+defaultAgent()+"):", func(agent string) tea.Cmd {
+					return popup.Ask("agent and flags (empty for "+layout.Line(agentCommand("", nil))+"):", func(answer string) tea.Cmd {
 						return popup.Ask("prompt:", func(prompt string) tea.Cmd {
 							return tea.Batch(popup.Say("making "+name+"…"), popup.Do(func() error {
+								s, err := startFromAnswer(answer)
+								if err != nil {
+									return err
+								}
+								s.prompt = prompt
 								main, err := mainCheckout(from)
 								if err != nil {
 									return err
 								}
-								return newWorktree(b, main, name, agent, prompt, "agent", "")
+								return newWorktree(b, main, name, "", s)
 							}, popup.Quit))
 						})
 					})
