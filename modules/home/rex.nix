@@ -51,6 +51,9 @@ lib.mkMerge [
       "Workspace.inactivePaneFadeMode" = "both";
       "Workspace.usesStandardInactiveWindowPaneStyles" = true;
       "Workspace.usesPaneGlass" = false;
+      "Workspace.showsActivePaneBorder" = true;
+      "Workspace.activePaneBorderColor" = "magenta";
+      "Workspace.activePaneBorderOpacity" = 0.315625;
       "Workspace.interfaceStyle" = "useTheme";
       "Workspace.appearance" = "system";
 
