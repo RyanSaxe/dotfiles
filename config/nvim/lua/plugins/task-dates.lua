@@ -1,8 +1,10 @@
 -- Colors a task's 📅 date by when it's due, as sketchybar's T letter does:
--- overdue, today and tomorrow, or faint once the task is done. A date on
--- any other line stays plain. The colors are ThemeTask* in
--- theme/highlights.lua.
-local task = "^%s*[-*+] %[(.)%]"
+-- overdue, today and tomorrow, or faint once the task is done. A date on a
+-- line a task wraps onto takes that task's color, and a date anywhere else
+-- stays plain. The colors are ThemeTask* in theme/highlights.lua.
+local tasks = require("markdown.tasks")
+
+local DATE = "%d%d%d%d%-%d%d%-%d%d"
 
 ---@param date string YYYY-MM-DD
 ---@return string?
@@ -18,26 +20,62 @@ local function due_group(date)
   end
 end
 
+---@param buf integer
+---@param row integer 1-based
+---@return string line, or "" above the first line or below the last
+local function line_at(buf, row)
+  return row >= 1 and vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
+end
+
+---@param pattern string
+---@return fun(buf: integer): string?
+local function in_markdown(pattern)
+  return function(buf)
+    if vim.bo[buf].filetype == "markdown" then
+      return pattern
+    end
+  end
+end
+
 return {
-  "nvim-mini/mini.hipatterns",
-  opts = function(_, opts)
-    opts.highlighters = opts.highlighters or {}
-    opts.highlighters.task_due = {
-      pattern = function(buf)
-        if vim.bo[buf].filetype == "markdown" then
-          return "📅 %d%d%d%d%-%d%d%-%d%d"
-        end
-      end,
-      group = function(buf, match, data)
-        local line = vim.api.nvim_buf_get_lines(buf, data.line - 1, data.line, false)[1] or ""
-        local mark = line:match(task)
-        if not mark then
-          return nil
-        elseif mark ~= " " then
-          return "ThemeTaskDone"
-        end
-        return due_group(match:sub(-10))
-      end,
-    }
-  end,
+  {
+    "nvim-mini/mini.hipatterns",
+    opts = function(_, opts)
+      opts.highlighters = opts.highlighters or {}
+      opts.highlighters.task_due = {
+        -- Prettier can wrap a line between 📅 and its date.
+        pattern = {
+          in_markdown("📅 " .. DATE),
+          in_markdown("()📅()%s*$"),
+          in_markdown("^%s*()" .. DATE .. "()"),
+        },
+        group = function(buf, match, data)
+          local date = match:match(DATE)
+          if match == "📅" then
+            date = line_at(buf, data.line + 1):match("^%s*(" .. DATE .. ")")
+          elseif not match:find("📅") and not line_at(buf, data.line - 1):find("📅%s*$") then
+            date = nil
+          end
+          local first, mark = tasks.find(buf, data.line)
+          if not (date and first) then
+            return nil
+          elseif mark ~= " " then
+            return "ThemeTaskDone"
+          end
+          return due_group(date)
+        end,
+      }
+      -- mini.hipatterns redraws only the lines that change, and a wrapped
+      -- date's color comes from the task's first line, so a change in
+      -- Normal mode or the end of an Insert redraws the lines in view.
+      vim.api.nvim_create_autocmd({ "TextChanged", "InsertLeave" }, {
+        group = vim.api.nvim_create_augroup("task_dates", { clear = true }),
+        callback = function(event)
+          if vim.bo[event.buf].filetype == "markdown" then
+            pcall(MiniHipatterns.update, event.buf, vim.fn.line("w0"), vim.fn.line("w$"))
+          end
+        end,
+      })
+    end,
+  },
 }
