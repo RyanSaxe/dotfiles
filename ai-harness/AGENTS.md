@@ -72,8 +72,7 @@ Build the change in small slices, and check each one through the interface
 people use. Then try the finished work as its users would, fix what that
 finds, and shape it into commits a reviewer can follow.
 Raise the pull request, as a draft or ready, and follow its checks until they
-pass, going back to fix whatever fails. Leave finished work committed when
-you hand it back.
+pass, going back to fix whatever fails.
 
 Scale the checking to the change, but always use the change as its users
 would. A small change that's easy to undo needs its tests, the project's
