@@ -47,6 +47,8 @@ let
   # Each is registered from the profile, whose path stays the same when
   # pair updates, in place of the store path `pair start` prints.
   pairAdapters = "${config.home.profileDirectory}/lib/pair/adapters";
+  opencodePlugin =
+    if lib.versionAtLeast pkgs.opencode.version "2" then "opencode" else "opencode/plugin.js";
   pairPlugins = pkgs.writeShellScript "pair-plugins" ''
     set -eu
     jq=${pkgs.jq}/bin/jq
@@ -71,12 +73,12 @@ let
       if [ -e "$dir/$name" ]; then opencode="$dir/$name"; fi
     done
     [ -s "$opencode" ] || echo '{}' > "$opencode"
-    # opencode 2 loads pair's plugin folder. plugin.js in it is opencode 1's
-    # plugin, which opencode 2 doesn't load, so drop a listing of it.
-    "$jq" '.plugin = [(.plugin // [])[] | select(type != "string" or (endswith("/lib/pair/adapters/opencode/plugin.js") | not))]' \
+    # opencode 2 loads pair's plugin folder, and opencode 1 the plugin.js in
+    # it. List the one the installed opencode loads, and drop the other.
+    "$jq" '.plugin = [(.plugin // [])[] | select(type != "string" or ((endswith("/lib/pair/adapters/opencode") or endswith("/lib/pair/adapters/opencode/plugin.js")) | not))]' \
       "$opencode" > "$opencode.new"
     mv "$opencode.new" "$opencode"
-    register "$opencode" plugin "${pairAdapters}/opencode"
+    register "$opencode" plugin "${pairAdapters}/${opencodePlugin}"
   '';
 
   pushover = name: "${cfg.repo}/ai-harness/tools/notify-pushover.zsh '${name}'";
