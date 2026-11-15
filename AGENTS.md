@@ -27,9 +27,7 @@ How a change takes effect depends on the file:
   affect every config, so a Mac needs `home-switch` and `mac-switch`.
 
 `theme light` and `theme dark` switch macOS and every app between light and
-dark without a rebuild. ws keeps its mascot in
-`~/.local/state/ws/mascot.json`, outside this repository, and rewrites that
-file itself.
+dark without a rebuild.
 
 To color a new app, add a file to `theme/apps` that maps the meanings in
 `theme/meanings.nix`, such as `t.muted` or `t.code.function`, to the files
