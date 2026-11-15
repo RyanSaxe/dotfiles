@@ -56,11 +56,11 @@ into one value, or split the function.
 
 ## State machines
 
-Some code waits in one of several states between calls, and something
-outside it decides when it moves on. A background job is one. A worker
-starts it, it runs for a while, it ends done or failed, and a caller can ask
-for its result at any point. Give each state its own type, with only the
-fields that exist in that state, and change the state in one place:
+A state machine is a value that moves between states over time and has
+different data in each. A background job is one. While it runs it has a
+start time, once it's done it has a report, and if it fails it has an error.
+Give each state its own type with only that state's fields, and let one
+piece of code move the job from state to state:
 
 ```python
 @dataclass(frozen=True)
