@@ -18,7 +18,7 @@ let
   pair = pkgs.callPackage ../../pkgs/pair { src = inputs.pair; };
 
   personal = lib.elem "personal" cfg.roles;
-  inherit (pkgs.stdenv.hostPlatform) isLinux;
+  inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
   # Where the agents' commands are, which the switch's own PATH leaves out.
   agentPath =
     if isLinux then "${config.home.path}/bin" else "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
@@ -116,17 +116,24 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     )
   );
 
-  # Codex reads its managed hooks from /etc/codex, which Home Manager can't
-  # write. A Linux computer links that folder to these files once:
-  #   sudo ln -sfn ~/.config/codex/managed /etc/codex
-  xdg.configFile = lib.mkIf isLinux (
-    lib.mapAttrs' (
-      name: source:
-      lib.nameValuePair "codex/managed/${name}" {
-        source = if builtins.isPath source then source else config.lib.file.mkOutOfStoreSymlink source;
-      }
-    ) (import ../codex-managed.nix cfg.repo)
-  );
+  xdg.configFile = lib.mkMerge [
+    # Codex reads its managed hooks from /etc/codex, which Home Manager can't
+    # write. A Linux computer links that folder to these files once:
+    #   sudo ln -sfn ~/.config/codex/managed /etc/codex
+    (lib.mkIf isLinux (
+      lib.mapAttrs' (
+        name: source:
+        lib.nameValuePair "codex/managed/${name}" {
+          source = if builtins.isPath source then source else config.lib.file.mkOutOfStoreSymlink source;
+        }
+      ) (import ../codex-managed.nix cfg.repo)
+    ))
+    # pair's Start agent and `pair spawn` run this script to open a new
+    # agent in Rex, tmux or Terminal.
+    (lib.mkIf (lib.elem "gui" cfg.roles && isDarwin) {
+      "pair/spawn".source = link "config/pair/spawn";
+    })
+  ];
 
   programs.claude-code = {
     enable = true;
