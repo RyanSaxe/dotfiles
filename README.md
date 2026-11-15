@@ -5,7 +5,7 @@ from macOS's settings to my editor.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/screen-dark.png">
-  <img alt="The Mac's screen: sketchybar across the top, and Rex below it with a Python file and docs/layout.md open in Neovim, the second with its diagram drawn as a picture." src="assets/screen-light.png">
+  <img alt="The Mac's screen: sketchybar across the top, and Rex below it with a Python file and docs/layout.md open in Neovim, the second with its diagram drawn as a picture and its pane outlined as the focused one." src="assets/screen-light.png">
 </picture>
 
 ## How it works
@@ -59,7 +59,7 @@ In Rex or tmux, Alt and a key opens a `ws` popup:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/picker-dark.png">
-  <img alt="The Alt-O picker over Rex, listing sessions, repositories and a bookmarked folder beside the selected session's screen." src="assets/picker-light.png">
+  <img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on those that have a running session and a bookmarked folder last, beside the selected repository's git status." src="assets/picker-light.png">
 </picture>
 
 <picture>
