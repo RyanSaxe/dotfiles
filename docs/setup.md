@@ -42,7 +42,8 @@ file expects it. These steps set up the two computers `flake.nix` lists,
    old `~/.zshrc`, to `NAME.pre-nix`.
 
 Rex, Tailscale and Google Chrome are still installed by hand, as
-[LATER.md](../LATER.md) says.
+[LATER.md](../LATER.md) says. [By hand](manual.md) lists what to do once
+after the switches: Chrome's theme and the agents' sign-ins.
 
 ## A Linux box
 

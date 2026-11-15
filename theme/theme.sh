@@ -37,6 +37,18 @@ if [[ ! -d "$dir/$mode" ]]; then
   exit 1
 fi
 
+# `theme light` changes macOS's appearance, and sketchybar runs `theme`
+# again on that change. The lock makes the second run wait, so it reads the
+# mode the first one wrote and doesn't restart Chrome a second time. After
+# five seconds a run goes ahead, so a lock left by a killed run can't block.
+lock="$dir/.lock"
+for _ in {1..50}; do
+  if mkdir "$lock" 2>/dev/null; then break; fi
+  sleep 0.1
+done
+trap 'rmdir "$lock" 2>/dev/null || true' EXIT
+previous=$(cat "$dir/mode" 2>/dev/null || true)
+
 # Each link is swapped in whole, so an app never reads a half-moved file.
 for file in "$dir/$mode"/*; do
   name=${file##*/}
@@ -48,8 +60,25 @@ mv -f "$dir/.mode.new" "$dir/mode"
 
 # Chrome builds its theme into this file once and reuses it at each launch,
 # so removing it makes Chrome's next launch build the current mode's. A
-# running Chrome keeps its colors until then.
+# running Chrome keeps its colors until then, so when the mode changes,
+# Chrome quits and opens again. It reopens its windows only with "Continue
+# where you left off" on, which docs/manual.md says to set.
 rm -f "$dir/chrome/Cached Theme.pak"
+if [[ $OSTYPE == darwin* && -n $previous && $mode != "$previous" ]] &&
+  /usr/bin/pgrep -xq "Google Chrome"; then
+  # AppKit asks Chrome to quit as Cmd-Q would, with no permission to
+  # control another app.
+  /usr/bin/osascript -l JavaScript >/dev/null <<'JS'
+ObjC.import("AppKit");
+const apps = $.NSRunningApplication.runningApplicationsWithBundleIdentifier("com.google.Chrome");
+for (let i = 0; i < apps.count; i++) apps.objectAtIndex(i).terminate;
+JS
+  for _ in {1..100}; do
+    if ! /usr/bin/pgrep -xq "Google Chrome"; then break; fi
+    sleep 0.1
+  done
+  /usr/bin/open -g -b com.google.Chrome
+fi
 
 # A personal Mac with a screen has a desktop picture for each mode. AppKit
 # sets it on every screen, which needs no permission to control another app.

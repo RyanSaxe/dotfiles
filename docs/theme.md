@@ -54,7 +54,8 @@ An app that keeps its colors in memory also needs a reload line in
 
 ## Chrome
 
-Chrome's theme is an extension in `~/.config/theme/chrome`. Load it once on
-each computer: in `chrome://extensions`, turn on Developer mode, click Load
-unpacked and choose that folder. Chrome builds its theme only when it
-starts, so it changes mode at its next launch.
+Chrome's theme is an extension in `~/.config/theme/chrome`, which each
+computer loads once, as [By hand](manual.md#chrome-on-a-mac) says. Its
+frame and tabs are the chrome color and its toolbar the background, like
+sketchybar and Neovim. Chrome builds a theme only when it starts, so when
+the mode changes `theme` quits Chrome and opens it again.

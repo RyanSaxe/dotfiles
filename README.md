@@ -97,9 +97,10 @@ app, press Cmd-Alt and the letter to act on it:
 | Page                               | Contents                                                    |
 | ---------------------------------- | ----------------------------------------------------------- |
 | [Setup](docs/setup.md)             | Setting up a new Mac or Linux machine                       |
+| [By hand](docs/manual.md)          | What each computer needs once after setup                   |
 | [Layout](docs/layout.md)           | Hosts, roles, modules and where each file is                |
 | [ws](docs/ws.md)                   | ws's commands, layouts and popups, and the state it saves   |
 | [Theme](docs/theme.md)             | Light and dark, and coloring another app                    |
 | [AGENTS.md](AGENTS.md)             | Which rebuild each change needs, the checks and the rules   |
 | [AI harness](ai-harness/README.md) | The agents' instructions, skills, settings and phone alerts |
-| [LATER.md](LATER.md)               | What is still set up by hand                                |
+| [LATER.md](LATER.md)               | What the setup doesn't do yet                               |
