@@ -80,7 +80,8 @@ class Job:
     def fail(self, error: str) -> None: ...
 ```
 
-Most code isn't a state machine at all. Steps that always run in the same order are a function. Use a functional style, with pure functions for the
+Most code isn't a state machine at all. Steps that always run in the same
+order are a function. Use a functional style, with pure functions for the
 logic, side effects at the edges, and dependencies passed in as arguments
 (dependency injection). Instead of this:
 
