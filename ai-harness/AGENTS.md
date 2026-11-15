@@ -37,9 +37,9 @@ to every change:
   Give the real function the defaults it needs, and call it.
 - Fail clearly when an input, dependency or setting is missing. Don't add a
   fallback that hides a broken setup.
-- Make a state machine explicit when one exists, with one type per state
-  and one owner, not flags spread across components. A sequence of calls is
-  a function, not a state machine.
+- Make a state machine explicit when one exists, with one owner that
+  changes its state through named methods, not flags set across components.
+  A sequence of calls is a function, not a state machine.
 
 ## Testing and checking
 

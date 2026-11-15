@@ -56,38 +56,31 @@ into one value, or split the function.
 
 ## State machines and functions
 
-Don't write implicit state machines, where a status field decides which
-other fields are set. When a value really has states, give each state its
-own type. Instead of this:
+Don't write implicit state machines, where it's unclear what can change
+what. When something has states, one owner changes them through named
+methods, and other code calls those methods instead of setting fields
+itself. The object can have as many fields as it needs. Instead of this:
 
 ```python
-@dataclass
-class Job:
-    status: str  # "running", "done" or "failed"
-    report: Report | None = None
-    error: str | None = None
+job.started = True                         # set by the worker
+job.finished = True                        # set by a callback
+if job.started and not job.finished: ...   # checked by the API
 ```
 
 write this:
 
 ```python
-@dataclass(frozen=True)
-class Running:
-    started_at: datetime
+class Job:
+    status: Status  # QUEUED, RUNNING, DONE or FAILED
+    report: Report | None
+    error: str | None
 
-@dataclass(frozen=True)
-class Done:
-    report: Report
-
-@dataclass(frozen=True)
-class Failed:
-    error: str
-
-type Job = Running | Done | Failed
+    def start(self) -> None: ...
+    def finish(self, report: Report) -> None: ...
+    def fail(self, error: str) -> None: ...
 ```
 
-Steps that always run in the same order aren't a state machine, so write
-them as a function. Use a functional style, with pure functions for the
+Most code isn't a state machine at all. Steps that always run in the same order are a function. Use a functional style, with pure functions for the
 logic, side effects at the edges, and dependencies passed in as arguments
 (dependency injection). Instead of this:
 
