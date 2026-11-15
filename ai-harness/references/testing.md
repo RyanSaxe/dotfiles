@@ -36,9 +36,10 @@ def test_import_saves_valid_orders_and_reports_the_rest():
     assert report.rejected == ["B2"]
 ```
 
-Use the real dependency when it's practical. When it isn't, pass in a fake
-that behaves like the real one, as `InMemoryDatabase` stores orders and
-returns them. Don't assert an exact value unless that value is the contract.
+Use the real dependency wherever you can. Substitute only what a test can't
+run, like a network service, and substitute a fake, a small working version
+like `InMemoryDatabase`, rather than a mock that records calls. Don't assert
+an exact value unless that value is the contract.
 
 ## Choose the cases
 
