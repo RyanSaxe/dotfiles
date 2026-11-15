@@ -203,9 +203,9 @@ local function people()
   Snacks.picker.files({ title = "People", cwd = vault, cmd = "fd", ignored = true, ft = "md", args = search })
 end
 
-return {
+local notes = {
   "obsidian-nvim/obsidian.nvim",
-  -- A computer without the vault gets no notes keys instead of an error.
+  -- A computer without the vault gets none of the vault's keys instead of an error.
   cond = vim.fn.isdirectory(vault) == 1,
   -- Loaded at startup, so :Obsidian works before any note is open.
   lazy = false,
@@ -228,7 +228,6 @@ return {
     footer = { format = "{{backlinks}} backlinks" },
   },
   keys = {
-    { "<leader>o", group = "Notes" },
     { "<leader>od", obsidian("today"), desc = "Today's note" },
     { "<leader>oy", obsidian("yesterday"), desc = "Yesterday's note" },
     { "<leader>oD", obsidian("tomorrow"), desc = "Tomorrow's note" },
@@ -250,20 +249,33 @@ return {
     },
     { "<leader>op", people, desc = "People" },
     { "<leader>ob", obsidian("backlinks"), desc = "Backlinks" },
-    -- These two work on a task in any Markdown file, outside the vault too.
-    {
-      "<leader>ox",
-      function()
-        require("markdown.tasks").toggle()
-      end,
-      desc = "Tick or untick a task",
-    },
-    {
-      "<leader>ou",
-      function()
-        require("markdown.tasks").pick_due()
-      end,
-      desc = "Set or clear a task's due date",
+  },
+}
+
+return {
+  notes,
+  -- The Notes group and its two task keys are on every computer, with the
+  -- vault or without it, since they work on a task in any Markdown file.
+  {
+    "folke/which-key.nvim",
+    opts = {
+      spec = {
+        { "<leader>o", group = "Notes" },
+        {
+          "<leader>ox",
+          function()
+            require("markdown.tasks").toggle()
+          end,
+          desc = "Tick or untick a task",
+        },
+        {
+          "<leader>ou",
+          function()
+            require("markdown.tasks").pick_due()
+          end,
+          desc = "Set or clear a task's due date",
+        },
+      },
     },
   },
 }
