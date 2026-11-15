@@ -6,7 +6,7 @@ edit here applies at their next session.
 | Skill                             | Description                                                  |
 | --------------------------------- | ------------------------------------------------------------ |
 | [`worktrees`](worktrees/SKILL.md) | Start, watch, message and remove worktree agents with `ws`.  |
-| [`wiki`](wiki/SKILL.md)           | Write and tidy the wiki, the pages agents keep in the vault. |
+| [`wiki`](wiki/SKILL.md)           | Decide what agents learn is worth a page, and write it.      |
 
 Most other skills come from a private catalog, which installs them into
 `~/.agents/skills`. Each home switch runs pair's

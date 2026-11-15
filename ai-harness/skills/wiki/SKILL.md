@@ -1,65 +1,80 @@
 ---
 name: wiki
-description: Keep the user's wiki, the Markdown pages in their vault that agents write and the user reads. Use when you find something worth reusing in later work, such as how a tool behaves, a researched comparison or a decision and its reasons, and when the user asks you to record, find or tidy something in the wiki.
+description: Use whenever you learn something during the work, about a field, a tool or why something was chosen, and whenever the user mentions the wiki. Decides whether it deserves a page, then writes it.
 ---
 
 # Wiki
 
-The wiki is a folder of linked Markdown pages in `~/generic/vault/wiki/`.
-Agents write it and the user reads it. Write only inside a wiki folder. Read
-the user's own notes in `notes/` when they help, but never change them. Never
-run git in the vault. The user commits and pushes it.
+The wiki is where agents write down what they learn, so the user can read
+it and later sessions can start from it.
 
-## Which wiki
+It lives in `$VAULT_DIR/wiki/`, a folder of linked Markdown pages. The
+user's own notes are in `$VAULT_DIR/notes/`, and on a computer with a
+private space also in `$VAULT_DIR/private/notes/`. Read them when they help,
+and never change them.
 
-A computer may also have a private wiki in `~/generic/vault/private/wiki/`,
-which is never pushed anywhere. On such a computer, put a page in the shared
-wiki only when every fact on it comes from a public source you cite, such as
-a project's documentation or a public repository. Put everything else in the
-private wiki. On a computer without a private wiki, use the shared one.
+## Decide whether it deserves a page
 
-## What goes in
+Most of what you learn in a session doesn't. Write a page when what you
+learned will still be true after this task, and someone working in this
+area later would want to know it. Good pages explain something:
 
-Write a page when you find something another session could reuse:
-how a tool or library behaves, a comparison you researched, or a decision
-and its reasons. Leave out:
+- what an experiment showed and why, such as which reward shaping made a
+  reinforcement learning agent exploit the game instead of learning it
+- how a tool really behaves where its docs are silent or wrong, with the
+  version you checked
+- a comparison you researched, and what decided it
+- a decision and the reasons that would change it
 
-- session logs, plans and task status, which go in the repository's
-  `agent-notes/` folder;
-- facts about one repository, which go in that repository's docs, linked
-  from the wiki;
-- credentials, other people's personal details and quotes from a
-  conversation.
+Leave out what belongs elsewhere: lists of commands or projects, session
+logs and task status, which go in the repository's `agent-notes/`, facts
+about one repository, which go in its docs, and anything about how to work
+with the user, which is memory. Never write credentials, other people's
+personal details or quotes from a conversation.
 
-## Find the page first
+## Write the page
 
-Read `index.md`, then search the wiki for the topic. When the wiki already
-has a page on it, update that page instead of starting another one.
+Read `index.md` and search the wiki for the topic first. When a page
+already covers it, improve that page instead of starting another. When a
+page is wrong, rewrite it rather than adding an update section.
 
-## Pages
+- Give each page one topic and a file name that's unique in the wiki and
+  makes sense alone, such as `ppo-reward-hacking.md`, because a link is the
+  file name without its folder. Put it in a folder for its subject, such as
+  `ml/rl/` or `tools/rex/`, so the next project in that field finds it.
+  Use a project folder, such as `projects/jace/`, only for what is about
+  that one project, such as which experiments it ran and what they showed.
+- Start with front matter that has `updated: YYYY-MM-DD` and `sources:`, a
+  list of the links you used. Then give the page a title that states the
+  answer, and answer its question in a sentence or two before the detail.
+- Link another page as `[[name]]` where you first mention it. When you
+  rename a page, change every link to it in the same edit.
+- Add or change its line in `index.md`, grouped by folder: the link and the
+  question the page answers. Add a line to the top of `log.md`: the date,
+  the link and what changed.
 
-- Give each page one topic and a file name that is unique in the wiki and
-  makes sense alone, such as `rex-hosts.md`, because a link is the file name
-  without its folder.
-- Put each page in a folder for its topic, nested as deep as you like, such
-  as `tools/rex/`. Move pages into a better folder whenever you see one. A
-  move doesn't break links.
-- When you rename a page, change every `[[old-name]]` in the wiki to
-  `[[new-name]]` in the same edit.
-- After you add, move or rename pages, run `~/generic/vault/bin/check.py`. It
-  reports two pages with the same name and links that find no page.
-- Start a page with two lines, `updated: YYYY-MM-DD` and `sources:` with
-  the links you used, then the answer to the page's question in a sentence
-  or two. Name the version you checked a tool against.
-- Link another page as `[[name]]` where you first mention it.
-- Never link from the shared wiki into the private one, because the link
-  would push the private page's name.
-- When a page is wrong, rewrite it. Don't add an "Update" section.
+## Commit it
 
-## index.md and log.md
+Run `prettier --write` on each page you changed. The vault's
+`.prettierrc.json` wraps prose at 80 columns, as Neovim does when the user
+saves a page, and the vault's check refuses a page that isn't formatted or
+isn't linked from `index.md`. Then commit and push only the wiki paths you changed, never
+the user's notes:
 
-In `index.md`, write one line per page, grouped by folder: the link and the
-question the page answers. Change it whenever you add, move or rename a page.
+```sh
+git -C "$VAULT_DIR" add wiki/ml/rl/ppo-reward-hacking.md wiki/index.md wiki/log.md
+git -C "$VAULT_DIR" commit -m "Explain why PPO exploited the reward"
+git -C "$VAULT_DIR" push
+```
 
-In `log.md`, add one line per change, newest first: the date, the link and
-what changed.
+The commit hook runs `bin/check.py`, which refuses two pages with the same
+name and links that find no page. Fix what it reports and commit again.
+
+## The private wiki
+
+A computer may also have `$VAULT_DIR/private/wiki/`, which has its own git
+repository and is never pushed. On such a computer, put a page in the shared
+wiki only when every fact on it comes from a public source you cite, and
+everything else in the private one. Commit private pages there, without
+pushing. Never link from the shared wiki into the private one, because the
+link would publish the private page's name.
