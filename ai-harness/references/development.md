@@ -54,13 +54,21 @@ send(report, recipients)
 When a call still needs many arguments, group the ones that belong together
 into one value, or split the function.
 
-## State machines
+## State machines and functions
 
-A state machine is a value that moves between states over time and has
-different data in each. A background job is one. While it runs it has a
-start time, once it's done it has a report, and if it fails it has an error.
-Give each state its own type with only that state's fields, and let one
-piece of code move the job from state to state:
+Don't write implicit state machines, where a status field decides which
+other fields are set. When a value really has states, give each state its
+own type. Instead of this:
+
+```python
+@dataclass
+class Job:
+    status: str  # "running", "done" or "failed"
+    report: Report | None = None
+    error: str | None = None
+```
+
+write this:
 
 ```python
 @dataclass(frozen=True)
@@ -78,73 +86,30 @@ class Failed:
 type Job = Running | Done | Failed
 ```
 
-A caller has to match `Done` before it can read `report`, so it can't read a
-report that doesn't exist yet. Don't write the implicit version, a `status`
-string beside `report` and `error` fields that are sometimes `None`, with
-every caller checking `status` first.
-
-Steps that always run in the same order aren't a state machine. Nothing
-outside waits between them or asks which one is running, so they belong in
-one function. Written as a state machine, an import that fetches, parses,
-validates and saves needs a type for each step and a `step` function that
-moves between them:
+Steps that always run in the same order aren't a state machine, so write
+them as a function. Use a functional style, with pure functions for the
+logic, side effects at the edges, and dependencies passed in as arguments
+(dependency injection). Instead of this:
 
 ```python
-@dataclass(frozen=True)
-class Fetching:
-    since: datetime
-
-@dataclass(frozen=True)
-class Parsing:
-    since: datetime
-    rows: tuple[Row, ...]
-
-# ...Validating and Saving, each repeating the fields before it
-
-def step(state: Fetching | Parsing | Validating | Saving, *, api, db): ...
+def step(state: Fetching | Parsing | Saving, *, api, db) -> Fetching | Parsing | Saving | Done: ...
 ```
 
-As a function, it's shorter and reads in order:
+write this:
 
 ```python
 def import_orders(since: datetime, *, api: OrdersApi, db: Database) -> ImportReport:
-    rows = api.fetch(since)
-    orders = [parse_order(row) for row in rows]
+    orders = [parse_order(row) for row in api.fetch(since)]
     valid, rejected = validate(orders)
     db.save(valid)
     return ImportReport(saved=len(valid), rejected=rejected)
 ```
 
-## Pass dependencies in
-
-Give a function what it depends on as arguments, as `import_orders` gets its
-API client and database. Don't reach for a global, a module-level client or
-an object the function builds itself. The caller then decides what the
-function runs against, and a test can pass a small fake instead of patching
-internals.
-
-Ask for the smallest thing the function uses. A function that calls only
-one thing takes a callable, like `fetch: Callable[[datetime], list[Row]]`.
-A function that calls several methods of one object takes a protocol that
-lists those methods, defined in the module that uses it. Reach for a plain
-value or function before a class, and a class before a framework.
-
-## Write code that's easy to test
-
-Keep decisions apart from input and output. `validate` takes orders and
-returns the valid ones and the rejected ones, so its test calls it with a
-list and checks what comes back. `import_orders` does the fetching and
-saving around it, and its test passes fakes for those. Code that makes its
-decisions in the middle of reading files or calling services can only be
-tested by mocking each call, and those tests break whenever the code
-changes.
-
-Keep modules out of each other's internals. When a change to one module
-forces edits in another that has nothing to do with it, the two are
-coupled. Put what they share behind a small interface, or copy the little
-they share. A test that needs a long setup or many mocks usually means the
-code's boundaries are in the wrong place, so fix the code rather than the
-test. `testing.md` covers the tests themselves.
+A test passes a fake API and an in-memory database, and tests `validate` on
+its own with plain values. Ask for the smallest dependency that works, a
+callable when the function needs one operation and a protocol when it needs
+several methods. When a test needs a long setup or many mocks, the code is
+too coupled, so fix its boundaries rather than the test.
 
 ## Keep boundaries honest
 
