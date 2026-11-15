@@ -37,8 +37,8 @@ rules apply to every change:
 - Fail clearly when an input, dependency or setting is missing. Don't add a
   fallback that hides a broken setup.
 - Avoid implicit state machines, where it's unclear what can change what.
-  When something has states, make clear which component owns them and their
-  valid transitions. A sequence of calls is a function, not a state machine.
+  When something has states, one component owns them and their valid
+  transitions, consistent with the domain model.
 
 ## Testing and checking
 
@@ -106,9 +106,9 @@ message, and `pair agents` lists the sessions that are running.
 included. Read its AGENTS.md before you install a tool or change a setting.
 A general-purpose tool goes in through Nix there, not a global `brew`, `pip`
 or `npm` install, so every computer gets the same one. The dotfiles are
-public, so a tool that only one project needs, or one that is internal to a
-company, is installed in that project's own environment, not in the
-dotfiles. Ask when you can't tell.
+public, so private and internal tools never go in them. Install a tool that
+only one project needs in that project's own environment. Ask when you can't
+tell.
 
 ## The wiki
 

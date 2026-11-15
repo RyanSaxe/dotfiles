@@ -1,36 +1,39 @@
 # Verification
 
-Passing tests and CI don't show that a change works. Before you call it
-done, use it the way its users would.
+Passing tests are the first check, not the last. Before you call a change
+done, use it where a person will actually meet it, and see it work there.
+Take the shortest path to evidence that convinces you, and stop when you
+have it. Then share that evidence wherever the change is discussed, like a
+pull request's description, because it's what will convince the reader too.
 
-## Use it as its users would
+## Use it through its real interface
 
-Start from what was asked for, not from the files that changed. Use the
-change through the interface its users have, knowing only what they would
-know. Try the normal path first, then the mistakes and interruptions a real
-user would make.
+Run the command, open the page, load the config in the program that reads
+it, or call the library the way another project would. Do it on a throwaway
+instance with its own socket or folder, never on one the user is running.
 
-## Scale it to the change
+## Match the effort to the change
 
-A small change that's easy to undo needs one realistic use. A large, risky
-or user-facing change needs several simulated users with different
-backgrounds and goals. Give each one a fresh context and a brief that says
-who they are and what they want, and leave out what you suspect. They report
-what they did and what they saw, and you judge it.
+A small, familiar change needs one direct confirmation. A normal feature
+needs its intended path and its most important failure. A new, visual or
+stateful change needs realistic use, with repeated actions and the
+transitions that could expose hidden state. Stay with what a real user would
+do, and don't count a failure in a situation nobody would reach as a bug.
+
+## Reproduce a bug before and after
+
+For a bug, make it happen first, through the interface where it showed up.
+After the fix, the same steps should work.
 
 ## Compare with the intended behavior
 
-A surprise isn't a bug until you've reproduced it on the same revision and
-compared it with the intended behavior. Learn what was intended from the
-request, the docs or the user, not from the code, because the code may be
-what's wrong, and behavior that looks wrong may be what someone asked for.
-When the intent isn't clear, ask before you change anything. For a confirmed
-bug, fix the cause and repeat the attempt that found it.
+A surprise isn't a bug until you've reproduced it and compared it with what
+was intended. Learn the intent from the request, the docs or the user, never
+from the code, which may be what's wrong. When the intent isn't clear, ask
+before you change anything.
 
-## Look at the real thing
+## Look at anything visual
 
-Behavior, rendering and keys need the real program. For anything visual,
-take a screenshot and look at it. Check a web page at 390, 768 and 1280
+Take a screenshot and look at it. Check a web page at 390, 768 and 1280
 pixels wide, and record motion as timed screenshots, because a screencast
-drops frames. Use a throwaway instance with its own socket or folder, never
-one the user is running.
+drops frames.

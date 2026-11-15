@@ -37,9 +37,8 @@ why a workaround exists or what outside constraint forced a choice.
 ## State machines
 
 Avoid implicit state machines, where it's unclear what can change what.
-When something really has states, make ownership clear and consistent with
-the domain model: which component owns the state and its valid transitions,
-and which process coordinates changes across boundaries. Instead of this:
+When something has states, one component owns them and their valid
+transitions, consistent with the domain model. Instead of this:
 
 ```python
 post.published = True                 # in the publish handler
@@ -72,10 +71,9 @@ published post.
 
 ## Functional style and dependency injection
 
-Most code isn't a state machine. Steps that always run in the same order are
-a function. Write them in a functional style, with pure functions for the
-logic and side effects at the edges, and pass dependencies in as arguments
-(dependency injection). Instead of this:
+Most code isn't a state machine. Write it in a functional style, with pure
+functions for the logic and side effects at the edges, and pass dependencies
+in as arguments (dependency injection). Instead of this:
 
 ```python
 def step(state: Fetching | Parsing | Saving, *, api, db) -> Fetching | Parsing | Saving | Done: ...
