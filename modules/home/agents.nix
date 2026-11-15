@@ -22,6 +22,15 @@ let
   agentPath =
     if isLinux then "${config.home.path}/bin" else "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
   linkSkills = "${cfg.repo}/ai-harness/tools/link-agent-skills.sh";
+  convertAgents = [
+    "${pkgs.uv}/bin/uv"
+    "run"
+    "--quiet"
+    "--python"
+    "${pkgs.python3}/bin/python3"
+    "--script"
+    "${cfg.repo}/ai-harness/tools/convert-codex-agents.py"
+  ];
 
   skills = {
     worktrees = link "ai-harness/skills/worktrees";
@@ -250,6 +259,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
       run /bin/sh ${linkSkills}
     '';
+    codexAgents = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${lib.escapeShellArgs convertAgents}";
     piTheme = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${piTheme}";
     pairPlugins = lib.hm.dag.entryAfter [ "piTheme" ] "run ${pairPlugins}";
   };
@@ -264,6 +274,17 @@ lib.mkIf (lib.elem "base" cfg.roles) {
         linkSkills
       ];
       WatchPaths = [ "${config.home.homeDirectory}/.agents/skills" ];
+      RunAtLoad = true;
+    };
+  };
+
+  # The catalog installs agents only for Codex. This writes each one for
+  # Claude as it lands.
+  launchd.agents.convert-codex-agents = lib.mkIf (personal && pkgs.stdenv.hostPlatform.isDarwin) {
+    enable = true;
+    config = {
+      ProgramArguments = convertAgents;
+      WatchPaths = [ "${config.home.homeDirectory}/.codex/agents" ];
       RunAtLoad = true;
     };
   };

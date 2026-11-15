@@ -15,9 +15,10 @@ ai-harness/
 ├── references/       what AGENTS.md says to read before writing code,
 │                     tests or checking work
 ├── skills/           Agent Skills: worktrees and wiki
-├── tools/            notify-pushover.zsh, the agents' push hook, and
+├── tools/            notify-pushover.zsh, the agents' push hook,
 │                     link-agent-skills.sh, which shares Codex's skills
-│                     with Claude Code
+│                     with Claude Code, and convert-codex-agents.py,
+│                     which does the same for Codex's agents
 ├── statusline.js     Claude Code's status line
 └── codex/            requirements.toml, Codex's managed hooks
 ```
@@ -45,6 +46,9 @@ Most skills come from a private catalog, which installs them into
 `~/.claude/skills`, so on computers with the `personal` role
 `tools/link-agent-skills.sh` links each skill there. Each home switch runs it
 once, and on a Mac a launchd agent also runs it whenever `~/.agents/skills`
+changes. The catalog's agents land only in `~/.codex/agents`, so
+`tools/convert-codex-agents.py` writes a Claude agent in `~/.claude/agents`
+for each one, at each home switch and, on a Mac, whenever that folder
 changes. Other tools install their own skills: pair's comes from pair's own
 `npx skills add RyanSaxe/pair -g`, which each home switch runs when the
 skill is missing, and byor and Rex install theirs.
