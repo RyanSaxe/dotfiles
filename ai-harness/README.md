@@ -1,8 +1,8 @@
 # AI harness
 
-Global instructions, references, skills and hook scripts for Claude Code and
-Codex. `modules/home/agents.nix` puts them where each agent looks. Most are
-links into this checkout, so an edit applies at the agent's next session.
+Global instructions, skills and hook scripts for Claude Code and Codex.
+`modules/home/agents.nix` puts them where each agent looks. Most are links
+into this checkout, so an edit applies at the agent's next session.
 
 On a Mac, Claude Code comes from its own installer and Codex from the
 Homebrew cask a Mac switch installs, and both update themselves. On Linux,
@@ -12,8 +12,9 @@ computer with the `personal` role.
 ```text
 ai-harness/
 ├── AGENTS.md         global instructions
-├── references/       documentation AGENTS.md links to
-├── skills/           Agent Skills: worktrees, wiki and write-docs
+├── references/       what AGENTS.md says to read before writing code,
+│                     tests or checking work
+├── skills/           Agent Skills: worktrees and wiki
 ├── tools/            notify-pushover.zsh, the agents' push hook, and
 │                     link-agent-skills.sh, which shares Codex's skills
 │                     with Claude Code
@@ -23,18 +24,15 @@ ai-harness/
 
 | Where the agent looks                                      | What's there                                              |
 | ---------------------------------------------------------- | --------------------------------------------------------- |
-| `~/.claude/CLAUDE.md`                                      | Two imports: `AGENTS.md` here and `~/.codex/AGENTS.md`    |
+| `~/.claude/CLAUDE.md`                                      | An import of `AGENTS.md`                                  |
 | `developer_instructions` in `~/.codex/config.toml`         | The text of `AGENTS.md`, copied at each home switch       |
-| `~/.codex/AGENTS.md`                                       | Yours. A switch only creates it, empty, when it's missing |
-| `~/.claude/references`, `~/.codex/references`              | Links to `references/`                                    |
 | `~/.claude/skills/NAME`, `~/.agents/skills/NAME`           | Links to each skill in `skills/`                          |
 | `~/.claude/statusline.js`                                  | A link to `statusline.js`                                 |
 | `/etc/codex/requirements.toml`                             | A copy of `codex/requirements.toml`                       |
 | `/etc/codex/hooks/notify-pushover.zsh`                     | A link to `tools/notify-pushover.zsh`                     |
 
-Claude reads your instructions live through the import. Codex has no import,
-so it gets them at the next `home-switch`, and it reads them together with
-`~/.codex/AGENTS.md`.
+Claude reads the instructions live through the import. Codex has no import,
+so it gets them at the next `home-switch`.
 
 A Mac switch writes `/etc/codex`, where Codex reads its managed hooks. Home
 Manager can't write to `/etc`, so on Linux the home switch puts the same
@@ -42,13 +40,14 @@ files in `~/.config/codex/managed`, and `/etc/codex` is a link to that
 folder, made once by hand. `modules/codex-managed.nix` lists the files for
 both.
 
-Other tools install the rest of the skills. pair's comes from pair's own
+Most skills come from a private catalog, which installs them into
+`~/.agents/skills`, the folder Codex reads. Claude Code reads only
+`~/.claude/skills`, so on computers with the `personal` role
+`tools/link-agent-skills.sh` links each skill there. Each home switch runs it
+once, and on a Mac a launchd agent also runs it whenever `~/.agents/skills`
+changes. Other tools install their own skills: pair's comes from pair's own
 `npx skills add RyanSaxe/pair -g`, which each home switch runs when the
-skill is missing. byor and Rex install their own. Some installers write
-skills only into `~/.agents/skills`, which Claude Code doesn't read, so on
-computers with the `personal` role `tools/link-agent-skills.sh` links each
-one into `~/.claude/skills`. Each home switch runs it once, and on a Mac a
-launchd agent also runs it whenever `~/.agents/skills` changes.
+skill is missing, and byor and Rex install theirs.
 
 Computers with the `personal` role also get pi, opencode and Copilot CLI,
 the other agents pair's hub can wake. All three read pair's skill from

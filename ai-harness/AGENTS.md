@@ -1,216 +1,123 @@
-# How You Operate
+# AGENTS.md
 
-Project-specific requirements are authoritative for work in that project.
-Direct user requests define the scope and intent, subject to those
-requirements. Both take precedence over these global defaults.
+These are the user's standing instructions, and they apply to every task.
+Follow them all, together with any other instructions you're given, such
+as a skill's. An order matters only when two instructions say opposite
+things. Then what the user asks for always comes first, next the AGENTS.md
+closest to the file you're changing, an app's before its repository's,
+then instructions you loaded for the task at hand, and this file last.
 
-<important>
+## Before you start
 
-Read [How to Write and Communicate Clearly](~/generic/dotfiles/ai-harness/references/writing.md) before continuing. Its
-principles govern your voice in conversation as well as plans, explanations,
-documentation, and review artifacts. Revisit it when writing substantial prose
-or when your communication starts to drift.
+- Read the instructions and code that govern the work, enough to choose a
+  sound approach.
+- Check each fact your work depends on at its source before you rely on
+  it.
+- Before you start, ask about any choice that could change correctness,
+  scope, behavior or risk.
+- During a long task, don't stop to ask. Decide, note what you assumed, and
+  keep going. Stop only when going on could do harm that's hard to undo, or
+  when the work can't continue.
+- When the work adds or changes an interface that people or other
+  components use, agree on it with the user before building it. The tests
+  and docs then describe that interface.
 
-</important>
+## Writing code
 
-These principles describe how to operate, not a script to perform. Apply them
-with judgment. Do not create plans, commits, tests, documentation, or evidence
-solely to satisfy the wording. Use the smallest process that produces
-trustworthy, reviewable work.
+Before planning or building a substantial change, read
+`~/generic/dotfiles/ai-harness/references/development.md`. These rules apply
+to every change:
 
-Your job is to turn the driver's intent into a correct, understandable, and
-useful result. Lead with outcomes, decisions, and blockers. Be concise without
-omitting information that changes a decision. Never claim more than the
-available evidence supports.
+- Keep a change to what the task needs. Leave unrelated code, formatting and
+  structure as they are, and don't add abstractions, options or error
+  handling for cases that can't happen.
+- Match the style of the code around it. Make the code explain itself, and
+  write a comment only to say why.
+- Don't write a function that only passes its arguments on to another one.
+  Give the real function the defaults it needs, and call it.
+- Fail clearly when an input, dependency or setting is missing. Don't add a
+  fallback that hides a broken setup.
+- Make a state machine explicit when one exists, with one type per state
+  and one owner, not flags spread across components. A sequence of calls is
+  a function, not a state machine.
 
-## Fundamental principles
+## Testing and checking
 
-### Think Before Acting
+Before writing or changing tests, read
+`~/generic/dotfiles/ai-harness/references/testing.md`. Before checking that
+work is done, read `~/generic/dotfiles/ai-harness/references/verification.md`.
 
-Before editing, understand the requested outcome, applicable requirements,
-existing behavior, and relevant constraints. Read the instructions and source
-material that govern the work. Investigate enough to choose a sound approach,
-then proceed without manufacturing a ceremony around ordinary decisions.
+- Test behavior that matters, through the interface people use. Delete a
+  test you wrote only to drive a tricky piece of code before the work is
+  done.
+- Run the project's own checks, the ones its commit hook and CI run, and fix
+  what your change breaks. Never silence a check to make it pass.
+- Then use the change the way a person would, in the real program. Passing
+  tests don't show that a feature works.
 
-If an important public, user-facing, or cross-component interface is part of
-the work, align with the driver on that interface before implementation. The
-agreed interface should guide the tests and documentation. For ordinary
-internal changes, use the existing contracts and proceed.
+Debug on the smallest run that still shows the problem. Anything slow needs
+a small version that goes through the same code on a little input, so you
+can reproduce a failure, try a fix and see the result in seconds rather than
+hours. Keep that small run working as the code changes, and say when only
+the full run can show that a change works.
 
-When ambiguity could affect correctness, scope, behavior, risk, cost, or user
-intent, stop and ask. When the goal and constraints are clear, use your
-judgment and keep moving.
-
-### Simplicity First
-
-Use the smallest design that solves the current problem well. Prefer existing
-mechanisms and clear local solutions over new layers, speculative flexibility,
-or abstractions for one possible future. Simplicity does not mean ignoring
-important failure cases; it means making each piece of complexity earn its
-place.
-
-### Surgical Changes
-
-Touch what the work requires and leave unrelated code, formatting, and
-structure alone. Match the project's conventions. Remove unused code created
-by your change, but do not turn a focused task into an unrelated cleanup.
-
-Prefer names, types, and structure that make the code explain itself. Comments
-should explain a non-obvious reason, constraint, invariant, or workaround—not
-repeat what the code already says. Project requirements may choose a different
-style; follow the more specific requirement.
-
-### Goal-Driven Execution
-
-Keep the work directed toward the requested outcome. Choose a sensible approach
-and reassess it when it stops producing useful progress. Do not continue
-mechanically just because a plan was written, and do not mistake completed
-steps for a completed result.
-
-Carry the work through implementation, evidence, documentation where it has
-durable value, and a clear handoff. If the requested outcome cannot be reached,
-explain the actual blocker and the smallest useful next choices.
-
-### Act with Certainty
-
-AI can produce plausible but false answers. Do not treat a guess, an unverified
-assumption, or a failed search as a fact. Check the relevant source of truth.
-Distinguish “not found” from “does not exist,” and say what remains unknown when
-the evidence is incomplete.
-
-Raise the evidence threshold with the consequence of being wrong. Investigate,
-reproduce, or use the real interface until you have enough confidence to act.
-When certainty remains insufficient, take a bounded reversible step or explain
-the uncertainty instead of pretending it is resolved.
-
-### Shared Artifacts
-
-Commits, pull requests, issues, code comments and docs are read by people who
-were not part of the conversation, and many of them are public. Write each one
-from what its repository shows. Mention a tool, project, person, path or fact
-from anywhere else, such as the conversation, your instructions, another
-repository, this machine or a tool configured privately for the repository,
-only when the repository already shows it or the driver asks for it. This holds
-for public tools too. When the reason for a change depends on that context,
-describe what the change does instead, or ask.
-
-## Feature Development
-
-Feature work is a loop rather than a ceremony. Verification can send the work
-back into implementation; documentation describes the verified result.
+## From task to pull request
 
 ```text
-understand → isolate → plan → implement → test → verify
-                                      ↑         │
-                                      └─ fix ───┘
-                              verify → document → hand off
+task ─▶ build ─▶ clean up ─▶ pull request ─▶ checks pass ─▶ hand back
+          ▲          │              │
+          └── fix ◀──┴──────────────┘
 ```
 
-### Isolate the Work
+Build the change in small slices, and check each one through the interface
+people use. Then try the finished work as its users would, fix what that
+finds, and shape it into commits a reviewer can follow.
+Raise the pull request, as a draft or ready, and follow its checks until they
+pass, going back to fix whatever fails. Leave finished work committed when
+you hand it back.
 
-Use `ws` for feature development that can be isolated in a worktree, as the
-worktrees skill describes. Create or resume the worktree before editing. Do
-not create a nested worktree when the task is already in one. Read-only
-investigation and genuinely trivial changes do not require a new worktree.
+Work in a separate worktree when the change runs alongside other work in the
+same repository, or when the user asks for one, and make it with `ws`, as the
+worktrees skill describes. Otherwise work in the checkout you're in.
 
-This computer's tools and settings live in `~/generic/dotfiles`. Read its
-`AGENTS.md` before installing a tool or changing a setting.
+## Commits, pull requests and docs
 
-### Development Practices
+People who weren't part of the work read these, often in public. Describe
+the change from what's in the repository, and leave out anything a reader
+can't find there, this conversation included. Mention something from outside
+the repository only when the repository already does or the user asks.
 
-Prefer clear interfaces, readable control flow, low coupling, and maintainable
-designs. Avoid premature optimization, speculative generalization, and
-complexity that does not serve the current requirement. Fail clearly when a
-required input, dependency, or assumption is missing. Use the project's
-conventions and toolchain as part of the design.
+Make each commit one coherent step of the change. Keep every doc, example
+and comment that your change affects accurate, and never leave stale
+guidance behind.
 
-<important>
+Plans, notes and scratch files go in `agent-notes/` at the repository root.
+The global git ignore keeps that folder out of every repository.
 
-Read [Development Practices](~/generic/dotfiles/ai-harness/references/development.md) before planning or
-implementing substantial feature work, and revisit it when the design changes.
+## Other agents
 
-</important>
+To start an agent in another terminal and work with it, run
+`pair spawn CLI --prompt "…"`, which prints the name to message it by.
+`pair message --to NAME --text "…"` sends it a message, and `pair agents`
+lists the sessions that are running.
 
-### Testing
+## This computer
 
-Tests protect behavior that matters. Choose the boundary and cases that give
-useful confidence without freezing implementation details. Testing is part of
-design and development, not a ritual performed only after coding.
+`~/generic/dotfiles` sets up this computer with Nix, these instructions
+included. Read its AGENTS.md before you install a tool or change a setting.
+Install a tool through Nix there, not with a global `brew`, `pip` or `npm`
+install, so every computer gets the same one.
 
-Use the project's normal quality checks as evidence. Fix failures caused by
-the change; do not silence a check simply to make the work pass.
+## The wiki
 
-<important>
+`$VAULT_DIR/wiki` is what earlier sessions learned and wrote down for later
+ones.
 
-Read [Testing](~/generic/dotfiles/ai-harness/references/testing.md) before writing or materially changing
-tests.
-
-</important>
-
-### Verification
-
-Passing tests and CI establish useful facts but do not, by themselves, prove
-that a feature works. Verify through the interface where the user encounters
-the change, with effort proportional to its risk, novelty, and consequence.
-
-Run the project's own checks, the ones its commit gate and CI run, and
-treat them as the authority on whether a change passes; the project's
-instructions say what they are. None of this proves a feature works.
-Behavior, rendering, and keybindings need the real interface, so open the
-program and use the thing you changed.
-
-When a script or test opens a new browser on macOS, launch Chrome for Testing,
-with Playwright's channel "chromium" or from `~/Library/Caches/ms-playwright`,
-not `/Applications/Google Chrome.app` or channel "chrome". Each new Google
-Chrome adds keys to the keychain and reads all of them, and that load can make
-any Chrome's certificate checks fail after 30 seconds. This does not cover a
-tool that drives the Chrome already open, such as Claude in Chrome.
-
-<important>
-
-Read [Verification](~/generic/dotfiles/ai-harness/references/verification.md) before planning or performing
-verification.
-
-</important>
-
-### Documentation
-
-Documentation should be clear, concise, and appropriate to the surface. Not
-every change needs new documentation. Any documentation, example, comment, or
-other durable artifact affected by the work must remain accurate; never leave
-stale or misleading guidance behind. Final documentation should describe the
-verified behavior, even if drafts or notes existed earlier.
-
-<important>
-
-Read [How to Write and Communicate Clearly](~/generic/dotfiles/ai-harness/references/writing.md) before writing or revising
-documentation.
-
-</important>
-
-## Make the Work Reviewable
-
-Git artifacts exist to make review easier, not to record every action taken.
-The history should make the reasoning behind the final work legible to someone
-who was not present while it was built.
-
-Make commits coherent pieces of that reasoning. Split a large change when it
-contains distinct concepts or meaningful review stages; do not split merely
-because several files or commands were involved. Commits may depend on earlier
-commits, and normal history repairs such as amendments or reverts are fine when
-they improve the result. Do not commit scratch work, plans, logs, temporary
-diagnostics, or generated noise unless they are intentional project artifacts.
-Keep them in an `agent-notes/` folder at the repository root, which the
-global git ignore covers in every repository.
-Unless the driver asks for an uncommitted draft, leave intended implementation
-work committed at handoff.
-
-Make pull requests, handoffs, and other review artifacts easy to inspect. Give
-the reader enough context to understand what changed and why, then choose the
-form that best fits the work rather than filling out a fixed template.
-
-When direct evidence would make review substantially easier, expose it in an
-inspectable form: a screenshot, recording, rendered page, HTML artifact, plot,
-saved output, or another appropriate artifact. Keep disposable evidence out of
-the repository, but make useful evidence available and point the reviewer to
-it.
+- Before you work in an area, read `$VAULT_DIR/wiki/index.md` for pages on
+  it. When something surprises you, search the wiki first with
+  `rg -i 'WORDS' "$VAULT_DIR/wiki"`. A page may already explain it.
+- When you learn something worth knowing again, write it there, as the wiki
+  skill describes.
+- Your harness's own memory tool is for how to work with the user, and it
+  stays with one agent on one computer. The wiki is for what's true about the
+  world, and the user and every agent read it.

@@ -1,45 +1,46 @@
 # Verification
 
-Verification answers one question: what evidence shows that the change works
-where a person will actually encounter it?
+Passing tests and CI don't show that a change works. Before you call it
+done, use it the way the people who rely on it would, and see that it does
+what they need.
 
-Automated checks establish useful facts, but a passing test suite is not the
-same as a working feature. Verify through the public interface whenever
-practical: run the command, use the UI, load the configuration with its real
-consumer, or call the library as a downstream user would. Whatever it is, you
-can test it as if you were a user.
+## Use it the way its users would
+
+Start from what the user asked for, not from the files that changed. Think
+about who will meet the change, and try what each of them would try, through
+the same interface and with only what they would know. Different people find
+different problems.
+
+Cover the ordinary path first, then the mistakes and interruptions a real
+user would make. For a large or risky change, give the attempts to fresh
+agents. Brief each one on who they are and what they want, and leave out
+what you suspect. They report what they did and what they saw, and you judge
+it.
+
+## Compare with the intended behavior
+
+A surprise isn't a bug until you've reproduced it on the same revision and
+compared it with the intended behavior. Learn what was intended from the
+request, the docs or the user, not from the code, because the code may be
+what's wrong, and behavior that looks wrong may be what someone asked for.
+When the intent isn't clear, ask before you change anything.
+
+Keep defects apart from friction and from problems with the environment.
+For a confirmed bug, fix the cause, add the regression test `testing.md`
+describes, and repeat the attempt that found it.
 
 ## Match the effort to the change
 
-Choose the depth from the change's risk, novelty, uncertainty, and consequence.
+A wording change needs one look where it renders. A normal feature needs its
+main path and its most important failure. A new, visual or stateful change
+needs realistic use from several angles.
 
-- A small, familiar change may need one direct confirmation on the driver's
-  machine.
-- A normal feature should exercise the intended path and the most important
-  failure or boundary.
-- A new, visual, stateful, or high-risk feature deserves realistic exploratory
-  use. Try alternate paths, repeat actions, and transitions that could expose
-  hidden state.
+## Look at the real thing
 
-Do not follow a fixed checklist when it produces weak evidence. Prefer the
-shortest path to convincing evidence.
-
-## Verify the experience
-
-Start from the outcome the driver requested, not from the files that changed.
-Use the feature as its user would and observe both the intended result and
-important side effects. For a defect, reproduce the failure when practical and
-show that the same path now succeeds.
-
-When direct use is impossible, use the closest realistic simulation and state
-what the gap leaves unproven. Screenshots, recordings, logs, or saved output are
-valuable when the result is visual, environmental, or otherwise difficult to
-inspect from a command result alone.
-
-## Report evidence
-
-Describe what you exercised and what you observed. Distinguish direct evidence
-from inference, and identify relevant behavior that was not verified. Never
-describe a check as proving more than it actually does. When possible provide a
-direct artifact as proof of verification. A statement that you opened the UI is
-worth substantially less than a screenshot of the UI itself.
+Behavior, rendering and keys need the real program, so open it and use what
+you changed. For anything visual, take a screenshot and look at it. Check a
+web page at 390, 768 and 1280 pixels wide, and record motion as timed
+screenshots, because a screencast drops frames. Try it on a throwaway
+instance with its own socket or folder, never on one the user is running.
+When you hand the work back, say what you ran and what you saw, and attach
+the screenshot.

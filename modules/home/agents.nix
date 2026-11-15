@@ -2,9 +2,8 @@
 # their modules have no package. Linux installs them from nixpkgs, and
 # Claude Code only on a personal computer. Either way the modules only
 # merge settings into each agent's own file, keeping whatever the agent
-# writes there itself. ~/.codex/AGENTS.md
-# is yours, so it never comes from the repo. Skills from other installers,
-# such as byor, Rex and pair, stay with those tools.
+# writes there itself. Skills from other installers, such as byor, Rex and
+# pair, stay with those tools.
 {
   config,
   lib,
@@ -98,15 +97,12 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   home.packages = [ pair ];
 
   home.file = {
-    # Claude reads both instruction files through imports. Codex can't
-    # import, so it gets the repo's through developer_instructions below.
+    # Claude reads the instructions through an import. Codex can't import,
+    # so it gets them through developer_instructions below.
     ".claude/CLAUDE.md".text = ''
       @${cfg.repo}/ai-harness/AGENTS.md
-      @${config.home.homeDirectory}/.codex/AGENTS.md
     '';
-    ".claude/references".source = link "ai-harness/references";
     ".claude/statusline.js".source = link "ai-harness/statusline.js";
-    ".codex/references".source = link "ai-harness/references";
     ".codex/themes/dotfiles.tmTheme".source =
       config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
     ".claude/themes/dotfiles.json".source =
@@ -184,8 +180,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       # gpt-6.1-sol's largest window, compacted at 80% of it.
       model_context_window = 872000;
       model_auto_compact_token_limit = 697600;
-      # Codex adds these to ~/.codex/AGENTS.md, so an edit to the repo's
-      # file reaches Codex at the next home switch.
+      # An edit to the repo's file reaches Codex at the next home switch.
       developer_instructions = builtins.readFile ../../ai-harness/AGENTS.md;
       service_tier = "default";
       approval_policy = "on-request";
@@ -235,14 +230,6 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   };
 
   home.activation = {
-    # Claude's import needs the file, and the switch that drops the old link
-    # leaves none. From then on the file is yours.
-    codexInstructions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      if [ ! -e "$HOME/.codex/AGENTS.md" ]; then
-        run rm -f "$HOME/.codex/AGENTS.md"
-        run touch "$HOME/.codex/AGENTS.md"
-      fi
-    '';
     # pair's own installer, for each agent this computer has that lacks the
     # skill.
     pairSkill = lib.hm.dag.entryAfter [ "linkGeneration" ] ''

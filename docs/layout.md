@@ -58,7 +58,7 @@ modules/
 theme/              what each color means, one file per app, and `theme`
 pkgs/               ws's Go source and the pair package
 config/             files programs read as they are, linked from the checkout
-ai-harness/         the agents' instructions, references, skills and hooks
+ai-harness/         the agents' instructions, skills and hooks
 secrets/            secrets.yaml, encrypted to the keys in .sops.yaml
 tests/              the prompt's test
 docs/               these pages

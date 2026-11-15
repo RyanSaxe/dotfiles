@@ -10,7 +10,7 @@ mkdir -p "$to"
 for skill in "$from"/*/; do
   name=$(basename "$skill")
   case $name in
-  # Home Manager's backups, such as unslop.pre-nix, aren't skills.
+  # Home Manager's backups, such as NAME.pre-nix, aren't skills.
   *.*) continue ;;
   esac
   [ -f "$skill/SKILL.md" ] || continue
