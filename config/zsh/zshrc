@@ -65,10 +65,12 @@ done
 unset _fn
 source "$HOME/.config/zsh/aliases.zsh"
 vi_mode_init
-venv_init
-
-# The prompt owns the venv indicator; activate must not inject its own.
+# The prompt owns the venv indicator; activate must not inject its own. This
+# comes before venv_init: a shell started in a project activates its venv
+# there, and an activate that saw no setting saves the default prompt, which
+# deactivate puts back when you leave the project.
 export VIRTUAL_ENV_DISABLE_PROMPT=1
+venv_init
 
 # ----- plugins (linked by the zsh module) -----------------------------
 # Order matters: fzf-tab needs compinit first; syntax highlighting goes last.
