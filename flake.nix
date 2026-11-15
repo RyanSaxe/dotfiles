@@ -55,12 +55,18 @@
         "aarch64-darwin"
         "x86_64-linux"
       ];
-      # Claude Code is the one unfree package. Linux installs it from nixpkgs.
+      # The only unfree packages: Claude Code, which Linux installs from
+      # nixpkgs, and Copilot CLI.
       pkgsFor =
         system:
         import nixpkgs {
           inherit system;
-          config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "claude-code";
+          config.allowUnfreePredicate =
+            pkg:
+            builtins.elem (nixpkgs.lib.getName pkg) [
+              "claude-code"
+              "github-copilot-cli"
+            ];
         };
       specialArgs = { inherit inputs; };
     in

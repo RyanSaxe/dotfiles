@@ -45,10 +45,18 @@ both.
 Other tools install the rest of the skills. pair's comes from pair's own
 `npx skills add RyanSaxe/pair -g`, which each home switch runs when the
 skill is missing. byor and Rex install their own. Some installers write
-skills only into `~/.agents/skills`, which only Codex reads, so on
+skills only into `~/.agents/skills`, which Claude Code doesn't read, so on
 computers with the `personal` role `tools/link-agent-skills.sh` links each
 one into `~/.claude/skills`. Each home switch runs it once, and on a Mac a
 launchd agent also runs it whenever `~/.agents/skills` changes.
+
+Computers with the `personal` role also get pi, opencode and Copilot CLI,
+the other agents pair's hub can wake. All three read pair's skill from
+`~/.agents/skills`, as Codex does. Each home switch registers pair's pi
+extension and opencode plugin from
+`~/.nix-profile`, a path that stays the same when pair updates. The
+`copilot` alias starts Copilot CLI with its UI server and access to pair's
+state folder, which pair needs.
 
 Each agent's settings live in `modules/home/agents.nix`. Each home switch
 merges them into `~/.claude/settings.json` and `~/.codex/config.toml`, keeping

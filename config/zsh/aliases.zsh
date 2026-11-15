@@ -13,6 +13,10 @@ alias gc='git commit'
 alias gp='git push'
 alias gl='git log --oneline'
 
+# pair's hub wakes Copilot CLI only through its UI server, and each pair
+# session's files are in pair's state folder, outside the project.
+alias copilot='copilot --ui-server --add-dir "${XDG_STATE_HOME:-$HOME/.local/state}/pair"'
+
 # Common utilities
 alias ..='cd ..'
 alias ...='cd ../..'

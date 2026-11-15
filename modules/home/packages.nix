@@ -95,7 +95,10 @@ in
     # JetBrains Mono built into it.
     ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals (has "personal") [
+      # The agents besides Claude Code and Codex that pair's hub can wake.
       pkgs.pi-coding-agent
+      pkgs.opencode
+      pkgs.github-copilot-cli
       pkgs.pnpm
       (pkgs.python312.withPackages (
         python: with python; [
