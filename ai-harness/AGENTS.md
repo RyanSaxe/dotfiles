@@ -104,8 +104,11 @@ message, and `pair agents` lists the sessions that are running.
 
 `~/generic/dotfiles` sets up this computer with Nix, these instructions
 included. Read its AGENTS.md before you install a tool or change a setting.
-Install a tool through Nix there, not with a global `brew`, `pip` or `npm`
-install, so every computer gets the same one.
+A general-purpose tool goes in through Nix there, not a global `brew`, `pip`
+or `npm` install, so every computer gets the same one. The dotfiles are
+public, so a tool for one project or for the user's work is installed in
+that project's own environment, not in the dotfiles. Ask when you can't
+tell.
 
 ## The wiki
 
