@@ -46,6 +46,7 @@ func TestATasksStateSectionAndProject(t *testing.T) {
 		"```",
 		"## vault",
 		"- [ ] on a branch",
+		"",
 		"-[ ] not a task",
 	}, "\n"))
 	writeNote(t, vault, "notes/daily/2026-11-09.md", "- [ ] outside a project\n")
@@ -79,6 +80,75 @@ func TestATasksStateSectionAndProject(t *testing.T) {
 	}
 }
 
+// Prettier wraps a long task at 80 columns, under the task's text, and can
+// part 📅 from its date.
+func TestAWrappedTaskReadsAsOne(t *testing.T) {
+	vault := t.TempDir()
+	note := strings.Join([]string{
+		"# nix",
+		"- [ ] Renew the domain before it lapses and tell the team which registrar holds",
+		"      it 📅 2026-11-09",
+		"- [ ] Renew the domain before it lapses and tell the team which registrar hol 📅",
+		"      2026-11-16",
+		"  - [ ] a nested task 📅 2026-11-08 that",
+		"        wraps",
+		"  - a list item",
+		"- [ ] a lazy",
+		"continuation",
+		"",
+		"a paragraph 📅 2026-11-08",
+		"- [ ] above a quote",
+		"  > a quote 📅 2026-11-08",
+		"- [ ] above a table",
+		"  | a | b 📅 2026-11-08 |",
+		"  | - | - |",
+		"- [ ] above a heading",
+		"## vault",
+		"- [ ] above a fence",
+		"```",
+		"- [ ] a sample",
+		"```",
+		"a paragraph",
+	}, "\n")
+	writeNote(t, vault, "notes/projects/nix/TODO.md", note)
+
+	ts, err := vaultTasks(vault, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := func(due, state, section string, line int, text string) task {
+		return task{Text: text, Due: due, State: state, Project: "nix", Section: section, File: "notes/projects/nix/TODO.md", Line: line}
+	}
+	want := []task{
+		in("2026-11-09", "today", "nix", 2, "Renew the domain before it lapses and tell the team which registrar holds it"),
+		in("2026-11-16", "soon", "nix", 4, "Renew the domain before it lapses and tell the team which registrar hol"),
+		in("2026-11-08", "overdue", "nix", 6, "a nested task that wraps"),
+		in("", "none", "nix", 9, "a lazy continuation"),
+		in("", "none", "nix", 13, "above a quote"),
+		in("", "none", "nix", 15, "above a table"),
+		in("", "none", "nix", 18, "above a heading"),
+		in("", "none", "vault", 20, "above a fence"),
+	}
+	if len(ts) != len(want) {
+		t.Fatalf("got %d tasks, want %d: %+v", len(ts), len(want), ts)
+	}
+	for i := range want {
+		if ts[i] != want[i] {
+			t.Errorf("task %d is %+v, want %+v", i, ts[i], want[i])
+		}
+	}
+
+	// Ticking a wrapped task changes the box on its first line.
+	if err := tickTask(vault, ts[1], now); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(note, "\n")
+	lines[3] = strings.Replace(lines[3], "[ ]", "[x]", 1)
+	if got, want := readNote(t, vault, "notes/projects/nix/TODO.md"), strings.Join(lines, "\n"); got != want {
+		t.Errorf("the note is %q, want %q", got, want)
+	}
+}
+
 func TestEachFormOfADueDate(t *testing.T) {
 	for in, want := range map[string]string{
 		"": "", "today": "2026-11-09", "tmr": "2026-11-10", "3d": "2026-11-12", "fri": "2026-11-13",
@@ -100,6 +170,7 @@ func TestATaskIsAddedAboveTheFirstBranch(t *testing.T) {
 		"a missing file":    {"", "2026-11-13", "# nix\n\n- [ ] new 📅 2026-11-13\n"},
 		"no branches":       {"# nix\n\n- [ ] old\n", "", "# nix\n\n- [ ] old\n- [ ] new\n"},
 		"a branch":          {"# nix\n\n- [ ] old\n\n## vault\n\n- [ ] theirs\n", "", "# nix\n\n- [ ] old\n- [ ] new\n\n## vault\n\n- [ ] theirs\n"},
+		"a wrapped task":    {"# nix\n\n- [ ] old\n      wraps\n\n## vault\n", "", "# nix\n\n- [ ] old\n      wraps\n- [ ] new\n\n## vault\n"},
 		"only a branch":     {"# nix\n\n## vault\n- [ ] theirs\n", "", "# nix\n\n- [ ] new\n\n## vault\n- [ ] theirs\n"},
 		"a fenced ## above": {"# nix\n```\n## sample\n```\n## vault\n", "", "# nix\n```\n## sample\n```\n- [ ] new\n## vault\n"},
 	} {

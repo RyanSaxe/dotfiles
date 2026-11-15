@@ -105,6 +105,15 @@ A task is a `- [ ]` line in any Markdown file under `$VAULT_DIR`, which is
 - [ ] Renew the domain 📅 2026-12-01
 ```
 
+A long task can wrap onto the lines below it, as Prettier wraps it. Its
+text goes on until a blank line, a list item, a heading, a quote, a table
+or a code fence, and the date can be on any of its lines:
+
+```markdown
+- [ ] Renew the domain before it lapses, and tell the team which registrar
+      holds it 📅 2026-12-01
+```
+
 Tasks tags each one `overdue`, `today` or `soon`, for a date within a week.
 In a repository with an `origin` remote, PROJECT is the remote's
 repository name, and the first tab lists the tasks under

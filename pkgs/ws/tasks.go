@@ -23,17 +23,18 @@ import (
 )
 
 // A task is a `- [ ]` or `- [x]` line in a markdown file under the vault,
-// outside a fenced code block. ws reads the vault each time it lists tasks
-// and writes a note only to add a task or tick one.
+// outside a fenced code block, and the lines it wraps onto. ws reads the
+// vault each time it lists tasks and writes a note only to add a task or
+// tick one.
 type task struct {
 	Text    string
 	Done    bool
-	Due     string // YYYY-MM-DD, from 📅 on the line
+	Due     string // YYYY-MM-DD, from 📅 anywhere in the text
 	State   string // overdue, today, soon, later or none
 	Project string
 	Section string
 	File    string // relative to the vault
-	Line    int
+	Line    int    // the line with the box
 }
 
 var (
@@ -41,6 +42,9 @@ var (
 	headingRe = regexp.MustCompile(`^#{1,6}\s+(.*\S)`)
 	fenceRe   = regexp.MustCompile("^\\s*(`{3,}|~{3,})")
 	dueRe     = regexp.MustCompile(`\s*📅\s*(\d{4}-\d{2}-\d{2})`)
+	// A blank line, a list item, a heading, a quote or a table ends a
+	// paragraph in Markdown, so it ends a task's text.
+	breakRe = regexp.MustCompile(`^\s*($|([-*+]|\d+[.)]|#{1,6})(\s|$)|[>|])`)
 )
 
 func vaultDir() string {
@@ -73,33 +77,42 @@ func noteProject(file string) string {
 	return ""
 }
 
-// noteTasks reads the tasks in one note. file is its path in the vault.
+// noteTasks reads the tasks in one note. file is its path in the vault. A
+// wrapped task's lines join with single spaces, and a fence ends its text.
 func noteTasks(file, content string, today time.Time) []task {
 	var ts []task
 	project, section := noteProject(file), ""
+	textEnd := -2 // the last line of the last task's text so far
 	unfenced(strings.Split(content, "\n"), func(i int, line string) {
-		if h := headingRe.FindStringSubmatch(line); h != nil {
+		if m := taskRe.FindStringSubmatch(line); m != nil {
+			ts = append(ts, task{Text: strings.TrimSpace(m[2]), Done: m[1] == "x", Project: project, Section: section, File: file, Line: i + 1})
+			textEnd = i
+		} else if i == textEnd+1 && !breakRe.MatchString(line) {
+			ts[len(ts)-1].Text += " " + strings.TrimSpace(line)
+			textEnd = i
+		} else if h := headingRe.FindStringSubmatch(line); h != nil {
 			section = h[1]
-		} else if m := taskRe.FindStringSubmatch(line); m != nil {
-			t := task{Text: strings.TrimSpace(m[2]), Done: m[1] == "x", State: "none", Project: project, Section: section, File: file, Line: i + 1}
-			// An impossible date stays part of the text.
-			if d := dueRe.FindStringSubmatch(t.Text); d != nil && validDate(d[1]) {
-				t.Due, t.Text = d[1], strings.TrimSpace(strings.Replace(t.Text, d[0], "", 1))
-				// ISO dates compare as text.
-				switch day := today.Format(time.DateOnly); {
-				case t.Due < day:
-					t.State = "overdue"
-				case t.Due == day:
-					t.State = "today"
-				case t.Due <= today.AddDate(0, 0, 7).Format(time.DateOnly):
-					t.State = "soon"
-				default:
-					t.State = "later"
-				}
-			}
-			ts = append(ts, t)
 		}
 	})
+	for i := range ts {
+		t := &ts[i]
+		t.State = "none"
+		// An impossible date stays part of the text.
+		if d := dueRe.FindStringSubmatch(t.Text); d != nil && validDate(d[1]) {
+			t.Due, t.Text = d[1], strings.TrimSpace(strings.Replace(t.Text, d[0], "", 1))
+			// ISO dates compare as text.
+			switch day := today.Format(time.DateOnly); {
+			case t.Due < day:
+				t.State = "overdue"
+			case t.Due == day:
+				t.State = "today"
+			case t.Due <= today.AddDate(0, 0, 7).Format(time.DateOnly):
+				t.State = "soon"
+			default:
+				t.State = "later"
+			}
+		}
+	}
 	return ts
 }
 
