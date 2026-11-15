@@ -74,12 +74,6 @@ finds, and shape it into commits a reviewer can follow.
 Raise the pull request, as a draft or ready, and follow its checks until they
 pass, going back to fix whatever fails.
 
-Scale the checking to the change, but always use the change as its users
-would. A small change that's easy to undo needs its tests, the project's
-checks and one realistic use in the real program. Several simulated users
-and a review are for large, risky or user-facing changes, or when the user
-asks. Stop a fix-and-recheck loop after two rounds.
-
 Work in a separate worktree when the change runs alongside other work in the
 same repository, or when the user asks for one, and make it with `ws`, as the
 worktrees skill describes. Otherwise work in the checkout you're in.
