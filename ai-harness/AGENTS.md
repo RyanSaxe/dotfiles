@@ -24,7 +24,7 @@ then instructions you loaded for the task at hand, and this file last.
 
 ## Writing code
 
-Before planning or building a substantial change, read
+Before you write code, read
 `~/generic/dotfiles/ai-harness/references/development.md`. The references'
 examples are in Python, and the same ideas apply in any language. These
 rules apply to every change:
@@ -34,13 +34,11 @@ rules apply to every change:
   handling for cases that can't happen.
 - Match the style of the code around it. Make the code explain itself, and
   write a comment only to say why.
-- Don't write a function that only passes its arguments on to another one.
-  Give the real function the defaults it needs, and call it.
 - Fail clearly when an input, dependency or setting is missing. Don't add a
   fallback that hides a broken setup.
-- Make a state machine explicit when one exists, with one owner that
-  changes its state through named methods, not flags set across components.
-  A sequence of calls is a function, not a state machine.
+- Avoid implicit state machines, where it's unclear what can change what.
+  When something has states, make clear which component owns them and their
+  valid transitions. A sequence of calls is a function, not a state machine.
 
 ## Testing and checking
 
@@ -56,11 +54,11 @@ work is done, read `~/generic/dotfiles/ai-harness/references/verification.md`.
 - Then use the change the way a person would, in the real program. Passing
   tests don't show that a feature works.
 
-Debug on the smallest run that still shows the problem. Anything slow needs
-a small version that goes through the same code on a little input, so you
-can reproduce a failure, try a fix and see the result in seconds rather than
-hours. Keep that small run working as the code changes, and say when only
-the full run can show that a change works.
+Debug on the smallest run that still shows the problem. When something
+takes minutes or more to run, like a data pipeline or an end-to-end test,
+give it a small mode that runs the same code on a sample of the input,
+chosen by a flag or a config. Use it to reproduce a failure and try a fix in
+seconds, and keep it working as the code changes.
 
 ## From task to pull request
 
@@ -81,7 +79,7 @@ Scale the checking to the change, but always use the change as its users
 would. A small change that's easy to undo needs its tests, the project's
 checks and one realistic use in the real program. Several simulated users
 and a review are for large, risky or user-facing changes, or when the user
-asks. Stop a fix-and-recheck loop after two rounds and report what's left.
+asks. Stop a fix-and-recheck loop after two rounds.
 
 Work in a separate worktree when the change runs alongside other work in the
 same repository, or when the user asks for one, and make it with `ws`, as the

@@ -1,56 +1,46 @@
 # Testing
 
-Keep a test only if it fails when something a user or another program
-relies on breaks. While you build, write as many temporary tests and probes
-as you like, and delete them before you finish. Code is much easier to test
-when it takes its dependencies as arguments, and `development.md` explains
-how to write it that way.
+Use tests and probes freely while you build, and expect most of them to be
+temporary. Delete those before you finish. Keep a small set of tests that
+protect important behavior through stable interfaces, so that a different
+correct implementation passes them unchanged.
 
-## Test what a caller can see
+## Test behavior, not implementation
 
-Test through the same interface that people or other code use, and check
-results and effects, not which helpers ran. A different correct
-implementation should pass every test unchanged.
-
-This test checks how `import_orders` works rather than what it does. It
-fails if the code saves orders one at a time instead of in one call, and it
-still passes if an order goes missing:
+Test what a caller can see, through the interface it uses. Instead of this:
 
 ```python
-def test_import_orders():
-    api = Mock(fetch=Mock(return_value=[ROW_A, ROW_B]))
-    db = Mock()
-    import_orders(SINCE, api=api, db=db)
-    db.save.assert_called_once()
+def test_total(mocker):
+    add_line = mocker.spy(cart, "_add_line")
+    cart.total([Line(qty=2, price=3.0), Line(qty=1, price=4.0)])
+    assert add_line.call_count == 2
 ```
 
-This one checks what callers rely on, that valid orders are saved and
-invalid ones are reported:
+write this:
 
 ```python
-def test_import_saves_valid_orders_and_reports_the_rest():
-    api = FakeOrdersApi(rows=[row(id="A1"), row(id="B2", price=None)])
-    db = InMemoryDatabase()
-    report = import_orders(SINCE, api=api, db=db)
-    assert [order.id for order in db.orders()] == ["A1"]
-    assert report.rejected == ["B2"]
+def test_total_is_the_sum_of_its_lines():
+    assert cart.total([Line(qty=2, price=3.0), Line(qty=1, price=4.0)]) == 10.0
 ```
 
-Use the real dependency wherever you can. Substitute only what a test can't
-run, like a network service, and substitute a fake, a small working version
-like `InMemoryDatabase`, rather than a mock that records calls. Don't assert
-an exact value unless that value is the contract.
+The first test breaks when `total` stops calling `_add_line`, and still
+passes when the total is wrong.
+
+## Use real dependencies
+
+Use the real dependency wherever you can. When a test can't run it, like a
+network service or the clock, pass in a fake, a small working version like
+an in-memory database, rather than a mock that records calls. Code that
+takes its dependencies as arguments makes this easy, and `development.md`
+shows how to write it.
 
 ## Choose the cases
 
-Cover the normal path first, then the edge cases and failures a caller
-would notice. A bug fix gets a regression test that fails before the fix and
-passes after it, through the interface where the bug showed up. Name each
-test after the behavior and the condition, so a failure says what stopped
-working.
-
-Don't add a test just because a file changed. A change that adds no
-behavior is better checked by running the program.
+Cover the normal path, then the edge cases and failures a caller would
+notice, and name each test after the behavior it protects. When you fix a
+bug that could come back, add a test that fails without the fix, through the
+interface where the bug showed. A typo or a one-off mistake doesn't need
+one, and neither does a change that adds no behavior.
 
 ## Keep tests away from real state
 
