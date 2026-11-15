@@ -4,8 +4,8 @@ These are the user's standing instructions, and they apply to every task.
 Follow them all, together with any other instructions you're given, such
 as a skill's. An order matters only when two instructions say opposite
 things. Then what the user asks for always comes first, next the AGENTS.md
-closest to the file you're changing, an app's before its repository's,
-then instructions you loaded for the task at hand, and this file last.
+closest to the file you're changing, then instructions you loaded for the
+task at hand, and this file last.
 
 ## Before you start
 
