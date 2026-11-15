@@ -3,6 +3,7 @@ package markdown_test
 import (
 	"errors"
 	"image"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -43,5 +44,18 @@ func TestPicturesComeFromProseOnly(t *testing.T) {
 	})
 	if !slices.Equal(fetched, []string{"a.png"}) || !slices.Equal(drawn, []string{"graph LR; a-->b"}) {
 		t.Errorf("fetched %v and drew %v, want [a.png] and the one diagram", fetched, drawn)
+	}
+}
+
+// glamour keeps each line of a list item apart, but Markdown joins a wrapped
+// item's lines with spaces, as it joins a paragraph's. A hard break still
+// ends a line.
+func TestAWrappedListItemReadsAsOneLine(t *testing.T) {
+	md := "- [ ] Renew the domain before it lapses\n      and tell the team\n- a hard break  \n  stays"
+	o := markdown.Options{Dark: true}
+	out := regexp.MustCompile("\x1b\\[[0-9;:]*m").ReplaceAllString(markdown.Load(md, o).Render(80, o), "")
+	out = regexp.MustCompile(` +\n`).ReplaceAllString(out, "\n")
+	if !strings.Contains(out, "Renew the domain before it lapses and tell the team\n") || !strings.Contains(out, "a hard break\nstays") {
+		t.Errorf("the item isn't one line, or the hard break is gone, in %q", out)
 	}
 }

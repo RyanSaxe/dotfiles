@@ -17,6 +17,10 @@ import (
 	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	gmtext "github.com/yuin/goldmark/text"
 
 	"workspace/kitty"
 )
@@ -100,7 +104,7 @@ func Load(md string, o Options) Doc {
 	var lines, diagramLines []string
 	flush := func() {
 		if len(lines) > 0 {
-			d = append(d, part{text: strings.Join(lines, "\n")})
+			d = append(d, part{text: joinSoftBreaks(strings.Join(lines, "\n"))})
 			lines = nil
 		}
 	}
@@ -155,6 +159,37 @@ func Load(md string, o Options) Doc {
 	}
 	flush()
 	return d
+}
+
+// glamour joins the lines of a paragraph but keeps each line of a list item
+// apart, so a wrapped item reads ragged. joinSoftBreaks puts a space in place
+// of each soft line break, as Markdown renders one, and of the next line's
+// indent and quote marks. It parses md as glamour does, so it leaves hard
+// breaks and code as they are.
+func joinSoftBreaks(md string) string {
+	src := []byte(md)
+	doc := goldmark.New(goldmark.WithExtensions(extension.GFM, extension.DefinitionList)).Parser().Parse(gmtext.NewReader(src))
+	var out []byte
+	kept := 0
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		t, ok := n.(*ast.Text)
+		if !ok || !entering || !t.SoftLineBreak() {
+			return ast.WalkContinue, nil
+		}
+		end := t.Segment.Stop
+		for end < len(src) && (src[end] == ' ' || src[end] == '\t') {
+			end++
+		}
+		if end == len(src) || src[end] != '\n' {
+			return ast.WalkContinue, nil
+		}
+		for end++; end < len(src) && strings.IndexByte(" \t>", src[end]) >= 0; end++ {
+		}
+		out = append(append(out, src[kept:t.Segment.Stop]...), ' ')
+		kept = end
+		return ast.WalkContinue, nil
+	})
+	return string(append(out, src[kept:]...))
 }
 
 // Render lays the doc out w columns wide. A picture becomes Kitty
