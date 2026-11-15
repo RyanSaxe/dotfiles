@@ -37,7 +37,8 @@ const usage = `usage:
   ws rm NAME [--force]               close a worktree's session, remove it and delete its branch,
                                      but without --force it refuses uncommitted changes and keeps a branch
                                      that isn't merged and whose pull request GitHub doesn't show as merged
-  ws pick NAME [--client ID]         open a popup: go, worktrees, reviews, tasks, agents, theme, keys or files.
+  ws pick NAME [--client ID]         open a popup: go, sessions, worktrees, reviews, tasks, agents, theme, keys or files.
+                                     sessions is the go popup on its Sessions tab.
                                      --from BLOCK starts it in the folder of that Rex pane
   ws theme                           the theme popup: light or dark, and the mascot
   ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file

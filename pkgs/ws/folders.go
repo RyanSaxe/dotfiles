@@ -16,57 +16,29 @@ import (
 	"workspace/popup"
 )
 
+// A place is a folder, a session, or a folder and its session.
 type place struct{ dir, session string }
 
-// goPopup lists running sessions, then repositories by their last git
-// activity, then bookmarks, each folder once.
-func goPopup(b mux.Backend) popup.Popup {
+// The go popup's tabs.
+const (
+	foldersTab = iota
+	sessionsTab
+)
+
+// goPopup lists repositories, worktrees and bookmarks by their last git
+// activity on one tab, and running sessions on the other. It opens on first,
+// foldersTab or sessionsTab.
+func goPopup(b mux.Backend, first int) popup.Popup {
 	return popup.Popup{
-		Noun: "folders",
-		Tabs: []popup.Tab{{Name: "Folders", Empty: "No sessions, repositories or bookmarks."}},
-		Load: func(int) ([]popup.Row, error) {
+		Noun:  "folders and sessions",
+		Tabs:  []popup.Tab{foldersTab: {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."}, sessionsTab: {Name: "Sessions", Empty: "No sessions are running."}},
+		Start: first,
+		Load: func(tab int) ([]popup.Row, error) {
 			ss, err := b.Sessions()
-			// Asking what each session is doing takes a few Rex calls, so they
-			// run while the walk does.
-			doing := make([]mux.Pane, len(ss))
-			var wg sync.WaitGroup
-			for i, s := range ss {
-				wg.Go(func() { doing[i] = b.Landing(s.ID) })
+			if tab == foldersTab {
+				return folderRows(ss), err
 			}
-			wts, _ := filepath.Glob(filepath.Join(worktreeRoot, "*", "*"))
-			dirs, marks := repos(), bookmarks()
-			folder := map[string]string{} // a session's label to its folder
-			for _, d := range slices.Concat(wts, marks, dirs) {
-				folder[labelFor(d)] = d
-			}
-			type dated struct {
-				dir string
-				at  time.Time
-			}
-			ds := make([]dated, len(dirs))
-			for i, d := range dirs {
-				ds[i] = dated{d, activity(d)}
-			}
-			slices.SortStableFunc(ds, func(a, b dated) int { return b.at.Compare(a.at) })
-			var rows []popup.Row
-			listed := map[string]bool{}
-			add := func(label string, r popup.Row) {
-				if !listed[label] {
-					listed[label] = true
-					rows = append(rows, r)
-				}
-			}
-			wg.Wait()
-			for i, s := range ss {
-				add(s.Label, popup.Row{ID: s.ID, Title: s.Label, Detail: tilde(cmp.Or(folder[s.Label], doing[i].Folder)), Tag: doingTag(doing[i].Doing), Data: place{folder[s.Label], s.ID}})
-			}
-			for _, d := range ds {
-				add(labelFor(d.dir), popup.Row{ID: d.dir, Title: filepath.Base(d.dir), Detail: tilde(d.dir), Qualifier: relAge(d.at), Data: place{dir: d.dir}})
-			}
-			for _, d := range marks {
-				add(labelFor(d), popup.Row{ID: d, Title: filepath.Base(d), Detail: tilde(d), Tag: popup.Dim.SetString("bookmark"), Data: place{dir: d}})
-			}
-			return rows, err
+			return sessionRows(b, ss), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
 			p := r.Data.(place)
@@ -104,6 +76,81 @@ func goPopup(b mux.Backend) popup.Popup {
 	}
 }
 
+// A folder is a repository, a worktree or a bookmark.
+type folder struct {
+	dir      string
+	at       time.Time // when git last moved its HEAD
+	bookmark bool
+}
+
+// folders lists repositories, worktrees and bookmarks, each once, the latest
+// git activity first.
+func folders() []folder {
+	wts, _ := filepath.Glob(filepath.Join(worktreeRoot, "*", "*", ".git"))
+	for i, w := range wts {
+		wts[i] = filepath.Dir(w)
+	}
+	marks := bookmarks()
+	var fs []folder
+	listed := map[string]bool{}
+	for _, d := range slices.Concat(repos(), wts, marks) {
+		if !listed[d] {
+			listed[d] = true
+			fs = append(fs, folder{d, activity(d), slices.Contains(marks, d)})
+		}
+	}
+	slices.SortStableFunc(fs, func(a, b folder) int { return b.at.Compare(a.at) })
+	return fs
+}
+
+// folderRows are the Folders tab: each folder, with its session when one is
+// running, so Enter goes to that session.
+func folderRows(ss []mux.Session) []popup.Row {
+	sessions := map[string]string{} // a label to its session
+	for _, s := range ss {
+		sessions[s.Label] = s.ID
+	}
+	var rows []popup.Row
+	for _, f := range folders() {
+		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, sessions[labelFor(f.dir)]}}
+		if f.bookmark {
+			r.Tag = popup.Dim.SetString("bookmark")
+		}
+		rows = append(rows, r)
+	}
+	return rows
+}
+
+// sessionRows are the Sessions tab: each running session with what it's
+// doing, and its folder.
+func sessionRows(b mux.Backend, ss []mux.Session) []popup.Row {
+	// Asking what each session is doing takes a few Rex calls, so they run
+	// while the walk does.
+	doing := make([]mux.Pane, len(ss))
+	var wg sync.WaitGroup
+	for i, s := range ss {
+		wg.Go(func() { doing[i] = b.Landing(s.ID) })
+	}
+	dirs := map[string]string{} // a session's label to its folder
+	for _, f := range folders() {
+		dirs[labelFor(f.dir)] = f.dir
+	}
+	wg.Wait()
+	rows := make([]popup.Row, len(ss))
+	for i, s := range ss {
+		rows[i] = popup.Row{ID: s.ID, Title: s.Label, Detail: tilde(cmp.Or(dirs[s.Label], doing[i].Folder)), Tag: doingTag(doing[i].Doing), Data: place{dirs[s.Label], s.ID}}
+	}
+	return rows
+}
+
+// folderTitle is PROJECT/NAME for a worktree and the folder's name otherwise.
+func folderTitle(dir string) string {
+	if rel, err := filepath.Rel(worktreeRoot, dir); err == nil && !strings.HasPrefix(rel, "..") && strings.Count(rel, "/") == 1 {
+		return rel
+	}
+	return filepath.Base(dir)
+}
+
 // doingTag names what a session's pane is doing: an agent's status in its
 // color, else the program it runs.
 func doingTag(doing string) lipgloss.Style {
@@ -129,7 +176,17 @@ func folderSummary(dir string) string {
 // pull. It reads the time off git's log file, since asking git costs a
 // process per folder.
 func activity(dir string) time.Time {
-	info, err := os.Stat(filepath.Join(dir, ".git", "logs", "HEAD"))
+	gitDir := filepath.Join(dir, ".git")
+	// A worktree's .git is a file naming its folder in the main checkout's.
+	if data, err := os.ReadFile(gitDir); err == nil {
+		if named, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "gitdir: "); ok {
+			gitDir = named
+			if !filepath.IsAbs(named) {
+				gitDir = filepath.Join(dir, named)
+			}
+		}
+	}
+	info, err := os.Stat(filepath.Join(gitDir, "logs", "HEAD"))
 	if err != nil {
 		return time.Time{}
 	}

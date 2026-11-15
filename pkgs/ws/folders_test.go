@@ -1,0 +1,87 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"workspace/mux"
+	"workspace/popup"
+)
+
+// gitLog leaves the log that git writes in gitDir when HEAD moves, dated at.
+func gitLog(t *testing.T, gitDir string, at time.Time) {
+	t.Helper()
+	log := filepath.Join(gitDir, "logs", "HEAD")
+	if err := os.MkdirAll(filepath.Dir(log), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(log, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(log, at, at); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Folders lists repositories, worktrees and bookmarks once each, the latest
+// git activity first, and Enter on one with a session goes to that session.
+// Sessions lists only the running sessions.
+func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
+	scratch := t.TempDir()
+	oldHome, oldRoot := home, worktreeRoot
+	home, worktreeRoot = scratch, filepath.Join(scratch, "worktrees")
+	t.Cleanup(func() { home, worktreeRoot = oldHome, oldRoot })
+
+	day := func(d int) time.Time { return time.Date(2026, 11, d, 12, 0, 0, 0, time.UTC) }
+	gitLog(t, filepath.Join(scratch, "Projects", "quiet", ".git"), day(1))
+	gitLog(t, filepath.Join(scratch, "Projects", "busy", ".git"), day(8))
+	// A worktree's .git is a file naming its folder in the main checkout.
+	feature := filepath.Join(worktreeRoot, "quiet", "feature")
+	writeNote(t, feature, ".git", "gitdir: "+filepath.Join(scratch, "Projects", "quiet", ".git", "worktrees", "feature")+"\n")
+	gitLog(t, filepath.Join(scratch, "Projects", "quiet", ".git", "worktrees", "feature"), day(10))
+	writeNote(t, scratch, "notes/inbox.md", "")
+	writeNote(t, scratch, ".config/ws/bookmarks", "~/notes\n~/Projects/quiet\n")
+
+	calls := filepath.Join(t.TempDir(), "calls")
+	onPath(t, "tmux", `echo "$*" >> `+calls+`
+case "$1" in
+list-sessions) printf 'busy\nscratch\n';;
+display-message) printf 'zsh\t/elsewhere\n';;
+esac`)
+	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
+
+	folders, err := p.Load(foldersTab)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var titles []string
+	for _, r := range folders {
+		titles = append(titles, r.Title)
+	}
+	if want := []string{"quiet/feature", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
+		t.Errorf("Folders lists %v, want %v", titles, want)
+	}
+	enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
+	if msg := enter.Run(folders[1])(); msg != popup.Quit {
+		t.Errorf("Enter on busy gave %v, want the popup to close", msg)
+	}
+	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "switch-client -t =busy\n") {
+		t.Errorf("Enter on busy, which has a session, ran tmux with\n%s", got)
+	}
+
+	sessions, err := p.Load(sessionsTab)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listed []string
+	for _, r := range sessions {
+		listed = append(listed, r.Title+" in "+r.Detail)
+	}
+	if want := []string{"busy in ~/Projects/busy", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
+		t.Errorf("Sessions lists %v, want %v", listed, want)
+	}
+}

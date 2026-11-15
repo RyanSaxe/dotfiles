@@ -44,7 +44,8 @@ built-in `review` layout runs `nvim gh://{pr}`.
 
 | Key       | Popup     | Lists                                                                  |
 | --------- | --------- | ---------------------------------------------------------------------- |
-| Alt-O     | go        | Sessions, then repositories, latest git activity first, then bookmarks |
+| Alt-O     | go        | Repositories, worktrees and bookmarks, latest git activity first       |
+| Alt-S     | sessions  | Running sessions and what each is doing, on the go popup's second tab  |
 | Alt-W     | worktrees | This project's worktrees, and all of them on a second tab              |
 | Alt-R     | reviews   | Pull requests and issues on GitHub that involve you                    |
 | Alt-T     | tasks     | Open tasks in the vault, soonest due first                             |
@@ -69,7 +70,8 @@ closes. The bottom line lists the popup's other keys.
 | tasks     | edit   | add                    | done          |                                  |
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
-per line.
+per line. Enter on a folder that has a running session goes to that session.
+In Rex, Alt-Shift-S opens Rex's own Change Session.
 
 ## Reviews
 

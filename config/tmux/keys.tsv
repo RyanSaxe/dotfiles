@@ -11,8 +11,8 @@ tmux	copy ctrl+v	toggle rectangle selection
 tmux	copy y	copy selection and exit
 tmux	copy ctrl+h/j/k/l	move between panes
 tmux	copy ctrl+\	last active pane
-tmux	alt+s	ws go popup: sessions, repos, folders
-tmux	alt+o	ws go popup: sessions, repos, folders
+tmux	alt+s	ws go popup on Sessions: running sessions
+tmux	alt+o	ws go popup on Folders: repos, worktrees, bookmarks
 tmux	alt+w	ws worktrees popup
 tmux	alt+c	ws theme popup: mode and mascot
 tmux	alt+a	ws agents popup
@@ -20,8 +20,8 @@ tmux	alt+r	ws reviews popup
 tmux	alt+t	ws tasks popup
 tmux	alt+/	ws keys popup: this list
 tmux	prefix r	reload tmux config
-tmux	prefix s	ws go popup
-tmux	prefix o	ws go popup
+tmux	prefix s	ws go popup on Sessions
+tmux	prefix o	ws go popup on Folders
 tmux	prefix c	new window (inherits current path)
 tmux	prefix |/-	split pane right/below (inherits current path)
 tmux	prefix l	last window

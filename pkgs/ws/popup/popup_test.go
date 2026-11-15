@@ -218,6 +218,21 @@ func TestTheMousePicksRows(t *testing.T) {
 	}
 }
 
+// A popup opens on the tab it starts on, and Tab still moves to the others.
+func TestAPopupOpensOnItsStartTab(t *testing.T) {
+	var picked []string
+	p := picker(nil, nil, &picked)
+	p.Tabs = []popup.Tab{{Name: "Folders"}, {Name: "Sessions"}}
+	p.Load = func(tab int) ([]popup.Row, error) {
+		return []popup.Row{{ID: p.Tabs[tab].Name, Title: p.Tabs[tab].Name}}, nil
+	}
+	p.Start = 1
+	run(start(p), enter, tea.KeyMsg{Type: tea.KeyTab}, enter)
+	if want := []string{"Sessions", "Folders"}; !slices.Equal(picked, want) {
+		t.Errorf("picked %v, want %v", picked, want)
+	}
+}
+
 // A reload draws the header's art again, so the popup shows art that an
 // action or anything else changed, such as a new mascot, without being opened
 // again.

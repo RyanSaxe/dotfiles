@@ -48,7 +48,8 @@ In Rex or tmux, Alt and a key opens a `ws` popup:
 
 | Key       | Popup                                                          |
 | --------- | -------------------------------------------------------------- |
-| Alt-O     | Go: sessions, repositories and bookmarked folders              |
+| Alt-O     | Go: repositories, worktrees and bookmarked folders             |
+| Alt-S     | Sessions: the running sessions, on Go's second tab             |
 | Alt-W     | Worktrees: this project's worktrees, and all of them on a tab  |
 | Alt-R     | Reviews: the pull requests and issues that need you            |
 | Alt-T     | Tasks: the open tasks in your notes                            |

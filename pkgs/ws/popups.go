@@ -15,7 +15,8 @@ func pick(b mux.Backend, name string) error {
 	term := b.Images()
 	dir, _ := os.Getwd()
 	popups := map[string]func() popup.Popup{
-		"go":        func() popup.Popup { return goPopup(b) },
+		"go":        func() popup.Popup { return goPopup(b, foldersTab) },
+		"sessions":  func() popup.Popup { return goPopup(b, sessionsTab) },
 		"worktrees": func() popup.Popup { return worktreesPopup(b) },
 		"reviews":   func() popup.Popup { return reviewsPopup(b, term) },
 		"tasks":     func() popup.Popup { return tasksPopup(b, term) },
@@ -26,7 +27,7 @@ func pick(b mux.Backend, name string) error {
 	}
 	build, ok := popups[name]
 	if !ok {
-		return fmt.Errorf("no popup named %s, only go, worktrees, reviews, tasks, agents, theme, keys or files", name)
+		return fmt.Errorf("no popup named %s, only go, sessions, worktrees, reviews, tasks, agents, theme, keys or files", name)
 	}
 	// The mascot's accent colors the popups, and only the popups.
 	if hex := accentColor(); hex != "" {

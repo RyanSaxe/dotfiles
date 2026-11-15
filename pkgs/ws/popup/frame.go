@@ -60,7 +60,7 @@ type frame struct {
 }
 
 func newFrame(id int, p Popup, art Art) frame {
-	m := frame{id: id, p: p, lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
+	m := frame{id: id, p: p, active: p.Start, lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
 	for i := range m.lists {
 		l := list.New(nil, delegate{p.OneLine}, 0, 0)
 		l.Filter = listFilter

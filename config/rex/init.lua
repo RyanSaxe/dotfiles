@@ -267,14 +267,22 @@ for i = 1, 9 do
   rex.bind("alt+" .. i, "move", { action = "client.tab.goto", args = { index = i } })
 end
 rex.bind("alt+n", "move", { action = "client.tab.new" })
-rex.bind("alt+s", "move", { action = "session.switch" })
+rex.bind("alt+shift+s", "move", { action = "session.switch" })
 rex.bind("alt+l", "last_pane")
 rex.bind("alt+shift+a", "focus_agent")
 rex.bind("alt+g", "client.sidebar.toggle")
 rex.bind("alt+shift+c", "client.theme.change")
 rex.bind("alt+/", "ws_pick", { name = "keys" })
 
-for key, name in pairs({ o = "go", w = "worktrees", r = "reviews", t = "tasks", a = "agents", c = "theme" }) do
+for key, name in pairs({
+  o = "go",
+  s = "sessions",
+  w = "worktrees",
+  r = "reviews",
+  t = "tasks",
+  a = "agents",
+  c = "theme",
+}) do
   rex.bind("alt+" .. key, "ws_pick", { name = name })
 end
 
