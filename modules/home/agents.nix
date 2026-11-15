@@ -71,7 +71,12 @@ let
       if [ -e "$dir/$name" ]; then opencode="$dir/$name"; fi
     done
     [ -s "$opencode" ] || echo '{}' > "$opencode"
-    register "$opencode" plugin "${pairAdapters}/opencode/plugin.js"
+    # opencode 2 loads pair's plugin folder. plugin.js in it is opencode 1's
+    # plugin, which opencode 2 doesn't load, so drop a listing of it.
+    "$jq" '.plugin = [(.plugin // [])[] | select(type != "string" or (endswith("/lib/pair/adapters/opencode/plugin.js") | not))]' \
+      "$opencode" > "$opencode.new"
+    mv "$opencode.new" "$opencode"
+    register "$opencode" plugin "${pairAdapters}/opencode"
   '';
 
   pushover = name: "${cfg.repo}/ai-harness/tools/notify-pushover.zsh '${name}'";
