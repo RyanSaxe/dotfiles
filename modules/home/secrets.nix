@@ -1,4 +1,5 @@
-# Secrets from secrets/secrets.yaml, encrypted to each computer's age key
+# Secrets from a sops file, secrets/secrets.yaml unless the host's
+# dotfiles.secretsFile names another, encrypted to each computer's age key
 # (.sops.yaml lists them). Each switch decrypts them into
 # ~/.config/sops-nix/secrets, one file per secret.
 {
@@ -18,7 +19,7 @@
           "${config.home.homeDirectory}/Library/Application Support/sops/age/keys.txt"
         else
           "${config.xdg.configHome}/sops/age/keys.txt";
-      defaultSopsFile = ../../secrets/secrets.yaml;
+      defaultSopsFile = config.dotfiles.secretsFile;
       # The Pushover hook reads these on every computer.
       secrets.pushover-user = { };
       secrets.pushover-token = { };

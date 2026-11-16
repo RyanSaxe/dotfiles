@@ -40,6 +40,12 @@ in
       description = "The folder of the flake that builds this computer, which the switch commands build and nix-update updates. A computer built from a private flake sets it to that flake's folder.";
     };
 
+    secretsFile = mkOption {
+      type = types.path;
+      default = ../secrets/secrets.yaml;
+      description = "The sops file each home switch decrypts this computer's secrets from. A computer built from a private flake can bring its own.";
+    };
+
     git.email = mkOption {
       type = types.str;
       description = "The email git commits with on this computer.";
