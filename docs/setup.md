@@ -112,3 +112,6 @@ switch.
 A new computer needs its own host file in `hosts/`, an entry in
 `flake.nix`, and its own lines under `pair-hub-host`, `attention-watch` and
 `attention-ignore` in the secrets.
+
+The host file's `vault.dir` names the vault's folder. A computer without
+the vault leaves `vault` out.

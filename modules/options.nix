@@ -44,5 +44,20 @@ in
       default = 0;
       description = "Points AeroSpace leaves above the windows on the built-in display, for the notch and the bar.";
     };
+
+    vault = mkOption {
+      type = types.nullOr (
+        types.submodule {
+          options = {
+            dir = mkOption {
+              type = types.str;
+              description = "Where the vault is checked out, which the switch exports as VAULT_DIR.";
+            };
+          };
+        }
+      );
+      default = null;
+      description = "The Markdown vault that Neovim and ws read and write, or null for a computer without one.";
+    };
   };
 }

@@ -9,5 +9,8 @@
     ];
     repo = "/home/ryansaxe/generic/dotfiles";
     git.email = "ryancsaxe+1@gmail.com";
+    vault = {
+      dir = "/home/ryansaxe/generic/vault";
+    };
   };
 }

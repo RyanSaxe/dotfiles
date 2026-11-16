@@ -73,7 +73,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     UV_PYTHON_INSTALL_DIR = "$HOME/.local/share/uv/python";
     UV_SYSTEM_CERTS = "true";
     # The Markdown vault, which Neovim and ws read and write.
-    VAULT_DIR = "$HOME/generic/vault";
+    VAULT_DIR = lib.mkIf (cfg.vault != null) cfg.vault.dir;
   };
 
   xdg.configFile."zsh".source = config.lib.file.mkOutOfStoreSymlink "${cfg.repo}/config/zsh";

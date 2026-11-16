@@ -1,5 +1,5 @@
-# ws, and on computers with a screen the watcher behind sketchybar's A and R
-# letters.
+# ws, and on computers with a screen the watcher behind sketchybar's A, R
+# and T letters.
 {
   config,
   lib,
@@ -39,6 +39,9 @@ lib.mkMerge [
           "/usr/bin"
           "/bin"
         ];
+        # The T letter reads the vault, and launchd gives the job none of
+        # the shell's variables.
+        EnvironmentVariables.VAULT_DIR = lib.mkIf (cfg.vault != null) cfg.vault.dir;
         StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/ws-attention.log";
       };
     };

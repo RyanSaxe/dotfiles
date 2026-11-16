@@ -14,7 +14,7 @@ in
 lib.mkIf (lib.elem "base" cfg.roles) {
   home.packages = [ pkgs.neovim ];
   xdg.configFile."nvim".source = config.lib.file.mkOutOfStoreSymlink "${cfg.repo}/config/nvim";
-  xdg.configFile."vault/templates" = {
+  xdg.configFile."vault/templates" = lib.mkIf (cfg.vault != null) {
     source = config.lib.file.mkOutOfStoreSymlink "${cfg.repo}/config/vault/templates";
     # A link the old checkout left here would otherwise stop the switch.
     force = true;
