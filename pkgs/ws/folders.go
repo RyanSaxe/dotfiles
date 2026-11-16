@@ -169,7 +169,13 @@ func doingTag(doing string) lipgloss.Style {
 // open a folder of more than 25 entries.
 func folderSummary(dir string) string {
 	summary := gitSummary(dir)
-	tree, _ := runIn(dir, "tree", "-C", "-L", "2", "--dirsfirst", "--gitignore", "--filelimit", "25", "--noreport", "-I", ".git")
+	args := []string{"-C", "--dirsfirst", "--gitignore", "--noreport", "-I", ".git"}
+	tree, _ := runIn(dir, "tree", append(args, "-L", "2", "--filelimit", "25")...)
+	// The limit holds for the top folder too, and then tree prints only its
+	// name, so a top folder over the limit is listed one level deep instead.
+	if !strings.Contains(tree, "\n") {
+		tree, _ = runIn(dir, "tree", append(args, "-L", "1")...)
+	}
 	if status, log, ok := strings.Cut(summary, "\n\n"); ok {
 		return status + "\n\n" + tree + "\n\n" + log
 	}

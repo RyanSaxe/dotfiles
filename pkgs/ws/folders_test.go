@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -90,5 +92,45 @@ esac`)
 	}
 	if want := []string{"busy in ~/Projects/busy", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
 		t.Errorf("Sessions lists %v, want %v", listed, want)
+	}
+}
+
+// The preview lists a repository's top folder even when it holds more than
+// the 25 entries tree opens a folder for.
+func TestTheFolderPreviewListsALargeTopFolder(t *testing.T) {
+	for _, tool := range []string{"git", "tree"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skip(tool + " is not installed")
+		}
+	}
+	// A commit hook runs these tests, and the scratch repository must not be
+	// the one being committed to.
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	writeNote(t, dir, "src/main.go", "package main")
+	for i := range 30 {
+		writeNote(t, dir, fmt.Sprintf("note%02d.md", i), "")
+	}
+	// Committed, so git status doesn't list the files itself.
+	for _, args := range [][]string{{"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "files"}} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+
+	preview, err := goPopup(nil, foldersTab).Fetch(popup.Row{Data: place{dir: dir}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"src", "note00.md", "note29.md"} {
+		if !strings.Contains(preview.(string), want) {
+			t.Errorf("the preview leaves out %s:\n%s", want, preview)
+		}
 	}
 }
