@@ -11,6 +11,7 @@
     git.email = "ryancsaxe+1@gmail.com";
     vault = {
       dir = "/home/ryansaxe/generic/vault";
+      remote = "git@github.com:RyanSaxe/vault.git";
     };
   };
 }

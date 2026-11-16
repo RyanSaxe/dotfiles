@@ -60,6 +60,29 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     };
   };
 
+  # The switch clones the vault when its folder is missing, and neither git
+  # nor ssh asks anything: ssh trusts a host it hasn't seen, as answering
+  # yes would, and fails rather than ask for a passphrase. A failed clone,
+  # as before GitHub has this computer's key, prints why and the switch goes
+  # on. LogLevel=ERROR keeps ssh's note about a new host out of that reason.
+  # /usr/bin/ssh is the ssh git uses in a shell, and Apple's reads the
+  # UseKeychain line GitHub's guide adds to ~/.ssh/config, which Nix's
+  # openssh refuses.
+  home.activation.cloneVault = lib.mkIf (cfg.vault != null) (
+    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      vault=${lib.escapeShellArg cfg.vault.dir}
+      if [[ ! -e $vault ]] && ! error=$(
+        export GIT_TERMINAL_PROMPT=0
+        export GIT_SSH_COMMAND="/usr/bin/ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR"
+        run ${lib.getExe config.programs.git.package} clone --quiet ${lib.escapeShellArg cfg.vault.remote} "$vault" 2>&1
+      ); then
+        # ssh ends its lines with a carriage return.
+        reason=$(head -n 1 <<< "$error" | tr -d '\r')
+        warnEcho "The vault wasn't cloned into $vault: ''${reason%.}. Run the switch again once GitHub accepts this computer's ssh key."
+      fi
+    ''
+  );
+
   programs.delta = {
     enable = true;
     enableGitIntegration = true;

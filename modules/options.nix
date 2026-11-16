@@ -53,6 +53,10 @@ in
               type = types.str;
               description = "Where the vault is checked out, which the switch exports as VAULT_DIR.";
             };
+            remote = mkOption {
+              type = types.str;
+              description = "The git remote the home switch clones the vault from when its folder is missing.";
+            };
           };
         }
       );

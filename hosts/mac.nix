@@ -14,6 +14,7 @@
     notchInset = 32;
     vault = {
       dir = "/Users/ryansaxe/generic/vault";
+      remote = "git@github.com:RyanSaxe/vault.git";
     };
   };
 }

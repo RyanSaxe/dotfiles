@@ -39,7 +39,8 @@ file expects it. These steps set up the two computers `flake.nix` lists,
    ```
 
    `-b pre-nix` renames each file the home switch would replace, such as an
-   old `~/.zshrc`, to `NAME.pre-nix`.
+   old `~/.zshrc`, to `NAME.pre-nix`. The home switch also
+   [clones the vault](#the-vault).
 
 Rex, Tailscale and Google Chrome are still installed by hand, as
 [LATER.md](../LATER.md) says. [By hand](manual.md) lists what to do once
@@ -84,6 +85,8 @@ and runs Rex's server as a systemd user service.
    rex server status                                        # print the link that signs the server in to the tailnet
    ```
 
+   The home switch also [clones the vault](#the-vault).
+
 ## Encrypt the secrets to a new key
 
 A new key can't open the secrets until they're encrypted to it.
@@ -95,6 +98,14 @@ sops updatekeys secrets/secrets.yaml
 git commit .sops.yaml secrets/secrets.yaml -m "chore(secrets): add a key"
 git push
 ```
+
+## The vault
+
+The home switch clones the vault, the Markdown notes that Neovim and ws
+read, into `~/generic/vault` when that folder is missing. It clones from
+GitHub over ssh, so GitHub must accept this computer's ssh key. Until it
+does, the switch prints that it didn't clone the vault and finishes the
+rest. Run `home-switch` again once the key is on GitHub.
 
 ## After the first switches
 
@@ -113,5 +124,5 @@ A new computer needs its own host file in `hosts/`, an entry in
 `flake.nix`, and its own lines under `pair-hub-host`, `attention-watch` and
 `attention-ignore` in the secrets.
 
-The host file's `vault.dir` names the vault's folder. A computer without
-the vault leaves `vault` out.
+The host file's `vault` names the vault's folder and the git remote to
+clone it from. A computer without the vault leaves it out.
