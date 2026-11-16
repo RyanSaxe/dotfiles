@@ -220,3 +220,13 @@ this repository's, skip the Rex lines on a Linux box without the
 sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake ~/generic/work-dotfiles#work
 nix run home-manager/master -- switch -b pre-nix --flake ~/generic/work-dotfiles#ACCOUNT@work
 ```
+
+An agent can follow this section on a new computer, and needs the person at
+the computer for these steps:
+
+- typing the password when the Nix installer and `mac-switch` run `sudo`;
+- `gh auth login`, then `gh ssh-key add ~/.ssh/id_ed25519.pub` so that
+  GitHub accepts the computer's ssh key, which cloning the vault needs;
+- the secret values: the Pushover keys, which `sops -d secrets/secrets.yaml`
+  shows on a computer that already has them, and the GitHub accounts that
+  Reviews watches and ignores.
