@@ -38,16 +38,24 @@ if [[ ! -d "$dir/$mode" ]]; then
 fi
 
 # `theme light` changes macOS's appearance, and sketchybar runs `theme`
-# again on that change. The lock makes the second run wait, so it reads the
-# mode the first one wrote and doesn't restart Chrome a second time. After
-# five seconds a run goes ahead, so a lock left by a killed run can't block.
+# again on that change. The lock makes the second run wait until the first
+# has finished, which can take ten seconds while Chrome quits and opens
+# again. After twenty seconds a run goes ahead, so a lock left by a killed
+# run can't block.
 lock="$dir/.lock"
-for _ in {1..50}; do
+for _ in {1..200}; do
   if mkdir "$lock" 2>/dev/null; then break; fi
   sleep 0.1
 done
 trap 'rmdir "$lock" 2>/dev/null || true' EXIT
 previous=$(cat "$dir/mode" 2>/dev/null || true)
+
+# When sketchybar's run finds the mode already applied, the run that changed
+# the appearance did everything. Going on would reload sketchybar a second
+# time, and two reloads at once add the bar's items out of order.
+if [[ ${SENDER:-} == appearance_change && $mode == "$previous" ]]; then
+  exit 0
+fi
 
 # Each link is swapped in whole, so an app never reads a half-moved file.
 for file in "$dir/$mode"/*; do
