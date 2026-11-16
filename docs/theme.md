@@ -25,9 +25,11 @@ sketchybar and Claude Code keep their colors in memory, so `theme` reloads
 them too. A computer without Claude Code gets none of Claude Code's theme
 files.
 
-A personal Mac with a screen also gets a desktop picture for each mode,
-painted from the theme's colors by `theme/desktop.py`, and `theme` sets it
-on every screen at each switch.
+A Mac with a screen also gets a desktop picture for each mode, painted
+from the theme's colors by `theme/desktop.py`, and `theme` sets it on
+every screen at each switch. A computer whose desktop picture is managed
+elsewhere sets `dotfiles.desktopPicture = false` in its host file, and
+`theme` then leaves the picture alone.
 
 ## Color another app
 

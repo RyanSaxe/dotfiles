@@ -81,5 +81,11 @@ in
       default = true;
       description = "Whether this computer has Claude Code. Without it, a switch writes none of Claude Code's files or settings.";
     };
+
+    desktopPicture = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Whether `theme` sets the desktop picture on a computer with the gui role. A computer whose desktop picture is managed elsewhere turns it off.";
+    };
   };
 }

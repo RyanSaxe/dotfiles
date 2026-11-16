@@ -16,12 +16,18 @@ let
       inherit lib mode;
       palette = inputs.catppuccin-palette;
     };
-  # Claude Code's theme and status line colors, which a computer without
-  # Claude Code leaves out.
-  absent = lib.optionals (!config.dotfiles.claudeCode) [
-    "claude-theme.json"
-    "ai-statusline-colors.js"
-  ];
+  cfg = config.dotfiles;
+  # A computer with a screen gets a desktop picture for each mode, unless
+  # its host turns it off.
+  desktopPicture = lib.elem "gui" cfg.roles && cfg.desktopPicture;
+  # What a computer leaves out: Claude Code's theme and status line colors
+  # without Claude Code, and the picture's colors without a picture.
+  absent =
+    lib.optionals (!cfg.claudeCode) [
+      "claude-theme.json"
+      "ai-statusline-colors.js"
+    ]
+    ++ lib.optional (!desktopPicture) "desktop.json";
   files =
     mode:
     lib.mapAttrs' (name: text: lib.nameValuePair "theme/${mode}/${name}" { inherit text; }) (
@@ -39,7 +45,6 @@ let
         pkgs.writeText "desktop-${mode}.json" (rendered mode)."desktop.json"
       } $out
     '';
-  roles = config.dotfiles.roles;
   theme = pkgs.writeShellApplication {
     name = "theme";
     runtimeInputs = [ pkgs.tmux ];
@@ -58,9 +63,8 @@ lib.mkMerge [
     '';
   }
 
-  # A personal computer with a screen gets a desktop picture for each mode,
-  # which `theme` sets at each switch.
-  (lib.mkIf (lib.elem "gui" roles && lib.elem "personal" roles) {
+  # `theme` sets the current mode's picture at each switch.
+  (lib.mkIf desktopPicture {
     xdg.configFile = {
       "theme/dark/desktop.png".source = picture "dark";
       "theme/light/desktop.png".source = picture "light";

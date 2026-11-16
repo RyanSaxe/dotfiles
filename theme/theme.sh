@@ -97,8 +97,9 @@ JS
   /usr/bin/open -g -b com.google.Chrome
 fi
 
-# A personal Mac with a screen has a desktop picture for each mode. AppKit
-# sets it on every screen, which needs no permission to control another app.
+# The switch installs a desktop picture for each mode on a Mac with a
+# screen, unless its host turns the picture off. AppKit sets it on every
+# screen, which needs no permission to control another app.
 if [[ $OSTYPE == darwin* && -f "$dir/$mode/desktop.png" ]]; then
   /usr/bin/osascript -l JavaScript - "$dir/$mode/desktop.png" >/dev/null <<'JS'
 function run(argv) {
