@@ -70,6 +70,17 @@ func taskLevel(ts []task, today time.Time) string {
 	return level
 }
 
+// vaultTaskLevel is the taskLevel of the vault's tasks, and none on a
+// computer without a vault, so its T letter stays off.
+func vaultTaskLevel(now time.Time) (string, error) {
+	vault := vaultDir()
+	if vault == "" {
+		return "none", nil
+	}
+	ts, err := vaultTasks(vault, now)
+	return taskLevel(ts, now), err
+}
+
 func attention(watch bool) error {
 	if watch {
 		return watchAttention()
@@ -82,11 +93,11 @@ func attention(watch bool) error {
 	var a acks
 	readJSON("inbox.json", &in)
 	readJSON("acknowledged.json", &a)
-	ts, err := vaultTasks(vaultDir(), time.Now())
+	tasks, err := vaultTaskLevel(time.Now())
 	if err != nil {
 		return err
 	}
-	fmt.Println(agents, reviewLevel(in, a), taskLevel(ts, time.Now()))
+	fmt.Println(agents, reviewLevel(in, a), tasks)
 	return nil
 }
 
@@ -144,13 +155,12 @@ func watchAttention() error {
 		republish()
 	}
 	recount := func() {
-		now := time.Now()
-		ts, err := vaultTasks(vaultDir(), now)
+		level, err := vaultTaskLevel(time.Now())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "ws: tasks:", err)
 			return
 		}
-		publish("task-attention", taskLevel(ts, now))
+		publish("task-attention", level)
 	}
 	reviews := time.NewTicker(5 * time.Minute)
 	tasks := time.NewTicker(time.Minute)

@@ -264,3 +264,13 @@ func TestTickingATaskChangesOnlyItsBox(t *testing.T) {
 		}
 	}
 }
+
+func TestTasksWithoutAVaultSaysSo(t *testing.T) {
+	t.Setenv("VAULT_DIR", "")
+	p := tasksPopup(mux.Detect(func(string) string { return "" }, ""), kitty.Terminal{})
+	for tab := range p.Tabs {
+		if rows, err := p.Load(tab); err == nil || !strings.Contains(err.Error(), "VAULT_DIR") {
+			t.Errorf("tab %d loaded %v (%v), want it to say the vault isn't set up", tab, rows, err)
+		}
+	}
+}

@@ -129,8 +129,9 @@ job runs as a launchd agent. Ctrl-R fetches now.
 
 ## Tasks
 
-A task is a `- [ ]` line in any Markdown file under `$VAULT_DIR`, which is
-`~/generic/vault`. A date after 📅 makes it due:
+A task is a `- [ ]` line in any Markdown file under `$VAULT_DIR`, the
+vault's folder, which the computer's host file sets. A date after 📅 makes
+it due:
 
 ```markdown
 - [ ] Renew the domain 📅 2026-12-01
@@ -152,6 +153,9 @@ repository name, and the first tab lists the tasks under
 asks for the text and a due date, such as `fri`, `3d`, `tmr` or
 `2026-12-01`, and adds the task to `notes/projects/PROJECT/TODO.md`.
 Ctrl-X ticks the box in the note.
+
+On a computer whose host file sets no vault, `$VAULT_DIR` is unset, so
+Tasks says the vault isn't set up and the T letter stays off.
 
 ## What ws keeps
 

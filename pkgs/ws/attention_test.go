@@ -31,6 +31,20 @@ func TestTaskLevel(t *testing.T) {
 	}
 }
 
+func TestTheTaskLetterStaysOffWithoutAVault(t *testing.T) {
+	vault := t.TempDir()
+	writeNote(t, vault, "notes/daily/2026-11-08.md", "- [ ] call the bank 📅 2026-11-08\n")
+	for _, c := range []struct{ name, dir, want string }{
+		{"a vault with an overdue task", vault, "overdue"},
+		{"no vault", "", "none"},
+	} {
+		t.Setenv("VAULT_DIR", c.dir)
+		if got, err := vaultTaskLevel(now); got != c.want || err != nil {
+			t.Errorf("%s: the level is %q (%v), want %q", c.name, got, err, c.want)
+		}
+	}
+}
+
 func TestNextAgent(t *testing.T) {
 	agents := []mux.Terminal{
 		{Label: "web", Block: "idle", Status: mux.Idle},

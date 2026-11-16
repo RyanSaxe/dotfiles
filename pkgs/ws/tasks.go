@@ -47,8 +47,10 @@ var (
 	breakRe = regexp.MustCompile(`^\s*($|([-*+]|\d+[.)]|#{1,6})(\s|$)|[>|])`)
 )
 
+// vaultDir is the vault's folder, which the switch exports as VAULT_DIR on a
+// computer whose host file names a vault, and "" on any other.
 func vaultDir() string {
-	return cmp.Or(os.Getenv("VAULT_DIR"), filepath.Join(home, "generic", "vault"))
+	return os.Getenv("VAULT_DIR")
 }
 
 // unfenced calls visit with each line outside a fenced code block.
@@ -226,6 +228,11 @@ func tickTask(vault string, t task, today time.Time) error {
 
 func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 	vault := vaultDir()
+	// Without a vault there are no tasks to list, and no note to add one to.
+	if vault == "" {
+		err := errors.New("the vault isn't set up, since VAULT_DIR is unset")
+		return popup.Popup{Noun: "tasks", Tabs: []popup.Tab{{Name: "Tasks"}}, Load: func(int) ([]popup.Row, error) { return nil, err }}
+	}
 	tags := map[string]lipgloss.Style{"overdue": popup.Red.SetString("overdue"), "today": popup.Yellow.SetString("today"), "soon": popup.Accent.SetString("soon")}
 	// A project's tasks are filed under the name of its origin remote.
 	project := ""
