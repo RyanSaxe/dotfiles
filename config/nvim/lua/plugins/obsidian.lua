@@ -18,7 +18,7 @@
 --                 is the day the note was made.
 --   notes_subdir  is notes/, where obsidian.nvim puts a note it makes with
 --                 no folder named, such as one from :Obsidian link_new.
-local vault = vim.fs.normalize(vim.env.VAULT_DIR or "~/generic/vault")
+local vault = vim.env.VAULT_DIR and vim.fs.normalize(vim.env.VAULT_DIR)
 local templates = (vim.env.XDG_CONFIG_HOME or vim.fn.expand("~/.config")) .. "/vault/templates"
 
 ---@param command string
@@ -205,8 +205,9 @@ end
 
 local notes = {
   "obsidian-nvim/obsidian.nvim",
-  -- A computer without the vault gets none of the vault's keys instead of an error.
-  cond = vim.fn.isdirectory(vault) == 1,
+  -- Without VAULT_DIR, or before the switch has cloned the vault, Neovim gets
+  -- none of the vault's keys instead of an error.
+  cond = vault ~= nil and vim.fn.isdirectory(vault) == 1,
   -- Loaded at startup, so :Obsidian works before any note is open.
   lazy = false,
   opts = {

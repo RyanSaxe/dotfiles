@@ -125,4 +125,6 @@ A new computer needs its own host file in `hosts/`, an entry in
 `attention-ignore` in the secrets.
 
 The host file's `vault` names the vault's folder and the git remote to
-clone it from. A computer without the vault leaves it out.
+clone it from. A computer without the vault leaves it out. It then has no
+`VAULT_DIR`, so Neovim skips obsidian.nvim and ws's Tasks says the vault
+isn't set up.
