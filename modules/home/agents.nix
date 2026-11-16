@@ -3,7 +3,8 @@
 # Claude Code only on a personal computer. Either way the modules only
 # merge settings into each agent's own file, keeping whatever the agent
 # writes there itself. Skills from other installers, such as byor, Rex and
-# pair, stay with those tools.
+# pair, stay with those tools. A computer whose host turns off
+# dotfiles.claudeCode gets none of Claude Code's files or settings.
 {
   config,
   lib,
@@ -17,6 +18,7 @@ let
   pair = pkgs.callPackage ../../pkgs/pair { src = inputs.pair; };
 
   personal = lib.elem "personal" cfg.roles;
+  claude = cfg.claudeCode;
   inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
   # Where the agents' commands are, which the switch's own PATH leaves out.
   agentPath =
@@ -123,17 +125,22 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   home.packages = [ pair ];
 
   home.file = {
-    # Claude reads the instructions through an import. Codex can't import,
-    # so it gets them through developer_instructions below.
-    ".claude/CLAUDE.md".text = ''
-      @${cfg.repo}/ai-harness/AGENTS.md
-    '';
-    ".claude/statusline.js".source = link "ai-harness/statusline.js";
     ".codex/themes/dotfiles.tmTheme".source =
       config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
-    ".claude/themes/dotfiles.json".source =
-      config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
   }
+  // lib.optionalAttrs claude (
+    {
+      # Claude reads the instructions through an import. Codex can't import,
+      # so it gets them through developer_instructions below.
+      ".claude/CLAUDE.md".text = ''
+        @${cfg.repo}/ai-harness/AGENTS.md
+      '';
+      ".claude/statusline.js".source = link "ai-harness/statusline.js";
+      ".claude/themes/dotfiles.json".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
+    }
+    // skillLinks ".claude/skills"
+  )
   // lib.optionalAttrs personal {
     # Copilot CLI registers each session with pair from this start hook.
     ".copilot/hooks/pair.json".text = builtins.toJSON {
@@ -147,7 +154,6 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       ];
     };
   }
-  // skillLinks ".claude/skills"
   // skillLinks ".agents/skills"
   // lib.optionalAttrs personal (
     lib.genAttrs' [ "dark" "light" ] (
@@ -178,7 +184,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   ];
 
   programs.claude-code = {
-    enable = true;
+    enable = claude;
     package = if isLinux && personal then pkgs.claude-code else null;
     mutableSettings = true;
     settings = {
@@ -271,11 +277,11 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   home.activation = {
     # pair's own installer, for each agent this computer has that lacks the
     # skill.
-    pairStartHook = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${pairStartHook}";
+    pairStartHook = lib.mkIf claude (lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${pairStartHook}");
     pairSkill = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       installed() { PATH="${agentPath}" command -v "$1" > /dev/null; }
       agents=""
-      if installed claude && [ ! -e "$HOME/.claude/skills/pair" ]; then agents="$agents -a claude-code"; fi
+      ${lib.optionalString claude ''if installed claude && [ ! -e "$HOME/.claude/skills/pair" ]; then agents="$agents -a claude-code"; fi''}
       if installed codex && [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a codex"; fi
       ${lib.optionalString personal ''
         # pi, opencode and Copilot CLI read the same folder as Codex.
@@ -288,17 +294,21 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     '';
   }
   // lib.optionalAttrs personal {
-    agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
-      run /bin/sh ${linkSkills}
-    '';
-    codexAgents = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${lib.escapeShellArgs convertAgents}";
+    agentSkills = lib.mkIf claude (
+      lib.hm.dag.entryAfter [ "pairSkill" ] ''
+        run /bin/sh ${linkSkills}
+      ''
+    );
+    codexAgents = lib.mkIf claude (
+      lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${lib.escapeShellArgs convertAgents}"
+    );
     piTheme = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${piTheme}";
     pairPlugins = lib.hm.dag.entryAfter [ "piTheme" ] "run ${pairPlugins}";
   };
 
   # Some installers put skills only in Codex's folder. This links each new
   # one for Claude as it lands.
-  launchd.agents.link-agent-skills = lib.mkIf (personal && pkgs.stdenv.hostPlatform.isDarwin) {
+  launchd.agents.link-agent-skills = lib.mkIf (personal && claude && isDarwin) {
     enable = true;
     config = {
       ProgramArguments = [
@@ -312,7 +322,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
 
   # The catalog installs agents only for Codex. This writes each one for
   # Claude as it lands.
-  launchd.agents.convert-codex-agents = lib.mkIf (personal && pkgs.stdenv.hostPlatform.isDarwin) {
+  launchd.agents.convert-codex-agents = lib.mkIf (personal && claude && isDarwin) {
     enable = true;
     config = {
       ProgramArguments = convertAgents;

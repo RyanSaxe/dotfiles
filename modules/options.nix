@@ -75,5 +75,11 @@ in
       default = null;
       description = "The Markdown vault that Neovim and ws read and write, or null for a computer without one.";
     };
+
+    claudeCode = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Whether this computer has Claude Code. Without it, a switch writes none of Claude Code's files or settings.";
+    };
   };
 }

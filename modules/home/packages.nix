@@ -119,7 +119,7 @@ in
             # every one. The switch's own PATH has none of their folders.
             has() { PATH="${agentPath}" command -v "$1" > /dev/null; }
             agents=skill
-            has claude && agents="$agents,claude-code"
+            ${lib.optionalString config.dotfiles.claudeCode ''has claude && agents="$agents,claude-code"''}
             has codex && agents="$agents,codex"
             run "$HOME/.local/bin/byor" install --agents "$agents" < /dev/null
           fi

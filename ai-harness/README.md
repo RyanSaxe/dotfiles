@@ -9,6 +9,11 @@ Homebrew cask a Mac switch installs, and both update themselves. On Linux,
 the home switch installs Codex from nixpkgs, and Claude Code too on a
 computer with the `personal` role.
 
+A computer without Claude Code sets `dotfiles.claudeCode = false` in its
+host file. Its switches then write nothing for Claude Code: no
+`~/.claude` files or settings, no skills or agents linked for it, and no
+Claude Code theme or status line colors.
+
 ```text
 ai-harness/
 ├── AGENTS.md         global instructions

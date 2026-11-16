@@ -22,7 +22,8 @@ meanings into one app's files. Each home switch renders every app for both
 modes, into `~/.config/theme/dark` and `~/.config/theme/light`, and
 `theme` points the links in `~/.config/theme` at one mode. tmux, Ghostty,
 sketchybar and Claude Code keep their colors in memory, so `theme` reloads
-them too.
+them too. A computer without Claude Code gets none of Claude Code's theme
+files.
 
 A personal Mac with a screen also gets a desktop picture for each mode,
 painted from the theme's colors by `theme/desktop.py`, and `theme` sets it

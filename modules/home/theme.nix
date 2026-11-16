@@ -16,10 +16,16 @@ let
       inherit lib mode;
       palette = inputs.catppuccin-palette;
     };
+  # Claude Code's theme and status line colors, which a computer without
+  # Claude Code leaves out.
+  absent = lib.optionals (!config.dotfiles.claudeCode) [
+    "claude-theme.json"
+    "ai-statusline-colors.js"
+  ];
   files =
     mode:
     lib.mapAttrs' (name: text: lib.nameValuePair "theme/${mode}/${name}" { inherit text; }) (
-      rendered mode
+      removeAttrs (rendered mode) absent
     );
   # Each mode's desktop picture, painted from that mode's desktop.json.
   painter = pkgs.python3.withPackages (ps: [
