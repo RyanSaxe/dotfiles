@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 
 	"workspace/popup"
 )
@@ -233,6 +234,22 @@ func TestAPopupOpensOnItsStartTab(t *testing.T) {
 	}
 }
 
+// Shift-Tab moves through the tabs the other way, wrapping from the first
+// to the last.
+func TestShiftTabGoesBackThroughTheTabs(t *testing.T) {
+	var picked []string
+	p := picker(nil, nil, &picked)
+	p.Tabs = []popup.Tab{{Name: "One"}, {Name: "Two"}, {Name: "Three"}}
+	p.Load = func(tab int) ([]popup.Row, error) {
+		return []popup.Row{{ID: p.Tabs[tab].Name, Title: p.Tabs[tab].Name}}, nil
+	}
+	shiftTab := tea.KeyMsg{Type: tea.KeyShiftTab}
+	run(start(p), shiftTab, enter, shiftTab, enter)
+	if want := []string{"Three", "Two"}; !slices.Equal(picked, want) {
+		t.Errorf("picked %v, want %v", picked, want)
+	}
+}
+
 // A reload draws the header's art again, so the popup shows art that an
 // action or anything else changed, such as a new mascot, without being opened
 // again.
@@ -252,6 +269,25 @@ func TestAReloadDrawsTheArtAgain(t *testing.T) {
 	mascot = "mew"
 	if m, _ = run(m, ctrlR); !strings.Contains(header(m), "mew") {
 		t.Errorf("after Ctrl-R, the header is %q", header(m))
+	}
+}
+
+// The accent follows the mascot, so a reload that draws a new mascot also
+// colors the popup with its accent.
+func TestAReloadTakesTheNewAccent(t *testing.T) {
+	profile, accent := lipgloss.ColorProfile(), popup.Accent
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(profile); popup.Accent = accent })
+	hex := "#ff0000"
+	draw := func() popup.Art { return popup.Art{Cells: "x", Cols: 1, Rows: 1, Accent: hex} }
+	m := popup.New(picker([]popup.Row{{ID: "a", Title: "a"}}, nil, new([]string)), draw)
+	m, _ = run(m, size, m.Init()())
+	if !strings.Contains(m.View(), "38;2;255;0;0") {
+		t.Fatal("the popup doesn't use the first mascot's accent")
+	}
+	hex = "#00ff00"
+	if m, _ = run(m, ctrlR); !strings.Contains(m.View(), "38;2;0;255;0") {
+		t.Error("after a reload drew a new mascot, the popup still uses the old accent")
 	}
 }
 

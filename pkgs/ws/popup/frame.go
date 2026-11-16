@@ -69,14 +69,22 @@ func newFrame(id int, p Popup, art Art) frame {
 		l.SetShowStatusBar(false)
 		l.SetShowHelp(false)
 		l.Styles.PaginationStyle, l.Styles.ArabicPagination = lipgloss.NewStyle(), Dim
-		l.Paginator.ActiveDot, l.Paginator.InactiveDot = Accent.Render("•"), Dim.Render("•")
 		l.FilterInput.Focus() // typing edits the filter, and listPane draws it
 		m.lists[i] = l
 	}
-	m.spin = spinner.New(spinner.WithSpinner(spinner.MiniDot), spinner.WithStyle(Accent))
+	m.spin = spinner.New(spinner.WithSpinner(spinner.MiniDot))
 	m.input = textinput.New()
-	m.input.PromptStyle, m.input.Cursor.Style = Accent, Accent
+	m.restyle()
 	return m
+}
+
+// restyle gives the parts that keep their own copy of Accent the current one.
+func (m *frame) restyle() {
+	for i := range m.lists {
+		m.lists[i].Paginator.ActiveDot, m.lists[i].Paginator.InactiveDot = Accent.Render("•"), Dim.Render("•")
+	}
+	m.spin.Style = Accent
+	m.input.PromptStyle, m.input.Cursor.Style = Accent, Accent
 }
 
 // load starts every tab's current load.
@@ -242,8 +250,11 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 	case "down", "ctrl+j", "ctrl+n":
 		l.CursorDown()
 		return m, m.selectionChanged()
-	case "tab", "shift+tab":
+	case "tab":
 		m.active = (m.active + 1) % len(m.lists)
+		return m, m.selectionChanged()
+	case "shift+tab":
+		m.active = (m.active + len(m.lists) - 1) % len(m.lists)
 		return m, m.selectionChanged()
 	case "ctrl+r":
 		return m, func() tea.Msg { return reloadMsg("") } // through the stack, which draws the art again

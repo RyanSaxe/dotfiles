@@ -51,6 +51,9 @@ func (r Row) FilterValue() string { return r.Title + " " + r.Detail }
 type Art struct {
 	Cells, Setup string
 	Cols, Rows   int
+	// Accent is the hex color the popup's accent takes when the art is
+	// drawn, or "" to keep the one it has.
+	Accent string
 }
 
 // The terminal's own palette, so popups follow its theme.

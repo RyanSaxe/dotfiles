@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Run shows p until it quits, with the art that draw returns at the right of
@@ -35,6 +36,9 @@ func open(p Popup, draw func() Art) stack {
 	var art Art
 	if draw != nil {
 		art = draw()
+	}
+	if art.Accent != "" {
+		Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(art.Accent))
 	}
 	return stack{frames: []frame{newFrame(0, p, art)}, draw: draw, art: art, next: 1}
 }
@@ -76,10 +80,14 @@ func (s stack) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmd, func() tea.Msg { return artMsg(draw()) })
 	case artMsg:
 		// Every frame shows the art in its header, and the header's height
-		// sets the room left for the list.
+		// sets the room left for the list. A new mascot brings a new accent.
 		s.art, s.frames = Art(msg), slices.Clone(s.frames)
+		if s.art.Accent != "" {
+			Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(s.art.Accent))
+		}
 		for i := range s.frames {
 			s.frames[i].art = s.art
+			s.frames[i].restyle()
 			if s.size.Width > 0 {
 				s.frames[i], _ = s.frames[i].update(s.size)
 			}
