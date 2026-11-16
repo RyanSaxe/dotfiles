@@ -31,6 +31,7 @@
 
   outputs =
     inputs@{
+      self,
       nixpkgs,
       nix-darwin,
       home-manager,
@@ -71,34 +72,65 @@
       specialArgs = { inherit inputs; };
     in
     {
+      # lib.mac builds a Mac's system config and lib.home a home config,
+      # each from a host file. `name` is the computer's name in
+      # darwinConfigurations and homeConfigurations, which the switch
+      # commands build. A private flake builds its own computers with them,
+      # as docs/setup.md shows.
+      lib = {
+        mac =
+          {
+            name,
+            system,
+            host,
+          }:
+          nix-darwin.lib.darwinSystem {
+            inherit specialArgs;
+            modules = [
+              ./modules/options.nix
+              ./modules/darwin
+              host
+              {
+                nixpkgs.hostPlatform = system;
+                dotfiles.host = name;
+              }
+            ];
+          };
+
+        home =
+          {
+            name,
+            system,
+            host,
+          }:
+          home-manager.lib.homeManagerConfiguration {
+            pkgs = pkgsFor system;
+            extraSpecialArgs = specialArgs;
+            modules = [
+              ./modules/options.nix
+              ./modules/home
+              host
+              { dotfiles.host = name; }
+            ];
+          };
+      };
+
       darwinConfigurations = builtins.mapAttrs (
         name: host:
-        nix-darwin.lib.darwinSystem {
-          inherit specialArgs;
-          modules = [
-            ./modules/options.nix
-            ./modules/darwin
-            ./hosts/${name}.nix
-            {
-              nixpkgs.hostPlatform = host.system;
-              dotfiles.host = name;
-            }
-          ];
+        self.lib.mac {
+          inherit name;
+          inherit (host) system;
+          host = ./hosts/${name}.nix;
         }
       ) macs;
 
       homeConfigurations = nixpkgs.lib.mapAttrs' (
         name: host:
         nixpkgs.lib.nameValuePair "${host.user}@${name}" (
-          home-manager.lib.homeManagerConfiguration {
-            pkgs = pkgsFor host.system;
-            extraSpecialArgs = specialArgs;
-            modules = [
-              ./modules/options.nix
-              ./modules/home
-              ./hosts/${name}.nix
-              { dotfiles.host = name; }
-            ];
+          self.lib.home {
+            inherit name;
+            inherit (host) system;
+            host = ./hosts/${name}.nix;
           }
         )
       ) (macs // linux);
