@@ -60,7 +60,7 @@ pkgs/               ws's Go source and the pair package
 config/             files programs read as they are, linked from the checkout
 ai-harness/         the agents' instructions, skills and hooks
 secrets/            secrets.yaml, encrypted to the keys in .sops.yaml
-tests/              the prompt's test
+tests/              the prompt's test, and a placeholder work host CI builds
 docs/               these pages
 assets/             the README's screenshots
 ```

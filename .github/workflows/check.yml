@@ -6,7 +6,7 @@ on:
   pull_request:
 
 # Neither job has an age key, so neither decrypts a secret. A build only
-# checks that secrets/secrets.yaml has each key a config names.
+# checks that the config's sops file has each key the config names.
 jobs:
   mac:
     # Apple Silicon, like the Mac configs it builds.
@@ -41,3 +41,6 @@ jobs:
         run: |
           nix build --no-link --print-build-logs \
             '.#homeConfigurations."ryansaxe@linux".activationPackage'
+
+      - name: Build a work Linux home config, from tests/work
+        run: nix build --no-link --print-build-logs .#checks.x86_64-linux.work

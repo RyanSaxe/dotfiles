@@ -135,6 +135,15 @@
         )
       ) (macs // linux);
 
+      # A work computer's home config, from a placeholder host that names no
+      # real account, which CI builds.
+      checks.x86_64-linux.work =
+        (self.lib.home {
+          name = "work";
+          system = "x86_64-linux";
+          host = ./tests/work/host.nix;
+        }).activationPackage;
+
       packages = nixpkgs.lib.genAttrs systems (system: {
         ws = (pkgsFor system).callPackage ./pkgs/ws { };
         pair = (pkgsFor system).callPackage ./pkgs/pair { src = inputs.pair; };
