@@ -13,7 +13,7 @@ computer with the `personal` role.
 ai-harness/
 ├── AGENTS.md         global instructions
 ├── references/       what AGENTS.md says to read before writing code,
-│                     tests or checking work
+│                     tests or prose, or checking work
 ├── skills/           Agent Skills: worktrees and wiki
 ├── tools/            notify-pushover.zsh, the agents' push hook,
 │                     link-agent-skills.sh, which shares Codex's skills

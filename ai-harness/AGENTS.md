@@ -7,6 +7,9 @@ things. Then what the user asks for always comes first, next the AGENTS.md
 closest to the file you're changing, then instructions you loaded for the
 task at hand, and this file last.
 
+Before you write anything a person will read, including your replies to
+the user, read `~/generic/dotfiles/ai-harness/references/writing.md`.
+
 ## Before you start
 
 - Read the instructions and code that govern the work, enough to choose a
