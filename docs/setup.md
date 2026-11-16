@@ -6,15 +6,15 @@ file expects it. These steps set up the two computers `flake.nix` lists,
 
 ## A Mac
 
-1. Install Nix, Homebrew and Claude Code. The Mac switch installs apps
-   through Homebrew but can't install Homebrew itself, and Claude Code goes
-   before the first home switch so that the switch sets byor and pair up
-   for it.
+1. Install Nix and Homebrew, and Claude Code on a computer that uses
+   Claude. The Mac switch installs apps through Homebrew but can't install
+   Homebrew itself. Claude Code goes before the first home switch, so that
+   the switch sets byor and pair up for it.
 
    ```sh
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   curl -fsSL https://claude.ai/install.sh | bash
+   curl -fsSL https://claude.ai/install.sh | bash   # only on a computer that uses Claude
    ```
 
 2. In a new terminal, so that `nix` is on the PATH, clone the repository
@@ -128,3 +128,95 @@ The host file's `vault` names the vault's folder and the git remote to
 clone it from. A computer without the vault leaves it out. It then has no
 `VAULT_DIR`, so Neovim skips obsidian.nvim and ws's Tasks says the vault
 isn't set up.
+
+A computer whose details stay out of this repository is built from a
+private flake instead, as the next section shows.
+
+## A computer built from a private flake
+
+A private flake keeps a computer's account name, email and own tools out of
+this public repository. It takes this checkout as an input, keeps the
+computer's host file and secrets beside its `flake.nix`, and builds the
+computer's configs with `lib.mac` and `lib.home`:
+
+```nix
+# flake.nix
+{
+  inputs.dotfiles.url = "git+file:///Users/ACCOUNT/generic/dotfiles?ref=main";
+  outputs =
+    { dotfiles, ... }:
+    {
+      darwinConfigurations.work = dotfiles.lib.mac {
+        name = "work";
+        system = "aarch64-darwin";
+        host = ./host.nix;
+      };
+      homeConfigurations."ACCOUNT@work" = dotfiles.lib.home {
+        name = "work";
+        system = "aarch64-darwin";
+        host = ./host.nix;
+      };
+    };
+}
+```
+
+```nix
+# host.nix
+{
+  dotfiles = {
+    user = "ACCOUNT";
+    roles = [ "base" "gui" "work" ];
+    repo = "/Users/ACCOUNT/generic/dotfiles";
+    flake = "/Users/ACCOUNT/generic/work-dotfiles"; # this flake's folder
+    git.email = "EMAIL";
+    secretsFile = ./secrets.yaml;
+    claudeCode = false; # this computer has no Claude Code
+    desktopPicture = false; # its desktop picture is managed elsewhere
+    vault = {
+      dir = "/Users/ACCOUNT/generic/vault";
+      remote = "git@github.com:GITHUB_ACCOUNT/vault.git";
+    };
+  };
+}
+```
+
+`name` is the computer's name in both outputs, so `mac-switch` builds
+`work` and `home-switch` builds `ACCOUNT@work`. A Linux box has only the
+`homeConfigurations` entry, with `system = "x86_64-linux"`, paths under
+`/home` and no `gui` role.
+
+`flake` points the switches and `nix-update` at the private flake. The
+switches build the commit of this repository that the private flake's
+`flake.lock` pins, and `nix-update` moves that pin to the latest commit on
+the checkout's `main`, so pull the checkout first. The other inputs, such
+as nixpkgs, stay where this repository's `flake.lock` pins them. The input
+names `main` because Nix won't lock a checkout with uncommitted changes
+otherwise. Files linked from `config/` and `ai-harness/` still apply from
+the checkout as soon as they change.
+
+`secretsFile` is the private flake's own sops file. It needs
+`pushover-user` and `pushover-token`, and an entry named after the
+computer, here `work`, under `pair-hub-host`, `attention-watch` and
+`attention-ignore`. A value the computer doesn't use can be empty. A
+`.sops.yaml` beside it lists the age keys that open it:
+
+```yaml
+# .sops.yaml
+creation_rules:
+  - path_regex: secrets\.yaml$
+    age: AGE_PUBLIC_KEY
+```
+
+`sops secrets.yaml` then opens a new file in your editor and encrypts it
+when you save. Nix reads only the files git tracks in a flake's
+repository, so commit all of the private flake's files.
+
+Set the computer up as a Mac or a Linux box above, with the private flake
+in the folder `flake` names. Make its secrets file in place of encrypting
+this repository's, skip the Rex lines on a Linux box without the
+`rex-server` role, and run the first switches against the private flake:
+
+```sh
+sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake ~/generic/work-dotfiles#work
+nix run home-manager/master -- switch -b pre-nix --flake ~/generic/work-dotfiles#ACCOUNT@work
+```

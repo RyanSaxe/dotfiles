@@ -25,6 +25,7 @@ Sign each agent in to its account:
 | opencode    | `opencode auth login`           |
 | Copilot CLI | `copilot login`                 |
 
-pi, opencode and Copilot CLI are only on computers with the `personal`
-role. Restart any pi or opencode that was running during the first home
-switch, so it loads pair's extension or plugin.
+Claude Code is only on computers that use Claude, and pi, opencode and
+Copilot CLI only on computers with the `personal` role. Restart any pi or
+opencode that was running during the first home switch, so it loads pair's
+extension or plugin.

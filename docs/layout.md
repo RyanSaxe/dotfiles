@@ -5,6 +5,11 @@
 `modules/home`. Both read the computer's host file in `hosts/`, which names
 its roles, and each module turns itself on for the roles it belongs to.
 
+`flake.nix` builds these configs with `lib.mac` and `lib.home`, which it
+also exports. A computer whose details stay out of this repository is
+built from a private flake that calls them with a host file of its own, as
+[Setup](setup.md#a-computer-built-from-a-private-flake) shows.
+
 ```mermaid
 flowchart LR
   subgraph Hosts
