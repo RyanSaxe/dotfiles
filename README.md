@@ -3,10 +3,7 @@
 These are my dotfiles: one Nix flake that sets up my Mac and a Linux server,
 from macOS's settings to my editor.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/screen-dark.png">
-  <img alt="The Mac's screen: sketchybar across the top, and Rex below it with a Python file and docs/layout.md open in Neovim, the second with its diagram drawn as a picture and its pane outlined as the focused one." src="assets/screen-light.png">
-</picture>
+<img alt="The Mac's screen: sketchybar across the top, and Rex below it with two Neovim panes. The focused one has a Python file, and the other a note with its Mermaid diagram and formula drawn as pictures." src="assets/screen.png">
 
 ## How it works
 
@@ -57,20 +54,11 @@ In Rex or tmux, Alt and a key opens a `ws` popup:
 | Alt-C     | Theme: switch light and dark, and pick the picture in popups   |
 | Alt-/     | Keys: every key binding                                        |
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/picker-dark.png">
-  <img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on those that have a running session and a bookmarked folder last, beside the selected repository's git status." src="assets/picker-light.png">
-</picture>
+<img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on those that have a running session and a bookmarked folder last, beside the selected repository's status, top-level folders and files, and recent commits." src="assets/picker.png">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/reviews-dark.png">
-  <img alt="The Reviews popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description." src="assets/reviews-light.png">
-</picture>
+<img alt="The Reviews popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description." src="assets/reviews.png">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/tasks-dark.png">
-  <img alt="The Tasks popup over Rex, with sketchybar's T lit. It lists the repository's open tasks by due date beside the note they're in." src="assets/tasks-light.png">
-</picture>
+<img alt="The Tasks popup over Rex, with sketchybar's T lit. It lists the repository's open tasks by due date beside the note they're in." src="assets/tasks.png">
 
 At the left of sketchybar, after the date, are AeroSpace's four workspaces,
 with the focused one in the accent color:
