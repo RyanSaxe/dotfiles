@@ -1,6 +1,6 @@
 # Options every host file sets. Both the Mac config and the home config
 # import this, so a host file can be shared by the two.
-{ lib, ... }:
+{ config, lib, ... }:
 let
   inherit (lib) mkOption types;
 in
@@ -8,7 +8,7 @@ in
   options.dotfiles = {
     host = mkOption {
       type = types.str;
-      description = "This computer's name in flake.nix, which the switch commands build.";
+      description = "This computer's name in the flake that builds it, which the switch commands build.";
     };
 
     user = mkOption {
@@ -32,6 +32,12 @@ in
     repo = mkOption {
       type = types.str;
       description = "Where this repository is checked out. Linked config files point here, so edits apply without a switch.";
+    };
+
+    flake = mkOption {
+      type = types.str;
+      default = config.dotfiles.repo;
+      description = "The folder of the flake that builds this computer, which the switch commands build and nix-update updates. A computer built from a private flake sets it to that flake's folder.";
     };
 
     git.email = mkOption {

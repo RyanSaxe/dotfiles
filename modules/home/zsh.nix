@@ -21,11 +21,11 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   programs.zsh = {
     enable = true;
     shellAliases = {
-      home-switch = "home-manager switch --flake '${cfg.repo}#${cfg.user}@${cfg.host}'";
-      nix-update = "nix flake update --flake '${cfg.repo}' && ${lib.optionalString isDarwin "mac-switch && "}home-switch && uv tool upgrade --all";
+      home-switch = "home-manager switch --flake '${cfg.flake}#${cfg.user}@${cfg.host}'";
+      nix-update = "nix flake update --flake '${cfg.flake}' && ${lib.optionalString isDarwin "mac-switch && "}home-switch && uv tool upgrade --all";
     }
     // lib.optionalAttrs isDarwin {
-      mac-switch = "sudo darwin-rebuild switch --flake '${cfg.repo}#${cfg.host}'";
+      mac-switch = "sudo darwin-rebuild switch --flake '${cfg.flake}#${cfg.host}'";
     };
     # zshrc runs compinit itself, with a full check once a day.
     enableCompletion = false;
