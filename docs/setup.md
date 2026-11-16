@@ -186,13 +186,13 @@ computer's configs with `lib.mac` and `lib.home`:
 `/home` and no `gui` role.
 
 `flake` points the switches and `nix-update` at the private flake. The
-switches build the commit of this repository that the private flake's
-`flake.lock` pins, and `nix-update` moves that pin to the latest commit on
-the checkout's `main`, so pull the checkout first. The other inputs, such
+switches pass this checkout to it as the input named `dotfiles`, so they
+build it as it is, uncommitted changes included, like a computer that
+`flake.nix` lists. The private flake must name the input `dotfiles`.
+`nix-update` updates the private flake's lock, and the other inputs, such
 as nixpkgs, stay where this repository's `flake.lock` pins them. The input
 names `main` because Nix won't lock a checkout with uncommitted changes
-otherwise. Files linked from `config/` and `ai-harness/` still apply from
-the checkout as soon as they change.
+otherwise.
 
 `secretsFile` is the private flake's own sops file. It needs
 `pushover-user` and `pushover-token`, and an entry named after the

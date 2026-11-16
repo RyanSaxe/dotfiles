@@ -26,10 +26,6 @@ How a change takes effect depends on the file:
 - **Both:** `flake.nix`, `flake.lock`, `hosts/` and `modules/options.nix`
   affect every config, so a Mac needs `home-switch` and `mac-switch`.
 
-On a computer built from a private flake, the switches build the commit of
-`main` that the private flake's lock pins, so a change that needs a switch
-reaches that computer once it's on `main` and `nix-update` has run.
-
 `theme light` and `theme dark` switch macOS and every app between light and
 dark without a rebuild.
 

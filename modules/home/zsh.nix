@@ -16,16 +16,22 @@ let
     zsh-autosuggestions = "${pkgs.zsh-autosuggestions}/share/zsh/plugins/zsh-autosuggestions";
     fast-syntax-highlighting = "${pkgs.zsh-fast-syntax-highlighting}/share/zsh/plugins/fast-syntax-highlighting";
   };
+  # A private flake builds this checkout as it is, uncommitted changes
+  # included, like a computer this repository builds itself, in place of the
+  # commit its lock pins.
+  live = lib.optionalString (
+    cfg.flake != cfg.repo
+  ) " --override-input dotfiles 'git+file://${cfg.repo}'";
 in
 lib.mkIf (lib.elem "base" cfg.roles) {
   programs.zsh = {
     enable = true;
     shellAliases = {
-      home-switch = "home-manager switch --flake '${cfg.flake}#${cfg.user}@${cfg.host}'";
+      home-switch = "home-manager switch --flake '${cfg.flake}#${cfg.user}@${cfg.host}'${live}";
       nix-update = "nix flake update --flake '${cfg.flake}' && ${lib.optionalString isDarwin "mac-switch && "}home-switch && uv tool upgrade --all";
     }
     // lib.optionalAttrs isDarwin {
-      mac-switch = "sudo darwin-rebuild switch --flake '${cfg.flake}#${cfg.host}'";
+      mac-switch = "sudo darwin-rebuild switch --flake '${cfg.flake}#${cfg.host}'${live}";
     };
     # zshrc runs compinit itself, with a full check once a day.
     enableCompletion = false;
