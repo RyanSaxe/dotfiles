@@ -30,6 +30,8 @@ var (
 	purple  = color.NRGBA{100, 70, 200, 255}
 	crimson = color.NRGBA{220, 30, 40, 255}
 	gold    = color.NRGBA{220, 180, 60, 255}
+	blush   = color.NRGBA{245, 195, 205, 255}
+	teal    = color.NRGBA{40, 170, 190, 255}
 	grey    = color.NRGBA{128, 128, 128, 255}
 )
 
@@ -44,6 +46,11 @@ func TestMascotColors(t *testing.T) {
 		{"small eyes keep their hue", paint(
 			layer{image.Rect(0, 0, 200, 200), purple}, layer{image.Rect(50, 50, 70, 70), crimson}, layer{image.Rect(130, 50, 150, 70), crimson},
 		), "lavender", "maroon"},
+		// Jigglypuff's case: a pale pink body outweighs small vivid eyes,
+		// which give the second color.
+		{"a pale body outweighs vivid eyes", paint(
+			layer{image.Rect(0, 0, 200, 200), blush}, layer{image.Rect(50, 50, 70, 70), teal}, layer{image.Rect(130, 50, 150, 70), teal},
+		), "maroon", "sky"},
 		// A mostly red mascot leads with its other hue, since a red accent
 		// reads as an error everywhere it shows.
 		{"red never leads", paint(

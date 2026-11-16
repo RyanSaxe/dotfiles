@@ -164,11 +164,11 @@ func loadPNG(path string) (image.Image, error) {
 
 // ----- colors ------------------------------------------------------------
 //
-// mascotColors finds the mascot's two hues as the theme command did: the
-// dominant vivid hue, or the dominant pale one when nothing is vivid, and
-// the most distinct other hue the mascot actually has. Then each snaps to
-// the Catppuccin accent nearest in OKLCH hue, the second to a different
-// accent than the first.
+// mascotColors finds the mascot's two hues: the dominant hue of its vivid
+// and clearly tinted pale pixels, or of its pale ones when nothing is
+// vivid, and the most distinct other hue the mascot actually has. Then each
+// snaps to the Catppuccin accent nearest in OKLCH hue, the second to a
+// different accent than the first.
 
 type hsv struct{ h, s, v float64 }
 
@@ -268,20 +268,28 @@ func representative(px []hsv, b int) hsv {
 	return hsv{math.Mod(h/n+center+1, 1), s / n, v / n}
 }
 
+// tinted is the saturation from which a pale pixel competes with the vivid
+// ones for the main color, so a pale body outweighs small vivid eyes.
+const tinted = 0.15
+
 func pickPair(vivid, pale []hsv) (hsv, hsv) {
 	lead := vivid
 	if len(lead) == 0 { // a mascot painted only in dusty colors, such as mewtwo
 		lead = pale
 	}
-	lw := weights(lead)
-	primary := 0
-	for i := range lw {
-		if lw[i] > lw[primary] {
-			primary = i
+	main := lead
+	if len(vivid) > 0 {
+		main = slices.Clone(vivid)
+		for _, p := range pale {
+			if p.s >= tinted {
+				main = append(main, p)
+			}
 		}
 	}
-	threshold := lw[primary] * 0.02 // a cluster this much weaker is noise
-	accent := representative(lead, primary)
+	primary := strongest(weights(main))
+	accent := representative(main, primary)
+	lw := weights(lead)
+	threshold := lw[strongest(lw)] * 0.02 // a cluster this much weaker is noise
 	tiers := []struct {
 		px  []hsv
 		w   []float64
@@ -299,6 +307,17 @@ func pickPair(vivid, pale []hsv) (hsv, hsv) {
 		}
 	}
 	return accent, accent
+}
+
+// strongest is the bucket with the most weight.
+func strongest(w []float64) int {
+	best := 0
+	for i := range w {
+		if w[i] > w[best] {
+			best = i
+		}
+	}
+	return best
 }
 
 func isRed(c hsv) bool {
