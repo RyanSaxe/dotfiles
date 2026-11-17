@@ -33,7 +33,7 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 		Noun:  "folders and sessions",
 		Tabs:  []popup.Tab{foldersTab: {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."}, sessionsTab: {Name: "Sessions", Empty: "No sessions are running."}},
 		Start: first,
-		Load: func(tab int) ([]popup.Row, error) {
+		Load: func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
 			ss, err := b.Sessions()
 			if tab == foldersTab {
 				return folderRows(ss), err

@@ -47,7 +47,7 @@ func TestFilesTabsEachListTheirOwnKind(t *testing.T) {
 		{".env.example", ".gitignore"},
 		{".cache/tmp.json", "build/out.bin"},
 	} {
-		rows, err := p.Load(tab)
+		rows, err := p.Load(tab, nil)
 		if err != nil {
 			t.Fatalf("tab %s: %v", p.Tabs[tab].Name, err)
 		}

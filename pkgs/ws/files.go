@@ -32,7 +32,7 @@ func filesPopup(b mux.Backend, dir string) popup.Popup {
 	return popup.Popup{
 		Noun: "files", OneLine: true,
 		Tabs: []popup.Tab{{Name: "Files", Empty: "No files."}, {Name: "Hidden", Empty: "No hidden files."}, {Name: "Ignored", Empty: "No ignored files."}},
-		Load: func(t int) ([]popup.Row, error) {
+		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
 			files, err := find(flags[t])
 			if err == nil && t > 0 {
 				var before []string

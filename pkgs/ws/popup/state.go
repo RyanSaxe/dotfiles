@@ -12,7 +12,7 @@ const (
 	picking                    // nothing to show yet, and Enter waits for the rows
 	loaded                     // showing rows
 	failed                     // showing why the load failed
-	reloading                  // showing rows while the next load runs
+	updating                   // showing rows while a load runs, whose rows replace them
 	retrying                   // showing a failure while the next load runs
 )
 
@@ -25,6 +25,7 @@ type tabLoad struct {
 type (
 	tabEvent  interface{ isTabEvent() }
 	reloadTab struct{}
+	tabShown  struct{ gen int } // rows Load showed before it returned
 	tabDone   struct {
 		gen int
 		err error
@@ -33,6 +34,7 @@ type (
 )
 
 func (reloadTab) isTabEvent()  {}
+func (tabShown) isTabEvent()   {}
 func (tabDone) isTabEvent()    {}
 func (pickEarly) isTabEvent()  {}
 func (keyPressed) isTabEvent() {} // any key after an early Enter takes it back
@@ -50,8 +52,16 @@ const (
 func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 	switch e := e.(type) {
 	case reloadTab:
-		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: reloading, failed: retrying, reloading: reloading, retrying: retrying}[t.state]
+		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: updating, failed: retrying, updating: updating, retrying: retrying}[t.state]
 		return tabLoad{state: state, gen: t.gen + 1, err: t.err}, dropRows
+	case tabShown:
+		switch {
+		case e.gen != t.gen:
+			return t, dropRows
+		case t.state == picking:
+			return tabLoad{state: updating, gen: t.gen}, showAndPick
+		}
+		return tabLoad{state: updating, gen: t.gen}, showRows
 	case pickEarly:
 		if t.state == firstLoad {
 			return tabLoad{state: picking, gen: t.gen}, dropRows
@@ -74,13 +84,14 @@ func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 	return t, dropRows
 }
 
-func (t tabLoad) showsRows() bool { return t.state == loaded || t.state == reloading }
+func (t tabLoad) showsRows() bool { return t.state == loaded || t.state == updating }
 func (t tabLoad) showsErr() bool  { return t.state == failed || t.state == retrying }
 func (t tabLoad) busy() bool      { return t.state != loaded && t.state != failed }
 
 // A row's details are fetched once the cursor rests on it, so holding j
-// doesn't fetch every row it passes. gen is the frame's reload the fetch
-// belongs to, so a fetch from before a reload is dropped.
+// doesn't fetch every row it passes, or at once when a tab's final rows
+// arrive under the cursor. gen is the frame's reload the fetch belongs to,
+// so a fetch from before a reload is dropped.
 type detailState int
 
 const (
@@ -101,6 +112,7 @@ type detail struct {
 type (
 	detailEvent interface{ isDetailEvent() }
 	arrived     struct{ gen int } // the cursor arrived on the row
+	rowsLoaded  struct{ gen int } // the tab's final rows arrived with the cursor on the row
 	rested      struct{}          // the cursor is still on the row a moment later
 	fetched     struct {
 		gen  int
@@ -109,9 +121,10 @@ type (
 	}
 )
 
-func (arrived) isDetailEvent() {}
-func (rested) isDetailEvent()  {}
-func (fetched) isDetailEvent() {}
+func (arrived) isDetailEvent()    {}
+func (rowsLoaded) isDetailEvent() {}
+func (rested) isDetailEvent()     {}
+func (fetched) isDetailEvent()    {}
 
 // effect is what the frame does after a row's details move on.
 type effect int
@@ -127,6 +140,10 @@ func (d detail) next(e detailEvent) (detail, effect) {
 	case arrived:
 		if d.state == unasked || d.state == waiting {
 			return detail{state: waiting, gen: e.gen}, waitToRest
+		}
+	case rowsLoaded:
+		if d.state == unasked || d.state == waiting {
+			return detail{state: fetching, gen: e.gen}, fetch
 		}
 	case rested:
 		if d.state == waiting {

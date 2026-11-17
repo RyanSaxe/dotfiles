@@ -2,9 +2,11 @@ package popup_test
 
 import (
 	"errors"
+	"io"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -72,7 +74,7 @@ func picker(rows []popup.Row, err error, picked *[]string) popup.Popup {
 	return popup.Popup{
 		Noun: "rows",
 		Tabs: []popup.Tab{{Name: "Rows", Empty: "No rows."}},
-		Load: func(int) ([]popup.Row, error) { return rows, err },
+		Load: func(int, func([]popup.Row)) ([]popup.Row, error) { return rows, err },
 		Actions: []popup.Action{{Key: "enter", Help: "pick", Run: func(r popup.Row) tea.Cmd {
 			*picked = append(*picked, r.ID)
 			return nil
@@ -94,7 +96,7 @@ func TestFailedLoadRetries(t *testing.T) {
 	var picked []string
 	rows, err := []popup.Row(nil), errors.New("gh: rate limited")
 	p := picker(nil, nil, &picked)
-	p.Load = func(int) ([]popup.Row, error) { return rows, err }
+	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) { return rows, err }
 	m := start(p)
 	m, _ = run(m, enter)
 	if len(picked) != 0 {
@@ -125,7 +127,9 @@ func TestRowsFromBeforeAReloadAreDropped(t *testing.T) {
 	var picked []string
 	answer := "old"
 	p := picker(nil, nil, &picked)
-	p.Load = func(int) ([]popup.Row, error) { return []popup.Row{{ID: answer, Title: answer}}, nil }
+	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) {
+		return []popup.Row{{ID: answer, Title: answer}}, nil
+	}
 	m := popup.New(p, nil)
 	first := m.Init() // the first load, still running
 	answer = "new"
@@ -155,6 +159,56 @@ func TestEnterBeforeTheRowsPicksTheTopMatch(t *testing.T) {
 	}
 }
 
+// Rows a Load shows appear while it still runs, and Enter picks from them.
+// When the final rows replace them, the cursor stays on its row, and the
+// preview, which waits for the final rows, gets that row as Load returned it.
+func TestRowsShownWhileLoadingGiveWayToTheFinalOnes(t *testing.T) {
+	finish := make(chan struct{})
+	picks, fetches := make(chan popup.Row, 4), make(chan popup.Row, 4)
+	p := popup.Popup{
+		Noun: "rows",
+		Tabs: []popup.Tab{{Name: "Rows"}},
+		Load: func(_ int, show func([]popup.Row)) ([]popup.Row, error) {
+			show([]popup.Row{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}})
+			<-finish
+			return []popup.Row{{ID: "new", Title: "new"}, {ID: "a", Title: "a"}, {ID: "b", Title: "b", Detail: "final"}}, nil
+		},
+		Fetch:   func(r popup.Row) (any, error) { fetches <- r; return "", nil },
+		Actions: []popup.Action{{Key: "enter", Help: "pick", Run: func(r popup.Row) tea.Cmd { picks <- r; return nil }}},
+	}
+	// The rows arrive while the program runs, as they do in a terminal.
+	prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(io.Discard), tea.WithoutRenderer(), tea.WithoutSignalHandler())
+	go prog.Run()
+	t.Cleanup(prog.Kill)
+	prog.Send(size)
+	prog.Send(enter)
+	if r := receive(t, picks); r.ID != "a" {
+		t.Fatalf("Enter while Load ran picked %q, want a", r.ID)
+	}
+	prog.Send(down)
+	time.Sleep(300 * time.Millisecond) // longer than the cursor rests before its preview
+	close(finish)
+	if r := receive(t, fetches); r.ID != "b" || r.Detail != "final" {
+		t.Errorf("the first preview was of %q with detail %q, want b as Load returned it", r.ID, r.Detail)
+	}
+	prog.Send(enter)
+	if r := receive(t, picks); r.ID != "b" {
+		t.Errorf("Enter after the final rows picked %q, want b, where the cursor was", r.ID)
+	}
+}
+
+// receive waits for what a running popup hands its Fetch or actions.
+func receive(t *testing.T, c chan popup.Row) popup.Row {
+	t.Helper()
+	select {
+	case r := <-c:
+		return r
+	case <-time.After(5 * time.Second):
+		t.Fatal("the popup handed over no row")
+	}
+	return popup.Row{}
+}
+
 // Rows that load before the terminal's size arrives are there to pick once
 // it does.
 func TestRowsBeforeTheSizeCanBePicked(t *testing.T) {
@@ -174,7 +228,9 @@ func TestDetailsAreFetchedOnceAndShown(t *testing.T) {
 	p := popup.Popup{
 		Noun: "rows",
 		Tabs: []popup.Tab{{Name: "Rows"}},
-		Load: func(int) ([]popup.Row, error) { return []popup.Row{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}}, nil },
+		Load: func(int, func([]popup.Row)) ([]popup.Row, error) {
+			return []popup.Row{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}}, nil
+		},
 		Fetch: func(r popup.Row) (any, error) {
 			fetches = append(fetches, r.ID)
 			return pr{"details of " + r.ID}, nil
@@ -241,7 +297,7 @@ func TestAPopupOpensOnItsStartTab(t *testing.T) {
 	var picked []string
 	p := picker(nil, nil, &picked)
 	p.Tabs = []popup.Tab{{Name: "Folders"}, {Name: "Sessions"}}
-	p.Load = func(tab int) ([]popup.Row, error) {
+	p.Load = func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
 		return []popup.Row{{ID: p.Tabs[tab].Name, Title: p.Tabs[tab].Name}}, nil
 	}
 	p.Start = 1
@@ -257,7 +313,7 @@ func TestShiftTabGoesBackThroughTheTabs(t *testing.T) {
 	var picked []string
 	p := picker(nil, nil, &picked)
 	p.Tabs = []popup.Tab{{Name: "One"}, {Name: "Two"}, {Name: "Three"}}
-	p.Load = func(tab int) ([]popup.Row, error) {
+	p.Load = func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
 		return []popup.Row{{ID: p.Tabs[tab].Name, Title: p.Tabs[tab].Name}}, nil
 	}
 	shiftTab := tea.KeyMsg{Type: tea.KeyShiftTab}

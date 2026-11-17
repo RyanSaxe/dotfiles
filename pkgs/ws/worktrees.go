@@ -43,7 +43,7 @@ func worktreesPopup(b mux.Backend) popup.Popup {
 	return popup.Popup{
 		Noun: "worktrees",
 		Tabs: tabs,
-		Load: func(t int) ([]popup.Row, error) {
+		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
 			var rows []popup.Row
 			for _, w := range worktrees(b) {
 				if project != "" && t == 0 && w.Project != project {

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -27,6 +28,7 @@ type (
 		frame, tab, gen int
 		rows            []Row
 		err             error
+		more            tea.Cmd // reads the load's next rows, or nil for the ones Load returned
 	}
 	detailMsg struct {
 		frame, gen int
@@ -87,14 +89,32 @@ func (m *frame) restyle() {
 	m.input.PromptStyle, m.input.Cursor.Style = Accent, Accent
 }
 
-// load starts every tab's current load.
+// load starts every tab's current load. Load runs in a goroutine, and the
+// frame reads the rows it shows and returns one message at a time.
 func (m frame) load() tea.Cmd {
 	cmds := []tea.Cmd{m.spin.Tick}
 	for t := range m.p.Tabs {
 		id, gen := m.id, m.tabs[t].gen
+		// The box holds the newest rows the frame hasn't read. They replace
+		// any older ones, so Load never waits on the frame, even one that has
+		// stopped reading after a reload or closed.
+		box, mu := make(chan rowsMsg, 1), new(sync.Mutex)
+		read := func() tea.Msg { return <-box }
+		put := func(msg rowsMsg) {
+			mu.Lock()
+			defer mu.Unlock()
+			select {
+			case <-box:
+			default:
+			}
+			box <- msg
+		}
 		cmds = append(cmds, func() tea.Msg {
-			rows, err := m.p.Load(t)
-			return rowsMsg{id, t, gen, rows, err}
+			go func() {
+				rows, err := m.p.Load(t, func(rows []Row) { put(rowsMsg{id, t, gen, rows, nil, read}) })
+				put(rowsMsg{id, t, gen, rows, err, nil})
+			}()
+			return read()
 		})
 	}
 	return tea.Batch(cmds...)
@@ -114,9 +134,11 @@ func (m frame) busy() bool {
 	return false
 }
 
+// selected is the row under the cursor, while the tab shows rows and not a
+// failed load.
 func (m frame) selected() (Row, bool) {
 	r, ok := m.lists[m.active].SelectedItem().(Row)
-	return r, ok
+	return r, ok && m.tabs[m.active].showsRows()
 }
 
 func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
@@ -129,18 +151,25 @@ func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 		m.syncDetail()
 		return m, nil
 	case rowsMsg:
+		event := tabEvent(tabDone{msg.gen, msg.err})
+		if msg.more != nil {
+			event = tabShown{msg.gen}
+		}
 		var effect rowsEffect
-		if m.tabs[msg.tab], effect = m.tabs[msg.tab].next(tabDone{msg.gen, msg.err}); effect == dropRows {
+		if m.tabs[msg.tab], effect = m.tabs[msg.tab].next(event); effect == dropRows {
 			return m, nil
 		}
 		m.setRows(msg.tab, msg.rows)
-		moved := m.selectionChanged()
+		cmds := []tea.Cmd{msg.more}
+		if msg.tab == m.active {
+			cmds = append(cmds, m.moveSelected(rowsLoaded{m.reloads}))
+		}
 		if effect == showAndPick {
 			var picked tea.Cmd
 			m, picked = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
-			return m, tea.Batch(moved, picked)
+			cmds = append(cmds, picked)
 		}
-		return m, moved
+		return m, tea.Batch(cmds...)
 	case settleMsg:
 		if r, ok := m.selected(); ok && r.ID == msg.id {
 			return m, m.moveDetail(r, rested{})
@@ -321,21 +350,26 @@ func (m frame) rowAt(x, y int) (int, bool) {
 	return i, true
 }
 
-// setRows puts rows on a tab, filtered by what was typed there. SetItems
-// would filter them in a command whose matches go to whichever list is
-// active when it ends, so they are filtered here, at once.
+// setRows puts rows on a tab, filtered by what was typed there, with the
+// cursor on the row it was on. SetItems would filter them in a command whose
+// matches go to whichever list is active when it ends, so they are filtered
+// here, at once.
 func (m *frame) setRows(tab int, rows []Row) {
 	items := make([]list.Item, len(rows))
 	for i, r := range rows {
 		items[i] = r
 	}
 	l := &m.lists[tab]
+	at := l.Index()
+	was, had := l.SelectedItem().(Row)
 	l.SetItems(items)
 	if query := l.FilterValue(); query != "" {
-		at := l.Index()
 		l.SetFilterText(query)
-		l.Select(at)
 	}
+	if i := slices.IndexFunc(l.VisibleItems(), func(it list.Item) bool { return it.(Row).ID == was.ID }); had && i >= 0 {
+		at = i
+	}
+	l.Select(at)
 }
 
 // filter shows the active list's rows that match query, or every row when
@@ -362,14 +396,19 @@ func (m frame) updateList(msg tea.Msg) (frame, tea.Cmd) {
 
 // selectionChanged shows what's known about the new selection, and tells
 // its details the cursor arrived.
-func (m *frame) selectionChanged() tea.Cmd {
+func (m *frame) selectionChanged() tea.Cmd { return m.moveSelected(arrived{m.reloads}) }
+
+// moveSelected shows what's known about the selection, and moves its
+// details on with e. Details wait for the tab's final rows, since a row
+// shown before them may not know everything Fetch needs.
+func (m *frame) moveSelected(e detailEvent) tea.Cmd {
 	m.vp.GotoTop()
 	m.syncDetail()
 	r, ok := m.selected()
-	if !ok {
+	if !ok || m.tabs[m.active].busy() {
 		return nil
 	}
-	return m.moveDetail(r, arrived{m.reloads})
+	return m.moveDetail(r, e)
 }
 
 // Below 80 columns, as on a phone, the list and the details take turns at

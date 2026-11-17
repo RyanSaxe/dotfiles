@@ -16,8 +16,11 @@ type Popup struct {
 	List    int  // the list's share of the width in percent, 35 when unset // what it lists, as in "loading folders"
 	Tabs    []Tab
 	Start   int // the tab it opens on, 0 for the first
-	Load    func(tab int) ([]Row, error)
-	Fetch   func(r Row) (any, error)                 // details, once the cursor rests on a row, or nil for none and a list the full width
+	// Load fills a tab. It may call show with the rows it has so far, as often
+	// as it likes, and each call replaces the tab's rows. The rows it returns
+	// are final, and the tab stops loading then.
+	Load    func(tab int, show func([]Row)) ([]Row, error)
+	Fetch   func(r Row) (any, error)                 // details of a final row, once the cursor rests on it, or nil for none and a list the full width
 	Head    func(r Row, details any, w int) []string // nil shows the row's meta and title on a phone
 	Body    func(r Row, details any, w int) string   // draws details that aren't a string or a Screen
 	Actions []Action
