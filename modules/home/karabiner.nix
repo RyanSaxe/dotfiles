@@ -10,7 +10,7 @@
 let
   cfg = config.dotfiles;
 in
-lib.mkIf (lib.elem "personal" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
+lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
   xdg.configFile."karabiner".source =
     config.lib.file.mkOutOfStoreSymlink "${cfg.repo}/config/karabiner";
 }

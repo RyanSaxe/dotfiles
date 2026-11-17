@@ -23,9 +23,9 @@ flowchart LR
     rexServer["rex-server"]
   end
   subgraph Modules
-    guiModules["ghostty, aerospace, sketchybar, macos,<br>darwin/macos, darwin/homebrew"]
-    baseModules["zsh, git, tmux, neovim, packages,<br>ws, agents, secrets, darwin/codex"]
-    personalModules["rex, karabiner"]
+    guiModules["ghostty, aerospace, sketchybar, karabiner, macos,<br>darwin/macos, darwin/homebrew"]
+    baseModules["zsh, git, tmux, neovim, packages,<br>ws, agents, secrets, darwin/codex, darwin/homebrew"]
+    personalModules["rex"]
     rexServerModules["rex-server"]
   end
   mac --> base & gui & personal
@@ -38,9 +38,9 @@ flowchart LR
 
 | Role         | Adds                                                  |
 | ------------ | ----------------------------------------------------- |
-| `base`       | The shell, editor, tools and agent settings           |
-| `gui`        | A Mac's window manager, bar, fonts, apps and settings |
-| `personal`   | Rex's settings, Karabiner and byor's rules            |
+| `base`       | The shell, editor, tools, Codex and agent settings    |
+| `gui`        | A Mac's desktop apps, Karabiner and settings          |
+| `personal`   | Rex's settings, extra agents and byor's rules         |
 | `rex-server` | Rex's server, as a systemd user service               |
 
 Some modules also check a second role. `packages`, for example, adds fonts
