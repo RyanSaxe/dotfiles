@@ -138,6 +138,23 @@ func TestRowsFromBeforeAReloadAreDropped(t *testing.T) {
 	}
 }
 
+// Enter pressed before the first rows arrive goes to the top match once they
+// do, so typing a name and Enter straight after opening a popup works.
+func TestEnterBeforeTheRowsPicksTheTopMatch(t *testing.T) {
+	var picked []string
+	rows := []popup.Row{{ID: "notes", Title: "notes"}, {ID: "dotfiles", Title: "dotfiles"}}
+	m := popup.New(picker(rows, nil, &picked), nil)
+	load := m.Init() // the first load, still running
+	m, _ = run(m, size, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("dot")}, enter)
+	if len(picked) != 0 {
+		t.Fatalf("picked %v before any row arrived", picked)
+	}
+	run(m, load())
+	if !slices.Equal(picked, []string{"dotfiles"}) {
+		t.Errorf("picked %v, want [dotfiles]", picked)
+	}
+}
+
 // Rows that load before the terminal's size arrives are there to pick once
 // it does.
 func TestRowsBeforeTheSizeCanBePicked(t *testing.T) {

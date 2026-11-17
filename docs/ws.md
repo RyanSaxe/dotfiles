@@ -75,8 +75,9 @@ works only in Rex. `ws pick NAME` opens any of them from a shell.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Enter acts
-on the row and Esc clears the filter or closes. The bottom line lists the
-popup's other keys.
+on the row and Esc clears the filter or closes. Enter pressed before the
+rows appear acts on the top match once they do, unless another key comes
+first. The bottom line lists the popup's other keys.
 
 | Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Other                            |
 | --------- | ------ | ---------------------- | ------------- | -------------------------------- |
