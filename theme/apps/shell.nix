@@ -5,8 +5,6 @@
   "shell-colors.zsh" = ''
     # Tells terminal programs which mode this is.
     export COLORFGBG='${if mode == "dark" then "15;0" else "0;15"}'
-    # delta reads bat's theme only from here.
-    export BAT_THEME="dotfiles-${mode}"
     ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=${t.faint}'
     # Naming the mode stops fzf asking the terminal, whose answer leaks into
     # tmux popups as text.
