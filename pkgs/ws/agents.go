@@ -17,7 +17,7 @@ func agentsPopup(b mux.Backend) popup.Popup {
 	return popup.Popup{
 		Noun: "terminals",
 		Tabs: []popup.Tab{{Name: "Agents", Empty: "No terminal reports a program status."}},
-		Load: func(int) ([]popup.Row, error) {
+		Load: func(int, func([]popup.Row)) ([]popup.Row, error) {
 			if !inRex {
 				return nil, errors.New("agents lists Rex terminals, and this terminal is not in Rex")
 			}

@@ -47,7 +47,7 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 	return popup.Popup{
 		Noun: noun,
 		Tabs: tabs,
-		Load: func(t int) ([]popup.Row, error) {
+		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
 			in, err := waitForInbox()
 			var a acks
 			readJSON("acknowledged.json", &a)

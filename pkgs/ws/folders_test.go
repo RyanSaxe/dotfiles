@@ -56,7 +56,7 @@ display-message) printf 'zsh\t/elsewhere\n';;
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
 
-	folders, err := p.Load(foldersTab)
+	folders, err := p.Load(foldersTab, func([]popup.Row) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ esac`)
 		t.Errorf("Enter on busy, which has a session, ran tmux with\n%s", got)
 	}
 
-	sessions, err := p.Load(sessionsTab)
+	sessions, err := p.Load(sessionsTab, func([]popup.Row) {})
 	if err != nil {
 		t.Fatal(err)
 	}

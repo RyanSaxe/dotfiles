@@ -26,7 +26,7 @@ func keysPopup(b mux.Backend) popup.Popup {
 	return popup.Popup{
 		Noun: "keys", OneLine: true,
 		Tabs: []popup.Tab{{Name: "Keys", Empty: "No keys."}},
-		Load: func(int) ([]popup.Row, error) {
+		Load: func(int, func([]popup.Row)) ([]popup.Row, error) {
 			var keys []key
 			var err error
 			if r, ok := b.(mux.Rex); ok {
