@@ -2,7 +2,7 @@ package mux
 
 import (
 	"bufio"
-	"cmp"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"workspace/kitty"
@@ -37,21 +36,6 @@ func rexJSON(v any, args ...string) error {
 		err = json.Unmarshal([]byte(out), v)
 	}
 	return err
-}
-
-func (Rex) Sessions() ([]Session, error) {
-	var ls struct {
-		Sessions []struct {
-			ID    string `json:"session_id"`
-			Label string
-		}
-	}
-	err := rexJSON(&ls, "ls", "--json")
-	ss := make([]Session, len(ls.Sessions))
-	for i, s := range ls.Sessions {
-		ss[i] = Session{s.ID, s.Label}
-	}
-	return ss, err
 }
 
 func (Rex) Create(label, dir string, panes []layout.Pane) (string, error) {
@@ -166,84 +150,54 @@ func (Rex) Kill(id string) error {
 	return err
 }
 
-func (r Rex) Capture(id string) (string, error) {
-	block, err := r.landing(id)
-	if err != nil || block == "" {
-		return "", err
+//go:embed snapshot.lua
+var snapshotScript string
+
+// Snapshot reads every session and terminal with snapshot.lua, in one call
+// to the server.
+func (Rex) Snapshot() (Snapshot, error) {
+	var read struct {
+		Sessions luaList[Session]
+		Panes    luaList[struct {
+			Session, Label, ID, Program, Folder, Status, App, Title string
+			Landing, Agent                                          bool
+			Updated                                                 time.Time
+		}]
 	}
-	return r.CaptureBlock(id, block)
+	cmd := exec.Command("rex", "--autostart=false", "do", "-")
+	cmd.Stdin = strings.NewReader(snapshotScript)
+	out, err := output(cmd)
+	if err == nil {
+		err = json.Unmarshal([]byte(out), &read)
+	}
+	s := Snapshot{Sessions: read.Sessions}
+	for _, p := range read.Panes {
+		status, _ := ParseStatus(p.Status)
+		s.Panes = append(s.Panes, Pane{Session: p.Session, Label: p.Label, ID: p.ID, Landing: p.Landing, Agent: p.Agent,
+			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated})
+	}
+	return s, err
 }
 
-// CaptureBlock is the text of one pane, with its colors.
-func (Rex) CaptureBlock(session, block string) (string, error) {
-	return rex("capture", "-s", session, "-b", block, "--format", "vt", "--trim")
+// A luaList is a list a Lua script returns, which reads as {} when it's
+// empty, since Lua has one kind of table for lists and objects.
+type luaList[T any] []T
+
+func (l *luaList[T]) UnmarshalJSON(data []byte) error {
+	if string(data) == "{}" {
+		*l = nil
+		return nil
+	}
+	return json.Unmarshal(data, (*[]T)(l))
 }
 
-func (r Rex) Landing(id string) Pane {
-	block, err := r.landing(id)
-	if err != nil || block == "" {
-		return Pane{}
-	}
-	var proc struct{ Foreground struct{ Name, Cwd string } }
-	done := make(chan struct{})
-	go func() {
-		rexJSON(&proc, "block", "call", "-s", id, "-b", block, "process")
-		close(done)
-	}()
-	state := programStatus(id, block).State
-	<-done
-	return Pane{Doing: cmp.Or(state, proc.Foreground.Name), Folder: proc.Foreground.Cwd}
+func (Rex) Focus(p Pane) error {
+	_, err := rex("focus", "-s", p.Session, p.ID)
+	return err
 }
 
-// landing is the pane a session shows, where going to it lands: the focused
-// pane of its active tab, or the tab's first tiled pane when a float, such as
-// a popup, has the focus.
-func (Rex) landing(id string) (string, error) {
-	var view struct {
-		Active  string `json:"active_window_id"`
-		Windows []struct {
-			ID      string `json:"window_id"`
-			Focused string `json:"focused_block_id"`
-			Layers  []struct {
-				Kind   string
-				Blocks []struct {
-					ID string `json:"block_id"`
-				}
-			}
-		}
-	}
-	if err := rexJSON(&view, "session", "inspect", id, "--json"); err != nil {
-		return "", err
-	}
-	for _, w := range view.Windows {
-		if w.ID != view.Active {
-			continue
-		}
-		for _, l := range w.Layers {
-			if l.Kind != "tiled" || len(l.Blocks) == 0 {
-				continue
-			}
-			block := l.Blocks[0].ID
-			for _, b := range l.Blocks {
-				if b.ID == w.Focused {
-					block = b.ID
-				}
-			}
-			return block, nil
-		}
-	}
-	return "", nil
-}
-
-func (r Rex) Statuses() map[string]Status {
-	states := map[string]Status{}
-	ts, _ := r.Terminals()
-	for _, t := range ts {
-		if cur, ok := states[t.Label]; !ok || t.Status < cur {
-			states[t.Label] = t.Status
-		}
-	}
-	return states
+func (Rex) Capture(p Pane) (string, error) {
+	return rex("capture", "-s", p.Session, "-b", p.ID, "--format", "vt", "--trim")
 }
 
 func (Rex) Inside() bool { return true }
@@ -259,88 +213,6 @@ func draws(term string) bool {
 		return true
 	}
 	return false
-}
-
-type programState struct {
-	ID, State, App string
-	Updated        time.Time `json:"updated_at"`
-}
-
-// programStatus is what a terminal's program reports about itself. A record
-// with no id is the program itself, and the others its parts.
-func programStatus(session, block string) programState {
-	var res struct{ Records []programState }
-	rexJSON(&res, "block", "call", "-s", session, "-b", block, "program_status")
-	for _, r := range res.Records {
-		if r.ID == "" {
-			return r
-		}
-	}
-	return programState{}
-}
-
-// A Terminal is one Rex pane and what its program reports. Status is Open
-// when the program reports nothing, and then App, Cwd and Title are empty.
-type Terminal struct {
-	Session, Label, Block string
-	Status                Status
-	App, Cwd              string
-	Title                 string // what the program calls the terminal, such as an agent's task
-	Updated               time.Time
-}
-
-// Terminals lists every Rex terminal with the status its program reports,
-// asking the server about each one in parallel.
-func (Rex) Terminals() ([]Terminal, error) {
-	ss, err := Rex{}.Sessions()
-	var (
-		mu  sync.Mutex
-		wg  sync.WaitGroup
-		out []Terminal
-	)
-	for _, s := range ss {
-		wg.Go(func() {
-			var ls struct {
-				Blocks []struct {
-					ID      string `json:"block_id"`
-					Creator string `json:"creator_name"`
-				}
-			}
-			rexJSON(&ls, "block", "ls", "-s", s.ID, "--json")
-			for _, b := range ls.Blocks {
-				if b.Creator != "com.superlogical.terminal" {
-					continue
-				}
-				wg.Go(func() {
-					t := Terminal{Session: s.ID, Label: s.Label, Block: b.ID}
-					st := programStatus(s.ID, b.ID)
-					t.Status, _ = ParseStatus(st.State)
-					if t.Status != Open {
-						t.App, t.Updated = st.App, st.Updated
-						var proc struct{ Foreground struct{ Cwd string } }
-						var title struct{ Title string }
-						if rexJSON(&proc, "block", "call", "-s", s.ID, "-b", b.ID, "process") == nil {
-							t.Cwd = proc.Foreground.Cwd
-						}
-						if rexJSON(&title, "block", "call", "-s", s.ID, "-b", b.ID, "title") == nil {
-							t.Title = title.Title
-						}
-					}
-					mu.Lock()
-					out = append(out, t)
-					mu.Unlock()
-				})
-			}
-		})
-	}
-	wg.Wait()
-	return out, err
-}
-
-// Focus moves a session's focus to one of its panes.
-func (Rex) Focus(session, block string) error {
-	_, err := rex("focus", "-s", session, block)
-	return err
 }
 
 // PaneFolder is the folder of the program in one of this session's panes.

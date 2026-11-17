@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,8 +15,12 @@ import (
 	"workspace/popup"
 )
 
-// A place is a folder, a session, or a folder and its session.
-type place struct{ dir, session string }
+// A place is a folder, a session, or a folder and its session, with the
+// pane going to the session lands on.
+type place struct {
+	dir, session string
+	pane         mux.Pane
+}
 
 // The go popup's tabs.
 const (
@@ -34,18 +37,18 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 		Tabs:  []popup.Tab{foldersTab: {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."}, sessionsTab: {Name: "Sessions", Empty: "No sessions are running."}},
 		Start: first,
 		Load: func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
-			ss, err := b.Sessions()
+			s, err := b.Snapshot()
 			if tab == foldersTab {
-				return folderRows(ss), err
+				return folderRows(s), err
 			}
-			return sessionRows(b, ss), err
+			return sessionRows(s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
 			p := r.Data.(place)
 			if p.session == "" {
 				return folderSummary(p.dir), nil
 			}
-			out, err := b.Capture(p.session)
+			out, err := b.Capture(p.pane)
 			return popup.Tail(out), err
 		},
 		Actions: []popup.Action{
@@ -105,15 +108,16 @@ func folders() []folder {
 
 // folderRows are the Folders tab: each folder, with its session when one is
 // running, so Enter goes to that session.
-func folderRows(ss []mux.Session) []popup.Row {
+func folderRows(s mux.Snapshot) []popup.Row {
 	sessions := map[string]string{} // a label to its session
-	for _, s := range ss {
-		sessions[s.Label] = s.ID
+	for _, session := range s.Sessions {
+		sessions[session.Label] = session.ID
 	}
 	var rows []popup.Row
 	for _, f := range folders() {
 		session := sessions[labelFor(f.dir)]
-		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, session}}
+		pane, _ := s.Landing(session)
+		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, session, pane}}
 		switch {
 		case session != "":
 			r.Tag = popup.Green.SetString("session")
@@ -127,22 +131,16 @@ func folderRows(ss []mux.Session) []popup.Row {
 
 // sessionRows are the Sessions tab: each running session with what it's
 // doing, and its folder.
-func sessionRows(b mux.Backend, ss []mux.Session) []popup.Row {
-	// Asking what each session is doing takes a few Rex calls, so they run
-	// while the walk does.
-	doing := make([]mux.Pane, len(ss))
-	var wg sync.WaitGroup
-	for i, s := range ss {
-		wg.Go(func() { doing[i] = b.Landing(s.ID) })
-	}
+func sessionRows(s mux.Snapshot) []popup.Row {
 	dirs := map[string]string{} // a session's label to its folder
 	for _, f := range folders() {
 		dirs[labelFor(f.dir)] = f.dir
 	}
-	wg.Wait()
-	rows := make([]popup.Row, len(ss))
-	for i, s := range ss {
-		rows[i] = popup.Row{ID: s.ID, Title: s.Label, Detail: tilde(cmp.Or(dirs[s.Label], doing[i].Folder)), Tag: doingTag(doing[i].Doing), Data: place{dirs[s.Label], s.ID}}
+	rows := make([]popup.Row, len(s.Sessions))
+	for i, session := range s.Sessions {
+		pane, _ := s.Landing(session.ID)
+		dir := dirs[session.Label]
+		rows[i] = popup.Row{ID: session.ID, Title: session.Label, Detail: tilde(cmp.Or(dir, pane.Folder)), Tag: doingTag(pane), Data: place{dir, session.ID, pane}}
 	}
 	return rows
 }
@@ -155,13 +153,13 @@ func folderTitle(dir string) string {
 	return filepath.Base(dir)
 }
 
-// doingTag names what a session's pane is doing: an agent's status in its
-// color, else the program it runs.
-func doingTag(doing string) lipgloss.Style {
-	if s, ok := mux.ParseStatus(doing); ok {
-		return statusTag(s)
+// doingTag names what a pane is doing: its agent's status in its color,
+// else the program it runs.
+func doingTag(p mux.Pane) lipgloss.Style {
+	if p.Status != mux.Open {
+		return statusTag(p.Status)
 	}
-	return popup.Dim.SetString(cmp.Or(doing, "open"))
+	return popup.Dim.SetString(cmp.Or(p.Program, "open"))
 }
 
 // folderSummary is a folder's git status, the top two levels of its tree,
