@@ -46,6 +46,12 @@ Rex, Tailscale and Google Chrome are still installed by hand, as
 [LATER.md](../LATER.md) says. [By hand](manual.md) lists what to do once
 after the switches: Chrome's theme and the agents' sign-ins.
 
+The `gui` role selects desktop settings and apps. Nix installs most of those
+apps, and Homebrew installs the casks in `modules/darwin/homebrew.nix`.
+Docker Desktop and LibreOffice are optional manual installs on every computer.
+The Homebrew list is additive: switches leave unlisted formulas and casks
+installed because `homebrew.onActivation.cleanup` is `"none"`.
+
 ## A Linux box
 
 There's no Linux machine yet, so CI builds its config on every push to keep it

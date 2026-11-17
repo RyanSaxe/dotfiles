@@ -10,8 +10,6 @@ lib.mkIf (lib.elem "gui" config.dotfiles.roles) {
     casks = [
       # OpenAI's cask, which offers its own upgrades.
       "codex"
-      "docker-desktop"
-      "libreoffice"
     ]
     # Its config is config/karabiner, linked by modules/home/karabiner.nix.
     ++ lib.optional (lib.elem "personal" config.dotfiles.roles) "karabiner-elements";
