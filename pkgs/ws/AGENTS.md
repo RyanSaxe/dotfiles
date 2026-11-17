@@ -15,7 +15,8 @@ packaged on their own:
 - `popup`: the frame every popup shares, fzf's matching, terminal captures
 - `kitty`: images drawn with Kitty's Unicode placeholders
 - `markdown`: markdown for a pane, with pictures and mermaid diagrams
-- `mux`: Rex and tmux sessions, what their panes are doing, agent statuses
+- `mux`: Rex and tmux sessions and panes, read in one `Snapshot` with what
+  each pane runs and its agent's status, and the actions on them
 - `layout`: session layouts and shell quoting
 
 The command in this folder holds everything that knows Ryan's setup: the CLI,
@@ -63,6 +64,10 @@ from `~/.local/share/dotfiles/mascots`.
 - Anything `ws` must track itself is a named type that lists its states,
   with one function that moves between them. Never spread flags across the
   code to stand for a state.
+- A load reads the multiplexer once, with `Snapshot`, and never asks it
+  about one row at a time.
+- A new fact about sessions or panes goes into both backends' `Snapshot`.
+  A backend that can't know it leaves the field empty.
 - Tests guard what a popup author or a person relies on, through the
   packages' public API: what Load, Fetch and the actions receive, what Esc
   does, the order Match ranks in. They never assert on private fields or

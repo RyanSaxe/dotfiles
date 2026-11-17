@@ -521,7 +521,8 @@ func printWorktrees(b mux.Backend, asJSON bool) error {
 // first and the most recently committed first within a project.
 func worktrees(b mux.Backend) []worktree {
 	gits, _ := filepath.Glob(filepath.Join(worktreeRoot, "*", "*", ".git"))
-	states := b.Statuses()
+	snapshot, _ := b.Snapshot()
+	states := snapshot.Statuses()
 	wts := make([]worktree, len(gits))
 	var wg sync.WaitGroup
 	for i, g := range gits {

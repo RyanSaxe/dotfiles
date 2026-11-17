@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -21,18 +22,31 @@ type Tmux struct {
 
 func tmux(args ...string) (string, error) { return run("tmux", args...) }
 
-func (Tmux) Sessions() ([]Session, error) {
-	out, err := tmux("list-sessions", "-F", "#{session_name}")
+// paneFormat is what Snapshot reads of each pane. The title goes last,
+// since a program can put a tab in it.
+const paneFormat = "#{session_name}\t#{window_active}#{pane_active}\t#{pane_id}\t#{@ws}\t#{pane_current_command}\t#{pane_current_path}\t#{pane_title}"
+
+// Snapshot reads every pane with one list-panes. tmux has no program
+// status, so every pane is Open, with no app or time.
+func (Tmux) Snapshot() (Snapshot, error) {
+	out, err := tmux("list-panes", "-a", "-F", paneFormat)
 	if err != nil && (strings.Contains(err.Error(), "no server running") || strings.Contains(err.Error(), "error connecting")) {
-		return nil, nil
+		return Snapshot{}, nil
 	}
-	var ss []Session
-	for name := range strings.SplitSeq(out, "\n") {
-		if name != "" {
-			ss = append(ss, Session{"=" + name, name}) // = matches the name exactly
+	var s Snapshot
+	for line := range strings.SplitSeq(out, "\n") {
+		f := strings.SplitN(line, "\t", 7)
+		if len(f) < 7 {
+			continue
 		}
+		id := "=" + f[0] // = matches the name exactly
+		if !slices.ContainsFunc(s.Sessions, func(s Session) bool { return s.ID == id }) {
+			s.Sessions = append(s.Sessions, Session{id, f[0]})
+		}
+		s.Panes = append(s.Panes, Pane{Session: id, Label: f[0], ID: f[2], Landing: f[1] == "11", Agent: f[3] == "agent",
+			Program: f[4], Folder: f[5], Status: Open, Title: f[6]})
 	}
-	return ss, err
+	return s, err
 }
 
 func (Tmux) Create(label, dir string, panes []layout.Pane) (string, error) {
@@ -105,27 +119,13 @@ func (Tmux) Kill(id string) error {
 	return err
 }
 
-// Capture reads the active pane of the session's current window.
-func (Tmux) Capture(id string) (string, error) {
-	return tmux("capture-pane", "-p", "-e", "-J", "-t", id+":")
+func (Tmux) Focus(p Pane) error {
+	_, err := tmux("select-window", "-t", p.ID, ";", "select-pane", "-t", p.ID)
+	return err
 }
 
-// Landing is the program in the session's active pane, since tmux has no
-// program status, and its folder.
-func (Tmux) Landing(id string) Pane {
-	out, _ := tmux("display-message", "-p", "-t", id+":", "#{pane_current_command}\t#{pane_current_path}")
-	doing, folder, _ := strings.Cut(out, "\t")
-	return Pane{Doing: doing, Folder: folder}
-}
-
-// Statuses is Open for every session, since tmux has no program status.
-func (t Tmux) Statuses() map[string]Status {
-	states := map[string]Status{}
-	ss, _ := t.Sessions()
-	for _, s := range ss {
-		states[s.Label] = Open
-	}
-	return states
+func (Tmux) Capture(p Pane) (string, error) {
+	return tmux("capture-pane", "-p", "-e", "-J", "-t", p.ID)
 }
 
 func (t Tmux) Inside() bool { return t.inside }

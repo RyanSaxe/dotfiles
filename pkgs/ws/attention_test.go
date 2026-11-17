@@ -46,20 +46,20 @@ func TestTheTaskLetterStaysOffWithoutAVault(t *testing.T) {
 }
 
 func TestNextAgent(t *testing.T) {
-	agents := []mux.Terminal{
-		{Label: "web", Block: "idle", Status: mux.Idle},
-		{Label: "api", Block: "done-b", Status: mux.Done},
-		{Label: "shell", Block: "plain", Status: mux.Open},
-		{Label: "api", Block: "working", Status: mux.Working},
-		{Label: "app", Block: "done-a", Status: mux.Done},
+	agents := []mux.Pane{
+		{Label: "web", ID: "idle", Status: mux.Idle},
+		{Label: "api", ID: "done-b", Status: mux.Done},
+		{Label: "shell", ID: "plain", Status: mux.Open},
+		{Label: "api", ID: "working", Status: mux.Working},
+		{Label: "app", ID: "done-a", Status: mux.Done},
 	}
-	blocked := append(slices.Clone(agents), mux.Terminal{Label: "zeta", Block: "blocked", Status: mux.Blocked})
+	blocked := append(slices.Clone(agents), mux.Pane{Label: "zeta", ID: "blocked", Status: mux.Blocked})
 
 	cases := []struct {
 		name  string
-		ts    []mux.Terminal
+		panes []mux.Pane
 		last  string
-		block string
+		want  string
 	}{
 		{"a first jump goes to the most urgent", agents, "", "done-b"},
 		{"the next jump moves on in order of need", agents, "done-b", "done-a"},
@@ -70,12 +70,12 @@ func TestNextAgent(t *testing.T) {
 		{"after a blocked agent the walk goes on", blocked, "blocked", "done-b"},
 	}
 	for _, c := range cases {
-		got, ok := nextAgent(c.ts, c.last)
-		if !ok || got.Block != c.block {
-			t.Errorf("%s: went to %q, want %q", c.name, got.Block, c.block)
+		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last)
+		if !ok || got.ID != c.want {
+			t.Errorf("%s: went to %q, want %q", c.name, got.ID, c.want)
 		}
 	}
-	if _, ok := nextAgent([]mux.Terminal{{Block: "plain", Status: mux.Open}}, ""); ok {
+	if _, ok := nextAgent(mux.Snapshot{Panes: []mux.Pane{{ID: "plain", Status: mux.Open}}}, ""); ok {
 		t.Error("a jump found an agent where only plain terminals run")
 	}
 }

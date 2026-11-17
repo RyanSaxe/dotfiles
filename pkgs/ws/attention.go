@@ -26,9 +26,9 @@ import (
 // otherwise. A finished agent doesn't count: Rex doesn't tell ws when you've
 // looked at one, so it would stay lit until the agent ran again.
 func agentLevel() (string, error) {
-	ts, err := mux.Rex{}.Terminals()
-	for _, t := range ts {
-		if t.Status <= mux.Error {
+	s, err := mux.Rex{}.Snapshot()
+	for _, p := range s.Agents() {
+		if p.Status <= mux.Error {
 			return "waiting", err
 		}
 	}
@@ -205,20 +205,20 @@ func signalAttention(sig syscall.Signal) error {
 	return nil
 }
 
-// nextAgent is the agent a jump goes to after the one at block last. Agents go
+// nextAgent is the agent a jump goes to after the one in pane last. Agents go
 // in order of need, blocked, failed, done, working, then idle, and by session
 // within each. A jump moves on from the last one and wraps around, except that
 // an agent blocked on you or failed comes first unless the last jump went to
-// one. Terminals with no agent are skipped, and false means there is none.
-func nextAgent(ts []mux.Terminal, last string) (mux.Terminal, bool) {
-	agents := slices.DeleteFunc(slices.Clone(ts), func(t mux.Terminal) bool { return t.Status == mux.Open })
+// one. Panes with no agent are skipped, and false means there is none.
+func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
+	agents := s.Agents()
 	if len(agents) == 0 {
-		return mux.Terminal{}, false
+		return mux.Pane{}, false
 	}
-	slices.SortFunc(agents, func(a, b mux.Terminal) int {
-		return cmp.Or(cmp.Compare(a.Status, b.Status), cmp.Compare(a.Label, b.Label), cmp.Compare(a.Block, b.Block))
+	slices.SortFunc(agents, func(a, b mux.Pane) int {
+		return cmp.Or(cmp.Compare(a.Status, b.Status), cmp.Compare(a.Label, b.Label), cmp.Compare(a.ID, b.ID))
 	})
-	i := slices.IndexFunc(agents, func(t mux.Terminal) bool { return t.Block == last })
+	i := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.ID == last })
 	if i < 0 || (agents[0].Status <= mux.Error && agents[i].Status > mux.Error) {
 		return agents[0], true
 	}
@@ -229,9 +229,9 @@ func nextAgent(ts []mux.Terminal, last string) (mux.Terminal, bool) {
 // does, and remembers it for the next jump. It works outside any terminal, as
 // from an AeroSpace key, because it names the app client itself.
 func jumpToAgent(client string) error {
-	ts, err := mux.Rex{}.Terminals()
+	s, err := mux.Rex{}.Snapshot()
 	last, _ := os.ReadFile(filepath.Join(stateDir, "last-jump"))
-	next, ok := nextAgent(ts, string(last))
+	next, ok := nextAgent(s, string(last))
 	if !ok {
 		if err != nil {
 			return err
@@ -247,8 +247,8 @@ func jumpToAgent(client string) error {
 	if err := rex.Show(next.Session); err != nil {
 		return err
 	}
-	if err := rex.Focus(next.Session, next.Block); err != nil {
+	if err := rex.Focus(next); err != nil {
 		return err
 	}
-	return writeWhole("last-jump", []byte(next.Block))
+	return writeWhole("last-jump", []byte(next.ID))
 }

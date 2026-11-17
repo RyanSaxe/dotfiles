@@ -5,7 +5,9 @@ buildGoModule {
 
   src = lib.fileset.toSource {
     root = ./.;
-    fileset = lib.fileset.fileFilter (f: f.hasExt "go" || f.name == "go.mod" || f.name == "go.sum") ./.;
+    fileset = lib.fileset.fileFilter (
+      f: f.hasExt "go" || f.hasExt "lua" || f.name == "go.mod" || f.name == "go.sum"
+    ) ./.;
   };
 
   vendorHash = "sha256-5/xeGFMbd/eXbcXqUoW8crgnL1BeDd9Vb+Yd3SWt3PE=";
