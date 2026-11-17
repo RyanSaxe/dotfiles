@@ -50,7 +50,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       status.showUntrackedFiles = "all";
     };
     includes = [
-      # delta's diff colors for the current mode, which `theme` relinks.
+      # delta's colors for the current mode, which `theme` relinks.
       { path = "${config.xdg.configHome}/theme/delta-colors.gitconfig"; }
     ]
     # The vault's pre-commit hook runs its check, bin/check.py, before each commit.
@@ -86,8 +86,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   programs.delta = {
     enable = true;
     enableGitIntegration = true;
-    # delta takes bat's theme from BAT_THEME, which the shell sets to the
-    # current mode's, and its diff colors from the include above.
+    # delta takes bat's theme and its diff colors from the include above.
     options.navigate = true;
   };
 
@@ -102,17 +101,15 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   # gh renders Markdown in the theme's glamour style, as ws's popups do.
   home.sessionVariables.GLAMOUR_STYLE = "${config.xdg.configHome}/theme/glamour.json";
 
-  # Dotfiles.tmTheme for each mode, which bat and delta share. bat picks
-  # one from macOS's appearance, and a shell's BAT_THEME names the same.
+  # Dotfiles.tmTheme for each mode, which bat and delta share. bat's config
+  # names the current mode's, and `theme` relinks it, as it does delta's
+  # include.
   programs.bat = {
     enable = true;
-    config = {
-      theme = "auto:system";
-      theme-dark = "dotfiles-dark";
-      theme-light = "dotfiles-light";
-    };
     themes = lib.genAttrs [ "dotfiles-dark" "dotfiles-light" ] (name: {
       src = config.xdg.configFile."theme/${lib.removePrefix "dotfiles-" name}/Dotfiles.tmTheme".source;
     });
   };
+  xdg.configFile."bat/config".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/bat-config";
 }

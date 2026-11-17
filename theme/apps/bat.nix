@@ -4,6 +4,7 @@
   lib,
   t,
   c,
+  mode,
   wash,
   ...
 }:
@@ -28,6 +29,9 @@ let
   };
 in
 {
+  # bat's config names this mode's theme, because bat reads the system's
+  # appearance only on macOS.
+  "bat-config" = "--theme=dotfiles-${mode}\n";
   "Dotfiles.tmTheme" = lib.generators.toPlist { escape = true; } {
     name = "Dotfiles";
     settings = [
