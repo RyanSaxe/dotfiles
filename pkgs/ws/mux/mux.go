@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"workspace/kitty"
 	"workspace/layout"
@@ -17,22 +18,60 @@ import (
 
 type Session struct{ ID, Label string }
 
-// A Backend is the multiplexer holding sessions.
-// Pane is what a session's pane is doing, its agent's status or else the
-// program it runs, and the folder it runs in.
-type Pane struct{ Doing, Folder string }
+// A Snapshot is every session and pane, read in one call: one `rex do`
+// script in Rex (about 50 ms), one `tmux list-panes -a` in tmux (about 11 ms).
+type Snapshot struct {
+	Sessions []Session
+	Panes    []Pane
+}
 
+// A Pane is one terminal in a session: what it runs, in which folder, and
+// what its program reports about itself.
+type Pane struct {
+	Session, Label, ID string
+	Landing, Agent     bool // where going to the session lands, and the pane marked agent
+	Program, Folder    string
+	Status             Status // Open when the program reports nothing
+	App, Title         string
+	Updated            time.Time
+}
+
+// Landing is the pane going to the session lands on.
+func (s Snapshot) Landing(session string) (Pane, bool) {
+	i := slices.IndexFunc(s.Panes, func(p Pane) bool { return p.Session == session && p.Landing })
+	if i < 0 {
+		return Pane{}, false
+	}
+	return s.Panes[i], true
+}
+
+// Statuses is each label's most urgent status.
+func (s Snapshot) Statuses() map[string]Status {
+	states := map[string]Status{}
+	for _, p := range s.Panes {
+		if cur, ok := states[p.Label]; !ok || p.Status < cur {
+			states[p.Label] = p.Status
+		}
+	}
+	return states
+}
+
+// Agents is the panes that report a status.
+func (s Snapshot) Agents() []Pane {
+	return slices.DeleteFunc(slices.Clone(s.Panes), func(p Pane) bool { return p.Status == Open })
+}
+
+// A Backend is the multiplexer holding sessions.
 type Backend interface {
-	Sessions() ([]Session, error)
-	Create(label, dir string, panes []layout.Pane) (id string, err error)
-	Show(id string) error
-	Tab(id, dir string, args ...string) error // a new tab running args, which the session shows and which closes when they exit
-	Send(id, text string) error               // types text and Enter into the session's agent pane
-	Kill(id string) error
-	Capture(id string) (string, error) // the text of the pane the session shows
-	Landing(id string) Pane            // the pane going to the session lands on
-	// Statuses is each session's most urgent agent status, by label.
-	Statuses() map[string]Status
+	Snapshot() (Snapshot, error)
+	// Actions, each on a session or pane that a Snapshot gave.
+	Create(label, dir string, panes []layout.Pane) (string, error)
+	Show(session string) error
+	Focus(p Pane) error                            // moves the session's focus to the pane
+	Tab(session, dir string, args ...string) error // a new tab running args, which the session shows and which closes when they exit
+	Send(session, text string) error               // types text and Enter into the session's agent pane
+	Kill(session string) error
+	Capture(p Pane) (string, error) // the pane's text, with its colors
 	// Inside says whether the program runs in one of this multiplexer's panes.
 	Inside() bool
 	Current() (string, error) // the id of the session the program runs in, popups included
@@ -53,10 +92,10 @@ func Detect(getenv func(string) string, client string) Backend {
 
 // Find is the id of the session labeled label, or "" when there is none.
 func Find(b Backend, label string) (string, error) {
-	ss, err := b.Sessions()
-	for _, s := range ss {
-		if s.Label == label {
-			return s.ID, nil
+	s, err := b.Snapshot()
+	for _, session := range s.Sessions {
+		if session.Label == label {
+			return session.ID, nil
 		}
 	}
 	return "", err
@@ -98,15 +137,16 @@ func ParseStatus(s string) (Status, bool) {
 	return Open, false
 }
 
-// run runs a program and returns its trimmed output. A failure reads as what
+func run(name string, args ...string) (string, error) { return output(exec.Command(name, args...)) }
+
+// output runs cmd and returns its trimmed output. A failure reads as what
 // the program printed to stderr.
-func run(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
+func output(cmd *exec.Cmd) (string, error) {
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if msg := strings.TrimSpace(stderr.String()); err != nil && msg != "" {
-		err = fmt.Errorf("%s: %s", name, msg)
+		err = fmt.Errorf("%s: %s", cmd.Args[0], msg)
 	}
 	return strings.TrimSpace(string(out)), err
 }
