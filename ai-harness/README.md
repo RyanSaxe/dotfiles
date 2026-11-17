@@ -78,6 +78,11 @@ merges them into `~/.claude/settings.json` and `~/.codex/config.toml`, keeping
 whatever the agent wrote there itself. Deleting a setting from the module
 leaves it in the file, so delete it there by hand too.
 
+Playwright runs in an isolated headless browser. Automatically named artifacts
+go to `codex/browser-artifacts/playwright` under Home Manager's `xdg.stateHome`,
+normally `~/.local/state`. An explicit filename must be an absolute path there:
+Playwright resolves relative filenames inside the project checkout.
+
 ## Phone notifications
 
 `tools/notify-pushover.zsh` sends a [Pushover](https://pushover.net) push when

@@ -63,6 +63,11 @@ give it a small mode that runs the same code on a sample of the input,
 chosen by a flag or a config. Use it to reproduce a failure and try a fix in
 seconds, and keep it working as the code changes.
 
+Keep browser screenshots and traces outside project checkouts. With Playwright
+MCP, omit the filename to use its configured output directory, or pass an
+absolute path under that directory. Relative filenames resolve inside the
+project checkout.
+
 ## From task to pull request
 
 ```text
