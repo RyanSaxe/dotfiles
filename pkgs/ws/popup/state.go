@@ -9,6 +9,7 @@ type loadState int
 
 const (
 	firstLoad loadState = iota // nothing to show yet
+	picking                    // nothing to show yet, and Enter waits for the rows
 	loaded                     // showing rows
 	failed                     // showing why the load failed
 	reloading                  // showing rows while the next load runs
@@ -28,27 +29,49 @@ type (
 		gen int
 		err error
 	}
+	pickEarly struct{} // Enter, with no row to pick yet
 )
 
-func (reloadTab) isTabEvent() {}
-func (tabDone) isTabEvent()   {}
+func (reloadTab) isTabEvent()  {}
+func (tabDone) isTabEvent()    {}
+func (pickEarly) isTabEvent()  {}
+func (keyPressed) isTabEvent() {} // any key after an early Enter takes it back
 
-// next moves a tab on, and says whether the event's rows go into the list.
-func (t tabLoad) next(e tabEvent) (tabLoad, bool) {
+// rowsEffect is what the frame does with the rows a load brought.
+type rowsEffect int
+
+const (
+	dropRows rowsEffect = iota
+	showRows
+	showAndPick // show them, and pick the top one for the Enter that came first
+)
+
+// next moves a tab on, and says what becomes of the event's rows.
+func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 	switch e := e.(type) {
 	case reloadTab:
-		state := map[loadState]loadState{firstLoad: firstLoad, loaded: reloading, failed: retrying, reloading: reloading, retrying: retrying}[t.state]
-		return tabLoad{state: state, gen: t.gen + 1, err: t.err}, false
+		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: reloading, failed: retrying, reloading: reloading, retrying: retrying}[t.state]
+		return tabLoad{state: state, gen: t.gen + 1, err: t.err}, dropRows
+	case pickEarly:
+		if t.state == firstLoad {
+			return tabLoad{state: picking, gen: t.gen}, dropRows
+		}
+	case keyPressed:
+		if t.state == picking {
+			return tabLoad{state: firstLoad, gen: t.gen}, dropRows
+		}
 	case tabDone:
 		switch {
 		case e.gen != t.gen:
-			return t, false
+			return t, dropRows
 		case e.err != nil:
-			return tabLoad{state: failed, gen: t.gen, err: e.err}, false
+			return tabLoad{state: failed, gen: t.gen, err: e.err}, dropRows
+		case t.state == picking:
+			return tabLoad{state: loaded, gen: t.gen}, showAndPick
 		}
-		return tabLoad{state: loaded, gen: t.gen}, true
+		return tabLoad{state: loaded, gen: t.gen}, showRows
 	}
-	return t, false
+	return t, dropRows
 }
 
 func (t tabLoad) showsRows() bool { return t.state == loaded || t.state == reloading }

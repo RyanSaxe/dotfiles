@@ -129,16 +129,18 @@ func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 		m.syncDetail()
 		return m, nil
 	case rowsMsg:
-		var keep bool
-		if m.tabs[msg.tab], keep = m.tabs[msg.tab].next(tabDone{msg.gen, msg.err}); !keep {
+		var effect rowsEffect
+		if m.tabs[msg.tab], effect = m.tabs[msg.tab].next(tabDone{msg.gen, msg.err}); effect == dropRows {
 			return m, nil
 		}
-		items := make([]list.Item, len(msg.rows))
-		for i, r := range msg.rows {
-			items[i] = r
+		m.setRows(msg.tab, msg.rows)
+		moved := m.selectionChanged()
+		if effect == showAndPick {
+			var picked tea.Cmd
+			m, picked = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+			return m, tea.Batch(moved, picked)
 		}
-		cmd := m.lists[msg.tab].SetItems(items)
-		return m, tea.Batch(cmd, m.selectionChanged())
+		return m, moved
 	case settleMsg:
 		if r, ok := m.selected(); ok && r.ID == msg.id {
 			return m, m.moveDetail(r, rested{})
@@ -220,6 +222,7 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 		return m, cmd
 	}
 	m.foot, _ = m.foot.next(keyPressed{})
+	m.tabs[m.active], _ = m.tabs[m.active].next(keyPressed{})
 	l, key, detailsAlone := &m.lists[m.active], k.String(), m.narrow() && m.phone == phoneDetails
 	switch {
 	case key == "ctrl+c":
@@ -242,6 +245,12 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 		if a.Key == key && (ok || a.Always) {
 			return m, a.Run(r)
 		}
+	}
+	// Enter before the first rows arrive waits for them, so typing a name and
+	// Enter straight after the popup opens goes to its top match.
+	if key == "enter" && !ok {
+		m.tabs[m.active], _ = m.tabs[m.active].next(pickEarly{})
+		return m, nil
 	}
 	switch key {
 	case "up", "ctrl+k", "ctrl+p":
@@ -310,6 +319,23 @@ func (m frame) rowAt(x, y int) (int, bool) {
 		return 0, false
 	}
 	return i, true
+}
+
+// setRows puts rows on a tab, filtered by what was typed there. SetItems
+// would filter them in a command whose matches go to whichever list is
+// active when it ends, so they are filtered here, at once.
+func (m *frame) setRows(tab int, rows []Row) {
+	items := make([]list.Item, len(rows))
+	for i, r := range rows {
+		items[i] = r
+	}
+	l := &m.lists[tab]
+	l.SetItems(items)
+	if query := l.FilterValue(); query != "" {
+		at := l.Index()
+		l.SetFilterText(query)
+		l.Select(at)
+	}
 }
 
 // filter shows the active list's rows that match query, or every row when
@@ -554,10 +580,10 @@ func (m frame) listPane(w, h int) string {
 		return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, lipgloss.JoinVertical(lipgloss.Center, lines...))
 	}
 	switch {
-	case t.state == firstLoad:
-		return center(m.spin.View() + Dim.Render(" loading "+m.p.Noun))
 	case t.showsErr():
 		return center(Red.Render("Could not load "+m.p.Noun), "", Dim.Width(w-4).Align(lipgloss.Center).Render(t.err.Error()), "", Dim.Render("^r to retry"))
+	case !t.showsRows():
+		return center(m.spin.View() + Dim.Render(" loading "+m.p.Noun))
 	case len(l.Items()) == 0:
 		return center(Green.Render("✓"), "", Dim.Render(m.p.Tabs[m.active].Empty))
 	}
