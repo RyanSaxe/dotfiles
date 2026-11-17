@@ -231,7 +231,7 @@ func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 	// Without a vault there are no tasks to list, and no note to add one to.
 	if vault == "" {
 		err := errors.New("the vault isn't set up, since VAULT_DIR is unset")
-		return popup.Popup{Noun: "tasks", Tabs: []popup.Tab{{Name: "Tasks"}}, Load: func(int) ([]popup.Row, error) { return nil, err }}
+		return popup.Popup{Noun: "tasks", Tabs: []popup.Tab{{Name: "Tasks"}}, Load: func(int, func([]popup.Row)) ([]popup.Row, error) { return nil, err }}
 	}
 	tags := map[string]lipgloss.Style{"overdue": popup.Red.SetString("overdue"), "today": popup.Yellow.SetString("today"), "soon": popup.Accent.SetString("soon")}
 	// A project's tasks are filed under the name of its origin remote.
@@ -247,7 +247,7 @@ func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 	return popup.Popup{
 		Noun: "tasks",
 		Tabs: tabs,
-		Load: func(tab int) ([]popup.Row, error) {
+		Load: func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
 			ts, err := vaultTasks(vault, time.Now())
 			ts = slices.DeleteFunc(ts, func(t task) bool { return t.Done || project != "" && tab == 0 && t.Project != project })
 			// ISO dates sort as text, and undated tasks go last.

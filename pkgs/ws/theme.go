@@ -131,7 +131,7 @@ func themePopup(term kitty.Terminal) popup.Popup {
 	return popup.Popup{
 		Noun: "modes and mascots", OneLine: true,
 		Tabs: tabs,
-		Load: func(t int) ([]popup.Row, error) {
+		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
 			c, err := readTheme()
 			if err != nil {
 				return nil, err
