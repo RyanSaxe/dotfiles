@@ -269,6 +269,9 @@ lib.mkIf (lib.elem "base" cfg.roles) {
           "-y"
           "@playwright/mcp@0.0.83"
           "--headless"
+          "--isolated"
+          "--output-dir"
+          "${config.xdg.stateHome}/codex/browser-artifacts/playwright"
         ];
       };
     };
