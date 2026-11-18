@@ -1,0 +1,46 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["ALL"]
+unfixable = [
+    # A fix leaves an unused import for review instead of deleting it, since
+    # removing one can change what the package exports.
+    "F401",
+]
+ignore = [
+    # The license file covers the project, so no file carries a copyright notice.
+    "CPY001",
+    # Scripts and test folders aren't packages, so they have no __init__.py.
+    "INP001",
+    # Every module has a docstring, and a class or function has one only
+    # where it says what the names and types don't.
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+    "D106",
+    "D107",
+    # These contradict D211 and D212, which stay on.
+    "D203",
+    "D213",
+    # ruff format owns trailing commas, and this conflicts with it.
+    "COM812",
+    # A long signature is fine when the parameters after the first two are
+    # keyword-only.
+    "PLR0913",
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    # pytest checks with plain asserts.
+    "S101",
+    # A test's literal values are the behavior it documents.
+    "PLR2004",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
