@@ -55,11 +55,19 @@ page is wrong, rewrite it rather than adding an update section.
 
 ## Commit it
 
-Run `prettier --write` on each page you changed. The vault's
-`.prettierrc.json` wraps prose at 80 columns, as Neovim does when the user
-saves a page, and the vault's check refuses a page that isn't formatted or
-isn't linked from `index.md`. Then commit and push only the wiki paths you changed, never
-the user's notes:
+In `$VAULT_DIR`, format each page you changed with the command the vault's
+check prints:
+
+```sh
+uvx rumdl@0.3.2 fmt --config .rumdl.toml wiki/ml/rl/ppo-reward-hacking.md
+```
+
+The vault's `.rumdl.toml` wraps prose at 80 columns, as Neovim does when the
+user saves a page. `--config` names it because `private/` is a git
+repository of its own, where rumdl wouldn't find it. The vault's check
+refuses a page that isn't formatted, breaks one of rumdl's lint rules or
+isn't linked from `index.md`. Then commit and push only the wiki paths you
+changed, never the user's notes:
 
 ```sh
 git -C "$VAULT_DIR" add wiki/ml/rl/ppo-reward-hacking.md wiki/index.md wiki/log.md
