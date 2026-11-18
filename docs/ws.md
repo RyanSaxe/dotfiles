@@ -9,6 +9,7 @@ examples.
 
 ```sh
 ws open ~/generic/dotfiles          # open a folder, or switch to its tab or session
+ws tab . -- htop                    # run htop in a new tab of this folder's tab or session
 ws new fix-login                    # make ~/worktrees/PROJECT/fix-login on its own branch, with an agent
 ws new fix-popups --session         # open it as a session of its own, not a tab
 ws new fix-login --agent codex --prompt "Fix the redirect" --base main
@@ -45,6 +46,12 @@ of its own. A tab `ws` adds to a worktree's tab, such as a file the files
 popup opens, takes the worktree's name, so it is part of the place. Any
 other tab, such as one you or an agent named `tests`, is part of its
 session's place.
+
+`ws tab DIR -- COMMAND` adds such a tab: it runs COMMAND in a new tab of
+DIR's place, and opens the place first when DIR has none, with COMMAND
+typed into its shell. The files popup opens a file this way, and `pair
+spawn` opens each agent it starts this way, so an agent spawned in a
+worktree joins that worktree's place.
 
 `ws rm` and Ctrl-X in the go popup close a place's tabs, or its whole
 session when nothing else is in it. Removing a worktree closes its tab and

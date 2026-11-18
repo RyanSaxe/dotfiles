@@ -153,7 +153,7 @@ type Backend interface {
 	CreateTab(session, name, dir string, panes []layout.Pane) (Place, error) // a tab of session named name, or unnamed when name is "", running panes in dir
 	Show(p Place) error                                                      // shows the place's session and selects its tab
 	Focus(p Pane) error                                                      // shows the pane's session and tab, with the pane focused
-	Tab(p Place, dir string, args ...string) error                           // a new tab of the place running args, shown, which closes when they exit
+	Tab(p Place, dir string, args ...string) (Place, error)                  // a new tab of the place running args, which closes when they exit, as a place to Show
 	Kill(p Place) error                                                      // closes the place's tabs, or its session when it is Whole
 	Capture(p Pane) (string, error)                                          // the pane's text, with its colors
 	// Inside says whether the program runs in one of this multiplexer's panes.

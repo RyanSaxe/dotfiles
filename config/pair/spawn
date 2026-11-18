@@ -1,11 +1,11 @@
 #!/bin/bash
 # pair runs `spawn DIR COMMAND ARG…`, with no shell, to open an agent CLI in
-# a new terminal in DIR: a new window of the caller's tmux server, else a new
-# tab of the caller's Rex session, else a new Terminal window. tmux comes
-# first, as in ws, because a tmux inside a Rex tab is what the caller sees.
-# A tmux server that has stopped, or a Rex session that has closed, passes to
-# the next choice. Rex can't report which session its app is showing, so a
-# closed session has no other Rex session to fall back to.
+# a new terminal in DIR. Inside tmux or Rex, `ws tab` opens it in a new tab
+# of DIR's place, the tab or session ws opened DIR in, and opens that place
+# first when DIR has none. Outside both, it opens a new Terminal window.
+# tmux comes first, as in ws, because a tmux inside a Rex tab is what the
+# caller sees. A tmux server that has stopped, or a Rex session that has
+# closed, passes to the next choice.
 set -e
 
 if [ "$#" -lt 2 ]; then
@@ -29,11 +29,12 @@ done
 set -- env "${pass[@]}" "$@"
 
 if [ -n "$TMUX" ] && tmux list-sessions >/dev/null 2>&1; then
-  exec tmux new-window -c "$dir" -- "$@"
+  exec ws tab "$dir" -- "$@"
 fi
 
+# ws picks tmux whenever TMUX is set, so a stopped server's TMUX goes.
 if [ -n "$REX_SESSION" ] && rex --autostart=false session inspect "$REX_SESSION" >/dev/null 2>&1; then
-  exec rex --autostart=false run -s "$REX_SESSION" -c "$dir" -- "$@"
+  exec env -u TMUX ws tab "$dir" -- "$@"
 fi
 
 # Terminal opens a .command file in a new window and runs it. The file

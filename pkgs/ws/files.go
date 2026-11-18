@@ -94,7 +94,7 @@ func openFile(b mux.Backend, dir, file string) error {
 	if !found {
 		return open(b, dir, start{layout: "file", file: file}, true)
 	}
-	return b.Tab(p, dir, "nvim", file)
+	return showTab(b, p, dir, "nvim", file)
 }
 
 // without is files minus every name in drop, in files' order.

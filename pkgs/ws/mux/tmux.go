@@ -157,17 +157,14 @@ func (t Tmux) Show(p Place) error {
 }
 
 // Tab names the window after the place when the place's tabs are named, so
-// it is one of them.
-func (t Tmux) Tab(p Place, dir string, args ...string) error {
-	window := []string{"new-window", "-t", p.Session + ":", "-c", dir, "-P", "-F", "#{window_id}"}
+// it is one of them, and makes it in the background, as CreateTab does.
+func (Tmux) Tab(p Place, dir string, args ...string) (Place, error) {
+	window := []string{"new-window", "-d", "-t", p.Session + ":", "-c", dir, "-P", "-F", "#{window_id}"}
 	if p.Named {
 		window = append(window, "-n", p.Label)
 	}
 	id, err := tmux(append(append(window, "--"), args...)...)
-	if err == nil && (t.inside || t.Client != "") {
-		err = t.switchTo(id)
-	}
-	return err
+	return Place{Label: p.Label, Session: p.Session, Tab: id, Tabs: []string{id}, Named: p.Named}, err
 }
 
 func tmuxType(pane, text string) error {

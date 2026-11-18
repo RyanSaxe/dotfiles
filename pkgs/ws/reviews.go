@@ -308,7 +308,7 @@ func reviewAgent(b mux.Backend, it item) error {
 		return err
 	}
 	prompt := fmt.Sprintf("Review pull request %s. Read its description and its diff with gh, then list what should change before it merges, most important first.", it.URL)
-	return b.Tab(p, dir, append(agent, "--", prompt)...)
+	return showTab(b, p, dir, append(agent, "--", prompt)...)
 }
 
 // signedImage is an attachment's link in a pull request's HTML: signed, so

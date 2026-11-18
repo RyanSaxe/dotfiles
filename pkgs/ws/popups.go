@@ -72,6 +72,16 @@ func perLoad[T any](work func() (T, error)) func(tab int) (T, error) {
 	}
 }
 
+// showTab runs args in a new tab of the place p and goes there, since the
+// person who picked a row in a popup wants to see what it opened.
+func showTab(b mux.Backend, p mux.Place, dir string, args ...string) error {
+	t, err := b.Tab(p, dir, args...)
+	if err != nil {
+		return err
+	}
+	return b.Show(t)
+}
+
 // page runs a pager such as delta in the popup's place, and comes back to
 // the popup with its error, if any, as a notice.
 func page(pager *exec.Cmd) tea.Cmd {
