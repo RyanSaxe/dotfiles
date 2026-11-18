@@ -93,11 +93,13 @@ In Rex, Alt-Shift-S opens Rex's own Change Session.
 ## Agents that need you
 
 An agent needs you when it finished or waits on you and you haven't
-looked at its pane since. Sketchybar's A lights while one does, and
-Cmd-Alt-A (`ws focus agent`) cycles through those agents, failed first,
-then blocked, then done, and within each the one that has needed you
-longest first. When no agent needs you, it cycles through every agent.
-`ws` reads what each multiplexer already tracks:
+looked at its pane since. Sketchybar's A lights while one does: red when
+an agent has failed, peach when one is blocked, and green when the agents
+that need you have only finished. Cmd-Alt-A (`ws focus agent`) cycles
+through those agents, failed first, then blocked, then done, and within
+each the one that has needed you longest first. When no agent needs you,
+it cycles through every agent. `ws` reads what each multiplexer already
+tracks:
 
 - **tmux:** the agent is the pane `ws` marked agent when it made the
   session. It needs you once its window's bell rings while no client shows
@@ -105,11 +107,11 @@ longest first. When no agent needs you, it cycles through every agent.
   nothing. Claude Code and Codex ring the bell when they finish or wait, as
   [ai-harness/README.md](../ai-harness/README.md#agents-that-need-you)
   describes. A bell doesn't say whether the agent finished or waits, so an
-  agent that rang counts as blocked, and Cmd-Alt-A orders those agents by
-  how long they have needed you. The agents popup shows the agent as
-  working while its window prints and idle otherwise. tmux tracks bells and
-  output per window, so a bell or output from a shell pane beside the agent
-  counts as the agent's.
+  agent that rang counts as blocked: it lights the A peach, and Cmd-Alt-A
+  orders those agents by how long they have needed you. The agents popup
+  shows the agent as working while its window prints and idle otherwise.
+  tmux tracks bells and output per window, so a bell or output from a shell
+  pane beside the agent counts as the agent's.
 - **Rex:** a blocked or failed agent needs you until it reports something
   else, and a done one until a Rex app shows its pane. The pane you're
   looking at needs nothing, and `ws attention --watch` remembers a done

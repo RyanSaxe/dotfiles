@@ -49,7 +49,7 @@ var commandUsages = []string{`
                                      sessions is the go popup on its Sessions tab`, `
   ws theme                           the theme popup: light or dark, and the mascot`, `
   ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file`, `
-  ws attention [--watch]             print what needs you, as agents (waiting or none), reviews
+  ws attention [--watch]             print what needs you, as agents (failed, waiting, done or none), reviews
                                      (ci, review or none) and tasks (overdue, today, tomorrow or none).
                                      --watch publishes all three for sketchybar and fetches the inbox
                                      Reviews lists every 5 minutes`, `

@@ -5,8 +5,10 @@
 # then done, and within each the one that has waited longest first.
 #
 # `ws attention --watch` publishes the level:
-# - waiting: an agent needs you: it failed, waits on you, or finished since
-#   you last looked at it
+# - failed:  a failed agent needs you
+# - waiting: a blocked agent needs you, or a tmux agent rang its bell, which
+#   doesn't say why
+# - done:    only agents that finished since you last looked at them need you
 # - none:    dim, like an unfocused workspace, and still a keybind reminder
 
 source "$HOME/.config/sketchybar/colors.sh"
@@ -16,10 +18,22 @@ ATTENTION="none"
 [[ -r "$ATTENTION_FILE" ]] && ATTENTION=$(<"$ATTENTION_FILE")
 
 case "$ATTENTION" in
+failed)
+  sketchybar --set "$NAME" \
+    icon.color="$AGENT_FAILED_FG" \
+    background.color="$AGENT_FAILED_BG" \
+    background.drawing=on
+  ;;
 waiting)
   sketchybar --set "$NAME" \
     icon.color="$AGENT_WAITING_FG" \
     background.color="$AGENT_WAITING_BG" \
+    background.drawing=on
+  ;;
+done)
+  sketchybar --set "$NAME" \
+    icon.color="$AGENT_DONE_FG" \
+    background.color="$AGENT_DONE_BG" \
     background.drawing=on
   ;;
 *)

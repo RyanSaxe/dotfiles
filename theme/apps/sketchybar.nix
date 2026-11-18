@@ -18,8 +18,12 @@ let
     WORKSPACE_INACTIVE_BG = "0x00000000";
     TIME_NORMAL = argb "ff" t.accent;
     TIME_HIGHLIGHT = argb "ff" t.error; # a meeting is about to start or end
+    AGENT_FAILED_FG = argb "ff" t.error;
+    AGENT_FAILED_BG = argb "33" t.error;
     AGENT_WAITING_FG = argb "ff" t.waiting;
     AGENT_WAITING_BG = argb "33" t.waiting;
+    AGENT_DONE_FG = argb "ff" t.done;
+    AGENT_DONE_BG = argb "33" t.done;
     REVIEW_CI_FG = argb "ff" t.error; # a check failed on your pull request
     REVIEW_CI_BG = argb "33" t.error;
     REVIEW_PENDING_FG = argb "ff" t.waiting;
