@@ -49,12 +49,19 @@ func needRank(p mux.Pane) int {
 	return 1
 }
 
-// agentLevel is waiting when an agent needs you, and none otherwise.
+// agentLevels names each needRank as sketchybar's A shows it, then the
+// level for when no agent needs you.
+var agentLevels = []string{"failed", "waiting", "done", "none"}
+
+// agentLevel is the level of the most urgent agent that needs you.
 func agentLevel(s mux.Snapshot) string {
-	if slices.ContainsFunc(s.Agents(), func(p mux.Pane) bool { return p.NeedsYou }) {
-		return "waiting"
+	rank := len(agentLevels) - 1
+	for _, p := range s.Agents() {
+		if p.NeedsYou {
+			rank = min(rank, needRank(p))
+		}
 	}
-	return "none"
+	return agentLevels[rank]
 }
 
 // noteSeen records in seen.json the done record of the pane you're looking

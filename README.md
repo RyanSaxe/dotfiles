@@ -75,14 +75,15 @@ Add Shift to the key to move the focused window to that workspace.
 After them are three letters that light up when something needs you. From any
 app, press Cmd-Alt and the letter to act on it:
 
-| Letter | Lights up when                                         | Cmd-Alt and the letter |
-| ------ | ------------------------------------------------------ | ---------------------- |
-| A      | An agent is blocked on you or has failed               | Go to that agent       |
-| R      | A pull request or issue is in Reviews' Needs you tab  | Open Reviews           |
-| T      | A task is due by tomorrow                              | Open Tasks             |
+| Letter | Lights up when                                               | Cmd-Alt and the letter |
+| ------ | ------------------------------------------------------------ | ---------------------- |
+| A      | An agent has failed, is blocked or finished since you looked | Go to that agent       |
+| R      | A pull request or issue is in Reviews' Needs you tab         | Open Reviews           |
+| T      | A task is due by tomorrow                                    | Open Tasks             |
 
-Cmd-Alt-A goes to failed agents first, then blocked ones, then finished
-ones.
+The A lights red while a failed agent needs you, peach while a blocked one
+does, and green while only finished ones do. Cmd-Alt-A goes to failed
+agents first, then blocked ones, then finished ones.
 
 ## Documentation
 

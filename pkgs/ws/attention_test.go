@@ -47,6 +47,34 @@ func TestTheTaskLetterStaysOffWithoutAVault(t *testing.T) {
 	}
 }
 
+func TestAgentLevel(t *testing.T) {
+	quiet := []mux.Pane{
+		{ID: "working", Status: mux.Working},
+		{ID: "seen", Status: mux.Done},
+		// Rex reports the agent you're looking at as needing nothing.
+		{ID: "looking", Status: mux.Blocked},
+	}
+	unseen := mux.Pane{ID: "unseen", Status: mux.Done, NeedsYou: true}
+	blocked := mux.Pane{ID: "blocked", Status: mux.Blocked, NeedsYou: true}
+	failed := mux.Pane{ID: "failed", Status: mux.Error, NeedsYou: true}
+	bell := mux.Pane{ID: "bell", Status: mux.Idle, NeedsYou: true}
+	for _, c := range []struct {
+		name  string
+		panes []mux.Pane
+		want  string
+	}{
+		{"nothing needs you", quiet, "none"},
+		{"a finished agent you haven't looked at", append(slices.Clone(quiet), unseen), "done"},
+		{"a blocked agent outranks a finished one", append(slices.Clone(quiet), unseen, blocked), "waiting"},
+		{"a failed agent outranks a blocked one", append(slices.Clone(quiet), unseen, blocked, failed), "failed"},
+		{"a tmux bell counts as blocked", []mux.Pane{bell}, "waiting"},
+	} {
+		if got := agentLevel(mux.Snapshot{Panes: c.panes}); got != c.want {
+			t.Errorf("%s: the level is %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestNextAgent(t *testing.T) {
 	agents := []mux.Pane{
 		{Label: "web", ID: "idle", Status: mux.Idle},
