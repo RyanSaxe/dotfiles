@@ -236,6 +236,21 @@ func receive(t *testing.T, c chan popup.Row) popup.Row {
 	return popup.Row{}
 }
 
+// A reload that leaves fewer rows than the cursor's place, as closing the
+// last row's session does, puts the cursor on the new last row.
+func TestAReloadThatShortensTheListKeepsARowSelected(t *testing.T) {
+	var picked []string
+	rows := []popup.Row{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}, {ID: "c", Title: "c"}}
+	p := picker(nil, nil, &picked)
+	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) { return rows, nil }
+	m, _ := run(start(p), down, down)
+	rows = rows[:2]
+	run(m, ctrlR, enter)
+	if !slices.Equal(picked, []string{"b"}) {
+		t.Errorf("picked %v, want [b]", picked)
+	}
+}
+
 // Rows that load before the terminal's size arrives are there to pick once
 // it does.
 func TestRowsBeforeTheSizeCanBePicked(t *testing.T) {
