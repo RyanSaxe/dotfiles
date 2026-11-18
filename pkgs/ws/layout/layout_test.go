@@ -12,12 +12,12 @@ import (
 var builtins = map[string]string{"agent": "[[pane]]\nrun = \"{agent} {prompt}\"\nfocus = true\n\n[[pane]]\nsize = 35\n"}
 
 func TestLoadFillsPlaceholders(t *testing.T) {
-	vars := map[string][]string{"{agent}": {"codex", "-c", "model_reasoning_effort=high"}, "{prompt}": {"fix the 'bug'"}}
+	vars := map[string][]string{"{agent}": {"codex", "-m", "gpt-6.1-sol"}, "{prompt}": {"fix the 'bug'"}}
 	panes, err := layout.Load(t.TempDir(), "agent", builtins, vars)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := panes[0].Run, `codex -c 'model_reasoning_effort=high' 'fix the '\''bug'\'''`; got != want || !panes[0].Focus {
+	if got, want := panes[0].Run, `codex -m gpt-6.1-sol 'fix the '\''bug'\'''`; got != want || !panes[0].Focus {
 		t.Errorf("first pane runs %s (focus %v), want %s, focused", got, panes[0].Focus, want)
 	}
 	if p := panes[1]; p.Split != "right" || p.Size != 35 || p.Run != "" {
