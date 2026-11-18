@@ -58,6 +58,10 @@ func TestATmuxSnapshot(t *testing.T) {
 		os.RemoveAll(dir)
 	})
 	t.Setenv("TMUX_TMPDIR", dir)
+	// A program run outside a terminal, as by launchd, gets no locale.
+	for _, v := range []string{"LC_ALL", "LC_CTYPE", "LANG"} {
+		t.Setenv(v, "")
+	}
 	work, err := filepath.EvalSymlinks(t.TempDir()) // tmux reports the real path
 	if err != nil {
 		t.Fatal(err)
