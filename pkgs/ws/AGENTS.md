@@ -51,7 +51,7 @@ The rest are records `ws` keeps for itself:
 - `seen.json`: each done Rex report you were looking at as it came, by
   pane, so it doesn't need you once you look away. Only the `--watch` job
   writes it, and it keeps only panes that still exist
-- `mascot.json`: the mascot and its two colors, which only the popups use,
+- `mascot.json`: the mascot and its accent, which only the popups use,
   written by `ws mascot` and the theme popup
 - `agent`: the agent this computer starts by default, set by `ws agent`
 - `agent-flags.json`: each agent's default flags, set by `ws agent`

@@ -18,19 +18,18 @@ import (
 	"workspace/popup"
 )
 
-// themeChoice is a computer's mascot and the two Catppuccin accents its
-// colors snapped to, which color the popups. Only ws reads and writes it, as
+// themeChoice is a computer's mascot and the Catppuccin accent its colors
+// snapped to, which colors the popups. Only ws reads and writes it, as
 // mascot.json in stateDir.
 type themeChoice struct {
 	Mascot string `json:"mascot"`
 	Accent string `json:"accent"`
-	Notify string `json:"notify"`
 }
 
 // readTheme is the saved choice, or the default mascot on a computer that
 // has saved none.
 func readTheme() (themeChoice, error) {
-	c := themeChoice{Mascot: "pokemon:raikou", Accent: "yellow", Notify: "sky"}
+	c := themeChoice{Mascot: "pokemon:raikou", Accent: "yellow"}
 	err := readJSON("mascot.json", &c)
 	if errors.Is(err, os.ErrNotExist) {
 		err = nil
@@ -65,7 +64,7 @@ func accentColor() string {
 	return palette.Mocha.Colors[c.Accent].Hex
 }
 
-// setMascot takes the mascot's two colors from its picture and applies it.
+// setMascot takes the mascot's accent from its picture and applies it.
 func setMascot(name string) error {
 	name, err := mascotName(name)
 	if err != nil {
@@ -83,7 +82,7 @@ func setMascot(name string) error {
 	if err != nil {
 		return err
 	}
-	if c.Accent, c.Notify, err = mascotColors(img); err != nil {
+	if c.Accent, err = mascotAccent(img); err != nil {
 		return err
 	}
 	c.Mascot = name
@@ -123,7 +122,7 @@ type mode string
 func themePopup(term kitty.Terminal) popup.Popup {
 	// A tab per kind of mascot, and Yours only on a computer with PNGs.
 	locals, _ := filepath.Glob(filepath.Join(localMascots, "*.png"))
-	kinds := []string{"", "pokemon", "shiny-pokemon"}
+	kinds := []string{"pokemon", "shiny-pokemon"}
 	tabs := []popup.Tab{{Name: "Mode", Empty: "No modes."}, {Name: "Pokémon", Empty: "No Pokémon."}, {Name: "Shiny", Empty: "No shiny Pokémon."}}
 	if len(locals) > 0 {
 		kinds, tabs = append(kinds, "local"), append(tabs, popup.Tab{Name: "Yours", Empty: "No PNGs in " + tilde(localMascots) + "."})
@@ -148,8 +147,9 @@ func themePopup(term kitty.Terminal) popup.Popup {
 					current(popup.Row{ID: "mode:light", Title: "Light", Data: mode("light")}, themeMode() == "light"),
 				}, nil
 			}
+			kind := kinds[t-1] // Mode comes before the mascots' tabs
 			var ids []string
-			if kinds[t] == "local" {
+			if kind == "local" {
 				for _, f := range locals {
 					ids = append(ids, filepath.Base(f))
 				}
@@ -159,7 +159,7 @@ func themePopup(term kitty.Terminal) popup.Popup {
 			// The current mascot leads its tab.
 			var rows []popup.Row
 			for _, id := range ids {
-				name := kinds[t] + ":" + id
+				name := kind + ":" + id
 				r := current(popup.Row{ID: name, Title: id, Data: name}, name == c.Mascot)
 				if name == c.Mascot {
 					rows = append([]popup.Row{r}, rows...)

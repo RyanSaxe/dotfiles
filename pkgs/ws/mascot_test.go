@@ -27,7 +27,6 @@ func paint(layers ...layer) image.Image {
 }
 
 var (
-	purple  = color.NRGBA{100, 70, 200, 255}
 	crimson = color.NRGBA{220, 30, 40, 255}
 	gold    = color.NRGBA{220, 180, 60, 255}
 	blush   = color.NRGBA{245, 195, 205, 255}
@@ -35,36 +34,28 @@ var (
 	grey    = color.NRGBA{128, 128, 128, 255}
 )
 
-func TestMascotColors(t *testing.T) {
+func TestMascotAccent(t *testing.T) {
 	for _, tc := range []struct {
-		name           string
-		img            image.Image
-		accent, notify string
+		name   string
+		img    image.Image
+		accent string
 	}{
-		// Gengar's case: red eyes, 2% of a purple body, still give the
-		// second color.
-		{"small eyes keep their hue", paint(
-			layer{image.Rect(0, 0, 200, 200), purple}, layer{image.Rect(50, 50, 70, 70), crimson}, layer{image.Rect(130, 50, 150, 70), crimson},
-		), "lavender", "maroon"},
-		// Jigglypuff's case: a pale pink body outweighs small vivid eyes,
-		// which give the second color.
+		// Jigglypuff's case: a pale pink body outweighs small vivid eyes.
 		{"a pale body outweighs vivid eyes", paint(
 			layer{image.Rect(0, 0, 200, 200), blush}, layer{image.Rect(50, 50, 70, 70), teal}, layer{image.Rect(130, 50, 150, 70), teal},
-		), "maroon", "sky"},
+		), "maroon"},
 		// A mostly red mascot leads with its other hue, since a red accent
 		// reads as an error everywhere it shows.
 		{"red never leads", paint(
 			layer{image.Rect(0, 0, 200, 150), crimson}, layer{image.Rect(0, 150, 200, 200), gold},
-		), "yellow", "maroon"},
-		// One hue still gives two different accents.
-		{"one hue gives two accents", paint(layer{image.Rect(0, 0, 200, 200), gold}), "yellow", "peach"},
+		), "yellow"},
 	} {
-		accent, notify, err := mascotColors(tc.img)
-		if err != nil || accent != tc.accent || notify != tc.notify {
-			t.Errorf("%s: got %s and %s (%v), want %s and %s", tc.name, accent, notify, err, tc.accent, tc.notify)
+		accent, err := mascotAccent(tc.img)
+		if err != nil || accent != tc.accent {
+			t.Errorf("%s: got %s (%v), want %s", tc.name, accent, err, tc.accent)
 		}
 	}
-	if _, _, err := mascotColors(paint(layer{image.Rect(0, 0, 200, 200), grey})); err == nil {
-		t.Error("a grey picture has no hue, but mascotColors found one")
+	if _, err := mascotAccent(paint(layer{image.Rect(0, 0, 200, 200), grey})); err == nil {
+		t.Error("a grey picture has no hue, but mascotAccent found one")
 	}
 }

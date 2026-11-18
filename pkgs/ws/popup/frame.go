@@ -454,9 +454,8 @@ func (m frame) leftW() int {
 	if !m.sideBySide() {
 		return m.w
 	}
-	// The list takes about a third unless the popup says otherwise, so the
-	// details have room for a diff.
-	return min(max(m.w*cmp.Or(m.p.List, 35)/100, 38), m.w-40)
+	// The list takes about a third, so the details have room for a diff.
+	return min(max(m.w*35/100, 38), m.w-40)
 }
 
 func (m frame) rightW() int {
@@ -571,18 +570,10 @@ func (delegate) Spacing() int { return 1 }
 func (delegate) Update(tea.Msg, *list.Model) tea.Cmd { return nil }
 
 func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	r, preW, prefix := item.(Row), 0, ""
-	for _, it := range m.Items() {
-		if p := it.(Row).Prefix; p != "" {
-			preW = max(preW, len(p)+1)
-		}
-	}
-	if preW > 0 {
-		prefix = fmt.Sprintf("%*s ", preW, r.Prefix)
-	}
-	bar, pre, title := "  ", Dim, lipgloss.NewStyle()
+	r := item.(Row)
+	bar, title := "  ", lipgloss.NewStyle()
 	if index == m.Index() {
-		bar, pre, title = Accent.Render("│ "), Accent, Accent.Bold(true)
+		bar, title = Accent.Render("│ "), Accent.Bold(true)
 	}
 	// Title and Tag on the first line, Detail and Qualifier on the second,
 	// each pair pushed to the edges.
@@ -590,19 +581,19 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	if d.oneLine && r.Qualifier != "" {
 		tag = strings.TrimSpace(tag + " " + Dim.Render(fmt.Sprintf("%4s", r.Qualifier)))
 	}
-	tw := m.Width() - 2 - len(prefix) - lipgloss.Width(tag) - 1 // bar, prefix, tag and its space
+	tw := m.Width() - 2 - lipgloss.Width(tag) - 1 // bar, tag and its space
 	t := ansi.Truncate(r.Title, tw, "…")
 	matches := slices.DeleteFunc(slices.Clone(m.MatchesForItem(index)), func(i int) bool { return i >= len([]rune(t)) })
-	line1 := bar + pre.Render(prefix) + lipgloss.StyleRunes(t, matches, title.Underline(true), title) +
+	line1 := bar + lipgloss.StyleRunes(t, matches, title.Underline(true), title) +
 		strings.Repeat(" ", tw-ansi.StringWidth(t)+1) + tag
 	if d.oneLine {
 		fmt.Fprint(w, line1)
 		return
 	}
 	qualifier := Dim.Render(r.Qualifier)
-	dw := m.Width() - 2 - len(prefix) - lipgloss.Width(qualifier) - 1
+	dw := m.Width() - 2 - lipgloss.Width(qualifier) - 1
 	detail := ansi.Truncate(r.Detail, dw, "…")
-	line2 := bar + strings.Repeat(" ", len(prefix)) + Dim.Render(detail) +
+	line2 := bar + Dim.Render(detail) +
 		strings.Repeat(" ", dw-ansi.StringWidth(detail)+1) + qualifier
 	fmt.Fprint(w, line1+"\n"+line2)
 }

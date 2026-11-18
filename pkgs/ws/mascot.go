@@ -66,8 +66,8 @@ func fetchMascot(name string) (mascot, error) {
 }
 
 // fetchPokemon caches a Pokémon's game sprite, which popups draw, and its
-// official artwork, which keeps details the small sprite drops, such as
-// gengar's red eyes, for its colors.
+// official artwork, which keeps details the small sprite drops, for its
+// accent.
 func fetchPokemon(name string, shiny bool) (mascot, error) {
 	dir := filepath.Join(mascotCache, "pokemon")
 	base, variant := name, "front_default"
@@ -164,11 +164,10 @@ func loadPNG(path string) (image.Image, error) {
 
 // ----- colors ------------------------------------------------------------
 //
-// mascotColors finds the mascot's two hues: the dominant hue of its vivid
-// and clearly tinted pale pixels, or of its pale ones when nothing is
-// vivid, and the most distinct other hue the mascot actually has. Then each
-// snaps to the Catppuccin accent nearest in OKLCH hue, the second to a
-// different accent than the first.
+// mascotAccent finds the mascot's accent: the dominant hue of its vivid and
+// clearly tinted pale pixels, or of its pale ones when nothing is vivid,
+// snapped to the Catppuccin accent nearest in OKLCH hue. A red hue gives way
+// to the most distinct other hue the mascot actually has.
 
 type hsv struct{ h, s, v float64 }
 
@@ -182,17 +181,16 @@ var mochaAccents = []struct{ name, hex string }{
 	{"sky", "#89dceb"}, {"sapphire", "#74c7ec"}, {"blue", "#89b4fa"}, {"lavender", "#b4befe"},
 }
 
-func mascotColors(img image.Image) (accent, notify string, err error) {
+func mascotAccent(img image.Image) (string, error) {
 	vivid, pale := gatherPixels(img)
 	if len(vivid) == 0 && len(pale) == 0 {
-		return "", "", errors.New("the picture is grey, so it has no hue to take")
+		return "", errors.New("the picture is grey, so it has no hue to take")
 	}
-	a, n := pickPair(vivid, pale)
-	if isRed(a) && !isRed(n) { // an overly red accent reads as an error
-		a, n = n, a
+	a, other := pickPair(vivid, pale)
+	if isRed(a) && !isRed(other) { // an overly red accent reads as an error
+		a = other
 	}
-	accent = nearestAccent(darkStyled(a, false), "")
-	return accent, nearestAccent(darkStyled(n, true), accent), nil
+	return nearestAccent(darkStyled(a)), nil
 }
 
 // gatherPixels splits the picture's opaque, tinted pixels into vivid and
@@ -326,23 +324,16 @@ func isRed(c hsv) bool {
 
 // darkStyled is the pastel the theme command gave a hue on a dark
 // background, which is what the snapping compares.
-func darkStyled(c hsv, bright bool) [3]float64 {
-	v := 0.85
-	if bright {
-		v = 0.92
-	}
-	r, g, b := fromHSV(c.h, min(max(c.s, 0.55), 0.85), v)
+func darkStyled(c hsv) [3]float64 {
+	r, g, b := fromHSV(c.h, min(max(c.s, 0.55), 0.85), 0.85)
 	return [3]float64{r, g, b}
 }
 
-// nearestAccent is the accent closest in OKLCH hue, other than not.
-func nearestAccent(rgb [3]float64, not string) string {
+// nearestAccent is the accent closest in OKLCH hue.
+func nearestAccent(rgb [3]float64) string {
 	h := okHue(rgb)
 	best, bestGap := "", 361.0
 	for _, a := range mochaAccents {
-		if a.name == not {
-			continue
-		}
 		var c [3]float64
 		for i := range c {
 			var n int

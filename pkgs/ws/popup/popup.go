@@ -11,9 +11,8 @@ import (
 // A Popup is one list to pick from: its tabs, how a tab loads, what a row's
 // details show, and its keys. Load and Fetch run off the UI.
 type Popup struct {
-	Noun    string
-	OneLine bool // rows of one line, with the title, tag and qualifier on it
-	List    int  // the list's share of the width in percent, 35 when unset // what it lists, as in "loading folders"
+	Noun    string // what it lists, as in "loading folders"
+	OneLine bool   // rows of one line, with the title, tag and qualifier on it
 	Tabs    []Tab
 	Start   int // the tab it opens on, 0 for the first
 	// Load fills a tab. It may call show with the rows it has so far, as often
@@ -34,13 +33,11 @@ type Action struct {
 	Run       func(r Row) tea.Cmd
 }
 
-// A Row is up to two lines: prefix, title, tag and side, then meta.
-//
-// It has four places: Title and Tag on its first line, Detail and Qualifier
-// on its second. A popup fills the ones it has something for, and the frame
-// lays them out the same way in every popup.
+// A Row is up to two lines. It has four places: Title and Tag on its first
+// line, Detail and Qualifier on its second. A popup fills the ones it has
+// something for, and the frame lays them out the same way in every popup.
 type Row struct {
-	ID, Prefix               string
+	ID                       string
 	Title, Detail, Qualifier string
 	Tag                      lipgloss.Style // shown when it has a string set
 	Data                     any
