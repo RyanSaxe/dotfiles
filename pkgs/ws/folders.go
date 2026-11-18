@@ -41,17 +41,18 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 		Start: first,
 		// Folders shows the walk's rows at once, and tags the folders that
 		// have a session once the snapshot comes. Enter on an untagged row
-		// still goes to its session, since open finds it.
+		// still goes to its session, since open finds it. Sessions reads the
+		// snapshot first, so it runs while Folders walks.
 		Load: func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
+			if tab == sessionsTab {
+				s, err := snapshot(tab)
+				fs, _ := walk(tab)
+				return sessionRows(fs, s), err
+			}
 			fs, _ := walk(tab)
-			if tab == foldersTab {
-				show(folderRows(fs, mux.Snapshot{}))
-			}
+			show(folderRows(fs, mux.Snapshot{}))
 			s, err := snapshot(tab)
-			if tab == foldersTab {
-				return folderRows(fs, s), err
-			}
-			return sessionRows(fs, s), err
+			return folderRows(fs, s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
 			// A session's pane shows what it's doing, and a folder without one
