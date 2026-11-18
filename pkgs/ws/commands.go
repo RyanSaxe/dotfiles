@@ -103,9 +103,10 @@ Neovim, and file opens {file} in Neovim. A pane's run can use {agent}, {prompt},
 		about: `Run COMMAND in a new tab of folder DIR's place, its tab or session. The tab closes when
 COMMAND exits. When DIR has no place, ws opens one as ws open does, a worktree as a tab or a
 session as open_as in ~/.config/ws/config.toml says, and types COMMAND into its shell in
-place of a layout. Run by a person, ws tab goes to the new tab, and run by an agent, it
-leaves the view alone. pair's launch script opens each agent it spawns this way. Outside Rex
-and tmux there is no terminal to open a tab in, so ws tab fails.`,
+place of a layout, so that shell stays open after COMMAND exits. Run by a person, ws tab goes
+to the new tab, and run by an agent, it leaves the view alone. pair's launch script opens
+each agent it spawns this way. Outside Rex and tmux there is no terminal to open a tab in, so
+ws tab fails.`,
 		examples: []string{"ws tab . -- htop", "ws tab ~/worktrees/dotfiles/fix-login -- claude --effort high"},
 		run: func(b mux.Backend, c call) error {
 			dir, _ := filepath.Abs(c.args[0])

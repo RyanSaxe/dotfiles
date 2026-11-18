@@ -47,11 +47,12 @@ popup opens, takes the worktree's name, so it is part of the place. Any
 other tab, such as one you or an agent named `tests`, is part of its
 session's place.
 
-`ws tab DIR -- COMMAND` adds such a tab: it runs COMMAND in a new tab of
-DIR's place, and opens the place first when DIR has none, with COMMAND
-typed into its shell. The files popup opens a file this way, and `pair
-spawn` opens each agent it starts this way, so an agent spawned in a
-worktree joins that worktree's place.
+`ws tab DIR -- COMMAND` runs COMMAND in a new tab of DIR's place, which
+closes when COMMAND exits. When DIR has no place, it opens one first, with
+COMMAND typed into its shell, which stays open after COMMAND exits. The
+files popup opens a file the same way, and `pair spawn` opens each agent
+it starts with `ws tab`, so an agent spawned in a worktree joins that
+worktree's place.
 
 `ws rm` and Ctrl-X in the go popup close a place's tabs, or its whole
 session when nothing else is in it. Removing a worktree closes its tab and
