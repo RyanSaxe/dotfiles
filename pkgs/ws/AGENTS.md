@@ -66,6 +66,11 @@ An agent's model and effort are its own settings, which the home switch
 writes from `modules/home/agents.nix`. `ws` starts an agent with no flags
 of its own, and only reads those settings for `ws agent`.
 
+Outside its own files, `ws project` writes the agents' trust for a project
+it made: `hasTrustDialogAccepted` in `~/.claude.json`, under the lock Claude
+Code takes on that file, and `trust_level` in `~/.codex/config.toml`. Each
+write reads the file and swaps the whole new file in.
+
 ## Rules
 
 - Each file has one writer, which swaps it in whole. Only the `--watch` job

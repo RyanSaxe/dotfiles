@@ -30,6 +30,7 @@ nix-update      # update the flake's inputs, rebuild, and upgrade uv's tools
 theme dark      # switch macOS and every app to dark, or to light
 ws new NAME     # make a worktree on branch NAME and start an agent in it
 ws pr NUMBER    # check a pull request out into its own worktree
+ws project REPO # clone a GitHub repository, or make a new project, and open it
 ws rm NAME      # close a worktree's tab, remove it and delete its branch
 ```
 

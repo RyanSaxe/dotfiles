@@ -143,15 +143,26 @@ func writeWhole(name string, data []byte) error {
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(stateDir, "."+name+"-*")
+	return replaceFile(filepath.Join(stateDir, name), data)
+}
+
+// replaceFile swaps data in for file whole, so a reader never sees half of
+// it. A file that exists keeps its mode, and a new one is readable only by
+// you.
+func replaceFile(file string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+"-*")
 	if err != nil {
 		return err
 	}
-	if _, err = tmp.Write(data); err == nil {
-		err = tmp.Close()
+	_, err = tmp.Write(data)
+	if info, statErr := os.Stat(file); err == nil && statErr == nil {
+		err = tmp.Chmod(info.Mode().Perm())
+	}
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
 	}
 	if err == nil {
-		err = os.Rename(tmp.Name(), filepath.Join(stateDir, name))
+		err = os.Rename(tmp.Name(), file)
 	}
 	if err != nil {
 		os.Remove(tmp.Name())

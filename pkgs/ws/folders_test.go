@@ -203,7 +203,7 @@ func TestEachGoTabOffersItsOwnKeys(t *testing.T) {
 		row  any
 		want []string
 	}{
-		{foldersTab, place{dir: "/p", at: mux.Place{Session: "s"}}, []string{"enter", "ctrl+x", "ctrl+f"}},
+		{foldersTab, place{dir: "/p", at: mux.Place{Session: "s"}}, []string{"enter", "ctrl+t", "ctrl+x", "ctrl+f"}},
 		{worktreesTab, worktreeRow{base: "origin/main", pr: "https://github.com/o/r/pull/1"}, []string{"enter", "ctrl+t", "ctrl+x", "ctrl+f", "ctrl+g", "ctrl+o"}},
 		{sessionsTab, place{dir: "/p", at: mux.Place{Session: "s"}}, []string{"enter", "ctrl+x", "ctrl+f"}},
 		{agentsTab, mux.Pane{ID: "%1"}, []string{"enter"}},

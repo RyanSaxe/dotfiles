@@ -179,6 +179,48 @@ checkout that already has its branch, and start an agent there.`,
 		},
 	},
 	{
+		name: "project", group: "Projects and worktrees",
+		line: "ws project NAME|REPO", summary: "clone a GitHub repository, or make a new project, and open it",
+		args:  "NAME|REPO",
+		flags: []option{{"in", "DIR", "make or clone it in DIR. A new project needs it, and so does a clone\nwhen no folder here holds its owner's repositories"}},
+		about: `Clone REPO, given as owner/name or a GitHub URL, or make a new project NAME with git init,
+then open it with the agent layout. A clone goes in the folder under your home folder that
+holds most of its owner's repositories, and a repository already here only opens. A new
+project's agent starts with the prompt "Set up this project". ws stops before it makes
+anything when the project's folder is taken, or a session of its name is running.
+
+ws trusts a new project, and a clone from an owner with repositories here, in Claude Code's
+~/.claude.json and Codex's ~/.codex/config.toml, so its agent starts without asking. Outside
+Rex and tmux, ws project only makes the project and prints its path.`,
+		examples: []string{
+			"ws project notes --in ~/Projects",
+			"ws project junegunn/fzf --in ~/Projects",
+			"ws project https://github.com/junegunn/fzf.vim",
+		},
+		run: func(b mux.Backend, c call) error {
+			cs := checkouts()
+			p, err := planProject(c.args[0], cs)
+			if err != nil {
+				return err
+			}
+			if in := c.flags["in"]; in != "" && p.existing == "" {
+				// A shell leaves the ~ in --in=~/DIR.
+				if rest, ok := strings.CutPrefix(in, "~/"); ok {
+					in = filepath.Join(home, rest)
+				}
+				p.parent, _ = filepath.Abs(in)
+			}
+			if p.needsFolder() {
+				return fmt.Errorf("say which folder %s goes in with --in DIR, such as %s", p.name, oneOf(folderChoices(cs)))
+			}
+			dir, err := p.make(b)
+			if err != nil {
+				return err
+			}
+			return open(b, dir, p.start(), false)
+		},
+	},
+	{
 		name: "ls", group: "Projects and worktrees",
 		line: "ws ls", summary: "list worktrees and their agents",
 		flags: []option{{"json", "", "print them as JSON, with each one's path and last commit"}},

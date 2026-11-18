@@ -16,14 +16,16 @@ ws new fix-login --agent codex --prompt "Fix the redirect" --base main
 ws pr 123                           # make a worktree on pull request 123, with an agent
 ws pr 123 --prompt "Review it"      # start its agent with a prompt, as ws new does
 ws pr 123 --layout review           # open pull request 123 in Neovim instead
+ws project notes --in ~/Projects    # make a new project with git init, and open it
+ws project junegunn/fzf.vim         # clone a repository next to its owner's others, and open it
 ws ls                               # list worktrees and their agents
 ws rm fix-login                     # close its tab or session, remove it and delete its branch
 ws agent                            # print the agent ws starts, with its model and effort
 ```
 
 Without `--force`, `ws rm` refuses a worktree with uncommitted changes, and
-keeps a branch that hasn't merged. Outside Rex and tmux, `ws new` and
-`ws pr` only make the worktree and print its path.
+keeps a branch that hasn't merged. Outside Rex and tmux, `ws new`, `ws pr`
+and `ws project` only make the worktree or project and print its path.
 
 ## Places
 
@@ -93,6 +95,32 @@ the selected row's project. It asks for the worktree's name, then an agent,
 flags or both, such as `--model opus` or `codex -m gpt-6.1-sol`, then a
 prompt.
 
+## New projects
+
+`ws project` and Ctrl-T on the go popup's Folders tab take a new project's
+name, `owner/repo` or a GitHub URL, and open the project as Enter does:
+
+- **A repository** goes in the folder under your home folder that holds most
+  of its owner's repositories. On a tie, the folder with the owner's latest
+  git activity wins. A repository already on this computer only opens.
+- **A new name** becomes a folder with `git init`, and its agent starts with
+  the prompt "Set up this project", which loads the
+  [project-setup](../ai-harness/skills/project-setup/SKILL.md) skill.
+
+For a new name, or an owner with no repositories here, ws can't tell where
+the project goes. Ctrl-T then asks, offering the folders under your home
+folder that hold repositories, the one with the most first, and
+`ws project` needs `--in DIR`. When anything else already has the project's
+folder, or a session of its name is running, ws stops before it makes
+anything.
+
+ws trusts a new project, and a clone from an owner with repositories here,
+so its agent starts without asking. It sets `hasTrustDialogAccepted` in
+`~/.claude.json`, under the lock Claude Code takes on that file, and
+`trust_level = "trusted"` in `~/.codex/config.toml`. A clone from an owner
+with nothing here still asks. A worktree needs nothing, since both CLIs
+trust it through its main checkout.
+
 ## Layouts
 
 A layout is the panes a new session opens with. `--layout NAME` reads
@@ -153,7 +181,7 @@ the browser.
 
 | Popup         | Enter  | Ctrl-T                 | Ctrl-X        | Ctrl-F | Ctrl-G | Ctrl-O       |
 | ------------- | ------ | ---------------------- | ------------- | ------ | ------ | ------------ |
-| go, Folders   | go     |                        | close         | files  |        |              |
+| go, Folders   | go     | new project            | close         | files  |        |              |
 | go, Worktrees | go     | new worktree and agent | remove        | files  | diff   | pull request |
 | go, Sessions  | go     |                        | close         | files  |        |              |
 | go, Agents    | go     |                        |               |        |        |              |
