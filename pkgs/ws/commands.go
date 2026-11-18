@@ -22,9 +22,6 @@ type command struct {
 	about, more   string // what ws COMMAND --help says before its flags, and after them
 	examples      []string
 	run           func(b mux.Backend, c call) error
-	// unparsed passes its words to run as they are, since ws agent's words
-	// after the agent are the agent's.
-	unparsed bool
 }
 
 // An option is a flag a command takes, with the word its value is, or no
@@ -47,7 +44,7 @@ func (c call) start() start {
 var (
 	agentOption      = option{"agent", "claude|codex", "start this agent instead of the default"}
 	promptOption     = option{"prompt", "TEXT", "the agent's first prompt"}
-	agentWordsOption = option{"", "FLAGS", "start the agent with FLAGS instead of its default flags"}
+	agentWordsOption = option{"", "FLAGS", "pass FLAGS, such as --model or --effort, to the agent, overriding its\nown settings"}
 )
 
 var commands = []command{
@@ -192,21 +189,17 @@ AeroSpace's Cmd-Alt-A, T and R run it.`,
 	},
 	{
 		name: "agent", group: "Settings",
-		line: "ws agent", summary: "print or set the agent ws starts and its flags",
-		args: "[claude|codex [FLAGS]]", unparsed: true,
-		about: `Print the default agent first, then each other agent that has default flags, with its
-flags. ws agent AGENT makes AGENT the default agent and keeps every agent's flags.
-ws agent AGENT FLAGS also saves FLAGS as AGENT's default flags, and ws agent AGENT -- with
-nothing after it clears them. Every agent ws starts gets its default flags unless its command
-gives its own. With no default agent set, it is claude when that is installed and codex
-otherwise.`,
-		examples: []string{"ws agent", "ws agent codex", "ws agent claude --effort medium", "ws agent claude --"},
+		line: "ws agent", summary: "print the agent ws starts, with its model and effort",
+		about: `Print the agent ws starts, which ~/.config/ws/config.toml names, then the model and effort
+its own settings give it: model and effortLevel in ~/.claude/settings.json for claude, and
+model and model_reasoning_effort in ~/.codex/config.toml for codex. home-switch writes the
+config from the host file's dotfiles.ws.agent, and the agents' settings from
+modules/home/agents.nix, so every session of the agent shares them. ws starts the agent with
+no flags of its own, and ws new and ws pr pass it the words after their --, which override
+its settings for that session.`,
+		examples: []string{"ws agent", "ws new fix-login -- --effort high"},
 		run: func(b mux.Backend, c call) error {
-			if len(c.args) == 0 {
-				printAgents()
-				return nil
-			}
-			return setAgent(c.args[0], c.args[1:])
+			return printAgent()
 		},
 	},
 	{
@@ -300,7 +293,7 @@ func run(name string, words []string, backend func(client string) mux.Backend) e
 	c := commands[i]
 	// The agent's words are its own, so --help among them is the agent's.
 	own := words
-	if j := slices.Index(words, "--"); j >= 0 && !c.unparsed {
+	if j := slices.Index(words, "--"); j >= 0 {
 		own = words[:j]
 	}
 	if slices.ContainsFunc(own, func(w string) bool { return slices.Contains([]string{"-h", "-help", "--help"}, w) }) {
@@ -321,10 +314,6 @@ func run(name string, words []string, backend func(client string) mux.Backend) e
 // arguments, and each flag's value follows it or an =.
 func (c command) parse(words []string) (call, error) {
 	in := call{flags: map[string]string{}}
-	if c.unparsed {
-		in.args = words
-		return in, nil
-	}
 words:
 	for i := 0; i < len(words); i++ {
 		w := words[i]

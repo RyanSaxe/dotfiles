@@ -246,7 +246,7 @@ func repos() []string {
 }
 
 func bookmarks() []string {
-	data, _ := os.ReadFile(filepath.Join(home, ".config", "ws", "bookmarks"))
+	data, _ := os.ReadFile(filepath.Join(configDir, "bookmarks"))
 	var dirs []string
 	for line := range strings.SplitSeq(string(data), "\n") {
 		if line = strings.TrimSpace(line); line != "" {

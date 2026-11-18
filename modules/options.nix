@@ -82,6 +82,25 @@ in
       description = "Whether this computer has Claude Code. Without it, a switch writes none of Claude Code's files or settings.";
     };
 
+    ws.agent = mkOption {
+      type = types.enum [
+        "claude"
+        "codex"
+      ];
+      default = if config.dotfiles.claudeCode then "claude" else "codex";
+      defaultText = lib.literalExpression ''if config.dotfiles.claudeCode then "claude" else "codex"'';
+      description = "The agent CLI ws starts on this computer. Its model and effort are the CLI's own settings, which agents.nix sets.";
+    };
+
+    ws.openAs = mkOption {
+      type = types.enum [
+        "tab"
+        "session"
+      ];
+      default = "tab";
+      description = "How ws opens a worktree: as a tab named after it in its project's session, or as a session of its own.";
+    };
+
     desktopPicture = mkOption {
       type = types.bool;
       default = true;

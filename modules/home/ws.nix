@@ -17,6 +17,10 @@ lib.mkMerge [
     home.packages = [ ws ];
     # The popups turn the mascot's accent into a color with it.
     home.sessionVariables.WS_PALETTE = "${inputs.catppuccin-palette}/palette.json";
+    xdg.configFile."ws/config.toml".source = (pkgs.formats.toml { }).generate "ws-config.toml" {
+      agent = cfg.ws.agent;
+      open_as = cfg.ws.openAs;
+    };
   })
 
   (lib.mkIf (has "gui" && pkgs.stdenv.hostPlatform.isDarwin) {

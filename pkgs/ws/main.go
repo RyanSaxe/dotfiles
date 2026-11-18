@@ -30,7 +30,7 @@ var (
 	// interactive means a person ran ws, so it may change what their app or
 	// tmux client shows. An agent's output is not a terminal.
 	interactive = isatty.IsTerminal(os.Stdout.Fd())
-	layoutsDir  = filepath.Join(home, ".config", "ws", "layouts")
+	layoutsDir  = filepath.Join(configDir, "layouts")
 )
 
 // The built-in layouts, used when layoutsDir has no file of the name. review
@@ -83,7 +83,7 @@ func main() {
 // start is how a new session begins: its layout, the agent its agent pane
 // runs with its flags and a first prompt, and for the review layout the pull
 // request as owner/repo/pr/N. The zero value is the agent layout running the
-// default agent with its defaults.
+// agent the config names, with its own settings.
 type start struct {
 	layout, agent, prompt, pr, file string
 	flags                           []string
@@ -110,7 +110,11 @@ func open(b mux.Backend, dir string, s start, needsSession bool) error {
 			}
 			return []string{v}
 		}
-		vars := map[string][]string{"{agent}": agentCommand(s.agent, s.flags), "{prompt}": word(s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
+		agent, err := agentCommand(s.agent, s.flags)
+		if err != nil {
+			return err
+		}
+		vars := map[string][]string{"{agent}": agent, "{prompt}": word(s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
 		panes, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, vars)
 		if err != nil {
 			return err
@@ -126,76 +130,13 @@ func open(b mux.Backend, dir string, s start, needsSession bool) error {
 	return b.Show(id)
 }
 
-// agents are the programs ws starts as an agent.
-var agents = []string{"claude", "codex"}
-
-// defaultAgent is the agent this computer starts when a command names none:
-// the one `ws agent` saved, or claude when it is installed and codex otherwise.
-func defaultAgent() string {
-	data, _ := os.ReadFile(filepath.Join(stateDir, "agent"))
-	if saved := strings.TrimSpace(string(data)); slices.Contains(agents, saved) {
-		return saved
-	}
-	if _, err := exec.LookPath("claude"); err != nil {
-		return "codex"
-	}
-	return "claude"
-}
-
-// agentFlags are each agent's default flags, which `ws agent` saves.
-func agentFlags() map[string][]string {
-	flags := map[string][]string{}
-	readJSON("agent-flags.json", &flags)
-	return flags
-}
-
-// agentCommand is the words that start agent, or the default agent when
-// agent is empty: the agent and flags, or its defaults when flags is empty.
-func agentCommand(agent string, flags []string) []string {
-	agent = cmp.Or(agent, defaultAgent())
-	if len(flags) == 0 {
-		flags = agentFlags()[agent]
-	}
-	return append([]string{agent}, flags...)
-}
-
-// printAgents prints the default agent first, then each other agent that
-// has defaults, with its defaults.
-func printAgents() {
-	def, all := defaultAgent(), agentFlags()
-	fmt.Println(layout.Line(append([]string{def}, all[def]...)))
-	for _, name := range agents {
-		if name != def && len(all[name]) > 0 {
-			fmt.Println(layout.Line(append([]string{name}, all[name]...)))
-		}
-	}
-}
-
-// setAgent makes name the default agent. Words after it replace its
-// defaults, and a -- with nothing after it clears them.
-func setAgent(name string, words []string) error {
-	if !slices.Contains(agents, name) {
-		return fmt.Errorf("%q is not an agent ws starts, which are %s", name, strings.Join(agents, " and "))
-	}
-	if len(words) > 0 {
-		if words[0] == "--" {
-			words = words[1:]
-		}
-		all := agentFlags()
-		all[name] = words
-		if len(words) == 0 {
-			delete(all, name)
-		}
-		if err := writeJSON("agent-flags.json", all); err != nil {
-			return err
-		}
-	}
-	return writeWhole("agent", []byte(name+"\n"))
-}
-
-// checkStart fails on an agent ws doesn't start or a layout that doesn't
-// load, so a new worktree fails before there is one to clean up.
+// checkStart fails on a config that doesn't load, an agent ws doesn't start
+// or a layout that doesn't load, so a new worktree fails before there is one
+// to clean up.
 func checkStart(s start) error {
+	if _, err := loadConfig(); err != nil {
+		return err
+	}
 	if s.agent != "" && !slices.Contains(agents, s.agent) {
 		return fmt.Errorf("%q is not an agent ws starts, which are %s", s.agent, strings.Join(agents, " and "))
 	}

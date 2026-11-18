@@ -17,7 +17,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/junegunn/go-shellwords"
 
-	"workspace/layout"
 	"workspace/mux"
 	"workspace/popup"
 )
@@ -126,7 +125,8 @@ func worktreesPopup(b mux.Backend) popup.Popup {
 					from = w.Path
 				}
 				return popup.Ask("name:", func(name string) tea.Cmd {
-					return popup.Ask("agent and flags (empty for "+layout.Line(agentCommand("", nil))+"):", func(answer string) tea.Cmd {
+					agent, _ := defaultAgent()
+					return popup.Ask("agent and flags (empty for "+agent+"):", func(answer string) tea.Cmd {
 						return popup.Ask("prompt:", func(prompt string) tea.Cmd {
 							return tea.Batch(popup.Say("making "+name+"…"), popup.Do(func() error {
 								s, err := startFromAnswer(answer)

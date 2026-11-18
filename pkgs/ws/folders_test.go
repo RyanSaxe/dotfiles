@@ -36,9 +36,9 @@ func gitLog(t *testing.T, gitDir string, at time.Time) {
 // Sessions lists only the running sessions.
 func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 	scratch := t.TempDir()
-	oldHome, oldRoot := home, worktreeRoot
-	home, worktreeRoot = scratch, filepath.Join(scratch, "worktrees")
-	t.Cleanup(func() { home, worktreeRoot = oldHome, oldRoot })
+	oldHome, oldRoot, oldConfig := home, worktreeRoot, configDir
+	home, worktreeRoot, configDir = scratch, filepath.Join(scratch, "worktrees"), filepath.Join(scratch, ".config", "ws")
+	t.Cleanup(func() { home, worktreeRoot, configDir = oldHome, oldRoot, oldConfig })
 
 	day := func(d int) time.Time { return time.Date(2026, 11, d, 12, 0, 0, 0, time.UTC) }
 	gitLog(t, filepath.Join(scratch, "Projects", "quiet", ".git"), day(1))

@@ -53,13 +53,17 @@ The rest are records `ws` keeps for itself:
   writes it, and it keeps only panes that still exist
 - `mascot.json`: the mascot and its accent, which only the popups use,
   written by `ws mascot` and the theme popup
-- `agent`: the agent this computer starts by default, set by `ws agent`
-- `agent-flags.json`: each agent's default flags, set by `ws agent`
 
 Mascot pictures from PokeAPI and drawn mermaid diagrams are caches, in
-`~/.cache/dotfiles`. `ws` reads layouts from `~/.config/ws/layouts`, extra
-folders for the go popup from `~/.config/ws/bookmarks`, and local mascots
-from `~/.local/share/dotfiles/mascots`.
+`~/.cache/dotfiles`. `ws` reads its settings from `~/.config/ws`:
+`config.toml`, which the home switch writes from the host file's
+`dotfiles.ws`, layouts in `layouts`, and extra folders for the go popup in
+`bookmarks`. `XDG_CONFIG_HOME` moves that folder. Local mascots are in
+`~/.local/share/dotfiles/mascots`.
+
+An agent's model and effort are its own settings, which the home switch
+writes from `modules/home/agents.nix`. `ws` starts an agent with no flags
+of its own, and only reads those settings for `ws agent`.
 
 ## Rules
 

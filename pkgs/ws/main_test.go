@@ -22,70 +22,64 @@ func onPath(t *testing.T, name, script string) {
 	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
 }
 
-func TestDefaultAgent(t *testing.T) {
-	stateDir = t.TempDir()
-	t.Setenv("PATH", "")
-	if got := defaultAgent(); got != "codex" {
-		t.Errorf("without claude installed: got %s, want codex", got)
+// withConfig gives ws a config that names agent, as the home switch writes
+// it, and nothing when agent is "".
+func withConfig(t *testing.T, agent string) {
+	t.Helper()
+	old := configDir
+	configDir = t.TempDir()
+	t.Cleanup(func() { configDir = old })
+	if agent == "" {
+		return
 	}
-	onPath(t, "claude", "")
-	if got := defaultAgent(); got != "claude" {
-		t.Errorf("with claude installed: got %s, want claude", got)
-	}
-	if err := setAgent("codex", nil); err != nil || defaultAgent() != "codex" {
-		t.Errorf("after setting codex: got %s (%v), want codex", defaultAgent(), err)
-	}
-	if err := setAgent("nope", nil); err == nil || defaultAgent() != "codex" {
-		t.Errorf("setting an unknown agent: got %s (%v), want an error and codex kept", defaultAgent(), err)
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("agent = \""+agent+"\"\nopen_as = \"tab\"\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
-// Each agent keeps its own defaults, and a command's own flags replace them.
-func TestAgentCommandUsesEachAgentsDefaults(t *testing.T) {
-	stateDir = t.TempDir()
-	onPath(t, "claude", "")
-	for _, tc := range []struct {
-		name         string
-		set          string // the agent ws agent sets, when not empty
-		setWords     []string
-		agent, flags string // what the command names, split at spaces
-		want         string
-	}{
-		{"saved defaults", "claude", []string{"--effort", "medium"}, "", "", "claude --effort medium"},
-		{"own flags replace them", "", nil, "", "--model opus", "claude --model opus"},
-		{"another agent has none yet", "", nil, "codex", "", "codex"},
-		{"its own defaults", "codex", []string{"-m", "gpt-6.1-sol"}, "", "", "codex -m gpt-6.1-sol"},
-		{"switching keeps claude's", "", nil, "claude", "", "claude --effort medium"},
-		{"switching back keeps both", "claude", nil, "codex", "", "codex -m gpt-6.1-sol"},
-		{"a -- before them", "claude", []string{"--", "--effort", "low"}, "", "", "claude --effort low"},
-		{"a -- alone clears them", "claude", []string{"--"}, "", "", "claude"},
+// ws agent reports the agent the config names, with the model and effort
+// that agent's own settings give it.
+func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
+	settings := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", settings)
+	t.Setenv("CODEX_HOME", settings)
+	for name, text := range map[string]string{
+		"settings.json": `{"model": "opus[1m]", "effortLevel": "medium", "theme": "dark"}`,
+		"config.toml":   "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"high\"\n",
 	} {
-		if tc.set != "" {
-			if err := setAgent(tc.set, tc.setWords); err != nil {
-				t.Fatal(err)
-			}
+		if err := os.WriteFile(filepath.Join(settings, name), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
 		}
-		if got := strings.Join(agentCommand(tc.agent, strings.Fields(tc.flags)), " "); got != tc.want {
-			t.Errorf("%s: got %s, want %s", tc.name, got, tc.want)
+	}
+	for agent, want := range map[string]string{"claude": "opus[1m] medium", "codex": "gpt-6.1-sol high"} {
+		withConfig(t, agent)
+		named, err := defaultAgent()
+		model, effort, settingsErr := agentSettings(named)
+		if got := model + " " + effort; err != nil || settingsErr != nil || named != agent || got != want {
+			t.Errorf("with %s configured: got %s with %s (%v, %v), want %s", agent, named, got, err, settingsErr, want)
 		}
+	}
+	withConfig(t, "")
+	if _, err := defaultAgent(); err == nil {
+		t.Error("without a config, ws named an agent")
 	}
 }
 
 // The worktrees popup asks for an agent and flags, either or both.
 func TestPopupAnswerNamesAnAgentOrFlags(t *testing.T) {
-	stateDir = t.TempDir()
-	onPath(t, "claude", "")
-	if err := setAgent("claude", []string{"--effort", "medium"}); err != nil {
-		t.Fatal(err)
-	}
+	withConfig(t, "claude")
 	for answer, want := range map[string]string{
-		"":             "claude --effort medium",
+		"":             "claude",
 		"codex":        "codex",
 		"--model opus": "claude --model opus",
 		`claude --append-system-prompt "be brief"`: "claude --append-system-prompt 'be brief'",
 	} {
 		s, err := startFromAnswer(answer)
-		if got := layout.Line(agentCommand(s.agent, s.flags)); err != nil || got != want {
+		var words []string
+		if err == nil {
+			words, err = agentCommand(s.agent, s.flags)
+		}
+		if got := layout.Line(words); err != nil || got != want {
 			t.Errorf("%q starts %s (%v), want %s", answer, got, err, want)
 		}
 	}
@@ -97,9 +91,6 @@ func TestPopupAnswerNamesAnAgentOrFlags(t *testing.T) {
 // A command refuses a flag it doesn't take, rather than run without it.
 func TestCommandsTakeOnlyTheirOwnFlags(t *testing.T) {
 	for _, c := range commands {
-		if c.unparsed {
-			continue
-		}
 		for _, other := range commands {
 			for _, o := range other.flags {
 				words := append(slices.Repeat([]string{"x"}, len(strings.Fields(c.args))), "--"+o.name)
@@ -131,7 +122,8 @@ func (r *recorder) Create(label, dir string, panes []layout.Pane) (string, error
 }
 
 // ws pr starts its agent as ws new does, with the agent, prompt and flags
-// its words name, wherever its flags come.
+// its words name, wherever its flags come. Without --agent, it is the agent
+// the config names, with only the flags after --.
 func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 	for _, tool := range []string{"git", "rsync"} {
 		if _, err := exec.LookPath(tool); err != nil {
@@ -160,14 +152,20 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 	// gh shows pull request 5 on the branch feature, and its checkout does
 	// nothing.
 	onPath(t, "gh", "echo feature https://github.com/o/r/pull/5")
-	for _, words := range [][]string{
-		{"new", "fix-login", "--agent", "codex", "--prompt", "fix it", "--", "-m", "gpt-6.1-sol"},
-		{"pr", "--prompt", "fix it", "5", "--agent", "codex", "--", "-m", "gpt-6.1-sol"},
+	withConfig(t, "claude")
+	for _, tc := range []struct {
+		words []string
+		want  string
+	}{
+		{[]string{"new", "fix-login", "--agent", "codex", "--prompt", "fix it", "--", "-m", "gpt-6.1-sol"}, "codex -m gpt-6.1-sol -- 'fix it'"},
+		{[]string{"pr", "--prompt", "fix it", "5", "--agent", "codex", "--", "-m", "gpt-6.1-sol"}, "codex -m gpt-6.1-sol -- 'fix it'"},
+		{[]string{"new", "plain"}, "claude --"},
+		{[]string{"new", "harder", "--", "--effort", "high"}, "claude --effort high --"},
 	} {
 		b := &recorder{}
-		err := run(words[0], words[1:], func(string) mux.Backend { return b })
-		if want := "codex -m gpt-6.1-sol -- 'fix it'"; err != nil || len(b.panes) == 0 || b.panes[0].Run != want {
-			t.Errorf("ws %s made the panes %+v (%v), want an agent pane running %s", strings.Join(words, " "), b.panes, err, want)
+		err := run(tc.words[0], tc.words[1:], func(string) mux.Backend { return b })
+		if err != nil || len(b.panes) == 0 || b.panes[0].Run != tc.want {
+			t.Errorf("ws %s made the panes %+v (%v), want an agent pane running %s", strings.Join(tc.words, " "), b.panes, err, tc.want)
 		}
 	}
 }
@@ -244,8 +242,8 @@ func TestAgentLayoutKeepsThePromptOutOfTheFlags(t *testing.T) {
 }
 
 // A ws new that can't start its agent leaves no worktree or branch behind:
-// an unknown agent, a session already running under the worktree's name,
-// and ignored files that can't be copied.
+// a missing config, an unknown agent, a session already running under the
+// worktree's name, and ignored files that can't be copied.
 func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
@@ -283,6 +281,9 @@ func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 			t.Errorf("ws new %s left its branch", name)
 		}
 	}
+	withConfig(t, "")
+	failsToStart("no-config", start{layout: "agent"})
+	withConfig(t, "claude")
 	failsToStart("fix-login", start{layout: "agent", agent: "opus"})
 	failsToStart("taken", start{layout: "agent"})
 	onPath(t, "rsync", "exit 1")
@@ -320,6 +321,7 @@ view) echo "feature https://github.com/o/r/pull/7";;
 checkout) git checkout -q feature;;
 esac`)
 	onPath(t, "rsync", "exit 1")
+	withConfig(t, "claude")
 	if _, err := pullRequest(nil, repo, "7", start{layout: "review"}); err == nil {
 		t.Error("ws pr 7 succeeded")
 	}
