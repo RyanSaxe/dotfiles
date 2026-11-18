@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,38 +37,62 @@ type call struct {
 	flags            map[string]string
 }
 
-// start is how the session a call asks for begins.
-func (c call) start() start {
-	return start{layout: c.flags["layout"], agent: c.flags["agent"], prompt: c.flags["prompt"], flags: c.agentWords}
+// start is how the place a call asks for begins.
+func (c call) start() (start, error) {
+	s := start{layout: c.flags["layout"], agent: c.flags["agent"], prompt: c.flags["prompt"], flags: c.agentWords}
+	switch tab, session := c.flags["tab"] == "true", c.flags["session"] == "true"; {
+	case tab && session:
+		return s, errors.New("--tab and --session ask for opposite places, so give one of them")
+	case tab:
+		s.openAs = "tab"
+	case session:
+		s.openAs = "session"
+	}
+	return s, nil
 }
 
 var (
 	agentOption      = option{"agent", "claude|codex", "start this agent instead of the default"}
 	promptOption     = option{"prompt", "TEXT", "the agent's first prompt"}
+	tabOption        = option{"tab", "", "open the worktree as a tab of its project's session, overriding the\nconfig's open_as"}
+	sessionOption    = option{"session", "", "open the worktree as a session of its own, overriding the config's\nopen_as"}
 	agentWordsOption = option{"", "FLAGS", "pass FLAGS, such as --model or --effort, to the agent, overriding its\nown settings"}
 )
+
+// placesHelp is what ws open, ws new and ws pr --help say about places.
+const placesHelp = `
+A folder's terminals are in its place: a tab named after the folder, or a session labeled
+after it. A worktree opens as a tab named PROJECT/NAME in its project's session, which ws
+starts with a plain shell in the main checkout when there is none, or as a session of its
+own. open_as in ~/.config/ws/config.toml chooses, and --tab and --session override it. Any
+other folder opens as a session.
+`
 
 var commands = []command{
 	{
 		name: "open", group: "Projects and worktrees",
-		line: "ws open DIR", summary: "switch to the folder's session, or open one",
+		line: "ws open DIR", summary: "switch to the folder's tab or session, or open one",
 		args:  "DIR",
-		flags: []option{{"layout", "NAME", "the layout a new session opens with, agent by default"}},
-		about: `Switch to folder DIR's session, or open DIR as a new session when it has none. Outside Rex
-and tmux there is no terminal to open a session in, so ws open fails.`,
-		more: `
-A layout is the panes a new session opens with, in ~/.config/ws/layouts/NAME.toml. agent,
+		flags: []option{{"layout", "NAME", "the layout a new place opens with, agent by default"}, tabOption, sessionOption},
+		about: `Switch to folder DIR's place, its tab or session, or open one for it when it has none.
+Outside Rex and tmux there is no terminal to open one in, so ws open fails.`,
+		more: placesHelp + `
+A layout is the panes a new place opens with, in ~/.config/ws/layouts/NAME.toml. agent,
 review and file are built in: agent runs the agent beside a shell, review opens {pr} in
 Neovim, and file opens {file} in Neovim. A pane's run can use {agent}, {prompt}, {pr}, {file},
 {dir} and {name}.
 `,
-		examples: []string{"ws open ~/generic/dotfiles", "ws open . --layout file"},
+		examples: []string{"ws open ~/generic/dotfiles", "ws open . --layout file", "ws open ~/worktrees/dotfiles/fix-login --session"},
 		run: func(b mux.Backend, c call) error {
 			dir, _ := filepath.Abs(c.args[0])
 			if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 				return fmt.Errorf("%s is not a folder", dir)
 			}
-			return open(b, dir, c.start(), true)
+			s, err := c.start()
+			if err != nil {
+				return err
+			}
+			return open(b, dir, s, true)
 		},
 	},
 	{
@@ -78,19 +103,26 @@ Neovim, and file opens {file} in Neovim. A pane's run can use {agent}, {prompt},
 			agentOption, promptOption,
 			{"layout", "NAME", "the layout to open, agent by default"},
 			{"base", "REF", "start the branch from REF instead of HEAD"},
+			tabOption, sessionOption,
 			agentWordsOption,
 		},
 		about: `Make a worktree in ~/worktrees/PROJECT/NAME on a new branch NAME, copy the main checkout's
-ignored files, such as .env, into it, and start an agent there. It refuses when a session
-named PROJECT/NAME is already running. Outside Rex and tmux, it only makes the worktree and
-prints its path.`,
+ignored files, such as .env, into it, and start an agent there. It refuses when a tab or
+session named PROJECT/NAME is already open. Outside Rex and tmux, it only makes the worktree
+and prints its path.`,
+		more: placesHelp,
 		examples: []string{
 			"ws new fix-login",
 			`ws new fix-login --agent codex --prompt "Fix the redirect" --base main`,
 			"ws new fix-popups -- --effort high --model opus",
+			"ws new fix-popups --session",
 		},
 		run: func(b mux.Backend, c call) error {
-			return newWorktree(b, ".", c.args[0], c.flags["base"], c.start())
+			s, err := c.start()
+			if err != nil {
+				return err
+			}
+			return newWorktree(b, ".", c.args[0], c.flags["base"], s)
 		},
 	},
 	{
@@ -100,17 +132,24 @@ prints its path.`,
 		flags: []option{
 			agentOption, promptOption,
 			{"layout", "NAME", "the layout to open, agent by default. review opens the pull request\nin Neovim instead"},
+			tabOption, sessionOption,
 			agentWordsOption,
 		},
 		about: `Check out pull request NUMBER of this project in ~/worktrees/PROJECT/pr-NUMBER, or open the
 checkout that already has its branch, and start an agent there.`,
+		more: placesHelp,
 		examples: []string{
 			"ws pr 123",
 			`ws pr 123 --prompt "List what should change before this merges"`,
 			"ws pr 123 --layout review",
+			"ws pr 123 -- --effort high",
 		},
 		run: func(b mux.Backend, c call) error {
-			_, err := pullRequest(b, ".", c.args[0], c.start())
+			s, err := c.start()
+			if err != nil {
+				return err
+			}
+			_, err = pullRequest(b, ".", c.args[0], s)
 			return err
 		},
 	},
@@ -119,7 +158,7 @@ checkout that already has its branch, and start an agent there.`,
 		line: "ws ls", summary: "list worktrees and their agents",
 		flags: []option{{"json", "", "print them as JSON, with each one's path and last commit"}},
 		about: `List the worktrees under ~/worktrees by project, this project's first, with each one's
-branch, whether it has uncommitted changes, and the state of its session's agent.`,
+branch, whether it has uncommitted changes, and the state of the agents in its tab or session.`,
 		examples: []string{"ws ls", "ws ls --json | jq -r '.[].path'"},
 		run: func(b mux.Backend, c call) error {
 			return printWorktrees(b, c.flags["json"] == "true")
@@ -127,13 +166,14 @@ branch, whether it has uncommitted changes, and the state of its session's agent
 	},
 	{
 		name: "rm", group: "Projects and worktrees",
-		line: "ws rm NAME", summary: "remove a worktree, its branch and its session",
+		line: "ws rm NAME", summary: "remove a worktree, its branch and its tab or session",
 		args:  "NAME",
 		flags: []option{{"force", "", "remove the worktree and delete its branch anyway"}},
-		about: `Remove worktree NAME, delete its branch and close its session. NAME is the worktree's folder
-under ~/worktrees/PROJECT, or PROJECT/NAME when several projects have one. ws rm refuses a
-worktree with uncommitted changes, and keeps a branch that git doesn't call merged unless
-GitHub shows its pull request merged.`,
+		about: `Remove worktree NAME, delete its branch and close its tab or session, which leaves the rest
+of its project's session open. NAME is the worktree's folder under ~/worktrees/PROJECT, or
+PROJECT/NAME when several projects have one. ws rm refuses a worktree with uncommitted
+changes, and keeps a branch that git doesn't call merged unless GitHub shows its pull
+request merged.`,
 		examples: []string{"ws rm fix-login", "ws rm dotfiles/fix-login --force"},
 		run: func(b mux.Backend, c call) error {
 			return remove(b, c.args[0], c.flags["force"] == "true")

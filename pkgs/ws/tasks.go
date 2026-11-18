@@ -303,7 +303,7 @@ func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 				return popup.Do(func() error {
 					here, err := b.Current()
 					if err == nil {
-						err = b.Tab(here, vault, "nvim", line, t.File)
+						err = b.Tab(mux.Place{Session: here}, vault, "nvim", line, t.File)
 					}
 					return err
 				}, popup.Quit)

@@ -15,11 +15,12 @@ import (
 	"workspace/popup"
 )
 
-// A place is a folder, a session, or a folder and its session, with the
-// pane going to the session lands on.
+// A place is a folder, a place it's open in, or both, with the pane going
+// to the place lands on.
 type place struct {
-	dir, session string
-	pane         mux.Pane
+	dir  string
+	at   mux.Place // Session is "" while the folder isn't open
+	pane mux.Pane
 }
 
 // The go popup's tabs.
@@ -29,8 +30,8 @@ const (
 )
 
 // goPopup lists repositories, worktrees and bookmarks by their last git
-// activity on one tab, and running sessions on the other. It opens on first,
-// foldersTab or sessionsTab.
+// activity on one tab, and the places folders are open in, each session and
+// named tab, on the other. It opens on first, foldersTab or sessionsTab.
 func goPopup(b mux.Backend, first int) popup.Popup {
 	walk := perLoad(func() ([]folder, error) { return folders(), nil })
 	snapshot := perLoad(func() (mux.Snapshot, error) { return b.Snapshot() })
@@ -39,9 +40,9 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 		Tabs:  []popup.Tab{foldersTab: {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."}, sessionsTab: {Name: "Sessions", Empty: "No sessions are running."}},
 		Start: first,
 		// Folders shows the walk's rows at once, and tags the folders that
-		// have a session once the snapshot comes. Enter on an untagged row
-		// still goes to its session, since open finds it. Sessions reads the
-		// snapshot first, so it runs while Folders walks.
+		// are open once the snapshot comes. Enter on an untagged row still
+		// goes to its place, since open finds it. Sessions reads the snapshot
+		// first, so it runs while Folders walks.
 		Load: func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
 			if tab == sessionsTab {
 				s, err := snapshot(tab)
@@ -54,7 +55,7 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			return folderRows(fs, s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
-			// A session's pane shows what it's doing, and a folder without one
+			// A place's pane shows what it's doing, and a folder without one
 			// shows its summary.
 			switch p := r.Data.(place); {
 			case p.pane.ID != "":
@@ -69,20 +70,20 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
 				p := r.Data.(place)
 				return popup.Do(func() error {
-					if p.session != "" {
-						return b.Show(p.session)
+					if p.at.Session != "" {
+						return b.Show(p.at)
 					}
 					return open(b, p.dir, start{}, true)
 				}, popup.Quit)
 			}},
-			// A folder's row knows its session once the snapshot comes.
-			{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).session != "" }, Run: func(r popup.Row) tea.Cmd {
-				session := r.Data.(place).session
+			// A folder's row knows its place once the snapshot comes.
+			{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).at.Session != "" }, Run: func(r popup.Row) tea.Cmd {
+				at := r.Data.(place).at
 				return popup.Ask("Close "+r.Title+" and everything running in it? (y/N)", func(answer string) tea.Cmd {
 					if !strings.EqualFold(answer, "y") {
 						return nil
 					}
-					return popup.Do(func() error { return b.Kill(session) }, popup.Reload("closed "+r.Title))
+					return popup.Do(func() error { return b.Kill(at) }, popup.Reload("closed "+r.Title))
 				})
 			}},
 			{Key: "ctrl+f", Help: "files", When: func(_ int, r popup.Row) bool { return r.Data.(place).dir != "" }, Run: func(r popup.Row) tea.Cmd {
@@ -119,20 +120,25 @@ func folders() []folder {
 	return fs
 }
 
-// folderRows are the Folders tab: each folder, with its session when one is
-// running in s, so Enter goes to that session.
+// folderRows are the Folders tab: each folder, with its place when it is
+// open in s, so Enter goes to that place. The tag says whether that place is
+// a session or a tab.
 func folderRows(fs []folder, s mux.Snapshot) []popup.Row {
-	sessions := map[string]string{} // a label to its session
-	for _, session := range s.Sessions {
-		sessions[session.Label] = session.ID
+	places := map[string]mux.Place{} // a label to the first place with it
+	for _, p := range s.Places() {
+		if _, ok := places[p.Label]; !ok {
+			places[p.Label] = p
+		}
 	}
 	var rows []popup.Row
 	for _, f := range fs {
-		session := sessions[labelFor(f.dir)]
-		pane, _ := s.Landing(session)
-		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, session, pane}}
+		at, open := places[labelFor(f.dir)]
+		pane, _ := s.Landing(at)
+		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, at, pane}}
 		switch {
-		case session != "":
+		case open && at.Named:
+			r.Tag = popup.Green.SetString("tab")
+		case open:
 			r.Tag = popup.Green.SetString("session")
 		case f.bookmark:
 			r.Tag = popup.Dim.SetString("bookmark")
@@ -142,21 +148,22 @@ func folderRows(fs []folder, s mux.Snapshot) []popup.Row {
 	return rows
 }
 
-// sessionRows are the Sessions tab: each running session with what it's
-// doing, and its folder.
+// sessionRows are the Sessions tab: each place, a session or a named tab,
+// with what it's doing, and its folder.
 func sessionRows(fs []folder, s mux.Snapshot) []popup.Row {
-	dirs := map[string]string{} // a session's label to its folder
+	dirs := map[string]string{} // a place's label to its folder
 	for _, f := range fs {
 		dirs[labelFor(f.dir)] = f.dir
 	}
-	rows := make([]popup.Row, len(s.Sessions))
-	for i, session := range s.Sessions {
-		dir, tag := dirs[session.Label], popup.Dim.SetString("open")
-		pane, ok := s.Landing(session.ID)
+	places := s.Places()
+	rows := make([]popup.Row, len(places))
+	for i, at := range places {
+		dir, tag := dirs[at.Label], popup.Dim.SetString("open")
+		pane, ok := s.Landing(at)
 		if ok {
 			tag = doingTag(pane)
 		}
-		rows[i] = popup.Row{ID: session.ID, Title: session.Label, Detail: tilde(cmp.Or(dir, pane.Folder)), Tag: tag, Data: place{dir, session.ID, pane}}
+		rows[i] = popup.Row{ID: at.Session + " " + at.Tab, Title: at.Label, Detail: tilde(cmp.Or(dir, pane.Folder)), Tag: tag, Data: place{dir, at, pane}}
 	}
 	return rows
 }

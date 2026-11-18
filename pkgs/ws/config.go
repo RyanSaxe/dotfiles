@@ -35,6 +35,9 @@ func loadConfig() (config, error) {
 	if !slices.Contains(agents, c.Agent) {
 		return c, fmt.Errorf("%s names the agent %q, and ws starts only %s", path, c.Agent, strings.Join(agents, " and "))
 	}
+	if c.OpenAs != "tab" && c.OpenAs != "session" {
+		return c, fmt.Errorf("%s says open_as %q, which is neither tab nor session", path, c.OpenAs)
+	}
 	return c, nil
 }
 
