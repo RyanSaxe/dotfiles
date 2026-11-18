@@ -56,6 +56,7 @@ type frame struct {
 	started time.Time // when the current load began
 	lists   []list.Model
 	tabs    []tabLoad
+	cursors []cursorState // each tab's
 	details map[string]detail
 	phone   phoneView
 	foot    footer
@@ -66,7 +67,7 @@ type frame struct {
 }
 
 func newFrame(id int, over bool, p Popup, art Art) frame {
-	m := frame{id: id, over: over, p: p, active: p.Start, started: time.Now(), lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
+	m := frame{id: id, over: over, p: p, active: p.Start, started: time.Now(), lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), cursors: make([]cursorState, len(p.Tabs)), details: map[string]detail{}, art: art}
 	for i := range m.lists {
 		l := list.New(nil, delegate{p.OneLine}, 0, 0)
 		l.Filter = listFilter
@@ -317,9 +318,11 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 	switch key {
 	case "up", "ctrl+k", "ctrl+p":
 		l.CursorUp()
+		m.cursors[m.active] = m.cursors[m.active].next(movedCursor{})
 		return m, m.selectionChanged()
 	case "down", "ctrl+j", "ctrl+n":
 		l.CursorDown()
+		m.cursors[m.active] = m.cursors[m.active].next(movedCursor{})
 		return m, m.selectionChanged()
 	case "tab":
 		m.active = (m.active + 1) % len(m.lists)
@@ -360,6 +363,7 @@ func (m frame) handleMouse(e tea.MouseMsg) (frame, tea.Cmd) {
 		return m, nil
 	}
 	m.lists[m.active].Select(i)
+	m.cursors[m.active] = m.cursors[m.active].next(movedCursor{})
 	moved := m.selectionChanged()
 	m, picked := m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	return m, tea.Batch(moved, picked)
@@ -384,9 +388,10 @@ func (m frame) rowAt(x, y int) (int, bool) {
 }
 
 // setRows puts rows on a tab, filtered by what was typed there, with the
-// cursor on the row it was on. SetItems would filter them in a command whose
-// matches go to whichever list is active when it ends, so they are filtered
-// here, at once.
+// cursor on the top row or on the row you moved it to, as the tab's
+// cursorState says. SetItems would filter them in a command whose matches
+// go to whichever list is active when it ends, so they are filtered here,
+// at once.
 func (m *frame) setRows(tab int, rows []Row) {
 	items := make([]list.Item, len(rows))
 	for i, r := range rows {
@@ -399,7 +404,10 @@ func (m *frame) setRows(tab int, rows []Row) {
 	if query := l.FilterValue(); query != "" {
 		l.SetFilterText(query)
 	}
-	if i := slices.IndexFunc(l.VisibleItems(), func(it list.Item) bool { return it.(Row).ID == was.ID }); had && i >= 0 {
+	switch i := slices.IndexFunc(l.VisibleItems(), func(it list.Item) bool { return it.(Row).ID == was.ID }); {
+	case m.cursors[tab] == onTop:
+		at = 0
+	case had && i >= 0:
 		at = i
 	}
 	// A cursor past the last row, such as after its session closed, would
@@ -410,11 +418,14 @@ func (m *frame) setRows(tab int, rows []Row) {
 // filter shows the active list's rows that match query, or every row when
 // query is empty.
 func (m *frame) filter(query string) tea.Cmd {
-	if l := &m.lists[m.active]; query == "" {
+	l := &m.lists[m.active]
+	if query == "" {
 		l.ResetFilter()
 	} else {
 		l.SetFilterText(query)
 	}
+	l.Select(0)
+	m.cursors[m.active] = m.cursors[m.active].next(changedFilter{})
 	return m.selectionChanged()
 }
 

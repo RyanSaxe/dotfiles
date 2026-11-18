@@ -183,6 +183,36 @@ func (d detail) next(e detailEvent) (detail, effect) {
 	return d, nothing
 }
 
+// Where a tab's cursor goes when its rows change. It stays on the top row,
+// the best match for what was typed, until you move it, and then it stays
+// on the row you moved to. Typing puts it back on the top row, since the
+// best match changes.
+type cursorState int
+
+const (
+	onTop    cursorState = iota // on the top row, whichever row that is
+	onChosen                    // on the row you moved to, wherever it goes
+)
+
+type (
+	cursorEvent   interface{ isCursorEvent() }
+	movedCursor   struct{} // you moved the cursor
+	changedFilter struct{} // you typed or cleared a filter
+)
+
+func (movedCursor) isCursorEvent()   {}
+func (changedFilter) isCursorEvent() {}
+
+func (c cursorState) next(e cursorEvent) cursorState {
+	switch e.(type) {
+	case movedCursor:
+		return onChosen
+	case changedFilter:
+		return onTop
+	}
+	return c
+}
+
 // On a narrow screen such as a phone, the list and the details take turns.
 // A wide screen shows both whatever this says, and keeps it for when it
 // narrows again.
