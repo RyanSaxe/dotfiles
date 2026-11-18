@@ -193,17 +193,24 @@ func setAgent(name string, words []string) error {
 	return writeWhole("agent", []byte(name+"\n"))
 }
 
+// checkStart fails on an agent ws doesn't start or a layout that doesn't
+// load, so a new worktree fails before there is one to clean up.
+func checkStart(s start) error {
+	if s.agent != "" && !slices.Contains(agents, s.agent) {
+		return fmt.Errorf("%q is not an agent ws starts, which are %s", s.agent, strings.Join(agents, " and "))
+	}
+	_, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, nil)
+	return err
+}
+
 func newWorktree(b mux.Backend, from, name, base string, s start) error {
 	if strings.ContainsAny(name, "/ ") {
 		return fmt.Errorf("%q has a slash or space, and a worktree name must be one folder", name)
 	}
-	if s.agent != "" && !slices.Contains(agents, s.agent) {
-		return fmt.Errorf("%q is not an agent ws starts, which are %s", s.agent, strings.Join(agents, " and "))
+	if err := checkStart(s); err != nil {
+		return err
 	}
 	main, err := mainCheckout(from)
-	if err == nil {
-		_, err = layout.Load(layoutsDir, s.layout, builtinLayouts, nil) // a bad layout fails before there is a worktree to clean up
-	}
 	if err != nil {
 		return err
 	}
@@ -227,9 +234,12 @@ func newWorktree(b mux.Backend, from, name, base string, s start) error {
 	return open(b, dir, s, false)
 }
 
-// pullRequest opens a pull request's worktree with layout, which can be
-// review: Neovim on the pull request's conversation and review.
-func pullRequest(b mux.Backend, from, number, layout string) (string, error) {
+// pullRequest opens a pull request's worktree as s says, and its layout can
+// be review: Neovim on the pull request's conversation and review.
+func pullRequest(b mux.Backend, from, number string, s start) (string, error) {
+	if err := checkStart(s); err != nil {
+		return "", err
+	}
 	main, err := mainCheckout(from)
 	if err != nil {
 		return "", err
@@ -240,7 +250,7 @@ func pullRequest(b mux.Backend, from, number, layout string) (string, error) {
 	}
 	branch, url, _ := strings.Cut(view, " ")
 	// snacks.nvim opens gh://owner/repo/pr/N, and the URL ends in owner/repo/pull/N.
-	s := start{layout: layout, pr: strings.Replace(strings.TrimPrefix(url, "https://github.com/"), "/pull/", "/pr/", 1)}
+	s.pr = strings.Replace(strings.TrimPrefix(url, "https://github.com/"), "/pull/", "/pr/", 1)
 	// git lets a branch live in one worktree, so a pull request already
 	// checked out somewhere opens there.
 	if dir := checkedOut(main, branch); dir != "" {

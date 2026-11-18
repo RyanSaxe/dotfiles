@@ -11,6 +11,7 @@ ws open ~/generic/dotfiles          # open a folder as a session, or switch to i
 ws new fix-login                    # make ~/worktrees/PROJECT/fix-login on its own branch, with an agent
 ws new fix-login --agent codex --prompt "Fix the redirect" --base main
 ws pr 123                           # make a worktree on pull request 123, with an agent
+ws pr 123 --prompt "Review it"      # start its agent with a prompt, as ws new does
 ws pr 123 --layout review           # open pull request 123 in Neovim instead
 ws ls                               # list worktrees and their agents
 ws rm fix-login                     # close its session, remove it and delete its branch
@@ -22,7 +23,7 @@ keeps a branch that hasn't merged. Outside Rex and tmux, `ws new` and
 `ws pr` only make the worktree and print its path.
 
 Each agent has its own default flags, which every agent ws starts gets.
-`ws new` replaces them with the words after `--`:
+`ws new` and `ws pr` replace them with the words after `--`:
 
 ```sh
 ws agent claude --effort medium     # claude starts with --effort medium, and is the default

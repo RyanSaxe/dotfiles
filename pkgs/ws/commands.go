@@ -101,16 +101,19 @@ prints its path.`,
 		line: "ws pr NUMBER", summary: "check out a pull request in a worktree and open it",
 		args: "NUMBER",
 		flags: []option{
+			agentOption, promptOption,
 			{"layout", "NAME", "the layout to open, agent by default. review opens the pull request\nin Neovim instead"},
+			agentWordsOption,
 		},
 		about: `Check out pull request NUMBER of this project in ~/worktrees/PROJECT/pr-NUMBER, or open the
 checkout that already has its branch, and start an agent there.`,
 		examples: []string{
 			"ws pr 123",
+			`ws pr 123 --prompt "List what should change before this merges"`,
 			"ws pr 123 --layout review",
 		},
 		run: func(b mux.Backend, c call) error {
-			_, err := pullRequest(b, ".", c.args[0], c.flags["layout"])
+			_, err := pullRequest(b, ".", c.args[0], c.start())
 			return err
 		},
 	},
