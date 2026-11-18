@@ -27,10 +27,16 @@ type Popup struct {
 
 type Tab struct{ Name, Empty string }
 
+// An Action is a key the footer lists and the frame runs, only while it
+// works on the tab and the selected row.
 type Action struct {
 	Key, Help string
 	Always    bool // runs with no row selected
-	Run       func(r Row) tea.Cmd
+	// When says whether the action works on the tab and the row, and nil
+	// means it works on every row. An Always action with no row selected
+	// gets the zero Row.
+	When func(tab int, r Row) bool
+	Run  func(r Row) tea.Cmd
 }
 
 // A Row is up to two lines. It has four places: Title and Tag on its first

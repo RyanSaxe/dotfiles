@@ -2,7 +2,6 @@ package main
 
 import (
 	"cmp"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -76,34 +75,18 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 					return open(b, p.dir, start{}, true)
 				}, popup.Quit)
 			}},
-			{Key: "ctrl+f", Help: "files", Run: func(r popup.Row) tea.Cmd {
-				p := r.Data.(place)
-				if p.dir == "" {
-					return popup.Say(r.Title + " has no folder to search")
-				}
-				return popup.Push(filesPopup(b, p.dir))
+			{Key: "ctrl+f", Help: "files", When: func(_ int, r popup.Row) bool { return r.Data.(place).dir != "" }, Run: func(r popup.Row) tea.Cmd {
+				return popup.Push(filesPopup(b, r.Data.(place).dir))
 			}},
-			{Key: "ctrl+x", Help: "close", Run: func(r popup.Row) tea.Cmd {
-				p := r.Data.(place)
-				return func() tea.Msg {
-					// A row shown before the snapshot doesn't know its session yet.
-					session, err := p.session, error(nil)
-					if session == "" {
-						session, err = mux.Find(b, labelFor(p.dir))
+			// A folder's row knows its session once the snapshot comes.
+			{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).session != "" }, Run: func(r popup.Row) tea.Cmd {
+				session := r.Data.(place).session
+				return popup.Ask("Close "+r.Title+" and everything running in it? (y/N)", func(answer string) tea.Cmd {
+					if !strings.EqualFold(answer, "y") {
+						return nil
 					}
-					if err == nil && session == "" {
-						err = errors.New(r.Title + " has no session to close")
-					}
-					if err != nil {
-						return popup.Notice(err.Error())
-					}
-					return popup.Ask("Close "+r.Title+" and everything running in it? (y/N)", func(answer string) tea.Cmd {
-						if !strings.EqualFold(answer, "y") {
-							return nil
-						}
-						return popup.Do(func() error { return b.Kill(session) }, popup.Reload("closed "+r.Title))
-					})()
-				}
+					return popup.Do(func() error { return b.Kill(session) }, popup.Reload("closed "+r.Title))
+				})
 			}},
 		},
 	}

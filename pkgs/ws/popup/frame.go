@@ -158,6 +158,13 @@ func (m frame) selected() (Row, bool) {
 	return r, ok && m.tabs[m.active].showsRows()
 }
 
+// works says whether an action works on the active tab and the selected
+// row, so that the footer lists it and its key runs it.
+func (m frame) works(a Action) bool {
+	r, ok := m.selected()
+	return (ok || a.Always) && (a.When == nil || a.When(m.active, r))
+}
+
 func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -289,7 +296,7 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 	// as Reviews does with Ctrl-R.
 	r, ok := m.selected()
 	for _, a := range m.p.Actions {
-		if a.Key == key && (ok || a.Always) {
+		if a.Key == key && m.works(a) {
 			return m, a.Run(r)
 		}
 	}
@@ -689,9 +696,11 @@ func (m frame) renderFooter() string {
 		keys = slices.DeleteFunc(keys, func(k [2]string) bool { return k[0] == "tab" })
 	}
 	for _, a := range m.p.Actions {
-		keys = append(keys, [2]string{strings.ReplaceAll(a.Key, "ctrl+", "^"), a.Help})
+		if m.works(a) {
+			keys = append(keys, [2]string{strings.ReplaceAll(a.Key, "ctrl+", "^"), a.Help})
+		}
 	}
-	if !slices.ContainsFunc(m.p.Actions, func(a Action) bool { return a.Key == "ctrl+r" }) {
+	if !slices.ContainsFunc(m.p.Actions, func(a Action) bool { return a.Key == "ctrl+r" && m.works(a) }) {
 		keys = append(keys, [2]string{"^r", "refresh"})
 	}
 	if m.sideBySide() || detailsAlone {

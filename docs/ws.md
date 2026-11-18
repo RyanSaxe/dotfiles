@@ -82,7 +82,7 @@ In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Enter acts
 on the row and Esc clears the filter or closes. Enter pressed before the
 rows appear acts on the top match once they do, unless another key comes
-first. The bottom line lists the popup's other keys.
+first.
 
 | Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Other                            |
 | --------- | ------ | ---------------------- | ------------- | -------------------------------- |
@@ -91,6 +91,11 @@ first. The bottom line lists the popup's other keys.
 | worktrees | go     | new worktree and agent | remove        |                                  |
 | reviews   | review | review with an agent   | done          | Ctrl-G diff, Ctrl-O browser      |
 | tasks     | edit   | add                    | done          |                                  |
+
+The bottom line lists only the keys that work on the selected row, and a
+key that doesn't work there does nothing. Reviews offers Ctrl-T and Ctrl-G
+only on a pull request and Ctrl-X only on Needs you, and the go popup offers
+Ctrl-X only on a folder with a running session.
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
 per line. A folder that has a running session is tagged `session`, and

@@ -64,21 +64,21 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 				if !show(it) {
 					continue
 				}
-				rows = append(rows, inboxRow(it, t == 0))
+				rows = append(rows, inboxRow(it, t == needsYouTab))
 			}
 			// Needs you puts the most urgent first, then the newest. The views
 			// put whatever changed last first.
 			slices.SortStableFunc(rows, func(x, y popup.Row) int {
-				if t == 0 {
-					p, q := itemOf(x).Reasons[0], itemOf(y).Reasons[0]
+				if t == needsYouTab {
+					p, q := x.Data.(item).Reasons[0], y.Data.(item).Reasons[0]
 					return cmp.Or(int(p.Kind)-int(q.Kind), q.At.Compare(p.At))
 				}
-				return itemOf(y).Updated.Compare(itemOf(x).Updated)
+				return y.Data.(item).Updated.Compare(x.Data.(item).Updated)
 			})
 			return rows, err
 		},
 		Fetch: func(r popup.Row) (any, error) {
-			it := itemOf(r)
+			it := r.Data.(item)
 			text := it.Body
 			if !it.Issue {
 				text = signedAttachments(text, it.Repo, strconv.Itoa(it.Number))
@@ -94,7 +94,7 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 		Body: func(_ popup.Row, d any, w int) string { return d.(markdown.Doc).Render(w, markdownIn("", term)) },
 		Actions: []popup.Action{
 			{Key: "enter", Help: "review", Run: func(r popup.Row) tea.Cmd {
-				it := itemOf(r)
+				it := r.Data.(item)
 				return tea.Batch(popup.Say("opening #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error {
 					acknowledge(it)
 					if it.Issue {
@@ -104,18 +104,12 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 					return err
 				}, popup.Quit))
 			}},
-			{Key: "ctrl+x", Help: "done", Run: func(r popup.Row) tea.Cmd {
-				if _, ok := r.Data.(notification); !ok {
-					return popup.Say("only Needs you acknowledges")
-				}
-				it := itemOf(r)
+			{Key: "ctrl+x", Help: "done", When: func(tab int, _ popup.Row) bool { return tab == needsYouTab }, Run: func(r popup.Row) tea.Cmd {
+				it := r.Data.(item)
 				return popup.Do(func() error { return acknowledge(it) }, popup.Reload("acknowledged #"+strconv.Itoa(it.Number)))
 			}},
-			{Key: "ctrl+g", Help: "diff", Run: func(r popup.Row) tea.Cmd {
-				it := itemOf(r)
-				if it.Issue {
-					return popup.Say("an issue has no diff")
-				}
+			{Key: "ctrl+g", Help: "diff", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
+				it := r.Data.(item)
 				diff := fmt.Sprintf("gh pr diff %d -R %s --color=always | delta --paging=always", it.Number, it.Repo)
 				return tea.ExecProcess(exec.Command("sh", "-c", diff), func(err error) tea.Msg {
 					if err != nil {
@@ -124,15 +118,12 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 					return popup.Notice("")
 				})
 			}},
-			{Key: "ctrl+t", Help: "agent", Run: func(r popup.Row) tea.Cmd {
-				it := itemOf(r)
-				if it.Issue {
-					return popup.Say("an agent reviews pull requests, not issues")
-				}
+			{Key: "ctrl+t", Help: "agent", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
+				it := r.Data.(item)
 				return tea.Batch(popup.Say("opening an agent on #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error { return reviewAgent(b, it) }, popup.Quit))
 			}},
 			{Key: "ctrl+o", Help: "browser", Run: func(r popup.Row) tea.Cmd {
-				it := itemOf(r)
+				it := r.Data.(item)
 				return popup.Do(func() error { return browse(it) }, popup.Notice("opened "+it.URL))
 			}},
 			{Key: "ctrl+r", Help: "refresh", Always: true, Run: func(popup.Row) tea.Cmd {
@@ -144,16 +135,11 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 
 var verbs = map[reasonKind]string{failing: "failed", changesRequested: "asked for changes", reviewed: "reviewed", commented: "commented", opened: "opened it"}
 
-// A notification is an item on Needs you, the only tab that acknowledges.
-type notification struct{ item }
+// needsYouTab is the Reviews tab that lists what waits on you, the only one
+// whose items you mark done.
+const needsYouTab = 0
 
-// itemOf is the item behind a row on any tab.
-func itemOf(r popup.Row) item {
-	if n, ok := r.Data.(notification); ok {
-		return n.item
-	}
-	return r.Data.(item)
-}
+func isPullRequest(_ int, r popup.Row) bool { return !r.Data.(item).Issue }
 
 // inboxRow fills a row's four places: the title and why it needs you, then
 // the repository, who acted and when. A pull request of yours that needs
@@ -162,9 +148,6 @@ func inboxRow(it item, needs bool) popup.Row {
 	// The number goes with the repository on the second line, so the title
 	// gets the whole first line.
 	r := popup.Row{ID: it.ID, Title: it.Title, Data: it}
-	if needs {
-		r.Data = notification{it}
-	}
 	repo := path.Base(it.Repo) + "#" + strconv.Itoa(it.Number)
 	if it.Issue {
 		repo = path.Base(it.Repo) + " issue #" + strconv.Itoa(it.Number)
@@ -191,7 +174,7 @@ func inboxRow(it item, needs bool) popup.Row {
 // inboxHead is what the row doesn't say: the whole title, which the narrow
 // list cuts, then a pull request's branch, size, review and checks.
 func inboxHead(r popup.Row, _ any, w int) []string {
-	it := itemOf(r)
+	it := r.Data.(item)
 	lines := []string{popup.Bold.Width(w).Render(it.Title), ""}
 	if it.Issue {
 		return lines
