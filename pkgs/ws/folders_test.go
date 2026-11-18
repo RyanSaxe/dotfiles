@@ -145,3 +145,15 @@ func TestTheFolderPreviewListsALargeTopFolder(t *testing.T) {
 		}
 	}
 }
+
+// A session with no pane to land on, such as one Rex is still making, reads
+// as open, and its preview captures no pane.
+func TestASessionWithNoPaneToLandOnReadsAsOpen(t *testing.T) {
+	rows := sessionRows(nil, mux.Snapshot{Sessions: []mux.Session{{ID: "s", Label: "new"}}})
+	if tag := rows[0].Tag.String(); tag != "open" {
+		t.Errorf("the session is tagged %q, want open", tag)
+	}
+	if preview, err := goPopup(nil, sessionsTab).Fetch(rows[0]); preview != nil || err != nil {
+		t.Errorf("the preview is %v (%v), want none", preview, err)
+	}
+}
