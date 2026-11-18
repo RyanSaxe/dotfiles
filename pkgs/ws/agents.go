@@ -23,7 +23,7 @@ func agentsPopup(b mux.Backend) popup.Popup {
 			}
 			s, err := b.Snapshot()
 			ps := s.Agents()
-			slices.SortFunc(ps, func(a, b mux.Pane) int { return cmp.Or(int(a.Status)-int(b.Status), b.Updated.Compare(a.Updated)) })
+			slices.SortFunc(ps, func(a, b mux.Pane) int { return b.Updated.Compare(a.Updated) })
 			rows := make([]popup.Row, len(ps))
 			for i, p := range ps {
 				app := p.App
