@@ -89,6 +89,7 @@ nbstripout removes, and ruff and ty check them too.
   delete its demo files.
 - oxfmt formats and oxlint lints, in place of Prettier and ESLint. Install
   them with `npm install --save-dev --save-exact oxfmt oxlint`.
+  `.oxfmtrc.json` keeps oxfmt off Markdown, which rumdl formats.
 - Code that goes through a build step is TypeScript with `"strict": true`,
   and the template's `tsc` hook checks its types. A framework with its own
   check, such as `astro check`, runs it from that hook instead.
@@ -210,10 +211,12 @@ then delete the old tool's config, its dependency and its CI steps:
 - `npx @oxlint/migrate` writes `.oxlintrc.json` from the ESLint config.
 - `rumdl import FILE` writes `.rumdl.toml` from a markdownlint config.
 
-Then change each setting the template also has to the template's value, and
-keep the rest. Fix what a newly enabled rule finds, or turn the rule off with
-a comment saying why. Reformat the whole repository in a commit of its own,
-so that the other commits show only what they change.
+Then change each setting the template also has to the template's value, but
+add the template's `ignorePatterns` to the converted ones instead of
+replacing them, and keep the rest. Fix what a newly enabled rule finds, or
+turn the rule off with a comment saying why. Reformat the whole repository
+in a commit of its own, so that the other commits show only what they
+change.
 
 Renaming a workflow or a job changes the names that branch rulesets require
 and that `workflow_run` triggers name, so update those too.
