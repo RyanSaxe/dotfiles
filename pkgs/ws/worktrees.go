@@ -37,162 +37,136 @@ func startFromAnswer(answer string) (start, error) {
 	return s, err
 }
 
-// worktreesPopup opens on the worktrees of the project ws runs in, with
-// every project's on a second tab.
-func worktreesPopup(b mux.Backend) popup.Popup {
-	project := ""
-	if main, err := mainCheckout("."); err == nil {
-		project = filepath.Base(main)
+// worktreeRows are the go popup's Worktrees tab: every worktree, the current
+// project's first, as ws ls sorts them. Each worktree's name and folder show
+// at once, its branch, changes, last commit and agent state once git and the
+// multiplexer answer, and its pull request once GitHub does.
+func worktreeRows(snapshot func() (mux.Snapshot, error), show func([]popup.Row)) []popup.Row {
+	dirs := worktreeDirs(currentProject())
+	// GitHub answers last, so it's asked first.
+	prs := make(chan map[string]map[string]string, 1)
+	go func() { prs <- openPullRequests(dirs) }()
+	// Folders lists the same folders with other details, and the frame keeps
+	// a row's details by its ID.
+	id := func(w worktree) string { return "worktree:" + w.Path }
+	early := make([]popup.Row, len(dirs))
+	for i, w := range dirs {
+		early[i] = popup.Row{ID: id(w), Title: w.Name, Detail: tilde(w.Path), Data: worktreeRow{worktree: w}}
 	}
-	tabs := []popup.Tab{{Name: "Worktrees", Empty: "No worktrees under ~/worktrees."}}
-	if project != "" {
-		tabs = []popup.Tab{{Name: project, Empty: "No worktrees of " + project + "."}, {Name: "All", Empty: "No worktrees under ~/worktrees."}}
-	}
-	// The first tab lists only project's worktrees, when there is one.
-	onTab := func(t int, w worktree) bool { return project == "" || t != 0 || w.Project == project }
-	gather := perLoad(func() ([]worktreeRow, error) {
-		wts := worktrees(b)
-		bases := perProject(wts, defaultBranch)
-		rows := make([]worktreeRow, len(wts))
-		for i, w := range wts {
-			rows[i] = worktreeRow{worktree: w, base: bases[w.Project]}
+	show(early)
+	wts := worktrees(snapshot)
+	bases := perProject(wts, defaultBranch)
+	rows := make([]popup.Row, len(wts))
+	for i, w := range wts {
+		// Only what the name doesn't already say: the project, the branch
+		// where it isn't named after the worktree, and whether it has changes,
+		// then the last commit, so the line is never empty.
+		parts := []string{w.Project}
+		if w.Branch != w.Name {
+			parts = append(parts, w.Branch)
 		}
-		return rows, nil
-	})
-	pulls := perLoad(func() (map[string]map[string]string, error) { return openPullRequests(worktreeDirs(project)), nil })
-	return popup.Popup{
-		Noun: "worktrees",
-		Tabs: tabs,
-		// Each worktree's name and folder show at once, its branch, changes,
-		// last commit and agent state once git and the multiplexer answer,
-		// and its pull request once GitHub does.
-		Load: func(t int, show func([]popup.Row)) ([]popup.Row, error) {
-			// GitHub answers last, so it's asked first.
-			prs := make(chan map[string]map[string]string, 1)
-			go func() { found, _ := pulls(t); prs <- found }()
-			var early []popup.Row
-			for _, w := range worktreeDirs(project) {
-				if onTab(t, w) {
-					early = append(early, popup.Row{ID: w.Path, Title: w.Name, Detail: tilde(w.Path), Data: worktreeRow{worktree: w}})
-				}
+		if w.Dirty {
+			parts = append(parts, "modified")
+		}
+		meta := strings.Join(append(parts, w.Subject), " · ")
+		rows[i] = popup.Row{ID: id(w), Title: w.Name, Detail: meta, Qualifier: relAge(w.Updated), Data: worktreeRow{worktree: w, base: bases[w.Project]}}
+		if s, ok := mux.ParseStatus(w.State); ok {
+			rows[i].Tag = statusTag(s)
+		}
+	}
+	show(slices.Clone(rows)) // the frame reads them while the pull requests join these
+	openPRs := <-prs
+	for i := range rows {
+		w := rows[i].Data.(worktreeRow)
+		w.pr = openPRs[w.Project][w.Branch]
+		rows[i].Data = w
+	}
+	return rows
+}
+
+// worktreeActions are the Worktrees tab's keys.
+func worktreeActions(b mux.Backend) []popup.Action {
+	return []popup.Action{
+		{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
+			w := r.Data.(worktreeRow)
+			return popup.Do(func() error { return open(b, w.Path, start{}, true) }, popup.Quit)
+		}},
+		// The new worktree belongs to the project ws runs in, as with ws new,
+		// whichever project's row is selected. Outside a project, it belongs
+		// to the selected row's.
+		{Key: "ctrl+t", Help: "new", Always: true, Run: func(r popup.Row) tea.Cmd {
+			from := "."
+			if w, ok := r.Data.(worktreeRow); ok && currentProject() == "" {
+				from = w.Path
 			}
-			show(early)
-			wts, _ := gather(t)
-			var rows []popup.Row
-			for _, w := range wts {
-				if !onTab(t, w.worktree) {
-					continue
-				}
-				// Only what the tab and the name don't already say: the project on
-				// All, the branch where it isn't named after the worktree, and
-				// whether it has changes, then the last commit, so the line is
-				// never empty.
-				var parts []string
-				if project == "" || t != 0 {
-					parts = append(parts, w.Project)
-				}
-				if w.Branch != w.Name {
-					parts = append(parts, w.Branch)
-				}
-				if w.Dirty {
-					parts = append(parts, "modified")
-				}
-				meta := strings.Join(append(parts, w.Subject), " · ")
-				r := popup.Row{ID: w.Path, Title: w.Name, Detail: meta, Qualifier: relAge(w.Updated), Data: w}
-				if s, ok := mux.ParseStatus(w.State); ok {
-					r.Tag = statusTag(s)
-				}
-				rows = append(rows, r)
+			main, err := mainCheckout(from)
+			if err != nil {
+				return popup.Say(err.Error())
 			}
-			show(slices.Clone(rows)) // the frame reads them while the pull requests join these
-			openPRs := <-prs
-			for i := range rows {
-				w := rows[i].Data.(worktreeRow)
-				w.pr = openPRs[w.Project][w.Branch]
-				rows[i].Data = w
-			}
-			return rows, nil
-		},
-		Fetch: func(r popup.Row) (any, error) { return gitSummary(r.Data.(worktreeRow).Path), nil },
-		Actions: []popup.Action{
-			{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
-				w := r.Data.(worktreeRow)
-				return popup.Do(func() error { return open(b, w.Path, start{}, true) }, popup.Quit)
-			}},
-			{Key: "ctrl+t", Help: "new", Always: true, Run: func(r popup.Row) tea.Cmd {
-				from := "." // with no worktrees yet, the project is the folder ws runs in
-				if w, ok := r.Data.(worktreeRow); ok {
-					from = w.Path
-				}
-				return popup.Ask("name:", func(name string) tea.Cmd {
-					agent, _ := defaultAgent()
-					return popup.Ask("agent and flags (empty for "+agent+"):", func(answer string) tea.Cmd {
-						return popup.Ask("prompt:", func(prompt string) tea.Cmd {
-							return tea.Batch(popup.Say("making "+name+"…"), popup.Do(func() error {
-								s, err := startFromAnswer(answer)
-								if err != nil {
-									return err
-								}
-								s.prompt = prompt
-								main, err := mainCheckout(from)
-								if err != nil {
-									return err
-								}
-								return newWorktree(b, main, name, "", s)
-							}, popup.Quit))
-						})
+			return popup.Ask("name of the new worktree of "+filepath.Base(main)+":", func(name string) tea.Cmd {
+				agent, _ := defaultAgent()
+				return popup.Ask("agent and flags (empty for "+agent+"):", func(answer string) tea.Cmd {
+					return popup.Ask("prompt:", func(prompt string) tea.Cmd {
+						return tea.Batch(popup.Say("making "+name+"…"), popup.Do(func() error {
+							s, err := startFromAnswer(answer)
+							if err != nil {
+								return err
+							}
+							s.prompt = prompt
+							return newWorktree(b, main, name, "", s)
+						}, popup.Quit))
 					})
 				})
-			}},
-			{Key: "ctrl+x", Help: "remove", Run: func(r popup.Row) tea.Cmd {
-				w := r.Data.(worktreeRow)
-				rm := func(force bool) tea.Cmd {
-					return func() tea.Msg {
-						if err := remove(b, w.Project+"/"+w.Name, force); err != nil {
-							return popup.Reload(err.Error())
-						}
-						return popup.Reload("removed " + w.Project + "/" + w.Name)
-					}
-				}
-				ask := popup.Ask(w.Name+" has uncommitted changes. Remove it and its branch anyway? (y/N)", func(answer string) tea.Cmd {
-					if strings.EqualFold(answer, "y") {
-						return rm(true)
-					}
-					return nil
-				})
-				// git says now whether it has changes, since a row shown before
-				// git answered doesn't know.
+			})
+		}},
+		{Key: "ctrl+x", Help: "remove", Run: func(r popup.Row) tea.Cmd {
+			w := r.Data.(worktreeRow)
+			rm := func(force bool) tea.Cmd {
 				return func() tea.Msg {
-					if changes, _ := git(w.Path, "status", "--porcelain"); changes == "" {
-						return rm(false)()
+					if err := remove(b, w.Project+"/"+w.Name, force); err != nil {
+						return popup.Reload(err.Error())
 					}
-					return ask()
+					return popup.Reload("removed " + w.Project + "/" + w.Name)
 				}
-			}},
-			{Key: "ctrl+f", Help: "files", Run: func(r popup.Row) tea.Cmd {
-				return popup.Push(filesPopup(b, r.Data.(worktreeRow).Path))
-			}},
-			// How the files git tracks changed since the branch left the default
-			// branch, committed or not.
-			{Key: "ctrl+g", Help: "diff", When: func(_ int, r popup.Row) bool { return r.Data.(worktreeRow).base != "" }, Run: func(r popup.Row) tea.Cmd {
-				w := r.Data.(worktreeRow)
-				return page(exec.Command("sh", "-c", `git -C "$1" diff --merge-base "$2" | delta --paging=always`, "sh", w.Path, w.base))
-			}},
-			{Key: "ctrl+o", Help: "browser", When: func(_ int, r popup.Row) bool { return r.Data.(worktreeRow).pr != "" }, Run: func(r popup.Row) tea.Cmd {
-				url := r.Data.(worktreeRow).pr
-				return popup.Do(func() error {
-					_, err := runIn("", "gh", "pr", "view", url, "--web")
-					return err
-				}, popup.Notice("opened "+url))
-			}},
-		},
+			}
+			ask := popup.Ask(w.Name+" has uncommitted changes. Remove it and its branch anyway? (y/N)", func(answer string) tea.Cmd {
+				if strings.EqualFold(answer, "y") {
+					return rm(true)
+				}
+				return nil
+			})
+			// git says now whether it has changes, since a row shown before
+			// git answered doesn't know.
+			return func() tea.Msg {
+				if changes, _ := git(w.Path, "status", "--porcelain"); changes == "" {
+					return rm(false)()
+				}
+				return ask()
+			}
+		}},
+		{Key: "ctrl+f", Help: "files", Run: func(r popup.Row) tea.Cmd {
+			return popup.Push(filesPopup(b, r.Data.(worktreeRow).Path))
+		}},
+		// How the files git tracks changed since the branch left the default
+		// branch, committed or not.
+		{Key: "ctrl+g", Help: "diff", When: func(_ int, r popup.Row) bool { return r.Data.(worktreeRow).base != "" }, Run: func(r popup.Row) tea.Cmd {
+			w := r.Data.(worktreeRow)
+			return page(exec.Command("sh", "-c", `git -C "$1" diff --merge-base "$2" | delta --paging=always`, "sh", w.Path, w.base))
+		}},
+		{Key: "ctrl+o", Help: "browser", When: func(_ int, r popup.Row) bool { return r.Data.(worktreeRow).pr != "" }, Run: func(r popup.Row) tea.Cmd {
+			url := r.Data.(worktreeRow).pr
+			return popup.Do(func() error {
+				_, err := runIn("", "gh", "pr", "view", url, "--web")
+				return err
+			}, popup.Notice("opened "+url))
+		}},
 	}
 }
 
-// A worktreeRow is a worktree as its popup lists it: base is its project's
-// default branch, which its diff starts from, and pr is the URL of its
-// branch's open pull request. Each is "" while the popup doesn't know it,
-// and when there is none.
+// A worktreeRow is a worktree as the Worktrees tab lists it: base is its
+// project's default branch, which its diff starts from, and pr is the URL of
+// its branch's open pull request. Each is "" while the popup doesn't know
+// it, and when there is none.
 type worktreeRow struct {
 	worktree
 	base, pr string

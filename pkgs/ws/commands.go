@@ -206,12 +206,13 @@ request merged.`,
 	},
 	{
 		name: "pick", group: "Popups",
-		line: "ws pick NAME", summary: "open a popup: go, sessions, worktrees, agents, reviews,\ntasks, theme, keys or files",
+		line: "ws pick NAME", summary: "open a popup: go, worktrees, sessions, agents, reviews,\ntasks, theme, keys or files",
 		args:  "NAME",
 		flags: []option{{"client", "ID", "the Rex app a picked row switches, which Rex's keys pass. Without it,\nws switches the app that shows this terminal"}},
-		about: `Open popup NAME: go, sessions, worktrees, agents, reviews, tasks, theme, keys or files.
-sessions is the go popup on its Sessions tab. go also lists the folders in
-~/.config/ws/bookmarks, one per line.`,
+		about: `Open popup NAME: go, worktrees, sessions, agents, reviews, tasks, theme, keys or files.
+The go popup has four tabs: Folders, Worktrees, Sessions and Agents. go opens it on Folders,
+and worktrees, sessions and agents open it on their own tab. Folders also lists the folders
+in ~/.config/ws/bookmarks, one per line.`,
 		more: `
 In every popup:
   typing                   filter the rows
@@ -227,7 +228,7 @@ When the popup is under 80 columns wide, → shows the row's details, and ← or
 the rows.
 
 A popup's own keys mean the same in every popup that has them, and the bottom line lists only
-the ones that work on the selected row:
+the ones that work on the tab and the selected row:
   Ctrl-T                   start something new
   Ctrl-X                   finish or remove the row
   Ctrl-F                   search the row's folder

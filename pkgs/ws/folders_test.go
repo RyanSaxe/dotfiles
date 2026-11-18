@@ -193,3 +193,90 @@ func TestASessionWithNoPaneToLandOnReadsAsOpen(t *testing.T) {
 		t.Errorf("the preview is %v (%v), want none", preview, err)
 	}
 }
+
+// Each tab of the go popup offers its own keys, in the order every popup
+// lists them, and no other tab's.
+func TestEachGoTabOffersItsOwnKeys(t *testing.T) {
+	p := goPopup(nil, foldersTab)
+	for _, tc := range []struct {
+		tab  int
+		row  any
+		want []string
+	}{
+		{foldersTab, place{dir: "/p", at: mux.Place{Session: "s"}}, []string{"enter", "ctrl+x", "ctrl+f"}},
+		{worktreesTab, worktreeRow{base: "origin/main", pr: "https://github.com/o/r/pull/1"}, []string{"enter", "ctrl+t", "ctrl+x", "ctrl+f", "ctrl+g", "ctrl+o"}},
+		{sessionsTab, place{dir: "/p", at: mux.Place{Session: "s"}}, []string{"enter", "ctrl+x", "ctrl+f"}},
+		{agentsTab, mux.Pane{ID: "%1"}, []string{"enter"}},
+	} {
+		var keys []string
+		for _, a := range p.Actions {
+			if a.When == nil || a.When(tc.tab, popup.Row{Data: tc.row}) {
+				keys = append(keys, a.Key)
+			}
+		}
+		if !slices.Equal(keys, tc.want) {
+			t.Errorf("%s offers %v, want %v", p.Tabs[tc.tab].Name, keys, tc.want)
+		}
+	}
+}
+
+// Ctrl-T on Worktrees makes the worktree in the project ws runs in, even
+// when that project has none yet and another project's row is selected.
+func TestCtrlTMakesAWorktreeOfTheProjectWsRunsIn(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	// A commit hook runs these tests, and ws must not reach the repository
+	// being committed to.
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	oldRoot := worktreeRoot
+	worktreeRoot = t.TempDir()
+	t.Cleanup(func() { worktreeRoot = oldRoot })
+	stateDir = t.TempDir()
+	withConfig(t, "claude", "tab")
+	projects := t.TempDir()
+	for _, name := range []string{"mine", "other"} {
+		if err := os.Mkdir(filepath.Join(projects, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, args := range [][]string{
+			{"init", "-q", "-b", "main"},
+			{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+		} {
+			if _, err := git(filepath.Join(projects, name), args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, err := git(filepath.Join(projects, "other"), "worktree", "add", "-q", "-b", "feat", filepath.Join(worktreeRoot, "other", "feat")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(projects, "mine"))
+	onPath(t, "tmux", "exit 0") // a tmux server with no sessions
+
+	p := goPopup(mux.Detect(func(string) string { return "" }, ""), worktreesTab)
+	rows, err := p.Load(worktreesTab, func([]popup.Row) {})
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("Worktrees lists %v (%v), want other's feat", rows, err)
+	}
+	ctrlT, _ := working(p, "ctrl+t", worktreesTab, rows[0])
+	m, msg := popup.New(p, nil), ctrlT.Run(rows[0])()
+	for _, answer := range []string{"fix", "", ""} { // its name, the default agent and no prompt
+		m, _ = m.Update(msg)
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(answer)})
+		_, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		msg = then()
+	}
+	for _, cmd := range msg.(tea.BatchMsg) {
+		cmd()
+	}
+	if _, err := os.Stat(filepath.Join(worktreeRoot, "mine", "fix")); err != nil {
+		t.Errorf("Ctrl-T didn't make mine/fix: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(worktreeRoot, "other", "fix")); err == nil {
+		t.Error("Ctrl-T made other/fix, in the selected row's project")
+	}
+}

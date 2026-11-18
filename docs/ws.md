@@ -87,8 +87,11 @@ ws new fix-popups -- --effort high  # starts claude --effort high
 ws new fix-login --agent codex      # starts codex instead
 ```
 
-The worktrees popup's Ctrl-T asks for an agent, flags or both, such as
-`--model opus` or `codex -m gpt-6.1-sol`.
+Ctrl-T on the go popup's Worktrees tab makes a worktree of the project you're
+in, as `ws new` does, whichever row is selected. Outside a project, it uses
+the selected row's project. It asks for the worktree's name, then an agent,
+flags or both, such as `--model opus` or `codex -m gpt-6.1-sol`, then a
+prompt.
 
 ## Layouts
 
@@ -114,24 +117,28 @@ the files popup starts a folder's session with.
 
 ## Popups
 
-| Key          | Popup     | Lists                                                                  |
-| ------------ | --------- | ---------------------------------------------------------------------- |
-| Alt-O        | go        | Repositories, worktrees and bookmarks, latest git activity first       |
-| Ctrl-F in go | files     | The selected folder's files, and its hidden and ignored ones on tabs   |
-| Alt-S        | sessions  | Each place, a session or a worktree's tab, and what it's doing         |
-| Alt-W        | worktrees | This project's worktrees, and all of them on a second tab              |
-| Alt-R        | reviews   | Pull requests and issues on GitHub that involve you                    |
-| Alt-T        | tasks     | Open tasks in the vault, soonest due first                             |
-| Alt-A        | agents    | Agents and what each is doing                                          |
-| Alt-C        | theme     | Light or dark, and the mascot                                          |
-| Alt-/        | keys      | Every key binding, and where it is set                                 |
+| Key          | Popup            | Lists                                                                |
+| ------------ | ---------------- | -------------------------------------------------------------------- |
+| Alt-O        | go, on Folders   | Repositories, worktrees and bookmarks, latest git activity first     |
+| Alt-W        | go, on Worktrees | Every worktree, this project's first, with its branch and agent      |
+| Alt-S        | go, on Sessions  | Each place, a session or a worktree's tab, and what it's doing       |
+| Alt-A        | go, on Agents    | Agents and what each is doing, the latest report first               |
+| Ctrl-F in go | files            | The selected folder's files, and its hidden and ignored ones on tabs |
+| Alt-R        | reviews          | Pull requests and issues on GitHub that involve you                  |
+| Alt-T        | tasks            | Open tasks in the vault, soonest due first                           |
+| Alt-C        | theme            | Light or dark, and the mascot                                        |
+| Alt-/        | keys             | Every key binding, and where it is set                               |
+
+Tab moves between the go popup's four tabs. Typing a project's name on
+Worktrees brings that project's worktrees to the top.
 
 Rex binds the Alt keys in `config/rex/init.lua`, and tmux in
 `config/tmux/tmux.conf`. In Rex, one of them pressed inside a popup
 replaces that popup, and in tmux the popup ignores it. Files opens over the
 go popup, and Esc goes back to it. `ws pick NAME` opens any of these
-popups from a shell, and `ws pick files` lists the files of the folder it
-runs in. `ws pick --help` lists the keys every popup shares.
+popups from a shell, where `go`, `worktrees`, `sessions` and `agents` open
+the go popup on their tab, and `ws pick files` lists the files of the
+folder it runs in. `ws pick --help` lists the keys every popup shares.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Ctrl-D and
@@ -144,20 +151,22 @@ opens the row, Ctrl-T starts something new, Ctrl-X finishes or removes the
 row, Ctrl-F searches the row's folder, Ctrl-G shows a diff and Ctrl-O opens
 the browser.
 
-| Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Ctrl-F | Ctrl-G | Ctrl-O       |
-| --------- | ------ | ---------------------- | ------------- | ------ | ------ | ------------ |
-| go        | go     |                        | close         | files  |        |              |
-| files     | edit   |                        |               |        |        |              |
-| worktrees | go     | new worktree and agent | remove        | files  | diff   | pull request |
-| reviews   | review | review with an agent   | done          |        | diff   | browser      |
-| tasks     | edit   | add                    | done          |        |        |              |
+| Popup         | Enter  | Ctrl-T                 | Ctrl-X        | Ctrl-F | Ctrl-G | Ctrl-O       |
+| ------------- | ------ | ---------------------- | ------------- | ------ | ------ | ------------ |
+| go, Folders   | go     |                        | close         | files  |        |              |
+| go, Worktrees | go     | new worktree and agent | remove        | files  | diff   | pull request |
+| go, Sessions  | go     |                        | close         | files  |        |              |
+| go, Agents    | go     |                        |               |        |        |              |
+| files         | edit   |                        |               |        |        |              |
+| reviews       | review | review with an agent   | done          |        | diff   | browser      |
+| tasks         | edit   | add                    | done          |        |        |              |
 
-The bottom line lists only the keys that work on the selected row, and a
-key that doesn't work there does nothing. Reviews offers Ctrl-T and Ctrl-G
-only on a pull request and Ctrl-X only on Needs you, and the go popup offers
-Ctrl-X only on a folder that is open.
+The bottom line lists only the keys that work on the tab and the selected
+row, and a key that doesn't work there does nothing. Reviews offers Ctrl-T
+and Ctrl-G only on a pull request and Ctrl-X only on Needs you, and the go
+popup's Folders tab offers Ctrl-X only on a folder that is open.
 
-In the worktrees popup, Ctrl-G shows in `delta` how the files git tracks
+On the Worktrees tab, Ctrl-G shows in `delta` how the files git tracks
 changed, committed or not, since the branch left the project's default
 branch, the one `origin/HEAD` names. A project without `origin/HEAD` has no
 Ctrl-G, and `git remote set-head origin --auto` sets it. Ctrl-O opens the
@@ -193,8 +202,9 @@ tracks:
   [ai-harness/README.md](../ai-harness/README.md#agents-that-need-you)
   describes. A bell doesn't say whether the agent finished or waits, so an
   agent that rang counts as blocked: it lights the A peach, and Cmd-Alt-A
-  orders those agents by how long they have needed you. The agents popup
-  shows the agent as working while its window prints and idle otherwise.
+  orders those agents by how long they have needed you. The go popup's
+  Agents tab shows the agent as working while its window prints and idle
+  otherwise.
   tmux tracks bells and output per window, so a bell or output from a shell
   pane beside the agent counts as the agent's.
 - **Rex:** a blocked or failed agent needs you until it reports something

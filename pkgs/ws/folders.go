@@ -26,28 +26,43 @@ type place struct {
 // The go popup's tabs.
 const (
 	foldersTab = iota
+	worktreesTab
 	sessionsTab
+	agentsTab
 )
 
-// goPopup lists repositories, worktrees and bookmarks by their last git
-// activity on one tab, and the places folders are open in, each session and
-// named tab, on the other. It opens on first, foldersTab or sessionsTab.
+// goPopup has a tab for each kind of place to go: repositories, worktrees
+// and bookmarks by their last git activity, every worktree with its branch
+// and agent, the places folders are open in, each session and named tab, and
+// the agents by their latest report. It opens on first.
 func goPopup(b mux.Backend, first int) popup.Popup {
 	walk := perLoad(func() ([]folder, error) { return folders(), nil })
 	snapshot := perLoad(func() (mux.Snapshot, error) { return b.Snapshot() })
 	return popup.Popup{
-		Noun:  "folders and sessions",
-		Tabs:  []popup.Tab{foldersTab: {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."}, sessionsTab: {Name: "Sessions", Empty: "No sessions are running."}},
+		Noun: "folders, worktrees, sessions and agents",
+		Tabs: []popup.Tab{
+			foldersTab:   {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."},
+			worktreesTab: {Name: "Worktrees", Empty: "No worktrees under ~/worktrees."},
+			sessionsTab:  {Name: "Sessions", Empty: "No sessions are running."},
+			agentsTab:    {Name: "Agents", Empty: "No terminal reports a program status."},
+		},
 		Start: first,
-		// Folders shows the walk's rows at once, and tags the folders that
-		// are open once the snapshot comes. Enter on an untagged row still
-		// goes to its place, since open finds it. Sessions reads the snapshot
-		// first, so it runs while Folders walks.
+		// Every tab reads the same snapshot. Folders shows the walk's rows at
+		// once, and tags the folders that are open once the snapshot comes.
+		// Enter on an untagged row still goes to its place, since open finds
+		// it. Sessions reads the snapshot first, so it runs while Folders
+		// walks.
 		Load: func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
-			if tab == sessionsTab {
+			switch tab {
+			case worktreesTab:
+				return worktreeRows(func() (mux.Snapshot, error) { return snapshot(tab) }, show), nil
+			case sessionsTab:
 				s, err := snapshot(tab)
 				fs, _ := walk(tab)
 				return sessionRows(fs, s), err
+			case agentsTab:
+				s, err := snapshot(tab)
+				return agentRows(s), err
 			}
 			fs, _ := walk(tab)
 			show(folderRows(fs, mux.Snapshot{}))
@@ -55,41 +70,61 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			return folderRows(fs, s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
-			// A place's pane shows what it's doing, and a folder without one
-			// shows its summary.
-			switch p := r.Data.(place); {
-			case p.pane.ID != "":
-				out, err := b.Capture(p.pane)
+			// A pane shows what it's doing, a worktree its git summary, and a
+			// folder that isn't open its summary and top folders.
+			switch d := r.Data.(type) {
+			case worktreeRow:
+				return gitSummary(d.Path), nil
+			case mux.Pane:
+				out, err := b.Capture(d)
 				return popup.Tail(out), err
-			case p.dir != "":
-				return folderSummary(p.dir), nil
+			case place:
+				if d.pane.ID != "" {
+					out, err := b.Capture(d.pane)
+					return popup.Tail(out), err
+				}
+				if d.dir != "" {
+					return folderSummary(d.dir), nil
+				}
 			}
 			return nil, nil
 		},
-		Actions: []popup.Action{
-			{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
-				p := r.Data.(place)
-				return popup.Do(func() error {
-					if p.at.Session != "" {
-						return b.Show(p.at)
-					}
-					return open(b, p.dir, start{}, true)
-				}, popup.Quit)
-			}},
-			// A folder's row knows its place once the snapshot comes.
-			{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).at.Session != "" }, Run: func(r popup.Row) tea.Cmd {
-				at := r.Data.(place).at
-				return popup.Ask("Close "+r.Title+" and everything running in it? (y/N)", func(answer string) tea.Cmd {
-					if !strings.EqualFold(answer, "y") {
-						return nil
-					}
-					return popup.Do(func() error { return b.Kill(at) }, popup.Reload("closed "+r.Title))
-				})
-			}},
-			{Key: "ctrl+f", Help: "files", When: func(_ int, r popup.Row) bool { return r.Data.(place).dir != "" }, Run: func(r popup.Row) tea.Cmd {
-				return popup.Push(filesPopup(b, r.Data.(place).dir))
-			}},
-		},
+		Actions: slices.Concat(
+			onTabs([]int{foldersTab, sessionsTab}, placeActions(b)),
+			onTabs([]int{worktreesTab}, worktreeActions(b)),
+			onTabs([]int{agentsTab}, []popup.Action{{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
+				p := r.Data.(mux.Pane)
+				return popup.Do(func() error { return b.Focus(p) }, popup.Quit)
+			}}}),
+		),
+	}
+}
+
+// placeActions are the keys of Folders and Sessions.
+func placeActions(b mux.Backend) []popup.Action {
+	return []popup.Action{
+		{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
+			p := r.Data.(place)
+			return popup.Do(func() error {
+				if p.at.Session != "" {
+					return b.Show(p.at)
+				}
+				return open(b, p.dir, start{}, true)
+			}, popup.Quit)
+		}},
+		// A folder's row knows its place once the snapshot comes.
+		{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).at.Session != "" }, Run: func(r popup.Row) tea.Cmd {
+			at := r.Data.(place).at
+			return popup.Ask("Close "+r.Title+" and everything running in it? (y/N)", func(answer string) tea.Cmd {
+				if !strings.EqualFold(answer, "y") {
+					return nil
+				}
+				return popup.Do(func() error { return b.Kill(at) }, popup.Reload("closed "+r.Title))
+			})
+		}},
+		{Key: "ctrl+f", Help: "files", When: func(_ int, r popup.Row) bool { return r.Data.(place).dir != "" }, Run: func(r popup.Row) tea.Cmd {
+			return popup.Push(filesPopup(b, r.Data.(place).dir))
+		}},
 	}
 }
 

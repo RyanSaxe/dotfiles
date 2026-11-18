@@ -299,7 +299,7 @@ func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	return cycle[0], true
 }
 
-// jumpToAgent goes to the next agent in s, the way the agents popup does,
+// jumpToAgent goes to the next agent in s, the way the Agents tab does,
 // and remembers it for the next jump. s and read are what b.Snapshot
 // returned, and read matters only when s has no agent. It works outside any
 // terminal, as from an AeroSpace key, when b names the Rex app or tmux client
