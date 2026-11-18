@@ -69,17 +69,20 @@ func TestATmuxSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmux("new-session", "-d", "-s", "api", "-c", work)
-	// The agent is sleep run through a link named claude, since ws knows an
-	// agent by the name it runs as. macOS kills a copy of a system program.
-	sleep, err := exec.LookPath("sleep")
+	// The agent is tmux run through a link named claude, since ws knows an
+	// agent by the name it runs as, waiting on a channel nothing signals.
+	// macOS kills a copy of a system program, and nixpkgs' sleep is a link
+	// to coreutils, which picks its command by that name.
+	program, err := exec.LookPath("tmux")
 	claude := filepath.Join(dir, "claude")
 	if err == nil {
-		err = os.Symlink(sleep, claude)
+		err = os.Symlink(program, claude)
 	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}", `printf '\a'; exec `+claude+` 600`)
+	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}",
+		`printf '\a'; exec `+claude+` -S `+socket+` wait-for never`)
 	tmux("new-session", "-d", "-s", "web", "-c", work)
 
 	// tmux reads the bell from the pane's output a moment after it rings.
