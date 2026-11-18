@@ -15,8 +15,8 @@ from macOS's settings to my editor.
   checkout, so a program picks up an edit the next time it starts. Any other
   change needs a rebuild, which the commands below run.
 - `ws`, a Go program in `pkgs/ws`, opens each folder, worktree and pull
-  request as a Rex session with an agent in it. You switch between those
-  sessions with its popups, listed below.
+  request in Rex with an agent in it, a worktree as a tab of its project's
+  session. You switch between them with its popups, listed below.
 - In `theme/meanings.nix`, each use of color, such as `error` or `muted`,
   has a Catppuccin color. Every app's colors are generated from that file in
   light and dark mode, so changing `error` there changes it everywhere.
@@ -30,7 +30,7 @@ nix-update      # update the flake's inputs, rebuild, and upgrade uv's tools
 theme dark      # switch macOS and every app to dark, or to light
 ws new NAME     # make a worktree on branch NAME and start an agent in it
 ws pr NUMBER    # check a pull request out into its own worktree
-ws rm NAME      # close a worktree's session, remove it and delete its branch
+ws rm NAME      # close a worktree's tab, remove it and delete its branch
 ```
 
 [docs/ws.md](docs/ws.md) has the other `ws` commands, and `ws --help` lists them
@@ -47,7 +47,7 @@ In Rex or tmux, these keys open a `ws` popup:
 | ------------ | -------------------------------------------------------------- |
 | Alt-O        | Go: repositories, worktrees and bookmarked folders             |
 | Ctrl-F in Go | Files: the selected folder's files, to open in Neovim          |
-| Alt-S        | Sessions: the running sessions, on Go's second tab             |
+| Alt-S        | Sessions: each session and worktree tab, on Go's second tab    |
 | Alt-W        | Worktrees: this project's worktrees, and all of them on a tab  |
 | Alt-R        | Reviews: the pull requests and issues that need you            |
 | Alt-T        | Tasks: the open tasks in your notes                            |

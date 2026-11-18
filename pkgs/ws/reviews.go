@@ -291,23 +291,24 @@ func prWorktree(b mux.Backend, it item, layout string) (string, error) {
 	return pullRequest(b, dir, strconv.Itoa(it.Number), start{layout: layout})
 }
 
-// reviewAgent opens the default agent in a new tab of the pull request's session,
-// starting the session first when there's none, with a short review prompt.
+// reviewAgent opens the default agent in a new tab of the pull request's
+// place, starting the place first when there's none, with a short review
+// prompt.
 func reviewAgent(b mux.Backend, it item) error {
 	dir, err := prWorktree(b, it, "review")
 	if err != nil {
 		return err
 	}
-	id, err := mux.Find(b, labelFor(dir))
-	if err != nil || id == "" {
-		return cmp.Or(err, fmt.Errorf("no session for %s", dir))
+	p, found, err := mux.Find(b, labelFor(dir))
+	if err != nil || !found {
+		return cmp.Or(err, fmt.Errorf("no session or tab for %s", dir))
 	}
 	agent, err := agentCommand("", nil)
 	if err != nil {
 		return err
 	}
 	prompt := fmt.Sprintf("Review pull request %s. Read its description and its diff with gh, then list what should change before it merges, most important first.", it.URL)
-	return b.Tab(id, dir, append(agent, "--", prompt)...)
+	return b.Tab(p, dir, append(agent, "--", prompt)...)
 }
 
 // signedImage is an attachment's link in a pull request's HTML: signed, so

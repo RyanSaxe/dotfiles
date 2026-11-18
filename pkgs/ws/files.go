@@ -84,20 +84,17 @@ func gitChanges(dir string) map[string]lipgloss.Style {
 	return tags
 }
 
-// openFile opens file in Neovim in a new tab of dir's session, or starts the
-// session with it.
+// openFile opens file in Neovim in a new tab of dir's place, or starts the
+// place with it.
 func openFile(b mux.Backend, dir, file string) error {
-	id, err := mux.Find(b, labelFor(dir))
+	p, found, err := mux.Find(b, labelFor(dir))
 	if err != nil {
 		return err
 	}
-	if id == "" {
+	if !found {
 		return open(b, dir, start{layout: "file", file: file}, true)
 	}
-	if err := b.Tab(id, dir, "nvim", file); err != nil {
-		return err
-	}
-	return b.Show(id)
+	return b.Tab(p, dir, "nvim", file)
 }
 
 // without is files minus every name in drop, in files' order.

@@ -11,7 +11,7 @@ tmux	copy ctrl+v	toggle rectangle selection
 tmux	copy y	copy selection and exit
 tmux	copy ctrl+h/j/k/l	move between panes
 tmux	copy ctrl+\	last active pane
-tmux	alt+s	ws go popup on Sessions: running sessions
+tmux	alt+s	ws go popup on Sessions: sessions and worktree tabs
 tmux	alt+o	ws go popup on Folders: repos, worktrees, bookmarks
 tmux	alt+w	ws worktrees popup
 tmux	alt+c	ws theme popup: mode and mascot

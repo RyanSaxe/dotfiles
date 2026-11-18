@@ -1,20 +1,22 @@
 # ws
 
-`ws` opens folders, worktrees and pull requests as Rex or tmux sessions,
-and draws the popups you use to switch between them. `ws --help` lists every
-command, and `ws COMMAND --help` lists the command's flags with examples.
+`ws` opens folders, worktrees and pull requests in Rex or tmux sessions and
+tabs, and draws the popups you use to switch between them. `ws --help`
+lists every command, and `ws COMMAND --help` lists the command's flags with
+examples.
 
 ## Commands
 
 ```sh
-ws open ~/generic/dotfiles          # open a folder as a session, or switch to it
+ws open ~/generic/dotfiles          # open a folder, or switch to its tab or session
 ws new fix-login                    # make ~/worktrees/PROJECT/fix-login on its own branch, with an agent
+ws new fix-popups --session         # open it as a session of its own, not a tab
 ws new fix-login --agent codex --prompt "Fix the redirect" --base main
 ws pr 123                           # make a worktree on pull request 123, with an agent
 ws pr 123 --prompt "Review it"      # start its agent with a prompt, as ws new does
 ws pr 123 --layout review           # open pull request 123 in Neovim instead
 ws ls                               # list worktrees and their agents
-ws rm fix-login                     # close its session, remove it and delete its branch
+ws rm fix-login                     # close its tab, remove it and delete its branch
 ws agent                            # print the agent ws starts, with its model and effort
 ```
 
@@ -22,15 +24,43 @@ Without `--force`, `ws rm` refuses a worktree with uncommitted changes, and
 keeps a branch that hasn't merged. Outside Rex and tmux, `ws new` and
 `ws pr` only make the worktree and print its path.
 
+## Places
+
+A folder's terminals are in its place: a tab named after the folder, or a
+session labeled after it. `ws` finds a place by that name wherever it is,
+in sessions you made by hand too, and keeps no record of where it put one.
+
+A worktree opens as `openAs` in the host file says, `tab` by default:
+
+- **tab:** a tab named PROJECT/NAME in the project's session, labeled
+  PROJECT. When that session isn't running, `ws` starts it with a plain
+  shell in the main checkout as its first tab, so no agent starts that
+  nobody asked for.
+- **session:** a session of its own, labeled PROJECT/NAME.
+
+`--tab` and `--session` on `ws open`, `ws new` and `ws pr` override it for
+one command. Any other folder, such as a main checkout, opens as a session
+of its own. A tab `ws` adds to a place, such as a file the files popup
+opens, takes the place's name, so it is part of the place. A tab nobody
+named is part of its session's place.
+
+`ws rm` and Ctrl-X in the go popup close a place's tabs, or its whole
+session when nothing else is in it. Removing a worktree closes its tab and
+leaves the project's session open.
+
 ## Settings
 
 Each computer's host file sets ws's settings under `dotfiles.ws`, and
 `home-switch` writes them to `~/.config/ws/config.toml`. `agent` is the
 agent CLI ws starts, claude or codex. It defaults to claude on a computer
-with Claude Code and to codex otherwise:
+with Claude Code and to codex otherwise. `openAs` is where a worktree
+opens, `tab` or `session`, as [Places](#places) says:
 
 ```nix
-dotfiles.ws.agent = "claude";
+dotfiles.ws = {
+  agent = "claude";
+  openAs = "tab";
+};
 ```
 
 ws starts the agent with no flags of its own, so its model and effort are
@@ -78,7 +108,7 @@ the files popup starts a folder's session with.
 | ------------ | --------- | ---------------------------------------------------------------------- |
 | Alt-O        | go        | Repositories, worktrees and bookmarks, latest git activity first       |
 | Ctrl-F in go | files     | The selected folder's files, and its hidden and ignored ones on tabs   |
-| Alt-S        | sessions  | Running sessions and what each is doing, on the go popup's second tab  |
+| Alt-S        | sessions  | Each place, a session or a worktree's tab, and what it's doing         |
 | Alt-W        | worktrees | This project's worktrees, and all of them on a second tab              |
 | Alt-R        | reviews   | Pull requests and issues on GitHub that involve you                    |
 | Alt-T        | tasks     | Open tasks in the vault, soonest due first                             |
@@ -106,7 +136,7 @@ the browser.
 
 | Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Ctrl-F | Ctrl-G | Ctrl-O       |
 | --------- | ------ | ---------------------- | ------------- | ------ | ------ | ------------ |
-| go        | go     |                        | close session | files  |        |              |
+| go        | go     |                        | close         | files  |        |              |
 | files     | edit   |                        |               |        |        |              |
 | worktrees | go     | new worktree and agent | remove        | files  | diff   | pull request |
 | reviews   | review | review with an agent   | done          |        | diff   | browser      |
@@ -115,7 +145,7 @@ the browser.
 The bottom line lists only the keys that work on the selected row, and a
 key that doesn't work there does nothing. Reviews offers Ctrl-T and Ctrl-G
 only on a pull request and Ctrl-X only on Needs you, and the go popup offers
-Ctrl-X only on a folder with a running session.
+Ctrl-X only on a folder that is open.
 
 In the worktrees popup, Ctrl-G shows in `delta` how the files git tracks
 changed, committed or not, since the branch left the project's default
@@ -126,11 +156,11 @@ branch of the same name doesn't count, so a worktree of someone else's pull
 request has no Ctrl-O, and Reviews' Ctrl-O opens it instead.
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
-per line. A folder that has a running session is tagged `session`, and
-Enter on it goes to that session. Ctrl-X asks before it closes a session,
+per line. A folder that is open is tagged `tab` or `session`, by its
+place, and Enter on it goes there. Ctrl-X asks before it closes the place,
 and closes it only when you answer `y`, since the agent in it stops too.
 Enter in files opens the file in Neovim, in a new tab of the folder's
-session, or starts that session with the `file` layout.
+place, or starts that place with the `file` layout.
 In Rex, Alt-Shift-S opens Rex's own Change Session.
 
 ## Agents that need you

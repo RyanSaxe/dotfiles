@@ -118,8 +118,9 @@ func shownSession() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	id, err := mux.Find(mux.Rex{}, label)
-	if id == "" && err == nil {
+	s, err := mux.Rex{}.Snapshot()
+	id, ok := s.Session(label)
+	if !ok && err == nil {
 		err = fmt.Errorf("no session is labeled %q", label)
 	}
 	return id, err

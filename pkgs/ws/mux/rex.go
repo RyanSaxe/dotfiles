@@ -45,7 +45,7 @@ func rexJSON(v any, args ...string) error {
 	return err
 }
 
-func (Rex) Create(label, dir string, panes []layout.Pane) (string, error) {
+func (Rex) Create(label, dir string, panes []layout.Pane) (Place, error) {
 	var made struct {
 		ID      string `json:"session_id"`
 		Windows []struct {
@@ -53,16 +53,40 @@ func (Rex) Create(label, dir string, panes []layout.Pane) (string, error) {
 		} `json:"initial_windows"`
 	}
 	if err := rexJSON(&made, "new", label, "-c", dir, "--json"); err != nil {
-		return "", err
+		return Place{}, err
 	}
-	s, blocks := made.ID, made.Windows[0].Blocks[:1]
+	return Place{Label: label, Session: made.ID, Whole: true}, rexLayOut(made.ID, made.Windows[0].Blocks[0], dir, panes)
+}
+
+// CreateTab leaves the session's active tab as it is, until a pane in the
+// layout takes the focus or Show selects the tab.
+func (Rex) CreateTab(session, name, dir string, panes []layout.Pane) (Place, error) {
+	args := []string{"window", "new", "-s", session}
+	if name != "" {
+		args = append(args, name)
+	}
+	var made struct {
+		Window string   `json:"window_id"`
+		Blocks []string `json:"block_ids"`
+	}
+	if err := rexJSON(&made, append(args, "-c", dir, "--focus=false", "--json")...); err != nil {
+		return Place{}, err
+	}
+	p := Place{Label: name, Session: session, Tab: made.Window, Tabs: []string{made.Window}, Named: name != ""}
+	return p, rexLayOut(session, made.Blocks[0], dir, panes)
+}
+
+// rexLayOut splits session's block first into panes and types each one's
+// command.
+func rexLayOut(s, first, dir string, panes []layout.Pane) error {
+	blocks := []string{first}
 	for _, p := range panes[1:] {
 		var split struct {
 			Blocks []string `json:"block_ids"`
 		}
 		if err := rexJSON(&split, "split", "-s", s, "-b", blocks[len(blocks)-1], "--split", p.Split,
 			"--ratio", strconv.Itoa(p.Size), "-c", dir, "--focus=false", "--json"); err != nil {
-			return s, err
+			return err
 		}
 		blocks = append(blocks, split.Blocks[0])
 	}
@@ -81,11 +105,11 @@ func (Rex) Create(label, dir string, panes []layout.Pane) (string, error) {
 			do("focus", "-s", s, blocks[i])
 		}
 	}
-	return s, err
+	return err
 }
 
-// Show switches a Rex app to a session.
-func (r Rex) Show(id string) error { return r.show(id, "") }
+// Show switches a Rex app to the place's session and selects its tab.
+func (r Rex) Show(p Place) error { return r.show(p.Session, p.Tab) }
 
 // show switches a Rex app to a session, and to one of its tabs when window
 // isn't "", trying each viewer in turn because a client that created a pane
@@ -129,20 +153,29 @@ func (r Rex) viewers() []string {
 	return append(slices.Compact(slices.DeleteFunc(cs, func(c string) bool { return c == "" })), "")
 }
 
-// Tab brings the app to the tab it opens, since the app keeps showing its
+// Tab names the tab after the place when the place's tabs are named, so it
+// is one of them, and brings the app to it, since the app keeps showing its
 // own tab when the server makes another one active.
-func (r Rex) Tab(id, dir string, args ...string) error {
+func (r Rex) Tab(p Place, dir string, args ...string) error {
+	window := []string{"window", "new", "-s", p.Session}
+	if p.Named {
+		window = append(window, p.Label)
+	}
 	var made struct {
 		Window string `json:"window_id"`
 	}
-	if err := rexJSON(&made, append([]string{"run", "-s", id, "-c", dir, "--json", "--"}, args...)...); err != nil {
+	if err := rexJSON(&made, append(append(window, "-c", dir, "--json", "--"), args...)...); err != nil {
 		return err
 	}
-	return r.show(id, made.Window)
+	return r.show(p.Session, made.Window)
 }
 
-func (Rex) Kill(id string) error {
-	_, err := rex("kill", id)
+func (Rex) Kill(p Place) error {
+	if p.Whole {
+		_, err := rex("kill", p.Session)
+		return err
+	}
+	_, err := rex(append([]string{"window", "close", "-s", p.Session}, p.Tabs...)...)
 	return err
 }
 
@@ -155,10 +188,11 @@ func (r Rex) Snapshot() (Snapshot, error) {
 	var read struct {
 		Sessions luaList[Session]
 		Panes    luaList[struct {
-			Session, Label, ID, Program, Folder, Status, App, Title string
-			Landing                                                 bool
-			Updated                                                 time.Time
-			Shown                                                   luaList[time.Time]
+			Session, Label, ID, Tab, Program, Folder, Status, App, Title string
+			TabName                                                      string `json:"tab_name"`
+			Focused, Landing                                             bool
+			Updated                                                      time.Time
+			Shown                                                        luaList[time.Time]
 		}]
 	}
 	cmd := exec.Command("rex", "--autostart=false", "do", "-")
@@ -170,7 +204,7 @@ func (r Rex) Snapshot() (Snapshot, error) {
 	s := Snapshot{Sessions: read.Sessions}
 	for _, p := range read.Panes {
 		status, _ := ParseStatus(p.Status)
-		pane := Pane{Session: p.Session, Label: p.Label, ID: p.ID, Landing: p.Landing,
+		pane := Pane{Session: p.Session, Label: p.Label, ID: p.ID, Tab: p.Tab, TabName: p.TabName, Focused: p.Focused, Landing: p.Landing,
 			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated}
 		pane.NeedsYou = r.needsYou(pane, p.Shown, r.Shown != "" && p.Label == r.Shown && p.Landing)
 		s.Panes = append(s.Panes, pane)

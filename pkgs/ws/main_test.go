@@ -22,9 +22,9 @@ func onPath(t *testing.T, name, script string) {
 	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
 }
 
-// withConfig gives ws a config that names agent, as the home switch writes
-// it, and nothing when agent is "".
-func withConfig(t *testing.T, agent string) {
+// withConfig gives ws a config that names agent and open_as, as the home
+// switch writes it, and nothing when agent is "".
+func withConfig(t *testing.T, agent, openAs string) {
 	t.Helper()
 	old := configDir
 	configDir = t.TempDir()
@@ -32,7 +32,7 @@ func withConfig(t *testing.T, agent string) {
 	if agent == "" {
 		return
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("agent = \""+agent+"\"\nopen_as = \"tab\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("agent = \""+agent+"\"\nopen_as = \""+openAs+"\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -52,14 +52,14 @@ func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
 		}
 	}
 	for agent, want := range map[string]string{"claude": "opus[1m] medium", "codex": "gpt-6.1-sol high"} {
-		withConfig(t, agent)
+		withConfig(t, agent, "tab")
 		named, err := defaultAgent()
 		model, effort, settingsErr := agentSettings(named)
 		if got := model + " " + effort; err != nil || settingsErr != nil || named != agent || got != want {
 			t.Errorf("with %s configured: got %s with %s (%v, %v), want %s", agent, named, got, err, settingsErr, want)
 		}
 	}
-	withConfig(t, "")
+	withConfig(t, "", "")
 	if _, err := defaultAgent(); err == nil {
 		t.Error("without a config, ws named an agent")
 	}
@@ -67,7 +67,7 @@ func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
 
 // The worktrees popup asks for an agent and flags, either or both.
 func TestPopupAnswerNamesAnAgentOrFlags(t *testing.T) {
-	withConfig(t, "claude")
+	withConfig(t, "claude", "tab")
 	for answer, want := range map[string]string{
 		"":             "claude",
 		"codex":        "codex",
@@ -107,18 +107,49 @@ func TestCommandsTakeOnlyTheirOwnFlags(t *testing.T) {
 	}
 }
 
-// recorder is a multiplexer that ws runs inside, which records the panes of
-// the session ws makes.
+// recorder is a multiplexer that ws runs inside, with the sessions and panes
+// of snapshot, which records each session and tab ws makes.
 type recorder struct {
 	mux.Backend
-	panes []layout.Pane
+	snapshot mux.Snapshot
+	made     []made
 }
 
-func (r *recorder) Snapshot() (mux.Snapshot, error) { return mux.Snapshot{}, nil }
+// made is a session or tab ws made: its label, the session a tab is in, its
+// folder and its panes.
+type made struct {
+	label, in, dir string
+	panes          []layout.Pane
+}
+
+func (m made) String() string {
+	what := "session " + m.label
+	if m.in != "" {
+		what = "tab " + m.label + " of " + m.in
+	}
+	if len(m.panes) == 1 && m.panes[0].Run == "" {
+		what += ", a plain shell,"
+	}
+	return what + " in " + m.dir
+}
+
+func (r *recorder) Snapshot() (mux.Snapshot, error) { return r.snapshot, nil }
 func (r *recorder) Inside() bool                    { return true }
-func (r *recorder) Create(label, dir string, panes []layout.Pane) (string, error) {
-	r.panes = panes
-	return label, nil
+func (r *recorder) Create(label, dir string, panes []layout.Pane) (mux.Place, error) {
+	r.made = append(r.made, made{label: label, dir: dir, panes: panes})
+	return mux.Place{Label: label, Session: "session:" + label, Whole: true}, nil
+}
+func (r *recorder) CreateTab(session, name, dir string, panes []layout.Pane) (mux.Place, error) {
+	r.made = append(r.made, made{label: name, in: session, dir: dir, panes: panes})
+	return mux.Place{Label: name, Session: session, Tab: "tab:" + name, Named: name != ""}, nil
+}
+
+// lastPanes are the panes of the last session or tab ws made.
+func (r *recorder) lastPanes() []layout.Pane {
+	if len(r.made) == 0 {
+		return nil
+	}
+	return r.made[len(r.made)-1].panes
 }
 
 // ws pr starts its agent as ws new does, with the agent, prompt and flags
@@ -152,7 +183,7 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 	// gh shows pull request 5 on the branch feature, and its checkout does
 	// nothing.
 	onPath(t, "gh", "echo feature https://github.com/o/r/pull/5")
-	withConfig(t, "claude")
+	withConfig(t, "claude", "tab")
 	for _, tc := range []struct {
 		words []string
 		want  string
@@ -164,9 +195,78 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 	} {
 		b := &recorder{}
 		err := run(tc.words[0], tc.words[1:], func(string) mux.Backend { return b })
-		if err != nil || len(b.panes) == 0 || b.panes[0].Run != tc.want {
-			t.Errorf("ws %s made the panes %+v (%v), want an agent pane running %s", strings.Join(tc.words, " "), b.panes, err, tc.want)
+		if panes := b.lastPanes(); err != nil || len(panes) == 0 || panes[0].Run != tc.want {
+			t.Errorf("ws %s made the panes %+v (%v), want an agent pane running %s", strings.Join(tc.words, " "), panes, err, tc.want)
 		}
+	}
+}
+
+// A worktree opens as the config's open_as says, unless --tab or --session
+// says otherwise. As a tab, it is named after the worktree in its project's
+// session, which ws starts as a plain shell in the main checkout when there
+// is none. Any other folder opens as a session, even as a tab.
+func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
+	for _, tool := range []string{"git", "rsync"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skip(tool, " is not installed")
+		}
+	}
+	// A commit hook runs these tests, and ws new must not reach the
+	// repository being committed to.
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+	} {
+		if _, err := git(repo, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	main, err := mainCheckout(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	oldRoot, oldInteractive := worktreeRoot, interactive
+	worktreeRoot, interactive = t.TempDir(), false
+	t.Cleanup(func() { worktreeRoot, interactive = oldRoot, oldInteractive })
+	project := filepath.Base(main)
+	root := filepath.Join(worktreeRoot, project)
+	opened := mux.Snapshot{Sessions: []mux.Session{{ID: "session:" + project, Label: project}}}
+	for _, tc := range []struct {
+		openAs   string // the config's
+		words    []string
+		snapshot mux.Snapshot
+		want     []string
+	}{
+		{"tab", []string{"new", "one"}, mux.Snapshot{}, []string{
+			"session " + project + ", a plain shell, in " + main,
+			"tab " + project + "/one of session:" + project + " in " + root + "/one",
+		}},
+		{"tab", []string{"new", "two"}, opened, []string{"tab " + project + "/two of session:" + project + " in " + root + "/two"}},
+		{"tab", []string{"new", "three", "--session"}, opened, []string{"session " + project + "/three in " + root + "/three"}},
+		{"session", []string{"new", "four"}, opened, []string{"session " + project + "/four in " + root + "/four"}},
+		{"session", []string{"new", "five", "--tab"}, opened, []string{"tab " + project + "/five of session:" + project + " in " + root + "/five"}},
+		{"tab", []string{"open", main}, mux.Snapshot{}, []string{"session " + project + " in " + main}},
+	} {
+		withConfig(t, "claude", tc.openAs)
+		b := &recorder{snapshot: tc.snapshot}
+		err := run(tc.words[0], tc.words[1:], func(string) mux.Backend { return b })
+		var got []string
+		for _, m := range b.made {
+			got = append(got, m.String())
+		}
+		if err != nil || !slices.Equal(got, tc.want) {
+			t.Errorf("with open_as %s, ws %s made %q (%v), want %q", tc.openAs, strings.Join(tc.words, " "), got, err, tc.want)
+		}
+	}
+	withConfig(t, "claude", "tab")
+	if err := run("new", []string{"six", "--tab", "--session"}, func(string) mux.Backend { return &recorder{} }); err == nil {
+		t.Error("ws new six --tab --session made a worktree")
 	}
 }
 
@@ -267,7 +367,7 @@ func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 	worktreeRoot = t.TempDir()
 	t.Cleanup(func() { worktreeRoot = oldRoot })
 	project := filepath.Base(repo)
-	onPath(t, "tmux", `[ "$2" = list-panes ] && printf '`+project+`/taken\t11\t%%1\tagent\tclaude\t/elsewhere\t0\t0\tclaude\n'`)
+	onPath(t, "tmux", `[ "$2" = list-panes ] && printf '`+project+`/taken\t11\t%%1\tagent\tclaude\t/elsewhere\t0\t0\t@1\t\tclaude\n'`)
 	b := mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, "")
 	failsToStart := func(name string, s start) {
 		t.Helper()
@@ -281,9 +381,9 @@ func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 			t.Errorf("ws new %s left its branch", name)
 		}
 	}
-	withConfig(t, "")
+	withConfig(t, "", "")
 	failsToStart("no-config", start{layout: "agent"})
-	withConfig(t, "claude")
+	withConfig(t, "claude", "tab")
 	failsToStart("fix-login", start{layout: "agent", agent: "opus"})
 	failsToStart("taken", start{layout: "agent"})
 	onPath(t, "rsync", "exit 1")
@@ -321,7 +421,7 @@ view) echo "feature https://github.com/o/r/pull/7";;
 checkout) git checkout -q feature;;
 esac`)
 	onPath(t, "rsync", "exit 1")
-	withConfig(t, "claude")
+	withConfig(t, "claude", "tab")
 	if _, err := pullRequest(nil, repo, "7", start{layout: "review"}); err == nil {
 		t.Error("ws pr 7 succeeded")
 	}

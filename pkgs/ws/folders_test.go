@@ -32,8 +32,9 @@ func gitLog(t *testing.T, gitDir string, at time.Time) {
 }
 
 // Folders lists repositories, worktrees and bookmarks once each, the latest
-// git activity first, and Enter on one with a session goes to that session.
-// Sessions lists only the running sessions.
+// git activity first, and Enter on one that is open goes to its place.
+// Sessions lists only the places: each session, and each tab named after a
+// folder, whichever session it is in.
 func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 	scratch := t.TempDir()
 	oldHome, oldRoot, oldConfig := home, worktreeRoot, configDir
@@ -53,7 +54,7 @@ func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 	calls := filepath.Join(t.TempDir(), "calls")
 	onPath(t, "tmux", `echo "$*" >> `+calls+`
 case "$2" in
-list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\tbusy\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\tscratch\n';;
+list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nbusy\t01\t%%3\t\tzsh\t/elsewhere\t0\t0\t@3\tquiet/feature\tfeature\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tscratch\n';;
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
 
@@ -73,19 +74,19 @@ esac`)
 	for _, r := range folders {
 		tags = append(tags, r.Tag.String())
 	}
-	if want := []string{"", "session", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
+	if want := []string{"tab", "session", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
 		t.Errorf("Folders tags its rows %q, want %q", tags, want)
 	}
 	enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
 	if msg := enter.Run(folders[1])(); msg != popup.Quit {
 		t.Errorf("Enter on busy gave %v, want the popup to close", msg)
 	}
-	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "switch-client -t =busy\n") {
+	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "switch-client -t @1\n") {
 		t.Errorf("Enter on busy, which has a session, ran tmux with\n%s", got)
 	}
-	// Ctrl-X asks before it closes a session, and only y closes it. A row
-	// shown before the snapshot doesn't know its session, so Ctrl-X closes
-	// it only once the snapshot comes.
+	// Ctrl-X asks before it closes a place, and only y closes it. A row shown
+	// before the snapshot doesn't know its place, so Ctrl-X closes it only
+	// once the snapshot comes.
 	ctrlX := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "ctrl+x" })]
 	i := slices.IndexFunc(early, func(r popup.Row) bool { return r.Title == "busy" })
 	if i < 0 || early[i].Tag.String() == "session" {
@@ -94,22 +95,27 @@ esac`)
 	if ctrlX.When(foldersTab, early[i]) {
 		t.Error("Ctrl-X offers to close busy before the snapshot says it has a session")
 	}
-	if !ctrlX.When(foldersTab, folders[1]) || ctrlX.When(foldersTab, folders[0]) {
-		t.Error("Ctrl-X isn't offered on exactly the folders with a session")
+	if !ctrlX.When(foldersTab, folders[0]) || !ctrlX.When(foldersTab, folders[1]) || ctrlX.When(foldersTab, folders[2]) {
+		t.Error("Ctrl-X isn't offered on exactly the folders that are open")
 	}
-	closeBusy := func(answer string) string {
-		m, _ := popup.New(p, nil).Update(ctrlX.Run(folders[1])())
+	closeRow := func(row int, answer string) string {
+		m, _ := popup.New(p, nil).Update(ctrlX.Run(folders[row])())
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(answer)})
 		if _, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter}); then != nil {
 			then()
 		}
 		return readNote(t, filepath.Dir(calls), "calls")
 	}
-	if got := closeBusy("n"); strings.Contains(got, "kill-session") {
+	if got := closeRow(1, "n"); strings.Contains(got, "kill-") {
 		t.Errorf("Ctrl-X on busy, answered n, ran tmux with\n%s", got)
 	}
-	if got := closeBusy("y"); !strings.Contains(got, "kill-session -t =busy\n") {
+	// busy's session holds quiet/feature's tab too, so closing busy closes
+	// only its own tab, and closing quiet/feature only that one.
+	if got := closeRow(1, "y"); !strings.Contains(got, "kill-window -t @1\n") || strings.Contains(got, "kill-session") {
 		t.Errorf("Ctrl-X on busy, answered y, ran tmux with\n%s", got)
+	}
+	if got := closeRow(0, "y"); !strings.Contains(got, "kill-window -t @3\n") || strings.Contains(got, "kill-session") {
+		t.Errorf("Ctrl-X on quiet/feature, answered y, ran tmux with\n%s", got)
 	}
 
 	sessions, err := p.Load(sessionsTab, func([]popup.Row) {})
@@ -120,7 +126,7 @@ esac`)
 	for _, r := range sessions {
 		listed = append(listed, r.Title+" in "+r.Detail)
 	}
-	if want := []string{"busy in ~/Projects/busy", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
+	if want := []string{"busy in ~/Projects/busy", "quiet/feature in ~/worktrees/quiet/feature", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
 		t.Errorf("Sessions lists %v, want %v", listed, want)
 	}
 }

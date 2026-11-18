@@ -1,7 +1,7 @@
 // Ws opens folders, worktrees and pull requests as terminal sessions, in Rex
 // or tmux, with an agent started in them, and offers popups to move between
 // them. State lives with the tools: git owns worktrees and branches, and the
-// multiplexer owns sessions, named after their folder.
+// multiplexer owns sessions and tabs, named after their folder.
 package main
 
 import (
@@ -58,7 +58,7 @@ focus = true
 `,
 }
 
-// labelFor names a folder's session.
+// labelFor names a folder's place.
 func labelFor(dir string) string { return mux.Label(dir, worktreeRoot) }
 
 // gitHookEnv is what git hands to hooks, which would point every git command
@@ -80,28 +80,34 @@ func main() {
 	}
 }
 
-// start is how a new session begins: its layout, the agent its agent pane
-// runs with its flags and a first prompt, and for the review layout the pull
-// request as owner/repo/pr/N. The zero value is the agent layout running the
-// agent the config names, with its own settings.
+// start is how a new place begins: its layout, the agent its agent pane
+// runs with its flags and a first prompt, for the review layout the pull
+// request as owner/repo/pr/N, and whether a worktree opens as a tab or a
+// session. The zero value is the agent layout running the agent the config
+// names, with its own settings, in the place the config says.
 type start struct {
 	layout, agent, prompt, pr, file string
 	flags                           []string
+	openAs                          string // tab, session, or "" for the config's open_as
 }
 
-// open shows the session for dir, creating it from the layout when there is
-// none. Outside Rex and tmux there is no terminal to create one in, so it
-// fails when the caller needs the session, and prints the folder otherwise.
-func open(b mux.Backend, dir string, s start, needsSession bool) error {
-	label := labelFor(dir)
-	id, err := mux.Find(b, label)
+// open shows dir's place, making it from the layout when there is none.
+// Outside Rex and tmux there is no terminal to make one in, so it fails when
+// the caller needs the place, and prints the folder otherwise.
+func open(b mux.Backend, dir string, s start, needsPlace bool) error {
+	snap, err := b.Snapshot()
 	if err != nil {
 		return err
 	}
-	if id == "" && !b.Inside() && needsSession {
+	place, found := snap.Find(labelFor(dir))
+	if !found && !b.Inside() && needsPlace {
 		return errors.New("there is no terminal to open a session in, so run this inside Rex or tmux")
 	}
-	if id == "" && b.Inside() {
+	if !found && b.Inside() {
+		c, err := loadConfig()
+		if err != nil {
+			return err
+		}
 		// An empty value fills in no word, so a session without a prompt
 		// starts its agent with none.
 		word := func(v string) []string {
@@ -119,15 +125,51 @@ func open(b mux.Backend, dir string, s start, needsSession bool) error {
 		if err != nil {
 			return err
 		}
-		if id, err = b.Create(label, dir, panes); err != nil {
+		if place, err = makePlace(b, snap, dir, cmp.Or(s.openAs, c.OpenAs), panes); err != nil {
 			return err
 		}
+		found = true
 	}
-	if id == "" || !interactive {
+	if !found || !interactive {
 		fmt.Println(dir)
 		return nil
 	}
-	return b.Show(id)
+	return b.Show(place)
+}
+
+// makePlace makes dir's place with panes in it. As a tab, a worktree is a
+// tab named after it in its project's session, which starts as a plain shell
+// in the main checkout when there is none, so it starts no agent nobody
+// asked for. Any other folder is a session of its own, or an unnamed tab of
+// the session already labeled after it.
+func makePlace(b mux.Backend, snap mux.Snapshot, dir, openAs string, panes []layout.Pane) (mux.Place, error) {
+	label := labelFor(dir)
+	if openAs == "tab" && isWorktree(dir) {
+		main, err := mainCheckout(dir)
+		if err != nil {
+			return mux.Place{}, err
+		}
+		session, ok := snap.Session(labelFor(main))
+		if !ok {
+			project, err := b.Create(labelFor(main), main, []layout.Pane{{}})
+			if err != nil {
+				return mux.Place{}, err
+			}
+			session = project.Session
+		}
+		return b.CreateTab(session, label, dir, panes)
+	}
+	if session, ok := snap.Session(label); ok {
+		return b.CreateTab(session, "", dir, panes)
+	}
+	return b.Create(label, dir, panes)
+}
+
+// isWorktree says whether dir is one of ws's worktrees,
+// ~/worktrees/PROJECT/NAME.
+func isWorktree(dir string) bool {
+	rel, err := filepath.Rel(worktreeRoot, dir)
+	return err == nil && !strings.HasPrefix(rel, "..") && strings.Count(rel, "/") == 1
 }
 
 // checkStart fails on a config that doesn't load, an agent ws doesn't start
@@ -157,12 +199,12 @@ func newWorktree(b mux.Backend, from, name, base string, s start) error {
 	}
 	dir := filepath.Join(worktreeRoot, filepath.Base(main), name)
 	label := labelFor(dir)
-	// open would go to that session, and start no agent and send no prompt.
-	switch id, err := mux.Find(b, label); {
+	// open would go to that place, and start no agent and send no prompt.
+	switch _, found, err := mux.Find(b, label); {
 	case err != nil:
 		return err
-	case id != "":
-		return fmt.Errorf("a session named %s is already running, so close it or pick another name", label)
+	case found:
+		return fmt.Errorf("a session or tab named %s is already open, so close it or pick another name", label)
 	}
 	if _, err := git(from, append([]string{"worktree", "add", "-b", name, dir}, cmp.Or(base, "HEAD"))...); err != nil {
 		return err
@@ -233,8 +275,8 @@ func copyIgnored(main, dir string) error {
 	return nil
 }
 
-// remove lets git refuse a worktree with uncommitted changes, and closes the
-// session last because ws may be running inside it.
+// remove lets git refuse a worktree with uncommitted changes, and closes its
+// place last because ws may be running inside it.
 func remove(b mux.Backend, name string, force bool) error {
 	dir, err := resolveWorktree(name)
 	if err != nil {
@@ -256,8 +298,8 @@ func remove(b mux.Backend, name string, force bool) error {
 	if branch != "" {
 		branchErr = deleteBranch(main, branch, force)
 	}
-	if id, _ := mux.Find(b, labelFor(dir)); id != "" {
-		if err := b.Kill(id); err != nil {
+	if p, found, _ := mux.Find(b, labelFor(dir)); found {
+		if err := b.Kill(p); err != nil {
 			return err
 		}
 	}

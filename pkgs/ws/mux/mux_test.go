@@ -29,9 +29,10 @@ func TestLabel(t *testing.T) {
 }
 
 // A tmux Snapshot lists each session and pane: the pane going to the session
-// lands on, the pane an agent runs in, and the folder each runs in. The agent
-// needs you once its window's bell rings where no client shows it, and works
-// while its window prints. Every other pane is Open.
+// lands on, the pane an agent runs in, and the folder each runs in. A window
+// someone named is a place of its own, and the rest of its session another.
+// The agent needs you once its window's bell rings where no client shows
+// it, and works while its window prints. Every other pane is Open.
 func TestATmuxSnapshot(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux is not installed")
@@ -81,8 +82,11 @@ func TestATmuxSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}",
+	// The agent runs in a tab named after a worktree, beside a tab nobody
+	// named.
+	agent := tmux("new-window", "-d", "-t", "api:", "-n", "api/feature", "-c", work, "-P", "-F", "#{pane_id}",
 		`printf '\a'; exec `+claude+` -S `+socket+` wait-for never`)
+	tmux("split-window", "-d", "-t", agent, "-c", work)
 	tmux("new-session", "-d", "-s", "web", "-c", work)
 
 	// tmux reads the bell from the pane's output a moment after it rings.
@@ -103,9 +107,21 @@ func TestATmuxSnapshot(t *testing.T) {
 	if want := []string{"api", "web"}; !slices.Equal(labels, want) {
 		t.Errorf("the sessions are %v, want %v", labels, want)
 	}
-	lands, ok := s.Landing(s.Sessions[0].ID)
-	if !ok || lands.ID == agent || lands.Folder != work {
-		t.Errorf("going to api lands on %+v, want its first pane, in %s", lands, work)
+	var places []string
+	for _, p := range s.Places() {
+		places = append(places, p.Label)
+	}
+	if want := []string{"api", "api/feature", "web"}; !slices.Equal(places, want) {
+		t.Errorf("the places are %v, want %v", places, want)
+	}
+	api, _ := s.Find("api")
+	lands, ok := s.Landing(api)
+	if !ok || lands.ID == agent || lands.Folder != work || api.Whole {
+		t.Errorf("going to api lands on %+v, want its first pane, in %s, and api is %+v, want the session less a tab", lands, work, api)
+	}
+	feature, _ := s.Find("api/feature")
+	if lands, ok := s.Landing(feature); !ok || lands.ID != agent || !feature.Named || len(feature.Tabs) != 1 {
+		t.Errorf("api/feature is %+v and lands on %+v, want its one named tab, landing on the agent", feature, lands)
 	}
 	i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agent })
 	if i < 0 {
@@ -117,8 +133,8 @@ func TestATmuxSnapshot(t *testing.T) {
 	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID != agent && (p.NeedsYou || p.Status != mux.Open) }) {
 		t.Errorf("a pane with no agent reports something in %+v", s.Panes)
 	}
-	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Working, "web": mux.Open}) {
-		t.Errorf("the statuses are %v, want api working and web open", got)
+	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Open, "api/feature": mux.Working, "web": mux.Open}) {
+		t.Errorf("the statuses are %v, want api/feature working, and api and web open", got)
 	}
 }
 

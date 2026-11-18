@@ -1,7 +1,7 @@
 # ws
 
-`ws` opens folders, worktrees and pull requests as Rex or tmux sessions,
-and draws the popups that move between them.
+`ws` opens folders, worktrees and pull requests in Rex or tmux sessions and
+tabs, and draws the popups that move between them.
 
 `ws` can grow, but keep it lean. A feature earns its lines by doing
 something Ryan uses every day, extends a popup or command that exists before
@@ -15,9 +15,9 @@ packaged on their own:
 - `popup`: the frame every popup shares, fzf's matching, terminal captures
 - `kitty`: images drawn with Kitty's Unicode placeholders
 - `markdown`: markdown for a pane, with pictures and mermaid diagrams
-- `mux`: Rex and tmux sessions and panes, read in one `Snapshot` with what
-  each pane runs, its agent's status and whether it needs you, and the
-  actions on them
+- `mux`: Rex and tmux sessions, tabs and panes, read in one `Snapshot` with
+  each pane's tab, what it runs, its agent's status and whether it needs
+  you, the places folders are open in, and the actions on them
 - `layout`: session layouts and shell quoting
 
 The command in this folder holds everything that knows Ryan's setup: the CLI,
@@ -29,8 +29,9 @@ draws images, are passed in rather than read from globals.
 ## What ws keeps
 
 State lives with the tools. git owns worktrees and branches, Rex and tmux
-own sessions and agent statuses, and gh owns pull requests. `ws` asks them
-each time and keeps no copy. What it does keep is in `~/.local/state/ws`.
+own sessions, tabs and agent statuses, and gh owns pull requests. `ws` asks
+them each time and keeps no copy. What it does keep is in
+`~/.local/state/ws`.
 `XDG_STATE_HOME` moves that folder, so a scratch run can use its own.
 
 `ws attention --watch` runs as a launchd agent on each Mac with the `gui`

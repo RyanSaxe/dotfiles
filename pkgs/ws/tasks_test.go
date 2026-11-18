@@ -203,8 +203,8 @@ func TestATaskIsAddedAboveTheFirstBranch(t *testing.T) {
 
 // Enter on a task opens its note in a new tab of the popup's session and
 // lands there. Rex's app keeps showing its own tab when the server makes
-// another active, so it is sent to the new one, and tmux shows a new window
-// unless told not to.
+// another active, and the tab may be in a session the client isn't showing,
+// so the app or client is sent to the new tab.
 func TestEnterOnATaskLandsInItsTab(t *testing.T) {
 	for _, tc := range []struct {
 		name, program, script string
@@ -212,18 +212,19 @@ func TestEnterOnATaskLandsInItsTab(t *testing.T) {
 		want                  []string // lines the program was called with, in order
 	}{
 		{"rex", "rex",
-			`case " $* " in *" run "*) echo '{"window_id":"window:task","block_ids":["block:task"]}';; esac`,
+			`case " $* " in *" window new "*) echo '{"window_id":"window:task","block_ids":["block:task"]}';; esac`,
 			map[string]string{"REX_BLOCK": "block:popup", "REX_SESSION": "session:work"},
 			[]string{
-				"--autostart=false run -s session:work -c VAULT --json -- nvim +1 notes/daily/2026-11-09.md",
+				"--autostart=false window new -s session:work -c VAULT --json -- nvim +1 notes/daily/2026-11-09.md",
 				"--autostart=false -C client:app do session.select session_id=session:work window_id=window:task",
 			}},
 		{"tmux", "tmux",
-			`case "$2" in display-message) echo work;; esac`,
+			`case "$2" in display-message) echo work;; new-window) echo @9;; esac`,
 			map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"},
 			[]string{
 				"-u display-message -p #{session_name}",
-				"-u new-window -t =work: -c VAULT -- nvim +1 notes/daily/2026-11-09.md",
+				"-u new-window -t =work: -c VAULT -P -F #{window_id} -- nvim +1 notes/daily/2026-11-09.md",
+				"-u switch-client -t @9",
 			}},
 	} {
 		vault := t.TempDir()
