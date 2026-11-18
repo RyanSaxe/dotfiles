@@ -386,7 +386,9 @@ func (m *frame) setRows(tab int, rows []Row) {
 	if i := slices.IndexFunc(l.VisibleItems(), func(it list.Item) bool { return it.(Row).ID == was.ID }); had && i >= 0 {
 		at = i
 	}
-	l.Select(at)
+	// A cursor past the last row, such as after its session closed, would
+	// leave nothing selected.
+	l.Select(min(at, max(len(l.VisibleItems())-1, 0)))
 }
 
 // filter shows the active list's rows that match query, or every row when
