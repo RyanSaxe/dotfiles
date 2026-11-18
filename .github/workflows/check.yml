@@ -10,9 +10,10 @@ on:
     types: [opened, synchronize, reopened, closed]
 
 # A newer push to a pull request cancels the run for its older commit. On
-# main, a run that has started finishes, so it reports on its commit even
-# while merges keep arriving. GitHub still replaces a waiting main run with
-# a newer one, so a burst of merges leaves one run going and one waiting.
+# main, a run that has started finishes, so it reports on its commit and
+# saves the store cache that new pull requests start from, even while
+# merges keep arriving. GitHub still replaces a waiting main run with a
+# newer one, so a burst of merges leaves one run going and one waiting.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -38,11 +39,57 @@ jobs:
           tools=$(nix build --no-link --print-out-paths --inputs-from . nixpkgs#stylua nixpkgs#shfmt nixpkgs#go | sed 's|$|/bin|' | paste -sd: -)
           PATH="$tools:$PATH" uvx prek run --all-files --show-diff-on-failure
 
+      # The store cache holds the paths in the configs that have no
+      # cache.nixos.org signature: mostly what the build made itself, such as
+      # packages cache.nixos.org has no build of and the configs' own files.
+      # It holds them as a `nix-store --export`, because a binary cache would
+      # also need every path they refer to. Each flake.lock starts its own
+      # cache.
+      - &restore-store
+        name: Restore the store cache
+        id: restore-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/store
+          key: store-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-keys: store-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+
+      - &import-store
+        name: Import its paths
+        if: steps.restore-store.outputs.cache-matched-key
+        # Nix imports a path only once the paths it refers to are in the
+        # store, so this first fetches those from cache.nixos.org.
+        run: |
+          xargs nix-store --realise < "$RUNNER_TEMP/store/references" > /dev/null
+          nix-store --import < "$RUNNER_TEMP/store/paths" > /dev/null
+
       - name: Build this Mac's configs
         run: |
-          nix build --no-link --print-build-logs \
+          nix build --no-link --print-build-logs --print-out-paths \
             .#darwinConfigurations.mac.system \
-            '.#homeConfigurations."ryansaxe@mac".activationPackage'
+            '.#homeConfigurations."ryansaxe@mac".activationPackage' \
+            >> "$RUNNER_TEMP/out-paths"
+
+      - &export-store
+        name: Export the paths cache.nixos.org didn't sign
+        id: export-store
+        env:
+          KEY: ${{ steps.restore-store.outputs.cache-primary-key }}
+        run: |
+          rm -rf "$RUNNER_TEMP/store" && mkdir "$RUNNER_TEMP/store"
+          paths=$(nix path-info --recursive --sigs $(cat "$RUNNER_TEMP/out-paths") | awk '!/cache\.nixos\.org-1:/ { print $1 }' | sort)
+          nix-store --export $paths > "$RUNNER_TEMP/store/paths"
+          nix-store --query --references $paths | sort -u | grep -vxF "$paths" > "$RUNNER_TEMP/store/references"
+          echo "key=$KEY-$(echo "$paths" | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - &save-store
+        name: Save the store cache
+        # A run whose paths match the ones it restored has nothing to save.
+        if: steps.export-store.outputs.key != steps.restore-store.outputs.cache-matched-key
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/store
+          key: ${{ steps.export-store.outputs.key }}
 
   linux:
     if: github.event.action != 'closed'
@@ -51,10 +98,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@v3
 
+      - *restore-store
+      - *import-store
+
       - name: Build the Linux home config
         run: |
-          nix build --no-link --print-build-logs \
-            '.#homeConfigurations."ryansaxe@linux".activationPackage'
+          nix build --no-link --print-build-logs --print-out-paths \
+            '.#homeConfigurations."ryansaxe@linux".activationPackage' \
+            >> "$RUNNER_TEMP/out-paths"
 
       - name: Build a work Linux home config, from tests/work
-        run: nix build --no-link --print-build-logs .#checks.x86_64-linux.work
+        run: |
+          nix build --no-link --print-build-logs --print-out-paths \
+            .#checks.x86_64-linux.work >> "$RUNNER_TEMP/out-paths"
+
+      - *export-store
+      - *save-store
