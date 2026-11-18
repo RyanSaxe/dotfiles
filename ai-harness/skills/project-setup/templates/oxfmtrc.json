@@ -1,4 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "printWidth": 80
+  "printWidth": 80,
+  // rumdl formats Markdown.
+  "ignorePatterns": ["*.md"]
 }
