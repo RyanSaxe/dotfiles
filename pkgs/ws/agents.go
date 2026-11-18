@@ -36,13 +36,7 @@ func agentsPopup(b mux.Backend) popup.Popup {
 		},
 		Actions: []popup.Action{{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
 			p := r.Data.(mux.Pane)
-			return popup.Do(func() error {
-				err := b.Show(p.Session)
-				if err == nil {
-					err = b.Focus(p)
-				}
-				return err
-			}, popup.Quit)
+			return popup.Do(func() error { return b.Focus(p) }, popup.Quit)
 		}}},
 	}
 }

@@ -290,9 +290,6 @@ func jumpToAgent(b mux.Backend) error {
 		}
 		return errors.New("no agent is running")
 	}
-	if err := b.Show(next.Session); err != nil {
-		return err
-	}
 	if err := b.Focus(next); err != nil {
 		return err
 	}

@@ -214,8 +214,24 @@ func (l *luaList[T]) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, (*[]T)(l))
 }
 
-func (Rex) Focus(p Pane) error {
-	_, err := rex("focus", "-s", p.Session, p.ID)
+//go:embed focus.lua
+var focusScript string
+
+// Focus shows a pane with focus.lua, in one call to the server, trying each
+// viewer in turn as show does.
+func (r Rex) Focus(p Pane) error {
+	var err error
+	for _, c := range r.viewers() {
+		args := []string{"do", "-", "session_id=" + p.Session, "block_id=" + p.ID}
+		if c != "" {
+			args = append([]string{"-C", c}, args...)
+		}
+		cmd := exec.Command("rex", append([]string{"--autostart=false"}, args...)...)
+		cmd.Stdin = strings.NewReader(focusScript)
+		if _, err = output(cmd); err == nil {
+			return nil
+		}
+	}
 	return err
 }
 
