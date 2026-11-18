@@ -11,11 +11,15 @@ func TestPickWindow(t *testing.T) {
 		{"one on code wins", []window{{"11", "browser", "Rex"}, {"12", "code", "Rex"}}, "12"},
 		{"else the first, to move", []window{{"11", "browser", "Rex"}, {"12", "message", "Rex"}}, "11"},
 		{"never Settings", []window{{"10", "code", "Settings - Interface"}, {"11", "browser", "Rex"}}, "11"},
+		{"only Settings", []window{{"10", "code", "Settings - Interface"}}, ""},
 		{"no window", nil, ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			if w, _ := pickWindow(c.ws); w.id != c.id {
-				t.Errorf("pickWindow = %q, want %q", w.id, c.id)
+			// ws focus picks from one list more than once.
+			for range 2 {
+				if w, ok := pickWindow(c.ws); w.id != c.id || ok != (c.id != "") {
+					t.Fatalf("pickWindow = %q, %v, want %q", w.id, ok, c.id)
+				}
 			}
 		})
 	}
