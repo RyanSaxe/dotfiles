@@ -112,6 +112,9 @@ func placeActions(b mux.Backend) []popup.Action {
 				return open(b, p.dir, start{}, true)
 			}, popup.Quit)
 		}},
+		{Key: "ctrl+t", Help: "new project", Always: true, When: func(tab int, _ popup.Row) bool { return tab == foldersTab }, Run: func(popup.Row) tea.Cmd {
+			return newProject(b)
+		}},
 		// A folder's row knows its place once the snapshot comes.
 		{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).at.Session != "" }, Run: func(r popup.Row) tea.Cmd {
 			at := r.Data.(place).at
