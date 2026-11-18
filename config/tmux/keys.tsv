@@ -13,9 +13,9 @@ tmux	copy ctrl+h/j/k/l	move between panes
 tmux	copy ctrl+\	last active pane
 tmux	alt+s	ws go popup on Sessions: sessions and worktree tabs
 tmux	alt+o	ws go popup on Folders: repos, worktrees, bookmarks
-tmux	alt+w	ws worktrees popup
+tmux	alt+w	ws go popup on Worktrees: every worktree, this project's first
 tmux	alt+c	ws theme popup: mode and mascot
-tmux	alt+a	ws agents popup
+tmux	alt+a	ws go popup on Agents: running agents, newest report first
 tmux	alt+r	ws reviews popup
 tmux	alt+t	ws tasks popup
 tmux	alt+/	ws keys popup: this list

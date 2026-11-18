@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 
@@ -19,18 +20,18 @@ func pick(b mux.Backend, name string) error {
 	dir, _ := os.Getwd()
 	popups := map[string]func() popup.Popup{
 		"go":        func() popup.Popup { return goPopup(b, foldersTab) },
+		"worktrees": func() popup.Popup { return goPopup(b, worktreesTab) },
 		"sessions":  func() popup.Popup { return goPopup(b, sessionsTab) },
-		"worktrees": func() popup.Popup { return worktreesPopup(b) },
+		"agents":    func() popup.Popup { return goPopup(b, agentsTab) },
 		"reviews":   func() popup.Popup { return reviewsPopup(b, term) },
 		"tasks":     func() popup.Popup { return tasksPopup(b, term) },
-		"agents":    func() popup.Popup { return agentsPopup(b) },
 		"theme":     func() popup.Popup { return themePopup(term) },
 		"files":     func() popup.Popup { return filesPopup(b, dir) },
 		"keys":      func() popup.Popup { return keysPopup(b) },
 	}
 	build, ok := popups[name]
 	if !ok {
-		return fmt.Errorf("no popup named %s, only go, sessions, worktrees, reviews, tasks, agents, theme, keys or files", name)
+		return fmt.Errorf("no popup named %s, only go, worktrees, sessions, agents, reviews, tasks, theme, keys or files", name)
 	}
 	// The mascot's accent colors the popups, and only the popups.
 	if hex := accentColor(); hex != "" {
@@ -80,6 +81,17 @@ func showTab(b mux.Backend, p mux.Place, dir string, args ...string) error {
 		return err
 	}
 	return b.Show(t)
+}
+
+// onTabs makes actions work only on the tabs listed, and there only where
+// their own When says.
+func onTabs(tabs []int, actions []popup.Action) []popup.Action {
+	for i, a := range actions {
+		actions[i].When = func(tab int, r popup.Row) bool {
+			return slices.Contains(tabs, tab) && (a.When == nil || a.When(tab, r))
+		}
+	}
+	return actions
 }
 
 // page runs a pager such as delta in the popup's place, and comes back to

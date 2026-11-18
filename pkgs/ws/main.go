@@ -368,7 +368,7 @@ type worktree struct {
 }
 
 func printWorktrees(b mux.Backend, asJSON bool) error {
-	wts := worktrees(b)
+	wts := worktrees(b.Snapshot)
 	if asJSON {
 		out, err := json.MarshalIndent(wts, "", "  ")
 		fmt.Println(string(out))
@@ -400,18 +400,15 @@ func worktreeDirs(current string) []worktree {
 }
 
 // worktrees lists ~/worktrees/PROJECT/NAME checkouts with their branch,
-// changes, last commit and agent state, the current project first and the
-// most recently committed first within a project.
-func worktrees(b mux.Backend) []worktree {
-	current := ""
-	if main, err := mainCheckout("."); err == nil {
-		current = filepath.Base(main)
-	}
+// changes, last commit and the agent state snapshot gives, the current
+// project first and the most recently committed first within a project.
+func worktrees(snapshot func() (mux.Snapshot, error)) []worktree {
+	current := currentProject()
 	wts := worktreeDirs(current)
 	var states map[string]mux.Status
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		s, _ := b.Snapshot()
+		s, _ := snapshot()
 		states = s.Statuses()
 	})
 	for i := range wts {
@@ -473,6 +470,15 @@ func resolveWorktree(name string) (string, error) {
 		return filepath.Dir(matches[0]), nil
 	}
 	return "", fmt.Errorf("several projects have a worktree named %s, so name it as PROJECT/%s", name, name)
+}
+
+// currentProject is the name of the project ws runs in, or "" outside one.
+func currentProject() string {
+	main, err := mainCheckout(".")
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(main)
 }
 
 // mainCheckout is the repository's first working tree, the one its

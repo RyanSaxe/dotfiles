@@ -65,7 +65,8 @@ func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
 	}
 }
 
-// The worktrees popup asks for an agent and flags, either or both.
+// Ctrl-T on the go popup's Worktrees tab asks for an agent and flags,
+// either or both.
 func TestPopupAnswerNamesAnAgentOrFlags(t *testing.T) {
 	withConfig(t, "claude", "tab")
 	for answer, want := range map[string]string{

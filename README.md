@@ -45,13 +45,13 @@ In Rex or tmux, these keys open a `ws` popup:
 
 | Key          | Popup                                                          |
 | ------------ | -------------------------------------------------------------- |
-| Alt-O        | Go: repositories, worktrees and bookmarked folders             |
+| Alt-O        | Go, on Folders: repositories, worktrees and bookmarked folders |
+| Alt-W        | Go, on Worktrees: every worktree, this project's first         |
+| Alt-S        | Go, on Sessions: each session and worktree tab                 |
+| Alt-A        | Go, on Agents: every running agent, newest report first        |
 | Ctrl-F in Go | Files: the selected folder's files, to open in Neovim          |
-| Alt-S        | Sessions: each session and worktree tab, on Go's second tab    |
-| Alt-W        | Worktrees: this project's worktrees, and all of them on a tab  |
 | Alt-R        | Reviews: the pull requests and issues that need you            |
 | Alt-T        | Tasks: the open tasks in your notes                            |
-| Alt-A        | Agents: every running agent, newest report first               |
 | Alt-C        | Theme: switch light and dark, and pick the picture in popups   |
 | Alt-/        | Keys: every key binding                                        |
 
