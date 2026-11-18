@@ -1,8 +1,8 @@
 #!/usr/bin/env zsh
 # The "A" agent-attention letter: a pseudo-workspace indicator sitting
 # after the real workspace letters, lit while an agent in Rex or tmux needs
-# you. cmd-alt-a walks through those agents, the one that has waited longest
-# first.
+# you. cmd-alt-a walks through those agents, failed first, then blocked,
+# then done, and within each the one that has waited longest first.
 #
 # `ws attention --watch` publishes the level:
 # - waiting: an agent needs you: it failed, waits on you, or finished since
