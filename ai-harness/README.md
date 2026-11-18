@@ -99,3 +99,26 @@ send a test push:
 echo '{"hook_event_name": "Stop", "last_assistant_message": "test"}' |
   PUSHOVER_IDLE=0 ai-harness/tools/notify-pushover.zsh test
 ```
+
+## Agents that need you
+
+In tmux, `ws` learns that an agent needs you from its window's bell, as
+[docs/ws.md](../docs/ws.md#agents-that-need-you) describes, so both agents
+ring it. Each home switch sets Claude Code's `preferredNotifChannel` to
+`terminal_bell`. On computers without Rex, it also sets Codex's
+`tui.notification_method` to `bel`, `tui.notifications` to `true` and
+`tui.notification_condition` to `always`, so Codex rings whether or not its
+pane has focus. Rex computers keep Codex's own notifications.
+
+When each agent rang, in a tmux session no client showed, with Claude Code
+2.1.327 and Codex 0.169:
+
+| Agent       | Finished turn                | Permission prompt or approval  | Question                       |
+| ----------- | ---------------------------- | ------------------------------ | ------------------------------ |
+| Claude Code | about a minute after it ends | about 6 seconds after it shows | about 6 seconds after it shows |
+| Codex       | as it ends                   | as it shows                    | as it shows                    |
+
+Claude Code rings for a finished turn only once its prompt has sat idle for
+a minute, so a turn you watched end still needs you if you switch away
+within that minute. A Codex plan-mode prompt rings with the turn it ends,
+and a Codex `request_permissions` prompt rings nothing.

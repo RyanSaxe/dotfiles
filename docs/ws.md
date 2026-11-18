@@ -102,7 +102,9 @@ reads what each multiplexer already tracks:
 - **tmux:** the agent is the pane `ws` marked agent when it made the
   session. It needs you once its window's bell rings while no client shows
   the window, until a client switches to it, so a bell you saw marks
-  nothing. The agents popup shows the agent as working while its window
+  nothing. Claude Code and Codex ring the bell when they finish or wait, as
+  [ai-harness/README.md](../ai-harness/README.md#agents-that-need-you)
+  describes. The agents popup shows the agent as working while its window
   prints and idle otherwise. tmux tracks bells and output per window, so a
   bell or output from a shell pane beside the agent counts as the agent's.
 - **Rex:** a blocked or failed agent needs you until it reports something

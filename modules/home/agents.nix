@@ -20,6 +20,9 @@ let
   personal = lib.elem "personal" cfg.roles;
   claude = cfg.claudeCode;
   inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
+  # Rex runs on a personal Mac and on a Linux computer that runs its server,
+  # as modules/home/rex.nix sets up.
+  hasRex = (personal && isDarwin) || lib.elem "rex-server" cfg.roles;
   # Where the agents' commands are, which the switch's own PATH leaves out.
   agentPath =
     if isLinux then "${config.home.path}/bin" else "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
@@ -196,6 +199,9 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       alwaysThinkingEnabled = true;
       editorMode = "vim";
       theme = "custom:dotfiles";
+      # The bell marks the agent's tmux window when a turn ends or a prompt
+      # waits, which is how ws learns in tmux that an agent needs you.
+      preferredNotifChannel = "terminal_bell";
       statusLine = {
         type = "command";
         command = "$HOME/.claude/statusline.js";
@@ -262,6 +268,15 @@ lib.mkIf (lib.elem "base" cfg.roles) {
           "task-progress"
         ];
         status_line_use_colors = true;
+      }
+      # Without Rex, Codex rings the bell for every notification, which
+      # covers a finished turn, an approval and a question, whether or not
+      # its pane has focus. tmux marks the bell on a window you aren't
+      # viewing, and ws reads that as the agent needing you.
+      // lib.optionalAttrs (!hasRex) {
+        notification_method = "bel";
+        notifications = true;
+        notification_condition = "always";
       };
       mcp_servers.playwright = {
         command = "npx";
