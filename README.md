@@ -41,18 +41,19 @@ folder, so it doesn't need your password. `mac-switch` changes macOS's
 settings, the Homebrew apps and files in `/etc`, so it asks for your password.
 `nix-update` runs both.
 
-In Rex or tmux, Alt and a key opens a `ws` popup:
+In Rex or tmux, these keys open a `ws` popup:
 
-| Key       | Popup                                                          |
-| --------- | -------------------------------------------------------------- |
-| Alt-O     | Go: repositories, worktrees and bookmarked folders             |
-| Alt-S     | Sessions: the running sessions, on Go's second tab             |
-| Alt-W     | Worktrees: this project's worktrees, and all of them on a tab  |
-| Alt-R     | Reviews: the pull requests and issues that need you            |
-| Alt-T     | Tasks: the open tasks in your notes                            |
-| Alt-A     | Agents: every running agent, the ones waiting on you first     |
-| Alt-C     | Theme: switch light and dark, and pick the picture in popups   |
-| Alt-/     | Keys: every key binding                                        |
+| Key          | Popup                                                          |
+| ------------ | -------------------------------------------------------------- |
+| Alt-O        | Go: repositories, worktrees and bookmarked folders             |
+| Ctrl-F in Go | Files: the selected folder's files, to open in Neovim          |
+| Alt-S        | Sessions: the running sessions, on Go's second tab             |
+| Alt-W        | Worktrees: this project's worktrees, and all of them on a tab  |
+| Alt-R        | Reviews: the pull requests and issues that need you            |
+| Alt-T        | Tasks: the open tasks in your notes                            |
+| Alt-A        | Agents: every running agent, newest report first               |
+| Alt-C        | Theme: switch light and dark, and pick the picture in popups   |
+| Alt-/        | Keys: every key binding                                        |
 
 <img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on those that have a running session and a bookmarked folder last, beside the selected repository's status, top-level folders and files, and recent commits." src="assets/picker.png">
 
