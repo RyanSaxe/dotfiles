@@ -39,7 +39,6 @@ for _, session in ipairs(rex.call("session.list").sessions) do
         label = session.label,
         id = block.block_id,
         landing = block.block_id == lands,
-        agent = block.label == "agent",
       }
       local process = rex.block.call(TERMINAL, "process", at)
       local foreground = process and process.foreground

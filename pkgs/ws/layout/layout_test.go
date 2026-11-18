@@ -17,8 +17,8 @@ func TestLoadFillsPlaceholders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := panes[0].Run, `codex -c 'model_reasoning_effort=high' 'fix the '\''bug'\'''`; got != want || !panes[0].Agent || !panes[0].Focus {
-		t.Errorf("first pane runs %s (agent %v, focus %v), want %s as the focused agent", got, panes[0].Agent, panes[0].Focus, want)
+	if got, want := panes[0].Run, `codex -c 'model_reasoning_effort=high' 'fix the '\''bug'\'''`; got != want || !panes[0].Focus {
+		t.Errorf("first pane runs %s (focus %v), want %s, focused", got, panes[0].Focus, want)
 	}
 	if p := panes[1]; p.Split != "right" || p.Size != 35 || p.Run != "" {
 		t.Errorf("second pane is %+v, want an empty pane split right at 35", p)

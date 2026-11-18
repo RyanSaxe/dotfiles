@@ -21,7 +21,6 @@ type Pane struct {
 	Split string // right, left, above or below
 	Size  int
 	Focus bool
-	Agent bool `toml:"-"` // runs {agent}, so its pane is marked as the agent's
 }
 
 // Load reads dir/NAME.toml, or builtins[name] when there is no such file,
@@ -48,7 +47,7 @@ func Load(dir, name string, builtins map[string]string, vars map[string][]string
 	fill := strings.NewReplacer(pairs...)
 	for i := range l.Pane {
 		p := &l.Pane[i]
-		p.Agent, p.Run = strings.Contains(p.Run, "{agent}"), strings.TrimSpace(fill.Replace(p.Run))
+		p.Run = strings.TrimSpace(fill.Replace(p.Run))
 		p.Split, p.Size = cmp.Or(p.Split, "right"), cmp.Or(p.Size, 50)
 		if !slices.Contains([]string{"right", "left", "above", "below"}, p.Split) && err == nil {
 			err = fmt.Errorf("split %q is not right, left, above or below", p.Split)
