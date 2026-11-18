@@ -41,9 +41,10 @@ A worktree opens where the host file's `openAs` says, `tab` by default:
 
 `--tab` and `--session` on `ws open`, `ws new` and `ws pr` override it for
 one command. Any other folder, such as a main checkout, opens as a session
-of its own. A tab `ws` adds to a place, such as a file the files popup
-opens, takes the place's name, so it is part of the place. Any other tab,
-such as one you or an agent named `tests`, is part of its session's place.
+of its own. A tab `ws` adds to a worktree's tab, such as a file the files
+popup opens, takes the worktree's name, so it is part of the place. Any
+other tab, such as one you or an agent named `tests`, is part of its
+session's place.
 
 `ws rm` and Ctrl-X in the go popup close a place's tabs, or its whole
 session when nothing else is in it. Removing a worktree closes its tab and
