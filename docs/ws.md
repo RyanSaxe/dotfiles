@@ -159,7 +159,7 @@ it due:
 - [ ] Renew the domain 📅 2026-12-01
 ```
 
-A long task can wrap onto the lines below it, as Prettier wraps it. Its
+A long task can wrap onto the lines below it, as rumdl wraps it. Its
 text goes on until a blank line, a list item, a heading, a quote, a table
 or a code fence, and the date can be on any of its lines:
 

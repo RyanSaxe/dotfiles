@@ -85,7 +85,7 @@ func TestATasksStateSectionAndProject(t *testing.T) {
 	}
 }
 
-// Prettier wraps a long task at 80 columns, under the task's text, and can
+// rumdl wraps a long task at 80 columns, under the task's text, and can
 // part 📅 from its date.
 func TestAWrappedTaskReadsAsOne(t *testing.T) {
 	vault := t.TempDir()
