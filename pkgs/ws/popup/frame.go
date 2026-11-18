@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ type (
 		rows            []Row
 		err             error
 		more            tea.Cmd // reads the load's next rows, or nil for the ones Load returned
+		panicked        any     // what Load panicked with, with its stack
 	}
 	detailMsg struct {
 		frame, gen int
@@ -99,7 +101,15 @@ func (m frame) load() tea.Cmd {
 		// any older ones, so Load never waits on the frame, even one that has
 		// stopped reading after a reload or closed.
 		box, mu := make(chan rowsMsg, 1), new(sync.Mutex)
-		read := func() tea.Msg { return <-box }
+		// A panic in Load is raised again where the frame reads, in a command,
+		// where Bubble Tea catches it and restores the terminal.
+		read := func() tea.Msg {
+			msg := <-box
+			if msg.panicked != nil {
+				panic(msg.panicked)
+			}
+			return msg
+		}
 		put := func(msg rowsMsg) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -111,8 +121,14 @@ func (m frame) load() tea.Cmd {
 		}
 		cmds = append(cmds, func() tea.Msg {
 			go func() {
-				rows, err := m.p.Load(t, func(rows []Row) { put(rowsMsg{id, t, gen, rows, nil, read}) })
-				put(rowsMsg{id, t, gen, rows, err, nil})
+				defer func() {
+					if r := recover(); r != nil {
+						put(rowsMsg{panicked: fmt.Sprintf("%v\n\n%s", r, debug.Stack())})
+					}
+				}()
+				show := func(rows []Row) { put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, more: read}) }
+				rows, err := m.p.Load(t, show)
+				put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, err: err})
 			}()
 			return read()
 		})
