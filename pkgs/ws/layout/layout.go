@@ -21,7 +21,7 @@ type Pane struct {
 	Split string // right, left, above or below
 	Size  int
 	Focus bool
-	Agent bool `toml:"-"` // runs {agent}, so its session can be sent text
+	Agent bool `toml:"-"` // runs {agent}, so its pane is marked as the agent's
 }
 
 // Load reads dir/NAME.toml, or builtins[name] when there is no such file,

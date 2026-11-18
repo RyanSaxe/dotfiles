@@ -1,6 +1,6 @@
 ---
 name: worktrees
-description: Start, watch, message and remove worktree agents with `ws`. Use when work should run in its own git worktree, when starting other agents in parallel, or when checking on or cleaning up worktrees.
+description: Start, watch and remove worktree agents with `ws`, and message them with `pair`. Use when work should run in its own git worktree, when starting other agents in parallel, or when checking on or cleaning up worktrees.
 ---
 
 # Worktrees
@@ -45,8 +45,12 @@ ws new NAME --agent claude --prompt "…"
   reports blocked, error, done, working or idle. In tmux, the agent shows
   working while its window prints and idle otherwise.
 - In Rex, the rex skill covers reading an agent's screen.
-- `ws send NAME "text"` types the text and Enter into that worktree's agent
-  pane. Answer another agent only when the user asked you to coordinate.
+- `pair message --to NAME --text "…"` sends the text to an agent through its
+  own CLI. NAME is pair's name for the agent, not the worktree's.
+  `pair agents` lists each running agent with its folder, so find the
+  worktree's agent there: the one in `~/worktrees/dotfiles/agent-jump-order`
+  is `agent-jump-order-41`. Answer another agent only when the user asked you
+  to coordinate.
 
 ## Clean up
 

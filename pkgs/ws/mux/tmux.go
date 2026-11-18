@@ -1,8 +1,6 @@
 package mux
 
 import (
-	"cmp"
-	"fmt"
 	"os"
 	"os/exec"
 	"slices"
@@ -129,16 +127,6 @@ func (t Tmux) Show(id string) error {
 func (Tmux) Tab(id, dir string, args ...string) error {
 	_, err := tmux(append([]string{"new-window", "-t", id + ":", "-c", dir, "--"}, args...)...)
 	return err
-}
-
-func (Tmux) Send(id, text string) error {
-	out, err := tmux("list-panes", "-s", "-t", id, "-F", "#{pane_id} #{@ws}")
-	for line := range strings.SplitSeq(out, "\n") {
-		if pane, mark, _ := strings.Cut(line, " "); mark == "agent" {
-			return tmuxType(pane, text)
-		}
-	}
-	return cmp.Or(err, fmt.Errorf("session %s has no agent pane", strings.TrimPrefix(id, "=")))
 }
 
 func tmuxType(pane, text string) error {

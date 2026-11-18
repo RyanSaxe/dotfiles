@@ -72,7 +72,6 @@ type Backend interface {
 	Show(session string) error
 	Focus(p Pane) error                            // moves the session's focus to the pane
 	Tab(session, dir string, args ...string) error // a new tab running args, which the session shows and which closes when they exit
-	Send(session, text string) error               // types text and Enter into the session's agent pane
 	Kill(session string) error
 	Capture(p Pane) (string, error) // the pane's text, with its colors
 	// Inside says whether the program runs in one of this multiplexer's panes.

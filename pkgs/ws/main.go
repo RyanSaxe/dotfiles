@@ -27,7 +27,7 @@ import (
 
 // commandArgs is how many arguments each command takes. ws agent takes none
 // or one.
-var commandArgs = map[string]int{"open": 1, "new": 1, "pr": 1, "send": 2, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}
+var commandArgs = map[string]int{"open": 1, "new": 1, "pr": 1, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}
 
 // commandUsages are the commands' entries in ws --help, and ws COMMAND
 // --help prints the command's entry with its commandDetails.
@@ -37,7 +37,6 @@ var commandUsages = []string{`
                                      make ~/worktrees/PROJECT/NAME on branch NAME and start an agent there,
                                      with FLAGS in place of the agent's defaults`, `
   ws pr NUMBER [--layout NAME]       the same, checked out to a pull request. The review layout opens it in Neovim`, `
-  ws send NAME TEXT                  type TEXT and Enter into a session's agent pane`, `
   ws agent [claude|codex [FLAGS]]    print the default agent and each agent's default flags, or set them.
                                      Every agent ws starts gets its defaults unless its command gives its own
                                      flags. With no default agent set, it is claude when that is installed
@@ -210,8 +209,6 @@ func run(cmd string, args []string) error {
 			return nil
 		}
 		return setAgent(pos[0], agentWords)
-	case "send":
-		return send(b, pos[0], pos[1])
 	case "ls":
 		return printWorktrees(b, *asJSON)
 	case "rm":
@@ -410,25 +407,6 @@ func prepare(b mux.Backend, main, dir string, s start) error {
 		}
 	}
 	return open(b, dir, s, false)
-}
-
-// send takes a session label or a worktree name.
-func send(b mux.Backend, name, text string) error {
-	id, err := mux.Find(b, name)
-	if err == nil && id == "" {
-		var dir string
-		if dir, err = resolveWorktree(name); err != nil {
-			return err
-		}
-		id, err = mux.Find(b, labelFor(dir))
-	}
-	if err != nil {
-		return err
-	}
-	if id == "" {
-		return fmt.Errorf("no session for %s", name)
-	}
-	return b.Send(id, text)
 }
 
 // remove lets git refuse a worktree with uncommitted changes, and closes the
