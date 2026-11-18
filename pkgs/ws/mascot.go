@@ -471,8 +471,9 @@ func opaqueBounds(img image.Image) image.Rectangle {
 // mascot, so one id is enough, and a new popup replaces the last one's.
 const mascotImageID = kitty.ID(0x575301)
 
-// mascotArt draws the theme's mascot rows cells tall, or nothing when the
-// terminal can't draw it, there is no theme, or the sprite isn't cached. Half
+// mascotArt draws the theme's mascot rows cells tall, downloading its sprite
+// when it isn't cached. It draws nothing when the terminal can't draw it,
+// there is no theme, or the sprite is missing and can't be downloaded. Half
 // blocks this small are a smudge, so there's no other way to draw it.
 func mascotArt(rows int, term kitty.Terminal) popup.Art {
 	if !term.Draws {

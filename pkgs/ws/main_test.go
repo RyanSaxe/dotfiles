@@ -53,9 +53,9 @@ func TestAgentCommandUsesEachAgentsDefaults(t *testing.T) {
 		{"saved defaults", "claude", []string{"--effort", "medium"}, "", "", "claude --effort medium"},
 		{"own flags replace them", "", nil, "", "--model opus", "claude --model opus"},
 		{"another agent has none yet", "", nil, "codex", "", "codex"},
-		{"its own defaults", "codex", []string{"-c", "x=1"}, "", "", "codex -c x=1"},
+		{"its own defaults", "codex", []string{"-m", "gpt-6.1-sol"}, "", "", "codex -m gpt-6.1-sol"},
 		{"switching keeps claude's", "", nil, "claude", "", "claude --effort medium"},
-		{"switching back keeps both", "claude", nil, "codex", "", "codex -c x=1"},
+		{"switching back keeps both", "claude", nil, "codex", "", "codex -m gpt-6.1-sol"},
 		{"a -- before them", "claude", []string{"--", "--effort", "low"}, "", "", "claude --effort low"},
 		{"a -- alone clears them", "claude", []string{"--"}, "", "", "claude"},
 	} {

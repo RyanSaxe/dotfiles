@@ -32,7 +32,7 @@ ws agent claude --                  # clears claude's default flags
 ```
 
 The worktrees popup's Ctrl-T asks for an agent, flags or both, such as
-`--model opus` or `codex -c model_reasoning_effort=high`.
+`--model opus` or `codex -m gpt-6.1-sol`.
 
 ## Layouts
 
@@ -49,28 +49,33 @@ split = "right"   # right, left, above or below
 size = 35         # percent of the space
 ```
 
-`run` can use `{agent}`, `{prompt}`, `{pr}`, `{dir}` and `{name}`.
-`{agent}` is the agent and its flags, and the `--` after it keeps a flag
-that takes several values, such as claude's `--add-dir`, from taking the
-prompt as one of them. The built-in `review` layout runs `nvim gh://{pr}`.
+`run` can use `{agent}`, `{prompt}`, `{pr}`, `{file}`, `{dir}` and
+`{name}`. `{agent}` is the agent and its flags, and the `--` after it keeps
+a flag that takes several values, such as claude's `--add-dir`, from taking
+the prompt as one of them. The built-in `review` layout runs
+`nvim gh://{pr}`, and the built-in `file` layout runs `nvim {file}`, which
+the files popup starts a folder's session with.
 
 ## Popups
 
-| Key       | Popup     | Lists                                                                  |
-| --------- | --------- | ---------------------------------------------------------------------- |
-| Alt-O     | go        | Repositories, worktrees and bookmarks, latest git activity first       |
-| Alt-S     | sessions  | Running sessions and what each is doing, on the go popup's second tab  |
-| Alt-W     | worktrees | This project's worktrees, and all of them on a second tab              |
-| Alt-R     | reviews   | Pull requests and issues on GitHub that involve you                    |
-| Alt-T     | tasks     | Open tasks in the vault, soonest due first                             |
-| Alt-A     | agents    | Agents and what each is doing                                          |
-| Alt-C     | theme     | Light or dark, and the mascot                                          |
-| Alt-/     | keys      | Every key binding, and where it is set                                 |
+| Key          | Popup     | Lists                                                                  |
+| ------------ | --------- | ---------------------------------------------------------------------- |
+| Alt-O        | go        | Repositories, worktrees and bookmarks, latest git activity first       |
+| Ctrl-F in go | files     | The selected folder's files, and its hidden and ignored ones on tabs   |
+| Alt-S        | sessions  | Running sessions and what each is doing, on the go popup's second tab  |
+| Alt-W        | worktrees | This project's worktrees, and all of them on a second tab              |
+| Alt-R        | reviews   | Pull requests and issues on GitHub that involve you                    |
+| Alt-T        | tasks     | Open tasks in the vault, soonest due first                             |
+| Alt-A        | agents    | Agents and what each is doing                                          |
+| Alt-C        | theme     | Light or dark, and the mascot                                          |
+| Alt-/        | keys      | Every key binding, and where it is set                                 |
 
-Rex binds these in `config/rex/init.lua`, and tmux in
-`config/tmux/tmux.conf`. In Rex, one of these keys pressed inside a popup
-replaces that popup, and in tmux the popup ignores it. `ws pick NAME`
-opens any of them from a shell.
+Rex binds the Alt keys in `config/rex/init.lua`, and tmux in
+`config/tmux/tmux.conf`. In Rex, one of them pressed inside a popup
+replaces that popup, and in tmux the popup ignores it. Files opens over the
+go popup, and Esc goes back to it. `ws pick NAME` opens any of these
+popups from a shell, and `ws pick files` lists the files of the folder it
+runs in.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Enter acts
@@ -81,6 +86,7 @@ first. The bottom line lists the popup's other keys.
 | Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Other                            |
 | --------- | ------ | ---------------------- | ------------- | -------------------------------- |
 | go        | go     |                        | close session | Ctrl-F search the folder's files |
+| files     | edit   |                        |               |                                  |
 | worktrees | go     | new worktree and agent | remove        |                                  |
 | reviews   | review | review with an agent   | done          | Ctrl-G diff, Ctrl-O browser      |
 | tasks     | edit   | add                    | done          |                                  |
@@ -89,6 +95,8 @@ The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
 per line. A folder that has a running session is tagged `session`, and
 Enter on it goes to that session. Ctrl-X asks before it closes a session,
 and closes it only when you answer `y`, since the agent in it stops too.
+Enter in files opens the file in Neovim, in a new tab of the folder's
+session, or starts that session with the `file` layout.
 In Rex, Alt-Shift-S opens Rex's own Change Session.
 
 ## Agents that need you
@@ -147,10 +155,11 @@ release-robot
 ```
 
 Enter checks a pull request out into its own worktree and opens it in
-Neovim. On an issue, it opens the browser. Ctrl-T does the same as Enter
-and also starts an agent in a second tab, asked to review the pull
-request. On Needs you, Ctrl-X marks an item done until something new
-happens on it.
+Neovim, or opens an issue in the browser, and marks the item done: it
+leaves Needs you until something new happens on it. Ctrl-T opens a pull
+request as Enter does and also starts an agent in a second tab, asked to
+review it, but doesn't mark it done. On Needs you, Ctrl-X marks an item
+done without opening it.
 
 Reviews reads the inbox that `ws attention --watch` fetches from GitHub
 every five minutes, so it opens without waiting on GitHub. On a Mac, that
