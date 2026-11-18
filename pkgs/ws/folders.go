@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -79,10 +80,20 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			}},
 			{Key: "ctrl+x", Help: "close", Run: func(r popup.Row) tea.Cmd {
 				p := r.Data.(place)
-				if p.session == "" {
-					return popup.Say(r.Title + " has no session to close")
-				}
-				return popup.Do(func() error { return b.Kill(p.session) }, popup.Reload("closed "+r.Title))
+				return popup.Do(func() error {
+					// A row shown before the snapshot doesn't know its session yet.
+					session, err := p.session, error(nil)
+					if session == "" {
+						session, err = mux.Find(b, labelFor(p.dir))
+					}
+					if err == nil && session == "" {
+						err = errors.New(r.Title + " has no session to close")
+					}
+					if err != nil {
+						return err
+					}
+					return b.Kill(session)
+				}, popup.Reload("closed "+r.Title))
 			}},
 		},
 	}
