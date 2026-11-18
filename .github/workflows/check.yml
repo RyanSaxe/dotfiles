@@ -4,11 +4,24 @@ on:
   push:
     branches: [main]
   pull_request:
+    # The default types, plus closed. A closed pull request's run builds
+    # nothing and cancels the run still going for it, since main's run
+    # checks what was merged.
+    types: [opened, synchronize, reopened, closed]
+
+# A newer push to a pull request cancels the run for its older commit. On
+# main, a run that has started finishes, so it reports on its commit even
+# while merges keep arriving. GitHub still replaces a waiting main run with
+# a newer one, so a burst of merges leaves one run going and one waiting.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Neither job has an age key, so neither decrypts a secret. A build only
 # checks that the config's sops file has each key the config names.
 jobs:
   mac:
+    if: github.event.action != 'closed'
     # Apple Silicon, like the Mac configs it builds.
     runs-on: macos-latest
     steps:
@@ -32,6 +45,7 @@ jobs:
             '.#homeConfigurations."ryansaxe@mac".activationPackage'
 
   linux:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
