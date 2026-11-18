@@ -40,7 +40,7 @@ func open(p Popup, draw func() Art) stack {
 	if art.Accent != "" {
 		Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(art.Accent))
 	}
-	return stack{frames: []frame{newFrame(0, p, art)}, draw: draw, art: art, next: 1}
+	return stack{frames: []frame{newFrame(0, false, p, art)}, draw: draw, art: art, next: 1}
 }
 
 func (s stack) Init() tea.Cmd { return s.top().load() }
@@ -58,7 +58,7 @@ func (s stack) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return s, nil
 	case pushMsg:
-		f, _ := newFrame(s.next, Popup(msg), s.art).update(s.size)
+		f, _ := newFrame(s.next, true, Popup(msg), s.art).update(s.size)
 		s.next++
 		s.frames = append(slices.Clone(s.frames), f)
 		return s, f.load()
