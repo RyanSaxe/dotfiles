@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -18,21 +19,52 @@ import (
 )
 
 // Attention is what sketchybar's A, R and T letters show. The agent level
-// comes from Rex's statuses, the review level from the inbox, and the task
-// level from the vault. The files under ~/.local/state/ws are what --watch
-// last published, for sketchybar and Reviews to read.
+// comes from the agents that need you, the review level from the inbox, and
+// the task level from the vault. The files under ~/.local/state/ws are what
+// --watch last published, for sketchybar and Reviews to read.
 
-// agentLevel is waiting when a program is blocked on you or failed, and none
-// otherwise. A finished agent doesn't count: Rex doesn't tell ws when you've
-// looked at one, so it would stay lit until the agent ran again.
-func agentLevel() (string, error) {
-	s, err := mux.Rex{}.Snapshot()
-	for _, p := range s.Agents() {
-		if p.Status <= mux.Error {
-			return "waiting", err
+// agentBackend is the multiplexer whose agents count. Outside a terminal, as
+// the --watch job runs, it follows ws focus: Rex when it's installed, and
+// tmux otherwise.
+func agentBackend(b mux.Backend) mux.Backend {
+	if b.Inside() {
+		return b
+	}
+	if _, err := exec.LookPath("rex"); err == nil {
+		return mux.Rex{}
+	}
+	return b
+}
+
+// agentLevel is waiting when an agent needs you, and none otherwise.
+func agentLevel(s mux.Snapshot) string {
+	if slices.ContainsFunc(s.Agents(), func(p mux.Pane) bool { return p.NeedsYou }) {
+		return "waiting"
+	}
+	return "none"
+}
+
+// noteSeen records in seen.json the done record of the pane you're looking
+// at, the landing pane of the session Rex's window shows. A record that
+// finished while you looked would need you once you looked away, since the
+// app asked for the pane's size before the record, and Rex.Snapshot doesn't
+// count a record listed there. The file keeps only the records of panes that
+// still exist, and the --watch job is its only writer.
+func noteSeen(s mux.Snapshot, shown string, seen map[string]time.Time) {
+	next := map[string]time.Time{}
+	for _, p := range s.Panes {
+		if t, ok := seen[p.ID]; ok {
+			next[p.ID] = t
+		}
+		if shown != "" && p.Label == shown && p.Landing && p.Status == mux.Done {
+			next[p.ID] = p.Updated
 		}
 	}
-	return "none", err
+	if !maps.EqualFunc(next, seen, time.Time.Equal) {
+		if err := writeJSON("seen.json", next); err != nil {
+			fmt.Fprintln(os.Stderr, "ws: agents:", err)
+		}
+	}
 }
 
 // reviewLevel is ci when a red check on one of your pull requests needs
@@ -81,14 +113,16 @@ func vaultTaskLevel(now time.Time) (string, error) {
 	return taskLevel(ts, now), err
 }
 
-func attention(watch bool) error {
+func attention(b mux.Backend, watch bool) error {
+	b = agentBackend(b)
 	if watch {
-		return watchAttention()
+		return watchAttention(b)
 	}
-	agents, err := agentLevel()
+	s, err := watched(b).Snapshot()
 	if err != nil {
 		return err
 	}
+	agents := agentLevel(s)
 	var in inbox
 	var a acks
 	readJSON("inbox.json", &in)
@@ -114,19 +148,19 @@ func publish(name, level string) {
 	exec.Command("sketchybar", "--trigger", strings.TrimSuffix(name, "-attention")+"_attention_change").Run()
 }
 
-// watchAttention republishes the agent level whenever Rex reports a status
-// change, fetches the inbox every 5 minutes and rereads the vault's tasks
+// watchAttention republishes the agent level whenever b reports a change,
+// fetches the inbox every 5 minutes and rereads the vault's tasks
 // every minute, which also catches a new day. It is the only process that
 // fetches the inbox. SIGUSR1 asks it to fetch now, as Ctrl-R in Reviews does,
 // and SIGUSR2 to republish the review level, after an acknowledgement. It
 // runs until it is killed.
-func watchAttention() error {
+func watchAttention(b mux.Backend) error {
 	if err := writeWhole("attention.pid", []byte(strconv.Itoa(os.Getpid()))); err != nil {
 		return err
 	}
 	// A signal already waiting covers any more, since one recount sees both.
 	changed := make(chan struct{}, 1)
-	go mux.Rex{}.Follow(func() {
+	go b.Follow(func() {
 		select {
 		case changed <- struct{}{}:
 		default:
@@ -173,11 +207,16 @@ func watchAttention() error {
 		case <-changed:
 			// A burst of reports, such as an agent finishing, settles first.
 			time.Sleep(300 * time.Millisecond)
-			if level, err := agentLevel(); err == nil {
-				publish("agent-attention", level)
-			} else {
+			w := watched(b)
+			s, err := w.Snapshot()
+			if err != nil {
 				fmt.Fprintln(os.Stderr, "ws: agents:", err)
+				continue
 			}
+			if r, ok := w.(mux.Rex); ok {
+				noteSeen(s, r.Shown, r.Seen)
+			}
+			publish("agent-attention", agentLevel(s))
 		case s := <-asked:
 			if s == syscall.SIGUSR1 {
 				refresh()
@@ -205,33 +244,44 @@ func signalAttention(sig syscall.Signal) error {
 	return nil
 }
 
-// nextAgent is the agent a jump goes to after the one in pane last. Agents go
-// in order of need, blocked, failed, done, working, then idle, and by session
-// within each. While any agent is blocked on you or failed, the jumps cycle
-// through those agents alone, and otherwise through all of them. A jump goes
-// to the agent after the last one and wraps around, or to the first when the
-// last one isn't in the cycle. Panes with no agent are skipped, and false
-// means there is none.
+// nextAgent is the agent a jump goes to after the one in pane last. While any
+// agent needs you, the jumps cycle through those agents alone, the one that
+// has needed you longest first. Otherwise they cycle through all of them, in
+// order of need, blocked, failed, done, working, then idle, and by session
+// within each. A jump goes to the agent after the last one and wraps around.
+// The last one may have left the cycle, as the agent you're looking at does
+// in Rex, so the jump goes on from where it would sit, and starts at the
+// first when it's gone. Panes with no agent are skipped, and false means
+// there is none.
 func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	agents := s.Agents()
 	if len(agents) == 0 {
 		return mux.Pane{}, false
 	}
-	slices.SortFunc(agents, func(a, b mux.Pane) int {
+	cycle := agents
+	order := func(a, b mux.Pane) int {
 		return cmp.Or(cmp.Compare(a.Status, b.Status), cmp.Compare(a.Label, b.Label), cmp.Compare(a.ID, b.ID))
-	})
-	if calm := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.Status > mux.Error }); calm > 0 {
-		agents = agents[:calm]
 	}
+	if waiting := slices.DeleteFunc(slices.Clone(agents), func(p mux.Pane) bool { return !p.NeedsYou }); len(waiting) > 0 {
+		cycle = waiting
+		order = func(a, b mux.Pane) int { return cmp.Or(a.Updated.Compare(b.Updated), cmp.Compare(a.ID, b.ID)) }
+	}
+	slices.SortFunc(cycle, order)
 	i := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.ID == last })
-	return agents[(i+1)%len(agents)], true
+	if i < 0 {
+		return cycle[0], true
+	}
+	if j := slices.IndexFunc(cycle, func(p mux.Pane) bool { return order(p, agents[i]) > 0 }); j >= 0 {
+		return cycle[j], true
+	}
+	return cycle[0], true
 }
 
-// jumpToAgent brings the Rex app to the next agent, the way the agents popup
-// does, and remembers it for the next jump. It works outside any terminal, as
-// from an AeroSpace key, because it names the app client itself.
-func jumpToAgent(client string) error {
-	s, err := mux.Rex{}.Snapshot()
+// jumpToAgent goes to the next agent, the way the agents popup does, and
+// remembers it for the next jump. It works outside any terminal, as from an
+// AeroSpace key, when b names the Rex app or tmux client to switch.
+func jumpToAgent(b mux.Backend) error {
+	s, err := b.Snapshot()
 	last, _ := os.ReadFile(filepath.Join(stateDir, "last-jump"))
 	next, ok := nextAgent(s, string(last))
 	if !ok {
@@ -240,16 +290,10 @@ func jumpToAgent(client string) error {
 		}
 		return errors.New("no agent is running")
 	}
-	if client == "" {
-		if client, err = (mux.Rex{}).App(); err != nil {
-			return err
-		}
-	}
-	rex := mux.Rex{Client: client}
-	if err := rex.Show(next.Session); err != nil {
+	if err := b.Show(next.Session); err != nil {
 		return err
 	}
-	if err := rex.Focus(next); err != nil {
+	if err := b.Focus(next); err != nil {
 		return err
 	}
 	return writeWhole("last-jump", []byte(next.ID))

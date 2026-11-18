@@ -221,7 +221,7 @@ func run(cmd string, args []string) error {
 	case "mascot":
 		return setMascot(pos[0])
 	case "attention":
-		return attention(*watch)
+		return attention(b, *watch)
 	case "focus":
 		return focus(pos[0])
 	}

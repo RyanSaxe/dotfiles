@@ -64,14 +64,14 @@ prompt as one of them. The built-in `review` layout runs `nvim gh://{pr}`.
 | Alt-W     | worktrees | This project's worktrees, and all of them on a second tab              |
 | Alt-R     | reviews   | Pull requests and issues on GitHub that involve you                    |
 | Alt-T     | tasks     | Open tasks in the vault, soonest due first                             |
-| Alt-A     | agents    | Rex terminals whose program reports a status                           |
+| Alt-A     | agents    | Agents and what each is doing                                          |
 | Alt-C     | theme     | Light or dark, and the mascot                                          |
 | Alt-/     | keys      | Every key binding, and where it is set                                 |
 
 Rex binds these in `config/rex/init.lua`, and tmux in
 `config/tmux/tmux.conf`. In Rex, one of these keys pressed inside a popup
-replaces that popup, and in tmux the popup ignores it. The agents popup
-works only in Rex. `ws pick NAME` opens any of them from a shell.
+replaces that popup, and in tmux the popup ignores it. `ws pick NAME`
+opens any of them from a shell.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Enter acts
@@ -90,6 +90,26 @@ The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
 per line. A folder that has a running session is tagged `session`, and
 Enter on it goes to that session.
 In Rex, Alt-Shift-S opens Rex's own Change Session.
+
+## Agents that need you
+
+An agent needs you when it finished or waits on you and you haven't
+looked at its pane since. Sketchybar's A lights while one does, and
+Cmd-Alt-A (`ws focus agent`) cycles through those agents, the one that has
+needed you longest first, or through every agent when none does. `ws`
+reads what each multiplexer already tracks:
+
+- **tmux:** the agent is the pane `ws` marked agent when it made the
+  session. It needs you once its window's bell rings while no client shows
+  the window, until a client switches to it, so a bell you saw marks
+  nothing. The agents popup shows the agent as working while its window
+  prints and idle otherwise. tmux tracks bells and output per window, so a
+  bell or output from a shell pane beside the agent counts as the agent's.
+- **Rex:** a blocked or failed agent needs you until it reports something
+  else, and a done one until a Rex app shows its pane. The pane you're
+  looking at needs nothing, and `ws attention --watch` remembers a done
+  report that came while you looked, so it doesn't need you once you look
+  away.
 
 ## Reviews
 

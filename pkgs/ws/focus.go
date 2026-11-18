@@ -40,7 +40,7 @@ func focus(what string) error {
 		return err
 	}
 	if what == "agent" {
-		return jumpToAgent(client)
+		return jumpToAgent(watched(mux.Rex{Client: client}))
 	}
 	// Run from outside Rex, the popup action has no session or pane of its
 	// own, so it gets the session the app shows and that session's pane.
@@ -82,9 +82,22 @@ func focusedBlock(session string) (string, error) {
 	return "", fmt.Errorf("session %s has no focused pane", session)
 }
 
-// shownSession is the session Rex's window shows. Rex reports no such
-// thing, but the window's title ends with the session's label.
+// shownSession is the session Rex's window shows.
 func shownSession() (string, error) {
+	label, err := shownLabel()
+	if err != nil {
+		return "", err
+	}
+	id, err := mux.Find(mux.Rex{}, label)
+	if id == "" && err == nil {
+		err = fmt.Errorf("no session is labeled %q", label)
+	}
+	return id, err
+}
+
+// shownLabel is the label of the session Rex's window shows. Rex reports no
+// such thing, but the window's title ends with the session's label.
+func shownLabel() (string, error) {
 	ws, err := appWindows(rexBundle)
 	if err != nil {
 		return "", err
@@ -94,17 +107,25 @@ func shownSession() (string, error) {
 	if !ok || i < 0 {
 		return "", errors.New("Rex's window doesn't name a session")
 	}
-	label := w.title[i+len(" - "):]
-	id, err := mux.Find(mux.Rex{}, label)
-	if id == "" && err == nil {
-		err = fmt.Errorf("no session is labeled %q", label)
-	}
-	return id, err
+	return w.title[i+len(" - "):], nil
 }
 
-// focusTmux opens Tasks or Reviews as a popup in the tmux client used last,
-// starting Ghostty on tmux's main session when no client is attached. tmux
-// has no agent statuses, so agent only says that.
+// watched gives a Rex backend what you've looked at that the server can't
+// tell it: the session Rex's window shows, and the done records the --watch
+// job saw you looking at as they finished. tmux keeps both itself.
+func watched(b mux.Backend) mux.Backend {
+	r, ok := b.(mux.Rex)
+	if !ok {
+		return b
+	}
+	r.Shown, _ = shownLabel()
+	readJSON("seen.json", &r.Seen)
+	return r
+}
+
+// focusTmux goes to the next agent, or opens Tasks or Reviews as a popup, in
+// the tmux client used last, starting Ghostty on tmux's main session when no
+// client is attached.
 func focusTmux(what string) error {
 	clients, _ := runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
 	client := newestClient(clients)
@@ -126,8 +147,7 @@ func focusTmux(what string) error {
 		return err
 	}
 	if what == "agent" {
-		_, err := runIn("", "tmux", "display-message", "-c", client, "Agents report no status in tmux yet")
-		return err
+		return jumpToAgent(mux.Tmux{Client: client})
 	}
 	// Run from outside tmux, the popup would otherwise belong to the session
 	// used last, which may not be the one the client shows.
