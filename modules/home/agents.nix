@@ -55,12 +55,10 @@ let
     mv "$settings.new" "$settings"
   '';
 
-  # pair's hub wakes pi through an extension and opencode through a plugin.
-  # Each is registered from the profile, whose path stays the same when
-  # pair updates, in place of the store path `pair start` prints.
+  # pair's hub wakes pi through an extension. It's registered from the
+  # profile, whose path stays the same when pair updates, in place of the
+  # store path `pair start` prints.
   pairAdapters = "${config.home.profileDirectory}/lib/pair/adapters";
-  opencodePlugin =
-    if lib.versionAtLeast pkgs.opencode.version "2" then "opencode" else "opencode/plugin.js";
   pairPlugins = pkgs.writeShellScript "pair-plugins" ''
     set -eu
     jq=${pkgs.jq}/bin/jq
@@ -75,22 +73,6 @@ let
     mkdir -p "''${pi%/*}"
     [ -s "$pi" ] || echo '{}' > "$pi"
     register "$pi" packages "${pairAdapters}/pi/extension.js"
-
-    # opencode reads the first of opencode.jsonc, opencode.json and
-    # config.json that exists, which is the last one this loop finds.
-    dir="${config.xdg.configHome}/opencode"
-    mkdir -p "$dir"
-    opencode="$dir/opencode.json"
-    for name in config.json opencode.json opencode.jsonc; do
-      if [ -e "$dir/$name" ]; then opencode="$dir/$name"; fi
-    done
-    [ -s "$opencode" ] || echo '{}' > "$opencode"
-    # opencode 2 loads pair's plugin folder, and opencode 1 the plugin.js in
-    # it. List the one the installed opencode loads, and drop the other.
-    "$jq" '.plugin = [(.plugin // [])[] | select(type != "string" or ((endswith("/lib/pair/adapters/opencode") or endswith("/lib/pair/adapters/opencode/plugin.js")) | not))]' \
-      "$opencode" > "$opencode.new"
-    mv "$opencode.new" "$opencode"
-    register "$opencode" plugin "${pairAdapters}/${opencodePlugin}"
   '';
 
   # `pair agents` lists a session once it registers, so other agents can
@@ -302,8 +284,8 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       ${lib.optionalString claude ''if installed claude && [ ! -e "$HOME/.claude/skills/pair" ]; then agents="$agents -a claude-code"; fi''}
       if installed codex && [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a codex"; fi
       ${lib.optionalString personal ''
-        # pi, opencode and Copilot CLI read the same folder as Codex.
-        if [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a pi -a opencode -a github-copilot"; fi
+        # pi and Copilot CLI read the same folder as Codex.
+        if [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a pi -a github-copilot"; fi
       ''}
       if [ -n "$agents" ]; then
         run env DISABLE_TELEMETRY=1 PATH="${pkgs.nodejs}/bin:${pkgs.git}/bin:$PATH" \
