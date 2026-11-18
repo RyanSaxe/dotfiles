@@ -126,15 +126,20 @@ func worktreesPopup(b mux.Backend) popup.Popup {
 						return popup.Reload("removed " + w.Project + "/" + w.Name)
 					}
 				}
-				if !w.Dirty {
-					return rm(false)
-				}
-				return popup.Ask(w.Name+" has uncommitted changes. Remove it and its branch anyway? (y/N)", func(answer string) tea.Cmd {
+				ask := popup.Ask(w.Name+" has uncommitted changes. Remove it and its branch anyway? (y/N)", func(answer string) tea.Cmd {
 					if strings.EqualFold(answer, "y") {
 						return rm(true)
 					}
 					return nil
 				})
+				// git says now whether it has changes, since a row shown before
+				// git answered doesn't know.
+				return func() tea.Msg {
+					if changes, _ := git(w.Path, "status", "--porcelain"); changes == "" {
+						return rm(false)()
+					}
+					return ask()
+				}
 			}},
 		},
 	}
