@@ -642,7 +642,20 @@ func (m frame) view() string {
 		}
 		tabs[i] = style.Render(t.Name) + Dim.Render(count(i))
 	}
-	header := ansi.Truncate(" "+strings.Join(tabs, Dim.Render(" | ")), m.w-m.art.Cols-2, "…")
+	// On a narrow screen the tabs before the active one give way to it, so
+	// it stays in view.
+	room, first := m.w-m.art.Cols-2, 0
+	from := func(first, last int) string {
+		lead := " "
+		if first > 0 {
+			lead = Dim.Render(" … ")
+		}
+		return lead + strings.Join(tabs[first:last], Dim.Render(" | "))
+	}
+	for first < m.active && lipgloss.Width(from(first, m.active+1)) > room {
+		first++
+	}
+	header := ansi.Truncate(from(first, len(tabs)), room, "…")
 	if m.art.Rows > 0 {
 		header = lipgloss.JoinHorizontal(lipgloss.Center, lipgloss.NewStyle().Width(m.w-m.art.Cols-1).Render(header), m.art.Cells)
 	}
