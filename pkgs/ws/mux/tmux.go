@@ -142,8 +142,18 @@ func (Tmux) Kill(id string) error {
 	return err
 }
 
-// Focus switches the client to the pane's session, window and pane.
-func (t Tmux) Focus(p Pane) error { return t.switchTo(p.ID) }
+// Focus switches the client to the pane's session, window and pane. Outside
+// tmux with no Client, it selects the pane and attaches this terminal to its
+// session instead.
+func (t Tmux) Focus(p Pane) error {
+	if t.inside || t.Client != "" {
+		return t.switchTo(p.ID)
+	}
+	if _, err := tmux("select-window", "-t", p.ID, ";", "select-pane", "-t", p.ID); err != nil {
+		return err
+	}
+	return t.Show(p.Session)
+}
 
 // switchTo switches the client to a session or a pane: Client when it's
 // set, and otherwise the client of the pane the program runs in.

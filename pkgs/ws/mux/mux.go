@@ -70,7 +70,7 @@ type Backend interface {
 	// Actions, each on a session or pane that a Snapshot gave.
 	Create(label, dir string, panes []layout.Pane) (string, error)
 	Show(session string) error
-	Focus(p Pane) error                            // moves the session's focus to the pane
+	Focus(p Pane) error                            // shows the pane's session and tab, with the pane focused
 	Tab(session, dir string, args ...string) error // a new tab running args, which the session shows and which closes when they exit
 	Kill(session string) error
 	Capture(p Pane) (string, error) // the pane's text, with its colors
