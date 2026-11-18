@@ -96,6 +96,30 @@ Neovim, and file opens {file} in Neovim. A pane's run can use {agent}, {prompt},
 		},
 	},
 	{
+		name: "tab", group: "Projects and worktrees",
+		line: "ws tab DIR -- COMMAND", summary: "run a command in a new tab of the folder's tab or session",
+		args:  "DIR",
+		flags: []option{{"", "COMMAND", "the command to run, with its arguments, word for word"}},
+		about: `Run COMMAND in a new tab of folder DIR's place, its tab or session. The tab closes when
+COMMAND exits. When DIR has no place, ws opens one as ws open does, a worktree as a tab or a
+session as open_as in ~/.config/ws/config.toml says, and types COMMAND into its shell in
+place of a layout. Run by a person, ws tab goes to the new tab, and run by an agent, it
+leaves the view alone. pair's launch script opens each agent it spawns this way. Outside Rex
+and tmux there is no terminal to open a tab in, so ws tab fails.`,
+		examples: []string{"ws tab . -- htop", "ws tab ~/worktrees/dotfiles/fix-login -- claude --effort high"},
+		run: func(b mux.Backend, c call) error {
+			dir, _ := filepath.Abs(c.args[0])
+			if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+				return fmt.Errorf("%s is not a folder", dir)
+			}
+			command := c.agentWords // the words after --
+			if len(command) == 0 {
+				return errors.New("it needs the command to run after --, such as ws tab . -- htop")
+			}
+			return runInTab(b, dir, command)
+		},
+	},
+	{
 		name: "new", group: "Projects and worktrees",
 		line: "ws new NAME", summary: "make a worktree on a new branch and start an agent in it",
 		args: "NAME",

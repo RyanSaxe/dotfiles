@@ -157,9 +157,8 @@ func (r Rex) viewers() []string {
 }
 
 // Tab names the tab after the place when the place's tabs are named, so it
-// is one of them, and brings the app to it, since the app keeps showing its
-// own tab when the server makes another one active.
-func (r Rex) Tab(p Place, dir string, args ...string) error {
+// is one of them, and makes it in the background, as CreateTab does.
+func (Rex) Tab(p Place, dir string, args ...string) (Place, error) {
 	window := []string{"window", "new", "-s", p.Session}
 	if p.Named {
 		window = append(window, p.Label)
@@ -167,10 +166,8 @@ func (r Rex) Tab(p Place, dir string, args ...string) error {
 	var made struct {
 		Window string `json:"window_id"`
 	}
-	if err := rexJSON(&made, append(append(window, "-c", dir, "--json", "--"), args...)...); err != nil {
-		return err
-	}
-	return r.show(p.Session, made.Window)
+	err := rexJSON(&made, append(append(window, "-c", dir, "--focus=false", "--json", "--"), args...)...)
+	return Place{Label: p.Label, Session: p.Session, Tab: made.Window, Tabs: []string{made.Window}, Named: p.Named}, err
 }
 
 // Kill closes the tab this program runs in last, since closing it ends the

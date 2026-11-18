@@ -113,6 +113,12 @@ type recorder struct {
 	mux.Backend
 	snapshot mux.Snapshot
 	made     []made
+	tabs     [][]string // each tab ws ran a command in: the place's label, the folder, then the command
+}
+
+func (r *recorder) Tab(p mux.Place, dir string, args ...string) (mux.Place, error) {
+	r.tabs = append(r.tabs, append([]string{p.Label, dir}, args...))
+	return mux.Place{Label: p.Label, Session: p.Session, Tab: "tab:new", Named: p.Named}, nil
 }
 
 // made is a session or tab ws made: its label, the session a tab is in, its
@@ -273,6 +279,68 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 	withConfig(t, "claude", "tab")
 	if err := run("new", []string{"six", "--tab", "--session"}, func(string) mux.Backend { return &recorder{} }); err == nil {
 		t.Error("ws new six --tab --session made a worktree")
+	}
+}
+
+// ws tab runs its command, word for word, in a new tab of the folder's
+// place, and makes the place with the command typed into its shell when the
+// folder has none. Run by an agent, it shows nothing, and the recorder has
+// no Show to call.
+func TestTabRunsItsCommandInTheFoldersPlace(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	// A commit hook runs these tests, and the scratch repository must not be
+	// the one being committed to.
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	oldRoot, oldInteractive := worktreeRoot, interactive
+	worktreeRoot, interactive = t.TempDir(), false
+	t.Cleanup(func() { worktreeRoot, interactive = oldRoot, oldInteractive })
+	repo := t.TempDir()
+	main, err := filepath.EvalSymlinks(repo) // git reports the real path
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Base(main)
+	fix := filepath.Join(worktreeRoot, project, "fix")
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+		{"worktree", "add", "-q", "-b", "fix", fix},
+	} {
+		if _, err := git(repo, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	withConfig(t, "claude", "tab")
+	command := []string{"env", "A=b c", "claude", "--effort", "high"}
+	words := append([]string{fix, "--"}, command...)
+
+	open := &recorder{snapshot: mux.Snapshot{
+		Sessions: []mux.Session{{ID: "session:" + project, Label: project}},
+		Panes:    []mux.Pane{{Session: "session:" + project, Label: project, ID: "pane", Tab: "tab:fix", TabName: project + "/fix", Focused: true}},
+	}}
+	if err := run("tab", words, func(string) mux.Backend { return open }); err != nil || len(open.made) > 0 ||
+		len(open.tabs) != 1 || !slices.Equal(open.tabs[0], append([]string{project + "/fix", fix}, command...)) {
+		t.Errorf("ws tab on an open worktree made %v and ran %q (%v), want one tab of %s/fix running %q", open.made, open.tabs, err, project, command)
+	}
+
+	closed := &recorder{}
+	err = run("tab", words, func(string) mux.Backend { return closed })
+	var got []string
+	for _, m := range closed.made {
+		got = append(got, m.String())
+	}
+	want := []string{"session " + project + ", a plain shell, in " + main, "tab " + project + "/fix of session:" + project + " in " + fix}
+	if err != nil || len(closed.tabs) > 0 || !slices.Equal(got, want) || closed.lastPanes()[0].Run != layout.Line(command) {
+		t.Errorf("ws tab on a closed worktree made %q with %+v (%v), want %q running %s", got, closed.lastPanes(), err, want, layout.Line(command))
+	}
+
+	if err := run("tab", []string{fix}, func(string) mux.Backend { return &recorder{} }); err == nil {
+		t.Error("ws tab with no command after -- ran")
 	}
 }
 

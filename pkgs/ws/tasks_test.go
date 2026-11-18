@@ -215,7 +215,7 @@ func TestEnterOnATaskLandsInItsTab(t *testing.T) {
 			`case " $* " in *" window new "*) echo '{"window_id":"window:task","block_ids":["block:task"]}';; esac`,
 			map[string]string{"REX_BLOCK": "block:popup", "REX_SESSION": "session:work"},
 			[]string{
-				"--autostart=false window new -s session:work -c VAULT --json -- nvim +1 notes/daily/2026-11-09.md",
+				"--autostart=false window new -s session:work -c VAULT --focus=false --json -- nvim +1 notes/daily/2026-11-09.md",
 				"--autostart=false -C client:app do session.select session_id=session:work window_id=window:task",
 			}},
 		{"tmux", "tmux",
@@ -223,7 +223,7 @@ func TestEnterOnATaskLandsInItsTab(t *testing.T) {
 			map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"},
 			[]string{
 				"-u display-message -p #{session_name}",
-				"-u new-window -t =work: -c VAULT -P -F #{window_id} -- nvim +1 notes/daily/2026-11-09.md",
+				"-u new-window -d -t =work: -c VAULT -P -F #{window_id} -- nvim +1 notes/daily/2026-11-09.md",
 				"-u switch-client -t @9",
 			}},
 	} {

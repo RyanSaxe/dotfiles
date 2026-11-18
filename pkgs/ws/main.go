@@ -137,6 +137,34 @@ func open(b mux.Backend, dir string, s start, needsPlace bool) error {
 	return b.Show(place)
 }
 
+// runInTab runs command in a new tab of dir's place. A folder with no place
+// gets one as open makes it, with command typed into its first shell in
+// place of a layout. A person who runs it goes to the tab, and an agent's
+// run leaves what the user sees alone.
+func runInTab(b mux.Backend, dir string, command []string) error {
+	if !b.Inside() {
+		return errors.New("there is no terminal to open a tab in, so run this inside Rex or tmux")
+	}
+	snap, err := b.Snapshot()
+	if err != nil {
+		return err
+	}
+	place, found := snap.Find(labelFor(dir))
+	if found {
+		place, err = b.Tab(place, dir, command...)
+	} else {
+		var c config
+		if c, err = loadConfig(); err != nil {
+			return err
+		}
+		place, err = makePlace(b, snap, dir, c.OpenAs, []layout.Pane{{Run: layout.Line(command), Focus: true}})
+	}
+	if err != nil || !interactive {
+		return err
+	}
+	return b.Show(place)
+}
+
 // makePlace makes dir's place with panes in it. As a tab, a worktree is a
 // tab named after it in its project's session, which starts as a plain shell
 // in the main checkout when there is none, so it starts no agent nobody
