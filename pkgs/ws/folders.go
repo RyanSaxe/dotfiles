@@ -75,9 +75,6 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 					return open(b, p.dir, start{}, true)
 				}, popup.Quit)
 			}},
-			{Key: "ctrl+f", Help: "files", When: func(_ int, r popup.Row) bool { return r.Data.(place).dir != "" }, Run: func(r popup.Row) tea.Cmd {
-				return popup.Push(filesPopup(b, r.Data.(place).dir))
-			}},
 			// A folder's row knows its session once the snapshot comes.
 			{Key: "ctrl+x", Help: "close", When: func(_ int, r popup.Row) bool { return r.Data.(place).session != "" }, Run: func(r popup.Row) tea.Cmd {
 				session := r.Data.(place).session
@@ -87,6 +84,9 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 					}
 					return popup.Do(func() error { return b.Kill(session) }, popup.Reload("closed "+r.Title))
 				})
+			}},
+			{Key: "ctrl+f", Help: "files", When: func(_ int, r popup.Row) bool { return r.Data.(place).dir != "" }, Run: func(r popup.Row) tea.Cmd {
+				return popup.Push(filesPopup(b, r.Data.(place).dir))
 			}},
 		},
 	}

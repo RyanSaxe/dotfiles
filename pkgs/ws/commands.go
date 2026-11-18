@@ -154,7 +154,7 @@ sessions is the go popup on its Sessions tab. go also lists the folders in
 In every popup:
   typing                   filter the rows
   ↑ ↓, Ctrl-J/K, Ctrl-N/P  move, as the mouse wheel does
-  Enter                    act on the row, as a click does
+  Enter                    go to or open the row, as a click does
   Tab, Shift-Tab           switch tabs
   Ctrl-D, Ctrl-U           scroll the details half a page
   Ctrl-R                   load the rows again
@@ -162,7 +162,15 @@ In every popup:
   Ctrl-C                   close the popup
 
 When the popup is under 80 columns wide, → shows the row's details, and ← or Esc goes back to
-the rows. The bottom line lists the popup's own keys.
+the rows.
+
+A popup's own keys mean the same in every popup that has them, and the bottom line lists only
+the ones that work on the selected row:
+  Ctrl-T                   start something new
+  Ctrl-X                   finish or remove the row
+  Ctrl-F                   search the row's folder
+  Ctrl-G                   show a diff
+  Ctrl-O                   open the browser
 `,
 		examples: []string{"ws pick go", "ws pick theme"},
 		run: func(b mux.Backend, c call) error {

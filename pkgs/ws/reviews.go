@@ -93,16 +93,20 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 		Head: inboxHead,
 		Body: func(_ popup.Row, d any, w int) string { return d.(markdown.Doc).Render(w, markdownIn("", term)) },
 		Actions: []popup.Action{
-			{Key: "enter", Help: "review", Run: func(r popup.Row) tea.Cmd {
+			{Key: "enter", Help: "review", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
 				it := r.Data.(item)
 				return tea.Batch(popup.Say("opening #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error {
-					acknowledge(it)
-					if it.Issue {
-						return browse(it)
-					}
 					_, err := prWorktree(b, it, "review")
 					return err
 				}, popup.Quit))
+			}},
+			{Key: "enter", Help: "open", When: isIssue, Run: func(r popup.Row) tea.Cmd {
+				it := r.Data.(item)
+				return popup.Do(func() error { return browse(it) }, popup.Quit)
+			}},
+			{Key: "ctrl+t", Help: "agent", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
+				it := r.Data.(item)
+				return tea.Batch(popup.Say("opening an agent on #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error { return reviewAgent(b, it) }, popup.Quit))
 			}},
 			{Key: "ctrl+x", Help: "done", When: func(tab int, _ popup.Row) bool { return tab == needsYouTab }, Run: func(r popup.Row) tea.Cmd {
 				it := r.Data.(item)
@@ -111,16 +115,7 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 			{Key: "ctrl+g", Help: "diff", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
 				it := r.Data.(item)
 				diff := fmt.Sprintf("gh pr diff %d -R %s --color=always | delta --paging=always", it.Number, it.Repo)
-				return tea.ExecProcess(exec.Command("sh", "-c", diff), func(err error) tea.Msg {
-					if err != nil {
-						return popup.Notice(err.Error())
-					}
-					return popup.Notice("")
-				})
-			}},
-			{Key: "ctrl+t", Help: "agent", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				return tea.Batch(popup.Say("opening an agent on #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error { return reviewAgent(b, it) }, popup.Quit))
+				return page(exec.Command("sh", "-c", diff))
 			}},
 			{Key: "ctrl+o", Help: "browser", Run: func(r popup.Row) tea.Cmd {
 				it := r.Data.(item)
@@ -140,6 +135,7 @@ var verbs = map[reasonKind]string{failing: "failed", changesRequested: "asked fo
 const needsYouTab = 0
 
 func isPullRequest(_ int, r popup.Row) bool { return !r.Data.(item).Issue }
+func isIssue(_ int, r popup.Row) bool       { return r.Data.(item).Issue }
 
 // inboxRow fills a row's four places: the title and why it needs you, then
 // the repository, who acted and when. A pull request of yours that needs

@@ -79,23 +79,36 @@ popups from a shell, and `ws pick files` lists the files of the folder it
 runs in. `ws pick --help` lists the keys every popup shares.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
-move, Tab and Shift-Tab move forward and back through the tabs, Enter acts
-on the row and Esc clears the filter or closes. Enter pressed before the
-rows appear acts on the top match once they do, unless another key comes
-first.
+move, Tab and Shift-Tab move forward and back through the tabs, Ctrl-D and
+Ctrl-U scroll the details, Ctrl-R gets fresh data and Esc clears the filter
+or closes. Enter pressed before the rows appear acts on the top match once
+they do, unless another key comes first.
 
-| Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Other                            |
-| --------- | ------ | ---------------------- | ------------- | -------------------------------- |
-| go        | go     |                        | close session | Ctrl-F search the folder's files |
-| files     | edit   |                        |               |                                  |
-| worktrees | go     | new worktree and agent | remove        |                                  |
-| reviews   | review | review with an agent   | done          | Ctrl-G diff, Ctrl-O browser      |
-| tasks     | edit   | add                    | done          |                                  |
+Each other key means the same in every popup that has it. Enter goes to or
+opens the row, Ctrl-T starts something new, Ctrl-X finishes or removes the
+row, Ctrl-F searches the row's folder, Ctrl-G shows a diff and Ctrl-O opens
+the browser.
+
+| Popup     | Enter  | Ctrl-T                 | Ctrl-X        | Ctrl-F | Ctrl-G | Ctrl-O       |
+| --------- | ------ | ---------------------- | ------------- | ------ | ------ | ------------ |
+| go        | go     |                        | close session | files  |        |              |
+| files     | edit   |                        |               |        |        |              |
+| worktrees | go     | new worktree and agent | remove        | files  | diff   | pull request |
+| reviews   | review | review with an agent   | done          |        | diff   | browser      |
+| tasks     | edit   | add                    | done          |        |        |              |
 
 The bottom line lists only the keys that work on the selected row, and a
 key that doesn't work there does nothing. Reviews offers Ctrl-T and Ctrl-G
 only on a pull request and Ctrl-X only on Needs you, and the go popup offers
 Ctrl-X only on a folder with a running session.
+
+In the worktrees popup, Ctrl-G shows in `delta` how the files git tracks
+changed, committed or not, since the branch left the project's default
+branch, the one `origin/HEAD` names. A project without `origin/HEAD` has no
+Ctrl-G, and `git remote set-head origin --auto` sets it. Ctrl-O opens the
+open pull request from the branch on `origin`. A fork's pull request from a
+branch of the same name doesn't count, so a worktree of someone else's pull
+request has no Ctrl-O, and Reviews' Ctrl-O opens it instead.
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
 per line. A folder that has a running session is tagged `session`, and
@@ -163,11 +176,10 @@ release-robot
 ```
 
 Enter checks a pull request out into its own worktree and opens it in
-Neovim, or opens an issue in the browser, and marks the item done: it
-leaves Needs you until something new happens on it. Ctrl-T opens a pull
-request as Enter does and also starts an agent in a second tab, asked to
-review it, but doesn't mark it done. On Needs you, Ctrl-X marks an item
-done without opening it.
+Neovim, or opens an issue in the browser. Ctrl-T opens a pull request as
+Enter does and also starts an agent in a second tab, asked to review it.
+Opening an item leaves it on Needs you, and only Ctrl-X there marks it done
+until something new happens on it.
 
 Reviews reads the inbox that `ws attention --watch` fetches from GitHub
 every five minutes, so it opens without waiting on GitHub. On a Mac, that

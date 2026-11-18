@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"workspace/mux"
@@ -62,6 +64,17 @@ func perLoad[T any](work func() (T, error)) func(tab int) (T, error) {
 		mu.Unlock()
 		return this()
 	}
+}
+
+// page runs a pager such as delta in the popup's place, and comes back to
+// the popup with its error, if any, as a notice.
+func page(pager *exec.Cmd) tea.Cmd {
+	return tea.ExecProcess(pager, func(err error) tea.Msg {
+		if err != nil {
+			return popup.Notice(err.Error())
+		}
+		return popup.Notice("")
+	})
 }
 
 // statusTag names an agent's status in its color.
