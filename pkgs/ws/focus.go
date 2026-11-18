@@ -40,7 +40,7 @@ func focus(what string) error {
 		return err
 	}
 	if what == "agent" {
-		return jumpToAgent(client)
+		return jumpToAgent(mux.Rex{Client: client})
 	}
 	// Run from outside Rex, the popup action has no session or pane of its
 	// own, so it gets the session the app shows and that session's pane.
@@ -102,9 +102,9 @@ func shownSession() (string, error) {
 	return id, err
 }
 
-// focusTmux opens Tasks or Reviews as a popup in the tmux client used last,
-// starting Ghostty on tmux's main session when no client is attached. tmux
-// has no agent statuses, so agent only says that.
+// focusTmux goes to the next agent, or opens Tasks or Reviews as a popup, in
+// the tmux client used last, starting Ghostty on tmux's main session when no
+// client is attached.
 func focusTmux(what string) error {
 	clients, _ := runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
 	client := newestClient(clients)
@@ -126,8 +126,7 @@ func focusTmux(what string) error {
 		return err
 	}
 	if what == "agent" {
-		_, err := runIn("", "tmux", "display-message", "-c", client, "Agents report no status in tmux yet")
-		return err
+		return jumpToAgent(mux.Tmux{Client: client})
 	}
 	// Run from outside tmux, the popup would otherwise belong to the session
 	// used last, which may not be the one the client shows.

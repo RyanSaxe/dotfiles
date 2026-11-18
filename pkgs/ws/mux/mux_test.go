@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"workspace/mux"
 )
@@ -28,8 +30,8 @@ func TestLabel(t *testing.T) {
 }
 
 // A tmux Snapshot lists each session and pane: the pane going to the session
-// lands on, the pane marked agent, and the folder each runs in. tmux reports
-// no status, so every session is Open.
+// lands on, the pane marked agent, the folder each runs in, and the status an
+// agent's hooks recorded on its pane, while that agent still runs.
 func TestATmuxSnapshot(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux is not installed")
@@ -69,7 +71,17 @@ func TestATmuxSnapshot(t *testing.T) {
 	tmux("new-session", "-d", "-s", "api", "-c", work)
 	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}")
 	tmux("set-option", "-p", "-t", agent, "@ws", "agent")
-	tmux("new-session", "-d", "-s", "web", "-c", work)
+	record := func(pane, status string, pid int) {
+		for option, value := range map[string]string{"@ws_status": status, "@ws_app": "codex", "@ws_pid": strconv.Itoa(pid), "@ws_since": "1700000000"} {
+			tmux("set-option", "-p", "-t", pane, option, value)
+		}
+	}
+	record(agent, "working", os.Getpid())
+	exited := exec.Command("true")
+	if err := exited.Run(); err != nil {
+		t.Fatal(err)
+	}
+	record(tmux("new-session", "-d", "-s", "web", "-c", work, "-P", "-F", "#{pane_id}"), "done", exited.Process.Pid)
 
 	s, err := mux.Detect(func(string) string { return "" }, "").Snapshot()
 	if err != nil {
@@ -86,10 +98,14 @@ func TestATmuxSnapshot(t *testing.T) {
 	if !ok || lands.ID == agent || lands.Folder != work {
 		t.Errorf("going to api lands on %+v, want its first pane, in %s", lands, work)
 	}
-	if i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.Agent }); i < 0 || s.Panes[i].ID != agent {
-		t.Errorf("the pane marked agent isn't %s in %+v", agent, s.Panes)
+	i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.Agent })
+	if i < 0 || s.Panes[i].ID != agent {
+		t.Fatalf("the pane marked agent isn't %s in %+v", agent, s.Panes)
 	}
-	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Open, "web": mux.Open}) {
-		t.Errorf("the statuses are %v, want both sessions open", got)
+	if p := s.Panes[i]; p.App != "codex" || !p.Updated.Equal(time.Unix(1700000000, 0)) {
+		t.Errorf("the agent's pane reads app %q since %v, want codex since 1700000000", p.App, p.Updated)
+	}
+	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Working, "web": mux.Open}) {
+		t.Errorf("the statuses are %v, want api working and web, whose agent exited, open", got)
 	}
 }

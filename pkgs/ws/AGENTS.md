@@ -45,8 +45,8 @@ The rest are records `ws` keeps for itself:
 
 - `acknowledged.json`: each item you marked done in Reviews, with what it
   needed you for then, so that anything newer brings it back
-- `last-jump`: the Rex pane the last `ws focus agent` went to, so the
-  next jump moves on
+- `last-jump`: the pane the last `ws focus agent` went to, so the next
+  jump moves on
 - `mascot.json`: the mascot and its two colors, which only the popups use,
   written by `ws mascot` and the theme popup
 - `agent`: the agent this computer starts by default, set by `ws agent`

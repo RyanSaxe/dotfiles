@@ -2,7 +2,6 @@ package main
 
 import (
 	"cmp"
-	"errors"
 	"slices"
 	"strings"
 
@@ -13,14 +12,10 @@ import (
 )
 
 func agentsPopup(b mux.Backend) popup.Popup {
-	_, inRex := b.(mux.Rex)
 	return popup.Popup{
 		Noun: "terminals",
 		Tabs: []popup.Tab{{Name: "Agents", Empty: "No terminal reports a program status."}},
 		Load: func(int, func([]popup.Row)) ([]popup.Row, error) {
-			if !inRex {
-				return nil, errors.New("agents lists Rex terminals, and this terminal is not in Rex")
-			}
 			s, err := b.Snapshot()
 			ps := s.Agents()
 			slices.SortFunc(ps, func(a, b mux.Pane) int { return cmp.Or(int(a.Status)-int(b.Status), b.Updated.Compare(a.Updated)) })

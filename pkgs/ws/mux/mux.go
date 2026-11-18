@@ -77,6 +77,9 @@ type Backend interface {
 	Current() (string, error) // the id of the session the program runs in, popups included
 	// Images is what the terminal showing the program can do with images.
 	Images() kitty.Terminal
+	// Follow calls changed at the start and whenever a status may have
+	// changed since, and never returns.
+	Follow(changed func())
 }
 
 // Detect is Rex inside Rex and tmux otherwise. Outside both, tmux sessions

@@ -1,13 +1,15 @@
 #!/usr/bin/env zsh
 # The "A" agent-attention letter: a pseudo-workspace indicator sitting
-# after the real workspace letters, lit from the statuses agents report to
-# Rex. cmd-alt-a walks through the agents, the one that wants you first.
+# after the real workspace letters, lit from the statuses agents report in
+# Rex or tmux. cmd-alt-a walks through the agents, the one that wants you
+# first.
 #
 # `ws attention --watch` publishes the level:
 # - waiting: an agent is blocked on you, or failed
 # - none:    dim, like an unfocused workspace, and still a keybind reminder
 #
-# A finished agent leaves it dim, since Rex can't say when you've seen one.
+# A finished agent leaves it dim, since neither Rex nor tmux can say when
+# you've seen one.
 
 source "$HOME/.config/sketchybar/colors.sh"
 
