@@ -423,6 +423,26 @@ func TestAPopupOpensOnItsStartTab(t *testing.T) {
 	}
 }
 
+// An action's key runs it only on the tab and row its condition holds for,
+// and does nothing elsewhere.
+func TestAnActionRunsOnlyWhereItWorks(t *testing.T) {
+	var done []string
+	p := picker(nil, nil, new([]string))
+	p.Tabs = []popup.Tab{{Name: "Needs you"}, {Name: "Issues"}}
+	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) {
+		return []popup.Row{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}}, nil
+	}
+	p.Actions = []popup.Action{{Key: "ctrl+x", Help: "done",
+		When: func(tab int, r popup.Row) bool { return tab == 0 && r.ID == "b" },
+		Run:  func(r popup.Row) tea.Cmd { done = append(done, r.ID); return nil }}}
+	ctrlX := tea.KeyMsg{Type: tea.KeyCtrlX}
+	// Ctrl-X on each row of Needs you, then on each row of Issues.
+	run(start(p), ctrlX, down, ctrlX, tea.KeyMsg{Type: tea.KeyTab}, ctrlX, down, ctrlX)
+	if want := []string{"b"}; !slices.Equal(done, want) {
+		t.Errorf("Ctrl-X ran on %v, want only on b in Needs you", done)
+	}
+}
+
 // Shift-Tab moves through the tabs the other way, wrapping from the first
 // to the last.
 func TestShiftTabGoesBackThroughTheTabs(t *testing.T) {
