@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -40,6 +41,27 @@ func pick(b mux.Backend, name string) error {
 		art.Accent = accentColor()
 		return art
 	})
+}
+
+// perLoad shares work between the tabs of one load, which all start at
+// once: the first tab to ask runs it, and the others wait for its result. A
+// tab that asks again is in the next load, which runs the work afresh.
+func perLoad[T any](work func() (T, error)) func(tab int) (T, error) {
+	var (
+		mu    sync.Mutex
+		run   func() (T, error)
+		asked map[int]bool
+	)
+	return func(tab int) (T, error) {
+		mu.Lock()
+		if run == nil || asked[tab] {
+			run, asked = sync.OnceValues(work), map[int]bool{}
+		}
+		asked[tab] = true
+		this := run
+		mu.Unlock()
+		return this()
+	}
 }
 
 // statusTag names an agent's status in its color.

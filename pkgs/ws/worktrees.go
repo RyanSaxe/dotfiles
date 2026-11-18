@@ -40,13 +40,27 @@ func worktreesPopup(b mux.Backend) popup.Popup {
 	if project != "" {
 		tabs = []popup.Tab{{Name: project, Empty: "No worktrees of " + project + "."}, {Name: "All", Empty: "No worktrees under ~/worktrees."}}
 	}
+	// The first tab lists only project's worktrees, when there is one.
+	onTab := func(t int, w worktree) bool { return project == "" || t != 0 || w.Project == project }
+	gather := perLoad(func() ([]worktree, error) { return worktrees(b), nil })
 	return popup.Popup{
 		Noun: "worktrees",
 		Tabs: tabs,
-		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
+		// Each worktree's name and folder show at once, and its branch,
+		// changes, last commit and agent state once git and the multiplexer
+		// answer.
+		Load: func(t int, show func([]popup.Row)) ([]popup.Row, error) {
+			var early []popup.Row
+			for _, w := range worktreeDirs(project) {
+				if onTab(t, w) {
+					early = append(early, popup.Row{ID: w.Path, Title: w.Name, Detail: tilde(w.Path), Data: w})
+				}
+			}
+			show(early)
+			wts, _ := gather(t)
 			var rows []popup.Row
-			for _, w := range worktrees(b) {
-				if project != "" && t == 0 && w.Project != project {
+			for _, w := range wts {
+				if !onTab(t, w) {
 					continue
 				}
 				// Only what the tab and the name don't already say: the project on

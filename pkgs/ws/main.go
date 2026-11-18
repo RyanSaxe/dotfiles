@@ -508,22 +508,40 @@ func printWorktrees(b mux.Backend, asJSON bool) error {
 	return tw.Flush()
 }
 
-// worktrees lists ~/worktrees/PROJECT/NAME checkouts, the current project
-// first and the most recently committed first within a project.
-func worktrees(b mux.Backend) []worktree {
+// worktreeDirs lists the ~/worktrees/PROJECT/NAME checkouts with only what
+// their folders say, in nearly the order worktrees sorts them in. Until
+// worktrees reads the last commit, Updated is when git last moved HEAD,
+// which a commit moves too.
+func worktreeDirs(current string) []worktree {
 	gits, _ := filepath.Glob(filepath.Join(worktreeRoot, "*", "*", ".git"))
-	snapshot, _ := b.Snapshot()
-	states := snapshot.Statuses()
 	wts := make([]worktree, len(gits))
-	var wg sync.WaitGroup
 	for i, g := range gits {
 		dir := filepath.Dir(g)
+		wts[i] = worktree{Project: filepath.Base(filepath.Dir(dir)), Name: filepath.Base(dir), Path: dir, Updated: activity(dir)}
+	}
+	sortWorktrees(wts, current)
+	return wts
+}
+
+// worktrees lists ~/worktrees/PROJECT/NAME checkouts with their branch,
+// changes, last commit and agent state, the current project first and the
+// most recently committed first within a project.
+func worktrees(b mux.Backend) []worktree {
+	current := ""
+	if main, err := mainCheckout("."); err == nil {
+		current = filepath.Base(main)
+	}
+	wts := worktreeDirs(current)
+	var states map[string]mux.Status
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		s, _ := b.Snapshot()
+		states = s.Statuses()
+	})
+	for i := range wts {
+		w := &wts[i]
 		wg.Go(func() {
-			w := worktree{Project: filepath.Base(filepath.Dir(dir)), Name: filepath.Base(dir), Path: dir}
-			if s, ok := states[labelFor(dir)]; ok {
-				w.State = s.String()
-			}
-			status, _ := git(dir, "status", "--porcelain=v2", "--branch")
+			status, _ := git(w.Path, "status", "--porcelain=v2", "--branch")
 			for line := range strings.SplitSeq(status, "\n") {
 				if b, ok := strings.CutPrefix(line, "# branch.head "); ok {
 					w.Branch = b
@@ -531,15 +549,22 @@ func worktrees(b mux.Backend) []worktree {
 					w.Dirty = true
 				}
 			}
-			w.Updated, w.Subject = lastCommit(dir)
-			wts[i] = w
+			w.Updated, w.Subject = lastCommit(w.Path)
 		})
 	}
 	wg.Wait()
-	current := ""
-	if main, err := mainCheckout("."); err == nil {
-		current = filepath.Base(main)
+	for i, w := range wts {
+		if s, ok := states[labelFor(w.Path)]; ok {
+			wts[i].State = s.String()
+		}
 	}
+	sortWorktrees(wts, current)
+	return wts
+}
+
+// sortWorktrees puts current's worktrees first, then each project's, the
+// most recently committed first.
+func sortWorktrees(wts []worktree, current string) {
 	slices.SortStableFunc(wts, func(a, b worktree) int {
 		if mine := a.Project == current; mine != (b.Project == current) {
 			if mine {
@@ -549,7 +574,6 @@ func worktrees(b mux.Backend) []worktree {
 		}
 		return cmp.Or(strings.Compare(a.Project, b.Project), b.Updated.Compare(a.Updated))
 	})
-	return wts
 }
 
 // resolveWorktree finds ~/worktrees/PROJECT/NAME from PROJECT/NAME or a NAME
