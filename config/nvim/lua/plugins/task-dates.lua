@@ -45,7 +45,7 @@ return {
     opts = function(_, opts)
       opts.highlighters = opts.highlighters or {}
       opts.highlighters.task_due = {
-        -- Prettier can wrap a line between 📅 and its date.
+        -- rumdl can wrap a line between 📅 and its date.
         pattern = {
           in_markdown("📅 " .. DATE),
           in_markdown("()📅()%s*$"),
