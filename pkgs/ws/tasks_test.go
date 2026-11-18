@@ -114,6 +114,10 @@ func TestAWrappedTaskReadsAsOne(t *testing.T) {
 		"- [ ] a sample",
 		"```",
 		"a paragraph",
+		"- [ ] Check that the headless shell at the same version as the browser honored",
+		"      390. width 📅 2026-11-08",
+		"- [ ] above a numbered list",
+		"1. a step 📅 2026-11-08",
 	}, "\n")
 	writeNote(t, vault, "notes/projects/nix/TODO.md", note)
 
@@ -133,6 +137,8 @@ func TestAWrappedTaskReadsAsOne(t *testing.T) {
 		in("", "none", "nix", 15, "above a table"),
 		in("", "none", "nix", 18, "above a heading"),
 		in("", "none", "vault", 20, "above a fence"),
+		in("2026-11-08", "overdue", "vault", 25, "Check that the headless shell at the same version as the browser honored 390. width"),
+		in("", "none", "vault", 27, "above a numbered list"),
 	}
 	if len(ts) != len(want) {
 		t.Fatalf("got %d tasks, want %d: %+v", len(ts), len(want), ts)
