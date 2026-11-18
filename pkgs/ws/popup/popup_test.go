@@ -5,6 +5,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -221,6 +222,79 @@ func TestAnEarlyEnterWaitsForARowThatMatches(t *testing.T) {
 	close(finish)
 	if r := receive(t, picks); r.ID != "b" {
 		t.Errorf("the early Enter picked %q, want b, the final rows' match", r.ID)
+	}
+}
+
+// A load and a fetch that finish as quickly as most do draw their rows and
+// details with no loading line before them, which would flash for a frame.
+func TestAQuickLoadDrawsNoLoadingLine(t *testing.T) {
+	p := picker(nil, nil, new([]string))
+	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) {
+		time.Sleep(50 * time.Millisecond)
+		return []popup.Row{{ID: "a", Title: "a"}}, nil
+	}
+	p.Fetch = func(popup.Row) (any, error) { time.Sleep(50 * time.Millisecond); return "about a", nil }
+	s := open(t, p)
+	s.waitToDraw(t, "about a")
+	for _, line := range []string{"loading rows", "loading details"} {
+		if s.drew(line) {
+			t.Errorf("the popup drew %q", line)
+		}
+	}
+}
+
+// A load or a fetch slow enough to notice says that it's loading until it
+// finishes.
+func TestASlowLoadSaysItsLoading(t *testing.T) {
+	rows, details := make(chan struct{}), make(chan struct{})
+	p := picker(nil, nil, new([]string))
+	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) {
+		<-rows
+		return []popup.Row{{ID: "a", Title: "a"}}, nil
+	}
+	p.Fetch = func(popup.Row) (any, error) { <-details; return "about a", nil }
+	s := open(t, p)
+	s.waitToDraw(t, "loading rows")
+	close(rows)
+	s.waitToDraw(t, "loading details")
+	close(details)
+	s.waitToDraw(t, "about a")
+}
+
+// open runs p as a terminal would, and keeps what it draws.
+func open(t *testing.T, p popup.Popup) *terminal {
+	s := new(terminal)
+	prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(s), tea.WithoutSignalHandler())
+	go prog.Run()
+	t.Cleanup(prog.Kill)
+	prog.Send(size)
+	return s
+}
+
+// A terminal keeps everything a running popup draws.
+type terminal struct {
+	mu  sync.Mutex
+	out strings.Builder
+}
+
+func (s *terminal) Write(b []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.out.Write(b)
+}
+
+func (s *terminal) drew(text string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return strings.Contains(s.out.String(), text)
+}
+
+func (s *terminal) waitToDraw(t *testing.T, text string) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); !s.drew(text); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the popup never drew %q", text)
+		}
 	}
 }
 

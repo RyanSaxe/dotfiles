@@ -51,7 +51,8 @@ type frame struct {
 	p       Popup
 	w, h    int
 	active  int
-	reloads int // which reload the details belong to
+	reloads int       // which reload the details belong to
+	started time.Time // when the current load began
 	lists   []list.Model
 	tabs    []tabLoad
 	details map[string]detail
@@ -64,7 +65,7 @@ type frame struct {
 }
 
 func newFrame(id int, p Popup, art Art) frame {
-	m := frame{id: id, p: p, active: p.Start, lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
+	m := frame{id: id, p: p, active: p.Start, started: time.Now(), lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
 	for i := range m.lists {
 		l := list.New(nil, delegate{p.OneLine}, 0, 0)
 		l.Filter = listFilter
@@ -206,6 +207,7 @@ func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 	case reloadMsg:
 		m.foot, _ = m.foot.next(say{string(msg)})
 		m.reloads++
+		m.started = time.Now()
 		m.details = map[string]detail{}
 		for i := range m.tabs {
 			m.tabs[i], _ = m.tabs[i].next(reloadTab{})
@@ -415,7 +417,7 @@ func (m frame) updateList(msg tea.Msg) (frame, tea.Cmd) {
 
 // selectionChanged shows what's known about the new selection, and tells
 // its details the cursor arrived.
-func (m *frame) selectionChanged() tea.Cmd { return m.moveSelected(arrived{m.reloads}) }
+func (m *frame) selectionChanged() tea.Cmd { return m.moveSelected(arrived{m.reloads, time.Now()}) }
 
 // moveSelected shows what's known about the selection, and moves its
 // details on with e. Details wait for the tab's final rows, since a row
@@ -493,8 +495,10 @@ func (m *frame) syncDetail() {
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, w, "…") + "\x1b[m" // no style reaches past the cut or into the border
 	}
+	// The body leaves room for the loading line, which can appear between
+	// syncs. Until it does, the box pads that room.
 	headH := 0
-	if head := m.detailHead(r, ok, w); head != "" {
+	if head := m.detailHead(r, ok, w, true); head != "" {
 		headH = lipgloss.Height(head)
 	}
 	m.vp.Width, m.vp.Height = w, max(0, m.h-m.headerH()-2-m.footerH()-headH)
@@ -504,7 +508,23 @@ func (m *frame) syncDetail() {
 	}
 }
 
-func (m frame) detailHead(r Row, ok bool, w int) string {
+// patience is how long a load or a fetch runs before the frame says that
+// it's loading. Most finish sooner, and a loading line drawn for a frame or
+// two flashes before what replaces it. The spinner, which ticks while
+// anything loads, draws the line once it's due.
+const patience = 300 * time.Millisecond
+
+// slow says whether a wait that began at since has run past patience.
+func slow(since time.Time) bool { return time.Since(since) >= patience }
+
+// detailsSlow says whether the row's details have kept the frame waiting past
+// patience, since the cursor arrived on the row, or since the load began for
+// a row the cursor never moved to.
+func (m frame) detailsSlow(r Row) bool { return slow(cmp.Or(m.details[r.ID].since, m.started)) }
+
+// detailHead is what heads the row's details, with their loading line only
+// when loading is set.
+func (m frame) detailHead(r Row, ok bool, w int, loading bool) string {
 	if !ok {
 		return ""
 	}
@@ -518,7 +538,7 @@ func (m frame) detailHead(r Row, ok bool, w int) string {
 	}
 	switch d := m.details[r.ID]; {
 	case m.p.Fetch == nil:
-	case d.state == unasked, d.state == waiting, d.state == fetching:
+	case (d.state == unasked || d.state == waiting || d.state == fetching) && loading:
 		lines = append(lines, m.spin.View()+Dim.Render(" loading details"))
 	case d.state == missing:
 		lines = append(lines, Red.Width(w).Render(d.err.Error()))
@@ -614,7 +634,7 @@ func (m frame) view() string {
 	left := box.Width(lw - 2).Height(bodyH - 2).Render(m.listPane(lw-4, bodyH-2))
 	r, ok := m.selected()
 	details := m.vp.View()
-	if head := m.detailHead(r, ok, m.rightW()); head != "" {
+	if head := m.detailHead(r, ok, m.rightW(), m.detailsSlow(r)); head != "" {
 		details = head + "\n" + details
 	}
 	right := box.Width(m.rightW() + 2).Height(bodyH - 2).Render(details)
@@ -640,6 +660,8 @@ func (m frame) listPane(w, h int) string {
 	switch {
 	case t.showsErr():
 		return center(Red.Render("Could not load "+m.p.Noun), "", Dim.Width(w-4).Align(lipgloss.Center).Render(t.err.Error()), "", Dim.Render("^r to retry"))
+	case !t.showsRows() && !slow(m.started):
+		return ""
 	case !t.showsRows():
 		return center(m.spin.View() + Dim.Render(" loading "+m.p.Noun))
 	case len(l.Items()) == 0:
