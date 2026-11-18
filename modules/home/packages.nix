@@ -58,10 +58,12 @@ in
         ast-grep
         gopls
         lua-language-server
-        markdownlint-cli
         nil
         nixfmt
+        oxfmt
+        # For the projects that still have a Prettier config.
         prettier
+        rumdl
         rust-analyzer
         shfmt
         stylua
