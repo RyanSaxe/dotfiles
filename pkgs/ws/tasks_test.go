@@ -213,11 +213,11 @@ func TestEnterOnATaskLandsInItsTab(t *testing.T) {
 				"--autostart=false -C client:app do session.select session_id=session:work window_id=window:task",
 			}},
 		{"tmux", "tmux",
-			`case "$1" in display-message) echo work;; esac`,
+			`case "$2" in display-message) echo work;; esac`,
 			map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"},
 			[]string{
-				"display-message -p #{session_name}",
-				"new-window -t =work: -c VAULT -- nvim +1 notes/daily/2026-11-09.md",
+				"-u display-message -p #{session_name}",
+				"-u new-window -t =work: -c VAULT -- nvim +1 notes/daily/2026-11-09.md",
 			}},
 	} {
 		vault := t.TempDir()

@@ -20,7 +20,10 @@ type Tmux struct {
 	term   string
 }
 
-func tmux(args ...string) (string, error) { return run("tmux", args...) }
+// tmux runs a tmux command. -u has it write UTF-8 whatever the locale, since
+// without a UTF-8 locale, as under launchd, it prints each tab and non-ASCII
+// character as an underscore.
+func tmux(args ...string) (string, error) { return run("tmux", append([]string{"-u"}, args...)...) }
 
 // paneFormat is what Snapshot reads of each pane. The title goes last,
 // since a program can put a tab in it.

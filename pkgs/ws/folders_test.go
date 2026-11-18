@@ -50,7 +50,7 @@ func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 
 	calls := filepath.Join(t.TempDir(), "calls")
 	onPath(t, "tmux", `echo "$*" >> `+calls+`
-case "$1" in
+case "$2" in
 list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\tbusy\nscratch\t11\t%%2\t\tzsh\t/elsewhere\tscratch\n';;
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
