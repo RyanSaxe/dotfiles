@@ -32,8 +32,11 @@ type Pane struct {
 	Landing, Agent     bool // where going to the session lands, and the pane marked agent
 	Program, Folder    string
 	Status             Status // Open when the program reports nothing
-	App, Title         string
-	Updated            time.Time
+	// NeedsYou says the pane's agent needs you and you haven't looked at the
+	// pane since.
+	NeedsYou   bool
+	App, Title string
+	Updated    time.Time // the pane's last activity
 }
 
 // Landing is the pane going to the session lands on.
@@ -77,6 +80,9 @@ type Backend interface {
 	Current() (string, error) // the id of the session the program runs in, popups included
 	// Images is what the terminal showing the program can do with images.
 	Images() kitty.Terminal
+	// Follow calls changed at the start and whenever an agent may have
+	// changed since, and never returns.
+	Follow(changed func())
 }
 
 // Detect is Rex inside Rex and tmux otherwise. Outside both, tmux sessions

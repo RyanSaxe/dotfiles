@@ -16,7 +16,8 @@ packaged on their own:
 - `kitty`: images drawn with Kitty's Unicode placeholders
 - `markdown`: markdown for a pane, with pictures and mermaid diagrams
 - `mux`: Rex and tmux sessions and panes, read in one `Snapshot` with what
-  each pane runs and its agent's status, and the actions on them
+  each pane runs, its agent's status and whether it needs you, and the
+  actions on them
 - `layout`: session layouts and shell quoting
 
 The command in this folder holds everything that knows Ryan's setup: the CLI,

@@ -9,13 +9,17 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"workspace/kitty"
 	"workspace/layout"
 )
 
 // Tmux is the tmux server, which the program may or may not run inside.
+// Client is the client Show and Focus switch when the program runs outside
+// tmux, as from a key bound outside every terminal.
 type Tmux struct {
+	Client string
 	inside bool
 	term   string
 }
@@ -27,10 +31,19 @@ func tmux(args ...string) (string, error) { return run("tmux", append([]string{"
 
 // paneFormat is what Snapshot reads of each pane. The title goes last,
 // since a program can put a tab in it.
-const paneFormat = "#{session_name}\t#{window_active}#{pane_active}\t#{pane_id}\t#{@ws}\t#{pane_current_command}\t#{pane_current_path}\t#{pane_title}"
+const paneFormat = "#{session_name}\t#{window_active}#{pane_active}\t#{pane_id}\t#{@ws}\t#{pane_current_command}\t#{pane_current_path}\t" +
+	"#{window_bell_flag}\t#{window_activity}\t#{pane_title}"
 
-// Snapshot reads every pane with one list-panes. tmux has no program
-// status, so every pane is Open, with no app or time.
+// working is how recently an agent's window must have printed for the agent
+// to count as working.
+const working = 5 * time.Second
+
+// Snapshot reads every pane with one list-panes. tmux has no program status,
+// so the agent is the pane marked agent, and what tmux tracks of its window
+// stands in for one: the agent works while the window prints, and needs you
+// while the window's bell flag is up. tmux raises the flag when the bell
+// rings in a window no client shows, and lowers it when a client switches
+// to the window, so a bell you saw marks nothing.
 func (Tmux) Snapshot() (Snapshot, error) {
 	out, err := tmux("list-panes", "-a", "-F", paneFormat)
 	if err != nil && (strings.Contains(err.Error(), "no server running") || strings.Contains(err.Error(), "error connecting")) {
@@ -38,18 +51,38 @@ func (Tmux) Snapshot() (Snapshot, error) {
 	}
 	var s Snapshot
 	for line := range strings.SplitSeq(out, "\n") {
-		f := strings.SplitN(line, "\t", 7)
-		if len(f) < 7 {
+		f := strings.SplitN(line, "\t", 9)
+		if len(f) < 9 {
 			continue
 		}
 		id := "=" + f[0] // = matches the name exactly
 		if !slices.ContainsFunc(s.Sessions, func(s Session) bool { return s.ID == id }) {
 			s.Sessions = append(s.Sessions, Session{id, f[0]})
 		}
-		s.Panes = append(s.Panes, Pane{Session: id, Label: f[0], ID: f[2], Landing: f[1] == "11", Agent: f[3] == "agent",
-			Program: f[4], Folder: f[5], Status: Open, Title: f[6]})
+		p := Pane{Session: id, Label: f[0], ID: f[2], Landing: f[1] == "11", Agent: f[3] == "agent",
+			Program: f[4], Folder: f[5], Status: Open, Title: f[8]}
+		if p.Agent {
+			activity, _ := strconv.ParseInt(f[7], 10, 64)
+			p.Updated = time.Unix(activity, 0)
+			p.Status = Idle
+			if time.Since(p.Updated) < working {
+				p.Status = Working
+			}
+			p.NeedsYou = f[6] == "1"
+		}
+		s.Panes = append(s.Panes, p)
 	}
 	return s, err
+}
+
+// Follow calls changed every few seconds and never returns, since tmux tells
+// no one when a window prints or rings. A Snapshot costs one list-panes,
+// about 11 ms.
+func (Tmux) Follow(changed func()) {
+	for {
+		changed()
+		time.Sleep(3 * time.Second)
+	}
 }
 
 func (Tmux) Create(label, dir string, panes []layout.Pane) (string, error) {
@@ -80,12 +113,11 @@ func (Tmux) Create(label, dir string, panes []layout.Pane) (string, error) {
 	return "=" + label, err
 }
 
-// Show switches this tmux client to the session, or attaches this terminal
-// to it when the program runs outside tmux.
+// Show switches the client to the session. Outside tmux with no Client, it
+// attaches this terminal to the session instead.
 func (t Tmux) Show(id string) error {
-	if t.inside {
-		_, err := tmux("switch-client", "-t", id)
-		return err
+	if t.inside || t.Client != "" {
+		return t.switchTo(id)
 	}
 	bin, err := exec.LookPath("tmux")
 	if err != nil {
@@ -122,8 +154,17 @@ func (Tmux) Kill(id string) error {
 	return err
 }
 
-func (Tmux) Focus(p Pane) error {
-	_, err := tmux("select-window", "-t", p.ID, ";", "select-pane", "-t", p.ID)
+// Focus switches the client to the pane's session, window and pane.
+func (t Tmux) Focus(p Pane) error { return t.switchTo(p.ID) }
+
+// switchTo switches the client to a session or a pane: Client when it's
+// set, and otherwise the client of the pane the program runs in.
+func (t Tmux) switchTo(target string) error {
+	args := []string{"switch-client", "-t", target}
+	if t.Client != "" {
+		args = append(args, "-c", t.Client)
+	}
+	_, err := tmux(args...)
 	return err
 }
 

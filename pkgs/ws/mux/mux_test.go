@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"workspace/mux"
 )
@@ -28,8 +29,9 @@ func TestLabel(t *testing.T) {
 }
 
 // A tmux Snapshot lists each session and pane: the pane going to the session
-// lands on, the pane marked agent, and the folder each runs in. tmux reports
-// no status, so every session is Open.
+// lands on, the pane marked agent, and the folder each runs in. The agent
+// needs you once its window's bell rings where no client shows it, and works
+// while its window prints. Every other pane is Open.
 func TestATmuxSnapshot(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux is not installed")
@@ -67,13 +69,20 @@ func TestATmuxSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmux("new-session", "-d", "-s", "api", "-c", work)
-	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}")
+	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}", `printf '\a'; exec cat`)
 	tmux("set-option", "-p", "-t", agent, "@ws", "agent")
 	tmux("new-session", "-d", "-s", "web", "-c", work)
 
-	s, err := mux.Detect(func(string) string { return "" }, "").Snapshot()
-	if err != nil {
-		t.Fatal(err)
+	// tmux reads the bell from the pane's output a moment after it rings.
+	backend := mux.Detect(func(string) string { return "" }, "")
+	var s mux.Snapshot
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		if s, err = backend.Snapshot(); err != nil {
+			t.Fatal(err)
+		}
+		if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.NeedsYou }) || time.Now().After(deadline) {
+			break
+		}
 	}
 	var labels []string
 	for _, session := range s.Sessions {
@@ -86,10 +95,58 @@ func TestATmuxSnapshot(t *testing.T) {
 	if !ok || lands.ID == agent || lands.Folder != work {
 		t.Errorf("going to api lands on %+v, want its first pane, in %s", lands, work)
 	}
-	if i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.Agent }); i < 0 || s.Panes[i].ID != agent {
-		t.Errorf("the pane marked agent isn't %s in %+v", agent, s.Panes)
+	i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.Agent })
+	if i < 0 || s.Panes[i].ID != agent {
+		t.Fatalf("the pane marked agent isn't %s in %+v", agent, s.Panes)
 	}
-	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Open, "web": mux.Open}) {
-		t.Errorf("the statuses are %v, want both sessions open", got)
+	if p := s.Panes[i]; !p.NeedsYou || p.Status != mux.Working {
+		t.Errorf("the agent that just rang reads %v, needing you %v, want working and needing you", p.Status, p.NeedsYou)
+	}
+	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return !p.Agent && (p.NeedsYou || p.Status != mux.Open) }) {
+		t.Errorf("a pane with no agent reports something in %+v", s.Panes)
+	}
+	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Working, "web": mux.Open}) {
+		t.Errorf("the statuses are %v, want api working and web open", got)
+	}
+}
+
+// A Rex agent needs you while it's blocked or failed, and while it's done
+// until an app shows its pane, which asks the server for the pane's size.
+// The pane you're looking at needs nothing, and nor does a done report that
+// came while you looked, which the caller lists in Seen.
+func TestARexSnapshotTellsWhichAgentsNeedYou(t *testing.T) {
+	bin := t.TempDir()
+	script := `#!/bin/sh
+cat >/dev/null
+cat <<'EOF'
+{"sessions": [{"id": "s:api", "label": "api"}, {"id": "s:web", "label": "web"}],
+ "panes": [
+  {"session": "s:api", "label": "api", "id": "looked-at", "landing": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:web", "label": "web", "id": "blocked", "landing": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:web", "label": "web", "id": "unseen", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
+  {"session": "s:web", "label": "web", "id": "never-shown", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:web", "label": "web", "id": "shown-since", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:06:00Z"]},
+  {"session": "s:web", "label": "web", "id": "listed", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
+  {"session": "s:web", "label": "web", "id": "working", "status": "working", "updated": "2026-11-17T12:05:00-05:00", "shown": {}}
+ ]}
+EOF`
+	if err := os.WriteFile(filepath.Join(bin, "rex"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+
+	finished := time.Date(2026, 11, 17, 17, 5, 0, 0, time.UTC)
+	s, err := mux.Rex{Shown: "api", Seen: map[string]time.Time{"listed": finished}}.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var needing []string
+	for _, p := range s.Panes {
+		if p.NeedsYou {
+			needing = append(needing, p.ID)
+		}
+	}
+	if want := []string{"blocked", "unseen", "never-shown"}; !slices.Equal(needing, want) {
+		t.Errorf("%v need you, want %v", needing, want)
 	}
 }

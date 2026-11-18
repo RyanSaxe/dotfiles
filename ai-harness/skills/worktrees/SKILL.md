@@ -42,7 +42,8 @@ ws new NAME --agent claude --prompt "…"
 ## Watch and message
 
 - `ws ls` lists worktrees by project with each session's agent state. Rex
-  reports blocked, error, done, working or idle. tmux shows only open.
+  reports blocked, error, done, working or idle. In tmux, the agent shows
+  working while its window prints and idle otherwise.
 - In Rex, the rex skill covers reading an agent's screen.
 - `ws send NAME "text"` types the text and Enter into that worktree's agent
   pane. Answer another agent only when the user asked you to coordinate.
