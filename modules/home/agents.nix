@@ -40,6 +40,7 @@ let
   skills = {
     worktrees = link "ai-harness/skills/worktrees";
     wiki = link "ai-harness/skills/wiki";
+    project-setup = link "ai-harness/skills/project-setup";
   };
   skillLinks =
     dir: lib.mapAttrs' (name: source: lib.nameValuePair "${dir}/${name}" { inherit source; }) skills;

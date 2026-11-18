@@ -1,0 +1,62 @@
+# prek runs these before each commit, and CI runs `prek run --all-files`.
+# Formatters fix files rather than only reporting them.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        # CI's checkout stages nothing, so check every file it is given.
+        args: [--enforce-all]
+
+  # Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # Python: ty checks the whole project, with the dependencies in uv.lock.
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.105
+    hooks:
+      - id: ty
+
+  # Notebooks: committed without their outputs.
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.2
+    hooks:
+      - id: nbstripout
+
+  # Web: oxfmt and oxlint run from node_modules, at the versions in
+  # package-lock.json.
+  - repo: local
+    hooks:
+      - id: oxfmt
+        name: oxfmt
+        entry: npx --no-install oxfmt --no-error-on-unmatched-pattern
+        language: system
+        files: \.([cm]?[jt]sx?|css|html|json|ya?ml|toml)$
+      - id: oxlint
+        name: oxlint
+        entry: npx --no-install oxlint --deny-warnings
+        language: system
+        files: \.[cm]?[jt]sx?$
+
+      # Web with a build step: tsc reads tsconfig.json only when it's given
+      # no file names, so it checks the whole project.
+      - id: tsc
+        name: tsc
+        entry: npx --no-install tsc --noEmit
+        language: system
+        files: \.[cm]?tsx?$|^tsconfig\.json$
+        pass_filenames: false
+
+  - repo: https://github.com/rvben/rumdl-pre-commit
+    rev: v0.3.4
+    hooks:
+      - id: rumdl-check
+        args: [--fix]
