@@ -32,16 +32,25 @@ const (
 // activity on one tab, and running sessions on the other. It opens on first,
 // foldersTab or sessionsTab.
 func goPopup(b mux.Backend, first int) popup.Popup {
+	walk := perLoad(func() ([]folder, error) { return folders(), nil })
+	snapshot := perLoad(func() (mux.Snapshot, error) { return b.Snapshot() })
 	return popup.Popup{
 		Noun:  "folders and sessions",
 		Tabs:  []popup.Tab{foldersTab: {Name: "Folders", Empty: "No repositories, worktrees or bookmarks."}, sessionsTab: {Name: "Sessions", Empty: "No sessions are running."}},
 		Start: first,
-		Load: func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
-			s, err := b.Snapshot()
+		// Folders shows the walk's rows at once, and tags the folders that
+		// have a session once the snapshot comes. Enter on an untagged row
+		// still goes to its session, since open finds it.
+		Load: func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
+			fs, _ := walk(tab)
 			if tab == foldersTab {
-				return folderRows(s), err
+				show(folderRows(fs, mux.Snapshot{}))
 			}
-			return sessionRows(s), err
+			s, err := snapshot(tab)
+			if tab == foldersTab {
+				return folderRows(fs, s), err
+			}
+			return sessionRows(fs, s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
 			p := r.Data.(place)
@@ -107,14 +116,14 @@ func folders() []folder {
 }
 
 // folderRows are the Folders tab: each folder, with its session when one is
-// running, so Enter goes to that session.
-func folderRows(s mux.Snapshot) []popup.Row {
+// running in s, so Enter goes to that session.
+func folderRows(fs []folder, s mux.Snapshot) []popup.Row {
 	sessions := map[string]string{} // a label to its session
 	for _, session := range s.Sessions {
 		sessions[session.Label] = session.ID
 	}
 	var rows []popup.Row
-	for _, f := range folders() {
+	for _, f := range fs {
 		session := sessions[labelFor(f.dir)]
 		pane, _ := s.Landing(session)
 		r := popup.Row{ID: f.dir, Title: folderTitle(f.dir), Detail: tilde(f.dir), Qualifier: relAge(f.at), Data: place{f.dir, session, pane}}
@@ -131,9 +140,9 @@ func folderRows(s mux.Snapshot) []popup.Row {
 
 // sessionRows are the Sessions tab: each running session with what it's
 // doing, and its folder.
-func sessionRows(s mux.Snapshot) []popup.Row {
+func sessionRows(fs []folder, s mux.Snapshot) []popup.Row {
 	dirs := map[string]string{} // a session's label to its folder
-	for _, f := range folders() {
+	for _, f := range fs {
 		dirs[labelFor(f.dir)] = f.dir
 	}
 	rows := make([]popup.Row, len(s.Sessions))
