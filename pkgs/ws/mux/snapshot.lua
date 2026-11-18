@@ -10,7 +10,7 @@ local function landing(view)
   for _, window in ipairs(view and view.windows or {}) do
     if window.window_id == view.active_window_id then
       for _, layer in ipairs(window.layers or {}) do
-        if layer.kind == "tiled" and #layer.blocks > 0 then
+        if layer.kind == "tiled" and #(layer.blocks or {}) > 0 then
           for _, block in ipairs(layer.blocks) do
             if block.block_id == window.focused_block_id then
               return block.block_id
