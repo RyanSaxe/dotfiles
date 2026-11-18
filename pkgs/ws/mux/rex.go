@@ -215,13 +215,6 @@ func draws(term string) bool {
 	return false
 }
 
-// PaneFolder is the folder of the program in one of this session's panes.
-func (r Rex) PaneFolder(block string) string {
-	var proc struct{ Foreground struct{ Cwd string } }
-	rexJSON(&proc, "block", "call", "-s", r.session, "-b", block, "process")
-	return proc.Foreground.Cwd
-}
-
 // A Binding is a key the server's config binds: the keys pressed in turn,
 // the action they run with its arguments, and the config line that binds it.
 type Binding struct {
