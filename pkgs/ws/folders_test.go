@@ -55,7 +55,8 @@ list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\tbusy\nscratch\t11\t%%2\t\t
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
 
-	folders, err := p.Load(foldersTab, func([]popup.Row) {})
+	var early []popup.Row // the rows Folders shows before the snapshot
+	folders, err := p.Load(foldersTab, func(rows []popup.Row) { early = rows })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +80,17 @@ esac`)
 	}
 	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "switch-client -t =busy\n") {
 		t.Errorf("Enter on busy, which has a session, ran tmux with\n%s", got)
+	}
+	// A row shown before the snapshot doesn't know its session, and its
+	// actions still find it.
+	ctrlX := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "ctrl+x" })]
+	i := slices.IndexFunc(early, func(r popup.Row) bool { return r.Title == "busy" })
+	if i < 0 || early[i].Tag.String() == "session" {
+		t.Fatalf("Folders showed %v before the snapshot", early)
+	}
+	ctrlX.Run(early[i])()
+	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "kill-session -t =busy\n") {
+		t.Errorf("Ctrl-X on busy as it showed before the snapshot ran tmux with\n%s", got)
 	}
 
 	sessions, err := p.Load(sessionsTab, func([]popup.Row) {})

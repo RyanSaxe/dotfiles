@@ -275,8 +275,9 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 			return m, a.Run(r)
 		}
 	}
-	// Enter before the first rows arrive waits for them, so typing a name and
-	// Enter straight after the popup opens goes to its top match.
+	// Enter with no row to pick, while the rows are still loading, waits for
+	// one that matches, so typing a name and Enter straight after the popup
+	// opens goes to its top match.
 	if key == "enter" && !ok {
 		m.tabs[m.active], _ = m.tabs[m.active].next(pickEarly{})
 		return m, nil

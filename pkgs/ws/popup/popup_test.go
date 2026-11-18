@@ -197,6 +197,33 @@ func TestRowsShownWhileLoadingGiveWayToTheFinalOnes(t *testing.T) {
 	}
 }
 
+// An Enter typed while none of the rows shown so far match waits for the
+// final rows, and goes to their top match.
+func TestAnEarlyEnterWaitsForARowThatMatches(t *testing.T) {
+	finish := make(chan struct{})
+	picks := make(chan popup.Row, 4)
+	p := popup.Popup{
+		Noun: "rows",
+		Tabs: []popup.Tab{{Name: "Rows"}},
+		Load: func(_ int, show func([]popup.Row)) ([]popup.Row, error) {
+			show([]popup.Row{{ID: "a", Title: "alpha", Detail: "~/alpha"}})
+			<-finish
+			return []popup.Row{{ID: "a", Title: "alpha", Detail: "main"}, {ID: "b", Title: "bravo", Detail: "fix the login"}}, nil
+		},
+		Actions: []popup.Action{{Key: "enter", Help: "pick", Run: func(r popup.Row) tea.Cmd { picks <- r; return nil }}},
+	}
+	prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(io.Discard), tea.WithoutRenderer(), tea.WithoutSignalHandler())
+	go prog.Run()
+	t.Cleanup(prog.Kill)
+	prog.Send(size)
+	prog.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("login")})
+	prog.Send(enter)
+	close(finish)
+	if r := receive(t, picks); r.ID != "b" {
+		t.Errorf("the early Enter picked %q, want b, the final rows' match", r.ID)
+	}
+}
+
 // receive waits for what a running popup hands its Fetch or actions.
 func receive(t *testing.T, c chan popup.Row) popup.Row {
 	t.Helper()

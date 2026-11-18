@@ -8,12 +8,13 @@ package popup
 type loadState int
 
 const (
-	firstLoad loadState = iota // nothing to show yet
-	picking                    // nothing to show yet, and Enter waits for the rows
-	loaded                     // showing rows
-	failed                     // showing why the load failed
-	updating                   // showing rows while a load runs, whose rows replace them
-	retrying                   // showing a failure while the next load runs
+	firstLoad       loadState = iota // nothing to show yet
+	picking                          // nothing to show yet, and Enter waits for the rows
+	loaded                           // showing rows
+	failed                           // showing why the load failed
+	updating                         // showing rows while a load runs, whose rows replace them
+	updatingPicking                  // the same, and Enter waits for a row that matches
+	retrying                         // showing a failure while the next load runs
 )
 
 type tabLoad struct {
@@ -45,30 +46,36 @@ type rowsEffect int
 const (
 	dropRows rowsEffect = iota
 	showRows
-	showAndPick // show them, and pick the top one for the Enter that came first
+	showAndPick // show them, and pick the top match for the Enter that came first
 )
 
 // next moves a tab on, and says what becomes of the event's rows.
 func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 	switch e := e.(type) {
 	case reloadTab:
-		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: updating, failed: retrying, updating: updating, retrying: retrying}[t.state]
+		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: updating, failed: retrying, updating: updating, updatingPicking: updatingPicking, retrying: retrying}[t.state]
 		return tabLoad{state: state, gen: t.gen + 1, err: t.err}, dropRows
 	case tabShown:
 		switch {
 		case e.gen != t.gen:
 			return t, dropRows
-		case t.state == picking:
-			return tabLoad{state: updating, gen: t.gen}, showAndPick
+		case t.state == picking || t.state == updatingPicking:
+			return tabLoad{state: updatingPicking, gen: t.gen}, showAndPick
 		}
 		return tabLoad{state: updating, gen: t.gen}, showRows
 	case pickEarly:
-		if t.state == firstLoad {
+		switch t.state {
+		case firstLoad:
 			return tabLoad{state: picking, gen: t.gen}, dropRows
+		case updating:
+			return tabLoad{state: updatingPicking, gen: t.gen}, dropRows
 		}
 	case keyPressed:
-		if t.state == picking {
+		switch t.state {
+		case picking:
 			return tabLoad{state: firstLoad, gen: t.gen}, dropRows
+		case updatingPicking:
+			return tabLoad{state: updating, gen: t.gen}, dropRows
 		}
 	case tabDone:
 		switch {
@@ -76,7 +83,7 @@ func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 			return t, dropRows
 		case e.err != nil:
 			return tabLoad{state: failed, gen: t.gen, err: e.err}, dropRows
-		case t.state == picking:
+		case t.state == picking || t.state == updatingPicking:
 			return tabLoad{state: loaded, gen: t.gen}, showAndPick
 		}
 		return tabLoad{state: loaded, gen: t.gen}, showRows
@@ -84,14 +91,16 @@ func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 	return t, dropRows
 }
 
-func (t tabLoad) showsRows() bool { return t.state == loaded || t.state == updating }
-func (t tabLoad) showsErr() bool  { return t.state == failed || t.state == retrying }
-func (t tabLoad) busy() bool      { return t.state != loaded && t.state != failed }
+func (t tabLoad) showsRows() bool {
+	return t.state == loaded || t.state == updating || t.state == updatingPicking
+}
+func (t tabLoad) showsErr() bool { return t.state == failed || t.state == retrying }
+func (t tabLoad) busy() bool     { return t.state != loaded && t.state != failed }
 
 // A row's details are fetched once the cursor rests on it, so holding j
-// doesn't fetch every row it passes, or at once when a tab's final rows
-// arrive under the cursor. gen is the frame's reload the fetch belongs to,
-// so a fetch from before a reload is dropped.
+// doesn't fetch every row it passes. The row under the cursor when a tab's
+// final rows arrive is fetched at once. gen is the frame's reload the fetch
+// belongs to, so a fetch from before a reload is dropped.
 type detailState int
 
 const (
