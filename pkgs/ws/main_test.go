@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"workspace/layout"
+	"workspace/mux"
 )
 
 // onPath puts a script named name first on PATH.
@@ -172,7 +173,10 @@ func TestAgentLayoutKeepsThePromptOutOfTheFlags(t *testing.T) {
 	}
 }
 
-func TestNewWorktreeRefusesAnUnknownAgent(t *testing.T) {
+// A ws new that can't start its agent leaves no worktree or branch behind:
+// an unknown agent, a session already running under the worktree's name,
+// and ignored files that can't be copied.
+func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
@@ -191,11 +195,26 @@ func TestNewWorktreeRefusesAnUnknownAgent(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	oldRoot := worktreeRoot
 	worktreeRoot = t.TempDir()
-	if err := newWorktree(nil, repo, "fix-login", "", start{layout: "agent", agent: "opus"}); err == nil {
-		t.Error("ws new made a worktree for the agent opus")
+	t.Cleanup(func() { worktreeRoot = oldRoot })
+	project := filepath.Base(repo)
+	onPath(t, "tmux", `[ "$2" = list-panes ] && printf '`+project+`/taken\t11\t%%1\tagent\tclaude\t/elsewhere\t0\t0\tclaude\n'`)
+	b := mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, "")
+	failsToStart := func(name string, s start) {
+		t.Helper()
+		if err := newWorktree(b, repo, name, "", s); err == nil {
+			t.Errorf("ws new %s succeeded", name)
+		}
+		if _, err := os.Stat(filepath.Join(worktreeRoot, project, name)); err == nil {
+			t.Errorf("ws new %s left its worktree", name)
+		}
+		if _, err := git(repo, "rev-parse", "--verify", "-q", "refs/heads/"+name); err == nil {
+			t.Errorf("ws new %s left its branch", name)
+		}
 	}
-	if made, _ := os.ReadDir(worktreeRoot); len(made) > 0 {
-		t.Errorf("ws new left %d folders under the worktree root", len(made))
-	}
+	failsToStart("fix-login", start{layout: "agent", agent: "opus"})
+	failsToStart("taken", start{layout: "agent"})
+	onPath(t, "rsync", "exit 1")
+	failsToStart("no-copy", start{layout: "agent"})
 }

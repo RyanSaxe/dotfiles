@@ -353,10 +353,23 @@ func newWorktree(b mux.Backend, from, name, base string, s start) error {
 		return err
 	}
 	dir := filepath.Join(worktreeRoot, filepath.Base(main), name)
+	label := labelFor(dir)
+	// open would go to that session, and start no agent and send no prompt.
+	switch id, err := mux.Find(b, label); {
+	case err != nil:
+		return err
+	case id != "":
+		return fmt.Errorf("a session named %s is already running, so close it or pick another name", label)
+	}
 	if _, err := git(from, append([]string{"worktree", "add", "-b", name, dir}, cmp.Or(base, "HEAD"))...); err != nil {
 		return err
 	}
-	return prepare(b, main, dir, s)
+	if err := copyIgnored(main, dir); err != nil {
+		git(main, "worktree", "remove", "--force", dir)
+		git(main, "branch", "-D", name)
+		return err
+	}
+	return open(b, dir, s, false)
 }
 
 // pullRequest opens a pull request's worktree with layout, which can be
@@ -386,12 +399,15 @@ func pullRequest(b mux.Backend, from, number, layout string) (string, error) {
 		git(main, "worktree", "remove", "--force", dir)
 		return "", err
 	}
-	return dir, prepare(b, main, dir, s)
+	if err := copyIgnored(main, dir); err != nil {
+		return dir, err
+	}
+	return dir, open(b, dir, s, false)
 }
 
-// prepare gives a new worktree the main checkout's ignored files, such as
-// .env and .byor, and opens its session.
-func prepare(b mux.Backend, main, dir string, s start) error {
+// copyIgnored gives a new worktree the main checkout's ignored files, such
+// as .env and .byor.
+func copyIgnored(main, dir string) error {
 	files, err := exec.Command("git", "-C", main, "ls-files", "--others", "--ignored", "--exclude-standard", "-z").Output()
 	if err != nil {
 		return fmt.Errorf("listing ignored files: %w", err)
@@ -406,7 +422,7 @@ func prepare(b mux.Backend, main, dir string, s start) error {
 			return err
 		}
 	}
-	return open(b, dir, s, false)
+	return nil
 }
 
 // remove lets git refuse a worktree with uncommitted changes, and closes the
