@@ -76,11 +76,11 @@
     "pair": {
       "flake": false,
       "locked": {
-        "lastModified": 1794795111,
-        "narHash": "sha256-2g3H93G7/9Jeq8erXYlOvpjIcgk4c+d3iY3t6CbmEzE=",
+        "lastModified": 1795028981,
+        "narHash": "sha256-6Dr2aKLOcQCL3CjGL1QAcCphb0lwt4ys9K4gVOAgnX8=",
         "owner": "RyanSaxe",
         "repo": "pair",
-        "rev": "b17c871de5407f1e1de276e3f05aced4ddf980b4",
+        "rev": "07799486ad1b7cdb10c095cce5253cda6e9ab3f8",
         "type": "github"
       },
       "original": {
