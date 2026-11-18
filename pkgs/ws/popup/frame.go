@@ -48,6 +48,7 @@ type (
 // A frame is one popup on screen.
 type frame struct {
 	id      int
+	over    bool // opened over another popup, which Esc goes back to
 	p       Popup
 	w, h    int
 	active  int
@@ -64,8 +65,8 @@ type frame struct {
 	art     Art
 }
 
-func newFrame(id int, p Popup, art Art) frame {
-	m := frame{id: id, p: p, active: p.Start, started: time.Now(), lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
+func newFrame(id int, over bool, p Popup, art Art) frame {
+	m := frame{id: id, over: over, p: p, active: p.Start, started: time.Now(), lists: make([]list.Model, len(p.Tabs)), tabs: make([]tabLoad, len(p.Tabs)), details: map[string]detail{}, art: art}
 	for i := range m.lists {
 		l := list.New(nil, delegate{p.OneLine}, 0, 0)
 		l.Filter = listFilter
@@ -688,6 +689,9 @@ func (m frame) renderFooter() string {
 		return ansi.Truncate(" "+Accent.Render("›")+" "+m.foot.text, m.w, "…")
 	}
 	esc := "quit"
+	if m.over {
+		esc = "back"
+	}
 	if m.lists[m.active].FilterValue() != "" {
 		esc = "clear"
 	}
