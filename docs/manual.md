@@ -22,10 +22,8 @@ Sign each agent in to its account:
 | Claude Code | `/login` inside `claude`        |
 | Codex       | `codex login`                   |
 | pi          | `/login` inside `pi`            |
-| opencode    | `opencode auth login`           |
 | Copilot CLI | `copilot login`                 |
 
-Claude Code is only on computers that use Claude, and pi, opencode and
-Copilot CLI only on computers with the `personal` role. Restart any pi or
-opencode that was running during the first home switch, so it loads pair's
-extension or plugin.
+Claude Code is only on computers that use Claude, and pi and Copilot CLI
+only on computers with the `personal` role. Restart any pi that was running
+during the first home switch, so it loads pair's extension.
