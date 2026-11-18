@@ -81,6 +81,9 @@ app, press Cmd-Alt and the letter to act on it:
 | R      | A pull request or issue is in Reviews' Needs you tab  | Open Reviews           |
 | T      | A task is due by tomorrow                              | Open Tasks             |
 
+Cmd-Alt-A goes to failed agents first, then blocked ones, then finished
+ones.
+
 ## Documentation
 
 | Page                               | Contents                                                    |

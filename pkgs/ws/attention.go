@@ -36,6 +36,19 @@ func agentBackend(b mux.Backend) mux.Backend {
 	return b
 }
 
+// needRank ranks an agent that needs you, most urgent first: failed, then
+// blocked, then done. tmux's bell doesn't say why it rang, so an agent that
+// rang ranks with blocked.
+func needRank(p mux.Pane) int {
+	switch p.Status {
+	case mux.Error:
+		return 0
+	case mux.Done:
+		return 2
+	}
+	return 1
+}
+
 // agentLevel is waiting when an agent needs you, and none otherwise.
 func agentLevel(s mux.Snapshot) string {
 	if slices.ContainsFunc(s.Agents(), func(p mux.Pane) bool { return p.NeedsYou }) {
@@ -245,13 +258,13 @@ func signalAttention(sig syscall.Signal) error {
 }
 
 // nextAgent is the agent a jump goes to after the one in pane last. While any
-// agent needs you, the jumps cycle through those agents alone, the one that
-// has needed you longest first. Otherwise they cycle through all of them, in
-// order of need, blocked, failed, done, working, then idle, and by session
-// within each. A jump goes to the agent after the last one and wraps around.
-// The last one may have left the cycle, as the agent you're looking at does
-// in Rex, so the jump goes on from where it would sit, and starts at the
-// first when it's gone. Panes with no agent are skipped, and false means
+// agent needs you, the jumps cycle through those agents alone, by needRank,
+// and within each rank the one that has needed you longest first. Otherwise
+// the jumps cycle through every agent, in order of need, blocked, failed,
+// done, working, then idle, and by session within each. A jump goes to the agent after the last one and wraps
+// around. The last one may have left the cycle, as the agent you're looking
+// at does in Rex, so the jump goes on from where it would sit, and starts at
+// the first when it's gone. Panes with no agent are skipped, and false means
 // there is none.
 func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	agents := s.Agents()
@@ -264,7 +277,9 @@ func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	}
 	if waiting := slices.DeleteFunc(slices.Clone(agents), func(p mux.Pane) bool { return !p.NeedsYou }); len(waiting) > 0 {
 		cycle = waiting
-		order = func(a, b mux.Pane) int { return cmp.Or(a.Updated.Compare(b.Updated), cmp.Compare(a.ID, b.ID)) }
+		order = func(a, b mux.Pane) int {
+			return cmp.Or(cmp.Compare(needRank(a), needRank(b)), a.Updated.Compare(b.Updated), cmp.Compare(a.ID, b.ID))
+		}
 	}
 	slices.SortFunc(cycle, order)
 	i := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.ID == last })

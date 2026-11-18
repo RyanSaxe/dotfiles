@@ -57,13 +57,23 @@ func TestNextAgent(t *testing.T) {
 	}
 	at := func(minute int) time.Time { return time.Date(2026, 11, 17, 12, minute, 0, 0, time.UTC) }
 	blocked := append(slices.Clone(agents), mux.Pane{Label: "zeta", ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)})
-	waiting := append(slices.Clone(blocked), mux.Pane{Label: "beta", ID: "unseen", Status: mux.Done, NeedsYou: true, Updated: at(9)})
+	waiting := append(slices.Clone(blocked),
+		mux.Pane{Label: "beta", ID: "unseen", Status: mux.Done, NeedsYou: true, Updated: at(1)},
+		mux.Pane{Label: "gamma", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(3)},
+		mux.Pane{Label: "eta", ID: "blocked-later", Status: mux.Blocked, NeedsYou: true, Updated: at(8)},
+	)
 	// Rex reports the agent you're looking at, where the last jump went, as
 	// needing nothing.
 	lookingAtY := []mux.Pane{
-		{Label: "a", ID: "x", Status: mux.Blocked, NeedsYou: true, Updated: at(1)},
-		{Label: "b", ID: "y", Status: mux.Blocked, Updated: at(2)},
-		{Label: "c", ID: "z", Status: mux.Blocked, NeedsYou: true, Updated: at(3)},
+		{Label: "a", ID: "x", Status: mux.Blocked, NeedsYou: true, Updated: at(3)},
+		{Label: "b", ID: "y", Status: mux.Error, Updated: at(2)},
+		{Label: "c", ID: "z", Status: mux.Error, NeedsYou: true, Updated: at(4)},
+	}
+	// tmux reports an agent whose window printed in the last few seconds as
+	// working.
+	bells := []mux.Pane{
+		{Label: "api", ID: "rang-last", Status: mux.Working, NeedsYou: true, Updated: at(9)},
+		{Label: "web", ID: "rang-first", Status: mux.Idle, NeedsYou: true, Updated: at(1)},
 	}
 
 	cases := []struct {
@@ -79,10 +89,13 @@ func TestNextAgent(t *testing.T) {
 		{"a jump whose agent is gone starts over", agents, "closed", "done-b"},
 		{"an agent that needs you comes first", blocked, "done-b", "blocked"},
 		{"a lone agent that needs you keeps the jumps", blocked, "blocked", "blocked"},
-		{"the agent that has needed you longest comes first", waiting, "", "blocked"},
-		{"the next jump goes to the next agent that needs you", waiting, "blocked", "unseen"},
-		{"the jumps cycle through the agents that need you", waiting, "unseen", "blocked"},
+		{"a failed agent comes before agents that needed you earlier", waiting, "", "failed"},
+		{"blocked comes after failed", waiting, "failed", "blocked"},
+		{"blocked agents go by how long they have needed you", waiting, "blocked", "blocked-later"},
+		{"done comes after blocked", waiting, "blocked-later", "unseen"},
+		{"the jumps cycle through the agents that need you", waiting, "unseen", "failed"},
 		{"a jump goes on from the agent you're looking at", lookingAtY, "y", "z"},
+		{"tmux bells go by how long they have needed you", bells, "", "rang-first"},
 	}
 	for _, c := range cases {
 		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last)
