@@ -277,16 +277,17 @@ func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	return cycle[0], true
 }
 
-// jumpToAgent goes to the next agent, the way the agents popup does, and
-// remembers it for the next jump. It works outside any terminal, as from an
-// AeroSpace key, when b names the Rex app or tmux client to switch.
-func jumpToAgent(b mux.Backend) error {
-	s, err := b.Snapshot()
+// jumpToAgent goes to the next agent in s, the way the agents popup does,
+// and remembers it for the next jump. s and read are what b.Snapshot
+// returned, and read matters only when s has no agent. It works outside any
+// terminal, as from an AeroSpace key, when b names the Rex app or tmux client
+// to switch.
+func jumpToAgent(b mux.Backend, s mux.Snapshot, read error) error {
 	last, _ := os.ReadFile(filepath.Join(stateDir, "last-jump"))
 	next, ok := nextAgent(s, string(last))
 	if !ok {
-		if err != nil {
-			return err
+		if read != nil {
+			return read
 		}
 		return errors.New("no agent is running")
 	}

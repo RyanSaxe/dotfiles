@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"workspace/mux"
@@ -26,26 +27,55 @@ func focus(what string) error {
 	if !slices.Contains([]string{"agent", "tasks", "reviews"}, what) {
 		return fmt.Errorf("ws focus takes agent, tasks or reviews, not %q", what)
 	}
-	// open fails only when no app has the bundle ID. -g leaves the window
-	// where it is, for bringToCode to move.
-	if _, err := runIn("", "open", "-g", "-b", rexBundle); err != nil {
-		return focusTmux(what)
-	}
-	if err := bringToCode(rexBundle); err != nil {
-		return err
-	}
-	var client string
-	err := waitFor(func() (err error) { client, err = (mux.Rex{}).App(); return err })
+	ws, err := appWindows(rexBundle)
 	if err != nil {
 		return err
 	}
+	if _, ok := pickWindow(ws); !ok {
+		// Rex shows no window, so it may not be running. open fails only
+		// when no app has the bundle ID. -g leaves the window where it is,
+		// for bringToCode to move.
+		if _, err := runIn("", "open", "-g", "-b", rexBundle); err != nil {
+			return focusTmux(what)
+		}
+		if ws, err = appWindows(rexBundle); err != nil {
+			return err
+		}
+	}
+	// AeroSpace and Rex answer separately, so Rex switches to what the key
+	// asked for while AeroSpace brings its window forward.
+	placed := make(chan error, 1)
+	go func() { placed <- bringToCode(rexBundle, ws) }()
+	err = focusRex(what, ws)
+	return errors.Join(err, <-placed)
+}
+
+// focusRex goes to the next agent in the Rex app, or opens Tasks or Reviews
+// there. ws is Rex's windows, whose title names the session the app shows.
+func focusRex(what string, ws []window) error {
+	var client string
+	connect := func() (err error) { client, err = (mux.Rex{}).App(); return err }
 	if what == "agent" {
-		return jumpToAgent(watched(mux.Rex{Client: client}))
+		r := watchedRex(mux.Rex{}, ws)
+		var s mux.Snapshot
+		var read error
+		var wg sync.WaitGroup
+		wg.Go(func() { s, read = r.Snapshot() })
+		err := waitFor(connect)
+		wg.Wait()
+		if err != nil {
+			return err
+		}
+		r.Client = client
+		return jumpToAgent(r, s, read)
+	}
+	if err := waitFor(connect); err != nil {
+		return err
 	}
 	// Run from outside Rex, the popup action has no session or pane of its
 	// own, so it gets the session the app shows and that session's pane.
 	var session, block string
-	err = waitFor(func() (err error) {
+	err := waitFor(func() (err error) {
 		if session, err = shownSession(); err == nil {
 			block, err = focusedBlock(session)
 		}
@@ -102,6 +132,11 @@ func shownLabel() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return windowLabel(ws)
+}
+
+// windowLabel is the label of the session that ws, Rex's windows, show.
+func windowLabel(ws []window) (string, error) {
 	w, ok := pickWindow(ws)
 	i := strings.LastIndex(w.title, " - ")
 	if !ok || i < 0 {
@@ -118,7 +153,13 @@ func watched(b mux.Backend) mux.Backend {
 	if !ok {
 		return b
 	}
-	r.Shown, _ = shownLabel()
+	ws, _ := appWindows(rexBundle)
+	return watchedRex(r, ws)
+}
+
+// watchedRex is watched for Rex, given ws, Rex's windows.
+func watchedRex(r mux.Rex, ws []window) mux.Rex {
+	r.Shown, _ = windowLabel(ws)
 	readJSON("seen.json", &r.Seen)
 	return r
 }
@@ -143,11 +184,19 @@ func focusTmux(what string) error {
 		if err != nil {
 			return err
 		}
-	} else if err := bringToCode(ghosttyBundle); err != nil {
-		return err
+	} else {
+		ws, err := appWindows(ghosttyBundle)
+		if err == nil {
+			err = bringToCode(ghosttyBundle, ws)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	if what == "agent" {
-		return jumpToAgent(mux.Tmux{Client: client})
+		t := mux.Tmux{Client: client}
+		s, err := t.Snapshot()
+		return jumpToAgent(t, s, err)
 	}
 	// Run from outside tmux, the popup would otherwise belong to the session
 	// used last, which may not be the one the client shows.
@@ -160,13 +209,10 @@ func focusTmux(what string) error {
 }
 
 // bringToCode focuses the app's window on the code workspace, moving one
-// there when none is. An app with no window yet opens one on the focused
-// workspace, which the key has already made the code workspace.
-func bringToCode(bundle string) error {
-	ws, err := appWindows(bundle)
-	if err != nil {
-		return err
-	}
+// there when none is. ws is the app's windows. An app with no window yet
+// opens one on the focused workspace, which the key has already made the
+// code workspace.
+func bringToCode(bundle string, ws []window) error {
 	w, ok := pickWindow(ws)
 	if !ok {
 		_, err := runIn("", "open", "-b", bundle)
@@ -177,7 +223,7 @@ func bringToCode(bundle string) error {
 			return err
 		}
 	}
-	_, err = runIn("", "aerospace", "focus", "--window-id", w.id)
+	_, err := runIn("", "aerospace", "focus", "--window-id", w.id)
 	return err
 }
 
@@ -199,7 +245,7 @@ func appWindows(bundle string) ([]window, error) {
 // pickWindow is the window to bring forward: the first on the code
 // workspace, else the first that isn't a Settings window.
 func pickWindow(ws []window) (window, bool) {
-	ws = slices.DeleteFunc(ws, func(w window) bool { return strings.HasPrefix(w.title, "Settings") })
+	ws = slices.DeleteFunc(slices.Clone(ws), func(w window) bool { return strings.HasPrefix(w.title, "Settings") })
 	if i := slices.IndexFunc(ws, func(w window) bool { return w.workspace == codeWorkspace }); i >= 0 {
 		return ws[i], true
 	}
