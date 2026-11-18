@@ -12,7 +12,6 @@ ws new fix-login                    # make ~/worktrees/PROJECT/fix-login on its 
 ws new fix-login --agent codex --prompt "Fix the redirect" --base main
 ws pr 123                           # make a worktree on pull request 123, with an agent
 ws pr 123 --layout review           # open pull request 123 in Neovim instead
-ws send fix-login "Run the tests"   # type a line and Enter into its agent
 ws ls                               # list worktrees and their agents
 ws rm fix-login                     # close its session, remove it and delete its branch
 ws agent codex                      # start codex by default on this computer

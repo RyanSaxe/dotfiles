@@ -144,14 +144,6 @@ func (r Rex) Tab(id, dir string, args ...string) error {
 	return r.show(id, made.Window)
 }
 
-func (Rex) Send(id, text string) error {
-	_, err := rex("send", "-s", id, "-b", "agent", "--", text)
-	if err == nil {
-		_, err = rex("send-key", "-s", id, "-b", "agent", "enter")
-	}
-	return err
-}
-
 func (Rex) Kill(id string) error {
 	_, err := rex("kill", id)
 	return err
