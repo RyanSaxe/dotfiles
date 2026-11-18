@@ -64,14 +64,16 @@ prompt as one of them. The built-in `review` layout runs `nvim gh://{pr}`.
 | Alt-W     | worktrees | This project's worktrees, and all of them on a second tab              |
 | Alt-R     | reviews   | Pull requests and issues on GitHub that involve you                    |
 | Alt-T     | tasks     | Open tasks in the vault, soonest due first                             |
-| Alt-A     | agents    | Rex terminals whose program reports a status                           |
+| Alt-A     | agents    | Terminals whose agent reports a status                                 |
 | Alt-C     | theme     | Light or dark, and the mascot                                          |
 | Alt-/     | keys      | Every key binding, and where it is set                                 |
 
 Rex binds these in `config/rex/init.lua`, and tmux in
 `config/tmux/tmux.conf`. In Rex, one of these keys pressed inside a popup
-replaces that popup, and in tmux the popup ignores it. The agents popup
-works only in Rex. `ws pick NAME` opens any of them from a shell.
+replaces that popup, and in tmux the popup ignores it. In tmux, Claude Code
+reports its status through hooks, which
+[ai-harness/README.md](../ai-harness/README.md#agent-status-in-tmux)
+describes. `ws pick NAME` opens any of them from a shell.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Enter acts

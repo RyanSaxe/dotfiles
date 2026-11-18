@@ -108,17 +108,18 @@ let
     fi
   '';
 
-  pushover = name: "${cfg.repo}/ai-harness/tools/notify-pushover.zsh '${name}'";
+  pushover = "${cfg.repo}/ai-harness/tools/notify-pushover.zsh 'Claude Code'";
+  # tmux drops the escape sequence Claude Code reports its status to Rex
+  # with, so in tmux these hooks record it on the agent's pane instead.
+  tmuxStatus = "${cfg.repo}/ai-harness/tools/tmux-agent-status.sh claude-code";
   claudeHook =
-    matcher:
+    matcher: commands:
     lib.optionalAttrs (matcher != null) { inherit matcher; }
     // {
-      hooks = [
-        {
-          type = "command";
-          command = pushover "Claude Code";
-        }
-      ];
+      hooks = map (command: {
+        type = "command";
+        inherit command;
+      }) commands;
     };
 in
 lib.mkIf (lib.elem "base" cfg.roles) {
@@ -205,12 +206,27 @@ lib.mkIf (lib.elem "base" cfg.roles) {
         defaultMode = "auto";
         allow = [ "Bash(gh pr merge:*)" ];
       };
-      # The merge replaces only these three lists, so byor's tool-use
-      # hooks and Rex's session-start hook stay as those tools wrote them.
+      # The merge replaces only these lists, so byor's tool-use hooks and
+      # Rex's session-start hook stay as those tools wrote them.
       hooks = {
-        Stop = [ (claudeHook null) ];
-        Notification = [ (claudeHook "permission_prompt|elicitation_dialog|agent_needs_input") ];
-        StopFailure = [ (claudeHook null) ];
+        UserPromptSubmit = [ (claudeHook null [ "${tmuxStatus} working" ]) ];
+        PermissionRequest = [ (claudeHook null [ "${tmuxStatus} blocked" ]) ];
+        Stop = [
+          (claudeHook null [
+            pushover
+            "${tmuxStatus} done"
+          ])
+        ];
+        Notification = [
+          (claudeHook "permission_prompt|elicitation_dialog|agent_needs_input" [ pushover ])
+        ];
+        StopFailure = [
+          (claudeHook null [
+            pushover
+            "${tmuxStatus} error"
+          ])
+        ];
+        SessionEnd = [ (claudeHook null [ tmuxStatus ]) ];
       };
     };
   };

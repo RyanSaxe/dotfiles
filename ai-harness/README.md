@@ -21,6 +21,8 @@ ai-harness/
 │                     tests or prose, or checking work
 ├── skills/           Agent Skills: worktrees and wiki
 ├── tools/            notify-pushover.zsh, the agents' push hook,
+│                     tmux-agent-status.sh, which records an agent's
+│                     status on its tmux pane,
 │                     link-agent-skills.sh, which shares Codex's skills
 │                     with Claude Code, and convert-codex-agents.py,
 │                     which does the same for Codex's agents
@@ -99,3 +101,26 @@ send a test push:
 echo '{"hook_event_name": "Stop", "last_assistant_message": "test"}' |
   PUSHOVER_IDLE=0 ai-harness/tools/notify-pushover.zsh test
 ```
+
+## Agent status in tmux
+
+In Rex, Claude Code reports its status itself, with an escape sequence that
+tmux drops. In tmux, its hooks run `tools/tmux-agent-status.sh`, which
+records the status on the agent's pane as the pane option `@ws_status`:
+
+| Hook                | Status                      |
+| ------------------- | --------------------------- |
+| `UserPromptSubmit`  | `working`                   |
+| `PermissionRequest` | `blocked`                   |
+| `Stop`              | `done`                      |
+| `StopFailure`       | `error`, after an API error |
+| `SessionEnd`        | cleared                     |
+
+`ws` reads the option for the agents popup, `ws attention` and
+`ws focus agent`, and counts it only while the agent that set it still
+runs. Hooks fire on fewer events than Rex sees, so the status can lag:
+
+- A turn you interrupt with Esc reads `working` until your next prompt.
+- A turn you stop at a permission prompt, with Esc or No, reads `blocked`
+  until your next prompt.
+- A prompt or question you answer reads `blocked` until the turn ends.
