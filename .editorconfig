@@ -24,7 +24,7 @@ max_line_length = 120
 [*.{sh,zsh}]
 indent_size = 2
 
-# prettier
+# oxfmt, and rumdl's default line length for Markdown
 [*.{html,css,js,ts,json,yaml,yml,md}]
 max_line_length = 80
 
