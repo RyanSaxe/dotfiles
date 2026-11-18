@@ -54,12 +54,16 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			return sessionRows(fs, s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
-			p := r.Data.(place)
-			if p.session == "" {
+			// A session's pane shows what it's doing, and a folder without one
+			// shows its summary.
+			switch p := r.Data.(place); {
+			case p.pane.ID != "":
+				out, err := b.Capture(p.pane)
+				return popup.Tail(out), err
+			case p.dir != "":
 				return folderSummary(p.dir), nil
 			}
-			out, err := b.Capture(p.pane)
-			return popup.Tail(out), err
+			return nil, nil
 		},
 		Actions: []popup.Action{
 			{Key: "enter", Help: "go", Run: func(r popup.Row) tea.Cmd {
@@ -158,9 +162,12 @@ func sessionRows(fs []folder, s mux.Snapshot) []popup.Row {
 	}
 	rows := make([]popup.Row, len(s.Sessions))
 	for i, session := range s.Sessions {
-		pane, _ := s.Landing(session.ID)
-		dir := dirs[session.Label]
-		rows[i] = popup.Row{ID: session.ID, Title: session.Label, Detail: tilde(cmp.Or(dir, pane.Folder)), Tag: doingTag(pane), Data: place{dir, session.ID, pane}}
+		dir, tag := dirs[session.Label], popup.Dim.SetString("open")
+		pane, ok := s.Landing(session.ID)
+		if ok {
+			tag = doingTag(pane)
+		}
+		rows[i] = popup.Row{ID: session.ID, Title: session.Label, Detail: tilde(cmp.Or(dir, pane.Folder)), Tag: tag, Data: place{dir, session.ID, pane}}
 	}
 	return rows
 }

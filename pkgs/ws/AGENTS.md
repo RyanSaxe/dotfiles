@@ -67,7 +67,7 @@ from `~/.local/share/dotfiles/mascots`.
 - A load reads the multiplexer once, with `Snapshot`, and never asks it
   about one row at a time.
 - A new fact about sessions or panes goes into both backends' `Snapshot`.
-  A backend that can't know it leaves the field empty.
+  A backend that can't know it leaves the field empty, and a status Open.
 - Tests guard what a popup author or a person relies on, through the
   packages' public API: what Load, Fetch and the actions receive, what Esc
   does, the order Match ranks in. They never assert on private fields or
