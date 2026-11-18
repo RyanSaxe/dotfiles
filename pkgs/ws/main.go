@@ -27,7 +27,7 @@ import (
 
 // commandArgs is how many arguments each command takes. ws agent takes none
 // or one.
-var commandArgs = map[string]int{"open": 1, "new": 1, "pr": 1, "ls": 0, "rm": 1, "pick": 1, "theme": 0, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}
+var commandArgs = map[string]int{"open": 1, "new": 1, "pr": 1, "ls": 0, "rm": 1, "pick": 1, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}
 
 // commandUsages are the commands' entries in ws --help, and ws COMMAND
 // --help prints the command's entry with its commandDetails.
@@ -47,7 +47,6 @@ var commandUsages = []string{`
                                      that isn't merged and whose pull request GitHub doesn't show as merged`, `
   ws pick NAME [--client ID]         open a popup: go, sessions, worktrees, reviews, tasks, agents, theme, keys or files.
                                      sessions is the go popup on its Sessions tab`, `
-  ws theme                           the theme popup: light or dark, and the mascot`, `
   ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file`, `
   ws attention [--watch]             print what needs you, as agents (failed, waiting, done or none), reviews
                                      (ci, review or none) and tasks (overdue, today, tomorrow or none).
@@ -213,8 +212,6 @@ func run(cmd string, args []string) error {
 		return printWorktrees(b, *asJSON)
 	case "rm":
 		return remove(b, pos[0], *force)
-	case "theme":
-		return pick(b, "theme")
 	case "mascot":
 		return setMascot(pos[0])
 	case "attention":
