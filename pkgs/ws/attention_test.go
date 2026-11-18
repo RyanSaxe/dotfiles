@@ -54,6 +54,7 @@ func TestNextAgent(t *testing.T) {
 		{Label: "app", ID: "done-a", Status: mux.Done},
 	}
 	blocked := append(slices.Clone(agents), mux.Pane{Label: "zeta", ID: "blocked", Status: mux.Blocked})
+	waiting := append(slices.Clone(blocked), mux.Pane{Label: "beta", ID: "failed", Status: mux.Error})
 
 	cases := []struct {
 		name  string
@@ -67,7 +68,9 @@ func TestNextAgent(t *testing.T) {
 		{"the last agent wraps to the first", agents, "idle", "done-b"},
 		{"a jump whose agent is gone starts over", agents, "closed", "done-b"},
 		{"a blocked agent comes first", blocked, "done-b", "blocked"},
-		{"after a blocked agent the walk goes on", blocked, "blocked", "done-b"},
+		{"a lone blocked agent keeps the jumps", blocked, "blocked", "blocked"},
+		{"the next jump goes to the next agent that needs you", waiting, "blocked", "failed"},
+		{"the jumps cycle through the agents that need you", waiting, "failed", "blocked"},
 	}
 	for _, c := range cases {
 		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last)

@@ -207,9 +207,11 @@ func signalAttention(sig syscall.Signal) error {
 
 // nextAgent is the agent a jump goes to after the one in pane last. Agents go
 // in order of need, blocked, failed, done, working, then idle, and by session
-// within each. A jump moves on from the last one and wraps around, except that
-// an agent blocked on you or failed comes first unless the last jump went to
-// one. Panes with no agent are skipped, and false means there is none.
+// within each. While any agent is blocked on you or failed, the jumps cycle
+// through those agents alone, and otherwise through all of them. A jump goes
+// to the agent after the last one and wraps around, or to the first when the
+// last one isn't in the cycle. Panes with no agent are skipped, and false
+// means there is none.
 func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	agents := s.Agents()
 	if len(agents) == 0 {
@@ -218,10 +220,10 @@ func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	slices.SortFunc(agents, func(a, b mux.Pane) int {
 		return cmp.Or(cmp.Compare(a.Status, b.Status), cmp.Compare(a.Label, b.Label), cmp.Compare(a.ID, b.ID))
 	})
-	i := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.ID == last })
-	if i < 0 || (agents[0].Status <= mux.Error && agents[i].Status > mux.Error) {
-		return agents[0], true
+	if calm := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.Status > mux.Error }); calm > 0 {
+		agents = agents[:calm]
 	}
+	i := slices.IndexFunc(agents, func(p mux.Pane) bool { return p.ID == last })
 	return agents[(i+1)%len(agents)], true
 }
 
