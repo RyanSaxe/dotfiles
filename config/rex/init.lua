@@ -17,12 +17,19 @@ local TERMINAL = "com.superlogical.terminal"
 local REX_DIR = debug.getinfo(1, "S").source:match("^@?(.*)/")
 local PREFIX = "ctrl+space>"
 
--- Opens command in a float, starting in cwd when it isn't nil.
+-- Opens command in a float, starting in cwd when it isn't nil. When a
+-- float's command exits, Rex focuses the last pane of the tab instead of the
+-- one the focus was on, so the command ends by running close_float, which
+-- closes the float the way that focuses the right pane.
 local function open_float(label, command, cwd)
+  local closing = { "/bin/sh", "-c", '"$@"; rex --autostart=false do close_float', "float" }
+  for _, arg in ipairs(command) do
+    table.insert(closing, arg)
+  end
   local _, err = rex.session.new_layer({
     bounds = { 0.08, 0.08, 0.84, 0.84 },
     focus = true,
-    layout = rex.layout.block({ flavor = SHELL, label = label, options = { command = command, cwd = cwd } }),
+    layout = rex.layout.block({ flavor = SHELL, label = label, options = { command = closing, cwd = cwd } }),
   })
   if err ~= nil then
     error(err, 0)
@@ -51,6 +58,19 @@ end
 local function in_float(block_id)
   return float_of(block_id) ~= nil
 end
+
+-- Closing a float with close_layer focuses the pane the focus was on before
+-- it opened, or the one a popup went to while it was open.
+rex.action({
+  name = "close_float",
+  title = "Close This Float",
+  run = function(ctx)
+    local layer = float_of(ctx.block_id)
+    if layer ~= nil then
+      rex.session.close_layer({ layer_id = layer })
+    end
+  end,
+})
 
 -- Those keys go to an editor in any pane, and to any program in a float, as
 -- they did in a tmux popup. A float's program can sit behind a shell, so its
