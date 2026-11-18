@@ -2,7 +2,7 @@
 
 `ws` opens folders, worktrees and pull requests as Rex or tmux sessions,
 and draws the popups you use to switch between them. `ws --help` lists every
-command and flag.
+command, and `ws COMMAND --help` lists the command's flags with examples.
 
 ## Commands
 
@@ -75,7 +75,7 @@ Rex binds the Alt keys in `config/rex/init.lua`, and tmux in
 replaces that popup, and in tmux the popup ignores it. Files opens over the
 go popup, and Esc goes back to it. `ws pick NAME` opens any of these
 popups from a shell, and `ws pick files` lists the files of the folder it
-runs in.
+runs in. `ws pick --help` lists the keys every popup shares.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Enter acts

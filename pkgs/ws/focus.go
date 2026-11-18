@@ -25,7 +25,7 @@ const (
 
 func focus(what string) error {
 	if !slices.Contains([]string{"agent", "tasks", "reviews"}, what) {
-		return fmt.Errorf("ws focus takes agent, tasks or reviews, not %q", what)
+		return fmt.Errorf("%q isn't agent, tasks or reviews", what)
 	}
 	ws, err := appWindows(rexBundle)
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	"cmp"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,80 +23,6 @@ import (
 	"workspace/layout"
 	"workspace/mux"
 )
-
-// commandArgs is how many arguments each command takes. ws agent takes none
-// or one.
-var commandArgs = map[string]int{"open": 1, "new": 1, "pr": 1, "ls": 0, "rm": 1, "pick": 1, "mascot": 1, "attention": 0, "focus": 1, "agent": 1}
-
-// commandUsages are the commands' entries in ws --help, and ws COMMAND
-// --help prints the command's entry with its commandDetails.
-var commandUsages = []string{`
-  ws open DIR [--layout NAME]        open a folder as a session, or switch to its session`, `
-  ws new NAME [--agent claude|codex] [--prompt TEXT] [--layout NAME] [--base REF] [-- FLAGS]
-                                     make ~/worktrees/PROJECT/NAME on branch NAME and start an agent there,
-                                     with FLAGS in place of the agent's defaults`, `
-  ws pr NUMBER [--layout NAME]       the same, checked out to a pull request. The review layout opens it in Neovim`, `
-  ws agent [claude|codex [FLAGS]]    print the default agent and each agent's default flags, or set them.
-                                     Every agent ws starts gets its defaults unless its command gives its own
-                                     flags. With no default agent set, it is claude when that is installed
-                                     and codex otherwise`, `
-  ws ls [--json]                     list worktrees and their agents`, `
-  ws rm NAME [--force]               close a worktree's session, remove it and delete its branch,
-                                     but without --force it refuses uncommitted changes and keeps a branch
-                                     that isn't merged and whose pull request GitHub doesn't show as merged`, `
-  ws pick NAME [--client ID]         open a popup: go, sessions, worktrees, reviews, tasks, agents, theme, keys or files.
-                                     sessions is the go popup on its Sessions tab`, `
-  ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file`, `
-  ws attention [--watch]             print what needs you, as agents (failed, waiting, done or none), reviews
-                                     (ci, review or none) and tasks (overdue, today, tomorrow or none).
-                                     --watch publishes all three for sketchybar and fetches the inbox
-                                     Reviews lists every 5 minutes`, `
-  ws focus agent|tasks|reviews       bring Rex, or Ghostty on tmux without Rex, onto the code workspace,
-                                     then go to the agent that needs you first or open Tasks or Reviews.
-                                     AeroSpace's Cmd-Alt-A, T and R run it`,
-}
-
-const agentExample = `
-Example: give claude default flags, then give one agent its own.
-  ws agent claude --effort medium
-  ws new fix-login                                  starts claude --effort medium
-  ws new fix-popups -- --effort high --model opus   starts claude --effort high --model opus
-`
-
-var commandDetails = map[string]string{
-	"new": `
-  --agent claude|codex  start this agent instead of the default one
-  --prompt TEXT         the agent's first prompt
-  --layout NAME         the session's layout, agent by default
-  --base REF            start the branch from REF instead of HEAD
-  -- FLAGS              start the agent with FLAGS instead of its defaults, which ws agent sets
-` + agentExample,
-	"agent": `
-ws agent prints the default agent first, then each other agent that has defaults.
-ws agent AGENT makes AGENT the default agent and keeps every agent's defaults.
-ws agent AGENT FLAGS also saves FLAGS as AGENT's defaults, so it makes AGENT the default
-too, and ws agent AGENT -- with nothing after it clears AGENT's defaults.
-` + agentExample,
-}
-
-var usage = "usage:" + strings.Join(commandUsages, "") + `
-In a popup, typing filters, the arrows, ^j/^k or the wheel move, enter or a click on a row acts,
-and esc clears the filter or closes.
-Outside Rex and tmux there is no terminal to open a session in, so ws open fails, and ws new and ws pr
-only make the worktree and print its path.
-Layouts are ~/.config/ws/layouts/NAME.toml, and agent and review are built in. Extra folders for go are ~/.config/ws/bookmarks.
-ws COMMAND --help prints that command's usage.
-` + agentExample
-
-// commandUsage is what ws COMMAND --help prints, or "" for no such command.
-func commandUsage(cmd string) string {
-	for _, u := range commandUsages {
-		if strings.HasPrefix(u, "\n  ws "+cmd+" ") {
-			return "usage:" + u + "\n" + commandDetails[cmd]
-		}
-	}
-	return ""
-}
 
 var (
 	home, _      = os.UserHomeDir()
@@ -145,81 +70,14 @@ func main() {
 		os.Unsetenv(v)
 	}
 	if len(os.Args) < 2 || slices.Contains([]string{"-h", "--help", "help"}, os.Args[1]) {
-		fmt.Print(usage)
+		fmt.Print(usage())
 		return
 	}
-	if err := run(os.Args[1], os.Args[2:]); err != nil {
-		fmt.Fprintln(os.Stderr, "ws:", err)
+	backend := func(client string) mux.Backend { return mux.Detect(os.Getenv, client) }
+	if err := run(os.Args[1], os.Args[2:], backend); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func run(cmd string, args []string) error {
-	// The agent's words are its own, so ws parses none of them: those after
-	// ws new's --, and those after ws agent's agent.
-	var agentWords []string
-	if i := slices.Index(args, "--"); cmd == "new" && i >= 0 {
-		args, agentWords = args[:i], args[i+1:]
-	}
-	isHelp := func(a string) bool { return slices.Contains([]string{"-h", "-help", "--help"}, a) }
-	if help := commandUsage(cmd); help != "" && slices.ContainsFunc(args, isHelp) {
-		fmt.Print(help)
-		return nil
-	}
-	if cmd == "agent" && len(args) > 1 {
-		args, agentWords = args[:1], args[1:]
-	}
-	fs := flag.NewFlagSet("ws "+cmd, flag.ExitOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, cmp.Or(commandUsage(cmd), usage)) }
-	layout := fs.String("layout", "agent", "")
-	agent := fs.String("agent", "", "")
-	prompt := fs.String("prompt", "", "")
-	base := fs.String("base", "", "")
-	asJSON := fs.Bool("json", false, "")
-	force := fs.Bool("force", false, "")
-	watch := fs.Bool("watch", false, "")
-	client := fs.String("client", "", "")
-	// flag stops at the first argument, so parse again after each one to
-	// let flags follow it.
-	var pos []string
-	for fs.Parse(args); fs.NArg() > 0; fs.Parse(args) {
-		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
-	}
-	nargs, known := commandArgs[cmd]
-	if !known || len(pos) != nargs && (cmd != "agent" || len(pos) > 0) {
-		return errors.New("unknown command or arguments, see ws --help")
-	}
-	b := mux.Detect(os.Getenv, *client)
-	switch cmd {
-	case "open":
-		dir, _ := filepath.Abs(pos[0])
-		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-			return fmt.Errorf("%s is not a folder", dir)
-		}
-		return open(b, dir, start{layout: *layout}, true)
-	case "new":
-		return newWorktree(b, ".", pos[0], *base, start{layout: *layout, agent: *agent, flags: agentWords, prompt: *prompt})
-	case "pr":
-		_, err := pullRequest(b, ".", pos[0], *layout)
-		return err
-	case "agent":
-		if len(pos) == 0 {
-			printAgents()
-			return nil
-		}
-		return setAgent(pos[0], agentWords)
-	case "ls":
-		return printWorktrees(b, *asJSON)
-	case "rm":
-		return remove(b, pos[0], *force)
-	case "mascot":
-		return setMascot(pos[0])
-	case "attention":
-		return attention(b, *watch)
-	case "focus":
-		return focus(pos[0])
-	}
-	return pick(b, pos[0])
 }
 
 // start is how a new session begins: its layout, the agent its agent pane

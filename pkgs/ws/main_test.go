@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -93,11 +94,24 @@ func TestPopupAnswerNamesAnAgentOrFlags(t *testing.T) {
 	}
 }
 
-// ws COMMAND --help prints the command's own usage.
-func TestEveryCommandHasItsOwnHelp(t *testing.T) {
-	for cmd := range commandArgs {
-		if commandUsage(cmd) == "" {
-			t.Errorf("ws %s --help has no usage of its own", cmd)
+// A command refuses a flag it doesn't take, rather than run without it.
+func TestCommandsTakeOnlyTheirOwnFlags(t *testing.T) {
+	for _, c := range commands {
+		if c.unparsed {
+			continue
+		}
+		for _, other := range commands {
+			for _, o := range other.flags {
+				words := append(slices.Repeat([]string{"x"}, len(strings.Fields(c.args))), "--"+o.name)
+				if o.value != "" {
+					words = append(words, "v")
+				}
+				_, err := c.parse(words)
+				takes := slices.ContainsFunc(c.flags, func(f option) bool { return f.name == o.name })
+				if takes != (err == nil) {
+					t.Errorf("ws %s %s: got error %v, want one only for a flag it doesn't take", c.name, strings.Join(words, " "), err)
+				}
+			}
 		}
 	}
 }
