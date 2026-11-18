@@ -7,7 +7,6 @@
 package mux
 
 import (
-	"cmp"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +30,7 @@ type Snapshot struct {
 // A Pane is one terminal in a session: its tab, what it runs, in which
 // folder, and what its program reports about itself. Label is its session's
 // label, and TabName is its tab's name when someone named the tab, else "".
+// A detached pane has no Tab.
 type Pane struct {
 	Session, Label, ID string
 	Tab, TabName       string
@@ -45,12 +45,20 @@ type Pane struct {
 	Updated    time.Time // the pane's last activity
 }
 
-// place is the label of the place a pane is in.
-func (p Pane) place() string { return cmp.Or(p.TabName, p.Label) }
+// place is the label of the place a pane is in: its tab's name when the
+// tab is named after a worktree, PROJECT/NAME as Label gives it, and its
+// session's label otherwise, so a tab named such as "tests" stays part of
+// its session.
+func (p Pane) place() string {
+	if strings.Count(p.TabName, "/") == 1 {
+		return p.TabName
+	}
+	return p.Label
+}
 
 // A Place is where a folder's terminals are, labeled after the folder: the
-// tabs someone named after it in a session, or the tabs of a session that
-// nobody named, under the session's label. Tab is the tab going to the place
+// tabs named after a worktree in a session, or the session's other tabs,
+// under the session's label. Tab is the tab going to the place
 // selects, the session's active tab when it is one of the place's and else
 // its first. Named says its tabs are named after it, and Whole that it is
 // every tab of its session, so closing it closes the session.
@@ -71,7 +79,7 @@ func (s Snapshot) Places() []Place {
 			i = len(places) - 1
 		}
 		pl := &places[i]
-		if !slices.Contains(pl.Tabs, p.Tab) {
+		if p.Tab != "" && !slices.Contains(pl.Tabs, p.Tab) {
 			pl.Tabs = append(pl.Tabs, p.Tab)
 		}
 		if p.Landing || pl.Tab == "" {

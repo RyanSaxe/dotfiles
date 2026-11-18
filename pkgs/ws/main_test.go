@@ -204,7 +204,8 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 // A worktree opens as the config's open_as says, unless --tab or --session
 // says otherwise. As a tab, it is named after the worktree in its project's
 // session, which ws starts as a plain shell in the main checkout when there
-// is none. Any other folder opens as a session, even as a tab.
+// is none. Any other folder opens as a session, even as a tab, such as one
+// in a worktree's spot that git doesn't check out.
 func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 	for _, tool := range []string{"git", "rsync"} {
 		if _, err := exec.LookPath(tool); err != nil {
@@ -236,6 +237,10 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 	t.Cleanup(func() { worktreeRoot, interactive = oldRoot, oldInteractive })
 	project := filepath.Base(main)
 	root := filepath.Join(worktreeRoot, project)
+	// A folder in a worktree's spot that git doesn't check out.
+	if err := os.MkdirAll(filepath.Join(root, "plain"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	opened := mux.Snapshot{Sessions: []mux.Session{{ID: "session:" + project, Label: project}}}
 	for _, tc := range []struct {
 		openAs   string // the config's
@@ -252,6 +257,7 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 		{"session", []string{"new", "four"}, opened, []string{"session " + project + "/four in " + root + "/four"}},
 		{"session", []string{"new", "five", "--tab"}, opened, []string{"tab " + project + "/five of session:" + project + " in " + root + "/five"}},
 		{"tab", []string{"open", main}, mux.Snapshot{}, []string{"session " + project + " in " + main}},
+		{"tab", []string{"open", root + "/plain"}, opened, []string{"session " + project + "/plain in " + root + "/plain"}},
 	} {
 		withConfig(t, "claude", tc.openAs)
 		b := &recorder{snapshot: tc.snapshot}

@@ -54,7 +54,7 @@ func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 	calls := filepath.Join(t.TempDir(), "calls")
 	onPath(t, "tmux", `echo "$*" >> `+calls+`
 case "$2" in
-list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nbusy\t01\t%%3\t\tzsh\t/elsewhere\t0\t0\t@3\tquiet/feature\tfeature\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tscratch\n';;
+list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nbusy\t01\t%%3\t\tzsh\t/elsewhere\t0\t0\t@3\tquiet/feature\tfeature\nbusy\t01\t%%4\t\tnvim\t/elsewhere\t0\t0\t@4\tquiet/feature\tREADME\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tscratch\n';;
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
 
@@ -109,12 +109,13 @@ esac`)
 	if got := closeRow(1, "n"); strings.Contains(got, "kill-") {
 		t.Errorf("Ctrl-X on busy, answered n, ran tmux with\n%s", got)
 	}
-	// busy's session holds quiet/feature's tab too, so closing busy closes
-	// only its own tab, and closing quiet/feature only that one.
+	// busy's session holds quiet/feature's two tabs too, so closing busy
+	// closes only its own tab, and closing quiet/feature closes its two in one
+	// command, which tmux finishes even when ws runs in the first.
 	if got := closeRow(1, "y"); !strings.Contains(got, "kill-window -t @1\n") || strings.Contains(got, "kill-session") {
 		t.Errorf("Ctrl-X on busy, answered y, ran tmux with\n%s", got)
 	}
-	if got := closeRow(0, "y"); !strings.Contains(got, "kill-window -t @3\n") || strings.Contains(got, "kill-session") {
+	if got := closeRow(0, "y"); !strings.Contains(got, "kill-window -t @3 ; kill-window -t @4\n") || strings.Contains(got, "kill-session") {
 		t.Errorf("Ctrl-X on quiet/feature, answered y, ran tmux with\n%s", got)
 	}
 
@@ -128,6 +129,16 @@ esac`)
 	}
 	if want := []string{"busy in ~/Projects/busy", "quiet/feature in ~/worktrees/quiet/feature", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
 		t.Errorf("Sessions lists %v, want %v", listed, want)
+	}
+	// scratch is a session with nothing else in it, so closing it closes the
+	// session.
+	m, _ := popup.New(p, nil).Update(ctrlX.Run(sessions[2])())
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if _, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter}); then != nil {
+		then()
+	}
+	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "kill-session -t =scratch\n") {
+		t.Errorf("Ctrl-X on scratch, answered y, ran tmux with\n%s", got)
 	}
 }
 

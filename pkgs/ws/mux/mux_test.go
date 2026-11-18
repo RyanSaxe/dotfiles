@@ -30,7 +30,8 @@ func TestLabel(t *testing.T) {
 
 // A tmux Snapshot lists each session and pane: the pane going to the session
 // lands on, the pane an agent runs in, and the folder each runs in. A window
-// someone named is a place of its own, and the rest of its session another.
+// named after a worktree is a place of its own, and the rest of its session
+// another.
 // The agent needs you once its window's bell rings where no client shows
 // it, and works while its window prints. Every other pane is Open.
 func TestATmuxSnapshot(t *testing.T) {
@@ -88,6 +89,8 @@ func TestATmuxSnapshot(t *testing.T) {
 		`printf '\a'; exec `+claude+` -S `+socket+` wait-for never`)
 	tmux("split-window", "-d", "-t", agent, "-c", work)
 	tmux("new-session", "-d", "-s", "web", "-c", work)
+	// A tab named after no worktree stays part of its session.
+	tmux("new-window", "-d", "-t", "web:", "-n", "logs", "-c", work)
 
 	// tmux reads the bell from the pane's output a moment after it rings.
 	backend := mux.Detect(func(string) string { return "" }, "")
@@ -118,6 +121,9 @@ func TestATmuxSnapshot(t *testing.T) {
 	lands, ok := s.Landing(api)
 	if !ok || lands.ID == agent || lands.Folder != work || api.Whole {
 		t.Errorf("going to api lands on %+v, want its first pane, in %s, and api is %+v, want the session less a tab", lands, work, api)
+	}
+	if web, _ := s.Find("web"); !web.Whole || len(web.Tabs) != 2 {
+		t.Errorf("web is %+v, want the whole session, its logs tab included", web)
 	}
 	feature, _ := s.Find("api/feature")
 	if lands, ok := s.Landing(feature); !ok || lands.ID != agent || !feature.Named || len(feature.Tabs) != 1 {
