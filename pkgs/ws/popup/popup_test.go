@@ -161,8 +161,9 @@ func TestEnterBeforeTheRowsPicksTheTopMatch(t *testing.T) {
 }
 
 // Rows a Load shows appear while it still runs, and Enter picks from them.
-// When the final rows replace them, the cursor stays on its row, and the
-// preview, which waits for the final rows, gets that row as Load returned it.
+// When the final rows replace them, the cursor stays on the row you moved it
+// to, and the preview, which waits for the final rows, gets that row as Load
+// returned it.
 func TestRowsShownWhileLoadingGiveWayToTheFinalOnes(t *testing.T) {
 	finish := make(chan struct{})
 	picks, fetches := make(chan popup.Row, 4), make(chan popup.Row, 4)
@@ -195,6 +196,50 @@ func TestRowsShownWhileLoadingGiveWayToTheFinalOnes(t *testing.T) {
 	prog.Send(enter)
 	if r := receive(t, picks); r.ID != "b" {
 		t.Errorf("Enter after the final rows picked %q, want b, where the cursor was", r.ID)
+	}
+}
+
+// Until you move the cursor, it stays on the top row as new rows arrive, so
+// Enter picks the best match. Once you move it, it stays on your row, and
+// typing puts it back on the top row.
+func TestTheCursorStaysOnTheTopRowUntilYouMoveIt(t *testing.T) {
+	backspace := tea.KeyMsg{Type: tea.KeyBackspace}
+	for _, tc := range []struct {
+		name string
+		keys []tea.Msg
+		want string
+	}{
+		{"untouched", nil, "newest"},
+		{"moved", []tea.Msg{down}, "bravo"},
+		{"moved, then typed", []tea.Msg{down, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")}, backspace}, "newest"},
+	} {
+		finish := make(chan struct{})
+		picks := make(chan popup.Row, 4)
+		p := popup.Popup{
+			Noun: "rows",
+			Tabs: []popup.Tab{{Name: "Rows"}},
+			Load: func(_ int, show func([]popup.Row)) ([]popup.Row, error) {
+				show([]popup.Row{{ID: "alpha", Title: "alpha"}, {ID: "bravo", Title: "bravo"}})
+				<-finish
+				return []popup.Row{{ID: "newest", Title: "newest"}, {ID: "alpha", Title: "alpha"}, {ID: "bravo", Title: "bravo"}}, nil
+			},
+			Actions: []popup.Action{{Key: "enter", Help: "pick", Run: func(r popup.Row) tea.Cmd { picks <- r; return nil }}},
+		}
+		s := new(terminal)
+		prog := tea.NewProgram(popup.New(p, nil), tea.WithInput(nil), tea.WithOutput(s), tea.WithoutSignalHandler())
+		go prog.Run()
+		prog.Send(size)
+		s.waitToDraw(t, "bravo")
+		for _, k := range tc.keys {
+			prog.Send(k)
+		}
+		close(finish)
+		s.waitToDraw(t, "newest")
+		prog.Send(enter)
+		if r := receive(t, picks); r.ID != tc.want {
+			t.Errorf("%s: Enter after the final rows picked %q, want %q", tc.name, r.ID, tc.want)
+		}
+		prog.Kill()
 	}
 }
 
