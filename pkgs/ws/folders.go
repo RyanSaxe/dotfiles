@@ -213,7 +213,8 @@ func activity(dir string) time.Time {
 // repos finds git checkouts anywhere under the home folder. It stops at a
 // repository, since nothing inside one is a separate project, and skips
 // hidden folders, ~/Library, ~/worktrees, which Worktrees lists, and folders
-// that hold no projects. That walk takes about 30 ms.
+// that hold no projects. That walk takes about 7 ms. Go's module cache in
+// ~/go would add about 140 ms, so GOPATH keeps it in ~/.local/share/go.
 func repos() []string {
 	skip := map[string]bool{"Library": true, filepath.Base(worktreeRoot): true, "node_modules": true,
 		"Applications": true, "Movies": true, "Music": true, "Pictures": true}

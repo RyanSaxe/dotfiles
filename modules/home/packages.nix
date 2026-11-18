@@ -109,6 +109,12 @@ in
       ))
     ];
 
+  # Go keeps its module cache and the tools `go install` builds in GOPATH,
+  # ~/go by default, where the go popup's walk of the home folder spent
+  # nearly all its time. Under ~/.local/share it sits in a hidden folder,
+  # which the walk skips.
+  home.sessionVariables.GOPATH = lib.mkIf (has "base") "${config.xdg.dataHome}/go";
+
   home.activation.uvTools = lib.mkIf (has "base") (
     lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       for tool in ${lib.escapeShellArgs uvTools}; do
