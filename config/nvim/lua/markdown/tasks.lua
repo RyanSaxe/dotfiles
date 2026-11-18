@@ -17,7 +17,7 @@ local function ends_text(line)
   local spaced = line .. " "
   return line:find("^%s*$") ~= nil
     or spaced:find("^%s*[-*+]%s") ~= nil
-    or spaced:find("^%s*%d+[.)]%s") ~= nil
+    or spaced:find("^%s*1[.)]%s") ~= nil
     or spaced:find("^%s*#+%s") ~= nil
     or line:find("^%s*[>|]") ~= nil
     or line:find("^%s*```") ~= nil

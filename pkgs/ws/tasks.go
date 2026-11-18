@@ -43,8 +43,9 @@ var (
 	fenceRe   = regexp.MustCompile("^\\s*(`{3,}|~{3,})")
 	dueRe     = regexp.MustCompile(`\s*📅\s*(\d{4}-\d{2}-\d{2})`)
 	// A blank line, a list item, a heading, a quote or a table ends a
-	// paragraph in Markdown, so it ends a task's text.
-	breakRe = regexp.MustCompile(`^\s*($|([-*+]|\d+[.)]|#{1,6})(\s|$)|[>|])`)
+	// paragraph in Markdown, so it ends a task's text. A numbered item ends
+	// it only from 1, as a line that starts with 390. continues a paragraph.
+	breakRe = regexp.MustCompile(`^\s*($|([-*+]|1[.)]|#{1,6})(\s|$)|[>|])`)
 )
 
 // vaultDir is the vault's folder, which the switch exports as VAULT_DIR on a
