@@ -87,7 +87,8 @@ first. The bottom line lists the popup's other keys.
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
 per line. A folder that has a running session is tagged `session`, and
-Enter on it goes to that session.
+Enter on it goes to that session. Ctrl-X asks before it closes a session,
+and closes it only when you answer `y`, since the agent in it stops too.
 In Rex, Alt-Shift-S opens Rex's own Change Session.
 
 ## Agents that need you

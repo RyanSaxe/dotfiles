@@ -85,7 +85,7 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			}},
 			{Key: "ctrl+x", Help: "close", Run: func(r popup.Row) tea.Cmd {
 				p := r.Data.(place)
-				return popup.Do(func() error {
+				return func() tea.Msg {
 					// A row shown before the snapshot doesn't know its session yet.
 					session, err := p.session, error(nil)
 					if session == "" {
@@ -95,10 +95,15 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 						err = errors.New(r.Title + " has no session to close")
 					}
 					if err != nil {
-						return err
+						return popup.Notice(err.Error())
 					}
-					return b.Kill(session)
-				}, popup.Reload("closed "+r.Title))
+					return popup.Ask("Close "+r.Title+" and everything running in it? (y/N)", func(answer string) tea.Cmd {
+						if !strings.EqualFold(answer, "y") {
+							return nil
+						}
+						return popup.Do(func() error { return b.Kill(session) }, popup.Reload("closed "+r.Title))
+					})()
+				}
 			}},
 		},
 	}

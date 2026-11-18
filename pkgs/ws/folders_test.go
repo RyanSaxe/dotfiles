@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"workspace/mux"
 	"workspace/popup"
 )
@@ -81,16 +83,27 @@ esac`)
 	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "switch-client -t =busy\n") {
 		t.Errorf("Enter on busy, which has a session, ran tmux with\n%s", got)
 	}
-	// A row shown before the snapshot doesn't know its session, and its
-	// actions still find it.
+	// Ctrl-X asks before it closes a session, and only y closes it. A row
+	// shown before the snapshot doesn't know its session, and its actions
+	// still find it.
 	ctrlX := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "ctrl+x" })]
 	i := slices.IndexFunc(early, func(r popup.Row) bool { return r.Title == "busy" })
 	if i < 0 || early[i].Tag.String() == "session" {
 		t.Fatalf("Folders showed %v before the snapshot", early)
 	}
-	ctrlX.Run(early[i])()
-	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "kill-session -t =busy\n") {
-		t.Errorf("Ctrl-X on busy as it showed before the snapshot ran tmux with\n%s", got)
+	closeBusy := func(answer string) string {
+		m, _ := popup.New(p, nil).Update(ctrlX.Run(early[i])())
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(answer)})
+		if _, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter}); then != nil {
+			then()
+		}
+		return readNote(t, filepath.Dir(calls), "calls")
+	}
+	if got := closeBusy("n"); strings.Contains(got, "kill-session") {
+		t.Errorf("Ctrl-X on busy, answered n, ran tmux with\n%s", got)
+	}
+	if got := closeBusy("y"); !strings.Contains(got, "kill-session -t =busy\n") {
+		t.Errorf("Ctrl-X on busy as it showed before the snapshot, answered y, ran tmux with\n%s", got)
 	}
 
 	sessions, err := p.Load(sessionsTab, func([]popup.Row) {})
