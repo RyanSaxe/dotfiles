@@ -47,8 +47,7 @@ var commandUsages = []string{`
                                      but without --force it refuses uncommitted changes and keeps a branch
                                      that isn't merged and whose pull request GitHub doesn't show as merged`, `
   ws pick NAME [--client ID]         open a popup: go, sessions, worktrees, reviews, tasks, agents, theme, keys or files.
-                                     sessions is the go popup on its Sessions tab.
-                                     --from BLOCK starts it in the folder of that Rex pane`, `
+                                     sessions is the go popup on its Sessions tab`, `
   ws theme                           the theme popup: light or dark, and the mascot`, `
   ws mascot NAME                     set the mascot: a Pokemon by name, shiny-pokemon:NAME, or a PNG file`, `
   ws attention [--watch]             print what needs you, as agents (waiting or none), reviews
@@ -182,7 +181,6 @@ func run(cmd string, args []string) error {
 	force := fs.Bool("force", false, "")
 	watch := fs.Bool("watch", false, "")
 	client := fs.String("client", "", "")
-	from := fs.String("from", "", "")
 	// flag stops at the first argument, so parse again after each one to
 	// let flags follow it.
 	var pos []string
@@ -226,13 +224,6 @@ func run(cmd string, args []string) error {
 		return attention(*watch)
 	case "focus":
 		return focus(pos[0])
-	}
-	// A popup's "the project you're in" is the project of the Rex pane it
-	// opened from. A float starts in the session's folder otherwise.
-	if r, ok := b.(mux.Rex); ok && *from != "" {
-		if dir := r.PaneFolder(*from); dir != "" {
-			os.Chdir(dir)
-		}
 	}
 	return pick(b, pos[0])
 }

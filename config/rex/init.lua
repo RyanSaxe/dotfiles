@@ -187,25 +187,27 @@ rex.action({
   end,
 })
 
--- `ws pick` switches the app itself, so it gets the client to switch. A ws
--- key pressed in a ws popup replaces that popup instead of stacking another
--- over it, and the new one starts in the folder the old one was in, which is
--- the folder of the pane it opened from.
+-- `ws pick` switches the app itself, so it gets the client to switch. A
+-- popup starts in the folder of the pane it opens from, which is what makes
+-- a popup's project the one you're in. A ws key pressed in a ws popup
+-- replaces that popup instead of stacking another over it, and the new one
+-- starts in the folder the old one was in.
 rex.action({
   name = "ws_pick",
   title = "Pick with ws",
   args = { name = "string" },
   run = function(ctx, args)
     local label = "ws " .. args.name
+    local command = { "ws", "pick", args.name, "--client", ctx.client_id }
+    local process = rex.block.call(TERMINAL, "process", { block_id = ctx.block_id })
+    local cwd = process and process.foreground and process.foreground.cwd
     local layer, shown = float_of(ctx.block_id)
     if layer == nil or shown:sub(1, 3) ~= "ws " then
       remember(ctx)
-      open_float(label, { "ws", "pick", args.name, "--client", ctx.client_id, "--from", ctx.block_id })
+      open_float(label, command, cwd)
       return
     end
-    local process = rex.block.call(TERMINAL, "process", { block_id = ctx.block_id })
-    local cwd = process and process.foreground and process.foreground.cwd
-    open_float(label, { "ws", "pick", args.name, "--client", ctx.client_id }, cwd)
+    open_float(label, command, cwd)
     rex.session.close_layer({ layer_id = layer })
   end,
 })
