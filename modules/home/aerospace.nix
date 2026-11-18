@@ -15,6 +15,11 @@ let
   rexDir = "${config.home.homeDirectory}/Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS";
 in
 lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
+  # launchd throttles an agent that names no ProcessType to utility priority,
+  # along with every program it starts. While the Mac was busy, AeroSpace
+  # then took up to a second to answer a command, and Cmd-Alt-A's ws focus
+  # ran at that priority too.
+  launchd.agents.aerospace.config.ProcessType = "Interactive";
   programs.aerospace = {
     enable = true;
     launchd.enable = true;
