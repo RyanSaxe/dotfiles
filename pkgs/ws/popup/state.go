@@ -1,5 +1,7 @@
 package popup
 
+import "time"
+
 // The frame's state, each part a named type with one function that moves
 // it. The frame's Update only turns Bubble Tea messages into these events.
 
@@ -100,7 +102,8 @@ func (t tabLoad) busy() bool     { return t.state != loaded && t.state != failed
 // A row's details are fetched once the cursor rests on it, so holding j
 // doesn't fetch every row it passes. The row under the cursor when a tab's
 // final rows arrive is fetched at once. gen is the frame's reload the fetch
-// belongs to, so a fetch from before a reload is dropped.
+// belongs to, so a fetch from before a reload is dropped, and since is when
+// the cursor arrived, or zero for a row it never moved to.
 type detailState int
 
 const (
@@ -114,16 +117,20 @@ const (
 type detail struct {
 	state detailState
 	gen   int
+	since time.Time
 	data  any
 	err   error
 }
 
 type (
 	detailEvent interface{ isDetailEvent() }
-	arrived     struct{ gen int } // the cursor arrived on the row
-	rowsLoaded  struct{ gen int } // the tab's final rows arrived with the cursor on the row
-	rested      struct{}          // the cursor is still on the row a moment later
-	fetched     struct {
+	arrived     struct { // the cursor arrived on the row
+		gen int
+		at  time.Time
+	}
+	rowsLoaded struct{ gen int } // the tab's final rows arrived with the cursor on the row
+	rested     struct{}          // the cursor is still on the row a moment later
+	fetched    struct {
 		gen  int
 		data any
 		err  error
@@ -148,15 +155,15 @@ func (d detail) next(e detailEvent) (detail, effect) {
 	switch e := e.(type) {
 	case arrived:
 		if d.state == unasked || d.state == waiting {
-			return detail{state: waiting, gen: e.gen}, waitToRest
+			return detail{state: waiting, gen: e.gen, since: e.at}, waitToRest
 		}
 	case rowsLoaded:
 		if d.state == unasked || d.state == waiting {
-			return detail{state: fetching, gen: e.gen}, fetch
+			return detail{state: fetching, gen: e.gen, since: d.since}, fetch
 		}
 	case rested:
 		if d.state == waiting {
-			return detail{state: fetching, gen: d.gen}, fetch
+			return detail{state: fetching, gen: d.gen, since: d.since}, fetch
 		}
 	case fetched:
 		switch {
