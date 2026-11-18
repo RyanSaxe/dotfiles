@@ -309,7 +309,7 @@ func prWorktree(b mux.Backend, it item, layout string) (string, error) {
 	if dir == "" {
 		return "", fmt.Errorf("no local checkout of %s under your home folder", it.Repo)
 	}
-	return pullRequest(b, dir, strconv.Itoa(it.Number), layout)
+	return pullRequest(b, dir, strconv.Itoa(it.Number), start{layout: layout})
 }
 
 // reviewAgent opens the default agent in a new tab of the pull request's session,

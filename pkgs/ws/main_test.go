@@ -116,6 +116,62 @@ func TestCommandsTakeOnlyTheirOwnFlags(t *testing.T) {
 	}
 }
 
+// recorder is a multiplexer that ws runs inside, which records the panes of
+// the session ws makes.
+type recorder struct {
+	mux.Backend
+	panes []layout.Pane
+}
+
+func (r *recorder) Snapshot() (mux.Snapshot, error) { return mux.Snapshot{}, nil }
+func (r *recorder) Inside() bool                    { return true }
+func (r *recorder) Create(label, dir string, panes []layout.Pane) (string, error) {
+	r.panes = panes
+	return label, nil
+}
+
+// ws pr starts its agent as ws new does, with the agent, prompt and flags
+// its words name, wherever its flags come.
+func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
+	for _, tool := range []string{"git", "rsync"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skip(tool, " is not installed")
+		}
+	}
+	// A commit hook runs these tests, and ws new must not reach the
+	// repository being committed to.
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+	} {
+		if _, err := git(repo, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(repo)
+	oldRoot, oldState, oldInteractive := worktreeRoot, stateDir, interactive
+	worktreeRoot, stateDir, interactive = t.TempDir(), t.TempDir(), false
+	t.Cleanup(func() { worktreeRoot, stateDir, interactive = oldRoot, oldState, oldInteractive })
+	// gh shows pull request 5 on the branch feature, and its checkout does
+	// nothing.
+	onPath(t, "gh", "echo feature https://github.com/o/r/pull/5")
+	for _, words := range [][]string{
+		{"new", "fix-login", "--agent", "codex", "--prompt", "fix it", "--", "-m", "gpt-6.1-sol"},
+		{"pr", "--prompt", "fix it", "5", "--agent", "codex", "--", "-m", "gpt-6.1-sol"},
+	} {
+		b := &recorder{}
+		err := run(words[0], words[1:], func(string) mux.Backend { return b })
+		if want := "codex -m gpt-6.1-sol -- 'fix it'"; err != nil || len(b.panes) == 0 || b.panes[0].Run != want {
+			t.Errorf("ws %s made the panes %+v (%v), want an agent pane running %s", strings.Join(words, " "), b.panes, err, want)
+		}
+	}
+}
+
 // A squash merge leaves a branch git calls unmerged, so only GitHub can say
 // its work landed.
 func TestDeleteBranchAsksGitHubAboutUnmergedBranches(t *testing.T) {
@@ -264,7 +320,7 @@ view) echo "feature https://github.com/o/r/pull/7";;
 checkout) git checkout -q feature;;
 esac`)
 	onPath(t, "rsync", "exit 1")
-	if _, err := pullRequest(nil, repo, "7", "review"); err == nil {
+	if _, err := pullRequest(nil, repo, "7", start{layout: "review"}); err == nil {
 		t.Error("ws pr 7 succeeded")
 	}
 	if dir := checkedOut(repo, "feature"); dir != "" {
