@@ -17,10 +17,13 @@ local TERMINAL = "com.superlogical.terminal"
 local REX_DIR = debug.getinfo(1, "S").source:match("^@?(.*)/")
 local PREFIX = "ctrl+space>"
 
--- Opens command in a float, starting in cwd when it isn't nil. When a
--- float's command exits, Rex focuses the last pane of the tab instead of the
--- one the focus was on, so the command ends by running close_float, which
--- closes the float the way that focuses the right pane.
+-- Opens command in a float, starting in cwd when it isn't nil.
+--
+-- When a float's command exits, Rex 0.1.0-preview.18 focuses the last pane
+-- of the tab instead of the one the focus was on. So the command ends by
+-- running close_float, which closes the float the way that focuses the right
+-- pane. Once Rex focuses the right pane on its own, delete close_float and
+-- run command as it is.
 local function open_float(label, command, cwd)
   local closing = { "/bin/sh", "-c", '"$@"; rex --autostart=false do close_float', "float" }
   for _, arg in ipairs(command) do
