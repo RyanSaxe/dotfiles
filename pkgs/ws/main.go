@@ -399,8 +399,10 @@ func pullRequest(b mux.Backend, from, number, layout string) (string, error) {
 		git(main, "worktree", "remove", "--force", dir)
 		return "", err
 	}
+	// The branch stays, since gh pr checkout may have reused one you had.
 	if err := copyIgnored(main, dir); err != nil {
-		return dir, err
+		git(main, "worktree", "remove", "--force", dir)
+		return "", err
 	}
 	return dir, open(b, dir, s, false)
 }

@@ -218,3 +218,45 @@ func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 	onPath(t, "rsync", "exit 1")
 	failsToStart("no-copy", start{layout: "agent"})
 }
+
+// A ws pr that can't copy the ignored files removes its worktree, so the next
+// ws pr checks the pull request out afresh instead of opening a worktree
+// without them. It keeps the branch, which gh pr checkout may have reused.
+func TestAFailedPullRequestCopyRemovesItsWorktree(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	// A commit hook runs these tests, and ws pr must not reach the
+	// repository being committed to.
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+		{"branch", "feature"}, // the pull request's branch, already local
+	} {
+		if _, err := git(repo, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	oldRoot := worktreeRoot
+	worktreeRoot = t.TempDir()
+	t.Cleanup(func() { worktreeRoot = oldRoot })
+	onPath(t, "gh", `case "$2" in
+view) echo "feature https://github.com/o/r/pull/7";;
+checkout) git checkout -q feature;;
+esac`)
+	onPath(t, "rsync", "exit 1")
+	if _, err := pullRequest(nil, repo, "7", "review"); err == nil {
+		t.Error("ws pr 7 succeeded")
+	}
+	if dir := checkedOut(repo, "feature"); dir != "" {
+		t.Errorf("ws pr 7 left the pull request checked out in %s", dir)
+	}
+	if _, err := git(repo, "rev-parse", "--verify", "-q", "refs/heads/feature"); err != nil {
+		t.Error("ws pr 7 deleted the branch feature")
+	}
+}
