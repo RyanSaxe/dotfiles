@@ -61,11 +61,11 @@ var (
 
 // placesHelp is what ws open, ws new and ws pr --help say about places.
 const placesHelp = `
-A folder's terminals are in its place: a tab named after the folder, or a session labeled
-after it. A worktree opens as a tab named PROJECT/NAME in its project's session, which ws
-starts with a plain shell in the main checkout when there is none, or as a session of its
-own. open_as in ~/.config/ws/config.toml chooses, and --tab and --session override it. Any
-other folder opens as a session.
+A folder's terminals are in its place: a session labeled after the folder or, for a worktree,
+a tab named PROJECT/NAME in any session. A worktree opens as a tab in its project's session,
+which ws starts with a plain shell in the main checkout when there is none, or as a session
+of its own. open_as in ~/.config/ws/config.toml chooses, and --tab and --session override it.
+Any other folder opens as a session.
 `
 
 var commands = []command{
