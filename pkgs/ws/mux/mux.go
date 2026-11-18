@@ -1,7 +1,8 @@
 // Package mux drives the terminal multiplexer that holds sessions, Rex or
-// tmux. Each session is labeled after its folder, and the pane running an
-// agent is marked "agent" (a Rex block label, a tmux pane option), so a
-// program finds both again without keeping state of its own.
+// tmux. Each session is labeled after its folder, so a program finds it
+// again without keeping state of its own. In tmux, an agent is a pane where
+// an agent CLI runs, found in the process table on each Snapshot. In Rex,
+// it is a pane whose program reports a status.
 package mux
 
 import (
@@ -29,7 +30,7 @@ type Snapshot struct {
 // what its program reports about itself.
 type Pane struct {
 	Session, Label, ID string
-	Landing, Agent     bool // where going to the session lands, and the pane marked agent
+	Landing            bool // where going to the session lands
 	Program, Folder    string
 	Status             Status // Open when the program reports nothing
 	// NeedsYou says the pane's agent needs you and you haven't looked at the

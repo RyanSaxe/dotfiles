@@ -110,10 +110,12 @@ each the one that has needed you longest first. When no agent needs you,
 it cycles through every agent. `ws` reads what each multiplexer already
 tracks:
 
-- **tmux:** the agent is the pane `ws` marked agent when it made the
-  session. It needs you once its window's bell rings while no client shows
-  the window, until a client switches to it, so a bell you saw marks
-  nothing. Claude Code and Codex ring the bell when they finish or wait, as
+- **tmux:** an agent is a pane where Claude Code, Codex, pi, Copilot CLI or
+  opencode runs, however it started. `ws` finds those programs in the
+  process table each time it looks. An agent needs you once its
+  window's bell rings while no client shows the window, until a client
+  switches to it, so a bell you saw marks nothing. Claude Code and Codex
+  ring the bell when they finish or wait, as
   [ai-harness/README.md](../ai-harness/README.md#agents-that-need-you)
   describes. A bell doesn't say whether the agent finished or waits, so an
   agent that rang counts as blocked: it lights the A peach, and Cmd-Alt-A

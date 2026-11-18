@@ -29,7 +29,7 @@ func TestLabel(t *testing.T) {
 }
 
 // A tmux Snapshot lists each session and pane: the pane going to the session
-// lands on, the pane marked agent, and the folder each runs in. The agent
+// lands on, the pane an agent runs in, and the folder each runs in. The agent
 // needs you once its window's bell rings where no client shows it, and works
 // while its window prints. Every other pane is Open.
 func TestATmuxSnapshot(t *testing.T) {
@@ -69,8 +69,17 @@ func TestATmuxSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmux("new-session", "-d", "-s", "api", "-c", work)
-	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}", `printf '\a'; exec cat`)
-	tmux("set-option", "-p", "-t", agent, "@ws", "agent")
+	// The agent is sleep run through a link named claude, since ws knows an
+	// agent by the name it runs as. macOS kills a copy of a system program.
+	sleep, err := exec.LookPath("sleep")
+	claude := filepath.Join(dir, "claude")
+	if err == nil {
+		err = os.Symlink(sleep, claude)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent := tmux("split-window", "-d", "-t", "api:", "-c", work, "-P", "-F", "#{pane_id}", `printf '\a'; exec `+claude+` 600`)
 	tmux("new-session", "-d", "-s", "web", "-c", work)
 
 	// tmux reads the bell from the pane's output a moment after it rings.
@@ -95,14 +104,14 @@ func TestATmuxSnapshot(t *testing.T) {
 	if !ok || lands.ID == agent || lands.Folder != work {
 		t.Errorf("going to api lands on %+v, want its first pane, in %s", lands, work)
 	}
-	i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.Agent })
-	if i < 0 || s.Panes[i].ID != agent {
-		t.Fatalf("the pane marked agent isn't %s in %+v", agent, s.Panes)
+	i := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agent })
+	if i < 0 {
+		t.Fatalf("the agent's pane, %s, is missing from %+v", agent, s.Panes)
 	}
 	if p := s.Panes[i]; !p.NeedsYou || p.Status != mux.Working {
 		t.Errorf("the agent that just rang reads %v, needing you %v, want working and needing you", p.Status, p.NeedsYou)
 	}
-	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return !p.Agent && (p.NeedsYou || p.Status != mux.Open) }) {
+	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID != agent && (p.NeedsYou || p.Status != mux.Open) }) {
 		t.Errorf("a pane with no agent reports something in %+v", s.Panes)
 	}
 	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Working, "web": mux.Open}) {

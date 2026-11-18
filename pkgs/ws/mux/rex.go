@@ -73,9 +73,6 @@ func (Rex) Create(label, dir string, panes []layout.Pane) (string, error) {
 		}
 	}
 	for i, p := range panes {
-		if p.Agent {
-			do("block", "rename", "-s", s, blocks[i], "agent")
-		}
 		if p.Run != "" {
 			do("send", "-s", s, "-b", blocks[i], "--", p.Run)
 			do("send-key", "-s", s, "-b", blocks[i], "enter")
@@ -159,7 +156,7 @@ func (r Rex) Snapshot() (Snapshot, error) {
 		Sessions luaList[Session]
 		Panes    luaList[struct {
 			Session, Label, ID, Program, Folder, Status, App, Title string
-			Landing, Agent                                          bool
+			Landing                                                 bool
 			Updated                                                 time.Time
 			Shown                                                   luaList[time.Time]
 		}]
@@ -173,7 +170,7 @@ func (r Rex) Snapshot() (Snapshot, error) {
 	s := Snapshot{Sessions: read.Sessions}
 	for _, p := range read.Panes {
 		status, _ := ParseStatus(p.Status)
-		pane := Pane{Session: p.Session, Label: p.Label, ID: p.ID, Landing: p.Landing, Agent: p.Agent,
+		pane := Pane{Session: p.Session, Label: p.Label, ID: p.ID, Landing: p.Landing,
 			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated}
 		pane.NeedsYou = r.needsYou(pane, p.Shown, r.Shown != "" && p.Label == r.Shown && p.Landing)
 		s.Panes = append(s.Panes, pane)
