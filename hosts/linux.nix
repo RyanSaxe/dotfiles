@@ -9,6 +9,10 @@
     ];
     repo = "/home/ryansaxe/generic/dotfiles";
     git.email = "ryancsaxe+1@gmail.com";
+    ws = {
+      agent = "claude";
+      openAs = "tab";
+    };
     vault = {
       dir = "/home/ryansaxe/generic/vault";
       remote = "git@github.com:RyanSaxe/vault.git";

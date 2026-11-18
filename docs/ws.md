@@ -15,21 +15,36 @@ ws pr 123 --prompt "Review it"      # start its agent with a prompt, as ws new d
 ws pr 123 --layout review           # open pull request 123 in Neovim instead
 ws ls                               # list worktrees and their agents
 ws rm fix-login                     # close its session, remove it and delete its branch
-ws agent codex                      # start codex by default on this computer
+ws agent                            # print the agent ws starts, with its model and effort
 ```
 
 Without `--force`, `ws rm` refuses a worktree with uncommitted changes, and
 keeps a branch that hasn't merged. Outside Rex and tmux, `ws new` and
 `ws pr` only make the worktree and print its path.
 
-Each agent has its own default flags, which every agent ws starts gets.
-`ws new` and `ws pr` replace them with the words after `--`:
+## Settings
+
+Each computer's host file sets ws's settings under `dotfiles.ws`, and
+`home-switch` writes them to `~/.config/ws/config.toml`. `agent` is the
+agent CLI ws starts, claude or codex. It defaults to claude on a computer
+with Claude Code and to codex otherwise:
+
+```nix
+dotfiles.ws.agent = "claude";
+```
+
+ws starts the agent with no flags of its own, so its model and effort are
+the agent's own settings, which every session of it shares and
+`modules/home/agents.nix` sets: `model` and `effortLevel` in
+`~/.claude/settings.json` for Claude Code, and `model` and
+`model_reasoning_effort` in `~/.codex/config.toml` for Codex. `ws agent`
+prints them. `ws new` and `ws pr` pass the words after `--` to the agent,
+which override its settings for that session:
 
 ```sh
-ws agent claude --effort medium     # claude starts with --effort medium, and is the default
-ws new fix-login                    # starts claude --effort medium
-ws new fix-popups -- --model opus   # starts claude --model opus
-ws agent claude --                  # clears claude's default flags
+ws agent                            # agent claude, model opus[1m], effort medium
+ws new fix-popups -- --effort high  # starts claude --effort high
+ws new fix-login --agent codex      # starts codex instead
 ```
 
 The worktrees popup's Ctrl-T asks for an agent, flags or both, such as
