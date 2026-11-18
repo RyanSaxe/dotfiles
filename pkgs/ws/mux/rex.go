@@ -101,7 +101,10 @@ func rexLayOut(s, first, dir string, panes []layout.Pane) error {
 			do("send", "-s", s, "-b", blocks[i], "--", p.Run)
 			do("send-key", "-s", s, "-b", blocks[i], "enter")
 		}
-		if p.Focus {
+		// The first pane has the focus already, and a focus call makes its
+		// tab the session's active one, which a tab made in the background
+		// must not become.
+		if p.Focus && i > 0 {
 			do("focus", "-s", s, blocks[i])
 		}
 	}
@@ -170,12 +173,41 @@ func (r Rex) Tab(p Place, dir string, args ...string) error {
 	return r.show(p.Session, made.Window)
 }
 
-func (Rex) Kill(p Place) error {
+// Kill closes the tab this program runs in last, since closing it ends the
+// program, and rex closes the tabs it's given one at a time.
+func (r Rex) Kill(p Place) error {
 	if p.Whole {
 		_, err := rex("kill", p.Session)
 		return err
 	}
-	_, err := rex(append([]string{"window", "close", "-s", p.Session}, p.Tabs...)...)
+	var view struct {
+		Windows []struct {
+			ID     string `json:"window_id"`
+			Layers []struct {
+				Blocks []struct {
+					ID string `json:"block_id"`
+				}
+			}
+		}
+	}
+	if err := rexJSON(&view, "window", "ls", "-s", p.Session, "--json"); err != nil {
+		return err
+	}
+	own := "" // the tab this program runs in, floats such as a popup included
+	for _, w := range view.Windows {
+		for _, l := range w.Layers {
+			for _, b := range l.Blocks {
+				if b.ID == r.block {
+					own = w.ID
+				}
+			}
+		}
+	}
+	tabs := slices.Clone(p.Tabs)
+	if i := slices.Index(tabs, own); i >= 0 {
+		tabs = append(slices.Delete(tabs, i, i+1), own)
+	}
+	_, err := rex(append([]string{"window", "close", "-s", p.Session}, tabs...)...)
 	return err
 }
 

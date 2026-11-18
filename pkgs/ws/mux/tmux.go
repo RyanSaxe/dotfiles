@@ -178,17 +178,22 @@ func tmuxType(pane, text string) error {
 	return err
 }
 
+// Kill closes the place's windows in one command, which the server finishes
+// even when one of them is the window this program runs in.
 func (Tmux) Kill(p Place) error {
 	if p.Whole {
 		_, err := tmux("kill-session", "-t", p.Session)
 		return err
 	}
-	for _, tab := range p.Tabs {
-		if _, err := tmux("kill-window", "-t", tab); err != nil {
-			return err
+	var kills []string
+	for i, tab := range p.Tabs {
+		if i > 0 {
+			kills = append(kills, ";")
 		}
+		kills = append(kills, "kill-window", "-t", tab)
 	}
-	return nil
+	_, err := tmux(kills...)
+	return err
 }
 
 // Focus switches the client to the pane's session, window and pane. Outside

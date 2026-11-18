@@ -165,11 +165,15 @@ func makePlace(b mux.Backend, snap mux.Snapshot, dir, openAs string, panes []lay
 	return b.Create(label, dir, panes)
 }
 
-// isWorktree says whether dir is one of ws's worktrees,
+// isWorktree says whether dir is one of ws's worktrees, a checkout at
 // ~/worktrees/PROJECT/NAME.
 func isWorktree(dir string) bool {
 	rel, err := filepath.Rel(worktreeRoot, dir)
-	return err == nil && !strings.HasPrefix(rel, "..") && strings.Count(rel, "/") == 1
+	if err != nil || strings.HasPrefix(rel, "..") || strings.Count(rel, "/") != 1 {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(dir, ".git"))
+	return err == nil
 }
 
 // checkStart fails on a config that doesn't load, an agent ws doesn't start
@@ -330,7 +334,7 @@ type worktree struct {
 	Path    string    `json:"path"`
 	Branch  string    `json:"branch"`
 	Dirty   bool      `json:"dirty"`
-	State   string    `json:"state"` // the session's most urgent agent status, "open", or "" with no session
+	State   string    `json:"state"` // its place's most urgent agent status, "open", or "" when it isn't open
 	Updated time.Time `json:"updated"`
 	Subject string    `json:"subject"` // the last commit's
 }

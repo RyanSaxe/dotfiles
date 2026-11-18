@@ -16,7 +16,7 @@ ws pr 123                           # make a worktree on pull request 123, with 
 ws pr 123 --prompt "Review it"      # start its agent with a prompt, as ws new does
 ws pr 123 --layout review           # open pull request 123 in Neovim instead
 ws ls                               # list worktrees and their agents
-ws rm fix-login                     # close its tab, remove it and delete its branch
+ws rm fix-login                     # close its tab or session, remove it and delete its branch
 ws agent                            # print the agent ws starts, with its model and effort
 ```
 
@@ -26,11 +26,12 @@ keeps a branch that hasn't merged. Outside Rex and tmux, `ws new` and
 
 ## Places
 
-A folder's terminals are in its place: a tab named after the folder, or a
-session labeled after it. `ws` finds a place by that name wherever it is,
-in sessions you made by hand too, and keeps no record of where it put one.
+A folder's terminals are in its place: a session labeled after the folder,
+or, for a worktree, a tab named PROJECT/NAME in any session. `ws` finds a
+place by that name wherever it is, in sessions you made by hand too, and
+keeps no record of where it put one.
 
-A worktree opens as `openAs` in the host file says, `tab` by default:
+A worktree opens where the host file's `openAs` says, `tab` by default:
 
 - **tab:** a tab named PROJECT/NAME in the project's session, labeled
   PROJECT. When that session isn't running, `ws` starts it with a plain
@@ -41,8 +42,8 @@ A worktree opens as `openAs` in the host file says, `tab` by default:
 `--tab` and `--session` on `ws open`, `ws new` and `ws pr` override it for
 one command. Any other folder, such as a main checkout, opens as a session
 of its own. A tab `ws` adds to a place, such as a file the files popup
-opens, takes the place's name, so it is part of the place. A tab nobody
-named is part of its session's place.
+opens, takes the place's name, so it is part of the place. Any other tab,
+such as one you or an agent named `tests`, is part of its session's place.
 
 `ws rm` and Ctrl-X in the go popup close a place's tabs, or its whole
 session when nothing else is in it. Removing a worktree closes its tab and
@@ -53,8 +54,8 @@ leaves the project's session open.
 Each computer's host file sets ws's settings under `dotfiles.ws`, and
 `home-switch` writes them to `~/.config/ws/config.toml`. `agent` is the
 agent CLI ws starts, claude or codex. It defaults to claude on a computer
-with Claude Code and to codex otherwise. `openAs` is where a worktree
-opens, `tab` or `session`, as [Places](#places) says:
+with Claude Code and to codex otherwise. `openAs`, `open_as` in the TOML,
+is where a worktree opens, `tab` or `session`, as [Places](#places) says:
 
 ```nix
 dotfiles.ws = {

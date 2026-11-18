@@ -6,9 +6,9 @@ description: Start, watch and remove worktree agents with `ws`, and message them
 # Worktrees
 
 `ws` puts a piece of work in its own git worktree at
-`~/worktrees/PROJECT/NAME`, with its own Rex or tmux session and an agent
-started on a prompt. It works out whether it runs in Rex, in tmux or in
-neither by itself.
+`~/worktrees/PROJECT/NAME`, in a tab of its project's Rex or tmux session
+or a session of its own, with an agent started on a prompt. It works out
+whether it runs in Rex, in tmux or in neither by itself.
 
 ## When to use one
 
@@ -34,15 +34,15 @@ ws new NAME --agent claude --prompt "…"
   `--effort` or `--model`.
 - `--base REF` branches from REF instead of the current HEAD. Fetch first and
   pass `origin/BRANCH`, so the base is current.
-- Run by an agent, `ws new` opens the session without switching the user's
-  view. Outside Rex and tmux it only creates the worktree and prints its
-  path, so do the work there yourself.
+- Run by an agent, `ws new` opens the worktree's tab or session without
+  switching the user's view. Outside Rex and tmux it only creates the
+  worktree and prints its path, so do the work there yourself.
 - `ws pr NUMBER` does the same for a pull request.
 
 ## Watch and message
 
-- `ws ls` lists worktrees by project with each session's agent state. Rex
-  reports blocked, error, done, working or idle. In tmux, the agent shows
+- `ws ls` lists worktrees by project with the agent state of each one's tab
+  or session. Rex reports blocked, error, done, working or idle. In tmux, the agent shows
   working while its window prints and idle otherwise.
 - In Rex, the rex skill covers reading an agent's screen.
 - `pair message --to NAME --text "…"` sends the text to an agent through its
@@ -54,7 +54,7 @@ ws new NAME --agent claude --prompt "…"
 
 ## Clean up
 
-`ws rm NAME` closes the session, removes the worktree and deletes the branch
-once it is merged, which after a squash merge means GitHub shows its pull
-request as merged. It refuses uncommitted changes and keeps an unmerged
+`ws rm NAME` closes its tab or session, removes the worktree and deletes the
+branch once it is merged, which after a squash merge means GitHub shows its
+pull request as merged. It refuses uncommitted changes and keeps an unmerged
 branch. Pass `--force` only when the user said to discard the work.
