@@ -20,8 +20,15 @@ import (
 // Rex is a Rex server. Panes start the login shell and commands are typed
 // into it, so the shell's own functions apply. Client is the app to switch,
 // when it's known, and the rest is the terminal the program runs in.
+//
+// Shown and Seen are what you've looked at that the server can't tell a
+// Snapshot: the label of the session Rex's window shows, "" when the caller
+// doesn't know, and the done records you were looking at as they finished,
+// each by its pane's ID and its time.
 type Rex struct {
 	Client               string
+	Shown                string
+	Seen                 map[string]time.Time
 	session, block, term string
 }
 
@@ -155,13 +162,14 @@ var snapshotScript string
 
 // Snapshot reads every session and terminal with snapshot.lua, in one call
 // to the server.
-func (Rex) Snapshot() (Snapshot, error) {
+func (r Rex) Snapshot() (Snapshot, error) {
 	var read struct {
 		Sessions luaList[Session]
 		Panes    luaList[struct {
 			Session, Label, ID, Program, Folder, Status, App, Title string
 			Landing, Agent                                          bool
 			Updated                                                 time.Time
+			Shown                                                   luaList[time.Time]
 		}]
 	}
 	cmd := exec.Command("rex", "--autostart=false", "do", "-")
@@ -173,10 +181,33 @@ func (Rex) Snapshot() (Snapshot, error) {
 	s := Snapshot{Sessions: read.Sessions}
 	for _, p := range read.Panes {
 		status, _ := ParseStatus(p.Status)
-		s.Panes = append(s.Panes, Pane{Session: p.Session, Label: p.Label, ID: p.ID, Landing: p.Landing, Agent: p.Agent,
-			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated})
+		pane := Pane{Session: p.Session, Label: p.Label, ID: p.ID, Landing: p.Landing, Agent: p.Agent,
+			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated}
+		pane.NeedsYou = r.needsYou(pane, p.Shown, r.Shown != "" && p.Label == r.Shown && p.Landing)
+		s.Panes = append(s.Panes, pane)
 	}
 	return s, err
+}
+
+// needsYou says whether a pane's agent needs you and you haven't looked at
+// the pane since. A blocked or failed agent needs you until it reports
+// something else, and a done one until an app shows its pane. Rex doesn't
+// expose the app's seen state yet, so the app's size requests stand in for
+// it: an app asks for a pane's size each time it shows the pane, so a done
+// record newer than every request is unseen. The pane you're looking at
+// needs nothing. Neither does a record that finished while you looked, which
+// Seen lists, since its pane's last request came before it.
+func (r Rex) needsYou(p Pane, shown []time.Time, looking bool) bool {
+	switch {
+	case looking:
+		return false
+	case p.Status == Blocked || p.Status == Error:
+		return true
+	case p.Status == Done:
+		seen := r.Seen[p.ID].Equal(p.Updated) || slices.ContainsFunc(shown, func(t time.Time) bool { return !t.Before(p.Updated) })
+		return !seen
+	}
+	return false
 }
 
 // A luaList is a list a Lua script returns, which reads as {} when it's
@@ -272,9 +303,10 @@ func (Rex) App() (string, error) {
 }
 
 // Follow calls changed once at the start and then for every event that can
-// change a status: a report, a removed report, a closed pane or a closed
-// session. It restarts the stream when the Rex server goes away, and never
-// returns.
+// change whether an agent needs you: a report, a removed report, an app
+// showing a pane, which asks for its size, a session's view changing, a
+// closed pane or a closed session. It restarts the stream when the Rex
+// server goes away, and never returns.
 func (Rex) Follow(changed func()) {
 	for {
 		changed()
@@ -304,8 +336,8 @@ func (Rex) Follow(changed func()) {
 				continue
 			}
 			ev := e.Payload.Event
-			if e.Type == "session_destroyed" || ev.Type == "block_closed" ||
-				ev.Type == "block_event" && strings.HasPrefix(ev.Payload.Name, "program_status") {
+			if e.Type == "session_destroyed" || ev.Type == "block_closed" || ev.Type == "session_view_changed" ||
+				ev.Type == "block_event" && (strings.HasPrefix(ev.Payload.Name, "program_status") || ev.Payload.Name == "size_changed") {
 				changed()
 			}
 		}

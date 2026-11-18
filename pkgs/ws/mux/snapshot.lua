@@ -1,7 +1,8 @@
 -- Every session and terminal pane, for Rex.Snapshot in rex.go: what each
--- pane runs, in which folder, the status its program reports, and whether
--- going to its session lands on it. The server answers a script about a
--- session only once the script has attached to it.
+-- pane runs, in which folder, the status its program reports, when each app
+-- last showed an agent's pane, and whether going to its session lands on
+-- it. The server answers a script about a session only once the script has
+-- attached to it.
 local TERMINAL = "com.superlogical.terminal"
 
 -- The pane going to a session lands on: the focused pane of its active tab,
@@ -50,6 +51,14 @@ for _, session in ipairs(rex.call("session.list").sessions) do
         -- A record with no id is the program itself, and the others its parts.
         if record.id == nil or record.id == "" then
           pane.status, pane.app, pane.updated = record.state, record.app, record.updated_at
+        end
+      end
+      if pane.status then
+        -- An app asks for a pane's size each time it shows the pane.
+        local size = rex.block.call(TERMINAL, "size", at)
+        pane.shown = {}
+        for _, request in ipairs(size and size.desired or {}) do
+          table.insert(pane.shown, request.updated_at)
         end
       end
       local title = rex.block.call(TERMINAL, "title", at)
