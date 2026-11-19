@@ -36,8 +36,8 @@ const (
 // and agent, the places folders are open in, each session and named tab, and
 // the agents by their latest report. It opens on first.
 func goPopup(b mux.Backend, first int) popup.Popup {
-	walk := perLoad(func() ([]folder, error) { return folders(), nil })
-	snapshot := perLoad(func() (mux.Snapshot, error) { return b.Snapshot() })
+	walk := perLoad(func(report func([]folder)) ([]folder, error) { return folders(report), nil })
+	snapshot := perLoad(func(func(mux.Snapshot)) (mux.Snapshot, error) { return b.Snapshot() })
 	return popup.Popup{
 		Noun: "folders, worktrees, sessions and agents",
 		Tabs: []popup.Tab{
@@ -47,26 +47,24 @@ func goPopup(b mux.Backend, first int) popup.Popup {
 			agentsTab:    {Name: "Agents", Empty: "No terminal reports a program status."},
 		},
 		Start: first,
-		// Every tab reads the same snapshot. Folders shows the walk's rows at
-		// once, and tags the folders that are open once the snapshot comes.
-		// Enter on an untagged row still goes to its place, since open finds
-		// it. Sessions reads the snapshot first, so it runs while Folders
-		// walks.
+		// Every tab reads the same walk and the same snapshot. Folders shows
+		// the folders as the walk finds them, and tags the ones that are open
+		// once the snapshot comes. Enter on an untagged row still goes to its
+		// place, since open finds it.
 		Load: func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
 			switch tab {
 			case worktreesTab:
-				return worktreeRows(func() (mux.Snapshot, error) { return snapshot(tab) }, show), nil
+				return worktreeRows(func() (mux.Snapshot, error) { return snapshot(tab, nil) }, show), nil
 			case sessionsTab:
-				s, err := snapshot(tab)
-				fs, _ := walk(tab)
+				s, err := snapshot(tab, nil)
+				fs, _ := walk(tab, nil)
 				return sessionRows(fs, s), err
 			case agentsTab:
-				s, err := snapshot(tab)
+				s, err := snapshot(tab, nil)
 				return agentRows(s), err
 			}
-			fs, _ := walk(tab)
-			show(folderRows(fs, mux.Snapshot{}))
-			s, err := snapshot(tab)
+			fs, _ := walk(tab, func(fs []folder) { show(folderRows(fs, mux.Snapshot{})) })
+			s, err := snapshot(tab, nil)
 			return folderRows(fs, s), err
 		},
 		Fetch: func(r popup.Row) (any, error) {
@@ -139,22 +137,29 @@ type folder struct {
 }
 
 // folders lists repositories, worktrees and bookmarks, each once, the latest
-// git activity first.
-func folders() []folder {
+// git activity first. found gets the list so far as it grows: first the
+// worktrees, which a glob lists at once, and the bookmarks, then each
+// folder's repositories as the walk of the home folder finishes that folder.
+func folders(found func([]folder)) []folder {
+	marks := bookmarks()
+	var fs []folder
+	listed := map[string]bool{}
+	add := func(dirs []string) {
+		for _, d := range dirs {
+			if !listed[d] {
+				listed[d] = true
+				fs = append(fs, folder{d, activity(d), slices.Contains(marks, d)})
+			}
+		}
+		slices.SortStableFunc(fs, func(a, b folder) int { return b.at.Compare(a.at) })
+		found(slices.Clone(fs))
+	}
 	wts, _ := filepath.Glob(filepath.Join(worktreeRoot, "*", "*", ".git"))
 	for i, w := range wts {
 		wts[i] = filepath.Dir(w)
 	}
-	marks := bookmarks()
-	var fs []folder
-	listed := map[string]bool{}
-	for _, d := range slices.Concat(repos(), wts, marks) {
-		if !listed[d] {
-			listed[d] = true
-			fs = append(fs, folder{d, activity(d), slices.Contains(marks, d)})
-		}
-	}
-	slices.SortStableFunc(fs, func(a, b folder) int { return b.at.Compare(a.at) })
+	add(slices.Concat(wts, marks))
+	walkRepos(add)
 	return fs
 }
 
@@ -262,32 +267,49 @@ func activity(dir string) time.Time {
 	return info.ModTime()
 }
 
-// repos finds git checkouts anywhere under the home folder. It stops at a
-// repository, since nothing inside one is a separate project, and skips
-// hidden folders, ~/Library, ~/worktrees, which Worktrees lists, and folders
-// that hold no projects. That walk takes about 7 ms. Go's module cache in
-// ~/go would add about 140 ms, so GOPATH keeps it in ~/.local/share/go.
+// repos finds git checkouts anywhere under the home folder.
 func repos() []string {
+	var found []string
+	walkRepos(func(dirs []string) { found = append(found, dirs...) })
+	return found
+}
+
+// walkRepos walks the home folder for git checkouts, and gives found each
+// top-level folder's checkouts as soon as it has walked that folder. It stops
+// at a repository, since nothing inside one is a separate project, and skips
+// hidden folders, ~/Library, ~/worktrees, which Worktrees lists, and folders
+// that hold no projects. Go's module cache in ~/go would add about 140 ms, so
+// GOPATH keeps it in ~/.local/share/go.
+func walkRepos(found func([]string)) {
 	skip := map[string]bool{"Library": true, filepath.Base(worktreeRoot): true, "node_modules": true,
 		"Applications": true, "Movies": true, "Music": true, "Pictures": true}
-	var found []string
-	var walk func(string)
-	walk = func(dir string) {
+	subfolders := func(dir string) []string {
 		entries, _ := os.ReadDir(dir)
+		var dirs []string
 		for _, e := range entries {
-			if !e.IsDir() || strings.HasPrefix(e.Name(), ".") || skip[e.Name()] {
-				continue
-			}
-			p := filepath.Join(dir, e.Name())
-			if _, err := os.Stat(filepath.Join(p, ".git")); err == nil {
-				found = append(found, p)
-			} else {
-				walk(p)
+			if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && !skip[e.Name()] {
+				dirs = append(dirs, filepath.Join(dir, e.Name()))
 			}
 		}
+		return dirs
 	}
-	walk(home)
-	return found
+	// within is the checkouts at or under dir.
+	var within func(dir string) []string
+	within = func(dir string) []string {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return []string{dir}
+		}
+		var repos []string
+		for _, sub := range subfolders(dir) {
+			repos = append(repos, within(sub)...)
+		}
+		return repos
+	}
+	for _, dir := range subfolders(home) {
+		if repos := within(dir); len(repos) > 0 {
+			found(repos)
+		}
+	}
 }
 
 func bookmarks() []string {
