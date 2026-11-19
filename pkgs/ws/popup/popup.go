@@ -17,7 +17,8 @@ type Popup struct {
 	Start   int // the tab it opens on, 0 for the first
 	// Load fills a tab. It may call show with the rows it has so far, as often
 	// as it likes, and each call replaces the tab's rows. The rows it returns
-	// are final, and the tab stops loading then.
+	// are final, and the tab stops loading then. The tab the popup opens on
+	// loads first, and the other tabs' Loads start once it returns.
 	Load    func(tab int, show func([]Row)) ([]Row, error)
 	Fetch   func(r Row) (any, error)                 // details of a final row, once the cursor rests on it, or nil for none and a list the full width
 	Head    func(r Row, details any, w int) []string // nil shows the row's meta and title on a phone

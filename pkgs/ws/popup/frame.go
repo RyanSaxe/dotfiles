@@ -96,13 +96,13 @@ func (m *frame) restyle() {
 
 // load starts every tab's current load. Load runs in a goroutine, and the
 // frame reads the rows it shows and returns one message at a time. The other
-// tabs start once the active tab shows its first rows or finishes, since
-// their work competes with it, and a slow tab, such as one that runs git in
-// every worktree, held up the rows on screen for a second.
+// tabs start once the active tab's load finishes, so their work can't slow
+// down the tab on screen. The active tab's command comes first, so a caller
+// that runs a batch's commands one at a time reaches it before the commands
+// that wait for it.
 func (m frame) load() tea.Cmd {
 	cmds := []tea.Cmd{m.spin.Tick}
-	first, once := make(chan struct{}), new(sync.Once)
-	activeShowed := func() { once.Do(func() { close(first) }) }
+	activeDone := make(chan struct{})
 	order := []int{m.active}
 	for t := range m.p.Tabs {
 		if t != m.active {
@@ -141,16 +141,11 @@ func (m frame) load() tea.Cmd {
 					}
 				}()
 				if t == m.active {
-					defer activeShowed()
+					defer close(activeDone)
 				} else {
-					<-first
+					<-activeDone
 				}
-				show := func(rows []Row) {
-					put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, more: read})
-					if t == m.active {
-						activeShowed()
-					}
-				}
+				show := func(rows []Row) { put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, more: read}) }
 				rows, err := m.p.Load(t, show)
 				put(rowsMsg{frame: id, tab: t, gen: gen, rows: rows, err: err})
 			}()
