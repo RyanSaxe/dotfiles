@@ -61,7 +61,7 @@ modules/
   darwin/           macOS settings, Homebrew casks and /etc/codex, for nix-darwin
   codex-managed.nix the files Codex's managed hooks need in /etc/codex
 theme/              what each color means, one file per app, and `theme`
-pkgs/               ws's Go source and the pair package
+pkgs/               ws's Go source, the pair package and tmux's patch
 config/             files programs read as they are, linked from the checkout
 ai-harness/         the agents' instructions, skills and hooks
 secrets/            secrets.yaml, encrypted to the keys in .sops.yaml
