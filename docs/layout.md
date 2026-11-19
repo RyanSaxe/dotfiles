@@ -67,7 +67,7 @@ ai-harness/         the agents' instructions, skills and hooks
 secrets/            secrets.yaml, encrypted to the keys in .sops.yaml
 tests/              the prompt's test, and a placeholder work host CI builds
 docs/               these pages
-assets/             the README's screenshots
+assets/             the README's screenshots, and retake.sh, which retakes them
 ```
 
 Most files under `config/` and `ai-harness/` are links into the checkout,
