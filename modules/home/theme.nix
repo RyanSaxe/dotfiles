@@ -47,7 +47,7 @@ let
     '';
   theme = pkgs.writeShellApplication {
     name = "theme";
-    runtimeInputs = [ pkgs.tmux ];
+    runtimeInputs = [ (pkgs.callPackage ../../pkgs/tmux { }) ];
     text = builtins.readFile ../../theme/theme.sh;
   };
   # The activation's PATH has no sketchybar, so `theme` is told where it is.
