@@ -36,13 +36,19 @@ func pick(b mux.Backend, name string) error {
 	if hex := accentColor(); hex != "" {
 		popup.Accent = lipgloss.NewStyle().Foreground(lipgloss.Color(hex))
 	}
+	// Rex starts a new pane, such as the float a popup opens in, at 80×24, and
+	// gives it its real size once the app draws it.
+	var placeholder tea.WindowSizeMsg
+	if _, ok := b.(mux.Rex); ok {
+		placeholder = tea.WindowSizeMsg{Width: 80, Height: 24}
+	}
 	// The mascot and its accent are drawn again on each reload, so the theme
 	// popup shows a new mascot and its color as soon as it's set.
 	return popup.Run(build(), func() popup.Art {
 		art := mascotArt(2, term)
 		art.Accent = accentColor()
 		return art
-	})
+	}, placeholder)
 }
 
 // perLoad shares work between the tabs of one load, which all start at
