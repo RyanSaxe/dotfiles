@@ -186,7 +186,13 @@ func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 		m.setRows(msg.tab, msg.rows)
 		cmds := []tea.Cmd{msg.more}
 		if msg.tab == m.active {
-			cmds = append(cmds, m.moveSelected(rowsLoaded{m.reloads}))
+			// The row's details wait from when its rows arrive, unless the
+			// frame already says it's loading them.
+			at := time.Now()
+			if slow(m.started) {
+				at = m.started
+			}
+			cmds = append(cmds, m.moveSelected(rowsLoaded{m.reloads, at}))
 		}
 		if effect == showAndPick {
 			var picked tea.Cmd
@@ -524,8 +530,8 @@ const patience = 300 * time.Millisecond
 func slow(since time.Time) bool { return time.Since(since) >= patience }
 
 // detailsSlow says whether the row's details have kept the frame waiting past
-// patience, since the cursor arrived on the row, or since the load began for
-// a row the cursor never moved to.
+// patience, since the cursor or the final rows arrived on the row, or, while
+// the rows still load, since the load began.
 func (m frame) detailsSlow(r Row) bool { return slow(cmp.Or(m.details[r.ID].since, m.started)) }
 
 // detailHead is what heads the row's details, with their loading line only

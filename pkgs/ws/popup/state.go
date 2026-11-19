@@ -1,6 +1,9 @@
 package popup
 
-import "time"
+import (
+	"cmp"
+	"time"
+)
 
 // The frame's state, each part a named type with one function that moves
 // it. The frame's Update only turns Bubble Tea messages into these events.
@@ -128,9 +131,12 @@ type (
 		gen int
 		at  time.Time
 	}
-	rowsLoaded struct{ gen int } // the tab's final rows arrived with the cursor on the row
-	rested     struct{}          // the cursor is still on the row a moment later
-	fetched    struct {
+	rowsLoaded struct { // the tab's final rows arrived with the cursor on the row
+		gen int
+		at  time.Time // when the row's details began to wait, unless the cursor came first
+	}
+	rested  struct{} // the cursor is still on the row a moment later
+	fetched struct {
 		gen  int
 		data any
 		err  error
@@ -159,7 +165,7 @@ func (d detail) next(e detailEvent) (detail, effect) {
 		}
 	case rowsLoaded:
 		if d.state == unasked || d.state == waiting {
-			return detail{state: fetching, gen: e.gen, since: d.since}, fetch
+			return detail{state: fetching, gen: e.gen, since: cmp.Or(d.since, e.at)}, fetch
 		}
 	case rested:
 		if d.state == waiting {
