@@ -9,10 +9,7 @@ theme         # follow macOS's appearance
 Changing the appearance in macOS works too, because sketchybar runs `theme`
 whenever it changes.
 
-<p>
-  <img src="../assets/screen-light.png" width="49%" alt="The Mac's screen in light mode, in Catppuccin Latte">
-  <img src="../assets/screen-dark.png" width="49%" alt="The same screen in dark mode, in Catppuccin Mocha">
-</p>
+<img alt="The Mac's screen in dark mode, in Catppuccin Mocha: sketchybar across the top, and Rex below it with two Neovim panes." src="../assets/screen.png">
 
 ## How it works
 

@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# Retakes every screenshot the README and the docs show, with demo content:
+# Retakes the screenshots the README and the docs show, with demo content:
 #
-#   assets/screen.png        the screen: sketchybar, and Rex with two Neovim
-#                            panes, on a Python file and on a note
-#   assets/screen-dark.png   the same shot, for docs/theme.md
-#   assets/screen-light.png  the same screen in light mode
-#   assets/picker.png        the go popup on Folders
-#   assets/inbox.png         the Inbox popup on Needs you, with sketchybar's
-#                            R lit
+#   assets/screen.png  the screen: sketchybar, and Rex with two Neovim panes,
+#                      on a Python file and on a note
+#   assets/picker.png  the go popup on Folders
+#   assets/inbox.png   the Inbox popup on Needs you, with sketchybar's R lit
 #
-#   assets/retake.sh          take them. This takes over the screen for a
-#                             few minutes and flips the theme, so don't type
+#   assets/retake.sh          take them, in dark mode. This takes over the
+#                             screen for about a minute, so don't type
 #                             meanwhile.
 #   assets/retake.sh --check  print each popup's and each Neovim pane's text
 #                             from a scratch tmux server instead. Nothing on
@@ -42,7 +39,7 @@ stop() {
 # The commands, as they are run with the demo's folders in place of yours.
 in_demo() {
   env HOME="$demo" XDG_CONFIG_HOME="$demo/.config" XDG_STATE_HOME="$demo/.local/state" \
-    XDG_CACHE_HOME="$demo/.cache" XDG_DATA_HOME="$demo/.local/share" VAULT_DIR="$demo/vault" \
+    XDG_CACHE_HOME="$demo/.cache" XDG_DATA_HOME="$demo/.local/share" VAULT_DIR="$demo/notebook" \
     PATH="$ws/bin:$PATH" "$@"
 }
 
@@ -80,7 +77,7 @@ aged() {
 }
 
 build_demo() {
-  mkdir -p "$demo"/{.config/ws,.config/sops-nix/secrets,.local/state/ws,vault/notes/projects/atlas,vault/notes/daily,notes}
+  mkdir -p "$demo"/{.config/ws,.config/sops-nix/secrets,.local/state/ws,notebook/notes/projects/atlas,notebook/notes/daily,notes}
   # The popups' colors and sketchybar's are the theme's, which holds nothing
   # private.
   ln -s "$HOME/.config/theme" "$demo/.config/theme"
@@ -133,7 +130,7 @@ build_demo() {
         + {Yours: true, Draft: true, Body: "Reads a bank statement saved as CSV."}
     ]}' >"$demo/.local/state/ws/inbox.json"
 
-  cat >"$demo/vault/notes/projects/atlas/TODO.md" <<EOF
+  cat >"$demo/notebook/notes/projects/atlas/TODO.md" <<EOF
 # atlas
 
 - [ ] Renew the tile server's certificate 📅 $(date -v-1d +%F)
@@ -145,17 +142,17 @@ build_demo() {
 
 - [ ] Ask for a login only once per session
 EOF
-  cat >"$demo/vault/notes/daily/$(date +%F).md" <<EOF
+  cat >"$demo/notebook/notes/daily/$(date +%F).md" <<EOF
 # $(date +%F)
 
 - [ ] Book the dentist 📅 $(date -v+1d +%F)
 - [ ] Send the ledger export to the accountant 📅 $(date -v+12d +%F)
 EOF
   # Neovim's breadcrumb starts at a note's repository, and the vault is one.
-  demo_git -C "$demo/vault" init -q
-  demo_git -C "$demo/vault" add -A
-  demo_git -C "$demo/vault" commit -qm "notes"
-  aged "$demo/vault/.git/logs/HEAD" 200
+  demo_git -C "$demo/notebook" init -q
+  demo_git -C "$demo/notebook" add -A
+  demo_git -C "$demo/notebook" commit -qm "notes"
+  aged "$demo/notebook/.git/logs/HEAD" 200
 }
 
 # demo_files writes what the two Neovim panes show.
@@ -215,7 +212,7 @@ class Viewport:
         ]
         return sorted(found, key=lambda t: abs(t.column - middle.column) + abs(t.row - middle.row))
 EOF
-  cat >"$demo/vault/notes/projects/atlas/tiles.md" <<'EOF'
+  cat >"$demo/notebook/notes/projects/atlas/tiles.md" <<'EOF'
 # How atlas loads tiles
 
 The map asks for the tiles under the screen, nearest the center first, and
@@ -253,7 +250,7 @@ check() {
     tmux -L "$server" capture-pane -p | sed -e 's/[[:space:]]*$//' -e '/^$/d'
     tmux -L "$server" kill-server
   done
-  for file in code/atlas/src/atlas.py vault/notes/projects/atlas/tiles.md; do
+  for file in code/atlas/src/atlas.py notebook/notes/projects/atlas/tiles.md; do
     tmux -L "$server" -f /dev/null new-session -d -x 100 -y 40 -c "$demo" "nvim $file"
     sleep 5
     echo "== nvim $file"
@@ -286,7 +283,7 @@ labeled_block() {
 open_popup() {
   local label="retake $1" command lua block columns
   command=$(printf '"%s", ' env "HOME=$demo" "XDG_CONFIG_HOME=$demo/.config" "XDG_STATE_HOME=$demo/.local/state" \
-    "XDG_CACHE_HOME=$demo/.cache" "XDG_DATA_HOME=$demo/.local/share" "VAULT_DIR=$demo/vault" "$ws/bin/ws" pick "$1")
+    "XDG_CACHE_HOME=$demo/.cache" "XDG_DATA_HOME=$demo/.local/share" "VAULT_DIR=$demo/notebook" "$ws/bin/ws" pick "$1")
   lua="local _, err = rex.session.new_layer({ bounds = { 0.08, 0.08, 0.84, 0.84 }, focus = true,
     layout = rex.layout.block({ flavor = 'com.superlogical.terminal.shell', label = '$label',
       options = { command = { $command }, cwd = '$demo/code/atlas' } }) })
@@ -323,19 +320,11 @@ letters() {
   done
 }
 
-# sketchybar's clock turns red at minutes 59, 00, 29 and 30, and its CPU
-# readout lights above 50%, so a shot waits both out. It waits from
-# the minute before a red one, so it can't run into it.
+# sketchybar's clock turns red at minutes 59, 00, 29 and 30, so a shot waits
+# those out, from the minute before, so it can't run into one.
 calm() {
-  local cpu
   while case $(date +%M) in 58 | 59 | 00 | 28 | 29 | 30) true ;; *) false ;; esac do sleep 5; done
   sketchybar --trigger system_woke # draws the clock now, not at its next minute
-  for _ in $(seq 1 30); do
-    cpu=$(sketchybar --query cpu | jq -r .label.value | tr -dc 0-9)
-    [ -n "$cpu" ] && [ "$cpu" -le 50 ] && return
-    sleep 2
-  done
-  stop "the CPU stayed above 50% for a minute, which lights sketchybar's readout, so run this when the computer is less busy"
 }
 
 # capture FILE... takes the screen into each of assets' FILEs, and refuses a
@@ -376,52 +365,18 @@ shoot_screen() {
 # shoot_popup NAME FILE takes the screen with `ws pick NAME` open.
 shoot_popup() {
   open_popup "$1"
-  # The second row has a review comment to show beside the list.
-  [ "$1" = go ] || rex send-key -s "$session" -b "$(labeled_block "retake $1")" down >/dev/null
+  # The second row shows more beside the list: a folder that isn't open, with
+  # its files and commits, and a review with its comment.
+  rex send-key -s "$session" -b "$(labeled_block "retake $1")" down >/dev/null
   capture "$2"
   close_popup "$1"
 }
 
-# Every window's workspace, app and title. A title can hold any character
-# but this separator.
-sep=$'\037'
-windows() {
-  aerospace list-windows --all --format "%{window-id}${sep}%{workspace}${sep}%{app-bundle-id}${sep}%{window-title}"
-}
-
-# to_mode MODE flips the theme. The flip quits and reopens Chrome, whose
-# windows come back with new IDs on the focused workspace, and takes the
-# focus with them. So once Chrome has its windows again, each window that
-# isn't Rex's goes back to the workspace a window of its app and title was
-# on, or to the browser workspace, and Rex gets the focus back.
-to_mode() {
-  local id space bundle title want
-  theme "$1" >/dev/null
-  sleep 6
-  for _ in $(seq 1 40); do
-    [ "$(windows | grep -c "${sep}com.google.Chrome${sep}")" -ge "$chrome" ] && break
-    sleep 0.5
-  done
-  windows | while IFS="$sep" read -r id space bundle title; do
-    [ "$bundle" = com.superlogical.rex ] && continue
-    want=$(awk -F"$sep" -v b="$bundle" -v t="${title:0:25}" '$3 == b && substr($4, 1, 25) == t { print $2; exit }' <<<"$placed")
-    [ "$space" = "${want:-browser}" ] || aerospace move-node-to-workspace --window-id "$id" "${want:-browser}" >/dev/null 2>&1 || true
-  done
-  aerospace workspace code
-  aerospace focus --window-id "${window%%|*}"
-  sleep 1
-}
-
-appearance() {
-  if [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = Dark ]; then echo dark; else echo light; fi
-}
-
-# restore puts back the mode, the session the app showed, the workspace and
+# restore puts back the session the app showed, the workspace and
 # sketchybar, and ends the demo session. Neovim is asked to quit first, so
 # it stops the programs it started.
 restore() {
   local pane
-  [ "$(appearance)" = "$mode" ] || to_mode "$mode" || true
   [ -z "$shown" ] || rex -C "$app" do session.select session_id="$shown" >/dev/null 2>&1 || true
   aerospace workspace "$workspace" || true
   for pane in $code $note; do
@@ -447,9 +402,12 @@ if [ "${1:-}" = --check ]; then
 fi
 [ $# -eq 0 ] || stop "the only argument is --check"
 
-for tool in rex aerospace sketchybar screencapture sips zsh nvim theme; do
+for tool in rex aerospace sketchybar screencapture sips zsh nvim; do
   command -v "$tool" >/dev/null || stop "$tool isn't installed"
 done
+# It never flips the theme itself: a flip quits and reopens Chrome and
+# redraws every app, which is too much to do to a computer in use.
+[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = Dark ] || stop "the shots are dark, so switch to dark mode first"
 app=$(app_client)
 [ -n "$app" ] || stop "no Rex app is connected, so open Rex first"
 window=$(rex_windows | head -1)
@@ -457,9 +415,6 @@ window=$(rex_windows | head -1)
 shown=$(rex ls --json | jq -r --arg label "${window##* - }" '[.sessions[] | select(.label == $label) | .session_id] | first // empty')
 [ -n "$shown" ] || stop "Rex's window doesn't name the session it shows, so it couldn't be put back"
 workspace=$(aerospace list-workspaces --focused)
-mode=$(appearance)
-placed=$(windows)
-chrome=$(grep -c "${sep}com.google.Chrome${sep}" <<<"$placed" || true)
 code="" note=""
 rex ls --json | jq -e '[.sessions[] | select(.label == "atlas")] | length == 0' >/dev/null || stop "a session named atlas is already running"
 
@@ -470,8 +425,8 @@ trap restore EXIT
 made=$(rex new atlas -c "$demo/code/atlas" --json -- nvim src/atlas.py)
 session=$(jq -r .session_id <<<"$made")
 code=$(jq -r '.initial_windows[0].block_ids[0]' <<<"$made")
-rex split -s "$session" -b "$code" -c "$demo/vault" --label "retake note" --focus=false -- nvim notes/projects/atlas/tiles.md >/dev/null
-note=$(labeled_block "retake note")
+rex split -s "$session" -b "$code" -c "$demo/notebook" --focus=false -- nvim notes/projects/atlas/tiles.md >/dev/null
+note=$(rex block ls -s "$session" --json | jq -r --arg code "$code" '[.blocks[] | select(.block_id != $code) | .block_id] | first // empty')
 [ -n "$note" ] || stop "the note's pane didn't open"
 
 # Rex's window draws nothing new while its workspace is hidden, and
@@ -484,10 +439,7 @@ aerospace focus --window-id "${window%%|*}"
 sleep 2
 [ "$(app_client)" = "$app" ] || stop "Rex's app stopped answering. Relaunch Rex yourself, then run this again"
 
-[ "$mode" = dark ] || to_mode dark
-shoot_screen screen.png screen-dark.png
+shoot_screen screen.png
 shoot_popup go picker.png
 letters none review none
 shoot_popup inbox inbox.png
-to_mode light
-shoot_screen screen-light.png
