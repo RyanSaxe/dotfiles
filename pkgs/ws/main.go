@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -411,9 +412,15 @@ func worktrees(snapshot func() (mux.Snapshot, error)) []worktree {
 		s, _ := snapshot()
 		states = s.Statuses()
 	})
+	// Each worktree takes two git commands. Started all at once, they run
+	// hundreds of processes that slow down everything else on the computer,
+	// the popup on screen included, so only as many run as there are CPUs.
+	slots := make(chan struct{}, runtime.NumCPU())
 	for i := range wts {
 		w := &wts[i]
 		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
 			status, _ := git(w.Path, "status", "--porcelain=v2", "--branch")
 			for line := range strings.SplitSeq(status, "\n") {
 				if b, ok := strings.CutPrefix(line, "# branch.head "); ok {
