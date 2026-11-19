@@ -29,7 +29,7 @@ file expects it. These steps set up the two computers `flake.nix` lists,
 3. [Encrypt the secrets to the new key](#encrypt-the-secrets-to-a-new-key).
 
 4. Pull, run the first switches and sign gh in to GitHub, which git and
-   Reviews use:
+   the Inbox use:
 
    ```sh
    nix run nixpkgs#git -- -C ~/generic/dotfiles pull
@@ -126,8 +126,8 @@ A new computer needs its own host file in `hosts/`, an entry in
 
 The host file's `vault` names the vault's folder and the git remote to
 clone it from. A computer without the vault leaves it out. It then has no
-`VAULT_DIR`, so Neovim skips obsidian.nvim and ws's Tasks says the vault
-isn't set up.
+`VAULT_DIR`, so Neovim skips obsidian.nvim and the Inbox's Tasks tab says the
+vault isn't set up.
 
 A computer whose details stay out of this repository is built from a
 private flake instead, as the next section shows.
@@ -229,4 +229,4 @@ the computer for these steps:
   GitHub accepts the computer's ssh key, which cloning the vault needs;
 - the secret values: the Pushover keys, which `sops -d secrets/secrets.yaml`
   shows on a computer that already has them, and the GitHub accounts that
-  Reviews watches and ignores.
+  the Inbox watches and ignores.

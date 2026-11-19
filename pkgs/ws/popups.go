@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"workspace/kitty"
 	"workspace/mux"
 	"workspace/popup"
 )
@@ -23,15 +24,16 @@ func pick(b mux.Backend, name string) error {
 		"worktrees": func() popup.Popup { return goPopup(b, worktreesTab) },
 		"sessions":  func() popup.Popup { return goPopup(b, sessionsTab) },
 		"agents":    func() popup.Popup { return goPopup(b, agentsTab) },
-		"reviews":   func() popup.Popup { return reviewsPopup(b, term) },
-		"tasks":     func() popup.Popup { return tasksPopup(b, term) },
+		"inbox":     func() popup.Popup { return inboxPopup(b, term, false) },
+		"reviews":   func() popup.Popup { return inboxPopup(b, term, false) },
+		"tasks":     func() popup.Popup { return inboxPopup(b, term, true) },
 		"theme":     func() popup.Popup { return themePopup(term) },
 		"files":     func() popup.Popup { return filesPopup(b, dir) },
 		"keys":      func() popup.Popup { return keysPopup(b) },
 	}
 	build, ok := popups[name]
 	if !ok {
-		return fmt.Errorf("no popup named %s, only go, worktrees, sessions, agents, reviews, tasks, theme, keys or files", name)
+		return fmt.Errorf("no popup named %s, only go, worktrees, sessions, agents, inbox, reviews, tasks, theme, keys or files", name)
 	}
 	// The mascot's accent colors the popups, and only the popups.
 	if hex := accentColor(); hex != "" {
@@ -89,6 +91,55 @@ func onTabs(tabs []int, actions []popup.Action) []popup.Action {
 	for i, a := range actions {
 		actions[i].When = func(tab int, r popup.Row) bool {
 			return slices.Contains(tabs, tab) && (a.When == nil || a.When(tab, r))
+		}
+	}
+	return actions
+}
+
+// inboxPopup is what waits on you outside the terminal: Reviews' tabs, then
+// the Tasks tabs. It opens on Needs you, or on the first Tasks tab when
+// onTasks is set. Each half keeps its own tabs, rows and keys, numbered from
+// 0, and a row's Data says which half it came from.
+func inboxPopup(b mux.Backend, term kitty.Terminal, onTasks bool) popup.Popup {
+	reviews, tasks := reviewTabs(b, term), taskTabs(b, term)
+	n := len(reviews.Tabs)
+	of := func(r popup.Row) popup.Popup {
+		if _, ok := r.Data.(task); ok {
+			return tasks
+		}
+		return reviews
+	}
+	p := popup.Popup{
+		Noun: reviews.Noun,
+		Tabs: slices.Concat(reviews.Tabs, tasks.Tabs),
+		Load: func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
+			if tab < n {
+				return reviews.Load(tab, show)
+			}
+			return tasks.Load(tab-n, show)
+		},
+		Fetch: func(r popup.Row) (any, error) { return of(r).Fetch(r) },
+		Head: func(r popup.Row, d any, w int) []string {
+			if head := of(r).Head; head != nil {
+				return head(r, d, w)
+			}
+			return nil
+		},
+		Body:    func(r popup.Row, d any, w int) string { return of(r).Body(r, d, w) },
+		Actions: slices.Concat(tabsFrom(0, n, reviews.Actions), tabsFrom(n, len(tasks.Tabs), tasks.Actions)),
+	}
+	if onTasks {
+		p.Start = n
+	}
+	return p
+}
+
+// tabsFrom makes actions work only on the count tabs from first, which they
+// know as tabs 0 and up, and there only where their own When says.
+func tabsFrom(first, count int, actions []popup.Action) []popup.Action {
+	for i, a := range actions {
+		actions[i].When = func(tab int, r popup.Row) bool {
+			return tab >= first && tab < first+count && (a.When == nil || a.When(tab-first, r))
 		}
 	}
 	return actions

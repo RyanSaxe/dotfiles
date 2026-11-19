@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # The "T" task letter, after A and R: is a task in the vault due. Alt-T in
-# Rex or tmux opens the Tasks popup.
+# Rex or tmux opens the Inbox popup on its Tasks tabs.
 #
 # `ws attention --watch` rereads the vault every minute and publishes:
 # - overdue:  an open task is past its date

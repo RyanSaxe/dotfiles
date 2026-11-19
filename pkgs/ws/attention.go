@@ -21,7 +21,7 @@ import (
 // Attention is what sketchybar's A, R and T letters show. The agent level
 // comes from the agents that need you, the review level from the inbox, and
 // the task level from the vault. The files under ~/.local/state/ws are what
-// --watch last published, for sketchybar and Reviews to read.
+// --watch last published, for sketchybar and the Inbox popup to read.
 
 // agentBackend is the multiplexer whose agents count. Outside a terminal, as
 // the --watch job runs, it follows ws focus: Rex when it's installed, and
@@ -171,7 +171,7 @@ func publish(name, level string) {
 // watchAttention republishes the agent level whenever b reports a change,
 // fetches the inbox every 5 minutes and rereads the vault's tasks
 // every minute, which also catches a new day. It is the only process that
-// fetches the inbox. SIGUSR1 asks it to fetch now, as Ctrl-R in Reviews does,
+// fetches the inbox. SIGUSR1 asks it to fetch now, as Ctrl-R in the Inbox does,
 // and SIGUSR2 to republish the review level, after an acknowledgement. It
 // runs until it is killed.
 func watchAttention(b mux.Backend) error {

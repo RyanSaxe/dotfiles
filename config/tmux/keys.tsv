@@ -16,8 +16,8 @@ tmux	alt+o	ws go popup on Folders: repos, worktrees, bookmarks
 tmux	alt+w	ws go popup on Worktrees: every worktree, this project's first
 tmux	alt+c	ws theme popup: mode and mascot
 tmux	alt+a	ws go popup on Agents: running agents, newest report first
-tmux	alt+r	ws reviews popup
-tmux	alt+t	ws tasks popup
+tmux	alt+r	ws inbox popup on Needs you: pull requests and issues
+tmux	alt+t	ws inbox popup on Tasks: open tasks in the vault
 tmux	alt+/	ws keys popup: this list
 tmux	prefix r	reload tmux config
 tmux	prefix s	ws go popup on Sessions
@@ -33,8 +33,8 @@ aerospace	cmd+alt+shift+v/b/n/m	send window to workspace
 aerospace	cmd+alt+s	summon the stack (on-demand accordion)
 aerospace	cmd+alt+shift+s	throw window onto the stack
 aerospace	cmd+alt+a	jump to agent needing attention (from anywhere)
-aerospace	cmd+alt+t	open the ws tasks popup (from anywhere)
-aerospace	cmd+alt+r	open the ws reviews popup (from anywhere)
+aerospace	cmd+alt+t	open the ws inbox popup on Tasks (from anywhere)
+aerospace	cmd+alt+r	open the ws inbox popup on Needs you (from anywhere)
 aerospace	cmd+alt+shift+r	reload aerospace config
 aerospace	cmd+alt+tab	previous workspace
 aerospace	cmd+alt+f	fullscreen

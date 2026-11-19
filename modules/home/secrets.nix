@@ -25,10 +25,10 @@
       secrets.pushover-token = { };
       # Each computer's Tailscale address, where its pair hub listens.
       secrets.pair-hub-host.key = "pair-hub-host/${config.dotfiles.host}";
-      # Repositories whose new items show in Reviews, as owner/name separated
+      # Repositories whose new items show in the Inbox, as owner/name separated
       # by spaces. Each computer's starts empty.
       secrets.attention-watch.key = "attention-watch/${config.dotfiles.host}";
-      # Accounts whose items and activity Reviews skips, one GitHub login or
+      # Accounts whose items and activity the Inbox skips, one GitHub login or
       # pattern with * per line. A new computer's starts empty.
       secrets.attention-ignore.key = "attention-ignore/${config.dotfiles.host}";
     };

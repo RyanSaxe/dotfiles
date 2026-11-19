@@ -37,7 +37,7 @@ lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
       exec.env-vars.PATH = "${config.home.profileDirectory}/bin:\${PATH}";
       # Cmd-Alt-A, T and R bring Rex, or Ghostty on tmux where Rex isn't
       # installed, onto the code workspace, then go to the agent that needs
-      # you or open Tasks or Reviews.
+      # you or open the Inbox on its Tasks tabs or on Needs you.
       mode.main.binding =
         lib.mapAttrs
           (_: what: [

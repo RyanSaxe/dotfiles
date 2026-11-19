@@ -51,16 +51,14 @@ In Rex or tmux, these keys open a `ws` popup:
 | Alt-S        | Go, on Sessions: each session and worktree tab                 |
 | Alt-A        | Go, on Agents: every running agent, newest report first        |
 | Ctrl-F in Go | Files: the selected folder's files, to open in Neovim          |
-| Alt-R        | Reviews: the pull requests and issues that need you            |
-| Alt-T        | Tasks: the open tasks in your notes                            |
+| Alt-R        | Inbox, on Needs you: the pull requests and issues that do      |
+| Alt-T        | Inbox, on its Tasks tabs: the open tasks in your notes         |
 | Alt-C        | Theme: switch light and dark, and pick the picture in popups   |
 | Alt-/        | Keys: every key binding                                        |
 
 <img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on those that have a running session and a bookmarked folder last, beside the selected repository's status, top-level folders and files, and recent commits." src="assets/picker.png">
 
-<img alt="The Reviews popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description." src="assets/reviews.png">
-
-<img alt="The Tasks popup over Rex, with sketchybar's T lit. It lists the repository's open tasks by due date beside the note they're in." src="assets/tasks.png">
+<img alt="The Inbox popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description. The tabs after it list your pull requests, your issues and your open tasks." src="assets/inbox.png">
 
 At the left of sketchybar, after the date, are AeroSpace's four workspaces,
 with the focused one in the accent color:
@@ -80,8 +78,8 @@ app, press Cmd-Alt and the letter to act on it:
 | Letter | Lights up when                                               | Cmd-Alt and the letter |
 | ------ | ------------------------------------------------------------ | ---------------------- |
 | A      | An agent has failed, is blocked or finished since you looked | Go to that agent       |
-| R      | A pull request or issue is in Reviews' Needs you tab         | Open Reviews           |
-| T      | A task is due by tomorrow                                    | Open Tasks             |
+| R      | A pull request or issue is in the Inbox's Needs you tab      | Open the Inbox on it   |
+| T      | A task is due by tomorrow                                    | Open the Inbox's tasks |
 
 The A lights red while a failed agent needs you, peach while a blocked one
 does, and green while only finished ones do. Cmd-Alt-A goes to failed

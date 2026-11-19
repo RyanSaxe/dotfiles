@@ -31,10 +31,11 @@ var reasonTags = map[reasonKind]lipgloss.Style{
 	reviewed: popup.Yellow.SetString("reviewed"), commented: popup.Yellow.SetString("comment"), opened: popup.Green.SetString("new"),
 }
 
-// reviewsPopup lists the inbox `ws attention --watch` last wrote: what needs
-// you, and your own open pull requests. It never asks GitHub for the list
-// itself, so it opens at once.
-func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
+// reviewTabs are the Inbox's first tabs, which list the inbox `ws attention
+// --watch` last wrote: what needs you, and your own open pull requests and
+// issues. They never ask GitHub for the list themselves, so they open at
+// once.
+func reviewTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 	noun := "your inbox"
 	if _, err := os.Stat(filepath.Join(stateDir, "inbox.json")); err != nil {
 		noun = "your inbox for the first time"
@@ -130,7 +131,7 @@ func reviewsPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
 
 var verbs = map[reasonKind]string{failing: "failed", changesRequested: "asked for changes", reviewed: "reviewed", commented: "commented", opened: "opened it"}
 
-// needsYouTab is the Reviews tab that lists what waits on you, the only one
+// needsYouTab is the Inbox tab that lists what waits on you, the only one
 // whose items you mark done.
 const needsYouTab = 0
 

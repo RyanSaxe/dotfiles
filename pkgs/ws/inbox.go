@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// The inbox is what Reviews lists: the open pull requests and issues that
+// The inbox is what the Inbox popup's reviews tabs list: the open pull requests and issues that
 // involve you, each with the reasons it needs you. `ws attention --watch` is
 // the only thing that fetches it and writes inbox.json, and the popup only
 // reads it. Your acknowledgements are the one thing ws keeps for it, in

@@ -152,21 +152,23 @@ the files popup starts a folder's session with.
 | Alt-S        | go, on Sessions  | Each place, a session or a worktree's tab, and what it's doing       |
 | Alt-A        | go, on Agents    | Agents and what each is doing, the latest report first               |
 | Ctrl-F in go | files            | The selected folder's files, and its hidden and ignored ones on tabs |
-| Alt-R        | reviews          | Pull requests and issues on GitHub that involve you                  |
-| Alt-T        | tasks            | Open tasks in the vault, soonest due first                           |
+| Alt-R        | inbox, on Needs  | Pull requests and issues on GitHub that involve you                  |
+| Alt-T        | inbox, on Tasks  | Open tasks in the vault, soonest due first                           |
 | Alt-C        | theme            | Light or dark, and the mascot                                        |
 | Alt-/        | keys             | Every key binding, and where it is set                               |
 
-Tab moves between the go popup's four tabs. Typing a project's name on
-Worktrees brings that project's worktrees to the top.
+Tab moves between the go popup's four tabs, and between the Inbox's: Needs
+you, Pull requests, Issues and Watching, then the Tasks tabs. Typing a
+project's name on Worktrees brings that project's worktrees to the top.
 
 Rex binds the Alt keys in `config/rex/init.lua`, and tmux in
 `config/tmux/tmux.conf`. In Rex, one of them pressed inside a popup
 replaces that popup, and in tmux the popup ignores it. Files opens over the
 go popup, and Esc goes back to it. `ws pick NAME` opens any of these
 popups from a shell, where `go`, `worktrees`, `sessions` and `agents` open
-the go popup on their tab, and `ws pick files` lists the files of the
-folder it runs in. `ws pick --help` lists the keys every popup shares.
+the go popup on their tab. `inbox` and `reviews` open the Inbox on Needs
+you, and `tasks` opens it on its first Tasks tab. `ws pick files` lists the
+files of the folder it runs in. `ws pick --help` lists the keys every popup shares.
 
 In every popup, typing filters the list, the arrows or Ctrl-J and Ctrl-K
 move, Tab and Shift-Tab move forward and back through the tabs, Ctrl-D and
@@ -179,20 +181,21 @@ opens the row, Ctrl-T starts something new, Ctrl-X finishes or removes the
 row, Ctrl-F searches the row's folder, Ctrl-G shows a diff and Ctrl-O opens
 the browser.
 
-| Popup         | Enter  | Ctrl-T                 | Ctrl-X        | Ctrl-F | Ctrl-G | Ctrl-O       |
-| ------------- | ------ | ---------------------- | ------------- | ------ | ------ | ------------ |
-| go, Folders   | go     | new project            | close         | files  |        |              |
-| go, Worktrees | go     | new worktree and agent | remove        | files  | diff   | pull request |
-| go, Sessions  | go     |                        | close         | files  |        |              |
-| go, Agents    | go     |                        |               |        |        |              |
-| files         | edit   |                        |               |        |        |              |
-| reviews       | review | review with an agent   | done          |        | diff   | browser      |
-| tasks         | edit   | add                    | done          |        |        |              |
+| Popup          | Enter  | Ctrl-T                 | Ctrl-X | Ctrl-F | Ctrl-G | Ctrl-O       |
+| -------------- | ------ | ---------------------- | ------ | ------ | ------ | ------------ |
+| go, Folders    | go     | new project            | close  | files  |        |              |
+| go, Worktrees  | go     | new worktree and agent | remove | files  | diff   | pull request |
+| go, Sessions   | go     |                        | close  | files  |        |              |
+| go, Agents     | go     |                        |        |        |        |              |
+| files          | edit   |                        |        |        |        |              |
+| inbox, reviews | review | review with an agent   | done   |        | diff   | browser      |
+| inbox, Tasks   | edit   | add                    | done   |        |        |              |
 
 The bottom line lists only the keys that work on the tab and the selected
-row, and a key that doesn't work there does nothing. Reviews offers Ctrl-T
-and Ctrl-G only on a pull request and Ctrl-X only on Needs you, and the go
-popup's Folders tab offers Ctrl-X only on a folder that is open.
+row, and a key that doesn't work there does nothing. The Inbox's reviews
+tabs, the ones before Tasks, offer Ctrl-T and Ctrl-G only on a pull request
+and Ctrl-X only on Needs you, and the go popup's Folders tab offers Ctrl-X
+only on a folder that is open.
 
 On the Worktrees tab, Ctrl-G shows in `delta` how the files git tracks
 changed, committed or not, since the branch left the project's default
@@ -200,7 +203,7 @@ branch, the one `origin/HEAD` names. A project without `origin/HEAD` has no
 Ctrl-G, and `git remote set-head origin --auto` sets it. Ctrl-O opens the
 open pull request from the branch on `origin`. A fork's pull request from a
 branch of the same name doesn't count, so a worktree of someone else's pull
-request has no Ctrl-O, and Reviews' Ctrl-O opens it instead.
+request has no Ctrl-O, and the Inbox's Ctrl-O opens it instead.
 
 The go popup's bookmarks are the folders in `~/.config/ws/bookmarks`, one
 per line. A folder that is open is tagged `tab` or `session`, by its
@@ -241,9 +244,18 @@ tracks:
   report that came while you looked, so it doesn't need you once you look
   away.
 
-## Reviews
+## Inbox
 
-The Needs you tab lists what waits on you, most urgent first:
+The Inbox is one popup for what waits on you outside the terminal. Its
+first tabs are reviews, the pull requests and issues on GitHub that involve
+you, and its last tabs are the vault's open tasks. Alt-R opens it on Needs
+you and Alt-T on its first Tasks tab, and Tab moves through them all. Each
+tab keeps its own keys.
+
+### Reviews
+
+The Needs you tab lists the reviews that wait on you, most urgent first.
+It never lists a task:
 
 | Tag        | Why                                                   |
 | ---------- | ----------------------------------------------------- |
@@ -257,7 +269,7 @@ Pull requests and Issues list your own open ones, and Watching lists what
 is new in the repositories you watch. Each computer's watched repositories
 are its `attention-watch` secret.
 
-Reviews skips the accounts in each computer's `attention-ignore` secret:
+The Inbox skips the accounts in each computer's `attention-ignore` secret:
 the pull requests and issues they open, and their comments and reviews on
 the rest, so nothing they do needs you or lights sketchybar's R. Each line
 is a GitHub login, or a pattern where `*` stands for any text. An app's
@@ -274,11 +286,11 @@ Enter does and also starts an agent in a second tab, asked to review it.
 Opening an item leaves it on Needs you, and only Ctrl-X there marks it done
 until something new happens on it.
 
-Reviews reads the inbox that `ws attention --watch` fetches from GitHub
-every five minutes, so it opens without waiting on GitHub. On a Mac, that
-job runs as a launchd agent. Ctrl-R fetches now.
+These tabs read what `ws attention --watch` fetches from GitHub every five
+minutes, so the Inbox opens without waiting on GitHub. On a Mac, that job
+runs as a launchd agent. Ctrl-R on one of them fetches now.
 
-## Tasks
+### Tasks
 
 A task is a `- [ ]` line in any Markdown file under `$VAULT_DIR`, the
 vault's folder, which the computer's host file sets. A date after 📅 makes
@@ -297,16 +309,18 @@ or a code fence, and the date can be on any of its lines:
       holds it 📅 2026-12-01
 ```
 
-Tasks tags each one `overdue`, `today` or `soon`, for a date within a week.
-In a repository with an `origin` remote, PROJECT is the remote's
-repository name, and the first tab lists the tasks under
-`notes/projects/PROJECT/` and `private/notes/projects/PROJECT/`. Ctrl-T
+The Tasks tabs come last and tag each task `overdue`, `today` or `soon`,
+for a date within a week. Outside a repository there is one, named Tasks,
+with every open task. In a repository with an `origin` remote, PROJECT is
+the remote's repository name, and there are two: PROJECT lists the tasks
+under `notes/projects/PROJECT/` and `private/notes/projects/PROJECT/`, and
+All lists every open task. Ctrl-T
 asks for the text and a due date, such as `fri`, `3d`, `tmr` or
 `2026-12-01`, and adds the task to `notes/projects/PROJECT/TODO.md`.
 Ctrl-X ticks the box in the note.
 
 On a computer whose host file sets no vault, `$VAULT_DIR` is unset, so
-Tasks says the vault isn't set up and the T letter stays off.
+the Tasks tab says the vault isn't set up and the T letter stays off.
 
 ## What ws keeps
 

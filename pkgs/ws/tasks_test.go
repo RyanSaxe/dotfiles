@@ -232,7 +232,7 @@ func TestEnterOnATaskLandsInItsTab(t *testing.T) {
 		writeNote(t, vault, "notes/daily/2026-11-09.md", "- [ ] call the bank\n")
 		calls := filepath.Join(t.TempDir(), "calls")
 		onPath(t, tc.program, `echo "$*" >> `+calls+"\n"+tc.script)
-		p := tasksPopup(mux.Detect(func(k string) string { return tc.env[k] }, "client:app"), kitty.Terminal{})
+		p := taskTabs(mux.Detect(func(k string) string { return tc.env[k] }, "client:app"), kitty.Terminal{})
 		rows, err := p.Load(len(p.Tabs)-1, func([]popup.Row) {})
 		if err != nil || len(rows) != 1 {
 			t.Fatalf("%s: loaded %v (%v), want the one task", tc.name, rows, err)
@@ -274,7 +274,7 @@ func TestTickingATaskChangesOnlyItsBox(t *testing.T) {
 
 func TestTasksWithoutAVaultSaysSo(t *testing.T) {
 	t.Setenv("VAULT_DIR", "")
-	p := tasksPopup(mux.Detect(func(string) string { return "" }, ""), kitty.Terminal{})
+	p := taskTabs(mux.Detect(func(string) string { return "" }, ""), kitty.Terminal{})
 	for tab := range p.Tabs {
 		if rows, err := p.Load(tab, func([]popup.Row) {}); err == nil || !strings.Contains(err.Error(), "VAULT_DIR") {
 			t.Errorf("tab %d loaded %v (%v), want it to say the vault isn't set up", tab, rows, err)

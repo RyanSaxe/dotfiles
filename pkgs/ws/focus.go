@@ -50,8 +50,9 @@ func focus(what string) error {
 	return errors.Join(err, <-placed)
 }
 
-// focusRex goes to the next agent in the Rex app, or opens Tasks or Reviews
-// there. ws is Rex's windows, whose title names the session the app shows.
+// focusRex goes to the next agent in the Rex app, or opens the Inbox there
+// on its Tasks tabs or on Needs you. ws is Rex's windows, whose title names
+// the session the app shows.
 func focusRex(what string, ws []window) error {
 	var client string
 	connect := func() (err error) { client, err = (mux.Rex{}).App(); return err }
@@ -165,9 +166,9 @@ func watchedRex(r mux.Rex, ws []window) mux.Rex {
 	return r
 }
 
-// focusTmux goes to the next agent, or opens Tasks or Reviews as a popup, in
-// the tmux client used last, starting Ghostty on tmux's main session when no
-// client is attached.
+// focusTmux goes to the next agent, or opens the Inbox popup on its Tasks
+// tabs or on Needs you, in the tmux client used last, starting Ghostty on
+// tmux's main session when no client is attached.
 func focusTmux(what string) error {
 	clients, _ := runIn("", "tmux", "list-clients", "-F", "#{client_activity} #{client_name}")
 	client := newestClient(clients)
