@@ -227,6 +227,34 @@ func tickTask(vault string, t task, today time.Time) error {
 	return os.WriteFile(file, []byte(strings.Join(lines, "")), 0o644)
 }
 
+// projectOf names the project a folder's tasks are filed under: the name of
+// its origin remote's repository, or "" for a folder without one.
+func projectOf(dir string) string {
+	url, err := git(dir, "remote", "get-url", "origin")
+	if err != nil {
+		return ""
+	}
+	url = strings.TrimSuffix(strings.TrimRight(url, "/"), ".git")
+	return url[strings.LastIndexAny(url, "/:")+1:]
+}
+
+// taskFolder is the folder whose place a task's note opens in: the checkout
+// of the task's project under the home folder, the one with the latest git
+// activity when several are, and the vault for a task outside a project or
+// one whose project has no checkout on this computer.
+func taskFolder(vault string, t task) string {
+	dir, latest := vault, time.Time{}
+	if t.Project == "" {
+		return dir
+	}
+	for _, repo := range repos() {
+		if at := activity(repo); projectOf(repo) == t.Project && (dir == vault || at.After(latest)) {
+			dir, latest = repo, at
+		}
+	}
+	return dir
+}
+
 // taskTabs are the Inbox's last tabs, which list the vault's open tasks,
 // soonest due first: Project tasks and All tasks inside a project, and one
 // Tasks tab outside one.
@@ -238,12 +266,7 @@ func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 		return popup.Popup{Noun: "tasks", Tabs: []popup.Tab{{Name: "Tasks"}}, Load: func(int, func([]popup.Row)) ([]popup.Row, error) { return nil, err }}
 	}
 	tags := map[string]lipgloss.Style{"overdue": popup.Red.SetString("overdue"), "today": popup.Yellow.SetString("today"), "soon": popup.Accent.SetString("soon")}
-	// A project's tasks are filed under the name of its origin remote.
-	project := ""
-	if url, err := git(".", "remote", "get-url", "origin"); err == nil {
-		url = strings.TrimSuffix(strings.TrimRight(url, "/"), ".git")
-		project = url[strings.LastIndexAny(url, "/:")+1:]
-	}
+	project := projectOf(".")
 	tabs := []popup.Tab{{Name: "Tasks", Empty: "No open tasks."}}
 	if project != "" {
 		// The tab isn't named after the project, since a long name would
@@ -294,24 +317,18 @@ func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 		Actions: []popup.Action{
 			{Key: "enter", Help: "edit", Run: func(r popup.Row) tea.Cmd {
 				t := r.Data.(task)
-				line := "+" + strconv.Itoa(t.Line)
+				edit := []string{"nvim", "+" + strconv.Itoa(t.Line), filepath.Join(vault, t.File)}
 				// Outside Rex and tmux there's no tab to open, so Neovim runs
 				// in the popup.
 				if !b.Inside() {
-					return tea.ExecProcess(exec.Command("nvim", line, filepath.Join(vault, t.File)), func(err error) tea.Msg {
+					return tea.ExecProcess(exec.Command(edit[0], edit[1:]...), func(err error) tea.Msg {
 						if err != nil {
 							return popup.Notice(err.Error())
 						}
 						return popup.Reload("")
 					})
 				}
-				return popup.Do(func() error {
-					here, err := b.Current()
-					if err == nil {
-						err = showTab(b, mux.Place{Session: here}, vault, "nvim", line, t.File)
-					}
-					return err
-				}, popup.Quit)
+				return popup.Do(func() error { return runInTab(b, taskFolder(vault, t), edit) }, popup.Quit)
 			}},
 			{Key: "ctrl+t", Help: "add", Always: true, Run: func(popup.Row) tea.Cmd {
 				return popup.Ask("task:", func(text string) tea.Cmd {
