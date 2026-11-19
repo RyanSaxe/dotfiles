@@ -19,6 +19,7 @@ const (
 	failed                           // showing why the load failed
 	updating                         // showing rows while a load runs, whose rows replace them
 	updatingPicking                  // the same, and Enter waits for a row that matches
+	reloading                        // showing the last load's rows until the next one finishes
 	retrying                         // showing a failure while the next load runs
 )
 
@@ -49,7 +50,8 @@ func (keyPressed) isTabEvent() {} // any key after an early Enter takes it back
 type rowsEffect int
 
 const (
-	dropRows rowsEffect = iota
+	dropRows rowsEffect = iota // from a load a reload replaced, so stop reading it
+	holdRows                   // keep the rows on screen, and read the load's next ones
 	showRows
 	showAndPick // show them, and pick the top match for the Enter that came first
 )
@@ -58,12 +60,16 @@ const (
 func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 	switch e := e.(type) {
 	case reloadTab:
-		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: updating, failed: retrying, updating: updating, updatingPicking: updatingPicking, retrying: retrying}[t.state]
+		// A reload keeps the rows a finished load showed, rather than show
+		// the next load's first rows, which may be only some of them.
+		state := map[loadState]loadState{firstLoad: firstLoad, picking: picking, loaded: reloading, failed: retrying, updating: updating, updatingPicking: updatingPicking, reloading: reloading, retrying: retrying}[t.state]
 		return tabLoad{state: state, gen: t.gen + 1, err: t.err}, dropRows
 	case tabShown:
 		switch {
 		case e.gen != t.gen:
 			return t, dropRows
+		case t.state == reloading:
+			return t, holdRows
 		case t.state == picking || t.state == updatingPicking:
 			return tabLoad{state: updatingPicking, gen: t.gen}, showAndPick
 		}
@@ -97,7 +103,7 @@ func (t tabLoad) next(e tabEvent) (tabLoad, rowsEffect) {
 }
 
 func (t tabLoad) showsRows() bool {
-	return t.state == loaded || t.state == updating || t.state == updatingPicking
+	return t.state == loaded || t.state == updating || t.state == updatingPicking || t.state == reloading
 }
 func (t tabLoad) showsErr() bool { return t.state == failed || t.state == retrying }
 func (t tabLoad) busy() bool     { return t.state != loaded && t.state != failed }

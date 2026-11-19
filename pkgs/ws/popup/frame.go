@@ -198,8 +198,11 @@ func (m frame) update(msg tea.Msg) (frame, tea.Cmd) {
 			event = tabShown{msg.gen}
 		}
 		var effect rowsEffect
-		if m.tabs[msg.tab], effect = m.tabs[msg.tab].next(event); effect == dropRows {
+		switch m.tabs[msg.tab], effect = m.tabs[msg.tab].next(event); effect {
+		case dropRows:
 			return m, nil
+		case holdRows:
+			return m, msg.more
 		}
 		m.setRows(msg.tab, msg.rows)
 		cmds := []tea.Cmd{msg.more}
@@ -643,11 +646,17 @@ func (m frame) view() string {
 	if m.w == 0 {
 		return "" // the first frame comes before the terminal size
 	}
+	// A tab's count has the spinner beside it while its load runs, since its
+	// rows may still grow or change.
 	count := func(i int) string {
-		if m.tabs[i].showsRows() {
-			return " (" + strconv.Itoa(len(m.lists[i].Items())) + ")"
+		if !m.tabs[i].showsRows() {
+			return ""
 		}
-		return ""
+		n := strconv.Itoa(len(m.lists[i].Items()))
+		if m.tabs[i].busy() {
+			return Dim.Render(" ("+n+" ") + m.spin.View() + Dim.Render(")")
+		}
+		return Dim.Render(" (" + n + ")")
 	}
 	// The header is the tabs with their counts, and the art at the right.
 	tabs := make([]string, len(m.p.Tabs))
@@ -656,7 +665,7 @@ func (m frame) view() string {
 		if i == m.active {
 			style = Accent.Bold(true)
 		}
-		tabs[i] = style.Render(t.Name) + Dim.Render(count(i))
+		tabs[i] = style.Render(t.Name) + count(i)
 	}
 	// On a narrow screen the tabs before the active one give way to it, so
 	// it stays in view.
@@ -702,12 +711,15 @@ func (m frame) listPane(w, h int) string {
 		}
 		return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, lipgloss.JoinVertical(lipgloss.Center, lines...))
 	}
+	// A tab that has shown no rows yet is still waiting, even when a load
+	// showed it an empty list, so only a finished load says it's empty.
+	waiting := !t.showsRows() || len(l.Items()) == 0 && t.busy()
 	switch {
 	case t.showsErr():
 		return center(Red.Render("Could not load "+m.p.Noun), "", Dim.Width(w-4).Align(lipgloss.Center).Render(t.err.Error()), "", Dim.Render("^r to retry"))
-	case !t.showsRows() && !slow(m.started):
+	case waiting && !slow(m.started):
 		return ""
-	case !t.showsRows():
+	case waiting:
 		return center(m.spin.View() + Dim.Render(" loading "+m.p.Noun))
 	case len(l.Items()) == 0:
 		return center(Green.Render("✓"), "", Dim.Render(m.p.Tabs[m.active].Empty))
@@ -716,6 +728,9 @@ func (m frame) listPane(w, h int) string {
 	if query := l.FilterValue(); query != "" {
 		filter = Accent.Render("/ ") + query
 		count = Dim.Render(fmt.Sprintf("%d of %d", len(l.VisibleItems()), len(l.Items())))
+		if t.busy() {
+			count += " " + m.spin.View()
+		}
 	}
 	gap := strings.Repeat(" ", max(0, w-lipgloss.Width(filter)-lipgloss.Width(count)))
 	return ansi.Truncate(filter+gap+count, w, "…") + "\n\n" + l.View()

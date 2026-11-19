@@ -143,6 +143,44 @@ func TestRowsFromBeforeAReloadAreDropped(t *testing.T) {
 	}
 }
 
+// A refresh keeps the rows it had until the new load finishes, rather than
+// the new load's first rows, which may be only some of them, and then shows
+// the new load's rows.
+func TestARefreshKeepsItsRowsUntilTheNewOnesArrive(t *testing.T) {
+	loads, release := 0, make(chan struct{})
+	p := picker(nil, nil, new([]string))
+	p.Load = func(_ int, show func([]popup.Row)) ([]popup.Row, error) {
+		if loads++; loads == 1 {
+			return []popup.Row{{ID: "a", Title: "alpha"}, {ID: "b", Title: "bravo"}}, nil
+		}
+		show([]popup.Row{{ID: "a", Title: "alpha"}})
+		<-release
+		return []popup.Row{{ID: "a", Title: "alpha"}, {ID: "c", Title: "charlie"}}, nil
+	}
+	m := start(p)
+	m, reload := m.Update(ctrlR)
+	m, load := m.Update(reload())
+	var more tea.Cmd
+	for _, cmd := range load().(tea.BatchMsg) {
+		if msg := cmd(); msg != nil {
+			if _, tick := msg.(spinner.TickMsg); !tick {
+				m, more = m.Update(msg) // the refresh's first rows
+			}
+		}
+	}
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "bravo") {
+		t.Errorf("while refreshing, the popup dropped bravo:\n%s", view)
+	}
+	close(release)
+	if more == nil {
+		t.Fatal("the refresh stopped reading the new load, so it never finishes")
+	}
+	m, _ = run(m, more())
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "charlie") || strings.Contains(view, "bravo") {
+		t.Errorf("after the refresh, the popup shows:\n%s", view)
+	}
+}
+
 // Enter pressed before the first rows arrive goes to the top match once they
 // do, so typing a name and Enter straight after opening a popup works.
 func TestEnterBeforeTheRowsPicksTheTopMatch(t *testing.T) {
