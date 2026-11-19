@@ -174,6 +174,11 @@ Ctrl-U scroll the details, Ctrl-R gets fresh data and Esc clears the filter
 or closes. Enter pressed before the rows appear acts on the top match once
 they do, unless another key comes first.
 
+A popup loads the tab it opens on first, and shows rows as they come in. While
+a tab is still loading, a spinner sits beside its count and beside the
+filter's count, since more rows can still arrive. Ctrl-R keeps the rows on
+screen until the new ones are complete.
+
 Each other key means the same in every popup that has it. Enter goes to or
 opens the row, Ctrl-T starts something new, Ctrl-X finishes or removes the
 row, Ctrl-F searches the row's folder, Ctrl-G shows a diff and Ctrl-O opens
