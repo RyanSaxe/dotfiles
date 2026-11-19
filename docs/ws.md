@@ -319,6 +319,14 @@ asks for the text and a due date, such as `fri`, `3d`, `tmr` or
 `2026-12-01`, and adds the task to `notes/projects/PROJECT/TODO.md`.
 Ctrl-X ticks the box in the note.
 
+Enter opens the task's note at its line in Neovim, in a new tab of the
+task's project's place. The project is the note's `notes/projects/NAME`
+folder, and its place is that of the checkout under your home folder whose
+`origin` repository is named NAME, the one git moved last when several
+are. `ws` opens that place when the checkout has none. A task outside a
+project, or one whose project has no checkout on this computer, opens in
+the vault's place.
+
 On a computer whose host file sets no vault, `$VAULT_DIR` is unset, so
 the Tasks tab says the vault isn't set up and the T letter stays off.
 

@@ -2,12 +2,15 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"workspace/kitty"
+	"workspace/layout"
 	"workspace/mux"
 	"workspace/popup"
 )
@@ -201,53 +204,75 @@ func TestATaskIsAddedAboveTheFirstBranch(t *testing.T) {
 	}
 }
 
-// Enter on a task opens its note in a new tab of the popup's session and
-// lands there. Rex's app keeps showing its own tab when the server makes
-// another active, and the tab may be in a session the client isn't showing,
-// so the app or client is sent to the new tab.
-func TestEnterOnATaskLandsInItsTab(t *testing.T) {
-	for _, tc := range []struct {
-		name, program, script string
-		env                   map[string]string
-		want                  []string // lines the program was called with, in order
-	}{
-		{"rex", "rex",
-			`case " $* " in *" window new "*) echo '{"window_id":"window:task","block_ids":["block:task"]}';; esac`,
-			map[string]string{"REX_BLOCK": "block:popup", "REX_SESSION": "session:work"},
-			[]string{
-				"--autostart=false window new -s session:work -c VAULT --focus=false --json -- nvim +1 notes/daily/2026-11-09.md",
-				"--autostart=false -C client:app do session.select session_id=session:work window_id=window:task",
-			}},
-		{"tmux", "tmux",
-			`case "$2" in display-message) echo work;; new-window) echo @9;; esac`,
-			map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"},
-			[]string{
-				"-u display-message -p #{session_name}",
-				"-u new-window -d -t =work: -c VAULT -P -F #{window_id} -- nvim +1 notes/daily/2026-11-09.md",
-				"-u switch-client -t @9",
-			}},
+// Enter on a task opens its note, at its line, in a new tab of its project's
+// place: the checkout whose origin repository has the project's name, and
+// the one git moved last when there are two. A task outside a project, or
+// one whose project has no checkout, opens in the vault's place, which ws
+// makes when there is none.
+func TestEnterOnATaskOpensItsProjectsPlace(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	oldHome, oldInteractive := home, interactive
+	home, interactive = t.TempDir(), false
+	t.Cleanup(func() { home, interactive = oldHome, oldInteractive })
+	withConfig(t, "claude", "tab")
+	checkout := func(folder string, at time.Time) string {
+		dir := filepath.Join(home, folder, "nix")
+		log := filepath.Join(dir, ".git", "logs", "HEAD")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", "git@github.com:someone/nix.git"}} {
+			if _, err := git(dir, args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeNote(t, dir, ".git/logs/HEAD", "")
+		if err := os.Chtimes(log, at, at); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	checkout("old", now.Add(-time.Hour))
+	latest := checkout("new", now)
+	vault := filepath.Join(home, "vault")
+	t.Setenv("VAULT_DIR", vault)
+	writeNote(t, vault, "notes/projects/nix/TODO.md", "# nix\n- [ ] pin the flake\n")
+	writeNote(t, vault, "notes/projects/gone/TODO.md", "- [ ] no checkout here\n")
+	writeNote(t, vault, "notes/daily/2026-11-09.md", "- [ ] call the bank\n")
+
+	for id, want := range map[string]string{
+		"notes/projects/nix/TODO.md:2":  latest,
+		"notes/projects/gone/TODO.md:1": vault,
+		"notes/daily/2026-11-09.md:1":   vault,
 	} {
-		vault := t.TempDir()
-		t.Setenv("VAULT_DIR", vault)
-		writeNote(t, vault, "notes/daily/2026-11-09.md", "- [ ] call the bank\n")
-		calls := filepath.Join(t.TempDir(), "calls")
-		onPath(t, tc.program, `echo "$*" >> `+calls+"\n"+tc.script)
-		p := taskTabs(mux.Detect(func(k string) string { return tc.env[k] }, "client:app"), kitty.Terminal{})
+		b := &recorder{snapshot: mux.Snapshot{
+			Sessions: []mux.Session{{ID: "session:nix", Label: "nix"}},
+			Panes:    []mux.Pane{{Session: "session:nix", Label: "nix", ID: "pane", Tab: "tab:1", Focused: true}},
+		}}
+		p := taskTabs(b, kitty.Terminal{})
 		rows, err := p.Load(len(p.Tabs)-1, func([]popup.Row) {})
-		if err != nil || len(rows) != 1 {
-			t.Fatalf("%s: loaded %v (%v), want the one task", tc.name, rows, err)
+		i := slices.IndexFunc(rows, func(r popup.Row) bool { return r.ID == id })
+		if err != nil || i < 0 {
+			t.Fatalf("loaded %v (%v), want a task at %s", rows, err, id)
 		}
 		enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
-		if msg := enter.Run(rows[0])(); msg != popup.Quit {
-			t.Errorf("%s: Enter gave %v, want the popup to close", tc.name, msg)
+		if msg := enter.Run(rows[i])(); msg != popup.Quit {
+			t.Errorf("%s: Enter gave %v, want the popup to close", id, msg)
 		}
-		got := strings.Split(strings.TrimSpace(readNote(t, filepath.Dir(calls), "calls")), "\n")
-		want := slices.Clone(tc.want)
-		for i := range want {
-			want[i] = strings.ReplaceAll(want[i], "VAULT", vault)
-		}
-		if !slices.Equal(got, want) {
-			t.Errorf("%s ran\n%s\nwant\n%s", tc.program, strings.Join(got, "\n"), strings.Join(want, "\n"))
+		file, line, _ := strings.Cut(id, ":")
+		edit := []string{"nvim", "+" + line, filepath.Join(vault, file)}
+		if want == vault {
+			if len(b.tabs) > 0 || len(b.made) != 1 || b.made[0].dir != vault || b.lastPanes()[0].Run != layout.Line(edit) {
+				t.Errorf("%s: Enter ran %q and made %v, want a place for the vault running %q", id, b.tabs, b.made, edit)
+			}
+		} else if len(b.made) > 0 || len(b.tabs) != 1 || !slices.Equal(b.tabs[0], append([]string{"nix", want}, edit...)) {
+			t.Errorf("%s: Enter ran %q and made %v, want one tab of nix in %s running %q", id, b.tabs, b.made, want, edit)
 		}
 	}
 }
