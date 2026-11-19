@@ -228,7 +228,7 @@ func tickTask(vault string, t task, today time.Time) error {
 }
 
 // taskTabs are the Inbox's last tabs, which list the vault's open tasks,
-// soonest due first: the project's tab and All inside a project, and one
+// soonest due first: Project tasks and All tasks inside a project, and one
 // Tasks tab outside one.
 func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 	vault := vaultDir()
@@ -246,7 +246,9 @@ func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 	}
 	tabs := []popup.Tab{{Name: "Tasks", Empty: "No open tasks."}}
 	if project != "" {
-		tabs = []popup.Tab{{Name: project, Empty: "No open tasks in " + project + "."}, {Name: "All", Empty: "No open tasks."}}
+		// The tab isn't named after the project, since a long name would
+		// crowd the Inbox's other tabs.
+		tabs = []popup.Tab{{Name: "Project tasks", Empty: "No open tasks in " + project + "."}, {Name: "All tasks", Empty: "No open tasks."}}
 	}
 	return popup.Popup{
 		Noun: "tasks",
@@ -259,7 +261,7 @@ func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 			rows := make([]popup.Row, len(ts))
 			for i, t := range ts {
 				// notes/projects/NAME/TODO.md:4 reads as NAME/TODO.md:4, and as
-				// TODO.md:4 on NAME's tab. private/notes/projects/NAME/TODO.md:4
+				// TODO.md:4 on Project tasks. private/notes/projects/NAME/TODO.md:4
 				// reads the same with private/ in front.
 				id := t.File + ":" + strconv.Itoa(t.Line)
 				note, private := strings.CutPrefix(id, "private/")
