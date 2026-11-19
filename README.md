@@ -56,9 +56,9 @@ In Rex or tmux, these keys open a `ws` popup:
 | Alt-C        | Theme: switch light and dark, and pick the picture in popups   |
 | Alt-/        | Keys: every key binding                                        |
 
-<img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on those that have a running session and a bookmarked folder last, beside the selected repository's status, top-level folders and files, and recent commits." src="assets/picker.png">
+<img alt="The go popup over Rex on its Folders tab, listing repositories by their latest git activity, with a session tag on the one that has a running session and a bookmarked folder last, beside the selected worktree's branch, top-level folders and files, and recent commits." src="assets/picker.png">
 
-<img alt="The Inbox popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description. The tabs after it list your pull requests, your issues and your open tasks." src="assets/inbox.png">
+<img alt="The Inbox popup over Rex, with sketchybar's R lit. The Needs you tab lists pull requests and issues, each tagged with why it needs you, beside the selected one's review comment and description. The tabs after it list your pull requests, your issues, what is new in watched repositories, and your open tasks." src="assets/inbox.png">
 
 At the left of sketchybar, after the date, are AeroSpace's four workspaces,
 with the focused one in the accent color:
