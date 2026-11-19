@@ -317,9 +317,9 @@ or a code fence, and the date can be on any of its lines:
 The Tasks tabs come last and tag each task `overdue`, `today` or `soon`,
 for a date within a week. Outside a repository there is one, named Tasks,
 with every open task. In a repository with an `origin` remote, PROJECT is
-the remote's repository name, and there are two: PROJECT lists the tasks
-under `notes/projects/PROJECT/` and `private/notes/projects/PROJECT/`, and
-All lists every open task. Ctrl-T
+the remote's repository name, and there are two: Project tasks lists the
+tasks under `notes/projects/PROJECT/` and
+`private/notes/projects/PROJECT/`, and All tasks lists every open task. Ctrl-T
 asks for the text and a due date, such as `fri`, `3d`, `tmr` or
 `2026-12-01`, and adds the task to `notes/projects/PROJECT/TODO.md`.
 Ctrl-X ticks the box in the note.
