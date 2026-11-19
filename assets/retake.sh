@@ -1,23 +1,35 @@
 #!/usr/bin/env bash
-# Retakes the README's popup screenshots with demo data:
+# Retakes every screenshot the README and the docs show, with demo content:
 #
-#   assets/picker.png  the go popup on Folders
-#   assets/inbox.png   the Inbox popup on Needs you, with sketchybar's R lit
+#   assets/screen.png        the screen: sketchybar, and Rex with two Neovim
+#                            panes, on a Python file and on a note
+#   assets/screen-dark.png   the same shot, for docs/theme.md
+#   assets/screen-light.png  the same screen in light mode
+#   assets/picker.png        the go popup on Folders
+#   assets/inbox.png         the Inbox popup on Needs you, with sketchybar's
+#                            R lit
 #
-#   assets/retake.sh          take them. This takes over the screen for
-#                             about a minute, so don't type meanwhile.
-#   assets/retake.sh --check  print each popup's text from a scratch tmux
-#                             server instead. Nothing on the screen changes.
+#   assets/retake.sh          take them. This takes over the screen for a
+#                             few minutes and flips the theme, so don't type
+#                             meanwhile.
+#   assets/retake.sh --check  print each popup's and each Neovim pane's text
+#                             from a scratch tmux server instead. Nothing on
+#                             the screen changes.
+#
+# Run it by hand on a Mac: it needs Rex's window, your fonts, your theme and
+# sketchybar, so it can't run in CI.
 #
 # It builds this checkout's ws, and demo repositories, a demo inbox and a
-# demo vault in a scratch folder. ws reads them because its popups run with
-# HOME and the XDG folders set to the scratch folder, so nothing of yours is
-# in a shot or changed. The shots are of Rex in dark mode on AeroSpace's code
-# workspace, in a session named demo that the script makes and kills.
+# demo vault in a scratch folder. The popups run with HOME and the XDG
+# folders set to that folder, and Neovim opens only files in it, so nothing
+# of yours is in a shot or changed. The shots are of Rex on AeroSpace's code
+# workspace, in a session named atlas that the script makes and kills.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
-scratch=$(mktemp -d)
+# Rex heads each pane with its folder, so the scratch folder has a short
+# path.
+scratch=$(mktemp -d /tmp/retake.XXXX)
 demo=$scratch/home
 session=""
 trap 'rm -rf "$scratch"' EXIT
@@ -79,7 +91,9 @@ build_demo() {
   demo_repo tide 400 "feat: forecast a week ahead" "test: cover a station with no data"
   demo_repo quill 3000 "feat: export a note as a PDF" "fix: keep a table's alignment"
   demo_repo harbor 9000 "chore: update the lock file"
-  echo "    return None" >>"$demo/code/atlas/src/atlas.py"
+  demo_files
+  demo_git -C "$demo/code/atlas" commit -qam "feat: list the tiles a viewport needs"
+  aged "$demo/code/atlas/.git/logs/HEAD" 12
   demo_git -C "$demo/code/atlas" worktree add -q -b fix-login "$demo/worktrees/atlas/fix-login"
   aged "$demo/code/atlas/.git/worktrees/fix-login/logs/HEAD" 40
   echo "~/notes" >"$demo/.config/ws/bookmarks"
@@ -137,18 +151,117 @@ EOF
 - [ ] Book the dentist 📅 $(date -v+1d +%F)
 - [ ] Send the ledger export to the accountant 📅 $(date -v+12d +%F)
 EOF
+  # Neovim's breadcrumb starts at a note's repository, and the vault is one.
+  demo_git -C "$demo/vault" init -q
+  demo_git -C "$demo/vault" add -A
+  demo_git -C "$demo/vault" commit -qm "notes"
+  aged "$demo/vault/.git/logs/HEAD" 200
+}
+
+# demo_files writes what the two Neovim panes show.
+demo_files() {
+  cat >"$demo/code/atlas/src/atlas.py" <<'EOF'
+"""Draws a map's routes over its tiles as the tiles load."""
+
+import math
+from collections.abc import Iterator
+from dataclasses import dataclass
+
+TILE_SIZE = 256
+
+
+@dataclass(frozen=True)
+class Tile:
+    """One square of the map at a zoom level, counted from the top left."""
+
+    zoom: int
+    column: int
+    row: int
+
+    def children(self) -> Iterator["Tile"]:
+        """The four tiles that cover this one at the next zoom level."""
+        for column in (2 * self.column, 2 * self.column + 1):
+            for row in (2 * self.row, 2 * self.row + 1):
+                yield Tile(self.zoom + 1, column, row)
+
+
+def tile_at(latitude: float, longitude: float, zoom: int) -> Tile:
+    """Find the tile that holds a point, in the Web Mercator projection."""
+    scale = 2**zoom
+    column = (longitude + 180) / 360 * scale
+    radians = math.radians(latitude)
+    row = (1 - math.asinh(math.tan(radians)) / math.pi) / 2 * scale
+    return Tile(zoom, int(column), int(row))
+
+
+class Viewport:
+    """The part of the map on screen, and the tiles it needs."""
+
+    def __init__(self, width: int, height: int, zoom: int) -> None:
+        self.width = width
+        self.height = height
+        self.zoom = zoom
+        self.center = (0.0, 0.0)
+
+    def tiles(self) -> list[Tile]:
+        """List the tiles that cover the screen, nearest the center first."""
+        middle = tile_at(*self.center, self.zoom)
+        across = math.ceil(self.width / TILE_SIZE / 2)
+        down = math.ceil(self.height / TILE_SIZE / 2)
+        found = [
+            Tile(self.zoom, middle.column + dx, middle.row + dy)
+            for dx in range(-across, across + 1)
+            for dy in range(-down, down + 1)
+        ]
+        return sorted(found, key=lambda t: abs(t.column - middle.column) + abs(t.row - middle.row))
+EOF
+  cat >"$demo/vault/notes/projects/atlas/tiles.md" <<'EOF'
+# How atlas loads tiles
+
+The map asks for the tiles under the screen, nearest the center first, and
+draws each route as soon as the tiles under it arrive.
+
+```mermaid
+flowchart LR
+  screen[Viewport] --> wanted[Tiles it needs]
+  wanted --> cache{In the cache?}
+  cache -->|yes| draw[Draw]
+  cache -->|no| fetch[Fetch] --> draw
+```
+
+A point's tile comes from the Web Mercator projection, at zoom level $z$:
+
+$$
+x = \left\lfloor \frac{\lambda + 180}{360} \cdot 2^z \right\rfloor
+$$
+
+```python
+tile = tile_at(latitude=47.6, longitude=-122.3, zoom=12)
+```
+EOF
 }
 
 # check prints each popup as a 200 by 50 terminal draws it, from a scratch
-# tmux server.
+# tmux server, then the two files as your Neovim opens them. tmux draws no
+# pictures, so the note's diagram and formula print as their source.
 check() {
-  local server="retake-$$" name
+  local server="retake-$$" name file
   for name in go inbox tasks; do
     in_demo tmux -L "$server" -f /dev/null new-session -d -x 200 -y 50 -c "$demo/code/atlas" "ws pick $name"
     sleep 3
     echo "== ws pick $name"
     tmux -L "$server" capture-pane -p | sed -e 's/[[:space:]]*$//' -e '/^$/d'
     tmux -L "$server" kill-server
+  done
+  for file in code/atlas/src/atlas.py vault/notes/projects/atlas/tiles.md; do
+    tmux -L "$server" -f /dev/null new-session -d -x 100 -y 40 -c "$demo" "nvim $file"
+    sleep 5
+    echo "== nvim $file"
+    tmux -L "$server" capture-pane -p | sed -e 's/[[:space:]]*$//' -e '/^$/d'
+    # Neovim quits on its own, so it stops the programs it started.
+    tmux -L "$server" send-keys Escape ':qa!' Enter
+    sleep 1
+    tmux -L "$server" kill-server 2>/dev/null || true
   done
 }
 
@@ -162,8 +275,8 @@ rex_windows() {
     awk -F'|' '$2 !~ /^Settings/'
 }
 
-# The demo session's floating pane, by the label open_popup gave it.
-float_block() {
+# The demo session's pane with a label the script gave it.
+labeled_block() {
   rex block ls -s "$session" --json | jq -r --arg label "$1" '[.blocks[] | select(.label == $label) | .block_id] | first // empty'
 }
 
@@ -178,10 +291,10 @@ open_popup() {
     layout = rex.layout.block({ flavor = 'com.superlogical.terminal.shell', label = '$label',
       options = { command = { $command }, cwd = '$demo/code/atlas' } }) })
     if err ~= nil then error(err, 0) end"
-  rex do -s "$session" -b "$pane" -e "$lua" >/dev/null
+  rex do -s "$session" -b "$code" -e "$lua" >/dev/null
   for _ in $(seq 1 40); do
     sleep 0.5
-    block=$(float_block "$label")
+    block=$(labeled_block "$label")
     [ -n "$block" ] || continue
     # The popup's bottom border is as wide as the pane. grep finds none
     # until the popup draws.
@@ -193,7 +306,7 @@ open_popup() {
 
 close_popup() {
   local block
-  block=$(float_block "retake $1")
+  block=$(labeled_block "retake $1")
   [ -z "$block" ] || rex send-key -s "$session" -b "$block" escape >/dev/null
   sleep 1
 }
@@ -225,34 +338,97 @@ calm() {
   stop "the CPU stayed above 30% for a minute, which lights sketchybar's readout"
 }
 
-# shoot NAME FILE takes the screen with the popup open, and refuses a shot
-# that would show another app, the Wi-Fi network's name or a frozen Rex.
-shoot() {
-  local raw=$scratch/$1.png width
-  open_popup "$1"
-  # The second row has a review comment to show beside the list.
-  [ "$1" = go ] || rex send-key -s "$session" -b "$(float_block "retake $1")" down >/dev/null
+# capture FILE... takes the screen into each of assets' FILEs, and refuses a
+# shot that would show another app, the Wi-Fi network's name or a frozen Rex.
+capture() {
+  local raw=$scratch/shot.png width file
   rex -C "$app" do client.notice.dismiss >/dev/null 2>&1 || true # Rex's "Update installed" notice
   sketchybar --set wifi label="Wi-Fi"
   calm
   sleep 1
   [ "$(aerospace list-workspaces --focused)" = code ] || stop "the code workspace lost focus"
+  [ -z "$(aerospace list-windows --workspace code --format '%{app-bundle-id}' | grep -v '^com.superlogical.rex$')" ] ||
+    stop "another app's window is on the code workspace, and would be in the shot"
   [ "$(aerospace list-windows --focused --format '%{app-bundle-id}')" = com.superlogical.rex ] || stop "Rex lost focus to another app"
   [ "$(app_client)" = "$app" ] || stop "Rex's app stopped answering. Relaunch Rex yourself, then run this again"
   screencapture -x -m "$raw"
   [ "$(sketchybar --query wifi | jq -r .label.value)" = "Wi-Fi" ] || stop "sketchybar wrote the Wi-Fi network's name during the shot"
-  close_popup "$1"
   width=$(sips -g pixelWidth "$raw" | awk '/pixelWidth/ { print $2 }')
   [ "$width" -le 1920 ] || sips --resampleWidth 1920 "$raw" >/dev/null
-  nix run --inputs-from "$repo" nixpkgs#pngquant -- --quality 85-98 --speed 1 --force --output "$repo/assets/$2" "$raw"
-  echo "retake: wrote assets/$2"
+  for file in "$@"; do
+    nix run --inputs-from "$repo" nixpkgs#pngquant -- --quality 85-98 --speed 1 --force --output "$repo/assets/$file" "$raw"
+    echo "retake: wrote assets/$file"
+  done
 }
 
-# restore puts back the session the app showed, the workspace and
-# sketchybar, and kills the demo session.
+# shoot_screen FILE... takes the two Neovim panes with no letter lit.
+# Neovim draws the note's diagram for the mode it is in while its pane has
+# the focus, so the note gets it for a moment first.
+shoot_screen() {
+  letters none none none
+  rex -C "$app" focus -s "$session" "$note" >/dev/null
+  sleep 5
+  rex -C "$app" focus -s "$session" "$code" >/dev/null
+  sleep 1
+  capture "$@"
+}
+
+# shoot_popup NAME FILE takes the screen with `ws pick NAME` open.
+shoot_popup() {
+  open_popup "$1"
+  # The second row has a review comment to show beside the list.
+  [ "$1" = go ] || rex send-key -s "$session" -b "$(labeled_block "retake $1")" down >/dev/null
+  capture "$2"
+  close_popup "$1"
+}
+
+# Every window's workspace, app and title. A title can hold any character
+# but this separator.
+sep=$'\037'
+windows() {
+  aerospace list-windows --all --format "%{window-id}${sep}%{workspace}${sep}%{app-bundle-id}${sep}%{window-title}"
+}
+
+# to_mode MODE flips the theme. The flip quits and reopens Chrome, whose
+# windows come back with new IDs on the focused workspace, and takes the
+# focus with them. So once Chrome has its windows again, each window that
+# isn't Rex's goes back to the workspace a window of its app and title was
+# on, or to the browser workspace, and Rex gets the focus back.
+to_mode() {
+  local id space bundle title want
+  theme "$1" >/dev/null
+  sleep 6
+  for _ in $(seq 1 40); do
+    [ "$(windows | grep -c "${sep}com.google.Chrome${sep}")" -ge "$chrome" ] && break
+    sleep 0.5
+  done
+  windows | while IFS="$sep" read -r id space bundle title; do
+    [ "$bundle" = com.superlogical.rex ] && continue
+    want=$(awk -F"$sep" -v b="$bundle" -v t="${title:0:25}" '$3 == b && substr($4, 1, 25) == t { print $2; exit }' <<<"$placed")
+    [ "$space" = "${want:-browser}" ] || aerospace move-node-to-workspace --window-id "$id" "${want:-browser}" >/dev/null 2>&1 || true
+  done
+  aerospace workspace code
+  aerospace focus --window-id "${window%%|*}"
+  sleep 1
+}
+
+appearance() {
+  if [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = Dark ]; then echo dark; else echo light; fi
+}
+
+# restore puts back the mode, the session the app showed, the workspace and
+# sketchybar, and ends the demo session. Neovim is asked to quit first, so
+# it stops the programs it started.
 restore() {
+  local pane
+  [ "$(appearance)" = "$mode" ] || to_mode "$mode" || true
   [ -z "$shown" ] || rex -C "$app" do session.select session_id="$shown" >/dev/null 2>&1 || true
   aerospace workspace "$workspace" || true
+  for pane in $code $note; do
+    rex send-key -s "$session" -b "$pane" escape >/dev/null 2>&1 || true
+    rex send -s "$session" -b "$pane" $':qa!\r' >/dev/null 2>&1 || true
+  done
+  sleep 1
   [ -z "$session" ] || rex kill "$session" >/dev/null 2>&1 || true
   sketchybar --trigger agent_attention_change --trigger review_attention_change --trigger task_attention_change
   sketchybar --update
@@ -271,10 +447,9 @@ if [ "${1:-}" = --check ]; then
 fi
 [ $# -eq 0 ] || stop "the only argument is --check"
 
-for tool in rex aerospace sketchybar screencapture sips zsh; do
+for tool in rex aerospace sketchybar screencapture sips zsh nvim theme; do
   command -v "$tool" >/dev/null || stop "$tool isn't installed"
 done
-[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = Dark ] || stop "the README's shots are dark, so run \`theme dark\` first"
 app=$(app_client)
 [ -n "$app" ] || stop "no Rex app is connected, so open Rex first"
 window=$(rex_windows | head -1)
@@ -282,28 +457,37 @@ window=$(rex_windows | head -1)
 shown=$(rex ls --json | jq -r --arg label "${window##* - }" '[.sessions[] | select(.label == $label) | .session_id] | first // empty')
 [ -n "$shown" ] || stop "Rex's window doesn't name the session it shows, so it couldn't be put back"
 workspace=$(aerospace list-workspaces --focused)
+mode=$(appearance)
+placed=$(windows)
+chrome=$(grep -c "${sep}com.google.Chrome${sep}" <<<"$placed" || true)
+code="" note=""
 rex ls --json | jq -e '[.sessions[] | select(.label == "atlas")] | length == 0' >/dev/null || stop "a session named atlas is already running"
 
 trap restore EXIT
 # The session is named after the demo repository it starts in, so the go
-# popup tags that folder as open.
-made=$(rex new atlas -c "$demo/code/atlas" --json)
+# popup tags that folder as open. Neovim runs your own setup, on the demo's
+# Python file and, beside it, the demo's note.
+made=$(rex new atlas -c "$demo/code/atlas" --json -- nvim src/atlas.py)
 session=$(jq -r .session_id <<<"$made")
-pane=$(jq -r '.initial_windows[0].block_ids[0]' <<<"$made")
+code=$(jq -r '.initial_windows[0].block_ids[0]' <<<"$made")
+rex split -s "$session" -b "$code" -c "$demo/vault" --label "retake note" --focus=false -- nvim notes/projects/atlas/tiles.md >/dev/null
+note=$(labeled_block "retake note")
+[ -n "$note" ] || stop "the note's pane didn't open"
 
 # Rex's window draws nothing new while its workspace is hidden, and
 # switching it to a session then has frozen the app. So the workspace comes
 # first.
 aerospace workspace code
 sleep 1
-[ "$(aerospace list-windows --workspace code --format '%{app-bundle-id}' | grep -vc '^com.superlogical.rex$')" -eq 0 ] ||
-  stop "another app's window is on the code workspace, and would be in the shots"
 rex -C "$app" do session.select session_id="$session" >/dev/null
 aerospace focus --window-id "${window%%|*}"
 sleep 2
 [ "$(app_client)" = "$app" ] || stop "Rex's app stopped answering. Relaunch Rex yourself, then run this again"
 
-letters none none none
-shoot go picker.png
+[ "$mode" = dark ] || to_mode dark
+shoot_screen screen.png screen-dark.png
+shoot_popup go picker.png
 letters none review none
-shoot inbox inbox.png
+shoot_popup inbox inbox.png
+to_mode light
+shoot_screen screen-light.png
