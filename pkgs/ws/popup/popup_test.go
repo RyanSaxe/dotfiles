@@ -261,6 +261,33 @@ func TestASlowLoadSaysItsLoading(t *testing.T) {
 	s.waitToDraw(t, "about a")
 }
 
+// In a terminal that gives a new pane a placeholder size before its real
+// one, as Rex gives 80×24, a popup draws nothing until the real size comes.
+// When none comes, the placeholder was the real size, and it draws anyway.
+func TestAPopupWaitsForTheTerminalsRealSize(t *testing.T) {
+	placeholder := tea.WindowSizeMsg{Width: 80, Height: 24}
+	p := picker([]popup.Row{{ID: "a", Title: "only-row"}}, nil, new([]string))
+	start := func() (*terminal, *tea.Program) {
+		s := new(terminal)
+		prog := tea.NewProgram(popup.WaitForSize(popup.New(p, nil), placeholder), tea.WithInput(nil), tea.WithOutput(s), tea.WithoutSignalHandler())
+		go prog.Run()
+		t.Cleanup(prog.Kill)
+		prog.Send(placeholder)
+		return s, prog
+	}
+
+	s, prog := start()
+	time.Sleep(100 * time.Millisecond)
+	if s.drew("only-row") {
+		t.Error("the popup drew at the placeholder size")
+	}
+	prog.Send(size)
+	s.waitToDraw(t, "only-row")
+
+	s, _ = start()
+	s.waitToDraw(t, "only-row")
+}
+
 // open runs p as a terminal would, and keeps what it draws.
 func open(t *testing.T, p popup.Popup) *terminal {
 	s := new(terminal)

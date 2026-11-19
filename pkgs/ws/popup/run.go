@@ -2,6 +2,7 @@ package popup
 
 import (
 	"slices"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -9,14 +10,61 @@ import (
 
 // Run shows p until it quits, with the art that draw returns at the right of
 // every header. Each reload draws it again, so the art can change while the
-// popup is open, and a nil draw shows none.
-func Run(p Popup, draw func() Art) error {
-	_, err := tea.NewProgram(New(p, draw), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+// popup is open, and a nil draw shows none. placeholder is the size the
+// terminal reports before its real one, as WaitForSize says, and the zero
+// size for a terminal that has its real size from the start.
+func Run(p Popup, draw func() Art, placeholder tea.WindowSizeMsg) error {
+	_, err := tea.NewProgram(WaitForSize(New(p, draw), placeholder), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
 	return err
 }
 
 // New is p as a Bubble Tea model, for a program that runs its own.
 func New(p Popup, draw func() Art) tea.Model { return open(p, draw) }
+
+// sizeWait is the longest m waits for the terminal's real size. A terminal
+// whose real size is the placeholder draws m after it.
+const sizeWait = 300 * time.Millisecond
+
+// WaitForSize draws nothing of m while the terminal has placeholder, the
+// size some terminals give a new pane before its real one, and draws m once
+// the real size comes or sizeWait passes. m loads meanwhile. Drawing at
+// once would show m at the placeholder's size for a moment, then again at
+// the real size.
+func WaitForSize(m tea.Model, placeholder tea.WindowSizeMsg) tea.Model {
+	return sizing{Model: m, placeholder: placeholder, waiting: true}
+}
+
+type sizing struct {
+	tea.Model
+	placeholder tea.WindowSizeMsg
+	waiting     bool
+}
+
+type sizeWaitedMsg struct{}
+
+func (s sizing) Init() tea.Cmd {
+	return tea.Batch(s.Model.Init(), tea.Tick(sizeWait, func(time.Time) tea.Msg { return sizeWaitedMsg{} }))
+}
+
+func (s sizing) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case sizeWaitedMsg:
+		s.waiting = false
+		return s, nil
+	case tea.WindowSizeMsg:
+		s.waiting = s.waiting && msg == s.placeholder
+	}
+	var cmd tea.Cmd
+	s.Model, cmd = s.Model.Update(msg)
+	return s, cmd
+}
+
+func (s sizing) View() string {
+	if s.waiting {
+		return ""
+	}
+	return s.Model.View()
+}
 
 // A stack is the popups open in one run: the first is the one Run opened,
 // and each Push opens one over the last. Esc closes the top one, and
