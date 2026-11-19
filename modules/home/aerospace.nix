@@ -1,5 +1,5 @@
-# AeroSpace, from config/aerospace/aerospace.toml with this computer's
-# notch inset applied. home-manager's launchd agent starts it at login.
+# AeroSpace, from config/aerospace/aerospace.toml with the built-in display's
+# notch applied. home-manager's launchd agent starts it at login.
 {
   config,
   lib,
@@ -10,6 +10,10 @@ let
   cfg = config.dotfiles;
   toml = builtins.fromTOML (builtins.readFile ../../config/aerospace/aerospace.toml);
   top = toml.gaps.outer.top;
+  # A MacBook with a notch keeps the top 32 points of its built-in display
+  # out of the area AeroSpace lays windows out in, at the default display
+  # scaling. A Mac without a built-in display has no monitor this matches.
+  notch = 32;
   ws = pkgs.callPackage ../../pkgs/ws { };
   # rex lives inside Rex Server's app, as in modules/home/ws.nix.
   rexDir = "${config.home.homeDirectory}/Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS";
@@ -24,14 +28,10 @@ lib.mkIf (lib.elem "gui" cfg.roles && pkgs.stdenv.hostPlatform.isDarwin) {
     enable = true;
     launchd.enable = true;
     settings = lib.recursiveUpdate toml {
-      gaps.outer.top =
-        if cfg.notchInset == 0 then
-          top
-        else
-          [
-            { monitor.built-in = top - cfg.notchInset; }
-            top
-          ];
+      gaps.outer.top = [
+        { monitor.built-in = top - notch; }
+        top
+      ];
       # launchd starts AeroSpace without the Nix profile on PATH, so the
       # workspace-change callback could not find sketchybar.
       exec.env-vars.PATH = "${config.home.profileDirectory}/bin:\${PATH}";

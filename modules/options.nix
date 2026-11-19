@@ -51,12 +51,6 @@ in
       description = "The email git commits with on this computer.";
     };
 
-    notchInset = mkOption {
-      type = types.int;
-      default = 0;
-      description = "Points AeroSpace leaves above the windows on the built-in display, for the notch and the bar.";
-    };
-
     vault = mkOption {
       type = types.nullOr (
         types.submodule {

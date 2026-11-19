@@ -64,8 +64,8 @@ run = 'layout floating'
 # re-deriving outer.top from this rule.
 #
 # On a Mac with a notch, the built-in display reserves the camera-housing
-# rows, so modules/home/aerospace.nix shrinks that display's gap by the host
-# file's notchInset, keeping the window top level with external monitors.
+# rows, so modules/home/aerospace.nix shrinks that display's gap by their
+# 32 points, keeping the window top level with external monitors.
 [gaps]
 inner.horizontal = 10
 inner.vertical = 10
