@@ -225,15 +225,16 @@ func TestAnEarlyEnterWaitsForARowThatMatches(t *testing.T) {
 	}
 }
 
-// A load and a fetch that finish as quickly as most do draw their rows and
-// details with no loading line before them, which would flash for a frame.
+// A load and a fetch that each finish as quickly as most do draw their rows
+// and details with no loading line before them, which would flash for a
+// frame, even when the two together take longer than either may.
 func TestAQuickLoadDrawsNoLoadingLine(t *testing.T) {
 	p := picker(nil, nil, new([]string))
 	p.Load = func(int, func([]popup.Row)) ([]popup.Row, error) {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 		return []popup.Row{{ID: "a", Title: "a"}}, nil
 	}
-	p.Fetch = func(popup.Row) (any, error) { time.Sleep(50 * time.Millisecond); return "about a", nil }
+	p.Fetch = func(popup.Row) (any, error) { time.Sleep(200 * time.Millisecond); return "about a", nil }
 	s := open(t, p)
 	s.waitToDraw(t, "about a")
 	for _, line := range []string{"loading rows", "loading details"} {
