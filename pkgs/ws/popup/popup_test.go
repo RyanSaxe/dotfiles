@@ -482,31 +482,39 @@ func TestTheMousePicksRows(t *testing.T) {
 }
 
 // The tab a popup opens on loads before the others start, so their work
-// can't slow down the rows on screen. The others start once it shows rows.
+// can't slow down the rows on screen, even after it shows its first rows.
+// The others start once it finishes, however it finishes.
 func TestThePopupLoadsTheTabItOpensOnFirst(t *testing.T) {
-	release, otherStarted := make(chan struct{}), make(chan struct{})
-	p := picker(nil, nil, new([]string))
-	p.Tabs = []popup.Tab{{Name: "Folders"}, {Name: "Worktrees"}}
-	p.Load = func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
-		if tab == 1 {
-			close(otherStarted)
-			return nil, nil
+	for _, fails := range []bool{false, true} {
+		release, otherStarted := make(chan struct{}), make(chan struct{})
+		p := picker(nil, nil, new([]string))
+		p.Tabs = []popup.Tab{{Name: "Folders"}, {Name: "Worktrees"}}
+		p.Start = 1
+		p.Load = func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
+			if tab == 0 {
+				close(otherStarted)
+				return nil, nil
+			}
+			if fails {
+				<-release
+				return nil, errors.New("git failed")
+			}
+			show([]popup.Row{{ID: "a", Title: "a"}})
+			<-release
+			return []popup.Row{{ID: "a", Title: "a"}}, nil
 		}
-		<-release
-		show([]popup.Row{{ID: "a", Title: "a"}})
-		return []popup.Row{{ID: "a", Title: "a"}}, nil
-	}
-	open(t, p)
-	select {
-	case <-otherStarted:
-		t.Fatal("Worktrees started loading before Folders showed its rows")
-	case <-time.After(100 * time.Millisecond):
-	}
-	close(release)
-	select {
-	case <-otherStarted:
-	case <-time.After(5 * time.Second):
-		t.Fatal("Worktrees never started loading after Folders showed its rows")
+		open(t, p)
+		select {
+		case <-otherStarted:
+			t.Fatalf("Folders started loading before Worktrees finished (Worktrees fails: %v)", fails)
+		case <-time.After(100 * time.Millisecond):
+		}
+		close(release)
+		select {
+		case <-otherStarted:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("Folders never started loading after Worktrees finished (Worktrees fails: %v)", fails)
+		}
 	}
 }
 
