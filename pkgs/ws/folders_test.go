@@ -58,15 +58,28 @@ list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nbusy\t01
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
 
-	var early []popup.Row // the rows Folders shows before the snapshot
-	folders, err := p.Load(foldersTab, func(rows []popup.Row) { early = rows })
+	var first, early []popup.Row // the rows Folders shows first, and last before the snapshot
+	folders, err := p.Load(foldersTab, func(rows []popup.Row) {
+		if first == nil {
+			first = rows
+		}
+		early = rows
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var titles []string
-	for _, r := range folders {
-		titles = append(titles, r.Title)
+	titlesOf := func(rows []popup.Row) []string {
+		var titles []string
+		for _, r := range rows {
+			titles = append(titles, r.Title)
+		}
+		return titles
 	}
+	// The worktrees and bookmarks show before the walk finds busy.
+	if got, want := titlesOf(first), []string{"quiet/feature", "quiet", "notes"}; !slices.Equal(got, want) {
+		t.Errorf("Folders first shows %q, want %q", got, want)
+	}
+	titles := titlesOf(folders)
 	if want := []string{"quiet/feature", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
 		t.Errorf("Folders lists %v, want %v", titles, want)
 	}

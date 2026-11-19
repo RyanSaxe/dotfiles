@@ -52,24 +52,45 @@ func pick(b mux.Backend, name string) error {
 	}, placeholder)
 }
 
-// perLoad shares work between the tabs of one load, which all start at
-// once: the first tab to ask runs it, and the others wait for its result. A
-// tab that asks again is in the next load, which runs the work afresh.
-func perLoad[T any](work func() (T, error)) func(tab int) (T, error) {
+// perLoad shares work between the tabs of one load: the first tab to ask
+// runs it, and the others wait for its result. A tab that asks again is in
+// the next load, which runs the work afresh. The work can report what it has
+// so far, and the tab that runs it gets those reports in progress, which may
+// be nil.
+func perLoad[T any](work func(report func(T)) (T, error)) func(tab int, progress func(T)) (T, error) {
 	var (
 		mu    sync.Mutex
-		run   func() (T, error)
+		run   func(progress func(T)) (T, error)
 		asked map[int]bool
 	)
-	return func(tab int) (T, error) {
+	return func(tab int, progress func(T)) (T, error) {
 		mu.Lock()
 		if run == nil || asked[tab] {
-			run, asked = sync.OnceValues(work), map[int]bool{}
+			run, asked = once(work), map[int]bool{}
 		}
 		asked[tab] = true
 		this := run
 		mu.Unlock()
-		return this()
+		return this(progress)
+	}
+}
+
+// once runs work for the first caller, with that caller's progress, and gives
+// every caller its result.
+func once[T any](work func(report func(T)) (T, error)) func(progress func(T)) (T, error) {
+	var (
+		do     sync.Once
+		result T
+		err    error
+	)
+	return func(progress func(T)) (T, error) {
+		do.Do(func() {
+			if progress == nil {
+				progress = func(T) {}
+			}
+			result, err = work(progress)
+		})
+		return result, err
 	}
 }
 
