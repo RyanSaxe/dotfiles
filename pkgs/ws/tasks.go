@@ -227,7 +227,10 @@ func tickTask(vault string, t task, today time.Time) error {
 	return os.WriteFile(file, []byte(strings.Join(lines, "")), 0o644)
 }
 
-func tasksPopup(b mux.Backend, term kitty.Terminal) popup.Popup {
+// taskTabs are the Inbox's last tabs, which list the vault's open tasks,
+// soonest due first: the project's tab and All inside a project, and one
+// Tasks tab outside one.
+func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 	vault := vaultDir()
 	// Without a vault there are no tasks to list, and no note to add one to.
 	if vault == "" {

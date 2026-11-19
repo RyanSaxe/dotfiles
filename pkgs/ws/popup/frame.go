@@ -320,7 +320,7 @@ func (m frame) handleKey(k tea.KeyMsg) (frame, tea.Cmd) {
 		return m, nil
 	}
 	// A popup's own key comes first, so it can take over one of the frame's,
-	// as Reviews does with Ctrl-R.
+	// as the Inbox does with Ctrl-R.
 	r, ok := m.selected()
 	for _, a := range m.p.Actions {
 		if a.Key == key && m.works(a) {
@@ -572,11 +572,13 @@ func (m frame) detailHead(r Row, ok bool, w int, loading bool) string {
 		return ""
 	}
 	// A row's meta and title head its details only on a narrow screen, where
-	// the list isn't beside them. A popup's own head always shows.
+	// the list isn't beside them. A popup's own head always shows, and stands
+	// in for them when it has lines for the row.
 	var lines []string
 	if m.p.Head != nil {
 		lines = m.p.Head(r, m.shown(r), w)
-	} else if m.narrow() {
+	}
+	if lines == nil && m.narrow() {
 		lines = []string{ansi.Truncate(Dim.Render(r.Detail), w, "…"), Bold.Width(w).Render(r.Title), ""}
 	}
 	switch d := m.details[r.ID]; {

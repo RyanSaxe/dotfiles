@@ -2,6 +2,7 @@ package main
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"workspace/kitty"
@@ -34,7 +35,7 @@ func TestOnlyCtrlXMarksAReviewDone(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	p := reviewsPopup(mux.Detect(func(string) string { return "" }, ""), kitty.Terminal{})
+	p := inboxPopup(mux.Detect(func(string) string { return "" }, ""), kitty.Terminal{}, false)
 	load := func(tab int) map[string]popup.Row {
 		rows, err := p.Load(tab, func([]popup.Row) {})
 		if err != nil {
@@ -79,5 +80,58 @@ func TestOnlyCtrlXMarksAReviewDone(t *testing.T) {
 	ctrlX.Run(issue)()
 	if got := needsYou(); !slices.Equal(got, []string{"pr"}) {
 		t.Errorf("after Ctrl-X on the issue, Needs you lists %v, want only pr", got)
+	}
+}
+
+// The Inbox lists Reviews' tabs, then the Tasks tabs. ws pick tasks opens it
+// on the first Tasks tab, and each tab keeps its own keys: Ctrl-X on a task
+// ticks it, and a pull request's keys don't work there.
+func TestTheInboxKeepsEachTabsKeys(t *testing.T) {
+	oldHome := home
+	home, stateDir = t.TempDir(), t.TempDir()
+	t.Cleanup(func() { home = oldHome })
+	vault := t.TempDir()
+	t.Setenv("VAULT_DIR", vault)
+	writeNote(t, vault, "notes/daily/2026-11-09.md", "- [ ] call the bank\n")
+	if err := writeJSON("inbox.json", inbox{Fetched: now, Items: []item{
+		{ID: "pr", Number: 1, Repo: "owner/repo", Title: "a pull request", Yours: true, Updated: now,
+			Reasons: []reason{{Kind: commented, Actor: "alice", At: now, Key: "c1"}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	b := mux.Detect(func(string) string { return "" }, "")
+	p, onTasks := inboxPopup(b, kitty.Terminal{}, false), inboxPopup(b, kitty.Terminal{}, true)
+	var names []string
+	for _, tab := range p.Tabs {
+		names = append(names, tab.Name)
+	}
+	if got := strings.Join(names[:3], ", "); got != "Needs you, Pull requests, Issues" || len(names) < 4 {
+		t.Fatalf("the tabs are %v, want Reviews' three, then the Tasks tabs", names)
+	}
+	if p.Start != needsYouTab || onTasks.Start != 3 {
+		t.Errorf("the Inbox opens on tabs %d and %d, want Needs you and the first Tasks tab", p.Start, onTasks.Start)
+	}
+	all := len(p.Tabs) - 1
+	rows, err := p.Load(all, func([]popup.Row) {})
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("the last tab loaded %v (%v), want the one task", rows, err)
+	}
+	for _, key := range []string{"ctrl+g", "ctrl+o"} {
+		if _, ok := working(p, key, all, rows[0]); ok {
+			t.Errorf("%s works on a task", key)
+		}
+	}
+	// With no row selected, each tab's own Ctrl-T is the one that works.
+	if a, _ := working(p, "ctrl+t", all, popup.Row{}); a.Help != "add" {
+		t.Errorf("Ctrl-T on a Tasks tab is %q, want add", a.Help)
+	}
+	ctrlX, _ := working(p, "ctrl+x", all, rows[0])
+	ctrlX.Run(rows[0])()
+	if got := readNote(t, vault, "notes/daily/2026-11-09.md"); got != "- [x] call the bank\n" {
+		t.Errorf("after Ctrl-X on the task, its note is %q, want the box ticked", got)
+	}
+	needs, _ := p.Load(needsYouTab, func([]popup.Row) {})
+	if len(needs) != 1 || needs[0].ID != "pr" {
+		t.Errorf("Needs you lists %v, want only the pull request", needs)
 	}
 }

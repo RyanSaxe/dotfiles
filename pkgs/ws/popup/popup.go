@@ -21,7 +21,7 @@ type Popup struct {
 	// loads first, and the other tabs' Loads start once it returns.
 	Load    func(tab int, show func([]Row)) ([]Row, error)
 	Fetch   func(r Row) (any, error)                 // details of a final row, once the cursor rests on it, or nil for none and a list the full width
-	Head    func(r Row, details any, w int) []string // nil shows the row's meta and title on a phone
+	Head    func(r Row, details any, w int) []string // nil, or no lines, shows the row's meta and title on a phone
 	Body    func(r Row, details any, w int) string   // draws details that aren't a string or a Screen
 	Actions []Action
 }

@@ -248,13 +248,16 @@ request merged.`,
 	},
 	{
 		name: "pick", group: "Popups",
-		line: "ws pick NAME", summary: "open a popup: go, worktrees, sessions, agents, reviews,\ntasks, theme, keys or files",
+		line: "ws pick NAME", summary: "open a popup: go, worktrees, sessions, agents, inbox, reviews,\ntasks, theme, keys or files",
 		args:  "NAME",
 		flags: []option{{"client", "ID", "the Rex app a picked row switches, which Rex's keys pass. Without it,\nws switches the app that shows this terminal"}},
-		about: `Open popup NAME: go, worktrees, sessions, agents, reviews, tasks, theme, keys or files.
-The go popup has four tabs: Folders, Worktrees, Sessions and Agents. go opens it on Folders,
-and worktrees, sessions and agents open it on their own tab. Folders also lists the folders
-in ~/.config/ws/bookmarks, one per line.`,
+		about: `Open popup NAME: go, worktrees, sessions, agents, inbox, reviews, tasks, theme, keys or
+files. The go popup has four tabs: Folders, Worktrees, Sessions and Agents. go opens it on
+Folders, and worktrees, sessions and agents open it on their own tab. Folders also lists the
+folders in ~/.config/ws/bookmarks, one per line.
+
+The Inbox popup has the reviews tabs, Needs you, Pull requests, Issues and Watching, then
+the Tasks tabs. inbox and reviews open it on Needs you, and tasks on its first Tasks tab.`,
 		more: `
 In every popup:
   typing                   filter the rows
@@ -284,12 +287,12 @@ the ones that work on the tab and the selected row:
 	},
 	{
 		name: "focus", group: "Popups",
-		line: "ws focus agent|tasks|reviews", summary: "bring Rex forward, then jump to the agent that needs you\nor open Tasks or Reviews. Cmd-Alt-A, T and R run it",
+		line: "ws focus agent|tasks|reviews", summary: "bring Rex forward, then jump to the agent that needs you\nor open the Inbox. Cmd-Alt-A, T and R run it",
 		args: "agent|tasks|reviews",
 		about: `Bring Rex onto AeroSpace's code workspace, or Ghostty on tmux when Rex isn't installed.
 Then ws focus agent goes to the agent that needs you first, and to the next one each time it
-runs, or to each agent in turn when none needs you. tasks and reviews open Tasks or Reviews.
-AeroSpace's Cmd-Alt-A, T and R run it.`,
+runs, or to each agent in turn when none needs you. reviews opens the Inbox on Needs you, and
+tasks on its first Tasks tab. AeroSpace's Cmd-Alt-A, T and R run it.`,
 		examples: []string{"ws focus agent", "ws focus reviews"},
 		run: func(b mux.Backend, c call) error {
 			return focus(c.args[0])
@@ -324,7 +327,7 @@ pikachu, shiny-pokemon:NAME for its shiny form, or a PNG file. The theme popup s
 	{
 		name: "attention", group: "Background",
 		line: "ws attention [--watch]", summary: "print what needs you, or keep sketchybar's A, R and T\ncurrent",
-		flags: []option{{"watch", "", "keep sketchybar's A, R and T current instead, and fetch the inbox\nReviews lists every 5 minutes. A launchd agent runs it on each Mac"}},
+		flags: []option{{"watch", "", "keep sketchybar's A, R and T current instead, and fetch the inbox\nthe Inbox popup lists every 5 minutes. A launchd agent runs it on each Mac"}},
 		about: `Print what needs you, as three words: agents (failed, waiting, done or none), reviews (ci,
 review or none) and tasks (overdue, today, tomorrow or none).`,
 		examples: []string{"ws attention", "ws attention --watch"},

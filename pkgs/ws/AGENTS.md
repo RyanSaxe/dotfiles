@@ -26,6 +26,11 @@ tasks, the mascot, and GitHub's private images. The core never imports it,
 and settings the core needs, such as the backend or whether the terminal
 draws images, are passed in rather than read from globals.
 
+The Inbox popup is two halves joined by `inboxPopup` in `popups.go`: the
+reviews tabs from `reviews.go`, then the Tasks tabs from `tasks.go`. Each
+half is a `popup.Popup` that numbers its own tabs from 0, so a change to
+one half's tabs or keys stays in its file.
+
 ## What ws keeps
 
 State lives with the tools. git owns worktrees and branches, Rex and tmux
@@ -35,17 +40,17 @@ them each time and keeps no copy. What it does keep is in
 `XDG_STATE_HOME` moves that folder, so a scratch run can use its own.
 
 `ws attention --watch` runs as a launchd agent on each Mac with the `gui`
-role, and writes the files sketchybar and Reviews read:
+role, and writes the files sketchybar and the Inbox popup read:
 
-- `inbox.json`: the pull requests and issues Reviews lists, as the job last
+- `inbox.json`: the pull requests and issues the Inbox lists, as the job last
   fetched them from GitHub
 - `agent-attention`, `review-attention` and `task-attention`: the levels
   the job last published for sketchybar's A, R and T
-- `attention.pid`: the job's process ID, which Reviews signals to fetch now
+- `attention.pid`: the job's process ID, which the Inbox signals to fetch now
 
 The rest are records `ws` keeps for itself:
 
-- `acknowledged.json`: each item you marked done in Reviews, with what it
+- `acknowledged.json`: each item you marked done in the Inbox, with what it
   needed you for then, so that anything newer brings it back
 - `last-jump`: the pane the last `ws focus agent` went to, so the next
   jump moves on
@@ -74,7 +79,7 @@ write reads the file and swaps the whole new file in.
 ## Rules
 
 - Each file has one writer, which swaps it in whole. Only the `--watch` job
-  fetches the inbox, and Reviews asks it to with a signal.
+  fetches the inbox, and the Inbox popup asks it to with a signal.
 - Anything `ws` must track itself is a named type that lists its states,
   with one function that moves between them. Never spread flags across the
   code to stand for a state.

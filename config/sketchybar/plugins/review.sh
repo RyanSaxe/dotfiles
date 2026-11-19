@@ -1,11 +1,11 @@
 #!/usr/bin/env zsh
 # The "R" review letter: the same shape as the agent "A", answering the
 # neighbouring question: is there GitHub work waiting on me. Alt-R in Rex
-# or tmux opens the Reviews popup.
+# or tmux opens the Inbox popup on Needs you.
 #
 # `ws attention --watch` asks GitHub every 5 minutes and publishes:
 # - ci:     a failing check on one of your pull requests needs you
-# - review: anything else in Reviews' Needs you tab
+# - review: anything else in the Inbox's Needs you tab
 # - none:   dim, like an unfocused workspace, and still a keybind reminder
 #
 # This reads the one-word file it writes, so the bar never waits on GitHub.

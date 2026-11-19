@@ -165,7 +165,7 @@ sketchybar --add item space.agent left \
 
 # The review letter, beside the agent one because it answers the neighbouring
 # question: an agent wants you versus GitHub wants you. Alt-R in Rex or tmux,
-# or Cmd-Alt-R from anywhere, opens the Reviews popup.
+# or Cmd-Alt-R from anywhere, opens the Inbox popup on Needs you.
 sketchybar --add item space.review left \
   --set space.review \
   icon="R" \
@@ -180,7 +180,8 @@ sketchybar --add item space.review left \
   --subscribe space.review review_attention_change
 
 # The task letter, last of the three: a task in the vault is due. Alt-T in
-# Rex or tmux, or Cmd-Alt-T from anywhere, opens the Tasks popup.
+# Rex or tmux, or Cmd-Alt-T from anywhere, opens the Inbox popup on its Tasks
+# tabs.
 sketchybar --add item space.task left \
   --set space.task \
   icon="T" \
