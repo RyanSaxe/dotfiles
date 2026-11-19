@@ -324,7 +324,7 @@ letters() {
 }
 
 # sketchybar's clock turns red at minutes 59, 00, 29 and 30, and its CPU
-# readout lights above about 30%, so a shot waits both out. It waits from
+# readout lights above 50%, so a shot waits both out. It waits from
 # the minute before a red one, so it can't run into it.
 calm() {
   local cpu
@@ -332,10 +332,10 @@ calm() {
   sketchybar --trigger system_woke # draws the clock now, not at its next minute
   for _ in $(seq 1 30); do
     cpu=$(sketchybar --query cpu | jq -r .label.value | tr -dc 0-9)
-    [ -n "$cpu" ] && [ "$cpu" -lt 30 ] && return
+    [ -n "$cpu" ] && [ "$cpu" -le 50 ] && return
     sleep 2
   done
-  stop "the CPU stayed above 30% for a minute, which lights sketchybar's readout"
+  stop "the CPU stayed above 50% for a minute, which lights sketchybar's readout, so run this when the computer is less busy"
 }
 
 # capture FILE... takes the screen into each of assets' FILEs, and refuses a
