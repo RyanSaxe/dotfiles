@@ -481,6 +481,35 @@ func TestTheMousePicksRows(t *testing.T) {
 	}
 }
 
+// The tab a popup opens on loads before the others start, so their work
+// can't slow down the rows on screen. The others start once it shows rows.
+func TestThePopupLoadsTheTabItOpensOnFirst(t *testing.T) {
+	release, otherStarted := make(chan struct{}), make(chan struct{})
+	p := picker(nil, nil, new([]string))
+	p.Tabs = []popup.Tab{{Name: "Folders"}, {Name: "Worktrees"}}
+	p.Load = func(tab int, show func([]popup.Row)) ([]popup.Row, error) {
+		if tab == 1 {
+			close(otherStarted)
+			return nil, nil
+		}
+		<-release
+		show([]popup.Row{{ID: "a", Title: "a"}})
+		return []popup.Row{{ID: "a", Title: "a"}}, nil
+	}
+	open(t, p)
+	select {
+	case <-otherStarted:
+		t.Fatal("Worktrees started loading before Folders showed its rows")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-otherStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Worktrees never started loading after Folders showed its rows")
+	}
+}
+
 // A popup opens on the tab it starts on, and Tab still moves to the others.
 func TestAPopupOpensOnItsStartTab(t *testing.T) {
 	var picked []string
