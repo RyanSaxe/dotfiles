@@ -98,9 +98,11 @@ in
     ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals (has "personal") [
       # Two agents besides Claude Code and Codex that pair's hub can wake,
-      # and the Python that `python3` runs.
+      # Antigravity's terminal agent `agy`, and the Python that `python3`
+      # runs.
       pkgs.pi-coding-agent
       pkgs.github-copilot-cli
+      pkgs.antigravity-cli
       (pkgs.python312.withPackages (
         python: with python; [
           numpy
