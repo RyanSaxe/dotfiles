@@ -44,12 +44,12 @@ fi
 fields=$(jq -r '
   if (.stop_hook_active // .continuationActive) then empty
   elif (.hook_event_name // .hookEventName) == "Stop" then
-    if (.terminationReason // "") == "ERROR" then
+    if ((.terminationReason // "") | ascii_downcase) == "error" then
       "failed", (.error // "")
-    elif (.terminationReason // "") == "USER_CANCELED" then
+    elif ((.terminationReason // "") | ascii_downcase) == "user_canceled" then
       empty
     else
-      "done", (.last_assistant_message // .lastUserInput // "")
+      "done", (.last_assistant_message // .lastAssistantMessage // "")
     end
   elif .hook_event_name == "Notification" then (.title // "needs you"), (.message // "")
   elif .hook_event_name == "StopFailure" then "failed: \(.error)", (.error_details // .last_assistant_message // "")
@@ -63,6 +63,19 @@ if [[ $fields == *$'\n'* ]]; then
   message=${fields#*$'\n'}
 else
   message=""
+fi
+
+# Antigravity's Stop payload omits the assistant's reply (it sends only
+# lastUserInput and transcriptPath), so read the last non-empty reply from
+# the tail of the transcript instead of echoing the user's own prompt back.
+if [[ -z $message && $what == done ]]; then
+  transcript=$(jq -r '.transcriptPath // empty' <<<"$event" 2>/dev/null)
+  if [[ -n $transcript ]]; then
+    transcript=${transcript/#\~/$HOME}
+    if [[ -r $transcript ]]; then
+      message=$(tail -n 50 "$transcript" | jq -rs '[.[] | select(.type == "PLANNER_RESPONSE" and (.content // "") != "") | .content] | last // "" | gsub("\n"; " ")' 2>/dev/null)
+    fi
+  fi
 fi
 
 cwd=$(jq -r '.cwd // .workspacePaths[0] // empty' <<<"$event" 2>/dev/null)

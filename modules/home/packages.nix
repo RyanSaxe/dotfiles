@@ -121,16 +121,20 @@ in
   home.sessionVariables.GOPATH = lib.mkIf (has "base") "${config.xdg.dataHome}/go";
 
   home.activation.uvTools = lib.mkIf (has "base") (
-    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    lib.hm.dag.entryAfter ([ "writeBoundary" ] ++ lib.optionals (has "personal") [ "agyInstall" ]) ''
       for tool in ${lib.escapeShellArgs uvTools}; do
         if ! ${pkgs.uv}/bin/uv tool list 2>/dev/null | grep -q "^$tool "; then
           run ${pkgs.uv}/bin/uv tool install "$tool"
           if [ "$tool" = byor ]; then
-            # Only the agents this computer has, since Claude is only on a
-            # personal one. The switch's own PATH has none of their folders.
+            # Only the agents this computer has, since Claude and Antigravity
+            # are only on a personal one. The switch's own PATH has none of
+            # their folders.
             has() { PATH="${agentPath}" command -v "$1" > /dev/null; }
             agents=skill
-            ${lib.optionalString (has "personal") ''has claude && agents="$agents,claude-code"''}
+            ${lib.optionalString (has "personal") ''
+              has claude && agents="$agents,claude-code"
+              has agy && agents="$agents,antigravity"
+            ''}
             has codex && agents="$agents,codex"
             run "$HOME/.local/bin/byor" install --agents "$agents" < /dev/null
           fi

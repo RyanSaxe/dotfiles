@@ -38,7 +38,7 @@ ai-harness/
 | `~/.claude/skills/NAME`, `~/.gemini/config/skills/NAME`, `~/.agents/skills/NAME` | Links to each skill in `skills/` |
 | `~/.claude/agents/NAME.md`, `~/.gemini/config/agents/NAME.md` | Agents converted from `~/.codex/agents` |
 | `~/.claude/statusline.js`, `~/.gemini/antigravity-cli/statusline.js` | Links to `statusline.js` |
-| `~/.gemini/config/hooks.json`                      | Merged Pushover hook for Antigravity CLI            |
+| `~/.gemini/config/hooks.json`                      | Merged Pushover and `pair` hooks for Antigravity CLI |
 | `/etc/codex/requirements.toml`                     | A copy of `codex/requirements.toml`                 |
 | `/etc/codex/hooks/notify-pushover.zsh`             | A link to `tools/notify-pushover.zsh`               |
 | `/etc/codex/hooks/pair-register.sh`                | A link to `tools/pair-register.sh`                  |
@@ -74,13 +74,12 @@ extension from `~/.nix-profile`, a path that stays the same when pair updates.
 The `copilot` alias starts Copilot CLI with its UI server and access to pair's
 state folder, which pair needs.
 
-Each Claude Code, Codex and Copilot session registers with pair as it
-starts, so `pair agents` lists it and other agents can message it. Each home
-switch adds pair's hook to Claude Code's `SessionStart` list beside Rex's,
-and writes `~/.copilot/hooks/pair.json`. Codex runs `tools/pair-register.sh`
-as a managed hook. Antigravity CLI exposes its language server address and
-token only to agent commands, not hooks, so an Antigravity session registers
-on its first `pair` command (which `pair spawn agy` runs in its first prompt).
+Each Claude Code, Codex, Copilot and Antigravity CLI session registers with
+pair as it starts, so `pair agents` lists it and other agents can message it.
+Each home switch adds `pair register --hook` to Claude Code's `SessionStart`
+list beside Rex's, to `~/.copilot/hooks/pair.json`, and to Antigravity CLI's
+`PreInvocation` hook in `~/.gemini/config/hooks.json`. Codex runs
+`tools/pair-register.sh` as a managed hook.
 
 Each agent's settings live in `modules/home/agents.nix`. Each home switch
 merges them into `~/.claude/settings.json`, `~/.codex/config.toml` and

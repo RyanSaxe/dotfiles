@@ -180,16 +180,22 @@ let
       ' "$settings" > "$settings.new"
     mv "$settings.new" "$settings"
   '';
-  # Merge only our named hook so hooks from other tools, such as byor, stay.
+  # Merge only our named hooks so hooks from other tools, such as byor, stay.
   agyHooks = pkgs.writeShellScript "agy-hooks" ''
     set -eu
     jq=${pkgs.jq}/bin/jq
     hooks="$HOME/.gemini/config/hooks.json"
     mkdir -p "''${hooks%/*}"
     [ -s "$hooks" ] || echo '{}' > "$hooks"
-    "$jq" --arg cmd ${lib.escapeShellArg (pushover "Antigravity")} '
+    "$jq" \
+      --arg pushover ${lib.escapeShellArg (pushover "Antigravity")} \
+      --arg pair ${lib.escapeShellArg pairRegister} \
+      '
       .["pushover-notify"] = {
-        Stop: [{type: "command", command: $cmd}]
+        Stop: [{type: "command", command: $pushover}]
+      }
+      | .["pair-register"] = {
+        PreInvocation: [{type: "command", command: $pair}]
       }
     ' "$hooks" > "$hooks.new"
     mv "$hooks.new" "$hooks"
