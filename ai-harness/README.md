@@ -36,6 +36,7 @@ ai-harness/
 | `~/.gemini/config/AGENTS.md`                       | A link to `AGENTS.md`                               |
 | `developer_instructions` in `~/.codex/config.toml` | The text of `AGENTS.md`, copied at each home switch |
 | `~/.claude/skills/NAME`, `~/.gemini/config/skills/NAME`, `~/.agents/skills/NAME` | Links to each skill in `skills/` |
+| `~/.claude/agents/NAME.md`, `~/.gemini/config/agents/NAME.md` | Agents converted from `~/.codex/agents` |
 | `~/.claude/statusline.js`, `~/.gemini/antigravity-cli/statusline.js` | Links to `statusline.js` |
 | `~/.gemini/config/hooks.json`                      | Merged Pushover hook for Antigravity CLI            |
 | `/etc/codex/requirements.toml`                     | A copy of `codex/requirements.toml`                 |
@@ -113,12 +114,14 @@ echo '{"hook_event_name": "Stop", "last_assistant_message": "test"}' |
 ## Agents that need you
 
 In tmux, `ws` learns that an agent needs you from its window's bell, as
-[docs/ws.md](../docs/ws.md#agents-that-need-you) describes, so both agents
-ring it. Each home switch sets Claude Code's `preferredNotifChannel` to
+[docs/ws.md](../docs/ws.md#agents-that-need-you) describes, so the agents ring
+it. Each home switch sets Claude Code's `preferredNotifChannel` to
 `terminal_bell`. On computers without Rex, it also sets Codex's
 `tui.notification_method` to `bel`, `tui.notifications` to `true` and
-`tui.notification_condition` to `always`, so Codex rings whether or not its
-pane has focus. Rex computers keep Codex's own notifications.
+`tui.notification_condition` to `always`, and Antigravity CLI's `notifications`
+to `true`, so they ring whether or not their pane has focus. Rex computers keep
+Codex's and Antigravity's own notifications (and Rex reads Antigravity's OSC
+7501 status directly).
 
 When each agent rang, in a tmux session no client showed, with Claude Code
 2.1.327 and Codex 0.169:

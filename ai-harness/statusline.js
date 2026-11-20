@@ -45,6 +45,14 @@ function firstDefined(...values) {
 }
 
 function number(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === "" ||
+    typeof value === "boolean"
+  ) {
+    return undefined;
+  }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
@@ -159,12 +167,15 @@ function main() {
       ? Math.round((used / 100) * windowSize)
       : undefined;
   const tokens = formatTokens(
-    firstDefined(
+    [
       context.current_context_tokens,
+      derivedTokens,
       context.total_input_tokens,
       nested(context, "current_usage", "input_tokens"),
-      derivedTokens,
-    ),
+    ].find((value) => {
+      const parsed = number(value);
+      return parsed !== undefined && parsed > 0;
+    }),
   );
   const details = [
     effort,

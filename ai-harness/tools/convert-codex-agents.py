@@ -37,11 +37,19 @@ def antigravity_agent(name: str, description: str, instructions: str) -> str:
         f"description: {json.dumps(description)}\n"
         "mainAgent: true\n"
         "subagent: true\n"
+        "tools:\n"
+        "  - read_file\n"
+        "  - write_file\n"
+        "  - edit_file\n"
+        "  - run_command\n"
+        "  - search_web\n"
         f"---\n\n{instructions.strip()}\n"
     )
 
 
 def written_here(path: Path) -> bool:
+    if path.is_symlink() or not path.is_file():
+        return False
     return path.read_text().startswith(f"---\n{MARK.format(name=path.stem)}\n")
 
 
@@ -51,7 +59,7 @@ def sync_target(target_dir: Path, agents: list[dict], render) -> None:
     for agent in agents:
         name = agent["name"]
         target = target_dir / f"{name}.md"
-        if target.exists() and not written_here(target):
+        if target.is_symlink() or (target.exists() and not written_here(target)):
             continue
         text = render(name, agent["description"], agent["developer_instructions"])
         if not target.exists() or target.read_text() != text:
@@ -64,7 +72,11 @@ def sync_target(target_dir: Path, agents: list[dict], render) -> None:
 
 
 def main() -> None:
-    agents = [tomllib.loads(source.read_text()) for source in sorted(CODEX_AGENTS.glob("*.toml"))]
+    agents = [
+        tomllib.loads(source.read_text())
+        for source in sorted(CODEX_AGENTS.glob("*.toml"))
+        if source.is_file()
+    ]
     sync_target(CLAUDE_AGENTS, agents, claude_agent)
     sync_target(ANTIGRAVITY_AGENTS, agents, antigravity_agent)
 
