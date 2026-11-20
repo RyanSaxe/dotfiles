@@ -88,6 +88,11 @@ merges them into `~/.claude/settings.json`, `~/.codex/config.toml` and
 there itself. Deleting a setting from the module leaves it in the file, so
 delete it there by hand too.
 
+Rex and tmux take ctrl+k and alt+s before Antigravity CLI sees them, so each
+home switch also merges two key bindings into
+`~/.gemini/antigravity-cli/keybindings.json`: alt+k approves a waiting
+subagent, and alt+b opens the swarm board.
+
 ## Phone notifications
 
 `tools/notify-pushover.zsh` sends a [Pushover](https://pushover.net) push when
