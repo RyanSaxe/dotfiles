@@ -51,14 +51,16 @@ after the switches: Chrome's theme and the agents' sign-ins.
 There's no Linux machine yet, so CI builds its config on every push to keep it
 working until there is one.
 
-The steps match the Mac's, without Homebrew, Claude Code's installer or
-nix-darwin. The home switch installs Claude Code and Codex from nixpkgs,
-and runs Rex's server as a systemd user service.
+The steps match the Mac's, without Homebrew or nix-darwin. The home switch
+installs Codex from nixpkgs, installs Antigravity CLI on a personal computer
+from its official installer, and runs Rex's server as a systemd user service.
 
-1. Install Nix:
+1. Install Nix, and Claude Code on a computer with the `personal` role so it
+   uses the same self-updating release as the Mac:
 
    ```sh
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
+   curl -fsSL https://claude.ai/install.sh | bash   # only on a personal computer
    ```
 
 2. In a new terminal, clone the repository and make the age key:

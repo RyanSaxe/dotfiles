@@ -28,7 +28,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     enable = true;
     shellAliases = {
       home-switch = "home-manager switch --flake '${cfg.flake}#${cfg.user}@${cfg.host}'${live}";
-      nix-update = "nix flake update --flake '${cfg.flake}' && ${lib.optionalString isDarwin "mac-switch && "}home-switch && uv tool upgrade --all";
+      nix-update = "nix flake update --flake '${cfg.flake}' && ${lib.optionalString isDarwin "mac-switch && "}home-switch && uv tool upgrade --all${lib.optionalString (lib.elem "personal" cfg.roles) " && (command -v agy >/dev/null && agy update || true)"}";
     }
     // lib.optionalAttrs isDarwin {
       mac-switch = "sudo darwin-rebuild switch --flake '${cfg.flake}#${cfg.host}'${live}";

@@ -2,11 +2,12 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Writes a Claude Code agent in ~/.claude/agents for each Codex agent in
-~/.codex/agents, and removes the ones whose Codex agent is gone.
+"""Writes Claude Code agents in ~/.claude/agents and Antigravity agents in
+~/.gemini/config/agents for each Codex agent in ~/.codex/agents, and removes
+the ones whose Codex agent is gone.
 
-A file this script didn't write stays as it is, so an agent made for Claude
-by hand or by another installer wins over a Codex agent of the same name.
+A file this script didn't write stays as it is, so an agent made by hand or
+by another installer wins over a Codex agent of the same name.
 """
 
 import json
@@ -15,6 +16,7 @@ from pathlib import Path
 
 CODEX_AGENTS = Path.home() / ".codex" / "agents"
 CLAUDE_AGENTS = Path.home() / ".claude" / "agents"
+ANTIGRAVITY_AGENTS = Path.home() / ".gemini" / "config" / "agents"
 MARK = "# Written by convert-codex-agents.py from ~/.codex/agents/{name}.toml."
 
 
@@ -28,27 +30,43 @@ def claude_agent(name: str, description: str, instructions: str) -> str:
     )
 
 
+def antigravity_agent(name: str, description: str, instructions: str) -> str:
+    return (
+        f"---\n{MARK.format(name=name)}\n"
+        f"name: {json.dumps(name)}\n"
+        f"description: {json.dumps(description)}\n"
+        "mainAgent: true\n"
+        "subagent: true\n"
+        f"---\n\n{instructions.strip()}\n"
+    )
+
+
 def written_here(path: Path) -> bool:
     return path.read_text().startswith(f"---\n{MARK.format(name=path.stem)}\n")
 
 
-def main() -> None:
-    CLAUDE_AGENTS.mkdir(parents=True, exist_ok=True)
+def sync_target(target_dir: Path, agents: list[dict], render) -> None:
+    target_dir.mkdir(parents=True, exist_ok=True)
     converted = set()
-    for source in sorted(CODEX_AGENTS.glob("*.toml")):
-        agent = tomllib.loads(source.read_text())
+    for agent in agents:
         name = agent["name"]
-        target = CLAUDE_AGENTS / f"{name}.md"
+        target = target_dir / f"{name}.md"
         if target.exists() and not written_here(target):
             continue
-        text = claude_agent(name, agent["description"], agent["developer_instructions"])
+        text = render(name, agent["description"], agent["developer_instructions"])
         if not target.exists() or target.read_text() != text:
             target.write_text(text)
         converted.add(target)
 
-    for target in CLAUDE_AGENTS.glob("*.md"):
+    for target in target_dir.glob("*.md"):
         if target not in converted and written_here(target):
             target.unlink()
+
+
+def main() -> None:
+    agents = [tomllib.loads(source.read_text()) for source in sorted(CODEX_AGENTS.glob("*.toml"))]
+    sync_target(CLAUDE_AGENTS, agents, claude_agent)
+    sync_target(ANTIGRAVITY_AGENTS, agents, antigravity_agent)
 
 
 if __name__ == "__main__":

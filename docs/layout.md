@@ -40,12 +40,12 @@ flowchart LR
 | ------------ | ----------------------------------------------------- |
 | `base`       | The shell, editor, tools and agent settings           |
 | `gui`        | A Mac's window manager, bar, fonts, apps and settings |
-| `personal`   | Claude Code, Rex's settings and byor's rules          |
+| `personal`   | Claude Code, Antigravity CLI, Rex's settings and byor's rules |
 | `rex-server` | Rex's server, as a systemd user service               |
 
 Some modules also check a second role. `packages`, for example, adds fonts
-for `gui`, and pi, Antigravity CLI and Python for `personal`. The theme
-module applies on every computer.
+for `gui`, and pi and Python for `personal`. The theme module applies on every
+computer.
 
 Rex is the terminal, and tmux, with Ghostty on a Mac, is set up as well for
 a computer without Rex. It has the same keys and popups.

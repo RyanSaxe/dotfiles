@@ -9,10 +9,11 @@
 }:
 let
   has = role: lib.elem role config.dotfiles.roles;
-  # Linux installs the agents from nixpkgs, as modules/home/agents.nix says.
+  # Linux installs Codex from nixpkgs, as modules/home/agents.nix says, and
+  # self-updating CLIs (Claude Code, Antigravity CLI) live in ~/.local/bin.
   agentPath =
     if pkgs.stdenv.hostPlatform.isLinux then
-      "${config.home.path}/bin"
+      "$HOME/.local/bin:${config.home.path}/bin"
     else
       "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
 
@@ -101,10 +102,9 @@ in
     # JetBrains Mono built into it.
     ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals (has "personal") [
-      # pi, which pair's hub can wake, Antigravity's terminal agent `agy`,
-      # and the Python that `python3` runs.
+      # pi, which pair's hub can wake, and the Python that `python3` runs.
+      # Antigravity CLI installs and updates itself into ~/.local/bin.
       pkgs.pi-coding-agent
-      pkgs.antigravity-cli
       (pkgs.python312.withPackages (
         python: with python; [
           numpy
