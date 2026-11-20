@@ -34,7 +34,7 @@ command -v fdfind >/dev/null 2>&1 && alias fd='fdfind'
 
 
 # Quick edits
-alias zshrc='$EDITOR ~/.zshrc'
+alias zshrc='$EDITOR ~/.config/zsh/zshrc'
 
 # Network and system info
 alias myip='curl -s ipinfo.io/ip'
