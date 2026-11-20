@@ -74,6 +74,7 @@ in
       type = types.enum [
         "claude"
         "codex"
+        "agy"
       ];
       default = if lib.elem "personal" config.dotfiles.roles then "claude" else "codex";
       defaultText = lib.literalExpression ''if lib.elem "personal" config.dotfiles.roles then "claude" else "codex"'';

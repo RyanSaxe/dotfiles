@@ -52,7 +52,7 @@ func (c call) start() (start, error) {
 }
 
 var (
-	agentOption      = option{"agent", "claude|codex", "start this agent instead of the default"}
+	agentOption      = option{"agent", "claude|codex|agy", "start this agent instead of the default"}
 	promptOption     = option{"prompt", "TEXT", "the agent's first prompt"}
 	tabOption        = option{"tab", "", "open the worktree as a tab of its project's session, overriding the\nconfig's open_as"}
 	sessionOption    = option{"session", "", "open the worktree as a session of its own, overriding the config's\nopen_as"}
@@ -190,8 +190,9 @@ project's agent starts with the prompt "Set up this project". ws stops before it
 anything when the project's folder is taken, or a session of its name is running.
 
 ws trusts a new project, and a clone from an owner with repositories here, in Claude Code's
-~/.claude.json and Codex's ~/.codex/config.toml, so its agent starts without asking. Outside
-Rex and tmux, ws project only makes the project and prints its path.`,
+~/.claude.json, Codex's ~/.codex/config.toml and Antigravity's
+~/.gemini/antigravity-cli/settings.json, so its agent starts without asking. Outside Rex and
+tmux, ws project only makes the project and prints its path.`,
 		examples: []string{
 			"ws project notes --in ~/Projects",
 			"ws project junegunn/fzf --in ~/Projects",
@@ -302,12 +303,12 @@ tasks on its first Tasks tab. AeroSpace's Cmd-Alt-A, T and R run it.`,
 		name: "agent", group: "Settings",
 		line: "ws agent", summary: "print the agent ws starts, with its model and effort",
 		about: `Print the agent ws starts, which ~/.config/ws/config.toml names, then the model and effort
-its own settings give it: model and effortLevel in ~/.claude/settings.json for claude, and
-model and model_reasoning_effort in ~/.codex/config.toml for codex. home-switch writes the
-config from the host file's dotfiles.ws.agent, and the agents' settings from
-modules/home/agents.nix, so every session of the agent shares them. ws starts the agent with
-no flags of its own, and ws new and ws pr pass it the words after their --, which override
-its settings for that session.`,
+its own settings give it: model and effortLevel in ~/.claude/settings.json for claude,
+model and model_reasoning_effort in ~/.codex/config.toml for codex, and model (with any
+effort suffix) in ~/.gemini/antigravity-cli/settings.json for agy. home-switch writes ws's
+config from the host file's dotfiles.ws.agent, and Claude Code's and Codex's settings from
+modules/home/agents.nix. ws starts the agent with no flags of its own, and ws new and ws pr
+pass it the words after their --, which override its settings for that session.`,
 		examples: []string{"ws agent", "ws new fix-login -- --effort high"},
 		run: func(b mux.Backend, c call) error {
 			return printAgent()

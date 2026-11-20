@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -133,5 +136,58 @@ func TestTheInboxKeepsEachTabsKeys(t *testing.T) {
 	needs, _ := p.Load(needsYouTab, func([]popup.Row) {})
 	if len(needs) != 1 || needs[0].ID != "pr" {
 		t.Errorf("Needs you lists %v, want only the pull request", needs)
+	}
+}
+
+type showRecorder struct{ recorder }
+
+func (*showRecorder) Show(mux.Place) error { return nil }
+
+// Ctrl-T on a pull request opens a review tab using each configured agent's
+// prompt convention: -- for claude and codex, and -i for agy.
+func TestReviewAgentPassesPromptForConfiguredAgent(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		os.Unsetenv(v)
+	}
+	oldHome, oldRoot, oldInteractive := home, worktreeRoot, interactive
+	home, worktreeRoot, interactive = t.TempDir(), t.TempDir(), false
+	t.Cleanup(func() { home, worktreeRoot, interactive = oldHome, oldRoot, oldInteractive })
+	repo := filepath.Join(home, "repo")
+	if err := os.Mkdir(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "feature"},
+		{"remote", "add", "origin", "https://github.com/owner/repo.git"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+	} {
+		if _, err := git(repo, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	realRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	onPath(t, "gh", "echo feature https://github.com/owner/repo/pull/9")
+	it := item{Number: 9, Repo: "owner/repo", URL: "https://github.com/owner/repo/pull/9"}
+	snap := mux.Snapshot{
+		Sessions: []mux.Session{{ID: "session:repo", Label: "repo"}},
+		Panes:    []mux.Pane{{Session: "session:repo", Label: "repo", ID: "pane", Tab: "tab:1", Focused: true}},
+	}
+	for agent, wantFlag := range map[string]string{"claude": "--", "agy": "-i"} {
+		withConfig(t, agent, "tab")
+		b := &showRecorder{recorder{snapshot: snap}}
+		if err := reviewAgent(b, it); err != nil {
+			t.Fatalf("%s: %v", agent, err)
+		}
+		if len(b.tabs) != 1 || len(b.tabs[0]) != 5 || b.tabs[0][0] != "repo" || b.tabs[0][1] != realRepo ||
+			b.tabs[0][2] != agent || b.tabs[0][3] != wantFlag || !strings.Contains(b.tabs[0][4], it.URL) {
+			t.Errorf("%s opened tabs %q, want [repo %s %s %s <prompt with %s>]", agent, b.tabs, realRepo, agent, wantFlag, it.URL)
+		}
 	}
 }

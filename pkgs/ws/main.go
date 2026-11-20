@@ -40,7 +40,7 @@ var (
 var builtinLayouts = map[string]string{
 	"agent": `
 [[pane]]
-run = "{agent} -- {prompt}"
+run = "{agent} {prompt}"
 focus = true
 
 [[pane]]
@@ -121,7 +121,7 @@ func open(b mux.Backend, dir string, s start, needsPlace bool) error {
 		if err != nil {
 			return err
 		}
-		vars := map[string][]string{"{agent}": agent, "{prompt}": word(s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
+		vars := map[string][]string{"{agent}": agent, "{prompt}": agentPrompt(agent[0], s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
 		panes, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, vars)
 		if err != nil {
 			return err
@@ -213,7 +213,7 @@ func checkStart(s start) error {
 		return err
 	}
 	if s.agent != "" && !slices.Contains(agents, s.agent) {
-		return fmt.Errorf("%q is not an agent ws starts, which are %s", s.agent, strings.Join(agents, " and "))
+		return fmt.Errorf("%q is not an agent ws starts, which are %s", s.agent, agentNames())
 	}
 	_, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, nil)
 	return err
