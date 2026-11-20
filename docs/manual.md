@@ -25,6 +25,7 @@ Sign each agent in to its account:
 | Copilot CLI     | `copilot login`                 |
 | Antigravity CLI | `/login` inside `agy`           |
 
-Claude Code is only on computers that use Claude, and pi, Copilot CLI and
-Antigravity CLI only on computers with the `personal` role. Restart any pi that was running
-during the first home switch, so it loads pair's extension.
+Codex and Copilot CLI are on every computer. Claude Code, pi and
+Antigravity CLI are only on computers with the `personal` role. Restart any
+pi that was running during the first home switch, so it loads pair's
+extension.

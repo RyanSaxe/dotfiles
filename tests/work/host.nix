@@ -12,6 +12,5 @@
     flake = "/home/placeholder/generic/work-dotfiles";
     git.email = "placeholder@example.com";
     secretsFile = ./secrets.yaml;
-    claudeCode = false;
   };
 }

@@ -4,13 +4,12 @@ Global instructions, skills and hook scripts for Claude Code and Codex.
 `modules/home/agents.nix` puts them where each agent looks. Most are links
 into this checkout, so an edit applies at the agent's next session.
 
-On a Mac, Claude Code comes from its own installer and Codex from the
-Homebrew cask a Mac switch installs, and both update themselves. On Linux,
-the home switch installs Codex from nixpkgs, and Claude Code too on a
-computer with the `personal` role.
+Codex is on every computer, and Claude Code only on a computer with the
+`personal` role. On a Mac, Claude Code comes from its own installer and
+Codex from the Homebrew cask a Mac switch installs, and both update
+themselves. On Linux, the home switch installs both from nixpkgs.
 
-A computer without Claude Code sets `dotfiles.claudeCode = false` in its
-host file. Its switches then write nothing for Claude Code: no
+A computer without the `personal` role gets nothing for Claude Code: no
 `~/.claude` files or settings, no skills or agents linked for it, and no
 Claude Code theme or status line colors.
 
@@ -59,9 +58,10 @@ changes. Other tools install their own skills: pair's comes from pair's own
 `npx skills add RyanSaxe/pair -g`, which each home switch runs when the
 skill is missing, and byor and Rex install theirs.
 
-Computers with the `personal` role also get pi and Copilot CLI, two agents
-besides Claude Code and Codex that pair's hub can wake. Both read pair's
-skill from `~/.agents/skills`, as Codex does. Each home switch registers
+Every computer also gets Copilot CLI, and a computer with the `personal`
+role gets pi and Antigravity CLI too. pair's hub can wake Copilot CLI and
+pi, as it wakes Claude Code and Codex. Both read pair's skill from
+`~/.agents/skills`, as Codex does. Each home switch registers
 pair's pi extension from `~/.nix-profile`, a path that stays the same when
 pair updates. The `copilot` alias starts Copilot CLI with its UI server and
 access to pair's state folder, which pair needs.
@@ -69,8 +69,7 @@ access to pair's state folder, which pair needs.
 Each Claude Code, Codex and Copilot session registers with pair as it
 starts, so `pair agents` lists it and other agents can message it. Each home
 switch adds pair's hook to Claude Code's `SessionStart` list beside Rex's,
-and writes `~/.copilot/hooks/pair.json` on computers with the `personal`
-role. Codex runs `tools/pair-register.sh` as a managed hook.
+and writes `~/.copilot/hooks/pair.json`. Codex runs `tools/pair-register.sh` as a managed hook.
 
 Each agent's settings live in `modules/home/agents.nix`. Each home switch
 merges them into `~/.claude/settings.json` and `~/.codex/config.toml`, keeping

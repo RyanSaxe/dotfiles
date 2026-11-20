@@ -70,19 +70,13 @@ in
       description = "The Markdown vault that Neovim and ws read and write, or null for a computer without one.";
     };
 
-    claudeCode = mkOption {
-      type = types.bool;
-      default = true;
-      description = "Whether this computer has Claude Code. Without it, a switch writes none of Claude Code's files or settings.";
-    };
-
     ws.agent = mkOption {
       type = types.enum [
         "claude"
         "codex"
       ];
-      default = if config.dotfiles.claudeCode then "claude" else "codex";
-      defaultText = lib.literalExpression ''if config.dotfiles.claudeCode then "claude" else "codex"'';
+      default = if lib.elem "personal" config.dotfiles.roles then "claude" else "codex";
+      defaultText = lib.literalExpression ''if lib.elem "personal" config.dotfiles.roles then "claude" else "codex"'';
       description = "The agent CLI ws starts on this computer. Its model and effort are the CLI's own settings, which agents.nix sets.";
     };
 
