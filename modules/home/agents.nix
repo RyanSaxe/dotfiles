@@ -159,6 +159,21 @@ let
     ' "$hooks" > "$hooks.new"
     mv "$hooks.new" "$hooks"
   '';
+  # Rex and tmux take ctrl+k to move between panes and alt+s for the ws
+  # sessions picker, so those two Antigravity actions move to free keys.
+  # Antigravity writes its other defaults into the file itself.
+  agyKeybindings = pkgs.writeShellScript "agy-keybindings" ''
+    set -eu
+    jq=${pkgs.jq}/bin/jq
+    keybindings="$HOME/.gemini/antigravity-cli/keybindings.json"
+    mkdir -p "''${keybindings%/*}"
+    [ -s "$keybindings" ] || echo '{}' > "$keybindings"
+    "$jq" '
+      .["subagent.approve_fast"] = ["alt+k"]
+      | .["swarm.board"] = ["alt+b"]
+    ' "$keybindings" > "$keybindings.new"
+    mv "$keybindings.new" "$keybindings"
+  '';
 in
 lib.mkIf (lib.elem "base" cfg.roles) {
   home.packages = [ pair ];
@@ -357,6 +372,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     agyInstall = lib.hm.dag.entryAfter [ "writeBoundary" ] "run ${agyInstall}";
     agySettings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agySettings}";
     agyHooks = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyHooks}";
+    agyKeybindings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyKeybindings}";
     agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
       run /bin/sh ${linkSkills}
     '';
