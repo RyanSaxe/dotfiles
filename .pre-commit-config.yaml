@@ -49,8 +49,8 @@ repos:
         pass_filenames: false
 
       - id: prompt
-        name: pytest (prompt)
+        name: pytest (prompt and theme)
         entry: uv run --no-project --with pytest pytest -q tests/zsh
         language: system
-        files: ^(config/zsh/prompt-segments\.sh|tests/zsh/)
+        files: ^(config/zsh/prompt-segments\.sh|theme/theme\.sh|tests/zsh/)
         pass_filenames: false
