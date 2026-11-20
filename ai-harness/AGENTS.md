@@ -25,9 +25,9 @@ task at hand, and this file last.
 ## Writing code
 
 Before you write code, read
-`~/generic/dotfiles/ai-harness/references/development.md`. The references'
-examples are in Python, and the same ideas apply in any language. These
-rules apply to every change:
+`$DOTFILES/ai-harness/references/development.md`. The references' examples
+are in Python, and the same ideas apply in any language. These rules apply
+to every change:
 
 - Keep a change to what the task needs. Leave unrelated code, formatting and
   structure as they are, and don't add abstractions, options or error
@@ -43,8 +43,8 @@ rules apply to every change:
 ## Testing and checking
 
 Before writing or changing tests, read
-`~/generic/dotfiles/ai-harness/references/testing.md`. Before checking that
-work is done, read `~/generic/dotfiles/ai-harness/references/verification.md`.
+`$DOTFILES/ai-harness/references/testing.md`. Before checking that work is
+done, read `$DOTFILES/ai-harness/references/verification.md`.
 
 - Test behavior that matters, through the interface people use. Delete a
   test you wrote only to drive a tricky piece of code before the work is
@@ -102,8 +102,8 @@ message, and `pair agents` lists the sessions that are running.
 
 ## This computer
 
-`~/generic/dotfiles` sets up this computer with Nix, these instructions
-included. Read its AGENTS.md before you install a tool or change a setting.
+`$DOTFILES` sets up this computer with Nix, these instructions included.
+Read its AGENTS.md before you install a tool or change a setting.
 A general-purpose tool goes in through Nix there, not a global `brew`, `pip`
 or `npm` install, so every computer gets the same one. The dotfiles are
 public, so private and internal tools never go in them. Install a tool that
