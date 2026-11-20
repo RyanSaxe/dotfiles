@@ -73,8 +73,9 @@ of its own, and only reads those settings for `ws agent`.
 
 Outside its own files, `ws project` writes the agents' trust for a project
 it made: `hasTrustDialogAccepted` in `~/.claude.json`, under the lock Claude
-Code takes on that file, and `trust_level` in `~/.codex/config.toml`. Each
-write reads the file and swaps the whole new file in.
+Code takes on that file, `trust_level` in `~/.codex/config.toml`, and
+`trustedWorkspaces` in `~/.gemini/antigravity-cli/settings.json`. Each write
+reads the file and swaps the whole new file in.
 
 ## Rules
 

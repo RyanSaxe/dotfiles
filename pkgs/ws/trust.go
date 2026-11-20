@@ -9,22 +9,26 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/BurntSushi/toml"
 )
 
 // trustFolder records root, a folder's real path, as trusted in Claude
-// Code's and Codex's configs, so an agent starts there without asking
-// first. A CLI without a config file has never run on this computer, and is
-// left alone.
+// Code's, Codex's and Antigravity's configs, so an agent starts there
+// without asking first. A CLI without a config file has never run on this
+// computer, and is left alone.
 func trustFolder(root string) error {
 	claude := filepath.Join(cmp.Or(os.Getenv("CLAUDE_CONFIG_DIR"), home), ".claude.json")
 	if err := trustInClaude(claude, root); err != nil {
 		return err
 	}
 	codex := filepath.Join(cmp.Or(os.Getenv("CODEX_HOME"), filepath.Join(home, ".codex")), "config.toml")
-	return trustInCodex(codex, root)
+	if err := trustInCodex(codex, root); err != nil {
+		return err
+	}
+	return trustInAntigravity(antigravitySettings(), root)
 }
 
 // trustInClaude sets projects[root].hasTrustDialogAccepted in Claude Code's
@@ -127,6 +131,38 @@ func trustInCodex(file, root string) error {
 		return err
 	}
 	return replaceFile(file, out.Bytes())
+}
+
+// trustInAntigravity appends root to trustedWorkspaces in Antigravity's
+// settings.json, leaving every other setting as Antigravity wrote it.
+func trustInAntigravity(file, root string) error {
+	data, err := os.ReadFile(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	config, err := object(data)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", tilde(file), err)
+	}
+	var trusted []string
+	if raw := config["trustedWorkspaces"]; len(raw) > 0 {
+		if err := json.Unmarshal(raw, &trusted); err != nil {
+			return fmt.Errorf("reading %s's trustedWorkspaces: %w", tilde(file), err)
+		}
+	}
+	if slices.Contains(trusted, root) {
+		return nil
+	}
+	if config["trustedWorkspaces"], err = encodeJSON(append(trusted, root), ""); err != nil {
+		return err
+	}
+	out, err := encodeJSON(config, "  ")
+	if err != nil {
+		return err
+	}
+	return replaceFile(file, append(out, '\n'))
 }
 
 // lockBeside takes the lock proper-lockfile keeps for file: the folder

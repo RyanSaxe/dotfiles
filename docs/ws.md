@@ -64,9 +64,10 @@ leaves the project's session open.
 
 Each computer's host file sets ws's settings under `dotfiles.ws`, and
 `home-switch` writes them to `~/.config/ws/config.toml`. `agent` is the
-agent CLI ws starts, claude or codex. It defaults to claude on a computer
-with Claude Code and to codex otherwise. `openAs`, `open_as` in the TOML,
-is where a worktree opens, `tab` or `session`, as [Places](#places) says:
+agent CLI ws starts: `claude`, `codex` or `agy`. It defaults to `claude`
+on a computer with Claude Code and to `codex` otherwise. `openAs`,
+`open_as` in the TOML, is where a worktree opens, `tab` or `session`, as
+[Places](#places) says:
 
 ```nix
 dotfiles.ws = {
@@ -75,11 +76,12 @@ dotfiles.ws = {
 };
 ```
 
-ws starts the agent with no flags of its own, so its model and effort are
-the agent's own settings, which every session of it shares and
-`modules/home/agents.nix` sets: `model` and `effortLevel` in
-`~/.claude/settings.json` for Claude Code, and `model` and
-`model_reasoning_effort` in `~/.codex/config.toml` for Codex. `ws agent`
+ws starts the agent with no flags of its own, so its model and effort come
+from the agent's own settings, which every session of it shares: `model` and
+`effortLevel` in `~/.claude/settings.json` for Claude Code, `model` and
+`model_reasoning_effort` in `~/.codex/config.toml` for Codex (both written
+by `modules/home/agents.nix`), and `model` (with any effort suffix) in
+`~/.gemini/antigravity-cli/settings.json` for Antigravity. `ws agent`
 prints them. `ws new` and `ws pr` pass the words after `--` to the agent,
 which override its settings for that session:
 
@@ -116,10 +118,12 @@ anything.
 
 ws trusts a new project, and a clone from an owner with repositories here,
 so its agent starts without asking. It sets `hasTrustDialogAccepted` in
-`~/.claude.json`, under the lock Claude Code takes on that file, and
-`trust_level = "trusted"` in `~/.codex/config.toml`. A clone from an owner
-with nothing here still asks. A worktree needs nothing, since both CLIs
-trust it through its main checkout.
+`~/.claude.json`, under the lock Claude Code takes on that file,
+`trust_level = "trusted"` in `~/.codex/config.toml`, and adds the folder
+to `trustedWorkspaces` in `~/.gemini/antigravity-cli/settings.json`. A
+clone from an owner with nothing here still asks. Claude Code and Codex
+trust a worktree through its main checkout; Antigravity trusts each folder
+path directly.
 
 ## Layouts
 
@@ -128,7 +132,7 @@ A layout is the panes a new session opens with. `--layout NAME` reads
 
 ```toml
 [[pane]]
-run = "{agent} -- {prompt}"
+run = "{agent} {prompt}"
 focus = true
 
 [[pane]]
@@ -137,11 +141,13 @@ size = 35         # percent of the space
 ```
 
 `run` can use `{agent}`, `{prompt}`, `{pr}`, `{file}`, `{dir}` and
-`{name}`. `{agent}` is the agent and its flags, and the `--` after it keeps
-a flag that takes several values, such as claude's `--add-dir`, from taking
-the prompt as one of them. The built-in `review` layout runs
-`nvim gh://{pr}`, and the built-in `file` layout runs `nvim {file}`, which
-the files popup starts a folder's session with.
+`{name}`. `{agent}` is the agent and its flags. `{prompt}` is the prompt in
+the form that agent takes: `-- PROMPT` for Claude Code and Codex, so a flag
+that takes several values such as Claude Code's `--add-dir` doesn't swallow
+the prompt, and `-i PROMPT` for Antigravity, or nothing when there is no
+prompt. The built-in `review` layout runs `nvim gh://{pr}`, and the
+built-in `file` layout runs `nvim {file}`, which the files popup starts a
+folder's session with.
 
 ## Popups
 
@@ -229,8 +235,8 @@ each the one that has needed you longest first. When no agent needs you,
 it cycles through every agent. `ws` reads what each multiplexer already
 tracks:
 
-- **tmux:** an agent is a pane where Claude Code, Codex, pi, Copilot CLI or
-  opencode runs, however it started. `ws` finds those programs in the
+- **tmux:** an agent is a pane where Claude Code, Codex, Antigravity, pi or
+  Copilot CLI runs, however it started. `ws` finds those programs in the
   process table each time it looks. An agent needs you once its
   window's bell rings while no client shows the window, until a client
   switches to it, so a bell you saw marks nothing. Claude Code and Codex

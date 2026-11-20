@@ -24,8 +24,8 @@ whether it runs in Rex, in tmux or in neither by itself.
 ws new NAME --agent claude --prompt "…"
 ```
 
-- Start the same agent you are. Claude Code starts `claude` and Codex starts
-  `codex`, unless the user names another.
+- Start the same agent you are: Claude Code starts `claude`, Codex starts
+  `codex` and Antigravity starts `agy`, unless the user names another.
 - NAME becomes the branch and the folder. Use a short kebab-case name for the
   change.
 - The prompt is the agent's whole brief: the goal, the files to read, what is

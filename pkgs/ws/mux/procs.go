@@ -36,7 +36,7 @@ func (t processTree) runsAgent(pid int) bool {
 }
 
 // agentCLIs are the names agent CLIs run as.
-var agentCLIs = []string{"claude", "codex", "pi", "opencode"}
+var agentCLIs = []string{"claude", "codex", "agy", "pi"}
 
 // isAgent says whether a command line runs an agent CLI. Copilot CLI runs
 // as node, with the script from the folder nixpkgs installs it in. Neovim's

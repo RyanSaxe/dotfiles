@@ -40,24 +40,38 @@ func withConfig(t *testing.T, agent, openAs string) {
 // ws agent reports the agent the config names, with the model and effort
 // that agent's own settings give it.
 func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
-	settings := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", settings)
-	t.Setenv("CODEX_HOME", settings)
-	for name, text := range map[string]string{
-		"settings.json": `{"model": "opus[1m]", "effortLevel": "medium", "theme": "dark"}`,
-		"config.toml":   "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"high\"\n",
+	claudeDir, codexDir, agyDir := t.TempDir(), t.TempDir(), t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claudeDir)
+	t.Setenv("CODEX_HOME", codexDir)
+	t.Setenv("ANTIGRAVITY_APP_DATA_DIR", agyDir)
+	for path, text := range map[string]string{
+		filepath.Join(claudeDir, "settings.json"): `{"model": "opus[1m]", "effortLevel": "medium", "theme": "dark"}`,
+		filepath.Join(codexDir, "config.toml"):    "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"high\"\n",
+		filepath.Join(agyDir, "settings.json"):    `{"model": "Gemini 4 Neon (High)", "theme": "dark"}`,
 	} {
-		if err := os.WriteFile(filepath.Join(settings, name), []byte(text), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for agent, want := range map[string]string{"claude": "opus[1m] medium", "codex": "gpt-6.1-sol high"} {
+	for agent, want := range map[string]string{
+		"claude": "opus[1m] medium",
+		"codex":  "gpt-6.1-sol high",
+		"agy":    "Gemini 4 Neon high",
+	} {
 		withConfig(t, agent, "tab")
 		named, err := defaultAgent()
 		model, effort, settingsErr := agentSettings(named)
 		if got := model + " " + effort; err != nil || settingsErr != nil || named != agent || got != want {
 			t.Errorf("with %s configured: got %s with %s (%v, %v), want %s", agent, named, got, err, settingsErr, want)
 		}
+	}
+	// An Antigravity model whose parenthesized suffix is not an effort level
+	// keeps its full label with no effort.
+	if err := os.WriteFile(filepath.Join(agyDir, "settings.json"), []byte(`{"model": "Orchestrator (Neon)"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if model, effort, err := agentSettings("agy"); err != nil || model != "Orchestrator (Neon)" || effort != "" {
+		t.Errorf("with Orchestrator (Neon): got %q %q (%v), want %q %q", model, effort, err, "Orchestrator (Neon)", "")
 	}
 	withConfig(t, "", "")
 	if _, err := defaultAgent(); err == nil {
@@ -70,9 +84,10 @@ func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
 func TestPopupAnswerNamesAnAgentOrFlags(t *testing.T) {
 	withConfig(t, "claude", "tab")
 	for answer, want := range map[string]string{
-		"":             "claude",
-		"codex":        "codex",
-		"--model opus": "claude --model opus",
+		"":                  "claude",
+		"codex":             "codex",
+		"agy --effort high": "agy --effort high",
+		"--model opus":      "claude --model opus",
 		`claude --append-system-prompt "be brief"`: "claude --append-system-prompt 'be brief'",
 	} {
 		s, err := startFromAnswer(answer)
@@ -187,9 +202,9 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 	oldRoot, oldState, oldInteractive := worktreeRoot, stateDir, interactive
 	worktreeRoot, stateDir, interactive = t.TempDir(), t.TempDir(), false
 	t.Cleanup(func() { worktreeRoot, stateDir, interactive = oldRoot, oldState, oldInteractive })
-	// gh shows pull request 5 on the branch feature, and its checkout does
+	// gh shows pull request N on a branch of its own, and its checkout does
 	// nothing.
-	onPath(t, "gh", "echo feature https://github.com/o/r/pull/5")
+	onPath(t, "gh", `echo "feature-$3 https://github.com/o/r/pull/$3"`)
 	withConfig(t, "claude", "tab")
 	for _, tc := range []struct {
 		words []string
@@ -197,8 +212,11 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 	}{
 		{[]string{"new", "fix-login", "--agent", "codex", "--prompt", "fix it", "--", "-m", "gpt-6.1-sol"}, "codex -m gpt-6.1-sol -- 'fix it'"},
 		{[]string{"pr", "--prompt", "fix it", "5", "--agent", "codex", "--", "-m", "gpt-6.1-sol"}, "codex -m gpt-6.1-sol -- 'fix it'"},
-		{[]string{"new", "plain"}, "claude --"},
-		{[]string{"new", "harder", "--", "--effort", "high"}, "claude --effort high --"},
+		{[]string{"new", "fix-agy", "--agent", "agy", "--prompt", "fix it", "--", "--effort", "high"}, "agy --effort high -i 'fix it'"},
+		{[]string{"pr", "--prompt", "fix it", "6", "--agent", "agy", "--", "--effort", "high"}, "agy --effort high -i 'fix it'"},
+		{[]string{"new", "plain-agy", "--agent", "agy"}, "agy"},
+		{[]string{"new", "plain"}, "claude"},
+		{[]string{"new", "harder", "--", "--effort", "high"}, "claude --effort high"},
 	} {
 		b := &recorder{}
 		err := run(tc.words[0], tc.words[1:], func(string) mux.Backend { return b })
@@ -390,28 +408,29 @@ func TestDeleteBranchAsksGitHubAboutUnmergedBranches(t *testing.T) {
 }
 
 // An agent option that takes several values, such as claude's --add-dir,
-// takes every word after it that isn't an option, so the agent layout ends
-// the options before the prompt.
+// takes every word after it that isn't an option, so claude and codex end
+// their options with -- before a prompt, while agy passes it with -i.
 func TestAgentLayoutKeepsThePromptOutOfTheFlags(t *testing.T) {
 	zsh, err := exec.LookPath("zsh")
 	if err != nil {
 		t.Skip("zsh is not installed")
 	}
-	for prompt, want := range map[string]string{
-		"fix the bug": "[--add-dir][/notes][--][fix the bug]",
-		"":            "[--add-dir][/notes][--]",
+	for _, tc := range []struct {
+		agent, prompt, want string
+	}{
+		{"claude", "fix the bug", "[--add-dir][/notes][--][fix the bug]"},
+		{"claude", "", "[--add-dir][/notes]"},
+		{"agy", "fix the bug", "[--add-dir][/notes][-i][fix the bug]"},
+		{"agy", "", "[--add-dir][/notes]"},
 	} {
-		vars := map[string][]string{"{agent}": {"claude", "--add-dir", "/notes"}, "{prompt}": nil}
-		if prompt != "" {
-			vars["{prompt}"] = []string{prompt}
-		}
+		vars := map[string][]string{"{agent}": {tc.agent, "--add-dir", "/notes"}, "{prompt}": agentPrompt(tc.agent, tc.prompt)}
 		panes, err := layout.Load(t.TempDir(), "agent", builtinLayouts, vars)
 		if err != nil {
 			t.Fatal(err)
 		}
-		out, err := exec.Command(zsh, "-f", "-c", `claude() { printf '[%s]' "$@" }; `+panes[0].Run).Output()
-		if err != nil || string(out) != want {
-			t.Errorf("prompt %q: claude got %s (%v), want %s", prompt, out, err, want)
+		out, err := exec.Command(zsh, "-f", "-c", tc.agent+`() { printf '[%s]' "$@" }; `+panes[0].Run).Output()
+		if err != nil || string(out) != tc.want {
+			t.Errorf("%s prompt %q: got %s (%v), want %s", tc.agent, tc.prompt, out, err, tc.want)
 		}
 	}
 }

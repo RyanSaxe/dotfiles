@@ -33,7 +33,7 @@ func loadConfig() (config, error) {
 		return c, fmt.Errorf("reading ws's config, which home-switch writes: %w", err)
 	}
 	if !slices.Contains(agents, c.Agent) {
-		return c, fmt.Errorf("%s names the agent %q, and ws starts only %s", path, c.Agent, strings.Join(agents, " and "))
+		return c, fmt.Errorf("%s names the agent %q, and ws starts only %s", path, c.Agent, agentNames())
 	}
 	if c.OpenAs != "tab" && c.OpenAs != "session" {
 		return c, fmt.Errorf("%s says open_as %q, which is neither tab nor session", path, c.OpenAs)
@@ -42,7 +42,12 @@ func loadConfig() (config, error) {
 }
 
 // agents are the programs ws starts as an agent.
-var agents = []string{"claude", "codex"}
+var agents = []string{"claude", "codex", "agy"}
+
+// agentNames lists agents as prose, such as "claude, codex and agy".
+func agentNames() string {
+	return strings.Join(agents[:len(agents)-1], ", ") + " and " + agents[len(agents)-1]
+}
 
 // defaultAgent is the agent the config names, which ws starts when a
 // command names none.
@@ -64,10 +69,44 @@ func agentCommand(agent string, flags []string) ([]string, error) {
 	return append([]string{agent}, flags...), nil
 }
 
+// agentPrompt is the words that pass prompt to agent, or nil when prompt is
+// empty. claude and codex take a positional prompt, after -- so a flag that
+// takes several values, such as claude's --add-dir, doesn't take the prompt
+// as one of them; agy takes an interactive prompt with -i.
+func agentPrompt(agent, prompt string) []string {
+	if prompt == "" {
+		return nil
+	}
+	if agent == "agy" {
+		return []string{"-i", prompt}
+	}
+	return []string{"--", prompt}
+}
+
+// antigravitySettings is Antigravity's settings.json, moved by
+// ANTIGRAVITY_APP_DATA_DIR when set.
+func antigravitySettings() string {
+	return filepath.Join(cmp.Or(os.Getenv("ANTIGRAVITY_APP_DATA_DIR"), filepath.Join(home, ".gemini", "antigravity-cli")), "settings.json")
+}
+
+// splitAgyModel splits an Antigravity model label such as
+// "Gemini 4 Neon (High)" into its model name and effort level when the
+// parenthesized suffix is one of agy's effort levels.
+func splitAgyModel(label string) (model, effort string) {
+	if i := strings.LastIndex(label, " ("); i > 0 && strings.HasSuffix(label, ")") {
+		level := strings.ToLower(label[i+2 : len(label)-1])
+		if slices.Contains([]string{"low", "medium", "high", "xhigh", "max"}, level) {
+			return label[:i], level
+		}
+	}
+	return label, ""
+}
+
 // agentSettings is the model and effort an agent's own settings give it,
-// "" for each one they leave unset: claude's in ~/.claude/settings.json and
-// codex's in ~/.codex/config.toml. CLAUDE_CONFIG_DIR and CODEX_HOME move
-// them, as they do for the agents.
+// "" for each one they leave unset: claude's in ~/.claude/settings.json,
+// codex's in ~/.codex/config.toml and agy's in
+// ~/.gemini/antigravity-cli/settings.json. CLAUDE_CONFIG_DIR, CODEX_HOME
+// and ANTIGRAVITY_APP_DATA_DIR override their folders.
 func agentSettings(agent string) (model, effort string, err error) {
 	switch agent {
 	case "claude":
@@ -88,6 +127,16 @@ func agentSettings(agent string) (model, effort string, err error) {
 		}
 		_, err = toml.DecodeFile(filepath.Join(cmp.Or(os.Getenv("CODEX_HOME"), filepath.Join(home, ".codex")), "config.toml"), &s)
 		model, effort = s.Model, s.Effort
+	case "agy":
+		var s struct {
+			Model string `json:"model"`
+		}
+		var data []byte
+		data, err = os.ReadFile(antigravitySettings())
+		if err == nil {
+			err = json.Unmarshal(data, &s)
+		}
+		model, effort = splitAgyModel(s.Model)
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		err = nil

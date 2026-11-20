@@ -71,35 +71,47 @@ func TestATmuxSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmux("new-session", "-d", "-s", "api", "-c", work)
-	// The agent is tmux run through a link named claude, since ws knows an
-	// agent by the name it runs as, waiting on a channel nothing signals.
-	// macOS kills a copy of a system program, and nixpkgs' sleep is a link
-	// to coreutils, which picks its command by that name.
+	// The agents are tmux run through links named claude and agy, since ws
+	// knows an agent by the name it runs as, waiting on a channel nothing
+	// signals. opencode is no longer counted as an agent. macOS kills a copy
+	// of a system program, and nixpkgs' sleep is a link to coreutils, which
+	// picks its command by that name.
 	program, err := exec.LookPath("tmux")
-	claude := filepath.Join(dir, "claude")
-	if err == nil {
-		err = os.Symlink(program, claude)
-	}
 	if err != nil {
 		t.Fatal(err)
 	}
+	link := func(name string) string {
+		path := filepath.Join(dir, name)
+		if err := os.Symlink(program, path); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	claude, agy, opencode := link("claude"), link("agy"), link("opencode")
 	// The agent runs in a tab named after a worktree, beside a tab nobody
 	// named.
 	agent := tmux("new-window", "-d", "-t", "api:", "-n", "api/feature", "-c", work, "-P", "-F", "#{pane_id}",
 		`printf '\a'; exec `+claude+` -S `+socket+` wait-for never`)
 	tmux("split-window", "-d", "-t", agent, "-c", work)
+	agyPane := tmux("new-window", "-d", "-t", "api:", "-n", "api/agy", "-c", work, "-P", "-F", "#{pane_id}",
+		`exec `+agy+` -S `+socket+` wait-for never`)
 	tmux("new-session", "-d", "-s", "web", "-c", work)
-	// A tab named after no worktree stays part of its session.
-	tmux("new-window", "-d", "-t", "web:", "-n", "logs", "-c", work)
+	// A tab named after no worktree stays part of its session, and opencode
+	// does not count as an agent.
+	tmux("new-window", "-d", "-t", "web:", "-n", "logs", "-c", work,
+		`exec `+opencode+` -S `+socket+` wait-for never`)
 
-	// tmux reads the bell from the pane's output a moment after it rings.
+	// tmux reads the bell from the pane's output a moment after it rings, and
+	// the agy pane's shell needs a moment to exec agy.
 	backend := mux.Detect(func(string) string { return "" }, "")
 	var s mux.Snapshot
 	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(50 * time.Millisecond) {
 		if s, err = backend.Snapshot(); err != nil {
 			t.Fatal(err)
 		}
-		if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.NeedsYou }) || time.Now().After(deadline) {
+		rang := slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.NeedsYou })
+		agyUp := slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agyPane && p.Status != mux.Open })
+		if (rang && agyUp) || time.Now().After(deadline) {
 			break
 		}
 	}
@@ -114,7 +126,7 @@ func TestATmuxSnapshot(t *testing.T) {
 	for _, p := range s.Places() {
 		places = append(places, p.Label)
 	}
-	if want := []string{"api", "api/feature", "web"}; !slices.Equal(places, want) {
+	if want := []string{"api", "api/feature", "api/agy", "web"}; !slices.Equal(places, want) {
 		t.Errorf("the places are %v, want %v", places, want)
 	}
 	api, _ := s.Find("api")
@@ -136,11 +148,14 @@ func TestATmuxSnapshot(t *testing.T) {
 	if p := s.Panes[i]; !p.NeedsYou || p.Status != mux.Working {
 		t.Errorf("the agent that just rang reads %v, needing you %v, want working and needing you", p.Status, p.NeedsYou)
 	}
-	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID != agent && (p.NeedsYou || p.Status != mux.Open) }) {
+	if j := slices.IndexFunc(s.Panes, func(p mux.Pane) bool { return p.ID == agyPane }); j < 0 || s.Panes[j].Status == mux.Open {
+		t.Errorf("the agy pane %s wasn't counted as an agent in %+v", agyPane, s.Panes)
+	}
+	if slices.ContainsFunc(s.Panes, func(p mux.Pane) bool { return p.ID != agent && p.ID != agyPane && (p.NeedsYou || p.Status != mux.Open) }) {
 		t.Errorf("a pane with no agent reports something in %+v", s.Panes)
 	}
-	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Open, "api/feature": mux.Working, "web": mux.Open}) {
-		t.Errorf("the statuses are %v, want api/feature working, and api and web open", got)
+	if got := s.Statuses(); !maps.Equal(got, map[string]mux.Status{"api": mux.Open, "api/agy": mux.Working, "api/feature": mux.Working, "web": mux.Open}) {
+		t.Errorf("the statuses are %v, want api/agy and api/feature working, and api and web open", got)
 	}
 }
 

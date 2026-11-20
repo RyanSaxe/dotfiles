@@ -80,6 +80,7 @@ in
       type = types.enum [
         "claude"
         "codex"
+        "agy"
       ];
       default = if config.dotfiles.claudeCode then "claude" else "codex";
       defaultText = lib.literalExpression ''if config.dotfiles.claudeCode then "claude" else "codex"'';
