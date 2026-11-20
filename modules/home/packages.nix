@@ -76,6 +76,10 @@ in
         age
         sops
 
+        # The agent besides Codex that every computer has, which pair's hub
+        # can wake.
+        github-copilot-cli
+
         # What snacks.nvim draws a note's pictures, diagrams and math with:
         # ImageMagick for every picture, in the build that reads PDFs, and
         # LaTeX with the packages its math template loads.
@@ -97,11 +101,9 @@ in
     # JetBrains Mono built into it.
     ++ lib.optionals (has "gui") [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals (has "personal") [
-      # Two agents besides Claude Code and Codex that pair's hub can wake,
-      # Antigravity's terminal agent `agy`, and the Python that `python3`
-      # runs.
+      # pi, which pair's hub can wake, Antigravity's terminal agent `agy`,
+      # and the Python that `python3` runs.
       pkgs.pi-coding-agent
-      pkgs.github-copilot-cli
       pkgs.antigravity-cli
       (pkgs.python312.withPackages (
         python: with python; [
@@ -124,11 +126,11 @@ in
         if ! ${pkgs.uv}/bin/uv tool list 2>/dev/null | grep -q "^$tool "; then
           run ${pkgs.uv}/bin/uv tool install "$tool"
           if [ "$tool" = byor ]; then
-            # Only the agents this computer has, since Claude isn't allowed on
-            # every one. The switch's own PATH has none of their folders.
+            # Only the agents this computer has, since Claude is only on a
+            # personal one. The switch's own PATH has none of their folders.
             has() { PATH="${agentPath}" command -v "$1" > /dev/null; }
             agents=skill
-            ${lib.optionalString config.dotfiles.claudeCode ''has claude && agents="$agents,claude-code"''}
+            ${lib.optionalString (has "personal") ''has claude && agents="$agents,claude-code"''}
             has codex && agents="$agents,codex"
             run "$HOME/.local/bin/byor" install --agents "$agents" < /dev/null
           fi

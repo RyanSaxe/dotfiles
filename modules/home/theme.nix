@@ -21,9 +21,10 @@ let
   # its host turns it off.
   desktopPicture = lib.elem "gui" cfg.roles && cfg.desktopPicture;
   # What a computer leaves out: Claude Code's theme and status line colors
-  # without Claude Code, and the picture's colors without a picture.
+  # without Claude Code, which only a personal computer has, and the
+  # picture's colors without a picture.
   absent =
-    lib.optionals (!cfg.claudeCode) [
+    lib.optionals (!lib.elem "personal" cfg.roles) [
       "claude-theme.json"
       "ai-statusline-colors.js"
     ]

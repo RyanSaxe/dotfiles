@@ -6,15 +6,15 @@ file expects it. These steps set up the two computers `flake.nix` lists,
 
 ## A Mac
 
-1. Install Nix and Homebrew, and Claude Code on a computer that uses
-   Claude. The Mac switch installs apps through Homebrew but can't install
+1. Install Nix and Homebrew, and Claude Code on a computer with the
+   `personal` role. The Mac switch installs apps through Homebrew but can't install
    Homebrew itself. Claude Code goes before the first home switch, so that
    the switch sets byor and pair up for it.
 
    ```sh
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   curl -fsSL https://claude.ai/install.sh | bash   # only on a computer that uses Claude
+   curl -fsSL https://claude.ai/install.sh | bash   # only on a personal computer
    ```
 
 2. In a new terminal, so that `nix` is on the PATH, clone the repository
@@ -170,7 +170,6 @@ computer's configs with `lib.mac` and `lib.home`:
     flake = "/Users/ACCOUNT/generic/work-dotfiles"; # this flake's folder
     git.email = "EMAIL";
     secretsFile = ./secrets.yaml;
-    claudeCode = false; # this computer has no Claude Code
     desktopPicture = false; # its desktop picture is managed elsewhere
     vault = {
       dir = "/Users/ACCOUNT/generic/vault";
