@@ -20,13 +20,14 @@ let
   # A computer with a screen gets a desktop picture for each mode, unless
   # its host turns it off.
   desktopPicture = lib.elem "gui" cfg.roles && cfg.desktopPicture;
-  # What a computer leaves out: Claude Code's theme and status line colors
-  # without Claude Code, which only a personal computer has, and the
-  # picture's colors without a picture.
+  # What a computer leaves out: Claude Code's, Antigravity's and pi's theme
+  # files without the personal role, and the picture's colors without a
+  # picture.
   absent =
     lib.optionals (!lib.elem "personal" cfg.roles) [
       "claude-theme.json"
       "ai-statusline-colors.js"
+      "pi-theme.json"
     ]
     ++ lib.optional (!desktopPicture) "desktop.json";
   files =
