@@ -17,13 +17,14 @@ computer needs them once, after [setup](setup.md).
 
 Sign each agent in to its account:
 
-| Agent       | Sign in with                    |
-| ----------- | ------------------------------- |
-| Claude Code | `/login` inside `claude`        |
-| Codex       | `codex login`                   |
-| pi          | `/login` inside `pi`            |
-| Copilot CLI | `copilot login`                 |
+| Agent           | Sign in with                    |
+| --------------- | ------------------------------- |
+| Claude Code     | `/login` inside `claude`        |
+| Codex           | `codex login`                   |
+| pi              | `/login` inside `pi`            |
+| Copilot CLI     | `copilot login`                 |
+| Antigravity CLI | `/login` inside `agy`           |
 
-Claude Code is only on computers that use Claude, and pi and Copilot CLI
-only on computers with the `personal` role. Restart any pi that was running
+Claude Code is only on computers that use Claude, and pi, Copilot CLI and
+Antigravity CLI only on computers with the `personal` role. Restart any pi that was running
 during the first home switch, so it loads pair's extension.

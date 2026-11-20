@@ -57,7 +57,7 @@
         "x86_64-linux"
       ];
       # The only unfree packages: Claude Code, which Linux installs from
-      # nixpkgs, and Copilot CLI.
+      # nixpkgs, Copilot CLI and Antigravity CLI.
       pkgsFor =
         system:
         import nixpkgs {
@@ -67,6 +67,7 @@
             builtins.elem (nixpkgs.lib.getName pkg) [
               "claude-code"
               "github-copilot-cli"
+              "antigravity-cli"
             ];
         };
       specialArgs = { inherit inputs; };
