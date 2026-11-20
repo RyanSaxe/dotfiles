@@ -1,10 +1,11 @@
-# Claude Code and Codex. Codex is on every computer, and Claude Code only
-# on a personal one: a computer without the personal role gets none of
-# Claude Code's files or settings. On a Mac both install and update
-# themselves, so their modules have no package, and Linux installs them
-# from nixpkgs. Either way the modules only merge settings into each
-# agent's own file, keeping whatever the agent writes there itself. Skills
-# from other installers, such as byor, Rex and pair, stay with those tools.
+# Claude Code, Codex and Antigravity CLI. Codex is on every computer, and
+# Claude Code and Antigravity CLI only on a personal one: a computer without
+# the personal role gets none of their files or settings. Claude Code and
+# Antigravity CLI install and update themselves on both macOS and Linux, and
+# Codex updates itself from its Homebrew cask on a Mac and comes from nixpkgs
+# on Linux. Either way the modules only merge settings into each agent's own
+# file, keeping whatever the agent writes there itself. Skills from other
+# installers, such as byor, Rex and pair, stay with those tools.
 {
   config,
   lib,
@@ -24,7 +25,10 @@ let
   hasRex = (personal && isDarwin) || lib.elem "rex-server" cfg.roles;
   # Where the agents' commands are, which the switch's own PATH leaves out.
   agentPath =
-    if isLinux then "${config.home.path}/bin" else "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
+    if isLinux then
+      "$HOME/.local/bin:${config.home.path}/bin"
+    else
+      "$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin";
   linkSkills = "${cfg.repo}/ai-harness/tools/link-agent-skills.sh";
   convertAgents = [
     "${pkgs.uv}/bin/uv"
@@ -105,6 +109,50 @@ let
         }
       ];
     };
+
+  # Antigravity CLI writes its own runtime state (such as trustedWorkspaces)
+  # into settings.json, so the switch merges only our managed keys.
+  agyInstall = pkgs.writeShellScript "agy-install" ''
+    set -eu
+    if [ ! -x "$HOME/.local/bin/agy" ]; then
+      PATH="${pkgs.curl}/bin:${pkgs.bash}/bin:$PATH" \
+        ${pkgs.curl}/bin/curl -fsSL https://antigravity.google/cli/install.sh | ${pkgs.bash}/bin/bash
+    fi
+  '';
+  agySettings = pkgs.writeShellScript "agy-settings" ''
+    set -eu
+    jq=${pkgs.jq}/bin/jq
+    settings="$HOME/.gemini/antigravity-cli/settings.json"
+    mkdir -p "''${settings%/*}"
+    [ -s "$settings" ] || echo '{}' > "$settings"
+    "$jq" \
+      --arg statusline "$HOME/.gemini/antigravity-cli/statusline.js" \
+      --argjson notifications ${lib.boolToString (!hasRex)} \
+      '
+      .agentMode = "auto"
+      | .allowNonWorkspaceAccess = true
+      | .editorMode = "vim"
+      | .colorScheme = "terminal"
+      | .statusLine = {type: "command", command: $statusline}
+      | (if $notifications then .notifications = true else del(.notifications) end)
+      | .permissions.allow = (((.permissions.allow // []) + ["command(pair)", "command(ws)", "command(rex)", "command(gh pr merge)"]) | unique)
+      ' "$settings" > "$settings.new"
+    mv "$settings.new" "$settings"
+  '';
+  # Merge only our named hook so hooks from other tools, such as byor, stay.
+  agyHooks = pkgs.writeShellScript "agy-hooks" ''
+    set -eu
+    jq=${pkgs.jq}/bin/jq
+    hooks="$HOME/.gemini/config/hooks.json"
+    mkdir -p "''${hooks%/*}"
+    [ -s "$hooks" ] || echo '{}' > "$hooks"
+    "$jq" --arg cmd ${lib.escapeShellArg (pushover "Antigravity")} '
+      .["pushover-notify"] = {
+        Stop: [{type: "command", command: $cmd}]
+      }
+    ' "$hooks" > "$hooks.new"
+    mv "$hooks.new" "$hooks"
+  '';
 in
 lib.mkIf (lib.elem "base" cfg.roles) {
   home.packages = [ pair ];
@@ -115,16 +163,20 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   }
   // lib.optionalAttrs personal (
     {
-      # Claude reads the instructions through an import. Codex can't import,
-      # so it gets them through developer_instructions below.
+      # Claude reads the instructions through an import, and Antigravity
+      # directly through a symlink. Codex can't import, so it gets them
+      # through developer_instructions below.
       ".claude/CLAUDE.md".text = ''
         @${cfg.repo}/ai-harness/AGENTS.md
       '';
       ".claude/statusline.js".source = link "ai-harness/statusline.js";
       ".claude/themes/dotfiles.json".source =
         config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
+      ".gemini/config/AGENTS.md".source = link "ai-harness/AGENTS.md";
+      ".gemini/antigravity-cli/statusline.js".source = link "ai-harness/statusline.js";
     }
     // skillLinks ".claude/skills"
+    // skillLinks ".gemini/config/skills"
   )
   // {
     # Copilot CLI registers each session with pair from this start hook.
@@ -170,7 +222,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
 
   programs.claude-code = {
     enable = personal;
-    package = if isLinux then pkgs.claude-code else null;
+    package = null;
     mutableSettings = true;
     settings = {
       model = "opus[1m]";
@@ -239,6 +291,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       };
       tui = {
         theme = "dotfiles";
+        vim_mode_default = true;
         status_line = [
           "project-name"
           "git-branch"
@@ -295,6 +348,9 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     '';
   }
   // lib.optionalAttrs personal {
+    agyInstall = lib.hm.dag.entryAfter [ "writeBoundary" ] "run ${agyInstall}";
+    agySettings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agySettings}";
+    agyHooks = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyHooks}";
     agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
       run /bin/sh ${linkSkills}
     '';

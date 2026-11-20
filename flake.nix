@@ -56,8 +56,8 @@
         "aarch64-darwin"
         "x86_64-linux"
       ];
-      # The only unfree packages: Claude Code, which Linux installs from
-      # nixpkgs, Copilot CLI and Antigravity CLI.
+      # The only unfree package: Copilot CLI. Claude Code and Antigravity CLI
+      # install and update themselves on every personal computer.
       pkgsFor =
         system:
         import nixpkgs {
@@ -65,9 +65,7 @@
           config.allowUnfreePredicate =
             pkg:
             builtins.elem (nixpkgs.lib.getName pkg) [
-              "claude-code"
               "github-copilot-cli"
-              "antigravity-cli"
             ];
         };
       specialArgs = { inherit inputs; };

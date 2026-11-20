@@ -1,17 +1,19 @@
 # AI harness
 
-Global instructions, skills and hook scripts for Claude Code and Codex.
-`modules/home/agents.nix` puts them where each agent looks. Most are links
-into this checkout, so an edit applies at the agent's next session.
+Global instructions, skills and hook scripts for Claude Code, Codex and
+Antigravity CLI. `modules/home/agents.nix` puts them where each agent looks.
+Most are links into this checkout, so an edit applies at the agent's next
+session.
 
-Codex is on every computer, and Claude Code only on a computer with the
-`personal` role. On a Mac, Claude Code comes from its own installer and
-Codex from the Homebrew cask a Mac switch installs, and both update
-themselves. On Linux, the home switch installs both from nixpkgs.
+Codex is on every computer, and Claude Code and Antigravity CLI only on a
+computer with the `personal` role. Claude Code and Antigravity CLI install and
+update themselves on both macOS and Linux (and `nix-update` also runs
+`agy update`). Codex comes from the Homebrew cask on a Mac, where it updates
+itself, and from nixpkgs on Linux.
 
-A computer without the `personal` role gets nothing for Claude Code: no
-`~/.claude` files or settings, no skills or agents linked for it, and no
-Claude Code theme or status line colors.
+A computer without the `personal` role gets nothing for Claude Code or
+Antigravity CLI: no `~/.claude` or `~/.gemini` files or settings, no skills or
+agents linked for them, and no Claude Code theme or status line colors.
 
 ```text
 ai-harness/
@@ -21,24 +23,27 @@ ai-harness/
 ├── skills/           Agent Skills: worktrees, wiki and project-setup
 ├── tools/            notify-pushover.zsh, the agents' push hook,
 │                     link-agent-skills.sh, which shares Codex's skills
-│                     with Claude Code, and convert-codex-agents.py,
-│                     which does the same for Codex's agents
-├── statusline.js     Claude Code's status line
+│                     with Claude Code and Antigravity CLI, and
+│                     convert-codex-agents.py, which does the same for
+│                     Codex's agents
+├── statusline.js     Claude Code's and Antigravity CLI's status line
 └── codex/            requirements.toml, Codex's managed hooks
 ```
 
 | Where the agent looks                              | What's there                                        |
 | -------------------------------------------------- | --------------------------------------------------- |
 | `~/.claude/CLAUDE.md`                              | An import of `AGENTS.md`                            |
+| `~/.gemini/config/AGENTS.md`                       | A link to `AGENTS.md`                               |
 | `developer_instructions` in `~/.codex/config.toml` | The text of `AGENTS.md`, copied at each home switch |
-| `~/.claude/skills/NAME`, `~/.agents/skills/NAME`   | Links to each skill in `skills/`                    |
-| `~/.claude/statusline.js`                          | A link to `statusline.js`                           |
+| `~/.claude/skills/NAME`, `~/.gemini/config/skills/NAME`, `~/.agents/skills/NAME` | Links to each skill in `skills/` |
+| `~/.claude/statusline.js`, `~/.gemini/antigravity-cli/statusline.js` | Links to `statusline.js` |
+| `~/.gemini/config/hooks.json`                      | Merged Pushover hook for Antigravity CLI            |
 | `/etc/codex/requirements.toml`                     | A copy of `codex/requirements.toml`                 |
 | `/etc/codex/hooks/notify-pushover.zsh`             | A link to `tools/notify-pushover.zsh`               |
 | `/etc/codex/hooks/pair-register.sh`                | A link to `tools/pair-register.sh`                  |
 
-Claude reads the instructions live through the import. Codex has no import,
-so it gets them at the next `home-switch`.
+Claude and Antigravity read the instructions live through the import and link.
+Codex has no import, so it gets them at the next `home-switch`.
 
 A Mac switch writes `/etc/codex`, where Codex reads its managed hooks. Home
 Manager can't write to `/etc`, so on Linux the home switch puts the same
@@ -48,33 +53,39 @@ both.
 
 Most skills come from a private catalog, which installs them into
 `~/.agents/skills`, the folder Codex reads. Claude Code reads only
-`~/.claude/skills`, so on computers with the `personal` role
-`tools/link-agent-skills.sh` links each skill there. Each home switch runs it
-once, and on a Mac a launchd agent also runs it whenever `~/.agents/skills`
-changes. The catalog's agents land only in `~/.codex/agents`, so
-`tools/convert-codex-agents.py` writes a Claude agent in `~/.claude/agents`
-for each one, at each home switch and, on a Mac, whenever that folder
-changes. Other tools install their own skills: pair's comes from pair's own
-`npx skills add RyanSaxe/pair -g`, which each home switch runs when the
-skill is missing, and byor and Rex install theirs.
+`~/.claude/skills` and Antigravity CLI reads `~/.gemini/config/skills`, so on
+computers with the `personal` role `tools/link-agent-skills.sh` links each
+skill into both. Each home switch runs it once, and on a Mac a launchd agent
+also runs it whenever `~/.agents/skills` changes. The catalog's agents land
+only in `~/.codex/agents`, so `tools/convert-codex-agents.py` writes a Claude
+agent in `~/.claude/agents` and an Antigravity agent in
+`~/.gemini/config/agents` for each one, at each home switch and, on a Mac,
+whenever that folder changes. Other tools install their own skills: pair's
+comes from pair's own `npx skills add RyanSaxe/pair -g`, which each home
+switch runs when the skill is missing, and byor and Rex install theirs.
 
 Every computer also gets Copilot CLI, and a computer with the `personal`
-role gets pi and Antigravity CLI too. pair's hub can wake Copilot CLI and
-pi, as it wakes Claude Code and Codex. Both read pair's skill from
-`~/.agents/skills`, as Codex does. Each home switch registers
-pair's pi extension from `~/.nix-profile`, a path that stays the same when
-pair updates. The `copilot` alias starts Copilot CLI with its UI server and
-access to pair's state folder, which pair needs.
+role gets pi and Antigravity CLI too. pair's hub can wake Copilot CLI, pi and
+Antigravity CLI, as it wakes Claude Code and Codex. Copilot CLI and pi read
+pair's skill from `~/.agents/skills`, as Codex does, and Antigravity CLI gets
+it through `tools/link-agent-skills.sh`. Each home switch registers pair's pi
+extension from `~/.nix-profile`, a path that stays the same when pair updates.
+The `copilot` alias starts Copilot CLI with its UI server and access to pair's
+state folder, which pair needs.
 
 Each Claude Code, Codex and Copilot session registers with pair as it
 starts, so `pair agents` lists it and other agents can message it. Each home
 switch adds pair's hook to Claude Code's `SessionStart` list beside Rex's,
-and writes `~/.copilot/hooks/pair.json`. Codex runs `tools/pair-register.sh` as a managed hook.
+and writes `~/.copilot/hooks/pair.json`. Codex runs `tools/pair-register.sh`
+as a managed hook. Antigravity CLI exposes its language server address and
+token only to agent commands, not hooks, so an Antigravity session registers
+on its first `pair` command (which `pair spawn agy` runs in its first prompt).
 
 Each agent's settings live in `modules/home/agents.nix`. Each home switch
-merges them into `~/.claude/settings.json` and `~/.codex/config.toml`, keeping
-whatever the agent wrote there itself. Deleting a setting from the module
-leaves it in the file, so delete it there by hand too.
+merges them into `~/.claude/settings.json`, `~/.codex/config.toml` and
+`~/.gemini/antigravity-cli/settings.json`, keeping whatever the agent wrote
+there itself. Deleting a setting from the module leaves it in the file, so
+delete it there by hand too.
 
 ## Phone notifications
 
@@ -82,8 +93,9 @@ leaves it in the file, so delete it there by hand too.
 an agent finishes a turn, asks for permission or a question, or fails. The
 title names the project, the agent and the event, and the message is the
 agent's last message or what it is asking for. Claude Code calls it from its
-`Stop`, `Notification` and `StopFailure` hooks, and Codex from the managed
-`Stop` and `PermissionRequest` hooks in `codex/requirements.toml`.
+`Stop`, `Notification` and `StopFailure` hooks, Codex from the managed
+`Stop` and `PermissionRequest` hooks in `codex/requirements.toml`, and
+Antigravity CLI from its `Stop` hook in `~/.gemini/config/hooks.json`.
 
 The script takes its two keys from the first place that has them:
 `PUSHOVER_USER` and `PUSHOVER_TOKEN` in the environment, then

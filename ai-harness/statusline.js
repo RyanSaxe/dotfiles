@@ -153,11 +153,17 @@ function main() {
       used === undefined ? undefined : 100 - used,
     ),
   );
+  const windowSize = number(context.context_window_size);
+  const derivedTokens =
+    used !== undefined && windowSize !== undefined
+      ? Math.round((used / 100) * windowSize)
+      : undefined;
   const tokens = formatTokens(
     firstDefined(
       context.current_context_tokens,
       context.total_input_tokens,
       nested(context, "current_usage", "input_tokens"),
+      derivedTokens,
     ),
   );
   const details = [
