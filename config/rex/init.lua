@@ -2,8 +2,8 @@
 -- tmux/tmux.conf bound to the Rex actions that do the same thing, and popups
 -- for `ws` and copy mode. Font and padding are app settings, not Lua.
 --
--- Rex's Dark Mode and Light Mode themes are Catppuccin Mocha and Latte,
--- imported in the app from https://github.com/catppuccin/ghostty.
+-- Rex's Dark Mode and Light Mode themes come from theme/apps/terminal.nix,
+-- written to Rex's preferences by modules/home/rex.nix.
 --
 -- The app handles no keys while an action that a key started is running, so
 -- every action here returns at once and waits on nothing it starts.
