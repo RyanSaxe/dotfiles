@@ -122,6 +122,38 @@ let
         ${pkgs.bash}/bin/bash "$script" < /dev/null
     fi
   '';
+  agyAllow = [
+    # Mount Nix and git/theme configs read-only in the terminal sandbox so
+    # sandboxed commands can run Nix binaries and read global git config.
+    "read_file(/nix)"
+    "read_file(${config.home.homeDirectory}/.nix-profile)"
+    "read_file(${config.home.homeDirectory}/.config/git)"
+    "read_file(${config.home.homeDirectory}/.config/theme)"
+  ]
+  ++ lib.optionals isDarwin [
+    "read_file(/run/current-system)"
+    "read_file(/opt/homebrew)"
+  ]
+  ++ [
+    # Writable uv tool and cache paths, matching Codex's uv-tools profile.
+    "write_file(${config.home.homeDirectory}/.cache/uv)"
+    "write_file(${config.home.homeDirectory}/.local/bin)"
+    "write_file(${config.home.homeDirectory}/.local/share/uv/tools)"
+    "write_file(${config.home.homeDirectory}/.local/share/uv/python)"
+    # IPC and network tools that run outside the sandbox in routine workflows.
+    "command(pair)"
+    "command(ws)"
+    "command(rex)"
+    "command(gh)"
+    "command(git fetch)"
+    "command(git pull)"
+    "command(git push)"
+  ];
+  agyAsk = [
+    "command(gh repo delete)"
+    "command(git push --force)"
+    "command(git push -f)"
+  ];
   agySettings = pkgs.writeShellScript "agy-settings" ''
     set -eu
     jq=${pkgs.jq}/bin/jq
@@ -131,6 +163,8 @@ let
     "$jq" \
       --arg statusline "$HOME/.gemini/antigravity-cli/statusline.js" \
       --argjson notifications ${lib.boolToString (!hasRex)} \
+      --argjson allow ${lib.escapeShellArg (builtins.toJSON agyAllow)} \
+      --argjson ask ${lib.escapeShellArg (builtins.toJSON agyAsk)} \
       '
       .agentMode = "auto"
       | .allowNonWorkspaceAccess = true
@@ -141,7 +175,8 @@ let
       | .colorScheme = "terminal"
       | .statusLine = {type: "command", command: $statusline}
       | (if $notifications then .notifications = true else del(.notifications) end)
-      | .permissions.allow = (((.permissions.allow // []) + ["command(pair)", "command(ws)", "command(rex)", "command(gh pr merge)"]) | unique)
+      | .permissions.allow = ((((.permissions.allow // []) | map(select(. != "command(gh pr merge)"))) + $allow) | unique)
+      | .permissions.ask = (((.permissions.ask // []) + $ask) | unique)
       ' "$settings" > "$settings.new"
     mv "$settings.new" "$settings"
   '';
