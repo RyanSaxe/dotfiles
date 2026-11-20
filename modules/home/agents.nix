@@ -115,8 +115,11 @@ let
   agyInstall = pkgs.writeShellScript "agy-install" ''
     set -eu
     if [ ! -x "$HOME/.local/bin/agy" ]; then
+      script=$(mktemp)
+      trap 'rm -f "$script"' EXIT
+      ${pkgs.curl}/bin/curl -fsSL https://antigravity.google/cli/install.sh -o "$script"
       PATH="${pkgs.curl}/bin:${pkgs.bash}/bin:$PATH" \
-        ${pkgs.curl}/bin/curl -fsSL https://antigravity.google/cli/install.sh | ${pkgs.bash}/bin/bash
+        ${pkgs.bash}/bin/bash "$script" < /dev/null
     fi
   '';
   agySettings = pkgs.writeShellScript "agy-settings" ''
@@ -363,7 +366,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   };
 
   # Some installers put skills only in Codex's folder. This links each new
-  # one for Claude as it lands.
+  # one for Claude Code and Antigravity CLI as it lands.
   launchd.agents.link-agent-skills = lib.mkIf (personal && isDarwin) {
     enable = true;
     config = {
@@ -377,7 +380,7 @@ lib.mkIf (lib.elem "base" cfg.roles) {
   };
 
   # The catalog installs agents only for Codex. This writes each one for
-  # Claude as it lands.
+  # Claude Code and Antigravity CLI as it lands.
   launchd.agents.convert-codex-agents = lib.mkIf (personal && isDarwin) {
     enable = true;
     config = {

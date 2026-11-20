@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # Sends a Pushover push for the agent hook event on stdin: a finished turn, a
-# permission prompt or question, or a failed turn. Claude Code and Codex call
-# it from their hooks, with the agent's name as $1.
+# permission prompt or question, or a failed turn. Claude Code, Codex and
+# Antigravity CLI call it from their hooks, with the agent's name as $1.
 #
 # The keys come from PUSHOVER_USER and PUSHOVER_TOKEN, from the secrets each
 # home switch decrypts into ~/.config/sops-nix/secrets, or from the login
@@ -20,7 +20,7 @@ agent=$1
 # Antigravity sends camelCase hook payloads (hookEventName) and requires JSON
 # on stdout. Emit {} on every exit path for it.
 is_antigravity=0
-if jq -e 'has("hookEventName")' <<<"$event" >/dev/null 2>&1; then
+if [[ $agent == Antigravity ]] || jq -e 'has("hookEventName")' <<<"$event" >/dev/null 2>&1; then
   is_antigravity=1
 fi
 finish() {
@@ -59,11 +59,15 @@ fields=$(jq -r '
   | gsub("\n"; " ")' <<<"$event" 2>/dev/null) || finish
 [[ -n $fields ]] || finish
 what=${fields%%$'\n'*}
-message=${fields#*$'\n'}
+if [[ $fields == *$'\n'* ]]; then
+  message=${fields#*$'\n'}
+else
+  message=""
+fi
 
-cwd=$(jq -r '.cwd // empty' <<<"$event")
+cwd=$(jq -r '.cwd // .workspacePaths[0] // empty' <<<"$event" 2>/dev/null)
 project=$(git -C "${cwd:-.}" rev-parse --show-toplevel 2>/dev/null)
-project=${${project:-$cwd}:t}
+project=${${project:-${cwd:-$PWD}}:t}
 
 # Pushover rejects a message over 1,024 characters.
 curl -fsS --max-time 10 https://api.pushover.net/1/messages.json \

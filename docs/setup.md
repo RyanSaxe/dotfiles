@@ -9,7 +9,8 @@ file expects it. These steps set up the two computers `flake.nix` lists,
 1. Install Nix and Homebrew, and Claude Code on a computer with the
    `personal` role. The Mac switch installs apps through Homebrew but can't install
    Homebrew itself. Claude Code goes before the first home switch, so that
-   the switch sets byor and pair up for it.
+   the switch sets byor and pair up for it. The home switch installs
+   Antigravity CLI itself on a personal computer, from its official installer.
 
    ```sh
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
@@ -114,7 +115,7 @@ rest. Run `home-switch` again once the key is on GitHub.
 ```sh
 home-switch   # apply a change to the home config
 mac-switch    # apply a change to macOS
-nix-update    # update the flake's inputs, run the switches, upgrade uv's tools
+nix-update    # update the flake's inputs, run the switches, upgrade uv's tools and agy
 ```
 
 [AGENTS.md](../AGENTS.md#applying-a-change) says which change needs which
