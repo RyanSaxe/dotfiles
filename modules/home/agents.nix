@@ -132,6 +132,9 @@ let
       .agentMode = "auto"
       | .allowNonWorkspaceAccess = true
       | .editorMode = "vim"
+      # Opens the prompt in Insert mode, where Enter sends and shift+enter
+      # or ctrl+j adds a newline.
+      | .vimInsertFirst = true
       | .colorScheme = "terminal"
       | .statusLine = {type: "command", command: $statusline}
       | (if $notifications then .notifications = true else del(.notifications) end)
