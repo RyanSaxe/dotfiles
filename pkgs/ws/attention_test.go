@@ -125,14 +125,46 @@ func TestNextAgent(t *testing.T) {
 		{"a jump goes on from the agent you're looking at", lookingAtY, "y", "z"},
 		{"tmux bells go by how long they have needed you", bells, "", "rang-first"},
 	}
+	// No agent started needing you after the last jump.
+	jumped := at(10)
 	for _, c := range cases {
-		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last)
+		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last, jumped)
 		if !ok || got.ID != c.want {
 			t.Errorf("%s: went to %q, want %q", c.name, got.ID, c.want)
 		}
 	}
-	if _, ok := nextAgent(mux.Snapshot{Panes: []mux.Pane{{ID: "plain", Status: mux.Open}}}, ""); ok {
+	if _, ok := nextAgent(mux.Snapshot{Panes: []mux.Pane{{ID: "plain", Status: mux.Open}}}, "", jumped); ok {
 		t.Error("a jump found an agent where only plain terminals run")
+	}
+}
+
+func TestNextAgentAfterANewNeed(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 11, 17, 12, minute, 0, 0, time.UTC) }
+	// The last jump went to "looked-at" at minute 4, so Rex reports it as
+	// needing nothing, and "done-later" is next in the cycle.
+	done := []mux.Pane{
+		{Label: "a", ID: "done-earlier", Status: mux.Done, NeedsYou: true, Updated: at(1)},
+		{Label: "b", ID: "looked-at", Status: mux.Done, Updated: at(3)},
+		{Label: "c", ID: "done-later", Status: mux.Done, NeedsYou: true, Updated: at(5)},
+	}
+	with := func(p mux.Pane) []mux.Pane { return append(slices.Clone(done), p) }
+	cases := []struct {
+		name  string
+		panes []mux.Pane
+		want  string
+	}{
+		{"a failure after the jump comes before the rest of the done agents",
+			with(mux.Pane{Label: "d", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(8)}), "failed"},
+		{"a block after the jump comes before the rest of the done agents",
+			with(mux.Pane{Label: "d", ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(8)}), "blocked"},
+		{"a failure from before the jump waits for the cycle to come round",
+			with(mux.Pane{Label: "d", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(2)}), "done-later"},
+	}
+	for _, c := range cases {
+		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, "looked-at", at(4))
+		if !ok || got.ID != c.want {
+			t.Errorf("%s: went to %q, want %q", c.name, got.ID, c.want)
+		}
 	}
 }
 
