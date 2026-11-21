@@ -264,16 +264,19 @@ func signalAttention(sig syscall.Signal) error {
 	return nil
 }
 
-// nextAgent is the agent a jump goes to after the one in pane last. While any
-// agent needs you, the jumps cycle through those agents alone, by needRank,
-// and within each rank the one that has needed you longest first. Otherwise
+// nextAgent is the agent a jump goes to after the one in pane last, where the
+// jump at time jumped went. While any agent needs you, the jumps cycle
+// through those agents alone, by needRank, and within each rank the one that
+// has needed you longest first. An agent that started needing you after that
+// jump, and more urgently than the last one, comes next instead, so a new
+// failure doesn't wait for the cycle to come round to it. Otherwise
 // the jumps cycle through every agent, in order of need, blocked, failed,
 // done, working, then idle, and by session within each. A jump goes to the agent after the last one and wraps
 // around. The last one may have left the cycle, as the agent you're looking
 // at does in Rex, so the jump goes on from where it would sit, and starts at
 // the first when it's gone. Panes with no agent are skipped, and false means
 // there is none.
-func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
+func nextAgent(s mux.Snapshot, last string, jumped time.Time) (mux.Pane, bool) {
 	agents := s.Agents()
 	if len(agents) == 0 {
 		return mux.Pane{}, false
@@ -293,6 +296,11 @@ func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 	if i < 0 {
 		return cycle[0], true
 	}
+	if j := slices.IndexFunc(cycle, func(p mux.Pane) bool {
+		return p.NeedsYou && p.Updated.After(jumped) && needRank(p) < needRank(agents[i])
+	}); j >= 0 {
+		return cycle[j], true
+	}
 	if j := slices.IndexFunc(cycle, func(p mux.Pane) bool { return order(p, agents[i]) > 0 }); j >= 0 {
 		return cycle[j], true
 	}
@@ -305,8 +313,13 @@ func nextAgent(s mux.Snapshot, last string) (mux.Pane, bool) {
 // terminal, as from an AeroSpace key, when b names the Rex app or tmux client
 // to switch.
 func jumpToAgent(b mux.Backend, s mux.Snapshot, read error) error {
-	last, _ := os.ReadFile(filepath.Join(stateDir, "last-jump"))
-	next, ok := nextAgent(s, string(last))
+	path := filepath.Join(stateDir, "last-jump")
+	last, _ := os.ReadFile(path)
+	var jumped time.Time
+	if info, err := os.Stat(path); err == nil {
+		jumped = info.ModTime()
+	}
+	next, ok := nextAgent(s, string(last), jumped)
 	if !ok {
 		if read != nil {
 			return read
