@@ -135,7 +135,7 @@ let
     "read_file(/opt/homebrew)"
   ]
   ++ [
-    # Writable uv tool and cache paths, matching Codex's uv-tools profile.
+    # Writable uv tool and cache paths.
     "write_file(${config.home.homeDirectory}/.cache/uv)"
     "write_file(${config.home.homeDirectory}/.local/bin)"
     "write_file(${config.home.homeDirectory}/.local/share/uv/tools)"
@@ -167,6 +167,9 @@ let
       --argjson ask ${lib.escapeShellArg (builtins.toJSON agyAsk)} \
       '
       .agentMode = "auto"
+      # Runs every tool without asking, as --dangerously-skip-permissions
+      # does, so ws and pair spawn need no flag.
+      | .toolPermission = "always-proceed"
       | .allowNonWorkspaceAccess = true
       | .editorMode = "vim"
       # Opens the prompt in Insert mode, where Enter sends and shift+enter
@@ -304,9 +307,12 @@ lib.mkIf (lib.elem "base" cfg.roles) {
         padding = 0;
       };
       permissions = {
-        defaultMode = "auto";
+        defaultMode = "bypassPermissions";
         allow = [ "Bash(gh pr merge:*)" ];
       };
+      # Starts in bypassPermissions without asking to confirm it first, so
+      # an agent that ws or pair spawn opens takes its prompt straight away.
+      skipDangerousModePermissionPrompt = true;
       # The merge replaces only these three lists, so byor's tool-use
       # hooks and Rex's session-start hook stay as those tools wrote them.
       hooks = {
@@ -330,9 +336,8 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       # An edit to the repo's file reaches Codex at the next home switch.
       developer_instructions = builtins.readFile ../../ai-harness/AGENTS.md;
       service_tier = "default";
-      approval_policy = "on-request";
-      approvals_reviewer = "auto_review";
-      default_permissions = "uv-tools";
+      approval_policy = "never";
+      default_permissions = ":danger-full-access";
       features = {
         daemon_auto_start = true;
         fast_mode = false;
@@ -341,16 +346,6 @@ lib.mkIf (lib.elem "base" cfg.roles) {
       };
       # How many subagents can run at once in one session.
       agents.max_concurrent_threads_per_session = 30;
-      permissions.uv-tools = {
-        description = "Workspace Auto with writable UV tool paths";
-        extends = ":workspace";
-        filesystem = {
-          "~/.cache/uv" = "write";
-          "~/.local/bin" = "write";
-          "~/.local/share/uv/tools" = "write";
-          "~/.local/share/uv/python" = "write";
-        };
-      };
       tui = {
         theme = "dotfiles";
         vim_mode_default = true;
@@ -387,6 +382,14 @@ lib.mkIf (lib.elem "base" cfg.roles) {
         ];
       };
     };
+  };
+
+  # packages.nix installs Copilot CLI.
+  programs.github-copilot-cli = {
+    enable = true;
+    package = null;
+    mutableSettings = true;
+    settings.defaultPermissionMode = "allow-all";
   };
 
   home.activation = {

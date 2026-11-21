@@ -110,11 +110,6 @@ public, so private and internal tools never go in them. Install a tool that
 only one project needs in that project's own environment. Ask when you can't
 tell.
 
-Codex's sandbox blocks the network and every socket, so `ws`, which needs
-the tmux and Rex sockets, and `gh`, which needs GitHub, fail inside it. In
-Codex, run every `ws` and `gh` command with escalated sandbox permissions
-from the first try.
-
 ## The wiki
 
 `$VAULT_DIR/wiki` is what earlier sessions learned and wrote down for later
