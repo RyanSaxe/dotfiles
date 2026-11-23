@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -147,16 +150,77 @@ func windowLabel(ws []window) (string, error) {
 	return w.title[i+len(" - "):], nil
 }
 
-// watched gives a Rex backend what you've looked at that the server can't
-// tell it: the session Rex's window shows, and the done records the --watch
-// job saw you looking at as they finished. tmux keeps both itself.
+// focusedRex is the label of the session Rex shows while Rex itself has
+// focus, or "" when another app is focused or AeroSpace can't be asked.
+func focusedRex() string {
+	line, err := runIn("", "aerospace", "list-windows", "--focused", "--format", "%{app-bundle-id}|%{window-title}")
+	if err != nil {
+		return ""
+	}
+	return focusedRexLabel(line)
+}
+
+// focusedRexLabel parses aerospace's "bundle-id|title" line for the focused
+// window and returns the Rex session label when a Rex session window has focus.
+func focusedRexLabel(line string) string {
+	bundle, title, ok := strings.Cut(strings.TrimSpace(line), "|")
+	if !ok || bundle != rexBundle || strings.HasPrefix(title, "Settings") {
+		return ""
+	}
+	i := strings.LastIndex(title, " - ")
+	if i < 0 {
+		return ""
+	}
+	return title[i+len(" - "):]
+}
+
+// followFocus calls changed whenever Rex gains or loses focus in AeroSpace,
+// so switching back to Rex clears seen reports and switching away surfaces
+// blocked ones. Switches between other apps trigger nothing.
+func followFocus(changed func()) {
+	if _, err := exec.LookPath("aerospace"); err != nil {
+		return
+	}
+	prev := focusedRex()
+	for {
+		cmd := exec.Command("aerospace", "subscribe", "--no-send-initial", "focus-changed")
+		out, err := cmd.StdoutPipe()
+		if err == nil {
+			err = cmd.Start()
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "ws: aerospace subscribe:", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		lines := bufio.NewScanner(out)
+		for lines.Scan() {
+			if cur := focusedRex(); cur != prev {
+				prev = cur
+				changed()
+			}
+		}
+		cmd.Wait()
+		time.Sleep(5 * time.Second)
+		if cur := focusedRex(); cur != prev {
+			prev = cur
+			changed()
+		}
+	}
+}
+
+// watched gives a Rex backend what you're looking at that the server can't
+// tell it: the session Rex's window shows while Rex has focus, and the done
+// or error records the --watch job saw you looking at as they came in. tmux
+// keeps both itself.
 func watched(b mux.Backend) mux.Backend {
 	r, ok := b.(mux.Rex)
 	if !ok {
 		return b
 	}
-	ws, _ := appWindows(rexBundle)
-	return watchedRex(r, ws)
+	r.Shown = focusedRex()
+	readJSON("seen.json", &r.Seen)
+	return r
 }
 
 // watchedRex is watched for Rex, given ws, Rex's windows.
