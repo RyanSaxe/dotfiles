@@ -56,13 +56,8 @@ func rexKeys(r mux.Rex) ([]key, error) {
 	}
 	var keys []key
 	for _, b := range bindings {
-		// A move binding runs the Rex action in its args, and a binding to a
-		// Lua function shows as client.key.forward.
+		// A binding to a Lua function shows as client.key.forward.
 		action, args := b.Action, b.Args
-		if action == "move" {
-			action, _ = args["action"].(string)
-			args, _ = args["args"].(map[string]any)
-		}
 		does := cmp.Or(titles[action], action)
 		if action == "client.key.forward" {
 			does = "Lua function"

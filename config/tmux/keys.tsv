@@ -2,7 +2,8 @@ app	chord	action
 tmux	alt+1-9	switch to window N
 tmux	alt+n	new window
 tmux	alt+q	detach client
-tmux	alt+l	jump back to last pane
+tmux	alt+h	navigate back to previous pane
+tmux	alt+l	navigate forward to next pane
 tmux	ctrl+h/j/k/l	move between panes (vim-aware)
 tmux	ctrl+b/f	scroll full page up/down (vim-aware copy-mode)
 tmux	ctrl+u/d	scroll half page up/down (vim-aware copy-mode)
@@ -24,8 +25,6 @@ tmux	prefix s	ws go popup on Sessions
 tmux	prefix o	ws go popup on Folders
 tmux	prefix c	new window (inherits current path)
 tmux	prefix |/-	split pane right/below (inherits current path)
-tmux	prefix l	last window
-tmux	prefix L	last session
 aerospace	cmd+alt+h/j/k/l	focus window left/down/up/right
 aerospace	cmd+alt+shift+h/j/k/l	move window left/down/up/right
 aerospace	cmd+alt+v/b/n/m	workspace: message/browser/code/meeting
