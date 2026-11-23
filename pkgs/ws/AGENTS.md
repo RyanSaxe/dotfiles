@@ -54,9 +54,9 @@ The rest are records `ws` keeps for itself:
   needed you for then, so that anything newer brings it back
 - `last-jump`: the pane the last `ws focus agent` went to, so the next
   jump moves on
-- `seen.json`: each done Rex report you were looking at as it came, by
-  pane, so it doesn't need you once you look away. Only the `--watch` job
-  writes it, and it keeps only panes that still exist
+- `seen.json`: each failed or done Rex report you were looking at as it
+  came, by pane, so it doesn't need you once you look away. Only the
+  `--watch` job writes it, and it keeps only panes that still exist
 - `mascot.json`: the mascot and its accent, which only the popups use,
   written by `ws mascot` and the theme popup
 

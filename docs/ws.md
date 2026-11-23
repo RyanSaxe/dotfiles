@@ -230,10 +230,11 @@ An agent needs you when it finished or waits on you and you haven't
 looked at its pane since. Sketchybar's A lights while one does: red when
 an agent has failed, peach when one is blocked, and green when the agents
 that need you have only finished. Cmd-Alt-A (`ws focus agent`) cycles
-through those agents, failed first, then blocked, then done, and within
-each the one that has needed you longest first. When no agent needs you,
-it cycles through every agent. `ws` reads what each multiplexer already
-tracks:
+within the most urgent level that any agent needing you is at: failed,
+then blocked, then done, oldest first within that level. Done agents come
+up only once no agent needing you is failed or blocked. When no agent
+needs you, it cycles through every agent. `ws` reads what each multiplexer
+already tracks:
 
 - **tmux:** an agent is a pane where Claude Code, Codex, Antigravity, pi or
   Copilot CLI runs, however it started. `ws` finds those programs in the
@@ -249,11 +250,11 @@ tracks:
   otherwise.
   tmux tracks bells and output per window, so a bell or output from a shell
   pane beside the agent counts as the agent's.
-- **Rex:** a blocked or failed agent needs you until it reports something
-  else, and a done one until a Rex app shows its pane. The pane you're
-  looking at needs nothing, and `ws attention --watch` remembers a done
-  report that came while you looked, so it doesn't need you once you look
-  away.
+- **Rex:** a blocked agent needs you until it reports something else, and
+  a failed or done one until a Rex app shows its pane. The pane you're
+  looking at needs nothing, and `ws attention --watch` remembers a failed
+  or done report that came while you looked, so it doesn't need you once
+  you look away.
 
 ## Inbox
 

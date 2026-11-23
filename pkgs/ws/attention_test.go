@@ -85,10 +85,12 @@ func TestNextAgent(t *testing.T) {
 	}
 	at := func(minute int) time.Time { return time.Date(2026, 11, 17, 12, minute, 0, 0, time.UTC) }
 	blocked := append(slices.Clone(agents), mux.Pane{Label: "zeta", ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)})
-	waiting := append(slices.Clone(blocked),
+	blockedAndDone := append(slices.Clone(blocked),
 		mux.Pane{Label: "beta", ID: "unseen", Status: mux.Done, NeedsYou: true, Updated: at(1)},
-		mux.Pane{Label: "gamma", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(3)},
 		mux.Pane{Label: "eta", ID: "blocked-later", Status: mux.Blocked, NeedsYou: true, Updated: at(8)},
+	)
+	waiting := append(slices.Clone(blockedAndDone),
+		mux.Pane{Label: "gamma", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(3)},
 	)
 	// Rex reports the agent you're looking at, where the last jump went, as
 	// needing nothing.
@@ -96,6 +98,14 @@ func TestNextAgent(t *testing.T) {
 		{Label: "a", ID: "x", Status: mux.Blocked, NeedsYou: true, Updated: at(3)},
 		{Label: "b", ID: "y", Status: mux.Error, Updated: at(2)},
 		{Label: "c", ID: "z", Status: mux.Error, NeedsYou: true, Updated: at(4)},
+	}
+	// You answered the last agent so it is working with a recent Updated,
+	// while an older blocked agent and several done agents still need you.
+	answeredLast := []mux.Pane{
+		{Label: "a", ID: "answered", Status: mux.Working, Updated: at(9)},
+		{Label: "b", ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)},
+		{Label: "c", ID: "done-1", Status: mux.Done, NeedsYou: true, Updated: at(1)},
+		{Label: "d", ID: "done-2", Status: mux.Done, NeedsYou: true, Updated: at(2)},
 	}
 	// tmux reports an agent whose window printed in the last few seconds as
 	// working.
@@ -118,73 +128,111 @@ func TestNextAgent(t *testing.T) {
 		{"an agent that needs you comes first", blocked, "done-b", "blocked"},
 		{"a lone agent that needs you keeps the jumps", blocked, "blocked", "blocked"},
 		{"a failed agent comes before agents that needed you earlier", waiting, "", "failed"},
-		{"blocked comes after failed", waiting, "failed", "blocked"},
-		{"blocked agents go by how long they have needed you", waiting, "blocked", "blocked-later"},
-		{"done comes after blocked", waiting, "blocked-later", "unseen"},
-		{"the jumps cycle through the agents that need you", waiting, "unseen", "failed"},
+		{"a lone failed agent keeps the jumps over blocked and done", waiting, "failed", "failed"},
+		{"blocked agents go by how long they have needed you", blockedAndDone, "blocked", "blocked-later"},
+		{"blocked agents wrap instead of dropping to done", blockedAndDone, "blocked-later", "blocked"},
+		{"a jump from a done agent goes back to the most urgent level", waiting, "unseen", "failed"},
+		{"a jump from a working last agent goes to an older blocked agent instead of done", answeredLast, "answered", "blocked"},
 		{"a jump goes on from the agent you're looking at", lookingAtY, "y", "z"},
 		{"tmux bells go by how long they have needed you", bells, "", "rang-first"},
 	}
-	// No agent started needing you after the last jump.
-	jumped := at(10)
 	for _, c := range cases {
-		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last, jumped)
+		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, c.last)
 		if !ok || got.ID != c.want {
 			t.Errorf("%s: went to %q, want %q", c.name, got.ID, c.want)
 		}
 	}
-	if _, ok := nextAgent(mux.Snapshot{Panes: []mux.Pane{{ID: "plain", Status: mux.Open}}}, "", jumped); ok {
+	if _, ok := nextAgent(mux.Snapshot{Panes: []mux.Pane{{ID: "plain", Status: mux.Open}}}, ""); ok {
 		t.Error("a jump found an agent where only plain terminals run")
 	}
-}
 
-func TestNextAgentAfterANewNeed(t *testing.T) {
-	at := func(minute int) time.Time { return time.Date(2026, 11, 17, 12, minute, 0, 0, time.UTC) }
-	// The last jump went to "looked-at" at minute 4, so Rex reports it as
-	// needing nothing, and "done-later" is next in the cycle.
-	done := []mux.Pane{
-		{Label: "a", ID: "done-earlier", Status: mux.Done, NeedsYou: true, Updated: at(1)},
-		{Label: "b", ID: "looked-at", Status: mux.Done, Updated: at(3)},
-		{Label: "c", ID: "done-later", Status: mux.Done, NeedsYou: true, Updated: at(5)},
+	// Simulate repeated presses in Rex, where the pane you land on stops
+	// needing you while you look at it (and a done pane stays seen after you
+	// leave it, while a blocked one needs you again).
+	walk := func(panes []mux.Pane, presses int) []string {
+		state := slices.Clone(panes)
+		seenDone := map[string]bool{}
+		last := ""
+		var got []string
+		for range presses {
+			s := slices.Clone(state)
+			for i := range s {
+				if s[i].ID == last || seenDone[s[i].ID] {
+					s[i].NeedsYou = false
+				}
+			}
+			p, ok := nextAgent(mux.Snapshot{Panes: s}, last)
+			if !ok {
+				t.Fatalf("press after %q found no agent", last)
+			}
+			got = append(got, p.ID)
+			if p.Status == mux.Done {
+				seenDone[p.ID] = true
+			}
+			last = p.ID
+		}
+		return got
 	}
-	with := func(p mux.Pane) []mux.Pane { return append(slices.Clone(done), p) }
-	cases := []struct {
+	threeDone := []mux.Pane{
+		{ID: "done-1", Status: mux.Done, NeedsYou: true, Updated: at(1)},
+		{ID: "done-2", Status: mux.Done, NeedsYou: true, Updated: at(2)},
+		{ID: "done-3", Status: mux.Done, NeedsYou: true, Updated: at(3)},
+	}
+	for _, c := range []struct {
 		name  string
 		panes []mux.Pane
-		want  string
+		want  []string
 	}{
-		{"a failure after the jump comes before the rest of the done agents",
-			with(mux.Pane{Label: "d", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(8)}), "failed"},
-		{"a block after the jump comes before the rest of the done agents",
-			with(mux.Pane{Label: "d", ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(8)}), "blocked"},
-		{"a failure from before the jump waits for the cycle to come round",
-			with(mux.Pane{Label: "d", ID: "failed", Status: mux.Error, NeedsYou: true, Updated: at(2)}), "done-later"},
-	}
-	for _, c := range cases {
-		got, ok := nextAgent(mux.Snapshot{Panes: c.panes}, "looked-at", at(4))
-		if !ok || got.ID != c.want {
-			t.Errorf("%s: went to %q, want %q", c.name, got.ID, c.want)
+		{
+			"one blocked and three done alternates back to the blocked agent",
+			append([]mux.Pane{{ID: "blocked", Status: mux.Blocked, NeedsYou: true, Updated: at(5)}}, threeDone...),
+			[]string{"blocked", "done-1", "blocked", "done-2", "blocked", "done-3"},
+		},
+		{
+			"two blocked and three done stays on the blocked agents",
+			append([]mux.Pane{
+				{ID: "blocked-1", Status: mux.Blocked, NeedsYou: true, Updated: at(5)},
+				{ID: "blocked-2", Status: mux.Blocked, NeedsYou: true, Updated: at(8)},
+			}, threeDone...),
+			[]string{"blocked-1", "blocked-2", "blocked-1", "blocked-2"},
+		},
+		{
+			"three blocked cycles through all three in order",
+			[]mux.Pane{
+				{ID: "blocked-1", Status: mux.Blocked, NeedsYou: true, Updated: at(2)},
+				{ID: "blocked-2", Status: mux.Blocked, NeedsYou: true, Updated: at(5)},
+				{ID: "blocked-3", Status: mux.Blocked, NeedsYou: true, Updated: at(8)},
+			},
+			[]string{"blocked-1", "blocked-2", "blocked-3", "blocked-1"},
+		},
+	} {
+		if got := walk(c.panes, len(c.want)); !slices.Equal(got, c.want) {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}
 }
 
-// The watch job keeps the done record of the pane you were looking at as it
-// finished, so it doesn't need you once you look away, and forgets the
+// The watch job keeps the done or error record of the pane you were looking at
+// as it came in, so it doesn't need you once you look away, and forgets the
 // records of panes that have closed.
-func TestTheWatchJobKeepsADoneRecordYouLookedAt(t *testing.T) {
-	stateDir = t.TempDir()
+func TestTheWatchJobKeepsARecordYouLookedAt(t *testing.T) {
 	finished := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)
-	s := mux.Snapshot{Panes: []mux.Pane{
-		{Label: "api", ID: "looked-at", Landing: true, Status: mux.Done, Updated: finished},
-		{Label: "api", ID: "beside", Status: mux.Done, Updated: finished},
-		{Label: "web", ID: "elsewhere", Landing: true, Status: mux.Done, Updated: finished},
-	}}
-	noteSeen(s, "api", map[string]time.Time{"closed": finished})
-	var seen map[string]time.Time
-	if err := readJSON("seen.json", &seen); err != nil {
-		t.Fatal(err)
-	}
-	if want := map[string]time.Time{"looked-at": finished}; !maps.EqualFunc(seen, want, time.Time.Equal) {
-		t.Errorf("the job kept %v, want only the record you looked at", seen)
+	for _, status := range []mux.Status{mux.Done, mux.Error} {
+		t.Run(status.String(), func(t *testing.T) {
+			stateDir = t.TempDir()
+			s := mux.Snapshot{Panes: []mux.Pane{
+				{Label: "api", ID: "looked-at", Landing: true, Status: status, Updated: finished},
+				{Label: "api", ID: "beside", Status: status, Updated: finished},
+				{Label: "web", ID: "elsewhere", Landing: true, Status: status, Updated: finished},
+			}}
+			noteSeen(s, "api", map[string]time.Time{"closed": finished})
+			var seen map[string]time.Time
+			if err := readJSON("seen.json", &seen); err != nil {
+				t.Fatal(err)
+			}
+			if want := map[string]time.Time{"looked-at": finished}; !maps.EqualFunc(seen, want, time.Time.Equal) {
+				t.Errorf("the job kept %v, want only the record you looked at", seen)
+			}
+		})
 	}
 }

@@ -23,8 +23,8 @@ import (
 //
 // Shown and Seen are what you've looked at that the server can't tell a
 // Snapshot: the label of the session Rex's window shows, "" when the caller
-// doesn't know, and the done records you were looking at as they finished,
-// each by its pane's ID and its time.
+// doesn't know, and the failed or done records you were looking at when they
+// came in, each by its pane's ID and its time.
 type Rex struct {
 	Client               string
 	Shown                string
@@ -242,20 +242,20 @@ func (r Rex) Snapshot() (Snapshot, error) {
 }
 
 // needsYou says whether a pane's agent needs you and you haven't looked at
-// the pane since. A blocked or failed agent needs you until it reports
-// something else, and a done one until an app shows its pane. Rex doesn't
-// expose the app's seen state yet, so the app's size requests stand in for
-// it: an app asks for a pane's size each time it shows the pane, so a done
-// record newer than every request is unseen. The pane you're looking at
-// needs nothing. Neither does a record that finished while you looked, which
+// the pane since. A blocked agent needs you until it reports something else,
+// and a failed or done one until an app shows its pane. Rex doesn't expose
+// the app's seen state yet, so the app's size requests stand in for it: an
+// app asks for a pane's size each time it shows the pane, so a failed or
+// done record newer than every request is unseen. The pane you're looking at
+// needs nothing. Neither does a record that came while you looked, which
 // Seen lists, since its pane's last request came before it.
 func (r Rex) needsYou(p Pane, shown []time.Time, looking bool) bool {
 	switch {
 	case looking:
 		return false
-	case p.Status == Blocked || p.Status == Error:
+	case p.Status == Blocked:
 		return true
-	case p.Status == Done:
+	case p.Status == Error || p.Status == Done:
 		seen := r.Seen[p.ID].Equal(p.Updated) || slices.ContainsFunc(shown, func(t time.Time) bool { return !t.Before(p.Updated) })
 		return !seen
 	}
