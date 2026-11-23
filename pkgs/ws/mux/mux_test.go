@@ -159,10 +159,10 @@ func TestATmuxSnapshot(t *testing.T) {
 	}
 }
 
-// A Rex agent needs you while it's blocked or failed, and while it's done
+// A Rex agent needs you while it's blocked, and while it's failed or done
 // until an app shows its pane, which asks the server for the pane's size.
-// The pane you're looking at needs nothing, and nor does a done report that
-// came while you looked, which the caller lists in Seen.
+// The pane you're looking at needs nothing, and nor does a failed or done
+// report that came while you looked, which the caller lists in Seen.
 func TestARexSnapshotTellsWhichAgentsNeedYou(t *testing.T) {
 	bin := t.TempDir()
 	script := `#!/bin/sh
@@ -172,6 +172,9 @@ cat <<'EOF'
  "panes": [
   {"session": "s:api", "label": "api", "id": "looked-at", "landing": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
   {"session": "s:web", "label": "web", "id": "blocked", "landing": true, "status": "blocked", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
+  {"session": "s:web", "label": "web", "id": "failed-unseen", "status": "error", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
+  {"session": "s:web", "label": "web", "id": "failed-shown-since", "status": "error", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:06:00Z"]},
+  {"session": "s:web", "label": "web", "id": "failed-listed", "status": "error", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
   {"session": "s:web", "label": "web", "id": "unseen", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:00:00Z"]},
   {"session": "s:web", "label": "web", "id": "never-shown", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": {}},
   {"session": "s:web", "label": "web", "id": "shown-since", "status": "done", "updated": "2026-11-17T12:05:00-05:00", "shown": ["2026-11-17T17:06:00Z"]},
@@ -185,7 +188,7 @@ EOF`
 	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
 
 	finished := time.Date(2026, 11, 17, 17, 5, 0, 0, time.UTC)
-	s, err := mux.Rex{Shown: "api", Seen: map[string]time.Time{"listed": finished}}.Snapshot()
+	s, err := mux.Rex{Shown: "api", Seen: map[string]time.Time{"listed": finished, "failed-listed": finished}}.Snapshot()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +198,7 @@ EOF`
 			needing = append(needing, p.ID)
 		}
 	}
-	if want := []string{"blocked", "unseen", "never-shown"}; !slices.Equal(needing, want) {
+	if want := []string{"blocked", "failed-unseen", "unseen", "never-shown"}; !slices.Equal(needing, want) {
 		t.Errorf("%v need you, want %v", needing, want)
 	}
 }
