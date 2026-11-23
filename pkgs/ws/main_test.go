@@ -261,12 +261,13 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 	worktreeRoot, interactive = t.TempDir(), false
 	t.Cleanup(func() { worktreeRoot, interactive = oldRoot, oldInteractive })
 	project := filepath.Base(main)
+	session := labelFor(main)
 	root := filepath.Join(worktreeRoot, project)
 	// A folder in a worktree's spot that git doesn't check out.
 	if err := os.MkdirAll(filepath.Join(root, "plain"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	opened := mux.Snapshot{Sessions: []mux.Session{{ID: "session:" + project, Label: project}}}
+	opened := mux.Snapshot{Sessions: []mux.Session{{ID: "session:" + session, Label: session}}}
 	for _, tc := range []struct {
 		openAs   string // the config's
 		words    []string
@@ -274,14 +275,14 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 		want     []string
 	}{
 		{"tab", []string{"new", "one"}, mux.Snapshot{}, []string{
-			"session " + project + ", a plain shell, in " + main,
-			"tab " + project + "/one of session:" + project + " in " + root + "/one",
+			"session " + session + ", a plain shell, in " + main,
+			"tab " + project + "/one of session:" + session + " in " + root + "/one",
 		}},
-		{"tab", []string{"new", "two"}, opened, []string{"tab " + project + "/two of session:" + project + " in " + root + "/two"}},
+		{"tab", []string{"new", "two"}, opened, []string{"tab " + project + "/two of session:" + session + " in " + root + "/two"}},
 		{"tab", []string{"new", "three", "--session"}, opened, []string{"session " + project + "/three in " + root + "/three"}},
 		{"session", []string{"new", "four"}, opened, []string{"session " + project + "/four in " + root + "/four"}},
-		{"session", []string{"new", "five", "--tab"}, opened, []string{"tab " + project + "/five of session:" + project + " in " + root + "/five"}},
-		{"tab", []string{"open", main}, mux.Snapshot{}, []string{"session " + project + " in " + main}},
+		{"session", []string{"new", "five", "--tab"}, opened, []string{"tab " + project + "/five of session:" + session + " in " + root + "/five"}},
+		{"tab", []string{"open", main}, mux.Snapshot{}, []string{"session " + session + " in " + main}},
 		{"tab", []string{"open", root + "/plain"}, opened, []string{"session " + project + "/plain in " + root + "/plain"}},
 	} {
 		withConfig(t, "claude", tc.openAs)
@@ -324,6 +325,7 @@ func TestTabRunsItsCommandInTheFoldersPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	project := filepath.Base(main)
+	session := labelFor(main)
 	fix := filepath.Join(worktreeRoot, project, "fix")
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main"},
@@ -339,8 +341,8 @@ func TestTabRunsItsCommandInTheFoldersPlace(t *testing.T) {
 	words := append([]string{fix, "--"}, command...)
 
 	open := &recorder{snapshot: mux.Snapshot{
-		Sessions: []mux.Session{{ID: "session:" + project, Label: project}},
-		Panes:    []mux.Pane{{Session: "session:" + project, Label: project, ID: "pane", Tab: "tab:fix", TabName: project + "/fix", Focused: true}},
+		Sessions: []mux.Session{{ID: "session:" + session, Label: session}},
+		Panes:    []mux.Pane{{Session: "session:" + session, Label: session, ID: "pane", Tab: "tab:fix", TabName: project + "/fix", Focused: true}},
 	}}
 	if err := run("tab", words, func(string) mux.Backend { return open }); err != nil || len(open.made) > 0 ||
 		len(open.tabs) != 1 || !slices.Equal(open.tabs[0], append([]string{project + "/fix", fix}, command...)) {
@@ -353,7 +355,7 @@ func TestTabRunsItsCommandInTheFoldersPlace(t *testing.T) {
 	for _, m := range closed.made {
 		got = append(got, m.String())
 	}
-	want := []string{"session " + project + ", a plain shell, in " + main, "tab " + project + "/fix of session:" + project + " in " + fix}
+	want := []string{"session " + session + ", a plain shell, in " + main, "tab " + project + "/fix of session:" + session + " in " + fix}
 	if err != nil || len(closed.tabs) > 0 || !slices.Equal(got, want) || closed.lastPanes()[0].Run != layout.Line(command) {
 		t.Errorf("ws tab on a closed worktree made %q with %+v (%v), want %q running %s", got, closed.lastPanes(), err, want, layout.Line(command))
 	}

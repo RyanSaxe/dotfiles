@@ -18,11 +18,17 @@ import (
 // every time, in a form tmux keeps as it is.
 func TestLabel(t *testing.T) {
 	for dir, want := range map[string]string{
-		"/home/r/worktrees/pair/fix-login":   "pair/fix-login",
-		"/home/r/Projects/the-nightly.build": "the-nightly_build",
-		"/home/r/worktrees/pair":             "pair",
+		"/home/r/worktrees/pair/fix-login":          "pair/fix-login",
+		"/home/r/Projects/the-nightly.build":        "Projects/the-nightly_build",
+		"/home/r/Projects/Games/magic-the-battling": "Games/magic-the-battling",
+		"/home/r/worktrees/pair":                    "worktrees/pair",
+		"/home/r/brain":                             "brain",
+		"/home/r":                                   "r",
+		"/tmp":                                      "tmp",
+		"/tmp/scratch":                              "tmp/scratch",
+		"/home/r/a.b/c:d/":                          "a_b/c_d",
 	} {
-		if got := mux.Label(dir, "/home/r/worktrees"); got != want {
+		if got := mux.Label(dir, "/home/r"); got != want {
 			t.Errorf("%s: got %s, want %s", dir, got, want)
 		}
 	}

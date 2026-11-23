@@ -252,8 +252,8 @@ func TestEnterOnATaskOpensItsProjectsPlace(t *testing.T) {
 		"notes/daily/2026-11-09.md:1":   vault,
 	} {
 		b := &recorder{snapshot: mux.Snapshot{
-			Sessions: []mux.Session{{ID: "session:nix", Label: "nix"}},
-			Panes:    []mux.Pane{{Session: "session:nix", Label: "nix", ID: "pane", Tab: "tab:1", Focused: true}},
+			Sessions: []mux.Session{{ID: "session:new/nix", Label: "new/nix"}},
+			Panes:    []mux.Pane{{Session: "session:new/nix", Label: "new/nix", ID: "pane", Tab: "tab:1", Focused: true}},
 		}}
 		p := taskTabs(b, kitty.Terminal{})
 		rows, err := p.Load(len(p.Tabs)-1, func([]popup.Row) {})
@@ -271,8 +271,8 @@ func TestEnterOnATaskOpensItsProjectsPlace(t *testing.T) {
 			if len(b.tabs) > 0 || len(b.made) != 1 || b.made[0].dir != vault || b.lastPanes()[0].Run != layout.Line(edit) {
 				t.Errorf("%s: Enter ran %q and made %v, want a place for the vault running %q", id, b.tabs, b.made, edit)
 			}
-		} else if len(b.made) > 0 || len(b.tabs) != 1 || !slices.Equal(b.tabs[0], append([]string{"nix", want}, edit...)) {
-			t.Errorf("%s: Enter ran %q and made %v, want one tab of nix in %s running %q", id, b.tabs, b.made, want, edit)
+		} else if len(b.made) > 0 || len(b.tabs) != 1 || !slices.Equal(b.tabs[0], append([]string{"new/nix", want}, edit...)) {
+			t.Errorf("%s: Enter ran %q and made %v, want one tab of new/nix in %s running %q", id, b.tabs, b.made, want, edit)
 		}
 	}
 }
