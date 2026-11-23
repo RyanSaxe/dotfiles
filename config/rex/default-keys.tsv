@@ -31,8 +31,10 @@ alt+cmd+left	Focus Pane Left	pane.focus.left
 alt+cmd+right	Focus Pane Right	pane.focus.right
 alt+cmd+up	Focus Pane Up	pane.focus.up
 alt+cmd+down	Focus Pane Down	pane.focus.down
-cmd+]	Focus Next Pane	pane.focus_next
-cmd+[	Focus Previous Pane	pane.focus_previous
+alt+cmd+]	Focus Next Pane	pane.focus_next
+alt+cmd+[	Focus Previous Pane	pane.focus_previous
+cmd+[	Navigate Back	client.navigate.back
+cmd+]	Navigate Forward	client.navigate.forward
 alt+shift+cmd+left	Move Pane Left	pane.move.left
 alt+shift+cmd+right	Move Pane Right	pane.move.right
 alt+shift+cmd+up	Move Pane Up	pane.move.up
