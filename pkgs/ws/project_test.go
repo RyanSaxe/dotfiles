@@ -86,8 +86,8 @@ func TestWsProjectPutsEachProjectWhereItBelongs(t *testing.T) {
 	calls := filepath.Join(t.TempDir(), "calls")
 	onPath(t, "gh", `echo "$*" >> `+calls+`
 mkdir -p "$4/.git" && printf '[remote "origin"]\n\turl = https://github.com/%s\n' "$3" > "$4/.git/config"`)
-	// A tmux server with one session, named busy, in another folder.
-	onPath(t, "tmux", `[ "$2" = list-panes ] && printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\n'`)
+	// A tmux server with sessions for Projects/busy and Games/fresh.
+	onPath(t, "tmux", `[ "$2" = list-panes ] && printf 'Projects/busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nGames/fresh\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tfresh\n'`)
 	backend := func(string) mux.Backend { return mux.Detect(func(string) string { return "" }, "") }
 	ws := func(words ...string) error { return run("project", words, backend) }
 	cloned := func() string { data, _ := os.ReadFile(calls); return string(data) }
@@ -127,9 +127,13 @@ mkdir -p "$4/.git" && printf '[remote "origin"]\n\turl = https://github.com/%s\n
 		t.Fatal("ws project ran gh before it knew where to clone")
 	}
 
-	// open would go to the session named busy, so ws makes nothing.
-	if err := ws("alice/busy"); err == nil || !strings.Contains(err.Error(), "busy") || cloned() != before {
-		t.Errorf("alice/busy, while a session named busy runs, gave %v and ran gh %q", err, strings.TrimPrefix(cloned(), before))
+	// open would go to the session named Projects/busy, so ws makes nothing,
+	// while a session for Games/fresh does not block ~/Projects/fresh.
+	if err := ws("alice/busy"); err == nil || !strings.Contains(err.Error(), "Projects/busy") || cloned() != before {
+		t.Errorf("alice/busy, while a session named Projects/busy runs, gave %v and ran gh %q", err, strings.TrimPrefix(cloned(), before))
+	}
+	if err := ws("alice/fresh"); err != nil {
+		t.Errorf("alice/fresh, while only Games/fresh runs, failed: %v", err)
 	}
 	// A trust that fails leaves nothing made, so trying again works.
 	codexConfig := readNote(t, home, ".codex/config.toml")

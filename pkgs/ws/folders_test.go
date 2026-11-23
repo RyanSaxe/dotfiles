@@ -43,6 +43,7 @@ func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 
 	day := func(d int) time.Time { return time.Date(2026, 11, d, 12, 0, 0, 0, time.UTC) }
 	gitLog(t, filepath.Join(scratch, "Projects", "quiet", ".git"), day(1))
+	gitLog(t, filepath.Join(scratch, "Projects", "Games", "busy", ".git"), day(5))
 	gitLog(t, filepath.Join(scratch, "Projects", "busy", ".git"), day(8))
 	// A worktree's .git is a file naming its folder in the main checkout.
 	feature := filepath.Join(worktreeRoot, "quiet", "feature")
@@ -54,7 +55,7 @@ func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
 	calls := filepath.Join(t.TempDir(), "calls")
 	onPath(t, "tmux", `echo "$*" >> `+calls+`
 case "$2" in
-list-panes) printf 'busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nbusy\t01\t%%3\t\tzsh\t/elsewhere\t0\t0\t@3\tquiet/feature\tfeature\nbusy\t01\t%%4\t\tnvim\t/elsewhere\t0\t0\t@4\tquiet/feature\tREADME\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tscratch\n';;
+list-panes) printf 'Projects/busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nProjects/busy\t01\t%%3\t\tzsh\t/elsewhere\t0\t0\t@3\tquiet/feature\tfeature\nProjects/busy\t01\t%%4\t\tnvim\t/elsewhere\t0\t0\t@4\tquiet/feature\tREADME\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tscratch\n';;
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
 
@@ -80,14 +81,14 @@ esac`)
 		t.Errorf("Folders first shows %q, want %q", got, want)
 	}
 	titles := titlesOf(folders)
-	if want := []string{"quiet/feature", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
+	if want := []string{"quiet/feature", "busy", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
 		t.Errorf("Folders lists %v, want %v", titles, want)
 	}
 	var tags []string
 	for _, r := range folders {
 		tags = append(tags, r.Tag.String())
 	}
-	if want := []string{"tab", "session", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
+	if want := []string{"tab", "session", "", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
 		t.Errorf("Folders tags its rows %q, want %q", tags, want)
 	}
 	enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
@@ -108,7 +109,7 @@ esac`)
 	if ctrlX.When(foldersTab, early[i]) {
 		t.Error("Ctrl-X offers to close busy before the snapshot says it has a session")
 	}
-	if !ctrlX.When(foldersTab, folders[0]) || !ctrlX.When(foldersTab, folders[1]) || ctrlX.When(foldersTab, folders[2]) {
+	if !ctrlX.When(foldersTab, folders[0]) || !ctrlX.When(foldersTab, folders[1]) || ctrlX.When(foldersTab, folders[2]) || ctrlX.When(foldersTab, folders[3]) {
 		t.Error("Ctrl-X isn't offered on exactly the folders that are open")
 	}
 	closeRow := func(row int, answer string) string {
@@ -140,7 +141,7 @@ esac`)
 	for _, r := range sessions {
 		listed = append(listed, r.Title+" in "+r.Detail)
 	}
-	if want := []string{"busy in ~/Projects/busy", "quiet/feature in ~/worktrees/quiet/feature", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
+	if want := []string{"Projects/busy in ~/Projects/busy", "quiet/feature in ~/worktrees/quiet/feature", "scratch in /elsewhere"}; !slices.Equal(listed, want) {
 		t.Errorf("Sessions lists %v, want %v", listed, want)
 	}
 	// scratch is a session with nothing else in it, so closing it closes the

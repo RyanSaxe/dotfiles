@@ -29,17 +29,17 @@ and `ws project` only make the worktree or project and print its path.
 
 ## Places
 
-A folder's terminals are in its place: a session labeled after the folder,
-or, for a worktree, a tab named PROJECT/NAME in any session. `ws` finds a
-place by that name wherever it is, in sessions you made by hand too, and
-keeps no record of where it put one.
+A folder's terminals are in its place: a session labeled PARENT/FOLDER (or
+FOLDER right under `~`), or, for a worktree, a tab named PROJECT/NAME in any
+session. `ws` finds a place by that name wherever it is, in sessions you made
+by hand too, and keeps no record of where it put one.
 
 A worktree opens where the host file's `openAs` says, `tab` by default:
 
 - **tab:** a tab named PROJECT/NAME in the project's session, labeled
-  PROJECT. When that session isn't running, `ws` starts it with a plain
-  shell in the main checkout as its first tab, so no agent starts that
-  nobody asked for.
+  PARENT/PROJECT (or PROJECT right under `~`). When that session isn't
+  running, `ws` starts it with a plain shell in the main checkout as its
+  first tab, so no agent starts that nobody asked for.
 - **session:** a session of its own, labeled PROJECT/NAME.
 
 `--tab` and `--session` on `ws open`, `ws new` and `ws pr` override it for

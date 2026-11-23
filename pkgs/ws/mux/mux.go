@@ -184,13 +184,20 @@ func Find(b Backend, label string) (Place, bool, error) {
 	return p, ok, err
 }
 
-// Label names a folder's place: PROJECT/NAME for a worktree under
-// worktreeRoot and the folder's name otherwise. tmux turns dots and colons
-// into underscores, so Label does too and a place has one label in either.
-func Label(dir, worktreeRoot string) string {
+// Label names a folder's place: PARENT/FOLDER, or just FOLDER when the
+// folder is home, directly under home, or at the filesystem root. Worktrees
+// under ~/worktrees/PROJECT/NAME get PROJECT/NAME by the same rule. tmux
+// turns dots and colons into underscores, so Label does too and a place has
+// one label in either.
+func Label(dir, home string) string {
+	dir = filepath.Clean(dir)
 	label := filepath.Base(dir)
-	if rel, err := filepath.Rel(worktreeRoot, dir); err == nil && !strings.HasPrefix(rel, "..") && strings.Count(rel, "/") == 1 {
-		label = rel
+	parent := filepath.Dir(dir)
+	if home != "" {
+		home = filepath.Clean(home)
+	}
+	if dir != home && parent != home && parent != dir && parent != "." && parent != string(filepath.Separator) {
+		label = filepath.Base(parent) + "/" + label
 	}
 	return strings.NewReplacer(".", "_", ":", "_").Replace(label)
 }

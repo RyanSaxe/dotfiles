@@ -60,7 +60,16 @@ focus = true
 }
 
 // labelFor names a folder's place.
-func labelFor(dir string) string { return mux.Label(dir, worktreeRoot) }
+func labelFor(dir string) string {
+	// git reports symlink-resolved paths (such as /private/var on macOS), so
+	// map paths under the real home back under home before labeling.
+	if real, err := filepath.EvalSymlinks(home); err == nil && real != home {
+		if rel, err := filepath.Rel(real, dir); err == nil && !strings.HasPrefix(rel, "..") {
+			dir = filepath.Join(home, rel)
+		}
+	}
+	return mux.Label(dir, home)
+}
 
 // gitHookEnv is what git hands to hooks, which would point every git command
 // ws runs at the repository whose hook ran it.
