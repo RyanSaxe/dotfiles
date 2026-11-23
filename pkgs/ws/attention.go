@@ -180,12 +180,16 @@ func watchAttention(b mux.Backend) error {
 	}
 	// A signal already waiting covers any more, since one recount sees both.
 	changed := make(chan struct{}, 1)
-	go b.Follow(func() {
+	poke := func() {
 		select {
 		case changed <- struct{}{}:
 		default:
 		}
-	})
+	}
+	go b.Follow(poke)
+	if _, ok := b.(mux.Rex); ok {
+		go followFocus(poke)
+	}
 	asked := make(chan os.Signal, 1)
 	signal.Notify(asked, syscall.SIGUSR1, syscall.SIGUSR2)
 	var in inbox
