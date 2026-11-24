@@ -59,15 +59,19 @@ local function start()
   if timer then
     return
   end
-  timer = vim.uv.new_timer()
-  if not timer then
+  local current = vim.uv.new_timer()
+  if not current then
     return
   end
-  timer:start(
+  timer = current
+  current:start(
     TICK_MS,
     TICK_MS,
     vim.schedule_wrap(function()
-      frame = (frame or 0) % M.FRAMES + 1
+      if timer ~= current or not frame then
+        return
+      end
+      frame = frame % M.FRAMES + 1
       repaint()
     end)
   )

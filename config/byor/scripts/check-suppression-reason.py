@@ -15,14 +15,14 @@ from pathlib import Path
 
 SUPPRESSION_RE = re.compile(
     r"(?P<marker>"
-    r"#\s*noqa(?::\s*[\w,\s-]+)?|"
+    r"#\s*noqa(?::\s*[\w]+(?:\s*,\s*[\w]+)*)?|"
     r"#\s*ty:\s*ignore(?:\[[^\]]+\])?|"
     r"#\s*type:\s*ignore(?:\[[^\]]+\])?|"
-    r"oxlint-disable(?:-next-line|-line)?(?:\s+[\w/@-]+(?:\s*,\s*[\w/@-]+)*)?|"
+    r"oxlint-disable(?:-next-line|-line)?(?:\s+[\w/@]+(?:-[\w/@]+)*(?:\s*,\s*[\w/@]+(?:-[\w/@]+)*)*)?|"
     r"@ts-(?:expect-error|ignore|nocheck)|"
-    r"ast-grep-ignore(?::\s*[\w.,\s-]+)?|"
+    r"ast-grep-ignore(?::\s*[\w./]+(?:-[\w./]+)*(?:\s*,\s*[\w./]+(?:-[\w./]+)*)*)?|"
     r"#\[allow\([^)]+\)\]|"
-    r"//\s*nolint(?::[\w,-]+)?"
+    r"//\s*nolint(?::[\w]+(?:-[\w]+)*(?:,[\w]+(?:-[\w]+)*)*)?"
     r")",
     re.IGNORECASE,
 )

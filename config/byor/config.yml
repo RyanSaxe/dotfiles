@@ -29,6 +29,9 @@ checks:
       - md
       - go
       - lua
+      - sh
+      - bash
+      - nix
     run: python3 ~/.config/byor/scripts/run-repo-linters.py
     gate: false
     tags:

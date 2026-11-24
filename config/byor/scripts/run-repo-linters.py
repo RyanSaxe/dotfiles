@@ -9,6 +9,7 @@ Rust `.rs` files are skipped here and checked by `cargo clippy` in prek and CI.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -24,12 +25,13 @@ GO_EXTS = {".go"}
 LUA_EXTS = {".lua"}
 
 
-def run_tool(argv: list[str], cwd: Path) -> str | None:
+def run_tool(argv: list[str], cwd: Path, *, env: dict[str, str] | None = None) -> str | None:
     """Run one linter command with a bounded timeout; return failure output or None."""
     try:
         result = subprocess.run(
             argv,
             cwd=cwd,
+            env=env,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -115,12 +117,44 @@ def check_go(repo_root: Path, files: list[str]) -> list[str]:
     return [f"[golangci-lint]\n{out}"] if out else []
 
 
+def _emmy_env(emmy_cfg: Path) -> dict[str, str] | None:
+    if "VIMRUNTIME" in os.environ:
+        return None
+    try:
+        if "VIMRUNTIME" not in emmy_cfg.read_text(encoding="utf-8", errors="replace"):
+            return None
+    except OSError:
+        return None
+    nvim = shutil.which("nvim")
+    if not nvim:
+        return None
+    try:
+        result = subprocess.run(
+            [nvim, "--clean", "--headless", "-u", "NONE", '+lua io.write(vim.env.VIMRUNTIME or "")', "+q"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    vimruntime = result.stdout.strip()
+    return {**os.environ, "VIMRUNTIME": vimruntime} if result.returncode == 0 and vimruntime else None
+
+
 def check_lua(repo_root: Path, files: list[str]) -> list[str]:
     failures: list[str] = []
-    if (repo_root / ".emmyrc.json").is_file() or (repo_root / "emmyrc.json").is_file():
+    emmy_cfg = next(
+        (repo_root / name for name in (".emmyrc.json", "emmyrc.json") if (repo_root / name).is_file()), None
+    )
+    if emmy_cfg is not None:
         emmy = shutil.which("emmylua_check")
         if emmy:
-            out = run_tool([emmy, *files], repo_root)
+            out = run_tool(
+                [emmy, "-c", str(emmy_cfg), "--severity", "error", *files],
+                repo_root,
+                env=_emmy_env(emmy_cfg),
+            )
             if out:
                 failures.append(f"[emmylua_check]\n{out}")
 

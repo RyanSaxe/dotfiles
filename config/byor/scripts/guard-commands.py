@@ -16,7 +16,12 @@ import sys
 from pathlib import Path
 
 # Explicit scratch roots allowed for automatic `rm -rf` cleanup (not creating temp files).
-SCRATCH_ROOTS = ("/tmp", "/private/tmp", "/var/folders")  # noqa: S108 -- path allowlist, not temp file creation
+SCRATCH_ROOTS = (
+    "/tmp",  # noqa: S108 -- path allowlist, not temp file creation
+    "/private/tmp",
+    "/var/folders",
+    "/private/var/folders",
+)
 GLOB_CHARS = set("*?[]")
 SHELL_SEPARATORS = {"&&", "||", ";", "|", "&", "\n", "(", ")"}
 WRAPPER_COMMANDS = {"command", "builtin", "exec", "nohup", "time", "sudo"}

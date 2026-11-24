@@ -51,11 +51,13 @@ EMMY_REQUIRED_ERRORS = (
     | frozenset({"unreachable-code"})
 )
 JSONC_TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
+ZSH_SHEBANG_RE = re.compile(rb"^#!\s*(?:/\S*/)?(?:env\s+(?:-\S+\s+)*)?zsh(?:\s|$)")
+SETUP_UV_RE = re.compile(r"astral-sh/setup-uv(?:@([^\s'\"#]+))?")
+SEMVER_PIN_RE = re.compile(r"v?\d+\.\d+\.\d+")
 
 PRUNE_DIRS = frozenset({".git", "node_modules", ".venv", "venv", "target", "dist", "build", "vendor"}) | frozenset(
     {"__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".rumdl_cache", ".next", ".astro"}
 )
-
 SKIP_SIZE_EXTS = (
     frozenset({".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml"})
     | frozenset({".md", ".mdx", ".markdown", ".map", ".snap", ".po", ".pot"})
@@ -112,24 +114,14 @@ def _read_text(path: Path) -> str | None:
         return None
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def _read_json(path: Path, *, jsonc: bool = False) -> dict[str, Any]:
     text = _read_text(path)
     if text is None:
         return {}
+    if jsonc:
+        text = JSONC_TOKEN_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", text)
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _read_jsonc(path: Path) -> dict[str, Any]:
-    text = _read_text(path)
-    if text is None:
-        return {}
-    stripped = JSONC_TOKEN_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", text)
-    try:
-        data = json.loads(stripped)
     except json.JSONDecodeError:
         return {}
     return data if isinstance(data, dict) else {}
@@ -232,6 +224,24 @@ def _collect_node_deps(package_json: dict[str, Any]) -> set[str]:
     return deps
 
 
+def _has_zsh_files(root: Path, files: list[str]) -> bool:
+    for rel in files:
+        path = Path(rel)
+        suffix = path.suffix.lower()
+        if suffix == ".zsh" or path.name in {"zshrc", "zshrc.minimal", ".zshrc"}:
+            return True
+        if suffix not in {".sh", ".bash", ""}:
+            continue
+        try:
+            with (root / rel).open("rb") as handle:
+                first_line = handle.readline(256)
+        except OSError:
+            continue
+        if ZSH_SHEBANG_RE.match(first_line):
+            return True
+    return False
+
+
 def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]) -> dict[str, Any]:
     counts: dict[str, int] = dict.fromkeys(STACK_EXTS, 0)
     ts_count = 0
@@ -253,7 +263,7 @@ def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]
         "web": (root / "package.json").is_file(),
         "markdown": False,
         "rust": (root / "Cargo.toml").is_file(),
-        "go": (root / "go.mod").is_file(),
+        "go": (root / "go.mod").is_file() or any(Path(rel).name == "go.mod" for rel in files),
         "lua": False,
         "notebooks": False,
         "shell": False,
@@ -264,6 +274,7 @@ def _detect_stacks(root: Path, files: list[str], *, package_json: dict[str, Any]
         "present": present,
         "has_typescript": ts_count > 0 or (root / "tsconfig.json").is_file() or "typescript" in node_deps,
         "has_react": react_count > 0 or "react" in node_deps,
+        "has_zsh": _has_zsh_files(root, files),
         "typescript_files": ts_count,
         "react_files": react_count,
     }
@@ -419,6 +430,17 @@ def _legacy_web_tools(root: Path, files: list[str], *, package_json: dict[str, A
     return findings
 
 
+def _legacy_lua_tools(root: Path, files: list[str], *, workflows: dict[str, Any]) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    if (root / ".luacheckrc").is_file():
+        findings.append({"category": "lua", "tool": "luacheck", "evidence": [".luacheckrc"]})
+    selene_ev = [rel for rel in files if Path(rel).name == "selene.toml"]
+    selene_ev.extend(f"{wf['path']}:selene" for wf in workflows["files"] if "selene" in wf["legacy_tools"])
+    if selene_ev:
+        findings.append({"category": "lua", "tool": "selene", "evidence": sorted(set(selene_ev))})
+    return findings
+
+
 def _inspect_legacy_tooling(
     root: Path,
     files: list[str],
@@ -435,9 +457,7 @@ def _inspect_legacy_tooling(
     mdlint_ev.extend(f"package.json-dep:{dep}" for dep in node_deps if "markdownlint" in dep)
     if mdlint_ev:
         findings.append({"category": "markdown", "tool": "markdownlint", "evidence": sorted(set(mdlint_ev))})
-
-    if (root / ".luacheckrc").is_file():
-        findings.append({"category": "lua", "tool": "luacheck", "evidence": [".luacheckrc"]})
+    findings.extend(_legacy_lua_tools(root, files, workflows=workflows))
 
     precommit_ev: list[str] = []
     if "pre-commit" in _collect_python_deps(root, pyproject):
@@ -466,45 +486,50 @@ def _inspect_legacy_tooling(
     return findings
 
 
+def _within_cap(value: object, limit: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= limit
+
+
 def _missing_ruff_rules(ruff_cfg: dict[str, Any]) -> list[dict[str, str]]:
     if not ruff_cfg:
         return [{"scope": "python", "item": "[tool.ruff]", "detail": "Ruff config in pyproject.toml"}]
-    missing: list[dict[str, str]] = []
     lint_cfg = _as_dict(ruff_cfg.get("lint"))
     pylint_cfg = _as_dict(lint_cfg.get("pylint"))
     mccabe_cfg = _as_dict(lint_cfg.get("mccabe"))
-    checks = (
+    caps = (
+        (mccabe_cfg, "mccabe", "max-complexity", EXPECTED_MAX_COMPLEXITY, "cap cyclomatic complexity via C901"),
+        (pylint_cfg, "pylint", "max-positional-args", EXPECTED_MAX_POSITIONAL_ARGS, "cap positional args via PLR0917"),
+        (pylint_cfg, "pylint", "max-branches", EXPECTED_MAX_BRANCHES, "cap branches via PLR0912"),
+        (pylint_cfg, "pylint", "max-nested-blocks", EXPECTED_MAX_NESTED_BLOCKS, "cap nesting depth via PLR1702"),
+    )
+    checks = [
         (lint_cfg.get("select") != ["ALL"], "[tool.ruff.lint] select = ['ALL']", "enable Ruff ALL ruleset"),
-        (
-            mccabe_cfg.get("max-complexity") != EXPECTED_MAX_COMPLEXITY,
-            "[tool.ruff.lint.mccabe] max-complexity = 8",
-            "cap cyclomatic complexity via C901",
-        ),
-        (
-            pylint_cfg.get("max-positional-args") != EXPECTED_MAX_POSITIONAL_ARGS,
-            "[tool.ruff.lint.pylint] max-positional-args = 2",
-            "cap positional args via PLR0917",
-        ),
-        (
-            pylint_cfg.get("max-branches") != EXPECTED_MAX_BRANCHES,
-            "[tool.ruff.lint.pylint] max-branches = 10",
-            "cap branches via PLR0912",
-        ),
-        (
-            pylint_cfg.get("max-nested-blocks") != EXPECTED_MAX_NESTED_BLOCKS,
-            "[tool.ruff.lint.pylint] max-nested-blocks = 4",
-            "cap nesting depth via PLR1702",
+        *(
+            (not _within_cap(cfg.get(key), limit), f"[tool.ruff.lint.{sec}] {key} <= {limit}", detail)
+            for cfg, sec, key, limit, detail in caps
         ),
         (
             not _as_dict(_as_dict(lint_cfg.get("flake8-tidy-imports")).get("banned-api")),
             "[tool.ruff.lint.flake8-tidy-imports.banned-api]",
             "ban cast, unittest and dynamic imports",
         ),
+    ]
+    return [{"scope": "python", "item": item, "detail": detail} for is_missing, item, detail in checks if is_missing]
+
+
+def _missing_setup_uv_pin(root: Path) -> list[dict[str, str]]:
+    text = _read_text(root / ".github" / "workflows" / "check.yml") or ""
+    unpinned = sorted(
+        {
+            f"@{ref}" if ref else "(unpinned)"
+            for m in SETUP_UV_RE.finditer(text)
+            if not ((ref := m.group(1)) and SEMVER_PIN_RE.fullmatch(ref))
+        }
     )
-    for is_missing, item, detail in checks:
-        if is_missing:
-            missing.append({"scope": "python", "item": item, "detail": detail})
-    return missing
+    if not unpinned:
+        return []
+    detail = f"pin astral-sh/setup-uv to full semver like @v10.4.0 (found: {', '.join(unpinned)})"
+    return [{"scope": "python", "item": "check.yml setup-uv semver pin", "detail": detail}]
 
 
 def _missing_python_configs(root: Path, pyproject: dict[str, Any], *, precommit_text: str) -> list[dict[str, str]]:
@@ -516,13 +541,12 @@ def _missing_python_configs(root: Path, pyproject: dict[str, Any], *, precommit_
     missing.extend(_missing_ruff_rules(_as_dict(_as_dict(pyproject.get("tool")).get("ruff"))))
     if "ty" not in _collect_python_deps(root, pyproject) and "ty-pre-commit" not in precommit_text:
         missing.append({"scope": "python", "item": "ty", "detail": "add ty to dev deps and .pre-commit-config.yaml"})
+    missing.extend(_missing_setup_uv_pin(root))
     return missing
 
 
 def _missing_oxlint_rules(root: Path, *, has_typescript: bool) -> list[dict[str, str]]:
-    cfg = _read_jsonc(root / ".oxlintrc.json")
-    if not cfg:
-        return []
+    cfg = _read_json(root / ".oxlintrc.json", jsonc=True)
     rules = _as_dict(cfg.get("rules"))
     required = OXLINT_COMMON_RULES | (OXLINT_TS_RULES if has_typescript else frozenset())
     absent = sorted(rule for rule in required if rule not in rules)
@@ -578,15 +602,32 @@ def _missing_rust_configs(root: Path) -> list[dict[str, str]]:
     return missing
 
 
-def _missing_go_configs(root: Path) -> list[dict[str, str]]:
-    cfg_path = next((root / name for name in (".golangci.yml", ".golangci.yaml") if (root / name).is_file()), None)
-    if cfg_path is None:
-        return [{"scope": "go", "item": ".golangci.yml", "detail": "golangci-lint v2 config"}]
-    text = _read_text(cfg_path) or ""
-    absent = sorted(name for name in GOLANGCI_REQUIRED if not re.search(rf"\b{re.escape(name)}\b", text))
-    if not absent:
-        return []
-    return [{"scope": "go", "item": ".golangci.yml parity linters", "detail": f"missing: {', '.join(absent)}"}]
+def _find_golangci_cfg(root: Path, mod_dir: Path) -> Path | None:
+    dirs = (mod_dir, Path()) if mod_dir != Path() else (Path(),)
+    for rel_dir in dirs:
+        for name in (".golangci.yml", ".golangci.yaml"):
+            candidate = root / rel_dir / name
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def _missing_go_configs(root: Path, files: list[str]) -> list[dict[str, str]]:
+    mod_dirs = sorted({Path(rel).parent for rel in files if Path(rel).name == "go.mod"}) or [Path()]
+    missing: list[dict[str, str]] = []
+    for mod_dir in mod_dirs:
+        cfg_path = _find_golangci_cfg(root, mod_dir)
+        if cfg_path is None:
+            item = ".golangci.yml" if mod_dir == Path() else f"{mod_dir.as_posix()}/.golangci.yml"
+            missing.append({"scope": "go", "item": item, "detail": "golangci-lint v2 config"})
+            continue
+        text = _read_text(cfg_path) or ""
+        absent = sorted(name for name in GOLANGCI_REQUIRED if not re.search(rf"\b{re.escape(name)}\b", text))
+        if absent:
+            rel_cfg = cfg_path.relative_to(root).as_posix()
+            detail = f"missing: {', '.join(absent)}"
+            missing.append({"scope": "go", "item": f"{rel_cfg} parity linters", "detail": detail})
+    return missing
 
 
 def _missing_lua_configs(root: Path, *, precommit_text: str) -> list[dict[str, str]]:
@@ -597,49 +638,48 @@ def _missing_lua_configs(root: Path, *, precommit_text: str) -> list[dict[str, s
     if not emmy_path.is_file():
         missing.append({"scope": "lua", "item": ".emmyrc.json", "detail": "emmylua_check config"})
     else:
-        severity = _as_dict(_as_dict(_read_jsonc(emmy_path).get("diagnostics")).get("severity"))
+        severity = _as_dict(_as_dict(_read_json(emmy_path, jsonc=True).get("diagnostics")).get("severity"))
         absent = sorted(rule for rule in EMMY_REQUIRED_ERRORS if severity.get(rule) != "error")
         if absent:
             preview = ", ".join(absent[:MAX_RULE_PREVIEW])
             missing.append({"scope": "lua", "item": ".emmyrc.json severity", "detail": f"not error: {preview}"})
     if precommit_text and "luacheck" not in precommit_text:
-        missing.append(
-            {
-                "scope": "lua",
-                "item": "luacheck complexity hook",
-                "detail": "luacheck --only 561 --max-cyclomatic-complexity 10",
-            }
-        )
+        detail = "luacheck --only 561 --max-cyclomatic-complexity 10"
+        missing.append({"scope": "lua", "item": "luacheck complexity hook", "detail": detail})
     return missing
 
 
-def _missing_shell_nix_configs(present: dict[str, int], *, precommit_text: str) -> list[dict[str, str]]:
+def _missing_shell_nix_configs(stacks: dict[str, Any], *, precommit_text: str) -> list[dict[str, str]]:
     if not precommit_text:
         return []
-    missing: list[dict[str, str]] = []
-    checks: tuple[tuple[str, str, str, str], ...] = (
-        ("shell", "shfmt", "shfmt hook", "format sh/bash scripts with shfmt -i 2"),
-        ("shell", "shellcheck", "shellcheck hook", "lint sh/bash scripts with shellcheck"),
-        ("shell", "zsh -n", "zsh syntax hook", "check zsh scripts with zsh -n"),
-        ("nix", "nixfmt", "nixfmt hook", "format Nix files with nixfmt"),
-        ("nix", "deadnix", "deadnix hook", "catch unused Nix bindings with deadnix --fail"),
-        ("nix", "statix", "statix hook", "catch Nix anti-patterns with statix check"),
+    present: dict[str, int] = stacks["present"]
+    checks: tuple[tuple[bool, str, str, str, str], ...] = (
+        ("shell" in present, "shell", "shfmt", "shfmt hook", "format sh/bash scripts with shfmt -i 2"),
+        ("shell" in present, "shell", "shellcheck", "shellcheck hook", "lint sh/bash scripts with shellcheck"),
+        (bool(stacks["has_zsh"]), "shell", "zsh -n", "zsh syntax hook", "check zsh scripts with zsh -n"),
+        ("nix" in present, "nix", "nixfmt", "nixfmt hook", "format Nix files with nixfmt"),
+        ("nix" in present, "nix", "deadnix", "deadnix hook", "catch unused Nix bindings with deadnix --fail"),
+        ("nix" in present, "nix", "statix", "statix hook", "catch Nix anti-patterns with statix check"),
     )
-    for stack, needle, item, detail in checks:
-        if stack in present and needle not in precommit_text:
-            missing.append({"scope": stack, "item": item, "detail": detail})
-    return missing
+    return [
+        {"scope": scope, "item": item, "detail": detail}
+        for required, scope, needle, item, detail in checks
+        if required and needle not in precommit_text
+    ]
 
 
-def _missing_systems_configs(root: Path, present: dict[str, int], *, precommit_text: str) -> list[dict[str, str]]:
+def _missing_systems_configs(
+    root: Path, stacks: dict[str, Any], *, files: list[str], precommit_text: str
+) -> list[dict[str, str]]:
+    present: dict[str, int] = stacks["present"]
     missing: list[dict[str, str]] = []
     if "rust" in present:
         missing.extend(_missing_rust_configs(root))
     if "go" in present:
-        missing.extend(_missing_go_configs(root))
+        missing.extend(_missing_go_configs(root, files))
     if "lua" in present:
         missing.extend(_missing_lua_configs(root, precommit_text=precommit_text))
-    missing.extend(_missing_shell_nix_configs(present, precommit_text=precommit_text))
+    missing.extend(_missing_shell_nix_configs(stacks, precommit_text=precommit_text))
     return missing
 
 
@@ -647,6 +687,7 @@ def _inspect_missing_configs(
     root: Path,
     stacks: dict[str, Any],
     *,
+    files: list[str],
     pyproject: dict[str, Any],
     package_json: dict[str, Any],
 ) -> list[dict[str, str]]:
@@ -665,20 +706,15 @@ def _inspect_missing_configs(
 
     precommit_text = _read_text(root / ".pre-commit-config.yaml") or ""
     if precommit_text and "max-file-lines" not in precommit_text:
-        missing.append(
-            {
-                "scope": "universal",
-                "item": "max-file-lines hook",
-                "detail": "1,000-line hard cap in .pre-commit-config.yaml",
-            }
-        )
+        detail = "1,000-line hard cap in .pre-commit-config.yaml"
+        missing.append({"scope": "universal", "item": "max-file-lines hook", "detail": detail})
 
     present = stacks["present"]
     if "python" in present:
         missing.extend(_missing_python_configs(root, pyproject, precommit_text=precommit_text))
     if "web" in present:
         missing.extend(_missing_web_configs(root, stacks, package_json=package_json))
-    missing.extend(_missing_systems_configs(root, present, precommit_text=precommit_text))
+    missing.extend(_missing_systems_configs(root, stacks, files=files, precommit_text=precommit_text))
     return missing
 
 
@@ -733,11 +769,7 @@ def _inspect_byor(root: Path, stacks: dict[str, Any]) -> dict[str, Any]:
     packages = _parse_simple_yaml_list(local_text, "packages") or _parse_simple_yaml_list(config_text, "packages")
 
     present = stacks["present"]
-    expected = ["craft"]
-    if "python" in present:
-        expected.append("python")
-    if "web" in present:
-        expected.append("web")
+    expected = ["craft", *(stack for stack in ("python", "web") if stack in present)]
 
     project_rules: list[str] = []
     if project_rules_dir.is_dir():
@@ -817,18 +849,11 @@ def audit_repository(root: Path) -> dict[str, Any]:
         "total_files": len(files),
         "stacks": stacks,
         "legacy_tooling": _inspect_legacy_tooling(
-            resolved,
-            files,
-            pyproject=pyproject,
-            package_json=package_json,
-            workflows=workflows,
+            resolved, files, pyproject=pyproject, package_json=package_json, workflows=workflows
         ),
         "workflows": workflows,
         "missing_configs": _inspect_missing_configs(
-            resolved,
-            stacks,
-            pyproject=pyproject,
-            package_json=package_json,
+            resolved, stacks, files=files, pyproject=pyproject, package_json=package_json
         ),
         "byor": _inspect_byor(resolved, stacks),
         "tools": {tool: shutil.which(tool) is not None for tool in PARITY_TOOLS},
@@ -883,77 +908,64 @@ def _format_sizes_section(sizes: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _yn(flag: object) -> str:
+    return "yes" if flag else "no"
+
+
+def _md_table(title: str, header: str, *, rows: list[str], empty: str = "") -> list[str]:
+    out = ["", f"## {title}", ""]
+    if not rows:
+        return [*out, empty]
+    sep = "| " + " | ".join("---" for _ in header.strip("|").split("|")) + " |"
+    return [*out, header, sep, *rows]
+
+
 def format_markdown(report: dict[str, Any]) -> str:
     """Format an audit report as concise Markdown tables."""
     lines: list[str] = [f"# Repository audit: `{report['path']}`", "", *_format_stacks_section(report["stacks"])]
-
-    lines.extend(["", "## Legacy tooling", ""])
-    legacy: list[dict[str, Any]] = report["legacy_tooling"]
-    if legacy:
-        lines.extend(["| Category | Tool | Evidence |", "| --- | --- | --- |"])
-        lines.extend(
-            f"| {e['category']} | {e['tool']} | {', '.join(f'`{ev}`' for ev in e['evidence'])} |" for e in legacy
-        )
-    else:
-        lines.append("None detected.")
-
+    legacy_rows = [
+        f"| {e['category']} | {e['tool']} | {', '.join(f'`{ev}`' for ev in e['evidence'])} |"
+        for e in report["legacy_tooling"]
+    ]
+    lines.extend(
+        _md_table("Legacy tooling", "| Category | Tool | Evidence |", rows=legacy_rows, empty="None detected.")
+    )
     lines.extend(["", *_format_workflows_section(report["workflows"])])
-
-    lines.extend(["", "## Missing canonical files and configs", ""])
-    missing: list[dict[str, str]] = report["missing_configs"]
-    if missing:
-        lines.extend(["| Scope | Missing | Why |", "| --- | --- | --- |"])
-        lines.extend(f"| {m['scope']} | `{m['item']}` | {m['detail']} |" for m in missing)
-    else:
-        lines.append("All canonical files and configs are present.")
-
+    missing_rows = [f"| {m['scope']} | `{m['item']}` | {m['detail']} |" for m in report["missing_configs"]]
+    lines.extend(
+        _md_table(
+            "Missing canonical files and configs",
+            "| Scope | Missing | Why |",
+            rows=missing_rows,
+            empty="All canonical files and configs are present.",
+        )
+    )
     byor = report["byor"]
-    lines.extend(
-        [
-            "",
-            "## BYOR wiring",
-            "",
-            "| Check | Status |",
-            "| --- | --- |",
-            f"| Initialized (`.byor/`) | {'yes' if byor['initialized'] else 'no'} |",
-            f"| Enabled packages | {', '.join(byor['packages']) or 'none'} |",
-            f"| Expected packages | {', '.join(byor['expected_packages'])} |",
-            f"| Missing packages | {', '.join(byor['missing_packages']) or 'none'} |",
-            f"| Stale packages | {', '.join(byor['stale_packages']) or 'none'} |",
-            f"| `gate: true` set (should be false) | {'yes' if byor['gate_enabled'] else 'no'} |",
-            f"| Project rules (`.byor/rules/project/`) | {byor['project_rules_count']} |",
-            f"| Needs `ast-grep` prek hook | {'yes' if byor['needs_ast_grep_hook'] else 'no'} |",
-            "",
-            *_format_sizes_section(report["file_sizes"]),
-        ]
-    )
-
-    tools = report["tools"]
-    lines.extend(
-        [
-            "",
-            "## Local tools",
-            "",
-            "| Tool | Available |",
-            "| --- | --- |",
-            *(f"| `{name}` | {'yes' if available else 'no'} |" for name, available in tools.items()),
-        ]
-    )
-
+    byor_rows = [
+        f"| Initialized (`.byor/`) | {_yn(byor['initialized'])} |",
+        f"| Enabled packages | {', '.join(byor['packages']) or 'none'} |",
+        f"| Expected packages | {', '.join(byor['expected_packages'])} |",
+        f"| Missing packages | {', '.join(byor['missing_packages']) or 'none'} |",
+        f"| Stale packages | {', '.join(byor['stale_packages']) or 'none'} |",
+        f"| `gate: true` set (should be false) | {_yn(byor['gate_enabled'])} |",
+        f"| Project rules (`.byor/rules/project/`) | {byor['project_rules_count']} |",
+        f"| Needs `ast-grep` prek hook | {_yn(byor['needs_ast_grep_hook'])} |",
+    ]
+    lines.extend(_md_table("BYOR wiring", "| Check | Status |", rows=byor_rows))
+    lines.extend(["", *_format_sizes_section(report["file_sizes"])])
+    tool_rows = [f"| `{name}` | {_yn(available)} |" for name, available in report["tools"].items()]
+    lines.extend(_md_table("Local tools", "| Tool | Available |", rows=tool_rows))
     hygiene = report["git_hygiene"]
-    lines.extend(
-        [
-            "",
-            "## Git hygiene",
-            "",
-            "| File | Present |",
-            "| --- | --- |",
-            f"| `.git-blame-ignore-revs` | {'yes' if hygiene['has_git_blame_ignore_revs'] else 'no'} |",
-            f"| `BACKLOG.md` | {'yes' if hygiene['has_backlog_md'] else 'no'} |",
-            f"| `AGENTS.md` | {'yes' if hygiene['has_agents_md'] else 'no'} |",
-            f"| `README.md` | {'yes' if hygiene['has_readme_md'] else 'no'} |",
-        ]
-    )
+    hygiene_rows = [
+        f"| `{name}` | {_yn(hygiene[key])} |"
+        for name, key in (
+            (".git-blame-ignore-revs", "has_git_blame_ignore_revs"),
+            ("BACKLOG.md", "has_backlog_md"),
+            ("AGENTS.md", "has_agents_md"),
+            ("README.md", "has_readme_md"),
+        )
+    ]
+    lines.extend(_md_table("Git hygiene", "| File | Present |", rows=hygiene_rows))
     return "\n".join(lines) + "\n"
 
 
