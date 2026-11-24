@@ -24,6 +24,7 @@ def current_mode() -> str:
         ["/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle"],
         capture_output=True,
         text=True,
+        check=False,
     )
     return "dark" if "Dark" in style.stdout else "light"
 

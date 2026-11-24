@@ -23,7 +23,7 @@ def is_test_path(path: Path) -> bool:
     if {part.lower() for part in path.parts[:-1]} & TEST_DIRS:
         return True
     name = path.name.lower()
-    if name in {"conftest.py"} or name.startswith("test_") or name.endswith(("_test.py", "_test.go", "_spec.lua")):
+    if name == "conftest.py" or name.startswith("test_") or name.endswith(("_test.py", "_test.go", "_spec.lua")):
         return True
     return any(marker in name for marker in (".test.", ".spec."))
 
@@ -75,8 +75,9 @@ def main(argv: list[str]) -> int:
             except ValueError:
                 rel_dir = str(parent)
             findings.append(
-                f"{raw}: `{rel_dir}/` now contains {sibling_count} sibling source files (threshold {SPRAWL_THRESHOLD}). "
-                "Check whether this directory is becoming a flat dumping ground and should be grouped into cohesive domain subdirectories."
+                f"{raw}: `{rel_dir}/` now contains {sibling_count} sibling source files "
+                f"(threshold {SPRAWL_THRESHOLD}). Check whether this directory is becoming a flat "
+                "dumping ground and should be grouped into cohesive domain subdirectories."
             )
 
     if findings:

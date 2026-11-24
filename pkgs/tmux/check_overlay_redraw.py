@@ -1,7 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Check that tmux delivers a popup's output written while a window redraw is
+"""Verify tmux deferred redraw behavior with an open popup overlay.
+
+Check that tmux delivers a popup's output written while a window redraw is
 deferred, and leaves a popup that wrote nothing alone.
 
 It attaches a client to a pty and fills that pty, so tmux can write the
@@ -17,6 +19,8 @@ defer a window redraw, and then reads the pty. It does that twice:
 usage: check_overlay_redraw.py [TMUX_BINARY]   (exit 0 pass, 1 fail)
 """
 
+from __future__ import annotations
+
 import fcntl
 import os
 import select
@@ -26,6 +30,11 @@ import sys
 import tempfile
 import termios
 import time
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 tmux = sys.argv[1] if len(sys.argv) > 1 else "tmux"
 T = [tmux, "-L", f"overlay-check-{os.getpid()}", "-f", "/dev/null"]
@@ -33,16 +42,16 @@ T = [tmux, "-L", f"overlay-check-{os.getpid()}", "-f", "/dev/null"]
 env = {k: v for k, v in os.environ.items() if k not in ("TMUX", "TMUX_PANE")}
 env["TERM"] = "xterm-256color"
 
-subprocess.run(T + ["new-session", "-d", "-x", "100", "-y", "30", "sh"], check=True, env=env)
+subprocess.run([*T, "new-session", "-d", "-x", "100", "-y", "30", "sh"], check=True, env=env)
 terminal, client_tty = os.openpty()
 fcntl.ioctl(client_tty, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 100, 0, 0))
 client = subprocess.Popen(
-    T + ["attach"], env=env, stdin=client_tty, stdout=client_tty, stderr=client_tty, start_new_session=True
+    [*T, "attach"], env=env, stdin=client_tty, stdout=client_tty, stderr=client_tty, start_new_session=True
 )
 out = bytearray()
 
 
-def read_for(seconds, until=None):
+def read_for(seconds: float, until: bytes | None = None) -> None:
     end = time.monotonic() + seconds
     while time.monotonic() < end and not (until and until in out):
         ready, _, _ = select.select([terminal], [], [], 0.02)
@@ -50,7 +59,7 @@ def read_for(seconds, until=None):
             out.extend(os.read(terminal, 65536))
 
 
-def wait_until(happened, what):
+def wait_until(happened: Callable[[], bool], what: str) -> None:
     end = time.monotonic() + 30
     while not happened():
         if time.monotonic() > end:
@@ -58,7 +67,7 @@ def wait_until(happened, what):
         time.sleep(0.02)
 
 
-def fill_pty():
+def fill_pty() -> None:
     """Write to the client's pty until it holds no more.
 
     A pty holds 1 KB on macOS and 20 KB on Linux. tmux defers a redraw only
@@ -75,11 +84,11 @@ def fill_pty():
         os.close(tty)
 
 
-def tm(*args):
-    return subprocess.run(T + list(args), check=True, env=env, capture_output=True, text=True).stdout
+def tm(*args: str) -> str:
+    return subprocess.run([*T, *args], check=True, env=env, capture_output=True, text=True).stdout
 
 
-def scroll_behind_full_pty(last_line):
+def scroll_behind_full_pty(last_line: int) -> None:
     """Fill the pty and scroll the pane under the popup.
 
     tmux marks the pane for a redraw, and defers that redraw while the pty
@@ -91,22 +100,33 @@ def scroll_behind_full_pty(last_line):
 
 
 failure = "the check did not finish"
-socket = None
+socket: Path | None = None
 with tempfile.TemporaryDirectory() as signals:
-    go, printed = os.path.join(signals, "go"), os.path.join(signals, "printed")
+    signals_dir = Path(signals)
+    go, printed = signals_dir / "go", signals_dir / "printed"
     try:
         # tmux asks a new client's terminal what it supports, and redraws
         # everything when no answer has come after five seconds. Nothing
         # answers here, so the check starts after that redraw.
         read_for(5.5)
-        socket = tm("display-message", "-p", "#{socket_path}").strip()
+        socket_str = tm("display-message", "-p", "#{socket_path}").strip()
+        socket = Path(socket_str) if socket_str else None
         name = tm("list-clients", "-F", "#{client_name}").strip()
         # display-popup returns only when the popup closes, so it runs
         # alongside. The popup prints MARKER once `go` exists.
         subprocess.Popen(
-            T
-            + ["display-popup", "-c", name, "-w", "60", "-h", "10", "-E"]
-            + [f"printf QUIET; until [ -e {go} ]; do sleep 0.05; done; printf MARKER; touch {printed}; sleep 30"],
+            [
+                *T,
+                "display-popup",
+                "-c",
+                name,
+                "-w",
+                "60",
+                "-h",
+                "10",
+                "-E",
+                f"printf QUIET; until [ -e {go} ]; do sleep 0.05; done; printf MARKER; touch {printed}; sleep 30",
+            ],
             env=env,
         )
         read_for(5.0, until=b"QUIET")
@@ -118,8 +138,8 @@ with tempfile.TemporaryDirectory() as signals:
         repainted = b"QUIET" in out[mark:]
 
         scroll_behind_full_pty(3000)
-        open(go, "w").close()
-        wait_until(lambda: os.path.exists(printed), "the popup to print")
+        go.touch()
+        wait_until(printed.exists, "the popup to print")
         time.sleep(0.5)  # tmux reads the popup's output
         mark = len(out)
         read_for(3.0, until=b"MARKER")
@@ -132,12 +152,13 @@ with tempfile.TemporaryDirectory() as signals:
         else:
             failure = None
     finally:
-        subprocess.run(T + ["kill-server"], env=env, capture_output=True)
+        subprocess.run([*T, "kill-server"], env=env, capture_output=True, check=False)
         os.close(client_tty)
         os.close(terminal)
         client.wait()
         # tmux leaves the socket of a server killed with a popup open.
-        if socket and os.path.exists(socket):
-            os.unlink(socket)
-print(f"FAIL: {failure}" if failure else "pass: tmux redrew the popup only for the popup's own output")
+        if socket and socket.exists():
+            socket.unlink()
+status = f"FAIL: {failure}" if failure else "pass: tmux redrew the popup only for the popup's own output"
+sys.stdout.write(f"{status}\n")
 sys.exit(1 if failure else 0)

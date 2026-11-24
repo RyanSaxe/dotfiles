@@ -18,6 +18,7 @@ PY_EXTS = {".py", ".pyi"}
 JS_EXTS = {".ts", ".tsx", ".js", ".jsx"}
 RUST_EXTS = {".rs"}
 LUA_EXTS = {".lua"}
+MAX_THIN_LINES = 2
 
 JS_DECL_RE = re.compile(
     r"^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function\s+([A-Za-z_$]\w*)|class\s+([A-Za-z_$]\w*)|(?:const|let)\s+([A-Za-z_$]\w*)\s*=|([A-Za-z_$]\w*)\s*\()"
@@ -49,28 +50,43 @@ def check_python(raw: str, text: str) -> list[str]:
         if not doc:
             continue
         non_empty = [line for line in doc.splitlines() if line.strip()]
-        if 1 <= len(non_empty) <= 2:
+        if 1 <= len(non_empty) <= MAX_THIN_LINES:
             findings.append(
                 f"{raw}:{node.lineno}: thin {len(non_empty)}-line docstring on `{node.name}`. {DELETE_PROMPT}"
             )
     return findings
 
 
-def check_js(raw: str, text: str) -> list[str]:
-    lines = text.splitlines()
-    findings: list[str] = []
+def _clean_jsdoc_lines(block: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for raw_line in block:
+        s = raw_line.strip()
+        s = re.sub(r"^/\*\*+", "", s)
+        s = re.sub(r"\*/$", "", s)
+        s = re.sub(r"^\*\s?", "", s).strip()
+        if s:
+            cleaned.append(s)
+    return cleaned
+
+
+def _skip_js_header(lines: list[str]) -> int:
     idx = 0
-    # Skip leading module header comment block if present at top of file.
     while idx < len(lines) and (not lines[idx].strip() or lines[idx].startswith("#!")):
         idx += 1
     if idx < len(lines) and lines[idx].strip().startswith("/*"):
         while idx < len(lines) and "*/" not in lines[idx]:
             idx += 1
         idx += 1
+    return idx
+
+
+def check_js(raw: str, text: str) -> list[str]:
+    lines = text.splitlines()
+    findings: list[str] = []
+    idx = _skip_js_header(lines)
 
     while idx < len(lines):
-        line = lines[idx].strip()
-        if line.startswith("/**"):
+        if lines[idx].strip().startswith("/**"):
             start = idx
             block: list[str] = []
             while idx < len(lines):
@@ -81,22 +97,11 @@ def check_js(raw: str, text: str) -> list[str]:
             next_idx = idx + 1
             while next_idx < len(lines) and not lines[next_idx].strip():
                 next_idx += 1
-            if next_idx < len(lines):
-                match = JS_DECL_RE.match(lines[next_idx])
-                if match:
-                    cleaned_lines: list[str] = []
-                    for raw_line in block:
-                        s = raw_line.strip()
-                        s = re.sub(r"^/\*\*+", "", s)
-                        s = re.sub(r"\*/$", "", s)
-                        s = re.sub(r"^\*\s?", "", s).strip()
-                        if s:
-                            cleaned_lines.append(s)
-                    if 1 <= len(cleaned_lines) <= 2:
-                        name = next((g for g in match.groups() if g), "declaration")
-                        findings.append(
-                            f"{raw}:{start + 1}: thin {len(cleaned_lines)}-line JSDoc on `{name}`. {DELETE_PROMPT}"
-                        )
+            match = JS_DECL_RE.match(lines[next_idx]) if next_idx < len(lines) else None
+            cleaned_lines = _clean_jsdoc_lines(block) if match else []
+            if match and 1 <= len(cleaned_lines) <= MAX_THIN_LINES:
+                name = next((g for g in match.groups() if g), "declaration")
+                findings.append(f"{raw}:{start + 1}: thin {len(cleaned_lines)}-line JSDoc on `{name}`. {DELETE_PROMPT}")
         idx += 1
     return findings
 
@@ -118,11 +123,12 @@ def check_rust(raw: str, text: str) -> list[str]:
             decl_idx = idx
             while decl_idx < len(lines) and lines[decl_idx].strip().startswith("#["):
                 decl_idx += 1
-            if decl_idx < len(lines) and 1 <= len(doc_lines) <= 2:
+            if decl_idx < len(lines) and 1 <= len(doc_lines) <= MAX_THIN_LINES:
                 match = RUST_DECL_RE.match(lines[decl_idx])
                 if match:
                     findings.append(
-                        f"{raw}:{start + 1}: thin {len(doc_lines)}-line doc comment on `{match.group(1)}`. {DELETE_PROMPT}"
+                        f"{raw}:{start + 1}: thin {len(doc_lines)}-line doc comment on `{match.group(1)}`. "
+                        f"{DELETE_PROMPT}"
                     )
             continue
         idx += 1
@@ -143,7 +149,7 @@ def check_lua(raw: str, text: str) -> list[str]:
                 if content and not content.startswith("@"):
                     prose_lines.append(content)
                 idx += 1
-            if idx < len(lines) and 1 <= len(prose_lines) <= 2:
+            if idx < len(lines) and 1 <= len(prose_lines) <= MAX_THIN_LINES:
                 match = LUA_DECL_RE.match(lines[idx])
                 if match:
                     findings.append(

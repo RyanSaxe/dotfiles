@@ -14,7 +14,7 @@
 local SHELL = "com.superlogical.terminal.shell"
 local TERMINAL = "com.superlogical.terminal"
 -- ~/.config/rex links to this directory, so the scripts sit beside this file.
-local REX_DIR = debug.getinfo(1, "S").source:match("^@?(.*)/")
+local REX_DIR = assert(debug.getinfo(1, "S")).source:match("^@?(.*)/")
 local PREFIX = "ctrl+space>"
 
 -- Opens command in a float, starting in cwd when it isn't nil.

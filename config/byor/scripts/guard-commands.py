@@ -10,17 +10,18 @@ operations while linked worktrees exist.
 
 from __future__ import annotations
 
-import os
 import shlex
 import subprocess
 import sys
 from pathlib import Path
 
-SCRATCH_ROOTS = ("/tmp", "/private/tmp", "/var/folders")
+# Explicit scratch roots allowed for automatic `rm -rf` cleanup (not creating temp files).
+SCRATCH_ROOTS = ("/tmp", "/private/tmp", "/var/folders")  # noqa: S108 -- path allowlist, not temp file creation
 GLOB_CHARS = set("*?[]")
 SHELL_SEPARATORS = {"&&", "||", ";", "|", "&", "\n", "(", ")"}
 WRAPPER_COMMANDS = {"command", "builtin", "exec", "nohup", "time", "sudo"}
 GIT_OPTIONS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
+MIN_SUBCMD_TOKENS = 2
 
 
 def split_segments(command: str) -> list[list[str]]:
@@ -69,9 +70,7 @@ def strip_prefixes(tokens: list[str]) -> list[str]:
                 arg = tokens[idx]
                 if arg in {"-u", "-C", "-S"}:
                     idx += 2
-                elif arg.startswith("-"):
-                    idx += 1
-                elif "=" in arg and arg.split("=", 1)[0].isidentifier():
+                elif arg.startswith("-") or ("=" in arg and arg.split("=", 1)[0].isidentifier()):
                     idx += 1
                 else:
                     break
@@ -88,30 +87,26 @@ def is_in_scratch(path: Path) -> bool:
 
 def is_safe_rm_target(raw: str) -> bool:
     """Allow recursive force delete only on explicit paths under scratch or agent-notes/."""
-    if not raw or any(ch in GLOB_CHARS for ch in raw):
-        return False
-    if "$" in raw or "`" in raw or raw.startswith("~"):
-        return False
-    parts = Path(raw).parts
-    if ".." in parts:
-        return False
-
+    has_bad_syntax = (
+        not raw
+        or any(ch in GLOB_CHARS for ch in raw)
+        or "$" in raw
+        or "`" in raw
+        or raw.startswith("~")
+        or ".." in Path(raw).parts
+    )
     cleaned = raw.rstrip("/")
-    if not cleaned:
+    if has_bad_syntax or not cleaned:
         return False
 
     if cleaned.startswith("/"):
-        for root in SCRATCH_ROOTS:
-            if cleaned.startswith(f"{root}/") and len(cleaned) > len(root) + 1:
-                return True
-        return False
+        return any(cleaned.startswith(f"{root}/") and len(cleaned) > len(root) + 1 for root in SCRATCH_ROOTS)
 
-    normalized = cleaned[2:] if cleaned.startswith("./") else cleaned
+    normalized = cleaned.removeprefix("./")
     return normalized.startswith("agent-notes/") and len(normalized) > len("agent-notes/")
 
 
-def check_rm(tokens: list[str]) -> str | None:
-    """Block `rm -rf` outside safe scratch and `agent-notes/` targets."""
+def _parse_rm_args(tokens: list[str]) -> tuple[bool, bool, list[str]]:
     recursive = False
     force = False
     targets: list[str] = []
@@ -120,22 +115,21 @@ def check_rm(tokens: list[str]) -> str | None:
     for tok in tokens[1:]:
         if not after_double_dash and tok == "--":
             after_double_dash = True
-            continue
-        if not after_double_dash and tok.startswith("--"):
-            if tok == "--recursive":
-                recursive = True
-            elif tok == "--force":
-                force = True
-            continue
-        if not after_double_dash and tok.startswith("-") and len(tok) > 1:
+        elif not after_double_dash and tok.startswith("--"):
+            recursive = recursive or tok == "--recursive"
+            force = force or tok == "--force"
+        elif not after_double_dash and tok.startswith("-") and len(tok) > 1:
             flags = tok[1:]
-            if "r" in flags or "R" in flags:
-                recursive = True
-            if "f" in flags:
-                force = True
-            continue
-        targets.append(tok)
+            recursive = recursive or ("r" in flags or "R" in flags)
+            force = force or ("f" in flags)
+        else:
+            targets.append(tok)
+    return recursive, force, targets
 
+
+def check_rm(tokens: list[str]) -> str | None:
+    """Block `rm -rf` outside safe scratch and `agent-notes/` targets."""
+    recursive, force, targets = _parse_rm_args(tokens)
     if not (recursive and force) or not targets:
         return None
 
@@ -161,7 +155,7 @@ def parse_git(tokens: list[str]) -> tuple[Path, str | None, list[str]]:
             git_cwd = candidate if candidate.is_absolute() else git_cwd / candidate
             idx += 2
             continue
-        if tok.startswith("-C") and len(tok) > 2:
+        if tok.startswith("-C") and len(tok) > MIN_SUBCMD_TOKENS:
             candidate = Path(tok[2:])
             git_cwd = candidate if candidate.is_absolute() else git_cwd / candidate
             idx += 1
@@ -195,8 +189,7 @@ def has_linked_worktrees(git_cwd: Path) -> bool:
     return any(worktrees_dir.iterdir())
 
 
-def check_git_branch(git_cwd: Path, args: list[str]) -> str | None:
-    """Allow `git branch -d`; block `git branch -D` if any target branch is unmerged."""
+def _parse_branch_delete_args(args: list[str]) -> tuple[bool, bool, list[str]]:
     forced = False
     delete_flag = False
     branches: list[str] = []
@@ -204,25 +197,21 @@ def check_git_branch(git_cwd: Path, args: list[str]) -> str | None:
     for arg in args:
         if not after_dd and arg == "--":
             after_dd = True
-            continue
-        if not after_dd and arg.startswith("--"):
-            if arg == "--force":
-                forced = True
-            elif arg == "--delete":
-                delete_flag = True
-            continue
-        if not after_dd and arg.startswith("-") and len(arg) > 1:
+        elif not after_dd and arg.startswith("--"):
+            forced = forced or arg == "--force"
+            delete_flag = delete_flag or arg == "--delete"
+        elif not after_dd and arg.startswith("-") and len(arg) > 1:
             flags = arg[1:]
-            if "D" in flags:
-                forced = True
-                delete_flag = True
-            if "d" in flags:
-                delete_flag = True
-            if "f" in flags:
-                forced = True
-            continue
-        branches.append(arg)
+            forced = forced or ("D" in flags or "f" in flags)
+            delete_flag = delete_flag or ("D" in flags or "d" in flags)
+        else:
+            branches.append(arg)
+    return forced, delete_flag, branches
 
+
+def check_git_branch(git_cwd: Path, args: list[str]) -> str | None:
+    """Allow `git branch -d`; block `git branch -D` if any target branch is unmerged."""
+    forced, delete_flag, branches = _parse_branch_delete_args(args)
     if not (forced and delete_flag) or not branches:
         return None
 
@@ -278,33 +267,8 @@ def check_git_worktree_remove(git_cwd: Path, args: list[str]) -> str | None:
     return None
 
 
-def check_git(tokens: list[str]) -> str | None:
-    """Apply context-aware git safety checks."""
-    git_cwd, subcmd, args = parse_git(tokens)
-    if not subcmd:
-        return None
-    scratch_repo = is_in_scratch(git_cwd)
-
-    if subcmd == "stash":
-        action = next((arg for arg in args if not arg.startswith("-")), "push")
-        if action not in {"list", "show"} and has_linked_worktrees(git_cwd):
-            return (
-                "Blocked mutating `git stash` while linked worktrees exist. "
-                "The stash stack is shared across worktrees and can clobber another session's work. "
-                "Commit WIP to a branch instead, or use `git stash list` / `git stash show`."
-            )
-        return None
-
-    if subcmd == "branch":
-        return check_git_branch(git_cwd, args)
-
-    if subcmd == "worktree" and args and args[0] == "remove":
-        return check_git_worktree_remove(git_cwd, args)
-
-    if scratch_repo:
-        return None
-
-    if subcmd == "reset" and any(arg == "--hard" for arg in args):
+def _check_git_discard(subcmd: str, args: list[str]) -> str | None:
+    if subcmd == "reset" and "--hard" in args:
         return (
             "Blocked `git reset --hard` outside a scratch directory. "
             "It permanently discards uncommitted changes. Inspect `git status` and ask the user first."
@@ -323,19 +287,39 @@ def check_git(tokens: list[str]) -> str | None:
                 "Preview with `git clean -nd` first and ask the user before deleting untracked files."
             )
 
-    if subcmd in {"checkout", "restore"}:
-        if any(arg in {".", "./", ":/"} for arg in args):
-            return (
-                f"Blocked repo-wide `git {subcmd}` on `.`. "
-                "Target only the specific file(s) you intend to revert, or ask the user first."
-            )
-
+    if subcmd in {"checkout", "restore"} and any(arg in {".", "./", ":/"} for arg in args):
+        return (
+            f"Blocked repo-wide `git {subcmd}` on `.`. "
+            "Target only the specific file(s) you intend to revert, or ask the user first."
+        )
     return None
+
+
+def check_git(tokens: list[str]) -> str | None:
+    """Apply context-aware git safety checks."""
+    git_cwd, subcmd, args = parse_git(tokens)
+    if not subcmd:
+        return None
+
+    if subcmd == "stash":
+        action = next((arg for arg in args if not arg.startswith("-")), "push")
+        if action not in {"list", "show"} and has_linked_worktrees(git_cwd):
+            return (
+                "Blocked mutating `git stash` while linked worktrees exist. "
+                "The stash stack is shared across worktrees and can clobber another session's work. "
+                "Commit WIP to a branch instead, or use `git stash list` / `git stash show`."
+            )
+        return None
+    if subcmd == "branch":
+        return check_git_branch(git_cwd, args)
+    if subcmd == "worktree" and args and args[0] == "remove":
+        return check_git_worktree_remove(git_cwd, args)
+    return None if is_in_scratch(git_cwd) else _check_git_discard(subcmd, args)
 
 
 def check_ws(tokens: list[str]) -> str | None:
     """Allow `ws rm <name>`; block `ws rm -f` / `--force`."""
-    if len(tokens) >= 2 and tokens[1] in {"rm", "remove"}:
+    if len(tokens) >= MIN_SUBCMD_TOKENS and tokens[1] in {"rm", "remove"}:
         forced = any(
             arg in {"-f", "--force"} or (arg.startswith("-") and not arg.startswith("--") and "f" in arg[1:])
             for arg in tokens[2:]

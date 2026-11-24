@@ -10,6 +10,15 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
 
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+        # Keep ruff-format on code files so prose examples in Markdown stay aligned.
+        types_or: [python, pyi, jupyter]
+
   - repo: local
     hooks:
       - id: nixfmt
@@ -20,11 +29,28 @@ repos:
         # One nix process at a time, or each waits on the flake lock.
         require_serial: true
 
+      - id: ty
+        name: ty
+        # theme/desktop.py imports numpy and pillow from the Nix Python env.
+        entry: uvx --with numpy --with pillow ty@0.0.105 check
+        language: system
+        types: [python]
+        pass_filenames: false
+
       - id: stylua
         name: stylua
         entry: stylua
         language: system
-        files: ^config/(nvim|rex)/.*\.lua$
+        files: \.lua$
+
+      - id: emmylua-check
+        name: emmylua-check
+        entry: >-
+          sh -c 'VIMRUNTIME="$(nvim --clean --headless -u NONE +"lua io.write(vim.env.VIMRUNTIME)" +q)"
+          emmylua_check -c .emmyrc.json --severity error config/nvim config/rex pkgs/ws/mux'
+        language: system
+        files: (\.lua$|^\.emmyrc\.json$)
+        pass_filenames: false
 
       - id: nvim-queries
         name: Neovim's context queries parse

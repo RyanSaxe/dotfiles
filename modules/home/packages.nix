@@ -57,6 +57,7 @@ in
 
         # Neovim's language servers and formatters. Mason fills in the rest.
         ast-grep
+        emmylua-check
         gopls
         lua-language-server
         nil

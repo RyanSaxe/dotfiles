@@ -47,7 +47,7 @@ def is_test_file(path: Path) -> bool:
     if parts & TEST_DIRS:
         return True
     name = path.name.lower()
-    if name in {"conftest.py"}:
+    if name == "conftest.py":
         return True
     if name.startswith("test_") or name.endswith(("_test.py", "_test.go", "_spec.lua")):
         return True
@@ -69,9 +69,8 @@ def extract_python_header_and_exports(text: str) -> tuple[str | None, set[str]]:
     header = ast.get_docstring(tree)
     exports: set[str] = set()
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            if not node.name.startswith("_"):
-                exports.add(node.name)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and not node.name.startswith("_"):
+            exports.add(node.name)
     return header, exports
 
 
@@ -148,7 +147,7 @@ def extract_go_header_and_exports(text: str) -> tuple[str | None, set[str]]:
                 break
             idx -= 1
             continue
-        if s.startswith("//") or s.startswith("/*") or s.startswith("*") or s.endswith("*/"):
+        if s.startswith(("//", "/*", "*")) or s.endswith("*/"):
             comment_lines.append(s)
             idx -= 1
             continue
@@ -205,6 +204,31 @@ def read_head_version(path: Path) -> str | None:
     return result.stdout if result.returncode == 0 else None
 
 
+def _check_export_drift(raw: str, path: Path, *, header: str, exports: set[str]) -> str | None:
+    head_text = read_head_version(path)
+    head_extracted = extract(path, head_text) if head_text is not None else None
+    if head_extracted is None:
+        return None
+    head_header, head_exports = head_extracted
+    if not head_header or head_header == "syntax-error" or header.strip() != head_header.strip():
+        return None
+    if exports == head_exports:
+        return None
+
+    added = sorted(exports - head_exports)
+    removed = sorted(head_exports - exports)
+    parts: list[str] = []
+    if added:
+        parts.append(f"added {', '.join(added[:5])}")
+    if removed:
+        parts.append(f"removed {', '.join(removed[:5])}")
+    delta = "; ".join(parts)
+    return (
+        f"{raw}:1: public exports changed ({delta}) while the module header stayed identical to HEAD. "
+        "Verify the module header still accurately describes this file's purpose and boundaries."
+    )
+
+
 def check_file(raw: str) -> str | None:
     path = Path(raw)
     if not path.is_file() or is_test_file(path):
@@ -217,41 +241,15 @@ def check_file(raw: str) -> str | None:
         return None
 
     extracted = extract(path, text)
-    if extracted is None:
+    if extracted is None or extracted[0] == "syntax-error":
         return None
     header, exports = extracted
-    if header == "syntax-error":
-        return None
     if not header:
         return (
             f"{raw}:1: missing module header. "
             "Add a concise top-of-file docstring/comment explaining what this module owns and its boundaries."
         )
-
-    head_text = read_head_version(path)
-    if head_text is None:
-        return None
-    head_extracted = extract(path, head_text)
-    if head_extracted is None:
-        return None
-    head_header, head_exports = head_extracted
-    if not head_header or head_header == "syntax-error":
-        return None
-
-    if header.strip() == head_header.strip() and exports != head_exports:
-        added = sorted(exports - head_exports)
-        removed = sorted(head_exports - exports)
-        parts: list[str] = []
-        if added:
-            parts.append(f"added {', '.join(added[:5])}")
-        if removed:
-            parts.append(f"removed {', '.join(removed[:5])}")
-        delta = "; ".join(parts)
-        return (
-            f"{raw}:1: public exports changed ({delta}) while the module header stayed identical to HEAD. "
-            "Verify the module header still accurately describes this file's purpose and boundaries."
-        )
-    return None
+    return _check_export_drift(raw, path, header=header, exports=exports)
 
 
 def main(argv: list[str]) -> int:

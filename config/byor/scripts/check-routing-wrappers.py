@@ -75,6 +75,9 @@ def _line_is_new(line_no: int, added_lines: set[int] | None) -> bool:
     return added_lines is None or line_no in added_lines
 
 
+TWO_STMT_WRAPPER_LEN = 2
+
+
 def _is_trivial_py_arg(node: ast.AST, param_names: set[str]) -> bool:
     if isinstance(node, ast.Constant):
         return True
@@ -82,9 +85,7 @@ def _is_trivial_py_arg(node: ast.AST, param_names: set[str]) -> bool:
         return node.id in param_names
     if isinstance(node, ast.Starred):
         return _is_trivial_py_arg(node.value, param_names)
-    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in {"self", "cls"}:
-        return True
-    return False
+    return isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in {"self", "cls"}
 
 
 def _is_super_call(call: ast.Call) -> bool:
@@ -142,19 +143,84 @@ def _param_names(args: ast.arguments) -> set[str]:
     return names
 
 
-def _wrapper_error(raw: str, line_no: int, name: str, target: str) -> str:
+def _wrapper_error(raw: str, line_no: int, *, name: str, target: str) -> str:
     return (
         f"{raw}:{line_no}: [error] `{name}` only forwards to `{target}`. "
         f"Call `{target}` directly unless `{name}` marks a real module boundary."
     )
 
 
-def _shallow_nudge(raw: str, line_no: int, name: str) -> str:
+def _shallow_nudge(raw: str, line_no: int, *, name: str) -> str:
     return (
         f"{raw}:{line_no}: [nudge] `{name}` is a new one-statement function. "
         "Inline it at call sites (even across two or three callers) to keep call stacks flat and grep results clear, "
         "unless it owns a domain rule shared across the codebase."
     )
+
+
+def _strip_docstring(body: list[ast.stmt]) -> list[ast.stmt]:
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        return body[1:]
+    return body
+
+
+def _extract_py_forwarding_call(body: list[ast.stmt]) -> ast.Call | None:
+    if len(body) == 1 and isinstance(body[0], (ast.Return, ast.Expr)):
+        return _unwrap_call(body[0].value)
+    if len(body) == TWO_STMT_WRAPPER_LEN:
+        first, second = body
+        if (
+            isinstance(first, ast.Assign)
+            and len(first.targets) == 1
+            and isinstance(first.targets[0], ast.Name)
+            and isinstance(second, ast.Return)
+            and isinstance(second.value, ast.Name)
+            and first.targets[0].id == second.value.id
+        ):
+            return _unwrap_call(first.value)
+    return None
+
+
+def _check_py_function(
+    raw: str,
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    *,
+    added_lines: set[int] | None,
+    check_shallow: bool,
+) -> str | None:
+    if (node.name.startswith("__") and node.name.endswith("__")) or node.decorator_list:
+        return None
+    body = _strip_docstring(list(node.body))
+    if not body or (len(body) == 1 and _is_py_stub(body[0])):
+        return None
+
+    call = _extract_py_forwarding_call(body)
+    if call is not None and _is_super_call(call):
+        return None
+
+    if call is not None:
+        target_name = _call_name(call)
+        params = _param_names(node.args)
+        is_distinct = bool(target_name and target_name != node.name and not target_name.endswith(f".{node.name}"))
+        all_trivial = all(_is_trivial_py_arg(arg, params) for arg in call.args) and all(
+            _is_trivial_py_arg(kw.value, params) for kw in call.keywords
+        )
+        if is_distinct and target_name and all_trivial:
+            return _wrapper_error(raw, node.lineno, name=node.name, target=target_name)
+
+    if (
+        check_shallow
+        and len(body) == 1
+        and isinstance(body[0], (ast.Return, ast.Expr))
+        and _line_is_new(node.lineno, added_lines)
+    ):
+        return _shallow_nudge(raw, node.lineno, name=node.name)
+    return None
 
 
 def check_python(raw: str, text: str, *, added_lines: set[int] | None, check_shallow: bool) -> list[str]:
@@ -165,76 +231,26 @@ def check_python(raw: str, text: str, *, added_lines: set[int] | None, check_sha
 
     findings: list[str] = []
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if (node.name.startswith("__") and node.name.endswith("__")) or node.decorator_list:
-            continue
-
-        body = list(node.body)
-        if (
-            body
-            and isinstance(body[0], ast.Expr)
-            and isinstance(body[0].value, ast.Constant)
-            and isinstance(body[0].value.value, str)
-        ):
-            body = body[1:]
-        if not body:
-            continue
-
-        call: ast.Call | None = None
-        if len(body) == 1:
-            stmt = body[0]
-            if _is_py_stub(stmt):
-                continue
-            if isinstance(stmt, (ast.Return, ast.Expr)):
-                call = _unwrap_call(stmt.value)
-        elif len(body) == 2:
-            first, second = body
-            if (
-                isinstance(first, ast.Assign)
-                and len(first.targets) == 1
-                and isinstance(first.targets[0], ast.Name)
-                and isinstance(second, ast.Return)
-                and isinstance(second.value, ast.Name)
-                and first.targets[0].id == second.value.id
-            ):
-                call = _unwrap_call(first.value)
-
-        if call is not None and _is_super_call(call):
-            continue
-
-        if call is not None:
-            target_name = _call_name(call)
-            if target_name and target_name != node.name and not target_name.endswith(f".{node.name}"):
-                params = _param_names(node.args)
-                all_args_trivial = all(_is_trivial_py_arg(arg, params) for arg in call.args) and all(
-                    _is_trivial_py_arg(kw.value, params) for kw in call.keywords
-                )
-                if all_args_trivial:
-                    findings.append(_wrapper_error(raw, node.lineno, node.name, target_name))
-                    continue
-
-        if (
-            check_shallow
-            and len(body) == 1
-            and isinstance(body[0], (ast.Return, ast.Expr))
-            and _line_is_new(node.lineno, added_lines)
-        ):
-            findings.append(_shallow_nudge(raw, node.lineno, node.name))
-
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            msg = _check_py_function(raw, node, added_lines=added_lines, check_shallow=check_shallow)
+            if msg:
+                findings.append(msg)
     return findings
 
 
 JS_FUNC_RE = re.compile(
-    r"^(?P<indent>[ \t]*)(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s+(?P<name>[A-Za-z_$]\w*)\s*(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^{=]+)?\{",
+    r"^(?P<indent>[ \t]*)(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s+"
+    r"(?P<name>[A-Za-z_$]\w*)\s*(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^{=]+)?\{",
     re.MULTILINE,
 )
 JS_ARROW_BLOCK_RE = re.compile(
-    r"^(?P<indent>[ \t]*)(?:export\s+)?const\s+(?P<name>[A-Za-z_$]\w*)\s*=\s*(?:async\s+)?(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^=]+)?=>\s*\{",
+    r"^(?P<indent>[ \t]*)(?:export\s+)?const\s+(?P<name>[A-Za-z_$]\w*)\s*=\s*"
+    r"(?:async\s+)?(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^=]+)?=>\s*\{",
     re.MULTILINE,
 )
 JS_ARROW_EXPR_RE = re.compile(
-    r"^(?P<indent>[ \t]*)(?:export\s+)?const\s+(?P<name>[A-Za-z_$]\w*)\s*=\s*(?:async\s+)?(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^=]+)?=>\s*(?!\{)(?P<expr>[^\n;]+);?",
+    r"^(?P<indent>[ \t]*)(?:export\s+)?const\s+(?P<name>[A-Za-z_$]\w*)\s*=\s*"
+    r"(?:async\s+)?(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^=]+)?=>\s*(?!\{)(?P<expr>[^\n;]+);?",
     re.MULTILINE,
 )
 JS_SIMPLE_ARG_RE = re.compile(
@@ -284,6 +300,47 @@ def _is_trivial_js_call(expr: str, func_name: str) -> str | None:
     return target
 
 
+def _extract_js_block_target(stmts: list[str], name: str) -> str | None:
+    if len(stmts) == 1:
+        stmt = stmts[0]
+        if "super." in stmt:
+            return None
+        return _is_trivial_js_call(stmt.removeprefix("return "), name)
+    if len(stmts) == TWO_STMT_WRAPPER_LEN:
+        assign = re.match(r"^(?:const|let|var)\s+([A-Za-z_$]\w*)\s*=\s*(.+)$", stmts[0])
+        ret = re.match(r"^return\s+([A-Za-z_$]\w*)$", stmts[1])
+        if assign and ret and assign.group(1) == ret.group(1):
+            return _is_trivial_js_call(assign.group(2), name)
+    return None
+
+
+def _check_js_block(
+    raw: str,
+    body: str,
+    *,
+    name: str,
+    line_no: int,
+    added_lines: set[int] | None,
+    check_shallow: bool,
+) -> str | None:
+    cleaned = re.sub(r"//[^\n]*", "", body)
+    cleaned = re.sub(r"/\*.*?\*/", "", cleaned, flags=re.DOTALL)
+    stmts = [s.strip() for s in cleaned.split(";") if s.strip()]
+    if len(stmts) == 1 and "super." in stmts[0]:
+        return None
+    target = _extract_js_block_target(stmts, name)
+    if target:
+        return _wrapper_error(raw, line_no, name=name, target=target)
+    if (
+        check_shallow
+        and len(stmts) == 1
+        and not re.match(r"^(?:if|for|while|switch|try)\b", stmts[0])
+        and _line_is_new(line_no, added_lines)
+    ):
+        return _shallow_nudge(raw, line_no, name=name)
+    return None
+
+
 def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow: bool) -> list[str]:
     findings: list[str] = []
     for pattern in (JS_FUNC_RE, JS_ARROW_BLOCK_RE):
@@ -294,35 +351,12 @@ def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow
             body = _extract_braced_body(text, match.end() - 1)
             if body is None:
                 continue
-            cleaned = re.sub(r"//[^\n]*", "", body)
-            cleaned = re.sub(r"/\*.*?\*/", "", cleaned, flags=re.DOTALL)
-            stmts = [s.strip() for s in cleaned.split(";") if s.strip()]
             line_no = text.count("\n", 0, match.start()) + 1
-
-            target: str | None = None
-            if len(stmts) == 1:
-                stmt = stmts[0]
-                if "super." in stmt:
-                    continue
-                if stmt.startswith("return "):
-                    target = _is_trivial_js_call(stmt[7:], name)
-                else:
-                    target = _is_trivial_js_call(stmt, name)
-            elif len(stmts) == 2:
-                assign = re.match(r"^(?:const|let|var)\s+([A-Za-z_$]\w*)\s*=\s*(.+)$", stmts[0])
-                ret = re.match(r"^return\s+([A-Za-z_$]\w*)$", stmts[1])
-                if assign and ret and assign.group(1) == ret.group(1):
-                    target = _is_trivial_js_call(assign.group(2), name)
-
-            if target:
-                findings.append(_wrapper_error(raw, line_no, name, target))
-            elif (
-                check_shallow
-                and len(stmts) == 1
-                and not re.match(r"^(?:if|for|while|switch|try)\b", stmts[0])
-                and _line_is_new(line_no, added_lines)
-            ):
-                findings.append(_shallow_nudge(raw, line_no, name))
+            msg = _check_js_block(
+                raw, body, name=name, line_no=line_no, added_lines=added_lines, check_shallow=check_shallow
+            )
+            if msg:
+                findings.append(msg)
 
     for match in JS_ARROW_EXPR_RE.finditer(text):
         name = match.group("name")
@@ -330,9 +364,9 @@ def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow
         line_no = text.count("\n", 0, match.start()) + 1
         target = _is_trivial_js_call(expr, name)
         if target:
-            findings.append(_wrapper_error(raw, line_no, name, target))
+            findings.append(_wrapper_error(raw, line_no, name=name, target=target))
         elif check_shallow and _line_is_new(line_no, added_lines):
-            findings.append(_shallow_nudge(raw, line_no, name))
+            findings.append(_shallow_nudge(raw, line_no, name=name))
 
     return findings
 

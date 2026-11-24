@@ -1,0 +1,65 @@
+# Repository Ruff configuration for dotfiles' Python scripts and tests.
+# Mirrors config/ruff/ruff.toml with documented dotfiles-specific ignores.
+line-length = 120
+
+[lint]
+select = ["ALL"]
+unfixable = [
+  # Leave unused imports for review instead of silently deleting them.
+  "F401",
+]
+ignore = [
+  # The license file covers the repository, so source files carry no header.
+  "CPY001",
+  # Scripts and test directories are not packages and need no __init__.py.
+  "INP001",
+  # Every source module gets a header docstring (D100); classes and functions
+  # get docstrings only when names and types cannot carry the meaning.
+  "D101",
+  "D102",
+  "D103",
+  "D105",
+  "D106",
+  "D107",
+  # Contradict D211 and D212, which stay enabled.
+  "D203",
+  "D213",
+  # ruff format owns trailing commas.
+  "COM812",
+  # Long signatures are fine once parameters past the first two are
+  # keyword-only (enforced by PLR0917 below).
+  "PLR0913",
+  # Dotfiles hook and utility scripts invoke trusted local CLIs (git, tmux,
+  # linters) via fixed argument lists, never shell=True.
+  "S603",
+  "S607",
+]
+
+[lint.pylint]
+# Keep positional parameters to at most two; make further parameters
+# keyword-only with `*` so call sites stay readable.
+max-positional-args = 2
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+"typing.cast".msg = "Fix or narrow the type instead of casting."
+"typing_extensions.cast".msg = "Fix or narrow the type instead of casting."
+"unittest".msg = "Use pytest instead of unittest."
+"unittest.mock".msg = "Prefer fakes or dependency injection over unittest.mock."
+"importlib.import_module".msg = "Use static imports instead of dynamic importlib loading."
+"importlib.util".msg = "Use static imports instead of dynamic importlib loading."
+"importlib.machinery".msg = "Use static imports instead of dynamic importlib loading."
+"importlib.reload".msg = "Avoid importlib.reload; structure state explicitly."
+"importlib.abc".msg = "Use static imports instead of custom importlib loaders."
+
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+  # pytest checks behavior with plain assert statements.
+  "S101",
+  # Literal values in tests document expected behavior.
+  "PLR2004",
+  # Module headers are for source modules, not tests.
+  "D100",
+]

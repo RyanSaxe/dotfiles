@@ -81,31 +81,21 @@ def check_file(raw: str) -> str | None:
     path = Path(raw)
     if not path.is_file() or path.name not in MANIFEST_INFO:
         return None
-
     try:
         rel = path.resolve().relative_to(Path.cwd().resolve()).as_posix()
-    except ValueError:
+        current_text = path.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError):
         return None
 
     head_text = git_show_head(rel)
-    if head_text is None:
-        return None
-
-    try:
-        current_text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-
-    head_deps = extract_deps(path.name, head_text)
+    head_deps = extract_deps(path.name, head_text) if head_text is not None else None
     current_deps = extract_deps(path.name, current_text)
     if head_deps is None or current_deps is None or head_deps == current_deps:
         return None
 
     lock_name, add_cmd = MANIFEST_INFO[path.name]
     lock_path = path.parent / lock_name
-    if not lock_path.is_file():
-        return None
-    if lockfile_was_updated(lock_path):
+    if not lock_path.is_file() or lockfile_was_updated(lock_path):
         return None
 
     return (

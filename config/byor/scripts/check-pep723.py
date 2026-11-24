@@ -44,7 +44,8 @@ def check_file(raw: str) -> str | None:
     detail = "; ".join(problems)
     return (
         f"{raw}:1: standalone Python script {detail}. "
-        f"Start executable scripts with `{EXPECTED_SHEBANG}` and a `# /// script` block declaring `requires-python` and `dependencies`."
+        f"Start executable scripts with `{EXPECTED_SHEBANG}` and a `# /// script` block "
+        "declaring `requires-python` and `dependencies`."
     )
 
 

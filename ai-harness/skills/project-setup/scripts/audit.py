@@ -189,7 +189,7 @@ def _run_git(root: Path, *args: str) -> subprocess.CompletedProcess[bytes] | Non
         return None
     try:
         # Fixed read-only git invocation against a validated directory path.
-        return subprocess.run([git_bin, "-C", str(root), *args], capture_output=True, check=False)  # noqa: S603
+        return subprocess.run([git_bin, "-C", str(root), *args], capture_output=True, check=False)
     except OSError:
         return None
 

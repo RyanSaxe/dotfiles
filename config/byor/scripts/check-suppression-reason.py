@@ -27,6 +27,8 @@ SUPPRESSION_RE = re.compile(
     re.IGNORECASE,
 )
 COMMENT_PREFIX_RE = re.compile(r"^\s*(?:#|//|/\*|\*|--)\s*(.+)$")
+MIN_REASON_WORDS = 2
+MAX_LOOKBACK_LINES = 2
 HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
@@ -60,7 +62,7 @@ def added_lines_for(path: Path) -> list[tuple[int, str]]:
         if hunk:
             current_line = int(hunk.group(1))
             continue
-        if line.startswith("+++") or line.startswith("---"):
+        if line.startswith(("+++", "---")):
             continue
         if line.startswith("+"):
             added.append((current_line, line[1:]))
@@ -75,14 +77,14 @@ def has_inline_reason(line: str, match_end: int) -> bool:
     # Strip leading separators like `--`, `#`, `//`, `:`, `-`, `*/`.
     tail = re.sub(r"^(?:--|//|#|:|-|\s)+", "", tail)
     tail = re.sub(r"\*/\s*$", "", tail).strip()
-    words = [w for w in re.findall(r"[A-Za-z]{2,}", tail)]
-    return len(words) >= 2
+    words = re.findall(r"[A-Za-z]{2,}", tail)
+    return len(words) >= MIN_REASON_WORDS
 
 
 def has_preceding_reason(all_lines: list[str], line_no: int) -> bool:
     idx = line_no - 2  # 0-based line immediately above
     checked = 0
-    while idx >= 0 and checked < 2:
+    while idx >= 0 and checked < MAX_LOOKBACK_LINES:
         prev = all_lines[idx]
         if not prev.strip():
             break
@@ -92,7 +94,7 @@ def has_preceding_reason(all_lines: list[str], line_no: int) -> bool:
         comment = COMMENT_PREFIX_RE.match(prev)
         if comment:
             words = re.findall(r"[A-Za-z]{2,}", comment.group(1))
-            if len(words) >= 2:
+            if len(words) >= MIN_REASON_WORDS:
                 return True
         break
     return False
@@ -117,7 +119,8 @@ def check_file(raw: str) -> list[str]:
         marker = match.group("marker").strip()
         findings.append(
             f"{raw}:{line_no}: newly added suppression `{marker}` has no explanation. "
-            "Fix the underlying issue if possible; if the suppression is justified, add a short reason inline (`-- reason` / `// reason`) or on the comment line directly above."
+            "Fix the underlying issue if possible; if the suppression is justified, add a short reason inline "
+            "(`-- reason` / `// reason`) or on the comment line directly above."
         )
     return findings
 
