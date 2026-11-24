@@ -32,6 +32,24 @@ MAX_LOOKBACK_LINES = 2
 HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
+def _parse_diff_added_lines(diff_text: str) -> list[tuple[int, str]]:
+    added: list[tuple[int, str]] = []
+    current_line = 0
+    for line in diff_text.splitlines():
+        hunk = HUNK_RE.match(line)
+        if hunk:
+            current_line = int(hunk.group(1))
+            continue
+        if line.startswith(("+++", "---")):
+            continue
+        if line.startswith("+"):
+            added.append((current_line, line[1:]))
+            current_line += 1
+        elif not line.startswith("-"):
+            current_line += 1
+    return added
+
+
 def added_lines_for(path: Path) -> list[tuple[int, str]]:
     """Return (1-based line_no, text) for newly added lines vs HEAD (or all lines if untracked)."""
     try:
@@ -54,22 +72,7 @@ def added_lines_for(path: Path) -> list[tuple[int, str]]:
     )
     if diff.returncode != 0:
         return []
-
-    added: list[tuple[int, str]] = []
-    current_line = 0
-    for line in diff.stdout.splitlines():
-        hunk = HUNK_RE.match(line)
-        if hunk:
-            current_line = int(hunk.group(1))
-            continue
-        if line.startswith(("+++", "---")):
-            continue
-        if line.startswith("+"):
-            added.append((current_line, line[1:]))
-            current_line += 1
-        elif not line.startswith("-"):
-            current_line += 1
-    return added
+    return _parse_diff_added_lines(diff.stdout)
 
 
 def has_inline_reason(line: str, match_end: int) -> bool:

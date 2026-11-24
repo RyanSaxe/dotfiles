@@ -6,7 +6,7 @@
   "mermaid.json" = builtins.toJSON {
     theme = "base";
     themeVariables = {
-      background = t.background;
+      inherit (t) background;
       primaryColor = t.raised;
       primaryTextColor = t.text;
       primaryBorderColor = t.info;

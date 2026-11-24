@@ -29,6 +29,19 @@ repos:
         # One nix process at a time, or each waits on the flake lock.
         require_serial: true
 
+      - id: deadnix
+        name: deadnix
+        entry: deadnix --fail
+        language: system
+        files: \.nix$
+
+      - id: statix
+        name: statix
+        entry: statix check
+        language: system
+        files: \.nix$
+        pass_filenames: false
+
       - id: ty
         name: ty
         # theme/desktop.py imports numpy and pillow from the Nix Python env.
@@ -52,6 +65,13 @@ repos:
         files: (\.lua$|^\.emmyrc\.json$)
         pass_filenames: false
 
+      - id: luacheck-complexity
+        name: luacheck (complexity)
+        # Only code 561 (cyclomatic complexity); emmylua_check owns static analysis.
+        entry: luacheck --no-config --only 561 --max-cyclomatic-complexity 10
+        language: system
+        files: \.lua$
+
       - id: nvim-queries
         name: Neovim's context queries parse
         entry: nvim --clean --headless -l config/nvim/scripts/check-queries.lua config/nvim
@@ -67,9 +87,33 @@ repos:
         # shfmt has no zsh dialect.
         exclude: '\.zsh$|^config/zsh/zshrc(\.minimal)?$'
 
+      - id: shellcheck
+        name: shellcheck
+        # Check POSIX sh, bash and dash scripts; skip zsh scripts.
+        entry: >-
+          sh -c 'rc=0; for f in "$@"; do
+            case "$f" in *.zsh) continue ;; esac
+            case "$(head -n 1 "$f")" in *zsh*) continue ;; esac
+            shellcheck "$f" || rc=1
+          done; exit $rc' --
+        language: system
+        types: [shell]
+
+      - id: zsh-syntax
+        name: zsh syntax check
+        entry: >-
+          sh -c 'rc=0; for f in "$@"; do
+            case "$f" in
+              *.zsh|config/zsh/zshrc|config/zsh/zshrc.minimal) zsh -n "$f" || rc=1 ;;
+              *) case "$(head -n 1 "$f")" in *zsh*) zsh -n "$f" || rc=1 ;; esac ;;
+            esac
+          done; exit $rc' --
+        language: system
+        files: (\.zsh$|\.sh$|^config/zsh/zshrc(\.minimal)?$|^config/sketchybar/sketchybarrc$)
+
       - id: ws
-        name: gofmt, go vet and go test (ws)
-        entry: sh -c 'cd pkgs/ws && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
+        name: golangci-lint and go test (ws)
+        entry: sh -c 'cd pkgs/ws && golangci-lint fmt && golangci-lint run && go test ./...'
         language: system
         files: ^pkgs/ws/
         pass_filenames: false

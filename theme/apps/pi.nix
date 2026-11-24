@@ -9,7 +9,7 @@
 }:
 let
   md = t.markdown;
-  code = t.code;
+  inherit (t) code;
 in
 {
   "pi-theme.json" = builtins.toJSON {
@@ -17,16 +17,18 @@ in
     name = "dotfiles-${mode}";
     appearance = mode;
     colors = {
-      accent = t.accent;
-      border = t.border;
+      inherit (t)
+        accent
+        border
+        error
+        muted
+        text
+        ;
       borderAccent = t.accent;
       borderMuted = t.raised;
       success = t.ok;
-      error = t.error;
       warning = t.warn;
-      muted = t.muted;
       dim = t.faint;
-      text = t.text;
       thinkingText = t.muted;
       selectedBg = t.raised;
       searchMatchBg = wash 0.3 code.member; # Neovim's Search

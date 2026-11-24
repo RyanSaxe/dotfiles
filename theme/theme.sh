@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # theme [dark|light] switches every app between light and dark. Given a
 # mode, it sets macOS's appearance first, so macOS, Rex and Ghostty's
 # colors change too. Without one it follows macOS, which is how sketchybar

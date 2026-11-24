@@ -34,6 +34,24 @@ def _is_test_file(path: Path) -> bool:
     return any(marker in name for marker in (".test.", ".spec."))
 
 
+def _parse_added_line_numbers(diff_text: str) -> set[int]:
+    added: set[int] = set()
+    current_line = 0
+    for line in diff_text.splitlines():
+        hunk = HUNK_RE.match(line)
+        if hunk:
+            current_line = int(hunk.group(1))
+            continue
+        if line.startswith(("+++", "---")):
+            continue
+        if line.startswith("+"):
+            added.add(current_line)
+            current_line += 1
+        elif not line.startswith("-"):
+            current_line += 1
+    return added
+
+
 def _added_line_numbers(path: Path) -> set[int] | None:
     """Return 1-based line numbers added vs HEAD, or None if the file is new/untracked."""
     try:
@@ -53,22 +71,7 @@ def _added_line_numbers(path: Path) -> set[int] | None:
     )
     if diff.returncode != 0:
         return set()
-
-    added: set[int] = set()
-    current_line = 0
-    for line in diff.stdout.splitlines():
-        hunk = HUNK_RE.match(line)
-        if hunk:
-            current_line = int(hunk.group(1))
-            continue
-        if line.startswith(("+++", "---")):
-            continue
-        if line.startswith("+"):
-            added.add(current_line)
-            current_line += 1
-        elif not line.startswith("-"):
-            current_line += 1
-    return added
+    return _parse_added_line_numbers(diff.stdout)
 
 
 def _line_is_new(line_no: int, added_lines: set[int] | None) -> bool:
@@ -259,22 +262,27 @@ JS_SIMPLE_ARG_RE = re.compile(
 JS_CALL_RE = re.compile(r"^(?:await\s+)?(?P<target>[A-Za-z_$][\w$.]*)\((?P<args>[^()]*)\)$")
 
 
+def _skip_js_string(text: str, start: int) -> int:
+    quote = text[start]
+    idx = start + 1
+    while idx < len(text):
+        ch = text[idx]
+        if ch == "\\":
+            idx += 2
+            continue
+        if ch == quote:
+            return idx
+        idx += 1
+    return len(text) - 1
+
+
 def _extract_braced_body(text: str, open_brace_idx: int) -> str | None:
     depth = 0
-    in_str: str | None = None
-    escape = False
-    for idx in range(open_brace_idx, len(text)):
+    idx = open_brace_idx
+    while idx < len(text):
         ch = text[idx]
-        if in_str:
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == in_str:
-                in_str = None
-            continue
         if ch in {"'", '"', "`"}:
-            in_str = ch
+            idx = _skip_js_string(text, idx) + 1
             continue
         if ch == "{":
             depth += 1
@@ -282,6 +290,7 @@ def _extract_braced_body(text: str, open_brace_idx: int) -> str | None:
             depth -= 1
             if depth == 0:
                 return text[open_brace_idx + 1 : idx]
+        idx += 1
     return None
 
 
@@ -341,14 +350,18 @@ def _check_js_block(
     return None
 
 
-def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow: bool) -> list[str]:
+def _check_js_block_matches(
+    raw: str,
+    text: str,
+    *,
+    added_lines: set[int] | None,
+    check_shallow: bool,
+) -> list[str]:
     findings: list[str] = []
     for pattern in (JS_FUNC_RE, JS_ARROW_BLOCK_RE):
         for match in pattern.finditer(text):
             name = match.group("name")
-            if name == "constructor":
-                continue
-            body = _extract_braced_body(text, match.end() - 1)
+            body = None if name == "constructor" else _extract_braced_body(text, match.end() - 1)
             if body is None:
                 continue
             line_no = text.count("\n", 0, match.start()) + 1
@@ -357,7 +370,11 @@ def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow
             )
             if msg:
                 findings.append(msg)
+    return findings
 
+
+def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow: bool) -> list[str]:
+    findings = _check_js_block_matches(raw, text, added_lines=added_lines, check_shallow=check_shallow)
     for match in JS_ARROW_EXPR_RE.finditer(text):
         name = match.group("name")
         expr = match.group("expr").strip()
@@ -367,7 +384,6 @@ def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow
             findings.append(_wrapper_error(raw, line_no, name=name, target=target))
         elif check_shallow and _line_is_new(line_no, added_lines):
             findings.append(_shallow_nudge(raw, line_no, name=name))
-
     return findings
 
 

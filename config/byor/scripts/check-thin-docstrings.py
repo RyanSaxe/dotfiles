@@ -161,26 +161,32 @@ def check_lua(raw: str, text: str) -> list[str]:
     return findings
 
 
+CHECKERS = (
+    (PY_EXTS, check_python),
+    (JS_EXTS, check_js),
+    (RUST_EXTS, check_rust),
+    (LUA_EXTS, check_lua),
+)
+
+
+def _check_file(raw: str) -> list[str]:
+    path = Path(raw)
+    if not path.is_file():
+        return []
+    checker = next((fn for exts, fn in CHECKERS if path.suffix in exts), None)
+    if checker is None:
+        return []
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    return checker(raw, text)
+
+
 def main(argv: list[str]) -> int:
     findings: list[str] = []
     for raw in argv:
-        path = Path(raw)
-        if not path.is_file():
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        ext = path.suffix
-        if ext in PY_EXTS:
-            findings.extend(check_python(raw, text))
-        elif ext in JS_EXTS:
-            findings.extend(check_js(raw, text))
-        elif ext in RUST_EXTS:
-            findings.extend(check_rust(raw, text))
-        elif ext in LUA_EXTS:
-            findings.extend(check_lua(raw, text))
-
+        findings.extend(_check_file(raw))
     if findings:
         sys.stdout.write("\n".join(findings) + "\n")
         return 1

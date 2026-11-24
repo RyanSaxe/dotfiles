@@ -220,51 +220,86 @@ let
   '';
 in
 lib.mkIf (lib.elem "base" cfg.roles) {
-  home.packages = [ pair ];
+  home = {
+    packages = [ pair ];
 
-  home.file = {
-    ".codex/themes/dotfiles.tmTheme".source =
-      config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
-  }
-  // lib.optionalAttrs personal (
-    {
-      # Claude reads the instructions through an import, and Antigravity
-      # directly through a symlink. Codex can't import, so it gets them
-      # through developer_instructions below.
-      ".claude/CLAUDE.md".text = ''
-        @${cfg.repo}/ai-harness/AGENTS.md
-      '';
-      ".claude/statusline.js".source = link "ai-harness/statusline.js";
-      ".claude/themes/dotfiles.json".source =
-        config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
-      ".gemini/config/AGENTS.md".source = link "ai-harness/AGENTS.md";
-      ".gemini/antigravity-cli/statusline.js".source = link "ai-harness/statusline.js";
+    file = {
+      ".codex/themes/dotfiles.tmTheme".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/Dotfiles.tmTheme";
     }
-    // skillLinks ".claude/skills"
-    // skillLinks ".gemini/config/skills"
-  )
-  // {
-    # Copilot CLI registers each session with pair from this start hook.
-    ".copilot/hooks/pair.json".text = builtins.toJSON {
-      version = 1;
-      hooks.sessionStart = [
-        {
-          type = "command";
-          bash = pairRegister;
-          timeoutSec = 30;
-        }
-      ];
-    };
-  }
-  // skillLinks ".agents/skills"
-  // lib.optionalAttrs personal (
-    lib.genAttrs' [ "dark" "light" ] (
-      mode:
-      lib.nameValuePair ".pi/agent/themes/dotfiles-${mode}.json" {
-        source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/${mode}/pi-theme.json";
+    // lib.optionalAttrs personal (
+      {
+        # Claude reads the instructions through an import, and Antigravity
+        # directly through a symlink. Codex can't import, so it gets them
+        # through developer_instructions below.
+        ".claude/CLAUDE.md".text = ''
+          @${cfg.repo}/ai-harness/AGENTS.md
+        '';
+        ".claude/statusline.js".source = link "ai-harness/statusline.js";
+        ".claude/themes/dotfiles.json".source =
+          config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/claude-theme.json";
+        ".gemini/config/AGENTS.md".source = link "ai-harness/AGENTS.md";
+        ".gemini/antigravity-cli/statusline.js".source = link "ai-harness/statusline.js";
       }
+      // skillLinks ".claude/skills"
+      // skillLinks ".gemini/config/skills"
     )
-  );
+    // {
+      # Copilot CLI registers each session with pair from this start hook.
+      ".copilot/hooks/pair.json".text = builtins.toJSON {
+        version = 1;
+        hooks.sessionStart = [
+          {
+            type = "command";
+            bash = pairRegister;
+            timeoutSec = 30;
+          }
+        ];
+      };
+    }
+    // skillLinks ".agents/skills"
+    // lib.optionalAttrs personal (
+      lib.genAttrs' [ "dark" "light" ] (
+        mode:
+        lib.nameValuePair ".pi/agent/themes/dotfiles-${mode}.json" {
+          source = config.lib.file.mkOutOfStoreSymlink "${config.xdg.configHome}/theme/${mode}/pi-theme.json";
+        }
+      )
+    );
+
+    activation = {
+      # pair's own installer, for each agent this computer has that lacks the
+      # skill.
+      pairStartHook = lib.mkIf personal (
+        lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${pairStartHook}"
+      );
+      pairSkill = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+        installed() { PATH="${agentPath}" command -v "$1" > /dev/null; }
+        agents=""
+        ${lib.optionalString personal ''if installed claude && [ ! -e "$HOME/.claude/skills/pair" ]; then agents="$agents -a claude-code"; fi''}
+        if installed codex && [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a codex"; fi
+        # Copilot CLI, and pi on a personal computer, read the same folder as
+        # Codex.
+        if [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a github-copilot${lib.optionalString personal " -a pi"}"; fi
+        if [ -n "$agents" ]; then
+          run env DISABLE_TELEMETRY=1 PATH="${pkgs.nodejs}/bin:${pkgs.git}/bin:$PATH" \
+            npx --yes skills add RyanSaxe/pair -g -s pair $agents -y < /dev/null
+        fi
+      '';
+    }
+    // lib.optionalAttrs personal {
+      agyInstall = lib.hm.dag.entryAfter [ "writeBoundary" ] "run ${agyInstall}";
+      agySettings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agySettings}";
+      agyHooks = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyHooks}";
+      agyKeybindings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyKeybindings}";
+      agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
+        run /bin/sh ${linkSkills}
+      '';
+      codexAgents = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${lib.escapeShellArgs convertAgents}";
+      piTheme = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${piTheme}";
+      pairPlugins = lib.hm.dag.entryAfter [ "piTheme" ] "run ${pairPlugins}";
+    };
+  };
 
   xdg.configFile = lib.mkMerge [
     # Codex reads its managed hooks from /etc/codex, which Home Manager can't
@@ -285,144 +320,113 @@ lib.mkIf (lib.elem "base" cfg.roles) {
     })
   ];
 
-  programs.claude-code = {
-    enable = personal;
-    package = null;
-    mutableSettings = true;
-    settings = {
-      model = "opus[1m]";
-      effortLevel = "medium";
-      # Compact at 80% of the 1M window, and never while a session sits idle.
-      env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = "80";
-      idleCompaction = false;
-      alwaysThinkingEnabled = true;
-      editorMode = "vim";
-      theme = "custom:dotfiles";
-      # The bell marks the agent's tmux window when a turn ends or a prompt
-      # waits, which is how ws learns in tmux that an agent needs you.
-      preferredNotifChannel = "terminal_bell";
-      statusLine = {
-        type = "command";
-        command = "$HOME/.claude/statusline.js";
-        padding = 0;
-      };
-      permissions = {
-        defaultMode = "bypassPermissions";
-        allow = [ "Bash(gh pr merge:*)" ];
-      };
-      # Starts in bypassPermissions without asking to confirm it first, so
-      # an agent that ws or pair spawn opens takes its prompt straight away.
-      skipDangerousModePermissionPrompt = true;
-      # The merge replaces only these three lists, so byor's tool-use
-      # hooks and Rex's session-start hook stay as those tools wrote them.
-      hooks = {
-        Stop = [ (claudeHook null) ];
-        Notification = [ (claudeHook "permission_prompt|elicitation_dialog|agent_needs_input") ];
-        StopFailure = [ (claudeHook null) ];
-      };
-    };
-  };
-
-  programs.codex = {
-    enable = true;
-    package = if isLinux then pkgs.codex else null;
-    mutableSettings = true;
-    settings = {
-      model = "gpt-6.1-sol";
-      model_reasoning_effort = "medium";
-      # gpt-6.1-sol's largest window, compacted at 80% of it.
-      model_context_window = 872000;
-      model_auto_compact_token_limit = 697600;
-      # An edit to the repo's file reaches Codex at the next home switch.
-      developer_instructions = builtins.readFile ../../ai-harness/AGENTS.md;
-      service_tier = "default";
-      approval_policy = "never";
-      default_permissions = ":danger-full-access";
-      features = {
-        daemon_auto_start = true;
-        fast_mode = false;
-        # Codex keeps notes from its sessions, as Claude does.
-        memories = true;
-      };
-      # How many subagents can run at once in one session.
-      agents.max_concurrent_threads_per_session = 30;
-      tui = {
-        theme = "dotfiles";
-        vim_mode_default = true;
-        status_line = [
-          "project-name"
-          "git-branch"
-          "model-with-reasoning"
-          "context-remaining"
-          "used-tokens"
-          "five-hour-limit"
-          "weekly-limit"
-          "task-progress"
-        ];
-        status_line_use_colors = true;
-      }
-      # Without Rex, Codex rings the bell for every notification, which
-      # covers a finished turn, an approval and a question, whether or not
-      # its pane has focus. tmux marks the bell on a window you aren't
-      # viewing, and ws reads that as the agent needing you.
-      // lib.optionalAttrs (!hasRex) {
-        notification_method = "bel";
-        notifications = true;
-        notification_condition = "always";
-      };
-      mcp_servers.playwright = {
-        command = "npx";
-        args = [
-          "-y"
-          "@playwright/mcp@0.0.83"
-          "--headless"
-          "--isolated"
-          "--output-dir"
-          "${config.xdg.stateHome}/codex/browser-artifacts/playwright"
-        ];
+  programs = {
+    claude-code = {
+      enable = personal;
+      package = null;
+      mutableSettings = true;
+      settings = {
+        model = "opus[1m]";
+        effortLevel = "medium";
+        # Compact at 80% of the 1M window, and never while a session sits idle.
+        env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = "80";
+        idleCompaction = false;
+        alwaysThinkingEnabled = true;
+        editorMode = "vim";
+        theme = "custom:dotfiles";
+        # The bell marks the agent's tmux window when a turn ends or a prompt
+        # waits, which is how ws learns in tmux that an agent needs you.
+        preferredNotifChannel = "terminal_bell";
+        statusLine = {
+          type = "command";
+          command = "$HOME/.claude/statusline.js";
+          padding = 0;
+        };
+        permissions = {
+          defaultMode = "bypassPermissions";
+          allow = [ "Bash(gh pr merge:*)" ];
+        };
+        # Starts in bypassPermissions without asking to confirm it first, so
+        # an agent that ws or pair spawn opens takes its prompt straight away.
+        skipDangerousModePermissionPrompt = true;
+        # The merge replaces only these three lists, so byor's tool-use
+        # hooks and Rex's session-start hook stay as those tools wrote them.
+        hooks = {
+          Stop = [ (claudeHook null) ];
+          Notification = [ (claudeHook "permission_prompt|elicitation_dialog|agent_needs_input") ];
+          StopFailure = [ (claudeHook null) ];
+        };
       };
     };
-  };
 
-  # packages.nix installs Copilot CLI.
-  programs.github-copilot-cli = {
-    enable = true;
-    package = null;
-    mutableSettings = true;
-    settings.defaultPermissionMode = "allow-all";
-  };
+    codex = {
+      enable = true;
+      package = if isLinux then pkgs.codex else null;
+      mutableSettings = true;
+      settings = {
+        model = "gpt-6.1-sol";
+        model_reasoning_effort = "medium";
+        # gpt-6.1-sol's largest window, compacted at 80% of it.
+        model_context_window = 872000;
+        model_auto_compact_token_limit = 697600;
+        # An edit to the repo's file reaches Codex at the next home switch.
+        developer_instructions = builtins.readFile ../../ai-harness/AGENTS.md;
+        service_tier = "default";
+        approval_policy = "never";
+        default_permissions = ":danger-full-access";
+        features = {
+          daemon_auto_start = true;
+          fast_mode = false;
+          # Codex keeps notes from its sessions, as Claude does.
+          memories = true;
+        };
+        # How many subagents can run at once in one session.
+        agents.max_concurrent_threads_per_session = 30;
+        tui = {
+          theme = "dotfiles";
+          vim_mode_default = true;
+          status_line = [
+            "project-name"
+            "git-branch"
+            "model-with-reasoning"
+            "context-remaining"
+            "used-tokens"
+            "five-hour-limit"
+            "weekly-limit"
+            "task-progress"
+          ];
+          status_line_use_colors = true;
+        }
+        # Without Rex, Codex rings the bell for every notification, which
+        # covers a finished turn, an approval and a question, whether or not
+        # its pane has focus. tmux marks the bell on a window you aren't
+        # viewing, and ws reads that as the agent needing you.
+        // lib.optionalAttrs (!hasRex) {
+          notification_method = "bel";
+          notifications = true;
+          notification_condition = "always";
+        };
+        mcp_servers.playwright = {
+          command = "npx";
+          args = [
+            "-y"
+            "@playwright/mcp@0.0.83"
+            "--headless"
+            "--isolated"
+            "--output-dir"
+            "${config.xdg.stateHome}/codex/browser-artifacts/playwright"
+          ];
+        };
+      };
+    };
 
-  home.activation = {
-    # pair's own installer, for each agent this computer has that lacks the
-    # skill.
-    pairStartHook = lib.mkIf personal (
-      lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${pairStartHook}"
-    );
-    pairSkill = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      installed() { PATH="${agentPath}" command -v "$1" > /dev/null; }
-      agents=""
-      ${lib.optionalString personal ''if installed claude && [ ! -e "$HOME/.claude/skills/pair" ]; then agents="$agents -a claude-code"; fi''}
-      if installed codex && [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a codex"; fi
-      # Copilot CLI, and pi on a personal computer, read the same folder as
-      # Codex.
-      if [ ! -e "$HOME/.agents/skills/pair" ]; then agents="$agents -a github-copilot${lib.optionalString personal " -a pi"}"; fi
-      if [ -n "$agents" ]; then
-        run env DISABLE_TELEMETRY=1 PATH="${pkgs.nodejs}/bin:${pkgs.git}/bin:$PATH" \
-          npx --yes skills add RyanSaxe/pair -g -s pair $agents -y < /dev/null
-      fi
-    '';
-  }
-  // lib.optionalAttrs personal {
-    agyInstall = lib.hm.dag.entryAfter [ "writeBoundary" ] "run ${agyInstall}";
-    agySettings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agySettings}";
-    agyHooks = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyHooks}";
-    agyKeybindings = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${agyKeybindings}";
-    agentSkills = lib.hm.dag.entryAfter [ "pairSkill" ] ''
-      run /bin/sh ${linkSkills}
-    '';
-    codexAgents = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${lib.escapeShellArgs convertAgents}";
-    piTheme = lib.hm.dag.entryAfter [ "linkGeneration" ] "run ${piTheme}";
-    pairPlugins = lib.hm.dag.entryAfter [ "piTheme" ] "run ${pairPlugins}";
+    # packages.nix installs Copilot CLI.
+    github-copilot-cli = {
+      enable = true;
+      package = null;
+      mutableSettings = true;
+      settings.defaultPermissionMode = "allow-all";
+    };
   };
 
   # Some installers put skills only in Codex's folder. This links each new

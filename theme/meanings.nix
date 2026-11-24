@@ -15,7 +15,7 @@ in
   stroke = both "#414149" "#e9e2d4"; # macOS's hairline around a window
 
   # Text, by how much it should be read.
-  text = c.text;
+  inherit (c) text;
   muted = c.subtext0;
   faint = c.overlay0;
 

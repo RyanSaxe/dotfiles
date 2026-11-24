@@ -10,7 +10,7 @@
 }:
 let
   md = t.markdown;
-  code = t.code;
+  inherit (t) code;
   fg = color: { inherit color; };
   heading =
     level:
@@ -90,9 +90,8 @@ in
       # The tiers bat.nix gives each grammar's scopes, in Chroma's names.
       chroma =
         lib.mapAttrs (_: fg) {
-          text = t.text;
-          error = t.error;
-          comment = code.comment;
+          inherit (t) text error;
+          inherit (code) comment literal;
           comment_preproc = code.structure;
           keyword = code.structure;
           keyword_reserved = code.structure;
@@ -110,7 +109,6 @@ in
           name_exception = code.type;
           name_function = code.function;
           name_other = code.variable;
-          literal = code.literal;
           literal_number = code.literal;
           literal_date = code.literal;
           literal_string = code.literal;

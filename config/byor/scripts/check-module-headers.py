@@ -74,43 +74,49 @@ def extract_python_header_and_exports(text: str) -> tuple[str | None, set[str]]:
     return header, exports
 
 
+JS_DIRECTIVES = {
+    '"use strict";',
+    "'use strict';",
+    '"use client";',
+    "'use client';",
+    '"use server";',
+    "'use server';",
+    '"use strict"',
+    "'use strict'",
+    '"use client"',
+    "'use client'",
+}
+
+
+def _skip_js_preamble(lines: list[str]) -> int:
+    idx = 1 if lines and lines[0].startswith("#!") else 0
+    while idx < len(lines) and (not lines[idx].strip() or lines[idx].strip() in JS_DIRECTIVES):
+        idx += 1
+    return idx
+
+
+def _read_js_leading_comment(lines: list[str], idx: int) -> list[str]:
+    if idx >= len(lines):
+        return []
+    header_lines: list[str] = []
+    first = lines[idx].strip()
+    if first.startswith("/*"):
+        while idx < len(lines):
+            header_lines.append(lines[idx])
+            if "*/" in lines[idx]:
+                break
+            idx += 1
+    elif first.startswith("//"):
+        while idx < len(lines) and lines[idx].strip().startswith("//"):
+            header_lines.append(lines[idx])
+            idx += 1
+    return header_lines
+
+
 def extract_js_header_and_exports(text: str) -> tuple[str | None, set[str]]:
     lines = text.splitlines()
-    idx = 0
-    if idx < len(lines) and lines[idx].startswith("#!"):
-        idx += 1
-    while idx < len(lines):
-        s = lines[idx].strip()
-        if not s or s in {
-            '"use strict";',
-            "'use strict';",
-            '"use client";',
-            "'use client';",
-            '"use server";',
-            "'use server';",
-            '"use strict"',
-            "'use strict'",
-            '"use client"',
-            "'use client'",
-        }:
-            idx += 1
-            continue
-        break
-
-    header_lines: list[str] = []
-    if idx < len(lines):
-        s = lines[idx].strip()
-        if s.startswith("/*"):
-            while idx < len(lines):
-                header_lines.append(lines[idx])
-                if "*/" in lines[idx]:
-                    break
-                idx += 1
-        elif s.startswith("//"):
-            while idx < len(lines) and lines[idx].strip().startswith("//"):
-                header_lines.append(lines[idx])
-                idx += 1
-
+    idx = _skip_js_preamble(lines)
+    header_lines = _read_js_leading_comment(lines, idx)
     header = "\n".join(header_lines).strip() or None
     exports = set(JS_EXPORT_RE.findall(text))
     return header, exports

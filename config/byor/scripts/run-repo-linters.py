@@ -17,6 +17,11 @@ from pathlib import Path
 TIMEOUT_SECONDS = 5
 PYTHON_EXTS = {".py", ".pyi"}
 WEB_EXTS = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
+SHELL_EXTS = {".sh", ".bash"}
+NIX_EXTS = {".nix"}
+MD_EXTS = {".md"}
+GO_EXTS = {".go"}
+LUA_EXTS = {".lua"}
 
 
 def run_tool(argv: list[str], cwd: Path) -> str | None:
@@ -111,13 +116,75 @@ def check_go(repo_root: Path, files: list[str]) -> list[str]:
 
 
 def check_lua(repo_root: Path, files: list[str]) -> list[str]:
-    if not ((repo_root / ".emmyrc.json").is_file() or (repo_root / "emmyrc.json").is_file()):
+    failures: list[str] = []
+    if (repo_root / ".emmyrc.json").is_file() or (repo_root / "emmyrc.json").is_file():
+        emmy = shutil.which("emmylua_check")
+        if emmy:
+            out = run_tool([emmy, *files], repo_root)
+            if out:
+                failures.append(f"[emmylua_check]\n{out}")
+
+    luacheck = shutil.which("luacheck")
+    if luacheck:
+        out = run_tool(
+            [luacheck, "--no-config", "--only", "561", "--max-cyclomatic-complexity", "10", *files], repo_root
+        )
+        if out:
+            failures.append(f"[luacheck]\n{out}")
+    return failures
+
+
+def _has_sh_or_bash_shebang(file_path: str) -> bool:
+    try:
+        with Path(file_path).open(encoding="utf-8", errors="replace") as handle:
+            first_line = handle.readline().strip()
+    except OSError:
+        return False
+    if not first_line.startswith("#!"):
+        return False
+    tokens = first_line[2:].split()
+    if not tokens:
+        return False
+    shell_name = Path(tokens[-1] if Path(tokens[0]).name == "env" and len(tokens) > 1 else tokens[0]).name
+    return shell_name in {"sh", "bash", "dash"}
+
+
+def check_shell(repo_root: Path, files: list[str]) -> list[str]:
+    shellcheck = shutil.which("shellcheck")
+    if not shellcheck:
         return []
-    emmy = shutil.which("emmylua_check")
-    if not emmy:
+    targets = [file_path for file_path in files if _has_sh_or_bash_shebang(file_path)]
+    if not targets:
         return []
-    out = run_tool([emmy, *files], repo_root)
-    return [f"[emmylua_check]\n{out}"] if out else []
+    out = run_tool([shellcheck, *targets], repo_root)
+    return [f"[shellcheck]\n{out}"] if out else []
+
+
+def check_nix(repo_root: Path, files: list[str]) -> list[str]:
+    failures: list[str] = []
+    deadnix = shutil.which("deadnix")
+    if deadnix:
+        out = run_tool([deadnix, "--fail", *files], repo_root)
+        if out:
+            failures.append(f"[deadnix]\n{out}")
+
+    statix = shutil.which("statix")
+    if statix:
+        statix_outputs = [out for file_path in files if (out := run_tool([statix, "check", file_path], repo_root))]
+        if statix_outputs:
+            failures.append("[statix]\n" + "\n".join(statix_outputs))
+    return failures
+
+
+CHECKERS = (
+    (PYTHON_EXTS, check_python),
+    (WEB_EXTS, check_web),
+    (MD_EXTS, check_markdown),
+    (GO_EXTS, check_go),
+    (LUA_EXTS, check_lua),
+    (SHELL_EXTS, check_shell),
+    (NIX_EXTS, check_nix),
+)
 
 
 def main(argv: list[str]) -> int:
@@ -126,23 +193,11 @@ def main(argv: list[str]) -> int:
     if not raw_files:
         return 0
 
-    py_files = [f for f in raw_files if Path(f).suffix in PYTHON_EXTS]
-    web_files = [f for f in raw_files if Path(f).suffix in WEB_EXTS]
-    md_files = [f for f in raw_files if Path(f).suffix == ".md"]
-    go_files = [f for f in raw_files if Path(f).suffix == ".go"]
-    lua_files = [f for f in raw_files if Path(f).suffix == ".lua"]
-
     failures: list[str] = []
-    if py_files:
-        failures.extend(check_python(repo_root, py_files))
-    if web_files:
-        failures.extend(check_web(repo_root, web_files))
-    if md_files:
-        failures.extend(check_markdown(repo_root, md_files))
-    if go_files:
-        failures.extend(check_go(repo_root, go_files))
-    if lua_files:
-        failures.extend(check_lua(repo_root, lua_files))
+    for exts, checker in CHECKERS:
+        matched = [f for f in raw_files if Path(f).suffix in exts]
+        if matched:
+            failures.extend(checker(repo_root, matched))
 
     if failures:
         sys.stdout.write("\n\n".join(failures) + "\n")

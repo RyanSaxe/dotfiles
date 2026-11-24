@@ -50,6 +50,18 @@ def split_segments(command: str) -> list[list[str]]:
     return segments
 
 
+def _skip_env_prefix(tokens: list[str], idx: int) -> int:
+    while idx < len(tokens):
+        arg = tokens[idx]
+        if arg in {"-u", "-C", "-S"}:
+            idx += 2
+        elif arg.startswith("-") or ("=" in arg and arg.split("=", 1)[0].isidentifier()):
+            idx += 1
+        else:
+            break
+    return idx
+
+
 def strip_prefixes(tokens: list[str]) -> list[str]:
     """Strip leading VAR=val assignments, `env` flags/assignments, and shell wrappers."""
     idx = 0
@@ -65,15 +77,7 @@ def strip_prefixes(tokens: list[str]) -> list[str]:
                 idx += 1
             continue
         if base == "env":
-            idx += 1
-            while idx < len(tokens):
-                arg = tokens[idx]
-                if arg in {"-u", "-C", "-S"}:
-                    idx += 2
-                elif arg.startswith("-") or ("=" in arg and arg.split("=", 1)[0].isidentifier()):
-                    idx += 1
-                else:
-                    break
+            idx = _skip_env_prefix(tokens, idx + 1)
             continue
         break
     return tokens[idx:]
@@ -234,6 +238,21 @@ def check_git_branch(git_cwd: Path, args: list[str]) -> str | None:
     )
 
 
+def _is_dirty_or_unreadable_worktree(git_cwd: Path, target: str) -> bool:
+    target_path = Path(target)
+    if not target_path.is_absolute():
+        target_path = git_cwd / target_path
+    if not target_path.exists():
+        return False
+    status = subprocess.run(
+        ["git", "-C", str(target_path), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return status.returncode != 0 or status.stdout.strip() != ""
+
+
 def check_git_worktree_remove(git_cwd: Path, args: list[str]) -> str | None:
     """Allow non-forced worktree removal; block `-f`/`--force` when the worktree is dirty or unknown."""
     forced = False
@@ -247,23 +266,11 @@ def check_git_worktree_remove(git_cwd: Path, args: list[str]) -> str | None:
         return None
 
     for target in targets:
-        target_path = Path(target)
-        if not target_path.is_absolute():
-            target_path = git_cwd / target_path
-        if not target_path.exists():
-            continue
-        status = subprocess.run(
-            ["git", "-C", str(target_path), "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if status.returncode == 0 and status.stdout.strip() == "":
-            continue
-        return (
-            f"Blocked forced worktree removal on dirty or unreadable worktree `{target}`. "
-            "Run `git worktree remove` without `--force` after committing or cleaning, or ask the user first."
-        )
+        if _is_dirty_or_unreadable_worktree(git_cwd, target):
+            return (
+                f"Blocked forced worktree removal on dirty or unreadable worktree `{target}`. "
+                "Run `git worktree remove` without `--force` after committing or cleaning, or ask the user first."
+            )
     return None
 
 

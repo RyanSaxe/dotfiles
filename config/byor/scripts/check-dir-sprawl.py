@@ -53,33 +53,33 @@ def count_sibling_sources(directory: Path) -> int:
     return count
 
 
-def main(argv: list[str]) -> int:
-    findings: list[str] = []
-    warned_dirs: set[Path] = set()
-    for raw in argv:
-        path = Path(raw)
-        if not path.is_file() or path.suffix not in SOURCE_EXTS or path.name in INDEX_MARKERS:
-            continue
-        if is_test_path(path):
-            continue
-        if not is_new_vs_head(path):
-            continue
-        parent = path.parent.resolve()
-        if parent in warned_dirs:
-            continue
-        sibling_count = count_sibling_sources(parent)
-        if sibling_count >= SPRAWL_THRESHOLD:
-            warned_dirs.add(parent)
-            try:
-                rel_dir = parent.relative_to(Path.cwd().resolve()).as_posix()
-            except ValueError:
-                rel_dir = str(parent)
-            findings.append(
-                f"{raw}: `{rel_dir}/` now contains {sibling_count} sibling source files "
-                f"(threshold {SPRAWL_THRESHOLD}). Check whether this directory is becoming a flat "
-                "dumping ground and should be grouped into cohesive domain subdirectories."
-            )
+def _check_candidate(raw: str, warned_dirs: set[Path]) -> str | None:
+    path = Path(raw)
+    if not path.is_file() or path.suffix not in SOURCE_EXTS or path.name in INDEX_MARKERS:
+        return None
+    if is_test_path(path) or not is_new_vs_head(path):
+        return None
+    parent = path.parent.resolve()
+    if parent in warned_dirs:
+        return None
+    sibling_count = count_sibling_sources(parent)
+    if sibling_count < SPRAWL_THRESHOLD:
+        return None
+    warned_dirs.add(parent)
+    try:
+        rel_dir = parent.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        rel_dir = str(parent)
+    return (
+        f"{raw}: `{rel_dir}/` now contains {sibling_count} sibling source files "
+        f"(threshold {SPRAWL_THRESHOLD}). Check whether this directory is becoming a flat "
+        "dumping ground and should be grouped into cohesive domain subdirectories."
+    )
 
+
+def main(argv: list[str]) -> int:
+    warned_dirs: set[Path] = set()
+    findings = [msg for raw in argv if (msg := _check_candidate(raw, warned_dirs))]
     if findings:
         sys.stdout.write("\n".join(findings) + "\n")
         return 1

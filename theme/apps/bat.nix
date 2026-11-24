@@ -37,7 +37,7 @@ in
     settings = [
       {
         settings = {
-          background = t.background;
+          inherit (t) background;
           foreground = t.text;
           caret = t.accent;
           lineHighlight = t.raised;

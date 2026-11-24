@@ -55,7 +55,7 @@ let
     ]
     ++ hues
     ++ [ gray.brightWhite ];
-    background = t.background;
+    inherit (t) background;
     foreground = t.text;
     cursor = c.rosewater;
     cursorText = both c.crust c.base;
