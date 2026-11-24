@@ -12,7 +12,10 @@ local M = {}
 ---@param hex string
 ---@return integer red, integer green, integer blue
 local function to_rgb(hex)
-  return tonumber(hex:sub(2, 3), 16), tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16)
+  local r = assert(tonumber(hex:sub(2, 3), 16))
+  local g = assert(tonumber(hex:sub(4, 5), 16))
+  local b = assert(tonumber(hex:sub(6, 7), 16))
+  return r, g, b
 end
 
 -- Share `amount` of color over the background (amount=1 is pure color).

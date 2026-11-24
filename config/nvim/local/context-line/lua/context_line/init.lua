@@ -26,14 +26,19 @@ local config = vim.deepcopy(defaults)
 ---@return context_line.Row[]
 local function rows_for(winid)
   local bufnr = vim.api.nvim_win_get_buf(winid)
-  if vim.api.nvim_win_get_config(winid).relative ~= "" or vim.bo[bufnr].filetype == "" then
+  local relative = vim.api.nvim_win_get_config(winid).relative --[[@as string]]
+  if relative ~= "" or vim.bo[bufnr].filetype == "" then
     return {}
   end
   local parser = vim.treesitter.get_parser(bufnr, nil, { error = false })
   if not parser then
     return {}
   end
-  local width = vim.api.nvim_win_get_width(winid) - vim.fn.getwininfo(winid)[1].textoff
+  local info = vim.fn.getwininfo(winid)[1]
+  if not info then
+    return {}
+  end
+  local width = vim.api.nvim_win_get_width(winid) - info.textoff
   local rows = {} ---@type context_line.Row[]
   for _, block in ipairs(blocks.find(winid, parser, config)) do
     local text, marks = header.line(parser, bufnr, block, width)

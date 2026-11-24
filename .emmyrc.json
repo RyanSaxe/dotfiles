@@ -1,11 +1,38 @@
 {
   "runtime": {
-    "version": "LuaJIT"
+    "version": "LuaJIT",
+    "requirePattern": [
+      "config/nvim/lua/?.lua",
+      "config/nvim/lua/?/init.lua",
+      "config/nvim/local/context-line/lua/?.lua",
+      "config/nvim/local/context-line/lua/?/init.lua",
+      "lua/?.lua",
+      "lua/?/init.lua",
+      "local/context-line/lua/?.lua",
+      "local/context-line/lua/?/init.lua"
+    ]
+  },
+  "strict": {
+    "requirePath": true
   },
   "workspace": {
     "library": ["$VIMRUNTIME/lua"]
   },
   "diagnostics": {
-    "globals": ["vim", "Snacks", "MiniHipatterns", "rex"]
+    "globals": ["vim", "Snacks", "MiniHipatterns", "rex"],
+    "severity": {
+      "need-check-nil": "error",
+      "param-type-mismatch": "error",
+      "return-type-mismatch": "error",
+      "unnecessary-if": "error",
+      "assign-type-mismatch": "error",
+      "inject-field": "error",
+      "redundant-return-value": "error",
+      "redundant-parameter": "error",
+      "undefined-field": "error",
+      "unused": "error",
+      "redefined-local": "error",
+      "unreachable-code": "error"
+    }
   }
 }

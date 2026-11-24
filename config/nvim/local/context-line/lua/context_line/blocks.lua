@@ -158,9 +158,56 @@ local function bodiless_header_end(node, start_row, cursor_row)
   end
   local condition = node:field("condition")[1]
   if condition then
-    return condition:end_()
+    local end_row, end_col = condition:end_()
+    return end_row, end_col
   end
   return start_row + 1, 0
+end
+
+---@param node TSNode
+---@param start_row integer
+---@param cursor_row integer
+---@return integer end_row
+---@return integer end_col
+local function default_header_end(node, start_row, cursor_row)
+  local body = node:field("body")[1]
+  if body then
+    local end_row, end_col = body:start()
+    return end_row, end_col
+  end
+  return bodiless_header_end(node, start_row, cursor_row)
+end
+
+---@param match table<integer, TSNode[]>
+---@param node TSNode
+---@param query vim.treesitter.Query
+---@return boolean is_block
+---@return boolean ends_at_comment
+---@return integer start_row
+---@return integer? end_row
+---@return integer? end_col
+local function match_captures(match, node, query)
+  local is_block, ends_at_comment = false, false
+  local start_row = node:start()
+  local end_row, end_col ---@type integer?, integer?
+  for id, nodes in pairs(match) do
+    local capture = nodes[#nodes]
+    local name = query.captures[id]
+    if name == "context" then
+      is_block = is_block or capture == node
+    elseif name == "context.start" and capture then
+      start_row = capture:start()
+    elseif name == "context.end" and nodes[1] then
+      -- A quantified capture, such as Ruby's for each `when` of a `case`,
+      -- holds several nodes in order, and the header ends at the first.
+      end_row, end_col = outermost_on_row(nodes[1], node):start()
+      ends_at_comment = in_comment(nodes[1])
+    elseif name == "context.final" and capture then
+      end_row, end_col = capture:end_()
+      ends_at_comment = in_comment(capture)
+    end
+  end
+  return is_block, ends_at_comment, start_row, end_row, end_col
 end
 
 --- Where the query says the header of `node` starts and ends, from the
@@ -179,34 +226,10 @@ end
 ---@return integer end_col
 local function match_header(root, node, bufnr, query, cursor_row)
   for _, match in query:iter_matches(root, bufnr, 0, -1, { max_start_depth = 0 }) do
-    local is_block, ends_at_comment = false, false
-    local start_row = node:start()
-    local end_row, end_col
-    for id, nodes in pairs(match) do
-      local capture = nodes[#nodes]
-      local name = query.captures[id]
-      if name == "context" then
-        is_block = is_block or capture == node
-      elseif name == "context.start" then
-        start_row = capture:start()
-      elseif name == "context.end" then
-        -- A quantified capture, such as Ruby's for each `when` of a `case`,
-        -- holds several nodes in order, and the header ends at the first.
-        end_row, end_col = outermost_on_row(nodes[1], node):start()
-        ends_at_comment = in_comment(nodes[1])
-      elseif name == "context.final" then
-        end_row, end_col = capture:end_()
-        ends_at_comment = in_comment(capture)
-      end
-    end
+    local is_block, ends_at_comment, start_row, end_row, end_col = match_captures(match, node, query)
     if is_block and not ends_at_comment then
-      if not end_row then
-        local body = node:field("body")[1]
-        if body then
-          end_row, end_col = body:start()
-        else
-          end_row, end_col = bodiless_header_end(node, start_row, cursor_row)
-        end
+      if not end_row or not end_col then
+        end_row, end_col = default_header_end(node, start_row, cursor_row)
       end
       return start_row, end_row, end_col
     end
@@ -254,6 +277,24 @@ local function last_text_row(bufnr, start_row, end_row, end_col)
   return end_row
 end
 
+---@param node TSNode
+---@param row integer
+---@param col integer
+---@return TSNode?
+local function closing_list_at(node, row, col)
+  local token = node:tree():root():descendant_for_range(row, col, row, col + 1)
+  local list = token and token:parent()
+  if not list then
+    return nil
+  end
+  local kind = list:type()
+  local is_list = kind:find("parameter") ~= nil or kind:find("argument") ~= nil
+  if not is_list or list:start() >= row or list:child(list:child_count() - 1) ~= token then
+    return nil
+  end
+  return list
+end
+
 --- The row the header of `node` starts on, given the row the query starts
 --- it on. A block can start partway through a row that opens by closing a
 --- list begun on an earlier row: Dart's query names a function's body,
@@ -272,14 +313,8 @@ local function declaration_row(node, bufnr, row)
   if row ~= node_row or col >= node_col then
     return row
   end
-  local token = node:tree():root():descendant_for_range(row, col, row, col + 1)
-  local list = token and token:parent()
+  local list = closing_list_at(node, row, col)
   if not list then
-    return row
-  end
-  local kind = list:type()
-  local is_list = kind:find("parameter") ~= nil or kind:find("argument") ~= nil
-  if not is_list or list:start() >= row or list:child(list:child_count() - 1) ~= token then
     return row
   end
   local holder, parent = list, list:parent()
@@ -287,6 +322,16 @@ local function declaration_row(node, bufnr, row)
     holder, parent = parent, parent:parent()
   end
   return (holder:start())
+end
+
+---@param node TSNode
+---@return TSNode?
+local function next_non_comment(node)
+  local item = node:next_sibling()
+  while item and item:type():find("comment", 1, true) do
+    item = item:next_sibling()
+  end
+  return item
 end
 
 --- The row of the first item inside the opening bracket that is the only
@@ -308,10 +353,7 @@ local function first_item_row(node, bufnr, row)
   if list_open ~= open then
     return nil
   end
-  local item = open:next_sibling()
-  while item and item:type():find("comment", 1, true) do
-    item = item:next_sibling()
-  end
+  local item = next_non_comment(open)
   if not item or item == close or item:start() == row then
     return nil
   end
@@ -349,6 +391,50 @@ local function block_for(node, bufnr, query, cursor_row)
   return { node = node, start_row = start_row, last_row = last_row }
 end
 
+---@param blocks context_line.Block[]
+---@param block context_line.Block
+local function append_block(blocks, block)
+  -- A block that starts inside the previous block's header reads
+  -- as part of it: one row from the outer start to the inner end.
+  -- The outer node stays, since its tree holds all of that text
+  -- when the inner block is in an injected language.
+  local previous = blocks[#blocks]
+  if previous and block.start_row <= previous.last_row then
+    previous.last_row = block.last_row
+  else
+    blocks[#blocks + 1] = block
+  end
+end
+
+---@class context_line.FindContext
+---@field bufnr integer
+---@field top_row integer
+---@field cursor_row integer
+---@field max_rows integer
+---@field separator_rows integer
+---@field screen_row fun(buf_row: integer): integer
+
+---@param blocks context_line.Block[]
+---@param langtree vim.treesitter.LanguageTree
+---@param range Range4
+---@param ctx context_line.FindContext
+local function collect_langtree_blocks(blocks, langtree, range, ctx)
+  local query = context_query(langtree:lang())
+  if not query then
+    return
+  end
+  for _, node in ipairs(ancestors(langtree, range)) do
+    local node_row = node:start()
+    local covered = math.min(ctx.max_rows, #blocks) + (#blocks > 0 and ctx.separator_rows or 0)
+    if node_row < ctx.top_row or ctx.screen_row(node_row) < covered then
+      local block = block_for(node, ctx.bufnr, query, ctx.cursor_row)
+      if block then
+        append_block(blocks, block)
+      end
+    end
+  end
+end
+
 --- The blocks to pin in `winid`, outermost first. A block shows when its
 --- node starts above the rows the pinned headers cover, so each header
 --- pinned lets one more start a row lower. The separator line under them
@@ -365,6 +451,9 @@ function M.find(winid, parser, opts)
   local cursor = vim.api.nvim_win_get_cursor(winid)
   local row, col = cursor[1] - 1, cursor[2]
   local info = vim.fn.getwininfo(winid)[1]
+  if not info then
+    return {}
+  end
   local text_top = info.winrow + info.winbar
   -- The screen row of a buffer row's first column, from the window's first
   -- text row; negative when that column is scrolled off the top.
@@ -380,29 +469,17 @@ function M.find(winid, parser, opts)
   parser:parse({ top_row, vim.fn.line("w$", winid) })
   local range = { row, col, row, col + 1 }
   local blocks = {} ---@type context_line.Block[]
+  ---@type context_line.FindContext
+  local ctx = {
+    bufnr = bufnr,
+    top_row = top_row,
+    cursor_row = row,
+    max_rows = max_rows,
+    separator_rows = separator_rows,
+    screen_row = screen_row,
+  }
   for _, langtree in ipairs(language_trees(parser, range)) do
-    local query = context_query(langtree:lang())
-    if query then
-      for _, node in ipairs(ancestors(langtree, range)) do
-        local node_row = node:start()
-        local covered = math.min(max_rows, #blocks) + (#blocks > 0 and separator_rows or 0)
-        if node_row < top_row or screen_row(node_row) < covered then
-          local block = block_for(node, bufnr, query, row)
-          if block then
-            -- A block that starts inside the previous block's header reads
-            -- as part of it: one row from the outer start to the inner end.
-            -- The outer node stays, since its tree holds all of that text
-            -- when the inner block is in an injected language.
-            local previous = blocks[#blocks]
-            if previous and block.start_row <= previous.last_row then
-              previous.last_row = block.last_row
-            else
-              blocks[#blocks + 1] = block
-            end
-          end
-        end
-      end
-    end
+    collect_langtree_blocks(blocks, langtree, range, ctx)
   end
 
   while #blocks > max_rows do

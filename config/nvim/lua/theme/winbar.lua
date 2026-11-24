@@ -49,10 +49,11 @@ end
 ---@param buf integer
 ---@return string
 local function diagnostics(buf)
-  local signs = vim.diagnostic.config().signs
+  local diag_config = vim.diagnostic.config()
+  local signs = diag_config and diag_config.signs
   ---@type table<integer, string>
   local marks = type(signs) == "table" and signs.text or {}
-  ---@type table<integer, integer>
+  ---@type table<integer, integer?>
   local counts = {}
   for _, d in ipairs(vim.diagnostic.get(buf)) do
     counts[d.severity] = (counts[d.severity] or 0) + 1
@@ -131,7 +132,8 @@ end
 -- be excluded by hand.
 ---@param win integer
 local function apply(win)
-  if vim.api.nvim_win_get_config(win).relative ~= "" then
+  local relative = vim.api.nvim_win_get_config(win).relative --[[@as string]]
+  if relative ~= "" then
     return
   end
   local buf = vim.api.nvim_win_get_buf(win)

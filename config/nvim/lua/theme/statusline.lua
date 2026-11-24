@@ -88,9 +88,35 @@ local function read_number(path)
   if not file then
     return nil
   end
-  local n = tonumber(file:read("*l"))
+  local line = file:read("*l")
   file:close()
-  return n
+  local n = line and tonumber(line) or nil
+  return n and math.floor(n) or nil
+end
+
+---@param s string?
+---@return integer
+local function to_int(s)
+  local n = s and tonumber(s) or nil
+  return n and math.floor(n) or 0
+end
+
+---@param dir string
+---@return string? operation, string? branch
+local function rebase_operation(dir)
+  for _, rebase in ipairs({ { "rebase-merge", "msgnum", "end" }, { "rebase-apply", "next", "last" } }) do
+    local folder = dir .. "/" .. rebase[1]
+    if vim.uv.fs_stat(folder) then
+      local step, total = read_number(folder .. "/" .. rebase[2]), read_number(folder .. "/" .. rebase[3])
+      local head = io.open(folder .. "/head-name")
+      local branch = head and (head:read("*l") or ""):match("^refs/heads/(.+)$")
+      if head then
+        head:close()
+      end
+      return step and total and ("rebasing %d/%d"):format(step, total) or "rebasing", branch
+    end
+  end
+  return nil, nil
 end
 
 -- What git is in the middle of, with its step for a rebase, as `git status`
@@ -103,17 +129,9 @@ local function operation(root)
   if not dir then
     return nil
   end
-  for _, rebase in ipairs({ { "rebase-merge", "msgnum", "end" }, { "rebase-apply", "next", "last" } }) do
-    local folder = dir .. "/" .. rebase[1]
-    if vim.uv.fs_stat(folder) then
-      local step, total = read_number(folder .. "/" .. rebase[2]), read_number(folder .. "/" .. rebase[3])
-      local head = io.open(folder .. "/head-name")
-      local branch = head and (head:read("*l") or ""):match("^refs/heads/(.+)$")
-      if head then
-        head:close()
-      end
-      return step and total and ("rebasing %d/%d"):format(step, total) or "rebasing", branch
-    end
+  local op, branch = rebase_operation(dir)
+  if op then
+    return op, branch
   end
   for _, marker in ipairs({
     { "MERGE_HEAD", "merging" },
@@ -128,6 +146,22 @@ local function operation(root)
   return nil
 end
 
+---@param state theme.RepoState
+---@param key string
+---@param value string
+local function apply_header(state, key, value)
+  if key == "branch.head" then
+    state.branch = value
+  elseif key == "branch.upstream" then
+    state.upstream = true
+  elseif key == "branch.ab" then
+    local ahead, behind = value:match("^%+(%d+) %-(%d+)$")
+    state.ahead, state.behind = to_int(ahead), to_int(behind)
+  elseif key == "stash" then
+    state.stash = to_int(value)
+  end
+end
+
 ---@param porcelain string `git status --porcelain=v2 --branch --show-stash`
 ---@return theme.RepoState
 local function parse(porcelain)
@@ -136,18 +170,11 @@ local function parse(porcelain)
   local oid = ""
   for line in porcelain:gmatch("[^\n]+") do
     local key, value = line:match("^# (%S+) (.*)$")
-    if key == "branch.oid" then
+    if key == "branch.oid" and value then
       oid = value
-    elseif key == "branch.head" then
-      state.branch = value
-    elseif key == "branch.upstream" then
-      state.upstream = true
-    elseif key == "branch.ab" then
-      local ahead, behind = value:match("^%+(%d+) %-(%d+)$")
-      state.ahead, state.behind = tonumber(ahead) or 0, tonumber(behind) or 0
-    elseif key == "stash" then
-      state.stash = tonumber(value) or 0
-    elseif not key then
+    elseif key and value then
+      apply_header(state, key, value)
+    else
       state.changed = state.changed + 1
     end
   end
@@ -158,6 +185,17 @@ local function parse(porcelain)
   return state
 end
 
+---@param state theme.RepoState
+---@return string
+local function branch_highlight(state)
+  if state.operation or state.detached then
+    return "ThemeStlAttention"
+  elseif state.behind > 0 then
+    return "ThemeStlBehind"
+  end
+  return "ThemeStlBranch"
+end
+
 -- The branch, then only what's unusual about the repository, all in the
 -- branch's gray. As in the prompt, only the branch name takes a color, and
 -- only when something needs you: peach when there are commits to pull, and
@@ -165,13 +203,7 @@ end
 ---@param state theme.RepoState
 ---@return string
 local function describe(state)
-  local name = "ThemeStlBranch"
-  if state.operation or state.detached then
-    name = "ThemeStlAttention"
-  elseif state.behind > 0 then
-    name = "ThemeStlBehind"
-  end
-  local parts = { paint(name, esc(state.branch)) }
+  local parts = { paint(branch_highlight(state), esc(state.branch)) }
   local function add(text)
     parts[#parts + 1] = paint("ThemeStlBranch", text)
   end
@@ -208,9 +240,9 @@ function M.render()
   return left .. "%=" .. paint(dot, "●") .. " " .. paint(group, letter) .. " "
 end
 
----@type table<string, true>
+---@type table<string, true?>
 local running = {}
----@type table<string, true>
+---@type table<string, true?>
 local again = {}
 
 -- Reads one repository's state again. A request while git is still running

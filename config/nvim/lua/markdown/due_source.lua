@@ -15,7 +15,7 @@ function source.new()
   return setmetatable({}, { __index = source })
 end
 
-function source:get_trigger_characters()
+function source.get_trigger_characters()
   return { "@" }
 end
 
@@ -40,36 +40,54 @@ local function dates_for(word)
 end
 
 ---@param ctx blink.cmp.Context
----@param callback fun(response: blink.cmp.CompletionResponse)
-function source:get_completions(ctx, callback)
-  local row, col = ctx.cursor[1], ctx.cursor[2]
-  local before = ctx.line:sub(1, col)
-  local at, word = before:match("()@([%w%-]*)$")
+---@param row integer
+---@param col integer
+---@param at integer
+---@param word string
+---@return table[]
+local function completion_items(ctx, row, col, at, word)
   local items = {}
-  -- An @ inside a word, as in an email address, is not a date.
-  if at and (at == 1 or before:sub(at - 1, at - 1):match("%s")) and tasks.find(ctx.bufnr, row) then
-    local finish = col + #ctx.line:sub(col + 1):match("^[%w%-]*")
-    -- A task has one date, so the new one takes the place of any it had.
-    local old = tasks.due_range(ctx.bufnr, row)
-    local today, tomorrow = tasks.day(0), tasks.day(1)
-    for _, date in ipairs(dates_for(word)) do
-      items[#items + 1] = {
-        label = tasks.label(date),
-        labelDetails = { description = date == today and "today" or date == tomorrow and "tomorrow" or nil },
-        filterText = "@" .. word,
-        sortText = date,
-        kind_name = "Date",
-        -- LazyVim's kind icons end in a space, so the menu has no gap of its own.
-        kind_icon = "📅 ",
-        textEdit = {
-          newText = "📅 " .. date,
-          range = {
-            start = { line = row - 1, character = at - 1 },
-            ["end"] = { line = row - 1, character = finish },
-          },
+  local suffix = ctx.line:sub(col + 1):match("^[%w%-]*") or ""
+  local finish = col + #suffix
+  -- A task has one date, so the new one takes the place of any it had.
+  local old = tasks.due_range(ctx.bufnr, row)
+  local today, tomorrow = tasks.day(0), tasks.day(1)
+  for _, date in ipairs(dates_for(word)) do
+    local description = date == today and "today" or date == tomorrow and "tomorrow" or nil
+    items[#items + 1] = {
+      label = tasks.label(date),
+      labelDetails = { description = description },
+      filterText = "@" .. word,
+      sortText = date,
+      kind_name = "Date",
+      -- LazyVim's kind icons end in a space, so the menu has no gap of its own.
+      kind_icon = "📅 ",
+      textEdit = {
+        newText = "📅 " .. date,
+        range = {
+          start = { line = row - 1, character = at - 1 },
+          ["end"] = { line = row - 1, character = finish },
         },
-        additionalTextEdits = old and { { newText = "", range = old } } or nil,
-      }
+      },
+      additionalTextEdits = old and { { newText = "", range = old } } or nil,
+    }
+  end
+  return items
+end
+
+---@param ctx blink.cmp.Context
+---@param callback fun(response: blink.cmp.CompletionResponse)
+function source.get_completions(_, ctx, callback)
+  local row, col = ctx.cursor[1], ctx.cursor[2]
+  local items = {}
+  if row and col then
+    local before = ctx.line:sub(1, col)
+    local raw_at, word = before:match("()@([%w%-]*)$")
+    local at = raw_at --[[@as integer?]]
+    -- An @ inside a word, as in an email address, is not a date.
+    local at_boundary = at ~= nil and (at == 1 or before:sub(at - 1, at - 1):match("%s") ~= nil)
+    if at and word and at_boundary and tasks.find(ctx.bufnr, row) then
+      items = completion_items(ctx, row, col, at, word)
     end
   end
   -- Each new letter can change the date, so blink asks again on every key.
@@ -83,7 +101,7 @@ local namespace = vim.api.nvim_create_namespace("markdown.due_source")
 ---extmark that follows the end of the @word through both edits.
 ---@param ctx blink.cmp.Context
 ---@param item blink.cmp.CompletionItem
-function source:execute(ctx, item, callback, default_implementation)
+function source.execute(_, ctx, item, callback, default_implementation)
   local finish = item.textEdit.range["end"]
   local mark = vim.api.nvim_buf_set_extmark(ctx.bufnr, namespace, finish.line, finish.character, {})
   default_implementation()

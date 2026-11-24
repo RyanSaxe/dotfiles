@@ -56,6 +56,10 @@
 ---@field palette ThemePalette
 ---@field code table<string, string> the code tiers bat, delta and zsh share
 
+---@class ThemeModule
+---@field dir string
+---@field tokens ThemeTokens?
+---@field floor_opts table
 local M = {}
 
 ---@type string
@@ -75,10 +79,6 @@ function M.load()
   return nil
 end
 
----@type ThemeTokens|nil
-M.tokens = nil
-
----@type table
 M.floor_opts = {}
 
 function M.apply()
@@ -88,12 +88,9 @@ function M.apply()
   local flavour = light and "latte" or "mocha"
   -- The generated palette IS the palette: feed it to the floor so every
   -- plugin integration paints with it, never stock catppuccin values.
-  ---@type table
   local opts = M.floor_opts
   if tokens then
-    ---@type table
-    local merged = vim.tbl_deep_extend("force", opts, { color_overrides = { [flavour] = tokens.palette } })
-    opts = merged
+    opts = vim.tbl_deep_extend("force", opts, { color_overrides = { [flavour] = tokens.palette } }) --[[@as table]]
   end
   require("catppuccin").setup(opts)
   vim.o.background = light and "light" or "dark"
