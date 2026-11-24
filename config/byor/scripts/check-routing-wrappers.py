@@ -1,22 +1,78 @@
 #!/usr/bin/env python3
-"""Flag pure pass-through routing wrapper functions in Python and TypeScript/JS.
+"""Flag pure routing wrappers and nudge on newly written one-statement helpers.
 
-Just-in-time steering check (`gate: false`) for the BYOR `craft` package.
-Detects functions or methods whose entire body only forwards parameters and
-constants straight to another function (including the two-statement
-`res = call(...); return res` shape), while skipping dunders, decorated
-functions, overrides, and constructors.
+Just-in-time steering check (`gate: false`) for the BYOR `craft` package,
+covering Python and TypeScript/JavaScript in two tiers:
+1. `[error]` Pure pass-through wrappers anywhere in the edited file whose body
+   only forwards parameters, constants, or `self`/`this` attributes to another
+   call (including `res = call(...); return res`).
+2. `[nudge]` Newly added or modified one-statement functions in non-test source
+   files (diff-scoped against `HEAD`), prompting the agent to inline shallow
+   helpers (even across 2-3 call sites) to keep call stacks flat and grep clear.
 """
 
 from __future__ import annotations
 
 import ast
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 PY_EXTS = {".py", ".pyi"}
 JS_EXTS = {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}
+TEST_DIRS = {"tests", "test", "__tests__", "spec", "specs"}
+HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def _is_test_file(path: Path) -> bool:
+    if {part.lower() for part in path.parts[:-1]} & TEST_DIRS:
+        return True
+    name = path.name.lower()
+    if name == "conftest.py" or name.startswith("test_") or name.endswith("_test.py"):
+        return True
+    return any(marker in name for marker in (".test.", ".spec."))
+
+
+def _added_line_numbers(path: Path) -> set[int] | None:
+    """Return 1-based line numbers added vs HEAD, or None if the file is new/untracked."""
+    try:
+        rel = path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return None
+    tracked = subprocess.run(["git", "cat-file", "-e", f"HEAD:{rel}"], capture_output=True, check=False)
+    if tracked.returncode != 0:
+        return None
+    diff = subprocess.run(
+        ["git", "diff", "HEAD", "-U0", "--", rel],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if diff.returncode != 0:
+        return set()
+
+    added: set[int] = set()
+    current_line = 0
+    for line in diff.stdout.splitlines():
+        hunk = HUNK_RE.match(line)
+        if hunk:
+            current_line = int(hunk.group(1))
+            continue
+        if line.startswith(("+++", "---")):
+            continue
+        if line.startswith("+"):
+            added.add(current_line)
+            current_line += 1
+        elif not line.startswith("-"):
+            current_line += 1
+    return added
+
+
+def _line_is_new(line_no: int, added_lines: set[int] | None) -> bool:
+    return added_lines is None or line_no in added_lines
 
 
 def _is_trivial_py_arg(node: ast.AST, param_names: set[str]) -> bool:
@@ -38,6 +94,20 @@ def _is_super_call(call: ast.Call) -> bool:
         and isinstance(call.func.value.func, ast.Name)
         and call.func.value.func.id == "super"
     )
+
+
+def _is_py_stub(stmt: ast.stmt) -> bool:
+    if isinstance(stmt, ast.Pass):
+        return True
+    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and stmt.value.value is Ellipsis:
+        return True
+    if isinstance(stmt, ast.Raise):
+        exc = stmt.exc
+        if isinstance(exc, ast.Name) and exc.id == "NotImplementedError":
+            return True
+        if isinstance(exc, ast.Call) and isinstance(exc.func, ast.Name) and exc.func.id == "NotImplementedError":
+            return True
+    return False
 
 
 def _call_name(call: ast.Call) -> str | None:
@@ -72,7 +142,22 @@ def _param_names(args: ast.arguments) -> set[str]:
     return names
 
 
-def check_python(raw: str, text: str) -> list[str]:
+def _wrapper_error(raw: str, line_no: int, name: str, target: str) -> str:
+    return (
+        f"{raw}:{line_no}: [error] `{name}` only forwards to `{target}`. "
+        f"Call `{target}` directly unless `{name}` marks a real module boundary."
+    )
+
+
+def _shallow_nudge(raw: str, line_no: int, name: str) -> str:
+    return (
+        f"{raw}:{line_no}: [nudge] `{name}` is a new one-statement function. "
+        "Inline it at call sites (even across two or three callers) to keep call stacks flat and grep results clear, "
+        "unless it owns a domain rule shared across the codebase."
+    )
+
+
+def check_python(raw: str, text: str, *, added_lines: set[int] | None, check_shallow: bool) -> list[str]:
     try:
         tree = ast.parse(text)
     except SyntaxError:
@@ -82,9 +167,7 @@ def check_python(raw: str, text: str) -> list[str]:
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        if node.name.startswith("__") and node.name.endswith("__"):
-            continue
-        if node.decorator_list:
+        if (node.name.startswith("__") and node.name.endswith("__")) or node.decorator_list:
             continue
 
         body = list(node.body)
@@ -95,13 +178,15 @@ def check_python(raw: str, text: str) -> list[str]:
             and isinstance(body[0].value.value, str)
         ):
             body = body[1:]
+        if not body:
+            continue
 
         call: ast.Call | None = None
         if len(body) == 1:
             stmt = body[0]
-            if isinstance(stmt, ast.Return):
-                call = _unwrap_call(stmt.value)
-            elif isinstance(stmt, ast.Expr):
+            if _is_py_stub(stmt):
+                continue
+            if isinstance(stmt, (ast.Return, ast.Expr)):
                 call = _unwrap_call(stmt.value)
         elif len(body) == 2:
             first, second = body
@@ -115,23 +200,28 @@ def check_python(raw: str, text: str) -> list[str]:
             ):
                 call = _unwrap_call(first.value)
 
-        if call is None or _is_super_call(call):
-            continue
-        target_name = _call_name(call)
-        if not target_name or target_name == node.name or target_name.endswith(f".{node.name}"):
+        if call is not None and _is_super_call(call):
             continue
 
-        params = _param_names(node.args)
-        all_args_trivial = all(_is_trivial_py_arg(arg, params) for arg in call.args) and all(
-            _is_trivial_py_arg(kw.value, params) for kw in call.keywords
-        )
-        if not all_args_trivial:
-            continue
+        if call is not None:
+            target_name = _call_name(call)
+            if target_name and target_name != node.name and not target_name.endswith(f".{node.name}"):
+                params = _param_names(node.args)
+                all_args_trivial = all(_is_trivial_py_arg(arg, params) for arg in call.args) and all(
+                    _is_trivial_py_arg(kw.value, params) for kw in call.keywords
+                )
+                if all_args_trivial:
+                    findings.append(_wrapper_error(raw, node.lineno, node.name, target_name))
+                    continue
 
-        findings.append(
-            f"{raw}:{node.lineno}: pure routing wrapper `{node.name}` only forwards to `{target_name}`. "
-            "Call the target directly unless this wrapper defines a real domain boundary."
-        )
+        if (
+            check_shallow
+            and len(body) == 1
+            and isinstance(body[0], (ast.Return, ast.Expr))
+            and _line_is_new(node.lineno, added_lines)
+        ):
+            findings.append(_shallow_nudge(raw, node.lineno, node.name))
+
     return findings
 
 
@@ -141,6 +231,10 @@ JS_FUNC_RE = re.compile(
 )
 JS_ARROW_BLOCK_RE = re.compile(
     r"^(?P<indent>[ \t]*)(?:export\s+)?const\s+(?P<name>[A-Za-z_$]\w*)\s*=\s*(?:async\s+)?(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^=]+)?=>\s*\{",
+    re.MULTILINE,
+)
+JS_ARROW_EXPR_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?:export\s+)?const\s+(?P<name>[A-Za-z_$]\w*)\s*=\s*(?:async\s+)?(?:<[^>]*>)?\s*\((?P<params>[^)]*)\)\s*(?::[^=]+)?=>\s*(?!\{)(?P<expr>[^\n;]+);?",
     re.MULTILINE,
 )
 JS_SIMPLE_ARG_RE = re.compile(
@@ -190,7 +284,7 @@ def _is_trivial_js_call(expr: str, func_name: str) -> str | None:
     return target
 
 
-def check_js(raw: str, text: str) -> list[str]:
+def check_js(raw: str, text: str, *, added_lines: set[int] | None, check_shallow: bool) -> list[str]:
     findings: list[str] = []
     for pattern in (JS_FUNC_RE, JS_ARROW_BLOCK_RE):
         for match in pattern.finditer(text):
@@ -200,13 +294,16 @@ def check_js(raw: str, text: str) -> list[str]:
             body = _extract_braced_body(text, match.end() - 1)
             if body is None:
                 continue
-            # Strip line comments and split statements.
             cleaned = re.sub(r"//[^\n]*", "", body)
             cleaned = re.sub(r"/\*.*?\*/", "", cleaned, flags=re.DOTALL)
             stmts = [s.strip() for s in cleaned.split(";") if s.strip()]
+            line_no = text.count("\n", 0, match.start()) + 1
+
             target: str | None = None
             if len(stmts) == 1:
                 stmt = stmts[0]
+                if "super." in stmt:
+                    continue
                 if stmt.startswith("return "):
                     target = _is_trivial_js_call(stmt[7:], name)
                 else:
@@ -216,12 +313,27 @@ def check_js(raw: str, text: str) -> list[str]:
                 ret = re.match(r"^return\s+([A-Za-z_$]\w*)$", stmts[1])
                 if assign and ret and assign.group(1) == ret.group(1):
                     target = _is_trivial_js_call(assign.group(2), name)
+
             if target:
-                line_no = text.count("\n", 0, match.start()) + 1
-                findings.append(
-                    f"{raw}:{line_no}: pure routing wrapper `{name}` only forwards to `{target}`. "
-                    "Call the target directly unless this wrapper defines a real domain boundary."
-                )
+                findings.append(_wrapper_error(raw, line_no, name, target))
+            elif (
+                check_shallow
+                and len(stmts) == 1
+                and not re.match(r"^(?:if|for|while|switch|try)\b", stmts[0])
+                and _line_is_new(line_no, added_lines)
+            ):
+                findings.append(_shallow_nudge(raw, line_no, name))
+
+    for match in JS_ARROW_EXPR_RE.finditer(text):
+        name = match.group("name")
+        expr = match.group("expr").strip()
+        line_no = text.count("\n", 0, match.start()) + 1
+        target = _is_trivial_js_call(expr, name)
+        if target:
+            findings.append(_wrapper_error(raw, line_no, name, target))
+        elif check_shallow and _line_is_new(line_no, added_lines):
+            findings.append(_shallow_nudge(raw, line_no, name))
+
     return findings
 
 
@@ -235,10 +347,12 @@ def main(argv: list[str]) -> int:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        check_shallow = not _is_test_file(path)
+        added_lines = _added_line_numbers(path) if check_shallow else set()
         if path.suffix in PY_EXTS:
-            findings.extend(check_python(raw, text))
+            findings.extend(check_python(raw, text, added_lines=added_lines, check_shallow=check_shallow))
         elif path.suffix in JS_EXTS:
-            findings.extend(check_js(raw, text))
+            findings.extend(check_js(raw, text, added_lines=added_lines, check_shallow=check_shallow))
 
     if findings:
         sys.stdout.write("\n".join(findings) + "\n")
