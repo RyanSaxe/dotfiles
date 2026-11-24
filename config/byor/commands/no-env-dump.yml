@@ -1,0 +1,29 @@
+id: no-env-dump
+language: Bash
+severity: error
+message: "Do not dump the entire shell environment (`env`, `printenv`, or `export -p`); secrets live there."
+rule:
+  any:
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)(env|printenv)$
+        - not:
+            has:
+              kind: word
+              regex: ^[^-]
+    - kind: declaration_command
+      all:
+        - regex: ^export(\s+-[A-Za-z]*p[A-Za-z]*)?$
+        - not:
+            has:
+              kind: variable_assignment
+        - not:
+            has:
+              kind: variable_name
+metadata:
+  byor:
+    rationale: Dumping all environment variables pulls API keys and tokens directly into agent context and session logs.
+    agent_prompt: Inspect only the specific variable you need (for example `printenv PATH` or `echo "$VAR"`), or pass explicit variables to a command (`env KEY=VAL cmd`).
+    tags: [safety, secrets]

@@ -1,0 +1,32 @@
+id: react.no-try-finally-js
+language: JavaScript
+severity: error
+message: Avoid `try ... finally` inside React components; React Compiler skips optimizing them.
+rule:
+  all:
+    - kind: try_statement
+    - has:
+        kind: finally_clause
+    - inside:
+        any:
+          - kind: function_declaration
+          - kind: arrow_function
+          - kind: function_expression
+        has:
+          any:
+            - kind: jsx_element
+            - kind: jsx_self_closing_element
+          stopBy: end
+        stopBy: end
+metadata:
+  byor:
+    rationale: >
+      React Compiler silently bails out of optimizing components that contain
+      try/finally blocks, and oxlint does not catch this in the fast path.
+    agent_prompt: >
+      Move cleanup into a helper outside the component body, a useEffect
+      cleanup function, or an explicit try/catch with post-block cleanup so
+      React Compiler can optimize this component.
+    tags:
+      - react
+      - web

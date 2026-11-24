@@ -1,0 +1,22 @@
+id: python.question-monkeypatch
+language: Python
+severity: info
+message: Verify monkeypatch.setattr/delattr is necessary instead of passing a dependency.
+rule:
+  any:
+    - pattern: monkeypatch.setattr($$$ARGS)
+    - pattern: monkeypatch.delattr($$$ARGS)
+metadata:
+  byor:
+    rationale: >
+      Patching attributes in place couples tests to private import paths and
+      module internals. Environment and directory helpers (setenv, delenv,
+      chdir) are fine and are not flagged.
+    agent_prompt: >
+      Prefer passing a fake, callable, or protocol as an argument. Keep
+      monkeypatch.setattr or monkeypatch.delattr only when crossing a boundary
+      you cannot inject, and add `# ast-grep-ignore: python.question-monkeypatch`
+      on the line above with a short comment explaining why.
+    tags:
+      - python
+      - testing

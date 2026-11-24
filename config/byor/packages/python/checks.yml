@@ -1,0 +1,9 @@
+checks:
+  - name: pep723-scripts
+    extensions:
+      - py
+    run: python3 ~/.config/byor/scripts/check-pep723.py
+    gate: false
+    tags:
+      - python
+      - scripts

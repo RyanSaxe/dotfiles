@@ -143,15 +143,22 @@ in
     ''
   );
 
-  # byor's global rules, its command rules, its style package and the
-  # scripts their checks run, linked from the checkout so a rule byor writes
-  # lands in the repo.
-  # byor owns the rest of ~/.config/byor.
-  xdg.configFile = lib.mkIf (has "personal") (
-    lib.genAttrs [ "byor/rules" "byor/commands" "byor/packages" "byor/scripts" ] (path: {
-      source = config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/${path}";
+  # Global Ruff fallback on every machine, plus byor's tracked config, rules,
+  # command rules, packages and check scripts on personal machines, linked from
+  # the checkout so edits land straight in the repo.
+  # byor keeps machine-specific state (repos.yml, state.yml) in ~/.local/state/byor.
+  xdg.configFile = lib.mkMerge [
+    (lib.mkIf (has "base") {
+      "ruff/ruff.toml".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/ruff/ruff.toml";
     })
-  );
+    (lib.mkIf (has "personal") (
+      lib.genAttrs [ "byor/config.yml" "byor/rules" "byor/commands" "byor/packages" "byor/scripts" ]
+        (path: {
+          source = config.lib.file.mkOutOfStoreSymlink "${config.dotfiles.repo}/config/${path}";
+        })
+    ))
+  ];
 
   home.sessionPath = [ "$HOME/.local/bin" ];
 }

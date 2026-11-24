@@ -1,0 +1,40 @@
+version: 1
+paths:
+  rules: rules
+  packages: packages
+  repos: repos.yml
+  commands: commands
+ast_grep:
+  command: auto
+output:
+  concise: true
+command_checks:
+  - name: guard-commands
+    run: python3 ~/.config/byor/scripts/guard-commands.py
+    tags:
+      - safety
+checks:
+  - name: repo-linters
+    extensions:
+      - py
+      - pyi
+      - js
+      - jsx
+      - mjs
+      - cjs
+      - ts
+      - tsx
+      - mts
+      - cts
+      - md
+      - go
+      - lua
+    run: python3 ~/.config/byor/scripts/run-repo-linters.py
+    gate: false
+    tags:
+      - lint
+init:
+  private: true
+  packages:
+    - craft
+profiles: {}

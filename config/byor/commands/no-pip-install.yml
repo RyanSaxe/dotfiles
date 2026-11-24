@@ -1,0 +1,33 @@
+id: no-pip-install
+language: Bash
+severity: error
+message: "Do not install Python packages with `pip`; use `uv` instead."
+rule:
+  any:
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)pip3?$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)python3?$
+        - has:
+            kind: word
+            regex: ^-m$
+        - has:
+            kind: word
+            regex: ^pip$
+        - has:
+            kind: word
+            regex: ^install$
+metadata:
+  byor:
+    rationale: Raw pip installs bypass uv.lock and pollute shared or wrong Python environments.
+    agent_prompt: Use `uv add` for project dependencies (ask the user first) or `uv run --with PKG` for one-off commands.
+    tags: [python, safety]

@@ -1,0 +1,23 @@
+id: ts.question-mocks
+language: TypeScript
+severity: info
+message: Verify this module mock or spy is necessary instead of passing a fake dependency.
+rule:
+  any:
+    - pattern: vi.mock($$$ARGS)
+    - pattern: jest.mock($$$ARGS)
+    - pattern: vi.spyOn($$$ARGS)
+    - pattern: jest.spyOn($$$ARGS)
+metadata:
+  byor:
+    rationale: >
+      Module mocks and spies couple tests to private imports and call
+      sequences instead of public behavior.
+    agent_prompt: >
+      Prefer real collaborators, small fakes, or injected dependencies. If this
+      mock or spy crosses a boundary you cannot inject, add
+      `// ast-grep-ignore: ts.question-mocks` on the line above with a short
+      reason comment.
+    tags:
+      - web
+      - testing

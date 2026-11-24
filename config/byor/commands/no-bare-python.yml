@@ -1,0 +1,19 @@
+id: no-bare-python
+language: Bash
+severity: error
+message: "Do not run bare `python` or `python3`; run through `uv`."
+rule:
+  kind: command
+  all:
+    - has:
+        field: name
+        regex: ^python3?$
+    - not:
+        has:
+          kind: word
+          regex: ^(-V|--version)$
+metadata:
+  byor:
+    rationale: Bare python picks up an unpredictable system interpreter instead of the project's locked uv environment.
+    agent_prompt: Use `uv run python ...` inside a project or `uv run --script ...` for a PEP 723 script.
+    tags: [python, safety]

@@ -1,0 +1,122 @@
+checks:
+  - name: module-headers
+    extensions:
+      - py
+      - pyi
+      - ts
+      - tsx
+      - mts
+      - cts
+      - js
+      - jsx
+      - mjs
+      - cjs
+      - rs
+      - go
+      - lua
+    run: python3 ~/.config/byor/scripts/check-module-headers.py
+    gate: false
+    tags:
+      - craft
+      - documentation
+  - name: thin-docstrings
+    extensions:
+      - py
+      - pyi
+      - ts
+      - tsx
+      - js
+      - jsx
+      - rs
+      - lua
+    run: python3 ~/.config/byor/scripts/check-thin-docstrings.py
+    gate: false
+    tags:
+      - craft
+      - documentation
+  - name: routing-wrappers
+    extensions:
+      - py
+      - pyi
+      - ts
+      - tsx
+      - mts
+      - cts
+      - js
+      - jsx
+      - mjs
+      - cjs
+    run: python3 ~/.config/byor/scripts/check-routing-wrappers.py
+    gate: false
+    tags:
+      - craft
+      - architecture
+  - name: file-lines
+    extensions:
+      - py
+      - pyi
+      - ts
+      - tsx
+      - mts
+      - cts
+      - js
+      - jsx
+      - mjs
+      - cjs
+      - rs
+      - go
+      - lua
+    run: python3 ~/.config/byor/scripts/check-file-lines.py
+    gate: false
+    tags:
+      - craft
+      - architecture
+  - name: dir-sprawl
+    extensions:
+      - py
+      - pyi
+      - ts
+      - tsx
+      - mts
+      - cts
+      - js
+      - jsx
+      - mjs
+      - cjs
+      - rs
+      - go
+      - lua
+    run: python3 ~/.config/byor/scripts/check-dir-sprawl.py
+    gate: false
+    tags:
+      - craft
+      - architecture
+  - name: suppression-reason
+    extensions:
+      - py
+      - pyi
+      - ts
+      - tsx
+      - mts
+      - cts
+      - js
+      - jsx
+      - mjs
+      - cjs
+      - rs
+      - go
+      - lua
+    run: python3 ~/.config/byor/scripts/check-suppression-reason.py
+    gate: false
+    tags:
+      - craft
+      - suppression
+  - name: manifest-deps
+    extensions:
+      - toml
+      - json
+    run: python3 ~/.config/byor/scripts/check-manifest-deps.py
+    gate: false
+    tags:
+      - craft
+      - dependencies

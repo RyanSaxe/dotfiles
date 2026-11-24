@@ -1,0 +1,106 @@
+id: no-global-installs
+language: Bash
+severity: error
+message: "Do not install tools globally outside Nix dotfiles."
+rule:
+  any:
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)brew$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)npm$
+        - has:
+            kind: word
+            regex: ^(install|i|add)$
+        - has:
+            kind: word
+            regex: ^(-g|--global)$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)pnpm$
+        - has:
+            kind: word
+            regex: ^(add|install|i)$
+        - has:
+            kind: word
+            regex: ^(-g|--global)$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)bun$
+        - has:
+            kind: word
+            regex: ^(add|install|i)$
+        - has:
+            kind: word
+            regex: ^(-g|--global)$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)cargo$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)go$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)uv$
+        - has:
+            kind: word
+            regex: ^tool$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)pipx$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)luarocks$
+        - has:
+            kind: word
+            regex: ^install$
+    - kind: command
+      all:
+        - has:
+            field: name
+            regex: (^|/)nix$
+        - has:
+            kind: word
+            regex: ^profile$
+        - has:
+            kind: word
+            regex: ^install$
+metadata:
+  byor:
+    rationale: General-purpose tools are managed declaratively in dotfiles through Nix so every machine stays consistent; project tools belong in the project environment.
+    agent_prompt: Add general-purpose tools through $DOTFILES (Nix), install project-only tools in the project's own environment (`uv add --dev`, `npm install --save-dev`), or run one-offs with `uvx` / `npx`.
+    tags: [safety, environment]
