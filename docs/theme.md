@@ -2,36 +2,35 @@
 
 ```sh
 theme light   # switch macOS and every app to Catppuccin Latte
-theme dark    # switch them to Catppuccin Mocha
-theme         # follow macOS's appearance
+theme dark    # switch macOS and every app to Catppuccin Mocha
+theme         # follow macOS appearance
 ```
 
-Changing the appearance in macOS works too, because sketchybar runs `theme`
-whenever it changes.
+Toggling macOS appearance also switches every app because sketchybar runs
+`theme` on system theme changes.
 
 <img alt="The Mac's screen in dark mode, in Catppuccin Mocha: sketchybar across the top, and Rex below it with two Neovim panes." src="../assets/screen.png">
 
 ## How it works
 
-`theme/meanings.nix` names what each color means, such as `muted` or
-`code.function`, once for each mode. Each file in `theme/apps` turns those
-meanings into one app's files. Each home switch renders every app for both
-modes, into `~/.config/theme/dark` and `~/.config/theme/light`, and
-`theme` points the links in `~/.config/theme` at one mode. tmux, Ghostty,
-sketchybar and Claude Code keep their colors in memory, so `theme` reloads
-them too. A computer without the `personal` role has no Claude Code,
-Antigravity CLI or pi, so it gets none of their theme files.
+`theme/meanings.nix` defines semantic color roles (such as `muted` or
+`code.function`) for both modes. Each file in `theme/apps/` maps those meanings
+into one app's config files. Every `home-switch` renders both modes into
+`~/.config/theme/dark` and `~/.config/theme/light`, and `theme` flips the
+symlinks in `~/.config/theme` to the active mode.
 
-A Mac with a screen also gets a desktop picture for each mode, painted
-from the theme's colors by `theme/desktop.py`, and `theme` sets it on
-every screen at each switch. A computer whose desktop picture is managed
-elsewhere sets `dotfiles.desktopPicture = false` in its host file, and
-`theme` then leaves the picture alone.
+Apps that keep colors in memory (`tmux`, Ghostty, sketchybar and Claude Code)
+are reloaded by `theme/theme.sh`. Hosts without the `personal` role skip theme
+files for Claude Code, Antigravity CLI and `pi`.
+
+On `gui` Macs, `theme/desktop.py` renders a wallpaper for each mode and `theme`
+applies it on every display unless `dotfiles.desktopPicture = false` is set in
+the host file.
 
 ## Color another app
 
-Add a file to `theme/apps` that takes the meanings as `t` and returns each
-file the app reads, by name:
+Add a file under `theme/apps/` that takes `t` (the meanings) and returns the
+app's files by name:
 
 ```nix
 # theme/apps/statusline.nix
@@ -47,16 +46,15 @@ file the app reads, by name:
 }
 ```
 
-Point the app at its file in `~/.config/theme`, here
-`~/.config/theme/ai-statusline-colors.js`. Use only meanings, never a hex.
-An app that keeps its colors in memory also needs a reload line in
+Point the app at `~/.config/theme/<file>` (here
+`~/.config/theme/ai-statusline-colors.js`). Use meanings only, never raw hex
+values. If the app caches colors in memory, add a reload line in
 `theme/theme.sh`.
 
 ## Chrome
 
-Chrome's theme is an extension in `~/.config/theme/chrome`, which each
-computer loads once, as [By hand](manual.md#chrome-on-a-mac) says. Its
-frame and tabs are the chrome color, like sketchybar, and its toolbar and
-selected tab the raised color of Neovim's current line. Chrome builds a
-theme only when it starts, so when the mode changes `theme` quits Chrome
-and opens it again.
+Chrome loads its unpacked theme from `~/.config/theme/chrome` once per machine
+(see [By hand](manual.md#chrome-on-a-mac)). Frame and tabs use the chrome
+surface (matching sketchybar); toolbar and active tab use the raised surface
+(matching Neovim's current line). Because Chrome only reads themes on launch,
+`theme` restarts Chrome when switching modes.

@@ -1,31 +1,28 @@
 # By hand
 
-The switches set up almost everything. These steps they can't do, so each
-computer needs them once, after [setup](setup.md).
+One-time steps that switches cannot automate. Run these once per machine after
+[Setup](setup.md).
 
 ## Chrome, on a Mac
 
-1. Load the theme. In `chrome://extensions`, turn on Developer mode, click
-   Load unpacked and choose `~/.config/theme/chrome`. In the file picker,
-   Cmd-Shift-G lets you type the path.
-2. In `chrome://settings/onStartup`, choose "Continue where you left off".
-   Chrome reads its theme only when it starts, so `theme` quits Chrome and
-   opens it again whenever the mode changes between light and dark. With
-   this setting Chrome reopens your windows and tabs.
+1. Load the theme: open `chrome://extensions`, enable Developer mode, click
+   **Load unpacked**, and select `~/.config/theme/chrome` (`Cmd-Shift-G` lets
+   you type the path).
+2. Open `chrome://settings/onStartup` and choose **Continue where you left
+   off**. Chrome loads themes only at startup, so `theme` restarts Chrome on
+   light/dark switches; this setting restores your windows and tabs.
 
 ## The agents
 
-Sign each agent in to its account:
+Sign each agent into its account:
 
-| Agent           | Sign in with                    |
-| --------------- | ------------------------------- |
-| Claude Code     | `/login` inside `claude`        |
-| Codex           | `codex login`                   |
-| pi              | `/login` inside `pi`            |
-| Copilot CLI     | `copilot login`                 |
-| Antigravity CLI | `/login` inside `agy`           |
+| Agent           | Sign in with          | Scope      |
+| --------------- | --------------------- | ---------- |
+| Codex           | `codex login`         | every host |
+| Copilot CLI     | `copilot login`       | every host |
+| Claude Code     | `/login` in `claude`  | `personal` |
+| pi              | `/login` in `pi`      | `personal` |
+| Antigravity CLI | `/login` in `agy`     | `personal` |
 
-Codex and Copilot CLI are on every computer. Claude Code, pi and
-Antigravity CLI are only on computers with the `personal` role. Restart any
-pi that was running during the first home switch, so it loads pair's
-extension.
+Restart any `pi` session running during the first `home-switch` so it loads
+`pair`'s extension.
