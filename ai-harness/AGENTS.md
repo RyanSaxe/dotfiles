@@ -80,6 +80,9 @@ worktrees skill describes. Otherwise work in the checkout you're in.
 
 ## Commits, pull requests and docs
 
+Before writing or revising READMEs, documentation pages or diagrams, read
+`$DOTFILES/ai-harness/references/documentation.md`.
+
 People who weren't part of the work read these, often in public. Describe
 the change from what's in the repository, and leave out anything a reader
 can't find there, this conversation included. Mention something from outside

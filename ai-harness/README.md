@@ -18,8 +18,8 @@ agents linked for them, and no Claude Code theme or status line colors.
 ```text
 ai-harness/
 ├── AGENTS.md         global instructions
-├── references/       what AGENTS.md says to read before writing code
-│                     or tests, or checking work
+├── references/       what AGENTS.md says to read before writing code,
+│                     tests or docs, or checking work
 ├── skills/           Agent Skills: worktrees, wiki and project-setup
 ├── tools/            notify-pushover.zsh, the agents' push hook,
 │                     link-agent-skills.sh, which shares Codex's skills

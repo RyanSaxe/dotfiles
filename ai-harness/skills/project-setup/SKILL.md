@@ -274,19 +274,32 @@ outputs, which `nbstripout` removes, and Ruff and `ty` check them too.
 
 ## Docs
 
-- The README sells the project to developers in one screen: a tagline, a picture
-  or a video, Get started, How it works with one diagram, links to the docs, and
-  the license. A feature gets no section of its own.
+Follow `write-well` and `$DOTFILES/ai-harness/references/documentation.md` when
+writing or revising docs:
+
+- **README as intro and hook:** sell the project in about one screen, with a
+  sharp upfront pitch that piques interest, a high-level architecture diagram
+  or visual, a fast quick start, links into `docs/` instead of duplicating
+  manuals, and the license. Keep prose concise: never a dry stub and never a
+  bloated wall of text. A feature gets no section of its own.
   [pair's README](https://github.com/RyanSaxe/pair#readme) follows this layout.
-- A diagram is a custom SVG with a light and a dark version in a `<picture>`,
-  never Mermaid. Add an image only where it helps.
-- Leave out qualifiers and filler: no list of platforms when every platform
+- **Diagrams as light/dark `<picture>` SVGs:** commit `-light.svg` and
+  `-dark.svg` pairs inside `<picture>` (`<source media="(prefers-color-scheme: dark)" srcset="..."><img ...>`)
+  instead of fenced `mermaid` blocks, which GitHub's mobile apps render as raw
+  code. Add a diagram only where it helps, use system typography with
+  `role="img"` and `aria-label`, and visually verify rendered PNGs in both light
+  and dark modes so no text clips or overlaps.
+- **Leave out qualifiers and filler:** no list of platforms when every platform
   works, no status banners, and no features that do not exist yet.
-- Longer docs go in `docs/`, in `getting-started/`, `concepts/`, `guides/`,
-  `reference/` and `contributing/`, with `docs/README.md` as the index and
-  images in `docs/assets/`.
-- The README is for using the project, and `AGENTS.md` is for changing it.
-  `AGENTS.md` has:
+- **Diátaxis in `docs/`:** for multi-doc repositories, separate
+  `docs/getting-started/` (crisp first-run tutorials), `docs/guides/` (lean task
+  recipes without background theory), `docs/concepts/` (focused prose discussion
+  without filler), `docs/reference/` (terse lookup tables) and
+  `docs/contributing/` when needed, with `docs/README.md` as the index and
+  images in `assets/` or `docs/assets/`. Skip unused directories rather than
+  creating empty stubs.
+- **README vs `AGENTS.md`:** the README is for using the project, and
+  `AGENTS.md` is for changing it. `AGENTS.md` has:
   - the setup, the modules, and the project's own rules for the code and the
     tests
   - the exact check commands
