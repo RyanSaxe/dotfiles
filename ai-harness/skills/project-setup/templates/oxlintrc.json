@@ -1,8 +1,22 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Drop "react" and "jsx-a11y" for pure Node CLIs and libraries.
+  "plugins": ["typescript", "react", "jsx-a11y", "unicorn", "oxc"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
     "perf": "error"
+  },
+  "rules": {
+    // Pass an options object when a function needs more than three inputs.
+    "max-params": ["error", { "max": 3 }],
+    // Narrow with type guards or runtime checks instead of casting with `as`.
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+    // Use `unknown` and narrow instead of turning off checks with `any`.
+    "typescript/no-explicit-any": "error",
+    // Handle null and undefined explicitly instead of using `!`.
+    "typescript/no-non-null-assertion": "error",
+    // Cover every member of a discriminated union in switch statements.
+    "typescript/switch-exhaustiveness-check": "error"
   }
 }

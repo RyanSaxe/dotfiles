@@ -23,6 +23,31 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Rust: clippy and rustfmt run from the toolchain.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      # Go: install golangci-lint only so prek runs both fmt and run.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.1.6
+          install-only: true
+
+      # Lua: install pinned stylua and emmylua_check binaries for prek.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: stylua@2.1.0
+      - name: Install emmylua_check
+        run: |
+          version=0.14.0
+          url="https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/${version}/emmylua_check-linux-x64.tar.gz"
+          curl -fsSL "$url" | tar -xz -C /usr/local/bin
+
       - run: uvx prek@0.5.11 run --all-files --show-diff-on-failure
 
   test:
@@ -41,3 +66,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+
+      # Rust: add `cargo machete` or `cargo deny check` here for shipped crates.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked
+
+      # Go
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test -race ./...
+
+      # Lua: run busted or `nvim --clean --headless` tests here when present.

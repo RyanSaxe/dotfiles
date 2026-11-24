@@ -1,0 +1,18 @@
+version: "2"
+
+formatters:
+  # gofumpt tightens gofmt; goimports keeps import groups ordered and pruned.
+  enable:
+    - gofumpt
+    - goimports
+
+linters:
+  # Standard enables Go's core correctness checks; the extra linters cover
+  # wrapped errors, common security bugs and idiomatic Go style.
+  default: standard
+  enable:
+    - staticcheck
+    - errcheck
+    - errorlint
+    - gosec
+    - revive

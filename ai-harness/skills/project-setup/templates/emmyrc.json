@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json",
+  "runtime": {
+    // Use "LuaJIT" for Neovim and LuaJIT projects, or "Lua5.4" for standalone Lua.
+    "version": "LuaJIT"
+  },
+  "diagnostics": {
+    "enable": true,
+    // Add host globals here when targeting an embedded runtime such as Neovim ("vim").
+    "globals": [],
+    "severity": {
+      // Catch shadowed locals, unused bindings and deprecated calls as errors.
+      "redefined-local": "error",
+      "unused": "error",
+      "deprecated": "error"
+    }
+  }
+}
