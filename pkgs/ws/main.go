@@ -18,11 +18,10 @@ import (
 	"sync"
 	"text/tabwriter"
 	"time"
-
-	"github.com/mattn/go-isatty"
-
 	"workspace/layout"
 	"workspace/mux"
+
+	"github.com/mattn/go-isatty"
 )
 
 var (
@@ -63,8 +62,8 @@ focus = true
 func labelFor(dir string) string {
 	// git reports symlink-resolved paths (such as /private/var on macOS), so
 	// map paths under the real home back under home before labeling.
-	if real, err := filepath.EvalSymlinks(home); err == nil && real != home {
-		if rel, err := filepath.Rel(real, dir); err == nil && !strings.HasPrefix(rel, "..") {
+	if realHome, err := filepath.EvalSymlinks(home); err == nil && realHome != home {
+		if rel, err := filepath.Rel(realHome, dir); err == nil && !strings.HasPrefix(rel, "..") {
 			dir = filepath.Join(home, rel)
 		}
 	}
@@ -77,7 +76,7 @@ var gitHookEnv = []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COM
 
 func main() {
 	for _, v := range gitHookEnv {
-		os.Unsetenv(v)
+		_ = os.Unsetenv(v)
 	}
 	if len(os.Args) < 2 || slices.Contains([]string{"-h", "--help", "help"}, os.Args[1]) {
 		fmt.Print(usage())
@@ -114,28 +113,7 @@ func open(b mux.Backend, dir string, s start, needsPlace bool) error {
 		return errors.New("there is no terminal to open a session in, so run this inside Rex or tmux")
 	}
 	if !found && b.Inside() {
-		c, err := loadConfig()
-		if err != nil {
-			return err
-		}
-		// An empty value fills in no word, so a session without a prompt
-		// starts its agent with none.
-		word := func(v string) []string {
-			if v == "" {
-				return nil
-			}
-			return []string{v}
-		}
-		agent, err := agentCommand(s.agent, s.flags)
-		if err != nil {
-			return err
-		}
-		vars := map[string][]string{"{agent}": agent, "{prompt}": agentPrompt(agent[0], s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
-		panes, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, vars)
-		if err != nil {
-			return err
-		}
-		if place, err = makePlace(b, snap, dir, cmp.Or(s.openAs, c.OpenAs), panes); err != nil {
+		if place, err = openNewPlace(b, snap, dir, s); err != nil {
 			return err
 		}
 		found = true
@@ -145,6 +123,31 @@ func open(b mux.Backend, dir string, s start, needsPlace bool) error {
 		return nil
 	}
 	return b.Show(place)
+}
+
+func openNewPlace(b mux.Backend, snap mux.Snapshot, dir string, s start) (mux.Place, error) {
+	c, err := loadConfig()
+	if err != nil {
+		return mux.Place{}, err
+	}
+	// An empty value fills in no word, so a session without a prompt
+	// starts its agent with none.
+	word := func(v string) []string {
+		if v == "" {
+			return nil
+		}
+		return []string{v}
+	}
+	agent, err := agentCommand(s.agent, s.flags)
+	if err != nil {
+		return mux.Place{}, err
+	}
+	vars := map[string][]string{"{agent}": agent, "{prompt}": agentPrompt(agent[0], s.prompt), "{pr}": word(s.pr), "{file}": word(s.file), "{dir}": {dir}, "{name}": {filepath.Base(dir)}}
+	panes, err := layout.Load(layoutsDir, cmp.Or(s.layout, "agent"), builtinLayouts, vars)
+	if err != nil {
+		return mux.Place{}, err
+	}
+	return makePlace(b, snap, dir, cmp.Or(s.openAs, c.OpenAs), panes)
 }
 
 // runInTab runs command in a new tab of dir's place. A folder with no place
@@ -183,24 +186,28 @@ func runInTab(b mux.Backend, dir string, command []string) error {
 func makePlace(b mux.Backend, snap mux.Snapshot, dir, openAs string, panes []layout.Pane) (mux.Place, error) {
 	label := labelFor(dir)
 	if openAs == "tab" && isWorktree(dir) {
-		main, err := mainCheckout(dir)
-		if err != nil {
-			return mux.Place{}, err
-		}
-		session, ok := snap.Session(labelFor(main))
-		if !ok {
-			project, err := b.Create(labelFor(main), main, []layout.Pane{{}})
-			if err != nil {
-				return mux.Place{}, err
-			}
-			session = project.Session
-		}
-		return b.CreateTab(session, label, dir, panes)
+		return makeWorktreeTab(b, snap, dir, label, panes)
 	}
 	if session, ok := snap.Session(label); ok {
 		return b.CreateTab(session, "", dir, panes)
 	}
 	return b.Create(label, dir, panes)
+}
+
+func makeWorktreeTab(b mux.Backend, snap mux.Snapshot, dir, label string, panes []layout.Pane) (mux.Place, error) {
+	main, err := mainCheckout(dir)
+	if err != nil {
+		return mux.Place{}, err
+	}
+	session, ok := snap.Session(labelFor(main))
+	if !ok {
+		project, err := b.Create(labelFor(main), main, []layout.Pane{{}})
+		if err != nil {
+			return mux.Place{}, err
+		}
+		session = project.Session
+	}
+	return b.CreateTab(session, label, dir, panes)
 }
 
 // isWorktree says whether dir is one of ws's worktrees, a checkout at
@@ -252,8 +259,8 @@ func newWorktree(b mux.Backend, from, name, base string, s start) error {
 		return err
 	}
 	if err := copyIgnored(main, dir); err != nil {
-		git(main, "worktree", "remove", "--force", dir)
-		git(main, "branch", "-D", name)
+		_, _ = git(main, "worktree", "remove", "--force", dir)
+		_, _ = git(main, "branch", "-D", name)
 		return err
 	}
 	return open(b, dir, s, false)
@@ -286,12 +293,12 @@ func pullRequest(b mux.Backend, from, number string, s start) (string, error) {
 		return "", err
 	}
 	if _, err := runIn(dir, "gh", "pr", "checkout", number); err != nil {
-		git(main, "worktree", "remove", "--force", dir)
+		_, _ = git(main, "worktree", "remove", "--force", dir)
 		return "", err
 	}
 	// The branch stays, since gh pr checkout may have reused one you had.
 	if err := copyIgnored(main, dir); err != nil {
-		git(main, "worktree", "remove", "--force", dir)
+		_, _ = git(main, "worktree", "remove", "--force", dir)
 		return "", err
 	}
 	return dir, open(b, dir, s, false)
@@ -300,11 +307,11 @@ func pullRequest(b mux.Backend, from, number string, s start) (string, error) {
 // copyIgnored gives a new worktree the main checkout's ignored files, such
 // as .env and .byor.
 func copyIgnored(main, dir string) error {
-	files, err := exec.Command("git", "-C", main, "ls-files", "--others", "--ignored", "--exclude-standard", "-z").Output()
+	files, err := exec.Command("git", "-C", main, "ls-files", "--others", "--ignored", "--exclude-standard", "-z").Output() //nolint:gosec // invokes git on local main checkout
 	if err != nil {
 		return fmt.Errorf("listing ignored files: %w", err)
 	}
-	rsync := exec.Command("rsync", "-a", "--from0", "--files-from=-", "--", main+"/", dir+"/")
+	rsync := exec.Command("rsync", "-a", "--from0", "--files-from=-", "--", main+"/", dir+"/") //nolint:gosec // invokes rsync between local git worktrees
 	rsync.Stdin = strings.NewReader(string(files))
 	if out, err := rsync.CombinedOutput(); err != nil {
 		return fmt.Errorf("copying ignored files: %s", out)
@@ -387,9 +394,9 @@ func printWorktrees(b mux.Backend, asJSON bool) error {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	for i, w := range wts {
 		if i == 0 || w.Project != wts[i-1].Project {
-			fmt.Fprintln(tw, w.Project)
+			_, _ = fmt.Fprintln(tw, w.Project)
 		}
-		fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\n", w.Name, w.Branch, map[bool]string{true: "modified"}[w.Dirty], w.State)
+		_, _ = fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\n", w.Name, w.Branch, map[bool]string{true: "modified"}[w.Dirty], w.State)
 	}
 	return tw.Flush()
 }
@@ -532,7 +539,7 @@ func git(dir string, args ...string) (string, error) {
 // runIn runs a program in dir and returns its trimmed output. A failure
 // reads as what the program printed to stderr.
 func runIn(dir, name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) //nolint:gosec // callers invoke fixed local CLI binaries (git, gh, rex, tmux, etc.)
 	cmd.Dir = dir
 	var stderr strings.Builder
 	cmd.Stderr = &stderr

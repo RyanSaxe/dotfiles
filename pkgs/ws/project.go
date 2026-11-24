@@ -11,11 +11,10 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
-
 	"workspace/mux"
 	"workspace/popup"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // A checkout is a repository the walk found: its folder, the GitHub
@@ -42,7 +41,7 @@ func checkouts() []checkout {
 // git is asked about that one.
 func originRepo(dir string) string {
 	url := ""
-	if data, err := os.ReadFile(filepath.Join(dir, ".git", "config")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(dir, ".git", "config")); err == nil { //nolint:gosec // reads local git config in discovered repo
 		inOrigin := false
 		for line := range strings.SplitSeq(string(data), "\n") {
 			line = strings.TrimSpace(line)
@@ -96,23 +95,39 @@ type project struct {
 	trust                        bool
 }
 
+func parseProjectAnswer(answer string) (project, error) {
+	answer = strings.TrimSpace(answer)
+	switch url, repo := githubRemote.FindStringSubmatch(answer), ownerRepo.FindStringSubmatch(answer); {
+	case url != nil:
+		return project{repo: url[1] + "/" + url[2], name: url[2]}, nil
+	case repo != nil:
+		return project{repo: repo[1] + "/" + repo[2], name: repo[2]}, nil
+	case answer == "" || answer == "." || answer == ".." || strings.ContainsAny(answer, "/ "):
+		return project{}, fmt.Errorf("%q isn't a project name, owner/repo or GitHub URL", answer)
+	default:
+		return project{name: answer, trust: true}, nil // ws makes it with git init
+	}
+}
+
+func bestOwnerParent(held map[string]int, latest map[string]time.Time) string {
+	parent := ""
+	for _, top := range slices.Sorted(maps.Keys(held)) {
+		if parent == "" || held[top] > held[parent] || held[top] == held[parent] && latest[top].After(latest[parent]) {
+			parent = top
+		}
+	}
+	return parent
+}
+
 // planProject reads answer, a new project's name, owner/name or a GitHub
 // URL, and finds where it goes among cs. A clone goes in the folder right
 // under home that holds most of its owner's repositories, the one with the
 // owner's latest activity on a tie. A new project, and a clone from an
 // owner with no repository here, leave parent for the caller to choose.
 func planProject(answer string, cs []checkout) (project, error) {
-	answer = strings.TrimSpace(answer)
-	var p project
-	switch url, repo := githubRemote.FindStringSubmatch(answer), ownerRepo.FindStringSubmatch(answer); {
-	case url != nil:
-		p.repo, p.name = url[1]+"/"+url[2], url[2]
-	case repo != nil:
-		p.repo, p.name = repo[1]+"/"+repo[2], repo[2]
-	case answer == "" || answer == "." || answer == ".." || strings.ContainsAny(answer, "/ "):
-		return p, fmt.Errorf("%q isn't a project name, owner/repo or GitHub URL", answer)
-	default:
-		return project{name: answer, trust: true}, nil // ws makes it with git init
+	p, err := parseProjectAnswer(answer)
+	if err != nil || p.repo == "" {
+		return p, err
 	}
 	owner, _, _ := strings.Cut(p.repo, "/")
 	held, latest := map[string]int{}, map[string]time.Time{}
@@ -130,16 +145,30 @@ func planProject(answer string, cs []checkout) (project, error) {
 			}
 		}
 	}
-	for _, top := range slices.Sorted(maps.Keys(held)) {
-		if p.parent == "" || held[top] > held[p.parent] || held[top] == held[p.parent] && latest[top].After(latest[p.parent]) {
-			p.parent = top
-		}
-	}
+	p.parent = bestOwnerParent(held, latest)
 	return p, nil
 }
 
 // needsFolder says whether someone must choose the folder p goes in.
 func (p project) needsFolder() bool { return p.parent == "" && p.existing == "" }
+
+// checkTarget ensures p's target directory is free and has no running session.
+// It returns an already-cloned path when dir holds p's repository.
+func (p project) checkTarget(b mux.Backend, dir string) (string, error) {
+	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
+		if p.repo != "" && strings.EqualFold(originRepo(dir), p.repo) {
+			return dir, nil
+		}
+		return "", fmt.Errorf("%s is taken, so ws made nothing", tilde(dir))
+	}
+	switch _, found, err := mux.Find(b, labelFor(dir)); {
+	case err != nil:
+		return "", err
+	case found:
+		return "", fmt.Errorf("a session named %s is already running, so close it first", labelFor(dir))
+	}
+	return "", nil
+}
 
 // make clones or makes p and trusts it when it should, and returns its
 // folder. A folder that already holds p's repository is only returned. Any
@@ -154,17 +183,8 @@ func (p project) make(b mux.Backend) (string, error) {
 		return "", fmt.Errorf("%s is not a folder", tilde(p.parent))
 	}
 	dir := filepath.Join(p.parent, p.name)
-	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
-		if p.repo != "" && strings.EqualFold(originRepo(dir), p.repo) {
-			return dir, nil
-		}
-		return "", fmt.Errorf("%s is taken, so ws made nothing", tilde(dir))
-	}
-	switch _, found, err := mux.Find(b, labelFor(dir)); {
-	case err != nil:
-		return "", err
-	case found:
-		return "", fmt.Errorf("a session named %s is already running, so close it first", labelFor(dir))
+	if existing, err := p.checkTarget(b, dir); err != nil || existing != "" {
+		return existing, err
 	}
 	// Trusting it first means a failure leaves nothing made, so trying again
 	// works.
@@ -173,14 +193,18 @@ func (p project) make(b mux.Backend) (string, error) {
 			return "", err
 		}
 	}
+	return p.createDir(dir)
+}
+
+func (p project) createDir(dir string) (string, error) {
 	if p.repo != "" {
 		_, err := runIn("", "gh", "repo", "clone", p.repo, dir)
 		return dir, err
 	}
-	if err := os.Mkdir(dir, 0o755); err != nil {
+	if err := os.Mkdir(dir, 0o750); err != nil {
 		return "", err
 	}
-	_, err = git(dir, "init", "-q")
+	_, err := git(dir, "init", "-q")
 	return dir, err
 }
 

@@ -1,0 +1,57 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofumpt
+
+linters:
+  default: standard
+  enable:
+    - cyclop
+    - errcheck
+    - errorlint
+    - gocognit
+    - gosec
+    - nestif
+    - revive
+    - staticcheck
+  settings:
+    # Cross-language complexity parity: Python uses C901 <= 8 (6 human-ideal,
+    # >10 tangled, 8 agent benchmark). Go allows cyclop <= 10, gocognit <= 15,
+    # and nestif <= 4 to account for idiomatic `if err != nil` checks.
+    cyclop:
+      max-complexity: 10
+    gocognit:
+      min-complexity: 15
+    nestif:
+      min-complexity: 4
+    revive:
+      rules:
+        - name: argument-limit
+          arguments: [5]
+        - name: unused-parameter
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: var-declaration
+        - name: var-naming
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false

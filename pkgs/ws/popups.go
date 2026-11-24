@@ -7,13 +7,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-
 	"workspace/kitty"
 	"workspace/mux"
 	"workspace/popup"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func pick(b mux.Backend, name string) error {
@@ -179,8 +178,10 @@ func page(pager *exec.Cmd) tea.Cmd {
 
 // statusTag names an agent's status in its color.
 func statusTag(s mux.Status) lipgloss.Style {
-	return map[mux.Status]lipgloss.Style{mux.Blocked: popup.Red, mux.Error: popup.Red, mux.Done: popup.Green,
-		mux.Working: popup.Fg("5"), mux.Idle: popup.Dim, mux.Open: popup.Accent}[s].SetString(s.String())
+	return map[mux.Status]lipgloss.Style{
+		mux.Blocked: popup.Red, mux.Error: popup.Red, mux.Done: popup.Green,
+		mux.Working: popup.Fg("5"), mux.Idle: popup.Dim, mux.Open: popup.Accent,
+	}[s].SetString(s.String())
 }
 
 // gitSummary is a folder's branch, changes and recent commits, in git's colors.

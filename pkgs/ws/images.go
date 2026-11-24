@@ -17,7 +17,6 @@ import (
 	"regexp"
 	"sync"
 	"time"
-
 	"workspace/kitty"
 	"workspace/markdown"
 )
@@ -45,39 +44,44 @@ var (
 )
 
 func loadImage(src, dir string) (image.Image, error) {
-	var r io.ReadCloser
+	r, err := openImage(src, dir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = r.Close() }()
+	img, _, err := image.Decode(r)
+	return img, err
+}
+
+func openImage(src, dir string) (io.ReadCloser, error) {
 	if m := fileLink.FindStringSubmatch(src); m != nil {
 		src = "https://raw.githubusercontent.com/" + m[1] + "/" + m[2]
 	}
 	if u, err := url.Parse(src); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		req, err := http.NewRequest("GET", src, nil)
-		if err != nil {
-			return nil, err
-		}
-		if u.Host == "raw.githubusercontent.com" {
-			if t := ghToken(); t != "" {
-				req.Header.Set("Authorization", "token "+t)
-			}
-		}
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return nil, fmt.Errorf("%s: %s", src, resp.Status)
-		}
-		r = resp.Body
-	} else {
-		f, err := os.Open(filepath.Join(dir, src))
-		if err != nil {
-			return nil, err
-		}
-		r = f
+		return fetchImageURL(u, src)
 	}
-	defer r.Close()
-	img, _, err := image.Decode(r)
-	return img, err
+	return os.Open(filepath.Join(dir, src)) //nolint:gosec // opens local markdown image relative to document dir
+}
+
+func fetchImageURL(u *url.URL, src string) (io.ReadCloser, error) {
+	req, err := http.NewRequest("GET", src, nil)
+	if err != nil {
+		return nil, err
+	}
+	if u.Host == "raw.githubusercontent.com" {
+		if t := ghToken(); t != "" {
+			req.Header.Set("Authorization", "token "+t)
+		}
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("%s: %s", src, resp.Status)
+	}
+	return resp.Body, nil
 }
 
 // mermaidThemes color diagrams like the terminal around them, in
@@ -93,19 +97,30 @@ func mermaidPNG(src string, dark bool) (image.Image, error) {
 	config := mermaidThemes[dark]
 	out := filepath.Join(mermaidCache, fmt.Sprintf("%x.png", sha256.Sum256([]byte(config+src))))
 	if _, err := os.Stat(out); err != nil {
-		if err := os.MkdirAll(mermaidCache, 0o755); err != nil {
+		if err := renderMermaid(src, config, out); err != nil {
 			return nil, err
-		}
-		in, cfg := out+".mmd", out+".json"
-		defer os.Remove(in)
-		defer os.Remove(cfg)
-		os.WriteFile(in, []byte(src), 0o644)
-		os.WriteFile(cfg, []byte(config), 0o644)
-		if b, err := exec.Command("mmdc", "-q", "-i", in, "-o", out, "-c", cfg, "-b", "transparent", "-s", "2").CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("mmdc: %s", bytes.TrimSpace(b))
 		}
 	}
 	return loadImage(out, "")
+}
+
+func renderMermaid(src, config, out string) error {
+	if err := os.MkdirAll(mermaidCache, 0o750); err != nil {
+		return err
+	}
+	in, cfg := out+".mmd", out+".json"
+	defer func() { _ = os.Remove(in) }()
+	defer func() { _ = os.Remove(cfg) }()
+	if err := os.WriteFile(in, []byte(src), 0o600); err != nil {
+		return err
+	}
+	if err := os.WriteFile(cfg, []byte(config), 0o600); err != nil {
+		return err
+	}
+	if b, err := exec.Command("mmdc", "-q", "-i", in, "-o", out, "-c", cfg, "-b", "transparent", "-s", "2").CombinedOutput(); err != nil { //nolint:gosec // invokes local mmdc renderer with cache paths
+		return fmt.Errorf("mmdc: %s", bytes.TrimSpace(b))
+	}
+	return nil
 }
 
 func darkMode() bool { return themeMode() != "light" }

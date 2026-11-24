@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
 	"workspace/mux"
 )
 
@@ -145,8 +144,8 @@ func attention(b mux.Backend, watch bool) error {
 	agents := agentLevel(s)
 	var in inbox
 	var a acks
-	readJSON("inbox.json", &in)
-	readJSON("acknowledged.json", &a)
+	_ = readJSON("inbox.json", &in)
+	_ = readJSON("acknowledged.json", &a)
 	tasks, err := vaultTaskLevel(time.Now())
 	if err != nil {
 		return err
@@ -158,26 +157,76 @@ func attention(b mux.Backend, watch bool) error {
 // publish writes level to the named file and tells sketchybar, but only when
 // the file holds a different level.
 func publish(name, level string) {
-	if old, _ := os.ReadFile(filepath.Join(stateDir, name)); string(old) == level {
+	if old, _ := os.ReadFile(filepath.Join(stateDir, name)); string(old) == level { //nolint:gosec // reads ws attention state file in stateDir
 		return
 	}
 	if err := writeWhole(name, []byte(level)); err != nil {
 		fmt.Fprintln(os.Stderr, "ws:", err)
 		return
 	}
-	exec.Command("sketchybar", "--trigger", strings.TrimSuffix(name, "-attention")+"_attention_change").Run()
+	event := strings.TrimSuffix(name, "-attention") + "_attention_change"
+	_ = exec.Command("sketchybar", "--trigger", event).Run() //nolint:gosec // triggers local sketchybar with ws attention event name
 }
 
-// watchAttention republishes the agent level whenever b reports a change,
-// fetches the inbox every 5 minutes and rereads the vault's tasks
-// every minute, which also catches a new day. It is the only process that
-// fetches the inbox. SIGUSR1 asks it to fetch now, as Ctrl-R in the Inbox does,
-// and SIGUSR2 to republish the review level, after an acknowledgement. It
-// runs until it is killed.
-func watchAttention(b mux.Backend) error {
-	if err := writeWhole("attention.pid", []byte(strconv.Itoa(os.Getpid()))); err != nil {
-		return err
+type attentionWatcher struct {
+	b  mux.Backend
+	in inbox
+}
+
+func (w *attentionWatcher) republish() {
+	var a acks
+	_ = readJSON("acknowledged.json", &a)
+	publish("review-attention", reviewLevel(w.in, a))
+}
+
+func (w *attentionWatcher) refresh() {
+	next, err := fetchInbox(w.in, watchList(), ignoreList(), time.Now())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ws: reviews:", err)
+		return
 	}
+	if err := writeJSON("inbox.json", next); err != nil {
+		fmt.Fprintln(os.Stderr, "ws: reviews:", err)
+		return
+	}
+	w.in = next
+	w.republish()
+}
+
+func (w *attentionWatcher) recountTasks() {
+	level, err := vaultTaskLevel(time.Now())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ws: tasks:", err)
+		return
+	}
+	publish("task-attention", level)
+}
+
+func (w *attentionWatcher) handleAgents() {
+	// A burst of reports, such as an agent finishing, settles first.
+	time.Sleep(300 * time.Millisecond)
+	wb := watched(w.b)
+	s, err := wb.Snapshot()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ws: agents:", err)
+		return
+	}
+	if r, ok := wb.(mux.Rex); ok {
+		noteSeen(s, r.Shown, r.Seen)
+	}
+	publish("agent-attention", agentLevel(s))
+}
+
+func (w *attentionWatcher) handleSignal(s os.Signal, reviews *time.Ticker) {
+	if s == syscall.SIGUSR1 {
+		w.refresh()
+		reviews.Reset(5 * time.Minute)
+		return
+	}
+	w.republish()
+}
+
+func startAttentionSignals(b mux.Backend) (chan struct{}, chan os.Signal) {
 	// A signal already waiting covers any more, since one recount sees both.
 	changed := make(chan struct{}, 1)
 	poke := func() {
@@ -192,64 +241,36 @@ func watchAttention(b mux.Backend) error {
 	}
 	asked := make(chan os.Signal, 1)
 	signal.Notify(asked, syscall.SIGUSR1, syscall.SIGUSR2)
-	var in inbox
-	readJSON("inbox.json", &in)
-	republish := func() {
-		var a acks
-		readJSON("acknowledged.json", &a)
-		publish("review-attention", reviewLevel(in, a))
+	return changed, asked
+}
+
+// watchAttention republishes the agent level whenever b reports a change,
+// fetches the inbox every 5 minutes and rereads the vault's tasks
+// every minute, which also catches a new day. It is the only process that
+// fetches the inbox. SIGUSR1 asks it to fetch now, as Ctrl-R in the Inbox does,
+// and SIGUSR2 to republish the review level, after an acknowledgement. It
+// runs until it is killed.
+func watchAttention(b mux.Backend) error {
+	if err := writeWhole("attention.pid", []byte(strconv.Itoa(os.Getpid()))); err != nil {
+		return err
 	}
-	refresh := func() {
-		next, err := fetchInbox(in, watchList(), ignoreList(), time.Now())
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "ws: reviews:", err)
-			return
-		}
-		if err := writeJSON("inbox.json", next); err != nil {
-			fmt.Fprintln(os.Stderr, "ws: reviews:", err)
-			return
-		}
-		in = next
-		republish()
-	}
-	recount := func() {
-		level, err := vaultTaskLevel(time.Now())
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "ws: tasks:", err)
-			return
-		}
-		publish("task-attention", level)
-	}
+	changed, asked := startAttentionSignals(b)
+	w := &attentionWatcher{b: b}
+	_ = readJSON("inbox.json", &w.in)
 	reviews := time.NewTicker(5 * time.Minute)
 	tasks := time.NewTicker(time.Minute)
-	refresh()
-	recount()
+	w.refresh()
+	w.recountTasks()
 	for {
 		select {
 		case <-tasks.C:
-			recount()
+			w.recountTasks()
 		case <-changed:
-			// A burst of reports, such as an agent finishing, settles first.
-			time.Sleep(300 * time.Millisecond)
-			w := watched(b)
-			s, err := w.Snapshot()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "ws: agents:", err)
-				continue
-			}
-			if r, ok := w.(mux.Rex); ok {
-				noteSeen(s, r.Shown, r.Seen)
-			}
-			publish("agent-attention", agentLevel(s))
+			w.handleAgents()
 		case s := <-asked:
-			if s == syscall.SIGUSR1 {
-				refresh()
-				reviews.Reset(5 * time.Minute)
-			} else {
-				republish()
-			}
+			w.handleSignal(s, reviews)
 		case <-reviews.C:
-			refresh()
+			w.refresh()
 		}
 	}
 }

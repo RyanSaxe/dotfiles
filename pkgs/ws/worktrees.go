@@ -13,12 +13,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"workspace/mux"
+	"workspace/popup"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/junegunn/go-shellwords"
-
-	"workspace/mux"
-	"workspace/popup"
 )
 
 // startFromAnswer reads the popup's answer to "agent and flags", split into
@@ -95,54 +94,10 @@ func worktreeActions(b mux.Backend) []popup.Action {
 		// whichever project's row is selected. Outside a project, it belongs
 		// to the selected row's.
 		{Key: "ctrl+t", Help: "new", Always: true, Run: func(r popup.Row) tea.Cmd {
-			from := "."
-			if w, ok := r.Data.(worktreeRow); ok && currentProject() == "" {
-				from = w.Path
-			}
-			main, err := mainCheckout(from)
-			if err != nil {
-				return popup.Say(err.Error())
-			}
-			return popup.Ask("name of the new worktree of "+filepath.Base(main)+":", func(name string) tea.Cmd {
-				agent, _ := defaultAgent()
-				return popup.Ask("agent and flags (empty for "+agent+"):", func(answer string) tea.Cmd {
-					return popup.Ask("prompt:", func(prompt string) tea.Cmd {
-						return tea.Batch(popup.Say("making "+name+"…"), popup.Do(func() error {
-							s, err := startFromAnswer(answer)
-							if err != nil {
-								return err
-							}
-							s.prompt = prompt
-							return newWorktree(b, main, name, "", s)
-						}, popup.Quit))
-					})
-				})
-			})
+			return askNewWorktree(b, r)
 		}},
 		{Key: "ctrl+x", Help: "remove", Run: func(r popup.Row) tea.Cmd {
-			w := r.Data.(worktreeRow)
-			rm := func(force bool) tea.Cmd {
-				return func() tea.Msg {
-					if err := remove(b, w.Project+"/"+w.Name, force); err != nil {
-						return popup.Reload(err.Error())
-					}
-					return popup.Reload("removed " + w.Project + "/" + w.Name)
-				}
-			}
-			ask := popup.Ask(w.Name+" has uncommitted changes. Remove it and its branch anyway? (y/N)", func(answer string) tea.Cmd {
-				if strings.EqualFold(answer, "y") {
-					return rm(true)
-				}
-				return nil
-			})
-			// git says now whether it has changes, since a row shown before
-			// git answered doesn't know.
-			return func() tea.Msg {
-				if changes, _ := git(w.Path, "status", "--porcelain"); changes == "" {
-					return rm(false)()
-				}
-				return ask()
-			}
+			return removeWorktreeCmd(b, r.Data.(worktreeRow))
 		}},
 		{Key: "ctrl+f", Help: "files", Run: func(r popup.Row) tea.Cmd {
 			return popup.Push(filesPopup(b, r.Data.(worktreeRow).Path))
@@ -151,7 +106,7 @@ func worktreeActions(b mux.Backend) []popup.Action {
 		// branch, committed or not.
 		{Key: "ctrl+g", Help: "diff", When: func(_ int, r popup.Row) bool { return r.Data.(worktreeRow).base != "" }, Run: func(r popup.Row) tea.Cmd {
 			w := r.Data.(worktreeRow)
-			return page(exec.Command("sh", "-c", `git -C "$1" diff --merge-base "$2" | delta --paging=always`, "sh", w.Path, w.base))
+			return page(exec.Command("sh", "-c", `git -C "$1" diff --merge-base "$2" | delta --paging=always`, "sh", w.Path, w.base)) //nolint:gosec // pipes git diff into delta with positional args
 		}},
 		{Key: "ctrl+o", Help: "browser", When: func(_ int, r popup.Row) bool { return r.Data.(worktreeRow).pr != "" }, Run: func(r popup.Row) tea.Cmd {
 			url := r.Data.(worktreeRow).pr
@@ -160,6 +115,57 @@ func worktreeActions(b mux.Backend) []popup.Action {
 				return err
 			}, popup.Notice("opened "+url))
 		}},
+	}
+}
+
+func askNewWorktree(b mux.Backend, r popup.Row) tea.Cmd {
+	from := "."
+	if w, ok := r.Data.(worktreeRow); ok && currentProject() == "" {
+		from = w.Path
+	}
+	main, err := mainCheckout(from)
+	if err != nil {
+		return popup.Say(err.Error())
+	}
+	return popup.Ask("name of the new worktree of "+filepath.Base(main)+":", func(name string) tea.Cmd {
+		agent, _ := defaultAgent()
+		return popup.Ask("agent and flags (empty for "+agent+"):", func(answer string) tea.Cmd {
+			return popup.Ask("prompt:", func(prompt string) tea.Cmd {
+				return tea.Batch(popup.Say("making "+name+"…"), popup.Do(func() error {
+					s, err := startFromAnswer(answer)
+					if err != nil {
+						return err
+					}
+					s.prompt = prompt
+					return newWorktree(b, main, name, "", s)
+				}, popup.Quit))
+			})
+		})
+	})
+}
+
+func removeWorktreeCmd(b mux.Backend, w worktreeRow) tea.Cmd {
+	rm := func(force bool) tea.Cmd {
+		return func() tea.Msg {
+			if err := remove(b, w.Project+"/"+w.Name, force); err != nil {
+				return popup.Reload(err.Error())
+			}
+			return popup.Reload("removed " + w.Project + "/" + w.Name)
+		}
+	}
+	ask := popup.Ask(w.Name+" has uncommitted changes. Remove it and its branch anyway? (y/N)", func(answer string) tea.Cmd {
+		if strings.EqualFold(answer, "y") {
+			return rm(true)
+		}
+		return nil
+	})
+	// git says now whether it has changes, since a row shown before
+	// git answered doesn't know.
+	return func() tea.Msg {
+		if changes, _ := git(w.Path, "status", "--porcelain"); changes == "" {
+			return rm(false)()
+		}
+		return ask()
 	}
 }
 
@@ -235,7 +241,7 @@ func openPullRequests(wts []worktree) map[string]map[string]string {
 	// their details wait for this call, so it gets five seconds.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, _ := exec.CommandContext(ctx, "gh", "api", "graphql", "-f", "query={"+query.String()+"}").Output()
+	out, _ := exec.CommandContext(ctx, "gh", "api", "graphql", "-f", "query={"+query.String()+"}").Output() //nolint:gosec // invokes local gh CLI with GraphQL query
 	var res struct {
 		Data map[string]*struct {
 			PullRequests struct {
@@ -246,7 +252,7 @@ func openPullRequests(wts []worktree) map[string]map[string]string {
 			}
 		}
 	}
-	json.Unmarshal(out, &res)
+	_ = json.Unmarshal(out, &res)
 	found := map[string]map[string]string{}
 	for i, p := range projects {
 		repo := res.Data["p"+strconv.Itoa(i)]

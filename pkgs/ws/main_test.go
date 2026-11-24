@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
 	"workspace/layout"
 	"workspace/mux"
 )
@@ -16,10 +15,50 @@ import (
 func onPath(t *testing.T, name, script string) {
 	t.Helper()
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0o700); err != nil { //nolint:gosec // test helper writes executable shim script to temp PATH
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+}
+
+// requireTools skips the test when any required binary isn't on PATH.
+func requireTools(t *testing.T, tools ...string) {
+	t.Helper()
+	for _, tool := range tools {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skip(tool + " is not installed")
+		}
+	}
+}
+
+// clearGitHookEnv unsets git's hook environment variables so scratch
+// repositories in tests never reach the checkout running a commit hook.
+func clearGitHookEnv(t *testing.T) {
+	t.Helper()
+	for _, v := range gitHookEnv {
+		t.Setenv(v, "")
+		if err := os.Unsetenv(v); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func runGitSteps(t *testing.T, dir string, steps ...[]string) {
+	t.Helper()
+	for _, args := range steps {
+		if _, err := git(dir, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func initBaseRepo(t *testing.T, dir string, extra ...[]string) {
+	t.Helper()
+	steps := append([][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
+	}, extra...)
+	runGitSteps(t, dir, steps...)
 }
 
 // withConfig gives ws a config that names agent and open_as, as the home
@@ -32,7 +71,7 @@ func withConfig(t *testing.T, agent, openAs string) {
 	if agent == "" {
 		return
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("agent = \""+agent+"\"\nopen_as = \""+openAs+"\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("agent = \""+agent+"\"\nopen_as = \""+openAs+"\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -44,15 +83,9 @@ func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", claudeDir)
 	t.Setenv("CODEX_HOME", codexDir)
 	t.Setenv("ANTIGRAVITY_APP_DATA_DIR", agyDir)
-	for path, text := range map[string]string{
-		filepath.Join(claudeDir, "settings.json"): `{"model": "opus[1m]", "effortLevel": "medium", "theme": "dark"}`,
-		filepath.Join(codexDir, "config.toml"):    "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"high\"\n",
-		filepath.Join(agyDir, "settings.json"):    `{"model": "Gemini 4 Neon (High)", "theme": "dark"}`,
-	} {
-		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	writeNote(t, claudeDir, "settings.json", `{"model": "opus[1m]", "effortLevel": "medium", "theme": "dark"}`)
+	writeNote(t, codexDir, "config.toml", "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"high\"\n")
+	writeNote(t, agyDir, "settings.json", `{"model": "Gemini 4 Neon (High)", "theme": "dark"}`)
 	for agent, want := range map[string]string{
 		"claude": "opus[1m] medium",
 		"codex":  "gpt-6.1-sol high",
@@ -67,9 +100,7 @@ func TestAgentReadsEachAgentsOwnSettings(t *testing.T) {
 	}
 	// An Antigravity model whose parenthesized suffix is not an effort level
 	// keeps its full label with no effort.
-	if err := os.WriteFile(filepath.Join(agyDir, "settings.json"), []byte(`{"model": "Orchestrator (Neon)"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeNote(t, agyDir, "settings.json", `{"model": "Orchestrator (Neon)"}`)
 	if model, effort, err := agentSettings("agy"); err != nil || model != "Orchestrator (Neon)" || effort != "" {
 		t.Errorf("with Orchestrator (Neon): got %q %q (%v), want %q %q", model, effort, err, "Orchestrator (Neon)", "")
 	}
@@ -161,6 +192,7 @@ func (r *recorder) Create(label, dir string, panes []layout.Pane) (mux.Place, er
 	r.made = append(r.made, made{label: label, dir: dir, panes: panes})
 	return mux.Place{Label: label, Session: "session:" + label, Whole: true}, nil
 }
+
 func (r *recorder) CreateTab(session, name, dir string, panes []layout.Pane) (mux.Place, error) {
 	r.made = append(r.made, made{label: name, in: session, dir: dir, panes: panes})
 	return mux.Place{Label: name, Session: session, Tab: "tab:" + name, Named: name != ""}, nil
@@ -174,30 +206,22 @@ func (r *recorder) lastPanes() []layout.Pane {
 	return r.made[len(r.made)-1].panes
 }
 
+func (r *recorder) madeStrings() []string {
+	got := make([]string, len(r.made))
+	for i, m := range r.made {
+		got[i] = m.String()
+	}
+	return got
+}
+
 // ws pr starts its agent as ws new does, with the agent, prompt and flags
 // its words name, wherever its flags come. Without --agent, it is the agent
 // the config names, with only the flags after --.
 func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
-	for _, tool := range []string{"git", "rsync"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skip(tool, " is not installed")
-		}
-	}
-	// A commit hook runs these tests, and ws new must not reach the
-	// repository being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git", "rsync")
+	clearGitHookEnv(t)
 	repo := t.TempDir()
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-	} {
-		if _, err := git(repo, args...); err != nil {
-			t.Fatal(err)
-		}
-	}
+	initBaseRepo(t, repo)
 	t.Chdir(repo)
 	oldRoot, oldState, oldInteractive := worktreeRoot, stateDir, interactive
 	worktreeRoot, stateDir, interactive = t.TempDir(), t.TempDir(), false
@@ -232,26 +256,10 @@ func TestNewAndPrStartTheAgentTheirFlagsName(t *testing.T) {
 // is none. Any other folder opens as a session, even as a tab, such as one
 // in a worktree's spot that git doesn't check out.
 func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
-	for _, tool := range []string{"git", "rsync"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skip(tool, " is not installed")
-		}
-	}
-	// A commit hook runs these tests, and ws new must not reach the
-	// repository being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git", "rsync")
+	clearGitHookEnv(t)
 	repo := t.TempDir()
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-	} {
-		if _, err := git(repo, args...); err != nil {
-			t.Fatal(err)
-		}
-	}
+	initBaseRepo(t, repo)
 	main, err := mainCheckout(repo)
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +272,7 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 	session := labelFor(main)
 	root := filepath.Join(worktreeRoot, project)
 	// A folder in a worktree's spot that git doesn't check out.
-	if err := os.MkdirAll(filepath.Join(root, "plain"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "plain"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	opened := mux.Snapshot{Sessions: []mux.Session{{ID: "session:" + session, Label: session}}}
@@ -288,11 +296,7 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 		withConfig(t, "claude", tc.openAs)
 		b := &recorder{snapshot: tc.snapshot}
 		err := run(tc.words[0], tc.words[1:], func(string) mux.Backend { return b })
-		var got []string
-		for _, m := range b.made {
-			got = append(got, m.String())
-		}
-		if err != nil || !slices.Equal(got, tc.want) {
+		if got := b.madeStrings(); err != nil || !slices.Equal(got, tc.want) {
 			t.Errorf("with open_as %s, ws %s made %q (%v), want %q", tc.openAs, strings.Join(tc.words, " "), got, err, tc.want)
 		}
 	}
@@ -306,16 +310,14 @@ func TestAWorktreeOpensAsATabOrASession(t *testing.T) {
 // place, and makes the place with the command typed into its shell when the
 // folder has none. Run by an agent, it shows nothing, and the recorder has
 // no Show to call.
+type tabTestFixture struct {
+	session, project, main, fix string
+	command, words              []string
+}
+
 func TestTabRunsItsCommandInTheFoldersPlace(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	// A commit hook runs these tests, and the scratch repository must not be
-	// the one being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	oldRoot, oldInteractive := worktreeRoot, interactive
 	worktreeRoot, interactive = t.TempDir(), false
 	t.Cleanup(func() { worktreeRoot, interactive = oldRoot, oldInteractive })
@@ -324,59 +326,49 @@ func TestTabRunsItsCommandInTheFoldersPlace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	project := filepath.Base(main)
-	session := labelFor(main)
+	project, session := filepath.Base(main), labelFor(main)
 	fix := filepath.Join(worktreeRoot, project, "fix")
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-		{"worktree", "add", "-q", "-b", "fix", fix},
-	} {
-		if _, err := git(repo, args...); err != nil {
-			t.Fatal(err)
-		}
-	}
+	initBaseRepo(t, repo, []string{"worktree", "add", "-q", "-b", "fix", fix})
 	withConfig(t, "claude", "tab")
 	command := []string{"env", "A=b c", "claude", "--effort", "high"}
-	words := append([]string{fix, "--"}, command...)
-
-	open := &recorder{snapshot: mux.Snapshot{
-		Sessions: []mux.Session{{ID: "session:" + session, Label: session}},
-		Panes:    []mux.Pane{{Session: "session:" + session, Label: session, ID: "pane", Tab: "tab:fix", TabName: project + "/fix", Focused: true}},
-	}}
-	if err := run("tab", words, func(string) mux.Backend { return open }); err != nil || len(open.made) > 0 ||
-		len(open.tabs) != 1 || !slices.Equal(open.tabs[0], append([]string{project + "/fix", fix}, command...)) {
-		t.Errorf("ws tab on an open worktree made %v and ran %q (%v), want one tab of %s/fix running %q", open.made, open.tabs, err, project, command)
+	fx := tabTestFixture{
+		session: session, project: project, main: main, fix: fix,
+		command: command, words: append([]string{fix, "--"}, command...),
 	}
-
-	closed := &recorder{}
-	err = run("tab", words, func(string) mux.Backend { return closed })
-	var got []string
-	for _, m := range closed.made {
-		got = append(got, m.String())
-	}
-	want := []string{"session " + session + ", a plain shell, in " + main, "tab " + project + "/fix of session:" + session + " in " + fix}
-	if err != nil || len(closed.tabs) > 0 || !slices.Equal(got, want) || closed.lastPanes()[0].Run != layout.Line(command) {
-		t.Errorf("ws tab on a closed worktree made %q with %+v (%v), want %q running %s", got, closed.lastPanes(), err, want, layout.Line(command))
-	}
-
+	fx.checkOpenWorktree(t)
+	fx.checkClosedWorktree(t)
 	if err := run("tab", []string{fix}, func(string) mux.Backend { return &recorder{} }); err == nil {
 		t.Error("ws tab with no command after -- ran")
+	}
+}
+
+func (fx tabTestFixture) checkOpenWorktree(t *testing.T) {
+	t.Helper()
+	open := &recorder{snapshot: mux.Snapshot{
+		Sessions: []mux.Session{{ID: "session:" + fx.session, Label: fx.session}},
+		Panes:    []mux.Pane{{Session: "session:" + fx.session, Label: fx.session, ID: "pane", Tab: "tab:fix", TabName: fx.project + "/fix", Focused: true}},
+	}}
+	if err := run("tab", fx.words, func(string) mux.Backend { return open }); err != nil || len(open.made) > 0 ||
+		len(open.tabs) != 1 || !slices.Equal(open.tabs[0], append([]string{fx.project + "/fix", fx.fix}, fx.command...)) {
+		t.Errorf("ws tab on an open worktree made %v and ran %q (%v), want one tab of %s/fix running %q", open.made, open.tabs, err, fx.project, fx.command)
+	}
+}
+
+func (fx tabTestFixture) checkClosedWorktree(t *testing.T) {
+	t.Helper()
+	closed := &recorder{}
+	err := run("tab", fx.words, func(string) mux.Backend { return closed })
+	want := []string{"session " + fx.session + ", a plain shell, in " + fx.main, "tab " + fx.project + "/fix of session:" + fx.session + " in " + fx.fix}
+	if got := closed.madeStrings(); err != nil || len(closed.tabs) > 0 || !slices.Equal(got, want) || closed.lastPanes()[0].Run != layout.Line(fx.command) {
+		t.Errorf("ws tab on a closed worktree made %q with %+v (%v), want %q running %s", got, closed.lastPanes(), err, want, layout.Line(fx.command))
 	}
 }
 
 // A squash merge leaves a branch git calls unmerged, so only GitHub can say
 // its work landed.
 func TestDeleteBranchAsksGitHubAboutUnmergedBranches(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	// A commit hook runs these tests, and the scratch repositories must not
-	// be the one being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	for _, tc := range []struct {
 		name, gh string
 		force    bool
@@ -389,17 +381,11 @@ func TestDeleteBranchAsksGitHubAboutUnmergedBranches(t *testing.T) {
 		{"force with no pull request", "exit 1", true, true},
 	} {
 		repo := t.TempDir()
-		for _, args := range [][]string{
-			{"init", "-q", "-b", "main"},
-			{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-			{"checkout", "-q", "-b", "feature"},
-			{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "squashed on GitHub"},
-			{"checkout", "-q", "main"},
-		} {
-			if _, err := git(repo, args...); err != nil {
-				t.Fatal(err)
-			}
-		}
+		initBaseRepo(t, repo,
+			[]string{"checkout", "-q", "-b", "feature"},
+			[]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "squashed on GitHub"},
+			[]string{"checkout", "-q", "main"},
+		)
 		onPath(t, "gh", tc.gh)
 		err := deleteBranch(repo, "feature", tc.force)
 		_, missing := git(repo, "rev-parse", "--verify", "-q", "refs/heads/feature")
@@ -430,7 +416,7 @@ func TestAgentLayoutKeepsThePromptOutOfTheFlags(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		out, err := exec.Command(zsh, "-f", "-c", tc.agent+`() { printf '[%s]' "$@" }; `+panes[0].Run).Output()
+		out, err := exec.Command(zsh, "-f", "-c", tc.agent+`() { printf '[%s]' "$@" }; `+panes[0].Run).Output() //nolint:gosec // test verifies layout command parsing in local zsh
 		if err != nil || string(out) != tc.want {
 			t.Errorf("%s prompt %q: got %s (%v), want %s", tc.agent, tc.prompt, out, err, tc.want)
 		}
@@ -441,24 +427,10 @@ func TestAgentLayoutKeepsThePromptOutOfTheFlags(t *testing.T) {
 // a missing config, an unknown agent, a session already running under the
 // worktree's name, and ignored files that can't be copied.
 func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	// A commit hook runs these tests, and ws new must not reach the
-	// repository being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	repo := t.TempDir()
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-	} {
-		if _, err := git(repo, args...); err != nil {
-			t.Fatal(err)
-		}
-	}
+	initBaseRepo(t, repo)
 	oldRoot := worktreeRoot
 	worktreeRoot = t.TempDir()
 	t.Cleanup(func() { worktreeRoot = oldRoot })
@@ -490,25 +462,10 @@ func TestAFailedNewWorktreeLeavesNothingBehind(t *testing.T) {
 // ws pr checks the pull request out afresh instead of opening a worktree
 // without them. It keeps the branch, which gh pr checkout may have reused.
 func TestAFailedPullRequestCopyRemovesItsWorktree(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	// A commit hook runs these tests, and ws pr must not reach the
-	// repository being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	repo := t.TempDir()
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-		{"branch", "feature"}, // the pull request's branch, already local
-	} {
-		if _, err := git(repo, args...); err != nil {
-			t.Fatal(err)
-		}
-	}
+	initBaseRepo(t, repo, []string{"branch", "feature"}) // the pull request's branch, already local
 	oldRoot := worktreeRoot
 	worktreeRoot = t.TempDir()
 	t.Cleanup(func() { worktreeRoot = oldRoot })

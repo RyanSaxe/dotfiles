@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
 	"workspace/mux"
 	"workspace/popup"
 )
@@ -86,7 +85,7 @@ func tmuxKeys() ([]key, error) {
 
 // tsv is the three tab-separated fields on each line of file.
 func tsv(file string) ([][]string, error) {
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec // reads local Rex or tmux keymap TSV from ~/.config
 	var lines [][]string
 	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
 		if f := strings.Split(line, "\t"); len(f) == 3 {

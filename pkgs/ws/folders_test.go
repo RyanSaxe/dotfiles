@@ -3,27 +3,25 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
-
 	"workspace/mux"
 	"workspace/popup"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // gitLog leaves the log that git writes in gitDir when HEAD moves, dated at.
 func gitLog(t *testing.T, gitDir string, at time.Time) {
 	t.Helper()
 	log := filepath.Join(gitDir, "logs", "HEAD")
-	if err := os.MkdirAll(filepath.Dir(log), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(log), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(log, nil, 0o644); err != nil {
+	if err := os.WriteFile(log, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chtimes(log, at, at); err != nil {
@@ -31,11 +29,40 @@ func gitLog(t *testing.T, gitDir string, at time.Time) {
 	}
 }
 
-// Folders lists repositories, worktrees and bookmarks once each, the latest
-// git activity first, and Enter on one that is open goes to its place.
-// Sessions lists only the places: each session, and each tab named after a
-// folder, whichever session it is in.
-func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
+func rowTitles(rows []popup.Row) []string {
+	titles := make([]string, len(rows))
+	for i, r := range rows {
+		titles[i] = r.Title
+	}
+	return titles
+}
+
+func rowTags(rows []popup.Row) []string {
+	tags := make([]string, len(rows))
+	for i, r := range rows {
+		tags[i] = r.Tag.String()
+	}
+	return tags
+}
+
+type goPopupHarness struct {
+	p     popup.Popup
+	ctrlX popup.Action
+	calls string
+}
+
+func (h goPopupHarness) confirmClose(t *testing.T, row popup.Row, answer string) string {
+	t.Helper()
+	m, _ := popup.New(h.p, nil).Update(h.ctrlX.Run(row)())
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(answer)})
+	if _, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter}); then != nil {
+		then()
+	}
+	return readNote(t, filepath.Dir(h.calls), "calls")
+}
+
+func setupGoPopupFixture(t *testing.T) goPopupHarness {
+	t.Helper()
 	scratch := t.TempDir()
 	oldHome, oldRoot, oldConfig := home, worktreeRoot, configDir
 	home, worktreeRoot, configDir = scratch, filepath.Join(scratch, "worktrees"), filepath.Join(scratch, ".config", "ws")
@@ -58,9 +85,14 @@ case "$2" in
 list-panes) printf 'Projects/busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nProjects/busy\t01\t%%3\t\tzsh\t/elsewhere\t0\t0\t@3\tquiet/feature\tfeature\nProjects/busy\t01\t%%4\t\tnvim\t/elsewhere\t0\t0\t@4\tquiet/feature\tREADME\nscratch\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tscratch\n';;
 esac`)
 	p := goPopup(mux.Detect(func(k string) string { return map[string]string{"TMUX": "/tmp/tmux-501/default,1,0"}[k] }, ""), foldersTab)
+	ctrlX := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "ctrl+x" })]
+	return goPopupHarness{p: p, ctrlX: ctrlX, calls: calls}
+}
 
+func checkFoldersTab(t *testing.T, h goPopupHarness) {
+	t.Helper()
 	var first, early []popup.Row // the rows Folders shows first, and last before the snapshot
-	folders, err := p.Load(foldersTab, func(rows []popup.Row) {
+	folders, err := h.p.Load(foldersTab, func(rows []popup.Row) {
 		if first == nil {
 			first = rows
 		}
@@ -69,71 +101,63 @@ esac`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	titlesOf := func(rows []popup.Row) []string {
-		var titles []string
-		for _, r := range rows {
-			titles = append(titles, r.Title)
-		}
-		return titles
-	}
 	// The worktrees and bookmarks show before the walk finds busy.
-	if got, want := titlesOf(first), []string{"quiet/feature", "quiet", "notes"}; !slices.Equal(got, want) {
+	if got, want := rowTitles(first), []string{"quiet/feature", "quiet", "notes"}; !slices.Equal(got, want) {
 		t.Errorf("Folders first shows %q, want %q", got, want)
 	}
-	titles := titlesOf(folders)
-	if want := []string{"quiet/feature", "busy", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
+	if titles, want := rowTitles(folders), []string{"quiet/feature", "busy", "busy", "quiet", "notes"}; !slices.Equal(titles, want) {
 		t.Errorf("Folders lists %v, want %v", titles, want)
 	}
-	var tags []string
-	for _, r := range folders {
-		tags = append(tags, r.Tag.String())
-	}
-	if want := []string{"tab", "session", "", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
+	if tags, want := rowTags(folders), []string{"tab", "session", "", "bookmark", "bookmark"}; !slices.Equal(tags, want) {
 		t.Errorf("Folders tags its rows %q, want %q", tags, want)
 	}
-	enter := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
+	enter := h.p.Actions[slices.IndexFunc(h.p.Actions, func(a popup.Action) bool { return a.Key == "enter" })]
 	if msg := enter.Run(folders[1])(); msg != popup.Quit {
 		t.Errorf("Enter on busy gave %v, want the popup to close", msg)
 	}
-	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "switch-client -t @1\n") {
+	if got := readNote(t, filepath.Dir(h.calls), "calls"); !strings.Contains(got, "switch-client -t @1\n") {
 		t.Errorf("Enter on busy, which has a session, ran tmux with\n%s", got)
 	}
-	// Ctrl-X asks before it closes a place, and only y closes it. A row shown
-	// before the snapshot doesn't know its place, so Ctrl-X closes it only
-	// once the snapshot comes.
-	ctrlX := p.Actions[slices.IndexFunc(p.Actions, func(a popup.Action) bool { return a.Key == "ctrl+x" })]
-	i := slices.IndexFunc(early, func(r popup.Row) bool { return r.Title == "busy" })
-	if i < 0 || early[i].Tag.String() == "session" {
-		t.Fatalf("Folders showed %v before the snapshot", early)
-	}
-	if ctrlX.When(foldersTab, early[i]) {
-		t.Error("Ctrl-X offers to close busy before the snapshot says it has a session")
-	}
-	if !ctrlX.When(foldersTab, folders[0]) || !ctrlX.When(foldersTab, folders[1]) || ctrlX.When(foldersTab, folders[2]) || ctrlX.When(foldersTab, folders[3]) {
-		t.Error("Ctrl-X isn't offered on exactly the folders that are open")
-	}
-	closeRow := func(row int, answer string) string {
-		m, _ := popup.New(p, nil).Update(ctrlX.Run(folders[row])())
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(answer)})
-		if _, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter}); then != nil {
-			then()
-		}
-		return readNote(t, filepath.Dir(calls), "calls")
-	}
-	if got := closeRow(1, "n"); strings.Contains(got, "kill-") {
+	checkFoldersCtrlX(t, h, early, folders)
+}
+
+func checkFoldersCtrlX(t *testing.T, h goPopupHarness, early, folders []popup.Row) {
+	t.Helper()
+	checkFoldersCtrlXAvailability(t, h, early, folders)
+	if got := h.confirmClose(t, folders[1], "n"); strings.Contains(got, "kill-") {
 		t.Errorf("Ctrl-X on busy, answered n, ran tmux with\n%s", got)
 	}
 	// busy's session holds quiet/feature's two tabs too, so closing busy
 	// closes only its own tab, and closing quiet/feature closes its two in one
 	// command, which tmux finishes even when ws runs in the first.
-	if got := closeRow(1, "y"); !strings.Contains(got, "kill-window -t @1\n") || strings.Contains(got, "kill-session") {
+	if got := h.confirmClose(t, folders[1], "y"); !strings.Contains(got, "kill-window -t @1\n") || strings.Contains(got, "kill-session") {
 		t.Errorf("Ctrl-X on busy, answered y, ran tmux with\n%s", got)
 	}
-	if got := closeRow(0, "y"); !strings.Contains(got, "kill-window -t @3 ; kill-window -t @4\n") || strings.Contains(got, "kill-session") {
+	if got := h.confirmClose(t, folders[0], "y"); !strings.Contains(got, "kill-window -t @3 ; kill-window -t @4\n") || strings.Contains(got, "kill-session") {
 		t.Errorf("Ctrl-X on quiet/feature, answered y, ran tmux with\n%s", got)
 	}
+}
 
-	sessions, err := p.Load(sessionsTab, func([]popup.Row) {})
+func checkFoldersCtrlXAvailability(t *testing.T, h goPopupHarness, early, folders []popup.Row) {
+	t.Helper()
+	// Ctrl-X asks before it closes a place, and only y closes it. A row shown
+	// before the snapshot doesn't know its place, so Ctrl-X closes it only
+	// once the snapshot comes.
+	i := slices.IndexFunc(early, func(r popup.Row) bool { return r.Title == "busy" })
+	if i < 0 || early[i].Tag.String() == "session" {
+		t.Fatalf("Folders showed %v before the snapshot", early)
+	}
+	if h.ctrlX.When(foldersTab, early[i]) {
+		t.Error("Ctrl-X offers to close busy before the snapshot says it has a session")
+	}
+	if !h.ctrlX.When(foldersTab, folders[0]) || !h.ctrlX.When(foldersTab, folders[1]) || h.ctrlX.When(foldersTab, folders[2]) || h.ctrlX.When(foldersTab, folders[3]) {
+		t.Error("Ctrl-X isn't offered on exactly the folders that are open")
+	}
+}
+
+func checkSessionsTab(t *testing.T, h goPopupHarness) {
+	t.Helper()
+	sessions, err := h.p.Load(sessionsTab, func([]popup.Row) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,44 +170,36 @@ esac`)
 	}
 	// scratch is a session with nothing else in it, so closing it closes the
 	// session.
-	m, _ := popup.New(p, nil).Update(ctrlX.Run(sessions[2])())
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	if _, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter}); then != nil {
-		then()
-	}
-	if got := readNote(t, filepath.Dir(calls), "calls"); !strings.Contains(got, "kill-session -t =scratch\n") {
+	if got := h.confirmClose(t, sessions[2], "y"); !strings.Contains(got, "kill-session -t =scratch\n") {
 		t.Errorf("Ctrl-X on scratch, answered y, ran tmux with\n%s", got)
 	}
+}
+
+// Folders lists repositories, worktrees and bookmarks once each, the latest
+// git activity first, and Enter on one that is open goes to its place.
+// Sessions lists only the places: each session, and each tab named after a
+// folder, whichever session it is in.
+func TestTheGoPopupsFoldersAndSessions(t *testing.T) {
+	h := setupGoPopupFixture(t)
+	checkFoldersTab(t, h)
+	checkSessionsTab(t, h)
 }
 
 // The preview lists a repository's top folder even when it holds more than
 // the 25 entries tree opens a folder for.
 func TestTheFolderPreviewListsALargeTopFolder(t *testing.T) {
-	for _, tool := range []string{"git", "tree"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skip(tool + " is not installed")
-		}
-	}
-	// A commit hook runs these tests, and the scratch repository must not be
-	// the one being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git", "tree")
+	clearGitHookEnv(t)
 	dir := t.TempDir()
-	if out, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v %s", err, out)
+	if _, err := git(dir, "init", "-q"); err != nil {
+		t.Fatalf("git init: %v", err)
 	}
 	writeNote(t, dir, "src/main.go", "package main")
 	for i := range 30 {
 		writeNote(t, dir, fmt.Sprintf("note%02d.md", i), "")
 	}
 	// Committed, so git status doesn't list the files itself.
-	for _, args := range [][]string{{"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "files"}} {
-		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", args, err, out)
-		}
-	}
+	runGitSteps(t, dir, []string{"add", "."}, []string{"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "files"})
 
 	preview, err := goPopup(nil, foldersTab).Fetch(popup.Row{Data: place{dir: dir}})
 	if err != nil {
@@ -237,15 +253,8 @@ func TestEachGoTabOffersItsOwnKeys(t *testing.T) {
 // Ctrl-T on Worktrees makes the worktree in the project ws runs in, even
 // when that project has none yet and another project's row is selected.
 func TestCtrlTMakesAWorktreeOfTheProjectWsRunsIn(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	// A commit hook runs these tests, and ws must not reach the repository
-	// being committed to.
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	oldRoot := worktreeRoot
 	worktreeRoot = t.TempDir()
 	t.Cleanup(func() { worktreeRoot = oldRoot })
@@ -253,17 +262,11 @@ func TestCtrlTMakesAWorktreeOfTheProjectWsRunsIn(t *testing.T) {
 	withConfig(t, "claude", "tab")
 	projects := t.TempDir()
 	for _, name := range []string{"mine", "other"} {
-		if err := os.Mkdir(filepath.Join(projects, name), 0o755); err != nil {
+		dir := filepath.Join(projects, name)
+		if err := os.Mkdir(dir, 0o750); err != nil {
 			t.Fatal(err)
 		}
-		for _, args := range [][]string{
-			{"init", "-q", "-b", "main"},
-			{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "base"},
-		} {
-			if _, err := git(filepath.Join(projects, name), args...); err != nil {
-				t.Fatal(err)
-			}
-		}
+		initBaseRepo(t, dir)
 	}
 	if _, err := git(filepath.Join(projects, "other"), "worktree", "add", "-q", "-b", "feat", filepath.Join(worktreeRoot, "other", "feat")); err != nil {
 		t.Fatal(err)
@@ -277,8 +280,18 @@ func TestCtrlTMakesAWorktreeOfTheProjectWsRunsIn(t *testing.T) {
 		t.Fatalf("Worktrees lists %v (%v), want other's feat", rows, err)
 	}
 	ctrlT, _ := working(p, "ctrl+t", worktreesTab, rows[0])
-	m, msg := popup.New(p, nil), ctrlT.Run(rows[0])()
-	for _, answer := range []string{"fix", "", ""} { // its name, the default agent and no prompt
+	answerPrompts(p, ctrlT.Run(rows[0])(), "fix", "", "") // its name, the default agent and no prompt
+	if _, err := os.Stat(filepath.Join(worktreeRoot, "mine", "fix")); err != nil {
+		t.Errorf("Ctrl-T didn't make mine/fix: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(worktreeRoot, "other", "fix")); err == nil {
+		t.Error("Ctrl-T made other/fix, in the selected row's project")
+	}
+}
+
+func answerPrompts(p popup.Popup, msg tea.Msg, answers ...string) {
+	m := popup.New(p, nil)
+	for _, answer := range answers {
 		m, _ = m.Update(msg)
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(answer)})
 		_, then := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -286,11 +299,5 @@ func TestCtrlTMakesAWorktreeOfTheProjectWsRunsIn(t *testing.T) {
 	}
 	for _, cmd := range msg.(tea.BatchMsg) {
 		cmd()
-	}
-	if _, err := os.Stat(filepath.Join(worktreeRoot, "mine", "fix")); err != nil {
-		t.Errorf("Ctrl-T didn't make mine/fix: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(worktreeRoot, "other", "fix")); err == nil {
-		t.Error("Ctrl-T made other/fix, in the selected row's project")
 	}
 }

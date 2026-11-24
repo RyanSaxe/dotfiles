@@ -12,14 +12,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-
 	"workspace/kitty"
 	"workspace/markdown"
 	"workspace/mux"
 	"workspace/popup"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // A task is a `- [ ]` or `- [x]` line in a markdown file under the vault,
@@ -59,9 +58,10 @@ func unfenced(lines []string, visit func(i int, line string)) {
 	fence := ""
 	for i, line := range lines {
 		if m := fenceRe.FindStringSubmatch(line); m != nil {
-			if fence == "" {
+			switch fence {
+			case "":
 				fence = m[1][:1]
-			} else if fence == m[1][:1] {
+			case m[1][:1]:
 				fence = ""
 			}
 		} else if fence == "" {
@@ -98,25 +98,30 @@ func noteTasks(file, content string, today time.Time) []task {
 		}
 	})
 	for i := range ts {
-		t := &ts[i]
-		t.State = "none"
-		// An impossible date stays part of the text.
-		if d := dueRe.FindStringSubmatch(t.Text); d != nil && validDate(d[1]) {
-			t.Due, t.Text = d[1], strings.TrimSpace(strings.Replace(t.Text, d[0], "", 1))
-			// ISO dates compare as text.
-			switch day := today.Format(time.DateOnly); {
-			case t.Due < day:
-				t.State = "overdue"
-			case t.Due == day:
-				t.State = "today"
-			case t.Due <= today.AddDate(0, 0, 7).Format(time.DateOnly):
-				t.State = "soon"
-			default:
-				t.State = "later"
-			}
-		}
+		applyTaskDue(&ts[i], today)
 	}
 	return ts
+}
+
+func applyTaskDue(t *task, today time.Time) {
+	t.State = "none"
+	// An impossible date stays part of the text.
+	d := dueRe.FindStringSubmatch(t.Text)
+	if d == nil || !validDate(d[1]) {
+		return
+	}
+	t.Due, t.Text = d[1], strings.TrimSpace(strings.Replace(t.Text, d[0], "", 1))
+	// ISO dates compare as text.
+	switch day := today.Format(time.DateOnly); {
+	case t.Due < day:
+		t.State = "overdue"
+	case t.Due == day:
+		t.State = "today"
+	case t.Due <= today.AddDate(0, 0, 7).Format(time.DateOnly):
+		t.State = "soon"
+	default:
+		t.State = "later"
+	}
 }
 
 func validDate(s string) bool {
@@ -136,7 +141,7 @@ func vaultTasks(vault string, today time.Time) ([]task, error) {
 				return filepath.SkipDir
 			}
 		case !d.IsDir() && strings.HasSuffix(path, ".md"):
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile(path) //nolint:gosec // reads markdown notes from user's local Obsidian vault
 			if err != nil {
 				return err
 			}
@@ -153,43 +158,37 @@ func vaultTasks(vault string, today time.Time) ([]task, error) {
 // and blank means no date.
 func dueDate(s string, today time.Time) (string, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
-	days, isDays := strings.CutSuffix(s, "d")
-	n, err := strconv.Atoi(days)
-	switch {
-	case s == "" || validDate(s):
+	if s == "" || validDate(s) {
 		return s, nil
-	case s == "today":
-		n = 0
-	case s == "tmr" || s == "tomorrow":
-		n = 1
-	case isDays && err == nil && n >= 0:
-	default:
-		day := time.Sunday
-		for len(s) < 3 || !strings.HasPrefix(strings.ToLower(day.String()), s) {
-			if day++; day > time.Saturday {
-				return "", fmt.Errorf("%q is not a date, so use today, tmr, 3d, a weekday such as fri, or YYYY-MM-DD", s)
-			}
-		}
-		n = (int(day-today.Weekday()) + 7) % 7
+	}
+	n, err := dueDateOffset(s, today)
+	if err != nil {
+		return "", err
 	}
 	return today.AddDate(0, 0, n).Format(time.DateOnly), nil
 }
 
-// addTask appends a task to notes/projects/PROJECT/TODO.md, above the first
-// ## heading so it sits with the project's tasks rather than a branch's.
-func addTask(vault, project, text, due string) error {
-	if project == "" {
-		return errors.New("this folder has no origin remote to name the task's project")
+func dueDateOffset(s string, today time.Time) (int, error) {
+	switch s {
+	case "today":
+		return 0, nil
+	case "tmr", "tomorrow":
+		return 1, nil
 	}
-	file := filepath.Join(vault, "notes", "projects", project, "TODO.md")
-	data, err := os.ReadFile(file)
-	if errors.Is(err, os.ErrNotExist) {
-		data, err = []byte("# "+project+"\n"), os.MkdirAll(filepath.Dir(file), 0o755)
+	if days, ok := strings.CutSuffix(s, "d"); ok {
+		if n, err := strconv.Atoi(days); err == nil && n >= 0 {
+			return n, nil
+		}
 	}
-	if err != nil {
-		return err
+	for day := time.Sunday; day <= time.Saturday; day++ {
+		if len(s) >= 3 && strings.HasPrefix(strings.ToLower(day.String()), s) {
+			return (int(day-today.Weekday()) + 7) % 7, nil
+		}
 	}
-	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	return 0, fmt.Errorf("%q is not a date, so use today, tmr, 3d, a weekday such as fri, or YYYY-MM-DD", s)
+}
+
+func taskInsertIndex(lines []string) int {
 	at := len(lines)
 	unfenced(lines, func(i int, line string) {
 		if at == len(lines) && strings.HasPrefix(line, "##") && headingRe.MatchString(line) {
@@ -199,6 +198,25 @@ func addTask(vault, project, text, due string) error {
 	for at > 0 && strings.TrimSpace(lines[at-1]) == "" {
 		at--
 	}
+	return at
+}
+
+// addTask appends a task to notes/projects/PROJECT/TODO.md, above the first
+// ## heading so it sits with the project's tasks rather than a branch's.
+func addTask(vault, project, text, due string) error {
+	if project == "" {
+		return errors.New("this folder has no origin remote to name the task's project")
+	}
+	file := filepath.Join(vault, "notes", "projects", project, "TODO.md")
+	data, err := os.ReadFile(file) //nolint:gosec // reads project TODO.md inside local vault
+	if errors.Is(err, os.ErrNotExist) {
+		data, err = []byte("# "+project+"\n"), os.MkdirAll(filepath.Dir(file), 0o750)
+	}
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	at := taskInsertIndex(lines)
 	entry := []string{"- [ ] " + text}
 	if due != "" {
 		entry[0] += " 📅 " + due
@@ -206,7 +224,7 @@ func addTask(vault, project, text, due string) error {
 	if at > 0 && headingRe.MatchString(lines[at-1]) {
 		entry = []string{"", entry[0]}
 	}
-	return os.WriteFile(file, []byte(strings.Join(slices.Insert(lines, at, entry...), "\n")+"\n"), 0o644)
+	return os.WriteFile(file, []byte(strings.Join(slices.Insert(lines, at, entry...), "\n")+"\n"), 0o600) //nolint:gosec // writes project TODO.md inside local vault
 }
 
 // tickTask turns t's box from [ ] to [x] and leaves every other byte of the
@@ -214,7 +232,7 @@ func addTask(vault, project, text, due string) error {
 // since the note may have changed after the list loaded.
 func tickTask(vault string, t task, today time.Time) error {
 	file := filepath.Join(vault, t.File)
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) //nolint:gosec // reads local vault markdown note
 	if err != nil {
 		return err
 	}
@@ -224,7 +242,7 @@ func tickTask(vault string, t task, today time.Time) error {
 	}
 	lines := strings.SplitAfter(string(data), "\n")
 	lines[t.Line-1] = strings.Replace(lines[t.Line-1], "[ ]", "[x]", 1)
-	return os.WriteFile(file, []byte(strings.Join(lines, "")), 0o644)
+	return os.WriteFile(file, []byte(strings.Join(lines, "")), 0o600) //nolint:gosec // writes local vault markdown note
 }
 
 // projectOf names the project a folder's tasks are filed under: the name of
@@ -265,7 +283,6 @@ func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 		err := errors.New("the vault isn't set up, since VAULT_DIR is unset")
 		return popup.Popup{Noun: "tasks", Tabs: []popup.Tab{{Name: "Tasks"}}, Load: func(int, func([]popup.Row)) ([]popup.Row, error) { return nil, err }}
 	}
-	tags := map[string]lipgloss.Style{"overdue": popup.Red.SetString("overdue"), "today": popup.Yellow.SetString("today"), "soon": popup.Accent.SetString("soon")}
 	project := projectOf(".")
 	tabs := []popup.Tab{{Name: "Tasks", Empty: "No open tasks."}}
 	if project != "" {
@@ -274,82 +291,98 @@ func taskTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 		tabs = []popup.Tab{{Name: "Project tasks", Empty: "No open tasks in " + project + "."}, {Name: "All tasks", Empty: "No open tasks."}}
 	}
 	return popup.Popup{
-		Noun: "tasks",
-		Tabs: tabs,
-		Load: func(tab int, _ func([]popup.Row)) ([]popup.Row, error) {
-			ts, err := vaultTasks(vault, time.Now())
-			ts = slices.DeleteFunc(ts, func(t task) bool { return t.Done || project != "" && tab == 0 && t.Project != project })
-			// ISO dates sort as text, and undated tasks go last.
-			slices.SortStableFunc(ts, func(a, b task) int { return strings.Compare(cmp.Or(a.Due, "~"), cmp.Or(b.Due, "~")) })
-			rows := make([]popup.Row, len(ts))
-			for i, t := range ts {
-				// notes/projects/NAME/TODO.md:4 reads as NAME/TODO.md:4, and as
-				// TODO.md:4 on Project tasks. private/notes/projects/NAME/TODO.md:4
-				// reads the same with private/ in front.
-				id := t.File + ":" + strconv.Itoa(t.Line)
-				note, private := strings.CutPrefix(id, "private/")
-				note = strings.TrimPrefix(note, "notes/projects/")
-				if project != "" && tab == 0 {
-					note = strings.TrimPrefix(note, project+"/")
-				}
-				if private {
-					note = "private/" + note
-				}
-				rows[i] = popup.Row{ID: id, Title: t.Text, Detail: note, Tag: tags[t.State], Data: t}
-				if due, err := time.Parse(time.DateOnly, t.Due); err == nil {
-					rows[i].Qualifier = due.Format("Jan 2")
-				}
-			}
-			return rows, err
-		},
-		// The note around the task, as markdown.
-		Fetch: func(r popup.Row) (any, error) {
-			t := r.Data.(task)
-			file := filepath.Join(vault, t.File)
-			data, err := os.ReadFile(file)
-			lines := strings.Split(string(data), "\n")
-			if err != nil || t.Line > len(lines) {
-				return nil, err
-			}
-			return markdown.Load(strings.Join(lines[max(0, t.Line-6):min(len(lines), t.Line+15)], "\n"), markdownIn(filepath.Dir(file), term)), nil
-		},
-		Body: func(_ popup.Row, d any, w int) string { return d.(markdown.Doc).Render(w, markdownIn("", term)) },
-		Actions: []popup.Action{
-			{Key: "enter", Help: "edit", Run: func(r popup.Row) tea.Cmd {
-				t := r.Data.(task)
-				edit := []string{"nvim", "+" + strconv.Itoa(t.Line), filepath.Join(vault, t.File)}
-				// Outside Rex and tmux there's no tab to open, so Neovim runs
-				// in the popup.
-				if !b.Inside() {
-					return tea.ExecProcess(exec.Command(edit[0], edit[1:]...), func(err error) tea.Msg {
-						if err != nil {
-							return popup.Notice(err.Error())
-						}
-						return popup.Reload("")
-					})
-				}
-				return popup.Do(func() error { return runInTab(b, taskFolder(vault, t), edit) }, popup.Quit)
-			}},
-			{Key: "ctrl+t", Help: "add", Always: true, Run: func(popup.Row) tea.Cmd {
-				return popup.Ask("task:", func(text string) tea.Cmd {
-					if text == "" {
-						return nil
-					}
-					return popup.Ask("due, such as fri or 3d (blank for none):", func(due string) tea.Cmd {
-						return popup.Do(func() error {
-							date, err := dueDate(due, time.Now())
-							if err != nil {
-								return err
-							}
-							return addTask(vault, project, text, date)
-						}, popup.Reload("added: "+text))
-					})
-				})
-			}},
-			{Key: "ctrl+x", Help: "done", Run: func(r popup.Row) tea.Cmd {
-				t := r.Data.(task)
-				return popup.Do(func() error { return tickTask(vault, t, time.Now()) }, popup.Reload("done: "+t.Text))
-			}},
-		},
+		Noun:    "tasks",
+		Tabs:    tabs,
+		Load:    func(tab int, _ func([]popup.Row)) ([]popup.Row, error) { return loadTaskRows(vault, project, tab) },
+		Fetch:   func(r popup.Row) (any, error) { return fetchTaskDoc(vault, r, term) },
+		Body:    func(_ popup.Row, d any, w int) string { return d.(markdown.Doc).Render(w, markdownIn("", term)) },
+		Actions: taskActions(b, vault, project),
 	}
+}
+
+func loadTaskRows(vault, project string, tab int) ([]popup.Row, error) {
+	tags := map[string]lipgloss.Style{"overdue": popup.Red.SetString("overdue"), "today": popup.Yellow.SetString("today"), "soon": popup.Accent.SetString("soon")}
+	ts, err := vaultTasks(vault, time.Now())
+	ts = slices.DeleteFunc(ts, func(t task) bool { return t.Done || project != "" && tab == 0 && t.Project != project })
+	// ISO dates sort as text, and undated tasks go last.
+	slices.SortStableFunc(ts, func(a, b task) int { return strings.Compare(cmp.Or(a.Due, "~"), cmp.Or(b.Due, "~")) })
+	rows := make([]popup.Row, len(ts))
+	for i, t := range ts {
+		id := t.File + ":" + strconv.Itoa(t.Line)
+		rows[i] = popup.Row{ID: id, Title: t.Text, Detail: formatTaskNote(id, project, project != "" && tab == 0), Tag: tags[t.State], Data: t}
+		if due, parseErr := time.Parse(time.DateOnly, t.Due); parseErr == nil {
+			rows[i].Qualifier = due.Format("Jan 2")
+		}
+	}
+	return rows, err
+}
+
+// formatTaskNote turns notes/projects/NAME/TODO.md:4 into NAME/TODO.md:4, or
+// TODO.md:4 on Project tasks, keeping any private/ prefix.
+func formatTaskNote(id, project string, projectTab bool) string {
+	note, private := strings.CutPrefix(id, "private/")
+	note = strings.TrimPrefix(note, "notes/projects/")
+	if projectTab {
+		note = strings.TrimPrefix(note, project+"/")
+	}
+	if private {
+		return "private/" + note
+	}
+	return note
+}
+
+func fetchTaskDoc(vault string, r popup.Row, term kitty.Terminal) (any, error) {
+	t := r.Data.(task)
+	file := filepath.Join(vault, t.File)
+	data, err := os.ReadFile(file) //nolint:gosec // reads local vault markdown note for task preview
+	lines := strings.Split(string(data), "\n")
+	if err != nil || t.Line > len(lines) {
+		return nil, err
+	}
+	return markdown.Load(strings.Join(lines[max(0, t.Line-6):min(len(lines), t.Line+15)], "\n"), markdownIn(filepath.Dir(file), term)), nil
+}
+
+func taskActions(b mux.Backend, vault, project string) []popup.Action {
+	return []popup.Action{
+		{Key: "enter", Help: "edit", Run: func(r popup.Row) tea.Cmd {
+			t := r.Data.(task)
+			edit := []string{"nvim", "+" + strconv.Itoa(t.Line), filepath.Join(vault, t.File)}
+			// Outside Rex and tmux there's no tab to open, so Neovim runs
+			// in the popup.
+			if !b.Inside() {
+				cmd := exec.Command("nvim", "+"+strconv.Itoa(t.Line), filepath.Join(vault, t.File)) //nolint:gosec // opens vault note in local nvim
+				return tea.ExecProcess(cmd, func(err error) tea.Msg {
+					if err != nil {
+						return popup.Notice(err.Error())
+					}
+					return popup.Reload("")
+				})
+			}
+			return popup.Do(func() error { return runInTab(b, taskFolder(vault, t), edit) }, popup.Quit)
+		}},
+		{Key: "ctrl+t", Help: "add", Always: true, Run: func(popup.Row) tea.Cmd {
+			return askAddTask(vault, project)
+		}},
+		{Key: "ctrl+x", Help: "done", Run: func(r popup.Row) tea.Cmd {
+			t := r.Data.(task)
+			return popup.Do(func() error { return tickTask(vault, t, time.Now()) }, popup.Reload("done: "+t.Text))
+		}},
+	}
+}
+
+func askAddTask(vault, project string) tea.Cmd {
+	return popup.Ask("task:", func(text string) tea.Cmd {
+		if text == "" {
+			return nil
+		}
+		return popup.Ask("due, such as fri or 3d (blank for none):", func(due string) tea.Cmd {
+			return popup.Do(func() error {
+				date, err := dueDate(due, time.Now())
+				if err != nil {
+					return err
+				}
+				return addTask(vault, project, text, date)
+			}, popup.Reload("added: "+text))
+		})
+	})
 }

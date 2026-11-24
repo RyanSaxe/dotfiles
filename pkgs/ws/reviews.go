@@ -14,15 +14,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
-
 	"workspace/kitty"
 	"workspace/markdown"
 	"workspace/mux"
 	"workspace/popup"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // reasonTags name why an item needs you, red for what's urgent.
@@ -40,92 +39,101 @@ func reviewTabs(b mux.Backend, term kitty.Terminal) popup.Popup {
 	if _, err := os.Stat(filepath.Join(stateDir, "inbox.json")); err != nil {
 		noun = "your inbox for the first time"
 	}
-	tabs := []popup.Tab{{Name: "Needs you", Empty: "Nothing needs you."}, {Name: "Pull requests", Empty: "You have no open pull requests."},
-		{Name: "Issues", Empty: "You have no open issues."}}
+	tabs := []popup.Tab{
+		{Name: "Needs you", Empty: "Nothing needs you."},
+		{Name: "Pull requests", Empty: "You have no open pull requests."},
+		{Name: "Issues", Empty: "You have no open issues."},
+	}
 	if len(watchList()) > 0 {
 		tabs = append(tabs, popup.Tab{Name: "Watching", Empty: "Nothing new in the repositories you watch."})
 	}
 	return popup.Popup{
-		Noun: noun,
-		Tabs: tabs,
-		Load: func(t int, _ func([]popup.Row)) ([]popup.Row, error) {
-			in, err := waitForInbox()
-			var a acks
-			readJSON("acknowledged.json", &a)
-			// Needs you is everything waiting on you, and what lights R. The
-			// other tabs are views, not notifications.
-			show := []func(item) bool{
-				func(it item) bool { return a.standing(it) == needsYou },
-				func(it item) bool { return it.Yours && !it.Issue },
-				func(it item) bool { return it.Yours && it.Issue },
-				func(it item) bool { return it.Watched },
-			}[t]
-			var rows []popup.Row
-			for _, it := range in.Items {
-				if !show(it) {
-					continue
-				}
-				rows = append(rows, inboxRow(it, t == needsYouTab))
-			}
-			// Needs you puts the most urgent first, then the newest. The views
-			// put whatever changed last first.
-			slices.SortStableFunc(rows, func(x, y popup.Row) int {
-				if t == needsYouTab {
-					p, q := x.Data.(item).Reasons[0], y.Data.(item).Reasons[0]
-					return cmp.Or(int(p.Kind)-int(q.Kind), q.At.Compare(p.At))
-				}
-				return y.Data.(item).Updated.Compare(x.Data.(item).Updated)
-			})
-			return rows, err
-		},
-		Fetch: func(r popup.Row) (any, error) {
+		Noun:    noun,
+		Tabs:    tabs,
+		Load:    func(t int, _ func([]popup.Row)) ([]popup.Row, error) { return loadReviewRows(t) },
+		Fetch:   func(r popup.Row) (any, error) { return fetchReviewDoc(r, term) },
+		Head:    inboxHead,
+		Body:    func(_ popup.Row, d any, w int) string { return d.(markdown.Doc).Render(w, markdownIn("", term)) },
+		Actions: reviewActions(b),
+	}
+}
+
+func loadReviewRows(t int) ([]popup.Row, error) {
+	in, err := waitForInbox()
+	var a acks
+	_ = readJSON("acknowledged.json", &a)
+	// Needs you is everything waiting on you, and what lights R. The
+	// other tabs are views, not notifications.
+	show := []func(item) bool{
+		func(it item) bool { return a.standing(it) == needsYou },
+		func(it item) bool { return it.Yours && !it.Issue },
+		func(it item) bool { return it.Yours && it.Issue },
+		func(it item) bool { return it.Watched },
+	}[t]
+	var rows []popup.Row
+	for _, it := range in.Items {
+		if show(it) {
+			rows = append(rows, inboxRow(it, t == needsYouTab))
+		}
+	}
+	// Needs you puts the most urgent first, then the newest. The views
+	// put whatever changed last first.
+	slices.SortStableFunc(rows, func(x, y popup.Row) int {
+		if t == needsYouTab {
+			p, q := x.Data.(item).Reasons[0], y.Data.(item).Reasons[0]
+			return cmp.Or(int(p.Kind)-int(q.Kind), q.At.Compare(p.At))
+		}
+		return y.Data.(item).Updated.Compare(x.Data.(item).Updated)
+	})
+	return rows, err
+}
+
+func fetchReviewDoc(r popup.Row, term kitty.Terminal) (any, error) {
+	it := r.Data.(item)
+	text := it.Body
+	if !it.Issue {
+		text = signedAttachments(text, it.Repo, strconv.Itoa(it.Number))
+	}
+	// What made it need you comes first, then the description.
+	if len(it.Reasons) > 0 && it.Reasons[0].Text != "" {
+		why := it.Reasons[0]
+		text = fmt.Sprintf("**%s** %s:\n\n%s\n\n---\n\n%s", why.Actor, verbs[why.Kind], why.Text, text)
+	}
+	return markdown.Load(text, markdownIn("", term)), nil
+}
+
+func reviewActions(b mux.Backend) []popup.Action {
+	return []popup.Action{
+		{Key: "enter", Help: "review", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
 			it := r.Data.(item)
-			text := it.Body
-			if !it.Issue {
-				text = signedAttachments(text, it.Repo, strconv.Itoa(it.Number))
-			}
-			// What made it need you comes first, then the description.
-			if len(it.Reasons) > 0 && it.Reasons[0].Text != "" {
-				why := it.Reasons[0]
-				text = fmt.Sprintf("**%s** %s:\n\n%s\n\n---\n\n%s", why.Actor, verbs[why.Kind], why.Text, text)
-			}
-			return markdown.Load(text, markdownIn("", term)), nil
-		},
-		Head: inboxHead,
-		Body: func(_ popup.Row, d any, w int) string { return d.(markdown.Doc).Render(w, markdownIn("", term)) },
-		Actions: []popup.Action{
-			{Key: "enter", Help: "review", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				return tea.Batch(popup.Say("opening #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error {
-					_, err := prWorktree(b, it, "review")
-					return err
-				}, popup.Quit))
-			}},
-			{Key: "enter", Help: "open", When: isIssue, Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				return popup.Do(func() error { return browse(it) }, popup.Quit)
-			}},
-			{Key: "ctrl+t", Help: "agent", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				return tea.Batch(popup.Say("opening an agent on #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error { return reviewAgent(b, it) }, popup.Quit))
-			}},
-			{Key: "ctrl+x", Help: "done", When: func(tab int, _ popup.Row) bool { return tab == needsYouTab }, Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				return popup.Do(func() error { return acknowledge(it) }, popup.Reload("acknowledged #"+strconv.Itoa(it.Number)))
-			}},
-			{Key: "ctrl+g", Help: "diff", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				diff := fmt.Sprintf("gh pr diff %d -R %s --color=always | delta --paging=always", it.Number, it.Repo)
-				return page(exec.Command("sh", "-c", diff))
-			}},
-			{Key: "ctrl+o", Help: "browser", Run: func(r popup.Row) tea.Cmd {
-				it := r.Data.(item)
-				return popup.Do(func() error { return browse(it) }, popup.Notice("opened "+it.URL))
-			}},
-			{Key: "ctrl+r", Help: "refresh", Always: true, Run: func(popup.Row) tea.Cmd {
-				return tea.Batch(popup.Say("refreshing…"), popup.Do(refreshInbox, popup.Reload("refreshed")))
-			}},
-		},
+			return tea.Batch(popup.Say("opening #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error {
+				_, err := prWorktree(b, it, "review")
+				return err
+			}, popup.Quit))
+		}},
+		{Key: "enter", Help: "open", When: isIssue, Run: func(r popup.Row) tea.Cmd {
+			it := r.Data.(item)
+			return popup.Do(func() error { return browse(it) }, popup.Quit)
+		}},
+		{Key: "ctrl+t", Help: "agent", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
+			it := r.Data.(item)
+			return tea.Batch(popup.Say("opening an agent on #"+strconv.Itoa(it.Number)+"…"), popup.Do(func() error { return reviewAgent(b, it) }, popup.Quit))
+		}},
+		{Key: "ctrl+x", Help: "done", When: func(tab int, _ popup.Row) bool { return tab == needsYouTab }, Run: func(r popup.Row) tea.Cmd {
+			it := r.Data.(item)
+			return popup.Do(func() error { return acknowledge(it) }, popup.Reload("acknowledged #"+strconv.Itoa(it.Number)))
+		}},
+		{Key: "ctrl+g", Help: "diff", When: isPullRequest, Run: func(r popup.Row) tea.Cmd {
+			it := r.Data.(item)
+			return page(exec.Command("sh", "-c", `gh pr diff "$1" -R "$2" --color=always | delta --paging=always`, "sh", strconv.Itoa(it.Number), it.Repo)) //nolint:gosec // pipes gh pr diff into delta with positional args
+		}},
+		{Key: "ctrl+o", Help: "browser", Run: func(r popup.Row) tea.Cmd {
+			it := r.Data.(item)
+			return popup.Do(func() error { return browse(it) }, popup.Notice("opened "+it.URL))
+		}},
+		{Key: "ctrl+r", Help: "refresh", Always: true, Run: func(popup.Row) tea.Cmd {
+			return tea.Batch(popup.Say("refreshing…"), popup.Do(refreshInbox, popup.Reload("refreshed")))
+		}},
 	}
 }
 
@@ -185,8 +193,10 @@ func inboxHead(r popup.Row, _ any, w int) []string {
 	}
 	add("branch", it.HeadRef+popup.Dim.Render(" → "+it.BaseRef))
 	add("changes", popup.Green.Render(fmt.Sprintf("+%d", it.Additions))+" "+popup.Red.Render(fmt.Sprintf("−%d", it.Deletions))+popup.Dim.Render(files))
-	review := map[string]string{"APPROVED": popup.Green.Render("approved"), "CHANGES_REQUESTED": popup.Red.Render("changes requested"),
-		"REVIEW_REQUIRED": popup.Yellow.Render("review required")}[it.Decision]
+	review := map[string]string{
+		"APPROVED": popup.Green.Render("approved"), "CHANGES_REQUESTED": popup.Red.Render("changes requested"),
+		"REVIEW_REQUIRED": popup.Yellow.Render("review required"),
+	}[it.Decision]
 	review = cmp.Or(review, popup.Dim.Render("no decision"))
 	if it.Mergeable == "CONFLICTING" {
 		review += popup.Dim.Render(" · ") + popup.Red.Render("conflicts")
@@ -247,7 +257,7 @@ func waitForInbox() (inbox, error) {
 // refreshInbox asks the attention job to fetch now and waits for it to write.
 func refreshInbox() error {
 	var before inbox
-	readJSON("inbox.json", &before)
+	_ = readJSON("inbox.json", &before)
 	if err := signalAttention(syscall.SIGUSR1); err != nil {
 		return err
 	}
@@ -265,12 +275,12 @@ func refreshInbox() error {
 func acknowledge(it item) error {
 	var a acks
 	var in inbox
-	readJSON("acknowledged.json", &a)
-	readJSON("inbox.json", &in)
+	_ = readJSON("acknowledged.json", &a)
+	_ = readJSON("inbox.json", &in)
 	if err := writeJSON("acknowledged.json", a.apply(ackEvent{acknowledge: &it, fresh: &in})); err != nil {
 		return err
 	}
-	signalAttention(syscall.SIGUSR2) // without a job, R is unchanged until it starts
+	_ = signalAttention(syscall.SIGUSR2) // without a job, R is unchanged until it starts
 	return nil
 }
 

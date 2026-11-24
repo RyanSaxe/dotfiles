@@ -3,16 +3,14 @@ package main
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+	"workspace/mux"
 
 	"github.com/BurntSushi/toml"
-
-	"workspace/mux"
 )
 
 // repoAt leaves a checkout in dir whose origin is url, last active at.
@@ -53,18 +51,24 @@ func trusted(t *testing.T, dir string) (claude, codex, agy bool) {
 	return c.Projects[root].HasTrustDialogAccepted, x.Projects[root].TrustLevel == "trusted", slices.Contains(a.TrustedWorkspaces, root)
 }
 
-// ws project clones a repository where its owner's others are, makes a new
-// project with git init, and stops before it makes anything when it can't
-// tell where to put one or its folder is taken. It trusts what it made,
-// unless it cloned from an owner with nothing here.
-func TestWsProjectPutsEachProjectWhereItBelongs(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
-	for _, v := range gitHookEnv {
-		t.Setenv(v, "")
-		os.Unsetenv(v)
-	}
+type projectTestEnv struct {
+	calls string
+}
+
+func (e projectTestEnv) ws(words ...string) error {
+	backend := func(string) mux.Backend { return mux.Detect(func(string) string { return "" }, "") }
+	return run("project", words, backend)
+}
+
+func (e projectTestEnv) cloned() string {
+	data, _ := os.ReadFile(e.calls) //nolint:gosec // reads test gh call log from temp dir
+	return string(data)
+}
+
+func setupProjectTestEnv(t *testing.T) projectTestEnv {
+	t.Helper()
+	requireTools(t, "git")
+	clearGitHookEnv(t)
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	t.Setenv("CODEX_HOME", "")
 	t.Setenv("ANTIGRAVITY_APP_DATA_DIR", "")
@@ -88,82 +92,88 @@ func TestWsProjectPutsEachProjectWhereItBelongs(t *testing.T) {
 mkdir -p "$4/.git" && printf '[remote "origin"]\n\turl = https://github.com/%s\n' "$3" > "$4/.git/config"`)
 	// A tmux server with sessions for Projects/busy and Games/fresh.
 	onPath(t, "tmux", `[ "$2" = list-panes ] && printf 'Projects/busy\t11\t%%1\t\tzsh\t/elsewhere\t0\t0\t@1\t\tbusy\nGames/fresh\t11\t%%2\t\tzsh\t/elsewhere\t0\t0\t@2\t\tfresh\n'`)
-	backend := func(string) mux.Backend { return mux.Detect(func(string) string { return "" }, "") }
-	ws := func(words ...string) error { return run("project", words, backend) }
-	cloned := func() string { data, _ := os.ReadFile(calls); return string(data) }
+	return projectTestEnv{calls: calls}
+}
 
-	if err := ws("alice/new"); err != nil {
+func checkProjectPlacement(t *testing.T, env projectTestEnv) {
+	t.Helper()
+	if err := env.ws("alice/new"); err != nil {
 		t.Fatal(err)
 	}
-	if want := "repo clone alice/new " + filepath.Join(home, "Projects", "new") + "\n"; cloned() != want {
-		t.Errorf("alice/new ran gh %q, want %q, into the folder that holds most of alice's", cloned(), want)
+	if want := "repo clone alice/new " + filepath.Join(home, "Projects", "new") + "\n"; env.cloned() != want {
+		t.Errorf("alice/new ran gh %q, want %q, into the folder that holds most of alice's", env.cloned(), want)
 	}
 	if claude, codex, agy := trusted(t, filepath.Join(home, "Projects", "new")); !claude || !codex || !agy {
 		t.Errorf("a clone from alice, whose repositories are here, is trusted by Claude Code %v, Codex %v and Antigravity %v", claude, codex, agy)
 	}
 	// bob has one repository in ~/generic and one in ~/Repos, and the one
 	// in ~/generic moved last.
-	if err := ws("https://github.com/bob/g"); err != nil {
+	if err := env.ws("https://github.com/bob/g"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, "generic", "g")); err != nil {
 		t.Errorf("bob/g didn't go in ~/generic: %v", err)
 	}
 	// A repository already here only opens.
-	before := cloned()
-	if err := ws("acme/C"); err != nil || cloned() != before {
-		t.Errorf("acme/C, already in ~/Work/c, gave %v and ran gh %q", err, strings.TrimPrefix(cloned(), before))
+	before := env.cloned()
+	if err := env.ws("acme/C"); err != nil || env.cloned() != before {
+		t.Errorf("acme/C, already in ~/Work/c, gave %v and ran gh %q", err, strings.TrimPrefix(env.cloned(), before))
 	}
+}
+
+func checkProjectRefusals(t *testing.T, env projectTestEnv) {
+	t.Helper()
+	before := env.cloned()
 	for _, words := range [][]string{{"carol/x"}, {"notes"}} {
-		err := ws(words...)
+		err := env.ws(words...)
 		if err == nil || !strings.Contains(err.Error(), "--in") || !strings.Contains(err.Error(), "~/Projects") {
 			t.Errorf("ws project %s gave %v, want it to ask for --in among the folders that hold repositories", words[0], err)
 		}
 	}
-	if err := ws("alice/taken"); err == nil || !strings.Contains(err.Error(), "~/Projects/taken") || cloned() != before {
-		t.Errorf("alice/taken, whose folder holds something else, gave %v and ran gh %q", err, strings.TrimPrefix(cloned(), before))
+	if err := env.ws("alice/taken"); err == nil || !strings.Contains(err.Error(), "~/Projects/taken") || env.cloned() != before {
+		t.Errorf("alice/taken, whose folder holds something else, gave %v and ran gh %q", err, strings.TrimPrefix(env.cloned(), before))
 	}
-	if cloned() != before {
+	checkProjectSessionConflicts(t, env, before)
+}
+
+func checkProjectSessionConflicts(t *testing.T, env projectTestEnv, before string) {
+	t.Helper()
+	if env.cloned() != before {
 		t.Fatal("ws project ran gh before it knew where to clone")
 	}
-
 	// open would go to the session named Projects/busy, so ws makes nothing,
 	// while a session for Games/fresh does not block ~/Projects/fresh.
-	if err := ws("alice/busy"); err == nil || !strings.Contains(err.Error(), "Projects/busy") || cloned() != before {
-		t.Errorf("alice/busy, while a session named Projects/busy runs, gave %v and ran gh %q", err, strings.TrimPrefix(cloned(), before))
+	if err := env.ws("alice/busy"); err == nil || !strings.Contains(err.Error(), "Projects/busy") || env.cloned() != before {
+		t.Errorf("alice/busy, while a session named Projects/busy runs, gave %v and ran gh %q", err, strings.TrimPrefix(env.cloned(), before))
 	}
-	if err := ws("alice/fresh"); err != nil {
+	if err := env.ws("alice/fresh"); err != nil {
 		t.Errorf("alice/fresh, while only Games/fresh runs, failed: %v", err)
 	}
-	// A trust that fails leaves nothing made, so trying again works.
-	codexConfig := readNote(t, home, ".codex/config.toml")
-	writeNote(t, home, ".codex/config.toml", "not = toml = at all")
-	if err := ws("drafts", "--in", filepath.Join(home, "Projects")); err == nil {
-		t.Error("ws project drafts made a project it couldn't trust")
+}
+
+func checkTrustFailureLeavesNothing(t *testing.T, env projectTestEnv, file, broken string) {
+	t.Helper()
+	saved := readNote(t, home, file)
+	writeNote(t, home, file, broken)
+	defer writeNote(t, home, file, saved)
+	if err := env.ws("drafts", "--in", filepath.Join(home, "Projects")); err == nil {
+		t.Errorf("ws project drafts made a project when %s was invalid", file)
 	}
 	if _, err := os.Stat(filepath.Join(home, "Projects", "drafts")); err == nil {
-		t.Error("ws project drafts left its folder after it couldn't trust it")
+		t.Errorf("ws project drafts left its folder after %s trust failed", file)
 	}
-	writeNote(t, home, ".codex/config.toml", codexConfig)
+}
 
-	agyConfig := readNote(t, home, ".gemini/antigravity-cli/settings.json")
-	writeNote(t, home, ".gemini/antigravity-cli/settings.json", `{"trustedWorkspaces": "not-an-array"}`)
-	if err := ws("drafts", "--in", filepath.Join(home, "Projects")); err == nil {
-		t.Error("ws project drafts made a project when Antigravity's settings were invalid")
-	}
-	if _, err := os.Stat(filepath.Join(home, "Projects", "drafts")); err == nil {
-		t.Error("ws project drafts left its folder after Antigravity trust failed")
-	}
-	writeNote(t, home, ".gemini/antigravity-cli/settings.json", agyConfig)
-
-	if err := ws("carol/x", "--in", filepath.Join(home, "Repos")); err != nil {
+func checkProjectCreationAndTrust(t *testing.T, env projectTestEnv) {
+	t.Helper()
+	if err := env.ws("carol/x", "--in", filepath.Join(home, "Repos")); err != nil {
 		t.Fatal(err)
 	}
 	if claude, codex, agy := trusted(t, filepath.Join(home, "Repos", "x")); claude || codex || agy {
 		t.Error("a clone from carol, who has nothing here, is trusted")
 	}
 	notes := filepath.Join(home, "Projects", "notes")
-	if err := ws("notes", "--in", filepath.Join(home, "Projects")); err != nil {
+	if err := env.ws("notes", "--in", filepath.Join(home, "Projects")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(notes, ".git")); err != nil {
@@ -172,6 +182,11 @@ mkdir -p "$4/.git" && printf '[remote "origin"]\n\turl = https://github.com/%s\n
 	if claude, codex, agy := trusted(t, notes); !claude || !codex || !agy {
 		t.Errorf("a new project is trusted by Claude Code %v, Codex %v and Antigravity %v", claude, codex, agy)
 	}
+	checkTrustPreservesExistingConfigs(t, notes)
+}
+
+func checkTrustPreservesExistingConfigs(t *testing.T, notes string) {
+	t.Helper()
 	// Trusting the same folder again does not duplicate its entry.
 	notesReal, err := filepath.EvalSymlinks(notes)
 	if err != nil {
@@ -180,6 +195,20 @@ mkdir -p "$4/.git" && printf '[remote "origin"]\n\turl = https://github.com/%s\n
 	if err := trustFolder(notesReal); err != nil {
 		t.Fatal(err)
 	}
+	checkPreservedConfigFiles(t, notesReal)
+	// A missing Antigravity settings file is left absent.
+	missingDir := t.TempDir()
+	t.Setenv("ANTIGRAVITY_APP_DATA_DIR", missingDir)
+	if err := trustFolder(notesReal); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(missingDir, "settings.json")); err == nil {
+		t.Error("trustFolder created Antigravity's settings.json when it didn't exist")
+	}
+}
+
+func checkPreservedConfigFiles(t *testing.T, notesReal string) {
+	t.Helper()
 	// What else the configs hold stays as it was.
 	if got := readNote(t, home, ".claude.json"); !strings.Contains(got, `"numStartups": 9007199254740993`) || !strings.Contains(got, `"lastPrompt": "\ud83d <b>"`) || !strings.Contains(got, `"allowedTools": [`) {
 		t.Errorf("Claude Code's config lost what it held:\n%s", got)
@@ -191,14 +220,43 @@ mkdir -p "$4/.git" && printf '[remote "origin"]\n\turl = https://github.com/%s\n
 		!strings.Contains(got, `"note": "a <b> c"`) || !strings.Contains(got, `"/old"`) || strings.Count(got, notesReal) != 1 {
 		t.Errorf("Antigravity's config lost what it held or duplicated %s:\n%s", notesReal, got)
 	}
-	// A missing Antigravity settings file is left absent.
-	missingDir := t.TempDir()
-	t.Setenv("ANTIGRAVITY_APP_DATA_DIR", missingDir)
-	if err := trustFolder(notesReal); err != nil {
+}
+
+// ws project clones a repository where its owner's others are, makes a new
+// project with git init, and stops before it makes anything when it can't
+// tell where to put one or its folder is taken. It trusts what it made,
+// unless it cloned from an owner with nothing here.
+func TestWsProjectPutsEachProjectWhereItBelongs(t *testing.T) {
+	env := setupProjectTestEnv(t)
+	checkProjectPlacement(t, env)
+	checkProjectRefusals(t, env)
+	checkTrustFailureLeavesNothing(t, env, ".codex/config.toml", "not = toml = at all")
+	checkTrustFailureLeavesNothing(t, env, ".gemini/antigravity-cli/settings.json", `{"trustedWorkspaces": "not-an-array"}`)
+	checkProjectCreationAndTrust(t, env)
+}
+
+func checkStaleLockTakeover(t *testing.T, lock string) {
+	t.Helper()
+	other := t.TempDir()
+	if err := os.Mkdir(lock, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(missingDir, "settings.json")); err == nil {
-		t.Error("trustFolder created Antigravity's settings.json when it didn't exist")
+	long := time.Now().Add(-time.Minute)
+	if err := os.Chtimes(lock, long, long); err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.EvalSymlinks(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := trustFolder(root); err != nil {
+		t.Fatal(err)
+	}
+	if claude, _, _ := trusted(t, other); !claude {
+		t.Error("ws didn't take over a lock left for a minute")
+	}
+	if _, err := os.Stat(lock); err == nil {
+		t.Error("ws left the lock behind")
 	}
 }
 
@@ -217,7 +275,7 @@ func TestTrustWaitsForClaudeCodesLock(t *testing.T) {
 	dir := t.TempDir()
 	lock := filepath.Join(home, ".claude.json.lock")
 
-	if err := os.Mkdir(lock, 0o755); err != nil {
+	if err := os.Mkdir(lock, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan error)
@@ -231,32 +289,14 @@ func TestTrustWaitsForClaudeCodesLock(t *testing.T) {
 		t.Fatalf("ws wrote the config while a session held its lock (%v)", err)
 	case <-time.After(300 * time.Millisecond):
 	}
-	os.Remove(lock) // the session finishes its write
+	if err := os.Remove(lock); err != nil { // the session finishes its write
+		t.Fatal(err)
+	}
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
 	if claude, _, _ := trusted(t, dir); !claude {
 		t.Error("the folder isn't trusted once the lock was free")
 	}
-
-	other := t.TempDir()
-	if err := os.Mkdir(lock, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	long := time.Now().Add(-time.Minute)
-	if err := os.Chtimes(lock, long, long); err != nil {
-		t.Fatal(err)
-	}
-	if root, err = filepath.EvalSymlinks(other); err != nil {
-		t.Fatal(err)
-	}
-	if err := trustFolder(root); err != nil {
-		t.Fatal(err)
-	}
-	if claude, _, _ := trusted(t, other); !claude {
-		t.Error("ws didn't take over a lock left for a minute")
-	}
-	if _, err := os.Stat(lock); err == nil {
-		t.Error("ws left the lock behind")
-	}
+	checkStaleLockTakeover(t, lock)
 }

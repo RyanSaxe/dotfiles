@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
 	"workspace/popup"
 )
 
@@ -22,7 +21,7 @@ func TestMatchOrdersLikeFzf(t *testing.T) {
 		"README.md", "docs/Server.md", "scripts/serve.sh", "src/shared/settings.mjs",
 	}
 	for _, term := range []string{"srvr", "server", "Server", "rev", "md", "zzz"} {
-		cmd := exec.Command(fzf, "--filter", term)
+		cmd := exec.Command(fzf, "--filter", term) //nolint:gosec // test compares Match order against local fzf binary
 		cmd.Stdin = strings.NewReader(strings.Join(lines, "\n"))
 		out, _ := cmd.Output() // fzf exits 1 when nothing matches
 		var got []string

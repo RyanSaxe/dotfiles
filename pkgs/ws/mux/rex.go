@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 	"workspace/kitty"
 	"workspace/layout"
 )
@@ -148,7 +147,7 @@ func (r Rex) viewers() []string {
 			ID string `json:"client_id"`
 		}
 	}
-	rexJSON(&size, "block", "call", "-s", r.session, "-b", r.block, "size")
+	_ = rexJSON(&size, "block", "call", "-s", r.session, "-b", r.block, "size")
 	cs := []string{size.Owner}
 	for _, d := range size.Desired {
 		cs = append(cs, d.ID)
@@ -233,8 +232,10 @@ func (r Rex) Snapshot() (Snapshot, error) {
 	s := Snapshot{Sessions: read.Sessions}
 	for _, p := range read.Panes {
 		status, _ := ParseStatus(p.Status)
-		pane := Pane{Session: p.Session, Label: p.Label, ID: p.ID, Tab: p.Tab, TabName: p.TabName, Focused: p.Focused, Landing: p.Landing,
-			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated}
+		pane := Pane{
+			Session: p.Session, Label: p.Label, ID: p.ID, Tab: p.Tab, TabName: p.TabName, Focused: p.Focused, Landing: p.Landing,
+			Program: p.Program, Folder: p.Folder, Status: status, App: p.App, Title: p.Title, Updated: p.Updated,
+		}
 		pane.NeedsYou = r.needsYou(pane, p.Shown, r.Shown != "" && p.Label == r.Shown && p.Landing)
 		s.Panes = append(s.Panes, pane)
 	}
@@ -286,7 +287,7 @@ func (r Rex) Focus(p Pane) error {
 		if c != "" {
 			args = append([]string{"-C", c}, args...)
 		}
-		cmd := exec.Command("rex", append([]string{"--autostart=false"}, args...)...)
+		cmd := exec.Command("rex", append([]string{"--autostart=false"}, args...)...) //nolint:gosec // invokes local rex binary with mux IDs
 		cmd.Stdin = strings.NewReader(focusScript)
 		if _, err = output(cmd); err == nil {
 			return nil
@@ -338,7 +339,7 @@ func (r Rex) Keymap() ([]Binding, map[string]string, error) {
 	// their names.
 	var app struct{ Actions []action }
 	if r.Client != "" {
-		rexJSON(&app, "-C", r.Client, "actions", "--json")
+		_ = rexJSON(&app, "-C", r.Client, "actions", "--json")
 	}
 	titles := map[string]string{}
 	for _, a := range slices.Concat(app.Actions, keymap.Actions) {
@@ -378,38 +379,47 @@ func (Rex) App() (string, error) {
 func (Rex) Follow(changed func()) {
 	for {
 		changed()
-		cmd := exec.Command("rex", "--autostart=false", "events", "--all", "--json")
-		out, err := cmd.StdoutPipe()
-		if err == nil {
-			err = cmd.Start()
-		}
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "ws: rex events:", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		lines := bufio.NewScanner(out)
-		lines.Buffer(make([]byte, 1<<20), 1<<20)
-		for lines.Scan() {
-			var e struct {
-				Type    string
-				Payload struct {
-					Event struct {
-						Type    string
-						Payload struct{ Name string }
-					}
-				}
-			}
-			if json.Unmarshal(lines.Bytes(), &e) != nil {
-				continue
-			}
-			ev := e.Payload.Event
-			if e.Type == "session_destroyed" || ev.Type == "block_closed" || ev.Type == "session_view_changed" ||
-				ev.Type == "block_event" && (strings.HasPrefix(ev.Payload.Name, "program_status") || ev.Payload.Name == "size_changed") {
-				changed()
-			}
-		}
-		cmd.Wait()
+		followRexEvents(changed)
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func followRexEvents(changed func()) {
+	cmd := exec.Command("rex", "--autostart=false", "events", "--all", "--json")
+	out, err := cmd.StdoutPipe()
+	if err == nil {
+		err = cmd.Start()
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ws: rex events:", err)
+		return
+	}
+	lines := bufio.NewScanner(out)
+	lines.Buffer(make([]byte, 1<<20), 1<<20)
+	for lines.Scan() {
+		if isAttentionEvent(lines.Bytes()) {
+			changed()
+		}
+	}
+	_ = cmd.Wait()
+}
+
+func isAttentionEvent(raw []byte) bool {
+	var e struct {
+		Type    string
+		Payload struct {
+			Event struct {
+				Type    string
+				Payload struct{ Name string }
+			}
+		}
+	}
+	if json.Unmarshal(raw, &e) != nil {
+		return false
+	}
+	ev := e.Payload.Event
+	if e.Type == "session_destroyed" || ev.Type == "block_closed" || ev.Type == "session_view_changed" {
+		return true
+	}
+	return ev.Type == "block_event" && (strings.HasPrefix(ev.Payload.Name, "program_status") || ev.Payload.Name == "size_changed")
 }
